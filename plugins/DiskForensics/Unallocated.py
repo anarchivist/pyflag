@@ -16,7 +16,10 @@ import pyflag.Exgrep as Exgrep
 #hidden = True
 
 class UnallocatedScan(GenScanFactory):
-    """ Scan unallocated space for files """
+    """ Scan unallocated space for files.
+
+    Unallocated space is defined as slack space (the space between the end of a file and the next block alignments) as well as unallocated blocks. This does not include allocated blocks which simply do not have file entries (e.g. deleted files).
+    """
     order=100
     def reset(self):
         self.dbh.execute("drop table if exists unallocated_%s" ,self.table)
@@ -29,8 +32,6 @@ class UnallocatedScan(GenScanFactory):
         ## We remove older tables to ensure we always have the latest up to date table.
         self.dbh.execute("drop table if exists unallocated_%s" ,self.table)
         self.dbh.execute("CREATE TABLE unallocated_%s (`inode` VARCHAR(50) NOT NULL,`offset` BIGINT NOT NULL,`size` BIGINT NOT NULL)",self.table)
-        self.fd=open("/tmp/test.slack","w")
-        
         unalloc_blocks = []
         count=0
         ## Now we work out the unallocated blocks by looking at the blocks table:
@@ -49,7 +50,7 @@ class UnallocatedScan(GenScanFactory):
                     self.table, count, offset, size))
 
                 ## Add a new VFS node:
-                self.fsfd.VFSCreate(None,'U%s' % count, "/unallocated/%s" % offset, size=size)
+                self.fsfd.VFSCreate(None,'U%s' % count, "/_unallocated_/%s" % offset, size=size)
                 count+=1
                 unalloc_blocks.append(new_block)
 
@@ -64,16 +65,35 @@ class UnallocatedScan(GenScanFactory):
             
         def process(self,data,metadata=None):
             if self.inode.startswith('U'):
-                self.outer.fd.write(data)
-                print "Processing inode %s bytes" % len(data)
                 for cut in Exgrep.process_string(data):
                     ## Create a VFS node:
                     self.outer.fsfd.VFSCreate(self.inode,'U%s' % cut['offset'],"%s.%s" % (cut['offset'],cut['type']),size=cut['length'])
                     self.outer.dbh.execute("insert into unallocated_%s set inode='%s|U%s',offset=%r,size=%r" , (self.outer.table,self.inode,cut['offset'],cut['offset'],cut['length']))
-                    print "Found %s" % (cut,)
 
         def finish(self):
             pass
+
+## Deleted files scanner:
+class DeletedScan(GenScanFactory):
+    """ Create VFS nodes for deleted files.
+
+    Deleted files are those which are allocated by the filesystem, but do not have a file entry. This makes them impossible to view through the normal GUI. By creating file table entries for those it is possible to view these inodes using the same GUI.
+    """
+    order=5
+    def prepare(self):
+        """ Create the extra file entries in the file table.
+
+        This scanner just inserts more entries into the file table. This means it needs intimate knowledge of the file/inode schema (rather than using the VFSCreate API). Since this scanner needs to have intimate knowledge of the schema to work out which inodes are deleted, this is probably ok. By inserting extra file entries, we dont need to have a VFS driver too. 
+        """
+        ## Create a deleted directory entry:
+        dbh2=self.dbh.clone()
+        self.dbh.execute("insert into file_%s set  inode='D0',mode='d/d',status='alloc',path='/',name='_deleted_'",self.table)
+        ## This will give us all the inodes which appear in the blocks
+        ## table (i.e. they are allocated), but do not appear in the
+        ## file table (i.e. do not have a filename).
+        self.dbh.execute("select a.inode as inode from block_%s as a left join file_%s as b on a.inode=b.inode where isnull(b.inode) group by a.inode",(self.table,self.table))
+        for row in self.dbh:
+            dbh2.execute("insert into file_%s set inode=%r,mode='r/r',status='alloc',path='/_deleted_/',name=%r",(self.table,row['inode'],row['inode']))
 
 ## Unallocated space VFS Driver:
 class Unallocated_File(FileSystem.File):
@@ -91,7 +111,6 @@ class Unallocated_File(FileSystem.File):
         row=self.dbh.fetch()
         self.size=row['size']
         self.offset=row['offset']
-        print "My size is %s %s" % (self.size,self.offset)
 
     def read(self,length=None):
         if (length == None) or ((length + self.readptr) > self.size):
@@ -102,6 +121,5 @@ class Unallocated_File(FileSystem.File):
 
         self.fd.seek(self.readptr+self.offset)
         result =self.fd.read(length)
-        print "Returned %s bytes from %s" % (len(result),self.offset+self.readptr)
         self.readptr+=len(result)
         return result

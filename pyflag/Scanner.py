@@ -166,7 +166,7 @@ class StoreAndScan:
         @arg name: The name of the file in the filesystem to operate on - The Scanner should have saved this file previously.
         """
 
-### This is used to scan a file with all the requested scanenr factories
+### This is used to scan a file with all the requested scanner factories
 def scanfile(ddfs,fd,factories):
     """ Given a file object and a list of factories, this function scans this file using the given factories
 

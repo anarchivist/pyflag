@@ -42,6 +42,10 @@ class PstScan(GenScanFactory):
             filename = self.ddfs.lookup(inode=self.inode)
 
             def scan_item(inode,item):
+                """ Scans the item with the scanner train.
+
+                inode is fully qualified inode (e.g. D12|Pxxxx.0)
+                """
                 fd = StringIO.StringIO(item.read())
                 fd.inode=inode
                 Scanner.scanfile(self.ddfs,fd,self.factories)               

@@ -50,7 +50,7 @@ class ZipScan(GenScanFactory):
 
                 ## Now call the scanners on this new file (FIXME limit the recursion level here)
                 fd = StringIO.StringIO(zip.read(namelist[i]))
-                fd.inode = self.inode
+                fd.inode = "%s|Z%s" % (self.inode,i)
                 Scanner.scanfile(self.ddfs,fd,self.factories)
                 
 ##                if self.factories:

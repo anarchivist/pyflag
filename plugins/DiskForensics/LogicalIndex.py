@@ -36,6 +36,8 @@ def escape(string):
 
 class Index(GenScanFactory):
     """ Keyword Index files """
+    ## Indexing must occur after all scanners have run.
+    order=200
     def __init__(self,dbh,table,fsfd):
         """ This creates the LogicalIndex table and initialised the index file """
         self.dbh=dbh
