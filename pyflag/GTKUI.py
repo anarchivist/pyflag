@@ -187,6 +187,14 @@ class FlagTreeModel(gtk.GenericTreeModel):
 
 class GTKUI(UI.GenericUI):
     """ A GTK UI Implementation. """
+
+    class UIToolbarItem:
+        def __init__(self, name, icon, callback, popup):
+            self.name = name
+            self.icon = icon
+            self.callback = callback
+            self.popup = popup
+            
     def __init__(self,default = None):
         # Create the Main Widget
         self.result=gtk.VBox()
@@ -197,10 +205,12 @@ class GTKUI(UI.GenericUI):
             self.defaults = default.defaults
             ## This is an array of form widgets. Every time we draw a form widget in this UI, we store it here, and then when we submit the widget, we take the values from here.
             self.form_widgets=default.form_widgets
+            self.toolbar_items = default.toolbar_items
         else:
             self.form_parms = {}
             self.defaults = FlagFramework.query_type(())
             self.form_widgets=[]
+            self.toolbar_items = []
             
         self.current_table=None
         self.nav_query=None
@@ -269,10 +279,7 @@ class GTKUI(UI.GenericUI):
 
     def tooltip(self, string):
         pass
-    
-    def toolbar(self, popup, string, icon):
-        pass
-    
+        
     def icon(self, path, **options):
         image = gtk.Image()
         image.set_from_file("%s/%s" % (config.IMAGEDIR, path))
@@ -748,8 +755,8 @@ class GTKUI(UI.GenericUI):
         dbh.execute(query_str,())
         return dbh,new_query
 
-    def toolbar(self,cb,text,icon=None,popup=True):
-        pass
+    def toolbar(self, cb, text, icon=None, popup=True):
+        self.toolbar_items.append(GTKUI.UIToolbarItem(text, icon, cb, popup))
 
     def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):
         """ Main table redered method.

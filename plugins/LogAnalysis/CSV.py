@@ -21,7 +21,7 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 import csv
-import Simple
+import plugins.LogAnalysis.Simple as Simple
 
 class CSVLog(Simple.SimpleLog):
     """ Log parser designed to handle comma seperated files """

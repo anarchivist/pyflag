@@ -40,262 +40,299 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.Registry as Registry
 import pyflag.DB as DB
+        
 
-dynasty = {
-    "Case Management": 10,
-    "Load Data":20,
-    }
+class GTKServer(gtk.Window):
+    """ A class which represents the main GTK server window """
 
-def order_families(families):
-    """ orders the list of the provided families based of the dynasty.
+    class FlagNotebook(gtk.Notebook):
+        """ A Flag notebook class
+        This is used because we store a bunch of toolbar related stuff with the notebook"""
+        
+        def __init__(self, uimanager):
+            gtk.Notebook.__init__(self)
+            self.uimanager = uimanager
+            self.merge_ids = {}
+            self.toolbar_uis = {}
+            self.toolbar_actions = {}
+            self.connect("switch-page", self.switch)
 
-    If a family is not in the dynasty it gets a score of 100. Note, list is ordered in place.
-    """
-    def sort_function(x,y):
-        try:
-            xscore=dynasty[x]
-        except KeyError:
-            xscore=ord(x[0])
+        def switch(self, notebook, page, pagenum):
+            """ tab switch callback """
+            widget = notebook.get_nth_page(pagenum)
 
-        try:
-            yscore=dynasty[y]
-        except KeyError:
-            yscore=ord(y[0])
+        def close_tab(self, action=None, page=None):
+            """ close current tab """
+            if not page:
+                page = self.get_current_page()
+            self.remove_page(page)
+            try:
+                del toolbar_uis[page]
+                del toolbar_actions[page]
+            except KeyError:
+                pass
+
+        def add_page(self, result, label):
+            """ add result (a GTKUI object) as a new tab with given label """
+            # each new page goes in a scrolled window
+            scroll = gtk.ScrolledWindow()
+            scroll.add_with_viewport(result.display())
+            scroll.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_AUTOMATIC)
             
-        if xscore<yscore:
-            return -1
-        elif xscore==yscore: return 0
-        return 1
-
-    families.sort(sort_function)
-
-def case_selector():
-    combobox = gtk.combo_box_new_text()
-    combobox.append_text('Select Case')
-    dbh = DB.DBO(config.FLAGDB)
-    dbh.execute('select value from meta where property=\'flag_db\'',())
-    while 1:
-        row = dbh.cursor.fetchone()
-        if not row: break
-        combobox.append_text(row[0])
-    combobox.set_active(0)
-    return combobox
-
-def navigate_cb(action):
-    pass
-
-def close_tab_cb(action):
-    global notebook
-    notebook.remove_page(notebook.get_current_page())
-
-def error_popup(text,error_msg="Error Occured"):
-    """ Draw the text in an error message box """
-    dialog=gtk.Window()
-    frame=gtk.Frame(error_msg)
-    box=gtk.VBox()
-    textview=gtk.TextView()
-    b=textview.get_buffer()
-    iter=b.get_iter_at_offset(0)
-    b.insert(iter,text)
-    box.add(textview)
-    frame.add(box)
-    dialog.add(frame)
-#    dialog.connect('destroy', lambda *w: gtk.main_quit())
-    dialog.show_all()
-
-def execute_report_cb(action, family, report):
-    """ Execute a report based on the clicked action item """
-    print 'executing report %s' % report
-    global notebook,flag
-    query = FlagFramework.query_type((),family=family,report=report,case='pyflag')
-    try:
-        result = flag.process_request(query)
-    except Exception,e:
-        import traceback,sys
-        import cStringIO
+            idx = self.get_current_page()
+            if idx != -1:
+                oldscroll = self.get_nth_page(idx)
+                cur_report = self.get_tab_label_text(oldscroll)
+            else:
+                cur_report = ''
         
-        a = cStringIO.StringIO()
-        traceback.print_tb(sys.exc_info()[2], file=a)
-        a.seek(0)
-        error_msg="%s: %s\n%s" % (sys.exc_info()[0],sys.exc_info()[1],a.read())
-        a.close()
-        error_popup(error_msg)
-        return
-    
-    scroll = gtk.ScrolledWindow()
-    scroll.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_AUTOMATIC)
-    scroll.add_with_viewport(result.display())
-    idx = notebook.append_page(scroll, gtk.Label(report))
-    notebook.show_all()
-    notebook.set_current_page(idx)
+            if (cur_report == label):
+                # reuse existing page if report is unchanged
+                self.close_tab(page=idx)
+                self.insert_page(scroll, gtk.Label(label), idx)
+            else:
+                # add a new page
+                idx = self.append_page(scroll, gtk.Label(label))
 
-def change(self,query_str):
-    """ Callback function used to redraw the results of the processing on the main window """
-    print "change called"
-    global notepad,flag
-    try:
-        result = flag.process_request(query_str)
-    except Exception,e:
-        import traceback,sys
-        import cStringIO
+            # update toolbar
+            #self.
+
+            # show results
+            self.show_all()
+            self.set_current_page(idx)
+
+        def update_toolbar(uimanager, tools):
+            """ Update the global UI toolbar with report specific buttons
+            Called whenever current report view changes """
+
+            actions = gtk.ActionGroup()
+            ui = '<toolbar name="Toolbar"><placeholder name="ReportTools">'
+
+            for t in tools:
+                ui += '<toolitem action="%s"/>' % t.name
+                actions.add_actions([(t.name, None, t.name, None, t.name, t.callback)])
+            ui += '</placeholder></toolbar>'
+            
+
+    def __init__(self):
+        """ GTKServer Main Function
+        Initialise framework and draw main window """
+        gtk.Window.__init__(self)
         
-        a = cStringIO.StringIO()
-        traceback.print_tb(sys.exc_info()[2], file=a)
-        a.seek(0)
-        error_msg="%s: %s\n%s" % (sys.exc_info()[0],sys.exc_info()[1],a.read())
-        a.close()
-        error_popup(error_msg)
-        return
+        # initialize flag
+        self.flag = FlagFramework.Flag()
+        FlagFramework.GLOBAL_FLAG_OBJ = self.flag
+        self.flag.ui = UI.GTKUI
 
-    # use a scrolled window to hold the results
-    scroll = gtk.ScrolledWindow()
-    scroll.add_with_viewport(result.display())
-    scroll.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_AUTOMATIC)
+        # set some window properties
+        self.set_title('PyFLAG')
+        self.set_icon_from_file('%s/pyflag_logo.png' % config.IMAGEDIR)
+        self.set_default_size(500, 500)
+        self.connect('destroy', lambda x: gtk.main_quit())
 
-    idx = notebook.get_current_page()
-    oldscroll = notebook.get_nth_page(idx)
-    cur_report = notebook.get_tab_label_text(oldscroll)
+        # these are the MAIN ELEMENTS of the GTKServer
+        self.vbox = gtk.VBox()
+        self.uimanager = gtk.UIManager()
+        self.notebook = GTKServer.FlagNotebook(self.uimanager)
+        ## have to build the ui at this point...
+        self.build_flag_menu()        
+        self.menubar = self.uimanager.get_widget('/Menubar')
+        self.toolbar = self.uimanager.get_widget('/Toolbar')
+        self.statusbar = gtk.Statusbar()
 
-    if (cur_report == query_str['report']):
-        # reuse existing page if report is unchanged    
-        notebook.remove_page(idx)
-        notebook.insert_page(scroll, gtk.Label(query_str['report']), idx)
-    else:
-        # add a new page
-        idx = notebook.append_page(scroll, gtk.Label(query_str['report']))
-    
-    # show results
-    notebook.show_all()
-    notebook.set_current_page(idx)
+        # pack these to arrange the UI
+        self.add_accel_group(self.uimanager.get_accel_group())
+        self.add(self.vbox)
+        self.vbox.pack_start(self.menubar, False)
+        
+        # but the toolbar in a HBox with a case selector
+        hbox = gtk.HBox()
+        combobox = self.case_selector()
+        self.toolbar = self.uimanager.get_widget('/Toolbar')
+        hbox.pack_start(combobox, False)
+        hbox.pack_start(self.toolbar)
 
-def build_flag_menu(window, uimanager):
-    # Create an actiongroup
-    actions = gtk.ActionGroup('menu_actions')
+        self.vbox.pack_start(hbox, False)
+        self.vbox.pack_start(self.notebook)
+        self.vbox.pack_end(self.statusbar, False)
+                
+        # install the main UI callback
+        self.flag.ui.link_callback = self.add_page
 
-    # Build the basic Menu UI
-    ui = """<menubar name="MenuBar">
-                <menu action="Flag">
-                    <menuitem action="Create new case"/>
-                    <menuitem action="Open Existing Case"/>
-                    <menuitem action="Reset Case"/>
-                    <menuitem action="Remove case"/>
-                    <menuitem action="Close"/>
-                    <menuitem action="Quit"/>
-                </menu>
-                <menu action="Edit">
-                    <menuitem action="Preferences"/>
-                </menu>
-                <menu action="View">
-                </menu>
-         """
-    actions.add_actions([('Flag', None, '_Flag'),])
-    actions.add_actions([('Create new case', None, 'Create new case', None, 'Create new case', execute_report_cb)], ('Case Management','Create new case'))
-    actions.add_actions([('Open Existing Case', None, 'Open Existing Case', None, 'Open Existing Case', execute_report_cb)], ('Case Management','Open Existing Case'))
-    actions.add_actions([('Reset Case', None, 'Reset Case', None, 'Reset Case', execute_report_cb)], ('Case Management', 'Reset Case'))
-    actions.add_actions([('Remove case', None, 'Remove case', None, 'Remove case', execute_report_cb)], ('Case Management','Remove case'))
-    actions.add_actions([('Close', gtk.STOCK_CLOSE, '_Close', 
-                            None, 'Close Current Tab', execute_report_cb),
-                         ('Quit', gtk.STOCK_QUIT, '_Quit', 
-                            None, 'Quit pyFLAG', execute_report_cb),
-                         ('Edit', None, '_Edit'),
-                         ('Preferences', gtk.STOCK_PREFERENCES, '_Preferences'),
-                         ('View', None, 'View')])
-    
-    # Add the Reports
-    ui += '<menu action="Reports">\n'
-    actions.add_actions([('Reports', None, '_Reports')])
-    family_list = Registry.REPORTS.get_families()
-    order_families(family_list)
-    for family in family_list:
-        ui += '\t<menu action="%s">\n' % family
-        actions.add_actions([(family, None, family)])
-        report_list = Registry.REPORTS.family[family]
-        for r in report_list:
-            if r.hidden: continue
-            ui += '\t\t<menuitem action="%s"/>\n' % r.name
-            actions.add_actions([(r.name, None, r.name, None, r.name, execute_report_cb)], (family,r.name))
-        ui += '\t</menu>\n'
-    ui += '</menu>'
-    ui += """<menu action="Help">
-                <menuitem action="Contents"/>
-                <menuitem action="About"/>
-             </menu>"""
-    actions.add_actions([('Help', None, '_Help'),
-                         ('Contents', gtk.STOCK_HELP, '_Contents'),
-                         ('About', gtk.STOCK_DIALOG_INFO, '_About')])
-    ui += '</menubar>\n'
-    # Add the Navigation Toolbar
-    ui += """<toolbar name="NaviBar">
-               <toolitem action="Prev Page"/>
-               <separator/>
-               <toolitem action="Next Page"/>
-               <separator/>
-               <toolitem action="Close Tab"/>
-               <separator/>
-             </toolbar>"""
-    actions.add_actions([('Prev Page', gtk.STOCK_GO_BACK, '_Prev Page', 
-                            None, 'Navigate to Previous Page', execute_report_cb),
-                         ('Next Page', gtk.STOCK_GO_FORWARD, '_Next Page', 
-                            None, 'Navigate to Next Page', execute_report_cb),
-                         ('Close Tab', gtk.STOCK_CLOSE, '_Close Tab', 
-                            None, 'Close current Tab', close_tab_cb)])
-    
-    # Add the actions to the uimanager
-    uimanager.insert_action_group(actions, 0)
-    
-    # Add a UI description
-    #print ui
-    uimanager.add_ui_from_string(ui)
+        # show it
+        self.show_all()
 
-#### BEGIN MAIN ####
+    def order_families(self, families):
+        """ orders the list of the provided families based of the dynasty.
 
-# initialize flag
-flag = FlagFramework.Flag()
-FlagFramework.GLOBAL_FLAG_OBJ =flag
-flag.ui = UI.GTKUI
+        If a family is not in the dynasty it gets a score of 100. Note, list is ordered in place.
+        """
+        dynasty = {
+            "Case Management": 10,
+            "Load Data":20,
+            }
 
-# create main window
-window = gtk.Window()
-window.set_title('PyFLAG')
-window.set_icon_from_file('%s/pyflag_logo.png' % config.IMAGEDIR)
-window.set_default_size(500,500)
-window.connect('destroy', lambda x: gtk.main_quit())
-vbox = gtk.VBox()
-window.add(vbox)
+        def sort_function(x,y):
+            try:
+                xscore=dynasty[x]
+            except KeyError:
+                xscore=ord(x[0])
 
-# Create a UI Manager
-uimanager = gtk.UIManager()
+            try:
+                yscore=dynasty[y]
+            except KeyError:
+                yscore=ord(y[0])
 
-# Add the accelerator group to the toplevel window
-window.add_accel_group(uimanager.get_accel_group())
+            if xscore<yscore:
+                return -1
+            elif xscore==yscore: return 0
+            return 1
 
-# build the report menu and navigation bar
-build_flag_menu(window, uimanager)
+        families.sort(sort_function)
 
-# Create a MenuBar for the reports menu
-menubar = uimanager.get_widget('/MenuBar')
-vbox.pack_start(menubar, False)
+    def case_selector(self):
+        """ helper function to draw a case selector """
+        combobox = gtk.combo_box_new_text()
+        combobox.append_text('Select Case')
+        dbh = DB.DBO(config.FLAGDB)
+        dbh.execute('select value from meta where property=\'flag_db\'',())
+        while 1:
+            row = dbh.cursor.fetchone()
+            if not row: break
+            combobox.append_text(row[0])
+        combobox.set_active(0)
+        return combobox
 
-# Create a toolbar for navigation
-hbox = gtk.HBox()
-combobox = case_selector()
+    def navigate_cb(action):
+        pass
 
-toolbar = uimanager.get_widget('/NaviBar')
-hbox.pack_start(combobox, False)
-hbox.pack_start(toolbar)
-vbox.pack_start(hbox, False)
+    def error_popup(self, text,error_msg="Error Occured"):
+        """ Draw the text in an error message box """
+        dialog=gtk.Window()
+        frame=gtk.Frame(error_msg)
+        box=gtk.VBox()
+        textview=gtk.TextView()
+        b=textview.get_buffer()
+        iter=b.get_iter_at_offset(0)
+        b.insert(iter,text)
+        box.add(textview)
+        frame.add(box)
+        dialog.add(frame)
+        dialog.show_all()
 
-# use a notebook for multiple reports
-notebook = gtk.Notebook()
-vbox.pack_start(notebook)
+    def add_page(self, query):
+        """ Add a new notebook page, or redraw existing page """
+        try:
+            result = self.flag.process_request(query)
+        except Exception,e:
+            import traceback,sys
+            import cStringIO
 
-# add a status bar
-statusbar = gtk.Statusbar()
-vbox.pack_end(statusbar, False)
+            a = cStringIO.StringIO()
+            traceback.print_tb(sys.exc_info()[2], file=a)
+            a.seek(0)
+            error_msg="%s: %s\n%s" % (sys.exc_info()[0],sys.exc_info()[1],a.read())
+            a.close()
+            self.error_popup(error_msg)
+            return
 
-#Install the GTK callback
-flag.ui.link_callback = change
+        self.notebook.add_page(result, query['report'])
 
-# do it!
-window.show_all()
+    def execute_report_cb(self, action, family, report):
+        """ Execute a report based on the clicked action item """
+        query = FlagFramework.query_type((),family=family,report=report,case='pyflag')
+        self.add_page(query)
+        
+    def build_flag_menu(self):
+        # Create an actiongroup
+        actions = gtk.ActionGroup('menu_actions')
+
+        # Build the basic Menu UI
+        # make a special case for a case mgmt reports by
+        # hard coding them into the Flag menu for usability
+        ui = """<menubar name="Menubar">
+                    <menu action="Flag">
+                        <menuitem action="Create new case"/>
+                        <menuitem action="Open Existing Case"/>
+                        <menuitem action="Reset Case"/>
+                        <menuitem action="Remove case"/>
+                        <menuitem action="Close"/>
+                        <menuitem action="Quit"/>
+                    </menu>
+                    <menu action="Edit">
+                        <menuitem action="Preferences"/>
+                    </menu>
+                    <menu action="View">
+                    </menu>
+             """
+        actions.add_actions([('Flag', None, '_Flag'),])
+        actions.add_actions([('Create new case', None, 'Create new case', None, 'Create new case', self.execute_report_cb)], ('Case Management','Create new case'))
+        actions.add_actions([('Open Existing Case', None, 'Open Existing Case', None, 'Open Existing Case', self.execute_report_cb)], ('Case Management','Open Existing Case'))
+        actions.add_actions([('Reset Case', None, 'Reset Case', None, 'Reset Case', self.execute_report_cb)], ('Case Management', 'Reset Case'))
+        actions.add_actions([('Remove case', None, 'Remove case', None, 'Remove case', self.execute_report_cb)], ('Case Management','Remove case'))
+        actions.add_actions([('Close', gtk.STOCK_CLOSE, '_Close', 
+                                None, 'Close Current Tab', self.execute_report_cb),
+                             ('Quit', gtk.STOCK_QUIT, '_Quit', 
+                                None, 'Quit pyFLAG', self.execute_report_cb),
+                             ('Edit', None, '_Edit'),
+                             ('Preferences', gtk.STOCK_PREFERENCES, '_Preferences'),
+                             ('View', None, 'View')])
+
+        # Add the Reports
+        ui += '<menu action="Reports">\n'
+        actions.add_actions([('Reports', None, '_Reports')])
+        family_list = Registry.REPORTS.get_families()
+        self.order_families(family_list)
+        for family in family_list:
+            ui += '\t<menu action="%s">\n' % family
+            actions.add_actions([(family, None, family)])
+            report_list = Registry.REPORTS.family[family]
+            for r in report_list:
+                if r.hidden: continue
+                ui += '\t\t<menuitem action="%s"/>\n' % r.name
+                actions.add_actions([(r.name, None, r.name, None, r.name, self.execute_report_cb)], (family,r.name))
+            ui += '\t</menu>\n'
+        ui += '</menu>'
+        ui += """<menu action="Help">
+                    <menuitem action="Contents"/>
+                    <menuitem action="About"/>
+                 </menu>"""
+        actions.add_actions([('Help', None, '_Help'),
+                             ('Contents', gtk.STOCK_HELP, '_Contents'),
+                             ('About', gtk.STOCK_DIALOG_INFO, '_About')])
+        ui += '</menubar>\n'
+        # Add the Navigation Toolbar
+        ui += """<toolbar name="Toolbar">
+                   <toolitem action="Prev Page"/>
+                   <toolitem action="Next Page"/>
+                   <separator/>
+                   <placeholder name="ReportTools">
+                   </placeholder>
+                   <separator/>
+                   <toolitem action="Close Tab"/>
+                   <separator/>
+                 </toolbar>"""
+        actions.add_actions([('Prev Page', gtk.STOCK_GO_BACK, '_Prev Page', 
+                                None, 'Navigate to Previous Page', self.execute_report_cb),
+                             ('Next Page', gtk.STOCK_GO_FORWARD, '_Next Page', 
+                                None, 'Navigate to Next Page', self.execute_report_cb),
+                             ('Close Tab', gtk.STOCK_CLOSE, '_Close Tab', 
+                                None, 'Close current Tab', self.notebook.close_tab)])
+
+        # Add the actions to the uimanager
+        self.uimanager.insert_action_group(actions, 0)
+
+        # Add a UI description
+        #print ui
+        self.uimanager.add_ui_from_string(ui)
+
+        # gray out the nav buttons for now
+        button = self.uimanager.get_widget('/Toolbar/Next Page')
+        button.set_sensitive(gtk.FALSE)
+        button = self.uimanager.get_widget('/Toolbar/Prev Page')
+        button.set_sensitive(gtk.FALSE)
+
+### BEGIN MAIN ####
+
+main = GTKServer()
 gtk.main()
