@@ -96,10 +96,12 @@ The following components can be seen:
         <li>Calculating a timeline of modified, accessed and created timestamps for all files within an image.</li>
         <li>Calculting file types (file magic) and hashes (MD5sums) and comapring these against the NIST NSRL hash set (if present).</li>
         <li>Browsing/Searching windows registry hives.</li>
+      <li>Examining the combined total of all IE History files in the image</li>
+      <li>Keyword searching and indexing in the Logical Image (See Index Search below)</li>
       </ul>
     These map to the reports which appear in the "Disk Forensics" tab in flag.<p>
     <h3>Scanners and Virutual filesystems</h3>
-    An important concept in Flag is that of scanners. Scanners are code modules (located inthe Scanners directory) which are executed on each file in the filesystem as the filesystem is loaded. There are a number of types of scanners currently, including:
+    An important concept in Flag is that of scanners. Scanners are code modules (located in the Scanners directory) which are executed on each file in the filesystem as the filesystem is loaded. There are a number of types of scanners currently, including:
     <ul>
       <li>scan file and record file type: This scanner establishes the file type of each file by use of the magic library. </li>
       <li>scan file and record file Hash: This scanner calculates the MD5 hash of each file and compares it against the NSRL database.</li>
@@ -107,15 +109,29 @@ The following components can be seen:
       <li>Load in IE History files: If the scanner comes across any IE History files, they will be analysed and inserted into the case IE History table.</li>
       <li>Load in Windows Registry files: If the scanner comes across any windows registry files, they will be analysed.</li>
       <li>Keyword Index files: The index dictionary will be used to index all files as they are seen.</li>
-      <li>
-
-      Before using these reports, the filesystem image must be loaded into flag. This is a three stage process:
+      <li> Recurse into gziped files: This scanner creates entries in the virtual filesystem pointing at the decompressed gzip files. This scanner will allow other scanners to operate on the decompressed data of gzip files (e.g. indexing, hash, and virus scanning will be done on the decompressed files).</li>
+      <li>Recurse into zip files: This scanner creates entries in the virtual filesystem for all files within the zip file. This allows other scanners to scan files within the zip file automatically.</li>
+      <li> Recurse into Pst Files: This Scanner allows Flag to analyse PST files (Produced by outlook). PST files contain a lot of different information including email messages, attachments, contacts, appointments etc. This scanner will create virtual filesystem entries for each of these cases so that users may navigate the PST file naturally using the filesystem browser. Since this work is done in the scanner, other scanners are now able to operate on the contents of the pst file. For example, virus scanning of email attachments will occur automatically. Keyword searching of email bodies will also occur automatically.</li>
+      </ul>
+<p>
+    The Scanners architecture allows the creation of virtual file system entries as files are scanned. The virtual filesystem represents a tree like view of information about files as well as files. For example, when Flag encounters a Zip file, Flag will automatically create a virtual directory which, when followed contains the uncomressed files from within the archive. This powerful feature allows the investigator to naturally examine content of zip files as though they were regular directories and files. </p>
+<p>The example shown in the following screen shot emphesizes this feature by showing the user navigating into a PST file. The email examined contains a Zip file as an attachment. Flag makes this attachment transparently available through the virtual filesystem as a virtual file. Since this file is a Zip file, Flag will make the content of the zip file appear as a virtual directory. Clicking on the virtual inodes allows the user to directly examine the content of the files transparently.</p>
+<p><img src=images/VirtualFileSystem.png border=3></p>
+In the above example it can be seen that the Inodes have a special format. For example the above file has the following format <em>D26|P2119876:1|Z1</em>. It is important to understand the formatting of the inode.</p>
+<p>Since Flag uses Filesystem drivers to actually read files, the inode description refers to which driver is needed to read each file, while the pipe character (|) represents the output from one driver being fed into the input of another driver. So in our example, the first part <em>D26</em> represents the DBFS (database filesystem driver) Inode 26 (in our case this image was imported using SleuthKit so it represents inode 26 as denoted by SleuthKit itself). The output of this is then fed into the PST driver (<em>P2119876:1</em>) with a specific Inode number that means something to it. The output of this driver is then fed into the Zip file driver (<em>Z1</em>) with an Inode that represents the second file in the Zip archive. Clearly the interpretation of the inode formatting depends on the individual driver. The recursive behaviour allows flag to recursively analyse data streams contained within other data streams to an arbitrary level.</p>
+<p>Since the scanners discover more virtual files as the scan process continues, we dubb the sequence of bytes uncovered by the scanners the <b>Logical Image</b>, as opposed to the <b>Physical Image</b> which comprises of the physical bitstream of the image itself. The difference between the two concepts becomes evident when one considers a keyword index search for example. A Keyword search over the physical image will not uncover keywords appearing in emails in PST files, or inside compressed files. Whereas a keyword search over the logical drive has access to the entire virtual filesystem's view of the uncomressed files and the virtual email messages within the PST file itself.</p>
+<p>This important distinction makes PyFlag an extremely powerful tool for rapid searching for information which may not be immediately accessible.</p>
+<h3>Loading the Filesystem</h3>
+<p>Before using these reports, the filesystem image must be loaded into flag. This is a three stage process:
       <ul>
         <li>Create a new case, as described above</li>
         <li>Create an IO Source using the "Load IO Data Source" report in the "LoadData" tab, this is done by selecting an appropriate IO subsystem as described above and filling out the form appropriatedly</li>
-        <li>Load the filesystem using the "Load Filesystem Image" report in the "LoadData" tab, the form simply asks for the case to load the data into and the IOSource to find the filesystem in. This will invoke the Sleuthkit software which extracts filesystem metadata and loads it into the case database. This step can take a while (10 minutes or so) for very large filesystems.</li>
+        <li><p>Load the filesystem using the "Load Filesystem Image" report in the "LoadData" tab, the form simply asks for the case to load the data into and the IOSource to find the filesystem in. </p>
+	<p>Note that the list of available scanners is displayed here with the option of disabling some of the scanners (They are all enabled by default). Some of the scanners take a significant amount of CPU time to complete (for example the Zip file scanner). This may prove to be undesirable in certain situations. In these cases the load process may be sped up by disabling some scanners as required.</p>
+	<p>Note however, that disabling scanners may remove functionality from the DiskForensics module. For example disabling the Zip file scanner will result in zip files not added to the Virtual File System (VFS) which will prevent files within the zip file from being indexed or virus scanned.</p>
+	</li>
       </ul>
-      Once the image is loaded the reports in the DiskForensics tab can be run. Note that the "MD5 Hash Comparison" can take a long time. Currently, before using the "Browse Registry" report, you must extract the registry hives from the image, this can be done my downloading them using the "Browse Filesystem" report.
+      Once the image is loaded the reports in the DiskForensics tab can be run.
 
     <h2>Unstructured Disk Forensics</h2>
     Sometimes it is impossible to recover files directly off a hard disk image. This may be due to the disk being corrupted, or the files being deleted, while the filesystem does not support file un-deletion (for example NTFS). In these cases it may be possible to recover some files by looking at the raw disk as a big chunk of binary data, without structure or filesystem, hence the term unstructured forensics.<p>
@@ -148,21 +164,33 @@ This technique is mostly suitable for searching for a great number of search ter
       If disk space is plentiful, it is recommended to add as many words as possible to the dictionary (since indexing is almost constant time this should not slow the indexing process very much). The author often uses a complete dictionary of the English language (often found in <i>/usr/dict/words</i>). A simple script is provided under the "indextools" directory to allow merging of the standard words dictionary into PyFlag. Note that this dictionary will often index about 70-90 thousand different words.
     
       <h2>Log Analysis</h2>
-      Flags provides simple yet powerful log analysis capabilities based on the flag table view. Flag allows you to load arbitrary plain text log files by first describing the file format. The loading process is as follows:
+    <p>Flags provides a simple yet powerful log analysis capabilities based on the Flag table view (described above). Since servers generate a wide variety of log file formats, it is often difficult to properly parse the log files in a consistant manner. Even the same software package can generate log files in very different formats depending on configurations. (For example Apache can generate an arbitrary log format based on configuration directives).</p>
+    <p>The result of this is that we need some way of logically telling Flag how to interpret the log file in order to parse it into the database. This template is called a <b>Log Preset</b> in Flag. A Log Preset simply represents a way of how to extract tabular data (i.e. columns and rows) from the log file so that the data may be stored uniformly in the database. Since different servers produce logs in different formats (depending on configuration), there will usually be different presets for each server.</p>
+<p>Once a preset has been created, the same preset may be used in the future to load log files from the same server.</p>
+<p>PyFlag uses the concept of log file drivers. A Log File Driver is a specialised bit of code that can read certain types of log files. Since log files come in a variety of formats, certain parsing algorithms work best with certain log types. A preset, therefore, encapsulates the driver used as well as any specific parameters it may require.</p>
+<p>Therefore, prior to loading a log file for analysis, we need to create a preset. In order to begin creating a preset we select the "Create Log Preset" Report within the LogAnalysis module. After selecting a sample log file of the required format, we may select the Log File driver. Following are descriptions of the individual options for each Log File driver.</p>
+    <h3>The Simple Log File Driver</h3>
+    <p>The Simple log file driver splits each line of the log file into columns based on a simple delimiter. If the logfile is simplistic enough, a reasonable approximation may be made. The following steps are taken:
       <ul>
-        <li>Create a new log file type using the "Create Log Preset" report in the "Log Analysis" tab. A form will be displayed which involves the following steps:
-          <ul>
-            <li>Select a sample log file, once selected, click "submit" and the form will be redraws with a preview of the log file</li>
-            <li>Select a field delimiter. Usually a simple delimiter (space, comma) will do, but you can also use a regular expression, in this case the sub-matches (ie. between '()' brackets) will become the fields.</li>
-            <li>Once the delimiter is selected, press "submit" again to update the form, a preview of the split lines will be displayed. You can now select any prefilter to apply to the text before splitting. Prefilters can be used to perform simple processing on the text such as to change date formats etc.</li>
-            <li>Assign names and types to fields. Here you must give each field a name, if the name is "ignore", that field will be discarded when the data is loaded. Choose the most appropriate type for each field, ie. numbers shoud be "int" and times should be "timestamp" if these are selected appropriately, searching will be more powerfull (eg, you can search for date ">2003-01-01" meaning dates after 01/01/2003, this would not be possible if date was a varchar). Here you can also choose which fields to create indexes for, indexes can significantly speedup searches, but will increase the size of the database.</li>
-            <li>Once satisfied that the table preview looks ok, and all fields and types have been assigned, select the checkbox to see a final preview. This will load the data into a temporary database table and display the results. This allows you to see if the types selected are appropriate for the data.</li>
-            <li>Give the preset a name, and store it in the flag database. Note that the new preset log type will now be available to all flag cases.</li>
-          </ul>
-        </li>
-        <li>Load the log file using the "Load Preset Log File" report in the "LoadData" tab. This simply requires choosing a name for the new table, selecting the log file type (as created above) and choosing the log file to load.</li>
-      </ul>
-      Once the logfile data is loaded, it can be analysed using the "List Log File Contents" report in the "LogAnalysis" tab. This report simply shows a table of the loaded log. The table can be search my multiple criteria at a time, and sorted or grouped by any column.
+      <li>The user may choose among a number of delimiters. Usually space is common.</li>
+      <li>Next Flag will read the first several lines from the log file and display them unaltered. This is used for the user to verify that indeed they have the right file selected.</li>
+      <li><p>Often a log file will not break on a simple delimiter cleanly, or some of the fields will need to be converted before the database will accept them. Notable for this is the apache common log format which stores dates in the following format: <em>01/Oct/2001:04:21:23</em>. This format can not be understood by the database, so a prefilter must be used to convert from one format to another.</p>
+	<p>Prefilters are simple regular expression substitution operators that apply on each line in the log file prior to it being split. (Users may need to click "submit" in order for their choices to be registered.)</p></li>
+      <li>PyFlag will now show the same sample lines as before after the prefilter transformation. This makes it easy to examine the effect of the transformation on the log file</li>
+      <li><p>A GUI is now drawn to allow the user to name each column and specify its type. Depending on the selected type, a database storage type will be assigned for log entries. This allows the database to store the data in the most appropriate and optimal type. For example if a column is an "IP Address", it will be stored as an INT in the database, and the whois lookup will be automatically done on it.</p>
+	<p>Adding an index on a column will make searching on the column much faster. The down side is a slight space requirement for the index. Note that since indexes are always added after the data has been inserted into the database, specifying an index on a column does not slow log importation down very much.</p></li>
+      <li>Once the user is happy with their choices, they may click on the final preview checkbox. PyFlag will then create a temporary table and use the preset to insert a few log file lines into it. The results will then be displayed in a table. This final check is required to ensure that the column formats are compatible with the database. For example, if the date format is incompatible with the database, the database will coerce the date value to be 0 (usually 1970). This sort of problem can be easily picked up in this stage.</li>
+      <li>Now the user can name the preset and save it off. This name will then be used in the future to load new log files from the same server.</li>
+    </ul>
+    Pyflag may then be used to load a log file into a table, and then view the table using the table widget. Power searching may be done on the data as described above.
+    <h3>CSV Log File Driver</h3>
+<p>Although at first glance a Comma Delimited file (CVS) seems like it may be processed using a simple delimiter, this is sometimes not the case. The reason is that CSV files often contain the delimiter (oftern comma) within fields. In that case special escape sequences or quoting are used to ensure the embedded commas are not mistaken to be delimiters.</p>
+
+<p>To this end the CSV driver is a reliable way of importing such data, even when the delimiter appears within the field data.</p>
+<p>The CSV driver uses its own CVS parsing engine to split each line into columns, and then presents an identical interface as the Simple Log File driver to allow users to name each column and specify its type.</p>
+<h3>IIS Log file driver</h3>
+<p>Microsoft IIS web/ftp server logs in a simple space delimited format. The IIS logfiles are designed to be machine readable by having a comment line at the top of the file with the fields logged and they order. This line allows the automatic assignment of column names and types. This allows the user to bypass the selection GUI and automatically create a preset for the specific file.</p>
+<p>No further options are required for this driver. If the IIS log file is well formed, the driver will automatically generate a correct preset and allow the user to verify it in the final preview table.</p>
 
     <h2>Network Packet Analysis</h2>
     The Network capture analysis is based on dissecting the packets using ethereal and loading the results into the database for analysis. Network analysis can be performed in two modes, corresponding to the flag tabs:
@@ -297,7 +325,7 @@ Please enter a value for filesystem type: linux-ext2
     <address><a href="mailto:pyflag-users@sourceforge.net"></a></address>
 <!-- Created: Sat Mar 13 21:51:49 EST 2004 -->
 <!-- hhmts start -->
-Last modified: Fri Nov  5 21:01:14 EST 2004
+Last modified: Sat Nov  6 00:25:20 EST 2004
 <!-- hhmts end -->
   </body>
 </html>
