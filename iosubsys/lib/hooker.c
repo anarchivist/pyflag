@@ -5,6 +5,7 @@
 #include <dlfcn.h>
 #include "fs_io.h"
 #include <stdarg.h>
+#include "except.h"
 
 /* Used for Debugging messages*/
 void debug(int level, const char *message, ...)
@@ -26,6 +27,7 @@ struct dispatcher_t {
   off_t (*lseek)(int fildes, off_t offset, int whence);
   off_t (*lseek64)(int fildes, off_t offset, int whence);
   ssize_t (*read)(int fd, void *buf, size_t count);
+  void (*exit)(int status);
 } *dispatch=NULL;
 
 // This static variable is used to decide when we should hook calls
@@ -76,6 +78,8 @@ void load_library(void) {
   check_errors();
   dispatch->read = dlsym(dispatch->handle,"read");
   check_errors();
+  dispatch->exit = dlsym(dispatch->handle,"exit");
+  check_errors();
 };
 
 //This function initialises the hooker
@@ -92,19 +96,30 @@ void init_hooker() {
 
   if(io_name) {
     iosource_count++;
-
+    
+    context=UNHOOKED;
     iosources[iosource_count] = io_open(io_name);
     //Parse options for this io subsystem:
     if(options)
       io_parse_options(iosources[iosource_count],options);
+    context=HOOKED;
   };
 
 };
 
 /* These are wrappers for all the functions we will be hooking.
  */
-int open(const char *pathname, int flags,int mode) {
+int open(const char *pathname, int flags, ...) {
+  va_list ap;
+  int mode;
+
+  va_start(ap,flags);
+  mode = (int)*ap;
+  va_end(ap);
+
   //If we were not initialised yet, we do so now...
+  debug(1,"opening");
+
   if(!dispatch) {
     init_hooker();
   };
@@ -193,4 +208,21 @@ ssize_t write(int fd, const void *buf, size_t count) {
   debug(1,"Writing is not allowed!\n");
   //Pretend to have written...
   return (count);
+};
+
+//Hook exit to prevent stupid programs from exiting suddenly when an
+//error occurs. This is mostly used for dbtool which is written using
+//sk. When sk has an abnormal condition, it just dies which stops
+//dbtool. This way we raise an exception allowing dbtool to catch it
+//and keep going.
+void exit(int status) {
+  if(context == HOOKED && status!=0) {
+    context = UNHOOKED;
+    RAISE(E_GENERIC,NULL,"exit() called with status %d",status);
+    context = HOOKED;
+  } else {
+    dispatch->exit(status);
+  };
+  //This is used to shut some gcc warnings but should never be reached.
+  exit(0);
 };
