@@ -27,7 +27,7 @@ void debug(int level,const char *message, ...)
 #define max(x,y) (x>y ? x: y)
 
 //The size of the heap mmaped at the same time (in pages)
-static int heap_mapped_length=1000000;
+static int heap_mapped_length=100000;
 //static int heap_file_offset=0;
 
 /* Write the index file header and return the total number of bytes occupied by the header. */
@@ -90,7 +90,7 @@ heap_ptr idx_malloc(struct index_file *idx,int size)
   //Do we fit in the currently allocated chunk?
   if(idx->end_of_heap_ptr > idx->heap_size) {
     idx->heap_size+=heap_mapped_length;
-    fprintf(stderr,"Will try to grow file to %lu\n",idx->heap_size);
+    //    fprintf(stderr,"Will try to grow file to %lu\n",idx->heap_size);
 
     //We need some quick memory for writing some zeros to the file
     buffer=(char *)malloc(heap_mapped_length);
@@ -590,6 +590,9 @@ struct index_file *idx_load_from_file(unsigned char *filename) {
 
   //How big is this file?
   idx->heap_size=lseek(idx->heap_fd,0,SEEK_END);
+
+  //This is a little wastefull since we lose the remainder of the malloced chunk...
+  idx->end_of_heap_ptr = idx->heap_size;
   
   //Is heap_mapped_length a multiple of page_size? if not we round it...
   if(((int)(heap_mapped_length/page_size))*page_size != heap_mapped_length) {

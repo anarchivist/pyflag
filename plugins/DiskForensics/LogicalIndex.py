@@ -46,13 +46,18 @@ class Index(GenScanFactory):
         ## When running in a distributed environment this is not
         ## accessible - maybe we need to pass this in the metadata?
         self.rel_offset = 0
-        self.block=0
+        self.dbh.execute("create table if not exists `LogicalIndex_%s` (`inode` VARCHAR( 20 ) NOT NULL ,`block` BIGINT NOT NULL, primary key(block))",(table))
+        ## The block number must be the largest that is available in the database.
+        self.dbh.execute("select max(block) as `max` from `LogicalIndex_%s`",(table))
+        row=self.dbh.fetch()
+        try:
+            self.block=int(row['max'])+1
+        except: self.block=0
         
         self.table=table
         self.filename = "%s/LogicalIndex_%s.idx" % (config.RESULTDIR,table)
 
     def prepare(self):
-        self.dbh.execute("create table if not exists `LogicalIndex_%s` (`inode` VARCHAR( 20 ) NOT NULL ,`block` BIGINT NOT NULL, primary key(block))",(self.table))
         try:
             ## Is the file already there?
             self.index = index.Load(self.filename)

@@ -40,6 +40,8 @@ import pyflag.Graph as Graph
 import pyflag.IO as IO
 import pyflag.DB as DB
 import pyflag.Scanner as Scanner
+import pyflag.ScannerUtils as ScannerUtils
+import pyflag.Registry as Registry
 
 description = "Disk Forensics"
 order=30
@@ -145,6 +147,7 @@ class ViewFile(Reports.report):
     def display(self,query,result):
         new_q = result.make_link(query, '')
         if not query.has_key('limit'): query['limit']= 0
+        dbh = self.DBO(query['case'])
 
         # retrieve the iosource for this fsimage
         iofd = IO.open(query['case'],query['fsimage'])
@@ -163,8 +166,47 @@ class ViewFile(Reports.report):
         path,name=os.path.split(path)
         image.headers=[("Content-Disposition","attachment; filename=%s" % name),]
         ## This fails in cases where the File object does not know its own size in advance (e.g. Pst).
-#                       ("Content-Length",filesize)]
-        
+##                       ("Content-Length",filesize)]
+
+        ## Create a popup to allow scanning of this file:
+        def scan_popup(query,result):
+            try:
+                if query["refresh"]:
+                    ## Actually scan this file:
+
+                    scanners = [ ]
+                    for i in query.getarray('scan'):
+                        try:
+                            tmp  = Registry.SCANNERS.dispatch(i)
+                            scanners.append(tmp(dbh,query['fsimage'],fsfd))
+                        except Exception,e:
+                            logging.log(logging.ERRORS,"Unable to initialise scanner %s" % e)
+
+                    ## Prepare the scanner factories for scanning:
+                    for s in scanners:
+                        s.prepare()
+                        
+                    print "Will now scan inode %s with %s" % (query['inode'],scanners)
+                    fd.seek(0)
+                    Scanner.scanfile(fsfd,fd,scanners)
+                    
+                    ## Return to the original page
+                    del query['refresh']
+                    del query['callback_stored']
+                    del query['scan']
+                    result.refresh(0,query,options={'parent':1})
+                    return
+            except KeyError:
+                pass
+                
+            result.heading("Scan this file")
+            result.ruler()
+            result.start_form(query,refresh="parent")
+            ScannerUtils.draw_scanners(query,result)
+            result.end_form()
+
+        result.popup(scan_popup,"Scan this File")
+
         result.heading("Viewing file in inode %s" % (query['inode']))
         try:
             result.text("Classified as %s by magic" % image.GetMagic())

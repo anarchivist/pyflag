@@ -40,6 +40,7 @@ import pyflag.DB as DB
 import pyflag.LogFile as LogFile
 import plugins.LogAnalysis.LogAnalysis as LogAnalysis
 import pyflag.logging as logging
+import pyflag.ScannerUtils as ScannerUtils
 
 description = "Load Data"
 
@@ -300,16 +301,8 @@ class LoadFS(Reports.report):
 
             ## Draw a list of checkboxes for all our scanners:
             result.ruler()
-            result.row("Choose Scanners to run:","",bgcolor='pink')
-            scanner_desc = [ i.__doc__.splitlines()[0] for i in Registry.SCANNERS.classes ]
-            for i in range(len(scanner_desc)):
-                scanner_name = Registry.SCANNERS.scanners[i]
-                scanner_factory = Registry.SCANNERS.classes[i]
-                ## should the checkbox be ticked by default?
-                if scanner_name not in query.getarray('scan') and scanner_factory.default:
-                    query['scan']=scanner_name 
-                result.checkbox(scanner_desc[i],"scan",scanner_name )
-
+            ScannerUtils.draw_scanners(query,result)
+            
             ## Try to get a magic hint
             try:
                 magic = FlagFramework.Magic()
@@ -360,10 +353,10 @@ class LoadFS(Reports.report):
         scanners = [ ]
         for i in user_scanners:
             try:
-                tmp  = Registry.SCANNERS.classes[Registry.SCANNERS.scanners.index(i)]
+                tmp  = Registry.SCANNERS.dispatch(i)
                 scanners.append(tmp(dbh,query['iosource'],fsfd))
             except Exception:
-                logging.log(logging.ERROR,"Unable to initialise scanner %s")
+                logging.log(logging.ERRORS,"Unable to initialise scanner %s")
 
         logging.log(logging.DEBUG,"Will invoke the following scanners: %s" % scanners)
         fsfd.scanfs(scanners)

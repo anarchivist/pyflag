@@ -51,7 +51,7 @@ class BaseScanner:
         self.size = 0
         self.ddfs = ddfs
         self.ddfs.dbh.set_meta("scan_%s" % outer.__class__, inode)
-        print "Scanning inode %s with %s" % (inode, outer)
+#        print "Scanning inode %s with %s" % (inode, outer)
 
     def process(self, data, metadata={}):
         """ process the chunk of data.
@@ -277,4 +277,3 @@ def scanfile(ddfs,fd,factories):
             o.finish()
         except Exception,e:
             logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
-
