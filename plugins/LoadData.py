@@ -256,8 +256,6 @@ class LoadIOSource(Reports.report):
             result.case_selector()
             result.ruler()
             subsystems=IO.subsystems.keys()
-            subsystems.sort()
-            subsystems.reverse()
             result.const_selector("Select IO Subsystem",'subsys',subsystems,subsystems)
             #this will cause a form to be placed into result.
             fd=IO.IOFactory(query,result)

@@ -30,7 +30,7 @@
 
 @var flag_version: Current version of the flag program
 """ 
-flag_version = "0.72"
+flag_version = "0.76"
 import sys,os
 import pyflag.conf
 config=pyflag.conf.ConfObject()
@@ -47,7 +47,7 @@ class query_type:
     """ A generic wrapper for holding CGI parameters.
 
     This is almost like a dictionary, except that there are methods provided to give access to CGI arrays obtained by repeated use of the same key mutiple times.
-    @note: This property necessitate the sometime unituitive way of resetting a paramter by initially deliting it. For example, to change the 'report' parameter in query you must do:
+    @note: This property necessitate the sometime unituitive way of resetting a paramter by initially deleting it. For example, to change the 'report' parameter in query you must do:
     
     >>> del query['report']
     >>> query['report'] = 'newvalue'
@@ -59,6 +59,8 @@ class query_type:
         self.q=[]
         if isinstance(query_list,list):
             self.q = query_list
+        elif isinstance(query_list,tuple):
+            self.q = list(query_list)
         elif isinstance(query_list,dict):
             for k,v in query_list.items():
                 self.__setitem__(k,v)

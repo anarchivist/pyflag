@@ -261,7 +261,7 @@ class HTMLUI(UI.GenericUI):
     def pre(self,string):
         self.result += "<pre>%s</pre>" % string
 
-    def link(self,string,target=None,options=None,**target_options):
+    def link(self,string,target=None,options=None,icon=None,**target_options):
         if target==None:
             target=FlagFramework.query_type(())
         q=target.clone()
@@ -281,7 +281,14 @@ class HTMLUI(UI.GenericUI):
         except KeyError:
             pass
 
-        self.result+="<a href='blah?%s' %s>%s</a>" % (q,self.opt_to_str(options),string)
+        if icon:
+            tmp = self.__class__(self)
+            tmp.icon(icon,alt=string,border=0)
+            tmp.tooltip(string)
+            string=tmp
+
+        self.result+="<a href='blah?%s' %s>" % (q,self.opt_to_str(options))
+        self.result+="%s</a>" % (string)
 
     def popup(self,callback, label,icon=None,toolbar=0, menubar=0, **options):
         """ This method presents a button on the screen, which when clicked will open a new window and use the callback to render in it.

@@ -259,8 +259,16 @@ class SearchIndex(Reports.report):
     def display(self,query,result):
         dbh = self.DBO(query['case'])
         keyword = query['keyword']
+        if not query.has_key('showall'):
+            query['where_Keyword']="=%s" % keyword
+            
         result.heading("Previously searched keywords in logical image %s" %
                        (query['fsimage']))
+
+        q=query.clone()
+        del q['where_Keyword']
+        result.link("Show all previously cached keywords",q,showall='y',icon='examine.png')
+        
         table = query['fsimage']
         iofd = IO.open(query['case'], query['fsimage'])
         fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)

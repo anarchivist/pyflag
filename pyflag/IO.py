@@ -40,8 +40,10 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import marshal
 import os,re
+import pyflag.logging as logging
 
 def mmls_popup(query,result,option_str=None,subsys=None,offset=None):
+    result.display=result.__str__
     try:
         if query['update']:
             query[offset]=query['update']
@@ -53,7 +55,7 @@ def mmls_popup(query,result,option_str=None,subsys=None,offset=None):
 
     result.heading("Output of mmls on io source")
     string = "%s -i %s -o %s %s/mmls -t dos foo" % (config.IOWRAPPER, subsys, option_str,config.FLAG_BIN)
-    print "Will launch %s" % string
+    logging.log(logging.DEBUG,"Will launch %s" % string)
     (stdin, stdout, stderr ) = os.popen3(string)
     output = stdout.readlines()
     try:
@@ -284,28 +286,26 @@ def IOFactory(query,result=None, subsys='subsys'):
 
 import pyflag.DB as DB
 
-subsystems=(
+subsystems=FlagFramework.query_type([
             ('advanced',advanced),
             ('sgzip',sgzip),
             ('ewf',ewf),
             ('standard',standard),
             ('mounted',mounted),
             ('raid',raid),
-            )
+            ])
+
+del subsystems['case']
 
 def open(case, iosource):
     """ lookup iosource in database and return an IO object """
     dbh = DB.DBO(case)
     try:
         optstr = dbh.get_meta(iosource)
-#        dbh.execute("select property from meta where value=%r", iosource)
-#        optstr = dbh.fetch()['property']
     except TypeError:
         raise IOError, "Not a valid IO Data Source: %s" % iosource
-#
     # unmarshal the option tuple from the database
     # opts[0] is always the subsystem name
     opts = marshal.loads(optstr)
-    inv = zip(*subsystems)
-    io=inv[1][list(inv[0]).index(opts[0])]
+    io=subsystems[opts[0][0]]
     return io(options=opts)

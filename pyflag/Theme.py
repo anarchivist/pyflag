@@ -173,8 +173,10 @@ class BlueTheme(BasicTheme):
     </tbody>
     </table>'''
 
-    def navbar(self,query=FlagFramework.query_type(()),next=None,previous=None,pageno=None):
+    def navbar(self,query=None,next=None,previous=None,pageno=None):
         """ Returns the HTML for the navigation bar. """
+        if query==None: query=FlagFramework.query_type(())
+        
         if not query.has_key('family'):
             query['family']=''
             
@@ -193,10 +195,20 @@ class BlueTheme(BasicTheme):
             q.FillQueryTarget(previous)
             previous = '<a href="f?%s"><img height=25 src="/flag/images/back.png"  border="0"></a>' %  (str(q))
 
-        bar = {'family': query['family'],'back': previous,'case': query['case'],'pageno':  pageno,'next': next,'reset': str(query)+'&reset=1','stop': str(query)+'&stop=1'}
+        ## These are the query parameters which will get propagated if they exist:
+        propegated = ['family','case','fsimage','iosubsys']
+        family=FlagFramework.query_type()
+        for i in propegated:
+            try:
+                del family[i]
+                family[i]=query[i]
+            except KeyError:
+                pass
+            
+        bar = {'family':family,'back': previous,'case': query['case'],'pageno':  pageno,'next': next,'reset': str(query)+'&reset=1','stop': str(query)+'&stop=1'}
 
         toolbar = '''<table><tr>
-        <td valign="bottom"><a href="f?family=%(family)s"><img height=25 src="/flag/images/home_grey.png" border="0"></a></td><td valign="bottom">%(back)s</td><td>%(case)s - page %(pageno)s</td><td valign="bottom">%(next)s</td> <td valign="bottom">
+        <td valign="bottom"><a href="%(family)s"><img height=25 src="/flag/images/home_grey.png" border="0"></a></td><td valign="bottom">%(back)s</td><td>%(case)s - page %(pageno)s</td><td valign="bottom">%(next)s</td> <td valign="bottom">
         <td valign="bottom"><a href="flag?%(reset)s"><img height=25 src="/flag/images/reset_grey.png" border="0"></a></td></tr></table>''' % bar
 
         return toolbar
