@@ -46,12 +46,6 @@ import re
 
 #config.LOG_LEVEL=7
 
-class DontDraw(Exception):
-    """ Exception raised by a UI to let the server know not to draw it.
-
-    This is mainly used by the form method to allow a UI to manage its own window
-    """
-
 class GTK_Draw_Form_Exception(Exception):
     """ This exception is raised when we want to draw a form """
     def __init__(self,query):
@@ -1369,4 +1363,4 @@ class GTKUI(UI.GenericUI):
         hbox.add(fbut)
         box.pack_start(hbox,False,False)
         self.server.create_window(box)
-        raise DontDraw()
+        raise FlagFramework.DontDraw()

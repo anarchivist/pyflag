@@ -49,7 +49,7 @@ def mmls_popup(query,result,option_str=None,subsys=None,offset=None):
             query[offset]=query['update']
             del query['update']
             del query['callback_stored']
-            result.refresh(0,query,options={'parent':1})
+            result.refresh(0,query,parent=1)
     except KeyError:
         pass
 

@@ -82,13 +82,18 @@ class BasicTheme:
     header='''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
         <html>
         <head>
-        <title>FLAG - Forensic Log Analysis GUI - %s</title>
+        <title>%s</title>
         </head>
-        <body link=blue vlink=blue bgcolor="#FFFFFF"><table width="100%%">
-        <tbody> <script src="images/functions.js" type="text/javascript" language="javascript"></script>
+        <body link=blue vlink=blue bgcolor="#FFFFFF"><script src="images/functions.js" type="text/javascript" language="javascript"></script>'''
+    banner = '''<table width="100%%">
+        <tbody> 
         <tr>
-        <td align=left width=10><img src="/flag/images/flag.png" alt="flag_heading" border="0"></td>''' % FlagFramework.flag_version
+        <td align=left width=10><img src="/flag/images/pyflag.png" alt="flag_heading" border="0"></td><td align=center> ''' 
 
+    def naked_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
+        """ Render the ui with minimal interventions """
+        return " ".join((self.header % title,data,self.footer))
+    
     def menu(self,flag,query):
         """ Draws the menu for the current family.
 
@@ -164,20 +169,10 @@ class BasicTheme:
         except:
             toolbar_str=''
 
-        return " ".join((self.header,meta,"<td align=left>%s</td><td align=center>"%toolbar_str,toolbar,'''</td><td width=10><center><img src="/flag/images/logo.png"><br><font size="+1"><a href="http://www.gnu.org/copyleft/gpl.html"> &copy;GPL</a></font></center></td></tr></tbody></table> </tr></table>\n''', data ,"<table width=100%%><tr><td></td></tr><tr><td align=center>%s</td></tr></table>"%(toolbar),self.footer))
+        return " ".join((self.header,self.banner,meta,"<td align=left>%s</td><td align=center>"%toolbar_str,toolbar,'''</td><td width=10><center><img src="/flag/images/logo.png"><br><font size="+1"><a href="http://www.gnu.org/copyleft/gpl.html"> &copy;GPL</a></font></center></td></tr></tbody></table> </tr></table>\n''', data ,"<table width=100%%><tr><td></td></tr><tr><td align=center>%s</td></tr></table>"%(toolbar),self.footer))
 
 class BlueTheme(BasicTheme):
     """ This class encapsulates the theme elements. The results from this class really depend on the UI used - for example the HTMLUI will expect HTML to come back from here. """
-
-    header='''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-        <html>
-        <head>
-        <title>FLAG - Forensic Log Analysis GUI. %s</title>
-        </head>
-        <body link=blue vlink=blue bgcolor="#FFFFFF"><table width="100%%">
-        <tbody> <script src="images/functions.js" type="text/javascript" language="javascript"></script>
-        <tr>
-        <td align=left width=10><img src="/flag/images/pyflag.png" alt="flag_heading" border="0"></td><td align=center> ''' % FlagFramework.flag_version
 
     hilight_bar = '''<table cellspacing=0 cellpadding=0 width="100%%" background="flag/images/topfill.jpg" border=0> <tbody>
     <tr><td align=left>%s</td>
@@ -221,7 +216,7 @@ class BlueTheme(BasicTheme):
 
         return toolbar
 
-    def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None,ui=None):
+    def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None,ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
 
         if not ui.toolbar_ui:
             toolbar_str='&nbsp;&nbsp;'
@@ -229,7 +224,7 @@ class BlueTheme(BasicTheme):
             toolbar_str=ui.toolbar_ui.__str__()
 
         toolbar=self.navbar(query=query , next=next , previous=previous , pageno=pageno)
-        return " ".join((self.header,meta,'''</td><td width=10><img src="/flag/images/logo.png"></td></tr></tbody></table> </tr></table>\n''',self.hilight_bar % (toolbar_str,toolbar), data ,self.hilight_bar % (toolbar_str,toolbar),self.footer))
+        return " ".join((self.header % title,self.banner,meta,'''</td><td width=10><img src="/flag/images/logo.png"></td></tr></tbody></table> </tr></table>\n''',self.hilight_bar % (toolbar_str,toolbar), data ,self.hilight_bar % (toolbar_str,toolbar),self.footer))
 
     def menu(self,flag,query):
         """ Draws the menu for the current family.

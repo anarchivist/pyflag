@@ -39,6 +39,9 @@ config=pyflag.conf.ConfObject()
 import pyflag.Theme
 import cStringIO,csv
 
+class HTMLException(Exception):
+    """ An exception raised within the UI - should not escape from this module """
+
 class HTTPObject:
     def __init__(self):
         self.content_type=None
@@ -88,11 +91,9 @@ class HTMLUI(UI.GenericUI):
         #naked. Note that this only affects UIs which are drawn in a
         #window not ones which are added to other UIs:
         self.decoration='full'
+        self.title=''
         
     def display(self):
-        if self.decoration=='naked':
-            return self.__str__()
-        
         #Make a toolbar
         if not self.nav_query:
             q = self.defaults.clone()
@@ -110,7 +111,10 @@ class HTMLUI(UI.GenericUI):
             theme=pyflag.Theme.factory(q['theme'])
         except KeyError:
             theme=pyflag.Theme.factory()
-        return theme.render(q,meta=self.meta,data=self.__str__(),next=self.next , previous=self.previous , pageno=self.pageno, ui=self)
+        if self.decoration=='naked':
+            return theme.naked_render(data=self.__str__(), ui=self,title=self.title)
+        else:
+            return theme.render(q,meta=self.meta,data=self.__str__(),next=self.next , previous=self.previous , pageno=self.pageno, ui=self)
     
     def __str__(self):
         #Check to see that table tags are balanced:
@@ -767,7 +771,7 @@ class HTMLUI(UI.GenericUI):
                     if query['refresh']:
                         del query['refresh']
                         del query['callback_stored']
-                        result.refresh(0,query,options={'parent':1})
+                        result.refresh(0,query,parent=1)
                 except KeyError:
                     pass
                 
@@ -1029,6 +1033,7 @@ class HTMLUI(UI.GenericUI):
             self.result += "%s%s" % (format,d)
 
         for d in cuts:
+            d = re.sub("\n","<br>\r\n",d)
             self.text_var += str(d)
             if options.has_key('wrap') and options['wrap'] == 'full':
                 try:
@@ -1044,7 +1049,7 @@ class HTMLUI(UI.GenericUI):
                         if index > wrap:
                             do_options(self.text_var[0:wrap],options)
                             self.text_var = self.text_var[wrap:]
-                            self.result+="<img src='/flag/images/next_line.png'>\n"
+                            self.result+="<img src='/flag/images/next_line.png'><br>\n"
                         else:
                             do_options("%s\n" % self.text_var[:index],options)
                             self.text_var = self.text_var[index+1:]
@@ -1131,12 +1136,11 @@ class HTMLUI(UI.GenericUI):
 
         self.result += "<form method=get action='/f'>\n"
 
-    def end_form(self,name='Submit'):
+    def end_form(self,value='Submit',**opts):
         for k,v in self.form_parms:
             self.result += "<input type=hidden name='%s' value='%s'>\n" % (k,v)
-
-        if name:
-            self.result += "<input type=submit value='%s'></form>\n" % (name)
+        
+        self.result += "<input type=submit value='%s' %s></form>\n" % (value,self.opt_to_str(opts))
 
     def join(self,ui):
         """ Joins the supplied ui object with this object """
@@ -1171,7 +1175,7 @@ class HTMLUI(UI.GenericUI):
         else:
             self.result += "<hr />\n"
         
-    def refresh(self,interval,query,options=None):
+    def refresh(self,interval,query,**options):
         if not options:
             options={}
 
@@ -1193,6 +1197,86 @@ class HTMLUI(UI.GenericUI):
         option_str = self.opt_to_str(options)
         self.result += "<img src=/flag/images/%s %s />" % (path, option_str)
 
+    def wizard(self,names=[],context="wizard",callbacks=[],title=''):
+        """ This implements a wizard.
+        
+        A wizard is a series of screens with a next/previous button to allow users to work through a process. Callbacks are called for each page. Each page is drawn inside a form, pressing the next button will submit the form, but pressing the previous button will not.
+        
+        Note that the results of all the forms are collected within the query object, so callers must manage the query objects by removing parameters as needed. You must ensure that the wizard callbacks generate enough parameters to display the report.
+        
+        Prototype for callbacks is:
+        
+        cb(query,result)
+
+        The callback should draw on the result using the parameters in query.
+        The return value of cb is boolean, true indicating that this page is ok, and we should continue to the next page, while false indicates an error condition, and the page is redisplayed. Note that it is the callbacks responsibility to indicate what has gone wrong to the user.
+        """
+        def wizard_cb(query,result):
+            """ This callback is responsible for managing the wizard popup window """
+            result.title="Pyflag Wizard %s" % title
+            try:
+                page=int(query[context])
+            except:
+                page=0
+                
+            result.heading(names[page])
+            new_query=query.clone()
+            del new_query[context]
+            del new_query['submit']
+
+            result.start_form(new_query)
+            result.start_table()
+
+            ## Ask the cb to draw on us: (We do not want the cb to stuff
+            ## with our form_parms so we create an empty ui)
+            tmp=result.__class__()
+            if query.has_key('submit'):
+                if callbacks[page](new_query,tmp):
+                    page+=1
+            ## This is the last page and it was ok - we just go to our parent page
+                    if page==len(names):
+                        del new_query['callback_stored']
+                        result.refresh(0,new_query,parent=1)
+                        return
+                else:
+                    self.text("There was an error with the form:",color="red")
+
+            ## This time we want to properly display the form
+            tmp=result.__class__(result)
+            callbacks[page](new_query,tmp)
+            result.row(tmp)
+
+            ## Add the form elements as hidden parameters:
+            result.hidden(context,page)
+            for k,v in result.form_parms:
+                result.result += "<input type=hidden name='%s' value='%s'>\n" % (k,v)
+
+            result.end_table()
+            if page>0:
+                result.result+="<input type=button value=Previous onclick=\"window.location=\'%s&%s=%s\'\"; />" % (new_query,context,page-1)
+            ## Make the update button
+            result.result += "<input type=submit value='Update'>"
+
+            if page<len(names)-1:
+                result.result += "<input type=submit value='Next' name=submit>\n"
+    #            self.end_form("Next",name='submit')
+    #            self.result+="%s<input type=button value=Next onclick=\"window.location=\'%s&%s=%s\'\"; />" % (page,new_query,context,page+1)
+            elif page==len(names)-1:
+                result.result += "<input type=submit value='Finish' name=submit>\n"
+    #            self.end_form("Finish",name='submit')
+    #            self.result+="%s<input type=button value=Finish onclick=\"self.opener.location=\'%s\'; self.close();\" />" % (page,new_query)
+
+            result.decoration='naked'
+
+        cb = self.store_callback(wizard_cb)
+##        try:
+##            page=int(query[context])
+##            cbfunc=callbacks[page]
+##        except (ValueError,KeyError):
+        self.result+="""<script language=javascript>var client; function open_wizard_window() {window.open('%s&%s=0&callback_stored=%s','client','toolbar=0,menubar=0,HEIGHT=600,WIDTH=800,scrollbars=yes')}; open_wizard_window(); </script><abbr title=\"It your browser blocks popups, click here to popup a wizard\"><a onclick=\"open_wizard_window()\">Click here to launch wizard</a></abbr>""" % (self.defaults,context,cb)
+        raise FlagFramework.DontDraw()
+        
+        
     def notebook(self,names=[],context="notebook",callbacks=[],descriptions=[]):
         """ Draw a notebook like UI with tabs.
 

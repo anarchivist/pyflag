@@ -39,6 +39,12 @@ import pyflag.logging as logging
 import index
 import pyflag.Registry as Registry
 
+class DontDraw(Exception):
+    """ Exception raised by a UI to let the server know not to draw it.
+
+    This is mainly used by the form method to allow a UI to manage its own window
+    """
+
 def get_traceback(e,result):
     import sys
     import traceback
@@ -423,10 +429,13 @@ class Flag:
                 #Set the default form behaviour
                 result.defaults = query
                 result.heading(report.name)
-                result.start_form(query)
-                report.form(query,result)
-                result.end_table()
-                result.end_form('Submit')
+                try:
+                    result.start_form(query)
+                    report.form(query,result)
+                    result.end_table()
+                    result.end_form('Submit')
+                except DontDraw:
+                    pass
                 
         #If one of the parameters is wrong - we present the user with an error page!!!
         except TypeCheck.ReportInvalidParamter, e:

@@ -141,7 +141,7 @@ class ListLogFile(Reports.report):
 class CreateLogPreset(Reports.report):
     """ Creates a new type of log file in the database, so that they can be loaded using the Load Log File report """
     parameters = {"log_preset":"sqlsafe", "datafile":"filename",
-                   "final":"alphanum", "preview":"alphanum"}
+                   }
     name="Create Log Preset"
     family = "Log Analysis"
     description="Create new preset log type"
@@ -161,13 +161,55 @@ class CreateLogPreset(Reports.report):
         def step1(query,result):
             result.row("Select a sample log file for the previewer")
             tmp = result.__class__(result)
-            tmp.filebox()
+            tmp.filebox(target='datafile')
             result.row("Enter name of log file:",tmp)
+            if query.has_key('datafile'):
+                return True
+            else:
+                result.text("Please input a log file name\n",color='red')
+                return False
+        
+        def step2(query,result):
+            result.const_selector("Select Log Processor", 'delmethod',
+                                  Registry.LOG_DRIVERS.drivers.keys() , Registry.LOG_DRIVERS.drivers.keys()
+                                  )
+            if query.has_key('delmethod'):
+                return True
+            else:
+                result.text("Please select a processor",color='red')
+                return False
 
+        def step3(query,result):
+            # Now we ask the log object to draw its form for us:
+            log = Registry.LOG_DRIVERS.drivers[query['delmethod']]('datafile',query)
+
+            #Ask the Log object to draw the form it requires
+            log.form(query,result)
+            return True
+
+        def step4(query,result):
+            dbh = self.DBO(query['case'])
+            result.text("The following is the result of importing the first few lines from the log file into the database.\nPlease check that the importation was successfull before continuing.",wrap='full')
+            log = Registry.LOG_DRIVERS.drivers[query['delmethod']]('datafile',query)
+            display_test_log(dbh,log,result,query)
+            return True
+
+        def step5(query,result):
+            result.textfield("name for preset:",'log_preset')
+##            result.hidden('final','ok')
+            if query.has_key('log_preset'):
+                return True
+            else:
+                result.text("Please type a name for the preset.\n",color='red')
+                return False
 
         result.wizard(
-            names = ( "Select File",),
-            callbacks = (step1,)
+            names = ( "Step 1: Select a log file",
+                      "Step 2: Select a Log processor",
+                      "Step 3: Configure Log processor",
+                      "Step 4: View test result",
+                      "Step 5: Save Preset"),
+            callbacks = (step1,step2,step3,step4,step5)
             )
 
         return

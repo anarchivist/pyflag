@@ -138,7 +138,7 @@ class BrowseFS(Reports.report):
                         del query['refresh']
                         del query['callback_stored']
                         del query['scan']
-                        result.refresh(0,query,options={'parent':1})
+                        result.refresh(0,query,parent=1)
                         return
                 except KeyError:
                     pass

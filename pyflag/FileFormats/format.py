@@ -265,6 +265,10 @@ class SimpleStruct(DataType):
         fields = NamedArray(self.fields,self.field_names)
         offset=0
         result={}
+        ## Temporarily set our data dict to be result, so that
+        ## instantiated classes can call parent['boo'] to retrieve
+        ## items already parsed.
+        self.data=result
         for item in fields:
             tmp=item['Type'](data[offset:],item['Count'],parent=self)
             self.offsets[item['Name']]=offset
@@ -273,16 +277,23 @@ class SimpleStruct(DataType):
             
         return result
 
-    def size(self):
-        size=0
+    def calculate_struct_size(self,struct):
+        """ calculates the total size of struct by summing its individual sizes.
 
+        struct is a dict of classes.
+        """
+        size=0
+    
+        for i in struct.values():
+            size+=i.size()
+        
+        return size
+        
+    def size(self):
         if not self.data:
             self.initialise()
-            
-        for i in self.data.values():
-            size+=i.size()
-            
-        return size
+
+        return self.calculate_struct_size(self.data)
             
     def __str__(self):
         """ Prints the array nicely """
@@ -529,11 +540,7 @@ class TERMINATED_STRING(DataType):
         
 class BYTE_ENUM(BYTE):
     types={}
-    
-    def read(self,data):
-        result=BYTE.read(self,data)
-        return result
-        
+            
     def __str__(self):
         if not self.data: self.initialise()
         try:
@@ -554,6 +561,15 @@ class LONG_ENUM(BYTE_ENUM):
 
 class WORD_ENUM(BYTE_ENUM):
     fmt='H'    
+
+class BitField(BYTE):
+    ## This stores the masks
+    masks = {}
+
+    def __str__(self):
+        if not self.data: self.initialise()
+        result=[ v for k,v in self.masks.items() if k & self.data ]
+        return ','.join(result)
 
 class UCS16_STR(STRING):
     def  read(self,data):

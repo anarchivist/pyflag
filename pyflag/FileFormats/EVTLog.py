@@ -108,7 +108,7 @@ class Event(SimpleStruct):
             [ TIMESTAMP,1,'TimeGenerated'],
             [ TIMESTAMP,1,'TimeWritten'],
             [ WORD,1,'EventID'],
-            [ WORD,1, 'Space0'],
+            [ WORD,1, 'pad'],
             [ EventType,1, 'EventType'],
             [ WORD,1, 'NumStrings'],
             [ WORD,1, 'EventCategory'],
