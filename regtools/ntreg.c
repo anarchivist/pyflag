@@ -1,6 +1,9 @@
 /*
  * ntreg.c - NT Registry Hive access library
  *
+ * 2004-aug: Deep indirect index support. NT351 support. Recursive delete.
+ *           Debugged a lot in allocation routines. Still no expansion.
+ * 2004-jan: Verbosity updates
  * 2003-jan: Allocation of new data, supports adding/deleting keys & stuff.
  *           Missing is expanding the file.
  * 2003-jan: Seems there may be garbage pages at end of file, not zero pages
@@ -8,7 +11,7 @@
  * 
  * NOTE: The API is not frozen. It can and will change every release.
  *
- * Copyright (c) 1997-2003 Petter Nordahl-Hagen.
+ * Copyright (c) 1997-2004 Petter Nordahl-Hagen.
  * Freely distributable in source or binary for noncommercial purposes,
  * but I allow some exceptions to this.
  * Please see the COPYING file for more details on
@@ -40,7 +43,11 @@
 
 #include "ntreg.h"
 
-const char ntreg_version[] = "ntreg lib routines, v0.90 030126 , (c) Petter N Hagen";
+/* Set to abort() and debug on more critical errors */
+#define DOCORE 0
+
+
+const char ntreg_version[] = "ntreg lib routines, v0.92 040818, (c) Petter N Hagen";
 
 char *val_types[REG_MAX+1] = {
   "REG_NONE", "REG_SZ", "REG_EXPAND_SZ", "REG_BINARY", "REG_DWORD",       /* 0 - 4 */
@@ -218,7 +225,7 @@ int debugit(char *buf, int sz)
 
    int dirty=0,to,from,l,i,j,wlen,cofs = 0;
    
-   printf("Buffer debugger. '?' for help.\n");
+   fprintf(stderr, "Buffer debugger. '?' for help.\n");
    
    while (1) {
       l = fmyinput(".",inbuf,90);
@@ -284,7 +291,7 @@ int debugit(char *buf, int sz)
 	    return(0);
 	    break;
 	  case 's':
-	    if (!dirty) printf("Buffer has not changed, no need to write..\n");
+	    if (!dirty) fprintf(stderr, "Buffer has not changed, no need to write..\n");
 	    return(dirty);
 	    break;
 	  case 'h':
@@ -299,14 +306,14 @@ int debugit(char *buf, int sz)
 	    }
 	    wlen = gethexorstr(&bp,whatbuf);
 	    if (to > sz) to = sz;
-	    printf("from: %x, to: %x, wlen: %d\n",from,to,wlen);
+	    fprintf(stderr, "from: %x, to: %x, wlen: %d\n",from,to,wlen);
 	    for (i = from; i < to; i++) {
 	       for (j = 0; j < wlen; j++) {
 		  if ( *(buf+i+j) != *(whatbuf+j)) break;
 	       }
-	       if (j == wlen) printf("%06x ",i);
+	       if (j == wlen) fprintf(stderr, "%06x ",i);
 	    }
-	    printf("\n");
+	    fprintf(stderr, "\n");
 	    break;
 	  case ':':
 	    bp++;
@@ -314,7 +321,7 @@ int debugit(char *buf, int sz)
 	    from = gethex(&bp);
 	    wlen = gethexorstr(&bp,whatbuf);
 	    
-	    printf("from: %x, wlen: %d\n",from,wlen);
+	    fprintf(stderr, "from: %x, wlen: %d\n",from,wlen);
 
 	    memcpy(buf+from,whatbuf,wlen);
 	    dirty = 1;
@@ -328,7 +335,7 @@ int debugit(char *buf, int sz)
 	    if (*(++bp) != 0) {
 	       j = gethex(&bp);
 	    }
-	    printf("from: %x, rid: %x\n",from,j);
+	    fprintf(stderr, "from: %x, rid: %x\n",from,j);
 	    seek_n_destroy(from,j,500,0);
 	    break;
 #endif
@@ -369,28 +376,28 @@ void parse_nk(struct hive *hdesc, int vofs, int blen)
   struct nk_key *key;
   int i;
 
-  printf("== nk at offset %0x\n",vofs);
+  fprintf(stderr, "== nk at offset %0x\n",vofs);
 
 #define D_OFFS(o) ( (void *)&(key->o)-(void *)hdesc->buffer-vofs )
 
   key = (struct nk_key *)(hdesc->buffer + vofs);
-  printf("%04x   type              = 0x%02x %s\n", D_OFFS(type)  , key->type,
+  fprintf(stderr, "%04x   type              = 0x%02x %s\n", D_OFFS(type)  , key->type,
 	                           (key->type == KEY_ROOT ? "ROOT_KEY" : "") );
-  printf("%04x   timestamp skipped\n", D_OFFS(timestamp) );
-  printf("%04x   parent key offset = 0x%0lx\n", D_OFFS(ofs_parent) ,key->ofs_parent);
-  printf("%04x   number of subkeys = %ld\n", D_OFFS(no_subkeys),key->no_subkeys);
-  printf("%04x   lf-record offset  = 0x%0lx\n",D_OFFS(ofs_lf),key->ofs_lf);
-  printf("%04x   number of values  = %ld\n", D_OFFS(no_values),key->no_values);
-  printf("%04x   val-list offset   = 0x%0lx\n",D_OFFS(ofs_vallist),key->ofs_vallist);
-  printf("%04x   sk-record offset  = 0x%0lx\n",D_OFFS(ofs_sk),key->ofs_sk);
-  printf("%04x   classname offset  = 0x%0lx\n",D_OFFS(ofs_classnam),key->ofs_classnam);
-  printf("%04x   *unused?*         = 0x%0lx\n",D_OFFS(dummy4),key->dummy4);
-  printf("%04x   name length       = %d\n", D_OFFS(len_name),key->len_name);
-  printf("%04x   classname length  = %d\n", D_OFFS(len_classnam),key->len_classnam);
+  fprintf(stderr, "%04x   timestamp skipped\n", D_OFFS(timestamp) );
+  fprintf(stderr, "%04x   parent key offset = 0x%0lx\n", D_OFFS(ofs_parent) ,key->ofs_parent);
+  fprintf(stderr, "%04x   number of subkeys = %ld\n", D_OFFS(no_subkeys),key->no_subkeys);
+  fprintf(stderr, "%04x   lf-record offset  = 0x%0lx\n",D_OFFS(ofs_lf),key->ofs_lf);
+  fprintf(stderr, "%04x   number of values  = %ld\n", D_OFFS(no_values),key->no_values);
+  fprintf(stderr, "%04x   val-list offset   = 0x%0lx\n",D_OFFS(ofs_vallist),key->ofs_vallist);
+  fprintf(stderr, "%04x   sk-record offset  = 0x%0lx\n",D_OFFS(ofs_sk),key->ofs_sk);
+  fprintf(stderr, "%04x   classname offset  = 0x%0lx\n",D_OFFS(ofs_classnam),key->ofs_classnam);
+  fprintf(stderr, "%04x   *unused?*         = 0x%0lx\n",D_OFFS(dummy4),key->dummy4);
+  fprintf(stderr, "%04x   name length       = %d\n", D_OFFS(len_name),key->len_name);
+  fprintf(stderr, "%04x   classname length  = %d\n", D_OFFS(len_classnam),key->len_classnam);
 
-  printf("%04x   Key name: <",D_OFFS(keyname) );
-  for(i = 0; i < key->len_name; i++) putchar(key->keyname[i]);
-  printf(">\n== End of key info.\n");
+  fprintf(stderr, "%04x   Key name: <",D_OFFS(keyname) );
+  for(i = 0; i < key->len_name; i++) putc(key->keyname[i], stderr);
+  fprintf(stderr, ">\n== End of key info.\n");
 
 }
 
@@ -402,24 +409,24 @@ void parse_vk(struct hive *hdesc, int vofs, int blen)
   struct vk_key *key;
   int i;
 
-  printf("== vk at offset %0x\n",vofs);
+  fprintf(stderr, "== vk at offset %0x\n",vofs);
 
 
   key = (struct vk_key *)(hdesc->buffer + vofs);
-  printf("%04x   name length       = %d (0x%0x)\n", D_OFFS(len_name),
+  fprintf(stderr, "%04x   name length       = %d (0x%0x)\n", D_OFFS(len_name),
 	                             key->len_name, key->len_name  );
-  printf("%04x   length of data    = %ld (0x%0lx)\n", D_OFFS(len_data),
+  fprintf(stderr, "%04x   length of data    = %ld (0x%0lx)\n", D_OFFS(len_data),
 	                             key->len_data, key->len_data  );
-  printf("%04x   data offset       = 0x%0lx\n",D_OFFS(ofs_data),key->ofs_data);
-  printf("%04x   value type        = 0x%0lx  %s\n", D_OFFS(val_type), key->val_type,
+  fprintf(stderr, "%04x   data offset       = 0x%0lx\n",D_OFFS(ofs_data),key->ofs_data);
+  fprintf(stderr, "%04x   value type        = 0x%0lx  %s\n", D_OFFS(val_type), key->val_type,
                  (key->val_type <= REG_MAX ? val_types[key->val_type] : "(unknown)") ) ;
 
-  printf("%04x   flag              = 0x%0x\n",D_OFFS(flag),key->flag);
-  printf("%04x   *unused?*         = 0x%0x\n",D_OFFS(dummy1),key->dummy1);
+  fprintf(stderr, "%04x   flag              = 0x%0x\n",D_OFFS(flag),key->flag);
+  fprintf(stderr, "%04x   *unused?*         = 0x%0x\n",D_OFFS(dummy1),key->dummy1);
 
-  printf("%04x   Key name: <",D_OFFS(keyname) );
-  for(i = 0; i < key->len_name; i++) putchar(key->keyname[i]);
-  printf(">\n== End of key info.\n");
+  fprintf(stderr, "%04x   Key name: <",D_OFFS(keyname) );
+  for(i = 0; i < key->len_name; i++) putc(key->keyname[i], stderr);
+  fprintf(stderr, ">\n== End of key info.\n");
 
 }
 
@@ -432,18 +439,18 @@ void parse_sk(struct hive *hdesc, int vofs, int blen)
   struct sk_key *key;
   /* int i; */
 
-  printf("== sk at offset %0x\n",vofs);
+  fprintf(stderr, "== sk at offset %0x\n",vofs);
 
   key = (struct sk_key *)(hdesc->buffer + vofs);
-  printf("%04x   *unused?*         = %d\n"   , D_OFFS(dummy1),     key->dummy1    );
-  printf("%04x   Offset to prev sk = 0x%0lx\n", D_OFFS(ofs_prevsk), key->ofs_prevsk);
-  printf("%04x   Offset to next sk = 0x%0lx\n", D_OFFS(ofs_nextsk), key->ofs_nextsk);
-  printf("%04x   Usage counter     = %ld (0x%0lx)\n", D_OFFS(no_usage),
+  fprintf(stderr, "%04x   *unused?*         = %d\n"   , D_OFFS(dummy1),     key->dummy1    );
+  fprintf(stderr, "%04x   Offset to prev sk = 0x%0lx\n", D_OFFS(ofs_prevsk), key->ofs_prevsk);
+  fprintf(stderr, "%04x   Offset to next sk = 0x%0lx\n", D_OFFS(ofs_nextsk), key->ofs_nextsk);
+  fprintf(stderr, "%04x   Usage counter     = %ld (0x%0lx)\n", D_OFFS(no_usage),
 	                                            key->no_usage,key->no_usage);
-  printf("%04x   Security data len = %ld (0x%0lx)\n", D_OFFS(len_sk),
+  fprintf(stderr, "%04x   Security data len = %ld (0x%0lx)\n", D_OFFS(len_sk),
 	                                            key->len_sk,key->len_sk);
 
-  printf("== End of key info.\n");
+  fprintf(stderr, "== End of key info.\n");
 
 }
 
@@ -456,13 +463,13 @@ void parse_lf(struct hive *hdesc, int vofs, int blen)
   struct lf_key *key;
   int i;
 
-  printf("== lf at offset %0x\n",vofs);
+  fprintf(stderr, "== lf at offset %0x\n",vofs);
 
   key = (struct lf_key *)(hdesc->buffer + vofs);
-  printf("%04x   number of keys    = %d\n", D_OFFS(no_keys), key->no_keys  );
+  fprintf(stderr, "%04x   number of keys    = %d\n", D_OFFS(no_keys), key->no_keys  );
 
   for(i = 0; i < key->no_keys; i++) {
-    printf("%04x      %3d   Offset: 0x%0lx  - <%c%c%c%c>\n", 
+    fprintf(stderr, "%04x      %3d   Offset: 0x%0lx  - <%c%c%c%c>\n", 
 	   D_OFFS(hash[i].ofs_nk), i,
 	   key->hash[i].ofs_nk,
            key->hash[i].name[0],
@@ -471,7 +478,7 @@ void parse_lf(struct hive *hdesc, int vofs, int blen)
            key->hash[i].name[3] );
   }
 
-  printf("== End of key info.\n");
+  fprintf(stderr, "== End of key info.\n");
 
 }
 
@@ -484,19 +491,19 @@ void parse_lh(struct hive *hdesc, int vofs, int blen)
   struct lf_key *key;
   int i;
 
-  printf("== lh at offset %0x\n",vofs);
+  fprintf(stderr, "== lh at offset %0x\n",vofs);
 
   key = (struct lf_key *)(hdesc->buffer + vofs);
-  printf("%04x   number of keys    = %d\n", D_OFFS(no_keys), key->no_keys  );
+  fprintf(stderr, "%04x   number of keys    = %d\n", D_OFFS(no_keys), key->no_keys  );
 
   for(i = 0; i < key->no_keys; i++) {
-    printf("%04x      %3d   Offset: 0x%0lx  - <hash: %08lx>\n", 
+    fprintf(stderr, "%04x      %3d   Offset: 0x%0lx  - <hash: %08lx>\n", 
 	   D_OFFS(lh_hash[i].ofs_nk), i,
 	   key->lh_hash[i].ofs_nk,
            key->lh_hash[i].hash );
   }
 
-  printf("== End of key info.\n");
+  fprintf(stderr, "== End of key info.\n");
 
 }
 
@@ -509,19 +516,44 @@ void parse_li(struct hive *hdesc, int vofs, int blen)
   struct li_key *key;
   int i;
 
-  printf("== li at offset %0x\n",vofs);
+  fprintf(stderr, "== li at offset %0x\n",vofs);
 
 #define D_OFFS(o) ( (void *)&(key->o)-(void *)hdesc->buffer-vofs )
 
   key = (struct li_key *)(hdesc->buffer + vofs);
-  printf("%04x   number of keys    = %d\n", D_OFFS(no_keys), key->no_keys  );
+  fprintf(stderr, "%04x   number of keys    = %d\n", D_OFFS(no_keys), key->no_keys  );
 
   for(i = 0; i < key->no_keys; i++) {
-    printf("%04x      %3d   Offset: 0x%0lx\n", 
+    fprintf(stderr, "%04x      %3d   Offset: 0x%0lx\n", 
 	   D_OFFS(hash[i].ofs_nk), i,
 	   key->hash[i].ofs_nk);
   }
-  printf("== End of key info.\n");
+  fprintf(stderr, "== End of key info.\n");
+
+}
+
+/* Parse the ri subindex-datablock
+ * (Used to list li/lf/lh's when ~>500keys)
+ * vofs = offset into struct (after size linkage)
+ */
+void parse_ri(struct hive *hdesc, int vofs, int blen)
+{
+  struct ri_key *key;
+  int i;
+
+  fprintf(stderr, "== ri at offset %0x\n",vofs);
+
+#define D_OFFS(o) ( (void *)&(key->o)-(void *)hdesc->buffer-vofs )
+
+  key = (struct ri_key *)(hdesc->buffer + vofs);
+  fprintf(stderr, "%04x   number of subindices = %d\n", D_OFFS(no_lis), key->no_lis  );
+
+  for(i = 0; i < key->no_lis; i++) {
+    fprintf(stderr, "%04x      %3d   Offset: 0x%0lx\n", 
+	   D_OFFS(hash[i].ofs_li), i,
+	   key->hash[i].ofs_li);
+  }
+  fprintf(stderr, "== End of key info.\n");
 
 }
 
@@ -538,11 +570,11 @@ int parse_block(struct hive *hdesc, int vofs,int verbose)
   seglen = get_int(hdesc->buffer+vofs);  
 
   if (verbose || seglen == 0) {
-    printf("** Block at offset %0x\n",vofs);
-    printf("seglen: %d, %u, 0x%0x\n",seglen,seglen,seglen);
+    fprintf(stderr, "** Block at offset %0x\n",vofs);
+    fprintf(stderr, "seglen: %d, %u, 0x%0x\n",seglen,seglen,seglen);
   }
   if (seglen == 0) {
-    printf("Whoops! FATAL! Zero data block size! (not registry or corrupt file?)\n");
+    fprintf(stderr, "Whoops! FATAL! Zero data block size! (not registry or corrupt file?)\n");
     debugit(hdesc->buffer,hdesc->size);
     return(0);
   }
@@ -552,7 +584,7 @@ int parse_block(struct hive *hdesc, int vofs,int verbose)
     hdesc->usetot += seglen;
     hdesc->useblk++;
     if (verbose) {
-      printf("USED BLOCK: %d, 0x%0x\n",seglen,seglen);
+      fprintf(stderr, "USED BLOCK: %d, 0x%0x\n",seglen,seglen);
       /*      hexdump(hdesc->buffer,vofs,vofs+seglen+4,1); */
     }
   } else {
@@ -561,7 +593,7 @@ int parse_block(struct hive *hdesc, int vofs,int verbose)
     bzero(hdesc->buffer+vofs+4,seglen-4);
 
     if (verbose) {
-      printf("FREE BLOCK!\n"); 
+      fprintf(stderr, "FREE BLOCK!\n"); 
       /*      hexdump(hdesc->buffer,vofs,vofs+seglen+4,1); */
     }
   }
@@ -592,8 +624,11 @@ int parse_block(struct hive *hdesc, int vofs,int verbose)
     case 0x736b: /* sk */
       parse_sk(hdesc, vofs, seglen);
       break;
+    case 0x7269: /* ri */
+      parse_ri(hdesc, vofs, seglen);
+      break;
     default:
-      printf("value data, or not handeled yet!\n");
+      fprintf(stderr, "value data, or not handeled yet!\n");
       break;
     }
   }
@@ -622,7 +657,7 @@ int find_page_start(struct hive *hdesc, int vofs)
     h = (struct hbin_page *)(hdesc->buffer + r);
     if (h->id != 0x6E696268) return(0);
     if (h->ofs_next == 0) {
-      printf("find_page_start: zero len or ofs_next found in page at 0x%x\n",r);
+      fprintf(stderr, "find_page_start: zero len or ofs_next found in page at 0x%x\n",r);
       return(0);
     }
     r += h->ofs_next;
@@ -647,7 +682,7 @@ int find_free_blk(struct hive *hdesc, int pofs, int size)
   
   p = (struct hbin_page *)(hdesc->buffer + pofs);
 
-  while (vofs-pofs < p->ofs_next) {
+  while (vofs-pofs < (p->ofs_next - HBIN_ENDFILL)) {
 
     seglen = get_int(hdesc->buffer+vofs);  
 
@@ -657,7 +692,7 @@ int find_free_blk(struct hive *hdesc, int pofs, int size)
 #endif
 
     if (seglen == 0) {
-      printf("find_free_blk: FATAL! Zero data block size! (not registry or corrupt file?)\n");
+      fprintf(stderr, "find_free_blk: FATAL! Zero data block size! (not registry or corrupt file?)\n");
       debugit(hdesc->buffer,hdesc->size);
       return(0);
     }
@@ -676,6 +711,13 @@ int find_free_blk(struct hive *hdesc, int pofs, int size)
 	if (seglen >= size) {
 #if FB_DEBUG
 	  printf("find_free_blk: found size %d block at 0x%x\n",seglen,vofs);
+#endif
+#if 0
+	  if (vofs == 0x19fb8) {
+	    printf("find_free_blk: vofs = %x, seglen = %x\n",vofs,seglen);
+	    debugit(hdesc->buffer,hdesc->size);
+	    abort();
+	  }
 #endif
 	  return(vofs);
 	}
@@ -709,7 +751,7 @@ int find_free(struct hive *hdesc, int size)
     h = (struct hbin_page *)(hdesc->buffer + r);
     if (h->id != 0x6E696268) return(0);
     if (h->ofs_next == 0) {
-      printf("find_free: zero len or ofs_next found in page at 0x%x\n",r);
+      fprintf(stderr, "find_free: zero len or ofs_next found in page at 0x%x\n",r);
       return(0);
     }
     blk = find_free_blk(hdesc,r,size);
@@ -735,7 +777,7 @@ int alloc_block(struct hive *hdesc, int ofs, int size)
   int trail, trailsize, oldsz;
 
   if (hdesc->state & HMODE_NOALLOC) {
-    printf("alloc_block: ERROR: Hive %s is in no allocation safe mode,"
+    fprintf(stderr, "alloc_block: ERROR: Hive %s is in no allocation safe mode,"
 	   "new space not allocated. Operation will fail!\n", hdesc->filename);
     return(0);
   }
@@ -813,7 +855,7 @@ int alloc_block(struct hive *hdesc, int ofs, int size)
     
     return(blk);
   } else {
-    printf("alloc_block: failed to alloc %d bytes, and hive expansion not implemented yet!\n",size);
+    fprintf(stderr, "alloc_block: failed to alloc %d bytes, and hive expansion not implemented yet!\n",size);
   }
   return(0);
 }
@@ -833,14 +875,19 @@ int free_block(struct hive *hdesc, int blk)
   struct hbin_page *p;
 
   if (hdesc->state & HMODE_NOALLOC) {
-    printf("free_block: ERROR: Hive %s is in no allocation safe mode,"
+    fprintf(stderr, "free_block: ERROR: Hive %s is in no allocation safe mode,"
 	   "space not freed. Operation will fail!\n", hdesc->filename);
     return(0);
   }
 
   size = get_int(hdesc->buffer+blk);
   if (size >= 0) {
-    printf("free_block: trying to free already free block!\n");
+    fprintf(stderr, "free_block: trying to free already free block!\n");
+#ifdef DOCORE
+      printf("blk = %x\n",blk);
+      debugit(hdesc->buffer,hdesc->size);
+      abort();
+#endif
     return(0);
   }
   size = -size;
@@ -852,35 +899,47 @@ int free_block(struct hive *hdesc, int blk)
   p = (struct hbin_page *)(hdesc->buffer + pofs);
   vofs = pofs + 0x20;
 
-  while (vofs-pofs < p->ofs_next) {
+  prevsz = -32;
 
-    seglen = get_int(hdesc->buffer+vofs);  
+  if (vofs != blk) {  /* Block is not at start of page? */
+    while (vofs-pofs < (p->ofs_next - HBIN_ENDFILL) ) {
 
-    if (seglen == 0) {
-      printf("free_block: EEEK! Zero data block size! (not registry or corrupt file?)\n");
+      seglen = get_int(hdesc->buffer+vofs);  
+      
+      if (seglen == 0) {
+	fprintf(stderr, "free_block: EEEK! Zero data block size! (not registry or corrupt file?)\n");
+	debugit(hdesc->buffer,hdesc->size);
+	return(0);
+      }
+      
+      if (seglen < 0) {
+	seglen = -seglen;
+	/*      hexdump(hdesc->buffer,vofs,vofs+seglen+4,1); */
+      } 
+      prev = vofs;
+      vofs += seglen;
+      if (vofs == blk) break;
+    }
+    
+    if (vofs != blk) {
+      fprintf(stderr, "free_block: ran off end of page!?!? Error in chains?\n");
+#ifdef DOCORE
+      printf("vofs = %x, pofs = %x, blk = %x\n",vofs,pofs,blk);
       debugit(hdesc->buffer,hdesc->size);
+      abort();
+#endif
       return(0);
     }
     
-    if (seglen < 0) {
-      seglen = -seglen;
-	/*      hexdump(hdesc->buffer,vofs,vofs+seglen+4,1); */
-    } 
-    prev = vofs;
-    vofs += seglen;
-    if (vofs == blk) break;
-  }
-
-  if (vofs != blk) {
-    printf("free_block: ran off end of page!?!? Error in chains?\n");
-    return(0);
+    prevsz = get_int(hdesc->buffer+prev);
+    
   }
 
   /* We also need details on next block (unless at end of page) */
   next = blk + size;
 
-  prevsz = get_int(hdesc->buffer+prev);
-  if (next >= p->ofs_next) nextsz = get_int(hdesc->buffer+next);
+  nextsz = 0;
+  if (next-pofs < (p->ofs_next - HBIN_ENDFILL) ) nextsz = get_int(hdesc->buffer+next);
 
 #if 0
   printf("offset prev : %x , blk: %x , next: %x\n",prev,blk,next);
@@ -888,7 +947,10 @@ int free_block(struct hive *hdesc, int blk)
 #endif
 
   /* Now check if next block is free, if so merge it with the one to be freed */
-  if ( (next >= p->ofs_next) && nextsz > 0) {
+  if ( nextsz > 0) {
+#if 0
+    printf("Swallow next\n");
+#endif
     size += nextsz;   /* Swallow it in current block */
     hdesc->useblk--;
     hdesc->usetot -= 4;
@@ -896,7 +958,7 @@ int free_block(struct hive *hdesc, int blk)
   }
 
   /* Now free the block (possibly with ajusted size as above) */
-  /*  bzero( (void *)(hdesc->buffer+blk), size); */
+   bzero( (void *)(hdesc->buffer+blk), size);
   *(int *)((hdesc->buffer)+blk) = (int)size;
   hdesc->usetot -= size;
   hdesc->unusetot -= size;
@@ -906,17 +968,22 @@ int free_block(struct hive *hdesc, int blk)
  
   /* Check if previous block is also free, if so, merge.. */
   if (prevsz > 0) {
+#if 0
+    printf("Swallow prev\n");
+#endif
     hdesc->usetot -= prevsz;
     hdesc->unusetot += prevsz;
     prevsz += size;
     /* And swallow current.. */
-    /*   bzero( (void *)(hdesc->buffer+prev), prevsz); */
+      bzero( (void *)(hdesc->buffer+prev), prevsz);
     *(int *)((hdesc->buffer)+prev) = (int)prevsz;
     hdesc->useblk--;
     return(prevsz);
   }
   return(size);
 }
+
+
 
 
 
@@ -946,11 +1013,11 @@ int ex_next_n(struct hive *hdesc, int nkofs, int *count, int *countri, struct ex
   if (!nkofs) return(-1);
   key = (struct nk_key *)(hdesc->buffer + nkofs);
   if (key->id != 0x6b6e) {
-    printf("ex_next error: Not a 'nk' node at 0x%0x\n",nkofs);
+    fprintf(stderr, "ex_next error: Not a 'nk' node at 0x%0x\n",nkofs);
     return(-1);
   }
 
-#undef EXNDEBUG
+#define EXNDEBUG 0
 
   lfkey = (struct lf_key *)(hdesc->buffer + key->ofs_lf + 0x1004);
   rikey = (struct ri_key *)(hdesc->buffer + key->ofs_lf + 0x1004);
@@ -962,10 +1029,16 @@ int ex_next_n(struct hive *hdesc, int nkofs, int *count, int *countri, struct ex
     if (*countri < 0 || *countri >= rikey->no_lis) { /* End of ri's? */
       return(0);
     }
-    /* Get the li-struct that's current based on countri */
+    /* Get the li of lf-struct that's current based on countri */
     likey = (struct li_key *)( hdesc->buffer + rikey->hash[*countri].ofs_li + 0x1004 ) ;
-    newnkofs = likey->hash[*count].ofs_nk + 0x1000;
-    /* Check if current li is exhausted */
+    if (likey->id == 0x696c) {
+      newnkofs = likey->hash[*count].ofs_nk + 0x1000;
+    } else {
+      lfkey = (struct lf_key *)( hdesc->buffer + rikey->hash[*countri].ofs_li + 0x1004 ) ;
+      newnkofs = lfkey->hash[*count].ofs_nk + 0x1000;
+    }
+
+    /* Check if current li/lf is exhausted */
 #if EXNDEBUG
     printf("likey->no_keys = %d\n",likey->no_keys);
 #endif
@@ -990,12 +1063,12 @@ int ex_next_n(struct hive *hdesc, int nkofs, int *count, int *countri, struct ex
   sptr->nk = newnkkey;
 
   if (newnkkey->id != 0x6b6e) {
-    printf("ex_next: ERROR: not 'nk' node at 0x%0x\n",newnkofs);
+    fprintf(stderr, "ex_next: ERROR: not 'nk' node at 0x%0x\n",newnkofs);
 
     return(-1);
   } else {
     if (newnkkey->len_name <= 0) {
-      printf("ex_next: nk at 0x%0x has no name!\n",newnkofs);
+      fprintf(stderr, "ex_next: nk at 0x%0x has no name!\n",newnkofs);
     } else {
       sptr->name = (char *)malloc(newnkkey->len_name+1);
       if (!sptr->name) {
@@ -1030,7 +1103,7 @@ int ex_next_v(struct hive *hdesc, int nkofs, int *count, struct vex_data *sptr)
   if (!nkofs) return(-1);
   key = (struct nk_key *)(hdesc->buffer + nkofs);
   if (key->id != 0x6b6e) {
-    printf("ex_next_v error: Not a 'nk' node at 0x%0x\n",nkofs);
+    fprintf(stderr, "ex_next_v error: Not a 'nk' node at 0x%0x\n",nkofs);
     return(-1);
   }
 
@@ -1044,7 +1117,7 @@ int ex_next_v(struct hive *hdesc, int nkofs, int *count, struct vex_data *sptr)
   vkofs = vlistkey[*count] + 0x1004;
   vkkey = (struct vk_key *)(hdesc->buffer + vkofs);
   if (vkkey->id != 0x6b76) {
-    printf("ex_next_v: hit non valuekey (vk) node during scan at offs 0x%0x\n",vkofs);
+    fprintf(stderr, "ex_next_v: hit non valuekey (vk) node during scan at offs 0x%0x\n",vkofs);
     return(-1);
   }
 
@@ -1104,7 +1177,7 @@ int get_abs_path(struct hive *hdesc, int nkofs, char *path, int maxlen)
   key = (struct nk_key *)(hdesc->buffer + nkofs);
   
   if (key->id != 0x6b6e) {
-    printf("get_abs_path: Not a 'nk' node!\n");
+    fprintf(stderr, "get_abs_path: Not a 'nk' node!\n");
     return(0);
   }
 
@@ -1175,6 +1248,7 @@ int trav_path(struct hive *hdesc, int vofs, char *path, int type)
   char part[ABSPATHLEN+1];
   char *partptr;
 
+  if (!hdesc) return(0);
   buf = hdesc->buffer;
 
   if (*path == '\\' && *(path+1) != '\\') {      /* Start from root if path starts with \ */
@@ -1186,7 +1260,7 @@ int trav_path(struct hive *hdesc, int vofs, char *path, int type)
   /*  printf("check of nk at offset: 0x%0x\n",vofs); */
 
   if (key->id != 0x6b6e) {
-    printf("trav_path: Error: Not a 'nk' node!\n");
+    fprintf(stderr, "trav_path: Error: Not a 'nk' node!\n");
     return(0);
   }
 
@@ -1236,6 +1310,10 @@ int trav_path(struct hive *hdesc, int vofs, char *path, int type)
       r = 0;
       likey = (struct li_key *)( hdesc->buffer + rikey->hash[r].ofs_li + 0x1004 ) ;
       subs = likey->no_keys;
+      if (likey->id != 0x696c) {  /* Bwah, not li anyway, XP uses lh usually which is actually smarter */
+	lfkey = (struct lf_key *)( hdesc->buffer + rikey->hash[r].ofs_li + 0x1004 ) ;
+	likey = NULL;
+      }
     } else {
       if (lfkey->id == 0x696c) { /* li? */
 	likey = (struct li_key *)(buf + lfofs);
@@ -1251,10 +1329,10 @@ int trav_path(struct hive *hdesc, int vofs, char *path, int type)
 	else newnkofs = lfkey->hash[i].ofs_nk + 0x1004;
 	newnkkey = (struct nk_key *)(buf + newnkofs);
 	if (newnkkey->id != 0x6b6e) {
-	  printf("ERROR: not 'nk' node! (strange?)\n");
+	  fprintf(stderr, "ERROR: not 'nk' node! (strange?)\n");
 	} else {
 	  if (newnkkey->len_name <= 0) {
-	    printf("[No name]\n");
+	    fprintf(stderr, "[No name]\n");
 	  } else {
 	    if (!strncmp(part,newnkkey->keyname,plen)) {
 	      /*	    printf("Key at 0x%0x matches! recursing!\n",newnkofs); */
@@ -1268,6 +1346,10 @@ int trav_path(struct hive *hdesc, int vofs, char *path, int type)
 	newnkofs = rikey->hash[r].ofs_li;
 	likey = (struct li_key *)( hdesc->buffer + newnkofs + 0x1004 ) ;
 	subs = likey->no_keys;
+	if (likey->id != 0x696c) {  /* Bwah, not li anyway, XP uses lh usually which is actually smarter */
+	  lfkey = (struct lf_key *)( hdesc->buffer + rikey->hash[r].ofs_li + 0x1004 ) ;
+	  likey = NULL;
+	}
       }
     } while (r < ricnt && ricnt);
 
@@ -1275,6 +1357,7 @@ int trav_path(struct hive *hdesc, int vofs, char *path, int type)
   /* Not found */
   return(0);
 }
+
 
 /* ls - list a 'nk' nodes subkeys and values
  * vofs - offset to start of data (skipping block linkage)
@@ -1292,8 +1375,7 @@ void nk_ls(struct hive *hdesc, char *path, int vofs, int type)
   nkofs = trav_path(hdesc, vofs, path, 0);
 
   if(!nkofs) {
-    printf("nk_ls: Key <%s> not found\n",path);
-    abort();
+    fprintf(stderr, "nk_ls: Key <%s> not found\n",path);
     return;
   }
   nkofs += 4;
@@ -1308,23 +1390,25 @@ void nk_ls(struct hive *hdesc, char *path, int vofs, int type)
     
   }
   
-  printf("Node has %ld subkeys and %ld values\n",key->no_subkeys,key->no_values);
+  fprintf(stderr, "Node has %ld subkeys and %ld values",key->no_subkeys,key->no_values);
+  if (key->len_classnam) printf(", and class-data of %d bytes",key->len_classnam);
+  fprintf(stderr, "\n");
 
   if (key->no_subkeys) {
-    printf("offs          key name\n");
+    fprintf(stderr, "offs          key name\n");
     while ((ex_next_n(hdesc, nkofs, &count, &countri, &ex) > 0)) {
-      printf("[%6x]   <%s>\n", ex.nkoffs, ex.name);
+      fprintf(stderr, "[%6x]   %c  <%s>\n", ex.nkoffs, (ex.nk->len_classnam)?'*':' ',ex.name);
       FREE(ex.name);
     }
   }
   count = 0;
   if (key->no_values) {
-    printf("offs        size      type   value name                    [value if type DWORD]\n");
+    fprintf(stderr, "offs        size      type   value name                    [value if type DWORD]\n");
     while ((ex_next_v(hdesc, nkofs, &count, &vex) > 0)) {
-      printf("[%6x] %6d  %-16s  <%s>", vex.vkoffs, vex.size,
+      fprintf(stderr, "[%6x] %6d  %-16s  <%s>", vex.vkoffs, vex.size,
 	     (vex.type < REG_MAX ? val_types[vex.type] : "(unknown)"), vex.name);
-      if (vex.type == REG_DWORD) printf(" %*d [0x%x]",25-strlen(vex.name),vex.val , vex.val);
-      printf("\n");
+      if (vex.type == REG_DWORD) fprintf(stderr, " %*d [0x%x]",25-strlen(vex.name),vex.val , vex.val);
+      fprintf(stderr, "\n");
       FREE(vex.name);
     }
   }
@@ -1395,7 +1479,7 @@ void *get_val_data(struct hive *hdesc, int vofs, char *path, int val_type)
   }    
 
   if (val_type && vkkey->val_type && (vkkey->val_type) != val_type) {
-    printf("Value <%s> is not of correct type!\n",path);
+    fprintf(stderr, "Value <%s> is not of correct type!\n",path);
     return NULL;
   }
 
@@ -1457,6 +1541,33 @@ int get_dword(struct hive *hdesc, int vofs, char *path)
 
   return(dword);
   
+}
+
+/* Sanity checker when transferring data into a block
+ * ofs = offset to data block, point to start of actual datablock linkage
+ * data = data to copy
+ * size = size of data to copy
+ */
+
+int fill_block(struct hive *hdesc, int ofs, void *data, int size)
+{
+  int blksize;
+
+  blksize = get_int(hdesc->buffer + ofs);
+  blksize = -blksize;
+
+#if 0
+  printf("fill_block: ofs = %x - %x, size = %x, blksize = %x\n",ofs,ofs+size,size,blksize);
+#endif
+  /*  if (blksize < size || ( (ofs & 0xfffff000) != ((ofs+size) & 0xfffff000) )) { */
+  if (blksize < size) {
+    fprintf(stderr, "fill_block: ERROR: block to small for data: ofs = %x, size = %x, blksize = %x\n",ofs,size,blksize);
+    debugit(hdesc->buffer,hdesc->size);
+    abort();
+  }
+
+  memcpy(hdesc->buffer + ofs + 4, data, size);
+  return(0);
 }
 
 
@@ -1545,25 +1656,29 @@ struct vk_key *add_value(struct hive *hdesc, int nkofs, char *name, int type)
   struct nk_key *nk;
   int oldvlist = 0, newvlist, newvkofs;
   struct vk_key *newvkkey;
+  char *blank="";
 
   if (!name || !*name) return(NULL);
 
+
   nk = (struct nk_key *)(hdesc->buffer + nkofs);
   if (nk->id != 0x6b6e) {
-    printf("add_value: Key pointer not to 'nk' node!\n");
+    fprintf(stderr, "add_value: Key pointer not to 'nk' node!\n");
     return(NULL);
   }
 
   if (trav_path(hdesc, nkofs, name, 1)) {
-    printf("add_value: value %s already exists\n",name);
+    fprintf(stderr, "add_value: value %s already exists\n",name);
     return(NULL);
   }
+
+  if (!strcmp(name,"@")) name = blank;
  
   if (nk->no_values) oldvlist = nk->ofs_vallist;
 
   newvlist = alloc_block(hdesc, nkofs, nk->no_values * 4 + 4);
   if (!newvlist) {
-    printf("add_value: failed to allocate new value list!\n");
+    fprintf(stderr, "add_value: failed to allocate new value list!\n");
     return(NULL);
   }
   if (oldvlist) {   /* Copy old data if any */
@@ -1573,7 +1688,7 @@ struct vk_key *add_value(struct hive *hdesc, int nkofs, char *name, int type)
   /* Allocate value descriptor including its name */
   newvkofs = alloc_block(hdesc, newvlist, sizeof(struct vk_key) + strlen(name));
   if (!newvkofs) {
-    printf("add_value: failed to allocate value descriptor\n");
+    fprintf(stderr, "add_value: failed to allocate value descriptor\n");
     free_block(hdesc, newvlist);
     return(NULL);
   }
@@ -1620,7 +1735,7 @@ void del_vk(struct hive *hdesc, int vkofs)
 
   vk = (struct vk_key *)(hdesc->buffer + vkofs);
   if (vk->id != 0x6b76) {
-    printf("del_vk: Key pointer not to 'vk' node!\n");
+    fprintf(stderr, "del_vk: Key pointer not to 'vk' node!\n");
     return;
   }
   
@@ -1644,12 +1759,12 @@ void del_allvalues(struct hive *hdesc, int nkofs)
 
   nk = (struct nk_key *)(hdesc->buffer + nkofs);
   if (nk->id != 0x6b6e) {
-    printf("del_allvalues: Key pointer not to 'nk' node!\n");
+    fprintf(stderr, "del_allvalues: Key pointer not to 'nk' node!\n");
     return;
   }
 
   if (!nk->no_values) {
-    printf("del_avalues: Key has no values!\n");
+    /*    printf("del_avalues: Key has no values!\n"); */
     return;
   }
 
@@ -1681,17 +1796,20 @@ int del_value(struct hive *hdesc, int nkofs, char *name)
   int vlistofs, slot, o, n, vkofs, newlistofs;
   long *vlistkey, *tmplist, *newlistkey;
   struct nk_key *nk;
+  char *blank="";
 
   if (!name || !*name) return(1);
 
+  if (!strcmp(name,"@")) name = blank;
+
   nk = (struct nk_key *)(hdesc->buffer + nkofs);
   if (nk->id != 0x6b6e) {
-    printf("del_value: Key pointer not to 'nk' node!\n");
+    fprintf(stderr, "del_value: Key pointer not to 'nk' node!\n");
     return(1);
   }
 
   if (!nk->no_values) {
-    printf("del_value: Key has no values!\n");
+    fprintf(stderr, "del_value: Key has no values!\n");
     return(1);
   }
 
@@ -1701,7 +1819,7 @@ int del_value(struct hive *hdesc, int nkofs, char *name)
   slot = vlist_find(hdesc, vlistofs, nk->no_values, name);
 
   if (slot == -1) {
-    printf("del_value: value %s not found!\n",name);
+    fprintf(stderr, "del_value: value %s not found!\n",name);
     return(1);
   }
 
@@ -1720,7 +1838,7 @@ int del_value(struct hive *hdesc, int nkofs, char *name)
   if (nk->no_values) {
     newlistofs = alloc_block(hdesc, vlistofs, nk->no_values * sizeof(long));
     if (!newlistofs) {
-      printf("del_value: FATAL: Was not able to alloc new index list\n");
+      fprintf(stderr, "del_value: FATAL: Was not able to alloc new index list\n");
       abort();
     }
     /* Now copy over, omitting deleted entry */
@@ -1736,6 +1854,9 @@ int del_value(struct hive *hdesc, int nkofs, char *name)
   return(0);
 }
 
+
+
+
 /* Add a subkey to a key
  * hdesc - usual..
  * nkofs - offset of current nk
@@ -1743,69 +1864,180 @@ int del_value(struct hive *hdesc, int nkofs, char *name)
  * return: ptr to new keystruct, or NULL
  */
 
+#undef AKDEBUG
 struct nk_key *add_key(struct hive *hdesc, int nkofs, char *name)
 {
 
-  int slot = 0, newlfofs = 0, oldlfofs = 0, o, n, i, onkofs, newnkofs, cmp;
-  struct lf_key *newlf, *oldlf;
+  int slot, newlfofs = 0, oldlfofs = 0, newliofs = 0;
+  int oldliofs = 0;
+  int o, n, i, onkofs, newnkofs, cmp;
+  int rimax, rislot, riofs, namlen;
+  struct ri_key *ri = NULL;
+  struct lf_key *newlf = NULL, *oldlf;
+  struct li_key *newli = NULL, *oldli;
   struct nk_key *key, *newnk, *onk;
   long hash;
 
   key = (struct nk_key *)(hdesc->buffer + nkofs);
 
   if (key->id != 0x6b6e) {
-    printf("add_key: current ptr not 'nk'\n");
+    fprintf(stderr, "add_key: current ptr not 'nk'\n");
     return(NULL);
   }
+
+  namlen = strlen(name);
 
   slot = -1;
   if (key->no_subkeys) {   /* It already has subkeys */
     
     oldlfofs = key->ofs_lf;
+    oldliofs = key->ofs_lf;
+   
     oldlf = (struct lf_key *)(hdesc->buffer + oldlfofs + 0x1004);
-    if (oldlf->id != 0x666c && oldlf->id != 0x686c) {
-      printf("add_key: index other than 'lf' or 'lh' not supported yet. 0x%04x\n",oldlf->id);
+    if (oldlf->id != 0x666c && oldlf->id != 0x686c && oldlf->id != 0x696c && oldlf->id != 0x6972)  {
+      fprintf(stderr, "add_key: index type not supported: 0x%04x\n",oldlf->id);
       return(NULL);
     }
 
-    ALLOC(newlf, 8 + 8*oldlf->no_keys + 8, 1);
-    newlf->no_keys = oldlf->no_keys + 1;
-    newlf->id = oldlf->id;
+    rimax = 0; ri = NULL; riofs = 0; rislot = -1;
+    if (oldlf->id == 0x6972) {  /* Indirect index 'ri', init loop */
+      riofs = key->ofs_lf;
+      ri = (struct ri_key *)(hdesc->buffer + riofs + 0x1004);
+      rimax = ri->no_lis-1;
 
-    /* Now copy old, checking where to insert (alphabetically) */
-    for (o = 0, n = 0; o < oldlf->no_keys; o++,n++) {
-      onkofs = oldlf->hash[o].ofs_nk;
-      onk = (struct nk_key *)(onkofs + hdesc->buffer + 0x1004);
-      if (slot == -1) {
-	cmp = strncasecmp(name, onk->keyname, onk->len_name);
-	if (!cmp) {
-	  printf("add_key: key %s already exists!\n",name);
-	  FREE(newlf);
-	  return(NULL);
-	}
-	if ( cmp < 0) {
-	  slot = o;
-	  n++;
-	}
-      }
-      newlf->hash[n].ofs_nk = oldlf->hash[o].ofs_nk;
-      newlf->hash[n].name[0] = oldlf->hash[o].name[0];
-      newlf->hash[n].name[1] = oldlf->hash[o].name[1];
-      newlf->hash[n].name[2] = oldlf->hash[o].name[2];
-      newlf->hash[n].name[3] = oldlf->hash[o].name[3];
+#ifdef AKDEBUG
+      printf("add_key: entering 'ri' traverse, rimax = %d\n",rimax);
+#endif
+
+      oldliofs = ri->hash[rislot+1].ofs_li;
+      oldlfofs = ri->hash[rislot+1].ofs_li;
+
     }
-    if (slot == -1) slot = oldlf->no_keys;
-  } else {
+
+    do {   /* 'ri' loop, at least run once if no 'ri' deep index */
+
+      if (ri) { /* Do next 'ri' slot */
+	rislot++;
+	oldliofs = ri->hash[rislot].ofs_li;
+	oldlfofs = ri->hash[rislot].ofs_li;
+	oldli = (struct li_key *)(hdesc->buffer + oldliofs + 0x1004);
+	oldlf = (struct lf_key *)(hdesc->buffer + oldlfofs + 0x1004);
+      }
+
+      oldli = (struct li_key *)(hdesc->buffer + oldliofs + 0x1004);
+      oldlf = (struct lf_key *)(hdesc->buffer + oldlfofs + 0x1004);
+
+#ifdef AKDEBUG
+      printf("add_key: top of ri-loop: rislot = %d\n",rislot);
+#endif
+      slot = -1;
+
+      if (oldli->id == 0x696c) {  /* li */
+	
+#ifdef AKDEBUG
+	printf("add_key: li slot allocate\n");
+#endif	
+
+	FREE(newli);
+	ALLOC(newli, 8 + 4*oldli->no_keys + 4, 1);
+	newli->no_keys = oldli->no_keys;
+	newli->id = oldli->id;
+	
+	/* Now copy old, checking where to insert (alphabetically) */
+	for (o = 0, n = 0; o < oldli->no_keys; o++,n++) {
+	  onkofs = oldli->hash[o].ofs_nk;
+	  onk = (struct nk_key *)(onkofs + hdesc->buffer + 0x1004);
+	  if (slot == -1) {
+#if 0
+	    printf("add_key: cmp <%s> with <%s>\n",name,onk->keyname);
+#endif
+
+	    cmp = strncasecmp(name, onk->keyname, (namlen > onk->len_name) ? namlen : onk->len_name);
+	    if (!cmp) {
+	      fprintf(stderr, "add_key: key %s already exists!\n",name);
+	      FREE(newli);
+	      return(NULL);
+	    }
+	    if ( cmp < 0) {
+	      slot = o;
+	      rimax = rislot; /* Cause end of 'ri' search, too */
+	      n++;
+#ifdef AKDEBUG
+	      printf("add_key: li-match: slot = %d\n",o);
+#endif
+	    }
+	  }
+	  newli->hash[n].ofs_nk = oldli->hash[o].ofs_nk;
+	}
+	if (slot == -1) slot = oldli->no_keys;
+	
+      } else { /* lf or lh */
+
+	oldlf = (struct lf_key *)(hdesc->buffer + oldlfofs + 0x1004);
+	
+	FREE(newlf);
+	ALLOC(newlf, 8 + 8*oldlf->no_keys + 8, 1);
+	newlf->no_keys = oldlf->no_keys;
+	newlf->id = oldlf->id;
+#ifdef AKDEBUG	
+	printf("add_key: new lf/lh no_keys: %d\n",newlf->no_keys);
+#endif
+	
+	/* Now copy old, checking where to insert (alphabetically) */
+	for (o = 0, n = 0; o < oldlf->no_keys; o++,n++) {
+	  onkofs = oldlf->hash[o].ofs_nk;
+	  onk = (struct nk_key *)(onkofs + hdesc->buffer + 0x1004);
+	  if (slot == -1) {
+
+#if 0
+	    printf("add_key: cmp <%s> with <%s>\n",name,onk->keyname);
+#endif
+	    cmp = strncasecmp(name, onk->keyname, (namlen > onk->len_name) ? namlen : onk->len_name);
+	    if (!cmp) {
+	      fprintf(stderr, "add_key: key %s already exists!\n",name);
+	      FREE(newlf);
+	      return(NULL);
+	    }
+	    if ( cmp < 0) {
+	      slot = o;
+	      rimax = rislot;  /* Cause end of 'ri' search, too */
+	      n++;
+#ifdef AKDEBUG
+	      printf("add_key: lf-match: slot = %d\n",o);
+#endif
+	    }
+	  }
+	  newlf->hash[n].ofs_nk = oldlf->hash[o].ofs_nk;
+	  newlf->hash[n].name[0] = oldlf->hash[o].name[0];
+	  newlf->hash[n].name[1] = oldlf->hash[o].name[1];
+	  newlf->hash[n].name[2] = oldlf->hash[o].name[2];
+	  newlf->hash[n].name[3] = oldlf->hash[o].name[3];
+	}
+	if (slot == -1) slot = oldlf->no_keys;
+      } /* li else check */
+
+
+
+    } while ( (rislot < rimax) );  /* 'ri' wrapper loop */
+
+  } else { /* Parent was empty, make new index block */
+#ifdef AKDEBUG
+    printf("add_key: new index!\n");
+#endif
     ALLOC(newlf, 8 + 8, 1);
     newlf->no_keys = 1;
-    newlf->id = 0x666c;  
-  }
+    /* Use ID (lf, lh or li) we fetched from root node, so we use same as rest of hive */
+    newlf->id = hdesc->nkindextype;
+    slot = 0;
+  } /* if has keys before */
+
 
   /* Make and fill in new nk */
   newnkofs = alloc_block(hdesc, nkofs, sizeof(struct nk_key) + strlen(name));
   if (!newnkofs) {
-    printf("add_key: unable to allocate space for new key descriptor for %s!\n",name);
+    fprintf(stderr, "add_key: unable to allocate space for new key descriptor for %s!\n",name);
     FREE(newlf);
+    FREE(newli);
     return(NULL);
   }
   newnk = (struct nk_key *)(hdesc->buffer + newnkofs + 4);
@@ -1821,40 +2053,79 @@ struct nk_key *add_key(struct hive *hdesc, int nkofs, char *name)
   newnk->ofs_classnam  = -1;
   newnk->len_name      = strlen(name);
   newnk->len_classnam  = 0;
-  strncpy(newnk->keyname, name, strlen(name));
+  strcpy(newnk->keyname, name);
   
-  /* And put its offset into parents index list */
-  newlf->hash[slot].ofs_nk = newnkofs - 0x1000;
-  if (newlf->id == 0x666c) {        /* lf hash */
-    newlf->hash[slot].name[0] = 0;
-    newlf->hash[slot].name[1] = 0;
-    newlf->hash[slot].name[2] = 0;
-    newlf->hash[slot].name[3] = 0;
-    strncpy(newlf->hash[n].name, name, 4);
-  } else if (newlf->id == 0x686c) {  /* lh. XP uses this. hashes whole name */
+  if (newli) {  /* Handle li */
+
+#if AKDEBUG
+    printf("add_key: li fill at slot: %d\n",slot);
+#endif
+
+    /* And put its offset into parents index list */
+    newli->hash[slot].ofs_nk = newnkofs - 0x1000;
+    newli->no_keys++;
+    
+    /* Allocate space for our new li list and copy it into reg */
+    newliofs = alloc_block(hdesc, nkofs, 8 + 4*newli->no_keys);
+    if (!newliofs) {
+      fprintf(stderr, "add_key: unable to allocate space for new index table for %s!\n",name);
+      FREE(newli);
+      free_block(hdesc,newnkofs);
+      return(NULL);
+    }
+    /*    memcpy(hdesc->buffer + newliofs + 4, newli, 8 + 4*newli->no_keys); */
+    fill_block(hdesc, newliofs, newli, 8 + 4*newli->no_keys);
+
+
+  } else {  /* lh or lf */
+
+#ifdef AKDEBUG
+    printf("add_key: lf/lh fill at slot: %d, rislot: %d\n",slot,rislot);
+#endif
+    /* And put its offset into parents index list */
+    newlf->hash[slot].ofs_nk = newnkofs - 0x1000;
+    newlf->no_keys++;
+    if (newlf->id == 0x666c) {        /* lf hash */
+      newlf->hash[slot].name[0] = 0;
+      newlf->hash[slot].name[1] = 0;
+      newlf->hash[slot].name[2] = 0;
+      newlf->hash[slot].name[3] = 0;
+      strncpy(newlf->hash[slot].name, name, 4);
+    } else if (newlf->id == 0x686c) {  /* lh. XP uses this. hashes whole name */
       for (i = 0,hash = 0; i < strlen(name); i++) {
 	hash *= 37;
 	hash += toupper(name[i]);
       }
       newlf->lh_hash[slot].hash = hash;
-  }
+    }
+    
+    /* Allocate space for our new lf list and copy it into reg */
+    newlfofs = alloc_block(hdesc, nkofs, 8 + 8*newlf->no_keys);
+    if (!newlfofs) {
+      fprintf(stderr, "add_key: unable to allocate space for new index table for %s!\n",name);
+      FREE(newlf);
+      free_block(hdesc,newnkofs);
+      return(NULL);
+    }
+    /*    memcpy(hdesc->buffer + newlfofs + 4, newlf, 8 + 8*newlf->no_keys); */
+    fill_block(hdesc, newlfofs, newlf, 8 + 8*newlf->no_keys);
+    
+  } /* li else */
 
-  /* Allocate space for our new lf list and copy it into reg */
-  newlfofs = alloc_block(hdesc, nkofs, 8 + 8*newlf->no_keys);
-  if (!newlfofs) {
-    printf("add_key: unable to allocate space for new key descriptor for %s!\n",name);
-    FREE(newlf);
-    free_block(hdesc,newnkofs);
-    return(NULL);
-  }
-  memcpy(hdesc->buffer + newlfofs + 4, newlf, 8 + 8*newlf->no_keys);
 
   /* Update parent, and free old lf list */
   key->no_subkeys++;
-  key->ofs_lf = newlfofs - 0x1000;
-  if (oldlfofs) free_block(hdesc,oldlfofs + 0x1000);
+  if (ri) {  /* ri index */
+    ri->hash[rislot].ofs_li = (newlf ? newlfofs : newliofs) - 0x1000;
+  } else { /* Parent key */
+    key->ofs_lf = (newlf ? newlfofs : newliofs) - 0x1000;
+  }
+
+  if (newlf && oldlfofs) free_block(hdesc,oldlfofs + 0x1000);
+  if (newli && oldliofs) free_block(hdesc,oldliofs + 0x1000);
 
   FREE(newlf);
+  FREE(newli);
   return(newnk);
 
 
@@ -1863,93 +2134,340 @@ struct nk_key *add_key(struct hive *hdesc, int nkofs, char *name)
 /* Delete a subkey from a key
  * hdesc - usual..
  * nkofs - offset of current nk
- * name  - name of key to delete
+ * name  - name of key to delete (must match exactly, also case)
  * return: 1 - err, 0 - ok
  */
+
+#undef DKDEBUG
 
 int del_key(struct hive *hdesc, int nkofs, char *name)
 {
 
   int slot = 0, newlfofs = 0, oldlfofs = 0, o, n, onkofs,  delnkofs;
-  struct lf_key *newlf, *oldlf;
+  int oldliofs = 0, no_keys = 0, newriofs = 0;
+  int namlen;
+  int rimax, riofs, rislot;
+  struct ri_key *ri, *newri = NULL;
+  struct lf_key *newlf = NULL, *oldlf = NULL;
+  struct li_key *newli = NULL, *oldli = NULL;
   struct nk_key *key, *onk, *delnk;
+  char fullpath[501];
 
   key = (struct nk_key *)(hdesc->buffer + nkofs);
 
+  namlen = strlen(name);
+
   if (key->id != 0x6b6e) {
-    printf("add_key: current ptr not nk\n");
+    fprintf(stderr,"add_key: current ptr not nk\n");
     return(1);
   }
 
   slot = -1;
   if (!key->no_subkeys) {
-    printf("del_key: key has no subkeys!\n");
+    fprintf(stderr, "del_key: key has no subkeys!\n");
     return(1);
   }
 
   oldlfofs = key->ofs_lf;
+  oldliofs = key->ofs_lf;
+  
   oldlf = (struct lf_key *)(hdesc->buffer + oldlfofs + 0x1004);
-  if (oldlf->id != 0x666c && oldlf->id != 0x686c) {
-    printf("del_key: index other than 'lf' or 'lh' not supported yet. 0x%04x\n",oldlf->id);
+  if (oldlf->id != 0x666c && oldlf->id != 0x686c && oldlf->id != 0x696c && oldlf->id != 0x6972)  {
+    printf("del_key: index other than 'lf', 'li' or 'lh' not supported yet. 0x%04x\n",oldlf->id);
     return(1);
   }
 
-  ALLOC(newlf, 8 + 8*oldlf->no_keys - 8, 1);
-  newlf->no_keys = oldlf->no_keys - 1;
-  newlf->id = oldlf->id;
+  rimax = 0; ri = NULL; riofs = 0; rislot = 0;
 
-  /* Now copy old, checking where to delete */
-  for (o = 0, n = 0; o < oldlf->no_keys; o++,n++) {
-    onkofs = oldlf->hash[o].ofs_nk;
-    onk = (struct nk_key *)(onkofs + hdesc->buffer + 0x1004);
-    if (slot == -1 && !strncmp(name, onk->keyname, onk->len_name)) {
-        slot = o;
-	delnkofs = onkofs; delnk = onk;
-	o++;
+  if (oldlf->id == 0x6972) {  /* Indirect index 'ri', init loop */
+    riofs = key->ofs_lf;
+    ri = (struct ri_key *)(hdesc->buffer + riofs + 0x1004);
+    rimax = ri->no_lis-1;
+    
+#ifdef DKDEBUG
+    printf("del_key: entering 'ri' traverse, rimax = %d\n",rimax);
+#endif
+    
+    oldliofs = ri->hash[rislot+1].ofs_li;
+    oldlfofs = ri->hash[rislot+1].ofs_li;
+    
+  }
+  
+  do {   /* 'ri' loop, at least run once if no 'ri' deep index */
+    
+    if (ri) { /* Do next 'ri' slot */
+      rislot++;
+      oldliofs = ri->hash[rislot].ofs_li;
+      oldlfofs = ri->hash[rislot].ofs_li;
+      oldli = (struct li_key *)(hdesc->buffer + oldliofs + 0x1004);
+      oldlf = (struct lf_key *)(hdesc->buffer + oldlfofs + 0x1004);
     }
-    newlf->hash[n].ofs_nk = oldlf->hash[o].ofs_nk;
-    newlf->hash[n].name[0] = oldlf->hash[o].name[0];
-    newlf->hash[n].name[1] = oldlf->hash[o].name[1];
-    newlf->hash[n].name[2] = oldlf->hash[o].name[2];
-    newlf->hash[n].name[3] = oldlf->hash[o].name[3];
-  }
+    
+    oldli = (struct li_key *)(hdesc->buffer + oldliofs + 0x1004);
+    oldlf = (struct lf_key *)(hdesc->buffer + oldlfofs + 0x1004);
+    
+#ifdef DKDEBUG
+    printf("del_key: top of ri-loop: rislot = %d\n",rislot);
+#endif
+    slot = -1;
+    
+    if (oldlf->id == 0x696c) {   /* 'li' handler */
+#ifdef DKDEBUG      
+      printf("del_key: li handler\n");
+#endif
+      
+      FREE(newli);
+      ALLOC(newli, 8 + 4*oldli->no_keys - 4, 1);
+      newli->no_keys = oldli->no_keys - 1; no_keys = newli->no_keys;
+      newli->id = oldli->id;
+      
+      /* Now copy old, checking where to delete */
+      for (o = 0, n = 0; o < oldli->no_keys; o++,n++) {
+	onkofs = oldli->hash[o].ofs_nk;
+	onk = (struct nk_key *)(onkofs + hdesc->buffer + 0x1004);
+	if (slot == -1 && onk->len_name == namlen && !strncmp(name, onk->keyname, (onk->len_name > namlen) ? onk->len_name : namlen)) {
+	  slot = o;
+	  delnkofs = onkofs; delnk = onk;
+	  rimax = rislot;
+	  o++;
+	}
+	newli->hash[n].ofs_nk = oldli->hash[o].ofs_nk;
+      }
+      
+      
+    } else { /* 'lf' or 'lh' are similar */
+      
+#ifdef DKDEBUG
+      printf("del_key: lf or lh handler\n");
+#endif
+      FREE(newlf);
+      ALLOC(newlf, 8 + 8*oldlf->no_keys - 8, 1);
+      newlf->no_keys = oldlf->no_keys - 1; no_keys = newlf->no_keys;
+      newlf->id = oldlf->id;
+      
+      /* Now copy old, checking where to delete */
+      for (o = 0, n = 0; o < oldlf->no_keys; o++,n++) {
+	onkofs = oldlf->hash[o].ofs_nk;
+	onk = (struct nk_key *)(onkofs + hdesc->buffer + 0x1004);
+	if (slot == -1 && (onk->len_name == namlen) && !strncmp(name, onk->keyname, onk->len_name)) {
+	  slot = o;
+	  delnkofs = onkofs; delnk = onk;
+	  rimax = rislot;
+	  o++;
+	}
+	newlf->hash[n].ofs_nk = oldlf->hash[o].ofs_nk;
+	newlf->hash[n].name[0] = oldlf->hash[o].name[0];
+	newlf->hash[n].name[1] = oldlf->hash[o].name[1];
+	newlf->hash[n].name[2] = oldlf->hash[o].name[2];
+	newlf->hash[n].name[3] = oldlf->hash[o].name[3];
+      }
+    } /* else lh or lf */
+
+  } while (rislot < rimax);  /* ri traverse loop */
+
   if (slot == -1) {
-    printf("del_key: subkey %s not found!\n",name);
+    fprintf(stderr,"del_key: subkey %s not found!\n",name);
     FREE(newlf);
+    FREE(newli);
     return(1);
   }
+
+#ifdef DKDEBUG
+  printf("del_key: key found at slot %d\n",slot);
+#endif
 
   if (delnk->no_values || delnk->no_subkeys) {
-    printf("del_key: subkey %s has subkeys or values. Not deleted.\n",name);
+    fprintf(stderr, "del_key: subkey %s has subkeys or values. Not deleted.\n",name);
     FREE(newlf);
+    FREE(newli);
     return(1);
   }
 
   /* Allocate space for our new lf list and copy it into reg */
-  if (newlf->no_keys) {
-    newlfofs = alloc_block(hdesc, nkofs, 8 + 8*newlf->no_keys);
+  if ( no_keys && (newlf || newli) ) {
+    newlfofs = alloc_block(hdesc, nkofs, 8 + (newlf ? 8 : 4) * no_keys);
+#ifdef DKDEBUG
+    fprintf(stderr,"del_key: alloc_block for index returns: %x\n",newlfofs);
+#endif
     if (!newlfofs) {
-      printf("del_key: unable to allocate space for new key descriptor for %s! Not deleted\n",name);
+      fprintf(stderr,"del_key: WARNING: unable to allocate space for new key descriptor for %s! Not deleted\n",name);
       FREE(newlf);
       return(1);
     }
-    memcpy(hdesc->buffer + newlfofs + 4, newlf, 8 + 8*newlf->no_keys);
+
+    /*    memcpy(hdesc->buffer + newlfofs + 4,
+	   ((void *)newlf ? (void *)newlf : (void *)newli), 8 + (newlf ? 8 : 4) * no_keys);
+    */
+    fill_block(hdesc, newlfofs,
+	   ((void *)newlf ? (void *)newlf : (void *)newli), 8 + (newlf ? 8 : 4) * no_keys);
+
+
   } else {  /* Last deleted, will throw away index */
-    newlfofs = -1;
+    newlfofs = 0xfff;  /* We subtract 0x1000 later */
   }
 
+  if (newlfofs < 0xfff) {
+    fprintf(stderr,"del_key: ERROR: newlfofs = %x\n",newlfofs);
+    debugit(hdesc->buffer,hdesc->size);
+    abort();
+  }
+
+  /* Check for CLASS data, if so, deallocate it too */
+  if (delnk->len_classnam) {
+    free_block(hdesc, delnk->ofs_classnam + 0x1000);
+  }
   /* Now it's safe to zap the nk */
   free_block(hdesc, delnkofs + 0x1000);
+  /* And the old index list */
+  free_block(hdesc, (oldlfofs ? oldlfofs : oldliofs) + 0x1000);
 
   /* Update parent */
   key->no_subkeys--;
-  key->ofs_lf = newlfofs - 0x1000;
+
+  if (ri) {
+    if (newlfofs == 0xfff) {
+
+      *fullpath = 0;
+      get_abs_path(hdesc, nkofs, fullpath, 480);
+
+      fprintf(stderr,"del_key: need to delete ri-entry! %x - %s\n",nkofs,fullpath);
+
+      if (ri->no_lis > 1) {  /* We have subindiceblocks left? */
+	/* Delete from array */
+	ALLOC(newri, 8 + 4*ri->no_lis - 4, 1);
+	newri->no_lis = ri->no_lis - 1;
+	newri->id = ri->id;
+	for (o = 0, n = 0; o < ri->no_lis; o++,n++) {
+	  if (n == rislot) o++;
+	  newri->hash[n].ofs_li = ri->hash[o].ofs_li;
+	}
+	newriofs = alloc_block(hdesc, nkofs, 8 + newri->no_lis*4 );
+	fprintf(stderr,"del_key: alloc_block for ri-block returns: %x\n",newriofs);
+	if (!newriofs) {
+	  fprintf(stderr,"del_key: WARNING: unable to allocate space for ri-index for %s! Not deleted\n",name);
+	  FREE(newlf);
+	  FREE(newri);
+	  return(1);
+	}
+	fill_block(hdesc, newriofs, newri, 8 + newri->no_lis * 4);
+	free_block(hdesc, riofs + 0x1000);
+	key->ofs_lf = newriofs - 0x1000;
+	FREE(newri);
+      } else { /* Last entry in ri was deleted, get rid of it, key is empty */
+	fprintf(stderr,"del_key: last ri deleted for %x\n",nkofs);
+	free_block(hdesc, riofs + 0x1000);
+	key->ofs_lf = -1;
+      }
+    } else {
+      ri->hash[rislot].ofs_li = newlfofs - 0x1000; 
+    }
+  } else {
+    key->ofs_lf = newlfofs - 0x1000;
+  }
 
   FREE(newlf);
   return(0);
 
 }
 
+/* Recursive delete keys
+ * hdesc - usual..
+ * nkofs - offset of current nk
+ * name  - name of key to delete
+ * return: 0 - ok, 1 fail
+ */
+void rdel_keys(struct hive *hdesc, char *path, int vofs)
+{
+  struct nk_key *key;
+  int nkofs;
+  struct ex_data ex;
+  int count = 0, countri = 0;
+  
+
+  if (!path || !*path) return;
+
+  nkofs = trav_path(hdesc, vofs, path, 0);
+
+  if(!nkofs) {
+    fprintf(stderr, "rdel_keys: Key <%s> not found\n",path);
+    return;
+  }
+  nkofs += 4;
+
+  key = (struct nk_key *)(hdesc->buffer + nkofs);
+#if 0
+  printf("rdel of node at offset 0x%0x\n",nkofs);
+#endif
+  if (key->id != 0x6b6e) {
+    fprintf(stderr, "Error: Not a 'nk' node!\n");
+
+    debugit(hdesc->buffer,hdesc->size);
+    
+  }
+  
+#if 0
+  printf("Node has %ld subkeys and %ld values\n",key->no_subkeys,key->no_values);
+#endif
+  if (key->no_subkeys) {
+    while ((ex_next_n(hdesc, nkofs, &count, &countri, &ex) > 0)) {
+#if 0
+      printf("%s\n",ex.name);
+#endif
+      rdel_keys(hdesc, ex.name, nkofs);
+      count = 0;
+      countri = 0;
+      FREE(ex.name);
+    }
+  }
+
+  del_allvalues(hdesc, nkofs);
+  del_key(hdesc, key->ofs_parent+0x1004, path);
+
+}
+  
+
+/* Get and copy keys CLASS-data (if any) to buffer
+ * Returns a buffer with the data (first long is size). see ntreg.h
+ * NOTE: caller must deallocate buffer! a simple free(keyval) will suffice.
+ */
+struct keyval *get_class(struct hive *hdesc,
+			    int curnk, char *path)
+{
+  int clen = 0, dofs = 0, nkofs;
+  struct nk_key *key;
+  struct keyval *data;
+  void *classdata;
+
+  if (!path && !curnk) return(NULL);
+
+  nkofs = trav_path(hdesc, curnk, path, 0);
+
+  if(!nkofs) {
+    fprintf(stderr, "get_class: Key <%s> not found\n",path);
+    return(NULL);
+  }
+  nkofs += 4;
+  key = (struct nk_key *)(hdesc->buffer + nkofs);
+
+  clen = key->len_classnam;
+  if (!clen) {
+    fprintf(stderr, "get_class: Key has no class data.\n");
+    return(NULL);
+  }
+
+  dofs = key->ofs_classnam;
+  classdata = (void *)(hdesc->buffer + dofs + 0x1004);
+  
+#if 0
+  printf("get_class: len_classnam = %d\n",clen);
+  printf("get_class: ofs_classnam = 0x%x\n",dofs);
+#endif
+
+  ALLOC(data, sizeof(struct keyval) + clen,1);
+  data->len = clen;
+  memcpy(&data->data, classdata, clen);
+  return(data);
+}
 
 
 /* Write to registry value.
@@ -1971,7 +2489,7 @@ int put_buf2val(struct hive *hdesc, struct keyval *kv,
   if (l == -1) return(0);  /* error */
   if (kv->len != l) {  /* Realloc data block if not same size as existing */
     if (!alloc_val_data(hdesc, vofs, path, kv->len)) {
-      printf("put_buf2val: %s : alloc_val_data failed!\n",path);
+      fprintf(stderr, "put_buf2val: %s : alloc_val_data failed!\n",path);
       return(0);
     }
   }
@@ -2013,7 +2531,10 @@ int put_dword(struct hive *hdesc, int vofs, char *path, int dword)
 void closeHive(struct hive *hdesc)
 {
 
-  printf("closing hive %s\n",hdesc->filename);
+  fprintf(stderr, "closing hive %s\n",hdesc->filename);
+  if (hdesc->state & HMODE_OPEN) {
+    close(hdesc->filedesc);
+  }
   FREE(hdesc->filename);
   FREE(hdesc->buffer);
   FREE(hdesc);
@@ -2059,6 +2580,8 @@ struct hive *openHive(char *filename, int mode)
   char *c;
   struct hbin_page *p;
   struct regf_header *hdr;
+  struct nk_key *nk;
+  struct ri_key *rikey;
   int verbose = (mode & HMODE_VERBOSE);
 
   CREATE(hdesc,struct hive,1);
@@ -2074,12 +2597,12 @@ struct hive *openHive(char *filename, int mode)
     fmode = O_RDWR;
   }
   hdesc->filedesc = open(hdesc->filename,fmode);
-  if (!(hdesc->filedesc)) {
+  if (hdesc->filedesc < 0) {
     fprintf(stderr,"openHive(%s) failed: %s, trying read-only\n",hdesc->filename,strerror(errno));
     fmode = O_RDONLY;
     mode |= HMODE_RO;
     hdesc->filedesc = open(hdesc->filename,fmode);
-    if (!(hdesc->filedesc)) {
+    if (hdesc->filedesc < 0) {
       fprintf(stderr,"openHive(%s) in fallback RO-mode failed: %s\n",hdesc->filename,strerror(errno));
       closeHive(hdesc);
       return(NULL);
@@ -2115,32 +2638,67 @@ struct hive *openHive(char *filename, int mode)
 
    hdr = (struct regf_header *)hdesc->buffer;
    if (hdr->id != 0x66676572) {
-     printf("openHive(%s): File does not seem to be a registry hive!\n",filename);
+     fprintf(stderr, "openHive(%s): File does not seem to be a registry hive!\n",filename);
      return(hdesc);
    }
-   //   printf("Hive's name (from header): <");
-   //   for (c = hdr->name; *c && (c < hdr->name + 64); c += 2) putchar(*c);
+   fprintf(stderr, "Hive's name (from header): <");
+   for (c = hdr->name; *c && (c < hdr->name + 64); c += 2) putc(*c, stderr);
 
    hdesc->rootofs = hdr->ofs_rootkey + 0x1000;
-   //   printf(">\nROOT KEY at offset: 0x%06x\n",hdesc->rootofs);
+   fprintf(stderr, ">\nROOT KEY at offset: 0x%06x * ",hdesc->rootofs);
+
+   /* Cache the roots subkey index type (li,lf,lh) so we can use the correct
+    * one when creating the first subkey in a key */
+   
+   nk = (struct nk_key *)(hdesc->buffer + hdesc->rootofs + 4);
+   if (nk->id == 0x6b6e) {
+     rikey = (struct ri_key *)(hdesc->buffer + nk->ofs_lf + 0x1004);
+     hdesc->nkindextype = rikey->id;
+     if (hdesc->nkindextype == 0x6972) {  /* Gee, big root, must check indirectly */
+       fprintf(stderr, "load_hive: DEBUG: BIG ROOT!\n");
+       rikey = (struct ri_key *)(hdesc->buffer + rikey->hash[0].ofs_li + 0x1004);
+       hdesc->nkindextype = rikey->id;
+     }
+     if (hdesc->nkindextype != 0x666c &&
+	 hdesc->nkindextype != 0x686c &&
+	 hdesc->nkindextype != 0x696c) {
+       hdesc->nkindextype = 0x666c;
+     }
+
+     fprintf(stderr, "Subkey indexing type is: %04x <%c%c>\n",
+	    hdesc->nkindextype,
+	    hdesc->nkindextype & 0xff,
+	    hdesc->nkindextype >> 8);
+   } else {
+     fprintf(stderr, "load_hive: WARNING: ROOT key does not seem to be a key! (not type == nk)\n");
+   }
+
+
 
    while (pofs < hdesc->size) {
+#ifdef LOAD_DEBUG
           if (verbose) hexdump(hdesc->buffer,pofs,pofs+0x20,1);
+#endif
      p = (struct hbin_page *)(hdesc->buffer + pofs);
      if (p->id != 0x6E696268) {
        fprintf(stderr, "Page at 0x%lx is not 'hbin', assuming file contains garbage at end",pofs);
        break;
      }
      hdesc->pages++;
+#ifdef LOAD_DEBUG
      if (verbose) printf("\n###### Page at 0x%0lx has size 0x%0lx, next at 0x%0lx ######\n",pofs,p->len_page,p->ofs_next);
-
+#endif
      if (p->ofs_next == 0) {
+#ifdef LOAD_DEBUG
        if (verbose) printf("openhive debug: bailing out.. pagesize zero!\n");
+#endif
        return(hdesc);
      }
 #if 0
      if (p->len_page != p->ofs_next) {
+#ifdef LOAD_DEBUG
        if (verbose) printf("openhive debug: len & ofs not same. HASTA!\n");
+#endif
        exit(0);
      }
 #endif
@@ -2155,10 +2713,23 @@ struct hive *openHive(char *filename, int mode)
 #endif
      pofs += p->ofs_next;
    }
-   //   printf("\nFile size %d [%x] bytes, containing %d pages (+ 1 headerpage)\n",hdesc->size,hdesc->size, hdesc->pages);
-   //  printf("Used for data: %d/%d blocks/bytes, unused: %d/%d blocks/bytes.\n",
-   //	  hdesc->useblk,hdesc->usetot,hdesc->unuseblk,hdesc->unusetot);
+   fprintf(stderr, "\nFile size %d [%x] bytes, containing %d pages (+ 1 headerpage)\n",hdesc->size,hdesc->size, hdesc->pages);
+   fprintf(stderr, "Used for data: %d/%d blocks/bytes, unused: %d/%d blocks/bytes.\n",
+
+	  hdesc->useblk,hdesc->usetot,hdesc->unuseblk,hdesc->unusetot);
   
+
+   /* So, let's guess what kind of hive this is, based on keys in its root */
+
+   hdesc->type = HTYPE_UNKNOWN;
+   if (trav_path(hdesc, 0, "\\SAM", 0)) hdesc->type = HTYPE_SAM;
+   else if (trav_path(hdesc, 0, "\\ControlSet", 0)) hdesc->type = HTYPE_SYSTEM;
+   else if (trav_path(hdesc, 0, "\\Policy", 0)) hdesc->type = HTYPE_SECURITY;
+   else if (trav_path(hdesc, 0, "\\Microsoft", 0)) hdesc->type = HTYPE_SOFTWARE;
+
+   /*
+   printf("DEBUG: Type of hive guessed to be: %d\n",hdesc->type);
+   */
 
   return(hdesc);
 

@@ -1,7 +1,7 @@
 /*
  * sam.h - known structures in the SAM hive of NT registry
  * 
- * Copyright (c) 1997-2003 Petter Nordahl-Hagen.
+ * Copyright (c) 1997-2004 Petter Nordahl-Hagen.
  * Freely distributable in source or binary for noncommercial purposes,
  * but I allow some exceptions to this.
  * Please see the COPYING file for more details on

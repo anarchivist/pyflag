@@ -91,6 +91,12 @@ struct  hbin_page {
 
 };
 
+/* Minimum block size utilized at end of block
+ * seem to be either 8 or 16, less than this
+ * is only filled with garbage. (usually 0xB2 0xB2 ..)
+ */
+#define HBIN_ENDFILL 0
+
 /* Security descriptor. I know how it's linked, but don't know
    how the real security data is constructed, it may as well
    be like the higher level security structs defined by MS in its
@@ -127,6 +133,8 @@ struct lf_key {
   short no_keys;    /* 0x0002	Word	number of keys          */
                     /* 0x0004	????	Hash-Records            */
   
+ union {
+
     struct lf_hash {
       long ofs_nk;    /* 0x0000	D-Word	Offset of corresponding "nk"-Record  */
       char name[4];   /* 0x0004	D-Word	ASCII: the first 4 characters of the key-name,  */
@@ -139,6 +147,8 @@ struct lf_key {
       long ofs_nk;    /* 0x0000	D-Word	Offset of corresponding "nk"-Record  */
       long hash;      /* 0x0004	D-Word	ASCII: the first 4 characters of the key-name,  */
     } lh_hash[1];
+  };
+
 };
 
 /* 3.x version of the above, contains only offset table, NOT
@@ -159,7 +169,9 @@ struct li_key {
  * an extention record if many li's.
  * This happens in NT4&5 when the lf hashlist grows larger
  * than about 400-500 entries/subkeys??, then the nk_key->ofs_lf points to this
- * instead of directly to an lf. (and it switches to li!)
+ * instead of directly to an lf.
+ * The sub-indices this points to seems to be li (yes!) in NT4 and 2k.
+ * In XP and newer they point to lh which is more efficient.
  * Likely to happen in HKLM\Software\classes (file extention list) and
  * in SAM when many users.
  */
@@ -250,12 +262,24 @@ struct keyval {
   int data;    /* Data. Goes on for length of value */
 };
 
+struct keyvala {
+  int len;      /* Length of databuffer */
+  int data[1];    /* Data. Goes on for length of value */
+};
+
 #define HMODE_RW        0
 #define HMODE_RO        0x1
 #define HMODE_OPEN      0x2
 #define HMODE_DIRTY     0x4
 #define HMODE_NOALLOC   0x8
 #define HMODE_VERBOSE 0x1000
+
+/* Suggested type of hive loaded, guessed by library, but not used by it */
+#define HTYPE_UNKNOWN   0
+#define HTYPE_SAM       1
+#define HTYPE_SYSTEM    2
+#define HTYPE_SECURITY  3
+#define HTYPE_SOFTWARE  4
 
 /* Hive definition, allocated by openHive(), dealloc by closeHive()
  * contains state data, must be passed in all functions
@@ -264,6 +288,8 @@ struct hive {
   char *filename;        /* Hives filename */
   int  filedesc;         /* File descriptor (only valid if state == OPEN) */
   int  state;            /* Current state of hive */
+  int  type;             /* Suggested type of hive. NOTE: Library will guess when
+			    it loads it, but application may change it if needed */
   int  pages;            /* Number of pages, total */
   int  useblk;           /* Total # of used blocks */
   int  unuseblk;         /* Total # of unused blocks */
@@ -271,6 +297,7 @@ struct hive {
   int  unusetot;         /* total # of bytes in unuseblk */
   int  size;             /* Hives size (filesise) in bytes */
   int  rootofs;          /* Offset of root-node */
+  short nkindextype;     /* Subkey-indextype the root key uses */
   char *buffer;          /* Files raw contents */
 };
 
@@ -292,7 +319,7 @@ struct hive {
             abort() ; \
        } \
     }
-#define FREE(p) { free(p); (p) = 0; }
+#define FREE(p) { if (p) { free(p); (p) = 0; } }
 
 
 #endif
@@ -336,3 +363,5 @@ void del_allvalues(struct hive *hdesc, int nkofs);
 int del_value(struct hive *hdesc, int nkofs, char *name);
 struct nk_key *add_key(struct hive *hdesc, int nkofs, char *name);
 int del_key(struct hive *hdesc, int nkofs, char *name);
+void rdel_keys(struct hive *hdesc, char *path, int nkofs);
+struct keyval *get_class(struct hive *hdesc, int curnk, char *path);

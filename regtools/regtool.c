@@ -37,7 +37,7 @@
 #include "registry.h"
 #include "regformat.h"
 #include "misc.h"
-
+#include "timeconv.h"
 #define MAX_HIVES 10
 
 extern char *val_types[REG_MAX+1];
@@ -237,7 +237,7 @@ void nk_ls_r(struct hive *hdesc, char *path, int vofs, int type)
   nkofs = trav_path(hdesc, vofs, path, 0);
 
   if(!nkofs) {
-    printf("nk_ls: Key <%s> not found\n",path);
+    //printf("nk_ls: Key <%s> not found\n",path);
     abort();
     return;
   }
@@ -247,7 +247,7 @@ void nk_ls_r(struct hive *hdesc, char *path, int vofs, int type)
   //  printf("ls of node at offset 0x%0x\n",nkofs);
 
   if (key->id != 0x6b6e) {
-    printf("Error: Not a 'nk' node!\n");
+    //printf("Error: Not a 'nk' node!\n");
 
     //   debugit(hdesc->buffer,hdesc->size);
     
@@ -334,8 +334,14 @@ void nk_ls_r(struct hive *hdesc, char *path, int vofs, int type)
 	} else {
 	  root_key = strdup("/UNKNOWN");
 	}
-		  
-	printf(" insert into %s set `path`='%s%s%s',`size`='%d',`type`='%s',`reg_key`='%s',`value`='%s' ;",tablename,path_prefix,root_key,clean_path,vex.size,  (vex.type < REG_MAX ? val_types[vex.type] : "(unknown)"), clean_name,clean_value);
+
+	// Process timestamp
+	time_t key_time;
+	DWORD rem;
+	key_time = fileTimeToUnixTime((FILETIME *)key->timestamp, &rem);
+	//fprintf(stderr, "%s\n", fileTimeToAscii((FILETIME *)key->timestamp));
+
+	printf(" insert into %s set `path`='%s%s%s',`size`='%d',`type`='%s',`modified`='%u',`remainder`='%u',`reg_key`='%s',`value`='%s' ;",tablename,path_prefix,root_key,clean_path,vex.size,  (vex.type < REG_MAX ? val_types[vex.type] : "(unknown)"), key_time, rem, clean_name,clean_value);
 	free(root_key);
       };
 
@@ -403,6 +409,8 @@ void create_table(char *table) {
   printf("    CREATE TABLE `%s` (\n\
     `path` CHAR(250) NOT NULL,\n\
     `size` SMALLINT NOT NULL,\n\
+    `modified` INT(11),\n\
+    `remainder` INT(11),\n\
     `type` CHAR(12) NOT NULL,\n\
     `reg_key` VARCHAR(200) NOT NULL,\n\
     `value` text\n\
