@@ -107,8 +107,11 @@ class LookupIP(Reports.report):
         res = dbh.fetch()
         
         for name in res.keys():
-            result.text("%s:\n" % name, color='red',font='typewriter')
-            result.text("%s\n\n" % (res[name]),color='black',font='typewriter')
+            tmp=result.__class__(result)
+            tmp2=result.__class__(result)
+            tmp.text("%s:" % name, color='red',font='typewriter')
+            tmp2.text("%s" % (res[name]),color='black',font='typewriter')
+            result.row(tmp,tmp2,valign="top")
 
 class LookupWhoisID(LookupIP):
     """ A report to show the IP by netname """
