@@ -31,45 +31,19 @@ from pyflag.Scanner import *
 
 import re
 
-class RScan:
-    """ Singleton class to manage regexp scanner access """
-    ## May need to do locking in future, if re is not reentrant.
-    scanner = None
-    default = True
-    def __init__(self):
-        logging.log(logging.DEBUG, "Debug: Init RScan")
-	self.foo = 1
-
-    def scan(self,buf,pattern):
-        """ Scan the given buffer, and return a regexp name or 'None'"""
-
-        logging.log(logging.DEBUG, "scaning for pattern /%s/" % pattern)
-
-        c=re.findall(r"%s" % pattern, buf)
-#        p=re.compile("%s" % pattern,re.I)  # gmj - move outside loop ?
-#        c=p.findall(buf) 
-
-        if c:
-            logging.log(logging.DEBUG, "Debug: Scanning Found: %s" % c)
-            return c
-        else:
-            return None
-
 class RegScan(GenScanFactory):
     """ Scan file for regexps """
     def __init__(self,dbh, table,fsfd):
-        logging.log(logging.DEBUG, "Debug: Creating regexp table")        
         dbh.execute(""" CREATE TABLE IF NOT EXISTS `regexp_%s` (
         `inode` varchar( 20 ) NOT NULL,
-        `class` tinytext NOT NULL,
-        `regexp` tinytext NOT NULL )""", table)
+        `class` varchar(50) NOT NULL,
+        `match` tinytext,
+        `offset` int)""", table)
         self.dbh=dbh
         self.table=table
         pydbh = DB.DBO(None)
         pydbh.execute("select class,pattern from regexps")
-        self.RegexpRows = [] 
-        for row in pydbh:
-            self.RegexpRows.append(row)
+        self.RegexpRows = [ (row['class'],re.compile(row['pattern'])) for row in pydbh ] 
 
     def destroy(self):
         self.dbh.execute('ALTER TABLE regexp_%s ADD INDEX(inode)', self.table)
@@ -78,44 +52,19 @@ class RegScan(GenScanFactory):
         GenScanFactory.reset(self)
         self.dbh.execute('drop table regexp_%s',self.table)
 
-    class Scan(BaseScanner):
+    class Scan(MemoryScan):
         def __init__(self, inode,ddfs,outer,factories=None):
-            BaseScanner.__init__(self, inode,ddfs,outer,factories)
-            self.inode = inode
+            MemoryScan.__init__(self, inode,ddfs,outer,factories)
             self.window = ''
-            self.dbh=outer.dbh
-            self.table=outer.table
             self.listfound = None
-            self.windowsize = 1000
             self.RegexpRows = outer.RegexpRows;
-            logging.log(logging.DEBUG, "Debug: Creating RScan")
-            self.scanner = RScan()
 
         def process(self, data,metadata=None):
-            """ This scans for the a regexp in buffer.  Should span buffers."""
-
-            # gmj - old logic ... scan for one regexp, stop when found.
-            #            if not self.regexp:
-            #                buf = self.window + data
-            #                self.regexp = self.scanner.scan(buf)
-            #                self.window = buf[-self.windowsize:]
-
+            """ This scans for the a regexp in buffer. """
             # gmj - new logic.  Scan for all occurances of all regexps. 
             for row in self.RegexpRows:
-                buf = self.window + data
-                self.listfound = None
-                self.listfound = self.scanner.scan(buf,row['pattern'])
-                if self.listfound:
-
-                    for found in self.listfound:
-                        self.dbh.execute("INSERT INTO regexp_%s VALUES(%r,%r,%r)", (self.table, self.inode, row['class'],found))
-
-                self.listfound = None
-                self.window = buf[-self.windowsize:]
-
-        def finish(self):
-            return
-		
+                for match in row[1].finditer(data):
+                    self.dbh.execute("INSERT INTO regexp_%s set `inode`=%r,`class`=%r, `match`=%r,`offset`=%r", (self.table, self.inode, row[0],match.group(0),self.offset+match.start()))
 
 class RegExpScan(Reports.report):
     """ Scan Filesystem for RegExpes using re"""
@@ -138,11 +87,11 @@ class RegExpScan(Reports.report):
 
         try:
             result.table(
-                columns=('a.inode','concat(path,name)', 'a.regexp','a.class'),
+                columns=('a.class','a.inode','concat(path,name)', 'a.match'),
                 names=('Inode','Filename','RegExp Found','RegExp Type'),
                 table='regexp_%s as a join file_%s as b on a.inode=b.inode ' % (tablename,tablename),
                 case=query['case'],
-                links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='inode')]
+                links=[ None,FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='inode')]
                 )
         except DB.DBError,e:
             result.para("Unable to display RegExp table, maybe you did not run the regexp scanner over the filesystem?")

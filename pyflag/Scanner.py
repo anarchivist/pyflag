@@ -51,6 +51,8 @@ class BaseScanner:
         self.size = 0
         self.ddfs = ddfs
         self.ddfs.dbh.set_meta("scan_%s" % outer.__class__, inode)
+        self.dbh=outer.dbh
+        self.table=outer.table
 #        print "Scanning inode %s with %s" % (inode, outer)
 
     def process(self, data, metadata={}):
@@ -115,6 +117,29 @@ class GenScanFactory:
         """ The Scan class must be defined as an inner class to the factory. """
 
 StoreAndScanFiles = []
+
+class MemoryScan(BaseScanner):
+    """ A scanner designed to scan buffers of text in memory.
+
+    This scanner implements a sliding window, i.e. each buffer scanned begins with OVERLAP/BUFFERSIZE from the previous buffer. This allows regex, and virus definitions to locate matches that are broken across a block boundary.
+    """
+    windowsize=1000
+    def __init__(self, inode,ddfs,outer,factories=None):
+        BaseScanner.__init__(self, inode,ddfs,outer,factories)
+        self.window = ''
+        self.offset=0
+
+    def process(self, data,metadata=None):
+        buf = self.window + data
+        self.process_buffer(buf)
+        self.window = buf[-self.windowsize:]
+        self.offset+=len(data)-self.windowsize
+
+    def process_buffer(self,buf):
+        """ This abstract method should implement the actual scanner.
+
+        @arg offset: The actual offset the buffer begins with inside the inode.
+        """
 
 class StoreAndScan(BaseScanner):
     """ A Scanner designed to store a temporary copy of the scanned file to be able to invoke an external program on it.

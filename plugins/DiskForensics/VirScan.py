@@ -73,22 +73,15 @@ class VirScan(GenScanFactory):
         GenScanFactory.reset(self)
         self.dbh.execute('drop table virus_%s',self.table)
 
-    class Scan(BaseScanner):
+    class Scan(MemoryScan):
         def __init__(self, inode,ddfs,outer,factories=None):
-            BaseScanner.__init__(self, inode,ddfs,outer,factories)
-            self.inode = inode
-            self.window = ''
-            self.dbh=outer.dbh
-            self.table=outer.table
+            MemoryScan.__init__(self, inode,ddfs,outer,factories)
             self.virus = None
-            self.windowsize = 1000
             self.scanner = VScan()
 
-        def process(self, data,metadata=None):
+        def process_buffer(self,buf):
             if not self.virus:
-                buf = self.window + data
-                self.virus = self.scanner.scan(buf)
-                self.window = buf[-self.windowsize:]
+                self.virus=self.scanner.scan(buf)
 
         def finish(self):
             if self.virus:

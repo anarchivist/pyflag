@@ -49,6 +49,11 @@ def main():
         # print help information and exit:
         usage()
         sys.exit(2)
+
+    if not args:
+        usage()
+        sys.exit(1)
+        
     drop = False
     verbose = False
     for o, a in opts:
