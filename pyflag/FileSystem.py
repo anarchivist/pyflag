@@ -579,8 +579,8 @@ class GZip_file(File):
         self.pos=0
 
     def read(self,len=None):
-        self.pos+=len
         if len!=None:
+            self.pos+=len
             return self.gz.read(len)
         else:
             self.pos=self.size
