@@ -1,3 +1,5 @@
+include ../Makefile.in
+
 OPT     = -O0 -Wall
 DEBUG   = -g
 INCL    = -I../iosubsys/misc/
@@ -12,7 +14,7 @@ index.o: index.c index.h
 
 python_binding: index.i
 	swig -python index.i
-	$(CC) $(CFLAGS) $(INCL) -I/usr/include/python2.3 index_wrap.c -shared $(LIBOBJ) $(LIBS) index.o -o _index.so
+	$(CC) $(CFLAGS) $(INCL) -I$(PYTHONINCL) index_wrap.c -shared $(LIBOBJ) $(LIBS) index.o -o _index.so
 	cp _index.so index.py $(TARGETS)/
 
 clean:

@@ -1,0 +1,11 @@
+## Top level include makefile
+BIN	= bin/
+DIRS	= iosubsys imagingtools/dd_rescue/ raidtools indextools regtools virustools mailtools sources
+PYTHONVER = 2.4
+SYSBINS = cjpeg djpeg
+PYTHONLIB = /usr/lib/python$(PYTHONVER)/
+PYTHONINCL = /usr/include/python$(PYTHONVER)/
+PYTHONBIN = `which python$(PYTHONVER)`
+DATA_DIR = `grep -i DATA_DIR pyflag/pyflagrc | cut -d= -f2`
+MYSQLCOMMAND =./bin_dist/mysql/bin/mysql --socket=bin_dist/mysql/data/pyflag.sock
+MISC_LIBS = /usr/lib/libgmp.so.3 /usr/lib/libmysqlclient_r.so.10 /usr/lib/libmagic.so.1

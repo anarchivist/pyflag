@@ -1,11 +1,12 @@
-INCL 	= -I/usr/include/python2.3 
+include ../../Makefile.in
+INCL 	= -I$(PYTHONINCL)
 LIBS	= -lmagic
 #Path where all the python things live
 PYTHONPATH = ../../libs/
 
 $(PYTHONPATH)/magic.py $(PYTHONPATH)/_magic.so:	magic.i
 	swig -python magic.i
-	$(CC) -I/usr/include/python2.3 magic_wrap.c -shared $(LIBS) -o $(PYTHONPATH)/_magic.so
+	$(CC) $(INCL) magic_wrap.c -shared $(LIBS) -o $(PYTHONPATH)/_magic.so
 	mv magic.py $(PYTHONPATH)
 
 clean:

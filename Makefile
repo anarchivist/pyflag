@@ -1,12 +1,5 @@
 ## Top level makefile
-BIN	= bin/
-DIRS	= iosubsys imagingtools/dd_rescue/ raidtools indextools regtools virustools mailtools sources
-SYSBINS = cjpeg djpeg
-PYTHONLIB = /usr/lib/python2.3/
-PYTHONBIN = `which python2.3`
-DATA_DIR = `grep -i DATA_DIR pyflag/pyflagrc | cut -d= -f2`
-MYSQLCOMMAND =./bin_dist/mysql/bin/mysql --socket=bin_dist/mysql/data/pyflag.sock
-MISC_LIBS = /usr/lib/libgmp.so.3 /usr/lib/libmysqlclient_r.so.10 /usr/lib/libmagic.so.1
+include Makefile.in
 
 all:	bins
 	for dir in $(DIRS); do\
@@ -31,7 +24,7 @@ bin-dist:
 	## Run the unit test to touch all the files
 	cd bin_dist/ && ./launch.sh pyflag/unit_test.py
 	## Now we cleanup python core (any files that were not touched)
-	find bin_dist/python2.3/ -atime +1 -exec rm {} \;
+	find bin_dist/python$(PYTHONVER)/ -atime +1 -exec rm {} \;
 
 	## Delete source directories
 	cd bin_dist/ && rm -rf sources sgzip regtools raidtools patches libevf iosubsys indextools exgrep docs virustools imagingtools mailtools

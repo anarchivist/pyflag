@@ -1,3 +1,5 @@
+include ../../Makefile.in
+
 INCL = -I../misc/ -I../sgzip/ -I../libevf/ -I../hashtools/
 ## Where libraries should go
 TARGET = ../../libs/
@@ -26,7 +28,7 @@ $(BIN_DIR)/remote_server: remote_server.o $(LIBS)
 
 python_binding: io.i
 	swig -python io.i
-	$(CC) $(CFLAGS) $(INCL) -I/usr/include/python2.3 io_wrap.c -shared $(LIBOBJ) $(LIBS) -o _iosubsys.so
+	$(CC) $(CFLAGS) $(INCL) -I$(PYTHONINCL) io_wrap.c -shared $(LIBOBJ) $(LIBS) -o _iosubsys.so
 	cp _iosubsys.so iosubsys.py $(TARGET)
 
 test: all

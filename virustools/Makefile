@@ -1,10 +1,11 @@
-INCL 	= -I/usr/include/python2.3 
+include ../Makefile.in
+INCL 	= -I$(PYTHONINCL)
 LIBS	= -lclamav
 TARGET = ../libs/
 
 $(TARGET)/clamav.py $(TARGET)/_clamav.so:	clamav.i
 	swig -python clamav.i
-	$(CC) -I/usr/include/python2.3 clamav_wrap.c -shared $(LIBS) -o $(TARGET)/_clamav.so
+	$(CC) $(INCL) clamav_wrap.c -shared $(LIBS) -o $(TARGET)/_clamav.so
 	mv clamav.py $(TARGET)/clamav.py
 
 clean:
