@@ -1,0 +1,210 @@
+------------------------------
+PyFlag Developer documentation
+------------------------------
+:Authors:
+   Michael Cohen and David Collett
+
+:Document Version:     0.10
+
+This is the developer documentation for pyflag. This document is designed to assist programmers to develop forensic or database applications using the pyflag framework.
+
+The following document has many examples of using the various classes. The author prefers to use the *ipython* shell to test things out. Before using ipyton, the python path must be set to load pyflag classes::
+
+    cd pyflag
+    export PYTHONPATH=`pwd`:`pwd`/libs/
+    ipython
+
+Using the Query Object
+======================
+The query object is a simplified way of handling CGI parameters. It is defined in pyflag.FlagFramework. At the basic level it looks very much like a standard python dict::
+
+   >> import pyflag.FlagFramework as FlagFramework
+   >> a= FlagFramework.query_type()
+   >> a['hello'] = 'world'
+   >> print a['hello']
+   world
+
+The main difference being that it is possible to store multiple values for each key value. This represents an array of values::
+
+   >> a['hello'] = 'cruel world'
+   >> print a['hello']
+   world
+
+Note that if we read a key with a construct like ``a['hello']``, we get the first value stored in the array. In order to read the array in full we can use the ``getarray`` method::
+
+   >> print a.getarray('hello')
+   ('world', 'cruel world')
+
+The corrolary of this property is that when we want to replace a value in a query object, it is not enough to just assign it with the new value (because that would just add a new one item to the list). We must first explicitly delete the value, and then assign the new one::
+
+   >> del a['hello']
+   >> a['hello'] = "new value"
+   >> print a['hello']
+   new value
+
+It is possible to initialise the query object in 3 different ways:
+
+1. The first is using the output of the cgi modules parser::
+
+   >>> a = FlagFramework.query_type(cgi.parse_qsl("hello=world&hello=another%20world&foo=bar"))
+
+2. The query object may be initialised using a dict. This is inappropriate for initialising arrays since dicts do not support multiple keys::
+
+   >> a = FlagFramework.query_type( {"hello":"world"} )
+
+3. The query object may be initialised using keyword arg. This is also inappropriate for initialising arrays, since python does not support multiple keyword args::
+
+   >> a = FlagFramework.query_type(hello="world")
+
+By string formatting the query object, a proper URL may be obtained. This is rarely needed, however::
+
+   >> print a
+   f?hello=world&hello=another%20world&foo=bar&case=pyflag
+
+Using the UI abstraction to render
+==================================
+PyFlag uses a User Interface (UI) abstraction. This means that all rendering of output is done by calling methods on a single UI object. Although this reduces the complexity of rendering, it allows PyFlag to implement any number of renderers for the output with minimal impact on other code. The UI objects are responsible for rendering the required widgets in the way that makes most sense to their specific implementations.
+
+Basics
+~~~~~~
+For example consider the following::
+    
+    >> import pyflag.HTMLUI as HTMLUI
+    >> ui=HTMLUI()
+    >> ui.heading("This is the heading")
+    >> ui.para("This is a paragraph")
+
+The first two lines create a HTMLUI object. It is very rare that developers need to instantiate a UI object themselves, since typically UI objects will be provided by the framework. Next we draw a heading and a paragraph on the ui object. Once our report has been complete, the framework will render the UI object by itself.
+
+Instantiating UI Objects:
+~~~~~~~~~~~~~~~~~~~~~~~~~
+We mentioned before that a UI object is usually provided by the framework. In order to instantiate a new UI based on the provided UI, we do something like::
+
+   >> new_ui = ui.__class__(ui)
+
+This instantiates a new instance of ui, based on ui. For example, if we wanted to draw two strings side by side::
+
+   >> left = ui.__class__(ui)
+   >> left.text("this is the left side")
+   >> right = ui.__class__(ui)
+   >> right.text("This is the right side")
+   >> ui.row(left,right)
+
+Recursive UI Objects:
+~~~~~~~~~~~~~~~~~~~~~
+We have seen in the previous example that we can instantiate new UI objects based on the provided UI object. These objects are then drawn on independently. Finally we see that we can insert UI objects as arguments for the original UI object's methods. We can use this property of UI objects (i.e. recursive nesting) to build some fairly complex arrangements.
+
+Note however, that the intention with abstracting the UI is to produce interfaces which are simple. By removing much of the control the designer has on the UI objects, we can assure that all interfaces will look good under whatever rendering environment they may be instantiated (e.g. HTML vs. GTK). Hence its usually a bad idea to micro-manage UI objects in order to get an exact effect.
+
+Some commonly used widgets:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An exhaustive account of all UI methods can be seen by running the ``gendoc.sh`` script from the top-level directory (This script uses the excellent epydoc package to generate automatic documentation from source code). 
+
+However, there are a number of commonly used widgets that are available in UI objects. We shall cover some of these here.
+
+One of the most impressive widgets within PyFlag (and in fact the feature which provides much of its power) is the table widget. The table widget allows users to perform powerful searches on database tables. For the developers, rendering such a widget could not be easier. The actual implementation of the widget is completely hidden in the UI, and developers simply need to provide a number of simple parameters. The following is an extract from the DiskForensics report::
+
+   >> ui.table(
+          columns=['f.inode','f.mode','concat(path,name)','f.status','size','from_unixtime(mtime)','from_unixtime(atime)','from_unixtime(ctime)'],
+          names=('Inode','Mode','Filename','Del','File Size','Last Modified','Last Accessed','Created'),
+          callbacks={'Del':DeletedIcon},
+          table='file_%s as f, inode_%s as i' % (fsfd.table,fsfd.table),
+          where="f.inode=i.inode",
+          case=query['case'],
+          links=[ FlagFramework.query_type((), case=query['case'],family=query['family'],report='ViewFile', fsimage=query['fsimage'],__target__='inode', inode="%s"),None, FlagFramework.query_type((),case=query['case'],family=query['family'],report='BrowseFS', fsimage=query['fsimage'],__target__='open_tree',open_tree="%s") ]
+       )
+
+Since the widget builds an SQL statement on the fly based on the parameters provided, the parameters are required to make sense from an SQL point of view. The actual SQL generated is similar to::
+
+  select column1 as name1,column2 as name2 ... from case.table where where 
+
+Therefore, the first parameter provided is *columns*. Note that columns can contain arbitrary database functions, as long as they make sense to the database (MySQL). Next we provide a list of names to name the columns. We also provide the table and the case (which is stored in its own database).
+
+The callbacks argument provides a list of callbacks to apply to different columns. When the UI retrieves the value of each column, it calls these callbacks to receive a UI object to render in place of the value. This facility allows developers to have icons etc inside the table.
+
+The links argument is an array of query objects representing links to other reports. The special query parameter *__target__* will take on the value of the specific column at each row. This allows developers to link from one report to the next based on results returned from the database.
+
+Plugins and Extending PyFlag
+============================
+PyFlag has a very modular architecture. It takes advantage of Pythons excellent introspection facilities to build a map of classes present in plugin files. This architecture allows developers to extend PyFlag by creating a python file and dropping it in the plugins directory.
+
+When PyFlag starts up, a central class registry is invoked (implemented in Registry.py). The Registry opens all python files in the plugins directory and registers classes that form components for PyFlag. Setting the log level to debug in ``~/.pyflagrc`` can be used to see this process. This is an extract from ``~/.pyflagrc``::
+
+   [misc]
+   log_level = 10
+
+Now when flag.sh is invoked. This is an extract of the debugging messages::
+
+   Debug: Will attempt to load plugin './plugins/IndexTools.py'
+   Debug: Added pyflag.Reports.report 'Index Tools:IndexImage'
+   Debug: Added pyflag.Reports.report 'Index Tools:SearchIndex'
+   Debug: Will attempt to load plugin './plugins/KnowledgeBase.py'
+   Debug: Added pyflag.Reports.report 'Knowledge Base:DisplayObject'
+   Debug: Added pyflag.Reports.report 'Knowledge Base:DrawNetworkDiagram'
+
+This shows how the Registry is opening each plugin and adding special classes to the central registry (In this case these are reports). If an exception is raised during imporation, this will be reported here, and the plugin will not be imported.
+
+In the following sections we explore some of the extensions that may be added to extend PyFlag's functionality. It should be noted that in order to add such an extension, developers must extend certain classes. For example in order to create a new report, developers must create a class which extends pyflag.Reports.report.
+
+Reports
+=======
+A central concept in PyFlag is the report. A report is the object which most users interact with. Reports belong to families of reports, which are grouped together, usually grouping reports with common functionality.
+
+Before exploring how a report is written we must first consider the practicality of forensic analysis. Most forensic analysis involves a time consuming analysis and a perusing phase where the investigator reviews the results of the analysis. PyFlag aims to seperate these phases so that analysis may be carried out automatically with little user intervention. Then the user is allowed to review the results of the analysis.
+
+This model is carried through to the report structure. There are basically three phases during the execution of the report:
+
+1. A form is being filled in to provide parameters for the analysis to proceed. These parameters may represent log files to load, IO sources to analyse or any other parameter that is required.
+
+2. The analysis is carried out with the user provided set of parameters.
+
+3. The result of the analysis is then browsed by the user.
+
+In order to implement this model there are three main methods in the reports object. The *form* method, the *analysis* method and the *display* method.
+
+The parameters
+~~~~~~~~~~~~~~
+The central key of information required in the model described in the previous section is the list of parameters. The list of parameters makes the current invocation of the report unique, so that the framework can tell if this report has already been executed previously (and does not need to be analysed) or if we need to analyse this report again. In addition, the framework can tell if the user has provided all the parameters required, and if not ask the report to render a form for the user to interact with.
+
+For example, suppose we have a report which loads a log file into the database. It requires a single parameter, the log file to load. 
+
+Suppose now that the user invoked the report without providing any parameters. The framework knows that this report requires a filename to operate on, but none was provided. Hence the framework will invoke the reports form method and present the result to the user. The user is now free to provide a filename as a parameter.
+
+Now the user provides the filename *foo.log* as a parameter. The framework can tell that there are no more parameters, and also that this report has not been run before with that same parameter, hence the analysis method is called with this parameter.
+
+While the report is analysed (in a seperate thread of execution). The Framework will call the *progress* method to allow the report a chance to inform the user about the current progress of the analysis. Note that the analysis may take many hours to complete, so it is important to ensure some meaningful feedback is provided to the user.
+
+Once the analysis method completes, the framework notes that the report has finished analysing and when the user calls the framework again with a filename parameter of *foo.log*, the framework notes that the report was already executed with this parameter and simply shows the *display* method.
+
+If the user calls the same report with a different filename, say *bar.log*. The analysis is called with the new parameter, since it is not the same as the previous call.
+
+It can be seen from the above example, that the parameters determine those invocations of the report which are unique. That is invoking the report with different parameters represents different analysis/display cycles. Developers should therefore, choose the parameters carefully to ensure that the analysis/display cycles are correct.
+
+Parameter types are also checked by the framework before being applied. The type checks are performed in TypeCheck.py. New types may be added as needed. If the parameter is of the wrong type, the framework rejects it automatically.
+
+The Form Method
+~~~~~~~~~~~~~~~
+The form method is called when the framework requires the report to draw a form for the user. Note that the form must allow the user to choose all the parameters required by the parameters attribute, or the report will not be usable.
+
+The form method gets two arguments: The query object supplied by the user, and an initialised UI object for the report to draw on. Here is an example of a small form method::
+
+    def form(self,query,result):
+          result.case_selector()
+          result.meta_selector(message='FS Image',case=query['case'],property='fsimage')
+          result.textfield('Inode','inode')
+
+This form draws a case selector, and then a selector of different filesystem images stored in the meta table.
+
+Analyse and Progress Methods
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This method actually does all the work. In order to make PyFlag responsive, ideally the analyse method should create tables in the database and populate those with the results of the analysis. The analyse method is run in a separate thread to the GUI, and therefore does not have a UI object to use.
+
+While the analyse method is executed, the progress method is periodically providing feedback to the user in another thread. The Analyse method should periodically update the progress method to pass status report. Since the two methods are run in separate threads, there are two main ways to achieve this communication:
+
+1. Data may be passed through instance variables. This is possible since its the same object which is being accessed in both threads.
+
+2. Data may be passed in the database meta table. The disadvantage here is that if a thread terminates abruptly the database may fall out of sync. This method is better when running in a distributed environment.
+
+Display Method
+~~~~~~~~~~~~~~
+The display method is run by the framework once analysis is complete. Note that the user may still manipulate some parameters which do not appear in the parameters attribute. These will not result in the reanalysis of the report.

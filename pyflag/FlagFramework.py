@@ -54,7 +54,7 @@ class query_type:
 
     since if the paramter is not deleted first, it will simply be appended to produce a report array.
     """
-    def __init__(self,query_list,**params):
+    def __init__(self,query_list=None,**params):
         """ Constructor initialises from a CGI list of (key,value) pairs or named keywords. These may repeat as needed """
         self.q=[]
         if isinstance(query_list,list):

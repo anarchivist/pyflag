@@ -211,7 +211,6 @@ def scanfile(ddfs,fd,factories):
             except Exception,e:
                 logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
 
-    fd.close()
     # call finish object of each method
     for o in objs:
         try:

@@ -298,7 +298,6 @@ class DBFS(FileSystem):
         dbh2 = DB.DBO(self.case)
         dbh3=DB.DBO(self.case)
 
-#        dbh3.execute('select inode, concat(path,name) as filename from file_%s where mode="r/r" and status="alloc" and inode not like "%%-Z-%%"',self.table)
         dbh3.execute('select inode, concat(path,name) as filename from file_%s where mode="r/r" and status="alloc"',self.table)
         count=0
         for row in dbh3:
@@ -310,6 +309,7 @@ class DBFS(FileSystem):
             try:
                 fd = self.open(inode=row['inode'])
                 Scanner.scanfile(self,fd,scanners)
+                fd.close()
             except Exception,e:
                 logging.log(logging.ERRORS,"%r: %s" % (e,e))
                 continue
