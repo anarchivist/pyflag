@@ -5,6 +5,7 @@ SYSBINS = cjpeg djpeg
 PYTHONLIB = /usr/lib/python2.3/
 PYTHONBIN = `which python2.3`
 DATA_DIR = `grep -i DATA_DIR pyflag/pyflagrc | cut -d= -f2`
+MYSQLCOMMAND =./bin_dist/mysql/bin/mysql --socket=bin_dist/mysql/data/pyflag.sock
 
 all:	bins
 	for dir in $(DIRS); do\
@@ -44,5 +45,12 @@ bin-dist:
 
 mysql:
 	cd bin_dist/ && tar -xvzf ../sources/mysql*.tgz
-	mkdir -p $(DATA_DIR)
-	
+	cd bin_dist/mysql/ && ./scripts/mysql_install_db
+#	ln -s bin_dist/mysql/bin/mysql bin_dist/bin/
+	## Now we launch the database in the background
+	bash -c ' cd bin_dist/mysql &&  ./bin/mysqld_safe --skip-networking --socket=pyflag.sock --skip-grant-tables  --datadir=./data/ &'
+	## Wait a bit for the server to start up
+	sleep 1
+	## Now we create the database:
+	echo 'CREATE DATABASE pyflag;' | $(MYSQLCOMMAND)
+	cat db.setup | $(MYSQLCOMMAND) pyflag

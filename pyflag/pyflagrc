@@ -11,7 +11,7 @@ Host=
 Port=3306
 UNIX_SOCKET = /var/run/mysqld/mysqld.sock
 # This is the directory (relative to the pyflag installation) where the mysql databases are installed to.
-DATA_DIR = data
+DATADIR=data
 
 #Default flag database
 FlagDB = pyflag

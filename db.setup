@@ -1,7 +1,6 @@
 -- 
 -- Table structure for table `whois`
 -- 
-
 CREATE TABLE `whois` (
   `id` int(11) NOT NULL auto_increment,
   `src_id` int(11) default NULL,
