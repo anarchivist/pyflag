@@ -53,18 +53,19 @@ for file in os.listdir(config.SCANNER_DIRECTORY):
 
         try:
             module = imp.load_source(module_name,os.path.join(config.SCANNER_DIRECTORY,file),fd)
+
+            ## Now look through all classes in the module for those which are extending Scanners.GenScanFactory and add those to our scanner list:
+            for cls in dir(module):
+                try:
+                    if issubclass(module.__dict__[cls],Scanners.GenScanFactory) and cls!="GenScanFactory":
+                        scanners.append(module.__dict__[cls])
+                        logging.log(logging.DEBUG,"++Added scanner class %s to Scanner list " % cls)
+                        scanner_names.append(cls)
+                except (TypeError, NameError) , e:
+                    continue
+                
         except Exception,e:
             logging.log(logging.ERRORS, "*** Unable to load Scanner module %s: %s" % (module_name,e))
-
-        ## Now look through all classes in the module for those which are extending Scanners.GenScanFactory and add those to our scanner list:
-        for cls in dir(module):
-            try:
-                if issubclass(module.__dict__[cls],Scanners.GenScanFactory) and cls!="GenScanFactory":
-                    scanners.append(module.__dict__[cls])
-                    logging.log(logging.DEBUG,"++Added scanner class %s to Scanner list " % cls)
-                    scanner_names.append(cls)
-            except (TypeError, NameError) , e:
-                continue
 
 def sort_function(x,y):
     a=scanners[scanner_names.index(x[1])].order

@@ -97,7 +97,18 @@ The following components can be seen:
         <li>Calculting file types (file magic) and hashes (MD5sums) and comapring these against the NIST NSRL hash set (if present).</li>
         <li>Browsing/Searching windows registry hives.</li>
       </ul>
-      These map to the reports which appear in the "Disk Forensics" tab in flag.<p>
+    These map to the reports which appear in the "Disk Forensics" tab in flag.<p>
+    <h3>Scanners and Virutual filesystems</h3>
+    An important concept in Flag is that of scanners. Scanners are code modules (located inthe Scanners directory) which are executed on each file in the filesystem as the filesystem is loaded. There are a number of types of scanners currently, including:
+    <ul>
+      <li>scan file and record file type: This scanner establishes the file type of each file by use of the magic library. </li>
+      <li>scan file and record file Hash: This scanner calculates the MD5 hash of each file and compares it against the NSRL database.</li>
+      <li>Scan file for viruses: Each file will be scanned for viruses using ClamAV - the free virus scanner.</li>
+      <li>Load in IE History files: If the scanner comes across any IE History files, they will be analysed and inserted into the case IE History table.</li>
+      <li>Load in Windows Registry files: If the scanner comes across any windows registry files, they will be analysed.</li>
+      <li>Keyword Index files: The index dictionary will be used to index all files as they are seen.</li>
+      <li>
+
       Before using these reports, the filesystem image must be loaded into flag. This is a three stage process:
       <ul>
         <li>Create a new case, as described above</li>
@@ -286,7 +297,7 @@ Please enter a value for filesystem type: linux-ext2
     <address><a href="mailto:pyflag-users@sourceforge.net"></a></address>
 <!-- Created: Sat Mar 13 21:51:49 EST 2004 -->
 <!-- hhmts start -->
-Last modified: Sun Apr 18 22:29:13 EST 2004
+Last modified: Fri Nov  5 21:01:14 EST 2004
 <!-- hhmts end -->
   </body>
 </html>
