@@ -1,7 +1,40 @@
-To install pyflag you must have a working mysql server somewhere. It
-may be on a different server than the server used to run pyflag, but
-you will need to have root level access to the database server. This
-is required in order to drop and create databases.
+PyFLAG Installation instructions.
+========================
+
+PyFlag is shipped in 3 different ways. The choice of which release
+file to select depends on individual choices (e.g. if a development
+environment is needed). The simplest distribution to install and use
+is the Binary+MySQL release, while the most technically challenging
+setup to achieve is compiling the source tar ball.
+
+This file covers installation instructions for all distributions. If
+you are not comfortable with compiling from source and satisfying all
+dependencies, the Binary+MySQL release is your obvious choice.
+
+Binary+MySQL distribution:
+--------------------------------------
+This distribution contains a stand alone version of the mysql server
+software. It is designed to be completely self contained and therefore
+has no external dependencies other than a fairly recent version of
+glibc. This distribution should run on most flavours of linux and has
+been thoroughly tested on sarge. To install simply:
+
+- Download the tarball.
+- Unpack the tarball in a directory of your choice.
+- cd into this directory and then execute ./flag.sh
+- point your browser to http://127.0.0.1:8000/
+
+The first time that flag is run, you will be asked to fill in a number
+of parameters. This will create a ~/.pyflagrc file in your home
+directory.
+
+Binary distribution:
+--------------------------
+This is a self contained distribution, which does not have an embedded
+mysql server. You will need to have a working mysql server
+somewhere. It may be on a different server than the server used to run
+pyflag, but you will need to have root level access to the database
+server. This is required in order to drop and create databases.
 
 Log into the mysql server by using the mysql utitlity (If you just
 installed mysql there is no root password set, so the -pxxxx can be
@@ -15,33 +48,37 @@ The grant command create a root level account on the database. You can
 replace localhost with the actuall host you intend to log in
 from. Note that mysql does not have a root password by default, but
 PyFlag _requires_ that you have a root password set for the mysql
-server. This is best practice anyway, and you should never consider
-running a mysql server with a blank root password.
+server when running in this mode. This is best practice anyway, and
+you should never consider running a mysql server with a blank root
+password.
 
 Now from the shell, populate the initial database:
 cat setup.db | mysql -u root -ppassword -h 127.0.0.1 pyflag
 
-You may also want to download the NSRL database as well. Consult the
-nsrl_load script to load the databases.
+Source Package:
+-----------------------
+If you wish to develop modules for PyFlag or contribute, we encourage
+you to download the source distribution. To install from source you
+will need to have the mysql database set up as described above, and
+have all library dependancies satisfied. Since the list of library
+dependencies changes very often, we will not provide an exhaustive
+list here.
 
-To Start PyFlag, cd into the unpacked binary directory, and run:
-bash$  ./flag.sh
-
-The first time that flag is run, you will be asked to fill in a number
-of parameters. This will create a ~/.pyflagrc file in your home
-directory.
+At the very least swig and python-dev are required, as well as
+python-mysqldb, clamav. Also plotticus, and ethereal sources are
+required (If you do not wish to use the TCPDump modules, the ethereal
+sources are not needed - flag should be ready to run by the time
+ethereal is compiled).
 
 Optional Features:
 ==============
+The following steps are recommended to do prior to using Flag.
 
-Virus scanning: Flag may use a virus scanner if one is available on
-the system. You will need to install the following packages on debian:
+1) Flag may use the NSRL when loading new filesystems. If you have the
+    NSRL Isos, you can mount them somewhere and then use the
+    utilities/NSRL_load.sh script to load the NSRL into the database.
 
-libclamav1-dev
-clamav-freshclam
-clamav-base
-clamav
-
-The library is required in order to compile python support for
-clamav. You will then need to run the freshclam script in order to
-download the latest version of the pattern files.
+2) Flag can download the whois databases for use when importing log
+   files. By Downloading the whois databases its possible to do very
+   fast whois lookups on every IP in imported logs and then see the
+   contact details for each network owner.
