@@ -72,6 +72,7 @@ class BrowseFS(Reports.report):
     def display(self,query,result):
         result.heading("Browsing Filesystem in image %s" % query['fsimage'])
         dbh = self.DBO(query['case'])
+        main_result=result
         
         # lookup the iosource for this fsimage
         iofd = IO.open(query['case'], query['fsimage'])
@@ -81,7 +82,6 @@ class BrowseFS(Reports.report):
         new_query = result.make_link(query, '')
             
         def tabular_view(query,result):
-            # tabular view
             result.table(
                 columns=['f.inode','f.mode','concat(path,name)','f.status','size','from_unixtime(mtime)','from_unixtime(atime)','from_unixtime(ctime)'],
                 names=('Inode','Mode','Filename','Del','File Size','Last Modified','Last Accessed','Created'),
@@ -89,10 +89,13 @@ class BrowseFS(Reports.report):
                 table='file_%s as f, inode_%s as i' % (fsfd.table,fsfd.table),
                 where="f.inode=i.inode",
                 case=query['case'],
-                links=[ FlagFramework.query_type((), case=query['case'],family=query['family'],report='ViewFile', fsimage=query['fsimage'],__target__='inode', inode="%s"),None, FlagFramework.query_type((),case=query['case'],family=query['family'],report='Browse Filesystem', fsimage=query['fsimage'],__target__='open_tree',open_tree="%s") ]
+                links=[ FlagFramework.query_type((), case=query['case'],family=query['family'],report='ViewFile', fsimage=query['fsimage'],__target__='inode', inode="%s"),
+                        None,
+                        FlagFramework.query_type((),case=query['case'],family=query['family'],report='Browse Filesystem', fsimage=query['fsimage'],__target__='open_tree',open_tree="%s") ]
                 )
 
         def tree_view(query,result):
+            # FIXME: This should be fixed to install the toolbar in the tree cb only...
             # default to tree view
             if (query.has_key("open_tree") and query['open_tree'] != '/'):
                 br = query['open_tree']
@@ -148,23 +151,19 @@ class BrowseFS(Reports.report):
                 ScannerUtils.draw_scanners(query,result)
                 result.end_table()
                 result.end_form()
-#                result.display = result.__str__
+                result.decoration='naked'
 
-            tmp = result.__class__(result)
-            result.toolbar(scan_popup,"Scan this directory",icon="examine.png")
-#            tmp2=result.__class__(result)
-#            tmp2.row("Inspecting branch %s  " % br,tmp)
-#            result.para(tmp2)
+#            tmp = result.__class__(result)
+            main_result.toolbar(scan_popup,"Scan this directory",icon="examine.png")
 
             def tree_cb(branch):
                 path =FlagFramework.normpath('/'.join(branch)+'/')
-                ## We need a local copy of the filesystem factory so as not to affect other instances!!!
+                ## We need a local copy of the filesystem factory so
+                ## as not to affect other instances!!!
                 fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
 
                 for i in fsfd.dent_walk(path): 
                     if i['mode']=="d/d" and i['status']=='alloc':
-#                        link = self.ui(result)
-#                        link.link(i['name'],new_query,open_tree="%s%s" %(path,i['name']), mode='table', where_Filename="%s%s" %(path,i['name']), order='Filename')# ,__mark__="%s%s" %(path,i['name']))
                         yield(([i['name'],i['name'],'branch']))
 
             def pane_cb(branch,tmp):
@@ -173,7 +172,6 @@ class BrowseFS(Reports.report):
                 tmp.table(
                     columns=['f.inode','name','f.status','size', 'from_unixtime(mtime)','f.mode'],
                     names=('Inode','Filename','Del','File Size','Last Modified','Mode'),
-#                    callbacks={'Del':DeletedIcon},
                     table='file_%s as f, inode_%s as i' % (fsfd.table,fsfd.table),
                     where="f.inode=i.inode and path=%r and f.mode!='d/d'" % (br),
                     case=query['case'],

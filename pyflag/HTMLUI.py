@@ -77,8 +77,15 @@ class HTMLUI(UI.GenericUI):
         self.text_var = ''
         self.text_line_count = 0
         self.nav_query = None
+        #This specified if we should render the UI in the theme or
+        #naked. Note that this only affects UIs which are drawn in a
+        #window not ones which are added to other UIs:
+        self.decoration='full'
         
     def display(self):
+        if self.decoration=='naked':
+            return self.__str__()
+        
         if self.binary:
             return self.result
         #Make a toolbar
@@ -155,16 +162,6 @@ class HTMLUI(UI.GenericUI):
         tmp = self.__class__()
         ## Negotiate a prefered format with the graph
         format = image.SetFormat(config.GRAPHFORMAT)
-        
-##        if format == 'png' or format == 'jpeg':
-##            out_format = 'png'
-##            ct = 'image/png'
-###            embed = '<img src="f?draw_stored=%%s" %s />' % opt
-##            embed = '<object type="image/png" data="f?draw_stored=%%s" %s />' % opt
-##        elif format == 'svg':
-##            out_format = 'svg'
-##            ct = 'image/svg+xml'
-##            embed = '<object type="image/svg+xml" data="f?draw_stored=%s" width=100%% height=100%% > </object>'
         
         #Ask the image whats its ct:
         tmp.result = image.display()
@@ -248,11 +245,6 @@ class HTMLUI(UI.GenericUI):
                         
         self.result+="<tr %s>\n" % self.opt_to_str(options)
         for column in columns:
-            ## This does not seem to be needed any more and it makes text blocks look bad inside a row
-            #Replace \n in column with <br>\n:
-#            import re
-#            column = re.sub(r"([^>])\n",r"\1<br>\n",str(column))
-
             self.result += "<%s %s>%s</%s>" % (type,self.opt_to_str(td_opts),column,type)
 
         self.result+="</tr>\n"
@@ -290,7 +282,6 @@ class HTMLUI(UI.GenericUI):
                 options['onclick']="self.opener.location=\"%s\"; self.close();" % q
             if 'popup' in tmp:
                 options['onclick'] ="window.open('%s','client','HEIGHT=600,WIDTH=600,scrollbars=yes')" % q
-#                options['target'] ="_blank"
                 self.result+="<a href=# %s >%s</a>" %(self.opt_to_str(options),string)
                 return
         except KeyError:
@@ -378,9 +369,6 @@ class HTMLUI(UI.GenericUI):
         del q['limit']
         del q['order']
         del q['dorder']
-#        for i in q.keys():
-#            if i.startswith('where_'):
-#                del q[i]
         
         q['__target__']=target
         try:
@@ -420,7 +408,8 @@ class HTMLUI(UI.GenericUI):
         if not self.defaults: raise UIException, "Must have default query for tree widget"
         query = self.defaults
 
-        #This is needed if we want to have more than one tree per page. FIXME - this is not currently implemented.
+        #This is needed if we want to have more than one tree per
+        #page. FIXME - this is not currently implemented.
         self.tree_id += 1
         
         #Read in the current branch that needs to be opened from the open_tree parameter
@@ -440,14 +429,18 @@ class HTMLUI(UI.GenericUI):
             """
             found =0
             tmp = []
-            #We search through all the items until we find the one that matches the branch for this depth, then recurse into it.
+            #We search through all the items until we find the one
+            #that matches the branch for this depth, then recurse into
+            #it.
             branch_array=branch[:depth]
             for k,v,t in tree_cb(branch_array):
                 if not k: return
                 if not t: continue
                 tmp.append((depth,k,v,t))
                 try:
-                    #We are further than config.MAXTREESIZE after the tree item that will matched, we can quit now after placing an arrow
+                    #We are further than config.MAXTREESIZE after the
+                    #tree item that will matched, we can quit now
+                    #after placing an arrow
                     if found and len(tmp)>config.MAXTREESIZE:
                         tree_array += tmp
                         if len(tmp) > config.MAXTREESIZE:
@@ -477,7 +470,9 @@ class HTMLUI(UI.GenericUI):
                     if len(tmp) > config.MAXTREESIZE:
                         break
 
-            #We get here if we exhausted all the items within config.MAXTREESIZE or did not find the requested branch in the tree
+            #We get here if we exhausted all the items within
+            #config.MAXTREESIZE or did not find the requested branch
+            #in the tree
             split =  tmp[:config.MAXTREESIZE]
             tree_array += split
             if len(split) == config.MAXTREESIZE:
@@ -578,7 +573,9 @@ class HTMLUI(UI.GenericUI):
         query_str = sql;
         query = self.defaults
         
-        #The new_query is the same one we got minus all the UI specific commands. The following section, just add UI specific commands onto the clean sheet
+        #The new_query is the same one we got minus all the UI
+        #specific commands. The following section, just add UI
+        #specific commands onto the clean sheet
         new_query = query.clone()
         del new_query['dorder']
         del new_query['order']
@@ -587,10 +584,16 @@ class HTMLUI(UI.GenericUI):
         select_clause=[]
         new_names=[]
         new_columns=[]
-        #find the group by clause. If the caller of this widget set their own group by, we cant use the users group by instructions.
+        #find the group by clause. If the caller of this widget set
+        #their own group by, we cant use the users group by
+        #instructions.
         if not groupby:
-             #If we have a group by, we actually want to only show a count and those columns that are grouped by, so we over ride columns and names... We do not however nuke the original names and columns until _after_ we calculate our where conditions.
-             #Mask contains those indexes for which names array matches the group_by clause
+             #If we have a group by, we actually want to only show a
+             #count and those columns that are grouped by, so we over
+             #ride columns and names... We do not however nuke the
+             #original names and columns until _after_ we calculate
+             #our where conditions.  Mask contains those indexes for
+             #which names array matches the group_by clause
              try:
                  mask = [ names.index(d) for d in query.getarray('group_by') ]
                  if not mask: raise ValueError
@@ -650,7 +653,9 @@ class HTMLUI(UI.GenericUI):
                     having.append("%s like %r " % (columns[index],"%%%%%s%%%%"% v))
                     condition_text="%s like %s" % (d[len('where_'):],"%%%s%%" % v)
 
-                #Create a link which deletes the current variable from the query string, allows the user to remove the current condition:
+                #Create a link which deletes the current variable from
+                #the query string, allows the user to remove the
+                #current condition:
                 tmp_query=query.clone()
                 tmp_query.remove(d,v)
                 tmp_link=self.__class__(self)
@@ -667,7 +672,8 @@ class HTMLUI(UI.GenericUI):
 
         query_str+=where_str
         
-        ## At this point we can add the group by calculated above, and replace the names and columns arrays from the group by
+        ## At this point we can add the group by calculated above, and
+        ## replace the names and columns arrays from the group by
         if group_by_str:
             query_str += " group by %s " % group_by_str
 
@@ -691,7 +697,8 @@ class HTMLUI(UI.GenericUI):
                 order = " `%s` asc " % names[0]
                 ordered_col = 0
 
-        ## This is used to render things in the popups. The query string here is naked without order by clauses
+        ## This is used to render things in the popups. The query
+        ## string here is naked without order by clauses
         query_str_basic = query_str
         query_str+= " order by %s " % order
 
@@ -751,7 +758,6 @@ class HTMLUI(UI.GenericUI):
             ## End of table_groupby_popup
                 
             ## Add a popup to allow the user to draw a graph
-##            self.popup(table_groupby_popup,'Graph',icon='pie.png',toolbar=1,menubar=1)
             self.toolbar(table_groupby_popup,'Graph',icon='pie.png')
         else: ## Not group by
             def table_configuration_popup(query,result):
@@ -784,7 +790,6 @@ class HTMLUI(UI.GenericUI):
         def save_table(query,result):
             result.display=result.__str__
             result.type = "text/x-comma-separated-values"
-##            result.type = "text/plain"
             data = cStringIO.StringIO()
             hidden_columns = query.getarray('hide_column')
             names_list = [ i for i in names if i not in hidden_columns ]
@@ -838,14 +843,19 @@ class HTMLUI(UI.GenericUI):
             #instatiate a whole lot of UI objects (based on self) for the table header
             tmp = self.__class__(self)
 
-            #Create links to the current query as well as an ordering parameter - note the addition of parameters we get by using the new query's str method, and the addition of parameters by using named args...
+            #Create links to the current query as well as an ordering
+            #parameter - note the addition of parameters we get by
+            #using the new query's str method, and the addition of
+            #parameters by using named args...
             try:
                 assert(query['dorder'] == d)
                 tmp.link(d,target=new_query,order=d)
             except (KeyError,AssertionError):
                 tmp.link(d,target=new_query,dorder=d)
 
-            #If the current header label is the same one in ordered_col, we highlight it to show the user which column is ordered:
+            #If the current header label is the same one in
+            #ordered_col, we highlight it to show the user which
+            #column is ordered:
             if names[ordered_col] == d:
                 tmp2=self.__class__(self)
                 tmp2.start_table()
@@ -860,7 +870,8 @@ class HTMLUI(UI.GenericUI):
         #output the table header
         self.row(*tmp_links)
 
-        #This is used to keep track of the lines with a common sorting key: common = (bgcolor state, last value)
+        #This is used to keep track of the lines with a common sorting
+        #key: common = (bgcolor state, last value)
         common = [False,0]
         count =0
         
@@ -935,7 +946,6 @@ class HTMLUI(UI.GenericUI):
             self.row("click here to group by column",colspan=50,align='center')
 
             #Insert the group by links at the bottom of the table
-#            del new_query['group_by']
             tmp_links = []
             for i in range(len(names)):
                 if i in hidden_columns: continue
@@ -948,17 +958,13 @@ class HTMLUI(UI.GenericUI):
             
         self.row("Enter a term to filter on field (% is wildcard)",colspan=50,align='center')
 
-        #Clear off any query objects starting with where_.... Do we want to do this? it might be useful to continually drill down with a number of conditions...
-#        for k in new_query.keys():
-#            if k.startswith('where_'):
-#                del new_query[k]
-
         #Now create a row with input boxes for each parameter
         tmp_links=[]
         for d in range(len(names)):
             if d in hidden_columns: continue
             tmp = self.__class__(self)
-            #It doesnt make sense to search for columns with callbacks, so we do not need to show the form.
+            #It doesnt make sense to search for columns with
+            #callbacks, so we do not need to show the form.
             if callbacks.has_key(names[d]):
                 try:
                     cb_result=callbacks[names[d]](query['where_%s' % names[d]])
@@ -979,7 +985,8 @@ class HTMLUI(UI.GenericUI):
         self.row(*tmp_links)
         self.row(*[ names[i] for i in range(len(names)) if i not in hidden_columns ])
 
-        #If our row count is smaller than the page size, then we dont have another page, set next page to None
+        #If our row count is smaller than the page size, then we dont
+        #have another page, set next page to None
         if count < config.PAGESIZE:
             self.next = None
 
@@ -1059,7 +1066,8 @@ class HTMLUI(UI.GenericUI):
             if options['Additional']:
                 del options['Additional']
         except KeyError:
-            ## If additional was not specified, we take the default from the current value of name
+            ## If additional was not specified, we take the default
+            ## from the current value of name
             import cgi
             try:
                 default = cgi.escape(self.defaults[name],quote=True)
@@ -1085,7 +1093,8 @@ class HTMLUI(UI.GenericUI):
             if options['Additional']:
                 del options['Additional']
         except KeyError:
-            ## If additional was not specified, we take the default from the current value of name
+            ## If additional was not specified, we take the default
+            ## from the current value of name
             import cgi
             try:
                 default = cgi.escape(self.defaults[name],quote=True)
@@ -1172,7 +1181,8 @@ class HTMLUI(UI.GenericUI):
         except KeyError:
             pass
 
-        ## We do both javascript refresh as well as meta refresh to ensure that the browser supports either method
+        ## We do both javascript refresh as well as meta refresh to
+        ## ensure that the browser supports either method
         self.result+=""" <script>function refresh() {window.location="%s";}; setTimeout("refresh()",%s) </script>""" % (query,int(interval)*1000)
         self.meta += "<META HTTP-EQUIV=Refresh Content=\"%s; URL=/f?%s\">" % (interval,query)
 

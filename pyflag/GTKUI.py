@@ -683,18 +683,25 @@ class GTKUI(UI.GenericUI):
         query_str = sql;
         query = self.defaults
         
-        #The new_query is the same one we got minus all the UI specific commands. The following section, just add UI specific commands onto the clean sheet
+        #The new_query is the same one we got minus all the UI
+        #specific commands. The following section, just add UI
+        #specific commands onto the clean sheet
         new_query = query.clone()
         del new_query['dorder']
         del new_query['order']
         del new_query['limit']
 
-        #find the group by clause - if we get a group by clause we need to change the rest of the query so heavily that we need check the group by last.
+        #find the group by clause - if we get a group by clause we
+        #need to change the rest of the query so heavily that we need
+        #check the group by last.
         if not groupby:
             group_by_str = ",".join([ " `%s`" % d for d in query.getarray('group_by') ])
             if group_by_str:
-                 #If we have a group by, we actually want to only show a count and those columns that are grouped by, so we over ride columns and names...
-                 #Mask contains those indexes for which names array matches the group_by clause
+                 #If we have a group by, we actually want to only show
+                 #a count and those columns that are grouped by, so we
+                 #over ride columns and names...  Mask contains those
+                 #indexes for which names array matches the group_by
+                 #clause
                  try:
                      mask = [ names.index(d) for d in query.getarray('group_by') ]
                      links = [None]+ [ self.make_link(query,"where_%s" % names[d],target_format="=%s") for d in mask ]
@@ -707,7 +714,9 @@ class GTKUI(UI.GenericUI):
                      names = ['Count'] + [ names[d] for d in mask ]
                      columns = [ 'count(*)' ] +  [ columns[d] for d in mask ]
 
-                     #Note that you cant have a group_by and a having clause together - so if you get a group_by we drop the having conditions
+                     #Note that you cant have a group_by and a having
+                     #clause together - so if you get a group_by we
+                     #drop the having conditions
                      for d in query.keys():
                          if d.startswith('where_'):
                              del query[d]
@@ -755,7 +764,9 @@ class GTKUI(UI.GenericUI):
                     having.append("%s like %r " % (columns[index],"%%%%%s%%%%"% v))
                     condition_text="%s like %s" % (d[len('where_'):],"%%%s%%" % v)
 
-                #Create a link which deletes the current variable from the query string, allows the user to remove the current condition:
+                #Create a link which deletes the current variable from
+                #the query string, allows the user to remove the
+                #current condition:
                 tmp_query=query.clone()
                 tmp_query.remove(d,v)
                 tmp_link=self.__class__(self)
