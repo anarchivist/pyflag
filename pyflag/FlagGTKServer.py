@@ -260,7 +260,8 @@ class GTKServer(gtk.Window):
         print "Drawing form for %s %s" % (query,self.form_dialog)
         if self.form_dialog:
             child=self.form_dialog.get_child()
-            self.form_dialog.remove(child)
+            if child:
+                self.form_dialog.remove(child)
         else:
             self.form_dialog=gtk.Window()
             self.form_dialog.set_transient_for(self)

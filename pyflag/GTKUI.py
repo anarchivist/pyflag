@@ -482,18 +482,12 @@ class GTKUI(UI.GenericUI):
         @arg target: A query object specifying where to go to.
         """
         ## Only respond to left clicks
-        if event.button !=1: return
         try:
-            family=target['family']
-            report=target['report']
-            report = Registry.REPORTS.dispatch(family,report)(FlagFramework.GLOBAL_FLAG_OBJ,ui=FlagFramework.GLOBAL_FLAG_OBJ.ui)
-            if not report.check_parameters(target):
-                self.server.process_query(target)
-        except KeyError:
+            if event.button !=1: return
+        except:
             pass
 
-        if self.link_callback:
-            self.link_callback(target)
+        self.server.process_query(target)
 
     def tooltip(self, string):
         """ redundant, never used """
@@ -811,15 +805,15 @@ class GTKUI(UI.GenericUI):
         f=gtk.FileSelection()
 
         def choose_file(widget,event):
-            f=widget.get_data('filedialog')
+#            f=widget.get_data('filedialog')
             file=f.get_filename()
             label=f.get_data('label')
             label.set_markup(file)
             f.hide()
 
         def hide_box(widget,event):
-            file=widget.get_data('filewidget')
-            file.hide()
+#            f=widget.get_data('filedialog')
+            f.hide()
 
         def callback(widget,event):
             file=widget.get_data('filewidget')
@@ -1006,7 +1000,7 @@ class GTKUI(UI.GenericUI):
         button.set_tooltip(self.tooltips, tooltip)
 
         if link:
-            button.connect('clicked', self.goto_link,None,link)
+            button.connect('clicked',  self.goto_link,link)
         else:
             button.connect('clicked', proxy_cb, cb, self, self.defaults)
             
@@ -1480,20 +1474,83 @@ class GTKUI(UI.GenericUI):
         """
         box=gtk.VBox()
         sw=gtk.ScrolledWindow()
-        sw.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_NEVER)
-        tmp=self.__class__(self)
+        sw.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_AUTOMATIC)
         fbut=gtk.ToolButton(gtk.STOCK_GO_FORWARD)
         bbut=gtk.ToolButton(gtk.STOCK_GO_BACK)
-        result=self.__class__(self)
-        callbacks[0](self.defaults,result)
-        sw.add_with_viewport(result.display())
+        query=self.defaults.clone()
+        query['page']=0
+
+        def process_click(result,query):
+            """ Updates query by adding the parameters specified by result's form_widgets """
+            print result.form_widgets
+            for widget,callback in result.form_widgets:
+                parameter=callback(widget)
+                print "parameter %s" % (parameter,)
+                del query[parameter[0]]
+                query[parameter[0]]=parameter[1]
+
+        def check_callback(page):
+            """ Checks if the form rendered ok. Returns true if the form was ok, false if it needs to be refilled """
+            result=self.__class__(server=self.server,ftoolbar=self.ftoolbar,query=query)
+            error_state=callbacks[page](query,result)
+            if not error_state:
+                print "There was an error with the form %s" % query
+                result.text("There was an error with the form",color="red")
+            
+            return error_state
+        
+        def draw_wizard_cb(widget=None,page=0):
+            """ Draw the page specified inside the wizard. """
+            result=self.__class__(server=self.server,ftoolbar=self.ftoolbar,query=query)
+            callbacks[page](query,result)
+                
+            child=sw.get_child()
+            if child:
+                sw.remove(child)
+            sw.add_with_viewport(result.display())
+            sw.show_all()
+            return result
+        
+        def process_wizard_page(widget=None,page=0,result=None):
+            if page==len(names)-1:
+                process_click(result,query)
+                self.refresh(0,query)
+                wizard_box.destroy()
+                print "finishing"
+                return
+
+            print "processing page %s %s" % (page,len(names))
+            if result:
+                process_click(result,query)
+                
+            ## Were we called from the button press?
+            if widget:
+                ## Is this page good?
+                if check_callback(page):
+                    result=draw_wizard_cb(widget,page+1)
+                    ## Set the next click button to direct to the next page
+                    fbut.disconnect(fbut.get_data('clicked'))
+                    print "setting callback to page %s" % page
+                    fbut.set_data('clicked',fbut.connect('clicked',process_wizard_page,page+1,result))
+                    return
+
+            result=draw_wizard_cb(page)
+            print "setting callback to page %s" % page
+            try:
+                fbut.disconnect(fbut.get_data('clicked'))
+            except TypeError:
+                pass
+
+            fbut.set_data('clicked',fbut.connect('clicked',process_wizard_page,page,result))
+
+        process_wizard_page(page=0)
         box.pack_start(sw,True,True)
         hbox=gtk.HButtonBox()
         hbox.set_layout(gtk.BUTTONBOX_EDGE)
         hbox.add(bbut)
         hbox.add(fbut)
         box.pack_start(hbox,False,False)
-        self.server.create_window(box)
+        wizard_box=self.server.create_window(box)
         raise FlagFramework.DontDraw()
 
 ##    def case_selector(self,case='case',message='Case:', **options):
