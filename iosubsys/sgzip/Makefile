@@ -6,7 +6,8 @@ INCL	= -I../misc -I../hashtools
 
 KERNEL_DIR?=/usr/src/linux
 
-CFLAGS:=`getconf LFS_CFLAGS` -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -s -I. -fno-strict-aliasing -fno-common -fomit-frame-pointer
+#CFLAGS:=`getconf LFS_CFLAGS` -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -s -I. -fno-strict-aliasing -fno-common -fomit-frame-pointer
+CFLAGS:=`getconf LFS_CFLAGS` -Wall -Wstrict-prototypes -Wno-trigraphs -g -I.
 -include $(KERNEL_DIR)/.config
 -include $(KERNEL_DIR)/conf.vars
 

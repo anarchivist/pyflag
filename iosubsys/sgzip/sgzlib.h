@@ -149,6 +149,12 @@ struct sgzip_header {
   } x;
 }  __attribute__((packed));
 
+//A struct to store some information about the sgzip state
+struct sgzip_obj {
+  struct sgzip_header *header;
+  int level;
+};
+
 /* This linked list stores the index as we are building the file */
 struct sgzip_index_list {
   unsigned long long int offset;
@@ -169,11 +175,11 @@ struct sgzip_header *sgzip_read_header(int fd) ;
 struct sgzip_header *sgzip_write_header(int fd,struct sgzip_header *header);
 
 /* Copy stream in to stream out compressing the output in sgzip format */
-void sgzip_compress_fds(int infd,int outfd,const struct sgzip_header *header);
+void sgzip_compress_fds(int infd,int outfd,const struct sgzip_obj *obj);
 
 /* read a random buffer from the sgziped file */
 int sgzip_read_random(char *buf, int len, unsigned long long int offs,
-		int fd, unsigned long long int *index,const struct sgzip_header *header);
+		int fd, unsigned long long int *index,const struct sgzip_obj *obj);
 
 /* 
    Reads the index from the file and returns an array of long ints
@@ -185,7 +191,7 @@ int sgzip_read_random(char *buf, int len, unsigned long long int offs,
 
    If the index is not there we flag an error by returning null.
 */
-unsigned long long int *sgzip_read_index(int fd,struct sgzip_header *header) ;
+unsigned long long int *sgzip_read_index(int fd,struct sgzip_obj *sgzip) ;
 
 /* 
    reads the stream and calculates the index map.
@@ -194,11 +200,11 @@ unsigned long long int *sgzip_read_index(int fd,struct sgzip_header *header) ;
    rebuilding the index. None of the blocks are decoded so this should be quick.
    We return an index_list list.
  */
-unsigned long long int *sgzip_calculate_index_from_stream(int fd,const struct sgzip_header *header);
+unsigned long long int *sgzip_calculate_index_from_stream(int fd,const struct sgzip_obj *obj);
 
 /* Write the index passed in at the current positon in the file. Note
    you would probably only want to do this after
    sgzip_calculate_index_from_stream so that the correct position is
    in the file */
 void sgzip_write_index(int outfd,unsigned long long int *index) ;
-void sgzip_decompress_fds(int fd,int outfd,const struct sgzip_header *header);
+void sgzip_decompress_fds(int fd,int outfd,struct sgzip_obj *sgzip);

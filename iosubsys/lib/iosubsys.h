@@ -75,7 +75,7 @@ int io_close(IO_INFO *self);
 void io_help(char *name) ;
 
 #define CHECK_OPTION(i,x) !strncasecmp(i->option, #x, strlen(#x))
-#define NEW(x) (x *)malloc(sizeof(x))
+#define NEW(x) (x *)calloc(sizeof(x),1)
 
 /* Parses the string for a number. Can interpret the following suffixed:
 

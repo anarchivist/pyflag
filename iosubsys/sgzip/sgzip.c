@@ -33,6 +33,8 @@
 #include <errno.h>
 #include <except.h>
 
+#define NEW(x) (x *)calloc(sizeof(x),1)
+
 #ifndef CYGWIN
 #define O_BINARY 0
 #endif
@@ -40,7 +42,7 @@
 // Constant messages:
 static char Malloc[]="Cant Malloc\n";
 static char Open[]="Cant open %s for reading\n";
-static struct sgzip_header *header=NULL;
+static struct sgzip_obj *sgzip=NULL;
 extern int sgz_verbose;
 
 static void die(const char *message, ...)
@@ -61,7 +63,7 @@ same for both the uncompressed file and the compressed file.
 @arg filename: The filename of an uncompressed image size
 @arg cfd:   A file descriptor for a compressed file
 */
-void test_harness(char *filename,int cfd,unsigned long long int *index,const struct sgzip_header *header) {
+void test_harness(char *filename,int cfd,unsigned long long int *index,const struct sgzip_obj *sgzip) {
   int fd1;
   int offset,count=0;
   int read_size;
@@ -71,15 +73,15 @@ void test_harness(char *filename,int cfd,unsigned long long int *index,const str
   
   while(1) {
     count++;
-    offset= 1+(rand() % 150*header->blocksize);
-    read_size = 1+(rand() % (3*header->blocksize));
+    offset= 1+(rand() % 150*sgzip->header->blocksize);
+    read_size = 1+(rand() % (3*sgzip->header->blocksize));
 
     data1=(char *)malloc(read_size+1024);
     data2=(char *)malloc(read_size+1024);
 
     lseek(fd1,offset,SEEK_SET);
     read(fd1,data1,read_size);
-    sgzip_read_random(data2,read_size,offset,cfd,index,header);
+    sgzip_read_random(data2,read_size,offset,cfd,index,sgzip);
 
     if(!memcmp(data1,data2,read_size)) {
       printf("Passed test %u,  read %u bytes from offset %u\n",count,read_size,offset);
@@ -93,7 +95,7 @@ void test_harness(char *filename,int cfd,unsigned long long int *index,const str
 };
 
 /* Prints usage information for sgzip */
-void usage() {
+void usage(void) {
   printf("sgzip - A seekable compressed format\n");
   printf("(c) 2004\n");
   printf("usage: sgzip [file1] [file2]\n");
@@ -105,6 +107,7 @@ void usage() {
   printf("  -L --license\t\tdisplay software license\n");
   printf("  -v --verbose\t\tverbose mode\n");
   printf("  -V --version\t\tdisplay version number\n");
+  printf("  -# (0-9)\t\tCompression level (0=no compression). Default is 1\n");
   printf("  file... files to (de)compress. If none given, use standard input/output.\n");
 };
 
@@ -147,6 +150,8 @@ void compress_file(char *filename) {
   int infd=0,outfd=1;
   char *out_filename;
 
+  if(!sgzip) sgzip=NEW(struct sgzip_obj);
+
   out_filename=(char *)malloc(strlen(filename)+4);
   if(!out_filename) die(Malloc);
   // For filename of - we use stdin, stdout
@@ -162,8 +167,8 @@ void compress_file(char *filename) {
     if(outfd<0) die("Cant create file %s\n",out_filename);
   };
 
-  header=sgzip_write_header(outfd,header);
-  sgzip_compress_fds(infd,outfd,header);
+  sgzip->header=sgzip_write_header(outfd,sgzip->header);
+  sgzip_compress_fds(infd,outfd,sgzip);
 
   close(infd);
   close(outfd);
@@ -175,6 +180,8 @@ void compress_file(char *filename) {
 void decompress_file(char *filename) {
   int infd=0,outfd=1;
   char *out_filename;
+
+  if(!sgzip) sgzip=NEW(struct sgzip_obj);
 
   // For filename of - we use stdin, stdout
   if(strcmp(filename,"-")) {    
@@ -201,8 +208,8 @@ void decompress_file(char *filename) {
   free(out_filename);
   };
 
-  header=sgzip_read_header(infd);
-  sgzip_decompress_fds(infd,outfd,header);
+  sgzip->header=sgzip_read_header(infd);
+  sgzip_decompress_fds(infd,outfd,sgzip);
 
   close(infd);
   close(outfd);
@@ -224,8 +231,11 @@ int main(int argc, char **argv) {
   // 'c' for compress, 'd' for decompress
   char mode='c';
 
+  sgzip=NEW(struct sgzip_obj);
+
   //Set the default header
-  header=sgzip_default_header();
+  sgzip->header=sgzip_default_header();
+  sgzip->level=1;
 
   //Parse all options
   while (1) {
@@ -243,12 +253,27 @@ int main(int argc, char **argv) {
     };
     
     c = getopt_long(argc, argv,
-		    "hdLvb:l:R:B:",
+		    "hdLvb:l:R:B:0123456789",
 		    long_options, &option_index);
     if (c == -1)
       break;
     
     switch (c) {
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9': {
+      char tmp[]="\0\0\0";
+      tmp[0]=c;
+      sgzip->level = atoi(tmp);
+      break;
+    };
     case 'v':
       sgz_verbose++;
       break;
@@ -264,7 +289,7 @@ int main(int argc, char **argv) {
       mode='d';
       break;
     case 'B':
-      header->blocksize=atol(optarg)*1024;
+      sgzip->header->blocksize=atol(optarg)*1024;
       break;
     case 'b':
       // do the benchmark for a file
@@ -283,9 +308,9 @@ int main(int argc, char **argv) {
 
 	fdin=open(comp_filename,O_RDONLY|O_BINARY);
 	if(fdin<0) die(Open,comp_filename);
-	header=sgzip_read_header(fdin);
-	index=sgzip_read_index(fdin,header);
-	test_harness(filename,fdin,index,header);
+	sgzip->header=sgzip_read_header(fdin);
+	index=sgzip_read_index(fdin,sgzip);
+	test_harness(filename,fdin,index,sgzip);
 	break;
       };
     case 'l':
@@ -299,13 +324,13 @@ int main(int argc, char **argv) {
 	fdin=open(filename,O_RDONLY|O_BINARY);
 	if(fdin<0) die(Open,filename);
 
-	header=sgzip_read_header(fdin);
-	if(!header) die(Open,filename);
-	memcpy(temp,header->x.compression,4);
+	sgzip->header=sgzip_read_header(fdin);
+	if(!sgzip->header) die(Open,filename);
+	memcpy(temp,sgzip->header->x.compression,4);
 	temp[4]=0;
 	 
-	printf(" Blocksize=%u Compression Engine=%s, ",header->blocksize,temp);
-	index=sgzip_read_index(fdin,header);
+	printf(" Blocksize=%u Compression Engine=%s, ",sgzip->header->blocksize,temp);
+	index=sgzip_read_index(fdin,sgzip);
 	for(count=1;index[count];count++)
 	  debug(1,"\n     Block %u is at offset %llu",count,index[count]);
 	debug(1,"\n");
@@ -315,8 +340,8 @@ int main(int argc, char **argv) {
 	  printf(" No index ");
 	} else {
 	  //This is needed in order to seek into the correct place in the file
-	  header=sgzip_read_header(fdin);
-	  derived_index=sgzip_calculate_index_from_stream(fdin,header);
+	  sgzip->header=sgzip_read_header(fdin);
+	  derived_index=sgzip_calculate_index_from_stream(fdin,sgzip);
 	  
 	  //Iterate over all indexes to see if they are the same
 	  for(count=1;index[count]!=0 && derived_index[count]!=0; count++) {
@@ -344,8 +369,8 @@ int main(int argc, char **argv) {
 	fdin=open(filename,O_RDWR|O_BINARY);
 	if(fdin<0) die(Open,filename);
 
-	header=sgzip_read_header(fdin);
-	index=sgzip_calculate_index_from_stream(fdin,header);
+	sgzip->header=sgzip_read_header(fdin);
+	index=sgzip_calculate_index_from_stream(fdin,sgzip);
 	sgzip_write_index(fdin,index+1);
 	close(fdin);
       };

@@ -900,7 +900,7 @@ class GTKUI(UI.GenericUI):
             self.right_button.set_data('query',q)
             self.left_button.set_data('query',q)
 
-        def previous_cb(widget):
+        def previous_cb(query,result):
             del self.defaults['limit']
             self.defaults['limit']=self.previous
             self.previous-=config.PAGESIZE
@@ -912,8 +912,9 @@ class GTKUI(UI.GenericUI):
             generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks)
             
             populate_store(store,generator,names)
+            return result
 
-        def next_cb(widget):
+        def next_cb(query,result):
             del self.defaults['limit']
             self.defaults['limit']=self.next
             self.next+=config.PAGESIZE
@@ -922,7 +923,8 @@ class GTKUI(UI.GenericUI):
             generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks)
             self.defaults=new_query
             populate_store(store,generator,names)
-            
+            return result
+        
         self.toolbar(previous_cb,"Prev Page",stock=gtk.STOCK_GO_BACK,tooltip="Go to Previous page",popup=False)
         self.toolbar(next_cb,"Next Page",stock=gtk.STOCK_GO_FORWARD,tooltip="Go to Next page",popup=False)
         self.row(treeview)

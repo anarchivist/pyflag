@@ -314,7 +314,7 @@ int adv_close(IO_INFO *self) {
  ************************************************/
 struct IO_INFO_SGZ {
   IO_INFO io;
-  struct sgzip_header *header;
+  struct sgzip_obj *sgzip;
   int fd;
   char *name;
   unsigned long long int *index;
@@ -330,7 +330,7 @@ int sgz_read_random(IO_INFO *self, char *buf, int len, off_t offs,
 
   if(!self->ready && self->open(self)<0) return(-1);
 
-  len=sgzip_read_random(buf,len,offs+io->offset,io->fd,io->index,io->header);
+  len=sgzip_read_random(buf,len,offs+io->offset,io->fd,io->index,io->sgzip);
   return(len);
 }
 
@@ -343,6 +343,8 @@ void sgz_help(void) {
 int sgz_open(IO_INFO *self) {
   IO_INFO_SGZ *io=(IO_INFO_SGZ *)self;
   
+  io->sgzip=NEW(struct sgzip_obj);
+
   if(!io->name) {
     RAISE(E_IOERROR,NULL,"No filename set!");
   };
@@ -352,16 +354,16 @@ int sgz_open(IO_INFO *self) {
     RAISE(E_IOERROR,NULL,"Could not open file %s",io->name);
   };
 
-  io->header=sgzip_read_header(io->fd);
-  if(!io->header) {
+  io->sgzip->header=sgzip_read_header(io->fd);
+  if(!io->sgzip->header) {
     RAISE(E_IOERROR,NULL,"%s is not a sgz file",io->name);
   };
 
-  io->index=sgzip_read_index(io->fd,io->header);
+  io->index=sgzip_read_index(io->fd,io->sgzip);
   if(!io->index) {
-    io->header=sgzip_read_header(io->fd);
+    io->sgzip->header=sgzip_read_header(io->fd);
     fprintf(stderr, "You may consider rebuilding the index on this file to speed things up, falling back to non-indexed method\n");
-    io->index=sgzip_calculate_index_from_stream(io->fd,io->header);
+    io->index=sgzip_calculate_index_from_stream(io->fd,io->sgzip);
   };
   self->ready=1;
   return(io->fd);
@@ -396,7 +398,8 @@ int sgz_initialiser(IO_INFO *self,IO_OPT *args) {
 int sgz_close(IO_INFO *self) {
   IO_INFO_SGZ *io=(IO_INFO_SGZ *)self;
   free(io->index);
-  free(io->header);
+  free(io->sgzip->header);
+  free(io->sgzip);
   return (close(io->fd));
 };
 

@@ -144,7 +144,7 @@ struct sgzip_header *sgzip_read_header(int fd) {
   };
   
   if(strncmp(result->magic,"sgz",3)) {
-    warn("File does not look like a sgz file\n");
+    RAISE(E_IOERROR,NULL,"File does not look like a sgz file (bad magic)\n");
     return(NULL);
   };
 
@@ -266,7 +266,7 @@ void sgzip_write_index(int outfd,unsigned long long int *index) {
 };
 
 /* Copy stream in to stream out */
-void sgzip_compress_fds(int infd,int outfd,const struct sgzip_header *header) {
+void sgzip_compress_fds(int infd,int outfd,const struct sgzip_obj *sgzip) {
   char *datain;
   unsigned long int lengthin;
   char *dataout;
@@ -279,34 +279,38 @@ void sgzip_compress_fds(int infd,int outfd,const struct sgzip_header *header) {
   unsigned long long int count=0;
   unsigned long long int *index;
 
-  datain=(char *) malloc(header->blocksize);
-  dataout=(char*)malloc(header->blocksize+1024);
+  datain=(char *) malloc(sgzip->header->blocksize);
+  dataout=(char*)malloc(sgzip->header->blocksize+1024);
   buffer = (char *)malloc(BUFFER_SIZE);
   if(!datain || !dataout || !buffer)
     RAISE(E_NOMEMORY,NULL,Malloc);
 
   do {
     //Read a block from the input
-    lengthin=read_from_stream(infd,datain,sizeof(*datain)*header->blocksize);
+    lengthin=read_from_stream(infd,datain,sizeof(*datain)*sgzip->header->blocksize);
     if(lengthin<0) {
       warn("Error reading from file descriptor\n");
       return;
     };
 
     //Compress this block
-    lengthout=header->blocksize+1024;
-    result = compress(dataout,(long int *)&lengthout,datain,(long int)lengthin);
-    if(result!=Z_OK) {
-      warn("Cant compress block of size %lu into size %lu...\n" , lengthin, lengthout);
+    lengthout=sgzip->header->blocksize+1024;
+    if(!sgzip->level) {
+      if(lengthin>lengthout) RAISE(E_GENERIC,NULL,"Unable to copy %u bytes into %u bytes\n",lengthin,lengthout);
+      memcpy(dataout,datain,lengthin);
+    } else {
+      result = compress2(dataout,(long int *)&lengthout,datain,(long int)lengthin,sgzip->level);
+      if(result!=Z_OK) {
+	warn("Cant compress block of size %lu into size %lu...\n" , lengthin, lengthout);
+      };
     };
-
     //Now we write the size of the compressed buffer as a pointer to
     //the next buffer.
     stream_write(outfd,&lengthout,sizeof(lengthout),
 		 buffer,&fill,BUFFER_SIZE,"Compressed Pointer");
 
     if(!(count % 100)) {
-      sgzip_debug(1,"Wrote %llu blocks of %lu bytes = %llu Mb total\r",count,header->blocksize,(count*header->blocksize/1024/1024));
+      sgzip_debug(1,"Wrote %llu blocks of %lu bytes = %llu Mb total\r",count,sgzip->header->blocksize,(count*sgzip->header->blocksize/1024/1024));
     };
 
     //Add this to the index list:
@@ -360,40 +364,40 @@ static int cached_length=-1;
 
 /* read a random buffer from the sgziped file */
 int sgzip_read_random(char *buf, int len, unsigned long long int offs,
-		      int fd, unsigned long long int *index,const struct sgzip_header *header) {
+		      int fd, unsigned long long int *index,const struct sgzip_obj *sgzip) {
   long int length;
   long long int block_offs,clength,copied=0,buffer_offset,available;
   int result;
 
   //Only malloc data the first time we run.
   if(!data)
-    data=(char *)malloc(sizeof(*data)*(header->blocksize+1024));
+    data=(char *)malloc(sizeof(*data)*(sgzip->header->blocksize+1024));
   if(!cdata)
-    cdata=(char *)malloc(sizeof(*cdata)*(header->blocksize+1024));
+    cdata=(char *)malloc(sizeof(*cdata)*(sgzip->header->blocksize+1024));
 
   if(!data || !cdata) RAISE(E_NOMEMORY,NULL,Malloc);
 
-  block_offs=(int)(offs/header->blocksize);
-  if(block_offs > header->x.max_chunks) {
+  block_offs=(int)(offs/sgzip->header->blocksize);
+  if(block_offs > sgzip->header->x.max_chunks) {
     return(0);
     //This should not raise... just return 0 bytes.
     //    RAISE(E_IOERROR,NULL,"Attempt to seek past the end of the file (block %lu requested from a %u blocks file)",block_offs,(header->x.max_chunks));
   };
   
   //The offset where we need to start from in the individual block.
-  buffer_offset=offs % header->blocksize;
+  buffer_offset=offs % sgzip->header->blocksize;
 
   while(len>0) {
     //If we no longer have any more blocks (we reached the end of the file)
-    if(block_offs >= (header->x.max_chunks-1)) break;
+    if(block_offs >= (sgzip->header->x.max_chunks-1)) break;
 
     //Here we decide if we have a cache miss:
     if(cached_block_offs != block_offs) {
       //Length of this block
       clength=index[block_offs+1]-index[block_offs];
 
-      if(clength>=(header->blocksize+1024)) {
-	RAISE(E_IOERROR,NULL,"Clength (%u) is too large (blocksize is %u)",clength,header->blocksize);
+      if(clength>=(sgzip->header->blocksize+1024)) {
+	RAISE(E_IOERROR,NULL,"Clength (%u) is too large (blocksize is %u)",clength,sgzip->header->blocksize);
       };
 
       if(clength<0) break;
@@ -404,7 +408,7 @@ int sgzip_read_random(char *buf, int len, unsigned long long int offs,
 	RAISE(E_IOERROR,NULL,"Compressed file reading problem (seeked to %llu - read %llu bytes)",sizeof(struct sgzip_header)+sizeof(unsigned int)*(block_offs+1)+ index[block_offs],clength);
       };
   
-      length=header->blocksize;
+      length=sgzip->header->blocksize;
       result=uncompress(data,(long int *)&length,cdata,clength);
     
       //Inability to decompress the data is non-recoverable:
@@ -446,7 +450,7 @@ int sgzip_read_random(char *buf, int len, unsigned long long int offs,
 
    If the index is not there we flag an error by returning null.
 */
-unsigned long long int *sgzip_read_index(int fd, struct sgzip_header *header) {
+unsigned long long int *sgzip_read_index(int fd, struct sgzip_obj *sgzip) {
   char magic[6];
   unsigned int count;
   unsigned long long int *index;
@@ -477,7 +481,7 @@ unsigned long long int *sgzip_read_index(int fd, struct sgzip_header *header) {
     return(NULL);
   };
 
-  header->x.max_chunks = count;
+  sgzip->header->x.max_chunks = count;
 
   //Allocate enough memory for the array:
   index=(unsigned long long int *)calloc(count+1,sizeof(*index));
@@ -509,12 +513,12 @@ unsigned long long int *sgzip_read_index(int fd, struct sgzip_header *header) {
    be quick.  We return an index array of unsigned long long ints.
  */
 unsigned long long int *sgzip_calculate_index_from_stream(int fd,
-			      const struct sgzip_header *header) {
+			      const struct sgzip_obj *sgzip) {
   int length=0;
   int zoffset=0;
   int offset=0,count=0;
   char *datain;
-  int datalength=header->blocksize+1024;
+  int datalength=sgzip->header->blocksize+1024;
   struct sgzip_index_list *result=NULL,*i;
   unsigned long long int *index=NULL;
 
@@ -543,7 +547,7 @@ unsigned long long int *sgzip_calculate_index_from_stream(int fd,
 	RAISE(E_IOERROR,NULL,Read,"file");
       };
       
-      offset+=header->blocksize;
+      offset+=sgzip->header->blocksize;
     };
   } EXCEPT(E_IOERROR) {
     /* When we hit the end of the file, we should get an io_error,
@@ -566,13 +570,13 @@ unsigned long long int *sgzip_calculate_index_from_stream(int fd,
 /* 
    Decompress the stream, writing it into the outfd.
  */
-void sgzip_decompress_fds(int fd,int outfd,const struct sgzip_header *header) {
+void sgzip_decompress_fds(int fd,int outfd,struct sgzip_obj *sgzip) {
   int length=0;
   long int lengthout=0;
   int result;
   int zoffset=0;
   char *datain,*dataout,*buffer;
-  int datalength=header->blocksize+1024;
+  int datalength=sgzip->header->blocksize+1024;
   long int count=0;
   unsigned long int fill=0;
 
@@ -617,7 +621,7 @@ void sgzip_decompress_fds(int fd,int outfd,const struct sgzip_header *header) {
     stream_write(outfd,dataout,sizeof(*dataout)*lengthout,buffer,&fill,BUFFER_SIZE,"Data write");
 
     if(!(count % 100)) {
-      sgzip_debug(1,"Wrote %lu blocks of %lu bytes = %lu Mb total\r",count,header->blocksize,count*header->blocksize/1024/1024);
+      sgzip_debug(1,"Wrote %lu blocks of %lu bytes = %lu Mb total\r",count,sgzip->header->blocksize,count*sgzip->header->blocksize/1024/1024);
     };
   };
 

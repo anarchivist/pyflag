@@ -123,7 +123,7 @@ class MemoryScan(BaseScanner):
 
     This scanner implements a sliding window, i.e. each buffer scanned begins with OVERLAP/BUFFERSIZE from the previous buffer. This allows regex, and virus definitions to locate matches that are broken across a block boundary.
     """
-    windowsize=1000
+    windowsize=200
     def __init__(self, inode,ddfs,outer,factories=None):
         BaseScanner.__init__(self, inode,ddfs,outer,factories)
         self.window = ''
