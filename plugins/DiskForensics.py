@@ -71,7 +71,7 @@ class BrowseFS(Reports.report):
                     link.link(i['name'],new_query,open_tree="%s%s" %(path,i['name']), mode='table', where_Filename="%s%s" %(path,i['name']), order='Filename')# ,__mark__="%s%s" %(path,i['name']))
                     yield(([i['name'],link,'branch']))
 
-        def DeletedIcon(value):
+        def DeletedIcon(value,result=None):
             """ Callback for deleted items """
             tmp=self.ui()
             if value=='alloc':

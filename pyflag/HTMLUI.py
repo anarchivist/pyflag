@@ -269,13 +269,20 @@ class HTMLUI(UI.GenericUI):
 
         self.result+="<a href='blah?%s'>%s</a>" % (q,string)
 
-    def popup(self,callback, label,toolbar=0, menubar=0, **options):
+    def popup(self,callback, label,icon=None,toolbar=0, menubar=0, **options):
         """ This method presents a button on the screen, which when clicked will open a new window and use the callback to render in it.
 
         The new UI will be based on the current UI.
         @arg callback: A callback function to render into the new UI
         """
-        self.result+="""<script language=javascript>  var client; function open_newclient_window() {  client=window.open('%s&callback_stored=%s','client','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=600,scrollbars=yes'); client.moveto(0,0);  }; </script><input type=button value=%r onclick=\"open_newclient_window()\"> """ % (self.defaults,self.store_callback(callback),toolbar,menubar,label)
+        cb = self.store_callback(callback)
+        self.result+="""<script language=javascript>  var client; function open_%s_window() {  client=window.open('%s&callback_stored=%s','client','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=600,scrollbars=yes'); client.moveto(0,0);  }; </script><abbr title=%r>""" % (cb,self.defaults,cb,toolbar,menubar,label)
+        if icon:
+            self.result+="""<a  onclick=\"open_%s_window()\"><img alt=%s border=0 src=images/%s></a>""" % (cb,label,icon)
+        else:
+            self.result+="""<input type=button value=%r onclick=\"open_%s_window()\"> """ % (label,cb)
+
+        self.result+="</abbr>"
 
     def radio(self,description,name,labels,**options):
         opts = self.opt_to_str(options)
@@ -699,7 +706,7 @@ class HTMLUI(UI.GenericUI):
             ## End of table_groupby_popup
                 
             ## Add a popup to allow the user to draw a graph
-            self.popup(table_groupby_popup,'Graph',toolbar=1,menubar=1)
+            self.popup(table_groupby_popup,'Graph',icon='pie.png',toolbar=1,menubar=1)
 
         ## Write the conditions at the top of the page:
         if conditions:
@@ -736,7 +743,7 @@ class HTMLUI(UI.GenericUI):
                     result.result += "# %s\n" % i
             result.result += data.read()
                 
-        self.popup(save_table,'Save Table')
+        self.popup(save_table,'Save Table',icon="floppy.png")
 
         tmp_links = []
         for d in names:

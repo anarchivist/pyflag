@@ -91,7 +91,10 @@ class ListLogFile(Reports.report):
                 result.link("Click here to remove whois information",q)
             else:
                 q['whois']="Yes"
-                result.link("Click here to show whois information",q)
+                tmp=result.__class__(result)
+                tmp.icon("whois.png",border=0)
+                tmp.tooltip("Click here to show whois information")
+                result.link(tmp,q)
 
         #Find the names of all the columns in table:
         dbh.execute("select * from %s_log limit 1",query['logtable'])
