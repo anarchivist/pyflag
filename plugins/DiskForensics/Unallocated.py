@@ -60,7 +60,7 @@ class UnallocatedScan(GenScanFactory):
 
         ## We ask the filesystem whats the blocksize - if we dont know, we use 1
         try:
-            blocksize=self.ddfs.block_size
+            blocksize=self.fsfd.blocksize
         except AttributeError:
             blocksize=1
 

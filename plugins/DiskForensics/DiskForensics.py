@@ -33,7 +33,6 @@ import pyflag.FlagFramework as FlagFramework
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import os,os.path,time,re
-import pyflag.Sleuthkit as Sleuthkit
 import pyflag.FileSystem as FileSystem
 import pyflag.logging as logging
 import pyflag.Graph as Graph

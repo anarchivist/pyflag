@@ -8,7 +8,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG 0.4 (12-02-2004)
+#  Version: FLAG $Version: 0.4 (12-02-2004)$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -50,15 +50,14 @@ class NewCase(Reports.report):
         result.defaults = query
         result.textfield("Please enter a new case name:","create_case")
         return result
-
-    def analyse(self,query):
-        #Get handle to flag db
+        
+    def display(self,query,result):
+                #Get handle to flag db
         dbh = self.DBO(None)
-        try:
-            dbh.execute("Create database %s",(query['create_case']))
+        dbh.execute("Create database if not exists %s",(query['create_case']))
+        dbh.execute("select * from meta where property='flag_db' and value=%r",query['create_case'])
+        if not dbh.fetch():
             dbh.execute("Insert into meta set property='flag_db',value=%r",query['create_case'])
-        except:
-            pass
 
         #Get handle to the case db
         case_dbh = self.DBO(query['create_case'])
@@ -72,10 +71,6 @@ class NewCase(Reports.report):
         except OSError:
             pass
 
-        #Ensure that the corresponding delete case is reset:
-        self.do_reset(FlagFramework.query_type((),family=query['family'], report = 'Remove case', remove_case = query['create_case']))
-        
-    def display(self,query,result):
         result.heading("Case Created")
         result.para("\n\nThe database for case %s has been created" %query['create_case'])
         result.link("Load a Disk Image", FlagFramework.query_type((), case=query['create_case'], family="Load Data", report="Load IO Data Source"))
@@ -100,26 +95,25 @@ class DelCase(Reports.report):
         result.case_selector(case="remove_case")
         return result
 
-    def analyse(self,query):
-        #Now reset the create case report
-        self.do_reset(FlagFramework.query_type((),family=query['family'], report = 'Create new case',create_case = query['remove_case']))
-
+    def display(self,query,result):
         #Delete the case from the database
         dbh = self.DBO(None)
-        dbh.execute("drop database %s" ,query['remove_case'])
+        dbh.execute("drop database if exists %s" ,query['remove_case'])
         dbh.execute("delete from meta where property='flag_db' and value=%r",query['remove_case'])
 
         ## Delete the temporary directory corresponding to this case and all its content
-        temporary_dir = "%s/case_%s" % (config.RESULTDIR,query['remove_case'])
-        for root, dirs, files in os.walk(temporary_dir,topdown=False):
-            for name in files:
-                os.remove(join(root, name))
-            for name in dirs:
-                os.rmdir(join(root, name))
+        try:
+            temporary_dir = "%s/case_%s" % (config.RESULTDIR,query['remove_case'])
+            for root, dirs, files in os.walk(temporary_dir,topdown=False):
+                for name in files:
+                    os.remove(join(root, name))
+                for name in dirs:
+                    os.rmdir(join(root, name))
 
-        os.rmdir(temporary_dir)
-
-    def display(self,query,result):
+            os.rmdir(temporary_dir)
+        except:
+            pass
+        
         result.heading("Deleted case")
         result.para("Case %s has been deleted" % query['remove_case'])
         return result

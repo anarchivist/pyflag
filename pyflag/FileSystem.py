@@ -180,7 +180,7 @@ class DBFS(FileSystem):
         self.dbh = DB.DBO(case)
         try:
             self.dbh.execute("select value from meta_%s where name='block_size'",self.table);
-            self.block_size = int(self.dbh.fetch()["value"])
+            self.blocksize = int(self.dbh.fetch()["value"])
         except:
             self.blocksize = 1024
 
@@ -218,7 +218,7 @@ class DBFS(FileSystem):
                     self.dbh.execute("insert into inode_%s  set mode=%r, links=%r , inode='%s|%s-',gid=0,uid=0",(self.table,40755, 3,root_inode,inode))
                 else:
                     self.dbh.execute("insert into file_%s set path=%r,name=%r,status='alloc',mode='d/d',inode='%s-'",(self.table,path,dirs[d],inode))
-                    self.dbh.execute("insert into inode_%s  set mode=%r, links=%r , inode='%s-',gid=0,uid=0",(self.table,40755, 3,root_inode,inode))
+                    self.dbh.execute("insert into inode_%s  set mode=%r, links=%r , inode='%s-',gid=0,uid=0",(self.table,40755, 3,inode))
                     
         path = normpath("%s/%s/" % (filename,os.path.dirname(new_filename)))
         ## Add the file itself to the file table

@@ -63,7 +63,7 @@ import pyflag.Exgrep
 import pyflag.Graph as Graph
 pl=Graph.Ploticus()
 
-import pyflag.Sleuthkit as Sleuthkit
+import pyflag.FileSystem as FileSystem
 import pyflag.pyflagsh
 
 import index

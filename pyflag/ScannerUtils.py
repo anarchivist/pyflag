@@ -29,7 +29,6 @@ def draw_scanners(query,result):
         scanner_factory = Registry.SCANNERS.classes[i]
         ## should the checkbox be ticked by default?
         if scanner_name not in query.getarray('scan') and scanner_factory.default:
-            query['scan']=scanner_name
+            result.defaults['scan']=scanner_name
 
         result.checkbox(scanner_desc[i],"scan",scanner_name )
-    

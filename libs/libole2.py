@@ -29,7 +29,7 @@
 
 """ A library for reading metadata from OLE2 files (MS word/office).
 
-Based heavily of Laola documentation:
+Based heavily on Laola documentation:
 
 http://user.cs.tu-berlin.de/~schwartz/pmh/guide.html
 """
@@ -111,7 +111,7 @@ class OLEHeader(SimpleStruct):
             [ LONG,1,'sbd_startblock'],
             [ LONG,1,'no_sbd'],
             [ LONG,1,'metab_start'],
-            [ LONG,1,'number_metab'],
+	    [ LONG,1,'number_metab'],
             [ DepotList,1, 'bbd_list'],
             ]
 
