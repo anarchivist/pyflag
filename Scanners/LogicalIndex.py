@@ -55,7 +55,11 @@ class Index(GenScanFactory):
         """ This deletes the index file and drops the LogicalIndex table """
         ## First destroy the object and then try to remove the index file
         del self.index
-        os.remove(self.filename)
+        try:
+            os.remove(self.filename)
+        except OSError:
+            pass
+        
         self.dbh.execute("drop table if exists `LogicalIndex_%s`",(self.table))
         ## Here we reset all reports that searched this disk
         FlagFramework.reset_all(case=self.dbh.case,report='SearchIndex', family='DiskForensics')

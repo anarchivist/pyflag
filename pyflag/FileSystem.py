@@ -504,50 +504,55 @@ class MountedFS_file(File):
     def tell(self):
         return self.fd.tell()
 
-import pypst2
-class Pst_file(File):
-    """ A file like object to read items from within pst files. The pst file is specified as an inode in the DBFS """
-    specifier = 'P'
-    blocks=()
-    def __init__(self, case, table, fd, inode):
-        File.__init__(self, case, table, fd, inode)
-        # strategy:
-        # cache whole of file in 'fd' to disk
-        # load into pypst2
-        # split inode into item_id and attachment number (if any)
-        # retrieve item using item_id
-        # if attachment, retrieve attachment from item using attachment number
-        # set self.data to either attachment or item
-        parts = inode.split('|')
-        pstinode = '|'.join(parts[:-1])
-        thispart = parts[-1]
+try:
+    import pypst2
+    class Pst_file(File):
+        """ A file like object to read items from within pst files. The pst file is specified as an inode in the DBFS """
+        specifier = 'P'
+        blocks=()
+        def __init__(self, case, table, fd, inode):
+            File.__init__(self, case, table, fd, inode)
+            # strategy:
+            # cache whole of file in 'fd' to disk
+            # load into pypst2
+            # split inode into item_id and attachment number (if any)
+            # retrieve item using item_id
+            # if attachment, retrieve attachment from item using attachment number
+            # set self.data to either attachment or item
+            parts = inode.split('|')
+            pstinode = '|'.join(parts[:-1])
+            thispart = parts[-1]
 
-        # open the pst file from disk cache
-        # or from fd if cached file does not exist
-        fname = make_filename(case, pstinode)
+            # open the pst file from disk cache
+            # or from fd if cached file does not exist
+            fname = make_filename(case, pstinode)
 
-        if not os.path.isfile(fname):
-            outfd = open(fname, 'w')
-            outfd.write(fd.read())
-            outfd.close()
+            if not os.path.isfile(fname):
+                outfd = open(fname, 'w')
+                outfd.write(fd.read())
+                outfd.close()
 
-        pst = pypst2.Pstfile(fname)
-        item = pst.open(thispart[1:])
-        self.data = item.read()
-        self.pos = 0
-        
-    def read(self,len=None):
-        if len:
-            temp=self.data[self.pos:self.pos+len]
-            self.pos+=len
-            return temp
-        else: return self.data
+            pst = pypst2.Pstfile(fname)
+            item = pst.open(thispart[1:])
+            self.data = item.read()
+            self.pos = 0
 
-    def close(self):
+        def read(self,len=None):
+            if len:
+                temp=self.data[self.pos:self.pos+len]
+                self.pos+=len
+                return temp
+            else: return self.data
+
+        def close(self):
+            pass
+
+        def seek(self,pos,rel=0):
+            self.pos=pos
+            
+except ImportError:
+    class Pst_file:
         pass
-        
-    def seek(self,pos):
-        self.pos=pos
 
 class Zip_file(File):
     """ A file like object to read files from within zip files. Note that the zip file is specified as an inode in the DBFS """
@@ -646,11 +651,12 @@ def make_filename(case, inode):
         config.RESULTDIR, case, dbh.MakeSQLSafe(inode)))
 
 # create a dict of all the File subclasses by specifier
-#import sys
-vfslist = {
-    'Z':Zip_file,
-    'D':DBFS_file,
-    'P':Pst_file,
-    'M':MountedFS_file,
-    'G':GZip_file,
-    }
+import sys
+vfslist={}
+for cls in dir():
+    try:
+        CLS=sys.modules[__name__].__dict__[cls]
+        if issubclass(CLS,File) and CLS != File:
+            vfslist[CLS.specifier]=CLS
+    except TypeError:
+        pass
