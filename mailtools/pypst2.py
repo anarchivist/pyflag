@@ -215,3 +215,6 @@ class Pstfile:
     def open(self, id):
         """ return a file-like item """
         return self.getitem(id)
+
+    def datetoascii(self, date):
+        return pypst.fileTimeToAscii(date)

@@ -82,6 +82,10 @@ class FileSystem:
 
         This object can then be used to read data from the specified file.
         @note: Only files may be opened, not directories."""
+
+
+        #print "trying to open a file"
+        #print "%s" % vfslist
         
         if not inode:
             inode = self.lookup(path)
@@ -94,14 +98,16 @@ class FileSystem:
             raise IOError('File not found for inode')
 
         # open the file, first pass will generally be 'D' or 'M'
-        # then any virtual file systems (vfs) will kick in :)
+        # then any virtual file systems (vfs) will kick in
         parts = inode.split('|')
         retfd = self.fd
-        for part in parts[1:]:
+        for part in parts:
             try:
-                retfd = vfslist[part[0]](self.case, self.table, retfd, part, path)
+                retfd = vfslist[part[0]](self.case, self.table, retfd, part)
             except IndexError:
                 raise IOError, "Unable to open inode: %s, no VFS" % part
+
+        return retfd
 
     def istat(self, path=None, inode=None):
         """ return a dict with information (istat) for the given inode or path. """
@@ -568,10 +574,11 @@ def FS_Factory(case,table,fd):
     return DBFS(case,table,fd)
 
 # create a dict of all the File subclasses by specifier
-vfslist = {}
-for i in dir(sys.modules['__main__']):
-    try:
-        if issubclass(sys.modules['__main__'].__dict__[i],File):
-            vfslist[sys.modules['__main__'].__dict__[i].specifier] = sys.modules['__main__'].__dict__[i]
-    except TypeError:
-        pass    
+#import sys
+vfslist = {'Z':Zip_file, 'D':DBFS_file, 'P':Pst_file, 'M':MountedFS_file}
+#for i in dir(sys.modules['__main__']):
+#    try:
+#        if issubclass(sys.modules['__main__'].__dict__[i],File):
+#            vfslist[sys.modules['__main__'].__dict__[i].specifier] = sys.modules['__main__'].__dict__[i]
+#    except TypeError:
+#        pass    

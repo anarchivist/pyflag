@@ -279,14 +279,14 @@ print_dent2(FILE *hFile, FS_DENT *fs_dent, int flags, FS_INFO *fs,
 			    (strcmp(fs_data->name, "$Data") != 0)) ||
 			   ((fs_data->type == NTFS_ATYPE_IDXROOT) && 
 			    (strcmp(fs_data->name, "$I30") != 0))) ) {
-	    fprintf(hFile, "INSERT INTO file_%s VALUES('%i-%i-%i','%s','%s','/%s','%s:%s');\n", 
+	    fprintf(hFile, "INSERT INTO file_%s VALUES('D%i-%i-%i','%s','%s','/%s','%s:%s');\n", 
 		    tbl_name,
 		    fs_dent->inode, fs_data->type, fs_data->id,
 		    t1,t2,t3,t4,t5);
 	    free(t5);
 
 	  } else {
-	    fprintf(hFile, "INSERT INTO file_%s VALUES('%i-%i-%i','%s','%s','/%s','%s');\n", 
+	    fprintf(hFile, "INSERT INTO file_%s VALUES('D%i-%i-%i','%s','%s','/%s','%s');\n", 
 		    tbl_name,
 		    fs_dent->inode, fs_data->type, fs_data->id, 
 		    t1,t2,t3,t4);
@@ -294,7 +294,7 @@ print_dent2(FILE *hFile, FS_DENT *fs_dent, int flags, FS_INFO *fs,
 
 	  //No Data stream
 	} else {	    
-	  fprintf(hFile, "INSERT INTO file_%s VALUES('%i','%s','%s','/%s','%s');\n", 
+	  fprintf(hFile, "INSERT INTO file_%s VALUES('D%i','%s','%s','/%s','%s');\n", 
 		  tbl_name,
 		  fs_dent->inode,
 		  t1,t2,t3,t4); 
@@ -414,7 +414,7 @@ print_inode(FS_INFO *fs, INUM_T inum, FS_INODE *fs_inode, int flags,
 					run.next = NULL;
 					ptr = &run;
 					
-					printf("INSERT INTO inode_%s VALUES('%lu-%d-%d','%c','%d','%d','%lu'," \
+					printf("INSERT INTO inode_%s VALUES('D%lu-%d-%d','%c','%d','%d','%lu'," \
 					       "'%lu','%lu',%lu,'%lo','%d','%s','%lu');\n",
 					       tbl_name,
 					       (ULONG) inum, fs_data->type, fs_data->id,
@@ -438,8 +438,7 @@ print_inode(FS_INFO *fs, INUM_T inum, FS_INODE *fs_inode, int flags,
 	}
 	else {
 
-	  //printf("INSERT INTO inode_%s VALUES('%lu','0','0','%c','%d','%d','%lu',"
-	  printf("INSERT INTO inode_%s VALUES('%lu','%c','%d','%d','%lu'," \
+	  printf("INSERT INTO inode_%s VALUES('D%lu','%c','%d','%d','%lu'," \
 		 "'%lu','%lu',%lu,'%lo','%d','%s','%lu');\n",
 		 tbl_name,
 		 (ULONG) inum, (flags & FS_FLAG_META_ALLOC) ? 'a' : 'f',
@@ -499,7 +498,7 @@ print_addr (FS_INFO *fs, DADDR_T addr, char *buf,
       // we have resident ntfs data
       //printf("resident found, size: %d\n", size);
       //printf("INSERT INTO resident_%s values('%lu','%d','%d','", 
-      printf("INSERT INTO resident_%s values('%lu-%d-%d','", 
+      printf("INSERT INTO resident_%s values('D%lu-%d-%d','", 
 	     tbl_name, (ULONG)(*run)->inum, (*run)->type, (*run)->id);
       print_sql_string(stdout, buf, size);
       printf("');\n");
@@ -569,20 +568,20 @@ void print_blocks (INUM_T inum, int type, int id, RUN *run) {
 	      //printf("('%lu','%i','%i','%lu','%lu','%lu'),\n", (ULONG)inum, type, id, index, start_block, count);
 	      //printf("INSERT INTO block_%s VALUES('%lu','%i','%i','%lu','%lu','%lu');\n", tbl_name, (ULONG)inum, type, id, index, start_block, count);
 	      if(type == 0) {
-	        printf("INSERT INTO block_%s VALUES('%lu','%lu','%lu','%lu');\n", tbl_name, (ULONG)inum, index, start_block, count);
+	        printf("INSERT INTO block_%s VALUES('D%lu','%lu','%lu','%lu');\n", tbl_name, (ULONG)inum, index, start_block, count);
 	      }
 	      else {
-	        printf("INSERT INTO block_%s VALUES('%lu-%i-%i','%lu','%lu','%lu');\n", tbl_name, (ULONG)inum, type, id, index, start_block, count);
+	        printf("INSERT INTO block_%s VALUES('D%lu-%i-%i','%lu','%lu','%lu');\n", tbl_name, (ULONG)inum, type, id, index, start_block, count);
 	      }
 	    }
 	    else {
 	      //printf("('%lu','%i','%i','%lu','%lu','%lu'),\n", (ULONG)inum, type, id, index, ptr->addr, count);
 	      //printf("INSERT INTO block_%s VALUES('%lu','%i','%i','%lu','%lu','%lu');\n", tbl_name, (ULONG)inum, type, id, index, ptr->addr, count);
 	      if(type == 0) {
-	        printf("INSERT INTO block_%s VALUES('%lu','%lu','%lu','%lu');\n", tbl_name, (ULONG)inum, index, ptr->addr, count);
+	        printf("INSERT INTO block_%s VALUES('D%lu','%lu','%lu','%lu');\n", tbl_name, (ULONG)inum, index, ptr->addr, count);
 	      }
 	      else {
-	        printf("INSERT INTO block_%s VALUES('%lu-%i-%i','%lu','%lu','%lu');\n", tbl_name, (ULONG)inum, type, id, index, ptr->addr, count);
+	        printf("INSERT INTO block_%s VALUES('D%lu-%i-%i','%lu','%lu','%lu');\n", tbl_name, (ULONG)inum, type, id, index, ptr->addr, count);
 	      }
 	    }
 	    start_block = 0;

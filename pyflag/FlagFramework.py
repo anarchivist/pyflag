@@ -526,7 +526,7 @@ class module_dispatcher:
                             try:
                                 module = imp.load_source(module_name,dirpath+'/'+filename,fd)
                             except Exception,e:
-                                logging.log(logging.ERRORS, "*** Unable to load module: %s" % e)
+                                logging.log(logging.ERRORS, "*** Unable to load module %s: %s" % (module_name,e))
                                 continue
 
                             fd.close()
