@@ -686,6 +686,9 @@ class GTKUI(UI.GenericUI):
         dbh.execute(query_str,())
         return dbh,new_query
 
+    def toolbar(self,cb,text,icon=None,popup=True):
+        pass
+
     def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):
         """ Main table redered method.
 
@@ -765,7 +768,6 @@ class GTKUI(UI.GenericUI):
                 parameter=callback(widget)
                 if parameter[0]=='group_by' and parameter[1]!='':
                     q['group_by']=parameter[1]
-
             self.link_callback(q)
 
         def column_callback(column,event=None):
@@ -877,13 +879,14 @@ class GTKUI(UI.GenericUI):
             x,y = (event.x,event.y)
             path,column,cellx,celly = widget.get_path_at_pos(int(x),int(y))
             q=column.get_data('link')
-            print "clicked on link to: %s" % q
+            
             if q:
                 model=widget.get_model()
                 iter=model.get_iter(path)
                 new_query = q.clone()
                 target=new_query['__target__']
                 del new_query['__target__']
+                del new_query[target]
                 new_query[target] = model.get_value(iter,column.get_data('column_number'))
                 self.link_callback(new_query)
                 

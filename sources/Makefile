@@ -4,7 +4,7 @@ ETHEREAL	= ethereal-0.10.2
 SLEUTHKIT	= sleuthkit-1.73
 ## If ethereal should be compiled statically
 STATIC		= yes
-PLOTICUS	= pl230src
+PLOTICUS	= pl231src
 
 PROGS		= $(BIN)/dbtool $(BIN)/pl $(BIN)/tethereal $(BIN)/prefabs 
 
