@@ -33,12 +33,12 @@ PyFlag aims to solve these two issues by:
 
 2. All data is placed in the database, with appropriated indexes, searching and grouping of data within log files is extremely fast. This allows for an interactive session, allowing the analyst to quickly and efficiently analyse the log data.
 
-The following sections will go through a number of examples. Readers are encouraged to follow these examples.
+The following sections will go through a number of examples. Readers are encouraged to follow these examples to gain an idea of the different features offered.
 
 Preperation
 ~~~~~~~~~~~
 Although PyFlag is very simple to install (Just download the mysql binary release, untar somewhere and run). There are a number of optional features that need to be installed to enhance the PyFlag user experience. 
 
-When analysing Log files it is often nice to know who is responsible for a block of IP. Often analysis perform a *whois* query on the required IP address. This process is typically slow, however, and the number of queries allowed is typically limited.
+When analysing Log files it is often nice to know who is responsible for a specific IP address. Often analysts perform a *whois* query on the required IP address. This process is typically slow, however, and the number of queries allowed is typically limited.
 
-PyFlag allows for performing offline whois queries by downloading the entire assigned IP database when possible and quickly searching through it. 
+PyFlag allows for performing offline whois queries by downloading the entire assigned IP database when possible and quickly searching through it. The whois database can be downloaded from the relevant registry (e.g. APNIC, RIPE etc). Due to copyright considerations, we are unable to ship these databases with PyFlag. A script is provided with the pyflag distribution to download the freely available whois databases. 

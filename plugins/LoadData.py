@@ -360,7 +360,14 @@ class LoadFS(Reports.report):
         cached_scanners = [ row['value'] for row in dbh ]
 
         ## We only run the scanners that were asked for which are not cached. We instantiate the factories themselves:
-        scanners = [ Registry.SCANNERS.classes[Registry.SCANNERS.scanners.index(i)](dbh,query['iosource'],fsfd) for i in user_scanners if i not in cached_scanners ]
+        scanners = [ ]
+        for i in user_scanners:
+            if i not in cached_scanners:
+                try:
+                    tmp  = Registry.SCANNERS.classes[Registry.SCANNERS.scanners.index(i)]
+                    scanners.append(tmp(dbh,query['iosource'],fsfd))
+                except Exception:
+                    logging.log(logging.ERROR,"Unable to initialise scanner %s")
 
         ## Store the sanners in the meta table:
         for s in user_scanners:

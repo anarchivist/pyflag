@@ -663,7 +663,8 @@ void idx_index_buffer(struct index_file *idx, long long int base,
     //Search for the current word in the index
     node_ref= is_in_index(idx ,&c);
 
-    if(node_ref) {
+    //We do not allow the root node to be indexed - This stops up from matching arbitrary nulls
+    if(node_ref && node_ref != idx->root) {
       node=absolute_node(idx, node_ref);
       //c has been advanced by is_in_index to the end of the word we
       //are indexing.
