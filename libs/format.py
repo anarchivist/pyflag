@@ -100,7 +100,10 @@ class DataType:
         else:
             self.buffer=buffer
         self.data=None
-        self.parent=kwargs['parent']
+        try:
+            self.parent=kwargs['parent']
+        except:
+            pass
 
     def initialise(self):
         self.data=self.read(self.buffer)
@@ -185,7 +188,10 @@ class SimpleStruct(DataType):
     field_names = ["Type","Count","Name","Description","Function" ]
 
     def __init__(self,buffer,*args,**kwargs):
-        self.parent=kwargs['parent']
+        try:
+            self.parent=kwargs['parent']
+        except:
+            self.parent=None
         DataType.__init__(self,buffer,*args,**kwargs)
         self.init()
         self.data={}
@@ -400,6 +406,9 @@ class BYTE_ENUM(BYTE):
         if not self.data: self.initialise()
         return self.data
 
+class LONG_ENUM(BYTE_ENUM):
+    fmt='l'    
+
 class UCS16_STR(STRING):
     def  read(self,data):
         """ FIXME: do proper UCS16 processing here """
@@ -439,3 +448,13 @@ class WIN_FILETIME(SimpleStruct):
         t = self.to_unixtime()
         if t<0: return "Invalid Timestamp"
         return "%s" % (time.ctime(t))
+
+class LPSTR(STRING):
+    """ This is a string with a size before it """
+    def __init__(self,buffer,*args,**kwargs):
+        BYTE.__init__(self,buffer,*args,**kwargs)
+
+    def read(self,data):
+        length = LONG(data)
+        self.fmt="%ss" % length.get_value()
+        return STRING.read(self,data[length.size():])

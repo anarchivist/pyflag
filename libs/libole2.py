@@ -133,12 +133,10 @@ class OLEFile:
     
     def __init__(self,data):
         self.data=data
-        self.header = OLEHeader(data,parent=None)
+        self.header = OLEHeader(data)
         #Check the magic:
         if self.header['magic'] != '\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1':
             raise OLEException("File Magic is not correct %s" % self.header['magic'])
-
-        print self.header
 
         ## Read the big block depot
         self.block_list = self.read_depot(self.header['bbd_list'],data,self.blocksize)
@@ -155,8 +153,8 @@ class OLEFile:
         ## properties. Not all of them make sense though...
         self.properties = PropertySetArray(
             self.root_chain, ## Data
-            len(self.root_chain)/0x80, ## Number of elements
-            parent=None)
+            len(self.root_chain)/0x80 ## Number of elements
+            )
 
         self.small_chain = self.cat(self.properties[0])
 
@@ -170,8 +168,7 @@ class OLEFile:
             if v>=0:
                 result.extend(
                     LONG_ARRAY(data[v * self.blocksize + self.header.size():],
-                    self.blocksize/4,
-                    parent=None).get_value()
+                               self.blocksize/4).get_value()
                     )
         return result
 
