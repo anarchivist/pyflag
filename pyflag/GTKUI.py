@@ -233,13 +233,17 @@ class GTKUI(UI.GenericUI):
     """ A GTK UI Implementation. """
     def __init__(self,default = None):
         ## Initialise the text view buffer for this widget
-        self.result=gtk.TextView()
-        self.buffer=gtk.TextBuffer(None)
-        self.result.set_buffer(self.buffer)
-        self.result.set_editable(False)
-        self.result.set_cursor_visible(False)
+        #self.result=gtk.TextView()
+        self.result=gtk.VBox()
+        #self.result=gtk.Frame()
+        #self.main_widget=gtk.VBox()
+        #self.result.add(self.main_widget)
+        #self.buffer=gtk.TextBuffer(None)
+        #self.result.set_buffer(self.buffer)
+        #self.result.set_editable(False)
+        #self.result.set_cursor_visible(False)
         #self.result.set_wrap_mode(gtk.WRAP_WORD)
-        self.iter=self.buffer.get_iter_at_offset(0)
+        #self.iter=self.buffer.get_iter_at_offset(0)
         if default != None:
             self.form_parms = default.form_parms
             self.defaults = default.defaults
@@ -251,25 +255,37 @@ class GTKUI(UI.GenericUI):
             self.form_widgets=[]
             
         ##Initialise the tags:
-        tag = self.buffer.create_tag('title')
-        tag.set_property('font', 'Sans 18')
+        #self.tagtable = gtk.TextTagTable()
+        
+        #tag = self.buffer.create_tag('title')
+        #tag = gtk.TextTag('title')
+        #tag.set_property('font', 'Sans 18')
+        #self.tagtable.add(tag)
+        
+        #tag=self.buffer.create_tag('link')
+        #tag = gtk.TextTag('link')
+        #tag.set_property('foreground','blue')
+        #self.tagtable.add(tag)
 
-        tag=self.buffer.create_tag('link')
-        tag.set_property('foreground','blue')
-
-        tag=self.buffer.create_tag('text')
-        tag.set_property('foreground','black')
-
-        self.main_widget = None
+        #tag=self.buffer.create_tag('text')
+        #tag = gtk.TextTag('text')
+        #tag.set_property('foreground','black')
+        #self.tagtable.add(tag)
+        
+        #self.main_widget = None
         self.flag = None
+        #self.current_table=None
         self.current_table=None
         self.nav_query=None
         self.widgets = []
+        self.title = None
         return
 
     def heading(self,string):
-        self.buffer.insert_with_tags_by_name(self.iter,string+'\n','title')
-
+        #self.buffer.insert_with_tags_by_name(self.iter,string+'\n','title')
+        #self.row(string, colspan=50)
+        self.title = string
+        
     def refresh(self, int, query):
         pass
 
@@ -280,12 +296,17 @@ class GTKUI(UI.GenericUI):
         ## Did the user forget to call end_table??? Dumb user!!!
         if self.current_table:
             self.end_table()
-            
+        if self.title:
+            frame = gtk.Frame(self.title)
+            frame.add(self.result)
+            return frame
         return self.result
 
     def start_table(self,**options):
-        self.current_table=gtk.Table(1,1,False)
-        self.current_table_row=0
+        if not self.current_table:
+            # I'm confused, should be allow nested tables in the *same* UI object?
+            self.current_table=gtk.Table(1,1,False)
+            self.current_table_row=0
 
     def row(self,*columns, **options):
         if not self.current_table:
@@ -300,37 +321,46 @@ class GTKUI(UI.GenericUI):
             if isinstance(col,self.__class__):
                 col=col.display()
             elif not issubclass(col.__class__,gtk.Widget):
-                temp=gtk.TextView()
-                temp_b=gtk.TextBuffer(None)
-                temp.set_wrap_mode(gtk.WRAP_NONE)
-                temp.set_buffer(temp_b)
-                temp.set_justification(gtk.JUSTIFY_LEFT)
-                temp_b.insert_at_cursor("%s"%col)
-                col=temp
-
+                #temp=gtk.TextView()
+                #temp_b=gtk.TextBuffer(None)
+                #temp.set_wrap_mode(gtk.WRAP_NONE)
+                #temp.set_buffer(temp_b)
+                #temp.set_justification(gtk.JUSTIFY_LEFT)
+                #temp_b.insert_at_cursor("%s"%col)
+                #col=temp
+                print "Printing %s which is a %s" % (col, col.__class__)
+                col = gtk.Label("%s" % col)
+                col.set_justify(gtk.JUSTIFY_LEFT)
+                print "%s == %s" % (col.get_justify(), gtk.JUSTIFY_LEFT)
             ##Attach the column to row at the end of the table:
             #self.current_table.attach_defaults(col,i,i+1,self.current_table_row-1,self.current_table_row)
             right_attach = i+1            
             if options.has_key('colspan'):
                 right_attach = i+options['colspan']
-            self.current_table.attach(col, i, right_attach, self.current_table_row-1, self.current_table_row, gtk.FILL|gtk.EXPAND, gtk.FILL|gtk.EXPAND, 0, 0)
-
+            #self.current_table.attach(col, i, right_attach, self.current_table_row-1, self.current_table_row, gtk.FILL|gtk.EXPAND, gtk.FILL|gtk.EXPAND, 0, 0)
+            self.current_table.attach(col, i, right_attach, self.current_table_row-1, self.current_table_row, gtk.FILL, 0, 0, 0)
     def end_table(self):
         ## Add the table to the result UI:
         if self.current_table:
-            child=self.buffer.create_child_anchor(self.iter)
-            self.result.add_child_at_anchor(self.current_table,child)
+            #child=self.buffer.create_child_anchor(self.iter)
+            #self.result.add_child_at_anchor(self.current_table,child)
+            #self.current_table=None
+            self.result.pack_start(self.current_table, False)
             self.current_table=None
 
     def goto_link(self,widget,event):
         if self.link_callback:
             self.link_callback(widget.get_data('query'))
 
+    def tooltip(self, string):
+        pass
+    
     def icon(self, path, **options):
-        """ not sure if this works, untested """
         image = gtk.Image()
         image.set_from_file("%s/%s" % (config.IMAGEDIR, path))
-        self.buffer.insert_pixbuf(self.iter, image.get_pixbuf())
+        self.row(image)
+        print "adding icon"
+        #self.buffer.insert_pixbuf(self.iter, image.get_pixbuf())
 
     def popup(self,callback, label,icon=None,toolbar=0, menubar=0, **options):
         pass
@@ -342,7 +372,6 @@ class GTKUI(UI.GenericUI):
 
     def checkbox(self,description,name,value,**options):
         """ Create a checkbox input for the name,value pair given. """
-        print "Building checkbox for %s,%s" % (name, value)
         checkbox = gtk.CheckButton(description)
         checkbox.set_data('name',name)
         checkbox.set_data('value',value)
@@ -372,9 +401,9 @@ class GTKUI(UI.GenericUI):
         ev.add(label)
         ev.add_events(gtk.gdk.BUTTON_PRESS_MASK)
         ev.connect("button_press_event",self.goto_link)
-       
-        child=self.buffer.create_child_anchor(self.iter)
-        self.result.add_child_at_anchor(ev,child)
+        self.row(ev)
+        #child=self.buffer.create_child_anchor(self.iter)
+        #self.result.add_child_at_anchor(ev,child)
 
     def const_selector(self,description,name,keys,values,**options):
         combobox = gtk.combo_box_new_text()
@@ -404,7 +433,7 @@ class GTKUI(UI.GenericUI):
                 pass
 
         self.form_widgets.append((combobox,callback))
-        self.row(description+'   ',combobox)
+        self.row(description,combobox)
 
     def start_form(self,target, **hiddens):
         for k,v in hiddens:
@@ -425,7 +454,7 @@ class GTKUI(UI.GenericUI):
             return (widget.get_data('name'),widget.get_text())
 
         self.form_widgets.append((widget,callback))
-        self.row(description+'   ',widget)
+        self.row(description,widget)
 
     def submit(self,widget,event=None,data=None):
         new_query=FlagFramework.query_type(())
@@ -466,14 +495,19 @@ class GTKUI(UI.GenericUI):
             if not d:
                 continue
             elif isinstance(d,gtk.Widget):
-                child=self.buffer.create_child_anchor(self.iter)
-                self.result.add_child_at_anchor(d,child)
+                #child=self.buffer.create_child_anchor(self.iter)
+                #self.result.add_child_at_anchor(d,child)
+                self.row(d)
             elif isinstance(d,self.__class__):
                 widget=d.display()
-                child=self.buffer.create_child_anchor(self.iter)
-                self.result.add_child_at_anchor(widget,child)
+                #child=self.buffer.create_child_anchor(self.iter)
+                #self.result.add_child_at_anchor(widget,child)
+                self.row(widget)
             else:
-                self.buffer.insert_with_tags_by_name(self.iter,d,'text')
+                label = gtk.Label(d)
+                label.set_justify(gtk.JUSTIFY_LEFT)
+                self.row(label)
+                #self.buffer.insert_with_tags_by_name(self.iter,d,'text')
 
     def para(self,string,**options):
         #FIXME, whats the difference between 'para' and 'text'
