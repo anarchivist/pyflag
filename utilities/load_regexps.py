@@ -94,8 +94,9 @@ def main():
                 if (count % 1000) == 0:
                     sys.stdout.write("Added %s words\r" % count)
                     sys.stdout.flush()
-                    
-                    fd.close()
+
+#	? need to wrap "for line in fd" in a try/except and catch EOF here ?
+#                    fd.close()
                     
                     sys.stdout.write("Added %s words\rDone\r" % count)
                     sys.stdout.flush()
