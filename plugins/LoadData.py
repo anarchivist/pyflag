@@ -251,6 +251,7 @@ class LoadIOSource(Reports.report):
 
     def form(self,query,result):
         result.start_table()
+
         try:
             result.case_selector()
             result.ruler()
@@ -260,7 +261,7 @@ class LoadIOSource(Reports.report):
             result.const_selector("Select IO Subsystem",'subsys',subsystems,subsystems)
             #this will cause a form to be placed into result.
             fd=IO.IOFactory(query,result)
-            result.textfield("Identifier","iosource")
+            result.textfield("Unique Data Load ID","iosource")
         except KeyError:
             pass
         except IOError, e:
@@ -393,8 +394,7 @@ class LoadFS(Reports.report):
                 result.row("Uploaded File Entries:", "%s"%row['Count'])
 
             result.row("System messages:")
-            for row in logging.ring_buffer:
-                result.row(row)
+            result.text('\n'.join(logging.ring_buffer),font='typewriter',color="red")
             ## FIXME: This is a horribly slow query...
   #          dbh.execute("select count(*) as count,value as total from inode_%s, meta_%s as m where m.name='last_inode' group by total" % (tablename, tablename))
   #          row = dbh.fetch()

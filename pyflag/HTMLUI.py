@@ -261,7 +261,9 @@ class HTMLUI(UI.GenericUI):
     def pre(self,string):
         self.result += "<pre>%s</pre>" % string
 
-    def link(self,string,target=FlagFramework.query_type(()),options=None,**target_options):
+    def link(self,string,target=None,options=None,**target_options):
+        if target==None:
+            target=FlagFramework.query_type(())
         q=target.clone()
         if target_options:
             for k,v in target_options.items():

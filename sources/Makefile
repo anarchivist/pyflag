@@ -17,7 +17,7 @@ $(BIN)/dbtool:
 	tar -xvzf $(SLEUTHKIT).tar.gz || (echo -e "--------------------------\\r\\nYou must have $(SLEUTHKIT).tar.gz in the sources directory\\r\\nYou can get it from http://sleuthkit.sf.net\\r\\n--------------------------" && exit -1)
 	patch -p0 < ../patches/$(SLEUTHKIT)_dbtool.patch
 	cd $(SLEUTHKIT) && make
-	cp $(SLEUTHKIT)/bin/dbtool $(SLEUTHKIT)/bin/fls $(BIN)
+	cp $(SLEUTHKIT)/bin/dbtool $(SLEUTHKIT)/bin/fls $(SLEUTHKIT)/bin/mmls $(BIN)
 
 $(BIN)/tethereal:
 	tar -xvjf $(ETHEREAL).tar.bz2 || (echo -e "--------------------------\\r\\nYou must have $(ETHEREAL).tar.gz in the sources directory\\r\\nYou can get it from http://www.ethereal.com\\r\\n--------------------------" && exit -1)

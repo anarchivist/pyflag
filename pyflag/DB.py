@@ -66,7 +66,6 @@ class DBO:
     @cvar lock: the unique lock that each thread must hold before executing new SQL
     @ivar temp_tables: A variable that keeps track of temporary tables so they may be dropped when this object gets gc'ed
     """
-    DBH = {}
     temp_tables = []
     
     def __init__(self,case):
@@ -79,24 +78,16 @@ class DBO:
         if not case:
             case = config.FLAGDB
         
-        if not DBO.DBH.has_key(case):
-            ## are we using the embedded server? This is experimental embedded server stuff - commented out until embedded server stabilizes a bit. (MC)
-##            try:
-##                MySQLdb.server_init(args=['python','--datadir=/tmp/mysql/','--log=/tmp/mysql.log'])
-##            except Exception,e:
-##                pass
-##            
-##            DBO.DBH[case] = MySQLdb.Connect(db=case)
-            try:
-                #Try to connect over TCP
-                DBO.DBH[case] = MySQLdb.Connect(user = config.USER, passwd = config.PASSWD,db = case, host=config.HOST, port=config.PORT)
-                DBO.mysql_bin_string = "%s -f -u %r -p%r -h%s -P%s" % (config.MYSQL_BIN,config.USER,config.PASSWD,config.HOST,config.PORT)
-            except Exception,e:
-                #or maybe over the socket?
-                DBO.DBH[case] = MySQLdb.Connect(user = config.USER, passwd = config.PASSWD,db = case, unix_socket = config.UNIX_SOCKET)
-                DBO.mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.USER,config.PASSWD,config.UNIX_SOCKET)
+        try:
+            #Try to connect over TCP
+            self.dbh = MySQLdb.Connect(user = config.USER, passwd = config.PASSWD,db = case, host=config.HOST, port=config.PORT)
+            self.mysql_bin_string = "%s -f -u %r -p%r -h%s -P%s" % (config.MYSQL_BIN,config.USER,config.PASSWD,config.HOST,config.PORT)
+        except Exception,e:
+            #or maybe over the socket?
+            self.dbh = MySQLdb.Connect(user = config.USER, passwd = config.PASSWD,db = case, unix_socket = config.UNIX_SOCKET)
+            self.mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.USER,config.PASSWD,config.UNIX_SOCKET)
 
-        self.cursor = DBO.DBH[case].cursor()
+        self.cursor = self.dbh.cursor()
         self.temp_tables = []
         self.case=case
 
@@ -260,7 +251,7 @@ class DBO:
         """ Destructor that gets called when this object is gced """
         for i in self.temp_tables:
             self.execute('drop table if exists %s',i)
-            
+        self.dbh.close()
 
     def MySQLHarness(self,client):
         """ A function to abstact the harness pipes for all programs emitting SQL.

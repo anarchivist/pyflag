@@ -39,7 +39,44 @@ import pyflag.FlagFramework as FlagFramework
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import marshal
-import os
+import os,re
+
+def mmls_popup(query,result,option_str=None,subsys=None,offset=None):
+    try:
+        if query['update']:
+            query[offset]=query['update']
+            del query['update']
+            del query['callback_stored']
+            result.refresh(0,query,options={'parent':1})
+    except KeyError:
+        pass
+
+    result.heading("Output of mmls on io source")
+    string = "%s -i %s -o %s %s/mmls -t dos foo" % (config.IOWRAPPER, subsys, option_str,config.FLAG_BIN)
+    print "Will launch %s" % string
+    (stdin, stdout, stderr ) = os.popen3(string)
+    output = stdout.readlines()
+    try:
+        result.start_table()
+        result.para(output[0])
+        result.para(output[1])
+        columns = output[3].split()
+        result.row(" ",*columns)
+        del query[offset]
+        for row in output:
+            m = re.match("^(\S+:)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)",row)
+            if m:
+                row = list(m.groups())
+                tmp = result.__class__(result)
+                del query['update']
+                query['update']="%ss" % row[2]
+                tmp.link(row[2],query)
+                row[2]=tmp
+                result.row(*row)
+    except IndexError:
+        pass
+    result.end_table()    
+    result.text(stderr.read(),color="red",font='typewriter')
 
 class IO:
     """ class for IO subsystem, provides basic contructor and read/seek functions
@@ -132,13 +169,23 @@ class IO:
 
 class sgzip(IO):
     parameters=('subsys','io_filename','io_offset')
-    
+
     def form(self,query,result):
-        print "sgzip form"
+        if not query.has_key('io_offset'):
+            query['io_offset']='0'
         tmp = result.__class__(result)
         tmp.filebox(target="io_filename")
         result.row("Select SGZ image:", tmp)
-        result.textfield("Enter partition offset in file:",'io_offset')
+        tmp = result.__class__(result)
+        tmp2 = result.__class__(result)
+        option_str="filename=%s" % query['io_filename']
+        tmp2.popup(
+            FlagFramework.Curry(mmls_popup,option_str=option_str,subsys="sgzip",offset="io_offset"),
+            "Survey the partition table",
+            icon="examine.png")
+        
+        tmp.row("Enter partition offset in file:",tmp2)
+        result.textfield(tmp,'io_offset')
   
 class standard(IO):
     parameters=('subsys','io_filename')
@@ -165,19 +212,43 @@ class advanced(IO):
     parameters=('subsys','io_filename','io_offset')
 
     def form(self,query,result):
+        if not query.has_key('io_offset'):
+            query['io_offset']='0'
+
         tmp = result.__class__(result)
         tmp.filebox(target="io_filename",multiple="multiple")
         result.row("Select image(s):", tmp)
-        result.textfield("Enter partition offset in file:",'io_offset')
+        tmp = result.__class__(result)
+        tmp2 = result.__class__(result)
+        option_str="filename=%s" % query['io_filename']
+        tmp2.popup(
+            FlagFramework.Curry(mmls_popup,option_str=option_str,subsys="advanced",offset="io_offset"),
+            "Survey the partition table",
+            icon="examine.png")
+        
+        tmp.row("Enter partition offset in file:",tmp2)
+        result.textfield(tmp,'io_offset')
 
 class ewf(IO):
     parameters=('subsys','io_filename','io_offset')
     
     def form(self,query,result):
+        if not query.has_key('io_offset'):
+            query['io_offset']='0'
+
         tmp = result.__class__(result)
         tmp.filebox(target="io_filename",multiple="multiple")
         result.row("Select EWF image(s):",tmp)
-        result.textfield("Enter partition offset in file:",'io_offset')
+        tmp = result.__class__(result)
+        tmp2 = result.__class__(result)
+        option_str="filename=%s" % query['io_filename']
+        tmp2.popup(
+            FlagFramework.Curry(mmls_popup,option_str=option_str,subsys="ewf",offset="io_offset"),
+            "Survey the partition table",
+            icon="examine.png")
+        
+        tmp.row("Enter partition offset in file:",tmp2)
+        result.textfield(tmp,'io_offset')
 
 class mounted(IO):
     parameters=('subsys','directory')
@@ -213,13 +284,14 @@ def IOFactory(query,result=None, subsys='subsys'):
 
 import pyflag.DB as DB
 
-subsystems={'standard':standard,
-            'advanced':advanced,
-            'sgzip':sgzip,
-            'ewf':ewf,
-            'mounted':mounted,
-            'raid':raid,
-            }
+subsystems=(
+            ('advanced',advanced),
+            ('sgzip',sgzip),
+            ('ewf',ewf),
+            ('standard',standard),
+            ('mounted',mounted),
+            ('raid',raid),
+            )
 
 def open(case, iosource):
     """ lookup iosource in database and return an IO object """
@@ -234,5 +306,6 @@ def open(case, iosource):
     # unmarshal the option tuple from the database
     # opts[0] is always the subsystem name
     opts = marshal.loads(optstr)
-    io=subsystems[opts[0][0]]
+    inv = zip(*subsystems)
+    io=inv[1][list(inv[0]).index(opts[0])]
     return io(options=opts)

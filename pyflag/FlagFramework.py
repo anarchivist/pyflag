@@ -605,11 +605,11 @@ class Curry:
     curry(3) is the same as calling foo(a=1,b=3).
     For more information see the Python Cookbook.
     """
-    def __init__(function,*args,**kwargs):
+    def __init__(self,function,*args,**kwargs):
         """ Initialised the curry object with the correct function."""
         self.fun=function
         self.pending = args[:]
-        self.kargs = kwargs.copy()
+        self.kwargs = kwargs.copy()
 
     def __call__(self,*args,**kwargs):
         if kwargs and self.kwargs:

@@ -86,3 +86,4 @@ def ProductTable(dirname):
 if __name__=="__main__":
     MainNSRLHash(dirname)
     ProductTable(dirname)    
+    print "You may wish to run this program with the -i arg to create indexes now. Otherwise indexes will be created the first time they are needed."
