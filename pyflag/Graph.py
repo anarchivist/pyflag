@@ -166,7 +166,7 @@ class Ploticus(GenericGraph):
     def display(self):
         import popen2
 
-        p = popen2.Popen3("%s/pl  -%s -o stdout  %s " % (config.FLAG_BIN,self.out_format,self.cmd))
+        p = popen2.Popen3("%s  -%s -o stdout  %s " % (config.PLOTICUS,self.out_format,self.cmd))
         p.tochild.write(self.input)
         p.tochild.close()
         data=p.fromchild.read()

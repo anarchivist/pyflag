@@ -50,6 +50,7 @@ sleuthkit= %(flag_bin)s/dbtool
 iowrapper = %(flag_bin)s/iowrapper
 
 #If you chose to use ploticus as the graph renderer, this variable is required for setting the prefab directory
+ploticus=%(flag_bin)s/pl
 ploticus_prefabs=%(flag_bin)s/prefabs/
 scanner_directory = %(pyflagdir)s/Scanners/
 
