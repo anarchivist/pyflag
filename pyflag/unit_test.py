@@ -7,7 +7,7 @@ This is used by the binary distribution building to remove files we do not touch
 ## Subsystem tests:
 import SimpleHTTPServer
 import cgi
-import re,time,sys,popen2
+import re,time,sys,popen2,types
 
 import pyflag.conf as conf
 config=conf.ConfObject()
@@ -54,3 +54,11 @@ import pickle
 a=pickle.dumps("hello world")
 if "hello world"!=pickle.loads(a):
 	raise Exception
+
+## Examine.py:
+import tempfile,getopt,os.path
+
+## Logfile:
+import csv,pickle
+
+
