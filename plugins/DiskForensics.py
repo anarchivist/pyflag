@@ -439,14 +439,18 @@ class VirusScan(Reports.report):
         dbh=self.DBO(query['case'])
         tablename = dbh.MakeSQLSafe(query['fsimage'])
 
-        result.table(
-            columns=('a.inode','concat(path,name)', 'virus'),
-            names=('Inode','Filename','Virus Detected'),
-            table='virus_%s as a join file_%s as b on a.inode=b.inode ' % (tablename,tablename),
-            case=query['case'],
-            links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='inode')]
-            )
-        
+        try:
+            result.table(
+                columns=('a.inode','concat(path,name)', 'virus'),
+                names=('Inode','Filename','Virus Detected'),
+                table='virus_%s as a join file_%s as b on a.inode=b.inode ' % (tablename,tablename),
+                case=query['case'],
+                links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='inode')]
+                )
+        except DB.DBError,e:
+            result.para("Unable to display Virus table, maybe you did not run the virus scanner over the filesystem?")
+            result.para("The error I got was %s"%e)
+            
 if 0:
     class VirusScan(Reports.report):
         """ Scan Filesystem for Viruses using clamav"""
