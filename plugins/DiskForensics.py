@@ -709,21 +709,10 @@ class SearchIndex(Reports.report):
         for offset in idx.search(keyword):
             ## Find out which inode this offset is in:
             dbh.execute("select inode,offset from LogicalIndex_%s where offset <= %r order by offset desc,id desc",(query['fsimage'],offset))
-            for row in dbh:
-                fd = fsfd.open(inode=row['inode'])
-                off = offset - int(row['offset'])
-                if off<10: off=10
-                fd.seek(off-10)
-                ## Read some data before and after the keyword
-                data = fd.read(10 + len(keyword) + 20)
-                if data[10:10+len(keyword)].lower()==keyword.lower():
-                    dbh2.execute("insert into LogicalKeyword_%s set inode=%r, offset=%r, text=%r, keyword=%r",(table,row['inode'],off,data,keyword))
-                    break
-                else:
-                    logging.log(logging.DEBUG,"Error: Could not find keyword %s in data %s (inode should be %s) " %(keyword,data,row['inode']))
-                    ## Once we found one inode that matches we quit
-                    break
-                fd.close()
+            row=dbh.fetch()
+            off = offset - int(row['offset'])
+            if off<10: off=10
+            dbh2.execute("insert into LogicalKeyword_%s set inode=%r, offset=%r, keyword=%r",(table,row['inode'],off,keyword))
         
     def display(self,query,result):
         dbh = self.DBO(query['case'])
@@ -734,14 +723,20 @@ class SearchIndex(Reports.report):
         iofd = IO.open(query['case'], query['fsimage'])
         fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
 
+        ## This stuff is done on the fly because it is time consuming - The disadvantage is that it cannot be searched on.
         def SampleData(string,result=None):
             offset=int(string)
-            dbh.execute("select inode from LogicalKeyword_%s where offset = %r ",(table,offset))
+            dbh.execute("select inode,text,offset from LogicalKeyword_%s where offset = %r ",(table,offset))
             row=dbh.fetch()
-            fd = fsfd.open(inode=row['inode'])
-            fd.seek(offset-10)
-            ## Read some data before and after the keyword
-            data = fd.read(10 + len(keyword) + 20)
+            if len(row['text'])<len(keyword):
+                fd = fsfd.open(inode=row['inode'])
+                fd.seek(offset-10)
+                ## Read some data before and after the keyword
+                data = fd.read(10 + len(keyword) + 20)
+                dbh.execute("update LogicalKeyword_%s set text=%r where offset=%r and inode=%r",(table,data,offset,row['inode']))
+            else:
+                data=row['text']
+
             return data
             
         result.table(
