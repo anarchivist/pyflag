@@ -30,7 +30,7 @@
 import MySQLdb
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-
+import pyflag.logging as logging
 import time,types
 import threading
 
@@ -68,6 +68,7 @@ class DBO:
     """
     DBH = {}
     lock = threading.Lock()
+    temp_tables = []
     
     def __init__(self,case):
         """ Constructor for DB access. Note that this object implements database connection caching and so should be instantiated whenever needed. If case is None, the handler returned is for the default flag DB
@@ -88,9 +89,11 @@ class DBO:
             try:
                 #Try to connect over TCP
                 DBO.DBH[case] = MySQLdb.Connect(user = config.USER, passwd = config.PASSWD,db = case, host=config.HOST, port=config.PORT)
-            except:
+                DBO.mysql_bin_string = "%s -f -u %r -p%r -h%s -P%s" % (config.MYSQL_BIN,config.USER,config.PASSWD,config.HOST,config.PORT)
+            except Exception,e:
                 #or maybe over the socket?
                 DBO.DBH[case] = MySQLdb.Connect(user = config.USER, passwd = config.PASSWD,db = case, unix_socket = config.UNIX_SOCKET)
+                DBO.mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.USER,config.PASSWD,config.UNIX_SOCKET)
 
         self.cursor = DBO.DBH[case].cursor()
         self.temp_tables = []
@@ -241,7 +244,8 @@ class DBO:
         print "Will shell out to run %s " % client
 
         import os
-        p_mysql=os.popen("%s -f -u %r -p%r -D%r"%(config.MYSQL_BIN,config.USER,config.PASSWD,self.case),'w')
+        print "Will use %s " % config.MYSQL_BIN
+        p_mysql=os.popen("%s -D%s" % (self.mysql_bin_string,self.case),'w')
         p_client=os.popen(client,'r')
         while 1:
             data= p_client.read(1000)

@@ -81,7 +81,7 @@ class BasicTheme:
         module_list = self.list_modules(flag)
         
         for k in module_list:
-            ## Dont list modules with not reports in them.
+            ## Dont list modules with no reports in them.
             r = flag.dispatch.family[k].items()
             r = [ 1 for kk,v in r if not v.hidden ]
             if len(r)==0: continue
@@ -244,6 +244,9 @@ class BlueTheme(BasicTheme):
                   <p><font size="1" face="Arial, Helvetica, sans-serif">'''
         
         for k in module_list:
+            r = flag.dispatch.family[k].items()
+            r = [ 1 for kk,v in r if not v.hidden ]
+            if len(r)==0: continue
             link = flag.ui()
             link.link(k,family=k)
             result.result+='''&nbsp;&nbsp;%s<br />\n''' % link

@@ -25,17 +25,28 @@ class ConfObject:
         ConfObject.config.read([sys.modules['pyflag'].__path__[0]+"/pyflagrc",os.path.expanduser('~/.pyflagrc')])
 
     def __init__(self):
-        """ Collect parameters from all sections into a single dict. """
+        """ Collect parameters from all sections into a single dict.
+
+        Note that we add these are dynamic attributed to our own class...
+        """
         if not ConfObject.config:
             self.parse()
             for section  in  self.config.sections():
                 for param in self.config.options(section):
-                    
+                    uparam=param.upper()
                     ## We can not trash our own methods, because we use upper case here
-                    if not ConfObject.__dict__.has_key(param.upper()):
-#                        print "Adding paramter %s->%s" % (param.upper(),self.config.get(section,param))
+                    if not ConfObject.__dict__.has_key(uparam):
                         ## Try storing values as integers first, then as string
                         try:
-                            ConfObject.__dict__[param.upper()]=int(self.config.get(section,param))
+                           value=int(self.config.get(section,param))
                         except ValueError:
-                            ConfObject.__dict__[param.upper()]=self.config.get(section,param)
+                            value=self.config.get(section,param)
+
+                        ## If there is an environment variable - it overrrides this:
+                        try:
+                            value=os.environ["PYFLAG_%s" % uparam]
+                        except KeyError:
+                            pass
+
+                        print "Adding paramter %s->%s" % (uparam,value)
+                        ConfObject.__dict__[uparam]=value

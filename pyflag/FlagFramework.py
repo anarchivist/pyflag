@@ -30,7 +30,7 @@
 
 @var flag_version: Current version of the flag program
 """ 
-flag_version = "0.64"
+flag_version = "0.72"
 import sys,os
 import pyflag.conf
 config=pyflag.conf.ConfObject()

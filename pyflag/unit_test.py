@@ -29,7 +29,7 @@ io=IO.IOFactory(query)
 import magic
 m=magic.magic_open(magic.MAGIC_NONE)
 if magic.magic_load(m,config.MAGICFILE) < 0:
-    raise IOError
+    raise IOError("Unable to find magic file")
 
 import pyflag.DB as DB
 dbh=DB.DBO(None)

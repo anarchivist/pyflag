@@ -20,7 +20,7 @@ clean:
           (cd $$dir; make clean "CC=$(CC)" MAKELEVEL=); done
 
 bin-dist:
-	rm -rf bin_dist
+#	rm -rf bin_dist
 	mkdir -p bin_dist
 	cp -ar $(PYTHONLIB) bin_dist/
 	for i in `find . -maxdepth 1 | egrep -v '(darcs|sources|bin_dist|^.$$)'`; do cp -a $$i bin_dist/; done
@@ -28,7 +28,7 @@ bin-dist:
 	## Reset all the time stamps to 0
 	find bin_dist/ -exec touch -a -d19700000 \{\} \;
 	## Run the unit test to touch all the files
-	cd bin_dist/ && PYTHONHOME=`pwd`/python2.3/ PYTHONPATH=`pwd`:`pwd`/python2.3/:`pwd`/python2.3/site-packages/:`pwd`/python2.3/lib-dynload ./bin/python pyflag/unit_test.py
+	cd bin_dist/ && ./launch.sh unit_test.py
 	## Now we cleanup python core (any files that were not touched)
 	find bin_dist/python2.3/ -atime +1 -exec rm {} \;
 
@@ -37,20 +37,21 @@ bin-dist:
 
 	## General cleanups
 	find bin_dist/ -depth -name CVS -exec rm -rf {} \;
-	find bin_dist/ -depth -empty -exec rmdir \{\} \; 
+	find bin_dist/ -depth -type d -empty -exec rmdir \{\} \; 
 	find bin_dist/ -depth -name \*~ -exec rm -f \{\} \; 
 
 	## Strip all binaries:
-	find bin_dist/ -perm +0111 -exec strip {} \;
+	find bin_dist/ -perm +0111 -exec strip {} \; 2> /dev/null
 
 mysql:
-	cd bin_dist/ && tar -xvzf ../sources/mysql*.tgz
-	cd bin_dist/mysql/ && ./scripts/mysql_install_db
-#	ln -s bin_dist/mysql/bin/mysql bin_dist/bin/
+	mkdir -p bin_dist
+	rm -rf bin_dist/mysql/
+	cd bin_dist/ && tar -xvzf ../sources/mysql*.tar.gz || (echo -e "**********************\n\nIn order to build embedded mysql support you will need the mysql binary distribution for your platform placed in the sources directory. This can be downloaded from mysql.com.\n\nFor example mysql-max-4.0.21-pc-linux-i686.tar.gz or mysql-standard-4.1.7-pc-linux-i686.tar.gz\n\n*****************************" && false)
+	cd bin_dist/mysql* && ./scripts/mysql_install_db
 	## Now we launch the database in the background
-	bash -c ' cd bin_dist/mysql &&  ./bin/mysqld_safe --skip-networking --socket=pyflag.sock --skip-grant-tables  --datadir=./data/ &'
+	bash -c ' cd bin_dist/mysql* &&  ./bin/mysqld_safe --skip-networking --socket=pyflag.sock --skip-grant-tables  --datadir=./data/ &'
 	## Wait a bit for the server to start up
 	sleep 1
 	## Now we create the database:
-	echo 'CREATE DATABASE pyflag;' | $(MYSQLCOMMAND)
-	cat db.setup | $(MYSQLCOMMAND) pyflag
+	export MYSQL=`ls -d ./bin_dist/mysql*` && echo 'CREATE DATABASE pyflag;' | $$MYSQL/bin/mysql --socket=$$MYSQL/data/pyflag.sock	
+	export MYSQL=`ls -d ./bin_dist/mysql*` && cat db.setup | $$MYSQL/bin/mysql --socket=$$MYSQL/data/pyflag.sock pyflag

@@ -1,5 +1,26 @@
 #!/bin/bash
 
+## Start up the mysql server if needed.
+PYFLAG_DATADIR=`pwd`/`ls -d mysql*/data`
+PYFLAG_UNIX_SOCKET=$PYFLAG_DATADIR/pyflag.sock
+
+if [ -d uploads ]; then
+export PYFLAG_UPLOADDIR=uploads
+fi
+
+## Note: If you wish to put the data directory somewhere else you will need to symlink it.
+## This will be executed if the mysql directory exists (then we are running in a pyflag+mysql distribution)
+if [ -e mysql* ]; then
+    cd mysql* &&   ./bin/mysqld_safe --skip-networking --socket=$PYFLAG_UNIX_SOCKET --skip-grant-tables  --datadir=$PYFLAG_DATADIR &
+    ## This will override the socket in the config file (This passwd and username may be bogus to force the DB handle to fall back onto the socket to connect if there is a mysql local server)
+    export PYFLAG_User=bogus_user
+    export PYFLAG_Passwd=password
+    export PYFLAG_Host=127.0.0.1
+    export PYFLAG_Port=0
+    export PYFLAG_UNIX_SOCKET
+    export PYFLAG_MYSQL_BIN=`pwd`/`ls mysql*/bin/mysql`
+fi
+
 if [ -e python2.3 ] ; then 
 	export PYTHONHOME=`pwd`/python2.3/
 	export LD_LIBRARY_PATH=`pwd`:`pwd`/libs/
