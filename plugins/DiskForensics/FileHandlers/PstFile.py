@@ -36,6 +36,7 @@ class PstScan(GenScanFactory):
 
 
     def reset(self):
+        GenScanFactory.reset(self)
         # reset the groupware tables, this should not be done here
         # if ever another scanner wants to use them also
         for name in ('email','contact','appointment','journal'):

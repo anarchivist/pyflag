@@ -28,6 +28,7 @@ class MD5Scan(GenScanFactory):
         self.table=table
 
     def reset(self):
+        GenScanFactory.reset(self)
         self.dbh.execute("drop table `md5_%s`",self.table)
 
     def destroy(self):

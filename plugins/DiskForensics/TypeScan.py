@@ -15,6 +15,7 @@ class TypeScan(Scanner.GenScanFactory):
     In addition to recording the file type, this class can also perform
     an action based on the mime type of the file"""
     order=5
+    default=True
     def __init__(self,dbh, table,fsfd):
         dbh.execute(""" CREATE TABLE IF NOT EXISTS `type_%s` (
         `inode` varchar( 20 ) NOT NULL,
@@ -24,6 +25,7 @@ class TypeScan(Scanner.GenScanFactory):
         self.table=table
 
     def reset(self):
+        Scanner.GenScanFactory.reset(self)
         self.dbh.execute("drop table if exists `type_%s`",self.table)
 
     def destroy(self):

@@ -49,6 +49,7 @@ class VirScan(GenScanFactory):
         self.dbh.execute('ALTER TABLE virus_%s ADD INDEX(inode)', self.table)
 
     def reset(self):
+        GenScanFactory.reset(self)
         self.dbh.execute('drop table virus_%s',self.table)
 
     class Scan:

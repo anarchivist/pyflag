@@ -55,6 +55,8 @@ class NewCase(Reports.report):
         #Get handle to the case db
         case_dbh = self.DBO(query['create_case'])
         case_dbh.execute("Create table meta(`time` timestamp(14) NOT NULL,property varchar(50), value text)",())
+        case_dbh.execute("alter table meta add index(property)");
+        case_dbh.execute("alter table meta add index(value(10))");
         case_dbh.execute("create table bookmarks (id int(11) auto_increment, canon text, url text,  description text,  bookmark text ,  PRIMARY KEY  (id),  KEY id (id))",())
 
         #Ensure that the corresponding delete case is reset:

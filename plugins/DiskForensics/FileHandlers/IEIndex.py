@@ -21,6 +21,7 @@ class IEIndex(Scanner.GenScanFactory):
         self.dbh.MySQLHarness("pasco -t %s -g create " % (self.table))
 
     def reset(self):
+        Scanner.GenScanFactory.reset(self)
         self.dbh.MySQLHarness("pasco -t %s -g drop " % (self.table))
         
     def destroy(self):

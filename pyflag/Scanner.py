@@ -39,11 +39,46 @@ config=pyflag.conf.ConfObject()
 import pyflag.logging as logging
 import os,imp
 
+class BaseScanner:
+    """ This is the actual scanner class that will be instanitated once for each file in the filesystem.
+    
+    factories is a list of factory scanner objects that should be used to scan new files that have been revealed due to this particular scanner. This is mostly used for iteratively scanning files found inside other files (e.g. zip archieves etc). If this scanner is not adding new files to the ddfs tables, you do not need to use this.
+    outer is a reference to the generator object that is used to instantiate these classes.
+    
+    Note that this is a nested class since it may only be instantiated by first instantiating a Factory object. """
+    def __init__(self, inode,ddfs,outer,factories=None):
+        self.inode = inode
+        self.size = 0
+        self.ddfs = ddfs
+        self.ddfs.dbh.set_meta("scan_%s" % outer.__class__, inode)
+        print "Scanning inode %s with %s" % (inode, outer)
+
+    def process(self, data, metadata={}):
+        """ process the chunk of data.
+
+        This function is given a chunk of data from the file - this may not be the complete file. Sometimes it may be appropropriate to accumulate the data until the finish method is called. It is prudent to accumulate the file to the filesystem in the temporary directory rather than try to accumulate it into memory.
+
+        @arg data: Some limited amount of data from the file.
+        @arg metadata: A dict specifying meta data that was deduced about this file by other scanners. Scanners may add meta data to this dict in order to indicate certain facts to other scanners about this file. For example the TypeScan scanner will store the magic in this dict to indicate when the PST scanner should scan the file etc. Note that the order of scanner invocation is important, and is controlled by the order parameter in the Scanner's GenScanFactory class.
+        """
+        pass
+
+    def finish(self):
+        """ all data has been provided to process, finish up.
+
+        Note that this signals the completion of the file. If a file had been queued during the process call, it should now be processed.
+        """
+        pass
+
+
 class GenScanFactory:
     """ Abstract Base class for scanner Factories.
     
     The Scanner Factory is a specialised class for producing scanner objects. It will be instantiated once per filesystem at the begining of the run, and destroyed at the end of the run. It will be expected to produce a new Scanner object for each file in the filesystem.
     """
+    ## Should this scanner be on by default?
+    default=True
+    
     def __init__(self,dbh,table,fsfd):
         """ Factory constructor.
 
@@ -70,48 +105,24 @@ class GenScanFactory:
 
     def reset(self):
         """ This method drops the relevant tables in the database, restoring the db to the correct state for rescanning to take place. """
-        pass
+        ## Delete all scanner activities from the meta table:
+        self.dbh.execute("delete from meta where property = %r", "scan_%s" % self.__class__)
 
     ## Relative order of scanners - Higher numbers come later in the order
     order=10
     
-    class Scan:
-        """ This is the actual scanner class that will be instanitated once for each file in the filesystem.
-
-        factories is a list of factory scanner objects that should be used to scan new files that have been revealed due to this particular scanner. This is mostly used for iteratively scanning files found inside other files (e.g. zip archieves etc). If this scanner is not adding new files to the ddfs tables, you do not need to use this.
-        outer is a reference to the generator object that is used to instantiate these classes.
-        
-        Note that this is a nested class since it may only be instantiated by first instantiating a Factory object. """
-        def __init__(self, inode,ddfs,outer,factories=None):
-            self.inode = inode
-            self.size = 0
-            self.ddfs = ddfs
-
-        def process(self, data, metadata={}):
-            """ process the chunk of data.
-
-            This function is given a chunk of data from the file - this may not be the complete file. Sometimes it may be appropropriate to accumulate the data until the finish method is called. It is prudent to accumulate the file to the filesystem in the temporary directory rather than try to accumulate it into memory.
-
-            @arg data: Some limited amount of data from the file.
-            @arg metadata: A dict specifying meta data that was deduced about this file by other scanners. Scanners may add meta data to this dict in order to indicate certain facts to other scanners about this file. For example the TypeScan scanner will store the magic in this dict to indicate when the PST scanner should scan the file etc. Note that the order of scanner invocation is important, and is controlled by the order parameter in the Scanner's GenScanFactory class.
-            """
-            pass
-
-        def finish(self):
-            """ all data has been provided to process, finish up.
-
-            Note that this signals the completion of the file. If a file had been queued during the process call, it should now be processed.
-            """
-            pass
+    class Scan(BaseScanner):
+        """ The Scan class must be defined as an inner class to the factory. """
 
 StoreAndScanFiles = []
 
-class StoreAndScan:
+class StoreAndScan(BaseScanner):
     """ A Scanner designed to store a temporary copy of the scanned file to be able to invoke an external program on it.
 
     Note that this is a scanner inner class (which should be defined inside the factory class). This class should be extended by Scanner factories to provide real implementations to the 'boring','make_filename' and 'external_process' methods.
     """
     def __init__(self, inode,ddfs,outer,factories=None):
+        BaseScanner.__init__(self, inode,ddfs,outer,factories)
         self.inode = inode
         self.table=outer.table
         self.dbh=outer.dbh
@@ -211,7 +222,6 @@ def scanfile(ddfs,fd,factories):
     @arg ddfs: A filesystem object. This is sometimes used to add new files into the filesystem by the scanner
     @arg fd: The file object of the file to scan
     @arg factories: A list of scanner factories to use when scanning the file.
-    @arg inode: The inode of the specific file. FIXME - Can we use the fd object to find out its own inode?
     """
     buffsize = 1024 * 1024
     # instantiate a scanner object from each of the factory
@@ -249,7 +259,7 @@ def scanfile(ddfs,fd,factories):
             except Exception,e:
                 logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
 
-    # call finish object of each method
+    # call finish method of each object
     for o in objs:
         try:
             o.finish()

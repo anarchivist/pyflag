@@ -65,6 +65,7 @@ class Index(GenScanFactory):
                 
     def reset(self):
         """ This deletes the index file and drops the LogicalIndex table """
+        GenScanFactory.reset(self)
         ## First destroy the object and then try to remove the index file
         try:
             del self.index

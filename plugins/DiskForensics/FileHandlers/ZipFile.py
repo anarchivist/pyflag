@@ -19,9 +19,6 @@ class ZipScan(GenScanFactory):
     def __init__(self,dbh, table,fsfd):
         self.dbh=dbh
         self.table=table
-
-    def reset(self):
-        pass
         
     def destroy(self):
         pass

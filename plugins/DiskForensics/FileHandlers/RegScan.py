@@ -17,6 +17,7 @@ class RegistryScan(GenScanFactory):
         self.dbh.execute('create table if not exists reg_%s (`path` CHAR(250), `size` SMALLINT, `type` CHAR(12),`reg_key` VARCHAR(200),`value` text)',self.table)
 
     def reset(self):
+        GenScanFactory.reset(self)
         self.dbh.execute('drop table if exists reg_%s',self.table)
         self.dbh.execute('drop table if exists regi_%s',self.table)
         
