@@ -161,8 +161,9 @@ class ViewFile(Reports.report):
         path=fsfd.lookup(inode=query['inode'])
         if not path: raise IOError("No path for Inode %s" % query['inode'])
         path,name=os.path.split(path)
-        image.headers=[("Content-Disposition","attachment; filename=%s" % name),
-                       ("Content-Length",filesize)]
+        image.headers=[("Content-Disposition","attachment; filename=%s" % name),]
+        ## This fails in cases where the File object does not know its own size in advance (e.g. Pst).
+#                       ("Content-Length",filesize)]
         
         result.heading("Viewing file in inode %s" % (query['inode']))
         try:
@@ -177,6 +178,8 @@ class ViewFile(Reports.report):
                 result.result=image.display()
                 result.type=image.GetContentType()
                 result.headers=image.headers
+                print "headers %s " %result.headers
+                result.display=result.__str__
                 result.binary=True
             return None
 
@@ -383,18 +386,6 @@ class DBFS_file(FileSystem.File):
             return self.data[property]
         except KeyError:
             return None
-        
-    def seek(self, offset, rel=None):
-        """ fake seeking routine, doesnt really seek, just updates the read pointer """
-        if rel==1:
-            self.readptr += offset
-        elif rel==2:
-            self.readptr = self.size + offset
-        else:
-            self.readptr = offset
-            
-        if(self.readptr > self.size):
-            self.readptr = self.size
 
     def read(self, length=None):
         if (length == None) or ((length + self.readptr) > self.size):
@@ -429,9 +420,6 @@ class DBFS_file(FileSystem.File):
                 self.readptr+=bytes_left
 
         return fbuf
-     
-    def tell(self):
-        return self.readptr
 
     def offset(self,offset):
         """ returns the offset into the current block group where the given offset is found"""

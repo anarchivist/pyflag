@@ -170,7 +170,10 @@ class DBFS(FileSystem):
         @arg new_filename: The prposed new filename for the VFS file. This may contain directories in which case sub directories will also be created.
         """
         ## filename is the filename in the filesystem for the zip file.
-        filename = self.lookup(inode=root_inode)
+        if root_inode:
+            filename = self.lookup(inode=root_inode)
+        else:
+            filename = '/'
 
         ## Check if the directories all exist properly:
         dirs = os.path.dirname(new_filename).split('/')
@@ -185,25 +188,35 @@ class DBFS(FileSystem):
 
             self.dbh.execute("select * from file_%s where path=%r and name=%r",(self.table, path, dirs[d]))
             if not self.dbh.fetch():
-                self.dbh.execute("insert into file_%s set path=%r,name=%r,status='alloc',mode='d/d',inode='%s|%s-'",(self.table,path,dirs[d],root_inode,inode))
+                if root_inode != None:
+                    self.dbh.execute("insert into file_%s set path=%r,name=%r,status='alloc',mode='d/d',inode='%s|%s-'",(self.table,path,dirs[d],root_inode,inode))
+                else:
+                    self.dbh.execute("insert into file_%s set path=%r,name=%r,status='alloc',mode='d/d',inode='%s-'",(self.table,path,dirs[d],inode))
 
         path = normpath("%s/%s/" % (filename,os.path.dirname(new_filename)))
         ## Add the file itself to the file table
-        self.dbh.execute("insert into file_%s set status='alloc',mode='r/r',inode='%s|%s',path=%r, name=%r",(self.table,root_inode,inode,normpath(path+'/'),name))
+        if root_inode:
+            self.dbh.execute("insert into file_%s set status='alloc',mode='r/r',inode='%s|%s',path=%r, name=%r",(self.table,root_inode,inode,normpath(path+'/'),name))
+        else:
+            self.dbh.execute("insert into file_%s set status='alloc',mode='r/r',inode='%s',path=%r, name=%r",(self.table,inode,normpath(path+'/'),name))
 
         ## Add the file to the inode table:
         extra = ','.join(["%s=%%r" % p for p in properties.keys()])
         if extra:
             extra=','+extra
-            
-        self.dbh.execute("insert into inode_%s set inode='%s|%s'" + extra ,[self.table, root_inode,inode] + properties.values())
+
+        if root_inode!=None:
+            self.dbh.execute("insert into inode_%s set inode='%s|%s'" + extra ,[self.table, root_inode,inode] + properties.values())
+        else:
+            self.dbh.execute("insert into inode_%s set inode='%s'" + extra ,[self.table, inode] + properties.values())
         
         ## Set the root file to be a d/d entry so it looks like its a virtual directory:
         self.dbh.execute("select * from file_%s where mode='d/d' and inode=%r and status='alloc'",(self.table,root_inode))
         if not self.dbh.fetch():
             self.dbh.execute("select * from file_%s where mode='r/r' and inode=%r and status='alloc'",(self.table,root_inode))
             row = self.dbh.fetch()
-            self.dbh.execute("insert into file_%s set mode='d/d',inode=%r,status='alloc',path=%r,name=%r",(self.table,root_inode,row['path'],row['name']))
+            if row:
+                self.dbh.execute("insert into file_%s set mode='d/d',inode=%r,status='alloc',path=%r,name=%r",(self.table,root_inode,row['path'],row['name']))
 
     def longls(self,path='/'):
         self.dbh.execute("select mode,inode,name from file_%s where path=%r", (self.table, path))
@@ -319,6 +332,8 @@ class File:
     """ This abstract base class documents the file like object used to read specific files in PyFlag.
     Each subclass must impliment this interface
     """
+    readptr = None
+    size = None
     def __init__(self, case, table, fd, inode):
         """ The constructor for this object.
         @arg case: Case to use
@@ -332,6 +347,8 @@ class File:
         self.table = table
         self.fd = fd
         self.inode = inode
+        self.readptr =0
+        self.size=0
 
     def close(self):
         """ Fake close method. """
@@ -339,14 +356,22 @@ class File:
     
     def seek(self, offset, rel=None):
         """ Seeks to a specified position inside the file """
-        pass
-    
-    def read(self, length=None):
-        """ Reads length bytes from file, or less if there are less bytes in file. If length is None, returns the whole file """
-        pass
-
+        if rel==1:
+            self.readptr += offset
+        elif rel==2:
+            self.readptr = self.size + offset
+        else:
+            self.readptr = offset
+            
+        if(self.readptr > self.size):
+            self.readptr = self.size
+         
     def tell(self):
         """ returns the current read pointer"""
+        return self.readptr
+
+    def read(self, length=None):
+        """ Reads length bytes from file, or less if there are less bytes in file. If length is None, returns the whole file """
         pass
 
     def stats(self):
