@@ -16,7 +16,7 @@ Binary+MySQL distribution:
 This distribution contains a stand alone version of the mysql server
 software. It is designed to be completely self contained and therefore
 has no external dependencies other than a fairly recent version of
-glibc. This distribution should run on most flavours of linux and has
+glibc. This distribution should run on most flavours of Linux and has
 been thoroughly tested on sarge. To install simply:
 
 - Download the tarball.
@@ -36,16 +36,16 @@ somewhere. It may be on a different server than the server used to run
 pyflag, but you will need to have root level access to the database
 server. This is required in order to drop and create databases.
 
-Log into the mysql server by using the mysql utitlity (If you just
+Log into the mysql server by using the mysql utility (If you just
 installed mysql there is no root password set, so the -pxxxx can be
 omitted):
 bash$  mysql -u root -pxxxx
 mysql> create database pyflag;
-mysql> grant all on *.* to root@localhost identified by "password";
+mysql> grant all on *.* to root@localhost identified by "Y0urP1ssw0rdH3r3";
 mysql> quit
 
 The grant command create a root level account on the database. You can
-replace localhost with the actuall host you intend to log in
+replace localhost with the actual host you intend to log in
 from. Note that mysql does not have a root password by default, but
 PyFlag _requires_ that you have a root password set for the mysql
 server when running in this mode. This is best practice anyway, and
@@ -53,29 +53,40 @@ you should never consider running a mysql server with a blank root
 password.
 
 Now from the shell, populate the initial database:
-cat setup.db | mysql -u root -ppassword -h 127.0.0.1 pyflag
+cat db.setup | mysql -u root -pY0urP1ssw0rdH3r3 -h localhost pyflag
 
 Source Package:
 -----------------------
 If you wish to develop modules for PyFlag or contribute, we encourage
 you to download the source distribution. To install from source you
 will need to have the mysql database set up as described above, and
-have all library dependancies satisfied. Since the list of library
+have all library dependencies satisfied. Since the list of library
 dependencies changes very often, we will not provide an exhaustive
 list here.
 
 At the very least swig and python-dev are required, as well as
-python-mysqldb, clamav. Also plotticus, and ethereal sources are
+python-mysqldb, clamav. Also ploticus, and ethereal sources are
 required (If you do not wish to use the TCPDump modules, the ethereal
 sources are not needed - flag should be ready to run by the time
 ethereal is compiled).
+
+A a recent (Feb 05) build on a sarge (debian) machine required the
+following to be downloaded to the sources/ directory:
+
+  ethereal-0.10.2.tar.bz2
+  libpng-2.2.8-config.tar.gz
+  pl230src.tar.gz
+  msleuthkit-1.73.tar.gz
+
+Tarballs in the sources/ directory are built automatically when 
+you type "make" in the top level directory.
 
 Optional Features:
 ==============
 The following steps are recommended to do prior to using Flag.
 
 1) Flag may use the NSRL when loading new filesystems. If you have the
-    NSRL Isos, you can mount them somewhere and then use the
+    NSRL ISOs, you can mount them somewhere and then use the
     utilities/NSRL_load.sh script to load the NSRL into the database.
 
 2) Flag can download the whois databases for use when importing log
