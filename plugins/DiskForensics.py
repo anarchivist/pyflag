@@ -66,6 +66,7 @@ class BrowseFS(Reports.report):
     parameters = {'fsimage':'fsimage'}
     hidden = False
     name = "Browse Filesystem"
+    family = "Disk Forensics"
     description = "Display filesystem in a browsable format"
     
     def display(self,query,result):
@@ -139,6 +140,7 @@ class ViewFile(Reports.report):
     """ Report to browse the filesystem """
     parameters = {'fsimage':'fsimage','inode':'sqlsafe'}
     hidden = True
+    family = "Disk Forensics"
     name = "View File Contents"
     description = "Display the contents of a file"
     
@@ -301,6 +303,7 @@ class Timeline(Reports.report):
     """ View file MAC times in a searchable table """
     parameters = {'fsimage':'fsimage'}
     name = "View File Timeline"
+    family = "Disk Forensics"
     description = "Browse file creation, modification, and access times"
 
     def form(self, query, result):
@@ -356,6 +359,7 @@ class HashComparison(BrowseFS):
     """ Compares MD5 hash against the NSRL database to classify files """
     parameters = {'fsimage':'fsimage'}
     name = "MD5 Hash comparison"
+    family = "Disk Forensics"
     description="This report will give a table for describing what the type of file this is based on the MD5 hash matches"
     progress_dict = {}
 
@@ -398,6 +402,7 @@ class IEHistory(Reports.report):
     """ View IE browsing history with pasco"""
     parameters = {'fsimage':'fsimage'}
     name = "IE Browser History (pasco)"
+    family = "Disk Forensics"
     description="This report will display all IE browsing history data found in index.dat files"
     def form(self,query,result):
         try:
@@ -423,6 +428,7 @@ class VirusScan(Reports.report):
     """ Scan Filesystem for Viruses using clamav"""
     parameters = {'fsimage':'fsimage'}
     name = "Virus Scan (clamav)"
+    family = "Disk Forensics"
     description="This report will scan for viruses and display a table of viruses found"
     def form(self,query,result):
         try:
@@ -454,6 +460,7 @@ if 0:
         """ Scan Filesystem for Viruses using clamav"""
         parameters = {'fsimage':'fsimage'}
         name = "Virus Scan (clamav)"
+        family = "Disk Forensics"
         description="This report will display a table of viruses found during the scanning on Loading the filesystem "
         progress_dict = {}
 
@@ -679,6 +686,7 @@ class SearchIndex(Reports.report):
     """ Search for indexed keywords """
     description = "Search for words that were indexed during filesystem load. Words must be in dictionary to be indexed. "
     name = "Search Indexed Keywords"
+    family = "Disk Forensics"
     parameters={'fsimage':'fsimage','keyword':'any'}
 
     def form(self,query,result):

@@ -68,6 +68,7 @@ class ListLogFile(Reports.report):
     """ Lists the content of the log file using the table UI object """
     parameters = {"logtable":"casetable"}
     name="List log file contents"
+    family = "Log Analysis"
     description="This report simply lists the log entries in a searchable/groupable table"
 
     def form(self,query,result):
@@ -140,6 +141,7 @@ class CreateLogPreset(Reports.report):
     parameters = {"log_preset":"sqlsafe", "datafile":"filename",
                    "final":"alphanum", "preview":"alphanum"}
     name="Create Log Preset"
+    family = "Log Analysis"
     description="Create new preset log type"
     order=40
 
@@ -223,6 +225,7 @@ class DeleteLogPreset(Reports.report):
     """ Deletes an old log preset """
     parameters = {"log_preset":"sqlsafe",  "final":"alphanum"}
     name="Delete Log Preset"
+    family = "Log Analysis"
     description="Delete preset log type"
     order=50
 
@@ -242,6 +245,7 @@ class BandWidth(Reports.report):
     """ Calculates the approximate bandwidth requirements by adding the size of each log entry within time period """
     parameters = {"logtable":"casetable","timestamp":"sqlsafe","size":"sqlsafe"}
     name = "Estimate Bandwidth"
+    family = "Log Analysis"
     description="Estimate approximate bandwidth requirements from log file"
 
     def form(self,query,result):

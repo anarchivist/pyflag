@@ -56,6 +56,7 @@ class BuildDictionary(Reports.report):
     """ Manipulate dictionary of search terms to index on """
     parameters = {}
     name="Build Dictionary"
+    family="Index Tools"
     description = "Builds a dictionary for indexing "
 
     def form(self,query,result):
@@ -136,6 +137,7 @@ class IndexImage(Reports.report):
     """ Indexes an IO Source using the global dictionary """
     parameters={"iosource":"iosource"}
     name="Index Image"
+    family="Index Tools"
     description = "Index image using global dictionary "
     order=50
 

@@ -45,6 +45,7 @@ class ConTable(Reports.report):
     A connection is a unique tuple (source_ip,source_port,dest_ip,dest_port) forming one end of the connection."""
     parameters = {'case':'flag_db'}
     name = "Connection Table"
+    family="TCP Dump Analysis"
     description = "Show unique TCP connections"
     order = 10
     
@@ -94,6 +95,7 @@ class ConTable(Reports.report):
 class DNSData(Reports.report):
     """ Class to browse the DNS traffic seen """
     name = 'DNS Traffic'
+    family="TCP Dump Analysis"
     description = 'View DNS traffic'
     parameters = {'case':'flag_db'}
     order = 20
@@ -116,6 +118,7 @@ class DNSData(Reports.report):
 class ProtocolsSeen(Reports.report):
     """ Reports statistics about the different protocols seen within the TCPDump and their frequency """
     name = "Protocols Seen"
+    family="TCP Dump Analysis"
     description = "Shows the different protocols seen within the capture"
     parameters = {'case':'flag_db'}
     order = 30
@@ -148,6 +151,7 @@ class ProtocolDistro(ProtocolsSeen):
     hidden = True
     description = "This report shows all the different protocols transport layer procols seen (e.g. UDP,TCP etc)"
     name = "Examine protocol distribution"
+    family="TCP Dump Analysis"
     parameters = {"protocol":"numeric"}
 
     def form(self,query,result):
@@ -200,6 +204,7 @@ class IPProtoBreakdown(ProtocolDistro):
     """ This report shows how the IP protocols are broken down, and the relative proportions of traffic appearing in the capture """
     hidden = True
     name = "IP protocol break down"
+    family="TCP Dump Analysis"
     description="This report shows how the IP protocols are broken down"
     parameters = {"ip_proto":"numeric"}
 
@@ -335,6 +340,7 @@ class UDPProtoBreakdown(IPProtoBreakdown):
 class TCPTrace(Reports.report):
     """ Reassembles the TCP connection and allowes the visulization of traffic exchanged """
     name = "TCP packet trace"
+    family="TCP Dump Analysis"
     hidden = "yes"
     description="Reassemble the data that forms the tcp stream in the same screen"
     parameters={"con_id" : "numeric"}
@@ -496,6 +502,7 @@ class HTTPURLs(Reports.report):
     """ Shows the URLs seen in the dump and links to their reconstruction """
     parameters =  {'case':'flag_db'}
     name = "Show HTTP URLs"
+    family="TCP Dump Analysis"
     description = " Displays URLs in dump "
 
     def form(self,query,result):
@@ -519,6 +526,7 @@ class ShowPacket(Reports.report):
     """ Displays the content of the packet, as broken into different protocols in a nice tabular structure """
     parameters = {"packet_id":"numeric"}
     name = "Show packet"
+    family="TCP Dump Analysis"
     description = "Displays the packet in detail"
 
     def form(self,query,result):

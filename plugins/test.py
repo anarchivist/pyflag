@@ -50,6 +50,7 @@ class TemplateReport(Reports.report):
     parameters = {'a':'numeric','b':'alphanum'}
     hidden = True
     name = "Test report"
+    family = "Test"
     
     def display(self,query,result):
         result.heading("I am calling the display method")

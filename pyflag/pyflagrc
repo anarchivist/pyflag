@@ -25,6 +25,8 @@ dotdir = /usr/local/bin
 #Flag can only read files from this directory
 uploaddir = 
 imagedir = %(pyflagdir)s/images/
+## Path to read flag plugins from:
+plugins = %(pyflagdir)s/plugins:%(pyflagdir)s/Scanners
 clamdir = %(pyflagdir)s/data/clamav/
 mysql_bin = /usr/bin/mysql
 

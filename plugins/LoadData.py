@@ -48,6 +48,7 @@ class LoadPresetLog(Reports.report):
     parameters = {"table":"any", "new_table":"any",
                   "datafile":"filename", "log_preset":"sqlsafe", "final":"alphanum"}
     name="Load Preset Log File"
+    family="Load Data"
     description="Load Data from log file into Database using Preset"
     order=30
 
@@ -141,6 +142,7 @@ class LoadTcpDump(Reports.report):
     """ Loads a TCPDump using the modified ethereal. """
     parameters = {"datafile":"filename"}
     name = "Load Pcap file"
+    family="Load Data"
     description = "Load a network capture file into the case Database "
     order=30
     
@@ -222,6 +224,7 @@ class LoadIOSource(Reports.report):
     subsequent use by other reports (eg. LoadFS and exgrep) """
     parameters = {"iosource":"sqlsafe","subsys":"iosubsystem"}
     name = "Load IO Data Source"
+    family="Load Data"
     description = "Load a data source into flag using IO subsystem"
     order = 10
 
@@ -262,6 +265,7 @@ class LoadFS(Reports.report):
     """ Loads Filesystem Image using the modified sleuthkit. """
     parameters = {"iosource":"iosource","fstype":"sqlsafe","scan":"alphanum"}
     name = "Load Filesystem image"
+    family="Load Data"
     description = "Load a filesystem image into the case Database"
     order = 20
 
@@ -402,6 +406,7 @@ class LoadKB(LoadTcpDump):
     """ Calculates a Knowledgebase based on a Pcap file and stores it in the case """
     parameters = {"datafile":"filename"}
     name = "Build Knowledge Base"
+    family="Load Data"
     description = "Builds a knowledge base from a Pcap file "
     order=50
     

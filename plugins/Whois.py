@@ -85,6 +85,7 @@ class LookupIP(Reports.report):
     """ Display Whois data for the given IP address """
     parameters = {"address":"ipaddress"}
     name = "Whois Lookup"
+    family = "Log Analysis"
     hidden = True
     description = "Perform Whois Lookup on IP Address"
 
@@ -111,6 +112,7 @@ class LookupWhoisID(LookupIP):
     """ A report to show the IP by netname """
     parameters = {'id':'numeric'}
     hidden=True
+    family = "Log Analysis"
 
     def display(self,query,result):
         result.heading("Whois Search Results")

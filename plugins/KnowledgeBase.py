@@ -44,6 +44,7 @@ class ViewKB(Reports.report):
     """ Views the knowledge base edge tables """
     parameters = {"start":"alphanum"}
     name = "View KB table"
+    family = "Knowledge Base"
     description = "View the Knowledge base table"
 
     def form(self,query,result):
@@ -66,6 +67,7 @@ class DisplayObject(Reports.report):
     """ Displays the object passed in a nice tree structure """
     parameters = {"object_name":"sqlsafe"}
     name = "View object"
+    family = "Knowledge Base"
     description = "Show object hierarchy"
     order = 20
 
@@ -128,6 +130,7 @@ class SearchObject(Reports.report):
     """ Searches the Knowledge Base for objects satisfying certain properties """
     parameters = {"type":"sqlsafe","search_term":"sqlsafe"}
     name = "Search Object"
+    family = "Knowledge Base"
     description = "Searches KB for Objects"
 
     def form(self,query,result):
@@ -158,6 +161,7 @@ class DrawNetworkDiagram(Reports.report):
     """ Draws a network diagram of the objects in the knowledge base """
     parameters = {'type':'sqlsafe','prog':'alphanum'}
     name = "Draw Network diagram"
+    family = "Knowledge Base"
     description = "Draws the network diagram from the KB"
 
     def form(self,query,result):

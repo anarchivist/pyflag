@@ -37,6 +37,7 @@ class NewCase(Reports.report):
     """ Creates a new flag case database."""
     parameters = {"create_case":"alphanum"}
     name = "Create new case"
+    family = "Case Management"
     description = "Create database for new case to load data into"
     order = 10
 
@@ -70,6 +71,7 @@ class DelCase(Reports.report):
     """ Removes a flag case database """
     parameters = {"remove_case":"flag_db"}
     name = "Remove case"
+    family = "Case Management"
     description="Remove database for specified case"
     order = 20
 
@@ -97,6 +99,7 @@ class ResetCase(Reports.report):
     """ Resets a flag case database """
     parameters = {"reset_case":"flag_db"}
     name = "Reset Case"
+    family = "Case Management"
     description = "Reset a case database (delete data)"
     order = 30
 

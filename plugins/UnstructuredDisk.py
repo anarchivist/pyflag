@@ -184,6 +184,7 @@ class ReassembleRaid(Reports.report):
     """ Reconstructs a raid partition from dd images of the individual disks """
     parameters = {'disk_count':'numeric','final':'alphanum'}
     name="Reassemble Raid disk"
+    family = "Unstructured Forensics"
     description = "Reassemble raid disk from individual dd images"
     hidden=True
     
@@ -361,6 +362,7 @@ class ConstructMap(Reports.report):
     """ Builds a Raid reconstruction map. You will need this in order to reconstruct the array """
     parameters = {'disk_count':'numeric','period':'numeric','final':'alphanum'}
     name="Construct Map"
+    family = "Unstructured Forensics"
     description = "Allows the construction of a raid map interactively"
     hidden=True
 
@@ -497,6 +499,7 @@ class ExamineRaidSlots(Reports.report):
     """ Examine Slots in raid map """
     parameters = {'disk_count':'numeric','period':'numeric','slot':'numeric','final':'alphanum'}
     name="Examine Slots"
+    family = "Unstructured Forensics"
     description = "Examine slot relation in raid map"
     hidden=True
     
@@ -628,6 +631,7 @@ class ExtractFiles(Reports.report):
     """ Extract files from corrupted disks by using Magic """
     parameters = {"iosource":"iosource"}
     name = "Extract files"
+    family = "Unstructured Forensics"
     description = "Extract files from unstructured data based on common file signatures"
     order = 50
     running=None
@@ -885,6 +889,7 @@ class BrowseDiskSector(Reports.report):
     """ Browses the disk image sector by sector """
     parameters = {"iosource":"iosource","limit":"numeric"}
     name = "Browse Disk Sectors"
+    family = "Unstructured Forensics"
     description="Browse disk image a sector at a time "
     order=60
 
