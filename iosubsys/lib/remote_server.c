@@ -1,5 +1,9 @@
 #include "remote.h"
 
+void server_child_exit() {
+  wait4(0,NULL,0,NULL);
+};
+
 /* This function sends an error reply to the client. It can formulate
    a more detailed explanation of the error */
 void send_error(int outfd,const char *message, ...)
@@ -48,14 +52,40 @@ int main(int argc, char **argv) {
   unsigned int length;
   unsigned int port=0;
 
-  if(argc<2) RAISE(E_GENERIC,NULL,"Usage: %s filename\n",argv[0]);
+  if(argc<2) RAISE(E_GENERIC,NULL,"Usage: %s filename [port number]\n\nIf port number is not provided, we communicate over stdin/stdout\n",argv[0]);
 
   //The user wants us to listen on TCP port rather than use stdin/out
   if(argc==3) {
+    int fd;
+    struct sockaddr_in s;
+    int size=sizeof(s);
+    int pid;
+
+    fd = socket (PF_INET, SOCK_STREAM, 0);
+    if(fd<0) RAISE(E_IOERROR,NULL,"Cant create socket");
+
     port=atoi(argv[2]);
+    if(setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &s, sizeof (s))<0) 
+      RAISE(E_IOERROR,NULL,"Set Sockopt failed");
+
+    s.sin_family=AF_INET;
+    s.sin_addr.s_addr=INADDR_ANY;
+    s.sin_port=htons(port);
+
+    if(bind(fd,(struct sockaddr *)&s,sizeof(s))<0)
+      RAISE(E_IOERROR,NULL,"Unable to bind to port %u",port);
+
+    if(listen(fd,1)<0) RAISE(E_IOERROR,NULL,"Unable to listen");
+
+    signal(SIGCHLD,server_child_exit);
     
-    //FIXME - implement a simple tcp server here...
-    
+    do {
+      infd=accept(fd,(struct sockaddr *)&s,&size);
+      pid=fork();
+
+      outfd=infd;
+    } while(pid);
+
   };
 
   fd=open(filename,O_RDONLY);
@@ -70,8 +100,10 @@ int main(int argc, char **argv) {
     FD_ZERO(&rfds);
     FD_SET(infd, &rfds);
 
-    /* Wait up to five seconds. */
-    tv.tv_sec = 5;
+    /* Wait up to five seconds, if we are using ssh. */
+    if(port) {
+      tv.tv_sec =9999;
+    } else tv.tv_sec = 5;
     tv.tv_usec = 0;
     
     if(select(1+infd, &rfds, NULL, NULL, &tv)<=0)

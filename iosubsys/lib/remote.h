@@ -9,6 +9,12 @@
 #include <string.h>
 #include <signal.h>
 #include "except.h"
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <sys/wait.h>
 
 #define BUFFERSIZE 1024
 
@@ -16,6 +22,8 @@ struct remote_handle {
   int paircs[2];
   int pairsc[2];
   int pid;
+  int port;
+  char *host;
 };
 
 //Opens a connection to the server, and initialises the sockets

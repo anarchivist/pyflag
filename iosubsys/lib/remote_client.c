@@ -18,31 +18,54 @@ void child_exit() {
 
 void remote_open_server(struct remote_handle *hndle,char **argv)
 {
-  int pid; 
+  //Use SSH rather than direct connection
+  if(!hndle->port) {
+    //Double pipe for comms from client to server
+    if(socketpair(AF_UNIX,SOCK_STREAM,0,hndle->paircs)<0) {
+      RAISE(E_IOERROR,NULL,"Unable to create sockets\n");
+    };
 
-  //Double pipe for comms from client to server
-  if(socketpair(AF_UNIX,SOCK_STREAM,0,hndle->paircs)<0) {
-    RAISE(E_IOERROR,NULL,"Unable to create sockets\n");
-  };
-
-  //Double pipe for comms from server to client
-  if(socketpair(AF_UNIX,SOCK_STREAM,0,hndle->pairsc)<0) {
-    RAISE(E_IOERROR,NULL,"Unable to create sockets\n");
-  };
+    //Double pipe for comms from server to client
+    if(socketpair(AF_UNIX,SOCK_STREAM,0,hndle->pairsc)<0) {
+      RAISE(E_IOERROR,NULL,"Unable to create sockets\n");
+    };
   
-  signal(SIGCHLD,child_exit);
-
-  hndle->pid=fork();
-  if(hndle->pid<0) perror("fork");
-  //Child redirects stdin/out to the socket pair
-  if(!hndle->pid) {
-    close(hndle->pairsc[1]);
-    dup2(hndle->pairsc[0],1);
-    close(hndle->paircs[0]);
-    dup2(hndle->paircs[1],0);
+    signal(SIGCHLD,child_exit);
     
-    execvp(argv[0],argv);
-    RAISE(E_IOERROR,NULL,"Unable to execve %s\n",argv[0]);
+    hndle->pid=fork();
+    if(hndle->pid<0) perror("fork");
+    //Child redirects stdin/out to the socket pair
+    if(!hndle->pid) {
+      close(hndle->pairsc[1]);
+      dup2(hndle->pairsc[0],1);
+      close(hndle->paircs[0]);
+      dup2(hndle->paircs[1],0);
+      
+      execvp(argv[0],argv);
+      RAISE(E_IOERROR,NULL,"Unable to execve %s\n",argv[0]);
+    };
+  } else {
+    int fd;
+    struct sockaddr_in s;
+    int size=sizeof(s);
+    struct hostent *ip;
+    
+    fd = socket (PF_INET, SOCK_STREAM, 0);
+    if(fd<0) RAISE(E_IOERROR,NULL,"Cant create socket");
+
+    ip=gethostbyname(hndle->host);
+
+    s.sin_family=AF_INET;
+    s.sin_port=htons(hndle->port);
+			
+    memcpy(&s.sin_addr.s_addr,ip->h_addr_list[0],
+	   sizeof(s.sin_addr.s_addr));	    
+
+    if(connect(fd,(struct sockaddr *)&s,size)<0) 
+      RAISE(E_IOERROR,NULL,"Unable to connect to %s",hndle->host);
+    
+    hndle->paircs[0]=fd;
+    hndle->pairsc[1]=fd;
   };
 };
 

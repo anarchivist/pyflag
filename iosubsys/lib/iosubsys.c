@@ -903,7 +903,6 @@ int raid_read_random(IO_INFO *self, char *buf, int len, off_t offs,
 struct IO_INFO_REMOTE {
   IO_INFO io;
   long long unsigned int offset;
-  char *remote_host;
   char *remote_server_path;
   char *remote_raw_device;
   char *username;
@@ -941,17 +940,20 @@ int remote_initialiser(IO_INFO *self,IO_OPT *args) {
 
   //Set some defaults
   io->username="root";
-  io->remote_host="localhost";
   io->remote_server_path="remote_server";
   io->remote_raw_device="/dev/hdc";
   io->hndl = NEW(struct remote_handle);
+  io->hndl->host="localhost";
 
   for(i=args;i;i=i->next) {
     if(CHECK_OPTION(i,offset)) {
       io->offset=parse_offsets(i->value);
       continue;
     } else if(CHECK_OPTION(i,host)) {
-      io->remote_host = strdup(i->value);
+      io->hndl->host = strdup(i->value);
+      continue;
+    } else if(CHECK_OPTION(i,port)) {
+      io->hndl->port = atoi(i->value);
       continue;
     } else if(CHECK_OPTION(i,server_path)) {
       io->remote_server_path = strdup(i->value);
@@ -979,7 +981,7 @@ int remote_open(IO_INFO *self) {
   argv[0]="ssh";
   argv[1]="-l";
   argv[2]=io->username;
-  argv[3]=io->remote_host;
+  argv[3]=io->hndl->host;
   argv[4]=io->remote_server_path;
   argv[5]=io->remote_raw_device;
   argv[6]=0;
