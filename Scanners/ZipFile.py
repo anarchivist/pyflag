@@ -5,7 +5,7 @@ This feature complements the ZIP filesystem driver to ensure that zip files are 
 import os.path
 import pyflag.logging as logging
 from Scanners import *
-import zipfile
+import zipfile,gzip
 
 class ZipScan(GenScanFactory):
     """ Recurse into Zip Files """
@@ -70,4 +70,44 @@ class ZipScan(GenScanFactory):
                             logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
 
             ## Set the zip file to be a d/d entry so it looks like its a virtual directory:
+            self.ddfs.dbh.execute("update file_%s set mode='d/d' where inode=%r",(self.ddfs.table,self.inode))
+
+class GZScan(ZipScan):
+    """ Recurse into gziped files """
+    class Scan(StoreAndScan):
+        def boring(self,metadata):
+            return metadata['mime'] not in (
+                'application/x-gzip',
+                )
+
+        def external_process(self,name):
+            gz=gzip.open(name)
+            i=0
+            ## filename is the filename in the filesystem for the zip file.
+            filename = self.ddfs.lookup(inode=self.inode)
+
+            ## Add a psuedo file in the filesystem
+            self.ddfs.dbh.execute("insert into file_%s set path=%r,name=%r,status='alloc',mode='r/r',inode='%s|G0'",(self.ddfs.table,filename+'/','data',self.inode))
+
+            data=gz.read()
+            
+            ## Add the file to the inode table:
+            self.ddfs.dbh.execute("insert into inode_%s set inode='%s|G0',size=%r",(self.ddfs.table, self.inode,len(data)))
+
+            ## Now call the scanners on this new file (FIXME limit the recursion level here. FIXME: Implement a generic scanner method for progressive scanning of files)
+            if self.factories:
+                objs = [c.Scan("%s|G%s" % (self.inode, str(i)),self.ddfs,c,factories=self.factories) for c in self.factories]
+                    
+                metadata={}
+                for o in objs:
+                    try:
+                        o.process(data,metadata=metadata)
+                        o.finish()
+                    except Exception,e:
+                        logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
+
+            ## Make the gzipped inode into a directory so we can recurse into it
+#            self.ddfs.dbh.execute("update file_%s set mode='d/d',inode='%s|Gdir%s' where inode=%r",(self.ddfs.table, self.inode))
+
+            ## Set the gzip file to be a d/d entry so it looks like its a virtual directory:
             self.ddfs.dbh.execute("update file_%s set mode='d/d' where inode=%r",(self.ddfs.table,self.inode))

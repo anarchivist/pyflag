@@ -387,10 +387,13 @@ class DBFS_file(File):
         
     def seek(self, offset, rel=None):
         """ fake seeking routine, doesnt really seek, just updates the read pointer """
-        if(rel):
+        if rel==1:
             self.readptr += offset
+        elif rel==2:
+            self.readptr = self.size + offset
         else:
             self.readptr = offset
+            
         if(self.readptr > self.size):
             self.readptr = self.size
 
@@ -534,13 +537,6 @@ class Zip_file(File):
     
     def __init__(self, case, table, fd, inode):
         File.__init__(self, case, table, fd, inode)
-        tmp1=open('/tmp/test.zip','w')
-        tmp1.write(fd.read())
-        tmp1.close()
-        tmp1=open('/tmp/test.zip','r')
-        tmp1.seek(0)
-        fd.seek(0)
-
         # strategy:
         # inode is the index into the namelist of the zip file (i hope this is consistant!!)
         # just read that file!
@@ -566,6 +562,40 @@ class Zip_file(File):
     def seek(self,pos):
         self.pos=pos
 
+import gzip
+
+class GZip_file(File):
+    """ A file like object to read gziped files. """
+    specifier="G"
+    
+    def __init__(self, case, table, fd, inode):
+        File.__init__(self, case, table, fd, inode)
+        try:
+            self.gz = gzip.GzipFile(fileobj=fd)
+        except Exception,e:
+            raise IOError, "GZip_File: Error %s" %e
+
+        self.size=0
+        self.pos=0
+
+    def read(self,len=None):
+        self.pos+=len
+        if len!=None:
+            return self.gz.read(len)
+        else:
+            self.pos=self.size
+            return self.gz.read()
+
+    def close(self):
+        self.gz.close()
+        
+    def seek(self,pos,rel=None):
+        if rel==1:
+            self.pos+=pos
+        else:
+            self.pos=pos
+            
+        self.gz.seek(self.pos)
 
 def FS_Factory(case,table,fd):
     """ This is the filesystem factory, it will create the most appropriate filesystem object available.
@@ -583,7 +613,13 @@ def FS_Factory(case,table,fd):
 
 # create a dict of all the File subclasses by specifier
 #import sys
-vfslist = {'Z':Zip_file, 'D':DBFS_file, 'P':Pst_file, 'M':MountedFS_file}
+vfslist = {
+    'Z':Zip_file,
+    'D':DBFS_file,
+    'P':Pst_file,
+    'M':MountedFS_file,
+    'G':GZip_file,
+    }
 #for i in dir(sys.modules['__main__']):
 #    try:
 #        if issubclass(sys.modules['__main__'].__dict__[i],File):
