@@ -429,6 +429,14 @@ void evf_decompress_fds(struct offset_table *offsets,int outfd) {
 	memset(data,0,offsets->chunk_size);
       };
     } else {
+      if(chunk_size - length == 4) {
+	// In encase v4, there seems to be a CRC after each block
+	// we dont bother checking it for compressed blocks because
+	// zlib does its own checking and any errors should be reported there
+	if(evf_crc(cdata, length, 1) != *((unsigned int *)(cdata+length))) {
+	  fprintf(stderr, "WARNING: CRC error in block %i\n", i);
+	}
+      }
       fprintf(stderr, "Block %i is UNCOMPRESSED\n", i);
       memcpy(data,cdata,length);
     };
