@@ -13,10 +13,10 @@ if [ -e mysql* ]; then
 
     cd mysql* &&   ./bin/mysqld_safe --skip-networking --socket=$PYFLAG_UNIX_SOCKET --skip-grant-tables  --datadir=$PYFLAG_DATADIR > /dev/null &
     ## This will override the socket in the config file (This passwd and username may be bogus to force the DB handle to fall back onto the socket to connect if there is a mysql local server)
-    export PYFLAG_User=bogus_user
-    export PYFLAG_Passwd=password
-    export PYFLAG_Host=127.0.0.1
-    export PYFLAG_Port=0
+    export PYFLAG_USER=bogus_user
+    export PYFLAG_PASSWD=password
+    export PYFLAG_HOST=127.0.0.1
+    export PYFLAG_PORT=0
     export PYFLAG_UNIX_SOCKET
     export PYFLAG_MYSQL_BIN=`pwd`/`ls mysql*/bin/mysql`
 fi

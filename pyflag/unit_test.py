@@ -74,3 +74,7 @@ import urllib
 
 ## Clamav scanner
 import clamav
+
+## Initialise registry to load all modules in.
+import pyflag.Registry as Registry
+Registry.Init()

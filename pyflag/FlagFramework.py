@@ -452,6 +452,12 @@ class Flag:
         for section in config.config.sections():
             for opt in config.config.options(section):
                 if config.config.get(section,opt)=='':
+                    ## Check to see if there is an environment variable which overrides this:
+                    try:
+                        if os.environ["PYFLAG_%s" % opt.upper()]: continue
+                    except KeyError:
+                        pass
+                        
                     ## Check to see if these parameters are outstanding:
                     if query.has_key(opt):
                         try:

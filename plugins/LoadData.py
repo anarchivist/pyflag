@@ -46,8 +46,11 @@ description = "Load Data"
 
 class LoadPresetLog(Reports.report):
     """ Loads a log file into the database using preset type """
-    parameters = {"table":"any", "new_table":"any",
-                  "datafile":"filename", "log_preset":"sqlsafe", "final":"alphanum"}
+## See FIXME below
+##    parameters = {"table":"any", "new_table":"any",
+##                  "datafile":"filename", "log_preset":"sqlsafe", "final":"alphanum"}
+    parameters = {"table":"any", "datafile":"filename",
+                  "log_preset":"sqlsafe", "final":"alphanum"}
     name="Load Preset Log File"
     family="Load Data"
     description="Load Data from log file into Database using Preset"
@@ -88,13 +91,15 @@ class LoadPresetLog(Reports.report):
             result.start_table()
             result.case_selector()
             result.meta_selector(config.FLAGDB,'Select preset type','log_preset',onclick="this.form.submit();")
+            ## FIXME: This is a nice idea but it stuffs up the framework's idea of whats cached and what isnt... this needs more work!!!
             # get existing tables
-            dbh = self.DBO(query['case'])
-            dbh.execute('select value from meta where property=%r group by value', 'logtable')
-            tables = [row['value'][:-4] for row in dbh]
-            tables.append('NEW')
-            result.const_selector('Insert into Table', 'table', tables, tables)
-            result.textfield("OR Enter New table name:","new_table")
+##            dbh = self.DBO(query['case'])
+##            dbh.execute('select value from meta where property=%r group by value', 'logtable')
+##            tables = [row['value'][:-4] for row in dbh]
+##            tables.append('NEW')
+##            result.const_selector('Insert into Table', 'table', tables, tables)
+##            result.textfield("OR Enter New table name:","new_table")
+            result.textfield("Table name:","table")
 
             tmp = self.ui(result)
             tmp.filebox()
@@ -268,11 +273,7 @@ class LoadIOSource(Reports.report):
         dbh.execute("insert into meta set property=%r,value=%r",(query['iosource'],fd.get_options()))
 
     def display(self,query,result):
-        result.heading("Data Source %s successfully added" % query['iosource'])
-        result.link("Load Filesystem", FlagFramework.query_type((), case=query['case'], family="Load Data", report="LoadFS", iosource=query['iosource']))
-        result.para('')
-        result.link("Extract Files", FlagFramework.query_type((), case=query['case'], family="Unstructured Disk", report="ExtractFiles", iosource=query['iosource']))
-
+        result.refresh(0, FlagFramework.query_type((), case=query['case'], family="Load Data", report="LoadFS", iosource=query['iosource']))
 
 import pyflag.Sleuthkit as Sleuthkit
 

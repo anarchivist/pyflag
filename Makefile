@@ -6,6 +6,7 @@ PYTHONLIB = /usr/lib/python2.3/
 PYTHONBIN = `which python2.3`
 DATA_DIR = `grep -i DATA_DIR pyflag/pyflagrc | cut -d= -f2`
 MYSQLCOMMAND =./bin_dist/mysql/bin/mysql --socket=bin_dist/mysql/data/pyflag.sock
+MISC_LIBS = /usr/lib/libgmp.so.3 /usr/lib/libmysqlclient_r.so.10
 
 all:	bins
 	for dir in $(DIRS); do\
@@ -42,6 +43,9 @@ bin-dist:
 
 	## Strip all binaries:
 	find bin_dist/ -perm +0111 -exec strip {} \; 2> /dev/null
+
+	## Adding miscelaneous libraries that need to be present in the binary distribution to work.
+	for i in $(MISC_LIBS); do cp $$i bin_dist/libs/; done
 
 mysql:
 	mkdir -p bin_dist

@@ -27,7 +27,7 @@ class ConfObject:
     def __init__(self):
         """ Collect parameters from all sections into a single dict.
 
-        Note that we add these are dynamic attributed to our own class...
+        Note that we add these as dynamic attributes to our own class...
         """
         if not ConfObject.config:
             self.parse()
