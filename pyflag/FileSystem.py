@@ -176,8 +176,6 @@ class DBFS(FileSystem):
         dirs = os.path.dirname(new_filename).split('/')
         name = os.path.basename(new_filename)
 
-        print dirs,filename,new_filename
-
         for d in range(len(dirs)):
             if not dirs[d]: continue
             if d>0:
@@ -185,7 +183,6 @@ class DBFS(FileSystem):
             else:
                 path = normpath("%s/" % filename)
 
-            print "Path is %s" % path
             self.dbh.execute("select * from file_%s where path=%r and name=%r",(self.table, path, dirs[d]))
             if not self.dbh.fetch():
                 self.dbh.execute("insert into file_%s set path=%r,name=%r,status='alloc',mode='d/d',inode='%s|%s-'",(self.table,path,dirs[d],root_inode,inode))

@@ -131,7 +131,6 @@ class StoreAndScan:
     def process(self, data,metadata=None):
         try:
             if not self.boring(metadata):
-                print "Will process %s" % self.table
                 self.file = open(self.make_filename(),'wb')
         except KeyError:
             pass

@@ -10,6 +10,8 @@ from pyflag.Scanner import *
 import zipfile,gzip
 from pyflag.FileSystem import File
 import time
+import StringIO
+import pyflag.Scanner as Scanner
 
 class ZipScan(GenScanFactory):
     """ Recurse into Zip Files """
@@ -47,21 +49,25 @@ class ZipScan(GenScanFactory):
                 self.ddfs.VFSCreate(self.inode,"Z%s" % i,namelist[i],size=zip.infolist()[i].file_size,mtime=t)
 
                 ## Now call the scanners on this new file (FIXME limit the recursion level here)
-                if self.factories:
-                    try:
-                        data=zip.read(namelist[i])
-                    except zipfile.zlib.error:
-                        continue
+                fd = StringIO.StringIO(zip.read(namelist[i]))
+                fd.inode = self.inode
+                Scanner.scanfile(self.ddfs,fd,self.factories)
+                
+##                if self.factories:
+##                    try:
+##                        data=zip.read(namelist[i])
+##                    except zipfile.zlib.error:
+##                        continue
 
-                    objs = [c.Scan("%s|Z%s" % (self.inode, str(i)),self.ddfs,c,factories=self.factories) for c in self.factories]
+##                    objs = [c.Scan("%s|Z%s" % (self.inode, str(i)),self.ddfs,c,factories=self.factories) for c in self.factories]
 
-                    metadata={}
-                    for o in objs:
-                        try:
-                            o.process(data,metadata=metadata)
-                            o.finish()
-                        except Exception,e:
-                            logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
+##                    metadata={}
+##                    for o in objs:
+##                        try:
+##                            o.process(data,metadata=metadata)
+##                            o.finish()
+##                        except Exception,e:
+##                            logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
 
 class GZScan(ZipScan):
     """ Recurse into gziped files """
