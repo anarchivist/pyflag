@@ -175,6 +175,27 @@ for i in definitions:
 
 import pyflag.IO as IO
 
+def process_string(string,extension=None):
+    """ This is just like process except it operates on a string """
+    offset=0
+    for cut in definitions:
+        if extension and cut['Extension'] not in extension: continue
+        while 1:
+            match=cut['CStartRE'].search(string,offset)
+            if match:
+                offset=match.start()
+                length=cut['MaxLength']
+                ## If there is an end RE, we try to read the entire length in, and then look for the end to we can adjust the length acurately. This is essential for certain file types which do not tolerate garbage at the end of the file, e.g. pdfs.
+                if cut.has_key('CEndRE'):
+                    end_match=cut['CEndRE'].search(string,offset)
+                    if end_match:
+                        length=end_match.end()-offset
+
+                yield({'offset':offset,'length':length,'type':cut['Extension']})
+                offset+=1
+            else:
+                return
+    
 def process(case,subsys,extension=None):
     """ A generator to produce all the recoverable files within the io object identified by identifier
 

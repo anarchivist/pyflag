@@ -11,6 +11,7 @@ import zipfile,gzip
 from pyflag.FileSystem import File
 import pyflag.FileSystem as FileSystem
 import pyflag.DB as DB
+import pyflag.Exgrep as Exgrep
 
 #hidden = True
 
@@ -28,6 +29,7 @@ class UnallocatedScan(GenScanFactory):
         ## We remove older tables to ensure we always have the latest up to date table.
         self.dbh.execute("drop table if exists unallocated_%s" ,self.table)
         self.dbh.execute("CREATE TABLE unallocated_%s (`inode` VARCHAR(50) NOT NULL,`offset` BIGINT NOT NULL,`size` BIGINT NOT NULL)",self.table)
+        self.fd=open("/tmp/test.slack","w")
         
         unalloc_blocks = []
         count=0
@@ -53,6 +55,25 @@ class UnallocatedScan(GenScanFactory):
 
             last=(row['block']+row['count'],0,row['inode'])
 
+    class Scan:                
+        def __init__(self, inode,ddfs,outer,factories=None):
+            self.inode=inode
+            self.ddfs=ddfs
+            self.outer=outer
+            self.factories=factories
+            
+        def process(self,data,metadata=None):
+            if self.inode.startswith('U'):
+                self.outer.fd.write(data)
+                print "Processing inode %s bytes" % len(data)
+                for cut in Exgrep.process_string(data):
+                    ## Create a VFS node:
+                    self.outer.fsfd.VFSCreate(self.inode,'U%s' % cut['offset'],"%s.%s" % (cut['offset'],cut['type']),size=cut['length'])
+                    self.outer.dbh.execute("insert into unallocated_%s set inode='%s|U%s',offset=%r,size=%r" , (self.outer.table,self.inode,cut['offset'],cut['offset'],cut['length']))
+                    print "Found %s" % (cut,)
+
+        def finish(self):
+            pass
 
 ## Unallocated space VFS Driver:
 class Unallocated_File(FileSystem.File):
@@ -70,6 +91,7 @@ class Unallocated_File(FileSystem.File):
         row=self.dbh.fetch()
         self.size=row['size']
         self.offset=row['offset']
+        print "My size is %s %s" % (self.size,self.offset)
 
     def read(self,length=None):
         if (length == None) or ((length + self.readptr) > self.size):
@@ -78,7 +100,8 @@ class Unallocated_File(FileSystem.File):
         if length == 0:
             return ''
 
-        self.fd.seek(self.readptr)
+        self.fd.seek(self.readptr+self.offset)
         result =self.fd.read(length)
+        print "Returned %s bytes from %s" % (len(result),self.offset+self.readptr)
         self.readptr+=len(result)
         return result
