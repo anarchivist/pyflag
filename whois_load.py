@@ -114,7 +114,8 @@ class WhoisRec:
         self.num_hosts = end_ip - self.start_ip + 1
       except ValueError, e:
         print >>sys.stderr, "ERROR PARSING: %s" % inetnum
-      
+
+      self.netname = self._getsingle('netname', string)
       self.country = self._getsingle('country', string)
       self.descr = self._getmulti('descr', string)
 
@@ -130,6 +131,7 @@ class WhoisRec:
     def parse_rir(self, string):
       cols = string.split('|')
       self.country = cols[1]
+      self.netname=''
       self.start_ip = aton(cols[3])
       self.num_hosts = int(cols[4])
       self.status = cols[6]
@@ -146,7 +148,13 @@ class WhoisRec:
         return "\n".join(WhoisRec.regex[field].findall(string))
 
     def __str__(self):
-      return "start_ip: %x\nnum_hosts: %i\ncountry: %s\nstatus: %s\ndescr: %s\n" % (self.start_ip,self.num_hosts,self.country,self.status, self.descr)
+      return """
+      start_ip: %x
+      netname: %s
+      num_hosts: %i
+      country: %s
+      status: %s
+      descr: %s""" % (self.start_ip,self.netname,self.num_hosts,self.country,self.status, self.descr)
 
 class Whois:
     """ class to process a whois database file """    
@@ -231,12 +239,12 @@ dbh.execute("drop table if exists whois_sources")
 dbh.execute("drop table if exists whois")
 dbh.execute("drop table if exists whois_routes")
 dbh.execute("CREATE TABLE IF NOT EXISTS whois_sources ( `id` int auto_increment, `source` varchar(20), `url` varchar(255), `updated` datetime, key(id))")
-dbh.execute("CREATE TABLE IF NOT EXISTS whois (`id` int auto_increment, `src_id` int, `start_ip` int(10) unsigned, `numhosts` int, `country` char(2), `descr` varchar(255), `status` enum('assigned','allocated','reserved','unallocated'), key(id))")
+dbh.execute("CREATE TABLE IF NOT EXISTS whois (`id` int auto_increment, `src_id` int, `start_ip` int(10) unsigned, `netname` varchar(50), `numhosts` int, `country` char(2), `descr` varchar(255), `status` enum('assigned','allocated','reserved','unallocated'), key(id))")
 dbh.execute("CREATE TABLE IF NOT EXISTS whois_routes ( `network` int(10) unsigned, `netmask` int(10) unsigned, `whois_id` int)")
 
 # add default (fallthrough) route and reserved ranges
 dbh.execute("INSERT INTO whois_sources VALUES ( 0, 'static', 'static', %r )", ':'.join(["%i"% i for i in time.localtime()]))
-dbh.execute("INSERT INTO whois VALUES (0,%s,0,0,'--','Default Fallthrough Route: IP INVALID OR UNASSIGNED', 'unallocated')", str(dbh.cursor.lastrowid))
+dbh.execute("INSERT INTO whois VALUES (0,%s,0,0,'Default','--','Default Fallthrough Route: IP INVALID OR UNASSIGNED', 'unallocated')", str(dbh.cursor.lastrowid))
 dbh.execute("INSERT INTO whois_routes VALUES (0,0,%s)", str(dbh.cursor.lastrowid))
 
 # process files
@@ -252,9 +260,10 @@ for url in urls:
   
   # process records
   for rec in db:
-    dbh.execute("INSERT INTO whois VALUES (0, %s, %s, %s, %r, %r, %r);", (
-      str(source_id), "%u" % rec.start_ip,
-      str(rec.num_hosts), rec.country, rec.descr, rec.status))  
+    dbh.execute("INSERT INTO whois VALUES (0, %r, %r,%r, %r, %r, %r, %r);", (
+      source_id, "%u" % rec.start_ip,
+      rec.netname,
+      rec.num_hosts, rec.country, rec.descr, rec.status))  
     whois_id = dbh.cursor.lastrowid
 
     #now process the networks (routes)...
@@ -288,4 +297,4 @@ for url in urls:
 
 # add indexes
 dbh.execute("ALTER TABLE whois ADD index(src_id);")
-dbh.execute("ALTER TABLE whois_routes ADD index(whois_id);")
+dbh.execute("ALTER TABLE whois_routes ADD index(network);")

@@ -59,6 +59,15 @@ def display_test_log(dbh,log,result,query):
     tmp_final.table(columns=columns,names=names,links=[], table=temp_table, case=query['case'], simple=True)
     result.row(tmp_final,bgcolor='lightgray',colspan=5)
 
+def whois_callback(value,result=None):
+    """ Returns a whois resolution of the given IP address in value """
+    import plugins.Whois as Whois
+    tmp = result.__class__(result)
+    whois = Whois.identify_network(value)
+    print "value %s whois %s" % (value,whois)
+    tmp.text(whois)
+    return tmp
+
 class ListLogFile(Reports.report):
     """ Lists the content of the log file using the table UI object """
     parameters = {"logtable":"casetable"}
@@ -93,18 +102,32 @@ class ListLogFile(Reports.report):
             
         columns =[]
         names = []
+        callbacks = {}
+        links = []
         for d in dbh.cursor.description:
             names.append(d[0])
             try:
                 type = log.types[log.fields.index(d[0])]
                 columns.append(LogFile.types[type].sql_out % d[0])
+                links.append(None)
+                if type == "IP Address" and query.has_key('whois'):
+                    names.append("Whois %s" % d[0])
+                    columns.append(LogFile.types[type].sql_out % d[0])
+                    callbacks["Whois %s" % d[0]]=whois_callback
+                    links.append( FlagFramework.query_type((),case=query['case'],family='Whois',report='LookupIP',__target__='address'))
+                    
             except ValueError:
                 columns.append(d[0])
+                links.append(None)
 
-        result.table(columns=columns,names=names,
-                     links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ListLogFile', logtable=query['logtable'],__target__='boo')],
-                     table=query['logtable']+'_log',
-                     case=query['case'])
+        result.table(
+            columns=columns,
+            names=names,
+            links= links,
+            table=query['logtable']+'_log',
+            callbacks = callbacks,
+            case=query['case']
+            )
 
 class CreateLogPreset(Reports.report):
     """ Creates a new type of log file in the database, so that they can be loaded using the Load Log File report """
@@ -113,6 +136,11 @@ class CreateLogPreset(Reports.report):
     name="Create Log Preset"
     description="Create new preset log type"
     order=40
+
+    def reset(self,query):
+        dbh = self.DBO(None)
+        dbh.execute("delete from meta where property='log_preset' and value=%r",query['log_preset'])
+        dbh.execute("delete from meta where property='log_preset_%s'",query['log_preset'])
 
     def display(self,query,result):
         result.heading("New log file preset %s created" % query['log_preset'])

@@ -44,7 +44,8 @@ order = 20
 
 class LoadPresetLog(Reports.report):
     """ Loads a log file into the database using preset type """
-    parameters = {"table":"any", "datafile":"filename", "log_preset":"sqlsafe", "final":"alphanum"}
+    parameters = {"table":"any", "new_table":"any",
+                  "datafile":"filename", "log_preset":"sqlsafe", "final":"alphanum"}
     name="Load Preset Log File"
     description="Load Data from log file into Database using Preset"
     order=30

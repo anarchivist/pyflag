@@ -430,7 +430,7 @@ class TextType(Type):
 
 class IPType(Type):
     """ IP addresses should be stored in the database as ints, but displayed in dot notation """
-    type = "int"
+    type = "int unsigned"
     sql_in= "INET_ATON(%r)"
     sql_out= "INET_NTOA(`%s`)"
     

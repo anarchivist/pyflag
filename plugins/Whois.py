@@ -36,6 +36,7 @@ config=pyflag.conf.ConfObject()
 import re
 
 description = "Offline Whois"
+hidden = False
 order = 40
 
 def lookup_whois(ip):
@@ -65,6 +66,14 @@ def lookup_whois(ip):
 
     return row['whois_id']
 
+def identify_network(ip):
+    """ Returns a uniq netname/country combination """
+    dbh = DB.DBO(None)
+    whois_id = lookup_whois(ip)
+    dbh.execute("select netname,country from whois where id=%r" , (whois_id))
+    row = dbh.fetch()
+    return "%s/%s" % (row['country'],row['netname'])
+
 class LookupIP(Reports.report):
     """ Display Whois data for the given IP address """
     parameters = {"address":"ipaddress"}
@@ -78,8 +87,6 @@ class LookupIP(Reports.report):
         # lookup IP address and show a nice summary of Whois Data
         dbh = self.DBO(None)
         ## get route id
-##        dbh.execute("SELECT whois_id from whois_routes where (INET_ATON(%r) & netmask) = network order by netmask desc limit 1;", query['address'])
-##        whois_id = dbh.fetch()['whois_id']
         whois_id = lookup_whois(query['address'])
         dbh.execute("SELECT INET_NTOA(start_ip) as start_ip, numhosts, country, descr, status from whois where id=%s",whois_id)
         res = dbh.fetch()

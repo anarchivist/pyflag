@@ -499,7 +499,7 @@ class HTMLUI(UI.GenericUI):
 
         If the callbacks variable is specified, it is a dictionary mapping names to callback function. These callbacks will be invoked to render the result of that column and should return a UI object. For example if the names arguement contains the name 'deleted':
 
-        >>> def function(value):
+        >>> def function(value,query=query):
         ....    @return: ui based on value
         
         >>> callbacks=['deleted':function]
@@ -713,7 +713,7 @@ class HTMLUI(UI.GenericUI):
 
                 ## Check if the user specified a callback for this column
                 if callbacks.has_key(names[i]):
-                    value=callbacks[names[i]](value)
+                    value=callbacks[names[i]](value,result=self)
 
                 ## Now add links if they are required
                 try:
