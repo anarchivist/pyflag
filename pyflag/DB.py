@@ -165,6 +165,16 @@ class DBO:
         self.lock.acquire()
         try:
             temp = self.cursor.fetchone()
+            temp2=[]
+            if temp:
+                for i in temp:
+                    try:
+                        temp2.append(i.tostring())
+                    except AttributeError:
+                        temp2.append(i)
+                        pass
+                temp = temp2
+                
         finally:
             self.lock.release()
             
@@ -244,7 +254,6 @@ class DBO:
         print "Will shell out to run %s " % client
 
         import os
-        print "Will use %s " % config.MYSQL_BIN
         p_mysql=os.popen("%s -D%s" % (self.mysql_bin_string,self.case),'w')
         p_client=os.popen(client,'r')
         while 1:

@@ -380,11 +380,11 @@ class TCPTrace(Reports.report):
         dbh.execute("select substring(data.data,size) as data,direction from connection_cache,data where connection_cache.id=data.key_id and con_id=%r group by id order by id",(query['con_id']))
 
         while 1:
-            rs = dbh.cursor.fetchone()
+            rs = dbh.fetch()
             if not rs: break
-            if rs[1] == '>':
-                result.text(rs[0],color='red',font='typewriter',sanitise='full',wrap='full')
-            else: result.text(rs[0],color='blue',font='typewriter',sanitise='full',wrap='full')
+            if rs['direction'] == '>':
+                result.text(rs['data'],color='red',font='typewriter',sanitise='full',wrap='full')
+            else: result.text(rs['data'],color='blue',font='typewriter',sanitise='full',wrap='full')
 
         result.text(finish=1)
 
@@ -412,18 +412,30 @@ class HTMLVisualise(TCPTrace):
         #Get all the data from the connection cache:
         dbh.execute("select substring(data.data,size) as data,direction from connection_cache,data where connection_cache.id=data.key_id and con_id=%r group by id order by id",(query['con_id']))
         import re
-
+        data=''
         for i in (1,2):
             tmp = ''
             while 1:
-                rs = dbh.cursor.fetchone()
+                rs = dbh.fetch()
                 if not rs: break
-                tmp += rs[0]
-                pattern = re.search("Content-Type:([^\r]*)",tmp)
+                tmp += rs['data']
+                c=re.compile("Content-Type:([^\r]+)")
+                pattern = c.search(tmp)
                 if pattern:
                     result.type = pattern.group(1)
-                    
-                if tmp.find("\r\n\r\n")>0: break
+                    print "Setting result type to %s" % result.type
+
+                header=tmp.find("\r\n\r\n")
+                if not header:
+                    break
+                else:
+                    data=tmp[header:]
+
+                header=data.find("\r\n\r\n")
+                if not header:
+                    break
+                else:
+                    data=data[header:]
 
         def find_url(pattern):
             """ This function queries the database to find the url of the object mentioned in pattern. It then returns a URL that redirects back to HTMLVis to view it. pattern is a match object. """
@@ -452,23 +464,22 @@ class HTMLVisualise(TCPTrace):
 
         def sanitise(s):
             """ Sanitises s from javascript and rewrites the img tags so they point back at flag for reconstruction """
-            import re
-
             #Find all the urls:
-            s=re.sub("(?is)(<\s*?img.*?src=['\"]?)([^\s'\"]*)",find_url,s)
+            s=re.sub("(<\s*?img.*?src=['\"]?)([^\s'\"]*)",find_url,s)
             return s
-        
+
+        san=sanitise(data)
+        result.text(san,sanitise='none')
         while 1:
-            rs = dbh.cursor.fetchone()
+            rs = dbh.fetch()
             if not rs: break
-            san =sanitise(rs[0])
+            san =sanitise(rs['data'])
             result.text(san,sanitise='none')
             
         result.text(finish=1)
 
         #This tricky call overloads the UI's display method with its stream method - this has the effect of dumping out the HTML verbatim into the browser. (Note this only makes sense for the HTMLUI).
         result.display = result.__str__
-
 
 class HTTPURLs(Reports.report):
     """ Shows the URLs seen in the dump and links to their reconstruction """
