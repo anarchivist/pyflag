@@ -85,16 +85,17 @@ class ListLogFile(Reports.report):
             raise Reports.ReportError("Unable to load the preset %s for table %s " % (row['value'],query['logtable']))
 
         if 'IP Address' in log.types:
+            tmp=result.__class__(result)
+            tmp.icon("whois.png",border=0)
             q=query.clone()
             if query.has_key('whois'):
                 del q['whois']
-                result.link("Click here to remove whois information",q)
+                tmp.tooltip("Click here to remove whois information")
             else:
                 q['whois']="Yes"
-                tmp=result.__class__(result)
-                tmp.icon("whois.png",border=0)
                 tmp.tooltip("Click here to show whois information")
-                result.link(tmp,q)
+            
+            result.link(tmp,q)
 
         #Find the names of all the columns in table:
         dbh.execute("select * from %s_log limit 1",query['logtable'])
@@ -229,12 +230,11 @@ class DeleteLogPreset(Reports.report):
         result.selector("Select Preset to delete",'log_preset',"select value,value from meta where property='log_preset'",(),case=None)
         result.checkbox('Click here to confirm deletion','final','ok')
 
-    def analyse(self, query):
+    def display(self,query,result):
         dbh = self.DBO(None)
         dbh.execute("delete from meta where property='log_preset' and value=%r",query['log_preset'])
         dbh.execute("delete from meta where property='log_preset_%s'",query['log_preset'])
 
-    def display(self,query,result):
         result.heading("deleted log preset %s" % query['log_preset'])
 
 class BandWidth(Reports.report):

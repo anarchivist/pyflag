@@ -252,7 +252,14 @@ class Log:
 
             if rows and count > rows:
                 break
-            
+        ## Now create indexes on the required fields
+        for field_number in range(len(self.fields)):
+            index = types[self.types[field_number]].index
+            if self.indexes[field_number] and index:
+                ## interpolate the column name into the index declaration
+                index = index % self.fields[field_number]
+                dbh.execute("Alter table %s add index(%s)" % (tablename,index))
+                
         ## Add the IP addresses to the whois table if required:
         dbh.execute("create table if not exists `whois` (`IP` INT NOT NULL ,`country` VARCHAR( 4 ) NOT NULL ,`NetName` VARCHAR( 50 ) NOT NULL ,`whois_id` INT NOT NULL ,PRIMARY KEY ( `IP` )) COMMENT = 'A local case specific collection of whois information'")
         for field_number in range(len(self.fields)):
@@ -525,6 +532,7 @@ class Type:
     type = None
     sql_in="%r"
     sql_out = "`%s`"
+    index = "%s"
     
 class VarType(Type):
     type = "varchar(250)"
@@ -537,6 +545,7 @@ class DateTimeType(Type):
 
 class TextType(Type):
     type = "text"
+    index=None
 
 class IPType(Type):
     """ IP addresses should be stored in the database as ints, but displayed in dot notation """

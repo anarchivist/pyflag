@@ -62,7 +62,9 @@ def lookup_whois(ip):
         ## If we found it, we return that, else we increase the
         ## netmask one more step and keep trying. Worst case we should
         ## pick off the 0.0.0.0 network which is our exit condition.
-        if row or netmask>pow(2,32):
+        if row: break
+
+        if netmask>pow(2,32):
             raise Reports.ReportError("Unable to find whois entry for %s " % ip)
 
         netmask = netmask * 2 + 1
