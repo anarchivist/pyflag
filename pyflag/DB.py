@@ -181,6 +181,12 @@ class DBO:
             return row['value']
         return None
 
+    def set_meta(self, property,value):
+        """ Sets the value in meta table
+        """
+        self.execute("insert into meta set property=%r,value=%r", (property,value))
+        return None
+
     def MakeSQLSafe(self,string):
         """ Returns a version of string, which is SQL safe.
 

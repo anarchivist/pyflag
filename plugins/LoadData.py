@@ -38,6 +38,7 @@ config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
 import pyflag.LogFile as LogFile
 import plugins.LogAnalysis as LogAnalysis
+import pyflag.logging as logging
 
 description = "Load Data"
 order = 20
@@ -259,7 +260,7 @@ import pyflag.Sleuthkit as Sleuthkit
 
 class LoadFS(Reports.report):
     """ Loads Filesystem Image using the modified sleuthkit. """
-    parameters = {"iosource":"iosource","fstype":"sqlsafe"}
+    parameters = {"iosource":"iosource","fstype":"sqlsafe","scan":"alphanum"}
     name = "Load Filesystem image"
     description = "Load a filesystem image into the case Database"
     order = 20
@@ -278,12 +279,21 @@ class LoadFS(Reports.report):
             fd=IO.open(query['case'],query['iosource'])
 
             fs_types = Sleuthkit.filesystems(fd)
-            
+
+            ## Draw a list of checkboxes for all our scanners:
+            result.ruler()
+            result.heading("Choose Scanners to run")
+            for i in range(len(Scanner.scanner_names)):
+                desc = Scanner.scanners[i].__doc__.splitlines()
+                ## Ensure that the checkbox is ticked by default.
+                if Scanner.scanner_names[i] not in query.getarray('scan'):
+                    query['scan']=Scanner.scanner_names[i]
+                result.checkbox(desc[0],"scan", Scanner.scanner_names[i])
             ## If there is only one choice - we choose it for the user and run this already.
-            if len(fs_types[0])==1:
-                query['fstype']=fs_types[1][0]
-                result.refresh(0,query)
-                return
+#            if len(fs_types[0])==1:
+#                query['fstype']=fs_types[1][0]
+#                result.refresh(0,query)
+#                return
             
             magic = FlagFramework.Magic()
             result.ruler()
@@ -300,29 +310,46 @@ class LoadFS(Reports.report):
         """ load the filesystem image data into the database """
         dbh = self.DBO(query['case'])
         self.progress_str=None
-        tablename=dbh.MakeSQLSafe(query['iosource'])
-        # call on sleuthkit module to shell out and load data
-        Sleuthkit.load_sleuth(query['case'],query['fstype'],tablename,query['iosource'])
-        dbh.execute("insert into meta set property='fsimage', value=%r", query['iosource'])
-
-        self.progress_str="Creating file and inode indexes"
         
-        #Add indexes:
-        index = (
-            ('file','inode'),
-            ('file','path(100)'),
-            ('file','name(100)'),
-            ('inode','inode'),
-            ('block','inode')
-            )
-        for x,y in index:
-            dbh.execute("alter table %s_%s add index(%s)",(x,tablename,y))
+        #Check to see if we have done this part previously
+        if dbh.get_meta('fsimage')!=query['iosource']:
+            tablename=dbh.MakeSQLSafe(query['iosource'])
+            # call on sleuthkit module to shell out and load data
+            Sleuthkit.load_sleuth(query['case'],query['fstype'],tablename,query['iosource'])
 
-        self.progress_str="Scanning"
+            self.progress_str="Creating file and inode indexes"        
+            #Add indexes:
+            index = (
+                ('file','inode'),
+                ('file','path(100)'),
+                ('file','name(100)'),
+                ('inode','inode'),
+                ('block','inode')
+                )
+            for x,y in index:
+                dbh.execute("alter table %s_%s add index(%s)",(x,tablename,y))
+
+            dbh.set_meta('fsimage',query['iosource'])
+        self.progress_str="Running Scanners on filesystem"
         ## Scan the filesystem for hashes and viruses etc.
         iofd=IO.open(query['case'],query['iosource'])
         fsfd=FileSystem.FS_Factory( query["case"], query["iosource"], iofd)
-        fsfd.scanfs(Scanner.scanners)
+        ## The scanners that users asked for:
+        user_scanners = query.getarray('scan')
+        ## Scanners we already did in the db:
+        dbh.execute("select value from meta where property='scanfs_%s'" , query['iosource'])
+        cached_scanners = [ row['value'] for row in dbh ]
+
+        ## We only run the scanners that were asked for which are not cached:
+        scanners = [ Scanner.scanners[Scanner.scanner_names.index(i)] for i in user_scanners if i not in cached_scanners ]
+
+        ## Store the sanners in the meta table:
+        for s in user_scanners:
+            if s not in cached_scanners:
+                dbh.set_meta("scanfs_%s" % query['iosource'], s)
+
+        logging.log(logging.DEBUG,"Will invoke the following scanners: %s" % scanners)
+        fsfd.scanfs(scanners)
         
     def display(self,query,result):
         result.heading("Uploaded FS Image from IO Source %s to case %s" % (query['iosource'],query['case']))
@@ -363,7 +390,14 @@ class LoadFS(Reports.report):
         Sleuthkit.del_sleuth(query['case'],tablename)
         iofd=IO.open(query['case'],query['iosource'])
         fsfd=FileSystem.FS_Factory( query["case"], query["iosource"], iofd)
-        fsfd.scanfs([Scanner.TypeScan,Scanner.MD5Scan],action='reset')
+        fsfd.scanfs(Scanner.scanners,action='reset')
+        dbh.execute("delete from meta where property=%r and value=%r",('fsimage',query['iosource']))
+        dbh.execute("delete from meta where property like 'scanfs_%s'",query['iosource'])
+
+        ## Here we remove from the meta table any reference to this report regardless of the scanners used:
+        del query['scan']
+        canonical_query = self.flag.canonicalise(query)
+        dbh.execute("delete from meta where property='report_executed' and value like '%s%%'",(canonical_query))
 
 class LoadKB(LoadTcpDump):
     """ Calculates a Knowledgebase based on a Pcap file and stores it in the case """

@@ -130,8 +130,8 @@ class report:
 
     def __init__(self,flag,ui=None):
         import pyflag.TypeCheck as TypeCheck
-	import pyflag.HTMLUI as UI
-	if not ui: ui = UI.HTMLUI
+        import pyflag.HTMLUI as UI
+        if not ui: ui = UI.HTMLUI
 
         self.TypeChecker = TypeCheck.TypeChecker()
         self.ui = ui

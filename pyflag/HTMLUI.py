@@ -306,7 +306,7 @@ class HTMLUI(UI.GenericUI):
         opt_str = ''
         if options:
             opt_str = self.opt_to_str(options)
-        if self.defaults.has_key(name) and self.defaults[name] == value:
+        if value in self.defaults.getarray(name):
             opt_str += 'checked'
         self.row(description,"<input type=checkbox name=\"%s\" value=\"%s\" %s>" % (name,value,opt_str))
         if self.form_parms.has_key(name):

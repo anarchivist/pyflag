@@ -363,10 +363,12 @@ except ImportError:
     clamav_module_present=0
 
 scanners=[]
+scanner_names=[]
 for c in dir():
     try:
         if issubclass(globals()[c],GenScanFactory) and c != 'GenScanFactory':
             scanners.append(globals()[c])
+            scanner_names.append(c)
     except TypeError:
         pass
 
