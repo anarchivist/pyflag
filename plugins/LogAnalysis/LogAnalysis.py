@@ -31,6 +31,7 @@
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
 import pyflag.LogFile as LogFile
+import pyflag.DB as DB
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import re
@@ -82,23 +83,19 @@ class ListLogFile(Reports.report):
         dbh = self.DBO(query['case'])
         dbh.execute("select value from meta where property = 'log_preset_%s'",(query['logtable']))
         row=dbh.fetch()
-        print "Row is %s" % row
         try:
             log = LogFile.get_loader(row['value'],None)
         except KeyError:
             raise Reports.ReportError("Unable to load the preset %s for table %s " % (row['value'],query['logtable']))
 
         if 'IP Address' in log.types and not query.has_key('group_by'):
-
-            def cb(query, result):
-                if query.has_key('whois'):
-                    del query['whois']
-                else:
-                    query['whois']="Yes"
-                    
-                self.display(query,result)
-                
-            result.toolbar(cb, 'Show Whois',icon='whois.png', tooltip="Show/Hide Whois Data")
+            new_query=query.clone()
+            if query.has_key('whois'):
+                del new_query['whois']
+                result.toolbar(link=new_query, text='Hide Whois Data',icon='whois.png')
+            else:
+                new_query['whois']='yes'
+                result.toolbar(link=new_query, text='Show Whois Data',icon='whois.png')
 
         #Find the names of all the columns in table:
         dbh.execute("select * from %s_log limit 1",query['logtable'])
@@ -124,7 +121,7 @@ class ListLogFile(Reports.report):
                     where.append("%s = whois_%s.IP" % (d[0],d[0]))
                     links.append( FlagFramework.query_type((),case=query['case'],family='Log Analysis',report='LookupWhoisID',__target__='id', __opt__='popup'))
                     
-            except ValueError:
+            except ValueError,e:
                 columns.append(d[0])
                 links.append(None)
 
@@ -185,6 +182,7 @@ class CreateLogPreset(Reports.report):
 
             #Ask the Log object to draw the form it requires
             log.form(query,result)
+            
             return True
 
         def step4(query,result):
@@ -274,7 +272,6 @@ class CreateLogPreset(Reports.report):
     def analyse(self, query):
         """ store this log type in the database """
         log = Registry.LOG_DRIVERS.drivers[query['delmethod']]('datafile',query)
-
         # pickle it to the database
         LogFile.store_loader(log, query['log_preset'])
 
@@ -303,6 +300,7 @@ class BandWidth(Reports.report):
     parameters = {"logtable":"casetable","timestamp":"sqlsafe","size":"sqlsafe"}
     name = "Estimate Bandwidth"
     family = "Log Analysis"
+    hidden=True
     description="Estimate approximate bandwidth requirements from log file"
 
     def form(self,query,result):
@@ -383,3 +381,105 @@ class BandWidth(Reports.report):
             case=query['case'],
             groupby='`Unix Timestamp`'
             )
+
+class RemoveLogPreset(Reports.report):
+    """ Removes a log preset, dropping all tables created using it """
+    name = "Remove Preset"
+#    hidden=True
+    family = "Log Analysis"
+    description = "Removes a preset"
+    parameters= {"log_preset":"sqlsafe", "confirm":"sqlsafe"}
+
+    def find_tables(self,preset):
+        """ Yields the tables which were created by a given preset.
+
+        @return: (database,table)
+        """
+        dbh=DB.DBO(None)
+        ## Find all the cases we know about:
+        dbh.execute("select value from meta where property='flag_db'")
+        for row in dbh:
+            ## Find all log tables with the current preset
+            dbh2=DB.DBO(row['value'])
+            dbh2.execute("select * from meta where property like \"log_preset_%%\" and value=%r",preset)
+            for row2 in dbh2:
+                yield (row['value'],row2['property'][len("log_preset_"):])
+
+    def form(self,query,result):
+        try:
+            result.selector("Select Preset to delete",'log_preset',"select value,value from meta where property='log_preset'",(),case=None)
+
+            tmp=result.__class__(result)
+            found=0
+            tmp.row("The following will also be dropped:",'')
+            left=result.__class__(result)
+            right=result.__class__(result)
+            left.text("Case",font='bold',color='red')
+            right.text("Table",font='bold',color='red')
+            tmp.row(left,right)
+            for a in self.find_tables(query['log_preset']):
+                found=1
+                tmp.row(*a)
+
+            if found:
+                result.row(tmp)
+            result.checkbox("Are you sure you want to do this?","confirm",'yes')
+        except KeyError:
+            pass
+
+    def display(self,query,result):
+        ## First drop the tables:
+        preset=query['log_preset']
+        ## This will reset all reports that loaded using the given preset - This should cause those tables to drop
+        dbh=DB.DBO(None)
+        ## Find all the cases we know about:
+        dbh.execute("select value from meta where property='flag_db'")
+        for row in dbh:
+            FlagFramework.reset_all(family='Load Data',report='LoadPresetLog',log_preset=preset,case=row['value'])
+
+##        for case,table in self.find_tables(preset):
+#            dbh=DB.DBO(case)
+#            dbh.execute("delete from meta where property=\"log_preset_%s\" and value=%r",(table,preset))
+#            dbh.execute("delete from meta where property=\"logtable\" and value=%r",(table))
+#            dbh.execute("drop table %s_log",table)
+
+        ## Now lose the preset itself
+        FlagFramework.reset_all(log_preset=preset,family=query['family'],report='Create Log Preset',case=None)
+#        dbh=DB.DBO(None)
+#        dbh.execute("delete from meta where property='log_preset_%s'",preset)
+#        dbh.execute("delete from meta where property='log_preset' and value=%r",preset)
+        
+        result.para("Deleted preset %s from the database" % query['log_preset'])
+        
+class ManageLogPresets(Reports.report):
+    """ View and delete the available presets """
+    name = "Manage Log Presets"
+    family = "Log Analysis"
+    description = "Log presets are templates which are used to parse different types of log. Since each type of log file is subtablly different, a suitable preset should be created for the specific type of log file. This report allows you to create a new preset, view existing presets and delete unused presets. "
+    def display(self,query,result):
+        result.heading("These are the currently available presets")
+        link = FlagFramework.query_type((),family=query['family'],report='CreateLogPreset')
+                                                   
+        result.toolbar(text="Add a new Preset",icon="new_preset.png",link=link,tooltip="Create a new Preset")
+        def DeleteIcon(value,result=None):
+            tmp=result.__class__(result)
+            tmp.icon("no.png",border=0,alt="Click here to delete %s preset" % value)
+            return tmp
+
+        def Describe(value,result=None):
+            try:
+                log = LogFile.get_loader(value,None)
+                return( "%s" % log.__class__)
+            except KeyError:
+                return "Unknown"
+        
+        result.table(
+            columns = ( "value","value",'value' ),
+            names = ( "Delete?","Log Preset","Type"),
+            links = [ FlagFramework.query_type((),family=query['family'],report='RemoveLogPreset',__target__='log_preset'),],
+            callbacks = { 'Delete?':DeleteIcon, 'Type':Describe },
+            where = 'property="log_preset"',
+            table="meta",
+            case=None
+            )
+        

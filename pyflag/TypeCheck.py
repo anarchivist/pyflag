@@ -168,3 +168,4 @@ class TypeChecker:
     def string(self,field,query):
         """ A default type that accepts anything """
         pass
+

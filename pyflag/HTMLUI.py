@@ -75,6 +75,9 @@ class HTMLUI(UI.GenericUI):
             self.defaults = FlagFramework.query_type(())
             self.toolbar_ui=None
             self.generator=HTTPObject()
+
+        if query:
+            self.defaults=query
             
         self.table_depth = 0
         self.type = "text/html"
@@ -277,7 +280,7 @@ class HTMLUI(UI.GenericUI):
     def pre(self,string):
         self.result += "<pre>%s</pre>" % string
 
-    def link(self,string,target=None,options=None,icon=None,**target_options):
+    def link(self,string,target=None,options=None,icon=None,tooltip=None,**target_options):
         if target==None:
             target=FlagFramework.query_type(())
         q=target.clone()
@@ -292,7 +295,7 @@ class HTMLUI(UI.GenericUI):
         if icon:
             tmp = self.__class__(self)
             tmp.icon(icon,alt=string,border=0)
-            tmp.tooltip(string)
+            tooltip=string
             string=tmp
 
         try:
@@ -308,8 +311,10 @@ class HTMLUI(UI.GenericUI):
         except KeyError:
             pass
 
-        self.result+="<a href='blah?%s' %s>" % (q,self.opt_to_str(options))
-        self.result+="%s</a>" % (string)
+        if tooltip:
+            self.result+="<abbr title='%s'><a href='blah?%s' %s>%s</a></abbr>" % (tooltip,q,self.opt_to_str(options),string)
+        else:
+            self.result+="<a href='blah?%s' %s>%s</a>" % (q,self.opt_to_str(options),string)
 
     def popup(self,callback, label,icon=None,toolbar=0, menubar=0, tooltip=None, **options):
         """ This method presents a button on the screen, which when clicked will open a new window and use the callback to render in it.
@@ -546,15 +551,18 @@ class HTMLUI(UI.GenericUI):
         ## Now draw the left part
         self.row(left,right,valign='top')
 
-    def toolbar(self,cb,text,icon=None,popup=True,tooltip=None):
+    def toolbar(self,cb=None,text=None,icon=None,popup=True,tooltip=None,link=None):
         """ Create a toolbar button.
 
         When the user clicks on the toolbar button, a popup window is created which the callback function then uses to render on.
         """
         if self.toolbar_ui==None:
             self.toolbar_ui=self.__class__(self)
-        
-        self.toolbar_ui.popup(cb,text,icon,tooltip=tooltip)
+
+        if link:
+            self.toolbar_ui.link(text,target=link,icon=icon,tooltip=tooltip)
+        else:
+            self.toolbar_ui.popup(cb,text,icon,tooltip=tooltip)
                 
     def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):
         """ Shows the results of an SQL query in a searchable/groupable/browsable table
@@ -1223,18 +1231,18 @@ class HTMLUI(UI.GenericUI):
             new_query=query.clone()
             del new_query[context]
             del new_query['submit']
-
+            
             result.start_form(new_query)
             result.start_table()
 
             ## Ask the cb to draw on us: (We do not want the cb to stuff
             ## with our form_parms so we create an empty ui)
-            tmp=result.__class__()
+            tmp=result.__class__(query=query)
             if query.has_key('submit'):
                 if callbacks[page](new_query,tmp):
                     page+=1
             ## This is the last page and it was ok - we just go to our parent page
-                    if page==len(names):
+                    if query['submit']=='Finish':
                         del new_query['callback_stored']
                         result.refresh(0,new_query,parent=1)
                         return
@@ -1243,6 +1251,7 @@ class HTMLUI(UI.GenericUI):
 
             ## This time we want to properly display the form
             tmp=result.__class__(result)
+            tmp.defaults=query
             callbacks[page](new_query,tmp)
             result.row(tmp)
 

@@ -119,10 +119,7 @@ class BasicTheme:
             for r in report_list:
                 if r.hidden: continue
                 link = flag.ui()
-                link.link(r.name,propegate(query,FlagFramework.query_type()),report=r.name)
-
-                #Add the module doc as a tooltip
-                link.tooltip(r.__doc__)
+                link.link(r.name,target=propegate(query,FlagFramework.query_type()),report=r.name,tooltip=r.__doc__)
 
                 report_block.row(link,colspan=2)
                 report_block.row(" ",r.description)
@@ -274,17 +271,14 @@ class BlueTheme(BasicTheme):
         for k in module_list:
             link = flag.ui()
             link.link(k,family=k)
-            result.result+='''&nbsp;&nbsp;%s<br />\n''' % link
+            result.result+='''&nbsp;&nbsp;%s<br />\n''' % (link,)
 
             if family==k:
                 report_list = Registry.REPORTS.family[family]
                 for r in report_list:
                     if r.hidden: continue
                     link = flag.ui()
-                    link.link(r.name,propegate(query,FlagFramework.query_type()),report=r.name)
-                    
-                    ## Add the module doc as a tooltip
-                    link.tooltip(r.__doc__)
+                    link.link(r.name,target=propegate(query,FlagFramework.query_type()),tooltip=r.__doc__,report=r.name)
                     
                     result.result+="&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong><big>&middot;</big></strong>&nbsp;%s <br />\n" % link
                 result.result+="<br/>"

@@ -49,7 +49,7 @@ class LoadPresetLog(Reports.report):
 ## See FIXME below
 ##    parameters = {"table":"any", "new_table":"any",
 ##                  "datafile":"filename", "log_preset":"sqlsafe", "final":"alphanum"}
-    parameters = {"table":"any", "datafile":"filename",
+    parameters = {"table":"sqlsafe", "datafile":"filename",
                   "log_preset":"sqlsafe", "final":"alphanum"}
     name="Load Preset Log File"
     family="Load Data"
@@ -115,13 +115,18 @@ class LoadPresetLog(Reports.report):
             result.start_table()
             dbh = self.DBO(query['case'])
             temp_table = dbh.get_temp()
-            for progress in log.load(dbh,temp_table, rows=3):
-                pass
+            try:
+                for progress in log.load(dbh,temp_table, rows=3):
+                    pass
 
-            # retrieve and display the temp table
-            dbh.execute("select * from %s limit 1",temp_table)
-            LogAnalysis.display_test_log(dbh,log,result,query)
-
+                # retrieve and display the temp table
+                dbh.execute("select * from %s limit 1",temp_table)
+                LogAnalysis.display_test_log(dbh,log,result,query)
+            except Exception,e:
+                result.text("Error: Unable to load a test set - maybe this log file is incompatible with this log preset?",color='red',font='bold')
+                logging.log(logging.DEBUG,"Unable to load test set - error returned was %s" % e)
+                return
+            
             result.end_table()
             
             result.checkbox('Click here when finished','final','ok')
@@ -132,13 +137,14 @@ class LoadPresetLog(Reports.report):
     def analyse(self, query):
         """ Load the log file into the table """
         log = LogFile.get_loader(query['log_preset'],query.getarray('datafile'))
-
-        # decide on table name
-        if query.has_key('new_table'):
-            del query['table']
-            query['table'] = query['new_table']
-
         dbh = self.DBO(query['case'])
+        
+        ## Check to make sure that this table is not used by some other preset:
+        dbh.execute("select * from meta where property='log_preset_%s'" ,query['table'])
+        row=dbh.fetch()
+        if row:
+            raise Reports.ReportError("Table %s already exists with a conflicting preset (%s) - you can only append to the same table with the same preset." % (query['table'],row['value']))
+        
         for progress in log.load(dbh,'%s_log'%query['table']):
             self.progress_str = progress
             

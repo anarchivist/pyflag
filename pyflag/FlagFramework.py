@@ -643,19 +643,25 @@ def reset_all(**query):
     flag = GLOBAL_FLAG_OBJ
     report =Registry.REPORTS.dispatch(query['family'],query['report'])
     dbh=DB.DBO(query['case'])
-    dbh.execute("select value from meta where property='report_executed' and value like 'family=%s%%'" % query['family'])
+    family=query['family'].replace(" ","%20")
+    dbh.execute("select value from meta where property='report_executed' and value like '%%family=%s%%'" % family)
     for row in dbh:
         import cgi
         
         q = query_type(cgi.parse_qsl(row['value']),case=query['case'])
         try:
             for k in query.keys():
+                if k=='case': continue
                 if q[k]!=query[k]:
                     raise KeyError()
 
             ## This report should now be reset:
-            print "Will now reset %s" %q
-             
+            logging.log(logging.DEBUG, "Will now reset %s" % row['value'])
+
+            try:
+                report=report(flag)
+            except:
+                pass
             report.reset(q)
             dbh2 = DB.DBO(query['case'])
             dbh2.execute("delete from meta where property='report_executed' and value=%r",row['value'])

@@ -147,7 +147,7 @@ class SimpleLog(LogFile.Log):
     def __init__(self,variable,query):
         LogFile.Log.__init__(self,variable,query)
         self.prefilters = query.getarray('prefilter')
-
+        print "log has query as %s" % query
         try:
             self.delimiter=query['delimiter']
         except KeyError:
@@ -175,6 +175,9 @@ class SimpleLog(LogFile.Log):
     def form(self,query,result):
         """ This draws the form required to fulfill all the parameters for this report
         """
+        print "My query is %s" % query
+        print "result's query is %s" % result.defaults.q
+
         result.const_selector("Simple Field Separator:",'delimiter',delimiters.values(), delimiters.keys())
         if not query.has_key('delimiter'):
             query['delimiter'] = ' '

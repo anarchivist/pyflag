@@ -57,13 +57,14 @@ class Log:
         self.query = query
 
         self.num_fields = 0
-        ## If this object was called with a known number of fields:
-        try:
-            while 1:
-                self.num_fields+=1
-                query['field%u'%self.num_fields]
-        except KeyError:
-            pass
+        ## If this object was called with an unknown number of fields we work it out. Note that we may not have all the consecutive fields defined:
+        for k in query.keys():
+            if k.startswith('field'):
+                number=int(k[len('field'):])
+                if number>self.num_fields:
+                    self.num_fields=number
+                    
+        self.num_fields+=1
 
         self.set_fields()
         self.set_types()
@@ -87,8 +88,9 @@ class Log:
         self.fields=[]
         for i in range(0,self.num_fields):
             try:
+                assert(len(self.query['field%u'%i])>0)
                 self.fields.append(self.query['field%u'%i])
-            except KeyError:
+            except (KeyError,AssertionError):
                 self.query['field%u' % i ] = 'ignore'
                 self.fields.append('ignore')
 
@@ -267,6 +269,7 @@ def store_loader(log, name):
     """ pickle and save given loader into the database """
     dbh = DB.DBO(config.FLAGDB)
     dbh.execute('INSERT INTO meta set property="log_preset", value=%r' % name)
+    print "%s" % log.fields
     dbh.execute('INSERT INTO meta set property="log_preset_%s", value=%r' % (name,log.pickle()))
 
 class Type:
