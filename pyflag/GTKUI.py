@@ -53,6 +53,10 @@ class GTK_Draw_Form_Exception(Exception):
 
 pointer=gtk.gdk.Cursor(gtk.gdk.HAND2)
 
+### Some helper functions:
+def destroy_window_cb(widget,event):
+    widget.get_parent_window().destroy()
+
 ## This is the tree model used for building trees in flag.
 class FlagTreeModel(gtk.GenericTreeModel):
     '''This class represents the model of a tree.
@@ -1193,3 +1197,24 @@ class GTKUI(UI.GenericUI):
         hbox.set_position(200)
         #self.row(hbox)
 
+    def download(self,file):
+        self.text("Click the button below to save the file to disk")
+        button=gtk.Button("Save As")
+        self.row(button)
+        
+        def button_cb(widget,event):
+            f=gtk.FileSelection("Save File as")
+            f.set_filename("%s/%s" % (config.RESULTDIR,file.inode))
+
+            def choose_file(widget,event):
+                fd=open(f.get_filename(),'w')
+                for data in file:
+                    fd.write(data)
+
+                destroy_window_cb(widget,event)
+
+            f.ok_button.connect("button_press_event",choose_file)
+            f.cancel_button.connect("button_press_event",destroy_window_cb)
+            f.show_all()
+
+        button.connect("button_press_event",button_cb)

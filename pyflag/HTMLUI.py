@@ -39,6 +39,12 @@ config=pyflag.conf.ConfObject()
 import pyflag.Theme
 import cStringIO,csv
 
+class HTTPObject:
+    def __init__(self):
+        self.content_type=None
+        self.generator=None
+        self.headers=None
+
 class HTMLUI(UI.GenericUI):
     """ A HTML UI implementation.
 
@@ -51,7 +57,6 @@ class HTMLUI(UI.GenericUI):
     callback_dict = {}
     callback_time_dict={}
     time_dict={}
-    binary=0
     
     def __init__(self,default = None):
         self.result = ''
@@ -60,11 +65,13 @@ class HTMLUI(UI.GenericUI):
             self.form_parms = default.form_parms
             self.defaults = default.defaults
             self.toolbar_ui=default.toolbar_ui
+            self.generator=default.generator
         else:
             import pyflag.FlagFramework as FlagFramework
             self.form_parms =FlagFramework.query_type(())
             self.defaults = FlagFramework.query_type(())
             self.toolbar_ui=None
+            self.generator=HTTPObject()
             
         self.table_depth = 0
         self.type = "text/html"
@@ -86,8 +93,6 @@ class HTMLUI(UI.GenericUI):
         if self.decoration=='naked':
             return self.__str__()
         
-        if self.binary:
-            return self.result
         #Make a toolbar
         if not self.nav_query:
             q = self.defaults.clone()
@@ -151,6 +156,18 @@ class HTMLUI(UI.GenericUI):
 
     table_depth = 0
 
+    def download(self,file):
+        """ Create a mechanism for the user to download the file.
+
+        @arg file: A file like object derived from FileSystem.File (This must be a generator).
+        """
+        magic=FlagFramework.Magic(mode='mime')
+        file.seek(0)
+        data=file.read(1000)
+        self.generator.content_type=magic.buffer(data)
+        self.generator.headers=[("Content-Disposition","attachment; filename=%s" % file.inode),]
+        self.generator.generator=file
+        
     def image(self,image,**options):
         """ Plots the current image inside the UI.
 
@@ -159,15 +176,15 @@ class HTMLUI(UI.GenericUI):
         opt = self.opt_to_str(**options)
         
         #Create a new UI for the graph:
-        tmp = self.__class__()
+        tmp = self.__class__(self)
         ## Negotiate a prefered format with the graph
         format = image.SetFormat(config.GRAPHFORMAT)
         
         #Ask the image whats its ct:
         tmp.result = image.display()
         tmp.type = image.GetContentType()
+        tmp.decoration='naked'
         #Redefine our display method to just dump the binary object back
-        tmp.binary=True
         if tmp.type.startswith("image"):
             self.result +=  '<img type=%r src="f?draw_stored=%s" %s />'  % (tmp.type,self.store(tmp),opt)
         else:
@@ -1213,6 +1230,5 @@ class HTMLUI(UI.GenericUI):
         #Now draw the results of the callback:
         result=self.__class__(self)
         cbfunc(query,result)
-        if not self.binary:
-            out+="<tr><td colspan=50><table border=1 width=100%%><tr><td>%s</td></tr></table></td></tr></table>" % result
-            self.result+=out
+        out+="<tr><td colspan=50><table border=1 width=100%%><tr><td>%s</td></tr></table></td></tr></table>" % result
+        self.result+=out

@@ -49,6 +49,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     def do_GET(self):
         i = self.path.rfind('?')
         result = flag.ui()
+        result.generator=UI.HTTPObject()
         
         if i >= 0:
             base, query = self.path[:i], FlagFramework.query_type(cgi.parse_qsl(self.path[i+1:]))
@@ -88,12 +89,10 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             return
 
         #Is this a request for a saved UI?
-        print query
         if query.has_key('draw_stored') and UI.HTMLUI.store_dict.has_key(query['draw_stored']):
             result = UI.HTMLUI.store_dict[query['draw_stored']]
         elif query.has_key('callback_stored') and UI.HTMLUI.callback_dict.has_key(query['callback_stored']):
-            result=flag.ui()
-            result.defaults = query
+            result=flag.ui(query=query)
             cb=query['callback_stored']
 #            del query['callback_stored']
             cb=UI.HTMLUI.callback_dict[cb]
@@ -149,9 +148,22 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         except AttributeError:
             pass
         
+        if result.generator and result.generator.generator:
+            self.send_header("Content-type", result.generator.content_type)
+            
+            for i in result.generator.headers:
+                self.send_header(i[0],i[1])
+                self.end_headers()
+
+            ## Print the data
+            for data in result.generator.generator:
+                self.wfile.write(data)
+
+            return
+
         self.send_header("Content-type", result.type)
         self.end_headers()
-        
+
         self.wfile.write(result.display())
         return
 

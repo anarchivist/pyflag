@@ -212,7 +212,7 @@ class ViewFile(Reports.report):
         fd = fsfd.open(inode=query['inode'])
 
         ## We only want this much data
-        image = Graph.FileDump(fd,limit=1000000)
+        image = Graph.FileThumb(fd)
         #How big is this file?
         i=fsfd.istat(inode=query['inode'])
         filesize=i['size']
@@ -276,15 +276,9 @@ class ViewFile(Reports.report):
 
         def download(query,result):
             """ Used for dumping the entire file into the browser """
-            if image:
-                result.result=image.display()
-                result.type=image.GetContentType()
-                result.headers=image.headers
-                print "headers %s " %result.headers
-                result.display=result.__str__
-                result.binary=True
-            return None
-
+            if fd:
+                result.download(fd)
+                
         def hexdump(query,out):
             """ Show the hexdump for the file """
             if image:
@@ -379,7 +373,7 @@ class ViewFile(Reports.report):
             left.end_table()
 
             if image:
-                right=self.ui()
+                right=self.ui(result)
                 right.image(image,width=200)
                 result.start_table(width="100%")
                 result.row(left,right,valign='top',align="left")

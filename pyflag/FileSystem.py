@@ -378,7 +378,18 @@ class File:
     def stats(self):
         """ Returns a dict of statistics about the content of the file. """
         pass
-    
+
+    def __iter__(self):
+        self.seek(0)
+        return self
+
+    def next(self):
+        data=self.read(1024*1024)
+        if len(data)!=0:
+            return data
+        else:
+            raise StopIteration
+        
 def FS_Factory(case,table,fd):
     """ This is the filesystem factory, it will create the most appropriate filesystem object available.
 

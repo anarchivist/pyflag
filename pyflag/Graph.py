@@ -253,16 +253,16 @@ class Thumbnailer(Image):
         @arg data: binary string representing the image
         """
         try:
-            os.mkdir("%s/%s/" %(config.RESULTDIR,self.datafile))
+            os.mkdir("%s/%s/" %(config.RESULTDIR,self.tempdir))
         except OSError:
             pass
         
         #First try to see if the file is already there from last time.
         try:
-            reader=open("%s/%s/%s.jpg" % (config.RESULTDIR,self.datafile,self.offset),'r')
+            reader=open("%s/%s/%s.jpg" % (config.RESULTDIR,self.tempdir,self.temp_name),'r')
             result = reader.read()
             reader.close()
-            print "Read file from  cache %s/%s/%s.jpg" % (config.RESULTDIR,self.datafile,self.offset)
+            print "Read file from  cache %s/%s/%s.jpg" % (config.RESULTDIR,self.tempdir,self.temp_name)
             return result
         except IOError:
             result=self.Extract_size(1000000)
@@ -272,16 +272,16 @@ class Thumbnailer(Image):
             t = pipes.Template()
             t.append("%s/djpeg -scale 1/2" % config.FLAG_BIN,'--')
             t.append("%s/cjpeg" % config.FLAG_BIN,'--')
-            writer = t.open("%s/%s/%s.jpg" % (config.RESULTDIR,self.datafile,self.offset),'w')
+            writer = t.open("%s/%s/%s.jpg" % (config.RESULTDIR,self.tempdir,self.temp_name),'w')
             writer.write(result)
             writer.close()
-            print "Made file %s/%s/%s.jpg" % (config.RESULTDIR,self.datafile,self.offset)
+            print "Made file %s/%s/%s.jpg" % (config.RESULTDIR,self.tempdir,self.temp_name)
         except IOError:
             pass
 
         #Now try to open it again
         try:
-            reader=open("%s/%s/%s.jpg" % (config.RESULTDIR,self.datafile,self.offset),'r')
+            reader=open("%s/%s/%s.jpg" % (config.RESULTDIR,self.tempdir,self.temp_name),'r')
             result = reader.read()
             reader.close()
         except IOError:
@@ -304,9 +304,10 @@ class Thumbnailer(Image):
                  "application/msword":"MSOffice",
 		 "application/msaccess":"MSOffice",
                  }    
-    def __init__(self):
+    def __init__(self,tempdir,temp_name):
         """ A do nothing constructor. Derived classes will want to extend this as they see fit. """
-        pass
+        self.tempdir=tempdir
+        self.temp_name=temp_name
  
     def display(self):
         generator=self.Extract()
@@ -356,15 +357,16 @@ class Thumbnailer(Image):
 class FileThumb(Thumbnailer):
     """ Simple thumbnailer for file-like objects. """
     def Extract(self):
-        size=100000
         self.fd.seek(0)
         while 1:
-            f=self.fd.read(size)
+            f=self.fd.read(self.limit)
             if not f: return
             yield f
 
-    def __init__(self,fd):
+    def __init__(self,fd,limit=1024*1024):
+        Thumbnailer.__init__(self,"case_%s" % (fd.case),"%s_%s" % (fd.table,fd.inode))
         self.fd = fd
+        self.limit=limit
 
 class FileDump(FileThumb):
     """ This simply returns the file with an appropriate mime type"""
@@ -372,6 +374,7 @@ class FileDump(FileThumb):
     dispatcher = {}
 
     def __init__(self,fd,limit=None):
+        FileThumb.__init__(self,fd,limit)
         self.fd = fd
         self.limit = limit
 
