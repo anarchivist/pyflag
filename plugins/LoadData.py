@@ -42,7 +42,6 @@ import plugins.LogAnalysis.LogAnalysis as LogAnalysis
 import pyflag.logging as logging
 
 description = "Load Data"
-order = 20
 
 class LoadPresetLog(Reports.report):
     """ Loads a log file into the database using preset type """

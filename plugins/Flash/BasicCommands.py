@@ -25,6 +25,8 @@ class load(pyflagsh.command):
                 raise ParserException("Load has the following format: case.tag")
             iofd=IO.open(case,sourcename)
             self.environment.__class__._FS=FileSystem.FS_Factory(case,sourcename,iofd)
+            self.environment.__class__._IOSOURCE = sourcename
+            self.environment.__class__._CASE = case
             yield "Loaded Filesystem tag %r in case %r" %(sourcename,case)
         except Exception,e:
             raise ParserException("Unable to open filesystem %s (%s)" %(text,e))
@@ -148,6 +150,18 @@ class cd(ls):
         for i in range(state,len(files)):
             if files[i].startswith(text):
                 return files[i]
+
+class cat(ls):
+    """ Dumps the content of the file """
+    def execute(self):
+        for arg in self.args[1:]:
+            path=os.path.abspath(os.path.join(self.environment.CWD,arg))
+            fd=self.environment._FS.open(path)
+            while 1:
+                f=fd.read(1000000)
+                if len(f)>0:
+                    yield f
+                else: break
 
 class less(ls):
         """ Pipes the content of the file to less """
@@ -429,3 +443,15 @@ class find_dict(find):
     def execute(self):
         for path in self.args[1:]:
             return self.list(path)
+
+class file(ls):
+    """ Returns the file magic of args """
+    def execute(self):
+        dbh=self.environment._DBO(self.environment._CASE)
+        #Find the inode of the file:
+        
+        for path in self.args[1:]:
+            inode = self.environment._FS.lookup(path=path)
+            dbh.execute("select mime,type from type_%s where inode =%r",(self.environment._IOSOURCE,inode))
+            yield dbh.fetch()
+

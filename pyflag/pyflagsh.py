@@ -24,7 +24,9 @@ class environment:
     _flag=None
     _DBO=None
     _FS = None
-
+    _IOSOURCE = None
+    _CASE = None
+    
     def __init__(self):
         environment.CWD='/'
         if not environment._flag:
@@ -120,7 +122,6 @@ class command_parse:
         try:
             ## Create an instance of this command:
             command=Registry.SHELL_COMMANDS[args[0]](args,self.environment)
-            print args,self.environment
             return command.execute()
         except KeyError:
             raise ParserException("No such command %s" % args[0])
@@ -191,9 +192,16 @@ def shell_execv_iter(*argv):
     return command.execute()
 
 def shell_execv(*argv):
-    """ prints the iterator """
+    """ returns the data returned by the iterator in one object """
+    string = None
     for i in shell_execv_iter(*argv):
-        print i
+        if i:
+            if string == None:
+                string = i
+            else:
+                string += i
+
+    return string
 
 if __name__ == "__main__":
     readline.set_completer(completer)
