@@ -46,6 +46,9 @@ order=30
 
 BLOCKSIZE=20
 
+def escape(string):
+    return ("%r" % string)[1:-1]
+
 def DeletedIcon(value,result=None):
     """ Callback for rendering deleted items """
     tmp=result.__class__(result)
@@ -714,9 +717,10 @@ class SearchIndex(Reports.report):
             dbh.execute("select inode,min(block) as minblock from LogicalIndex_%s where block = %r group by block",(query['fsimage'],block))
             row=dbh.fetch()
             if not row: continue
-            ## Here we remove the block number part from the int. If there are a number of blocks in the database for this inode, we account for the extra blocks.
+            ## Here we remove the block number part from the int. If
+            ## there are a number of blocks in the database for this
+            ## inode, we account for the extra blocks.
             off = offset - ((2*block - row['minblock']) << BLOCKSIZE)
-            if off<10: off=10
             dbh2.execute("insert into LogicalKeyword_%s set inode=%r, offset=%r, keyword=%r",(table,row['inode'],off,keyword))
         
     def display(self,query,result):
@@ -730,23 +734,34 @@ class SearchIndex(Reports.report):
 
         ## This stuff is done on the fly because it is time consuming - The disadvantage is that it cannot be searched on.
         def SampleData(string,result=None):
-            offset=int(string)
-            dbh.execute("select inode,text,offset from LogicalKeyword_%s where offset = %r ",(table,offset))
+            inode,offset=string.split(',')
+            offset=int(offset)
+            left=offset-10
+            if left<0: left=0
+
+            dbh.execute("select inode,text,offset,keyword from LogicalKeyword_%s where offset = %r and inode=%r ",(table,offset,inode))
             row=dbh.fetch()
-            if len(row['text'])<len(keyword):
+            keyword=row['keyword']
+            right=offset+len(keyword)+20
+
+            if len(row['text'])<len(keyword):                
                 fd = fsfd.open(inode=row['inode'])
-                fd.seek(offset-10)
+                fd.seek(left)
                 ## Read some data before and after the keyword
-                data = fd.read(10 + len(keyword) + 20)
+                data = fd.read(right-left)
                 dbh.execute("update LogicalKeyword_%s set text=%r where offset=%r and inode=%r",(table,data,offset,row['inode']))
             else:
                 data=row['text']
 
-            return data
+            output = result.__class__(result)
+            output.text(escape(data[0:offset-left]))
+            output.text(escape(data[offset-left:offset-left+len(keyword)]),color='red')
+            output.text(escape(data[offset-left+len(keyword):]),color='black')
+            return output
             
         result.table(
-            columns = ['inode','offset','keyword'],
-            names=['Inode','Data','Keyword'],
+            columns = ['inode','concat(inode,",",offset)','keyword','offset'],
+            names=['Inode','Data','Keyword','Offset'],
             callbacks = { 'Data': SampleData },
             table='LogicalKeyword_%s' % table,
             links = [ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',fsimage=query['fsimage'],mode='HexDump',__target__='inode') ],
