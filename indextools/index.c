@@ -281,22 +281,28 @@ void add_word(struct index_file *idx,unsigned char *c,int length)
       length--;
       //Does this node have children?
       node=absolute_node(idx,current_node);
-      if(!node->child) {
-	//If we dont have children, we create a new child node for it...
-	struct idx_node *child;
-	node_ptr child_ptr=new_node(idx);
 
-	//This is required in case the new_node function relocates the heap
-	node=absolute_node(idx,current_node);
-
-	//The child contains 1 character.
-	node->count=1;
-
-	node->child=child_ptr;
-	child=absolute_node(idx,node->child);
-	child->c=tolower(*(c));
+      //Do we need to store another char in the index? if not we use this node.
+      if(length==0) {
+	node_ref=current_node;
+      } else {
+           if(!node->child) {
+     	//If we dont have children, we create a new child node for it...
+     	struct idx_node *child;
+     	node_ptr child_ptr=new_node(idx);
+     
+     	//This is required in case the new_node function relocates the heap
+     	node=absolute_node(idx,current_node);
+     
+     	//The child contains 1 character.
+     	node->count=1;
+     
+     	node->child=child_ptr;
+     	child=absolute_node(idx,node->child);
+     	child->c=tolower(*(c));
+           };
+           node_ref=node->child;
       };
-      node_ref=node->child;
     } else {
       //We can't find this letter in the peers list, so we need to add the current letter to the peers:
       node=absolute_node(idx,node_ref);
@@ -360,7 +366,13 @@ node_ptr find_node(struct index_file *idx, node_ptr root_ptr,
       c++;
       length--;
       node=absolute_node(idx,current_node);
-      node_ref=node->child;
+
+      if(length>0) {
+	node_ref=node->child;
+      } else {
+	node_ref=current_node;
+      };
+
       if(!node_ref) {
 	//There are no children in this node, so we conclude that the
 	//word is not in the index.
@@ -468,7 +480,7 @@ static void add_offsets_to_array(struct index_file *idx,
     temp=absolute_offlist(idx, list_ptr);
     if(temp->offset){
       //      printf("Added %llu to list\n",temp->offset);
-      grow_list(&list,length,temp->offset);
+      grow_list(&list,length,temp->offset-1);
     };
     list_ptr=temp->next;
   } while(temp->next);
@@ -599,7 +611,11 @@ struct index_file *idx_load_from_file(unsigned char *filename) {
   return (idx);
 };
 
-/* Adds a new offset to the node node_ref */
+/* Adds a new offset to the node node_ref.
+
+Note that offset lists are null terminated (i.e. offset of 0
+represents end of list. So we store offset+1 in the actual array.
+ */
 void idx_add_offset_to_list(struct index_file *idx, node_ptr node_ref,
 			    unsigned long long int offset) 
 {
@@ -616,7 +632,7 @@ void idx_add_offset_to_list(struct index_file *idx, node_ptr node_ref,
   last->next=off;
   node->last_offset=off;
   last=absolute_offlist(idx,last->next);
-  last->offset=offset;
+  last->offset=offset+1;
 
 };
 
@@ -639,7 +655,7 @@ void idx_index_buffer(struct index_file *idx, long long int base,
   struct idx_node *node;
   node_ptr node_ref;
 
-  while(c<data+length) {
+  while(c<=data+length) {
     //Point at the current char in the buffer
     tmpc=c;
     node=absolute_node(idx, idx->root);
@@ -651,8 +667,8 @@ void idx_index_buffer(struct index_file *idx, long long int base,
       node=absolute_node(idx, node_ref);
       //c has been advanced by is_in_index to the end of the word we
       //are indexing.
-      strncpy(tmp,tmpc,max(c-tmpc,BUFFER));
-      *(tmp+(c-tmpc))=0;
+      //      strncpy(tmp,tmpc,max(c-tmpc,BUFFER));
+      // *(tmp+(c-tmpc))=0;
 
       idx_add_offset_to_list(idx, node_ref,base+(tmpc-data));
     } else {
