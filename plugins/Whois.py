@@ -8,7 +8,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG 0.4 (12-02-2004)
+#  Version: FLAG $Name:  $ $Date: 2004/10/16 10:00:17 $
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -28,6 +28,7 @@
 
 """ Module for performing Whois Lookups """
 import pyflag.Reports as Reports
+import pyflag.DB as DB
 import pyflag.FlagFramework as FlagFramework
 import pyflag.LogFile as LogFile
 import pyflag.conf
@@ -36,6 +37,33 @@ import re
 
 description = "Offline Whois"
 order = 40
+
+def lookup_whois(ip):
+    """ Functions searches the database for the most specific whois match.
+
+    @arg ip: Either an unsigned int or a string IP in decimal notation.
+    Returns a whois id. This id can be used to display the whois table.
+    """
+    dbh = DB.DBO(None)
+    if type(ip) == type(1):
+        ip="%r" % ip
+    else:
+        ip = "inet_aton(%r)" % ip
+        
+    netmask = 0
+    while 1:
+        dbh.execute("select whois_id from whois_routes where ( %s & inet_aton('255.255.255.255') & ~%r ) = network and (inet_aton('255.255.255.255') & ~%r) = netmask limit 1 " , (ip,netmask,netmask))
+#        dbh.execute("select whois_id from whois_routes where ( %s & ~(pow(2,%r) -1)) = network and ~(pow(2,%r)-1) = netmask limit 1 " , (ip,netmask,netmask))
+        row=dbh.fetch()
+        ## If we found it, we return that, else we increase the
+        ## netmask one more step and keep trying. Worst case we should
+        ## pick off the 0.0.0.0 network which is our exit condition.
+        if row:
+            break
+
+        netmask = netmask * 2 + 1
+
+    return row['whois_id']
 
 class LookupIP(Reports.report):
     """ Display Whois data for the given IP address """
@@ -49,9 +77,10 @@ class LookupIP(Reports.report):
     def display(self, query, result):
         # lookup IP address and show a nice summary of Whois Data
         dbh = self.DBO(None)
-        # get route id
-        dbh.execute("SELECT whois_id from whois_routes where (INET_ATON(%r) & netmask) = network order by netmask desc limit 1;", query['address'])
-        whois_id = dbh.fetch()['whois_id']
+        ## get route id
+##        dbh.execute("SELECT whois_id from whois_routes where (INET_ATON(%r) & netmask) = network order by netmask desc limit 1;", query['address'])
+##        whois_id = dbh.fetch()['whois_id']
+        whois_id = lookup_whois(query['address'])
         dbh.execute("SELECT INET_NTOA(start_ip) as start_ip, numhosts, country, descr, status from whois where id=%s",whois_id)
         res = dbh.fetch()
         result.heading("Whois Search Results For: %s" % query['address'])

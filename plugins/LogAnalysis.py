@@ -9,7 +9,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Name:  $ $Date: 2004/10/14 13:22:14 $
+#  Version: FLAG $Name:  $ $Date: 2004/10/16 10:00:16 $
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -70,7 +70,7 @@ class ListLogFile(Reports.report):
         result.meta_selector(query['case'],'Select Log Table','logtable')
 
     def display(self,query,result):
-        result.heading("Log File in Table %s" % query['logtable'])
+        result.heading("Log File in Table %s" % query['logtable'])            
         dbh = self.DBO(query['case'])
         dbh.execute("select value from meta where property = 'log_preset_%s'",(query['logtable']))
         row=dbh.fetch()
@@ -78,6 +78,15 @@ class ListLogFile(Reports.report):
             log = LogFile.get_loader(row['value'],None)
         except KeyError:
             raise Reports.ReportError("Unable to load the preset %s for table %s " % (row['value'],query['logtable']))
+
+        if 'IP Address' in log.types:
+            q=query.clone()
+            if query.has_key('whois'):
+                del q['whois']
+                result.link("Click here to remove whois information",q)
+            else:
+                q['whois']="Yes"
+                result.link("Click here to show whois information",q)
 
         #Find the names of all the columns in table:
         dbh.execute("select * from %s_log limit 1",query['logtable'])
