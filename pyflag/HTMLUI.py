@@ -37,6 +37,7 @@ import pyflag.conf
 import pyflag.UI as UI
 config=pyflag.conf.ConfObject()
 import pyflag.Theme
+import cStringIO,csv
 
 class HTMLUI(UI.GenericUI):
     """ A HTML UI implementation.
@@ -709,6 +710,33 @@ class HTMLUI(UI.GenericUI):
             self.row("Click any of the above links to remove this condition")
             self.end_table()
             self.start_table()
+
+        ## Draw a popup to allow the user to save the entire table in CSV format:
+        def save_table(query,result):
+            result.display=result.__str__
+            result.type = "text/x-comma-separated-values"
+##            result.type = "text/plain"
+            data = cStringIO.StringIO()
+            cvs_writer = csv.DictWriter(data,names)
+            dbh.execute(query_str_basic + " order by %s" % order,())
+            for row in dbh:
+                ## If there are any callbacks we respect those now.
+                for k,v in row.items():
+                    try:
+                        row[k]=callbacks[k](v)
+                    except KeyError:
+                        pass
+                cvs_writer.writerow(row)
+
+            data.seek(0)
+            result.result = "#Pyflag Table widget output\n#Query was %s.\n#Fields: %s\n""" %(query," ".join(names))
+            if condition_text_array:
+                result.result += "#The following conditions are in force\n"
+                for i in condition_text_array:
+                    result.result += "# %s\n" % i
+            result.result += data.read()
+                
+        self.popup(save_table,'Save Table')
 
         tmp_links = []
         for d in names:
