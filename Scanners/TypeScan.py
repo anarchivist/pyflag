@@ -37,6 +37,7 @@ class TypeScan(GenScanFactory):
         def __init__(self, inode,ddfs,dbh,table,factories=None):
             self.dbh=dbh
             self.table=table
+            self.ddfs = ddfs
             self.filename=self.ddfs.lookup(inode=inode)
             self.inode = inode
             self.type_mime = None

@@ -82,6 +82,7 @@ class HTMLUI(UI.GenericUI):
         #Make a toolbar
         if not self.nav_query:
             q = self.defaults.clone()
+            del q['__target__']
             q['__target__']='limit'
         else: q = self.nav_query
 
