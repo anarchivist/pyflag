@@ -257,8 +257,8 @@ class GTKServer(gtk.Window):
         else:
             self.form_dialog=gtk.ScrolledWindow()
             self.form_dialog.set_transient_for(self)
-            #self.form_dialog.set_position(gtk.WIN_POS_CENTER_ON_PARENT)
-            self.form_dialog.set_position(gtk.WIN_POS_CENTER_ALWAYS)
+            self.form_dialog.set_position(gtk.WIN_POS_CENTER_ON_PARENT)
+            #self.form_dialog.set_position(gtk.WIN_POS_CENTER_ALWAYS)
             #self.form_dialog.set_default_size(500,500)
             self.form_dialog.connect('destroy',self.delete_form)
 

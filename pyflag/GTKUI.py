@@ -284,9 +284,12 @@ class GTKUI(UI.GenericUI):
             if isinstance(col,self.__class__):
                 col=col.display()
             elif not isinstance(col,gtk.Widget):
-                col = gtk.Label("%s" % col)
-                col.set_justify(gtk.JUSTIFY_LEFT)
-                col.set_line_wrap(True)
+                print "Creating a Widget"
+                l = gtk.Label("%s" % col)
+                l.set_justify(gtk.JUSTIFY_LEFT)
+                l.set_line_wrap(True)
+                col = gtk.Alignment(0,0,0,0)
+                col.add(l)
                 
             ##Attach the column to row at the end of the table:
             right_attach = i+1            
@@ -414,8 +417,10 @@ class GTKUI(UI.GenericUI):
         if isinstance(string,self.__class__):
             label=string.display()
         elif not isinstance(string,gtk.Widget):
-            label=gtk.Label()
-            label.set_markup("<span foreground=\"blue\" style=\"italic\" underline=\"single\">%s</span>"%string)
+            l=gtk.Label()
+            l.set_markup("<span foreground=\"blue\" style=\"italic\" underline=\"single\">%s</span>"%string)
+            label = gtk.Alignment(0,0,0,0)
+            label.add(l)
         else: label=string
             
         ev.set_data('query',target)    
