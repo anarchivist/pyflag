@@ -187,13 +187,6 @@ class FlagTreeModel(gtk.GenericTreeModel):
 
 class GTKUI(UI.GenericUI):
     """ A GTK UI Implementation. """
-
-    class UIToolbarItem:
-        def __init__(self, name, icon, callback, popup):
-            self.name = name
-            self.icon = icon
-            self.callback = callback
-            self.popup = popup
             
     def __init__(self,default = None):
         # Create the Main Widget
@@ -205,15 +198,18 @@ class GTKUI(UI.GenericUI):
             self.defaults = default.defaults
             ## This is an array of form widgets. Every time we draw a form widget in this UI, we store it here, and then when we submit the widget, we take the values from here.
             self.form_widgets=default.form_widgets
-            self.toolbar_items = default.toolbar_items
+            self.toolbar_ui = default.toolbar_ui
         else:
             self.form_parms = {}
             self.defaults = FlagFramework.query_type(())
             self.form_widgets=[]
-            self.toolbar_items = []
+            self.toolbar_ui = gtk.Toolbar()
             
         self.current_table=None
         self.nav_query=None
+        self.next = None
+        self.previous = None
+        self.pageno = 0
         self.widgets = []
         self.title = None
         return
@@ -222,11 +218,12 @@ class GTKUI(UI.GenericUI):
         self.title = string
         
     def refresh(self, int, query):
+        """ what does this even to? """
         pass
 
     def __str__(self):
-        return self.display()
-#        return "GTKUI Widget"
+#        return self.display()
+        return "GTKUI Widget"
     
     def display(self):
         ## Did the user forget to call end_table??? Dumb user!!!
@@ -403,7 +400,7 @@ class GTKUI(UI.GenericUI):
         self.row(description,combobox)
 
     def start_form(self,target, **hiddens):
-        for k,v in hiddens:
+        for k,v in hiddens.items():
             self.form_parms[k]=v
             
         for k in target.q:
@@ -755,8 +752,35 @@ class GTKUI(UI.GenericUI):
         dbh.execute(query_str,())
         return dbh,new_query
 
+    def link_callback_ui(self, action, query):
+        """ wrapper function to satisfy clicked signal callback prototype """
+        self.link_callback(query)
+
     def toolbar(self, cb, text, icon=None, popup=True):
-        self.toolbar_items.append(GTKUI.UIToolbarItem(text, icon, cb, popup))
+        """ Add an item to the toolbar
+        cb may be a query item rather than a callback
+        in which case the query is run by flag and the results displayed in the pane"""
+        ## FIXME: maby have a icon set or factory or whatever
+        ## so that we can just use stock id's here, then scaling etc will
+        ## be done nicely by gtk for us.
+        ## FIXME: expand API to have short name + tooltip text
+
+        args = None
+        if isinstance(cb, FlagFramework.query_type):
+            args = cb
+            cb = self.link_callback_ui
+        
+        i = None
+        if icon:
+            i = gtk.Image()
+            i.set_from_file('%s/%s' % (config.IMAGEDIR, icon))
+            i.show()
+        button = gtk.ToolButton(icon_widget=i, label=text)
+        if args:
+            button.connect('clicked',cb,args)
+        else:
+            button.connect('clicked',cb)
+        self.toolbar_ui.insert(button, -1)
 
     def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):
         """ Main table redered method.
@@ -801,7 +825,7 @@ class GTKUI(UI.GenericUI):
         def page_cb(widget,event=None):
             """ Call back for pagination """
             store=widget.get_data('store')
-            dir=widget.get_data('direction')
+            #dir=widget.get_data('direction')
             q=widget.get_data('query')
             self.defaults=q
             
@@ -868,32 +892,34 @@ class GTKUI(UI.GenericUI):
                 store.set(*x)
 
             ## Update the navigation buttons
-            q=self.right_button.get_data('query')
-            del q['limit']
-            q['limit']=0
-            self.right_button.set_data('query',q)
-            self.left_button.set_data('query',q)
+            self.next = 0
+            self.previous = 0
+            #q=self.right_button.get_data('query')
+            #del q['limit']
+            #q['limit']=0
+            #self.right_button.set_data('query',q)
+            #self.left_button.set_data('query',q)
 
         ## Create buttons for navigation: FIXME: This code should really be in the application window's toolbar, and be global for the entire app.
-        if not self.nav_query:
-            q = self.defaults.clone()          
-            q['__target__']='limit'
-            
-        left=gtk.Button("Previous")
-        left.set_data('query',self.FillQueryTarget(q,self.previous))
-        left.set_data('store',store)
-        left.connect("clicked",page_cb)
-        self.left_button=left
+        #if not self.nav_query:
+        #    q = self.defaults.clone()          
+        #    q['__target__']='limit'
 
-        right=gtk.Button("Next")
-        self.right_button=right
-        right.set_data('query',self.FillQueryTarget(q,self.next))
-        right.set_data('store',store)
-        right.set_data('direction','forward')
-        right.connect("clicked",page_cb)
+        #left=gtk.Button("Previous")
+        #self.left_button=left
+        #left.set_data('query',self.FillQueryTarget(q,self.previous))
+        #left.set_data('store',store)
+        #left.connect("clicked",page_cb)
+
+        #right=gtk.Button("Next")
+        #self.right_button=right
+        #right.set_data('query',self.FillQueryTarget(q,self.next))
+        #right.set_data('store',store)
+        #right.set_data('direction','forward')
+        #right.connect("clicked",page_cb)
 
         ## Attach the widget to the result canvas
-        self.row(left,right)
+        #self.row(left,right)
         self.row(treeview)
 
         ## Create a group by selector

@@ -48,51 +48,37 @@ class GTKServer(gtk.Window):
     class FlagNotebook(gtk.Notebook):
         """ A Flag notebook class
         This is used because we store a bunch of toolbar related stuff with the notebook"""
-        
-        def __init__(self, uimanager):
+
+        def __init__(self, toolhbox):
             gtk.Notebook.__init__(self)
-            self.uimanager = uimanager
+            self.toolhbox = toolhbox
             self.cur_merge_id = None
             self.cur_page = None
             self.cur_action_grp = None
-            self.toolbar_uis = {}
-            self.toolbar_actions = {}
+            self.toolbars = {}
             self.connect("switch-page", self.switch)
-
-        def rem_toolbar(self, page):
-            if self.cur_merge_id:
-                self.uimanager.remove_ui(self.cur_merge_id)
-            if self.toolbar_actions.has_key(page):
-                self.uimanager.remove_action_group(self.toolbar_actions[page])
-
-        def add_toolbar(self, page):
-            if self.toolbar_actions.has_key(page):
-                self.uimanager.insert_action_group(self.toolbar_actions[page], -1)
-                self.cur_action_grp = self.toolbar_actions[page]
-            if self.toolbar_uis.has_key(page):
-                self.cur_merge_id = self.uimanager.add_ui_from_string(self.toolbar_uis[page])
             
         def switch(self, notebook, page, pagenum):
             """ tab switch callback, update toobar """
-            print "SWITCH TABS"
-            self.rem_toolbar(pagenum)    
-            self.add_toolbar(pagenum)
+            child = self.toolhbox.get_child()
+            if child:
+                self.toolhbox.remove(child)
+            if self.toolbars.has_key(pagenum):
+                self.toolhbox.add(self.toolbars[pagenum])
+            self.toolhbox.show_all()
             self.cur_page = pagenum
 
         def close_tab(self, action=None, page=None):
             """ close current tab """
             if not page:
                 page = self.get_current_page()
+            child = self.toolhbox.get_child()
+            self.toolhbox.remove(child)
             self.remove_page(page)
-            try:
-                self.rem_toolbar(page)
-                del self.toolbar_uis[page]
-                del self.toolbar_actions[page]
-            except KeyError:
-                pass
 
-        def add_page(self, result, label):
+        def add_page(self, result, query):
             """ add result (a GTKUI object) as a new tab with given label """
+            
             # each new page goes in a scrolled window
             scroll = gtk.ScrolledWindow()
             scroll.add_with_viewport(result.display())
@@ -105,34 +91,22 @@ class GTKServer(gtk.Window):
             else:
                 cur_report = ''
         
-            if (cur_report == label):
+            if (cur_report == query['report']):
                 # reuse existing page if report is unchanged
                 self.close_tab(page=idx)
-                self.insert_page(scroll, gtk.Label(label), idx)
+                self.insert_page(scroll, gtk.Label(query['report']), idx)
             else:
                 # add a new page
-                idx = self.append_page(scroll, gtk.Label(label))
+                idx = self.append_page(scroll, gtk.Label(query['report']))
 
-            # set toolbar vars
-            try:
-                self.rem_toolbar(idx)
-                del self.toolbar_uis[idx]
-                del self.toolbar_actions[idx]
-            except KeyError:
-                pass
+            # add toolbar to UI, first add a close tab button
+            if result.toolbar_ui.get_n_items() > 0:
+                result.toolbar_ui.insert(gtk.SeparatorToolItem(), -1)
+            button = gtk.ToolButton(gtk.STOCK_CLOSE)
+            button.connect('clicked', self.close_tab)
+            result.toolbar_ui.insert(button, -1)
+            self.toolbars[idx] = result.toolbar_ui
 
-            if result.toolbar_items:
-                self.toolbar_actions[idx] = gtk.ActionGroup('ReportActions')
-                self.toolbar_uis[idx] = '<toolbar name="Toolbar"><placeholder name="ReportTools">'
-                for t in result.toolbar_items:
-                    self.toolbar_uis[idx] += '<toolitem action="%s"/>' % t.name
-                    self.toolbar_actions[idx].add_actions([(t.name, None, t.name, None, t.name, t.callback)])
-                self.toolbar_uis[idx] += '</placeholder></toolbar>'
-
-                # FIXME: have to put icons on toolbuttons but cant retrieve widget until added to ui in switch
-                # this is going to have to be jumbled around...
-            
-            # show results, should fire the switch cb which will actually populate the uimanager
             self.show_all()
             self.set_current_page(idx)            
 
@@ -155,11 +129,11 @@ class GTKServer(gtk.Window):
         # these are the MAIN ELEMENTS of the GTKServer
         self.vbox = gtk.VBox()
         self.uimanager = gtk.UIManager()
-        self.notebook = GTKServer.FlagNotebook(self.uimanager)
+        self.toolhbox = gtk.HandleBox()
+        self.notebook = GTKServer.FlagNotebook(self.toolhbox)
         ## have to build the ui at this point...
         self.build_flag_menu()        
         self.menubar = self.uimanager.get_widget('/Menubar')
-        self.toolbar = self.uimanager.get_widget('/Toolbar')
         self.statusbar = gtk.Statusbar()
 
         # pack these to arrange the UI
@@ -168,13 +142,11 @@ class GTKServer(gtk.Window):
         self.vbox.pack_start(self.menubar, False)
         
         # but the toolbar in a HBox with a case selector
-        hbox = gtk.HBox()
-        combobox = self.case_selector()
-        self.toolbar = self.uimanager.get_widget('/Toolbar')
-        hbox.pack_start(combobox, False)
-        hbox.pack_start(self.toolbar)
+        #combobox = self.case_selector()
+        #self.hbox.pack_start(combobox, False)
+        #hbox.pack_start(self.toolbar)
 
-        self.vbox.pack_start(hbox, False)
+        self.vbox.pack_start(self.toolhbox, False)
         self.vbox.pack_start(self.notebook)
         self.vbox.pack_end(self.statusbar, False)
                 
@@ -258,7 +230,7 @@ class GTKServer(gtk.Window):
             self.error_popup(error_msg)
             return
 
-        self.notebook.add_page(result, query['report'])
+        self.notebook.add_page(result, query)
 
     def execute_report_cb(self, action, family, report):
         """ Execute a report based on the clicked action item """
@@ -324,22 +296,22 @@ class GTKServer(gtk.Window):
                              ('About', gtk.STOCK_DIALOG_INFO, '_About')])
         ui += '</menubar>\n'
         # Add the Navigation Toolbar
-        ui += """<toolbar name="Toolbar">
-                   <toolitem action="Prev Page"/>
-                   <toolitem action="Next Page"/>
-                   <separator/>
-                   <placeholder name="ReportTools">
-                   </placeholder>
-                   <separator/>
-                   <toolitem action="Close Tab"/>
-                   <separator/>
-                 </toolbar>"""
-        actions.add_actions([('Prev Page', gtk.STOCK_GO_BACK, '_Prev Page', 
-                                None, 'Navigate to Previous Page', self.execute_report_cb),
-                             ('Next Page', gtk.STOCK_GO_FORWARD, '_Next Page', 
-                                None, 'Navigate to Next Page', self.execute_report_cb),
-                             ('Close Tab', gtk.STOCK_CLOSE, '_Close Tab', 
-                                None, 'Close current Tab', self.notebook.close_tab)])
+        #ui += """<toolbar name="Toolbar">
+        #           <toolitem action="Prev Page"/>
+        #           <toolitem action="Next Page"/>
+        #           <separator/>
+        #           <placeholder name="ReportTools">
+        #           </placeholder>
+        #           <separator/>
+        #           <toolitem action="Close Tab"/>
+        #           <separator/>
+        #         </toolbar>"""
+        #actions.add_actions([('Prev Page', gtk.STOCK_GO_BACK, '_Prev Page', 
+        #                        None, 'Navigate to Previous Page', self.execute_report_cb),
+        #                     ('Next Page', gtk.STOCK_GO_FORWARD, '_Next Page', 
+        #                        None, 'Navigate to Next Page', self.execute_report_cb),
+        #                     ('Close Tab', gtk.STOCK_CLOSE, '_Close Tab', 
+        #                        None, 'Close current Tab', self.notebook.close_tab)])
 
         # Add the actions to the uimanager
         self.uimanager.insert_action_group(actions, 0)
@@ -349,10 +321,10 @@ class GTKServer(gtk.Window):
         self.uimanager.add_ui_from_string(ui)
 
         # gray out the nav buttons for now
-        button = self.uimanager.get_widget('/Toolbar/Next Page')
-        button.set_sensitive(gtk.FALSE)
-        button = self.uimanager.get_widget('/Toolbar/Prev Page')
-        button.set_sensitive(gtk.FALSE)
+        #button = self.uimanager.get_widget('/Toolbar/Next Page')
+        #button.set_sensitive(gtk.FALSE)
+        #button = self.uimanager.get_widget('/Toolbar/Prev Page')
+        #button.set_sensitive(gtk.FALSE)
 
 ### BEGIN MAIN ####
 

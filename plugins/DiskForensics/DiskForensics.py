@@ -151,7 +151,7 @@ class BrowseFS(Reports.report):
                 result.display = result.__str__
 
             tmp = result.__class__(result)
-            result.toolbar(scan_popup,"Scan all files in directory %s" % br,icon="examine.png")
+            result.toolbar(scan_popup,"Scan this directory",icon="examine.png")
             tmp2=result.__class__(result)
             tmp2.row("Inspecting branch %s  " % br,tmp)
             result.para(tmp2)
