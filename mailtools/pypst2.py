@@ -21,7 +21,9 @@ class Pstfile:
             self.pst = pst
             self.id = ptr.id
             self._item = item
-            
+            self._read() # must fill in self.data
+            self.size = len(self.data)
+
         def free(self):
             pypst._pst_freeItem(self._item)
 
@@ -35,7 +37,11 @@ class Pstfile:
             return self.read()
 
         def read(self):
-            return "I am a %s" % self.__class__
+            return self.data
+            #return "I am a %s" % self.__class__
+
+        def _read(self):
+            self.data = ''
 
         def __getattr__(self, name):
             """ access to data structures """
@@ -65,72 +71,60 @@ class Pstfile:
                 self.filename1 = ref.filename1
                 self.filename2 = ref.filename2
                 self.data = self.pst.get_attach_data(ref)
+                self.size = len(self.data)
                 
             def read(self):
                 return self.data
-        
+            
         def attach(self):
             """ iterate through attachments """
             attach = self._item.attach
             while attach:
                 yield Pstfile.Email.Attachment(self.pst, attach)
                 attach = attach.next
-            
-        def read(self):
+        
+        def _read(self):
             email = self._item.email
             base64enc = False
-            retstr = ''
+            self.data = ''
             if email.header:
-                retstr = email.header.replace('\r','')
+                self.data = email.header.replace('\r','')
                 m = re.search('Content-Transfer-Encoding:\s+base64',retstr,re.IGNORECASE)
                 if m:
                     base64enc = True
             if email.body:
                 if base64enc:
-                    retstr += base64.decodestring(email.body)
+                    self.data += base64.decodestring(email.body)
                 else:
-                    retstr += email.body.replace('\r','')
+                    self.data += email.body.replace('\r','')
             if email.htmlbody:
                 if base64enc:
-                    retstr += base64.decodestring(email.htmlbody)
+                    self.data += base64.decodestring(email.htmlbody)
                 else:
-                    retstr += email.htmlbody.replace('\r','')
+                    self.data += email.htmlbody.replace('\r','')
             if email.rtf_compressed:
                 #### WARNING: MEMORY LEAK ####
                 #retstr += pypst.rtf_decompress(email.rtf_compressed)
-                retstr += "Libpst: RTF compressed body found, not currently suppored\n"
+                self.data += "Libpst: RTF compressed body found, not currently suppored\n"
             if email.encrypted_body or email.encrypted_htmlbody:
-                retstr += "Libpst: Encrypted body found, not currenlty supported\n"
+                self.data += "Libpst: Encrypted body found, not currenlty supported\n"
 
-            for a in self.attach():
-                retstr += "Got Attachment: %s\n" % a.filename1
-                #fd = open('/tmp/attachment_%s' % a.filename1, 'w')
-                #fd.write(a.data)
-                #fd.close()
-
-            return retstr
 
     class Contact(Item):
         """ contact item """
-        ### FIXME, theres heaps more stuff to stick in here...
-        # is there a way to cycle through all these without knowing them by name?
-        fields = ('fullname','surname','first_name','middle_name',
-                  'display_name_prefix','suffix','nickname','address1',
-                  'address2','address3','birthday')
 
-        def read(self):
-            retstr = ''
+        def _read(self):
+            self.data = ''
             contact = self._item.contact
-            for field in Pstfile.Contact.fields:
-                val = contact.__getattr__(field)
+            for name in contact.__swig__getmethods:
+                val = contact.__getattr__(name):
                 if val:
-                    retstr += "%s: %s\n" % (field.title(), val)
-            return retstr
+                    self.data += "%s: %s\n" % (name.title(), val)
         
-    class Journal(Item):
+    class Journal(Contact):
         """ contact item """
 
-    class Appointment(Item):
+    class Appointment(Contact):
         """ appointment item """
 
     class Folder(Item):

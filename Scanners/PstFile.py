@@ -32,63 +32,68 @@ class PstScan(GenScanFactory):
             ## filename is the filename in the filesystem for the pst file.
             filename = self.ddfs.lookup(inode=self.inode)
 
-            def insert_into_table(mode,root,name):
-                rel_root="/"+root[len(fd.mount_point):]+"/"
-                if rel_root=="//": rel_root="/"
-                it = pst.getitem(name)
+            def scan_item(inode):
+                ## call the scanners on this new file (FIXME limit the recursion level here)
+                data=item.read()
+                if data:
+                    objs = [c.Scan(inode, self.ddfs, c, factories=self.factories) for c in self.factories]
                 
-                s=os.stat(os.path.join(root,name))
-                dbh.execute("insert into file_%s set inode='M%s',mode=%r,status='alloc',path=%r,name=%r",(table, s.st_ino, mode, rel_root, name))
-                try:
-                    link=os.readlink("%s/%s" % (root,name))
-                except OSError:
-                    link=''
-            
-                dbh.execute("insert into inode_%s set inode='M%s',uid=%r,gid=%r, mtime=%r,atime=%r,ctime=%r,mode=%r,links=%r,link=%r,size=%r",(table,s.st_ino,s.st_uid,s.st_gid,s.st_mtime,s.st_atime,s.st_ctime,str(oct(s.st_mode))[1:],s.st_nlink,link,s.st_size))
-                
-            ## Just walk over all the files and stat them all building the tables.
-            for root, dirs, files in pst.walk(pst.rootid):
-                for name in dirs:
-                    insert_into_table('d/d',root,name)
-                for name in files:
-                    insert_into_table('r/r',root,name)
-
-            
-            ## List all the files in the zip file:
-            dircount = 0
-            namelist = zip.namelist()
-            for i in range(len(namelist)):                
-                dirs=namelist[i].split('/')
-                for d in range(0, len(dirs)):
-                    path='%s/%s' % (filename,'/'.join(dirs[0:d]))
-                    if not path.endswith('/'): path=path+'/'
-                    self.ddfs.dbh.execute("select * from file_%s where path=%r and name=%r",(self.ddfs.table, path, dirs[d]))
-                    if not self.ddfs.dbh.fetch():
-                        dircount += 1
-                        self.ddfs.dbh.execute("insert into file_%s set path=%r,name=%r,status='alloc',mode='d/d',inode='%s|Zdir%s'",(self.ddfs.table,path,dirs[d],self.inode,dircount))
-
-                ## Add the file itself to the file table:
-                self.ddfs.dbh.execute("update file_%s set mode='r/r',inode='%s|Z%s' where path=%r and name=%r",(self.ddfs.table, self.inode, i, path, dirs[-1]))
-                
-                ## Add the file to the inode table:
-                self.ddfs.dbh.execute("insert into inode_%s set inode='%s|Z%s',size=%r,mtime=unix_timestamp('%s-%s-%s:%s:%s:%s')",(self.ddfs.table, self.inode, i, zip.infolist()[i].file_size)+zip.infolist()[i].date_time)
-
-                ## Now call the scanners on this new file (FIXME limit the recursion level here)
-                if self.factories:
-                    try:
-                        data=zip.read(namelist[i])
-                    except zipfile.zlib.error:
-                        continue
-                    
-                    objs = [c.Scan("%s|Z%s" % (self.inode, str(i)),self.ddfs,c,factories=self.factories) for c in self.factories]
-                    
                     metadata={}
                     for o in objs:
                         try:
                             o.process(data,metadata=metadata)
                             o.finish()
                         except Exception,e:
-                            logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
+                            logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))               
 
-            ## Set the zip file to be a d/d entry so it looks like its a virtual directory:
+            def add_email:
+                # add a directory entry for the email itself
+                dbh.execute("insert into file_%s set inode='%s|P%s',mode='d/d',status='alloc',path=%r,name=%r",(self.ddfs.table, self.inode, name[0], mode, root[1], name[1]))
+                dbh.execute("insert into inode_%s set inode='%s|P%s',uid=0,gid=0,mtime=%r,atime=%r,ctime=%r,mode=0,links='',link='',size=0",(table, self.inode, name[0], item.modify_date, item.modify_date, item.create_date))
+
+                # now add body and each attachment
+                dbh.execute("insert into file_%s set inode='%s|P%s:0',mode='r/r',status='alloc',path='%s/%s',name='body'",(self.ddfs.table, self.inode, name[0], root[1], name[1]))
+                dbh.execute("insert into inode_%s set inode='%s|P%s:0',uid=0,gid=0, mtime=%r,atime=%r,ctime=%r,mode=0,links='',link='',size=%s",(table, self.inode, name[0], time.ctime(item.arrival_date), time.ctime(item.arrival_date), time.ctime(item.sent_date), item.size))
+                
+                count = 1
+                for a in item.attach():
+                    if a.filename1:
+                        fname = a.filename1
+                    elif a.filename2:
+                        fname = a.filename2
+                    else:
+                        fname "attach%i" % count
+
+                    dbh.execute("insert into file_%s set inode='%s|P%s:%s',mode='r/r',status='alloc',path='%s/%s',name=%r",(self.ddfs.table, self.inode, name[0], count, root[1], name[1], fname))
+                    dbh.execute("insert into inode_%s set inode='%s|P%s:%s',uid=0,gid=0, mtime=%r,atime=%r,ctime=%r,mode=0,links='',link='',size=%s",(table, self.inode, name[0], count, time.ctime(item.arrival_date), time.ctime(item.arrival_date), time.ctime(item.sent_date), a.size))
+                    #scan attachments
+                    scan_item('%s|P%s:%s' % (self.inode, name[0], count))
+                    count += 1
+                #scan body
+                scan_item('%s|P%s:0' % (self.inode, name[0]))
+
+            def add_folder:
+                dbh.execute("insert into file_%s set inode='%s|P%s',mode='d/d',status='alloc',path=%r,name=%r",(self.ddfs.table, self.inode, name[0], mode, root[1], name[1]))
+                dbh.execute("insert into inode_%s set inode='%s|P%s',uid=0,gid=0,mtime=%r,atime=%r,ctime=%r,mode=0,links='',link='',size=0",(table, self.inode, name[0], item.modify_date, item.modify_date, item.create_date))
+
+            def add_other:
+                dbh.execute("insert into file_%s set inode='%s|P%s',mode='r/r',status='alloc',path=%r,name=%r",(self.ddfs.table, self.inode, name[0], root[1], name[1]))
+                dbh.execute("insert into inode_%s set inode='%s|P%s',uid=0,gid=0, mtime=%r,atime=%r,ctime=%r,mode=0,links='',link='',size=%s",(table, self.inode, name[0], item.modify_date, item.modify_date, item.create_date, item.size))
+                #scan body
+                scan_item('%s|P%s' % (self.inode, name[0]))
+ 
+
+            ## Just walk over all the files and stat them all building the tables.
+            for root, dirs, files in pst.walk2((pst.rootid, filename)):
+                for name in dirs:
+                    item = pst.getitem(name[0])
+                    add_folder()
+                for name in files:
+                    item = pst.getitem(name[0])
+                    if isinstance(item, pypst2.Pstfile.Email):
+                        add_email()
+                    else:
+                        add_other()
+
+            ## Set the pst file to be a d/d entry so it looks like its a virtual directory:
             self.ddfs.dbh.execute("update file_%s set mode='d/d' where inode=%r",(self.ddfs.table,self.inode))

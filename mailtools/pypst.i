@@ -4,6 +4,11 @@
 %rename(from_offset) from;
 %rename(to_offset) to;
 
+// convert FILETIME to unixtime (int)
+%typemap(out) FILETIME * {
+	$result = PyInt_FromLong(fileTimeToUnixTime($1, 0));
+}
+
 %{
 #include "libpst.h"
 #include "timeconv.h"
@@ -30,6 +35,7 @@ PyObject *pst_item_attach_data_as_pystring(pst_file *pstfile, pst_item_attach *a
 // change to simple types which get mapped
 typedef int int32_t;
 typedef unsigned int u_int32_t;
+typedef int time_t;
 
 //%include "libpst.h"
 
@@ -283,6 +289,13 @@ typedef struct _pst_item {
   int32_t private;
 } pst_item;
 
+typedef struct _pst_item_folder {
+  int32_t  email_count;
+  int32_t  unseen_email_count;
+  int32_t  assoc_count;
+  char subfolder;
+} pst_item_folder;
+
 %extend pst_file {
 	pst_file() {
 		return (pst_file *) malloc(sizeof(pst_file));
@@ -320,5 +333,5 @@ void _pst_freeItem(pst_item *item);
 
 /* time stuff from timeconv */
 //time_t fileTimeToUnixTime( const FILETIME *filetime, DWORD *remainder );
-char * fileTimeToAscii (const FILETIME *filetime);
+//char * fileTimeToAscii (const FILETIME *filetime);
 //struct tm * fileTimeToStructTM (const FILETIME *filetime);
