@@ -80,19 +80,19 @@ class BrowseFS(Reports.report):
         branch = ['']
         new_query = result.make_link(query, '')
             
-        try:
+        def tabular_view(query,result):
             # tabular view
-            if query['mode'] == 'table':
-                result.table(
-                    columns=['f.inode','f.mode','concat(path,name)','f.status','size','from_unixtime(mtime)','from_unixtime(atime)','from_unixtime(ctime)'],
-                    names=('Inode','Mode','Filename','Del','File Size','Last Modified','Last Accessed','Created'),
-                    callbacks={'Del':DeletedIcon},
-                    table='file_%s as f, inode_%s as i' % (fsfd.table,fsfd.table),
-                    where="f.inode=i.inode",
-                    case=query['case'],
-                    links=[ FlagFramework.query_type((), case=query['case'],family=query['family'],report='ViewFile', fsimage=query['fsimage'],__target__='inode', inode="%s"),None, FlagFramework.query_type((),case=query['case'],family=query['family'],report='BrowseFS', fsimage=query['fsimage'],__target__='open_tree',open_tree="%s") ]
-                    )
-        except KeyError:
+            result.table(
+                columns=['f.inode','f.mode','concat(path,name)','f.status','size','from_unixtime(mtime)','from_unixtime(atime)','from_unixtime(ctime)'],
+                names=('Inode','Mode','Filename','Del','File Size','Last Modified','Last Accessed','Created'),
+                callbacks={'Del':DeletedIcon},
+                table='file_%s as f, inode_%s as i' % (fsfd.table,fsfd.table),
+                where="f.inode=i.inode",
+                case=query['case'],
+                links=[ FlagFramework.query_type((), case=query['case'],family=query['family'],report='ViewFile', fsimage=query['fsimage'],__target__='inode', inode="%s"),None, FlagFramework.query_type((),case=query['case'],family=query['family'],report='Browse Filesystem', fsimage=query['fsimage'],__target__='open_tree',open_tree="%s") ]
+                )
+
+        def tree_view(query,result):
             # default to tree view
             if (query.has_key("open_tree") and query['open_tree'] != '/'):
                 br = query['open_tree']
@@ -152,12 +152,12 @@ class BrowseFS(Reports.report):
 
             tmp = result.__class__(result)
             result.toolbar(scan_popup,"Scan this directory",icon="examine.png")
-            tmp2=result.__class__(result)
-            tmp2.row("Inspecting branch %s  " % br,tmp)
-            result.para(tmp2)
+#            tmp2=result.__class__(result)
+#            tmp2.row("Inspecting branch %s  " % br,tmp)
+#            result.para(tmp2)
 
             def tree_cb(branch):
-                path ='/'.join(branch)+'/'
+                path =FlagFramework.normpath('/'.join(branch)+'/')
                 ## We need a local copy of the filesystem factory so as not to affect other instances!!!
                 fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
 
@@ -169,8 +169,7 @@ class BrowseFS(Reports.report):
 
             def pane_cb(branch,tmp):
                 query['order']='Filename'
-                br=os.path.normpath('/'.join(branch))+'/'
-                if br=='//': br='/'
+                br=FlagFramework.normpath('/'.join(branch)+'/')
                 tmp.table(
                     columns=['f.inode','name','f.status','size', 'from_unixtime(mtime)','f.mode'],
                     names=('Inode','Filename','Del','File Size','Last Modified','Mode'),
@@ -178,11 +177,15 @@ class BrowseFS(Reports.report):
                     table='file_%s as f, inode_%s as i' % (fsfd.table,fsfd.table),
                     where="f.inode=i.inode and path=%r and f.mode!='d/d'" % (br),
                     case=query['case'],
-                    links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile', fsimage=query['fsimage'],__target__='inode', inode="%s")]
+                    links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='View File', fsimage=query['fsimage'],__target__='inode', inode="%s")]
                     )
         
             result.tree(tree_cb = tree_cb,pane_cb = pane_cb, branch = branch )
-            return result
+        
+        result.notebook(
+            names=["Tree View","Table View"],
+            callbacks=[tree_view,tabular_view],
+            )
 
     def form(self,query,result):
         try:
@@ -273,7 +276,7 @@ class ViewFile(Reports.report):
             result.text("Unable to classify file, no blocks: %s" % e)
             image = None
 
-        def download(query):
+        def download(query,result):
             """ Used for dumping the entire file into the browser """
             if image:
                 result.result=image.display()
@@ -284,9 +287,8 @@ class ViewFile(Reports.report):
                 result.binary=True
             return None
 
-        def hexdump(query):
+        def hexdump(query,out):
             """ Show the hexdump for the file """
-            out=self.ui()
             if image:
                 try:
                     max=config.MAX_DATA_DUMP_SIZE
@@ -319,7 +321,7 @@ class ViewFile(Reports.report):
 
             return out
 
-        def strings(query):
+        def strings(query,result):
             """ Draw the strings in a file """
             str = pyflag.Strings.StringExtracter(fd)
             try:
@@ -334,7 +336,7 @@ class ViewFile(Reports.report):
             del q['mode']
             del q['hexlimit']
             
-            output=self.ui()
+            output=result
             output.start_table()
             row_number=0
             file_offset=offset
@@ -362,9 +364,8 @@ class ViewFile(Reports.report):
 
             return output
 
-        def stats(query):
+        def stats(query,result):
             """ Show statistics about the file """
-            result=self.ui()
             istat = fsfd.istat(inode=query['inode'])
             left=self.ui()
             left.row("filename:",'',"%s/%s"%(path,name))

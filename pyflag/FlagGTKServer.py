@@ -70,7 +70,8 @@ class GTKServer(gtk.Window):
             self.toolhbox = toolhbox
             self.toolbars = {}
             self.connect("switch-page", self.switch)
-            
+            self.pagenum=0
+        
         def switch(self, notebook, page, pagenum):
             """ tab switch callback, update toobar """
             child = self.toolhbox.get_child()
@@ -79,7 +80,12 @@ class GTKServer(gtk.Window):
             if self.toolbars.has_key(pagenum):
                 self.toolhbox.add(self.toolbars[pagenum])
             self.toolhbox.show_all()
+            #Remember current pagenumber
+            self.pagenum=pagenum
 
+        def refresh_toolbar(self):
+            self.switch(None,None,self.pagenum)
+            
         def close_tab(self, action=None, page=None):
             """ close current tab """
             if not page:
@@ -257,7 +263,7 @@ class GTKServer(gtk.Window):
             self.form_dialog.connect('destroy',self.delete_form)
 
         box=gtk.VBox()
-        self.form_dialog.add_with_viewport(box)
+        self.form_dialog.add(box)
         result = self.flag.ui(server=self)
         try:
             report.progress(query,result)

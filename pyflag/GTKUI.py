@@ -138,13 +138,17 @@ class FlagTreeModel(gtk.GenericTreeModel):
     def path_from_node(self,node):
         """ Returns  a tuple representing the tree from node coordinates """
         path = self.base + [ self.cache[tuple(node[:i])][node[i]][0] for i in range(len(node)) ]
-        return path
+        return path[1:]
     
     def _cache_cb(self,branch):
+        if branch==():
+            self.cache[branch]=[("/",None,'branch')]
+            return
+        
         path=self.path_from_node(branch)
-        self.cache[branch]=[ d for d in self.callback(path) ]
+        self.cache[branch]=[ d for d in self.callback(path[1:]) ]
         if len(self.cache[branch])==0 or self.cache[branch][0][0]==None:
-            self.cache[branch]=[("",None,'leaf')]
+            self.cache[branch]=[("(empty)",None,'leaf')]
 
     def on_iter_has_child(self, node):
         '''returns true if this node has children'''
@@ -164,24 +168,24 @@ class FlagTreeModel(gtk.GenericTreeModel):
         
     def on_iter_n_children(self, node):
         '''returns the number of children of this node'''
+        if node==None: return 1
+        
         branch=node[:-1]
         index=node[-1]
+        
         try:
             ## Get the cached results from the callback
             results=self.cache[branch]
             return len(results)
         except KeyError:
-            return 0
+            return None
         
     def on_iter_nth_child(self, node, n):
         '''returns the nth child of this node'''
-        return
-        if node == None:
-            return (n,)
-
-        print node
-        results=self.cache[node]
-        return results[n][0]
+#        if node == None:
+#            return (n,)
+        ## I have no idea what this does, but it stops nasty GTK warnings (MC)
+        return (n,)
         
     def on_iter_parent(self, node):
         '''returns the parent of this node'''
@@ -366,10 +370,11 @@ class GTKUI(UI.GenericUI):
         
         def switch_cb(notepad, page, pagenum, callbacks, query):
             p = notepad.get_nth_page(pagenum)
-            print "page is %s" % p
             if not self.notebook_views.has_key(pagenum):
-                print "query is %s, cb is %s" % (query,callbacks[pagenum])
-                self.notebook_views[pagenum]=callbacks[pagenum](query).display()
+                result=self.__class__(self)
+                callbacks[pagenum](query,result)
+                self.notebook_views[pagenum]=result.display()
+                
                 p.add_with_viewport(self.notebook_views[pagenum])
                 p.show_all()
             
@@ -413,7 +418,6 @@ class GTKUI(UI.GenericUI):
             combobox.append_text(v)
             try:
                 if self.form_parms[name]==v:
-                   #print "form_parms already has %s -> %s" % (name,self.form_parms[name])
                    combobox.set_active(len(values)-idx)
                    idx = -2
             except KeyError:
@@ -772,7 +776,6 @@ class GTKUI(UI.GenericUI):
         else:
             order= " `%s` desc " % names[self.sort[0]]
 
-        print "order is %s" % order
         query_str+= " order by %s " % order
 
         #Calculate limits
@@ -782,7 +785,6 @@ class GTKUI(UI.GenericUI):
         self.previous = int(query['limit']) - config.PAGESIZE
         if self.previous<0: self.previous=0
 
-        print "setting self.previous to %s" % self.previous
         self.next = int(query['limit']) + config.PAGESIZE
         self.pageno =  int(query['limit']) /config.PAGESIZE
                 
@@ -857,6 +859,7 @@ class GTKUI(UI.GenericUI):
 
         def populate_store(store,generator,names):
             store.clear()
+            count=0
             for row in generator:
                 iter = store.append()
                 x=[iter]
@@ -865,6 +868,8 @@ class GTKUI(UI.GenericUI):
                     x.append(str(row[names[i]]))
 
                 store.set(*x)
+                count+=1
+            return count
 
         populate_store(store,generator,names)
         ## Create a new widget
@@ -885,7 +890,7 @@ class GTKUI(UI.GenericUI):
             store=column.get_data('store')
             name=column.get_data('name')
             number=column.get_data('number')
-            self.sort[2].set_sort_indicator(FALSE)
+            self.sort[2].set_sort_indicator(False)
             self.sort[-1]=column
             self.sort[0]=number
             column.set_sort_indicator(True)
@@ -908,40 +913,54 @@ class GTKUI(UI.GenericUI):
             self.right_button.set_data('query',q)
             self.left_button.set_data('query',q)
 
+
+        # add nav toolitems directly to the toolbar
+        prev_button = gtk.ToolButton(gtk.STOCK_GO_BACK)
+        next_button = gtk.ToolButton(gtk.STOCK_GO_FORWARD)
+
         def previous_cb(widget):
             del self.defaults['limit']
             self.defaults['limit']=self.previous
             self.previous-=config.PAGESIZE
             if self.previous<0:
                 self.previous=0
-                #widget.set_sensitive(gtk.FALSE)
+                self.next=self.previous+config.PAGESIZE
+                prev_button.set_sensitive(False)
 
             ## Get new SQL iterator:
             generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks)
             
-            populate_store(store,generator,names)
-            return result
+            count=populate_store(store,generator,names)
+            if count==config.PAGESIZE:
+                next_button.set_sensitive(True)
+            else: next_button.set_sensitive(False)
+                
+#            return result
 
         def next_cb(widget):
+            old_next=self.next
             del self.defaults['limit']
             self.defaults['limit']=self.next
             self.next+=config.PAGESIZE
-
             ## Get new SQL iterator:
             generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks)
             self.defaults=new_query
-            populate_store(store,generator,names)
+            count=populate_store(store,generator,names)
+            if count<config.PAGESIZE:
+                self.next=old_next
+                next_button.set_sensitive(False)
+            else: next_button.set_sensitive(True)
 
-        # add nav toolitems directly to the toolbar
-        button = gtk.ToolButton(gtk.STOCK_GO_BACK)
-        button.set_tooltip(self.tooltips, 'Go to Previous Page')
-        button.connect('clicked', previous_cb)
-        self.toolbar_ui.insert(button, 0)
+            if self.next>0:
+                prev_button.set_sensitive(True)
 
-        button = gtk.ToolButton(gtk.STOCK_GO_FORWARD)
-        button.set_tooltip(self.tooltips, 'Go to Next Page')
-        button.connect('clicked', next_cb)
-        self.toolbar_ui.insert(button, 1)
+        prev_button.set_tooltip(self.tooltips, 'Go to Previous Page')
+        prev_button.connect('clicked', previous_cb)
+        self.toolbar_ui.insert(prev_button, 0)
+        next_button.set_tooltip(self.tooltips, 'Go to Next Page')
+        next_button.connect('clicked', next_cb)
+        self.toolbar_ui.insert(next_button, 1)
+        previous_cb(None)
 
         # add to a scrolled window
         sw = gtk.ScrolledWindow()
@@ -1005,7 +1024,6 @@ class GTKUI(UI.GenericUI):
                 del new_query['__target__']
                 del new_query[target]
                 new_query[target] = model.get_value(iter,column.get_data('column_number'))
-                print "new value is %s" % new_query
                 self.link_callback(new_query)
                 
         treeview.connect('button-press-event',click_callback)                    
@@ -1018,7 +1036,7 @@ class GTKUI(UI.GenericUI):
         """
         hbox=gtk.HPaned()
         sw = gtk.ScrolledWindow()
-        hbox.set_size_request(800, 400)
+        #hbox.set_size_request(800, 400)
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         hbox.add1(sw)
         
@@ -1033,12 +1051,17 @@ class GTKUI(UI.GenericUI):
         def selection_changed(selection):
             treeview = selection.get_tree_view()
             model, iter  = selection.get_selected()
-            path=model.get_path(iter)
-            ## Call the pane callback with the selected item
-            print model.path_from_node(path)
-            result=self.__class__()
-            pane_cb(model.path_from_node(path),result)
-
+            result=self.__class__(self)
+                
+            try:
+                path=model.get_path(iter)
+                ## Call the pane callback with the selected item
+                path=model.path_from_node(path)
+                if path[-1]!="(empty)":
+                    pane_cb(path,result)
+            except TypeError:
+                pane_cb('/',result)
+                
             ## Rip the widget from result and stick it in place of the old instance
             try:
                 hbox.remove(self.right_pane)
@@ -1052,8 +1075,13 @@ class GTKUI(UI.GenericUI):
             self.right_pane.add_with_viewport(result.display())
             hbox.add2(self.right_pane)
             hbox.show_all()
+            self.server.notebook.refresh_toolbar()
 
         selection = treeview.get_selection()
+        selection_changed(selection)
+                
         selection.set_mode(gtk.SELECTION_SINGLE)
         selection.connect('changed', selection_changed)
-        self.row(hbox)
+        self.result.pack_start(hbox)
+        hbox.set_position(200)
+        #self.row(hbox)
