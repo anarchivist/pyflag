@@ -900,7 +900,7 @@ class GTKUI(UI.GenericUI):
             self.right_button.set_data('query',q)
             self.left_button.set_data('query',q)
 
-        def previous_cb(query,result):
+        def previous_cb(widget):
             del self.defaults['limit']
             self.defaults['limit']=self.previous
             self.previous-=config.PAGESIZE
@@ -914,7 +914,7 @@ class GTKUI(UI.GenericUI):
             populate_store(store,generator,names)
             return result
 
-        def next_cb(query,result):
+        def next_cb(widget):
             del self.defaults['limit']
             self.defaults['limit']=self.next
             self.next+=config.PAGESIZE
@@ -923,10 +923,18 @@ class GTKUI(UI.GenericUI):
             generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks)
             self.defaults=new_query
             populate_store(store,generator,names)
-            return result
-        
-        self.toolbar(previous_cb,"Prev Page",stock=gtk.STOCK_GO_BACK,tooltip="Go to Previous page",popup=False)
-        self.toolbar(next_cb,"Next Page",stock=gtk.STOCK_GO_FORWARD,tooltip="Go to Next page",popup=False)
+
+        # add nav toolitems directly to the toolbar
+        button = gtk.ToolButton(gtk.STOCK_GO_BACK)
+        button.set_tooltip(self.tooltips, 'Go to Previous Page')
+        button.connect('clicked', previous_cb)
+        self.toolbar_ui.insert(button, 0)
+
+        button = gtk.ToolButton(gtk.STOCK_GO_FORWARD)
+        button.set_tooltip(self.tooltips, 'Go to Next Page')
+        button.connect('clicked', next_cb)
+        self.toolbar_ui.insert(button, 1)
+
         self.row(treeview)
 
         ## Create a group by selector
