@@ -340,6 +340,7 @@ int sgzip_read_random(char *buf, int len, unsigned long long int offs,
     free(data);
     free(temp);
 
+    return(0);
     RAISE(E_IOERROR,NULL,"Attempt to seek past the end of the file (block %lu requested from a %u blocks file)",block_offs,(header->x.max_chunks));
   };
   

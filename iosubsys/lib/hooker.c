@@ -55,6 +55,9 @@ void load_library(void) {
   HOOK(fopen);
   HOOK(fclose);
   HOOK(fread);
+
+  //Remove the LD_PRELOAD now that we are already hooked. This is needed if something else needs to fork later:
+    unsetenv("LD_PRELOAD");
 };
 
 //This function initialises the hooker
@@ -287,4 +290,14 @@ int fclose(FILE *stream) {
     return 0;
   };
   return dispatch->fclose(stream);
+};
+
+int stat(const char *file_name, struct stat *buf) {
+  buf->st_size=-1;
+  return(0);
+};
+
+int __xstat64 (int __ver, __const char *__filename, struct stat *buf) {
+  buf->st_size=-1;
+  return(0);
 };

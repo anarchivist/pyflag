@@ -51,3 +51,6 @@ IO_INFO *io_open(char *name);
 void io_parse_options(IO_INFO *io,char *opts) ;
 int io_close(IO_INFO *self);
 void io_help(char *name) ;
+
+#define CHECK_OPTION(i,x) !strncasecmp(i->option, #x, strlen(#x))
+#define NEW(x) (x *)malloc(sizeof(x))

@@ -7,6 +7,7 @@ initialised through the correct IO subsystem.
 #include "iosubsys.h"
 #include "sgzlib.h"
 #include "libevf.h"
+#include "remote.h"
 #include "except.h"
 
 inline int min(int x, int y) {
@@ -86,7 +87,7 @@ int std_initialiser(IO_INFO *io,IO_OPT *args) {
   for(;args;args=args->next) { 
     if(!args->value || strlen(args->value)==0) {
       self->name=strdup(args->option);
-    } else if(!strcmp(args->option,"filename")) {
+    } else if(CHECK_OPTION(args,filename)) {
       self->name=strdup(args->value);
     };
   };
@@ -201,7 +202,7 @@ int adv_add_file_to_split_list(IO_INFO_ADV *io,const char *name) {
   long long int max_offset=0;
   long long int file_size=0;
   
-  file=(struct adv_split_file *)malloc(sizeof(struct adv_split_file));
+  file=NEW(struct adv_split_file);
   if(!file) RAISE(E_NOMEMORY,NULL,"Cant Malloc");
 
   file->next=NULL;  
@@ -248,11 +249,11 @@ int adv_initialiser(IO_INFO *self,IO_OPT *args) {
     if(i->option && (!i->value || strlen(i->value)==0)) {
       adv_add_file_to_split_list(io,i->option);
       continue;
-    }else if(!strncasecmp(i->option,"file",strlen("file"))) {
+    }else if(CHECK_OPTION(i,file)) {
       adv_add_file_to_split_list(io,i->value);
       fprintf(stderr, "Set file to read from as %s\n",i->value);
       continue;
-    } else if(!strncasecmp(i->option,"offset",strlen("offset"))) {
+    } else if(CHECK_OPTION(i,offset)) {
       io->offset=atoll(i->value);
       continue;
     };
@@ -353,11 +354,11 @@ int sgz_initialiser(IO_INFO *self,IO_OPT *args) {
     if(i->option && (!i->value || strlen(i->value)==0)) {
       io->name=strdup(i->option);
       continue;
-    }else if(!strncasecmp(i->option,"file",strlen("file"))) {
+    }else if(CHECK_OPTION(i,file)) {
       io->name=strdup(i->value);
       fprintf(stderr, "Set file to read from as %s\n",i->value);
       continue;
-    } else if(!strncasecmp(i->option,"offset",strlen("offset"))) {
+    } else if(CHECK_OPTION(i,offset)) {
       io->offset=atoll(i->value);
       continue;
     };
@@ -480,7 +481,7 @@ int ewf_initialiser(IO_INFO *self,IO_OPT *args) {
   };
   
   for(i=args;i;i=i->next) {
-    if(!strncasecmp(i->option,"help",strlen("help"))) {
+    if(CHECK_OPTION(i,help)) {
       self->help();
       continue;
 
@@ -489,10 +490,10 @@ int ewf_initialiser(IO_INFO *self,IO_OPT *args) {
     } else if(i->option && (!i->value || strlen(i->value)==0)) {
       return(ewf_add_file(io,strdup(i->option)));
 
-    }else if(!strncasecmp(i->option,"file",strlen("file"))) {
+    }else if(CHECK_OPTION(i,file)) {
       return(ewf_add_file(io,strdup(i->value)));
 
-    } else if(!strncasecmp(i->option,"offset",strlen("offset"))) {
+    } else if(CHECK_OPTION(i,offset)) {
       io->offs=atoll(i->value);
       continue;
     };
@@ -611,7 +612,7 @@ struct raid_element {
 };
 
 struct raid_element *new_raid_element() {
-  struct raid_element *tmp = (struct raid_element *)malloc(sizeof(struct raid_element));
+  struct raid_element *tmp = NEW(struct raid_element );
 
   if(!tmp) RAISE(E_NOMEMORY,NULL,"Malloc failed");
   tmp->next = 0;
@@ -764,7 +765,7 @@ int raid_initialiser(IO_INFO *self,IO_OPT *args) {
     if(i->option && (!i->value || strlen(i->value)==0)) {
       add_raid_element(io,i->option);
       continue;
-    } else if(!strncasecmp(i->option,"file",strlen("file"))) {
+    } else if(CHECK_OPTION(i,file)) {
       add_raid_element(io,i->value);
       continue;
     } else if(!strcasecmp(i->option,"blocksize")) {
@@ -887,6 +888,110 @@ int raid_read_random(IO_INFO *self, char *buf, int len, off_t offs,
     return(read_len);
 }
 
+/********************************************
+ *      Remote Access subsystem 
+
+ *    This subsystem is used to access a machine over the network to
+ *    do remote analysis of its hard disk. There are two ways of using this:
+
+1. The remote machine must have an ssh server installed, and the remote server program somewhere on the path. This method encrypts and authenticates access. The subsystem will call ssh to create a tunnel between the analysis machine and the remote server.
+
+2. The remote server will be listening over TCP in a certain port. Note that this provides *NO* Encryption or authentication.
+
+*****************************************/
+struct IO_INFO_REMOTE {
+  IO_INFO io;
+  long long unsigned int offset;
+  char *remote_host;
+  char *remote_server_path;
+  char *remote_raw_device;
+  char *username;
+  struct remote_handle *hndl;
+};
+
+typedef struct IO_INFO_REMOTE IO_INFO_REMOTE;
+
+void remote_help(void) {
+  printf("A remote access subsystem\n");
+  printf("This is used to access a remote device on a remote system. It may be invoked using ssh (in which case we have authentication and encryption), or over a TCP/IP link to a remote server.\n\n");
+  printf("\toffset=bytes\t\tOffset from the start of the device\n");
+  printf("\thost=hostname\t\tHostname of target\n");
+  printf("\tuser=name\t\t Username at the remote target to use with ssh. This defaults to root\n");
+  printf("\tserver_path=path\t\tPath on the server where we can find the remote server program.\n");
+  printf("\tdevice=path\t\tRaw device to make available on the remote system.\n");
+};
+
+int remote_read_random(IO_INFO *self, char *buf,int len, off_t offs,
+		    const char *comment) {
+  IO_INFO_REMOTE *io=(IO_INFO_REMOTE *)self;
+  char *data=NULL;
+
+  offs+=io->offset;
+
+  remote_read_data(io->hndl,offs,&data,&len);
+  memcpy(buf,data,len);
+  free(data);
+  return(len);
+};
+
+int remote_initialiser(IO_INFO *self,IO_OPT *args) {
+  IO_OPT *i;
+  IO_INFO_REMOTE *io=(IO_INFO_REMOTE *)self;
+
+  //Set some defaults
+  io->username="root";
+  io->remote_host="localhost";
+  io->remote_server_path="remote_server";
+  io->remote_raw_device="/dev/hdc";
+  io->hndl = NEW(struct remote_handle);
+
+  for(i=args;i;i=i->next) {
+    if(CHECK_OPTION(i,offset)) {
+      io->offset=atoll(i->value);
+      continue;
+    } else if(CHECK_OPTION(i,host)) {
+      io->remote_host = strdup(i->value);
+      continue;
+    } else if(CHECK_OPTION(i,server_path)) {
+      io->remote_server_path = strdup(i->value);
+      continue;
+    } else if(CHECK_OPTION(i,device)) {
+      io->remote_raw_device=strdup(i->value);
+      continue;
+    } else if(CHECK_OPTION(i,user)) {
+      io->username=strdup(i->value);
+      continue;
+    };
+
+    // If we get here we did not recognise this option, raise an
+    // error:
+    RAISE(E_GENERIC,NULL,"option %s not recognised",i->option);
+  };
+};
+
+int remote_open(IO_INFO *self) {
+  IO_INFO_REMOTE *io=(IO_INFO_REMOTE *)self;
+  char *argv[8];
+
+  //We formulate the argvs we need for invoking the server:
+  argv[0]="ssh";
+  argv[1]="-l";
+  argv[2]=io->username;
+  argv[3]=io->remote_host;
+  argv[4]=io->remote_server_path;
+  argv[5]=io->remote_raw_device;
+  argv[6]=0;
+
+  remote_open_server(io->hndl, argv);
+};
+
+int remote_close(IO_INFO *self) {
+  IO_INFO_REMOTE *io=(IO_INFO_REMOTE *)self;
+
+  printf("Trying to kill process %u\n",io->hndl->pid);
+  kill(io->hndl->pid,SIGTERM);
+};
+
 /* These serve as classes (i.e. templates which each object
    instantiates). */
 static IO_INFO subsystems[] ={
@@ -905,6 +1010,9 @@ static IO_INFO subsystems[] ={
   { "raid","Raid 5 implementation",sizeof(IO_INFO_RAID),&io_constructor,&free,  
     &raid_help, &raid_initialiser, &raid_read_random, &raid_open, &raid_close,0},
 
+  { "remote","Remote Access Manipulation",sizeof(IO_INFO_REMOTE),&io_constructor,
+    &free,&remote_help,&remote_initialiser, &remote_read_random,&remote_open, &remote_close,0},
+
   //Sentinel
   { NULL, NULL, 0, NULL, NULL,
     NULL, NULL, NULL, NULL, NULL }
@@ -914,7 +1022,7 @@ static IO_INFO subsystems[] ={
 IO_OPT *new_io_opt() {
   IO_OPT *result;
 
-  result=(IO_OPT *)malloc(sizeof(IO_OPT));
+  result=NEW(IO_OPT);
   if(!result) RAISE(E_NOMEMORY,NULL,"Malloc");
   result->option=NULL;
   result->value=NULL;

@@ -1,3 +1,5 @@
+#include <sys/stat.h>
+
 //We call hard exit when hooking exit()
 extern void _exit(int);
 
