@@ -116,23 +116,19 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                     )
 
             def tree_notebook_cb(query,result):
-                if (query.has_key("open_tree") and query['open_tree'] != '/'):
-                    br = query['open_tree']
-                else:
-                    br = '/'
-                    
-                tmp=result.__class__(result)
-                dbh.execute("select from_unixtime(modified) as time from reg_%s where path=%r",(tablename,br))
-                row=dbh.fetch()
-                try:
-                    tmp.text("Last modified %s " % row['time'],color='red')
-                    result.row(tmp)
-                except TypeError:
-                    pass
-                    
+                
                 def pane_cb(branch,table):
                     path = FlagFramework.normpath('/'.join(branch))
+                    tmp=result.__class__(result)
+                    dbh.execute("select from_unixtime(modified) as time from reg_%s where path=%r",(tablename,path))
+                    row=dbh.fetch()
 
+                    try:
+                        tmp.text("Last modified %s " % row['time'],color='red')
+                        table.row(tmp)
+                    except TypeError:
+                        pass
+                    
                     # now display keys in table
                     new_q['mode'] = 'display'
                     new_q['path']=path
