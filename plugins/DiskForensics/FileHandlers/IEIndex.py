@@ -6,6 +6,8 @@ import os.path
 import pyflag.logging as logging
 import pyflag.Scanner as Scanner
 import pyflag.Reports as Reports
+import pyflag.conf
+config=pyflag.conf.ConfObject()
 
 ## raise Exception("This module not finished yet")
 

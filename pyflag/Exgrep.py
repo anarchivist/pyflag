@@ -167,6 +167,13 @@ cut["MaxLength"]=1000000
 cut["Comment"]="Windows movie file"
 definitions.append(cut)
 
+cut={}
+cut["Extension"]="zip"
+cut['StartRE']= "PK\\x03\\x04"
+cut["MaxLength"]=1000000
+cut["Comment"]="Zip file"
+definitions.append(cut)
+
 for i in definitions:
     i["CStartRE"]=re.compile(i["StartRE"])
     try:
@@ -177,8 +184,8 @@ import pyflag.IO as IO
 
 def process_string(string,extension=None):
     """ This is just like process except it operates on a string """
-    offset=0
     for cut in definitions:
+        offset=0
         if extension and cut['Extension'] not in extension: continue
         while 1:
             match=cut['CStartRE'].search(string,offset)
@@ -194,7 +201,7 @@ def process_string(string,extension=None):
                 yield({'offset':offset,'length':length,'type':cut['Extension']})
                 offset+=1
             else:
-                return
+                break
     
 def process(case,subsys,extension=None):
     """ A generator to produce all the recoverable files within the io object identified by identifier

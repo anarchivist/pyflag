@@ -12,13 +12,14 @@ from pyflag.FileSystem import File
 import pyflag.FileSystem as FileSystem
 import pyflag.DB as DB
 import pyflag.Exgrep as Exgrep
+import pyflag.Scanner as Scanner
 
 #hidden = True
 
 class UnallocatedScan(GenScanFactory):
     """ Scan unallocated space for files.
 
-    Unallocated space is defined as slack space (the space between the end of a file and the next block alignments) as well as unallocated blocks. This does not include allocated blocks which simply do not have file entries (e.g. deleted files).
+    Unallocated space is defined as slack space (the space between the end of a file and the next block alignments) as well as unallocated blocks. This does not include allocated blocks which simply do not have file entries (e.g. deleted files). Deleted files are handled in another scanner.
     """
     order=100
     def reset(self):
@@ -33,6 +34,13 @@ class UnallocatedScan(GenScanFactory):
         self.dbh.execute("drop table if exists unallocated_%s" ,self.table)
         self.dbh.execute("CREATE TABLE unallocated_%s (`inode` VARCHAR(50) NOT NULL,`offset` BIGINT NOT NULL,`size` BIGINT NOT NULL)",self.table)
         unalloc_blocks = []
+
+        ## We ask the filesystem whats the blocksize - if we dont know, we use 1
+        try:
+            blocksize=self.ddfs.block_size
+        except AttributeError:
+            blocksize=1
+
         count=0
         ## Now we work out the unallocated blocks by looking at the blocks table:
         last = (0,0)
@@ -44,8 +52,8 @@ class UnallocatedScan(GenScanFactory):
             new_block = ( last[0],row['block']-last[0])
             if new_block[1]>0:
                 ## Add the offset into the db table:
-                offset = new_block[0] * self.fsfd.block_size
-                size = new_block[1] * self.fsfd.block_size
+                offset = new_block[0] * blocksize
+                size = new_block[1] * blocksize
                 dbh2.execute("insert into unallocated_%s set inode='U%s',offset=%r,size=%r",(
                     self.table, count, offset, size))
 
@@ -56,20 +64,44 @@ class UnallocatedScan(GenScanFactory):
 
             last=(row['block']+row['count'],0,row['inode'])
 
+        ## Now we need to add the last unalloced block. This starts at
+        ## the last allocated block, and finished at the end of the IO
+        ## source. The size of -1 makes the VFS driver keep reading till the end.
+        offset = last[0] * blocksize
+        dbh2.execute("insert into unallocated_%s set inode='U%s',offset=%r,size=%r", (self.table,count,offset, -1))
+
+        ## Add a new VFS node:
+        self.fsfd.VFSCreate(None,'U%s' % count, "/_unallocated_/%s" % offset)
+
+
     class Scan:                
         def __init__(self, inode,ddfs,outer,factories=None):
             self.inode=inode
             self.ddfs=ddfs
             self.outer=outer
             self.factories=factories
+            ## This stores the absolute offset in the file we are scanning
+            self.offset=0
             
         def process(self,data,metadata=None):
-            if self.inode.startswith('U'):
+            ## We only scan top level Unallocated inodes
+            if self.inode.startswith('U') and "|" not in self.inode:
                 for cut in Exgrep.process_string(data):
                     ## Create a VFS node:
-                    self.outer.fsfd.VFSCreate(self.inode,'U%s' % cut['offset'],"%s.%s" % (cut['offset'],cut['type']),size=cut['length'])
-                    self.outer.dbh.execute("insert into unallocated_%s set inode='%s|U%s',offset=%r,size=%r" , (self.outer.table,self.inode,cut['offset'],cut['offset'],cut['length']))
+                    offset = cut['offset']+self.offset
+                    self.outer.fsfd.VFSCreate(self.inode,'U%s' % offset,"%s.%s" % (offset,cut['type']),size=cut['length'])
+                    self.outer.dbh.execute("insert into unallocated_%s set inode='%s|U%s',offset=%r,size=%r" , (self.outer.table,self.inode,offset,offset,cut['length']))
 
+                    ## Now scan the newfound file:
+                    fd = self.ddfs.open(inode='%s|U%s' % (self.inode,offset))
+                    tmp = fd.read(100)
+                    print "%r" % tmp
+                    fd.seek(0)
+                    print "inode is %s" % fd.inode
+                    Scanner.scanfile(self.ddfs,fd,self.factories)
+                ## End of for
+                self.offset += len(data)
+                
         def finish(self):
             pass
 
@@ -113,11 +145,15 @@ class Unallocated_File(FileSystem.File):
         self.offset=row['offset']
 
     def read(self,length=None):
-        if (length == None) or ((length + self.readptr) > self.size):
-            length = self.size - self.readptr
+        if self.size>0:
+            if (length == None) or ((length + self.readptr) > self.size):
+                length = self.size - self.readptr
 
-        if length == 0:
-            return ''
+            if length == 0:
+                return ''
+        else:
+            if length==None:
+                raise IOError("Unable to read entire IO source into memory")
 
         self.fd.seek(self.readptr+self.offset)
         result =self.fd.read(length)

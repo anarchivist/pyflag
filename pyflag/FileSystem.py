@@ -363,7 +363,7 @@ class File:
         else:
             self.readptr = offset
             
-        if(self.readptr > self.size):
+        if(self.size>0 and self.readptr > self.size):
             self.readptr = self.size
          
     def tell(self):
