@@ -78,7 +78,9 @@ class NewCase(Reports.report):
     def display(self,query,result):
         result.heading("Case Created")
         result.para("\n\nThe database for case %s has been created" %query['create_case'])
-        result.link("Proceed to load data", FlagFramework.query_type((), case=query['create_case'], family="Load Data", report="Load IO Data Source"))
+        result.link("Load a Disk Image", FlagFramework.query_type((), case=query['create_case'], family="Load Data", report="Load IO Data Source"))
+	result.para('')
+        result.link("Load a preset Log File", FlagFramework.query_type((), case=query['create_case'], family="Load Data", report="Load Preset Log File"))
         return result
 
 class DelCase(Reports.report):
