@@ -342,16 +342,9 @@ class GTKUI(UI.GenericUI):
         # draw the notebook
         notebook = gtk.Notebook()
         notebook.connect('switch-page', switch_cb, callbacks, query)
-        
-        for n in range(len(names)):
-            ## If a context is set, we render it now.
-            if(names[n]==context_str):
-                cb = callbacks[n](query)
-                self.notebook_views[n]=cb.display()
-                notebook.append_page(self.notebook_views[n], gtk.Label(names[n]))
-            else:
-                notebook.append_page(gtk.VBox(), gtk.Label(names[n]))
-
+        for name in names:
+            notebook.append_page(gtk.VBox(), gtk.Label(name))
+            
         self.result.pack_start(notebook)
                 
     def link(self,string,target=FlagFramework.query_type(()),**target_options):
