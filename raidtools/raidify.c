@@ -51,7 +51,7 @@ void raidify(char *in_file_name,struct raid_element *raid,int number_of_elements
   int i,j;
   int len=0;
   int infd=open(in_file_name, O_RDONLY);
-  char buf[BUFFSIZE];
+  char buf[BUFFSIZE+10];
 
   while(1) {
     memset(buf,0,BUFFSIZE);

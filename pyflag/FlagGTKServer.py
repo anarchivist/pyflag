@@ -35,7 +35,7 @@ import gtk,gtk.gdk
 
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
-import pyflag.GTKUI
+import pyflag.GTKUI as GTKUI
 from GTKUI import FlagNotebook,FlagToolbar
 import pyflag.TypeCheck as TypeCheck
 import pyflag.conf
@@ -50,7 +50,7 @@ def error_popup(e):
     @arg e: The exception object to print
     """
     dialog=gtk.Window()
-    result=pyflag.GTKUI.GTKUI()
+    result=GTKUI.GTKUI(server=main,ftoolbar=main.ftoolbar)
     FlagFramework.get_traceback(e,result)
     frame=gtk.Frame(result.title)
     result.title=None
@@ -123,10 +123,8 @@ class GTKServer(gtk.Window):
         # initialize flag
         self.flag = FlagFramework.Flag()
         FlagFramework.GLOBAL_FLAG_OBJ = self.flag
-
-        import pyflag.GTKUI
-
-        self.flag.ui = pyflag.GTKUI.GTKUI
+        
+        self.flag.ui = GTKUI.GTKUI
 
         # set some window properties
         self.set_title('PyFLAG')
@@ -318,18 +316,20 @@ class GTKServer(gtk.Window):
             else:
                 self.form_dialog=gtk.Window()
                 self.form_dialog.set_transient_for(self)
+                self.form_frame=gtk.Frame("%s" % report.name) 
                 #self.form_dialog.set_position(gtk.WIN_POS_CENTER_ON_PARENT)
-                self.form_dialog.set_position(gtk.WIN_POS_CENTER_ALWAYS)
-                #self.form_dialog.set_default_size(500,500)
+#                self.form_dialog.set_position(gtk.WIN_POS_CENTER_ALWAYS)
+#                self.form_dialog.set_default_size(500,500)
                 self.form_dialog.connect('destroy',self.delete_form)
+
             box=gtk.VBox()
-            self.form_dialog.add(box)
             toolbar=FlagServerToolbar(box)
             result = self.flag.ui(server=self,ftoolbar=toolbar)
             result.start_form(query)
-            print report
             try:
                 report.form(query,result)
+            except GTKUI.DontDraw,e:
+                return
             except Exception,e:
                 error_popup(e)
                 raise
@@ -337,7 +337,12 @@ class GTKServer(gtk.Window):
             ## Set the callback to ourselves:
             result.link_callback = self.draw_form
             result.end_form()
-            box.add(result.display())
+            
+            if self.form_frame.get_child():
+                self.form_frame.remove(self.form_frame.get_child())
+                
+            self.form_frame.add(result.display())
+            self.form_dialog.add(self.form_frame)
             self.form_dialog.show_all()
 
     def add_page(self, query):
@@ -419,6 +424,14 @@ class GTKServer(gtk.Window):
 
         # Add a UI description
         self.uimanager.add_ui_from_string(ui)
+
+    def create_window(self,widget):
+        """ Creates a new window and puts widget in it """
+        dialog=gtk.Window()
+        dialog.add(widget)
+        dialog.show_all()
+        return dialog
+
 
 ### BEGIN MAIN ####
 if __name__ == "__main__":

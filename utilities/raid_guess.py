@@ -106,7 +106,6 @@ if __name__=="__main__":
         return '.'.join(str)
 
     maps.append((6,6*16,gen_smartarray(6)))
-    print maps
 
     best_s=''
     best_len=0

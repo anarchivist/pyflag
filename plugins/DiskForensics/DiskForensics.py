@@ -281,7 +281,7 @@ class ViewFile(Reports.report):
                 
         def hexdump(query,out):
             """ Show the hexdump for the file """
-            if image:
+            if fd:
                 try:
                     max=config.MAX_DATA_DUMP_SIZE
                 except AttributeError:
@@ -292,7 +292,9 @@ class ViewFile(Reports.report):
                     limit=int(query['hexlimit'])
                 except KeyError:
                     limit=0
-                dump = FlagFramework.HexDump(image.display(),out)
+                    
+                fd.seek(limit)
+                dump = FlagFramework.HexDump(fd.read(max),out)
                 dump.dump(offset=limit,limit=max)
 
                 #Do the navbar

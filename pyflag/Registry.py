@@ -204,6 +204,7 @@ class ReportRegistry(Registry):
         return result[0]
     
     def check_class(self,Class):
+        ## If the report is missing any of those an exception will be raised...
         Class.display
         Class.analyse
         Class.progress
@@ -240,6 +241,21 @@ class VFSFileRegistry(Registry):
                 raise Exception("Class %s has the same specifier as %s. (%s)" % (cls,self.vfslist[cls.specifier],cls.specifier))
             self.vfslist[cls.specifier] = cls
 
+class FileSystemRegistry(Registry):
+    """ A class to register FileSystems.
+
+    FileSystems control the internal representation of the filesystem structure, the loading of this from an image and the browsing of the filesystem. Note that this is different than VFS which deal with how to read individual files from the FileSystem, but both are confined to use the same DBFS schema at present.
+    """
+    filesystems = {}
+    def __init__(self,ParentClass):
+        Registry.__init__(self,ParentClass)
+        for cls in self.classes:
+            if self.filesystems.has_key(cls.name):
+                raise Exception("Class %s has the same specifier as %s. (%s)" % (cls,self.filesystems[cls.name],cls.name))
+            ## A name of None will prevent from loading into Registry
+            if cls.name:
+                self.filesystems[cls.name] = cls
+
 class ShellRegistry(Registry):
     """ A class to manage Flash shell commands """
     commands = {}
@@ -271,6 +287,7 @@ SCANNERS = None
 VFS_FILES = None
 LOG_DRIVERS = None
 SHELL_COMMANDS = None
+FILESYSTEMS = None
 
 ## This is required for late initialisation to avoid dependency nightmare.
 def Init():
@@ -303,3 +320,8 @@ def Init():
     import pyflag.pyflagsh as pyflagsh
     global SHELL_COMMANDS
     SHELL_COMMANDS = ShellRegistry(pyflagsh.command)
+
+    ## Register Filesystem drivers
+    import pyflag.FileSystem as FileSystem
+    global FILESYSTEMS
+    FILESYSTEMS = FileSystemRegistry(FileSystem.FileSystem)

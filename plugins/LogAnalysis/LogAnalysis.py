@@ -158,6 +158,19 @@ class CreateLogPreset(Reports.report):
         return result
 
     def form(self,query,result):
+        def step1(query,result):
+            result.row("Select a sample log file for the previewer")
+            tmp = result.__class__(result)
+            tmp.filebox()
+            result.row("Enter name of log file:",tmp)
+
+
+        result.wizard(
+            names = ( "Select File",),
+            callbacks = (step1,)
+            )
+
+        return
         try:
             result.start_table()
             result.ruler()

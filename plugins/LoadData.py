@@ -298,7 +298,8 @@ class LoadFS(Reports.report):
             dbh = self.DBO(query['case'])
             fd=IO.open(query['case'],query['iosource'])
 
-            fs_types = Sleuthkit.filesystems(fd)
+##            fs_types = Sleuthkit.filesystems(fd)
+            fs_types = Registry.FILESYSTEMS.filesystems.keys()
 
             ## Draw a list of checkboxes for all our scanners:
             result.ruler()
@@ -311,10 +312,10 @@ class LoadFS(Reports.report):
                 result.row("Magic identifies this file as: %s" % magic.buffer(fd.read(10240)),colspan=50,bgcolor=config.HILIGHT)
                 fd.close()
 
-                result.const_selector("Enter Filesystem type",'fstype',fs_types[0],fs_types[1])
+                result.const_selector("Enter Filesystem type",'fstype',fs_types,fs_types)
                 result.ruler()
             except FlagFramework.FlagException:
-                result.hidden('fstype','mounted')
+                result.hidden('fstype','Mounted')
             
         except (KeyError,IOError,TypeError):
             pass
@@ -327,8 +328,12 @@ class LoadFS(Reports.report):
         #Check to see if we have done this part previously
         if dbh.get_meta('fsimage')!=query['iosource']:
             tablename=dbh.MakeSQLSafe(query['iosource'])
-            # call on sleuthkit module to shell out and load data
-            Sleuthkit.load_sleuth(query['case'],query['fstype'],tablename,query['iosource'])
+            io = IO.open(query['case'],query['iosource'])
+            # call on FileSystem to load data
+            print query['fstype']
+            fsobj=Registry.FILESYSTEMS.filesystems[query['fstype']](query['case'],tablename,io)
+            fsobj.load()
+##            Sleuthkit.load_sleuth(query['case'],query['fstype'],tablename,query['iosource'])
 
             self.progress_str="Creating file and inode indexes"        
             #Add indexes:
@@ -406,7 +411,9 @@ class LoadFS(Reports.report):
     def reset(self,query):
         dbh = self.DBO(query['case'])
         tablename = dbh.MakeSQLSafe(query['iosource'])
-        Sleuthkit.del_sleuth(query['case'],tablename)
+        fsobj=Registry.FILESYSTEMS.filesystems[query['fstype']](query['case'],tablename,query['iosource'])
+        fsobj.delete()
+##        Sleuthkit.del_sleuth(query['case'],tablename)
         iofd=IO.open(query['case'],query['iosource'])
         fsfd=FileSystem.FS_Factory( query["case"], query["iosource"], iofd)
 

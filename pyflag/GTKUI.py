@@ -46,6 +46,12 @@ import re
 
 #config.LOG_LEVEL=7
 
+class DontDraw(Exception):
+    """ Exception raised by a UI to let the server know not to draw it.
+
+    This is mainly used by the form method to allow a UI to manage its own window
+    """
+
 class GTK_Draw_Form_Exception(Exception):
     """ This exception is raised when we want to draw a form """
     def __init__(self,query):
@@ -403,12 +409,18 @@ class GTKUI(UI.GenericUI):
             right_attach = i+1            
             if options.has_key('colspan'):
                 right_attach = i+options['colspan']
-            self.current_table.attach(col, i, right_attach, self.current_table_row-1, self.current_table_row, gtk.EXPAND|gtk.FILL, 0, 0, 0)
+
+            stretch = gtk.EXPAND | gtk.FILL
+            if options.has_key('stretch'):
+                print "will expand row"
+                stretch =gtk.EXPAND | gtk.FILL
+                
+            self.current_table.attach(col, i, right_attach, self.current_table_row-1, self.current_table_row, stretch, 0, 0, 0)
 
     def end_table(self):
         ## Add the table to the result UI:
         if self.current_table:
-            self.result.pack_start(self.current_table,False,False)
+            self.result.pack_start(self.current_table,True,True)
             self.current_table=None
 
     def goto_link(self,widget,event):
@@ -443,10 +455,7 @@ class GTKUI(UI.GenericUI):
 
     def create_popup_window(self):
         """ Create a new window and render ourselves in it """
-        dialog=gtk.Window()
-        dialog.add(self.display())
-        dialog.show_all()
-        return dialog
+        self.server.create_window(self.display())
         
     def popup(self,callback, label,icon=None,toolbar=0, menubar=0, **options):
         pass
@@ -1222,6 +1231,8 @@ class GTKUI(UI.GenericUI):
             x,y = (event.x,event.y)
             try:
                 path,column,cellx,celly = widget.get_path_at_pos(int(x),int(y))
+                ## This is a workaround GTK - if we click on the column headers we get an event here..
+                if x<10: return
             except:
                 return
             q=column.get_data('link')
@@ -1336,3 +1347,26 @@ class GTKUI(UI.GenericUI):
         pix.set_from_pixbuf(pixbuf)
 
         self.row(pix)
+
+    def wizard(self,names=None,callbacks=None):
+        """ Draws a wizard displaying the callbacks one at the time.
+
+        prototype for callbacks is cb(query,result)
+        """
+        box=gtk.VBox()
+        sw=gtk.ScrolledWindow()
+        sw.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_NEVER)
+        tmp=self.__class__(self)
+        fbut=gtk.ToolButton(gtk.STOCK_GO_FORWARD)
+        bbut=gtk.ToolButton(gtk.STOCK_GO_BACK)
+        result=self.__class__(self)
+        callbacks[0](self.defaults,result)
+        sw.add_with_viewport(result.display())
+        box.pack_start(sw,True,True)
+        hbox=gtk.HButtonBox()
+        hbox.set_layout(gtk.BUTTONBOX_EDGE)
+        hbox.add(bbut)
+        hbox.add(fbut)
+        box.pack_start(hbox,False,False)
+        self.server.create_window(box)
+        raise DontDraw()

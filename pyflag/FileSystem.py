@@ -31,15 +31,17 @@
 
 When Flag loads a filesystem into the database, meta information about inodes, files and their allocation is stored within the database. The specific implementation of how this information is stored is abstracted here by use of the FileSystem object. The FileSystem object presents a well defined API to allow callers to query the case database about the filesystem.
 
-The FileSystem class is an abstract class which is implemented as derived classes. Users of this class need to call the FS_Factory to get a concrete implementation. The implementation deals with representing the directory structure, and provides access to the files within the filesystem.
+The FileSystem class is an abstract class which is implemented as derived classes. FileSystems implement this abstract class in plugins which are then registered in the registry. Users of this class need to use the registry to get specific implementations. The implementation deals with representing the directory structure, and provides access to the files within the filesystem.
 
 The File class abstracts an interface for accessing the data within a specific file inside the filesystem. Although this is very similar to the standard python file-like interface, there are some minor differences.
 
-In order for callers to have access to a specific file on the filesystem, they need to instantiate a FileSystem object by using FS_Factory, and then ask this instance for a File object by using the FileSystem.open method. It is discouraged to instantiate a File object directly.
+In order for callers to have access to a specific file on the filesystem, they need to instantiate a FileSystem object by using the Registry, and then ask this instance for a File object by using the FileSystem.open method. It is discouraged to instantiate a File object directly.
 
 Virtual Filesystems (vfs) are also supported by this subsystem in order to support archives such as zip and pst files. Files within filesystems are uniquely identified in the flag databases by an inode string. The inode string can have multiple parts delimited by the pipe ('|') character indicating that a virtual filesystem is to be used on the file. The first letter in the part indicates the virtual filesystem to use, here is an example:
 'D123|Z14' Here 'D' indicates the DBFS filesystem, Z indicates the Zip vfs.
-This inode therefore refers to the 14 file in the zip archive contained in inode 123 of the DBFS filesystem. VFS
+This inode therefore refers to the 14th file in the zip archive contained in inode 123 of the DBFS filesystem. VFS modules are also obtained using the registry.
+
+Note that typically VFS modules go hand in hand with scanners, since scanner discover new files, calling VFSCreate on the filesystem to add them, and VFS drivers are used to read those from the Inode specifications.
 """
 import os,os.path
 import pyflag.conf
@@ -59,9 +61,30 @@ import cStringIO
 import pyflag.Scanner as Scanner
 
 class FileSystem:
-    """ This is the base class for accessing file systems in PyFlag. This class is abstract and is here purely for documentation purposes """
-    def __init__(self, case, table, fd):
-        """ Constructor for creating an new filesystem object """
+    """ This is the base class for accessing file systems in PyFlag. This class is abstract and is here purely for documentation purposes.
+
+    @cvar name: The name of the filesystem to show in the loadfs dialog
+    """
+    def __init__(self, case, table, iosource):
+        """ Constructor for creating an new filesystem object
+
+        @arg case: Case to use
+        @arg table: The base name for all tables
+        @arg iosource: An already open data source, may be iosource, or another 'File'
+        """
+        pass
+    
+    name = None
+    
+    def load(self):
+        """ This method loads the filesystem into the database.
+
+        Currently the database schema is standardised by the DBFS class, and all other filesystems just extend the load method to implement different drivers for loading the filesystem into the database. For reading and manipulating the filesystem, the DBFS methods are used.
+        """
+        pass
+
+    def delete(self):
+        """ This method should remove the database which contains the filesystem """
         pass
     
     def longls(self,path='/'):
@@ -105,8 +128,9 @@ class FileSystem:
         # open the file, first pass will generally be 'D' or 'M'
         # then any virtual file systems (vfs) will kick in
         parts = inode.split('|')
-        sofar = [] # the inode part up to the file we want 
-        retfd = self.fd
+        sofar = [] # the inode part up to the file we want
+        ## We start with the FileSystem iosource as the file like object for use, and then as each file is opened, we update retfd.
+        retfd = self.iosource
         for part in parts:
             sofar.append(part)
             try:
@@ -146,12 +170,11 @@ class FileSystem:
         for performance, currently this includes file typing, file hashing and virus scanning"""
         pass
     
-
 class DBFS(FileSystem):
     """ Class for accessing filesystems using data in the database """
-    def __init__(self, case, table, fd):
+    def __init__(self, case, table, iosource):
         """ Initialise the DBFS object """
-        self.fd = fd
+        self.iosource=iosource
         self.table = table
         self.case = case
         self.dbh = DB.DBO(case)
@@ -318,17 +341,6 @@ class DBFS(FileSystem):
         for c in scanners:
             c.destroy()
 
-# redundant???
-#class MountedFS(DBFS):
-#    """ This class implements FS access for mounted directories on the host """
-#    def open(self, path=None, inode=None):
-#        if not path:
-#            self.dbh.execute("select path,name from file_%s where inode=%r",(self.table, inode))
-#            row=self.dbh.fetch()
-#            path=row['path']+"/"+row['name']
-#        
-#        return MountedFS_file(self.case, self.table, self.fd, inode,os.path.normpath(self.fd.mount_point+path))
-
 class File:
     """ This abstract base class documents the file like object used to read specific files in PyFlag.
     Each subclass must impliment this interface
@@ -389,43 +401,3 @@ class File:
             return data
         else:
             raise StopIteration
-        
-def FS_Factory(case,table,fd):
-    """ This is the filesystem factory, it will create the most appropriate filesystem object available.
-
-    @arg case: Case to use
-    @arg table: The base name for all tables
-    @arg fd: An already open iosource
-    """
-    ## If the iosource is special we handle it here:
-    class_name = (("%s" % fd.__class__).split("."))[-1]
-    #if class_name== "mounted":
-    #    return MountedFS(case,table,fd)
-    #else:
-    return DBFS(case,table,fd)
-
-
-# helper to get filename of cached files
-# ofter created by scanners
-##def make_filename(case, inode):
-##    """ This function should return a fairly unique name for saving the file in the tmp directory.
-    
-##    This class implementes a standard filename formatting convention:
-##    $RESULTDIR/$case_$inode
-    
-##    Where inode is the filename in the filesystem.
-##    """
-##    dbh = DB.DBO(None)
-##    return("%s/%s_%s" % (
-##        config.RESULTDIR, case, dbh.MakeSQLSafe(inode)))
-
-### create a dict of all the File subclasses by specifier
-##import sys
-##vfslist={}
-##for cls in dir():
-##    try:
-##        CLS=sys.modules[__name__].__dict__[cls]
-##        if issubclass(CLS,File) and CLS != File:
-##            vfslist[CLS.specifier]=CLS
-##    except TypeError:
-##        pass
