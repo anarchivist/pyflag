@@ -4,7 +4,9 @@
 # Developed by the Computer Network Vulnerability Team,
 # Information Security Group.
 # Department of Defence.
+#
 # Michael Cohen <scudette@users.sourceforge.net>
+# David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
 #  Version: FLAG 0.4 (12-02-2004)
@@ -234,9 +236,9 @@ class GTKUI(UI.GenericUI):
         self.result=gtk.TextView()
         self.buffer=gtk.TextBuffer(None)
         self.result.set_buffer(self.buffer)
-        self.result.set_editable(True)
-        self.result.set_cursor_visible(True)
-        self.result.set_wrap_mode(True)
+        self.result.set_editable(False)
+        self.result.set_cursor_visible(False)
+        #self.result.set_wrap_mode(gtk.WRAP_WORD)
         self.iter=self.buffer.get_iter_at_offset(0)
         if default != None:
             self.form_parms = default.form_parms
@@ -272,7 +274,7 @@ class GTKUI(UI.GenericUI):
         pass
 
     def __str__(self):
-        return "GTK Widget"
+        return "GTKUI Widget"
     
     def display(self):
         ## Did the user forget to call end_table??? Dumb user!!!
@@ -282,7 +284,7 @@ class GTKUI(UI.GenericUI):
         return self.result
 
     def start_table(self,**options):
-        self.current_table=gtk.Table(0,0,False)
+        self.current_table=gtk.Table(1,1,False)
         self.current_table_row=0
 
     def row(self,*columns, **options):
@@ -300,15 +302,18 @@ class GTKUI(UI.GenericUI):
             elif not issubclass(col.__class__,gtk.Widget):
                 temp=gtk.TextView()
                 temp_b=gtk.TextBuffer(None)
-                temp.set_wrap_mode(False)
+                temp.set_wrap_mode(gtk.WRAP_NONE)
                 temp.set_buffer(temp_b)
                 temp.set_justification(gtk.JUSTIFY_LEFT)
                 temp_b.insert_at_cursor("%s"%col)
                 col=temp
 
             ##Attach the column to row at the end of the table:
-#            self.current_table.attach_defaults(col,i,i+1,self.current_table_row-1,self.current_table_row)
-            self.current_table.attach(col,i,i+1,self.current_table_row-1,self.current_table_row,gtk.FILL,gtk.FILL,0,0)
+            #self.current_table.attach_defaults(col,i,i+1,self.current_table_row-1,self.current_table_row)
+            right_attach = i+1            
+            if options.has_key('colspan'):
+                right_attach = i+options['colspan']
+            self.current_table.attach(col, i, right_attach, self.current_table_row-1, self.current_table_row, gtk.FILL|gtk.EXPAND, gtk.FILL|gtk.EXPAND, 0, 0)
 
     def end_table(self):
         ## Add the table to the result UI:
@@ -326,6 +331,32 @@ class GTKUI(UI.GenericUI):
         image = gtk.Image()
         image.set_from_file("%s/%s" % (config.IMAGEDIR, path))
         self.buffer.insert_pixbuf(self.iter, image.get_pixbuf())
+
+    def popup(self,callback, label,icon=None,toolbar=0, menubar=0, **options):
+        pass
+
+    def ruler(self):
+        """ Ruler, spans all columns """
+        ruler = gtk.HSeparator()
+        self.row(ruler, colspan=50)
+
+    def checkbox(self,description,name,value,**options):
+        """ Create a checkbox input for the name,value pair given. """
+        print "Building checkbox for %s,%s" % (name, value)
+        checkbox = gtk.CheckButton(description)
+        checkbox.set_data('name',name)
+        checkbox.set_data('value',value)
+        if value in self.defaults.getarray(name):
+            checkbox.set_active(True)
+
+        def callback(widget):
+            if widget.get_active():
+                return (widget.get_data('name'),widget.get_data('value'))
+            else:
+                pass
+
+        self.form_widgets.append((checkbox,callback))
+        self.row(checkbox)
 
     def link(self,string,target=FlagFramework.query_type(()),**target_options):
         target=target.clone()
@@ -353,13 +384,14 @@ class GTKUI(UI.GenericUI):
             combobox.append_text(v)
             try:
                 if self.form_parms[name]==v:
-                   print "form_parms already has %s -> %s" % (name,self.form_parms[name])
+                   #print "form_parms already has %s -> %s" % (name,self.form_parms[name])
                    combobox.set_active(len(values)-idx)
                    idx = -2
             except KeyError:
                 pass
             idx -= 1
-        combobox.set_active(idx)
+        if idx > -1:
+            combobox.set_active(idx)
         
         def callback(widget):
             model = widget.get_model()
@@ -397,7 +429,7 @@ class GTKUI(UI.GenericUI):
 
     def submit(self,widget,event=None,data=None):
         new_query=FlagFramework.query_type(())
-        # case comes set to default, dont know why
+        # case comes set by default, dont know why
         # but is screws things up here
         del new_query['case']
 
@@ -415,7 +447,7 @@ class GTKUI(UI.GenericUI):
                     new_query[parameter[0]]=parameter[1]
             except TypeError:
                 pass
-        print "DEBUG: Submitting Form, new_query is: %s" % new_query
+        #print "DEBUG: Submitting Form, new_query is: %s" % new_query
         self.link_callback(new_query)
 
     def end_form(self,name='Submit'):
@@ -430,11 +462,16 @@ class GTKUI(UI.GenericUI):
         self.text("\r\n",widget)
 
     def text(self,*cuts,**options):
+        print cuts
+        print "Class is: %s" % self.__class__
         for d in cuts:
-            if isinstance(d,gtk.Widget):
+            if not d:
+                continue
+            elif isinstance(d,gtk.Widget):
                 child=self.buffer.create_child_anchor(self.iter)
                 self.result.add_child_at_anchor(d,child)
             elif isinstance(d,self.__class__):
+                print "WOOT"
                 widget=d.display()
                 child=self.buffer.create_child_anchor(self.iter)
                 self.result.add_child_at_anchor(widget,child)
@@ -442,7 +479,11 @@ class GTKUI(UI.GenericUI):
                 self.buffer.insert_with_tags_by_name(self.iter,d,'text')
 
     def para(self,string,**options):
-        self.buffer.insert_with_tags_by_name(self.iter,string+"\r\n\r\n",'text')
+        print "WTF?"
+        print string
+        #FIXME, whats the difference between 'para' and 'text'
+        self.text(string, options)
+        #self.buffer.insert_with_tags_by_name(self.iter,string+"\r\n\r\n",'text')
 
     def filebox(self,dir=None,target="datafile",multiple="single"):
         f=gtk.FileSelection()
