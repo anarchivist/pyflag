@@ -750,14 +750,20 @@ class HTMLUI(UI.GenericUI):
             data = cStringIO.StringIO()
             cvs_writer = csv.DictWriter(data,names)
             dbh.execute(query_str_basic + " order by %s" % order,())
+            hidden_columns = query.getarray('hide_column')
             for row in dbh:
                 ## If there are any callbacks we respect those now.
+                new_row={}
                 for k,v in row.items():
+                    if k in hidden_columns: continue
                     try:
                         row[k]=callbacks[k](v)
                     except (KeyError,Exception):
                         pass
-                cvs_writer.writerow(row)
+
+                    new_row[k]=row[k]
+                    
+                cvs_writer.writerow(new_row)
 
             data.seek(0)
             result.result = "#Pyflag Table widget output\n#Query was %s.\n#Fields: %s\n""" %(query," ".join(names))
