@@ -58,7 +58,7 @@ class HTMLUI(UI.GenericUI):
     callback_time_dict={}
     time_dict={}
     
-    def __init__(self,default = None):
+    def __init__(self,default = None,query=None):
         self.result = ''
         
         if default != None:

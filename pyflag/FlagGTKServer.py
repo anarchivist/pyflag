@@ -36,7 +36,7 @@ import gtk,gtk.gdk
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
 import pyflag.GTKUI
-from GTKUI import FlagNotebook
+from GTKUI import FlagNotebook,FlagToolbar
 import pyflag.TypeCheck as TypeCheck
 import pyflag.conf
 config=pyflag.conf.ConfObject()
@@ -60,6 +60,23 @@ def error_popup(e):
     dialog.add(frame)
     dialog.show_all()
 
+class FlagServerToolbar(FlagToolbar):
+    def __init__(self,canvas):
+        self.tchildren=[]
+        self.canvas = canvas
+        gtk.HBox.__init__(self)
+        self.tchildren = []
+
+    def destroy_toolbar(self):
+        pass
+
+    def redraw(self):
+        ## We need to initiate a redraw of our children now:
+        self.canvas.foreach(self.canvas.remove)
+        self.install(self.canvas)
+        self.canvas.show_all()
+        self.show_all()
+
 class FlagServerNotebook(FlagNotebook):
     """ Essentially the same as GTKUI FlagNotebook, but with a tab delete button """
 
@@ -67,8 +84,6 @@ class FlagServerNotebook(FlagNotebook):
         """ close current tab """
         if not page:
             page = self.get_current_page()
-        #child = self.toolhbox.get_child()
-        #self.toolhbox.remove(child)
         self.remove_page(page)
         # cleanup
         del self.queries[page]
@@ -122,8 +137,11 @@ class GTKServer(gtk.Window):
         # these are the MAIN ELEMENTS of the GTKServer
         self.vbox = gtk.VBox()
         self.uimanager = gtk.UIManager()
-        #self.toolhbox = gtk.HBox()
-        self.notebook = FlagServerNotebook()
+        self.toolhandlebox = gtk.HandleBox()
+        self.toolhbox = gtk.HBox()
+        self.toolhandlebox.add(self.toolhbox)
+        self.ftoolbar = FlagServerToolbar(self.toolhbox)
+        self.notebook = FlagServerNotebook(self.flag.ui(server=self,ftoolbar=self.ftoolbar))
         ## have to build the ui at this point...
         self.build_flag_menu()        
         self.menubar = self.uimanager.get_widget('/Menubar')
@@ -138,7 +156,8 @@ class GTKServer(gtk.Window):
         hbox = gtk.HBox()
         combobox = self.case_selector()
         hbox.pack_start(combobox, False)
-        #hbox.pack_start(self.toolhbox)
+        hbox.pack_start(self.toolhandlebox)
+        self.toolhbox.show_all()
 
         self.vbox.pack_start(hbox, False)
         self.vbox.pack_start(self.notebook, True, True)
@@ -305,7 +324,8 @@ class GTKServer(gtk.Window):
                 self.form_dialog.connect('destroy',self.delete_form)
             box=gtk.VBox()
             self.form_dialog.add(box)
-            result = self.flag.ui(server=self)
+            toolbar=FlagServerToolbar(box)
+            result = self.flag.ui(server=self,ftoolbar=toolbar)
             result.start_form(query)
             print report
             try:

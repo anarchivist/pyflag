@@ -202,82 +202,90 @@ class FlagTreeModel(gtk.GenericTreeModel):
         else:
             return node[:-1]
 
-class FlagToolbar(gtk.Toolbar):
-    """ Flag Toolbar class """
-    def __init__(self, tparent=None):
-        if tparent:
-            self.tparent = tparent
-            self.tparent.tchildren.append(self)
-        self.tchildren = []
+class FlagToolbar(gtk.HBox):
+    """ Flag Toolbar class.
 
-    def destroy(self):
+    Toolbars are areas for GTKUIs to draw tool button on. There are a number of UIs which manager these toolbars, e.g. notebook and tree views. These need to remove and install new toolbars as their contents are updated. This implementation has toolbars forming a tree, with the root toolbar owned by the server. As each management widget hides and redraws new UIs, they remove the toolbars from the tree and splice other ones in.
+
+    """
+    def __init__(self,tparent):
+        gtk.HBox.__init__(self)
+        self.tchildren = []
+        self.tparent = tparent
+        self.tparent.add_toolbar_child(self)
+        
+    def add_toolbar(self,button):
+        """ Adds a button to this toolbar. """
+        self.pack_start(button,False,False)
+        button.show_all()
+
+    def add_toolbar_child(self,child):
+        """ Add child to this toolbar """
+        self.tchildren.append(child)
+        
+    def destroy_toolbar(self):
+        """ Disassociate this toolbar from its parents.
+
+        Ask our parent to remove us from their list """
         self.tparent.delete(self)
 
     def delete(self, child):
-        try:
-            del self.tchildren[self.tchildren.index(child)]
-            self.redraw()
-        except IndexError,ValueError:
-            pass
+        """ Remove this child from our list """
+        del self.tchildren[self.tchildren.index(child)]
 
     def redraw(self):
-        if self.tparent:
-            self.tparent.redraw()
-        else:
-            self.display()
+        """ Ask our parent to redraw us """
+        self.tparent.redraw()
 
     def install(self, hbox):
+        """ When the parent is ready, they can ask us to draw our children on this hbox """
+        hbox.pack_start(self,False,False)
         for c in self.tchildren:
             c.install(hbox)
         self.show_all()
-        hbox.pack_start(self)
 
 class FlagNotebook(gtk.Notebook):
     """ A Flag notebook class
     This is used because we need to manage a bunch of toolbar related stuff along with the notebook"""
 
-    def __init__(self, ftoolbar=None):
+    def __init__(self, ui):
         gtk.Notebook.__init__(self)
-        self.ftoolbar = ftoolbar # master (parent) toolbar
+        self.ui = ui # master (parent) toolbar
         self.toolbars = {}
         self.views = {}
         self.callbacks = {}
         self.queries = {}
         self.names = {}
         self.switchid=self.connect("switch-page", self.switch)
-        self.curpage=0
+        self.curpage=None
         
     def switch(self, notebook, page, pagenum):
         # just-in-time page drawing stuff
         p = self.get_nth_page(pagenum)
         if not self.views.has_key(pagenum):
-            # create and store a new toolbar for UI to use
-            self.toolbars[pagenum] = FlagToolbar()
-            result = pyflag.GTKUI.GTKUI(query=self.queries[pagenum], ftoolbar=self.toolbars[pagenum])
+            # create and store a new toolbar for UI to use - Each page has a toolbar parented at our own toolbar
+            self.toolbars[pagenum] = FlagToolbar(self.ui.ftoolbar)
+
+            # Create a new UI for the page to be drawn on - toolbar buttons are drawn on our private toolbar
+            result = pyflag.GTKUI.GTKUI(self.ui, query=self.queries[pagenum],ftoolbar=self.toolbars[pagenum])
             self.callbacks[pagenum](self.queries[pagenum],result)
             self.views[pagenum]=result.display()
-            # store the child toolbar so we can destroy it when switced out...
             p.add_with_viewport(self.views[pagenum])
             p.show_all()
-            self.curpage = pagenum
-            return
-
-        # just do toolbar swapping, rip out old, add new
-        self.toolbars[self.curpage].destroy()
-        self.toolbars
-
-        #self.toolbars[curpage].destroy()
-        #self.toolbars[pagenum].
             
-        # toolbar switching stuff
-        #try:
-        #    child = self.toolhbox.get_children()[0]
-        #   self.toolhbox.remove(child)
-        #except IndexError:
-        #    pass
-        #if self.toolbars.has_key(pagenum):
-        #    self.toolhbox.add(self.toolbars[pagenum])
-        #self.toolhbox.show_all()
+        else:
+            ## add the toolbar as a child to our own toolbar
+            self.ui.ftoolbar.add_toolbar_child(self.toolbars[pagenum])
+
+        # just do toolbar swapping, rip out old toolbar by asking it
+        if self.curpage != None:
+            self.toolbars[self.curpage].destroy_toolbar()
+
+        ## Force toolbars to be redrawn
+        self.ui.ftoolbar.redraw()
+
+        ## Remember current page so we can remove this toolbar when page changes
+        self.curpage=pagenum
 
     def add_page(self, name, callback, query):
         """ add result (a GTKUI object) as a new tab with given label """
@@ -300,15 +308,9 @@ class FlagNotebook(gtk.Notebook):
 class GTKUI(UI.GenericUI):
     """ A GTK UI Implementation. """
             
-    def __init__(self,default = None,query=None,server=None, ftoolbar=None):
+    def __init__(self,default = None,query=None,server=None,ftoolbar=None):
         # Create the Main Widget
         self.result=gtk.VBox()
-
-        # toolbar
-        if ftoolbar:
-            self.ftoolbar = ftoolbar
-        else:
-            self.ftoolbar = FlagToolbar()
         
         # Inherit properties
         if default != None:
@@ -317,19 +319,27 @@ class GTKUI(UI.GenericUI):
             ## This is an array of form widgets. Every time we draw a form widget in this UI, we store it here, and then when we submit the widget, we take the values from here.
             self.form_widgets=default.form_widgets
             self.tooltips = default.tooltips
-            try:
-                self.server=default.server
-            except:
-                self.server=None
+            self.ftoolbar = default.ftoolbar
+            self.server=default.server
         else:
             self.form_parms = {}
             self.defaults = FlagFramework.query_type(())
             self.form_widgets=[]
             self.tooltips = gtk.Tooltips()
+            self.ftoolbar=None
 
-        if server: self.server=server
+        ## Overriding keyword args
+        if ftoolbar:
+            self.ftoolbar = ftoolbar
+
+        if server:
+            self.server=server
         
-        if query: self.defaults=query
+        if query:
+            self.defaults=query
+
+        assert(self.server)
+        assert(self.ftoolbar)
         
         self.current_table=None
         self.next = None
@@ -481,7 +491,7 @@ class GTKUI(UI.GenericUI):
         except:
             context_str=names[0]
             
-        notebook = FlagNotebook(self.ftoolbar)
+        notebook = FlagNotebook(self)
         for i in range(len(names)):
             notebook.add_page(names[i],callbacks[i],query)
             
@@ -909,9 +919,8 @@ class GTKUI(UI.GenericUI):
         ## be done nicely by gtk for us.
 
         def proxy_cb(widget, cb, result, query):
-            result=self.server.flag.ui(query=query,server=self.server)
-            cb(query, result)
-            self.server.notebook.add_page(result, query)
+#           result=self.server.flag.ui(query=query,server=self.server)
+            self.server.notebook.add_page(result, cb,query)
         
         i = None
         if icon:
@@ -928,7 +937,7 @@ class GTKUI(UI.GenericUI):
         button.set_tooltip(self.tooltips, tooltip)
 
         button.connect('clicked', proxy_cb, cb, self, self.defaults)
-        self.ftoolbar.insert(button, -1)
+        self.ftoolbar.add_toolbar(button)
 
     def table(self,sql="select ",columns=[],names=[],links=[],table='',where='1',groupby = None,case=None,callbacks={},**opts):
         """ Main table redered method.
@@ -1153,10 +1162,11 @@ class GTKUI(UI.GenericUI):
 
         prev_button.set_tooltip(self.tooltips, 'Go to Previous Page')
         prev_button.connect('clicked', previous_cb)
-        self.ftoolbar.insert(prev_button, 0)
+        self.ftoolbar.add_toolbar(prev_button)
+#        self.ftoolbar.insert(prev_button, 0)
         next_button.set_tooltip(self.tooltips, 'Go to Next Page')
         next_button.connect('clicked', next_cb)
-        self.ftoolbar.insert(next_button, 1)
+        self.ftoolbar.add_toolbar(next_button)
         previous_cb(None)
 
         # add to a scrolled window
@@ -1251,7 +1261,16 @@ class GTKUI(UI.GenericUI):
         def selection_changed(selection):
             treeview = selection.get_tree_view()
             model, iter  = selection.get_selected()
-            result=self.__class__(self)
+
+            ## Destroy old toolbar
+            try:
+                self.tree_toolbar.destroy_toolbar()
+            except:
+                pass
+
+            ## Create a new toolbar for child UI
+            self.tree_toolbar=FlagToolbar(self.ftoolbar)
+            result=self.__class__(self, ftoolbar=self.tree_toolbar)
                 
             try:
                 path=model.get_path(iter)
@@ -1268,14 +1287,13 @@ class GTKUI(UI.GenericUI):
             except AttributeError:
                 pass
 
-            
+            ## Force a redraw of the new toolbar
+            self.ftoolbar.redraw()
             self.right_pane=gtk.ScrolledWindow()
-#            self.right_pane.set_size_request(400, 400)
             self.right_pane.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
             self.right_pane.add_with_viewport(result.display())
             hbox.add2(self.right_pane)
             hbox.show_all()
-#            self.server.notebook.refresh_toolbar()
 
         selection = treeview.get_selection()
         selection_changed(selection)
@@ -1284,7 +1302,6 @@ class GTKUI(UI.GenericUI):
         selection.connect('changed', selection_changed)
         self.result.pack_start(hbox)
         hbox.set_position(200)
-        #self.row(hbox)
 
     def download(self,file):
         self.text("Click the button below to save the file to disk")

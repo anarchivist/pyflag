@@ -337,10 +337,10 @@ class ViewFile(Reports.report):
                     row_number+=1
                     if row_number>config.PAGESIZE: break
                     file_offset=i[0]
-                    tmp_link=self.ui()
+                    tmp_link=self.ui(result)
                     tmp_link.link("0x%x (%s)" % (file_offset,file_offset),q,mode="HexDump",hexlimit=file_offset)
           
-                    tmp_string=self.ui()
+                    tmp_string=self.ui(result)
                     tmp_string.text(i[1],color="red",sanitise="full",wrap='full')
                     output.row(tmp_link,tmp_string,valign="top")
 
@@ -359,8 +359,8 @@ class ViewFile(Reports.report):
         def stats(query,result):
             """ Show statistics about the file """
             istat = fsfd.istat(inode=query['inode'])
-            left=self.ui()
-            left.row("filename:",'',"%s/%s"%(path,name))
+            left=self.ui(result)
+            left.row("Filename:",'',FlagFramework.normpath("%s/%s"%(path,name)))
             for k,v in istat.iteritems():
                 left.row('%s:' % k,'',v)
 
