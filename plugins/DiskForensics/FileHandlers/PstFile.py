@@ -245,7 +245,7 @@ class Pst_file(File):
 
         # open the pst file from disk cache
         # or from fd if cached file does not exist
-        fname = FileSystem.make_filename(case, pstinode)
+        fname = Scanner.make_temp_filename(case, table, pstinode)
         if not os.path.isfile(fname):
             outfd = open(fname, 'w')
             outfd.write(fd.read())

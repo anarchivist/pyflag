@@ -175,10 +175,10 @@ class StoreAndScan(BaseScanner):
 
         Where $inode is the filename in the filesystem.
         """
-        return("%s/case_%s/%s_%s" % (
-            config.RESULTDIR,
-            self.dbh.case,self.table,
-            self.dbh.MakeSQLSafe(self.inode)))
+        make_temp_filename(
+            self.dbh.case, self.table,
+            self.dbh.MakeSQLSafe(self.inode)
+            )
 
     def finish(self):
         if self.file:
@@ -196,6 +196,12 @@ class StoreAndScan(BaseScanner):
 
         @arg name: The name of the file in the filesystem to operate on - The Scanner should have saved this file previously.
         """
+
+def make_temp_filename(case, fsimage, inode):
+        return("%s/case_%s/%s_%s" % (
+            config.RESULTDIR,
+            case,fsimage,
+            inode))
 
 class StoreAndScanType(StoreAndScan):
     """ This class scans a file only if a file is of a certain type.
