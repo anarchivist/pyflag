@@ -58,7 +58,7 @@ class NewCase(Reports.report):
         case_dbh.execute("create table bookmarks (id int(11) auto_increment, canon text, url text,  description text,  bookmark text ,  PRIMARY KEY  (id),  KEY id (id))",())
 
         #Ensure that the corresponding delete case is reset:
-        self.do_reset(FlagFramework.query_type((),family=query['family'], report = 'DelCase', remove_case = query['create_case']))
+        self.do_reset(FlagFramework.query_type((),family=query['family'], report = 'Remove case', remove_case = query['create_case']))
         
     def display(self,query,result):
         result.heading("Case Created")
@@ -82,7 +82,7 @@ class DelCase(Reports.report):
 
     def analyse(self,query):
         #Now reset the create case report
-        self.do_reset(FlagFramework.query_type((),family=query['family'], report = 'NewCase',create_case = query['remove_case']))
+        self.do_reset(FlagFramework.query_type((),family=query['family'], report = 'Create new case',create_case = query['remove_case']))
 
         #Delete the case from the database
         dbh = self.DBO(None)

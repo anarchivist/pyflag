@@ -129,6 +129,11 @@ class report:
         dbh = self.DBO(query['case'])
         dbh.execute("delete from meta where property='report_executed' and value=%r",canonical_query)
 
+    #This shows those canonicalised query strings which are currently
+    #executing. Note that this is a class variable to let different
+    #instances of the same class know when they are analysing.
+    executing = {}
+
     def __init__(self,flag,ui=None):
         import pyflag.TypeCheck as TypeCheck
         import pyflag.HTMLUI as UI
@@ -137,8 +142,6 @@ class report:
         self.TypeChecker = TypeCheck.TypeChecker()
         self.ui = ui
         self.flag=flag
-        #This shows those canonicalised query strings which are currently executing
-        self.executing = {}
 
     def check_prereq(self,query):
         """ This method checks to see if the analysis method of the report given by query was already run. If it has, this function returns immediately, else the analysis method is called. Note that this function will block untill all the analysis is finished. """

@@ -33,7 +33,6 @@ import pyflag.DB as DB
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.logging as logging
-import re
 import pickle
 
 class Log:
@@ -117,6 +116,7 @@ class Log:
         @arg dbh: A database handle to use
         @arg table_name: A table name to use
         @arg rows: number of rows to upload - if None , we upload them all
+        @return: A generator that represents the current progress indication.
         """
         ## First we create the table:
         cols = []
@@ -141,10 +141,16 @@ class Log:
                 ## We insert into the table those fields that are not ignored:
                 dbh.execute(insert_str, fields )
             except DB.DBError,e:
-                logging.log(2,"Warning: %s" % e)
+                logging.log(logging.WARNINGS,"Warning: %s" % e)
+            except TypeError:
+                logging.log(logging.WARNINGS,"Unable to load line into table SQL: %s Data: %s" % (insert_str,fields))
+                continue
+
+            yield "Uploaded %s rows" % count
 
             if rows and count > rows:
                 break
+            
         ## Now create indexes on the required fields
         for field_number in range(len(self.fields)):
             index = types[self.types[field_number]].index
@@ -152,6 +158,7 @@ class Log:
                 ## interpolate the column name into the index declaration
                 index = index % self.fields[field_number]
                 dbh.execute("Alter table %s add index(%s)" % (tablename,index))
+                yield "Created index on %s " % index
                 
         ## Add the IP addresses to the whois table if required:
         dbh.execute("create table if not exists `whois` (`IP` INT NOT NULL ,`country` VARCHAR( 4 ) NOT NULL ,`NetName` VARCHAR( 50 ) NOT NULL ,`whois_id` INT NOT NULL ,PRIMARY KEY ( `IP` )) COMMENT = 'A local case specific collection of whois information'")
@@ -160,12 +167,15 @@ class Log:
                 dbh2=dbh.clone()
                 #Handle for the pyflag db
                 dbh_pyflag = DB.DBO(None)
+                yield "Doing Whois lookup of column %s" % self.fields[field_number]
+                
                 dbh.execute("select `%s` as IP from %s group by `%s`", (
                     self.fields[field_number],
                     tablename,
                     self.fields[field_number]))
                 for row in dbh:
                     import plugins.Whois as Whois
+                    
                     whois_id = Whois.lookup_whois(row['IP'])
                     dbh_pyflag.execute("select * from whois where id=%r",(whois_id))
                     row2=dbh_pyflag.fetch()
@@ -259,16 +269,6 @@ def store_loader(log, name):
     dbh = DB.DBO(config.FLAGDB)
     dbh.execute('INSERT INTO meta set property="log_preset", value=%r' % name)
     dbh.execute('INSERT INTO meta set property="log_preset_%s", value=%r' % (name,log.pickle()))
-
-def pre_selector(result):
-    f = prefilter().filters
-    x = []
-    y = []
-    for i in f.keys():
-        x.append(i)
-        y.append(f[i][1])
-        
-    result.const_selector("pre-filter(s) to use on the data:",'prefilter',x,y,size=4,multiple="multiple")
 
 class Type:
     """ This class represents translations between the way a column is stored in the database and the way it is displayed.

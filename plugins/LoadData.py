@@ -60,6 +60,8 @@ class LoadPresetLog(Reports.report):
             result.para(fn)
         result.link("Browse this log file", FlagFramework.query_type((), case=query['case'], family="Log Analysis", report="ListLogFile", logtable="%s"%query['table']))
         return result
+
+    progress_str = None
     
     def progress(self,query,result):
         result.heading("Currently uploading log file into database")
@@ -69,15 +71,18 @@ class LoadPresetLog(Reports.report):
             query['table'] = tmp
         except KeyError:
             pass
-        
-        dbh = self.DBO(query['case'])
-        dbh.execute("select count(*) as count from %s_log", (query['table']))
-        tmp = dbh.fetch()
-        try:
-            result.para("Uploaded %s rows. " % tmp['count'])
-        except TypeError,e:
-            print "exception %s tmp is %s" %(e,tmp)
 
+        if not self.progress_str:
+            dbh = self.DBO(query['case'])
+            dbh.execute("select count(*) as count from %s_log", (query['table']))
+            tmp = dbh.fetch()
+            try:
+                result.para("Uploaded %s rows. " % tmp['count'])
+            except TypeError,e:
+                pass
+        else:
+            result.para(self.progress_str)
+            
     def form(self, query, result):
         try:
             result.case_selector()
@@ -101,7 +106,8 @@ class LoadPresetLog(Reports.report):
             # show preview
             dbh = self.DBO(query['case'])
             temp_table = dbh.get_temp()
-            log.load(dbh,temp_table, rows=3)
+            for progress in log.load(dbh,temp_table, rows=3):
+                pass
 
             # retrieve and display the temp table
             dbh.execute("select * from %s limit 1",temp_table)
@@ -122,7 +128,9 @@ class LoadPresetLog(Reports.report):
             query['table'] = query['new_table']
 
         dbh = self.DBO(query['case'])
-        log.load(dbh,'%s_log'%query['table'])
+        for progress in log.load(dbh,'%s_log'%query['table']):
+            self.progress_str = progress
+            
         dbh.execute("INSERT INTO meta set property='logtable', value='%s'" ,(query['table']))
         dbh.execute("INSERT INTO meta set property='log_preset_%s', value='%s'",(query['table'],query['log_preset']))
 

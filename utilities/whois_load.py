@@ -66,11 +66,14 @@ def largest_nm(num):
       res = hosts
     else:
       break
-  return ~res + 1
+
+  res =  (res-1) ^ MASK32
+  return res
 
 def num_hosts(nm):
   """ return number of hosts possible given netmask """
-  return ~nm + 1
+  res=(nm ^ MASK32) + 1
+  return res
 
 def aton(str):
   """ convert dotted decimal IP to int """
@@ -116,7 +119,7 @@ class WhoisRec:
         self.start_ip, end_ip = [ aton(a.strip()) for a in inetnum.split('-') ]
         self.num_hosts = end_ip - self.start_ip + 1
       except ValueError, e:
-        print >>sys.stderr, "ERROR PARSING: %s" % inetnum
+        print >>sys.stderr, "ERROR PARSING: %s %s" % (inetnum,e)
 
       self.netname = self._getsingle('netname', string)
       self.country = self._getsingle('country', string)
@@ -286,7 +289,6 @@ for url in urls:
     while masks:
       # get indexes of the ones that align
       align = [ x for x in range(len(masks)) if (network & masks[x]) == network ]
-      
       if len(align) == 0:
         # none align, have to split smallest network in half and try again
         masks.append(largest_nm(num_hosts(masks.pop())/2))

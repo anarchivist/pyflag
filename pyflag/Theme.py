@@ -69,6 +69,7 @@ class BasicTheme:
             report_block.start_table()
             report_list = Registry.REPORTS.family[family]
             for r in report_list:
+                if r.hidden: continue
                 link = flag.ui()
                 link.link(r.name,case=query['case'],family=family,report=r.name)
 

@@ -166,6 +166,9 @@ class ReportRegistry(Registry):
         if not result:
             result= [ i for i in f if report == ("%s" % i).split('.')[-1]]
 
+        if not result:
+            raise Exception("Can not find report %s/%s" % (family,report))
+        
         return result[0]
     
     def check_class(self,Class):
@@ -203,6 +206,14 @@ class VFSFileRegistry(Registry):
         for cls in self.classes:
             self.vfslist[cls.specifier] = cls
 
+class LogDriverRegistry(Registry):
+    """ A class taking care of Log file drivers """
+    drivers = {}
+    def __init__(self,ParentClass):
+        Registry.__init__(self,ParentClass)
+        for cls in self.classes:
+            self.drivers[cls.name]=cls
+
 REPORTS = None
 SCANNERS = None
 VFS_FILES = None
@@ -215,7 +226,6 @@ def Init():
     global REPORTS
     
     REPORTS=ReportRegistry(Reports.report)
-
     ## Now do the scanners
     import pyflag.Scanner as Scanner
     global SCANNERS
@@ -226,3 +236,8 @@ def Init():
     global VFS_FILES
     
     VFS_FILES = VFSFileRegistry(FileSystem.File)
+    ## Pick all Log File drivers:
+    import pyflag.LogFile as LogFile
+    
+    global LOG_DRIVERS
+    LOG_DRIVERS = LogDriverRegistry(LogFile.Log)

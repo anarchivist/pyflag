@@ -281,7 +281,8 @@ class Flag:
         print "Current thread is %s" % thread_name
         import pyflag.Reports as Reports
 
-        #note that we are executing this report (place a lock in the report object - only works because everyone is using the same instance of the report!!!)
+        #note that we are executing this report (place a lock in the
+        #report class - The lock is shared amongst all objects)
         report.executing[thread_name]={'query': canonical_query, 'error': None}
         try:
             result = report.analyse(query)

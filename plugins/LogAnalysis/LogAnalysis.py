@@ -35,6 +35,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import re
 import plugins.Whois as Whois
+import pyflag.Registry as Registry
 
 description = "Log Analysis"
 order = 35
@@ -80,6 +81,7 @@ class ListLogFile(Reports.report):
         dbh = self.DBO(query['case'])
         dbh.execute("select value from meta where property = 'log_preset_%s'",(query['logtable']))
         row=dbh.fetch()
+        print "Row is %s" % row
         try:
             log = LogFile.get_loader(row['value'],None)
         except KeyError:
@@ -152,7 +154,7 @@ class CreateLogPreset(Reports.report):
 
     def display(self,query,result):
         result.heading("New log file preset %s created" % query['log_preset'])
-        result.link("Load a log file", FlagFramework.query_type((),case=query['case'],family='LoadData',report='LoadPresetLog',log_preset=query['log_preset']))
+        result.link("Load a log file", FlagFramework.query_type((),case=query['case'],family='Load Data',report='LoadPresetLog',log_preset=query['log_preset']))
         return result
 
     def form(self,query,result):
@@ -180,12 +182,12 @@ class CreateLogPreset(Reports.report):
             result.ruler()
 
             result.const_selector("Select Log Processor", 'delmethod',
-                                  LogFile.plugins.keys() , LogFile.plugins.keys(),
+                                  Registry.LOG_DRIVERS.drivers.keys() , Registry.LOG_DRIVERS.drivers.keys(),
                                   onclick="this.form.submit();")
 
 ##            result.radio("Field Separator Type:","delmethod",('simple','advanced'),onclick="this.form.submit();")
             # Now we ask the log object to draw its form for us:
-            log = LogFile.plugins[query['delmethod']]('datafile',query)
+            log = Registry.LOG_DRIVERS.drivers[query['delmethod']]('datafile',query)
 
             #Ask the Log object to draw the form it requires
             log.form(query,result)
@@ -216,7 +218,7 @@ class CreateLogPreset(Reports.report):
 
     def analyse(self, query):
         """ store this log type in the database """
-        log = LogFile.plugins[query['delmethod']]('datafile',query)
+        log = Registry.LOG_DRIVERS.drivers[query['delmethod']]('datafile',query)
 
         # pickle it to the database
         LogFile.store_loader(log, query['log_preset'])
