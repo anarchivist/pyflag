@@ -20,6 +20,7 @@ from pyflag.FlagFramework import normpath
 
 class PstScan(GenScanFactory):
     """ Recurse into Pst Files """
+    default = True
     order=99
     def __init__(self,dbh, table,fsfd):
         self.dbh=dbh

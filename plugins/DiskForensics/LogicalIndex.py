@@ -38,6 +38,7 @@ class Index(GenScanFactory):
     """ Keyword Index files """
     ## Indexing must occur after all scanners have run.
     order=200
+    default = True
     def __init__(self,dbh,table,fsfd):
         """ This creates the LogicalIndex table and initialised the index file """
         self.dbh=dbh
@@ -55,6 +56,7 @@ class Index(GenScanFactory):
         try:
             ## Is the file already there?
             self.index = index.Load(self.filename)
+            print "Loading old index filename %s" % self.filename
         except IOError:
             ## If not we create it
             self.index = index.index(self.filename)
@@ -71,7 +73,8 @@ class Index(GenScanFactory):
             del self.index
         except AttributeError:
             pass
-        
+
+        self.dbh.execute("drop table if exists `LogicalIndex_%s`",self.table)
         try:
             os.remove(self.filename)
         except OSError:
@@ -282,7 +285,7 @@ class SearchIndex(Reports.report):
             output.text(escape(data[offset-left:offset-left+len(keyword)]),color='red',sanitise='full')
             output.text(escape(data[offset-left+len(keyword):]),color='black',sanitise='full')
             return output
-            
+
         result.table(
             columns = ['a.inode','name','concat(a.inode,",",offset)','keyword','offset'],
             names=['Inode','Filename','Data','Keyword','Offset'],
@@ -292,4 +295,4 @@ class SearchIndex(Reports.report):
             links = [ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',fsimage=query['fsimage'],mode='HexDump',__target__='inode') ],
             case=query['case'],
             )
-
+        

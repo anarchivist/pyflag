@@ -24,7 +24,7 @@ Things still to do for pyflag in no order of priority:
 - Add authentication and case management to the web interface. (low priority).
 
 
-fix scanner order by catching boring methods
+* fix scanner order by catching boring methods
 create a unique name /scanner table for scanners to determine if they have been run before
 allow scanners to be invoked on files
 Add libgmp dependencies to libs in binary release

@@ -349,6 +349,7 @@ class LoadFS(Reports.report):
                 dbh.execute("alter table %s_%s add index(%s)",(x,tablename,y))
 
             dbh.set_meta('fsimage',query['iosource'])
+
         self.progress_str="Running Scanners on filesystem"
         ## Scan the filesystem for hashes and viruses etc.
         iofd=IO.open(query['case'],query['iosource'])

@@ -16,6 +16,7 @@ import pyflag.Scanner as Scanner
 class ZipScan(GenScanFactory):
     """ Recurse into Zip Files """
     order=99
+    default = False
     def __init__(self,dbh, table,fsfd):
         self.dbh=dbh
         self.table=table
@@ -49,30 +50,14 @@ class ZipScan(GenScanFactory):
                 fd.inode = "%s|Z%s" % (self.inode,i)
                 Scanner.scanfile(self.ddfs,fd,self.factories)
                 
-##                if self.factories:
-##                    try:
-##                        data=zip.read(namelist[i])
-##                    except zipfile.zlib.error:
-##                        continue
-
-##                    objs = [c.Scan("%s|Z%s" % (self.inode, str(i)),self.ddfs,c,factories=self.factories) for c in self.factories]
-
-##                    metadata={}
-##                    for o in objs:
-##                        try:
-##                            o.process(data,metadata=metadata)
-##                            o.finish()
-##                        except Exception,e:
-##                            logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
-
 class GZScan(ZipScan):
     """ Recurse into gziped files """
-    class Scan(StoreAndScan):
-        def boring(self,metadata):
-            return metadata['mime'] not in (
-                'application/x-gzip',
-                )
-
+    default= False
+    class Scan(StoreAndScanType):
+        types = (
+            'application/x-gzip',
+            )
+        
         def external_process(self,name):
             gz=gzip.open(name)
             i=0

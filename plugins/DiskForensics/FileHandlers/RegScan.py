@@ -11,6 +11,7 @@ import pyflag.DB as DB
 
 class RegistryScan(GenScanFactory):
     """ Load in Windows Registry files """
+    default = True
     def __init__(self,dbh, table,fsfd):
         self.dbh=dbh
         self.table=table

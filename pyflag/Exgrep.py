@@ -40,7 +40,7 @@ definitions=[]
 cut={}
 cut["Extension"]="jpg"
 cut["StartRE"]="\\xff\\xd8....(JFIF|Exif)"
-cut["MaxLength"]=500000
+cut["MaxLength"]=1500000
 cut["Comment"]="JPEG picture file type"
 definitions.append(cut)
 

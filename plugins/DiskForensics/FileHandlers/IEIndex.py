@@ -13,6 +13,7 @@ config=pyflag.conf.ConfObject()
 
 class IEIndex(Scanner.GenScanFactory):
     """ Load in IE History files """
+    default = True
     def __init__(self,dbh, table,fsfd):
         self.dbh=dbh
         self.table=table

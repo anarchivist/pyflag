@@ -22,6 +22,7 @@ class UnallocatedScan(GenScanFactory):
     Unallocated space is defined as slack space (the space between the end of a file and the next block alignments) as well as unallocated blocks. This does not include allocated blocks which simply do not have file entries (e.g. deleted files). Deleted files are handled in another scanner.
     """
     order=100
+    default = False
     def reset(self):
         GenScanFactory.reset(self)
         self.dbh.execute("drop table if exists unallocated_%s" ,self.table)
@@ -114,20 +115,25 @@ class DeletedScan(GenScanFactory):
     Deleted files are those which are allocated by the filesystem, but do not have a file entry. This makes them impossible to view through the normal GUI. By creating file table entries for those it is possible to view these inodes using the same GUI.
     """
     order=5
+    default=True
     def prepare(self):
         """ Create the extra file entries in the file table.
 
         This scanner just inserts more entries into the file table. This means it needs intimate knowledge of the file/inode schema (rather than using the VFSCreate API). Since this scanner needs to have intimate knowledge of the schema to work out which inodes are deleted, this is probably ok. By inserting extra file entries, we dont need to have a VFS driver too. 
         """
-        ## Create a deleted directory entry:
-        dbh2=self.dbh.clone()
-        self.dbh.execute("insert into file_%s set  inode='D0',mode='d/d',status='alloc',path='/',name='_deleted_'",self.table)
-        ## This will give us all the inodes which appear in the blocks
-        ## table (i.e. they are allocated), but do not appear in the
-        ## file table (i.e. do not have a filename).
-        self.dbh.execute("select a.inode as inode from block_%s as a left join file_%s as b on a.inode=b.inode where isnull(b.inode) group by a.inode",(self.table,self.table))
-        for row in self.dbh:
-            dbh2.execute("insert into file_%s set inode=%r,mode='r/r',status='alloc',path='/_deleted_/',name=%r",(self.table,row['inode'],row['inode']))
+        ## We may only execute this scanner once per filesystem:
+        if not self.dbh.get_meta("deleted_scan_%s" % self.table):
+            ## Create a deleted directory entry:
+            dbh2=self.dbh.clone()
+            self.dbh.execute("insert into file_%s set  inode='D0',mode='d/d',status='alloc',path='/',name='_deleted_'",self.table)
+            ## This will give us all the inodes which appear in the blocks
+            ## table (i.e. they are allocated), but do not appear in the
+            ## file table (i.e. do not have a filename).
+            self.dbh.execute("select a.inode as inode from block_%s as a left join file_%s as b on a.inode=b.inode where isnull(b.inode) group by a.inode",(self.table,self.table))
+            for row in self.dbh:
+                dbh2.execute("insert into file_%s set inode=%r,mode='r/r',status='alloc',path='/_deleted_/',name=%r",(self.table,row['inode'],row['inode']))
+
+            self.dbh.set_meta("deleted_scan_%s" % self.table,"Scanned")
 
 ## Unallocated space VFS Driver:
 class Unallocated_File(FileSystem.File):
