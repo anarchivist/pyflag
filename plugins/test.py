@@ -48,7 +48,7 @@ class TemplateReport(Reports.report):
     Note that all reports must inherit from Reports.report and should override the methods and attributes listed below.
     """
     parameters = {'a':'numeric','b':'alphanum'}
-    hidden = False
+    hidden = True
     name = "Test report"
     
     def display(self,query,result):

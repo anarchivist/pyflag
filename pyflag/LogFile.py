@@ -8,7 +8,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Name:  $ $Date: 2004/10/16 13:08:48 $
+#  Version: FLAG $Name:  $ $Date: 2004/10/17 11:53:14 $
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -34,7 +34,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.logging as logging
 import re
-import cPickle
+import cPickle,csv
 
 delimiters = {'Space':' ', 'Comma':',', 'Colon':':', 'Semi-Colon':';', 'Hyphen':'-'}
 
@@ -49,8 +49,7 @@ class prefilter:
     
     @ivar  filters: A dict mapping the filter methods to their docstring descriptions.
     @ivar  res: A dict managing lists of (compiled RE's,target strings). This way REs only need to be compiled once.
-    """
-    
+    """    
     filters = {}
     res = {}
     
@@ -145,49 +144,55 @@ class prefilter:
         return self.transform(self.res['PFRemoveChars'],string)
 
 class Log:
-    """ This base class abstracts Loading of log files """
+    """ This base class abstracts Loading of log files.
+
+    Log files are loaded through the use of log file drivers. These
+    drivers extend this class, possibly providing new methods for form
+    and field, and potentially even read_record.
+    """
     datafile = ()
     num_fields = 0
     def __init__(self,variable,query):
         """ Load the log file.
 
-        @arg variable: Name of query variable that carries the name of the file. Note that this may be an array for files to specify a number of files.
+        @arg variable: Name of query variable that carries the name of the file. Note that this may be an array for users to specify a number of files.
         @arg query: The query object.
         """
         self.datafile = query.getarray(variable)
         if self.datafile==():
             raise KeyError("No variable %s" % variable)
-        self.fields = []
-        self.types = []
-        self.indexes = []
         self.query = query
 
+        self.num_fields = 0
         ## If this object was called with a known number of fields:
         try:
-            self.num_fields = int(query['number_of_fields'])
-            self.set_fields()
-            self.set_types()
-            self.set_indexes()
+            while 1:
+                self.num_fields+=1
+                query['field%u'%self.num_fields]
         except KeyError:
             pass
-        
-    _fd = None
+
+        self.set_fields()
+        self.set_types()
+        self.set_indexes()
     
-    def read_record(self):
-        """ Generates records """
-        if not self._fd:
-            _fd=open(self.datafile[0],'r')
-        # Each invocation of this generator should start reading the
-        # log file from the beginning.
-        _fd.seek(0)
-        ## TODO: Seamlessly handle multiple log files by catching when
-        ## one finishes and the next begins.
-        for line in _fd:
-            yield line
+    def read_record(self, ignore_comment = True):
+        """ Generates records.
+
+        This can handle multiple files as provided in the constructor.
+        """
+        for file in self.datafile:
+            fd=open(file,'r')
+            for line in fd:
+                if line.startswith('#') and ignore_comment:
+                    continue
+                else:
+                    yield line
 
     def set_fields(self):
         """ set the field names from the query, order is important """
-        for i in range(len(self.fields),self.num_fields):
+        self.fields=[]
+        for i in range(0,self.num_fields):
             try:
                 self.fields.append(self.query['field%u'%i])
             except KeyError:
@@ -196,7 +201,8 @@ class Log:
 
     def set_types(self):
         """ set the field types from the query, order is important """
-        for i in range(len(self.types),self.num_fields):
+        self.types=[]
+        for i in range(0,self.num_fields):
             try:
                 self.types.append(self.query['type%u'%i])
             except KeyError:
@@ -205,7 +211,8 @@ class Log:
 
     def set_indexes(self):
         """ which fields require indexes """
-        for i in range(len(self.indexes),self.num_fields):
+        self.indexes=[]
+        for i in range(0,self.num_fields):
             if self.query.has_key('index%u'%i):
                 self.indexes.append(True)
             else:
@@ -223,12 +230,11 @@ class Log:
         insert_sql = []
         field_indexes = []
         count=0
-        print self.fields,self.types
         for i in range(len(self.fields)):
             if self.fields[i]!='' and self.fields[i] != 'ignore':
                 field_indexes.append(i)
                 type = types[self.types[i]]()
-                cols.append("%s %s" % (self.fields[i], type.type ))
+                cols.append("`%s` %s" % (self.fields[i], type.type ))
                 insert_sql.append(type.sql_in)
 
         dbh.execute("CREATE TABLE IF NOT EXISTS %s (id int auto_increment,%s,key(id))" % (tablename,",".join(cols)))
@@ -258,8 +264,57 @@ class Log:
         ## Clear stuff that is not relevant
         self.datafile = None
         self.query = None
-        self._fd=None
         return cPickle.dumps(self)
+
+    def draw_type_selector(self,result):
+        """ Draws an interactive GUI allowing users to specify field names, types and choice of indexes """
+        result.start_table()
+        result.ruler()
+        tmp = result.__class__(result)
+        tmp.heading("Step 4:")
+        result.row(tmp,"Assign field names and Types to each field")
+        result.ruler()
+        result.end_table()
+
+        ## This part creates a GUI allowing users to assign names,
+        ## types and indexes to columns
+        result.start_table(border=1,bgcolor='lightgray')
+        count = 0
+        self.num_fields=0
+        for fields in self.get_fields():
+            count +=1                
+            result.row(*fields)
+            ## Find the largest number of columns in the data
+            if len(fields)>self.num_fields:
+                self.num_fields=len(fields)
+            if count>3: break
+
+        ## If we have more columns we set their names,types and
+        ## indexes from the users data.
+        self.num_fields=len(fields)
+        self.set_fields()
+        self.set_types()
+        self.set_indexes()
+
+        field = []
+        type = []
+        index = []
+        ## Now we create the input elements:
+        for i in range(len(self.fields)):
+            field_ui = result.__class__(result)
+            type_ui = result.__class__(result)
+            index_ui =  result.__class__(result)
+            
+            field_ui.textfield('','field%u' % i)
+            type_selector(type_ui,"type%u" % i)
+            index_ui.checkbox('Add Index?','index%u'%i,'yes')
+            field.append(field_ui)
+            type.append(type_ui)
+            index.append(index_ui)
+
+        result.row(*field)
+        result.row(*type)
+        result.row(*index)
 
 class SimpleLog(Log):
     """ A log processor to perform simple delimiter dissection
@@ -293,7 +348,8 @@ class SimpleLog(Log):
             yield row.split(self.delimiter)
 
     def form(self,query,result):
-        """ This draws the form required to fulfill all the parameters """
+        """ This draws the form required to fulfill all the parameters for this report
+        """
         result.const_selector("Simple Field Separator:",'delimiter',delimiters.values(), delimiters.keys())
         if not query.has_key('delimiter'):
             query['delimiter'] = ' '
@@ -326,59 +382,87 @@ class SimpleLog(Log):
         sample=[ self.prefilter_record(record) for record in sample ]
         result.row('\n'.join(sample),bgcolor='lightgray')
         result.end_table()
+        
+        self.draw_type_selector(result)
 
-        result.start_table()
-        result.ruler()
-        tmp = result.__class__(result)
-        tmp.heading("Step 4:")
-        result.row(tmp,"Assign field names and Types to each field")
-        result.ruler()
+class CSVLog(SimpleLog):
+    """ Log parser designed to handle comma seperated files """
+    def get_fields(self):
+        return csv.reader(self.read_record())
+        
+    def form(self,query,result):
+        result.end_table()
+        result.row("Unprocessed text from file",colspan=5)
+        sample = []
+        count =0
+        for line in self.read_record():
+            sample.append(line)
+            count +=1
+            if count>3:
+                break
+            
+        result.row('\n'.join(sample),bgcolor='lightgray')
         result.end_table()
 
-        ## This part creates a GUI allowing users to assign names,
-        ## types and indexes to columns
-        result.start_table(border=1,bgcolor='lightgray')
-        count = 0
-        for fields in self.get_fields():
-            count +=1
-            ## If we have more columns we set their names,types and
-            ## indexes from the users data.
-            if len(fields)>self.num_fields:
-                self.num_fields=len(fields)
-                self.set_fields()
-                self.set_types()
-                self.set_indexes()
-                
-            result.row(*fields)
-            if count>3: break
+        self.draw_type_selector(result)
 
-        field = []
-        type = []
-        index = []
-        ## Now we create the input elements:
-        for i in range(len(self.fields)):
-            field_ui = result.__class__(result)
-            type_ui = result.__class__(result)
-            index_ui =  result.__class__(result)
-            
-            field_ui.textfield('','field%u' % i)
-            type_selector(type_ui,"type%u" % i)
-            index_ui.checkbox('Add Index?','index%u'%i,'yes')
-            field.append(field_ui)
-            type.append(type_ui)
-            index.append(index_ui)
+class IISLog(SimpleLog):
+    """ Log parser for IIS (W3C Extended) log files """
+    def __init__(self, variable, query):
+        # set these params, then we can just use SimpleLog's get_fields
+        self.delimiter = ' '
+        self.prefilters = ['PFDateFormatChange2']
+        # run Log constructor, unset var so we dont do the extra stuff
+        Log.__init__(self,variable,query)
 
-        result.row(*field)
-        result.row(*type)
-        result.row(*index)
-        del result.defaults['number_of_fields']
-        result.hidden("number_of_fields",self.num_fields)
+        # now for the IIS magic, the code below sets up the
+        # fields, types, and indexes arrays req'd by load
+        # replaces the need for the form in SimpleLog
 
-class CSVLog(Log):
-    """ Log parser designed to handle comma seperated filess """
-    
+        # Find the fields line:
+        count=0
+        for row in self.read_record(ignore_comment = False):
+            count+=1
+            if row.startswith('#Fields: '):
+                self.fields = row.split()[1:]
+                # Coallesc the date and time field together:
+                try:
+                    i = self.fields.index('date')
+                    del self.fields[i]
+                except ValueError:
+                    pass
+
+                break
+
+            ## couldnt we find the field header?
+            if count>15:
+                raise Reports.ReportError("Error parsing IIS log file (I can't find a #Fields header line.) Maybe you may be able to use the simple log driver for this log?")
         
-plugins = {"Simple": SimpleLog,"CSV": CSVLog}
+        # try to guess types based on known field-names, not perfect...
+        # automatically index the non-varchar fields, leave the rest
+        self.types=[]
+        self.indexes=[]
+        for field in self.fields:
+            if field == 'time':
+                self.types.append('datetime')
+                self.indexes.append(True)
+            elif '-ip' in field:
+                self.types.append('IP Address')
+                self.indexes.append(True)
+            elif '-status' in field:
+                self.types.append('int')
+                self.indexes.append(True)
+            elif '-bytes' in field:
+                self.types.append('int')
+                self.indexes.append(True)
+            else:
+                self.types.append('varchar(250)')
+                self.indexes.append(False)
+            
+    def form(self, query, result):
+        result.para('NOTICE: This loader attempts to load IIS log files completely automatically by determining field names and types from the header comments, if this loader fails, please use the "Simple" loader')
+                
+plugins = {"Simple": SimpleLog,"CSV": CSVLog, "IIS Log":IISLog}
 
 def get_loader(name,datafile):
     """ lookup and unpickle log object from the database, return loader object

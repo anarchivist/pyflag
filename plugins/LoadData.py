@@ -9,7 +9,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Name:  $ $Date: 2004/10/16 13:08:48 $
+#  Version: FLAG $Name:  $ $Date: 2004/10/17 11:53:12 $
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -60,6 +60,13 @@ class LoadPresetLog(Reports.report):
     
     def progress(self,query,result):
         result.heading("Currently uploading log file into database")
+        try:
+            tmp = query['new_table']
+            del query['table']
+            query['table'] = tmp
+        except KeyError:
+            pass
+        
         dbh = self.DBO(query['case'])
         dbh.execute("select count(*) as count from %s_log", (query['table']))
         tmp = dbh.fetch()

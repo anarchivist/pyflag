@@ -268,6 +268,9 @@ class GTKUI(UI.GenericUI):
     def heading(self,string):
         self.buffer.insert_with_tags_by_name(self.iter,string+'\n','title')
 
+    def refresh(self, int, query):
+        pass
+
     def __str__(self):
         return "GTK Widget"
     

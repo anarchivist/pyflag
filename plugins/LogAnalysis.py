@@ -9,7 +9,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Name:  $ $Date: 2004/10/16 13:28:36 $
+#  Version: FLAG $Name:  $ $Date: 2004/10/17 11:53:12 $
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -43,6 +43,7 @@ def display_test_log(dbh,log,result,query):
     temp_table = dbh.get_temp()
 
     log.load(dbh,temp_table,rows= 3)
+    print log.fields, log.types
     dbh.execute("select * from %s limit 1",temp_table)
     columns =[]
     names = []
@@ -153,7 +154,7 @@ class CreateLogPreset(Reports.report):
             #Check if the user has supplied a name for the table: (if
             #they did not we throw an exception and return the form so
             #far - the overall effect is that the form will grow as
-            #the user enters more data.
+            #the user enters more data.)
             
             tmp = self.ui()
             tmp.heading("Step 1:")
@@ -188,7 +189,8 @@ class CreateLogPreset(Reports.report):
 
             dbh = self.DBO(query['case'])
             display_test_log(dbh,log,result,query)
-
+            result.end_table()
+            
             result.ruler()
             tmp = self.ui(result)
             tmp.heading("Step 5:")
