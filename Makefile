@@ -6,7 +6,7 @@ PYTHONLIB = /usr/lib/python2.3/
 PYTHONBIN = `which python2.3`
 DATA_DIR = `grep -i DATA_DIR pyflag/pyflagrc | cut -d= -f2`
 MYSQLCOMMAND =./bin_dist/mysql/bin/mysql --socket=bin_dist/mysql/data/pyflag.sock
-MISC_LIBS = /usr/lib/libgmp.so.3 /usr/lib/libmysqlclient_r.so.10
+MISC_LIBS = /usr/lib/libgmp.so.3 /usr/lib/libmysqlclient_r.so.10 /usr/lib/libmagic.so.1
 
 all:	bins
 	for dir in $(DIRS); do\
