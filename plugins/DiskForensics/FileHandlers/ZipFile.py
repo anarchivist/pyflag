@@ -26,17 +26,10 @@ class ZipScan(GenScanFactory):
     def destroy(self):
         pass
     
-    class Scan(StoreAndScan):
-        def boring(self,metadata):
-            """ FIXME: Change this to use the type from either metadata or the types table - this will allow dependency on type scanner to be optional. Move this to base class to allow other StoreAndScan classes to use the same method
-            """
-            try:
-                return metadata['mime'] not in (
-                    'application/x-zip',
-                    )
-            except KeyError:
-                """ FIXME: select from table... (This select may be done in the outer class and we just search an array at this point"""
-                return True
+    class Scan(StoreAndScanType):
+        types = (
+            'application/x-zip',
+            )
 
         def external_process(self,name):
             """ This is run on the extracted file """
@@ -59,22 +52,6 @@ class ZipScan(GenScanFactory):
                 fd.inode = "%s|Z%s" % (self.inode,i)
                 Scanner.scanfile(self.ddfs,fd,self.factories)
                 
-##                if self.factories:
-##                    try:
-##                        data=zip.read(namelist[i])
-##                    except zipfile.zlib.error:
-##                        continue
-
-##                    objs = [c.Scan("%s|Z%s" % (self.inode, str(i)),self.ddfs,c,factories=self.factories) for c in self.factories]
-
-##                    metadata={}
-##                    for o in objs:
-##                        try:
-##                            o.process(data,metadata=metadata)
-##                            o.finish()
-##                        except Exception,e:
-##                            logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
-
 class GZScan(ZipScan):
     """ Recurse into gziped files """
     class Scan(StoreAndScan):

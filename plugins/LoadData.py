@@ -401,10 +401,11 @@ class LoadFS(Reports.report):
             result.start_table()
             dbh.execute("select count(*) from file_%s" % tablename)
             f = dbh.cursor.fetchone()
-            result.row("Uploaded File Entries:", "%s"%f[0])
-            dbh.execute("select count(*) as count,value as total from inode_%s, meta_%s as m where m.name='last_inode' group by total" % (tablename, tablename))
-            row = dbh.fetch()
-            result.row("Uploaded Inode Entries:", "%s of %s"%(row['count'],row['total']))
+            ## FIXME: This is a horribly slow query...
+  #         result.row("Uploaded File Entries:", "%s"%f[0])
+  #          dbh.execute("select count(*) as count,value as total from inode_%s, meta_%s as m where m.name='last_inode' group by total" % (tablename, tablename))
+  #          row = dbh.fetch()
+  #          result.row("Uploaded Inode Entries:", "%s of %s"%(row['count'],row['total']))
             result.end_table()
         except (TypeError, DB.DBError):
             pass

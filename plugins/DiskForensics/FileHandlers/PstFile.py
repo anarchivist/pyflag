@@ -44,17 +44,16 @@ class PstScan(GenScanFactory):
     def destroy(self):
         pass
     
-    class Scan(StoreAndScan):
+    class Scan(StoreAndScanType):
         def __init__(self, inode,ddfs,outer,factories=None):
-            StoreAndScan.__init__(self, inode,ddfs,outer,factories)
+            StoreAndScanType.__init__(self, inode,ddfs,outer,factories)
             self.to_re = outer.to_re
             self.from_re = outer.from_re
-            
-        def boring(self,metadata):
-            return metadata['mime'] not in (
-                'application/x-msoutlook',
-                )
 
+        types = (
+            'application/x-msoutlook',
+            )
+        
         def external_process(self,name):
             """ This is run on the extracted file """
             pst=pypst2.Pstfile(name)

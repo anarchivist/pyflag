@@ -26,11 +26,8 @@ class IEIndex(Scanner.GenScanFactory):
     def destroy(self):
         self.dbh.execute('ALTER TABLE history_%s ADD INDEX(url(10))', self.table)
 
-    class Scan(Scanner.StoreAndScan):
-        def boring(self,metadata):
-            if metadata['mime']=='application/x-ie-index':
-                return False
-            return True
+    class Scan(Scanner.StoreAndScanType):
+        types = ['application/x-ie-index']
 
         def external_process(self,name):
             self.dbh.MySQLHarness("pasco -t %s -p %r %s " % (self.table,self.ddfs.lookup(inode=self.inode),name))

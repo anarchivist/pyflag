@@ -45,13 +45,12 @@ class RegistryScan(GenScanFactory):
         ## Add indexes:
         self.dbh.execute("alter table reg_%s add index(path)",self.table)
 
-    class Scan(StoreAndScan):
-        def boring(self,metadata):
-            return metadata['mime'] not in (
-                'application/x-winnt-registry',
-                'application/x-win9x-registry',
-                )
-
+    class Scan(StoreAndScanType):
+        types =  (
+            'application/x-winnt-registry',
+            'application/x-win9x-registry',
+            )
+        
         def external_process(self,filename):
             self.dbh.MySQLHarness("regtool -f %s -t reg_%s -p %r " % (filename,self.ddfs.table,self.ddfs.lookup(inode=self.inode)))
 

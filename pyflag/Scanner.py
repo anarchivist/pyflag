@@ -186,6 +186,24 @@ class StoreAndScan:
         @arg name: The name of the file in the filesystem to operate on - The Scanner should have saved this file previously.
         """
 
+class StoreAndScanType(StoreAndScan):
+    """ This class scans a file only if a file is of a certain type.
+
+    The determination of the type of a file is done by using the metadata passed from the type scanner, or failing that we query the type table for the given inode.
+    """
+    ## These are the mime types that will be used to decide if we should scan this file
+    types = []
+    
+    def boring(self,metadata):
+        try:
+            return metadata['mime'] not in self.types
+        except KeyError:
+            self.dbh.execute("select mime from type_%s where inode=%r",(self.table,self.inode))
+            row=self.dbh.fetch()
+            if row:
+                return row['mime'] not in self.types
+            else: return True
+
 ### This is used to scan a file with all the requested scanner factories
 def scanfile(ddfs,fd,factories):
     """ Given a file object and a list of factories, this function scans this file using the given factories

@@ -26,4 +26,6 @@ We first introduce a number of definitions:
 
  - *Words* are arbitrary byte sequences, which may contain unicode representations in foreign character sets.
 
- - A *dictionary* is defined as a list of *words*. This list may exist in a flat file, one word per line(As required by the command line indextool), or may be stored in the PyFlag database permanently.
+ - A *dictionary* is defined as a list of *words*. This list may exist in a flat file, one word per line (As required by the command line indextool), or may be stored in the PyFlag database permanently.
+
+- An *index* is a binary file which stores a list of offsets for each word in the dictionary. Searching the index amounts to looking up the index file for a list of offsets.
