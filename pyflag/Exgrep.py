@@ -170,8 +170,16 @@ definitions.append(cut)
 cut={}
 cut["Extension"]="zip"
 cut['StartRE']= "PK\\x03\\x04"
+cut['EndRE']="PK\\x05\\x06.{18}"
 cut["MaxLength"]=1000000
 cut["Comment"]="Zip file"
+definitions.append(cut)
+
+cut={}
+cut["Extension"]="pst"
+cut['StartRE']="!BDNF"
+cut['MaxLength'] = 10000000
+cut['Comment'] = "Outlook PST File"
 definitions.append(cut)
 
 for i in definitions:
