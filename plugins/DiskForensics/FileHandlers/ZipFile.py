@@ -26,11 +26,16 @@ class ZipScan(GenScanFactory):
     def destroy(self):
         pass
     
-    class Scan(StoreAndScan):            
+    class Scan(StoreAndScan):
         def boring(self,metadata):
-            return metadata['mime'] not in (
-                'application/x-zip',
-                )
+            """ FIXME: Change this to use the type from either metadata or the types table - this will allow dependency on type scanner to be optional. Move this to base class to allow other StoreAndScan classes to use the same method
+            """
+            try:
+                return metadata['mime'] not in (
+                    'application/x-zip',
+                    )
+            except KeyError:
+                """ FIXME: select from table... (This select may be done in the outer class and we just search an array at this point"""
 
         def external_process(self,name):
             """ This is run on the extracted file """

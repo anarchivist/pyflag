@@ -22,3 +22,21 @@ Things still to do for pyflag in no order of priority:
 - Automatically install the pyflag database if we cant find it.
 - Automatically create the configuration file if we cant find it using user prompts. (partially done)
 - Add authentication and case management to the web interface. (low priority).
+
+
+fix scanner order by catching boring methods
+create a unique name /scanner table for scanners to determine if they have been run before
+allow scanners to be invoked on files
+Add libgmp dependencies to libs in binary release
+libmysqlclient issues with bin mysql release - copy libmyclient to libs.
+starting the binary release asks database username and hosts, which are not required.
+Finish the indexing paper/utility
+Commit gtk script to tree
+add find to shell with suitable clauses for mime types etc...
+write examples of pyflag shell scripts in python...
+fat32 speedup and crash investigation.
+disk structure shell out to mmls in load io sources popup
+add a raw filesystem to have unallocated scanners work
+Remove unstructed forensics family
+Order families in menu
+Lead from load io source to load data directly - ignoring the load data
