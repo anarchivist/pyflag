@@ -31,5 +31,5 @@ else
 	export PYTHONPATH=`pwd`:`pwd`/libs/
 	# Add our libs dir to the LD_LIBRARY_PATH to run our hooker.
 	export LD_LIBRARY_PATH=`pwd`/libs/
-	env python $1 $2 $3 $4 $5 $6 $7
+	env python "$@"
 fi

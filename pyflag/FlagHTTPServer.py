@@ -165,5 +165,5 @@ if __name__ == "__main__":
     import pyflag.Graph as Graph
 
     Graph.Graph = Graph.Ploticus
-    
+
     SimpleHTTPServer.test(HandlerClass = FlagServerHandler)

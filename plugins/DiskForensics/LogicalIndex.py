@@ -103,6 +103,12 @@ class Index(GenScanFactory):
             self.outer=outer
             self.outer.rel_offset=0
             self.outer.block+=1
+            self.dbh.execute("select max(block) as `max` from `LogicalIndex_%s`",(outer.table))
+            row=self.dbh.fetch()
+            try:
+                self.outer.block=int(row['max'])+1
+            except: self.outer.block=0
+
             self.dbh.execute("insert into `LogicalIndex_%s` set inode=%r,block=%r",(outer.table,inode,self.outer.block))
 
         def process(self,data,metadata=None):
