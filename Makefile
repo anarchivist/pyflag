@@ -4,6 +4,7 @@ DIRS	= iosubsys imagingtools/dd_rescue/ raidtools indextools regtools virustools
 SYSBINS = cjpeg djpeg
 PYTHONLIB = /usr/lib/python2.3/
 PYTHONBIN = `which python2.3`
+DATA_DIR = `grep -i DATA_DIR pyflag/pyflagrc | cut -d= -f2`
 
 all:	bins
 	for dir in $(DIRS); do\
@@ -40,3 +41,8 @@ bin-dist:
 
 	## Strip all binaries:
 	find bin_dist/ -perm +0111 -exec strip {} \;
+
+mysql:
+	cd bin_dist/ && tar -xvzf ../sources/mysql*.tgz
+	mkdir -p $(DATA_DIR)
+	

@@ -35,6 +35,7 @@ config=pyflag.conf.ConfObject()
 import os,os.path,time,re
 import pyflag.Sleuthkit as Sleuthkit
 import pyflag.FileSystem as FileSystem
+import pyflag.logging as logging
 import pyflag.Graph as Graph
 import pyflag.IO as IO
 import pyflag.DB as DB
@@ -713,12 +714,15 @@ class SearchIndex(Reports.report):
                 off = offset - int(row['offset'])
                 if off<10: off=10
                 fd.seek(off-10)
+                ## Read some data before and after the keyword
                 data = fd.read(10 + len(keyword) + 20)
                 if data[10:10+len(keyword)].lower()==keyword.lower():
                     dbh2.execute("insert into LogicalKeyword_%s set inode=%r, offset=%r, text=%r, keyword=%r",(table,row['inode'],off,data,keyword))
                     break
                 else:
                     logging.log(logging.DEBUG,"Error: Could not find keyword %s in data %s (inode should be %s) " %(keyword,data,row['inode']))
+                    ## Once we found one inode that matches we quit
+                    break
                 fd.close()
         
     def display(self,query,result):
