@@ -448,7 +448,7 @@ class GTKUI(UI.GenericUI):
             
         widget=gtk.Button("Submit")
         widget.connect("button_press_event",self.submit)
-        self.text("\r\n",widget)
+        self.row(widget)
 
     text_widget = None
     text_widget_buffer = None
@@ -475,7 +475,7 @@ class GTKUI(UI.GenericUI):
         '''
 
         import pango
-        text_buffer.create_tag("heading",
+        text_buffer.create_tag("font_heading",
                                weight=pango.WEIGHT_BOLD,
                                size=15 * pango.SCALE)
         
@@ -573,7 +573,7 @@ class GTKUI(UI.GenericUI):
 
     def para(self,string,**options):
         #FIXME, whats the difference between 'para' and 'text'
-        self.text(string, options)
+        self.text(string, font='heading')
         #self.buffer.insert_with_tags_by_name(self.iter,string+"\r\n\r\n",'text')
 
     def filebox(self,dir=None,target="datafile",multiple="single"):
@@ -614,7 +614,7 @@ class GTKUI(UI.GenericUI):
         f.set_data('label',label)
 #        del self.form_parms[target]
         self.form_widgets.append((label,get_my_filename))
-        self.text(label,'   ',button)
+        self.row(label,'   ',button)
         try:
             del self.form_parms[target]
         except KeyError:
@@ -886,13 +886,13 @@ class GTKUI(UI.GenericUI):
         right.connect("clicked",page_cb)
 
         ## Attach the widget to the result canvas
-        self.text(left,right,'\r\n')
-        self.text(treeview)
+        self.row(left,right)
+        self.row(treeview)
 
         ## Create a group by selector
         tmp=self.__class__(self)
         tmp.const_selector("Group by a column: ",'group_by',['None']+list(names),['']+list(names))
-        self.text('\r\n',tmp)
+        self.row(tmp)
 
         ## Add the columns to the widget
         for i in range(len(names)):
@@ -1000,4 +1000,4 @@ class GTKUI(UI.GenericUI):
         selection = treeview.get_selection()
         selection.set_mode(gtk.SELECTION_SINGLE)
         selection.connect('changed', selection_changed)
-        self.text(hbox)
+        self.row(hbox)
