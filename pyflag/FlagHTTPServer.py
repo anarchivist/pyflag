@@ -94,7 +94,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             result=flag.ui()
             result.defaults = query
             cb=query['callback_stored']
-            del query['callback_stored']
+#            del query['callback_stored']
             cb=UI.HTMLUI.callback_dict[cb]
             cb(query,result)
 

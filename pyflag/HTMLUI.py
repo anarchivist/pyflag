@@ -261,14 +261,25 @@ class HTMLUI(UI.GenericUI):
     def pre(self,string):
         self.result += "<pre>%s</pre>" % string
 
-    def link(self,string,target=FlagFramework.query_type(()),**target_options):
+    def link(self,string,target=FlagFramework.query_type(()),options=None,**target_options):
         q=target.clone()
         if target_options:
             for k,v in target_options.items():
                 del q[k]
                 q[k]=v
 
-        self.result+="<a href='blah?%s'>%s</a>" % (q,string)
+        if not options:
+            options={}
+
+        try:
+            tmp=target['__opt__'].split(',')
+            if 'parent' in tmp:
+                del q['__opt__']
+                options['onclick']="self.opener.location=\"%s\"; self.close();" % q
+        except KeyError:
+            pass
+
+        self.result+="<a href='blah?%s' %s>%s</a>" % (q,self.opt_to_str(options),string)
 
     def popup(self,callback, label,icon=None,toolbar=0, menubar=0, **options):
         """ This method presents a button on the screen, which when clicked will open a new window and use the callback to render in it.
@@ -709,29 +720,27 @@ class HTMLUI(UI.GenericUI):
             self.popup(table_groupby_popup,'Graph',icon='pie.png',toolbar=1,menubar=1)
         else: ## Not group by
             def table_configuration_popup(query,result):
+                try:
+                    if query['refresh']:
+                        del query['refresh']
+                        del query['callback_stored']
+                        result.refresh(0,query,options={'parent':1})
+                except KeyError:
+                    pass
+                
                 result.display = result.__str__
                 result.heading("Select columns to hide:")
-                del query['callback_stored']
-                query['__opt__']= 'parent'
-                result.start_form(query)
+                result.start_form(query, refresh="parent")
+                result.start_table()
                 for name,column in zip(columns,names):
                     result.checkbox(name,"hide_column",column)
-
+                result.end_table()
                 result.end_form()
+ 
                     
             ## End table_configuration_popup
 
             self.popup(table_configuration_popup,'Configure',icon='spanner.png',toolbar=1,menubar=1)
-
-        ## Write the conditions at the top of the page:
-        if conditions:
-            self.start_table()
-            self.row("The following filter conditions are enforced")
-            for i in conditions:
-                self.row(i)
-            self.row("Click any of the above links to remove this condition")
-            self.end_table()
-            self.start_table()
 
         ## Draw a popup to allow the user to save the entire table in CSV format:
         def save_table(query,result):
@@ -760,8 +769,26 @@ class HTMLUI(UI.GenericUI):
                 
         self.popup(save_table,'Save Table',icon="floppy.png")
 
+        ## Write the conditions at the top of the page:
+        if conditions:
+            self.start_table()
+            self.row("The following filter conditions are enforced")
+            for i in conditions:
+                self.row(i)
+            self.row("Click any of the above links to remove this condition")
+            self.end_table()
+            self.start_table()
+
         tmp_links = []
-        for d in names:
+        hidden_columns = []
+        for i in range(len(names)):
+            d=names[i]
+            
+            ## Skip the hidden columns
+            if d in query.getarray('hide_column'):
+                hidden_columns.append(i)
+                continue
+            
             #instatiate a whole lot of UI objects (based on self) for the table header
             tmp = self.__class__(self)
 
@@ -771,7 +798,6 @@ class HTMLUI(UI.GenericUI):
                 tmp.link(d,target=new_query,order=d)
             except (KeyError,AssertionError):
                 tmp.link(d,target=new_query,dorder=d)
-
 
             #If the current header label is the same one in ordered_col, we highlight it to show the user which column is ordered:
             if names[ordered_col] == d:
@@ -783,7 +809,7 @@ class HTMLUI(UI.GenericUI):
             tmp_links.append(tmp)
 
         #This array keeps track of each column width
-        width = [ len(d) for d in names ]
+        width = [ len(names[d]) for d in range(len(names))]
 
         #output the table header
         self.row(*tmp_links)
@@ -798,12 +824,11 @@ class HTMLUI(UI.GenericUI):
             if not row: break
 
             #Form a row of strings
-            row_str = [ "%s" % d for d in row ]
-
-            #Update the maximum width of each column
-            for d in range(len(width)):
-                if width[d] < len(row_str[d]):
-                    width[d] = len(row_str[d])
+            row_str=[]
+            for i in range(len(row)):
+                row_str.append("%s" % row[i])
+                if width[i] < len(row_str[i]):
+                    width[i] = len(row_str[i])
 
             #Work through the row and create entry uis for each of them.
             for i in range(len(row_str)):
@@ -855,7 +880,7 @@ class HTMLUI(UI.GenericUI):
 
             count += 1
             #Add the row in
-            self.row(*row_str,**options)
+            self.row(*[ row_str[i] for i in range(len(row_str)) if i not in hidden_columns],**options)
 
         if opts.has_key('simple'):
             return
@@ -866,7 +891,9 @@ class HTMLUI(UI.GenericUI):
             #Insert the group by links at the bottom of the table
 #            del new_query['group_by']
             tmp_links = []
-            for d in names:
+            for i in range(len(names)):
+                if i in hidden_columns: continue
+                d=names[i]
                 tmp = self.__class__(self)
                 tmp.link(d,target=new_query,group_by=d)
                 tmp_links.append(tmp)
@@ -883,6 +910,7 @@ class HTMLUI(UI.GenericUI):
         #Now create a row with input boxes for each parameter
         tmp_links=[]
         for d in range(len(names)):
+            if d in hidden_columns: continue
             tmp = self.__class__(self)
             #It doesnt make sense to search for columns with callbacks, so we do not need to show the form.
             if callbacks.has_key(names[d]):
@@ -1038,7 +1066,7 @@ class HTMLUI(UI.GenericUI):
         """
         self.form_parms=target.clone()
         #Append the hidden params to the object
-        for k,v in hiddens:
+        for k,v in hiddens.items():
             self.form_parms[k]=v
 
         self.result += "<form method=get action='/f'>\n"
@@ -1048,7 +1076,7 @@ class HTMLUI(UI.GenericUI):
             self.result += "<input type=hidden name='%s' value='%s'>\n" % (k,v)
 
         if name:
-            self.result += "<input type=submit value='%s'></form>\n" % name 
+            self.result += "<input type=submit value='%s'></form>\n" % (name)
 
     def join(self,ui):
         """ Joins the supplied ui object with this object """
@@ -1083,7 +1111,19 @@ class HTMLUI(UI.GenericUI):
         else:
             self.result += "<hr />\n"
         
-    def refresh(self,interval,query):
+    def refresh(self,interval,query,options=None):
+        if not options:
+            options={}
+
+        try:
+            if options.has_key('parent'):
+                print " will try to refresh to parent"
+                self.result+="<script language=javascript>self.opener.location=\"%s\"; self.close();</script>" % query
+                return
+            
+        except KeyError:
+            pass
+
         self.meta += "<META HTTP-EQUIV=Refresh Content=\"%s; URL=/f?%s\">" % (interval,query)
 
     def icon(self, path, **options):
