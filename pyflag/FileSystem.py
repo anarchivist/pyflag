@@ -211,11 +211,15 @@ class DBFS(FileSystem):
 
             self.dbh.execute("select * from file_%s where path=%r and name=%r",(self.table, path, dirs[d]))
             if not self.dbh.fetch():
+                ## Directory does not exist, so we need to create it:
                 if root_inode != None:
                     self.dbh.execute("insert into file_%s set path=%r,name=%r,status='alloc',mode='d/d',inode='%s|%s-'",(self.table,path,dirs[d],root_inode,inode))
+#                    self.dbh.execute("update inode_%s  set mode=%r, links=%r where inode=%r",(self.table,40755, 3,inode))
+                    self.dbh.execute("insert into inode_%s  set mode=%r, links=%r , inode='%s|%s-',gid=0,uid=0",(self.table,40755, 3,root_inode,inode))
                 else:
                     self.dbh.execute("insert into file_%s set path=%r,name=%r,status='alloc',mode='d/d',inode='%s-'",(self.table,path,dirs[d],inode))
-
+                    self.dbh.execute("insert into inode_%s  set mode=%r, links=%r , inode='%s-',gid=0,uid=0",(self.table,40755, 3,root_inode,inode))
+                    
         path = normpath("%s/%s/" % (filename,os.path.dirname(new_filename)))
         ## Add the file itself to the file table
         if root_inode:
@@ -229,9 +233,9 @@ class DBFS(FileSystem):
             extra=','+extra
 
         if root_inode!=None:
-            self.dbh.execute("insert into inode_%s set inode='%s|%s'" + extra ,[self.table, root_inode,inode] + properties.values())
+            self.dbh.execute("insert into inode_%s set inode='%s|%s',mode=100777,links=3,gid=0,uid=0" + extra ,[self.table, root_inode,inode] + properties.values())
         else:
-            self.dbh.execute("insert into inode_%s set inode='%s'" + extra ,[self.table, inode] + properties.values())
+            self.dbh.execute("insert into inode_%s set inode='%s',mode=100777,links=3,gid=0,uid=0" + extra ,[self.table, inode] + properties.values())
         
         ## Set the root file to be a d/d entry so it looks like its a virtual directory:
         self.dbh.execute("select * from file_%s where mode='d/d' and inode=%r and status='alloc'",(self.table,root_inode))
@@ -240,6 +244,7 @@ class DBFS(FileSystem):
             row = self.dbh.fetch()
             if row:
                 self.dbh.execute("insert into file_%s set mode='d/d',inode=%r,status='alloc',path=%r,name=%r",(self.table,root_inode,row['path'],row['name']))
+                self.dbh.execute("update inode_%s  set mode=%r, links=%r where inode=%r",(self.table,40755, 3,root_inode))
 
     def longls(self,path='/', dirs = None):
         if(dirs == 1):
@@ -285,13 +290,12 @@ class DBFS(FileSystem):
             inode = self.lookup(path)
         if not inode:
             return None
-        self.dbh.execute("select inode, status, uid, gid, from_unixtime(mtime) as `mtime`, from_unixtime(atime) as `atime`, from_unixtime(ctime) as `ctime`, from_unixtime(dtime) as `dtime`, mode, links, link, size from inode_%s where inode=%r",(self.table, inode))
+        self.dbh.execute("select inode, status, uid, gid, mtime as mtime_epoch, from_unixtime(mtime) as `mtime`, atime as atime_epoch, from_unixtime(atime) as `atime`, ctime as ctime_epoch, from_unixtime(ctime) as `ctime`, from_unixtime(dtime) as `dtime`, mode, links, link, size from inode_%s where inode=%r",(self.table, inode))
         return self.dbh.fetch()
 
     def isdir(self,directory):
-        if not directory.endswith('/'):
-            directory+='/'
-        self.dbh.execute("select mode from file_%s where path=%r",(self.table,directory))
+        directory=FlagFramework.normpath(directory)
+        self.dbh.execute("select mode from file_%s where path=%r and name=%r and mode like 'd%%' ",(self.table,os.path.dirname(directory)+'/',os.path.basename(directory)))
         row=self.dbh.fetch()
         if row:
             return 1

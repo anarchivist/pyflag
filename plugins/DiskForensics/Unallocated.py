@@ -147,6 +147,7 @@ class DeletedScan(GenScanFactory):
             ## Create a deleted directory entry:
             dbh2=self.dbh.clone()
             self.dbh.execute("insert into file_%s set  inode='D0',mode='d/d',status='alloc',path='/',name='_deleted_'",self.table)
+            self.dbh.execute("insert into inode_%s set  inode='D0', links=3,mode=40755 ,gid=0,uid=0",self.table)
             ## This will give us all the inodes which appear in the blocks
             ## table (i.e. they are allocated), but do not appear in the
             ## file table (i.e. do not have a filename).

@@ -353,7 +353,8 @@ class LoadFS(Reports.report):
         self.progress_str="Running Scanners on filesystem"
         ## Scan the filesystem for hashes and viruses etc.
         iofd=IO.open(query['case'],query['iosource'])
-        fsfd=FileSystem.FS_Factory( query["case"], query["iosource"], iofd)
+        fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'],query['iosource'],iofd)
+##        fsfd=FileSystem.FS_Factory( query["case"], query["iosource"], iofd)
         ## The scanners that users asked for:
         user_scanners = query.getarray('scan')
 

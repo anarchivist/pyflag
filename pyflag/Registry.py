@@ -247,6 +247,7 @@ class FileSystemRegistry(Registry):
     FileSystems control the internal representation of the filesystem structure, the loading of this from an image and the browsing of the filesystem. Note that this is different than VFS which deal with how to read individual files from the FileSystem, but both are confined to use the same DBFS schema at present.
     """
     filesystems = {}
+    fs = {}
     def __init__(self,ParentClass):
         Registry.__init__(self,ParentClass)
         for cls in self.classes:
@@ -255,6 +256,7 @@ class FileSystemRegistry(Registry):
             ## A name of None will prevent from loading into Registry
             if cls.name:
                 self.filesystems[cls.name] = cls
+            self.fs[("%s" % cls).split(".")[-1]]=cls
 
 class ShellRegistry(Registry):
     """ A class to manage Flash shell commands """

@@ -76,7 +76,7 @@ class BrowseFS(Reports.report):
         
         # lookup the iosource for this fsimage
         iofd = IO.open(query['case'], query['fsimage'])
-        fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
+        fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"], query["fsimage"], iofd)
         
         branch = ['']
         new_query = result.make_link(query, '')
@@ -160,7 +160,7 @@ class BrowseFS(Reports.report):
                 path =FlagFramework.normpath('/'.join(branch)+'/')
                 ## We need a local copy of the filesystem factory so
                 ## as not to affect other instances!!!
-                fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
+                fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"], query["fsimage"], iofd)
 
                 for i in fsfd.dent_walk(path): 
                     if i['mode']=="d/d" and i['status']=='alloc':
@@ -208,7 +208,7 @@ class ViewFile(Reports.report):
 
         # retrieve the iosource for this fsimage
         iofd = IO.open(query['case'],query['fsimage'])
-        fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
+        fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"], query["fsimage"], iofd)
         fd = fsfd.open(inode=query['inode'])
 
         ## We only want this much data

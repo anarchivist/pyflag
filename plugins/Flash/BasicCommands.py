@@ -50,7 +50,7 @@ class load(pyflagsh.command):
             except ValueError:
                 raise ParserException("Load has the following format: case.tag")
             iofd=IO.open(case,sourcename)
-            self.environment.__class__._FS=FileSystem.FS_Factory(case,sourcename,iofd)
+            self.environment.__class__._FS=Registry.FILESYSTEMS.fs['DBFS'](case,sourcename,iofd)
             self.environment.__class__._IOSOURCE = sourcename
             self.environment.__class__._CASE = case
             yield "Loaded Filesystem tag %r in case %r" %(sourcename,case)
