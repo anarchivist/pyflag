@@ -542,7 +542,7 @@ class HTMLUI(UI.GenericUI):
             elif t == 'special':
                 left.result+="%s%s<br>\n" % ("<img src=/flag/images/spacer.png width=20 height=20>" * depth , "<a name=%s href=f?%s#%s>%s</a>  " % (open_tree,link,open_tree, str(v) ))
             else:
-                left.result+="%s%s%s<br>\n" % ("<img src=/flag/images/spacer.png width=20 height=20>" * depth , "<a name=%s /><img border=0 height=16 src=/flag/images/corner.png width=20 height=20>  " % open_tree, v )
+                left.result+="%s%s%s<br>\n" % ("<img src=/flag/images/spacer.png width=20 height=20>" * depth , "<a name=%s /><img border=0 height=16 src=/flag/images/corner.png width=20 height=20>&nbsp;&nbsp;" % open_tree, v )
         right=self.__class__(self)
         try:
             ## Get the right part:

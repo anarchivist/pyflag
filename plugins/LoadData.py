@@ -169,6 +169,7 @@ class LoadTcpDump(Reports.report):
     parameters = {"datafile":"filename"}
     name = "Load Pcap file"
     family="Load Data"
+    hidden=True
     description = "Load a network capture file into the case Database "
     order=30
     
@@ -439,6 +440,7 @@ class LoadKB(LoadTcpDump):
     parameters = {"datafile":"filename"}
     name = "Build Knowledge Base"
     family="Load Data"
+    hidden=True
     description = "Builds a knowledge base from a Pcap file "
     order=50
     

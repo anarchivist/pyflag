@@ -6,7 +6,9 @@ SLEUTHKIT	= sleuthkit-1.73
 STATIC		= yes
 PLOTICUS	= pl231src
 
-PROGS		= $(BIN)/dbtool $(BIN)/pl $(BIN)/tethereal $(BIN)/prefabs 
+## The TCPDUMP reports are inactive for now - therefore we do not need to compile ethereal at all.
+#PROGS		= $(BIN)/dbtool $(BIN)/pl $(BIN)/tethereal $(BIN)/prefabs 
+PROGS		= $(BIN)/dbtool $(BIN)/pl $(BIN)/prefabs 
 
 ## This bit compiles and patches ethereal, note that we expect to have
 ## the ethereal-xxx.tar.bz2 in the sources directory.

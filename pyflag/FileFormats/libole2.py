@@ -142,7 +142,8 @@ class RawString(UCS16_STR):
         if size>0:
             result=UCS16_STR(data,size).read(data)
         else:
-            result =STRING('',0)
+            result=''
+            
         return result
 
     def size(self):
@@ -233,7 +234,7 @@ class OLEFile:
         """ returns the data within each property """
         size=property['pps_size'].get_value()
         pps_sb = property['pps_sb'].get_value()
-        t = property['pps_type'].get_value()
+        t = property['pps_type']
         threshold=self.header['threshold'].get_value()
         
         ## only attempt to read files here... We can not read dirs or

@@ -555,6 +555,12 @@ class BYTE_ENUM(BYTE):
             return target==self.types[self.data]
         except KeyError:
             return target==self.data
+
+    def get_value(self):
+        if not self.data:
+            self.initialise()
+            
+        return self.types[self.data]
     
 class LONG_ENUM(BYTE_ENUM):
     fmt='l'    

@@ -216,7 +216,6 @@ class PropArray(ARRAY):
     target_class=Property
 
 def parse_summary_info(p,file):
-#    print p
     ## Get the property stream
     data = file.cat(p)
     header = PropHeader(data)
@@ -243,14 +242,14 @@ def parse_summary_info(p,file):
             ## This is an enum based on a long - This looks up the
             ## right type based on the value in the long
             value = PropDataType(section_data[offset:])
-            cls=value.get_value()
             try:
+                cls=value.get_value()
                 ## We recognise this data type - Lets get it
                 if issubclass(cls,DataType):
-                    value=cls(section_data[offset+value.size():])
+                    v=cls(section_data[offset+value.size():])
                     ## Print the data according to its data type
-                    print "%s: %s" % (prop['Type'],value)
-            except TypeError,e:
+                    print "%s: '%s'" % (prop['Type'],v)
+            except (TypeError,KeyError),e:
                 #print "Cant handle property type %s for %s" % (cls,prop['Type'])
                 pass
 

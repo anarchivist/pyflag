@@ -34,6 +34,12 @@
 
 static int verbose=10;
 
+inline int comparison(char x, char y) {
+  return(!strncasecmp(&x,&y,1));
+  //return x==tolower(y);
+  //return x==y;
+};
+
 void debug(int level,const char *message, ...)
 {
 	va_list ap;
@@ -247,7 +253,7 @@ static node_ptr find_peer(struct index_file *idx,node_ptr node_ref,
   while(1) {
     //Get memory pointers
     node=absolute_node(idx,node_ref);
-    if(node->c==tolower(*c)) {
+    if(comparison(node->c,*c)) {
       return(node_ref);
     };
 
@@ -282,7 +288,8 @@ static node_ptr append_to_peerlist(struct index_file *idx,
   //Node should point at the end of the list now...
   node->peer=temp;
   node=absolute_node(idx,node->peer);
-  node->c=tolower(*c);
+  //  node->c=tolower(*c);
+  node->c=*c;
   return(temp);
 };
 
@@ -321,7 +328,8 @@ void add_word(struct index_file *idx,unsigned char *c,int length)
      
      	node->child=child_ptr;
      	child=absolute_node(idx,node->child);
-     	child->c=tolower(*(c));
+	//     	child->c=tolower(*(c));
+	child->c=*c;
            };
            node_ref=node->child;
       };
@@ -377,7 +385,7 @@ node_ptr find_node(struct index_file *idx, node_ptr root_ptr,
 
   //Test the node we were given
   node=absolute_node(idx,root_ptr);
-  if(node->c == tolower(*c)) {
+  if(comparison(node->c,*c)) {
     current_node=root_ptr;
   } else {
     current_node=0;
@@ -648,6 +656,8 @@ void idx_add_offset_to_list(struct index_file *idx, node_ptr node_ref,
   struct  idx_node *node;
   offlist_ptr off=new_offset_list(idx);
 
+  //  printf("Added offset %llu to index\n",offset);
+
   if(offset>0xffffffff00000000)
     printf("Offset less than zero at %llu\n",offset);
   
@@ -705,6 +715,12 @@ void idx_index_buffer(struct index_file *idx, long long int base,
   free(tmp);
 };
 
+#define INDEX_FILE "/var/tmp/test.idx"
+//#define FILE_TO_INDEX "36.txt"
+#define FILE_TO_INDEX "/var/tmp/test_image.dd"
+//#define FILE_TO_INDEX "zero.txt"
+#define KEY_WORDS "/usr/share/dict/words"
+
 int main() {
   char *tmp=(char *)malloc(FILEBUFFER);
   char *tmp2;
@@ -719,9 +735,11 @@ int main() {
   // of the word "linux"
 
   if(1) {
-    idx=new_index("/storage/tmp/test.idx");
+    FILE *in=fopen(KEY_WORDS,"r");
 
-    while(fgets(tmp,FILEBUFFER,stdin)) {
+    idx=new_index(INDEX_FILE);
+
+    while(fgets(tmp,FILEBUFFER,in)) {
       int length=strlen(tmp)-1;
       
       if(tmp[length]=='\n') {
@@ -731,10 +749,10 @@ int main() {
 	add_word(idx,tmp,strlen(tmp));
     };
     
-    fd=open("/var/tmp/honeypot.hda5.dd",O_RDONLY);
-    //fd=open("wrnpc11.txt",O_RDONLY);
+    //    fd=open("/var/tmp/honeypot.hda5.dd",O_RDONLY);
+    fd=open(FILE_TO_INDEX,O_RDONLY);
     while((length=read(fd,tmp,FILEBUFFER))>0) {
-      fprintf(stderr,"Read %u bytes\n",count);
+      fprintf(stderr,"Read %u bytes\n",length);
       idx_index_buffer(idx,count,tmp,length);
       count+=length;
     };
@@ -742,11 +760,11 @@ int main() {
     free_index(idx);
   };
 
-  idx=idx_load_from_file("/storage/tmp/test.idx");
+  idx=idx_load_from_file(INDEX_FILE);
 
-  fd=open("/var/tmp/honeypot.hda8.dd",O_RDONLY);
+  fd=open(FILE_TO_INDEX,O_RDONLY);
 
-  tmp2="linu";
+  tmp2="document";
 
   printf("About to search for %s \n",tmp2);
 
