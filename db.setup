@@ -1,3 +1,48 @@
+-- 
+-- Table structure for table `whois`
+-- 
+
+CREATE TABLE `whois` (
+  `id` int(11) NOT NULL auto_increment,
+  `src_id` int(11) default NULL,
+  `start_ip` int(10) unsigned default NULL,
+  `netname` varchar(50) default NULL,
+  `numhosts` int(11) default NULL,
+  `country` char(2) default NULL,
+  `descr` varchar(255) default NULL,
+  `status` enum('assigned','allocated','reserved','unallocated') default NULL,
+  KEY `id` (`id`),
+  KEY `src_id` (`src_id`)
+) TYPE=MyISAM;
+
+-- --------------------------------------------------------
+
+-- 
+-- Table structure for table `whois_routes`
+-- 
+
+CREATE TABLE `whois_routes` (
+  `network` int(10) unsigned default NULL,
+  `netmask` int(10) unsigned default NULL,
+  `whois_id` int(11) default NULL,
+  KEY `whois_id` (`whois_id`),
+  KEY `network` (`network`)
+) TYPE=MyISAM;
+
+-- --------------------------------------------------------
+
+-- 
+-- Table structure for table `whois_sources`
+-- 
+
+CREATE TABLE `whois_sources` (
+  `id` int(11) NOT NULL auto_increment,
+  `source` varchar(20) default NULL,
+  `url` varchar(255) default NULL,
+  `updated` datetime default NULL,
+  KEY `id` (`id`)
+) TYPE=MyISAM;
+
 #
 # Table structure for table `NSRL_hashes`
 #
