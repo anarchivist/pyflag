@@ -48,11 +48,11 @@ class VirScan(GenScanFactory):
         self.dbh.execute('drop table virus_%s',self.table)
 
     class Scan:
-        def __init__(self, inode,ddfs,dbh,table,factories=None):
+        def __init__(self, inode,ddfs,outer,factories=None):
             self.inode = inode
             self.window = ''
-            self.dbh=dbh
-            self.table=table
+            self.dbh=outer.dbh
+            self.table=outer.table
             self.virus = None
             self.windowsize = 1000
             self.scanner = VScan()

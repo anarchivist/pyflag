@@ -206,7 +206,7 @@ class DBFS(FileSystem):
         """ Given a file object and a list of factories, this function scans this file using the given factories """
         buffsize = 1024 * 1024
         # instantiate a scanner object from each of the factory
-        objs = [c.Scan(inode,self,self.dbh,self.table,factories=factories) for c in factories]
+        objs = [c.Scan(inode,self,c,factories=factories) for c in factories]
         # read data (in chunks)
         while 1:
             ## This dict stores metadata about the file which may be filled in by some scanners in order to indicate some fact to other scanners.
@@ -235,8 +235,10 @@ class DBFS(FileSystem):
                 break
             # call process method of each class
             for o in objs:
-#                print "metadata is %s %s" % (o,metadata)
-                o.process(data,metadata=metadata)
+                try:
+                    o.process(data,metadata=metadata)
+                except Exception,e:
+                    logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
 
         fd.close()
         # call finish object of each method

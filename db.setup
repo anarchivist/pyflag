@@ -1466,3 +1466,9 @@ INSERT INTO enum VALUES ('tcp_flags_txt',128,'CWR');
 INSERT INTO enum VALUES ('ip_flags_txt',8,'Congestion');
 INSERT INTO enum VALUES ('ip_flags_txt',4,'Dont Frag');
 INSERT INTO enum VALUES ('ip_flags_txt',2,'More Frag');
+
+CREATE TABLE `dictionary` (
+	`word` VARCHAR( 50 ) NOT NULL ,
+	`class` VARCHAR( 50 ) NOT NULL ,
+	`encoding` SET( 'all', 'asci', 'ucs16' ) NOT NULL
+);

@@ -4,7 +4,7 @@ import sys
 count=0
 #filename="/var/tmp/honeypot.hda8.dd"
 filename="wrnpc11.txt"
-wordfile="/usr/dict/words"
+wordfile="/usr/share/dict/words"
 index_file="/tmp/test_python.idx"
 
 if 1:

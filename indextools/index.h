@@ -40,8 +40,8 @@ struct offset_list {
 } __attribute__((packed));
 
 /*
-Before indexing, we construct a tree in memory representing the
-dictionary. Each node in this tree is a letter of a word in the
+Before indexing, we construct a trie in memory representing the
+dictionary. Each node in this trie is a letter of a word in the
 dictionary, and each node has an arbitrary number of child nodes
 representing the letters following them.
 

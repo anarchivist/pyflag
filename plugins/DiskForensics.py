@@ -9,7 +9,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Name:  $ $Date: 2004/10/26 00:02:58 $
+#  Version: FLAG $Name:  $ $Date: 2004/10/26 01:07:53 $
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -74,7 +74,7 @@ class BrowseFS(Reports.report):
             
         def tree_cb(branch):
             path ='/'.join(branch)  + '/'
-            fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
+#            fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
 
             a = fsfd.dent_walk(path)
             for i in a:
@@ -664,28 +664,43 @@ class BrowseRegistry(BrowseFS):
         dbh.execute('drop table if exists reg_%s',tablename)
         dbh.execute('drop table if exists regi_%s',tablename)
 
-class ScanFileSystem(Reports.report):
-    """ Scan the file system """
-    parameters = { 'fsimage':'fsimage' }
-    name = "Scan File System"
-    description = "Scan the file system "
-    order=80
-    hidden=1
+class SearchIndex(Reports.report):
+    """ Search for indexed keywords """
+    description = "Search for words that were indexed during filesystem load. Words must be in dictionary to be indexed. "
+    name = "Search Indexed Keywords"
+    parameters={'fsimage':'fsimage','keyword':'any'}
 
     def form(self,query,result):
         try:
             result.case_selector()
-            if query['case']!=config.FLAGDB:
-                result.meta_selector(case=query['case'],property='fsimage')
+            result.meta_selector(case=query['case'],property='fsimage')
+            result.textfield("Keyword to search:",'keyword')
         except KeyError:
-            return result
+            return
         
     def display(self,query,result):
-        iofd=IO.open(query['case'],query['fsimage'])
-        fsfd=FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
-        fsfd.scanfs([Scanner.TypeScan,Scanner.MD5Scan])
+        dbh = self.DBO(query['case'])
+        keyword = query['keyword']
+        result.heading("Occurances of %s in logical image %s" %
+                       (keyword,query['fsimage']))
+        table = query['fsimage']
+        iofd = IO.open(query['case'], query['fsimage'])
+        fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
 
-    def reset(self,query):
-        iofd=IO.open(query['case'],query['fsimage'])
-        fsfd=FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
-        fsfd.scanfs([Scanner.TypeScan,Scanner.MD5Scan],action='reset')
+        import index
+
+        idx = index.Load("%s/LogicalIndex_%s.idx" % (config.RESULTDIR,table))
+        for offset in idx.search(keyword):
+            ## Find out which inode this offset is in:
+            dbh.execute("select inode,offset from LogicalIndex_%s where offset <= %r order by offset desc,id desc limit 2",(query['fsimage'],offset))
+            for row in dbh:
+                fd = fsfd.open(inode=row['inode'])
+                off = offset - int(row['offset']) - 10
+                if off<0: off=0
+                fd.seek(off)
+                data = fd.read(10 + len(keyword) + 20)
+                tmp = result.__class__(result)
+                tmp.link("View file",FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',fsimage=query['fsimage'],inode=row['inode'],mode='HexDump'))
+                if data[10:10+len(keyword)].lower() == keyword:
+                    result.text(data,"        ",tmp,"\n")
+                fd.close()

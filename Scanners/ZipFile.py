@@ -58,12 +58,15 @@ class ZipScan(GenScanFactory):
                     except zipfile.zlib.error:
                         continue
                     
-                    objs = [c.Scan("%s|Z|%s" % (self.inode,sub_inode),self.ddfs,self.ddfs.dbh,self.ddfs.table,factories=self.factories) for c in self.factories]
+                    objs = [c.Scan("%s|Z|%s" % (self.inode,sub_inode),self.ddfs,c,factories=self.factories) for c in self.factories]
                     
                     metadata={}
                     for o in objs:
-                        o.process(data,metadata=metadata)
-                        o.finish()
+                        try:
+                            o.process(data,metadata=metadata)
+                            o.finish()
+                        except Exception,e:
+                            logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
 
             ## Set the zip file to be a d/d entry so it looks like its a virtual directory:
             self.ddfs.dbh.execute("update file_%s set mode='d/d' where inode=%r",(self.ddfs.table,self.inode))

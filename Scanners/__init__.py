@@ -16,8 +16,10 @@ class GenScanFactory:
         """ This is the actual scanner class that will be instanitated once for each file in the filesystem.
 
         factories is a list of factory scanner objects that should be used to scan new files that have been revealed due to this particular scanner. This is mostly used for iteratively scanning files found inside other files (e.g. zip archieves etc). If this scanner is not adding new files to the ddfs tables, you do not need to use this.
+        outer is a reference to the generator object that is used to instantiate these classes.
+        
         Note that this is a nested class since it may only be instantiated by first instantiating a Factory object. """
-        def __init__(self, inode,dbh,table,factories=None):
+        def __init__(self, inode,outer,factories=None):
             self.inode = inode
             self.size = 0
 
@@ -61,10 +63,10 @@ class StoreAndScan:
     """
     file = None
 
-    def __init__(self, inode,ddfs,dbh,table,factories=None):
+    def __init__(self, inode,ddfs,outer,factories=None):
         self.inode = inode
-        self.table=table
-        self.dbh=dbh
+        self.table=outer.table
+        self.dbh=outer.dbh
         self.ddfs=ddfs
         self.factories=factories
 

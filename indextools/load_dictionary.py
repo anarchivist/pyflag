@@ -1,7 +1,7 @@
 """ A small script to load all 4 letter words or more from the english
 dictionary into the dictionary table within pyflag """
 
-wordfile="/usr/dict/words"
+wordfile="/usr/share/dict/words"
 fd=open(wordfile)
 for line in fd:
     if len(line)>3 and not "'" in line:
