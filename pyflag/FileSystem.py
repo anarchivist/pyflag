@@ -475,22 +475,23 @@ class MountedFS_file(File):
         #just look it up in the database i spose "where inode=inode" ??
 
         dbh = DB.DBO(case)
+        self.dbh=dbh
         dbh.execute("select path,name from file_%s where inode=%r",(self.table, inode))
         row=self.dbh.fetch()
         path=row['path']+"/"+row['name']
-        self.fd=open(path)
+        self.fd=open(fd.mount_point+'/'+path,'r')
     
     def close(self):
         self.fd.close()
 
     def seek(self, offset, rel=None):
-        if rel:
-            self.fd.seek(offset,1)
+        if rel!=None:
+            self.fd.seek(offset,rel)
         else:
             self.fd.seek(offset)
 
     def read(self, length=None):
-        if length:
+        if length!=None:
             return self.fd.read(length)
         else:
             return self.fd.read()
@@ -533,11 +534,18 @@ class Zip_file(File):
     
     def __init__(self, case, table, fd, inode):
         File.__init__(self, case, table, fd, inode)
+        tmp1=open('/tmp/test.zip','w')
+        tmp1.write(fd.read())
+        tmp1.close()
+        tmp1=open('/tmp/test.zip','r')
+        tmp1.seek(0)
+        fd.seek(0)
+
         # strategy:
         # inode is the index into the namelist of the zip file (i hope this is consistant!!)
         # just read that file!
         try:
-            z = zipfile.ZipFile(fd)
+            z = zipfile.ZipFile(fd,'r')
             self.data = z.read(z.namelist()[int(inode[1:])])
         except (IndexError, KeyError):
             raise IOError, "Zip_File: cant find index"

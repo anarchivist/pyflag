@@ -19,5 +19,5 @@ def log(level,message):
     if config.LOG_LEVEL>=level:
         print "%s: %s" % (lookup[level],message)
         
-    if level<ERRORS:
+    if level<=ERRORS:
         print traceback.print_tb(sys.exc_info()[2])

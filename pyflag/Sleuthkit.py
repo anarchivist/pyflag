@@ -81,13 +81,13 @@ def load_sleuth(case,fstype,table,iosource):
             rel_root="/"+root[len(fd.mount_point):]+"/"
             if rel_root=="//": rel_root="/"
             s=os.stat(os.path.join(root,name))
-            dbh.execute("insert into file_%s set inode='D%s',mode=%r,status='alloc',path=%r,name=%r",(table, s.st_ino, mode, rel_root, name))
+            dbh.execute("insert into file_%s set inode='M%s',mode=%r,status='alloc',path=%r,name=%r",(table, s.st_ino, mode, rel_root, name))
             try:
                 link=os.readlink("%s/%s" % (root,name))
             except OSError:
                 link=''
             
-            dbh.execute("insert into inode_%s set inode='D%s',uid=%r,gid=%r, mtime=%r,atime=%r,ctime=%r,mode=%r,links=%r,link=%r,size=%r",(table,s.st_ino,s.st_uid,s.st_gid,s.st_mtime,s.st_atime,s.st_ctime,str(oct(s.st_mode))[1:],s.st_nlink,link,s.st_size))
+            dbh.execute("insert into inode_%s set inode='M%s',uid=%r,gid=%r, mtime=%r,atime=%r,ctime=%r,mode=%r,links=%r,link=%r,size=%r",(table,s.st_ino,s.st_uid,s.st_gid,s.st_mtime,s.st_atime,s.st_ctime,str(oct(s.st_mode))[1:],s.st_nlink,link,s.st_size))
 
         ## Just walk over all the files and stat them all building the tables.
         for root, dirs, files in os.walk(fd.mount_point):

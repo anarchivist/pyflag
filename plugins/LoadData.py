@@ -289,20 +289,19 @@ class LoadFS(Reports.report):
                 if Scanner.scanner_names[i] not in query.getarray('scan'):
                     query['scan']=Scanner.scanner_names[i]
                 result.checkbox(desc[0],"scan", Scanner.scanner_names[i])
-            ## If there is only one choice - we choose it for the user and run this already.
-#            if len(fs_types[0])==1:
-#                query['fstype']=fs_types[1][0]
-#                result.refresh(0,query)
-#                return
+
+            ## Try to get a magic hint
+            try:
+                magic = FlagFramework.Magic()
+                result.ruler()
+                result.row("Magic identifies this file as: %s" % magic.buffer(fd.read(10240)),colspan=50,bgcolor=config.HILIGHT)
+                fd.close()
+
+                result.const_selector("Enter Filesystem type",'fstype',fs_types[0],fs_types[1])
+                result.ruler()
+            except FlagFramework.FlagException:
+                result.hidden('fstype','mounted')
             
-            magic = FlagFramework.Magic()
-            result.ruler()
-            result.row("Magic identifies this file as: %s" % magic.buffer(fd.read(10240)),colspan=50,bgcolor=config.HILIGHT)
-            fd.close()
-
-            result.const_selector("Enter Filesystem type",'fstype',fs_types[0],fs_types[1])
-            result.ruler()
-
         except (KeyError,IOError,TypeError):
             pass
 

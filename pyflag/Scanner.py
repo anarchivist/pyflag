@@ -83,4 +83,4 @@ for i in tmp:
     scanners.append(i[0])
     scanner_names.append(i[1])
 
-print "Scanner order is: %s" % scanner_names
+logging.log(logging.DEBUG, "Scanner order is: %s" % scanner_names)
