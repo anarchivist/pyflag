@@ -225,8 +225,9 @@ class DBFS(FileSystem):
             self.dbh.execute("select path,mode,inode,name from file_%s where path=%r and mode like 'r%%'", (self.table, path))
         else:
             self.dbh.execute("select path,mode,inode,name from file_%s where path=%r", (self.table, path))
-            
-        return [ dent for dent in self.dbh ]
+
+        ## This is done rather than return the generator to ensure that self.dbh does not get interfered with...
+        return [dent for dent in self.dbh]
     
     def ls(self, path="/", dirs=None):
         return [ dent['name'] for dent in self.longls(path,dirs) ]

@@ -71,7 +71,8 @@ class BrowseFS(Reports.report):
     
     def display(self,query,result):
         result.heading("Browsing Filesystem in image %s" % query['fsimage'])
-
+        dbh = self.DBO(query['case'])
+        
         # lookup the iosource for this fsimage
         iofd = IO.open(query['case'], query['fsimage'])
         fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
@@ -97,8 +98,63 @@ class BrowseFS(Reports.report):
                 br = query['open_tree']
             else:
                 br = '/'
-                
-            result.para("Inspecting branch %s\r\n" % br)
+
+            def scan_popup(query,result):
+                try:
+                    if query["refresh"]:
+                        ## Actually scan this file:
+
+                        scanners = [ ]
+                        for i in query.getarray('scan'):
+                            try:
+                                tmp  = Registry.SCANNERS.dispatch(i)
+                                scanners.append(tmp(dbh,query['fsimage'],fsfd))
+                            except Exception,e:
+                                logging.log(logging.ERRORS,"Unable to initialise scanner %s" % e)
+
+                        ## Prepare the scanner factories for scanning:
+                        for s in scanners:
+                            s.prepare()
+
+                        def process_directory(root):
+                            ## First scan all the files in the directory
+                            for stat in fsfd.longls(path=root,dirs=0):
+                                try:
+                                    fd=fsfd.open(inode=stat['inode'])
+                                    Scanner.scanfile(fsfd,fd,scanners)
+                                except Exception,e:
+                                    logging.log(logging.ERRORS,"Unable to open file %s: %s" % (stat['inode'],e))
+
+                            ## Now recursively scan all the directories in this directory:
+                            for directory in fsfd.ls(path=root,dirs=1):
+                                new_path = "%s%s/" % (root,directory)
+                                process_directory(new_path)
+
+                        process_directory(FlagFramework.normpath(br+'/'))
+                        
+                        ## Return to the original page
+                        del query['refresh']
+                        del query['callback_stored']
+                        del query['scan']
+                        result.refresh(0,query,options={'parent':1})
+                        return
+                except KeyError:
+                    pass
+
+                result.heading("Scan all files under this branch")
+                result.ruler()
+                result.start_form(query,refresh="parent")
+                result.start_table()
+                ScannerUtils.draw_scanners(query,result)
+                result.end_table()
+                result.end_form()
+                result.display = result.__str__
+
+            tmp = result.__class__(result)
+            tmp.popup(scan_popup,"Scan all files in directory %s" % br,icon="examine.png")
+            tmp2=result.__class__(result)
+            tmp2.row("Inspecting branch %s  " % br,tmp)
+            result.para(tmp2)
 
             def tree_cb(branch):
                 path ='/'.join(branch)+'/'

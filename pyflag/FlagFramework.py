@@ -649,7 +649,7 @@ def normpath(string):
     The Python normpath has a bug whereby it swallaws the last / in a path name - this makes it difficult to distinguish between a directory and a filename.
     This is a workaround this braindead implementation.
     """
-    tmp = os.path.normpath(string)
+    tmp = os.path.normpath('////'+string)
     if string.endswith('/') and not tmp.endswith('/'):
         tmp=tmp+'/'
     return tmp

@@ -49,7 +49,19 @@ def filesystems(iosource):
     @arg iosource: An already opened IO source (gotten by IO.open())
     @return: A tuple containing two tuples, the first is the names of each filesystem, and the second is the sleuthkit tag.
     """
-    filesystems_dict={'default':(['linux-ext2','linux-ext3','bsdi','fat','fat12','fat16','fat32','freebsd','netbsd','ntfs','openbsd','solaris'],['Linux ext2','Linux ext3','BSDi FFS','auto-detect FAT','FAT12','FAT16','FAT32','FreeBSD FFS','NetBSD FFS','NTFS','OpenBSD FFS','Solaris FFS']), 'mounted':(['Mounted'],['mounted'])}
+    filesystems_dict={
+        ## These filesystems are provided by sleuthkit
+        'default':(
+              ['linux-ext2','linux-ext3','bsdi','fat','fat12','fat16','fat32','freebsd','netbsd','ntfs','openbsd','solaris','raw'],
+              ['Linux ext2','Linux ext3','BSDi FFS','auto-detect FAT','FAT12','FAT16','FAT32','FreeBSD FFS','NetBSD FFS','NTFS','OpenBSD FFS','Solaris FFS','Raw']
+              ),
+
+        ##These are provided by special filesystem objects
+        'mounted':(
+              ['Mounted'],['mounted']
+              )
+        }
+    
     class_name = "%s" % iosource.__class__
     try:
         return filesystems_dict[(class_name.split("."))[-1]]

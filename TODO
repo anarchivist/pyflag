@@ -25,18 +25,19 @@ Things still to do for pyflag in no order of priority:
 
 
 * fix scanner order by catching boring methods
-create a unique name /scanner table for scanners to determine if they have been run before
-allow scanners to be invoked on files
+* create a unique name /scanner table for scanners to determine if they have been run before
+* allow scanners to be invoked on files
 Add libgmp dependencies to libs in binary release
 libmysqlclient issues with bin mysql release - copy libmyclient to libs.
 starting the binary release asks database username and hosts, which are not required.
 Finish the indexing paper/utility
-Commit gtk script to tree
-add find to shell with suitable clauses for mime types etc...
+- Commit gtk script to tree (not needed now that same script is written in flash).
+* add find to shell with suitable clauses for mime types etc...
 * write examples of pyflag shell scripts in python...
 fat32 speedup and crash investigation.
 disk structure shell out to mmls in load io sources popup
-add a raw filesystem to have unallocated scanners work
-Remove unstructed forensics family
+* add a raw filesystem to have unallocated scanners work
+* Remove unstructed forensics family
 Order families in menu
 Lead from load io source to load data directly - ignoring the load data
+* Allow recursive scanning of a directory

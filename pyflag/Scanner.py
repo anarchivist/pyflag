@@ -175,7 +175,7 @@ class StoreAndScan(BaseScanner):
 
         Where $inode is the filename in the filesystem.
         """
-        make_temp_filename(
+        return make_temp_filename(
             self.dbh.case, self.table,
             self.dbh.MakeSQLSafe(self.inode)
             )
