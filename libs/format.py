@@ -74,9 +74,19 @@ class Buffer:
             self.fd=cStringIO.StringIO(string)
             self.size=len(string)
 
+    def clone(self):
+        return self.__class__(fd=self.fd)
+    
+    def set_offset(self,offset):
+        """ This sets the absolute offset.
+
+        It is useful in files which specify an absolute offset into the file within some of the data structures.
+        """
+        self.offset=offset
+
     def __getitem__(self,offset):
         """ Return a single char from the string """
-        self.fd.seek(offset)
+        self.fd.seek(offset+self.offset)
         return self.fd.read(1)
 
     def __getslice__(self,a=None,b=None):
@@ -123,6 +133,10 @@ class DataType:
 
     def __ne__(self,target):
         return not self.__eq__(target)
+
+    def get_value(self):
+        """ In the general case we return ourself as the opaque data type """
+        return self
     
 class BasicType(DataType):
     """ Base class for basic types that unpack understands """
@@ -150,8 +164,11 @@ class BasicType(DataType):
 
         if isinstance(target,int):
             return self.data==target
-        
-        return self.data==self.read(target)
+
+        try:
+            return self.data==self.read(target)
+        except:
+            return False
 
 class WORD(BasicType):
     """ Reads a word (short int) from the data in big endian """
@@ -259,6 +276,14 @@ class SimpleStruct(DataType):
             
         return self.data[attr]
 
+
+    def __setitem__(self,k,attr):
+        print "Setting %s to %s " % (k,attr)
+        if not self.data:
+            self.initialise()
+
+        self.data[k]=attr
+        
 class POINTER(LONG):
     """ This represents a pointer to a struct within the file """
     def __init__(self,buffer,*args,**kwargs):
@@ -267,7 +292,10 @@ class POINTER(LONG):
         
     def read(self,data):
         result=LONG.read(self,data)
-        self.pointed = self.target_class(self.buffer[self.data:],parent=self.parent)
+        ## The data is pointed to is relative to our parents structure
+        offset=self.parent.buffer.offset+result
+        data.set_offset(offset)
+        self.pointed = self.target_class(data,parent=self.parent)
         return result
 
     def p(self):
@@ -362,7 +390,7 @@ class ARRAY(StructArray):
     def __str__(self):
         if not self.data:
             self.initialise()
-            
+
         result = ','.join([a.__str__() for a in self.data])
         return result
 
@@ -391,6 +419,51 @@ class STRING(BYTE):
     def substr(self,start,end):
         """ Truncates the string at a certain point """
         self.data=self.data[start:end]
+
+class TERMINATED_STRING(DataType):
+    """ This data structure represents a string which is terminated by a terminator.
+
+    For efficiency we read large blocks and use string finds to locate the terminator
+    """
+    terminator='\x00'
+    max_blocksize=1024*1024
+    initial_blocksize=1024
+    def read(self,data):
+        blocksize=self.initial_blocksize
+        tmp=''
+        end=-1
+        while end<0:
+            tmp=data[:blocksize].__str__()
+            if len(tmp)<blocksize:
+                end=blocksize
+                break
+
+            end=tmp.find(self.terminator)
+            blocksize*=2
+            if blocksize>self.max_blocksize:
+                end=self.max_blocksize
+                break
+
+        return data[0:end]
+
+    def get_value(self):
+        if not self.data:
+            self.initialise()
+            
+        return self.data
+
+    def __eq__(self,target):
+        if not self.data:
+            self.initialise()
+            
+        return self.data==target
+
+    def __getitem__(self,x):
+        if not self.data:
+            self.initialise()
+
+        print "x is %s" % x
+        return self.data[x]
         
 class BYTE_ENUM(BYTE):
     types={}
@@ -406,15 +479,33 @@ class BYTE_ENUM(BYTE):
         if not self.data: self.initialise()
         return self.data
 
+    def __eq__(self,target):
+        if not self.data:
+            self.initialise()
+            
+        return target==self.data
+    
 class LONG_ENUM(BYTE_ENUM):
     fmt='l'    
 
+class WORD_ENUM(BYTE_ENUM):
+    fmt='H'    
+
 class UCS16_STR(STRING):
     def  read(self,data):
-        """ FIXME: do proper UCS16 processing here """
         result=STRING.read(self,data)
-        return ''.join([ result[i] for i in range(0,len(result),2)])
+        ## This is the common encoding for windows system:
+        return result.decode("utf_16_le")
 
+    def __str__(self):
+        if not self.data:
+            self.initialise()
+            
+        try:
+            return "%s" % self.data
+        except UnicodeEncodeError:
+            return "%r" % self.data
+        
 class CLSID(ULONG_ARRAY):
     """ A class id - common in windows """
     def __init__(self,buffer,*args,**kwargs):
@@ -443,6 +534,10 @@ class WIN_FILETIME(SimpleStruct):
         """ Returns the current time as a unix time """
         t=float(self['high'].get_value())* 2**32 +self['low'].get_value()
         return (t*1e-7 - 11644473600)
+
+    def get_value(self):
+        """ We just return the unix time here """
+        return self.to_unixtime()
 
     def __str__(self):
         t = self.to_unixtime()

@@ -3,6 +3,7 @@
 # $Id: RegExp.py,v 1.3 2005/02/25 18:04:43 george Exp $
 #
 # $Log: RegExp.py,v $
+# Revision 1.4: scudette: Added dependency on new memory scanner solving the overlap issue.
 # Revision 1.3  2005/02/25 18:04:43  george
 # * Add regexp class to results database and display
 #
@@ -91,7 +92,7 @@ class RegExpScan(Reports.report):
                 names=('Inode','Filename','RegExp Found','RegExp Type'),
                 table='regexp_%s as a join file_%s as b on a.inode=b.inode ' % (tablename,tablename),
                 case=query['case'],
-                links=[ None,FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='inode')]
+                links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='inode')]
                 )
         except DB.DBError,e:
             result.para("Unable to display RegExp table, maybe you did not run the regexp scanner over the filesystem?")

@@ -20,7 +20,6 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 """ This scanner scans a file for its mime type and magic """
-import magic
 import pyflag.FlagFramework as FlagFramework
 import pyflag.conf
 config=pyflag.conf.ConfObject()

@@ -6102,6 +6102,10 @@
 0	string		regf		Windows NT registry file
 0	string		CREG		Windows 95 registry file
 
+# IE History file
+0	string		Client\ UrlCache\ MMF\ Ver\ 5.2 IE History File
+0	lelong		0x4E444221		MS Outlook PST File
+
 # Popular applications
 2080	string	Microsoft\ Word\ 6.0\ Document	%s
 2080	string	Documento\ Microsoft\ Word\ 6 Spanish Microsoft Word 6 document data
