@@ -347,7 +347,7 @@ class ViewFile(Reports.report):
                     tmp_link.link("0x%x (%s)" % (file_offset,file_offset),q,mode="HexDump",hexlimit=file_offset)
           
                     tmp_string=self.ui()
-                    tmp_string.text(i[1],color="red",sanitise="full")
+                    tmp_string.text(i[1],color="red",sanitise="full",wrap='full')
                     output.row(tmp_link,tmp_string,valign="top")
 
             except IOError:

@@ -450,25 +450,126 @@ class GTKUI(UI.GenericUI):
         widget.connect("button_press_event",self.submit)
         self.text("\r\n",widget)
 
+    text_widget = None
+    text_widget_buffer = None
+    text_widget_iter=None
+
+    def create_tags(self, text_buffer):
+        ''' Create a bunch of tags. Note that it's also possible to
+        create tags with gtk.text_tag_new() then add them to the
+        tag table for the buffer, text_buffer.create_tag() is
+        just a convenience function. Also note that you don't have
+        to give tags a name; pass None for the name to create an
+        anonymous tag.
+        
+        In any real app, another useful optimization would be to create
+        a GtkTextTagTable in advance, and reuse the same tag table for
+        all the buffers with the same tag set, instead of creating
+        new copies of the same tags for every buffer.
+
+        Tags are assigned default priorities in order of addition to the
+        tag table. That is, tags created later that affect the same text
+        property affected by an earlier tag will override the earlier
+        tag. You can modify tag priorities with
+        gtk.text_tag_set_priority().
+        '''
+
+        import pango
+        text_buffer.create_tag("heading",
+                               weight=pango.WEIGHT_BOLD,
+                               size=15 * pango.SCALE)
+        
+        text_buffer.create_tag("font_italic", style=pango.STYLE_ITALIC)
+        text_buffer.create_tag("font_normal", style=pango.STYLE_NORMAL)
+
+        text_buffer.create_tag("font_bold", weight=pango.WEIGHT_BOLD)
+        
+        # points times the pango.SCALE factor
+        text_buffer.create_tag("big", size=20 * pango.SCALE)
+        
+        text_buffer.create_tag("xx-small", scale=pango.SCALE_XX_SMALL)
+        
+        text_buffer.create_tag("x-large", scale=pango.SCALE_X_LARGE)
+        
+        text_buffer.create_tag("font_typewriter", family="monospace")
+        
+        text_buffer.create_tag("color_red", foreground="red")
+        text_buffer.create_tag("color_blue", foreground="blue")
+        text_buffer.create_tag("color_black", foreground="black")
+        
+        text_buffer.create_tag("red_background", background="red")
+                
+        text_buffer.create_tag("big_gap_before_line", pixels_above_lines=30)
+        
+        text_buffer.create_tag("big_gap_after_line", pixels_below_lines=30)
+        
+        text_buffer.create_tag("double_spaced_line", pixels_inside_wrap=10)
+        
+        text_buffer.create_tag("not_editable", editable=False)
+        
+        text_buffer.create_tag("wrap_full", wrap_mode=gtk.WRAP_WORD)
+        
+        text_buffer.create_tag("char_wrap", wrap_mode=gtk.WRAP_CHAR)
+        
+        text_buffer.create_tag("no_wrap", wrap_mode=gtk.WRAP_NONE)
+        
+        text_buffer.create_tag("center", justification=gtk.JUSTIFY_CENTER)
+        
+        text_buffer.create_tag("right_justify", justification=gtk.JUSTIFY_RIGHT)
+        
+        text_buffer.create_tag("wide_margins",
+                               left_margin=50, right_margin=50)
+        
+        text_buffer.create_tag("strikethrough", strikethrough=True)
+        
+        text_buffer.create_tag("underline",
+                               underline=pango.UNDERLINE_SINGLE)
+        
+        text_buffer.create_tag("double_underline",
+                               underline=pango.UNDERLINE_DOUBLE)
+        
+        text_buffer.create_tag("superscript",
+                               rise=10 * pango.SCALE, # 10 pixels
+                               size=8 * pango.SCALE) #  8 points
+        
+        text_buffer.create_tag("subscript",
+                               rise=-10 * pango.SCALE, # 10 pixels
+                               size=8 * pango.SCALE) #  8 points
+        
+        text_buffer.create_tag("rtl_quote",
+                               wrap_mode=gtk.WRAP_WORD, direction=gtk.TEXT_DIR_RTL,
+                               indent=30, left_margin=20, right_margin=20)
+        
+        
     def text(self,*cuts,**options):
+        tags=[]
+        
+        if not self.text_widget:
+            self.text_widget=gtk.TextView()
+            self.text_widget_buffer = self.text_widget.get_buffer()
+            self.create_tags(self.text_widget_buffer)
+            self.text_widget_iter = self.text_widget_buffer.get_iter_at_offset(0)
+            self.row(self.text_widget)
+
+        ##Fix up the options:
+        possible_options=('color','font','wrap')
+        for opt in possible_options:
+            if options.has_key(opt):
+                tags.append("%s_%s"%(opt,options[opt]))
+
         for d in cuts:
             if not d:
                 continue
             elif isinstance(d,gtk.Widget):
-                #child=self.buffer.create_child_anchor(self.iter)
-                #self.result.add_child_at_anchor(d,child)
-                self.row(d)
+                child=self.text_widget_buffer.create_child_anchor(self.text_widget_iter)
+                self.text_widget.add_child_at_anchor(d,child)
             elif isinstance(d,self.__class__):
                 widget=d.display()
-                #child=self.buffer.create_child_anchor(self.iter)
-                #self.result.add_child_at_anchor(widget,child)
-                self.row(widget)
+                child=self.text_widget_buffer.create_child_anchor(self.text_widget_iter)
+                self.text_widget.add_child_at_anchor(widget,child)
+                #self.row(widget)
             else:
-                label = gtk.Label(d)
-                label.set_line_wrap(gtk.TRUE)
-                label.set_justify(gtk.JUSTIFY_LEFT)
-                self.row(label)
-                #self.buffer.insert_with_tags_by_name(self.iter,d,'text')
+                self.text_widget_buffer.insert_with_tags_by_name(self.text_widget_iter,d,*tags)
 
     def para(self,string,**options):
         #FIXME, whats the difference between 'para' and 'text'
