@@ -44,6 +44,7 @@ sleuthkit= %(flag_bin)s/dbtool
 
 #If you chose to use ploticus as the graph renderer, this variable is required for setting the prefab directory
 ploticus_prefabs=%(flag_bin)s/prefabs/
+scanner_directory = %(pyflagdir)s/Scanners/
 
 [GUI]
 #Period we wait before refreshing the display when waiting for analysis to complete

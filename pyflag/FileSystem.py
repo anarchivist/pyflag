@@ -9,7 +9,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Name:  $ $Date: 2004/09/28 11:56:45 $
+#  Version: FLAG $Name:  $ $Date: 2004/10/23 15:48:12 $
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -209,6 +209,8 @@ class DBFS(FileSystem):
         objs = [c.Scan(inode,self,self.dbh,self.table,factories=factories) for c in factories]
         # read data (in chunks)
         while 1:
+            ## This dict stores metadata about the file which may be filled in by some scanners in order to indicate some fact to other scanners.
+            metadata = {}
             ## If the file is too fragmented, we skip it because it might take too long... NTFS is a shocking filesystem, with some files so fragmented that it takes a really long time to read them. In our experience these files are not important for scanning so we disable them here. Maybe this should be tunable?
             try:
                 if len(fd.blocks)>1000 or fd.size>100000000:
@@ -233,7 +235,7 @@ class DBFS(FileSystem):
                 break
             # call process method of each class
             for o in objs:
-                o.process(data)
+                o.process(data,metadata=metadata)
 
         fd.close()
         # call finish object of each method
