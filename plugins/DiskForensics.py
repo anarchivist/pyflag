@@ -72,17 +72,6 @@ class BrowseFS(Reports.report):
         branch = ['']
         new_query = result.make_link(query, '')
             
-        def tree_cb(branch):
-            path ='/'.join(branch)  + '/'
-#            fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
-
-            a = fsfd.dent_walk(path)
-            for i in a:
-                if i['mode']=="d/d" and i['status']=='alloc':
-                    link = self.ui(result)
-                    link.link(i['name'],new_query,open_tree="%s%s" %(path,i['name']), mode='table', where_Filename="%s%s" %(path,i['name']), order='Filename')# ,__mark__="%s%s" %(path,i['name']))
-                    yield(([i['name'],link,'branch']))
-
         try:
             # tabular view
             if query['mode'] == 'table':
@@ -100,22 +89,31 @@ class BrowseFS(Reports.report):
             if (query.has_key("open_tree") and query['open_tree'] != '/'):
                 br = query['open_tree']
             else:
-                br = ''
+                br = '/'
+                
+            result.para("Inspecting branch %s\r\n" % br)
+
+            def tree_cb(branch):
+                path ='/'.join(branch)+'/'
+                ## We need a local copy of the filesystem factory so as not to affect other instances!!!
+                fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
+
+                for i in fsfd.dent_walk(path): 
+                    if i['mode']=="d/d" and i['status']=='alloc':
+                        link = self.ui(result)
+                        link.link(i['name'],new_query,open_tree="%s%s" %(path,i['name']), mode='table', where_Filename="%s%s" %(path,i['name']), order='Filename')# ,__mark__="%s%s" %(path,i['name']))
+                        yield(([i['name'],link,'branch']))
 
             def pane_cb(branch,tmp):
                 query['order']='Filename'
-                br="/".join(branch)
-                if not fsfd.isdir(br):
-                    br = br[:br.rindex('/')]
-
-                print br
-#                tmp.text("Inspecting branch %s\r\n" % br)
+                br=os.path.normpath('/'.join(branch))+'/'
+                if br=='//': br='/'
                 tmp.table(
                     columns=['f.inode','name','f.status','size', 'from_unixtime(mtime)','f.mode'],
                     names=('Inode','Filename','Del','File Size','Last Modified','Mode'),
 #                    callbacks={'Del':DeletedIcon},
                     table='file_%s as f, inode_%s as i' % (fsfd.table,fsfd.table),
-                    where="f.inode=i.inode and path=%r and f.mode!='d/d'" % (br + '/'),
+                    where="f.inode=i.inode and path=%r and f.mode!='d/d'" % (br),
                     case=query['case'],
                     links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile', fsimage=query['fsimage'],__target__='inode', inode="%s")]
                     )
