@@ -10,7 +10,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG xxx (xx-xx-xxxx)
+#  Version: FLAG ($Version: $)
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -88,12 +88,40 @@ def close_tab_cb(action):
     global notebook
     notebook.remove_page(notebook.get_current_page())
 
+def error_popup(text,error_msg="Error Occured"):
+    """ Draw the text in an error message box """
+    dialog=gtk.Window()
+    frame=gtk.Frame(error_msg)
+    box=gtk.VBox()
+    textview=gtk.TextView()
+    b=textview.get_buffer()
+    iter=b.get_iter_at_offset(0)
+    b.insert(iter,text)
+    box.add(textview)
+    frame.add(box)
+    dialog.add(frame)
+#    dialog.connect('destroy', lambda *w: gtk.main_quit())
+    dialog.show_all()
+
 def execute_report_cb(action, family, report):
     """ Execute a report based on the clicked action item """
     print 'executing report %s' % report
     global notebook,flag
     query = FlagFramework.query_type((),family=family,report=report,case='pyflag')
-    result = flag.process_request(query)
+    try:
+        result = flag.process_request(query)
+    except Exception,e:
+        import traceback,sys
+        import cStringIO
+        
+        a = cStringIO.StringIO()
+        traceback.print_tb(sys.exc_info()[2], file=a)
+        a.seek(0)
+        error_msg="%s: %s\n%s" % (sys.exc_info()[0],sys.exc_info()[1],a.read())
+        a.close()
+        error_popup(error_msg)
+        return
+    
     scroll = gtk.ScrolledWindow()
     scroll.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_AUTOMATIC)
     scroll.add_with_viewport(result.display())
@@ -105,8 +133,20 @@ def change(self,query_str):
     """ Callback function used to redraw the results of the processing on the main window """
     print "change called"
     global notepad,flag
-    result =  flag.process_request(query_str)
-    
+    try:
+        result = flag.process_request(query_str)
+    except Exception,e:
+        import traceback,sys
+        import cStringIO
+        
+        a = cStringIO.StringIO()
+        traceback.print_tb(sys.exc_info()[2], file=a)
+        a.seek(0)
+        error_msg="%s: %s\n%s" % (sys.exc_info()[0],sys.exc_info()[1],a.read())
+        a.close()
+        error_popup(error_msg)
+        return
+
     # use a scrolled window to hold the results
     scroll = gtk.ScrolledWindow()
     scroll.add_with_viewport(result.display())
