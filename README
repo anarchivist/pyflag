@@ -13,19 +13,24 @@ and more managable.
 
 pyflag is designed to run on Linux and has been tested on recent
 versions of Redhat/Fedora and Debian (Stable/Testing). It performs
-data analyis using a mysql database. Mysql server and client libraries
-must me installed. It is written in python and should be portable to
-other unix-like systems.
+data analyis using a mysql database. It is written in python and
+should be portable to other unix-like systems.
 
-Flag is distributed in two forms:
+Flag is distributed in three ways:
 
-1. A (mostly) stand-alone binary distribition which includes a python
-interpreter and has very few external dependancies. All binaries were
+1. A complete stand alone binary distribition which contains an
+embedded mysql server. This should word on most reasonably recent
+Linux distributions . THIS IS THE RECOMMENDED WAY TO TRY PyFLAG. If
+you have problems with the other distributions, try this one.
+
+2. A (mostly) stand-alone binary distribition which includes a python
+interpreter, but does not include the MySQL server. All binaries were
 built on a debian sarge (glibc 2.3) system and *should* work on most
-linux distributions. THIS IS THE RECOMMENDED WAY TO TRY FLAG. You can
-find the binary distribution at http://pyflag.sourceforge.net
+linux distributions.. You can find the binary distribution at
+http://pyflag.sourceforge.net. Read the INSTALL file for more
+information.
 
-2. A full source distribution
+2. A full source distribution.
 
 This document describes the installation steps for the source
 distribution which includes pyflag and a few dependancies. This
@@ -72,7 +77,7 @@ as well as a user configured that is allowed to create and drop
 databases (typically root mysql user). 
 
 The source distribution contains a file called db.setup which
-cotains a mysql dump of the pyflag database. This must me loaded into
+cotains a mysql dump of the pyflag database. This must be loaded into
 mysql. Typically this would be done using the mysql client as follows:
 
 $ echo create database pyflag | mysql -uroot -ppass
@@ -88,7 +93,7 @@ patched and build in step 3. You must download the following files and
 place them in the "sources" directory in the pyflag distribution.
 
 ethereal-0.9.16.tar.bz2	(www.ethereal.com)
-pl220src.tar.gz			(ploticus.sourceforge.net)
+pl230src.tar.gz		(ploticus.sourceforge.net)
 
 3. Install pyflag
 
@@ -97,6 +102,12 @@ To build the pyflag distribution, just run make at the top level directory:
 $ make
 
 If nothing failed you should have a completed pyflag installation.
+
+3. Building binary distributions:
+
+ If you want to make a binary stand alone distribution, type make bin-dist in the toplevel directory.
+
+  If a binary+MySQL distribution is needed, you will need to download the binary mysql distribution from the mysql site, put the tar ball in the sources/ directory and type make mysql.
 
 4. Configure pyflag
 
@@ -131,4 +142,11 @@ $ mozilla http://localhost:8000/
 
 Further Documentation:
 ----------------------
-More complete documentation many be found in the manual.html withion the docs directory or of the pyflag web site.
+More complete documentation may be found in the manual.html within
+the docs directory or of the pyflag web site.
+
+Help and Support:
+------------------------
+All pyflag support is done through the support mailing list:
+
+pyflag-support@lists.sourceforge.net

@@ -12,7 +12,7 @@ reports:
 Introduction to reports:
 
 All flag functionality is provided by reports. A report is an object
-responsible to performing one particular type of analysis. Examples of
+responsible for performing one particular type of analysis. Examples of
 reports are "View file timelines" and "TCPtrace". 
 
 Each report belongs to a report family, example families are "Disk
@@ -67,5 +67,5 @@ test.py in the plugins directory. It is a report which is used to test
 UI features such as the tree, table and graph widgets. Finally you can
 simply look at the existing reports to see how things are done.
 
-If you are interested in contribiting to flag development, please use
+If you are interested in contribiting to pyflag development, please use
 the pyflag sourceforge lists.
