@@ -64,9 +64,9 @@ class Buffer:
     def __init__(self,string='',fd=None,offset=0,size=0):
         """ We can either specify a string, or a fd """
         self.offset=offset
-        if fd:
+        if fd!=None:
             self.fd=fd
-            if size:
+            if size!=None:
                 self.size=size
             else:
                 self.size=2147483647
@@ -74,6 +74,9 @@ class Buffer:
             self.fd=cStringIO.StringIO(string)
             self.size=len(string)
 
+        if self.size<0:
+            raise IOError("Unable to set negative size (%s) for buffer (offset was %s)" % (self.size,self.offset))
+        
     def clone(self):
         return self.__class__(fd=self.fd)
 
@@ -100,8 +103,11 @@ class Buffer:
         return self.__class__(fd=self.fd,offset=self.offset+a,size=b-a)
 
     def __str__(self):
-        self.fd.seek(self.offset)
-        return self.fd.read(self.size)
+        try:
+            self.fd.seek(self.offset)
+            return self.fd.read(self.size)
+        except Exception,e:
+            raise IOError("Unable to read %s bytes from %s - %r" %(self.offset,self.size,e))
 
 #### Start of data definitions:
 class DataType:
@@ -140,6 +146,21 @@ class DataType:
     def get_value(self):
         """ In the general case we return ourself as the opaque data type """
         return self
+
+class RAW(DataType):
+    """ This data type is simply a data buffer. """
+    def __init__(self,buffer,count,*args,**kwargs):
+        DataType.__init__(self,buffer,*args,**kwargs)
+        self.raw_size=count
+
+    def size(self):
+        return self.raw_size
+        
+    def __str__(self):
+        return "Raw data of %s byte" % self.raw_size
+
+    def get_value(self):
+        return self.buffer[:self.raw_size]
     
 class BasicType(DataType):
     """ Base class for basic types that unpack understands """
@@ -192,7 +213,7 @@ class ULONG(BasicType):
         if not self.data:
             self.initialise()
 
-        return "0x%X" % (self.data,)
+        return "%s (0x%X)" % (self.data,self.data)
 
 class LONGLONG(BasicType):
     fmt='q'
@@ -268,19 +289,12 @@ class SimpleStruct(DataType):
                 desc = item['Description']
             except:
                 desc = item['Name']
-                
-            try:
-                result+="%04X - %s(%s): %s\n" % (
-                    self.offsets[item['Name']],
-                    item['Name'],                   
-                    desc,
-                    item['Function'](self.data[item['Name']]))
-            except IndexError,e:
-                tmp = "\n   ".join(("%r" % self.data[item['Name']].__str__()).splitlines())
-                result+="%04X - %s(%s): %s\n" % (
-                    self.offsets[item['Name']],
-                    item['Name'],
-                    desc,tmp)
+
+            tmp = "\n   ".join((self.data[item['Name']].__str__()).splitlines())
+            result+="%04X - %s(%s): %s\n" % (
+                self.offsets[item['Name']] + self.buffer.offset,
+                item['Name'],
+                desc,tmp)
                                   
         return result
 
@@ -363,6 +377,8 @@ class StructArray(SimpleStruct):
         result=[]
         offset=0
         for x in range(self.count):
+            ## If we run out of space, we just stop.
+            if offset>=len(data): break
             tmp=self.target_class(data[offset:],parent=self)
             result.append(tmp)
             offset+=tmp.size()
@@ -489,20 +505,22 @@ class BYTE_ENUM(BYTE):
     
     def read(self,data):
         result=BYTE.read(self,data)
-        try:
-            return self.types[result]
-        except KeyError:
-            return "Unknown (%s)" % result
-    
+        return result
+        
     def __str__(self):
         if not self.data: self.initialise()
-        return self.data
-
+        try:
+            return "%s (%s)" % (self.data,self.types[self.data])
+        except KeyError:
+            return "Unknown (%s)" % self.data
+    
     def __eq__(self,target):
         if not self.data:
             self.initialise()
-            
-        return target==self.data
+        try:    
+            return target==self.types[self.data]
+        except KeyError:
+            return target==self.data
     
 class LONG_ENUM(BYTE_ENUM):
     fmt='l'    
@@ -525,7 +543,7 @@ class UCS16_STR(STRING):
             self.initialise()
             
         try:
-            return "%s" % self.data
+            return "%s" % self.data.__str__()
         except UnicodeEncodeError:
             return "%r" % self.data
         
@@ -566,6 +584,12 @@ class WIN_FILETIME(SimpleStruct):
         t = self.to_unixtime()
         if t<0: return "Invalid Timestamp"
         return "%s" % (time.ctime(t))
+
+class WIN12_FILETIME(WIN_FILETIME):
+    """ A 12 byte variant of above. Last LONG is just all zeros usually so we ignore it """
+    def init(self):
+        WIN_FILETIME.init(self)
+        self.fields.append([ ULONG,1,'pad'])
 
 class LPSTR(STRING):
     """ This is a string with a size before it """
