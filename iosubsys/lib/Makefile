@@ -2,14 +2,14 @@ INCLUDES = -I../misc/ -I../sgzip/ -I../libevf/ -I../fstools/
 
 CFLAGS=-g -Wall `getconf LFS_CFLAGS` $(INCLUDES)
 LIBS = ../misc/except.o fs_io.o ../sgzip/sgzlib.o ../fstools/libevf.o -lz ../hashtools/md5c.o
-all: open libhooker.so.1
+all:  libhooker.so.1
 
 libhooker.so.1: $(LIBS)
 	gcc -fPIC -rdynamic $(CFLAGS) -c hooker.c
 	gcc -shared -WI,-soname,libhooker.so $(LIBS) -o libhooker.so hooker.o -lc -ldl
 
 clean:
-	rm -f *.o *.so open
+	rm -f *.o *.so
 
 test:
 	echo "Hello world" > /tmp/test.txt
