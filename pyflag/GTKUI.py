@@ -258,24 +258,33 @@ class FlagNotebook(gtk.Notebook):
         self.names = {}
         self.switchid=self.connect("switch-page", self.switch)
         self.curpage=None
+        self.page_id=0
+
+    def get_page_with_id(self,page_id):
+        """ Gets the page widget for the specified id"""
+        for tested_page in range(0,self.page_id):
+            w=self.get_nth_page(tested_page)
+            if w.get_data('page_id')==page_id:
+                return tested_page
         
-    def switch(self, notebook, page, pagenum):
+    def switch(self, notebook, p, pagenum):
         # just-in-time page drawing stuff
         p = self.get_nth_page(pagenum)
-        if not self.views.has_key(pagenum):
+        page_id=p.get_data('page_id')
+        if not self.views.has_key(page_id):
             # create and store a new toolbar for UI to use - Each page has a toolbar parented at our own toolbar
-            self.toolbars[pagenum] = FlagToolbar(self.ui.ftoolbar)
+            self.toolbars[page_id] = FlagToolbar(self.ui.ftoolbar)
 
             # Create a new UI for the page to be drawn on - toolbar buttons are drawn on our private toolbar
-            result = pyflag.GTKUI.GTKUI(self.ui, query=self.queries[pagenum],ftoolbar=self.toolbars[pagenum])
-            self.callbacks[pagenum](self.queries[pagenum],result)
-            self.views[pagenum]=result.display()
-            p.add_with_viewport(self.views[pagenum])
+            result = pyflag.GTKUI.GTKUI(self.ui, query=self.queries[page_id],ftoolbar=self.toolbars[page_id])
+            self.callbacks[page_id](self.queries[page_id],result)
+            self.views[page_id]=result.display()
+            p.add_with_viewport(self.views[page_id])
             p.show_all()
             
         else:
             ## add the toolbar as a child to our own toolbar
-            self.ui.ftoolbar.add_toolbar_child(self.toolbars[pagenum])
+            self.ui.ftoolbar.add_toolbar_child(self.toolbars[page_id])
 
         # just do toolbar swapping, rip out old toolbar by asking it
         if self.curpage != None:
@@ -285,7 +294,7 @@ class FlagNotebook(gtk.Notebook):
         self.ui.ftoolbar.redraw()
 
         ## Remember current page so we can remove this toolbar when page changes
-        self.curpage=pagenum
+        self.curpage=page_id
 
     def add_page(self, name, callback, query):
         """ add result (a GTKUI object) as a new tab with given label """
@@ -293,9 +302,11 @@ class FlagNotebook(gtk.Notebook):
         # each new page goes in a scrolled window
         self.disconnect(self.switchid)
         scroll = gtk.ScrolledWindow()
+        scroll.set_data('page_id',self.page_id)
+        idx = self.page_id
+        self.page_id+=1
         scroll.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_AUTOMATIC)
-
-        idx = self.get_n_pages()
+        
         print 'numpages = %s' % idx
         self.callbacks[idx] = callback
         self.names[idx] = name
@@ -417,12 +428,12 @@ class GTKUI(UI.GenericUI):
             self.result.pack_start(self.current_table,True,True)
             self.current_table=None
 
-    def goto_link(self,widget,event):
+    def goto_link(self,widget,event,target):
         """ This is the callback function from links """
         ## If the target report does not have all its parameters - we
         ## should invoke the form for it here - this is different than
         ## the html ui since it takes care of it.
-        target = widget.get_data('query')
+#        target = widget.get_data('query')
         try:
             family=target['family']
             report=target['report']
@@ -523,7 +534,7 @@ class GTKUI(UI.GenericUI):
         ev.set_data('query',target)    
         ev.add(label)
         ev.add_events(gtk.gdk.BUTTON_PRESS_MASK)
-        ev.connect("button_press_event",self.goto_link)
+        ev.connect("button_press_event",self.goto_link,target)
         self.row(ev)
 
     def const_selector(self,description,name,keys,values,**options):
@@ -913,7 +924,7 @@ class GTKUI(UI.GenericUI):
         """ wrapper function to satisfy clicked signal callback prototype """
         self.link_callback(query)
 
-    def toolbar(self, cb, text, icon=None, popup=True, tooltip=None, stock=None):
+    def toolbar(self, cb=None, text=None, icon=None, popup=True, tooltip=None, stock=None,link=None):
         """ Add an item to the toolbar
         cb may be a query item rather than a callback
         in which case the query is run by flag and the results displayed in the pane"""
@@ -939,7 +950,11 @@ class GTKUI(UI.GenericUI):
         if not tooltip: tooltip=text
         button.set_tooltip(self.tooltips, tooltip)
 
-        button.connect('clicked', proxy_cb, cb, self, self.defaults)
+        if link:
+            button.connect('clicked', self.goto_link,None,link)
+        else:
+            button.connect('clicked', proxy_cb, cb, self, self.defaults)
+            
         self.ftoolbar.add_toolbar(button)
 
     def table(self,sql="select ",columns=[],names=[],links=[],table='',where='1',groupby = None,case=None,callbacks={},**opts):

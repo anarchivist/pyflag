@@ -80,10 +80,11 @@ class FlagServerToolbar(FlagToolbar):
 class FlagServerNotebook(FlagNotebook):
     """ Essentially the same as GTKUI FlagNotebook, but with a tab delete button """
 
-    def close_tab(self, action=None, page=None):
+    def close_tab(self, action=None, page_id=None):
         """ close current tab """
-        if not page:
-            page = self.get_current_page()
+        ## We need to find out which page was clicked on, we do this
+        ## by searching the pages for their page_ids:
+        page=self.get_page_with_id(page_id)  
         self.remove_page(page)
         # cleanup
         del self.queries[page]
@@ -100,13 +101,14 @@ class FlagServerNotebook(FlagNotebook):
 
         delete_button = gtk.Button()
         delete_button.add(delete_image)
-        delete_button.connect('clicked', self.close_tab)
+        delete_button.connect('clicked', self.close_tab, self.page_id-1)
+        print "adding page %s" % (self.page_id-1)
         
         hbox = gtk.HBox()
         hbox.pack_start(gtk.Label(name))
         hbox.pack_start(delete_button, False, False)
         hbox.show_all()
-        child = self.get_nth_page(self.get_n_pages()-1)
+        child = self.get_nth_page(self.get_page_with_id(self.page_id-1))
         self.set_tab_label(child, hbox)
         self.set_current_page(self.get_n_pages()-1)
             

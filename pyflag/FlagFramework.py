@@ -373,6 +373,11 @@ class Flag:
             result.para("It is possible that the appropriate module is not installed.")
             return result
 
+        def show_help(query,result):
+            result.heading("Help for %s" % report.name)
+            result.text(report.description,wrap='full')
+            result.decoration='naked'
+
         #Since flag must always operate on a case, if there is no case, we use the default flagdb as a case
         try:
             query['case']
@@ -386,6 +391,7 @@ class Flag:
             if report.check_parameters(query):
                 canonical_query = self.canonicalise(query)
                 #Parameters ok, lets go
+                result.toolbar(show_help,text="Help",icon="help.png")
 
                 #Check to see if the user wants to reset this report?
                 if query.has_key('reset'):
@@ -398,14 +404,13 @@ class Flag:
                 #Check to see if the report is cached in the database
                 if self.is_cached(query):                   
                     report.display(query,result)
-                    result.defaults = query
                     return result
                 
                 #Are we currently executing the report?
-                result = self.check_progress(report,query)
+                progress_result = self.check_progress(report,query)
                 
                 #OK - we run the analysis method in a seperate thread
-                if not result:
+                if not progress_result:
                    #Start a new thread and run the analysis in it.
                    t = threading.Thread(target=self.run_analysis,args=(report,query))
                    t.start()
@@ -414,20 +419,22 @@ class Flag:
                    #wait a little for the analysis to work
                    time.sleep(0.5)
                    #Are we still running the analysis?
-                   result = self.check_progress(report,query)
+                   progress_result = self.check_progress(report,query)
 
                    #Nope - we should run the display method now...
-                   if not result:
-                       result = self.ui()
-                       result.defaults = query
+                   if not progress_result:
                        report.display(query,result)
 
-                   return result
+                   return progress_result
+                ## Report analysis returned an error
+                else:
+                     return progress_result
                
             #Form does not have enough parameters...
             else:
                 #Set the default form behaviour
                 result.defaults = query
+                result.toolbar(show_help,text="Help",icon="help.png")
                 result.heading(report.name)
                 try:
                     result.start_form(query)

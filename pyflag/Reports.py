@@ -87,10 +87,8 @@ class report:
         @param query: A query_type object.
 
         """
-        result =self.ui()
-        result.heading("I am calling the analyse method.")
-        return result
-
+        pass
+    
     def form(self,query,result):
         """ This will be executed to produce the form. You do not need to put the <form> tags or the submit button here. You need to offer as many input elements here as are required by the parameters section above. """
         result.heading("I am calling the form method")

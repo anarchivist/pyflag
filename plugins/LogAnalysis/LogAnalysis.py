@@ -194,7 +194,6 @@ class CreateLogPreset(Reports.report):
 
         def step5(query,result):
             result.textfield("name for preset:",'log_preset')
-##            result.hidden('final','ok')
             if query.has_key('log_preset'):
                 return True
             else:
@@ -211,89 +210,12 @@ class CreateLogPreset(Reports.report):
             )
 
         return
-        try:
-            result.start_table()
-            result.ruler()
-            #Check if the user has supplied a name for the table: (if
-            #they did not we throw an exception and return the form so
-            #far - the overall effect is that the form will grow as
-            #the user enters more data.)
-            
-            tmp = self.ui()
-            tmp.heading("Step 1:")
-            result.row(tmp,"Select a sample log file for the previewer")
-            result.ruler()
-            #Create a new ui based on our current one
-            tmp = self.ui(default = result)
-            tmp.filebox()
-            result.row("Enter name of log file:",tmp)
-
-            result.ruler()
-            tmp = self.ui()
-            tmp.heading("Step 2:")
-            result.row(tmp,"Select a Log Processor")
-            result.ruler()
-
-            result.const_selector("Select Log Processor", 'delmethod',
-                                  Registry.LOG_DRIVERS.drivers.keys() , Registry.LOG_DRIVERS.drivers.keys(),
-                                  onclick="this.form.submit();")
-
-##            result.radio("Field Separator Type:","delmethod",('simple','advanced'),onclick="this.form.submit();")
-            # Now we ask the log object to draw its form for us:
-            log = Registry.LOG_DRIVERS.drivers[query['delmethod']]('datafile',query)
-
-            #Ask the Log object to draw the form it requires
-            log.form(query,result)
-            result.end_table()
-            result.start_table()
-
-            result.checkbox('Click here and submit to see final preview','preview','ok')
-            query['preview']
-
-            dbh = self.DBO(query['case'])
-            display_test_log(dbh,log,result,query)
-            result.end_table()
-            
-            result.ruler()
-            tmp = self.ui(result)
-            tmp.heading("Step 5:")
-            result.row(tmp,"Give the preset a name",align='left')
-            result.ruler()
-            result.textfield("name for preset:",'log_preset')
-            result.ruler()
-            result.checkbox('Click here when finished','final','ok')
-            result.end_table()
-            return result
-
-        #If any of the required paramters are not there, we pass the form back to the user to complete.
-        except KeyError,e:
-            return result
 
     def analyse(self, query):
         """ store this log type in the database """
         log = Registry.LOG_DRIVERS.drivers[query['delmethod']]('datafile',query)
         # pickle it to the database
         LogFile.store_loader(log, query['log_preset'])
-
-class DeleteLogPreset(Reports.report):
-    """ Deletes an old log preset """
-    parameters = {"log_preset":"sqlsafe",  "final":"alphanum"}
-    name="Delete Log Preset"
-    family = "Log Analysis"
-    description="Delete preset log type"
-    order=50
-
-    def form(self,query,result):
-        result.selector("Select Preset to delete",'log_preset',"select value,value from meta where property='log_preset'",(),case=None)
-        result.para("This report will drop all tables that have been loaded using this preset.")
-        result.checkbox('Click here to confirm deletion','final','ok')
-
-    def display(self,query,result):
-        dbh = self.DBO(None)
-        dbh.execute("delete from meta where property='log_preset' and value=%r",query['log_preset'])
-        dbh.execute("delete from meta where property='log_preset_%s'",query['log_preset'])
-
-        result.heading("deleted log preset %s" % query['log_preset'])
 
 class BandWidth(Reports.report):
     """ Calculates the approximate bandwidth requirements by adding the size of each log entry within time period """
@@ -385,7 +307,7 @@ class BandWidth(Reports.report):
 class RemoveLogPreset(Reports.report):
     """ Removes a log preset, dropping all tables created using it """
     name = "Remove Preset"
-#    hidden=True
+    hidden=True
     family = "Log Analysis"
     description = "Removes a preset"
     parameters= {"log_preset":"sqlsafe", "confirm":"sqlsafe"}
@@ -430,24 +352,16 @@ class RemoveLogPreset(Reports.report):
     def display(self,query,result):
         ## First drop the tables:
         preset=query['log_preset']
-        ## This will reset all reports that loaded using the given preset - This should cause those tables to drop
+        ## This will reset all reports that loaded using the given
+        ## preset - This should cause those tables to drop
         dbh=DB.DBO(None)
         ## Find all the cases we know about:
         dbh.execute("select value from meta where property='flag_db'")
         for row in dbh:
             FlagFramework.reset_all(family='Load Data',report='LoadPresetLog',log_preset=preset,case=row['value'])
 
-##        for case,table in self.find_tables(preset):
-#            dbh=DB.DBO(case)
-#            dbh.execute("delete from meta where property=\"log_preset_%s\" and value=%r",(table,preset))
-#            dbh.execute("delete from meta where property=\"logtable\" and value=%r",(table))
-#            dbh.execute("drop table %s_log",table)
-
         ## Now lose the preset itself
         FlagFramework.reset_all(log_preset=preset,family=query['family'],report='Create Log Preset',case=None)
-#        dbh=DB.DBO(None)
-#        dbh.execute("delete from meta where property='log_preset_%s'",preset)
-#        dbh.execute("delete from meta where property='log_preset' and value=%r",preset)
         
         result.para("Deleted preset %s from the database" % query['log_preset'])
         
@@ -455,7 +369,8 @@ class ManageLogPresets(Reports.report):
     """ View and delete the available presets """
     name = "Manage Log Presets"
     family = "Log Analysis"
-    description = "Log presets are templates which are used to parse different types of log. Since each type of log file is subtablly different, a suitable preset should be created for the specific type of log file. This report allows you to create a new preset, view existing presets and delete unused presets. "
+    description =     """ Log presets are templates which are used to parse different types of logs. Since each type of log file is subtablly different, a suitable preset should be created for the specific type of log file. This report allows you to create a new preset, view existing presets and delete unused presets. """
+    
     def display(self,query,result):
         result.heading("These are the currently available presets")
         link = FlagFramework.query_type((),family=query['family'],report='CreateLogPreset')
