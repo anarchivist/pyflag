@@ -4,11 +4,9 @@
 %rename(from_offset) from;
 %rename(to_offset) to;
 
-// declared but never defined
-%ignore _pst_getItem;
-
 %{
 #include "libpst.h"
+#include "timeconv.h"
 %}
 
 // change to simple types which get mapped
@@ -25,6 +23,63 @@ typedef unsigned int u_int32_t;
 #define PST_TYPE_TASK 12
 #define PST_TYPE_OTHER 13
 #define PST_TYPE_REPORT 14
+
+typedef struct _pst_item_email {
+  FILETIME *arrival_date;
+  int32_t autoforward; // 1 = true, 0 = not set, -1 = false
+  char *body;
+  char *cc_address;
+  char *common_name;
+  int32_t  conv_index;
+  int32_t  conversion_prohib;
+  int32_t  delete_after_submit; // 1 = true, 0 = false
+  int32_t  delivery_report; // 1 = true, 0 = false
+  char *encrypted_body;
+  int32_t  encrypted_body_size;
+  char *encrypted_htmlbody;
+  int32_t encrypted_htmlbody_size;
+  int32_t  flag;
+  char *header;
+  char *htmlbody;
+  int32_t  importance;
+  char *in_reply_to;
+  int32_t  message_cc_me; // 1 = true, 0 = false
+  int32_t  message_recip_me; // 1 = true, 0 = false
+  int32_t  message_to_me; // 1 = true, 0 = false
+  char *messageid;
+  int32_t  orig_sensitivity;
+  char *outlook_recipient;
+  char *outlook_recipient2;
+  char *outlook_sender;
+  char *outlook_sender_name;
+  char *outlook_sender2;
+  int32_t  priority;
+  char *proc_subject;
+  int32_t  read_receipt;
+  char *recip_access;
+  char *recip_address;
+  char *recip2_access;
+  char *recip2_address;
+  int32_t  reply_requested;
+  char *reply_to;
+  char *return_path_address;
+  int32_t  rtf_body_char_count;
+  int32_t  rtf_body_crc;
+  char *rtf_body_tag;
+  char *rtf_compressed;
+  int32_t  rtf_in_sync; // 1 = true, 0 = doesn't exist, -1 = false
+  int32_t  rtf_ws_prefix_count;
+  int32_t  rtf_ws_trailing_count;
+  char *sender_access;
+  char *sender_address;
+  char *sender2_access;
+  char *sender2_address;
+  int32_t  sensitivity;
+  FILETIME *sent_date;
+  pst_entryid *sentmail_folder;
+  char *sentto_address;
+  pst_item_email_subject *subject;
+} pst_item_email;
 
 typedef struct _pst_item_contact {
   char *access_method;
@@ -174,7 +229,6 @@ typedef struct _pst_item {
   int32_t private;
 } pst_item;
 
-
 %extend pst_file {
 	pst_file() {
 		return (pst_file *) malloc(sizeof(pst_file));
@@ -205,8 +259,12 @@ typedef struct _pst_item {
 	}
 }
 
-%extend pst_item {
-	void free() {
-		free(self);
-	}
-}
+void _pst_freeItem(pst_item *item);
+
+/* time stuff from timeconv */
+//time_t fileTimeToUnixTime( const FILETIME *filetime, DWORD *remainder );
+char * fileTimeToAscii (const FILETIME *filetime);
+//struct tm * fileTimeToStructTM (const FILETIME *filetime);
+
+/* rtf decoding */
+unsigned char* lzfu_decompress (unsigned char* rtfcomp);

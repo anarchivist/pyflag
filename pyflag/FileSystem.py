@@ -449,6 +449,43 @@ class MountedFS_file(DBFS_file):
     def tell(self):
         return self.fd.tell()
 
+class Pst_file(File):
+    """ A file like object to read items from within pst files. The pst file is specified as an inode in the DBFS """
+    blocks=()
+
+    def __init__(self,case,table,file,inode,sub_inode):
+        self.dbh=DB.DBO(case)
+        self.case = case
+        self.table = table
+        self.dbh.execute("select concat(path,name) as filename from file_%s where inode=%r",(table,inode))
+        pstfilename=self.dbh.fetch()['filename']
+        self.dbh.execute("select concat(path,name) as filename from file_%s where inode='%s|Z|%s'",(table,inode,sub_inode))
+        filename=self.dbh.fetch()['filename']
+
+        if not filename.startswith(pstfilename): raise FlagFramework.FlagException("Error in tables: %s does not start with %s" %(filename,pstfilename))
+        filename=filename[len(pstfilename)+1:]
+
+        ## Handle recursive files:
+        p=pypst2.Pstfile(file)
+        # filename should be id below...
+        self.data=p.open(filename).read()
+            
+        self.pos=0
+        self.size=len(self.data)
+        
+    def read(self,len=None):
+        if len:
+            temp=self.data[self.pos:self.pos+len]
+            self.pos+=len
+            return temp
+        else: return self.data
+
+    def close(self):
+        pass
+        
+    def seek(self,pos):
+        self.pos=pos
+
 class Zip_file(File):
     """ A file like object to read files from within zip files. Note that the zip file is specified as an inode in the DBFS """
     blocks=()
