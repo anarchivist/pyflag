@@ -658,6 +658,7 @@ struct IO_INFO_RAID {
   int number_of_slots;
   int logical_blocks_per_period;
   int block_size;
+  int header_size;
   unsigned long long int offset;
   //An array of map information
   char *map_string;
@@ -795,6 +796,9 @@ int raid_initialiser(IO_INFO *self,IO_OPT *args) {
     } else if(!strcasecmp(i->option,"blocksize")) {
       io->block_size=parse_offsets(i->value);
       continue;
+    } else if(!strcasecmp(i->option,"header")) {
+      io->header_size=parse_offsets(i->value);
+      continue;
     } else if(!strcasecmp(i->option,"disks")) {
       io->number_of_elements = atoi(i->value);
       if(!io->number_of_slots) io->number_of_slots=io->number_of_elements;
@@ -828,7 +832,7 @@ int raid_open(IO_INFO *self) {
 
   if(!io->block_size) RAISE(E_IOERROR,NULL,"Block size is not set");
 
-  if(!tmp_element || io->number_of_slots==0 || io->number_of_elements==0) RAISE(E_IOERROR,NULL,"No disks specified");
+  if(!tmp_element || io->number_of_slots==0 || io->number_of_elements==0) RAISE(E_IOERROR,NULL,"No disks or no slots specified");
 
   //Parse the map from the provided map string
   if(!io->map_string) RAISE(E_IOERROR,NULL,"No Raid Map specified");
@@ -899,7 +903,7 @@ int raid_slack_read(IO_INFO_RAID *io, char *buf, int len, off_t offs) {
 	  for(i=io->disks;i;i=i->next) {
 		if(i->fd != -1) {
   			//grab the other blocks and generate the missing one
-			  if(lseek(i->fd,physical_block * io->block_size+relative_offs,SEEK_SET)<0) {
+			  if(lseek(i->fd,io->header_size+physical_block * io->block_size+relative_offs,SEEK_SET)<0) {
 			    RAISE(E_IOERROR,NULL,"Could not seek\n");
 		  	};
 
@@ -912,7 +916,7 @@ int raid_slack_read(IO_INFO_RAID *io, char *buf, int len, off_t offs) {
   } else {
  //this is the normal case
 
-  if(lseek(fd,physical_block * io->block_size+relative_offs,SEEK_SET)<0) {
+  if(lseek(fd,io->header_size + physical_block * io->block_size+relative_offs,SEEK_SET)<0) {
     RAISE(E_IOERROR,NULL,"Could not seek\n");
   };
 

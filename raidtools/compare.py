@@ -1,0 +1,84 @@
+#!/usr/bin/python
+""" Compare a number of disks side by side """
+import sys
+from optparse import OptionParser
+
+parser = OptionParser()
+
+parser.add_option("-b", "--blocksize", default='0',
+                  help="Blocksize to use - if set only shows 5 lines on each side of block boundary")
+parser.add_option('-c','--context',default=5,
+                  help="Lines of context to show before/after block boundary")
+
+parser.add_option('-w','--width',default=16,
+                  help="Width of each column")
+parser.add_option("-s","--skip",
+                  default='0',
+                  help="skip this many bytes from the start of each file")
+
+(options, args) = parser.parse_args()
+
+if len(args)<2: 
+    print "You must specify more than two disks to compare. Try -h for help"
+    sys.exit(0)
+
+blocksize=0
+width=int(options.width)
+
+def parse_offsets(arg):
+    if arg.startswith('0x'): base=16
+    else: base=10
+    
+    suffixes = {'k':1024,
+                'K':1024,
+                'm':1024*1024,
+                'M':1024*1024,
+                'G':1024*1024*1024,
+                's':512,
+                }
+                
+    try:
+        suffix=arg[-1]
+        if suffix=='b': suffixes['b']=parse_offsets(options.blocksize)
+
+        return int(arg[:-1],base)*suffixes[suffix]
+    except (KeyError,ValueError,TypeError):
+        return int(arg,base)
+
+fds=[ open(arg,'r') for arg in args ]
+[ fd.seek(parse_offsets(options.skip)) for fd in fds ]
+
+count=parse_offsets(options.skip)
+blocksize = parse_offsets(options.blocksize)
+context=int(options.context)
+
+def print_context_lines(fds):
+    global count
+    for line_number in range(0,context):
+        str = "%012s "% hex(count)
+        for fd in fds:
+            data=fd.read(width)
+            for char in data:
+                if not (ord(char)>32 and ord(char)<127): char='.'
+                str+=char
+
+            str+=' '
+        print "%s" % str
+        count+=width
+    
+current_block=0
+while 1:
+    print_context_lines(fds)
+    if blocksize>width*context:
+        print ''
+        print ' '*13+" ".join([ "." * width for i in fds ])
+        print ''
+        count+=blocksize - 2*width * context
+        current_block +=1
+        [ fd.seek(count) for fd in fds ]
+
+    print_context_lines(fds)
+    if blocksize>width*context:
+        print ''
+        print ' '*13+" ".join([ ("*"*(width/2-2) + " %02s "+"*"*(width/2-2)) % i for i in range(len(fds)) ])
+        print 'Block %s: ' % current_block

@@ -40,11 +40,15 @@ if __name__=="__main__":
                       default=0,help="Offset to the start of the partition")
     parser.add_option("-b",'--blocksize',
                       default='4k',help="Blocksize to try")
-
+    parser.add_option("-s","--slots",
+                      default=0,help="number of slots to try (by default all slots")
+    parser.add_option("-H",'--header',
+                      default='0',help="Constant header for each disk")
+    
     (options, args) = parser.parse_args()
 
     ## This variable holds possible maps that I have seen. If you find more maps in practice, please submit a patch.
-    maps = (
+    maps = [
         ## The format of this is:
         ## (disks, slots, map)
         ## These are simple diagonal maps:
@@ -80,24 +84,49 @@ if __name__=="__main__":
         ## Some weird maps I have seen with HP controllers:
         (3, 6, '0.1.P.2.3.P.4.P.5.6.P.7.P.8.9.P.10.11'),
         (3, 6, '0.1.P.3.2.P.4.P.5.7.P.6.P.8.9.P.11.10'),
-        )
+        ]
+
+
+    ##Some really huge Raid controller seen on Compaq smart array 3200
+    def gen_smartarray(disknumber):
+        pos=disknumber-1
+        count=0
+        str=[]
+
+        while pos>=0:
+            for i in range(0,16):
+                for j in range(0,disknumber):
+                    if j==pos:
+                        str.append('P')
+                    else:
+                        str.append('%s'%count)
+                        count+=1
+            pos-=1
+
+        return '.'.join(str)
+
+    maps.append((6,6*16,gen_smartarray(6)))
+    print maps
 
     best_s=''
     best_len=0
 
     for disk,slots,map in maps:
+        if int(options.slots)!=slots: continue
+        
         if disk==len(args):
             print """
 ------------------------------------------------------
 Trying map %s with %s slots
 ------------------------------------------------------""" % (map,slots)
             for permutation in getPermutations(args):
-                s="./bin/iowrapper -i raid -o blocksize=%(block)s,slots=%(slots)s,map=%(map)s,offset=%(offset)s,%(filename)s %(command)s" % {
+                s="./bin/iowrapper -i raid -header %(header)s -blocksize %(block)s -slots %(slots)s -map %(map)s -offset %(offset)s -filenames %(filename)s -- %(command)s" % {
                     'command':options.command,
                     'slots':slots,
+                    'header':options.header,
                     'offset':options.offset,
                     'map':map,
-                    'filename':','.join(["filename=%s" % f for f in permutation]),
+                    'filename':' '.join(permutation),
                     'block':options.blocksize
                     }
                 print "Running %s:" % s
