@@ -115,10 +115,13 @@ class search:
         return self
 
     def next(self):
-        result =  _read_offset(self.list,self.i)
-        self.i+=1
-        if result<0:
-             raise StopIteration
+        result=-1
+        while result<0:
+	        result =  _read_offset(self.list,self.i)
+	        self.i+=1
+	        if result==-1:
+	             raise StopIteration
+
         return result
 
     def __del__(self):

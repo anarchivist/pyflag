@@ -36,6 +36,8 @@ urls = ['ftp://ftp.apnic.net/apnic/whois-data/APNIC/split/apnic.db.inetnum.gz',
         'ftp://ftp.arin.net/pub/stats/arin/delegated-arin-latest',
         'ftp://ftp.lacnic.net/pub/stats/lacnic/delegated-lacnic-latest']
 
+MASK32 = 0xffffffffL
+
 import sys
 
 def progress(block,blocksize,totalblocks):
@@ -51,7 +53,7 @@ def progress(block,blocksize,totalblocks):
 # pow2 list
 pow2 = {}
 for num in range(33):
-  pow2[2**num] = num
+  pow2[long(2**num)] = num
 
 pow2list = pow2.keys()
 pow2list.sort()
@@ -72,8 +74,9 @@ def num_hosts(nm):
 
 def aton(str):
   """ convert dotted decimal IP to int """
-  oct = [int(i) for i in str.split('.')]
-  return ((oct[0] << 24) + (oct[1] << 16) + (oct[2] << 8) + (oct[3]))
+  oct = [long(i) for i in str.split('.')]
+  result=((oct[0] << 24) | (oct[1] << 16) | (oct[2] << 8) | (oct[3])) & MASK32
+  return result
 
 #...doesnt work...
 #def ntoa(num):
@@ -106,7 +109,7 @@ class WhoisRec:
       # first unfold the string
       string = WhoisRec.unfold.sub(' ',string)
       # get start_ip, numhosts
-      self.start_ip = 0
+      self.start_ip = 0L
       self.num_hosts = 0
       try:
         inetnum = self._getsingle('inetnum', string)
@@ -290,7 +293,7 @@ for url in urls:
         masks.append(masks[-1])
       else:
         # choose the largest network which is aligned and assign it
-        dbh.execute("INSERT INTO whois_routes VALUES(%s, %s, %s);" % ("%u" % network, "%u" % masks[align[0]], str(whois_id)))
+        dbh.execute("INSERT INTO whois_routes VALUES(%s, %s, %s);" %((network & MASK32), "%u" % masks[align[0]], str(whois_id)))
         # advance network address and remove this from masks
         network = network + num_hosts(masks[align[0]])
         del masks[align[0]]

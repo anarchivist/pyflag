@@ -80,7 +80,7 @@ class Index(GenScanFactory):
             self.dbh.execute("insert into `LogicalIndex_%s` set inode=%r,block=%r",(outer.table,inode,self.outer.block))
 
         def process(self,data,metadata=None):
-            self.index.index_buffer(self.outer.block << BLOCKSIZE + self.outer.rel_offset ,data)
+            self.index.index_buffer(self.outer.block * pow(2, BLOCKSIZE) + self.outer.rel_offset ,data)
             self.outer.rel_offset+=len(data)
             ## If the file is longer than a block, we create a new block, and adjust the relative offset
             if self.outer.rel_offset > pow(2,BLOCKSIZE):

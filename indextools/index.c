@@ -445,6 +445,8 @@ inline void grow_list(offset_t **l,int *length,offset_t offset)
 {
   offset_t *list=*l;
 
+  if(offset>0xffffffff00000000)
+    printf("Offset less than zero at %llu\n",offset);
   list=(offset_t *)realloc(list,((*length)+1)*sizeof(offset_t));
   list[(*length)]=offset;
   (*length)++;
@@ -465,6 +467,7 @@ static void add_offsets_to_array(struct index_file *idx,
   do {
     temp=absolute_offlist(idx, list_ptr);
     if(temp->offset){
+      //      printf("Added %llu to list\n",temp->offset);
       grow_list(&list,length,temp->offset);
     };
     list_ptr=temp->next;
@@ -603,6 +606,9 @@ void idx_add_offset_to_list(struct index_file *idx, node_ptr node_ref,
   struct offset_list *last;
   struct  idx_node *node;
   offlist_ptr off=new_offset_list(idx);
+
+  if(offset>0xffffffff00000000)
+    printf("Offset less than zero at %llu\n",offset);
   
   node=absolute_node(idx,node_ref);
   last=absolute_offlist(idx, node->last_offset);

@@ -1,4 +1,4 @@
-OPT     = -O3 -Wall
+OPT     = -O0 -Wall
 DEBUG   = -g
 INCL    = -I../iosubsys/misc/
 CFLAGS  = $(DEFS) $(INCL) $(OPT) $(DEBUG)

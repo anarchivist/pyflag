@@ -720,7 +720,7 @@ class SearchIndex(Reports.report):
             ## Here we remove the block number part from the int. If
             ## there are a number of blocks in the database for this
             ## inode, we account for the extra blocks.
-            off = offset - ((2*block - row['minblock']) << BLOCKSIZE)
+            off = offset - ((2*block - row['minblock'])*pow(2, BLOCKSIZE))
             dbh2.execute("insert into LogicalKeyword_%s set inode=%r, offset=%r, keyword=%r",(table,row['inode'],off,keyword))
         
     def display(self,query,result):
@@ -754,16 +754,17 @@ class SearchIndex(Reports.report):
                 data=row['text']
 
             output = result.__class__(result)
-            output.text(escape(data[0:offset-left]))
-            output.text(escape(data[offset-left:offset-left+len(keyword)]),color='red')
-            output.text(escape(data[offset-left+len(keyword):]),color='black')
+            output.text(escape(data[0:offset-left]),sanitise='full')
+            output.text(escape(data[offset-left:offset-left+len(keyword)]),color='red',sanitise='full')
+            output.text(escape(data[offset-left+len(keyword):]),color='black',sanitise='full')
             return output
             
         result.table(
-            columns = ['inode','concat(inode,",",offset)','keyword','offset'],
-            names=['Inode','Data','Keyword','Offset'],
+            columns = ['a.inode','name','concat(a.inode,",",offset)','keyword','offset'],
+            names=['Inode','Filename','Data','Keyword','Offset'],
             callbacks = { 'Data': SampleData },
-            table='LogicalKeyword_%s' % table,
+            table='LogicalKeyword_%s as a, file_%s as b' % (table,table),
+            where='a.inode=b.inode',
             links = [ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',fsimage=query['fsimage'],mode='HexDump',__target__='inode') ],
             case=query['case'],
             )
