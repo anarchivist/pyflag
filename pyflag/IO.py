@@ -253,11 +253,11 @@ class ewf(IO):
         result.textfield(tmp,'io_offset')
 
 class mounted(IO):
-    parameters=('subsys','directory')
+    parameters=('subsys','io_directory')
 
     def form(self,query,result):
         result.text("Note that you must have full read permissions for the mounted directory. You may need to run pyflag as root for this!!!",color="red")
-        result.textfield("Enter mount point:",'directory')
+        result.textfield("Enter mount point:",'io_directory')
 
     def read(self, length=None):
         raise FlagFramework.FlagException("Reading of raw mounted IOSources does not make sense - You probably want to load the raw image file as a standard IOSubsystem !!!")
