@@ -326,6 +326,13 @@ class GTKUI(UI.GenericUI):
     def image(self, image, **options):
         pass
 
+    def create_popup_window(self):
+        """ Create a new window and render ourselves in it """
+        dialog=gtk.Window()
+        dialog.add(self.display())
+        dialog.show_all()
+        return dialog
+        
     def popup(self,callback, label,icon=None,toolbar=0, menubar=0, **options):
         pass
 
@@ -597,6 +604,7 @@ class GTKUI(UI.GenericUI):
         
         if not self.text_widget:
             self.text_widget=gtk.TextView()
+            self.text_widget.set_editable(False)
             self.text_widget_buffer = self.text_widget.get_buffer()
             self.text_widget.set_wrap_mode(gtk.WRAP_WORD)
             self.create_tags(self.text_widget_buffer)
@@ -746,23 +754,8 @@ class GTKUI(UI.GenericUI):
                 except ValueError:
                     ## If we dont know about this name, we ignore it.
                     continue
-                        
-                if v.startswith('=') or v.startswith('<') or v.startswith('>'):
-                    ## If the input starts with !, we do an exact match
-                    having.append("%s %s %r " % (columns[index],v[0],v[1:]))
-                    condition_text="%s %s %s" % (d[len('where_'):],v[0],v[1:])
-                elif v.find('%')>=0:
-                    #If the user already supplied the %, we dont add our own:
-                    having.append("%s like %r " % (columns[index],v.replace('%','%%')))
-                    condition_text="%s like %s" % (d[len('where_'):],v)
-                elif v[0] == '!':
-                    #If the user already supplied the %, we dont add our own:
-                    having.append("%s not like %r " % (columns[index],"%%%%%s%%%%"% v[1:]))
-                    condition_text="%s not like %s" % (d[len('where_'):],"%%%s%%" % v[1:])
-                else:
-                    ## Otherwise we do a fuzzy match. 
-                    having.append("%s like %r " % (columns[index],"%%%%%s%%%%"% v))
-                    condition_text="%s like %s" % (d[len('where_'):],"%%%s%%" % v)
+
+                filter_text.append(FlagFramework.make_sql_from_filter(v,filter_conditions,columns[index],d[len('where_'):]))
 
                 #Create a link which deletes the current variable from
                 #the query string, allows the user to remove the
@@ -844,11 +837,13 @@ class GTKUI(UI.GenericUI):
         button.connect('clicked', proxy_cb, cb, self, self.defaults)
         self.toolbar_ui.insert(button, -1)
 
-    def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):
+    def table(self,sql="select ",columns=[],names=[],links=[],table='',where='1',groupby = None,case=None,callbacks={},**opts):
         """ Main table redered method.
 
         The GTK Table widget is automatically refreshed by clicking it - rather than refreshing the entire page as is the case with the HTML UI. Hence it manages its own callbacks etc.
         """
+        names=list(names)
+        
         ## Establish the sorting order
         try:
             self.sort=[list(names).index(self.defaults['order']),'order']
@@ -857,6 +852,9 @@ class GTKUI(UI.GenericUI):
                 self.sort=[self.defaults['dorder'],'dorder']
             except KeyError:
                 self.sort=[0,'order']
+                
+        filter_conditions=[]
+        filter_text=[]
 
         # Get a new SQL generator for building the table with.
         generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks,**opts)
@@ -885,11 +883,111 @@ class GTKUI(UI.GenericUI):
                 count+=1
             return count
 
+        ##### Callback functions for Table right click menus ######
+        def right_button_menu(treeview, event):
+            """ Callback to render the right click menu """
+            if event.button == 3:
+                x = int(event.x)
+                y = int(event.y)
+                time = event.time
+                pthinfo = treeview.get_path_at_pos(x, y)
+                try:
+                    column = pthinfo[1]
+                except:
+                    column=None
+                
+                if pthinfo != None:
+                    path, col, cellx, celly = pthinfo
+                    treeview.grab_focus()
+                    treeview.set_cursor( path, col, 0)
+
+                menu=gtk.Menu()
+
+                if column:
+                    ## Get row content:
+                    model=treeview.get_model()
+                    iter=model.get_iter(path)
+                    data=model.get_value(iter,column.get_data('column_number'))
+
+                    ## Search menu entry
+                    search_menu=gtk.MenuItem("Add filters on Table")
+                    search_menu.connect("activate",search_menu_popup,column,data)
+                    menu.add(search_menu)
+
+                    ## Group by menu entry
+                    groupby_menu=gtk.MenuItem("Count Unique items")
+                    def groupby_menu_popup(widget):
+                        print "groupby launched"
+
+                    groupby_menu.connect("activate",groupby_menu_popup)
+                    menu.add(groupby_menu)
+
+                    menu.add(gtk.SeparatorMenuItem())
+
+                ## Add all currently enforced filter conditions:
+                def remove_filter_condition(widget,index):
+                    del filter_text[index]
+                    del filter_conditions[index]
+                    if len(filter_conditions):
+                        new_where = "%s and %s" % (where,' and '.join(filter_conditions))
+                    else: new_where=where
+
+                    ## Update the store with the new data
+                    generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=new_where,groupby = groupby,case=case,callbacks=callbacks,**opts)
+                    populate_store(store,generator,names)
+
+                for i in range(len(filter_conditions)):
+                    m=gtk.MenuItem("remove %s" % filter_text[i])
+                    m.connect("activate",remove_filter_condition,i)
+                    menu.add(m)
+
+                if len(filter_conditions) or column:
+                    menu.show_all()
+                    menu.popup( None, None, None, event.button, time)
+            return 0
+
+        def search_menu_popup(widget,column,data):
+            """ Launch the filter on column popup """
+            result=self.__class__(self)
+            result.heading("Add filter condition")
+            result.text("Add a new filter condition to column ")
+            result.text(column.get_title()+'\n',color='red',font='bold')
+            text_entry = gtk.Entry()
+            text_entry.set_text(data)
+            result.row(text_entry)
+            widget=gtk.Button("Submit")
+            column_name=columns[names.index(column.get_title())]
+            column_title=column.get_title()
+
+            widget.connect("button_press_event", process_filter_cb,column_name, column_title, text_entry, filter_conditions,store)
+            result.row(widget)
+            dialog=result.create_popup_window()
+            text_entry.grab_focus()
+
+        def process_filter_cb(widget,event,column_name,column_title,filter_str_widget,filter_conditions,store):
+            """ Filter the data in the store, enforcing filter conditions chosen by right click menu """
+            parent=widget.get_parent_window()
+
+            try:
+                filter_text.append(FlagFramework.make_sql_from_filter(filter_str_widget.get_text(),filter_conditions,column_name,column.get_title()))
+            except IndexError:
+                widget.get_parent_window().destroy()
+                return
+                
+            new_where = "%s and %s" % (where,' and '.join(filter_conditions))
+
+            ## Update the store with the new data
+            generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=new_where,groupby = groupby,case=case,callbacks=callbacks,**opts)
+            populate_store(store,generator,names)
+            widget.get_parent_window().destroy()
+
         populate_store(store,generator,names)
         ## Create a new widget
         treeview = gtk.TreeView(store)
         treeview.set_rules_hint(True)
-            
+
+        treeview.connect('button-press-event',right_button_menu)
+        
 ##        ## callback for all the links:
 ##        def table_link_callback(widget,event=None):
 ##            """ Get the query object from the widget and refresh to it, after appending various form parameters. """
@@ -1019,7 +1117,10 @@ class GTKUI(UI.GenericUI):
 
         def click_callback(widget,event):
             x,y = (event.x,event.y)
-            path,column,cellx,celly = widget.get_path_at_pos(int(x),int(y))
+            try:
+                path,column,cellx,celly = widget.get_path_at_pos(int(x),int(y))
+            except:
+                return
             q=column.get_data('link')
             
             if q:
@@ -1091,3 +1192,4 @@ class GTKUI(UI.GenericUI):
         self.result.pack_start(hbox)
         hbox.set_position(200)
         #self.row(hbox)
+

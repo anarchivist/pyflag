@@ -635,25 +635,10 @@ class HTMLUI(UI.GenericUI):
                 except ValueError:
                     ## If we dont know about this name, we ignore it.
                     continue
-                        
-                if v.startswith('=') or v.startswith('<') or v.startswith('>'):
-                    ## If the input starts with !, we do an exact match
-                    having.append("%s %s %r " % (columns[index],v[0],v[1:]))
-                    condition_text="%s %s %s" % (d[len('where_'):],v[0],v[1:])
-                elif v.find('%')>=0:
-                    #If the user already supplied the %, we dont add our own:
-                    having.append("%s like %r " % (columns[index],v.replace('%','%%')))
-                    condition_text="%s like %s" % (d[len('where_'):],v)
-                elif v[0] == '!':
-                    #If the user already supplied the %, we dont add our own:
-                    having.append("%s not like %r " % (columns[index],"%%%%%s%%%%"% v[1:]))
-                    condition_text="%s not like %s" % (d[len('where_'):],"%%%s%%" % v[1:])
-                else:
-                    ## Otherwise we do a fuzzy match. 
-                    having.append("%s like %r " % (columns[index],"%%%%%s%%%%"% v))
-                    condition_text="%s like %s" % (d[len('where_'):],"%%%s%%" % v)
 
-                #Create a link which deletes the current variable from
+                condition_text = FlagFramework.make_sql_from_filter(v,having,columns[index],d[len('where_'):])
+                
+                #create a link which deletes the current variable from
                 #the query string, allows the user to remove the
                 #current condition:
                 tmp_query=query.clone()
