@@ -650,8 +650,7 @@ void raid_help(void) {
 blocksize=number - The total size of the block in bytes. A block is the largest contiguous run of data.\n\
 slots=number - total number of slots in each period (if not specified this is assumed to be the same as the total number of disks\n\
 map=1,2,P,3,4,P... A comma delimited map of the raid reconstruction. This map must be syntactically correct.\n\
-offset=number - The offset to use into the disk.\n\
-\n");
+offset=number - The offset to use into the disk (can use prefixed like k,m,s - sectors=512).\n\n");
   printf("This is an example of a raid reassembly map. This example uses 7 disks and spreads the parity among them in a rotating fashion:\n\
 \n\
 Disks:  0  1  2  3  4  5  6\n\
@@ -665,7 +664,9 @@ S 0     0  1  2  3  4  5  P\n\
   6    37 38 39 40 41  P 36\n\
 \n\
  In this case the following parameters must be specified:\n\
- blocksize=65536,slots=7,map=0.1.2.3.4.5.P.P.6.7.8.9.10.11.17.P.12.13.14.15.16.22.23.P.18.19.20.21.27.28.29.P.24.25.26.32.33.34.35.P.30.31.37.38.39.40.41.P.36 as well as the ordered set of disk file names\n");
+ blocksize=64k,slots=7,map=0.1.2.3.4.5.P.P.6.7.8.9.10.11.17.P.12.13.14.15.16.22.23.P.18.19.20.21.27.28.29.P.24.25.26.32.33.34.35.P.30.31.37.38.39.40.41.P.36,filename=d1,filename=d2,filename=d3,filename=d4,filename=d5,filename=d6,filename=d7\n\
+\n\
+ Note that if one of the disks can not be opened, we try to reconstruct it from the parity.\n");
 };
 
 void add_raid_element(IO_INFO_RAID *io,char *filename) {
@@ -799,6 +800,7 @@ int raid_initialiser(IO_INFO *self,IO_OPT *args) {
 int raid_open(IO_INFO *self) {
   IO_INFO_RAID *io=(IO_INFO_RAID *)self;
   struct raid_element *tmp_element=io->disks;
+  int parity=0;
 
   io->logical_blocks_per_period = (io->number_of_elements-1) * (io->number_of_slots);
 
@@ -815,6 +817,8 @@ int raid_open(IO_INFO *self) {
     if(tmp_element->fd<0) {
 	    //RAISE(E_IOERROR,NULL,"Could not open file %s",tmp_element->name);
 	    fprintf(stderr,"Could not open file %s, marking as missing\n",tmp_element->name);
+	    parity++;
+	    if(parity>1) RAISE(E_IOERROR,NULL,"More than one disk is missing, currently only RAID 5 with 1 parity disk supported.\n");
     }
     tmp_element=tmp_element->next;
   };
