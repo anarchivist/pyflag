@@ -60,71 +60,15 @@ def error_popup(e):
     dialog.add(frame)
     dialog.show_all()
 
-##class FlagNotebook(gtk.Notebook):
-##    """ A Flag notebook class
-##    This is used because we need to manage a bunch of toolbar related stuff along with the notebook"""
-
-##    def __init__(self, toolhbox):
-##        gtk.Notebook.__init__(self)
-##        self.toolhbox = toolhbox
-##        self.toolbars = {}
-##        self.views = {}
-##        self.callbacks = {}
-##        self.queries = {}
-##        self.names = {}
-##        self.connect("switch-page", self.switch)
-##        self.pagenum=0
-        
-##    def switch(self, notebook, page, pagenum):
-##        # just-in-time page drawing stuff
-##        p = self.get_nth_page(pagenum)
-##        if not self.views.has_key(pagenum):
-##            try:
-##                #result=self.__class__(self)
-##                result = pyflag.GTKUI.GTKUI(query=self.queries[pagenum])
-##                self.callbacks[pagenum](self.queries[pagenum],result)
-##                self.views[pagenum]=result.display()
-##                self.toolbars[pagenum] = result.toolhbox
-##                p.add_with_viewport(self.views[pagenum])
-##                p.show_all()
-##            except Exception,e:
-##                error_popup(e)
-##                raise
-            
-##        # toolbar switching stuff
-##        child = self.toolhbox.get_child()
-##        if child:
-##            self.toolhbox.remove(child)
-##        if self.toolbars.has_key(pagenum):
-##            self.toolhbox.add(self.toolbars[pagenum])
-##        self.toolhbox.show_all()
-
-##    def add_page(self, name, callback, query):
-##        """ add result (a GTKUI object) as a new tab with given label """
-
-##        # each new page goes in a scrolled window
-##        scroll = gtk.ScrolledWindow()
-##        scroll.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_AUTOMATIC)
-
-##        idx = self.get_n_pages()
-##        self.callbacks[idx] = callback
-##        self.names[idx] = name
-##        self.queries[idx] = query
-##        #self.set_current_page(idx)
-        
-##        idx = self.append_page(scroll, gtk.Label(name))
-##        self.set_current_page(idx)
-
 class FlagServerNotebook(FlagNotebook):
-    """ Essentially the same as GTKUI Notebook, but with a tab delete button """
-
+    """ Essentially the same as GTKUI FlagNotebook, but with a tab delete button """
 
     def close_tab(self, action=None, page=None):
         """ close current tab """
         if not page:
             page = self.get_current_page()
-        child = self.toolhbox.get_child()
-        self.toolhbox.remove(child)
+        #child = self.toolhbox.get_child()
+        #self.toolhbox.remove(child)
         self.remove_page(page)
         # cleanup
         del self.queries[page]
@@ -134,8 +78,7 @@ class FlagServerNotebook(FlagNotebook):
     
     def add_page(self, name, callback, query):
         FlagNotebook.add_page(self, name, callback, query)
-        # create a delete image to add to the label, the very same one
-        # should be fine for all tabs...
+        
         delete_image = gtk.Image()
         delete_image.set_from_file( "%s/button_delete.xpm" % config.IMAGEDIR )
         delete_image.set_from_pixbuf( delete_image.get_pixbuf().scale_simple(9, 9, 2) )
@@ -179,8 +122,8 @@ class GTKServer(gtk.Window):
         # these are the MAIN ELEMENTS of the GTKServer
         self.vbox = gtk.VBox()
         self.uimanager = gtk.UIManager()
-        self.toolhbox = gtk.HandleBox()
-        self.notebook = FlagServerNotebook(self.toolhbox)
+        #self.toolhbox = gtk.HBox()
+        self.notebook = FlagServerNotebook()
         ## have to build the ui at this point...
         self.build_flag_menu()        
         self.menubar = self.uimanager.get_widget('/Menubar')
@@ -195,7 +138,7 @@ class GTKServer(gtk.Window):
         hbox = gtk.HBox()
         combobox = self.case_selector()
         hbox.pack_start(combobox, False)
-        hbox.pack_start(self.toolhbox)
+        #hbox.pack_start(self.toolhbox)
 
         self.vbox.pack_start(hbox, False)
         self.vbox.pack_start(self.notebook, True, True)
