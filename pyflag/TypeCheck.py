@@ -149,7 +149,7 @@ class TypeChecker:
         """ Checks that field is a table within the case given as query[case]. This is not a fatal error, we just return false if not. """
         dbh= DB.DBO(query['case'])
         try:
-            dbh.execute("select * from %s limit 1",query[field])
+            dbh.execute("select * from %s_log limit 1",query[field])
         except DB.DBError:
             return False
 

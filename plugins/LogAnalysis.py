@@ -9,7 +9,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG 0.4 (12-02-2004)
+#  Version: FLAG $Name:  $ $Date: 2004/10/14 13:22:14 $
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -38,6 +38,27 @@ import re
 description = "Log Analysis"
 order = 35
 
+def display_test_log(dbh,log,result,query):
+    # try to load and display as a final test
+    temp_table = dbh.get_temp()
+
+    log.load(dbh,temp_table,rows= 3)
+    dbh.execute("select * from %s limit 1",temp_table)
+    columns =[]
+    names = []
+    for d in dbh.cursor.description:
+        names.append(d[0])
+        try:
+            type = log.types[log.fields.index(d[0])]
+            columns.append(LogFile.types[type].sql_out % d[0])
+        except ValueError:
+            columns.append(d[0])
+
+    result.ruler()
+    tmp_final = result.__class__(result)
+    tmp_final.table(columns=columns,names=names,links=[], table=temp_table, case=query['case'], simple=True)
+    result.row(tmp_final,bgcolor='lightgray',colspan=5)
+
 class ListLogFile(Reports.report):
     """ Lists the content of the log file using the table UI object """
     parameters = {"logtable":"casetable"}
@@ -51,17 +72,30 @@ class ListLogFile(Reports.report):
     def display(self,query,result):
         result.heading("Log File in Table %s" % query['logtable'])
         dbh = self.DBO(query['case'])
+        dbh.execute("select value from meta where property = 'log_preset_%s'",(query['logtable']))
+        row=dbh.fetch()
+        try:
+            log = LogFile.get_loader(row['value'],None)
+        except KeyError:
+            raise Reports.ReportError("Unable to load the preset %s for table %s " % (row['value'],query['logtable']))
 
         #Find the names of all the columns in table:
-        dbh.execute("select * from %s limit 1",query['logtable'])
+        dbh.execute("select * from %s_log limit 1",query['logtable'])
             
         columns =[]
+        names = []
         for d in dbh.cursor.description:
-            columns.append(d[0])
+            names.append(d[0])
+            try:
+                type = log.types[log.fields.index(d[0])]
+                columns.append(LogFile.types[type].sql_out % d[0])
+            except ValueError:
+                columns.append(d[0])
 
-        result.table(columns=columns,names=columns,
+        result.table(columns=columns,names=names,
                      links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ListLogFile', logtable=query['logtable'],__target__='boo')],
-                     table=query['logtable'], case=query['case'])
+                     table=query['logtable']+'_log',
+                     case=query['case'])
 
 class CreateLogPreset(Reports.report):
     """ Creates a new type of log file in the database, so that they can be loaded using the Load Log File report """
@@ -116,20 +150,8 @@ class CreateLogPreset(Reports.report):
             result.checkbox('Click here and submit to see final preview','preview','ok')
             query['preview']
 
-            # try to load and display as a final test
             dbh = self.DBO(query['case'])
-            temp_table = dbh.get_temp()
-            
-            log.load(dbh,temp_table,rows= 3)
-            dbh.execute("select * from %s limit 1",temp_table)
-            columns =[]
-            for d in dbh.cursor.description:
-                columns.append(d[0])
-
-            result.ruler()
-            tmp_final = self.ui(result)
-            tmp_final.table(columns=columns,names=columns,links=[], table=temp_table, case=query['case'], simple=True)
-            result.row(tmp_final,bgcolor='lightgray',colspan=5)
+            display_test_log(dbh,log,result,query)
 
             result.ruler()
             tmp = self.ui(result)

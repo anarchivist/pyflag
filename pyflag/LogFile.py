@@ -220,17 +220,20 @@ class Log:
         """
         ## First we create the table:
         cols = []
+        insert_sql = []
         field_indexes = []
         count=0
         print self.fields,self.types
         for i in range(len(self.fields)):
             if self.fields[i]!='' and self.fields[i] != 'ignore':
                 field_indexes.append(i)
-                cols.append("%s %s" % (self.fields[i], self.types[i]))
+                type = types[self.types[i]]()
+                cols.append("%s %s" % (self.fields[i], type.type ))
+                insert_sql.append(type.sql_in)
 
         dbh.execute("CREATE TABLE IF NOT EXISTS %s (id int auto_increment,%s,key(id))" % (tablename,",".join(cols)))
         ## prepare the insert string
-        insert_str = "INSERT INTO "+tablename+" values(Null"+',%r'*len(field_indexes)+")"
+        insert_str = "INSERT INTO "+tablename+" values(Null,"+','.join(insert_sql)+")"
 
         for fields in self.get_fields():
             count += 1
@@ -403,7 +406,41 @@ def pre_selector(result):
         
     result.const_selector("pre-filter(s) to use on the data:",'prefilter',x,y,size=4,multiple="multiple")
 
-types = ('varchar(250)','int','datetime','text')
+class Type:
+    """ This class represents translations between the way a column is stored in the database and the way it is displayed.
+
+    This is used by the log driver to store the data in the most efficient format in the database.
+    @cvar type: The database type this column should be created with.
+    """
+    type = None
+    sql_in="%r"
+    sql_out = "`%s`"
+    
+class VarType(Type):
+    type = "varchar(250)"
+
+class IntType(Type):
+    type = "int"
+
+class DateTimeType(Type):
+    type = "datetime"
+
+class TextType(Type):
+    type = "text"
+
+class IPType(Type):
+    """ IP addresses should be stored in the database as ints, but displayed in dot notation """
+    type = "int"
+    sql_in= "INET_ATON(%r)"
+    sql_out= "INET_NTOA(`%s`)"
+    
+types = {
+    'varchar(250)': VarType,
+    'int': IntType,
+    'datetime': DateTimeType,
+    'text': TextType,
+    'IP Address': IPType
+    }
 
 def type_selector(result, name):
-    result.const_selector('',name, types, types)
+    result.const_selector('',name, types.keys(), types.keys())

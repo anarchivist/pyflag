@@ -37,6 +37,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
 import pyflag.LogFile as LogFile
+import plugins.LogAnalysis as LogAnalysis
 
 description = "Load Data"
 order = 20
@@ -53,7 +54,7 @@ class LoadPresetLog(Reports.report):
         result.para("Successfully uploaded the following files into case %s, table %s:" % (query['case'],query['table']))
         for fn in query.getarray('datafile'):
             result.para(fn)
-        result.link("Browse this log file", FlagFramework.query_type((), case=query['case'], family="LogAnalysis", report="ListLogFile", logtable="%s_log"%query['table']))
+        result.link("Browse this log file", FlagFramework.query_type((), case=query['case'], family="LogAnalysis", report="ListLogFile", logtable="%s"%query['table']))
         return result
     
     def progress(self,query,result):
@@ -93,17 +94,12 @@ class LoadPresetLog(Reports.report):
 
             # retrieve and display the temp table
             dbh.execute("select * from %s limit 1",temp_table)
-            columns =[]
-            for d in dbh.cursor.description:
-                columns.append(d[0])
-            preview_tbl = self.ui()
-            preview_tbl.table(columns=columns,names=columns,links=[], table=temp_table, case=query['case'],simple=True)
-            result.row(preview_tbl, colspan=5, bgcolor='lightgray')
+            LogAnalysis.display_test_log(dbh,log,result,query)
             
             result.checkbox('Click here when finished','final','ok')
             
         except KeyError:
-           pass
+            pass
 
     def analyse(self, query):
         """ Load the log file into the table """
@@ -116,11 +112,19 @@ class LoadPresetLog(Reports.report):
 
         dbh = self.DBO(query['case'])
         log.load(dbh,'%s_log'%query['table'])
-        dbh.execute("INSERT INTO meta set property='logtable', value='%s_log'"% query['table'])
+        dbh.execute("INSERT INTO meta set property='logtable', value='%s'" ,(query['table']))
+        dbh.execute("INSERT INTO meta set property='log_preset_%s', value='%s'",(query['table'],query['log_preset']))
 
     def reset(self, query):
         dbh = self.DBO(query['case'])
-        dbh.execute("DROP TABLE %s_log"% query['table'])
+        # decide on table name
+        if query.has_key('new_table'):
+            del query['table']
+            query['table'] = query['new_table']
+
+        dbh.execute("DROP TABLE if exists %s_log" % query['table'])
+        dbh.execute("delete from meta where property='logtable' and value='%s'" , (query['table']))
+        dbh.execute("delete from meta where property='log_preset_%s'" , (query['table']))
 
 import pyflag.Ethereal as Ethereal
 
