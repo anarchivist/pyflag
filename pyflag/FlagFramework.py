@@ -39,6 +39,18 @@ import pyflag.logging as logging
 import index
 import pyflag.Registry as Registry
 
+def get_traceback(e,result):
+    import sys
+    import traceback
+    import cStringIO
+    
+    a = cStringIO.StringIO()
+    traceback.print_tb(sys.exc_info()[2], file=a)
+    a.seek(0)
+    result.heading("%s: %s" % (sys.exc_info()[0],sys.exc_info()[1]))
+    result.text(a.read())            
+    a.close()
+
 class FlagException(Exception):
     """ Generic Flag Exception """
     pass
@@ -295,17 +307,8 @@ class Flag:
             return
         except Exception,e:
             #If anything goes wrong in the analysis phase, we have to set the error in report.executing
-            import sys
-            import traceback
-            import cStringIO
-
-            a = cStringIO.StringIO()
-            traceback.print_tb(sys.exc_info()[2], file=a)
             result = self.ui()
-            a.seek(0)
-            result.para("%s: %s" % (sys.exc_info()[0],sys.exc_info()[1]))
-            result.pre(a.read())
-            a.close()
+            get_traceback(e,result)
             report.executing[thread_name]['error'] = result
             print report.executing, result.__str__()
             return
@@ -316,7 +319,6 @@ class Flag:
         
         #Remove the lock
         del report.executing[thread_name]
-
 
     def check_progress(self,report,query):
         """ Checks the progress of a report. If the report is not running this method returns None. If the report is still running or has died due to an error, this method returns a UI object containing either the error message or a progress report called from the report's own progress method """

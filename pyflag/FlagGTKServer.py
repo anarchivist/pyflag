@@ -40,7 +40,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.Registry as Registry
 import pyflag.DB as DB
-        
+import threading
 
 class GTKServer(gtk.Window):
     """ A class which represents the main GTK server window """
@@ -77,7 +77,11 @@ class GTKServer(gtk.Window):
             
             # each new page goes in a scrolled window
             scroll = gtk.ScrolledWindow()
-            scroll.add_with_viewport(result.display())
+            try:
+                scroll.add_with_viewport(result.display())
+            except Exception,e:
+                self.error_popup(e)
+                raise
             scroll.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_AUTOMATIC)
             
             idx = self.get_current_page()
@@ -109,6 +113,8 @@ class GTKServer(gtk.Window):
     def __init__(self):
         """ GTKServer Main Function
         Initialise framework and draw main window """
+
+        self.form_dialog=None
         gtk.Window.__init__(self)
         
         # initialize flag
@@ -119,7 +125,7 @@ class GTKServer(gtk.Window):
         # set some window properties
         self.set_title('PyFLAG')
         self.set_icon_from_file('%s/pyflag_logo.png' % config.IMAGEDIR)
-        self.set_default_size(500, 500)
+        self.set_default_size(800,600)
         self.connect('destroy', lambda x: gtk.main_quit())
 
         # these are the MAIN ELEMENTS of the GTKServer
@@ -197,42 +203,138 @@ class GTKServer(gtk.Window):
     def navigate_cb(action):
         pass
 
-    def error_popup(self, text,error_msg="Error Occured"):
-        """ Draw the text in an error message box """
+    def error_popup(self, e):
+        """ Draw the text in an error message box
+
+        @arg e: The exception object to print
+        """
         dialog=gtk.Window()
-        frame=gtk.Frame(error_msg)
+        result=self.flag.ui()
+        FlagFramework.get_traceback(e,result)
+        frame=gtk.Frame(result.title)
+        result.title=None
         box=gtk.VBox()
-        textview=gtk.TextView()
-        b=textview.get_buffer()
-        iter=b.get_iter_at_offset(0)
-        b.insert(iter,text)
-        box.add(textview)
+        box.add(result.display())
         frame.add(box)
         dialog.add(frame)
         dialog.show_all()
 
-    def add_page(self, query):
-        """ Add a new notebook page, or redraw existing page """
-        try:
-            result = self.flag.process_request(query)
-        except Exception,e:
-            import traceback,sys
-            import cStringIO
+    def run_progress(self,query):
+        family=query['family']
+        report=query['report']
+        report = Registry.REPORTS.dispatch(family,report)(self.flag,ui=self.flag.ui)
+        if self.form_dialog:
+            child=self.form_dialog.get_child()
+            self.form_dialog.remove(child)
+        else:
+            self.form_dialog=gtk.Window()
+            self.form_dialog.set_default_size(500,500)
 
-            a = cStringIO.StringIO()
-            traceback.print_tb(sys.exc_info()[2], file=a)
-            a.seek(0)
-            error_msg="%s: %s\n%s" % (sys.exc_info()[0],sys.exc_info()[1],a.read())
-            a.close()
-            self.error_popup(error_msg)
+        box=gtk.VBox()
+        self.form_dialog.add(box)
+        result = self.flag.ui()
+        try:
+            report.progress(query,result)
+        except Exception,e:
+            self.error_popup(e)
+            raise
+        
+        box.add(result.display())
+        self.form_dialog.show_all()
+        
+    def run_analysis(self,report,query):
+        """ Run the analysis """
+        canonical_query = self.flag.canonicalise(query)
+        thread_name = threading.currentThread().getName()
+        print "Current thread is %s" % thread_name
+        try:
+            report.analyse(query)
+        except Exception,e:
+            self.error_popup(e)
             return
 
+        ## Draw the results in their own tab:
+        self.add_page(query)
+        self.form_dialog.destroy()
+        self.form_dialog=None
+        return
+
+    def draw_form(self,query):
+        family=query['family']
+        report=query['report']
+        report = Registry.REPORTS.dispatch(family,report)(self.flag,ui=self.flag.ui)
+        ## Check to see if we have all the parameters we need:
+        if report.check_parameters(query):
+            print "Parameters ok - we can go ahead"
+            ##Check to see if the report is cached in the database:
+            if self.flag.is_cached(query):
+                self.add_page(query)
+                self.form_dialog.destroy()
+                self.form_dialog=None
+                return
+            else:
+                ## Report is not cached - we shall analyse it in a seperate thread:
+                t = threading.Thread(target=self.run_analysis,args=(report,query))
+                t.start()
+                print "Analysing report"
+                import time
+
+                def progess_thread(t,query):
+                    """ This function is called to refresh the progress window """
+                    print "progress thread"
+                    while 1:
+                        time.sleep(1)
+                        if self.form_dialog:
+                            print "drawing progress"
+                            self.run_progress(query)
+                        else:
+                            return
+
+                ## Run the progress cycle in a seperate thread
+                t2 = threading.Thread(target=progess_thread,args=(t,query))
+                t2.start()
+                print "Calculating progress"
+                return
+
+        else:
+            if self.form_dialog:
+                child=self.form_dialog.get_child()
+                self.form_dialog.remove(child)
+            else:
+                self.form_dialog=gtk.Window()
+                self.form_dialog.set_default_size(500,500)
+
+            box=gtk.VBox()
+            self.form_dialog.add(box)
+            result = self.flag.ui()
+            result.start_form(query)
+            print report
+            try:
+                report.form(query,result)
+            except Exception,e:
+                self.error_popup(e)
+                raise
+            
+            ## Set the callback to ourselves:
+            result.link_callback = self.draw_form
+            result.end_form()
+            box.add(result.display())
+            self.form_dialog.show_all()
+
+    def add_page(self, query):
+        """ Add a new notebook page, or redraw existing page """
+        family=query['family']
+        report=query['report']
+        report = Registry.REPORTS.dispatch(family,report)(self.flag,ui=self.flag.ui)
+        result=self.flag.ui()
+        result=report.display(query,result)
         self.notebook.add_page(result, query)
 
     def execute_report_cb(self, action, family, report):
         """ Execute a report based on the clicked action item """
         query = FlagFramework.query_type((),family=family,report=report,case='pyflag')
-        self.add_page(query)
+        self.draw_form(query)
+#        self.add_page(query)
         
     def build_flag_menu(self):
         # Create an actiongroup
