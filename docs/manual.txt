@@ -1,7 +1,7 @@
 =============
 PyFlag Manual
 =============
-    Flag (Forensic and Log Analysis GUI) is a tool designed to simplify the examination of forensic evidence in the form of Hard disk images, logs and network captures. This manual documents some of the basic aspects of FLAG, but is by no means complete. There is a complete API documentation produced by epydoc in the docs directory. The API documentation is designed for developers who wish to contribute to PyFlag development.
+Flag (Forensic and Log Analysis GUI) is a tool designed to simplify the examination of forensic evidence in the form of Hard disk images, logs and network captures. This manual documents some of the basic aspects of FLAG, but is by no means complete. There is a complete API documentation produced by epydoc in the docs directory. The API documentation is designed for developers who wish to contribute to PyFlag development.
 
 Basic Concepts
 --------------
@@ -9,7 +9,6 @@ The following section describes a number of basic concepts in PyFlag.
 
 Flag Cases
 ``````````
-
 A central concept to flag is the case. A case is simply an area to collect related information regarding a particular incident. Internally a case is kept in its own database, and tables are added to the case as different forms of evidence are added.
 
 To create a new case, click the Case Management tab and add a new case.
@@ -90,58 +89,61 @@ Table Viewer Widget and the Navigation Bar
 ``````````````````````````````````````````
 The most powerfull widget in flag is the table viewer. This widget allows for extremely sophisticated searching of the dataset and is so important that an entire section is dedicated to it here. The figure below shows a typical usage of the *Table widget*, although it is used in many places within PyFlag.
 
-.. image:: images/Table.png
-   :width: 640
-   :height: 480
+The Table widget is shown here.
+
+.. figure:: images/Table.eps
+   :align: center
+
+   The PyFlag Table widget with captions explaining the different functions.
 
 The following components can be seen:
-  - Current Case:
+- Current Case:
     
-    This shows the currently selected case name
+  This shows the currently selected case name
 
-  - Next and Previous Page:
+- Next and Previous Page:
 
-    Often the number of rows of data can not fit within a single screen full. In this case the Next page arrow will be unshaded indicating that another page is available to view.
+  Often the number of rows of data can not fit within a single screen full. In this case the Next page arrow will be unshaded indicating that another page is available to view.
 
-  - Main Menu:
+- Main Menu:
 
-    The menu button takes you directly to the main menu for the currently selected module. From there you may select another module to look at or simply another report.
+  The menu button takes you directly to the main menu for the currently selected module. From there you may select another module to look at or simply another report.
 
-  - Column Name:
+- Column Name:
 
-    Each column in the table has a name. Clicking on the column name indicates that you wish to order the result alphabetically by that column. At any one time, a single column will appear to have a pink background. This indicates that the result is ordered by this column. Clicking the column again flips the sense of the ordering (from ascending to descending and back again).
+  Each column in the table has a name. Clicking on the column name indicates that you wish to order the result alphabetically by that column. At any one time, a single column will appear to have a pink background. This indicates that the result is ordered by this column. Clicking the column again flips the sense of the ordering (from ascending to descending and back again).
 
-    Note the colouring of the rows alternating between gray and white. For each unique value of the ordering column these colours alternate. The result is that by ordering the result set on one of the columns, it is quick to see which rows contain identical values with each column, because they will appear like groups of different colours.
+  Note the colouring of the rows alternating between gray and white. For each unique value of the ordering column these colours alternate. The result is that by ordering the result set on one of the columns, it is quick to see which rows contain identical values with each column, because they will appear like groups of different colours.
 
-    - Group by Column:
+- Group by Column:
 
-      The Group by column allows the user to count how many entries in the result set occur with each value of the column. For example in the figure above, by grouping by Source IP (and ordering by counts), it is possible to see which source IP produced the greatest number of hits.
+  The Group by column allows the user to count how many entries in the result set occur with each value of the column. For example in the figure above, by grouping by Source IP (and ordering by counts), it is possible to see which source IP produced the greatest number of hits.
 
-      Once in the group by screen, clicking on the individual source IP address allows the user to view all the hits produced by that IP address.
+  Once in the group by screen, clicking on the individual source IP address allows the user to view all the hits produced by that IP address.
 
-      Within the group by screen it is possible to plot a graph of the most common entries in the grouped by column. This is useful to gain a rapid visual feel to the data.
+  Within the group by screen it is possible to plot a graph of the most common entries in the grouped by column. This is useful to gain a rapid visual feel to the data.
 
-    - Search Column:
+- Search Column:
 
-      It is often handy to be able to eliminate a subset of the result set from the table, and concentrate on those results which match a specific criteria. For example, we may want to see those hits produced between certain date range, or those IP addresses requesting certain file extensions, or possibly both conditions at once.
+  It is often handy to be able to eliminate a subset of the result set from the table, and concentrate on those results which match a specific criteria. For example, we may want to see those hits produced between certain date range, or those IP addresses requesting certain file extensions, or possibly both conditions at once.
 
-      The search capability within the table widget allows for complex search criteria to be performed. Conditions are added cumulatively with a logical "and" seperating them. So for example, you can add the condition date>2001-10-01 and date<2002-10-01. The query is entered into the text area where the sense of the query is determined by the first character of the query string. So for example typing "<2001-10-01" in the date column will show all dates prior to october 1st 2001. The following modifiers are supported:
-      - > - The values are greater than the specified value
-      - < - The values are less than the specified value
-      - = - The values are exactly equal to the specified value
-      - ! - The values are not equal to the specified value
-      - Search term with a % in it - The values are similar to the specified value with % being the wildcard
-      - Search term - The values are similar to the specified value with wildcards automatically added before and after the search terms (so it may match in the middle of the entry)
+  The search capability within the table widget allows for complex search criteria to be performed. Conditions are added cumulatively with a logical "and" seperating them. So for example, you can add the condition date>2001-10-01 and date<2002-10-01. The query is entered into the text area where the sense of the query is determined by the first character of the query string. So for example typing "<2001-10-01" in the date column will show all dates prior to october 1st 2001. The following modifiers are supported:
+  - > - The values are greater than the specified value
+  - < - The values are less than the specified value
+  - = - The values are exactly equal to the specified value
+  - ! - The values are not equal to the specified value
+  - Search term with a % in it - The values are similar to the specified value with % being the wildcard
+  - Search term - The values are similar to the specified value with wildcards automatically added before and after the search terms (so it may match in the middle of the entry)
 
 Note that as new searching conditions are added, they will be listed at the top of the table. You may click on any of those links to remove that search term, while still preserving the others.
 
-     - ToolBar:
+- ToolBar:
      
-       These icons represent extra functions that may be invoked on the table widget:
+  These icons represent extra functions that may be invoked on the table widget:
 
-       - Customise Table: This allows the hiding of selected columns. This is usefull when the table has many columns or when exporting the data.
+  - Customise Table: This allows the hiding of selected columns. This is usefull when the table has many columns or when exporting the data.
 
-       - Export Data: After selecting the required subset of the data, it is often useful to extract the relevant data for insertion into a different application (e.g. into a report). This function allows the data to be exported into a comma delimited file (CSV) which may be imported into most spreadsheet programs.
+  - Export Data: After selecting the required subset of the data, it is often useful to extract the relevant data for insertion into a different application (e.g. into a report). This function allows the data to be exported into a comma delimited file (CSV) which may be imported into most spreadsheet programs.
 
 Modules
 -------
