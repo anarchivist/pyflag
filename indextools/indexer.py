@@ -93,10 +93,11 @@ if opt_dict.has_key("-i"):
             idx.add(value)
         ## Now keywords in external files
         if key=="-w":
-            fd = open(value,'r')
-            for line in fd:
+            fd2 = open(value,'r')
+            for line in fd2:
+                line = line[:-1]
                 idx.add(line)
-            fd.close()
+            fd2.close()
 
     ## Now index the image:
     count = 0
