@@ -756,7 +756,7 @@ class GTKUI(UI.GenericUI):
         """ wrapper function to satisfy clicked signal callback prototype """
         self.link_callback(query)
 
-    def toolbar(self, cb, text, icon=None, popup=True):
+    def toolbar(self, cb, text, icon=None, popup=True, tooltip=None):
         """ Add an item to the toolbar
         cb may be a query item rather than a callback
         in which case the query is run by flag and the results displayed in the pane"""
@@ -809,39 +809,7 @@ class GTKUI(UI.GenericUI):
         ## All columns are strings in here...
         store=gtk.ListStore(*tuple([gobject.TYPE_STRING] * len(names)))
 
-        for row in generator:
-            iter = store.append()
-            x=[iter]
-            for i in range(len(names)):
-                x.append(i)
-                x.append(str(row[names[i]]))
-                
-            store.set(*x)
-
-        ## Create a new widget
-        treeview = gtk.TreeView(store)
-        treeview.set_rules_hint(TRUE)
-
-        def page_cb(widget,event=None):
-            """ Call back for pagination """
-            store=widget.get_data('store')
-            #dir=widget.get_data('direction')
-            q=widget.get_data('query')
-            self.defaults=q
-            
-            ## Get new SQL iterator:
-            generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks)
-
-            self.previous = int(q['limit']) - config.PAGESIZE
-            if self.previous<0: self.previous=0
-
-            ## Update the navigation buttons
-            del q['limit']
-            q['__target__']='limit'
-            self.right_button.set_data('query',self.FillQueryTarget(q,self.next))
-            self.left_button.set_data('query',self.FillQueryTarget(q,self.previous))
-
-            ## Refresh the store with new data
+        def populate_store(store,generator,names):
             store.clear()
             for row in generator:
                 iter = store.append()
@@ -852,6 +820,10 @@ class GTKUI(UI.GenericUI):
 
                 store.set(*x)
 
+        populate_store(store,generator,names)
+        ## Create a new widget
+        treeview = gtk.TreeView(store)
+        treeview.set_rules_hint(TRUE)
             
         ## callback for all the links:
         def link_callback(widget,event=None):
@@ -881,45 +853,43 @@ class GTKUI(UI.GenericUI):
             ## Get new SQL iterator:
             generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks)
 
-            store.clear()
-            for row in generator:
-                iter = store.append()
-                x=[iter]
-                for i in range(len(names)):
-                    x.append(i)
-                    x.append(str(row[names[i]]))
-
-                store.set(*x)
+            populate_store(store,generator,names)
 
             ## Update the navigation buttons
-            self.next = 0
-            self.previous = 0
-            #q=self.right_button.get_data('query')
-            #del q['limit']
-            #q['limit']=0
-            #self.right_button.set_data('query',q)
-            #self.left_button.set_data('query',q)
+            q=self.right_button.get_data('query')
+            del q['limit']
+            q['limit']=0
+            self.right_button.set_data('query',q)
+            self.left_button.set_data('query',q)
 
         ## Create buttons for navigation: FIXME: This code should really be in the application window's toolbar, and be global for the entire app.
         #if not self.nav_query:
         #    q = self.defaults.clone()          
         #    q['__target__']='limit'
 
-        #left=gtk.Button("Previous")
-        #self.left_button=left
-        #left.set_data('query',self.FillQueryTarget(q,self.previous))
-        #left.set_data('store',store)
-        #left.connect("clicked",page_cb)
+        def previous_cb(widget):
+            del self.defaults['limit']
+            self.defaults['limit']=self.previous
+            self.previous-=config.PAGESIZE
+            if self.previous<0: self.previous=0
 
-        #right=gtk.Button("Next")
-        #self.right_button=right
-        #right.set_data('query',self.FillQueryTarget(q,self.next))
-        #right.set_data('store',store)
-        #right.set_data('direction','forward')
-        #right.connect("clicked",page_cb)
+            ## Get new SQL iterator:
+            generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks)
+            
+            populate_store(store,generator,names)
 
-        ## Attach the widget to the result canvas
-        #self.row(left,right)
+        def next_cb(widget):
+            del self.defaults['limit']
+            self.defaults['limit']=self.next
+            self.next+=config.PAGESIZE
+
+            ## Get new SQL iterator:
+            generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks)
+            self.defaults=new_query
+            populate_store(store,generator,names)
+            
+        self.toolbar(previous_cb,"Prev Page",icon=gtk.STOCK_GO_BACK,tooltip="Go to next page",popup=False)
+        self.toolbar(next_cb,"Next Page",icon=gtk.STOCK_GO_FORWARD,tooltip="Go to Previous page",popup=False)
         self.row(treeview)
 
         ## Create a group by selector
