@@ -796,7 +796,9 @@ class GTKUI(UI.GenericUI):
         ## be done nicely by gtk for us.
 
         def proxy_cb(widget, cb, result, query):
+            result=self.server.flag.ui(query=query,server=self)
             cb(query, result)
+            self.server.notebook.add_page(result, query)
         
         i = None
         if icon:
@@ -815,7 +817,7 @@ class GTKUI(UI.GenericUI):
         print "adding tooltip %s" % tooltip
         #tips.set_tip(button, tooltip)
         #tips.enable()
-        
+
         button.connect('clicked', proxy_cb, cb, self, self.defaults)
         self.toolbar_ui.insert(button, -1)
 

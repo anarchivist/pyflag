@@ -34,6 +34,7 @@ import gtk,gtk.gdk
 
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
+import pyflag.GTKUI
 import pyflag.TypeCheck as TypeCheck
 import pyflag.conf
 config=pyflag.conf.ConfObject()
@@ -47,9 +48,7 @@ def error_popup(e):
     @arg e: The exception object to print
     """
     dialog=gtk.Window()
-    import pyflag.GTKUI
-    
-    result=pyflag.GTKUI.GTKUI(server=self)
+    result=pyflag.GTKUI.GTKUI()
     FlagFramework.get_traceback(e,result)
     frame=gtk.Frame(result.title)
     result.title=None

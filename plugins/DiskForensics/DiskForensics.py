@@ -148,7 +148,7 @@ class BrowseFS(Reports.report):
                 ScannerUtils.draw_scanners(query,result)
                 result.end_table()
                 result.end_form()
-                result.display = result.__str__
+#                result.display = result.__str__
 
             tmp = result.__class__(result)
             result.toolbar(scan_popup,"Scan this directory",icon="examine.png")
@@ -262,7 +262,7 @@ class ViewFile(Reports.report):
             ScannerUtils.draw_scanners(query,result)
             result.end_table()
             result.end_form()
-            result.display = result.__str__
+#            result.display = result.__str__
 
         result.toolbar(scan_popup,"Scan this File",icon="examine.png")
 
