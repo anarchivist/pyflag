@@ -7,6 +7,24 @@
 %{
 #include "libpst.h"
 #include "timeconv.h"
+#include "Python.h"
+
+PyObject *pst_item_attach_data_as_pystring(pst_file *pstfile, pst_item_attach *attach) {
+	PyObject *ret;
+	if(attach->data == NULL) {	
+		int size = 0;
+		unsigned char *buff = NULL;
+		size = pst_attach_to_mem(pstfile, attach, &buff);
+		ret = PyString_FromStringAndSize(buff, size);
+		if(buff != NULL)
+			free(buff);
+	}
+	else {
+		ret = PyString_FromStringAndSize(attach->data, attach->size);
+	}
+	return ret;
+}
+
 %}
 
 // change to simple types which get mapped
@@ -23,6 +41,12 @@ typedef unsigned int u_int32_t;
 #define PST_TYPE_TASK 12
 #define PST_TYPE_OTHER 13
 #define PST_TYPE_REPORT 14
+
+typedef struct _pst_item_email_subject {
+  int32_t off1;
+  int32_t off2;
+  char *subj;
+} pst_item_email_subject;
 
 typedef struct _pst_item_email {
   FILETIME *arrival_date;
@@ -174,6 +198,36 @@ typedef struct _pst_item_contact {
   FILETIME *wedding_anniversary;
 } pst_item_contact;
 
+typedef struct _pst_item_attach {
+  char *filename1;
+  char *filename2;
+  char *mimetype;
+  char *data;
+  size_t  size;
+  int32_t  id2_val;
+  int32_t  id_val; // calculated from id2_val during creation of record
+  int32_t  method;
+  int32_t  position;
+  int32_t  sequence;
+  struct _pst_item_attach *next;
+} pst_item_attach;
+
+typedef struct _pst_item_journal {
+  FILETIME *end;
+  FILETIME *start;
+  char *type;
+} pst_item_journal;
+
+typedef struct _pst_item_appointment {
+  FILETIME *end;
+  char *location;
+  FILETIME *reminder;
+  FILETIME *start;
+  char *timezonestring;
+  int32_t showas;
+  int32_t label;
+} pst_item_appointment;
+
 typedef struct _pst_desc_tree {
   u_int32_t id;
   pst_index_ll * list_index;
@@ -257,6 +311,9 @@ typedef struct _pst_item {
 	pst_desc_ll *get_ptr(u_int32_t id) {
 		return _pst_getDptr(self, id);
 	}
+	PyObject *get_attach_data(pst_item_attach *attach) {
+		return pst_item_attach_data_as_pystring(self, attach);
+	}
 }
 
 void _pst_freeItem(pst_item *item);
@@ -265,6 +322,3 @@ void _pst_freeItem(pst_item *item);
 //time_t fileTimeToUnixTime( const FILETIME *filetime, DWORD *remainder );
 char * fileTimeToAscii (const FILETIME *filetime);
 //struct tm * fileTimeToStructTM (const FILETIME *filetime);
-
-/* rtf decoding */
-unsigned char* lzfu_decompress (unsigned char* rtfcomp);

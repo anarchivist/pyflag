@@ -17,7 +17,8 @@ class Pstfile:
         In addition, they have a 'read' method which should return something sensible
         for use in scanning etc. These keep a reference to the item and must be deleted to free memory
         """
-        def __init__(self, ptr, item):
+        def __init__(self, pst, ptr, item):
+            self.pst = pst
             self.id = ptr.id
             self._item = item
             
@@ -54,6 +55,25 @@ class Pstfile:
         """ email item """
         import base64
         
+        class Attachment:
+            """ Email attachment """
+            def __init__(self, pst, ref):
+                self.pst = pst
+                self.mimetype = ref.mimetype
+                self.filename1 = ref.filename1
+                self.filename2 = ref.filename2
+                self.data = self.pst.get_attach_data(ref)
+                
+            def read(self):
+                return self.data
+        
+        def attach(self):
+            """ iterate through attachments """
+            attach = self._item.attach
+            while attach:
+                yield Pstfile.Email.Attachment(self.pst, attach)
+                attach = attach.next
+            
         def read(self):
             email = self._item.email
             base64enc = False
@@ -74,11 +94,19 @@ class Pstfile:
                 else:
                     retstr += email.htmlbody.replace('\r','')
             if email.rtf_compressed:
-                #### WARNING BIG MEMORY LEAK ####
-                #retstr += pypst.lzfu_decompress(email.rtf_compressed)
+                #### WARNING: MEMORY LEAK ####
+                #retstr += pypst.rtf_decompress(email.rtf_compressed)
                 retstr += "Libpst: RTF compressed body found, not currently suppored\n"
             if email.encrypted_body or email.encrypted_htmlbody:
-                retstr += "Libpst: Encrypted body found, not currenlty supported\n"        
+                retstr += "Libpst: Encrypted body found, not currenlty supported\n"
+
+            for a in self.attach():
+                retstr += "Got Attachment: %s\n" % a.filename1
+                #fd = open('/tmp/attachment_%s' % a.filename1, 'w')
+                #fd.write(a.data)
+                #fd.close()
+                #retstr += a.data
+
             return retstr
 
     class Contact(Item):
@@ -106,12 +134,8 @@ class Pstfile:
 
     class Folder(Item):
         """ folder item """
-        def __init__(self, ptr, item):
-           Pstfile.Item.__init__(self, ptr, item)
-           self.name = item.file_as
-
         def __str__(self):
-            return self.name
+            return "Folder %s" % self._item.file_as
         
     def __init__(self, filename):
         self.pst = pypst.pst_file()
@@ -173,15 +197,15 @@ class Pstfile:
         item = self.pst.get_item(ptr)
         if(item):
             if item.folder:
-                ret = self.Folder(ptr, item)
+                ret = self.Folder(self.pst, ptr, item)
             elif item.contact:
-                ret = self.Contact(ptr, item)
+                ret = self.Contact(self.pst, ptr, item)
             elif ( item.email and item.type == pypst.PST_TYPE_NOTE or item.type == pypst.PST_TYPE_REPORT ):
-                ret = self.Email(ptr, item)
+                ret = self.Email(self.pst, ptr, item)
             elif item.type == pypst.PST_TYPE_JOURNAL:
-                ret = self.Journal(ptr, item)
+                ret = self.Journal(self.pst, ptr, item)
             elif item.type == pypst.PST_TYPE_APPOINTMENT:
-                ret = self.Appointment(ptr, item)
+                ret = self.Appointment(self.pst, ptr, item)
             else:
                 ret = None
             return ret
