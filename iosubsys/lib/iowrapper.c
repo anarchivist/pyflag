@@ -40,50 +40,96 @@ void usage(char *prog) {
   exit(0);
 };
 
+#define STRCMP(x,y) !strncasecmp(&(x),#y,strlen(#y)+1)
+
 int main(int argc, char **argv) 
 {
   char ch;
+  int i;
+  int opts_size=10;
+  char *opts=NULL;
   
   setenv("LD_PRELOAD","libio_hooker.so",1);
   context = UNHOOKED;
-
-  while ((ch = getopt(argc, argv, "+i:o:f:")) > 0) {
-    switch (ch) {
-    case 'i':
-      setenv("IO_SUBSYS",optarg,1);
-      if(!strcmp(optarg,"help")) {
-	init_hooker();
+  
+  //Parse all the options:
+  for(i=1;i<argc;) {
+    //This is an option:
+    if(argv[i][0]=='-') {
+      //Specify a file filter
+      if(STRCMP(argv[i][1],f) || STRCMP(argv[i][1],-filter)) {
+	i++;
+	setenv("IO_FILENAME",argv[i],1);
+	i++;
+	continue;
+	//Specify a subsystem
+      } else if(STRCMP(argv[i][1],h)|| STRCMP(argv[i][1],-help)) {
+	usage(argv[0]);
 	exit(0);
+
+      } else if(STRCMP(argv[i][1],i)|| STRCMP(argv[i][1],-subsystem)) {
+	i++;
+	setenv("IO_SUBSYS",argv[i],1);
+	if(!strcmp(argv[i],"help")) {
+	  init_hooker();
+	  exit(0);
+	};
+	i++;
+	continue;
+	//Specify a single option to the subsystem
+      } else if(STRCMP(argv[i][1],o) || STRCMP(argv[i][1],-options)) {
+	i++;
+	setenv("IO_OPTS",argv[i],1);
+	if(!strcmp(argv[i],"help")) {
+	  init_hooker();
+	  exit(0);
+	};
+	i++;
+	continue;
+	//A noop -- function used as a seperator between args
+      } else if(STRCMP(argv[i][1],-)) {
+	i++;
+	continue;
+      } else {
+	int j;
+	char *option=&(argv[i][1]);
+
+	i++;
+	//Arbitrary arg used for passing into subsystem. Here we allow
+	//a sequence of args until the next option (starting with
+	//-). This sequence will be joined by , and passed to subsystem
+	for(j=0;j+i<=argc;j++) {
+	  //Quit if we hit an arg
+	  if(argv[i+j][0]=='-') {
+	    break;
+	  } else {
+	    if(opts) {
+	      if(asprintf(&opts,"%s,%s=%s",opts,option,argv[i+j])<0)
+		RAISE(E_NOMEMORY,NULL,"Can not asprintf malloc\n");
+	    } else {
+	      if(asprintf(&opts,"%s=%s",option,argv[i+j])<0)
+		RAISE(E_NOMEMORY,NULL,"Can not asprintf malloc\n");
+	    };
+	    setenv("IO_OPTS",opts,1);
+	  };
+	};
+	i+=j;
+	continue;
       };
-      break;
 
-    case 'f':
-      setenv("IO_FILENAME",optarg,1);
-      break;
-
-    case 'o':
-      setenv("IO_OPTS",optarg,1);
-      if(!strcmp(optarg,"help")) {
-	init_hooker();
-	exit(0);
-      };
-      break;
-
-    case '?':
-    default: 
-      usage(argv[0]);
-      _exit(0);
+    } else {
+      if(i==argc) RAISE(E_GENERIC,NULL,"No file to execute ... maybe you need a -- somewhere?");
+      //Check that IO_SUBSYS has been set before:
+      if(!getenv("IO_SUBSYS")) RAISE(E_GENERIC,NULL,"No subsystem has been set!!");
+      //Specify a commandline to execute (Note this must be the last option)
+      execvp(argv[i],&argv[i]);
+      //If we get here we failed to execp
+      RAISE(E_GENERIC,NULL,"Could not exec %s\n",argv[i]);
     };
+
   };
 
-  //Any extra args are interpreted as the command to exec
-  if(optind<argc) {
-    execvp(argv[optind],&argv[optind]);
-    RAISE(E_GENERIC,NULL,"Could not exec %s: %s\n",argv[optind],strerror(errno));
-  };
-
-  //If we get here, just call usage:
-  usage(argv[0]);
-  return(0);
+  //If we are here something went horribly wrong:
+  RAISE(E_GENERIC,NULL,"No file to execute ... maybe you need a -- somewhere?");
 };
   
