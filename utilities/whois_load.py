@@ -296,6 +296,6 @@ for url in urls:
         del masks[align[0]]
 
 # add indexes
-dbh.execute("ALTER TABLE whois ADD index(src_id);")
-dbh.execute("ALTER TABLE whois ADD index(netname);")
-dbh.execute("ALTER TABLE whois_routes ADD index(network);")
+dbh.execute("ALTER TABLE whois ADD index(src_id)")
+dbh.execute("ALTER TABLE whois ADD index(netname)")
+dbh.execute("ALTER TABLE whois_routes ADD index(network)")

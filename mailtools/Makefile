@@ -11,11 +11,15 @@ LIBS	=$(PSTVER)/libpst.o $(PSTVER)/timeconv.o $(PSTVER)/libstrfunc.o $(PSTVER)/d
 	mv pypst.py ../
 
 libpst:
-	(echo Entering directory $(PSTVER); cd $(PSTVER); make "CC=$(CC)"; echo leaving directory $(PSTVER));
+	echo Entering directory $(PSTVER)
+	cd $(PSTVER) && make "CC=$(CC)"
+	echo leaving directory $(PSTVER)
 
 clean:
 	rm -f pypst_wrap.c pypst_wrap.o ../_pypst.so ../pypst.py ../pypst2.py
-	(echo Entering directory $(PSTVER); cd $(PSTVER); make "CC=$(CC)" clean ; echo leaving directory $(PSTVER));
+	echo Entering directory $(PSTVER)
+	cd $(PSTVER) && make "CC=$(CC)" clean
+	echo leaving directory $(PSTVER)
 
 test:	test.c
 	$(CC) -g $(INCL) test.c -shared $(LIBS) -o test

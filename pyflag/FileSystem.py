@@ -122,7 +122,6 @@ class FileSystem:
     def exists(self,path):
         """ Returns 1 if path exists, 0 otherwise """
         pass
-
     
     def scanfs(self, callbacks):
         """ Read every file in fs, and call given scanner callbacks for each file.
@@ -510,6 +509,7 @@ try:
         """ A file like object to read items from within pst files. The pst file is specified as an inode in the DBFS """
         specifier = 'P'
         blocks=()
+        size=None
         def __init__(self, case, table, fd, inode):
             File.__init__(self, case, table, fd, inode)
             # strategy:
@@ -536,6 +536,7 @@ try:
             item = pst.open(thispart[1:])
             self.data = item.read()
             self.pos = 0
+            self.size=len(self.data)
 
         def read(self,len=None):
             if len:
@@ -547,8 +548,16 @@ try:
         def close(self):
             pass
 
+        def tell(self):
+            return self.pos
+        
         def seek(self,pos,rel=0):
-            self.pos=pos
+            if rel==1:
+                self.pos+=pos
+            elif rel==2:
+                self.pos=len(self.data)+pos
+            else:
+                self.pos=pos
             
 except ImportError:
     class Pst_file:

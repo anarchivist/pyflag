@@ -32,7 +32,7 @@ class PstScan(GenScanFactory):
             ## filename is the filename in the filesystem for the pst file.
             filename = self.ddfs.lookup(inode=self.inode)
 
-            def scan_item(inode):
+            def scan_item(inode,item):
                 ## call the scanners on this new file (FIXME limit the recursion level here)
                 data=item.read()
                 if data:
@@ -67,10 +67,11 @@ class PstScan(GenScanFactory):
                     self.ddfs.dbh.execute("insert into file_%s set inode='%s|P%s:%s',mode='r/r',status='alloc',path='%s/%s',name=%r",(self.ddfs.table, self.inode, name[0], count, root[1], name[1]+'/', fname))
                     self.ddfs.dbh.execute("insert into inode_%s set inode='%s|P%s:%s',uid=0,gid=0, mtime=%r,atime=%r,ctime=%r,mode=0,links='',link='',size=%s",(self.table, self.inode, name[0], count, item.arrival_date, item.arrival_date, item.sent_date, a.size))
                     #scan attachments
-                    scan_item('%s|P%s:%s' % (self.inode, name[0], count))
+                    scan_item('%s|P%s:%s' % (self.inode, name[0], count),a)
                     count += 1
+                    
                 #scan body
-                scan_item('%s|P%s:0' % (self.inode, name[0]))
+                scan_item('%s|P%s:0' % (self.inode, name[0]),item)
 
             def add_folder():
                 self.ddfs.dbh.execute("insert into file_%s set inode='%s|P%s',mode='d/d',status='alloc',path=%r,name=%r",(self.table, self.inode, name[0], root[1]+'/', name[1]))
@@ -80,7 +81,7 @@ class PstScan(GenScanFactory):
                 self.ddfs.dbh.execute("insert into file_%s set inode='%s|P%s',mode='r/r',status='alloc',path=%r,name=%r",(self.table, self.inode, name[0], root[1]+'/', name[1]))
                 self.ddfs.dbh.execute("insert into inode_%s set inode='%s|P%s',uid=0,gid=0, mtime=%r,atime=%r,ctime=%r,mode=0,links='',link='',size=%s",(self.table, self.inode, name[0], item.modify_date, item.modify_date, item.create_date, item.size))
                 #scan body
-                scan_item('%s|P%s' % (self.inode, name[0]))
+                scan_item('%s|P%s' % (self.inode, name[0]),item)
  
 
             ## Just walk over all the files
