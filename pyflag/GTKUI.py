@@ -232,18 +232,10 @@ class FlagTreeModel(gtk.GenericTreeModel):
 class GTKUI(UI.GenericUI):
     """ A GTK UI Implementation. """
     def __init__(self,default = None):
-        ## Initialise the text view buffer for this widget
-        #self.result=gtk.TextView()
+        # Create the Main Widget
         self.result=gtk.VBox()
-        #self.result=gtk.Frame()
-        #self.main_widget=gtk.VBox()
-        #self.result.add(self.main_widget)
-        #self.buffer=gtk.TextBuffer(None)
-        #self.result.set_buffer(self.buffer)
-        #self.result.set_editable(False)
-        #self.result.set_cursor_visible(False)
-        #self.result.set_wrap_mode(gtk.WRAP_WORD)
-        #self.iter=self.buffer.get_iter_at_offset(0)
+
+        # Inherit properties
         if default != None:
             self.form_parms = default.form_parms
             self.defaults = default.defaults
@@ -254,27 +246,6 @@ class GTKUI(UI.GenericUI):
             self.defaults = FlagFramework.query_type(())
             self.form_widgets=[]
             
-        ##Initialise the tags:
-        #self.tagtable = gtk.TextTagTable()
-        
-        #tag = self.buffer.create_tag('title')
-        #tag = gtk.TextTag('title')
-        #tag.set_property('font', 'Sans 18')
-        #self.tagtable.add(tag)
-        
-        #tag=self.buffer.create_tag('link')
-        #tag = gtk.TextTag('link')
-        #tag.set_property('foreground','blue')
-        #self.tagtable.add(tag)
-
-        #tag=self.buffer.create_tag('text')
-        #tag = gtk.TextTag('text')
-        #tag.set_property('foreground','black')
-        #self.tagtable.add(tag)
-        
-        #self.main_widget = None
-        self.flag = None
-        #self.current_table=None
         self.current_table=None
         self.nav_query=None
         self.widgets = []
@@ -282,15 +253,14 @@ class GTKUI(UI.GenericUI):
         return
 
     def heading(self,string):
-        #self.buffer.insert_with_tags_by_name(self.iter,string+'\n','title')
-        #self.row(string, colspan=50)
         self.title = string
         
     def refresh(self, int, query):
         pass
 
     def __str__(self):
-        return "GTKUI Widget"
+        return self.display()
+#        return "GTKUI Widget"
     
     def display(self):
         ## Did the user forget to call end_table??? Dumb user!!!
@@ -321,30 +291,19 @@ class GTKUI(UI.GenericUI):
             if isinstance(col,self.__class__):
                 col=col.display()
             elif not issubclass(col.__class__,gtk.Widget):
-                #temp=gtk.TextView()
-                #temp_b=gtk.TextBuffer(None)
-                #temp.set_wrap_mode(gtk.WRAP_NONE)
-                #temp.set_buffer(temp_b)
-                #temp.set_justification(gtk.JUSTIFY_LEFT)
-                #temp_b.insert_at_cursor("%s"%col)
-                #col=temp
-                print "Printing %s which is a %s" % (col, col.__class__)
                 col = gtk.Label("%s" % col)
                 col.set_justify(gtk.JUSTIFY_LEFT)
-                print "%s == %s" % (col.get_justify(), gtk.JUSTIFY_LEFT)
+                col.set_line_wrap(gtk.TRUE)
+
             ##Attach the column to row at the end of the table:
-            #self.current_table.attach_defaults(col,i,i+1,self.current_table_row-1,self.current_table_row)
             right_attach = i+1            
             if options.has_key('colspan'):
                 right_attach = i+options['colspan']
-            #self.current_table.attach(col, i, right_attach, self.current_table_row-1, self.current_table_row, gtk.FILL|gtk.EXPAND, gtk.FILL|gtk.EXPAND, 0, 0)
-            self.current_table.attach(col, i, right_attach, self.current_table_row-1, self.current_table_row, gtk.FILL, 0, 0, 0)
+            self.current_table.attach(col, i, right_attach, self.current_table_row-1, self.current_table_row, gtk.FILL|gtk.EXPAND, 0, 0, 0)
+
     def end_table(self):
         ## Add the table to the result UI:
         if self.current_table:
-            #child=self.buffer.create_child_anchor(self.iter)
-            #self.result.add_child_at_anchor(self.current_table,child)
-            #self.current_table=None
             self.result.pack_start(self.current_table, False)
             self.current_table=None
 
@@ -355,12 +314,13 @@ class GTKUI(UI.GenericUI):
     def tooltip(self, string):
         pass
     
+    def toolbar(self, popup, string, icon):
+        pass
+    
     def icon(self, path, **options):
         image = gtk.Image()
         image.set_from_file("%s/%s" % (config.IMAGEDIR, path))
         self.row(image)
-        print "adding icon"
-        #self.buffer.insert_pixbuf(self.iter, image.get_pixbuf())
 
     def popup(self,callback, label,icon=None,toolbar=0, menubar=0, **options):
         pass
@@ -505,6 +465,7 @@ class GTKUI(UI.GenericUI):
                 self.row(widget)
             else:
                 label = gtk.Label(d)
+                label.set_line_wrap(gtk.TRUE)
                 label.set_justify(gtk.JUSTIFY_LEFT)
                 self.row(label)
                 #self.buffer.insert_with_tags_by_name(self.iter,d,'text')
