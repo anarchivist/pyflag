@@ -445,7 +445,7 @@ class GTKServer(gtk.Window):
             hbox.pack_start(widget,True,True, 0)
             vbox.pack_start(hbox,True,True, 0)
         else:
-            vbox.pack_start(widget,False,False,0)
+            vbox.pack_start(widget,True,True,0)
         vbox.pack_end(button,False,False,0)
         button.connect("clicked",lambda x: dialog.destroy())
         dialog.set_default_size(400,300)

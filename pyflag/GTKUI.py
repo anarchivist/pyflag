@@ -313,7 +313,6 @@ class FlagNotebook(gtk.Notebook):
         self.page_id+=1
         scroll.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_AUTOMATIC)
         
-        print 'numpages = %s' % idx
         self.callbacks[idx] = callback
         self.names[idx] = name
         self.queries[idx] = query
@@ -423,7 +422,6 @@ class GTKUI(UI.GenericUI):
 
             stretch = gtk.EXPAND | gtk.FILL
             if options.has_key('stretch'):
-                print "will expand row"
                 stretch =gtk.EXPAND | gtk.FILL
                 
             self.current_table.attach(col, i, right_attach, self.current_table_row-1, self.current_table_row, stretch, 0, 0, 0)
@@ -767,7 +765,6 @@ class GTKUI(UI.GenericUI):
         def choose_file(widget,event):
             f=widget.get_data('filedialog')
             file=f.get_filename()
-            print "You chose %s" % file
             label=f.get_data('label')
             label.set_markup(file)
             f.hide()
@@ -879,7 +876,7 @@ class GTKUI(UI.GenericUI):
                     ## If we dont know about this name, we ignore it.
                     continue
 
-                filter_text.append(FlagFramework.make_sql_from_filter(v,filter_conditions,columns[index],d[len('where_'):]))
+                self.filter_text.append(FlagFramework.make_sql_from_filter(v,self.filter_conditions,columns[index],d[len('where_'):]))
 
                 #Create a link which deletes the current variable from
                 #the query string, allows the user to remove the
@@ -901,7 +898,6 @@ class GTKUI(UI.GenericUI):
             query_str += " group by %s " % group_by_str
 
         #Find the order by clause - We look at self.sort to establish which column needs to be sorted. We assume self.sort is correctly initialised first.
-        print self.sort
         if self.sort[1]=='order':
             order= " `%s` asc " % names[self.sort[0]]
         else:
@@ -925,23 +921,26 @@ class GTKUI(UI.GenericUI):
 
         #Do the query, and find out the names of all the columns
         dbh.execute(query_str,())
-        return dbh,new_query
+        return dbh,new_query,names,columns,links
 
     def link_callback_ui(self, action, query):
         """ wrapper function to satisfy clicked signal callback prototype """
         self.link_callback(query)
 
-    def toolbar(self, cb=None, text=None, icon=None, popup=True, tooltip=None, stock=None,link=None):
+    def toolbar(self, cb=None, text=None, icon=None, popup=False, tooltip=None, stock=None,link=None):
         """ Add an item to the toolbar
         cb may be a query item rather than a callback
-        in which case the query is run by flag and the results displayed in the pane"""
-        ## FIXME: maby have a icon set or factory or whatever
-        ## so that we can just use stock id's here, then scaling etc will
-        ## be done nicely by gtk for us.
+        in which case the query is run by flag and the results displayed in the pane
 
+        popup determines in the page will be opened in a new notebook page, or in a special popup window.
+        """
         def proxy_cb(widget, cb, result, query):
-#           result=self.server.flag.ui(query=query,server=self.server)
-            self.server.notebook.add_page(result, cb,query)
+            if popup:
+                result=self.__class__(self)
+                if cb(query,result):
+                    self.create_window(result.display())
+            else:
+                self.server.notebook.add_page(result, cb,query)
         
         i = None
         if icon:
@@ -980,19 +979,19 @@ class GTKUI(UI.GenericUI):
             except KeyError:
                 self.sort=[0,'order']
                 
-        filter_conditions=[]
-        filter_text=[]
+        self.filter_conditions=[]
+        self.filter_text=[]
 
         # Get a new SQL generator for building the table with.
-        generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks,**opts)
+        generator,new_query,names,columns,links = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks,**opts)
         if not new_query: new_query=self.defaults
 
         try:
-            groupby=self.defaults['group_by']
-            print "Group by is %s" % groupby
+            if not groupby:
+                groupby=self.defaults['group_by']
         except KeyError:
             groupby=None
-        
+
         ## All columns are strings in here...
         store=gtk.ListStore(*tuple([gobject.TYPE_STRING] * len(names)))
 
@@ -1010,6 +1009,14 @@ class GTKUI(UI.GenericUI):
                 count+=1
             return count
 
+        ## Add filter to toolbar as well
+        self.toolbar(cb=
+                     lambda query,result: search_menu_popup(None,None),
+                     text="Add filter to table",
+                     stock=gtk.STOCK_ADD,
+                     popup=True
+                     )
+        
         ##### Callback functions for Table right click menus ######
         def right_button_menu(treeview, event):
             """ Callback to render the right click menu """
@@ -1043,60 +1050,108 @@ class GTKUI(UI.GenericUI):
 
                     ## Group by menu entry
                     groupby_menu=gtk.MenuItem("Count Unique items")
-                    def groupby_menu_popup(widget):
-                        print "groupby launched"
+                    def groupby_menu_popup(widget,column):
+                        """ Launch the groupby popup.
 
-                    groupby_menu.connect("activate",groupby_menu_popup)
+                        This popup displays the group by table in the popup and creates links to the original store
+                        """
+                        query=self.defaults.clone()
+                        query['group_by']=column.get_title()
+                        result=self.__class__(self,query=query)
+                        print "Will group by on %s" % column.get_title()
+                        result.table(columns=columns,names=names,table=table,where=where,groupby=groupby,case=case,callbacks=callbacks,**opts)
+                        self.server.create_window(result.display())
+
+                    groupby_menu.connect("activate",groupby_menu_popup,column)
                     menu.add(groupby_menu)
 
                     menu.add(gtk.SeparatorMenuItem())
 
                 ## Add all currently enforced filter conditions:
                 def remove_filter_condition(widget,index):
-                    del filter_text[index]
-                    del filter_conditions[index]
-                    if len(filter_conditions):
+                    """ Callback to remove a specific filter condition as found in the right click menu """
+                    del self.filter_text[index]
+                    del self.filter_conditions[index]
+                    if len(self.filter_conditions):
                         new_where = "%s and %s" % (where,' and '.join(filter_conditions))
                     else: new_where=where
 
                     ## Update the store with the new data
-                    generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=new_where,groupby = groupby,case=case,callbacks=callbacks,**opts)
+                    generator,new_query,x,y,z = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=new_where,groupby = groupby,case=case,callbacks=callbacks,**opts)
                     populate_store(store,generator,names)
 
-                for i in range(len(filter_conditions)):
+                for i in range(len(self.filter_conditions)):
                     m=gtk.MenuItem("remove %s" % filter_text[i])
                     m.connect("activate",remove_filter_condition,i)
                     menu.add(m)
 
-                if len(filter_conditions) or column:
+                if len(self.filter_conditions) or column:
                     menu.show_all()
                     menu.popup( None, None, None, event.button, time)
             return 0
 
-        def search_menu_popup(widget,column,data):
-            """ Launch the filter on column popup """
+        def search_menu_popup(widget,column,data='',table=None):
+            """ Launch the filter on column popup window
+
+            This popup can be launched from the right click menu as well as from the toolbar.
+            If launched from the right click menu we already know which column we filter on (by getting the position where the click occured). Otherwise we have a checkbox for that.
+            """
             result=self.__class__(self)
             result.heading("Add filter condition")
             result.text("Add a new filter condition to column ")
-            result.text(column.get_title()+'\n',color='red',font='bold')
+            combobox=None
+            if column:
+                result.text(column.get_title()+'\n',color='red',font='bold')
+            else:
+                hbox=gtk.HBox(False,8)
+                combobox=gtk.combo_box_new_text()
+                for c in treeview.get_columns():
+                    combobox.append_text(c.get_data('name'))
+                hbox.pack_start(gtk.Label("Column to filter:"))
+                hbox.pack_start(combobox)
+                result.row(hbox)
+                
             text_entry = gtk.Entry()
             text_entry.set_text(data)
             result.row(text_entry)
             widget=gtk.Button("Submit")
-            column_name=columns[names.index(column.get_title())]
-            column_title=column.get_title()
+            if column:
+                column_name=columns[names.index(column.get_title())]
+                column_title=column.get_title()
+            else:
+                column_name=None
+                column_title=None
 
-            widget.connect("button_press_event", process_filter_cb,column_name, column_title, text_entry, filter_conditions,store)
+            widget.connect("button_press_event", process_filter_cb,column_name, column_title, text_entry, self.filter_conditions,store,combobox)
             result.row(widget)
             dialog=result.create_popup_window()
             text_entry.grab_focus()
 
-        def process_filter_cb(widget,event,column_name,column_title,filter_str_widget,filter_conditions,store):
+        def process_filter_cb(widget,event,column_name,column_title,filter_str_widget,filter_conditions,store,comboname):
             """ Filter the data in the store, enforcing filter conditions chosen by right click menu """
             parent=widget.get_parent_window()
+            ## If comboname is given, we need to read the column_name,
+            ## column_title from the combo box
+            if comboname:
+                active=comboname.get_active()
+                if active<0:
+                    tmp = self.__class__(self)
+                    tmp.heading("Error")
+                    tmp.text("You must choose a column to filter on")
+                    self.server.create_window(tmp.display(),gtk.STOCK_DIALOG_ERROR)
+                    return
+
+                column_name=columns[active]
+                column_title=names[active]
+                
+            ## Work out which column we are working on (column widget)
+            for c in treeview.get_columns():
+                if c.get_data('name')==column_title:
+                    column=c
+                    break
 
             try:
-                filter_text.append(FlagFramework.make_sql_from_filter(filter_str_widget.get_text(),filter_conditions,column_name,column.get_title()))
+                self.filter_text.append(FlagFramework.make_sql_from_filter(filter_str_widget.get_text(),filter_conditions,column_name,column.get_title()))
             except IndexError:
                 widget.get_parent_window().destroy()
                 return
@@ -1104,7 +1159,7 @@ class GTKUI(UI.GenericUI):
             new_where = "%s and %s" % (where,' and '.join(filter_conditions))
 
             ## Update the store with the new data
-            generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=new_where,groupby = groupby,case=case,callbacks=callbacks,**opts)
+            generator,new_query,x,y,z = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=new_where,groupby = groupby,case=case,callbacks=callbacks,**opts)
             populate_store(store,generator,names)
             widget.get_parent_window().destroy()
 
@@ -1141,7 +1196,7 @@ class GTKUI(UI.GenericUI):
                 self.sort[1]='order'
 
             ## Get new SQL iterator:
-            generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks)
+            generator,new_query,x,y,z = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks)
 
             populate_store(store,generator,names)
 
@@ -1159,7 +1214,7 @@ class GTKUI(UI.GenericUI):
                 prev_button.set_sensitive(False)
 
             ## Get new SQL iterator:
-            generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks)
+            generator,new_query,x,y,z = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks)
             
             count=populate_store(store,generator,names)
             if count==config.PAGESIZE:
@@ -1174,7 +1229,7 @@ class GTKUI(UI.GenericUI):
             self.defaults['limit']=self.next
             self.next+=config.PAGESIZE
             ## Get new SQL iterator:
-            generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks)
+            generator,new_query,x,y,z = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks)
             self.defaults=new_query
             count=populate_store(store,generator,names)
             if count<config.PAGESIZE:
@@ -1244,6 +1299,9 @@ class GTKUI(UI.GenericUI):
         self.table_widget=treeview
 
         def click_callback(widget,event):
+            """ This callback is for emulating links within tables """
+            ## Only respond to left click here
+            if event.button!=1: return
             x,y = (event.x,event.y)
             try:
                 path,column,cellx,celly = widget.get_path_at_pos(int(x),int(y))
