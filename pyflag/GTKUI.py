@@ -38,7 +38,7 @@ config=pyflag.conf.ConfObject()
 import gtk,gobject,pango,gtk.gdk
 from gtk import TRUE, FALSE
 
-config.LOG_LEVEL=7
+#config.LOG_LEVEL=7
 
 pointer=gtk.gdk.Cursor(gtk.gdk.HAND2)
 
@@ -321,15 +321,18 @@ class GTKUI(UI.GenericUI):
         if self.link_callback:
             self.link_callback(widget.get_data('query'))
 
+    def icon(self, path, **options):
+        """ not sure if this works, untested """
+        image = gtk.Image()
+        image.set_from_file("%s/%s" % (config.IMAGEDIR, path))
+        self.buffer.insert_pixbuf(self.iter, image.get_pixbuf())
+
     def link(self,string,target=FlagFramework.query_type(()),**target_options):
         target=target.clone()
         if target_options:
             for k,v in target_options.items():
                 target[k]=v
 
-##        button = gtk.Button(string)
-##        button.set_data('query',target)
-##        button.connect("clicked",self.goto_link)
         ## Create an eventbox to catch the click event
         ev=gtk.EventBox()
         label=gtk.Label()
@@ -342,63 +345,34 @@ class GTKUI(UI.GenericUI):
         child=self.buffer.create_child_anchor(self.iter)
         self.result.add_child_at_anchor(ev,child)
 
-    def selector(self,description,name,sql,parms,**options):
-        try:
-            case = options['case']
-            del options['case']
-        except KeyError:
-            case = None
-
-        dbh = DB.DBO(case)
-        dbh.execute(sql,parms)
-        k=[]
-        v=[]
-        while 1:
-            row = dbh.cursor.fetchone()
-            if not row: break
-            k.append(name)
-            v.append(row[1])
-
-        self.const_selector(description,name,k,v)
-
     def const_selector(self,description,name,keys,values,**options):
-        menu = gtk.Menu()
-        widget = gtk.OptionMenu()
-        
-        def changed(widget):
-            print "changed"
-            
-        widget.connect('changed',changed)
-        active=None
-
-        ## Note that values are the parameters actually passed into the variable named by name, while keys are the pretty text descriptions of each choice.
-        for x,y in zip(keys,values):
-            item=gtk.MenuItem(y)
-            item.set_data('value',y)
-            item.set_data('name',name)
-            menu.append(item)
+        combobox = gtk.combo_box_new_text()
+        combobox.set_data('name',name)
+        idx = len(values)
+        for v in values:
+            combobox.append_text(v)
             try:
-                if self.form_parms[name]==y:
-                    print "form_parms already has %s -> %s" % (name,self.form_parms[name])
-                    ### FIXME - This does not work Why?!!!
-                    menu.select_item(item)
+                if self.form_parms[name]==v:
+                   print "form_parms already has %s -> %s" % (name,self.form_parms[name])
+                   combobox.set_active(len(values)-idx)
+                   idx = -2
             except KeyError:
                 pass
-
-        widget.set_menu(menu)
-        try:
-            del self.form_parms[name]
-        except KeyError:
-            pass
-
-        def callback(menu):
-            a=menu.get_active()
-            if not a: return (None,None)
-            return(a.get_data('name'),a.get_data('value'))
+            idx -= 1
+        combobox.set_active(idx)
         
-        self.form_widgets.append((menu,callback))
-        self.row(description+'   ',widget)
-        if active: active.activate()
+        def callback(widget):
+            model = widget.get_model()
+            active = widget.get_active()
+            if active < 0:
+                active = 0
+            try:
+                return (widget.get_data('name'), model[active][0])
+            except IndexError:
+                pass
+
+        self.form_widgets.append((combobox,callback))
+        self.row(description+'   ',combobox)
 
     def start_form(self,target, **hiddens):
         for k,v in hiddens:
@@ -422,15 +396,26 @@ class GTKUI(UI.GenericUI):
         self.row(description+'   ',widget)
 
     def submit(self,widget,event=None,data=None):
-        print "I have to submit this form!!!"
         new_query=FlagFramework.query_type(())
-        for widget,callback in self.form_widgets:
-            print callback(widget)
-            parameter=callback(widget)
-            if parameter[0]:
-                new_query[parameter[0]]=parameter[1]
+        # case comes set to default, dont know why
+        # but is screws things up here
+        del new_query['case']
 
-        print new_query
+        for widget,callback in self.form_widgets:
+            parameter=callback(widget)
+            try:
+                if parameter[0]:
+                    # the default case keeps coming back!!!
+                    # FIXME: find out where it comes from
+                    try:
+                        if parameter[0] == 'case' and new_query['case']:
+                            continue
+                    except KeyError:
+                        pass
+                    new_query[parameter[0]]=parameter[1]
+            except TypeError:
+                pass
+        print "DEBUG: Submitting Form, new_query is: %s" % new_query
         self.link_callback(new_query)
 
     def end_form(self,name='Submit'):
@@ -820,13 +805,17 @@ class GTKUI(UI.GenericUI):
 
         def click_callback(widget,event):
             x,y = (event.x,event.y)
-            path,column,cellx,celly = widget.get_path_at_pos(x,y)
+            path,column,cellx,celly = widget.get_path_at_pos(int(x),int(y))
             q=column.get_data('link')
+            print "clicked on link to: %s" % q
             if q:
                 model=widget.get_model()
                 iter=model.get_iter(path)
-                ## FIXME - Make this go places...
-                print "I got a click on (%s,%s) %s " % (x,y,model.get_value(iter,column.get_data('column_number')))
+                new_query = q.clone()
+                target=new_query['__target__']
+                del new_query['__target__']
+                new_query[target] = model.get_value(iter,column.get_data('column_number'))
+                self.link_callback(new_query)
                 
         treeview.connect('button-press-event',click_callback)                    
 
