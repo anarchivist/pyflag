@@ -4,6 +4,8 @@ Scanners are pieces of code that are run on all the files in a filesystem when t
 
 Scanners are actually factory classes and must be inherited from GenScanFactory. 
 """
+import pyflag.conf
+config=pyflag.conf.ConfObject()
 
 class GenScanFactory:
     """ Abstract Base class for scanner Factories.
@@ -51,3 +53,65 @@ class GenScanFactory:
     def reset(self):
         """ This method drops the relevant tables in the database, restoring the db to the correct state for rescanning to take place. """
         pass
+
+class StoreAndScan:
+    """ A Scanner designed to store a temporary copy of the scanned file to be able to invoke an external program on it.
+
+    Note that this is a scanner inner class (which should be defined inside the factory class). This class should be extended by Scanner factories to provide real implementations to the 'boring','make_filename' and 'external_process' methods.
+    """
+    file = None
+
+    def __init__(self, inode,ddfs,dbh,table,factories=None):
+        self.inode = inode
+        self.table=table
+        self.dbh=dbh
+        self.ddfs=ddfs
+
+    def boring(self,metadata):
+        """ This function decides if this file is boring (i.e. we should ignore it).
+
+        This must be implemented in derivative classes.
+
+        @arg metadata: The metadata dict which is filled with metadata about the file from previous scanners.
+        @return: True if the file is boring (i..e should be ignored), False if we are interested in it.
+        """
+
+    def process(self, data,metadata=None):
+        try:
+            if not self.boring(metadata):
+                print "Will process %s" % self.table
+                self.file = open(self.make_filename(),'wb')
+        except KeyError:
+            pass
+
+        if self.file:
+            self.file.write(data)
+
+    def make_filename(self):
+        """ This function should return a fairly unique name for saving the file in the tmp directory.
+
+        This class implementes a standard filename formatting convention:
+        $RESULTDIR/$case_$filename
+
+        Where $filename is the filename in the filesystem.
+        """
+        return("%s/%s_%s" % (
+            config.RESULTDIR,
+            self.dbh.case,
+            self.dbh.MakeSQLSafe(self.ddfs.lookup(inode=self.inode),
+                                 )))
+
+    def finish(self):
+        if self.file:
+            name = self.file.name
+            self.file.close()
+
+            self.external_process(name)
+
+    def external_process(self,name):
+        """ This function is invoked by the scanner to process a temporary file.
+
+        This function my be overridden by derived classes.
+
+        @arg name: The name of the file in the filesystem to operate on - The Scanner should have saved this file previously.
+        """

@@ -235,6 +235,7 @@ class DBFS(FileSystem):
                 break
             # call process method of each class
             for o in objs:
+#                print "metadata is %s %s" % (o,metadata)
                 o.process(data,metadata=metadata)
 
         fd.close()

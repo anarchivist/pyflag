@@ -629,7 +629,7 @@ class BrowseRegistry(BrowseFS):
 
                 def pane_cb(branch,table):
                     try:
-                        path='/'.join(query['open_tree'])
+                        path=query['open_tree']
                     except KeyError:
                         path = '/'.join(branch);
 

@@ -55,16 +55,16 @@ class TypeScan(GenScanFactory):
                 magic2 = FlagFramework.Magic()
                 self.type_mime = magic.buffer(data)
                 self.type_str = magic2.buffer(data)
-                if metadata:
-                    metadata['mime']=self.type_mime
-                    metadata['magic']=self.type_str
+                metadata['mime']=self.type_mime
+                metadata['magic']=self.type_str
 
-                # is there a handler for this mime-type? If so we save the data for later
-                if self.handlers.has_key(self.type_mime):
-                    self.fdata = data
+##                # is there a handler for this mime-type? If so we save the data for later
+##                if self.handlers.has_key(self.type_mime):
+##                    self.fdata = data
             else:
-                if self.fdata:
-                    self.fdata = self.fdata + data
+                pass
+##                if self.fdata:
+##                    self.fdata = self.fdata + data
 
             self.size = self.size + len(data)
 
