@@ -97,15 +97,14 @@ class StoreAndScan:
         """ This function should return a fairly unique name for saving the file in the tmp directory.
 
         This class implementes a standard filename formatting convention:
-        $RESULTDIR/$case_$filename
+        $RESULTDIR/$case_$inode
 
-        Where $filename is the filename in the filesystem.
+        Where $inode is the filename in the filesystem.
         """
         return("%s/%s_%s" % (
             config.RESULTDIR,
             self.dbh.case,
-            self.dbh.MakeSQLSafe(self.ddfs.lookup(inode=self.inode),
-                                 )))
+            self.dbh.MakeSQLSafe(self.inode)))
 
     def finish(self):
         if self.file:

@@ -1,6 +1,6 @@
 ## Top level makefile
 BIN	= bin/
-DIRS	= iosubsys imagingtools/dd_rescue/ raidtools indextools regtools virustools sources
+DIRS	= iosubsys imagingtools/dd_rescue/ raidtools indextools regtools virustools mailtools sources
 SYSBINS = cjpeg djpeg
 PYTHONLIB = /usr/lib/python2.3/
 PYTHONBIN = `which python2.3`

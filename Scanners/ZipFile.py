@@ -70,7 +70,7 @@ class ZipScan(GenScanFactory):
                             logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
 
             ## Set the zip file to be a d/d entry so it looks like its a virtual directory:
-            self.ddfs.dbh.execute("select * from file_%s where mode='r/r' and inode=%r",(self.ddfs.table,self.inode))
+            self.ddfs.dbh.execute("select * from file_%s where mode='r/r' and inode=%r order by status",(self.ddfs.table,self.inode))
             row=self.ddfs.dbh.fetch()
             self.ddfs.dbh.execute("insert into file_%s set mode='d/d',inode=%r,status=%r,path=%r,name=%r",(self.ddfs.table,self.inode,row['status'],row['path'],row['name']))
 #            self.ddfs.dbh.execute("update file_%s set mode='d/d' where inode=%r",(self.ddfs.table,self.inode))
@@ -110,6 +110,6 @@ class GZScan(ZipScan):
                         logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
 
             ## Set the gzip file to be a d/d entry so it looks like its a virtual directory:
-            self.ddfs.dbh.execute("select * from file_%s where mode='r/r' and inode=%r",(self.ddfs.table,self.inode))
+            self.ddfs.dbh.execute("select * from file_%s where mode='r/r' and inode=%r order by status",(self.ddfs.table,self.inode))
             row=self.ddfs.dbh.fetch()
             self.ddfs.dbh.execute("insert into file_%s set mode='d/d',inode=%r,status=%r,path=%r,name=%r",(self.ddfs.table,self.inode,row['status'],row['path'],row['name']))

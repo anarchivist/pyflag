@@ -6,7 +6,12 @@
 
 // convert FILETIME to unixtime (int)
 %typemap(out) FILETIME * {
-	$result = PyInt_FromLong(fileTimeToUnixTime($1, 0));
+	if($1 == NULL) {
+		Py_INCREF(Py_None);
+		$result =  Py_None;
+	}
+	else
+		$result = PyInt_FromLong(fileTimeToUnixTime($1, 0));
 }
 
 %{

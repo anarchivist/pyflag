@@ -76,6 +76,16 @@ class Pstfile:
             def read(self):
                 return self.data
             
+        def getattach(self, num):
+            attach = self._item.attach
+            count = 0
+            while attach:
+                if count == num:
+                    return Pstfile.Email.Attachment(self.pst, attach)
+                attach = attach.next
+                count += 1
+            raise IndexError, "No attachment: %i last is: %i" % (num, count)
+
         def attach(self):
             """ iterate through attachments """
             attach = self._item.attach
@@ -89,7 +99,7 @@ class Pstfile:
             self.data = ''
             if email.header:
                 self.data = email.header.replace('\r','')
-                m = re.search('Content-Transfer-Encoding:\s+base64',retstr,re.IGNORECASE)
+                m = re.search('Content-Transfer-Encoding:\s+base64',self.data,re.IGNORECASE)
                 if m:
                     base64enc = True
             if email.body:
@@ -112,21 +122,34 @@ class Pstfile:
 
     class Contact(Item):
         """ contact item """
-
         def _read(self):
             self.data = ''
             contact = self._item.contact
-            for name in contact.__swig__getmethods:
-                val = contact.__getattr__(name):
+            for name in contact.__swig_getmethods__:
+                val = contact.__getattr__(name)
                 if val:
                     self.data += "%s: %s\n" % (name.title(), val)
         
     class Journal(Contact):
         """ contact item """
+        def _read(self):
+            self.data = ''
+            journal = self._item.journal
+            for name in journal.__swig_getmethods__:
+                val = journal.__getattr__(name)
+                if val:
+                    self.data += "%s: %s\n" % (name.title(), val)
 
     class Appointment(Contact):
         """ appointment item """
-
+        def _read(self):
+            self.data = ''
+            appt = self._item.appointment
+            for name in appt.__swig_getmethods__:
+                val = appt.__getattr__(name)
+                if val:
+                    self.data += "%s: %s\n" % (name.title(), val)
+                    
     class Folder(Item):
         """ folder item """
         def __str__(self):
@@ -151,23 +174,6 @@ class Pstfile:
         self.pst.close()
         
     def walk(self, id, topdown=True):
-        """ emulate the os.walk directory tree generator, uses item ids, NOT strings """
-        if not id:
-            print "WTF happened?"
-
-        dirs, nondirs = self.listitems(id)
-                
-        if topdown:
-            yield id, dirs, nondirs
-
-        for mydir in dirs:
-            for x in self.walk(mydir, topdown):
-                yield x
-
-        if not topdown:
-            yield id, dirs, nondirs
-
-    def walk2(self, id, topdown=True):
         """ emulate the os.walk directory tree generator
         It has some peculiarities: The input arg is an (id, path) 2-tuple, where path
         can be empty in which case the results will be rooted there (it becomes ('/')).
@@ -191,44 +197,21 @@ class Pstfile:
         if not id[1]:
             id = (id[0], '/')
 
-        dirs, nondirs = self.listitems2(id)
+        dirs, nondirs = self.listitems(id)
                 
         if topdown:
             yield id, dirs, nondirs
 
         for mydir in dirs:
             tmp = (mydir[0], pjoin(id[1], mydir[1]))
-            #tmp = (mydir[0], "%s/%s" % (id[1], mydir[1]))
-            for x in self.walk2(tmp, topdown):
+            for x in self.walk(tmp, topdown):
                 yield x
 
         if not topdown:
             yield id, dirs, nondirs
-
-    def listitems(self, id):
-        """ return a tuple of tuples (dirs, nondirs) of all the items in this folder """
-        dirs, nondirs = [], []
-        ptr = self.pst.get_ptr(id)
-        ptr = ptr.child
-        while(ptr):
-            item = self.pst.get_item(ptr)
-            if item:
-                if item.folder:
-                    dirs.append(ptr.id)
-                elif (item.contact
-                      or ( item.email and item.type == pypst.PST_TYPE_NOTE or item.type == pypst.PST_TYPE_REPORT )
-                      or item.type == pypst.PST_TYPE_JOURNAL
-                      or item.type == pypst.PST_TYPE_APPOINTMENT ):
-                    nondirs.append(ptr.id)
-                else:
-                    # found something we cant deal with
-                    pass
-            pypst._pst_freeItem(item)
-            ptr = ptr.next
-        return (tuple(dirs), tuple(nondirs))
     
-    def listitems2(self, id):
-        """ return a tuple of lists of tuples(!!!) (dirs, nondirs) of all the items in this folder """
+    def listitems(self, id):
+        """ return a tuple of lists of tuples (dirs, nondirs) of all the items in this folder """
         dirs, nondirs = [], []
         ptr = self.pst.get_ptr(id[0])
         ptr = ptr.child
@@ -264,8 +247,12 @@ class Pstfile:
             return None
 
     def open(self, id):
-        """ return a file-like item """
-        return self.getitem(id)
-
-    def datetoascii(self, date):
-        return pypst.fileTimeToAscii(date)
+        """ return a file-like item or attachment
+        Email attachments can be opened directly using the id syntax itemid:attach_number eg. 1234:1
+        The attachment '0' is actually the email header and main body(part1)"""
+        parts = id.split(':')
+        item = self.getitem(int(parts[0]))
+        if len(parts) > 1:
+            if parts[1] != '0':
+                return item.getattach(int(parts[1])-1)
+        return item

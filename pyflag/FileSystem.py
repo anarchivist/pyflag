@@ -100,10 +100,12 @@ class FileSystem:
         # open the file, first pass will generally be 'D' or 'M'
         # then any virtual file systems (vfs) will kick in
         parts = inode.split('|')
+        sofar = [] # the inode part up to the file we want 
         retfd = self.fd
         for part in parts:
+            sofar.append(part)
             try:
-                retfd = vfslist[part[0]](self.case, self.table, retfd, part)
+                retfd = vfslist[part[0]](self.case, self.table, retfd, '|'.join(sofar))
             except IndexError:
                 raise IOError, "Unable to open inode: %s, no VFS" % part
 
@@ -179,7 +181,7 @@ class DBFS(FileSystem):
                 return None
             return res["inode"]
         else:
-            self.dbh.execute("select concat(path,name) as path from file_%s where inode=%r", (self.table,inode))
+            self.dbh.execute("select concat(path,name) as path from file_%s where inode=%r order by status", (self.table,inode))
             res = self.dbh.fetch()
             if not res:
                 return None
@@ -327,7 +329,7 @@ class File:
         @arg case: Case to use
         @arg table: The base name for all tables
         @arg fd: An already open data source, may be iosource, or another 'File'
-        @arg inode: The inode of the file to open, only the part relevant to this class
+        @arg inode: The inode of the file to open, the while inode ending with the part relevant to this vfs
         @note: This is not meant to be called directly, the File object must be created by a valid FileSystem object's open method.
         """
         # each file should remember its own part of the inode
@@ -502,11 +504,11 @@ class MountedFS_file(File):
     def tell(self):
         return self.fd.tell()
 
+import pypst2
 class Pst_file(File):
     """ A file like object to read items from within pst files. The pst file is specified as an inode in the DBFS """
     specifier = 'P'
     blocks=()
-
     def __init__(self, case, table, fd, inode):
         File.__init__(self, case, table, fd, inode)
         # strategy:
@@ -516,6 +518,22 @@ class Pst_file(File):
         # retrieve item using item_id
         # if attachment, retrieve attachment from item using attachment number
         # set self.data to either attachment or item
+        parts = inode.split('|')
+        pstinode = '|'.join(parts[:-1])
+        thispart = parts[-1]
+
+        # open the pst file from disk cache
+        # or from fd if cached file does not exist
+        fname = make_filename(case, pstinode)
+
+        if not os.path.isfile(fname):
+            outfd = open(fname, 'w')
+            outfd.write(fd.read())
+            outfd.close()
+
+        pst = pypst2.Pstfile(fname)
+        item = pst.open(thispart[1:])
+        self.data = item.read()
         self.pos = 0
         
     def read(self,len=None):
@@ -537,19 +555,13 @@ class Zip_file(File):
     
     def __init__(self, case, table, fd, inode):
         File.__init__(self, case, table, fd, inode)
-        tmp1=open('/tmp/test.zip','w')
-        tmp1.write(fd.read())
-        tmp1.close()
-        tmp1=open('/tmp/test.zip','r')
-        tmp1.seek(0)
-        fd.seek(0)
-
         # strategy:
         # inode is the index into the namelist of the zip file (i hope this is consistant!!)
         # just read that file!
+        parts = inode.split('|')
         try:
             z = zipfile.ZipFile(fd,'r')
-            self.data = z.read(z.namelist()[int(inode[1:])])
+            self.data = z.read(z.namelist()[int(parts[-1][1:])])
         except (IndexError, KeyError):
             raise IOError, "Zip_File: cant find index"
         
@@ -618,6 +630,21 @@ def FS_Factory(case,table,fd):
     #else:
     return DBFS(case,table,fd)
 
+
+# helper to get filename of cached files
+# ofter created by scanners
+def make_filename(case, inode):
+    """ This function should return a fairly unique name for saving the file in the tmp directory.
+    
+    This class implementes a standard filename formatting convention:
+    $RESULTDIR/$case_$inode
+    
+    Where inode is the filename in the filesystem.
+    """
+    dbh = DB.DBO(None)
+    return("%s/%s_%s" % (
+        config.RESULTDIR, case, dbh.MakeSQLSafe(inode)))
+
 # create a dict of all the File subclasses by specifier
 #import sys
 vfslist = {
@@ -627,9 +654,3 @@ vfslist = {
     'M':MountedFS_file,
     'G':GZip_file,
     }
-#for i in dir(sys.modules['__main__']):
-#    try:
-#        if issubclass(sys.modules['__main__'].__dict__[i],File):
-#            vfslist[sys.modules['__main__'].__dict__[i].specifier] = sys.modules['__main__'].__dict__[i]
-#    except TypeError:
-#        pass    
