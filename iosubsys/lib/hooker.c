@@ -150,10 +150,25 @@ int open(const char *pathname, int flags, ...) {
 };
 
 
-int llseek(unsigned int fd,  unsigned  long  offset_high,  unsigned  long  offset_low, 
+int llseek(unsigned int fildes,  unsigned  long  offset_high,  unsigned  long  offset_low, 
 	   loff_t *result, unsigned int whence) {
+  unsigned long long int offset=offset_high;
+
+  offset=(offset>>32)+offset_low;
+
   debug(1,"Called llseek\n");
-  return 0;
+  CHECK_INIT;
+  
+  if(context==UNHOOKED || !iosubsys || !iosources[fildes]) {
+    return dispatch->lseek(fildes,offset ,whence);
+  } else {
+    if(whence==SEEK_SET) {
+      iosources[fildes]->fpos = offset;
+    } else if(whence==SEEK_CUR) {
+      iosources[fildes]->fpos += offset;
+    };
+  };
+  return offset;
 };
 
 off_t lseek(int fildes, unsigned long int offset, int whence) {
@@ -163,7 +178,11 @@ off_t lseek(int fildes, unsigned long int offset, int whence) {
   if(context==UNHOOKED || !iosubsys || !iosources[fildes]) {
     return dispatch->lseek(fildes,offset ,whence);
   } else {
-    iosources[fildes]->fpos = offset;
+    if(whence == SEEK_SET) {
+      iosources[fildes]->fpos = offset;
+    } else if(whence==SEEK_CUR) {
+      iosources[fildes]->fpos += offset;
+    };
     return offset;
   };
 };
@@ -335,4 +354,8 @@ int __xstat64 (int __ver, __const char *__filename, struct stat *buf) {
 int fileno(FILE *stream) {
   CHECK_INIT;
 	return((int)stream);
+};
+
+int fcntl(int fd, int cmd, void *lock) {
+  return( 0);
 };
