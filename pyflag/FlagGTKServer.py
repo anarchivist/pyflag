@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python
 # ******************************************************
 # Copyright 2004: Commonwealth of Australia.
@@ -44,22 +43,6 @@ import pyflag.Registry as Registry
 import pyflag.DB as DB
 import threading
 
-def error_popup(e):
-    """ Draw the text in an error message box
-
-    @arg e: The exception object to print
-    """
-    dialog=gtk.Window()
-    result=GTKUI.GTKUI(server=main,ftoolbar=main.ftoolbar)
-    FlagFramework.get_traceback(e,result)
-    frame=gtk.Frame(result.title)
-    result.title=None
-    box=gtk.VBox()
-    box.add(result.display())
-    frame.add(box)
-    dialog.add(frame)
-    dialog.show_all()
-
 class FlagServerToolbar(FlagToolbar):
     def __init__(self,canvas):
         self.tchildren=[]
@@ -87,10 +70,10 @@ class FlagServerNotebook(FlagNotebook):
         page=self.get_page_with_id(page_id)  
         self.remove_page(page)
         # cleanup
-        del self.queries[page]
-        del self.toolbars[page]
-        del self.views[page]
-        del self.callbacks[page]
+        del self.queries[page_id]
+        del self.toolbars[page_id]
+        del self.views[page_id]
+        del self.callbacks[page_id]
     
     def add_page(self, name, callback, query):
         FlagNotebook.add_page(self, name, callback, query)
@@ -237,7 +220,7 @@ class GTKServer(gtk.Window):
         try:
             report.progress(query,result)
         except Exception,e:
-            error_popup(e)
+            self.error_popup(e)
             raise
         
         box.add(result.display())
@@ -254,7 +237,7 @@ class GTKServer(gtk.Window):
                 print "analysed report"
             except Exception,e:
                 gtk.gdk.threads_enter()
-                error_popup(e)
+                self.error_popup(e)
                 gtk.gdk.threads_leave()
                 return
             
@@ -333,7 +316,7 @@ class GTKServer(gtk.Window):
             except GTKUI.DontDraw,e:
                 return
             except Exception,e:
-                error_popup(e)
+                self.error_popup(e)
                 raise
             
             ## Set the callback to ourselves:
@@ -346,6 +329,24 @@ class GTKServer(gtk.Window):
             self.form_frame.add(result.display())
             self.form_dialog.add(self.form_frame)
             self.form_dialog.show_all()
+
+    def draw_report_help(self,action):
+        current_page = self.notebook.get_current_page()
+        result=GTKUI.GTKUI(server=main,ftoolbar=main.ftoolbar)
+        if current_page<0:
+            result.text("Error:\n",color='red',font='heading')
+            result.text("No report is currently displayed. Select a report first from the main menu",color='black')
+            self.create_window(result.display(),gtk.STOCK_DIALOG_WARNING)
+        else:
+            ## Find the report drawn on the current page:
+            p = self.notebook.get_nth_page(current_page)
+            query=self.notebook.queries[p.get_data('page_id')]
+            report_name=query['report']
+            family=query['family']
+            report = Registry.REPORTS.dispatch(family,report_name)(self.flag,ui=self.flag.ui)
+            result.heading("Help on %s" % report.name)
+            result.text(report.description)
+            self.create_window(result.display(),gtk.STOCK_DIALOG_INFO)
 
     def add_page(self, query):
         """ Add a new notebook page, or redraw existing page """
@@ -414,10 +415,12 @@ class GTKServer(gtk.Window):
         ui += '</menu>'
         ui += """<menu action="Help">
                     <menuitem action="Contents"/>
+                    <menuitem action="Current Report"/>
                     <menuitem action="About"/>
                  </menu>"""
         actions.add_actions([('Help', None, '_Help'),
                              ('Contents', gtk.STOCK_HELP, '_Contents'),
+                             ('Current Report', gtk.STOCK_HELP, '_Report',None,'Current Report',self.draw_report_help),
                              ('About', gtk.STOCK_DIALOG_INFO, '_About')])
         ui += '</menubar>\n'
 
@@ -427,12 +430,36 @@ class GTKServer(gtk.Window):
         # Add a UI description
         self.uimanager.add_ui_from_string(ui)
 
-    def create_window(self,widget):
+    def create_window(self,widget,icon=None):
         """ Creates a new window and puts widget in it """
+        vbox=gtk.VBox(False,8)
+        button=gtk.Button("Dismiss")
         dialog=gtk.Window()
-        dialog.add(widget)
+        dialog.add(vbox)
+        if icon:
+            hbox=gtk.HBox(False,8)
+            stock = gtk.image_new_from_stock(
+                icon,
+                gtk.ICON_SIZE_DIALOG)
+            hbox.pack_start(stock, False, False, 0)
+            hbox.pack_start(widget,True,True, 0)
+            vbox.pack_start(hbox,True,True, 0)
+        else:
+            vbox.pack_start(widget,False,False,0)
+        vbox.pack_end(button,False,False,0)
+        button.connect("clicked",lambda x: dialog.destroy())
+        dialog.set_default_size(400,300)
         dialog.show_all()
         return dialog
+
+    def error_popup(self,e):
+        """ Draw the text in an error message box
+
+        @arg e: The exception object to print
+        """
+        result=GTKUI.GTKUI(server=main,ftoolbar=main.ftoolbar)
+        FlagFramework.get_traceback(e,result)    
+        self.create_window(result.display(),gtk.STOCK_DIALOG_ERROR)
 
 
 ### BEGIN MAIN ####

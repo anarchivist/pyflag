@@ -272,12 +272,18 @@ class FlagNotebook(gtk.Notebook):
         p = self.get_nth_page(pagenum)
         page_id=p.get_data('page_id')
         if not self.views.has_key(page_id):
-            # create and store a new toolbar for UI to use - Each page has a toolbar parented at our own toolbar
+            # create and store a new toolbar for UI to use - Each page
+            # has a toolbar parented at our own toolbar
             self.toolbars[page_id] = FlagToolbar(self.ui.ftoolbar)
 
             # Create a new UI for the page to be drawn on - toolbar buttons are drawn on our private toolbar
             result = pyflag.GTKUI.GTKUI(self.ui, query=self.queries[page_id],ftoolbar=self.toolbars[page_id])
-            self.callbacks[page_id](self.queries[page_id],result)
+            try:
+                self.callbacks[page_id](self.queries[page_id],result)
+            except Exception,e:
+                self.ui.server.error_popup(e)
+                return
+            
             self.views[page_id]=result.display()
             p.add_with_viewport(self.views[page_id])
             p.show_all()
@@ -722,6 +728,7 @@ class GTKUI(UI.GenericUI):
         if not self.text_widget:
             self.text_widget=gtk.TextView()
             self.text_widget.set_editable(False)
+            self.text_widget.set_cursor_visible(False)
             self.text_widget_buffer = self.text_widget.get_buffer()
             self.text_widget.set_wrap_mode(gtk.WRAP_WORD)
             self.create_tags(self.text_widget_buffer)
