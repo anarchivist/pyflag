@@ -6,6 +6,8 @@ import os.path
 import pyflag.logging as logging
 from pyflag.Scanner import *
 import plugins.DiskForensics.DiskForensics as DiskForensics
+import pyflag.DB as DB
+
 
 class RegistryScan(GenScanFactory):
     """ Load in Windows Registry files """

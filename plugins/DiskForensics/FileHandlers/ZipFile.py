@@ -36,6 +36,7 @@ class ZipScan(GenScanFactory):
                     )
             except KeyError:
                 """ FIXME: select from table... (This select may be done in the outer class and we just search an array at this point"""
+                return True
 
         def external_process(self,name):
             """ This is run on the extracted file """

@@ -104,20 +104,23 @@ class GenScanFactory:
             """
             pass
 
+StoreAndScanFiles = []
 
 class StoreAndScan:
     """ A Scanner designed to store a temporary copy of the scanned file to be able to invoke an external program on it.
 
     Note that this is a scanner inner class (which should be defined inside the factory class). This class should be extended by Scanner factories to provide real implementations to the 'boring','make_filename' and 'external_process' methods.
     """
-    file = None
-
     def __init__(self, inode,ddfs,outer,factories=None):
         self.inode = inode
         self.table=outer.table
         self.dbh=outer.dbh
         self.ddfs=ddfs
         self.factories=factories
+        self.outer=outer
+        self.file = None
+        self.name = None
+        self.boring_status = True
 
     def boring(self,metadata):
         """ This function decides if this file is boring (i.e. we should ignore it).
@@ -130,8 +133,23 @@ class StoreAndScan:
 
     def process(self, data,metadata=None):
         try:
-            if not self.boring(metadata):
-                self.file = open(self.make_filename(),'wb')
+            ## If this file is boring, we check to see if there is new
+            ## information which makes it not boring:
+            if self.boring_status:
+                self.boring_status = self.boring(metadata)
+                
+            ## We store all the files we create in a central place, so
+            ## multiple instances of StoreAndScan can all share the
+            ## same physical file (as long at they all want to give it
+            ## the same name). This allows more efficient streamlining
+            ## as all StoreAndScan derivatives can use the same file,
+            ## but only one is actually responsible for creating it.
+            if not self.name:
+                self.name = self.make_filename()
+                
+            if not self.file and not self.boring_status and self.name not in StoreAndScanFiles:
+                StoreAndScanFiles.append(self.name)
+                self.file = open(self.name,'wb')
         except KeyError:
             pass
 
@@ -153,10 +171,12 @@ class StoreAndScan:
 
     def finish(self):
         if self.file:
-            name = self.file.name
             self.file.close()
+            ## We now remove the file from the central storage place:
+            StoreAndScanFiles.remove(self.name)
 
-            self.external_process(name)
+        if not self.boring_status:
+            self.external_process(self.name)
 
     def external_process(self,name):
         """ This function is invoked by the scanner to process a temporary file.

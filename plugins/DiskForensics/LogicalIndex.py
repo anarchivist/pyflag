@@ -61,7 +61,6 @@ class Index(GenScanFactory):
             pydbh = DB.DBO(None)
             pydbh.execute("select word from dictionary")
             for row in pydbh:
-                print "Adding %s" % row['word']
                 self.index.add(row['word'])
                 
     def reset(self):
