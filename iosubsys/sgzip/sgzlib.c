@@ -323,25 +323,39 @@ void sgzip_compress_fds(int infd,int outfd,const struct sgzip_header *header) {
   free(dataout);
 };
 
+/* We implement a simple cache here to avoid having to decompress the
+   same block if it is read in little chunks. This seems to make a
+   huge difference for programs like ils etc, particularly when
+   operating on a fat filesystem.
+
+   data is a malloced block which gets read every time. We never free
+   data since it must remain valid between calls.
+*/
+static char *data=NULL;
+static char *cdata=NULL;
+static long long int cached_block_offs=-1;
+static int cached_length=-1;
+
 /* read a random buffer from the sgziped file */
 int sgzip_read_random(char *buf, int len, unsigned long long int offs,
 		      int fd, unsigned long long int *index,const struct sgzip_header *header) {
-  char *data,*temp;
   long int length;
   long long int block_offs,clength,copied=0,buffer_offset,available;
   int result;
 
-  data=(char *)malloc(sizeof(*data)*(header->blocksize+1024));
-  temp=(char *)malloc(sizeof(*temp)*(header->blocksize+1024));
-  if(!data || !temp) RAISE(E_NOMEMORY,NULL,Malloc);
+  //Only malloc data the first time we run.
+  if(!data)
+    data=(char *)malloc(sizeof(*data)*(header->blocksize+1024));
+  if(!cdata)
+    cdata=(char *)malloc(sizeof(*cdata)*(header->blocksize+1024));
+
+  if(!data || !cdata) RAISE(E_NOMEMORY,NULL,Malloc);
 
   block_offs=(int)(offs/header->blocksize);
   if(block_offs > header->x.max_chunks) {
-    free(data);
-    free(temp);
-
     return(0);
-    RAISE(E_IOERROR,NULL,"Attempt to seek past the end of the file (block %lu requested from a %u blocks file)",block_offs,(header->x.max_chunks));
+    //This should not raise... just return 0 bytes.
+    //    RAISE(E_IOERROR,NULL,"Attempt to seek past the end of the file (block %lu requested from a %u blocks file)",block_offs,(header->x.max_chunks));
   };
   
   //The offset where we need to start from in the individual block.
@@ -351,38 +365,39 @@ int sgzip_read_random(char *buf, int len, unsigned long long int offs,
     //If we no longer have any more blocks (we reached the end of the file)
     if(block_offs >= (header->x.max_chunks-1)) break;
 
-    //Length of this block
-    clength=index[block_offs+1]-index[block_offs];
+    //Here we decide if we have a cache miss:
+    if(cached_block_offs != block_offs) {
+      //Length of this block
+      clength=index[block_offs+1]-index[block_offs];
 
-    if(clength>=(header->blocksize+1024)) {
-      free(data);
-      free(temp);
+      if(clength>=(header->blocksize+1024)) {
+	RAISE(E_IOERROR,NULL,"Clength (%u) is too large (blocksize is %u)",clength,header->blocksize);
+      };
 
-      RAISE(E_IOERROR,NULL,"Clength (%u) is too large (blocksize is %u)",clength,header->blocksize);
-    };
+      if(clength<0) break;
 
-    if(clength<0) break;
-
-    //Read the compressed block from the file:
-    if(lseek(fd,sizeof(struct sgzip_header)+sizeof(unsigned int)*(block_offs+1)+
-	     index[block_offs],SEEK_SET)<0 || read(fd,data,clength)<0) {
-      free(data);
-      free(temp);
-
-      RAISE(E_IOERROR,NULL,"Compressed file reading problem (seeked to %llu - read %llu bytes)",sizeof(struct sgzip_header)+sizeof(unsigned int)*(block_offs+1)+ index[block_offs],clength);
-    };
+      //Read the compressed block from the file:
+      if(lseek(fd,sizeof(struct sgzip_header)+sizeof(unsigned int)*(block_offs+1)+
+	       index[block_offs],SEEK_SET)<0 || read(fd,cdata,clength)<0) {
+	RAISE(E_IOERROR,NULL,"Compressed file reading problem (seeked to %llu - read %llu bytes)",sizeof(struct sgzip_header)+sizeof(unsigned int)*(block_offs+1)+ index[block_offs],clength);
+      };
   
-    length=header->blocksize;
-    result=uncompress(temp,(long int *)&length,data,clength);
+      length=header->blocksize;
+      result=uncompress(data,(long int *)&length,cdata,clength);
     
-    //Inability to decompress the data is non-recoverable:
-    if(!result==Z_OK) {
-      free(data);
-      free(temp);
+      //Inability to decompress the data is non-recoverable:
+      if(!result==Z_OK) {
+	RAISE(E_IOERROR,NULL,"Cant decompress block %lu \n" , block_offs);
+      };
 
-      RAISE(E_IOERROR,NULL,"Cant decompress block %lu \n" , block_offs);
+      //Note which block we decompressed
+      cached_block_offs = block_offs;
+      cached_length =length;
+    } else {
+      //Cache hit - data is valid
+      length=cached_length;
     };
-  
+
     //The available amount of data to read:
     available=length-buffer_offset;
     if(available>len) {
@@ -390,15 +405,13 @@ int sgzip_read_random(char *buf, int len, unsigned long long int offs,
     };
 
     //Copy the right data into the buffer
-    memcpy(buf+copied,temp+buffer_offset,available);
+    memcpy(buf+copied,data+buffer_offset,available);
     len-=available;
     copied+=available;
     block_offs++;
     buffer_offset=0;
   }
 
-  free(data);
-  free(temp);
   return(copied);
 };
 

@@ -461,16 +461,32 @@ void evf_decompress_fds(struct offset_table *offsets,int outfd) {
   free(cdata);
 };
 
+/* We implement a simple cache here to avoid having to decompress the
+   same block if it is read in little chunks. This seems to make a
+   huge difference for programs like ils etc, particularly when
+   operating on a fat filesystem.
+
+   data is a malloced block which gets read every time. We never free
+   data since it must remain valid between calls.
+*/
+static char *data=NULL;
+static char *cdata=NULL;
+static long long int cached_chunk=-1;
+static int cached_length=-1;
+
 /* Read a random buffer from the evf file */
 int evf_read_random(char *buf, int len, unsigned long long int offs,
 		    const struct offset_table *offsets) {
-  char *data,*cdata;
   long int length,clength,available;
   int result;
   unsigned long long int chunk,buffer_offset,chunk_size,copied=0;
 
-  data=(char *)malloc(offsets->chunk_size);
-  cdata=(char *)malloc(offsets->chunk_size+1024);  
+  if(!data)
+    data=(char *)malloc(offsets->chunk_size);
+
+  if(!cdata)
+    cdata=(char *)malloc(offsets->chunk_size+1024);  
+
   if(!data || !cdata) RAISE(E_NOMEMORY,NULL,Malloc);
   
   //Current chunk we are after:
@@ -486,34 +502,33 @@ int evf_read_random(char *buf, int len, unsigned long long int offs,
     //If we no longer have any more blocks (we reached the end of the file)
     if(chunk >= offsets->max_chunk) break;
 
-    //Seek to the right place in the right image:
-    if(lseek(offsets->fd[chunk],offsets->offset[chunk],SEEK_SET)<0) {
-      free(data);
-      free(cdata);
+    //Work out if this is a cache miss:
+    if(cached_chunk != chunk) {
 
-      RAISE(E_IOERROR,NULL,"Cant Seek");
-    };
-
-    //The size of the compressed chunk
-    chunk_size=offsets->size[chunk];
-    clength=read_from_stream(offsets->fd[chunk],cdata,chunk_size);
-    if(clength<chunk_size) {
-      free(data);
-      free(cdata);
-	
-      RAISE(E_IOERROR,NULL,Read,"decompressing file");  
-    };
-    
-    //Decompress the chunk:
-    length=offsets->chunk_size;  
-    if(chunk_size<offsets->chunk_size) {
-      result=uncompress(data,(long int *)&length,cdata,clength);
-      if(result!=Z_OK) {
-	evf_warn("Cant uncompress block of size %lu into size %lu..., filling with zeros\n" , clength, offsets->chunk_size);
-	memset(data,0,offsets->chunk_size);
+      //Seek to the right place in the right image:
+      if(lseek(offsets->fd[chunk],offsets->offset[chunk],SEEK_SET)<0) {
+	RAISE(E_IOERROR,NULL,"Cant Seek");
       };
-    } else {
-      memcpy(data,cdata,length);
+
+      //The size of the compressed chunk
+      chunk_size=offsets->size[chunk];
+      clength=read_from_stream(offsets->fd[chunk],cdata,chunk_size);
+      if(clength<chunk_size) {
+	RAISE(E_IOERROR,NULL,Read,"decompressing file");  
+      };
+    
+      //Decompress the chunk:
+      length=offsets->chunk_size;  
+      if(chunk_size<offsets->chunk_size) {
+	result=uncompress(data,(long int *)&length,cdata,clength);
+	if(result!=Z_OK) {
+	  evf_warn("Cant uncompress block of size %lu into size %lu..., filling with zeros\n" , clength, offsets->chunk_size);
+	  memset(data,0,offsets->chunk_size);
+	};
+      } else {
+	memcpy(data,cdata,length);
+      };
+      cached_chunk = chunk;
     };
 
     //The available amount of data to read:
@@ -530,8 +545,6 @@ int evf_read_random(char *buf, int len, unsigned long long int offs,
     buffer_offset=0;
   };
 
-  free(data);
-  free(cdata);
   return(copied);
 };
 
