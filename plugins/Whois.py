@@ -8,7 +8,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Name:  $ $Date: 2004/10/16 10:00:17 $
+#  Version: FLAG $Name:  $ $Date: 2004/10/16 13:28:37 $
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -78,6 +78,7 @@ class LookupIP(Reports.report):
     """ Display Whois data for the given IP address """
     parameters = {"address":"ipaddress"}
     name = "Whois Lookup"
+    hidden = True
     description = "Perform Whois Lookup on IP Address"
 
     def form(self, query, result):
@@ -93,4 +94,5 @@ class LookupIP(Reports.report):
         result.heading("Whois Search Results For: %s" % query['address'])
         
         for name in res.keys():
-            result.para("%s: %s" % (name, res[name]))
+            result.text("%s:\n" % name, color='red',font='typewriter')
+            result.text("%s\n\n" % (res[name]),color='black',font='typewriter')

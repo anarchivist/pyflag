@@ -9,7 +9,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Name:  $ $Date: 2004/10/16 10:00:16 $
+#  Version: FLAG $Name:  $ $Date: 2004/10/16 13:28:36 $
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -64,7 +64,6 @@ def whois_callback(value,result=None):
     import plugins.Whois as Whois
     tmp = result.__class__(result)
     whois = Whois.identify_network(value)
-    print "value %s whois %s" % (value,whois)
     tmp.text(whois)
     return tmp
 

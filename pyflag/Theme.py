@@ -9,7 +9,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Name:  $ $Date: 2004/10/07 13:04:02 $
+#  Version: FLAG $Name:  $ $Date: 2004/10/16 13:28:51 $
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -81,6 +81,10 @@ class BasicTheme:
         module_list = self.list_modules(flag)
         
         for k in module_list:
+            ## Dont list modules with not reports in them.
+            r = flag.dispatch.family[k].items()
+            r = [ 1 for kk,v in r if not v.hidden ]
+            if len(r)==0: continue
             link = flag.ui()
             link.link(k,family=k)
             family_block.row(link)
