@@ -87,7 +87,7 @@ class RegExpScan(Reports.report):
 
         try:
             result.table(
-                columns=('a.class','a.inode','concat(path,name)', 'a.match'),
+                columns=('a.inode','concat(path,name)', 'a.match','a.class'),
                 names=('Inode','Filename','RegExp Found','RegExp Type'),
                 table='regexp_%s as a join file_%s as b on a.inode=b.inode ' % (tablename,tablename),
                 case=query['case'],
