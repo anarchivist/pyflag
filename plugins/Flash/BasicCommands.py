@@ -298,12 +298,6 @@ class execute(pyflagsh.command):
 
     def complete(self,text,state):
         args=self.args
-        t=text
-        
-        ## This is a dirty hack!!! It will fail if the text appears as a seperate word twice in a completion
-        if text:
-            text=args[-1]
-            left=text.index(t)
 
         possibilities=[]
         allreports=[]
@@ -317,7 +311,7 @@ class execute(pyflagsh.command):
         if len(args)<2 or len(args)==2 and text:
             for i in range(state,len(possibilities)):
                 if possibilities[i].startswith(text):
-                    return possibilities[i][left:]
+                    return possibilities[i]
         else:
             for i in range(0,len(possibilities)):
                 if possibilities[i] == args[1]:

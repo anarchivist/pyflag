@@ -135,7 +135,20 @@ def escape(string):
     return string.replace(' ','\\ ')
 
 def completer(text,state):
-    args=shlex.split(readline.get_line_buffer())
+    """ This function gets called each time the user types tab to complete.
+
+    Note that this function works around a severe bug in the readline library: When completing a term with delimeters in it (eg spaces), the completer function received text=the last word in the term, despite the term having its delimeters properly escaped. In other words it seems that the completer functionality does not understand escaping properly. This results in problems when completing terms with spaces in them.
+
+    This workaround recalculates text from a proper shlex parse of the line.
+    """
+    t=text
+    line = readline.get_line_buffer()
+    args=shlex.split(line)
+    if line[-1] in readline.get_completer_delims():
+        text=''
+    else:
+        text=args[-1]
+
     # We are trying to complete the primary command:
     commands=Registry.SHELL_COMMANDS.commands.keys()
     if not len(args) or len(args)==1 and text:
@@ -144,7 +157,8 @@ def completer(text,state):
                 return commands[i]
     else:
         c=Registry.SHELL_COMMANDS[args[0]](args,env)
-        return(escape(c.complete(text,state)))
+        result=c.complete(text,state)
+        return(escape(result[len(text)-len(t):]))
 
 class Asker:
     """ Class asks the user for parameters to fill into flash scripts """
