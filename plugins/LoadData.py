@@ -279,7 +279,7 @@ import pyflag.Sleuthkit as Sleuthkit
 
 class LoadFS(Reports.report):
     """ Loads Filesystem Image into the database. """
-    parameters = {"iosource":"iosource","fstype":"sqlsafe","scan":"alphanum"}
+    parameters = {"iosource":"iosource","fstype":"string","scan":"alphanum"}
     name = "Load Filesystem image"
     family="Load Data"
     description = "Load a filesystem image into the case Database"
@@ -389,10 +389,12 @@ class LoadFS(Reports.report):
             dbh.execute("select count(*) as Count from file_%s" % tablename)
             row=dbh.fetch()
             if row:
-                result.row("Uploaded File Entries:", "%s"%row['Count'])
+                result.row("Uploaded File Entries: %s"%row['Count'])
 
             result.row("System messages:")
-            result.text('\n'.join(logging.ring_buffer),font='typewriter',color="red")
+            tmp=result.__class__(result)
+            tmp.text('\n'.join(logging.ring_buffer),font='typewriter',color="red")
+            result.row(tmp)
             ## FIXME: This is a horribly slow query...
   #          dbh.execute("select count(*) as count,value as total from inode_%s, meta_%s as m where m.name='last_inode' group by total" % (tablename, tablename))
   #          row = dbh.fetch()

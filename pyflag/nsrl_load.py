@@ -19,9 +19,16 @@ import sys,os
 if len(sys.argv)<2:
     print "Usage: %s path_to_nsrl_directory\n\nAn NSRL directory is one of the CDs, and usually has in it NSRLFile.txt,NSRLProd.txt.\n" % os.path.basename(sys.argv[0])
     sys.exit(0)
-    
+
 #Get a handle to our database
 dbh=DB.DBO(None)
+
+if sys.argv[1]=="-i":
+    print "Creating indexes on NSRL hashs (This could take several hours!!!)"
+    dbh.check_index("NSRL_hashes","md5",4)
+    print "Done!!"
+    sys.exit()
+    
 dbh.execute("""CREATE TABLE if not exists `NSRL_hashes` (
   `md5` char(16) NOT NULL default '',
   `filename` varchar(60) NOT NULL default '',

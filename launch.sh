@@ -11,7 +11,7 @@ if [ -e mysql* ]; then
     PYFLAG_DATADIR=`pwd`/`ls -d mysql*/data`
     PYFLAG_UNIX_SOCKET=$PYFLAG_DATADIR/pyflag.sock
 
-    cd mysql* &&   ./bin/mysqld_safe --skip-networking --socket=$PYFLAG_UNIX_SOCKET --skip-grant-tables  --datadir=$PYFLAG_DATADIR > /dev/null &
+    cd mysql* &&   ./bin/mysqld_safe --skip-networking --socket=$PYFLAG_UNIX_SOCKET --skip-grant-tables  --datadir=$PYFLAG_DATADIR --user=root > /dev/null &
     ## This will override the socket in the config file (This passwd and username may be bogus to force the DB handle to fall back onto the socket to connect if there is a mysql local server)
     export PYFLAG_USER=bogus_user
     export PYFLAG_PASSWD=password

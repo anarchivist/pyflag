@@ -1147,6 +1147,8 @@ class HTMLUI(UI.GenericUI):
         except KeyError:
             pass
 
+        ## We do both javascript refresh as well as meta refresh to ensure that the browser supports either method
+        self.result+=""" <script>function refresh() {window.location="%s";}; setTimeout("refresh()",%s) </script>""" % (query,int(interval)*1000)
         self.meta += "<META HTTP-EQUIV=Refresh Content=\"%s; URL=/f?%s\">" % (interval,query)
 
     def icon(self, path, **options):

@@ -149,8 +149,11 @@ class Unallocated_File(FileSystem.File):
         self.dbh = DB.DBO(case)
         self.dbh.execute("select * from unallocated_%s where inode=%r",(table,inode))
         row=self.dbh.fetch()
-        self.size=row['size']
-        self.offset=row['offset']
+        try:
+            self.size=row['size']
+            self.offset=row['offset']
+        except KeyError:
+            raise IOError
 
     def read(self,length=None):
         if self.size>0:

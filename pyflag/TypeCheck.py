@@ -109,10 +109,11 @@ class TypeChecker:
                     values.append(query[f])
 
     def sqlsafe(self,field,query):
-        """ Checks to see if the type had quotes in it """
+        """ Checks to see if the type had bad characters in it """
         for d in query.getarray(field):
-            if '"' in d or "'" in d:
-                raise ReportInvalidParamter,"quotes in parameter"
+            for char in "`\\\"' !@#$%^&*+/-()":
+                if char in d:
+                    raise ReportInvalidParamter,"Invalid character (%s) in field name" % char
 
     def iosubsystem(self,field,query):
         """ Check to see that the io subsystem is adequitely filled in
@@ -161,5 +162,9 @@ class TypeChecker:
             return False
         
     def any(self,field,query):
+        """ A default type that accepts anything """
+        pass
+
+    def string(self,field,query):
         """ A default type that accepts anything """
         pass

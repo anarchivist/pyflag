@@ -117,11 +117,11 @@ def load_sleuth(case,fstype,table,iosource):
             opts.append("%s=%s" % (fd.parameters[i+1][3:], fd.options[i+1][j]))
             
     # run sleuthkit
-    str= "%s  -i %s -o %s %s -t %s -f %s %s"%(config.IOWRAPPER,fd.options[0][0],
+    string= "%s  -i %s -o %s %s -t %s -f %s %s"%(config.IOWRAPPER,fd.options[0][0],
                                            ','.join(opts),config.SLEUTHKIT,table,fstype,table)
 
     sdbh.MySQLHarness(
-        str
+        string
         )
 
 def del_sleuth(case, table):

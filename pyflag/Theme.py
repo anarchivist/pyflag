@@ -34,6 +34,19 @@ config=pyflag.conf.ConfObject()
 import pyflag.FlagFramework as FlagFramework
 import pyflag.Registry as Registry
 
+def propegate(query,new_query):
+    """ This copies certain parameters from query into new_query if they exist in query """
+    propegated = ['family','case','fsimage','iosubsys']
+    for i in propegated:
+        try:
+            del new_query[i]
+            new_query[i]=query[i]
+        except KeyError:
+            pass
+
+    return new_query
+
+
 ## This places approximate order on families
 dynasty = {
     "Case Management": 10,
@@ -101,7 +114,7 @@ class BasicTheme:
             for r in report_list:
                 if r.hidden: continue
                 link = flag.ui()
-                link.link(r.name,case=query['case'],family=family,report=r.name)
+                link.link(r.name,propegate(query,FlagFramework.query_type()),report=r.name)
 
                 #Add the module doc as a tooltip
                 link.tooltip(r.__doc__)
@@ -135,7 +148,7 @@ class BasicTheme:
             q.FillQueryTarget(previous)
             previous = '<a href="f?%s"><img src="/flag/images/back.png"  border="0"></a>' %  (str(q))
 
-        bar = {'family': query['family'],'back': previous,'case': query['case'],'pageno':  pageno,'next': next,'reset': str(query)+'&reset=1','stop': str(query)+'&stop=1'}
+        bar = {'family': propegate(query,FlagFramework.query_type()),'back': previous,'case': query['case'],'pageno':  pageno,'next': next,'reset': str(query)+'&reset=1','stop': str(query)+'&stop=1'}
 
         toolbar = '''<table><tr>
         <td valign="bottom"><a href="f?family=%(family)s"><img src="/flag/images/home.png" border="0"></a></td><td valign="bottom">%(back)s</td>%(case)s - page %(pageno)s<td valign="bottom">%(next)s</td> <td valign="bottom">
@@ -195,17 +208,7 @@ class BlueTheme(BasicTheme):
             q.FillQueryTarget(previous)
             previous = '<a href="f?%s"><img height=25 src="/flag/images/back.png"  border="0"></a>' %  (str(q))
 
-        ## These are the query parameters which will get propagated if they exist:
-        propegated = ['family','case','fsimage','iosubsys']
-        family=FlagFramework.query_type()
-        for i in propegated:
-            try:
-                del family[i]
-                family[i]=query[i]
-            except KeyError:
-                pass
-            
-        bar = {'family':family,'back': previous,'case': query['case'],'pageno':  pageno,'next': next,'reset': str(query)+'&reset=1','stop': str(query)+'&stop=1'}
+        bar = {'family':propegate(query,FlagFramework.query_type()),'back': previous,'case': query['case'],'pageno':  pageno,'next': next,'reset': str(query)+'&reset=1','stop': str(query)+'&stop=1'}
 
         toolbar = '''<table><tr>
         <td valign="bottom"><a href="%(family)s"><img height=25 src="/flag/images/home_grey.png" border="0"></a></td><td valign="bottom">%(back)s</td><td>%(case)s - page %(pageno)s</td><td valign="bottom">%(next)s</td> <td valign="bottom">
@@ -272,7 +275,7 @@ class BlueTheme(BasicTheme):
                 for r in report_list:
                     if r.hidden: continue
                     link = flag.ui()
-                    link.link(r.name,case=query['case'],family=family,report=r.name)
+                    link.link(r.name,propegate(query,FlagFramework.query_type()),report=r.name)
                     
                     ## Add the module doc as a tooltip
                     link.tooltip(r.__doc__)

@@ -32,7 +32,7 @@
     =================
     
     This module presents a file like object using the python iosubsys
-    module from Sleuthkit.
+    module.
 """
 import iosubsys
 import pyflag.FlagFramework as FlagFramework
@@ -256,7 +256,7 @@ class mounted(IO):
     parameters=('subsys','directory')
 
     def form(self,query,result):
-        print "Drew form"
+        result.text("Note that you must have full read permissions for the mounted directory. You may need to run pyflag as root for this!!!",color="red")
         result.textfield("Enter mount point:",'directory')
 
     def read(self, length=None):
