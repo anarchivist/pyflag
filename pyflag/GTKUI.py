@@ -39,7 +39,6 @@ import pyflag.conf
 import pyflag.UI as UI
 config=pyflag.conf.ConfObject()
 import gtk,gobject,pango,gtk.gdk
-from gtk import TRUE, FALSE
 import pyflag.Registry as Registry
 
 #config.LOG_LEVEL=7
@@ -247,6 +246,9 @@ class GTKUI(UI.GenericUI):
             self.end_table()
         if self.title:
             frame = gtk.Frame(self.title)
+            frame.set_label_align(0.5,0.5)
+            frame.set_border_width(5)
+            #frame.set_shadow_type(gtk.SHADOW_OUT)
             frame.add(self.result)
             return frame
         return self.result
@@ -255,6 +257,7 @@ class GTKUI(UI.GenericUI):
         if not self.current_table:
             # I'm confused, should be allow nested tables in the *same* UI object?
             self.current_table=gtk.Table(1,1,False)
+            self.current_table.set_border_width(5)
             self.current_table_row=0
 
     def row(self,*columns, **options):
@@ -272,18 +275,18 @@ class GTKUI(UI.GenericUI):
             elif not isinstance(col,gtk.Widget):
                 col = gtk.Label("%s" % col)
                 col.set_justify(gtk.JUSTIFY_LEFT)
-                col.set_line_wrap(gtk.TRUE)
+                col.set_line_wrap(True)
                 
             ##Attach the column to row at the end of the table:
             right_attach = i+1            
             if options.has_key('colspan'):
                 right_attach = i+options['colspan']
-            self.current_table.attach(col, i, right_attach, self.current_table_row-1, self.current_table_row, gtk.FILL|gtk.EXPAND, 0, 0, 0)
+            self.current_table.attach(col, i, right_attach, self.current_table_row-1, self.current_table_row, gtk.FILL|gtk.EXPAND, gtk.FILL|gtk.EXPAND, 0, 0)
 
     def end_table(self):
         ## Add the table to the result UI:
         if self.current_table:
-            self.result.pack_start(self.current_table, False)
+            self.result.pack_start(self.current_table, True, True)
             self.current_table=None
 
     def goto_link(self,widget,event):
@@ -861,7 +864,7 @@ class GTKUI(UI.GenericUI):
         populate_store(store,generator,names)
         ## Create a new widget
         treeview = gtk.TreeView(store)
-        treeview.set_rules_hint(TRUE)
+        treeview.set_rules_hint(True)
             
 ##        ## callback for all the links:
 ##        def table_link_callback(widget,event=None):
@@ -880,7 +883,7 @@ class GTKUI(UI.GenericUI):
             self.sort[2].set_sort_indicator(FALSE)
             self.sort[-1]=column
             self.sort[0]=number
-            column.set_sort_indicator(TRUE)
+            column.set_sort_indicator(True)
             if self.sort[1]=='order':
                 column.set_sort_order(gtk.SORT_ASCENDING)
                 self.sort[1]='dorder'
@@ -935,21 +938,20 @@ class GTKUI(UI.GenericUI):
         button.connect('clicked', next_cb)
         self.toolbar_ui.insert(button, 1)
 
-        self.row(treeview)
-
-        ## Create a group by selector
-        
-        tmp=self.__class__(self)
-        tmp.const_selector("Group by a column: ",'group_by',['None']+list(names),['']+list(names))
-        self.row(tmp)
+        # add to a scrolled window
+        sw = gtk.ScrolledWindow()
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_ALWAYS)
+        sw.add(treeview)
+        self.row(sw)
+        #self.row(treeview)
 
         ## Add the columns to the widget
         for i in range(len(names)):
             renderer=gtk.CellRendererText()
             column = gtk.TreeViewColumn(names[i], renderer,text=i)
-            column.set_resizable(TRUE)
-            column.set_clickable(TRUE)
-            column.set_reorderable (TRUE)
+            column.set_resizable(True)
+            column.set_clickable(True)
+            column.set_reorderable (True)
             column.set_data('number',i)
             try:
                 if links[i]:
@@ -964,7 +966,7 @@ class GTKUI(UI.GenericUI):
             ## Make the ordered column headers
             if i==self.sort[0]:
                 self.sort.append(column)
-                column.set_sort_indicator(TRUE)
+                column.set_sort_indicator(True)
                 if self.sort[1]=='order':
                     column.set_sort_order(gtk.SORT_ASCENDING)
                     del q['dorder']

@@ -103,25 +103,44 @@ class GTKServer(gtk.Window):
             idx = self.get_current_page()
             if idx != -1:
                 oldscroll = self.get_nth_page(idx)
-                cur_report = self.get_tab_label_text(oldscroll)
+                #cur_report = self.get_tab_label_text(oldscroll)
+                oldlabelbox = self.get_tab_label(oldscroll)
+                oldlabel = oldlabelbox.get_children()[0]
+                cur_report = oldlabel.get_text()
             else:
                 cur_report = ''
         
             if (cur_report == query['report']):
                 # reuse existing page if report is unchanged
                 self.close_tab(page=idx)
-                self.insert_page(scroll, gtk.Label(query['report']), idx)
+                #self.insert_page(scroll, gtk.Label(query['report']), idx)
+                self.insert_page(scroll, position=idx)
             else:
                 # add a new page
-                idx = self.append_page(scroll, gtk.Label(query['report']))
+                #idx = self.append_page(scroll, gtk.Label(query['report']))
+                idx = self.append_page(scroll)
 
-            # add toolbar to UI, first add a close tab button
-            if result.toolbar_ui.get_n_items() > 0:
-                result.toolbar_ui.insert(gtk.SeparatorToolItem(), -1)
-            button = gtk.ToolButton(gtk.STOCK_CLOSE)
+            # build a label for the tab
+            button = gtk.Button(stock=gtk.STOCK_CLOSE)
             button.connect('clicked', self.close_tab)
-            button.set_tooltip(result.tooltips, 'Close Tab')
-            result.toolbar_ui.insert(button, -1)
+            result.tooltips.set_tip(button, 'Close Tab')
+            #button.set_tooltip(result.tooltips, 'Close Tab')
+            button.set_relief(gtk.RELIEF_NONE)
+            button.set_border_width(0)
+            hbox = gtk.HBox()
+            hbox.pack_start(gtk.Label(query['report']))
+            hbox.pack_end(button, False, False)
+            hbox.show_all()
+            self.set_tab_label(scroll, hbox)
+
+            
+            # add toolbar to UI, first add a close tab button
+            #if result.toolbar_ui.get_n_items() > 0:
+            #    result.toolbar_ui.insert(gtk.SeparatorToolItem(), -1)
+            #button = gtk.ToolButton(gtk.STOCK_CLOSE)
+            #button.connect('clicked', self.close_tab)
+            #button.set_tooltip(result.tooltips, 'Close Tab')
+            #result.toolbar_ui.insert(button, -1)
             self.toolbars[idx] = result.toolbar_ui
 
             self.show_all()
@@ -170,7 +189,7 @@ class GTKServer(gtk.Window):
         hbox.pack_start(self.toolhbox)
 
         self.vbox.pack_start(hbox, False)
-        self.vbox.pack_start(self.notebook)
+        self.vbox.pack_start(self.notebook, True, True)
         self.vbox.pack_end(self.statusbar, False)
                 
         # install the main UI callback
