@@ -770,7 +770,7 @@ int raid_initialiser(IO_INFO *self,IO_OPT *args) {
       add_raid_element(io,i->value);
       continue;
     } else if(!strcasecmp(i->option,"blocksize")) {
-      io->block_size=atoi(i->value);
+      io->block_size=parse_offsets(i->value);
       continue;
     } else if(!strcasecmp(i->option,"disks")) {
       io->number_of_elements = atoi(i->value);
@@ -785,7 +785,7 @@ int raid_initialiser(IO_INFO *self,IO_OPT *args) {
       io->map_string=strdup(i->value);
       continue;
     } else if(!strcasecmp(i->option,"offset")) {
-      io->offset=atoll(i->value);
+      io->offset=parse_offsets(i->value);
       continue;
     };
 
@@ -878,7 +878,11 @@ int raid_read_random(IO_INFO *self, char *buf, int len, off_t offs,
     if(!self->ready && self->open(self)<0) return(-1);
 
     while(len>0) {
-      result=raid_slack_read(io,buf,len,offs);
+      TRY {
+	result=raid_slack_read(io,buf,len,offs);
+      } EXCEPT (E_IOERROR) {
+	return(read_len);
+      };
       
       read_len+=result;
       len-=result;

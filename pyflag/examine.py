@@ -130,7 +130,8 @@ for image in Exgrep.process(None,io_target,("jpg")):
     
     new_image = tmp_dir + '/' + str(image['offset']) + '.jpg'
     if os.system( image_fix_cmd + new_image )>0:
-        raise(os.error,"Spawn command returned with error code")
+        pass
+#        raise(os.error,"Spawn command returned with error code")
 
     ## Get the new images size and add to tally
     new_image_size = os.stat( new_image )[stat.ST_SIZE]
