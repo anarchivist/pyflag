@@ -195,7 +195,6 @@ class GTKUI(UI.GenericUI):
     """ A GTK UI Implementation. """
             
     def __init__(self,default = None,query=None,server=None):
-        print "GTKUI CREATED"
         # Create the Main Widget
         self.result=gtk.VBox()
 
@@ -245,11 +244,6 @@ class GTKUI(UI.GenericUI):
         if self.current_table:
             self.end_table()
 
-        ## Apply text wrapping for the text widget:
-        if self.text_widget:
-            start, end = self.text_widget_buffer.get_bounds()
-            self.text_widget_buffer.apply_tag_by_name("wrap_full", start, end)
-
         if self.title:
             frame = gtk.Frame(self.title)
             frame.set_label_align(0.5,0.5)
@@ -261,7 +255,7 @@ class GTKUI(UI.GenericUI):
 
     def start_table(self,**options):
         if not self.current_table:
-            # I'm confused, should be allow nested tables in the *same* UI object?
+            # I'm confused, should we allow nested tables in the *same* UI object?
             self.current_table=gtk.Table(1,1,False)
             self.current_table.set_border_width(5)
             self.current_table_row=0
@@ -287,12 +281,12 @@ class GTKUI(UI.GenericUI):
             right_attach = i+1            
             if options.has_key('colspan'):
                 right_attach = i+options['colspan']
-            self.current_table.attach(col, i, right_attach, self.current_table_row-1, self.current_table_row, gtk.FILL|gtk.EXPAND, gtk.FILL|gtk.EXPAND, 0, 0)
+            self.current_table.attach(col, i, right_attach, self.current_table_row-1, self.current_table_row, gtk.EXPAND|gtk.FILL, 0, 0, 0)
 
     def end_table(self):
         ## Add the table to the result UI:
         if self.current_table:
-            self.result.pack_start(self.current_table, True, True)
+            self.result.pack_start(self.current_table,False,False)
             self.current_table=None
 
     def goto_link(self,widget,event):
@@ -372,17 +366,20 @@ class GTKUI(UI.GenericUI):
         
         def switch_cb(notepad, page, pagenum, callbacks, query):
             p = notepad.get_nth_page(pagenum)
+            print "page is %s" % p
             if not self.notebook_views.has_key(pagenum):
                 print "query is %s, cb is %s" % (query,callbacks[pagenum])
                 self.notebook_views[pagenum]=callbacks[pagenum](query).display()
-                p.pack_start(self.notebook_views[pagenum])
+                p.add_with_viewport(self.notebook_views[pagenum])
                 p.show_all()
             
         # draw the notebook
         notebook = gtk.Notebook()
         notebook.connect('switch-page', switch_cb, callbacks, query)
         for name in names:
-            notebook.append_page(gtk.VBox(), gtk.Label(name))
+            sw=gtk.ScrolledWindow()
+            sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+            notebook.append_page(sw, gtk.Label(name))
             
         self.result.pack_start(notebook)
                 
@@ -594,9 +591,11 @@ class GTKUI(UI.GenericUI):
         if not self.text_widget:
             self.text_widget=gtk.TextView()
             self.text_widget_buffer = self.text_widget.get_buffer()
+            self.text_widget.set_wrap_mode(gtk.WRAP_WORD)
             self.create_tags(self.text_widget_buffer)
             self.text_widget_iter = self.text_widget_buffer.get_iter_at_offset(0)
-            self.row(self.text_widget)
+            self.result.pack_start(self.text_widget,False,False)
+            #self.row(self.text_widget)
 
         ##Fix up the options:
         possible_options=('color','font','wrap')
@@ -946,10 +945,9 @@ class GTKUI(UI.GenericUI):
 
         # add to a scrolled window
         sw = gtk.ScrolledWindow()
-        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_ALWAYS)
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         sw.add(treeview)
-        self.row(sw)
-        #self.row(treeview)
+        self.result.pack_start(sw, True, True)
 
         ## Add the columns to the widget
         for i in range(len(names)):

@@ -103,7 +103,6 @@ class GTKServer(gtk.Window):
             idx = self.get_current_page()
             if idx != -1:
                 oldscroll = self.get_nth_page(idx)
-                #cur_report = self.get_tab_label_text(oldscroll)
                 oldlabelbox = self.get_tab_label(oldscroll)
                 oldlabel = oldlabelbox.get_children()[0]
                 cur_report = oldlabel.get_text()
@@ -113,34 +112,31 @@ class GTKServer(gtk.Window):
             if (cur_report == query['report']):
                 # reuse existing page if report is unchanged
                 self.close_tab(page=idx)
-                #self.insert_page(scroll, gtk.Label(query['report']), idx)
                 self.insert_page(scroll, position=idx)
             else:
                 # add a new page
-                #idx = self.append_page(scroll, gtk.Label(query['report']))
                 idx = self.append_page(scroll)
+                self.check_resize()
 
             # build a label for the tab
-            button = gtk.Button(stock=gtk.STOCK_CLOSE)
+            button = gtk.Button()
+            image = gtk.Image()
+            image.set_from_file( "%s/button_delete.xpm" % config.IMAGEDIR )
+            image.set_from_pixbuf( image.get_pixbuf().scale_simple(9, 9, 2) )
+            button.add( image )
+            button.set_relief(gtk.RELIEF_HALF)
+            button.set_border_width(0)
             button.connect('clicked', self.close_tab)
             result.tooltips.set_tip(button, 'Close Tab')
-            #button.set_tooltip(result.tooltips, 'Close Tab')
-            button.set_relief(gtk.RELIEF_NONE)
-            button.set_border_width(0)
+
             hbox = gtk.HBox()
             hbox.pack_start(gtk.Label(query['report']))
-            hbox.pack_end(button, False, False)
+            hbox.pack_start(button, False, False)
             hbox.show_all()
             self.set_tab_label(scroll, hbox)
 
             
-            # add toolbar to UI, first add a close tab button
-            #if result.toolbar_ui.get_n_items() > 0:
-            #    result.toolbar_ui.insert(gtk.SeparatorToolItem(), -1)
-            #button = gtk.ToolButton(gtk.STOCK_CLOSE)
-            #button.connect('clicked', self.close_tab)
-            #button.set_tooltip(result.tooltips, 'Close Tab')
-            #result.toolbar_ui.insert(button, -1)
+            # add toolbar to UI
             self.toolbars[idx] = result.toolbar_ui
 
             self.show_all()
@@ -253,7 +249,7 @@ class GTKServer(gtk.Window):
             child=self.form_dialog.get_child()
             self.form_dialog.remove(child)
         else:
-            self.form_dialog=gtk.Window()
+            self.form_dialog=gtk.ScrolledWindow()
             self.form_dialog.set_transient_for(self)
             #self.form_dialog.set_position(gtk.WIN_POS_CENTER_ON_PARENT)
             self.form_dialog.set_position(gtk.WIN_POS_CENTER_ALWAYS)
@@ -261,7 +257,7 @@ class GTKServer(gtk.Window):
             self.form_dialog.connect('destroy',self.delete_form)
 
         box=gtk.VBox()
-        self.form_dialog.add(box)
+        self.form_dialog.add_with_viewport(box)
         result = self.flag.ui(server=self)
         try:
             report.progress(query,result)
