@@ -29,7 +29,7 @@
 
 This is most useful when reading data structure with a fixed format (structs, arrays etc).
 """
-import struct,time
+import struct,time,cStringIO
 
 number_of_sections=4
 
@@ -56,18 +56,54 @@ class NamedArray:
         except:
             raise StopIteration()
 
+class Buffer:
+    """ This class looks very much like a string, but in fact uses a file object.
+
+    The advantage here is that when we do string slicing, we are not duplicating strings all over the place (better performace). Also it is always possible to tell where a particular piece of data came from.
+    """
+    def __init__(self,string='',fd=None,offset=0,size=0):
+        """ We can either specify a string, or a fd """
+        self.offset=offset
+        if fd:
+            self.fd=fd
+            if size:
+                self.size=size
+            else:
+                self.size=2147483647
+        else:
+            self.fd=cStringIO.StringIO(string)
+            self.size=len(string)
+
+    def __getitem__(self,offset):
+        """ Return a single char from the string """
+        self.fd.seek(offset)
+        return self.fd.read(1)
+
+    def __getslice__(self,a=None,b=None):
+        """ Returns another Buffer object which may be manipulated completely independently from this one.
+
+        Note that the new buffer object references the same fd that we are based on.
+        """
+        return self.__class__(fd=self.fd,offset=self.offset+a,size=b-a)
+
+    def __str__(self):
+        self.fd.seek(self.offset)
+        return self.fd.read(self.size)
+
 #### Start of data definitions:
 class DataType:
     """ Base class that reads a data type from the file."""
-    def __init__(self,buffer,offset,*args,**kwargs):
+    def __init__(self,buffer,*args,**kwargs):
         """ This will force this class to read the data type from data at the specified offset """
-        self.buffer=buffer
+        if isinstance(buffer,str):
+            self.buffer=Buffer(buffer)
+        else:
+            self.buffer=buffer
         self.data=None
-        self.offset=offset
         self.parent=kwargs['parent']
 
     def initialise(self):
-        self.data=self.read(self.buffer[self.offset:])
+        self.data=self.read(self.buffer)
         
     def size(self):
         """ This is the size of this data type - it returns the number of bytes we consume. """
@@ -92,7 +128,7 @@ class BasicType(DataType):
         return struct.calcsize(self.fmt)
 
     def read(self,data):
-        return struct.unpack(self.fmt,data[:self.size()])[0]
+        return struct.unpack(self.fmt,data[:self.size()].__str__())[0]
 
     def __int__(self):
         if not self.data:
@@ -148,9 +184,9 @@ class SimpleStruct(DataType):
     """ A class representing a simple struct to read off disk """
     field_names = ["Type","Count","Name","Description","Function" ]
 
-    def __init__(self,buffer,offset,*args,**kwargs):
+    def __init__(self,buffer,*args,**kwargs):
         self.parent=kwargs['parent']
-        DataType.__init__(self,buffer,offset,*args,**kwargs)
+        DataType.__init__(self,buffer,*args,**kwargs)
         self.init()
         self.data={}
         self.offsets={}
@@ -163,7 +199,7 @@ class SimpleStruct(DataType):
         offset=0
         result={}
         for item in fields:
-            tmp=item['Type'](data,offset,item['Count'],parent=self)
+            tmp=item['Type'](data[offset:],item['Count'],parent=self)
             self.offsets[item['Name']]=offset
             offset+=tmp.size()
             result[item['Name']]=tmp
@@ -198,14 +234,14 @@ class SimpleStruct(DataType):
                 
             try:
                 result+="%04X - %s(%s): %s\n" % (
-                    self.offsets[item['Name']]+self.offset,
+                    self.offsets[item['Name']],
                     item['Name'],                   
                     desc,
                     item['Function'](self.data[item['Name']]))
             except IndexError,e:
                 tmp = "\n   ".join(("%s" % self.data[item['Name']]).splitlines())
                 result+="%04X - %s(%s): %s\n" % (
-                    self.offsets[item['Name']]+self.offset,
+                    self.offsets[item['Name']],
                     item['Name'],
                     desc,tmp)
                                   
@@ -219,13 +255,13 @@ class SimpleStruct(DataType):
 
 class POINTER(LONG):
     """ This represents a pointer to a struct within the file """
-    def __init__(self,buffer,offset,*args,**kwargs):
-        LONG.__init__(self,buffer,offset,*args,**kwargs)
+    def __init__(self,buffer,*args,**kwargs):
+        LONG.__init__(self,buffer,*args,**kwargs)
         self.pointed=None
         
     def read(self,data):
         result=LONG.read(self,data)
-        self.pointed = self.target_class(self.buffer,self.data,parent=self.parent)
+        self.pointed = self.target_class(self.buffer[self.data:],parent=self.parent)
         return result
 
     def p(self):
@@ -241,9 +277,9 @@ class POINTER(LONG):
         return result
 
 class StructArray(SimpleStruct):
-    def __init__(self,buffer,offset,count,*args,**kwargs):
+    def __init__(self,buffer,count,*args,**kwargs):
         self.count=count
-        SimpleStruct.__init__(self,buffer,offset,*args,**kwargs)
+        SimpleStruct.__init__(self,buffer,*args,**kwargs)
         self.data=[]
 
     def init(self):
@@ -274,7 +310,7 @@ class StructArray(SimpleStruct):
         result=[]
         offset=0
         for x in range(self.count):
-            tmp=self.target_class(data,offset,parent=self)
+            tmp=self.target_class(data[offset:],parent=self)
             result.append(tmp)
             offset+=tmp.size()
 
@@ -338,9 +374,9 @@ class ULONG_ARRAY(ARRAY):
     target_class = ULONG
 
 class STRING(BYTE):
-    def __init__(self,buffer,offset,count,*args,**kwargs):
+    def __init__(self,buffer,count,*args,**kwargs):
         self.fmt="%ss" % count
-        BYTE.__init__(self,buffer,offset,count,*args,**kwargs)
+        BYTE.__init__(self,buffer,count,*args,**kwargs)
 
     def __str__(self):
         if not self.data: self.initialise()
@@ -372,8 +408,8 @@ class UCS16_STR(STRING):
 
 class CLSID(ULONG_ARRAY):
     """ A class id - common in windows """
-    def __init__(self,buffer,offset,*args,**kwargs):
-        ARRAY.__init__(self,buffer,offset,4,*args,**kwargs)
+    def __init__(self,buffer,*args,**kwargs):
+        ARRAY.__init__(self,buffer,4,*args,**kwargs)
 
     def __str__(self):
         if not self.data: self.initialise()
@@ -400,4 +436,6 @@ class WIN_FILETIME(SimpleStruct):
         return (t*1e-7 - 11644473600)
 
     def __str__(self):
-        return "%s" % (time.ctime(self.to_unixtime()))
+        t = self.to_unixtime()
+        if t<0: return "Invalid Timestamp"
+        return "%s" % (time.ctime(t))

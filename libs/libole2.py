@@ -75,7 +75,7 @@ class DepotList(LONG_ARRAY):
         result=[]
         offset=0
         while 1:
-            a=LONG(data,offset,parent=self)
+            a=LONG(data[offset:],parent=self)
             offset+=a.size()
             result.append(a)
             if a.get_value()<0:
@@ -94,6 +94,9 @@ class RawString(SimpleStruct):
             [ WORD, 1, 'pps_sizeofname'],
             ]
 
+    def get_value(self):
+        return self.__str__()
+    
     def __str__(self):
         if not self.data: self.initialise()
         return ("%s" % self['pps_rawname'])[0:self['pps_sizeofname'].get_value()/2]
@@ -130,18 +133,11 @@ class OLEFile:
     
     def __init__(self,data):
         self.data=data
-        self.header = OLEHeader(data,0,parent=None)
+        self.header = OLEHeader(data,parent=None)
         #Check the magic:
         if self.header['magic'] != '\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1':
             raise OLEException("File Magic is not correct %s" % self.header['magic'])
 
-        ## Check to see if the bbd is what its meant to be:
-        if self.header['number_of_bbd_blocks']==self.header['bbd_list'].size():
-            raise OLEException("bbd size incorrect, expected %s got  %s" %
-                          (self.header['number_of_bbd_blocks'],
-                           self.header['bbd_list'].size())
-                          )
-        
         print self.header
 
         ## Read the big block depot
@@ -150,7 +146,6 @@ class OLEFile:
         ## Build the root block chain:
         self.root_blocks = self.follow_chain(self.header['dirent_start'].get_value(), self.block_list)
 
-        print self.root_blocks
         ## The root chain is the chain of blocks for big blocks
         self.root_chain = self.read_run(self.root_blocks,
                                         self.data[self.header.size():],
@@ -160,7 +155,6 @@ class OLEFile:
         ## properties. Not all of them make sense though...
         self.properties = PropertySetArray(
             self.root_chain, ## Data
-            0, ## Offset
             len(self.root_chain)/0x80, ## Number of elements
             parent=None)
 
@@ -175,7 +169,7 @@ class OLEFile:
 
             if v>=0:
                 result.extend(
-                    LONG_ARRAY(data,v * self.blocksize + self.header.size(),
+                    LONG_ARRAY(data[v * self.blocksize + self.header.size():],
                     self.blocksize/4,
                     parent=None).get_value()
                     )
@@ -200,7 +194,7 @@ class OLEFile:
         ## big block list, otherwise from the small blocklist
         if size>=threshold or t=='root':
             ## Read from big blocks
-            print "Reading from big blocks"
+
             blocks = self.follow_chain(pps_sb, self.block_list)
             data=self.read_run(blocks,self.data[self.blocksize:],self.blocksize)
             return data[:size]
@@ -256,7 +250,8 @@ if __name__ == "__main__":
     a = OLEFile(data)
     count=0
     for p in a.properties:
-        print "Property %s %s" % (count,p.size())
+        print "Property %s" % (count)
+        print "%r"% p['pps_rawname'].get_value()
         print p
         data = a.cat(p)
         print "Data is %r length %s" % (data[:100],len(data))
