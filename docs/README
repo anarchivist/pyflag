@@ -1,0 +1,6 @@
+Documentation for PyFlag is now maintained as a seperate package. Documentation is basically a copy of the website at http://pyflag.sourceforge.net/
+
+It is possible to get the web site using darcs:
+
+darcs get http://pyflag.sourceforge.net/
+
