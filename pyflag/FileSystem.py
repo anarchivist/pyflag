@@ -352,6 +352,10 @@ class File:
     def tell(self):
         """ returns the current read pointer"""
         pass
+
+    def stats(self):
+        """ Returns a dict of statistics about the content of the file. """
+        pass
     
 class DBFS_file(File):
     """ Class for reading files within a loaded dd image, supports typical file-like operations, seek, tell, read """

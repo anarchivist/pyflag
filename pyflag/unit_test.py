@@ -50,6 +50,8 @@ import glob
 import time
 import zipfile
 import pickle
+import md5
+import threading
 
 a=pickle.dumps("hello world")
 if "hello world"!=pickle.loads(a):
@@ -61,4 +63,14 @@ import tempfile,getopt,os.path
 ## Logfile:
 import csv,pickle
 
+## The PST file
+import base64
 
+## Gzip scanner
+import gzip
+
+## Whois utilities
+import urllib
+
+## Clamav scanner
+import clamav
