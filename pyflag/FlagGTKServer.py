@@ -36,6 +36,7 @@ import gtk,gtk.gdk
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
 import pyflag.GTKUI
+from GTKUI import FlagNotebook
 import pyflag.TypeCheck as TypeCheck
 import pyflag.conf
 config=pyflag.conf.ConfObject()
@@ -59,133 +60,64 @@ def error_popup(e):
     dialog.add(frame)
     dialog.show_all()
 
-class FlagNotebook(gtk.Notebook):
-    """ A Flag notebook class
-    This is used because we need to manage a bunch of toolbar related stuff along with the notebook"""
+##class FlagNotebook(gtk.Notebook):
+##    """ A Flag notebook class
+##    This is used because we need to manage a bunch of toolbar related stuff along with the notebook"""
 
-    def __init__(self, toolhbox):
-        gtk.Notebook.__init__(self)
-        self.toolhbox = toolhbox
-        self.toolbars = {}
-        self.views = {}
-        self.callbacks = {}
-        self.queries = {}
-        self.names = {}
-        self.connect("switch-page", self.switch)
-        self.pagenum=0
+##    def __init__(self, toolhbox):
+##        gtk.Notebook.__init__(self)
+##        self.toolhbox = toolhbox
+##        self.toolbars = {}
+##        self.views = {}
+##        self.callbacks = {}
+##        self.queries = {}
+##        self.names = {}
+##        self.connect("switch-page", self.switch)
+##        self.pagenum=0
         
-    def switch(self, notebook, page, pagenum):
-        # just-in-time page drawing stuff
-        p = self.get_nth_page(pagenum)
-        if not self.views.has_key(pagenum):
-            try:
-                #result=self.__class__(self)
-                result = pyflag.GTKUI.GTKUI(query=self.queries[pagenum])
-                self.callbacks[pagenum](self.queries[pagenum],result)
-                self.views[pagenum]=result.display()
-                self.toolbars[pagenum] = result.toolhbox
-                p.add_with_viewport(self.views[pagenum])
-                p.show_all()
-            except Exception,e:
-                error_popup(e)
-                raise
+##    def switch(self, notebook, page, pagenum):
+##        # just-in-time page drawing stuff
+##        p = self.get_nth_page(pagenum)
+##        if not self.views.has_key(pagenum):
+##            try:
+##                #result=self.__class__(self)
+##                result = pyflag.GTKUI.GTKUI(query=self.queries[pagenum])
+##                self.callbacks[pagenum](self.queries[pagenum],result)
+##                self.views[pagenum]=result.display()
+##                self.toolbars[pagenum] = result.toolhbox
+##                p.add_with_viewport(self.views[pagenum])
+##                p.show_all()
+##            except Exception,e:
+##                error_popup(e)
+##                raise
             
-        # toolbar switching stuff
-        child = self.toolhbox.get_child()
-        if child:
-            self.toolhbox.remove(child)
-        if self.toolbars.has_key(pagenum):
-            self.toolhbox.add(self.toolbars[pagenum])
-        self.toolhbox.show_all()
-        #Remember current pagenumber
-        #self.pagenum=pagenum
+##        # toolbar switching stuff
+##        child = self.toolhbox.get_child()
+##        if child:
+##            self.toolhbox.remove(child)
+##        if self.toolbars.has_key(pagenum):
+##            self.toolhbox.add(self.toolbars[pagenum])
+##        self.toolhbox.show_all()
 
-#    def switch(self, notebook, page, pagenum):
-#        """ tab switch callback, update toobar """
-#        child = self.toolhbox.get_child()
-#       if child:
-#            self.toolhbox.remove(child)
-#        if self.toolbars.has_key(pagenum):
-#            self.toolhbox.add(self.toolbars[pagenum])
-#        self.toolhbox.show_all()
-#        #Remember current pagenumber
-#        self.pagenum=pagenum
+##    def add_page(self, name, callback, query):
+##        """ add result (a GTKUI object) as a new tab with given label """
 
-#    def refresh_toolbar(self):
-#        self.switch(None,None,self.pagenum)
+##        # each new page goes in a scrolled window
+##        scroll = gtk.ScrolledWindow()
+##        scroll.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_AUTOMATIC)
 
-
-
-    def add_page(self, name, callback, query):
-        """ add result (a GTKUI object) as a new tab with given label """
-
-        # each new page goes in a scrolled window
-        scroll = gtk.ScrolledWindow()
-        #try:
-        #    scroll.add_with_viewport(result.display())
-        #except Exception,e:
-        #   error_popup(e)
-        #    raise
-        scroll.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_AUTOMATIC)
-
-        #idx = self.get_current_page()
-        #if idx != -1:
-        #    oldscroll = self.get_nth_page(idx)
-        #    oldlabelbox = self.get_tab_label(oldscroll)
-        #    oldlabel = oldlabelbox.get_children()[0]
-        #    cur_report = oldlabel.get_text()
-        #else:
-        #    cur_report = ''
-
-        #if (cur_report == query['report']):
-            # reuse existing page if report is unchanged
-        #    self.close_tab(page=idx)
-        #    self.insert_page(scroll, position=idx)
-        #else:
-        #    # add a new page
-        idx = self.get_n_pages()
-        print 'numpages = %s' % idx
-        self.callbacks[idx] = callback
-        self.names[idx] = name
-        self.queries[idx] = query
-        #self.set_current_page(idx)
+##        idx = self.get_n_pages()
+##        self.callbacks[idx] = callback
+##        self.names[idx] = name
+##        self.queries[idx] = query
+##        #self.set_current_page(idx)
         
-        idx = self.append_page(scroll, gtk.Label(name))
-        print 'appended page %s' % idx
-        #    #self.check_resize()
-        self.set_current_page(idx)
-        # build a label for the tab
-        #button = gtk.Button()
-        #image = gtk.Image()
-        #image.set_from_file( "%s/button_delete.xpm" % config.IMAGEDIR )
-        #image.set_from_pixbuf( image.get_pixbuf().scale_simple(9, 9, 2) )
-        #button.add( image )
-        #button.set_relief(gtk.RELIEF_HALF)
-        #button.set_border_width(0)
-        #button.connect('clicked', self.close_tab)
-        #result.tooltips.set_tip(button, 'Close Tab')
-
-        #hbox = gtk.HBox()
-        #hbox.pack_start(gtk.Label(query['report']))
-        #hbox.pack_start(button, False, False)
-        #hbox.show_all()
-        #self.set_tab_label(scroll, hbox)
-
-
-        # add toolbar to UI
-        #self.toolbars[idx] = result.toolhbox
-
-        #self.show_all()
-
+##        idx = self.append_page(scroll, gtk.Label(name))
+##        self.set_current_page(idx)
 
 class FlagServerNotebook(FlagNotebook):
     """ Essentially the same as GTKUI Notebook, but with a tab delete button """
 
-    # create a delete image to add to the label, the very same one
-    # should be fine for all tabs...
-    delete_image = gtk.Image()
-    delete_image.set_from_file( "%s/button_delete.xpm" % config.IMAGEDIR )
-    delete_image.set_from_pixbuf( delete_image.get_pixbuf().scale_simple(9, 9, 2) )
 
     def close_tab(self, action=None, page=None):
         """ close current tab """
@@ -199,110 +131,26 @@ class FlagServerNotebook(FlagNotebook):
         del self.toolbars[page]
         del self.views[page]
         del self.callbacks[page]
-        
-    def __init__(self, toolhbox):
-        FlagNotebook.__init__(self, toolhbox)
-        # create a close button, same one is fine for all tabs
-        self.delete_button = gtk.Button()
-        self.delete_button.add(self.delete_image)
-        self.delete_button.connect('clicked', self.close_tab)
-        #result.tooltips.set_tip(button, 'Close Tab')
     
     def add_page(self, name, callback, query):
         FlagNotebook.add_page(self, name, callback, query)
+        # create a delete image to add to the label, the very same one
+        # should be fine for all tabs...
+        delete_image = gtk.Image()
+        delete_image.set_from_file( "%s/button_delete.xpm" % config.IMAGEDIR )
+        delete_image.set_from_pixbuf( delete_image.get_pixbuf().scale_simple(9, 9, 2) )
+
+        delete_button = gtk.Button()
+        delete_button.add(delete_image)
+        delete_button.connect('clicked', self.close_tab)
+        
         hbox = gtk.HBox()
         hbox.pack_start(gtk.Label(name))
-        hbox.pack_start(self.delete_button, False, False)
+        hbox.pack_start(delete_button, False, False)
         hbox.show_all()
         child = self.get_nth_page(self.get_n_pages()-1)
         self.set_tab_label(child, hbox)
-    
-##class FlagNotebook(gtk.Notebook):
-##    """ A Flag notebook class
-##    This is used because we store a bunch of toolbar related stuff with the notebook"""
-
-##    def __init__(self, toolhbox):
-##        gtk.Notebook.__init__(self)
-##        self.toolhbox = toolhbox
-##        self.toolbars = {}
-##        self.connect("switch-page", self.switch)
-##        self.pagenum=0
-
-##    def switch(self, notebook, page, pagenum):
-##        """ tab switch callback, update toobar """
-##        child = self.toolhbox.get_child()
-##        if child:
-##            self.toolhbox.remove(child)
-##        if self.toolbars.has_key(pagenum):
-##            self.toolhbox.add(self.toolbars[pagenum])
-##        self.toolhbox.show_all()
-##        #Remember current pagenumber
-##        self.pagenum=pagenum
-
-##    def refresh_toolbar(self):
-##        self.switch(None,None,self.pagenum)
-
-##    def close_tab(self, action=None, page=None):
-##        """ close current tab """
-##        if not page:
-##            page = self.get_current_page()
-##        child = self.toolhbox.get_child()
-##        self.toolhbox.remove(child)
-##        self.remove_page(page)
-
-##    def add_page(self, result, query):
-##        """ add result (a GTKUI object) as a new tab with given label """
-
-##        # each new page goes in a scrolled window
-##        scroll = gtk.ScrolledWindow()
-##        try:
-##            scroll.add_with_viewport(result.display())
-##        except Exception,e:
-##            error_popup(e)
-##            raise
-##        scroll.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_AUTOMATIC)
-
-##        idx = self.get_current_page()
-##        if idx != -1:
-##            oldscroll = self.get_nth_page(idx)
-##            oldlabelbox = self.get_tab_label(oldscroll)
-##            oldlabel = oldlabelbox.get_children()[0]
-##            cur_report = oldlabel.get_text()
-##        else:
-##            cur_report = ''
-
-##        if (cur_report == query['report']):
-##            # reuse existing page if report is unchanged
-##            self.close_tab(page=idx)
-##            self.insert_page(scroll, position=idx)
-##        else:
-##            # add a new page
-##            idx = self.append_page(scroll)
-##            self.check_resize()
-
-##        # build a label for the tab
-##        button = gtk.Button()
-##        image = gtk.Image()
-##        image.set_from_file( "%s/button_delete.xpm" % config.IMAGEDIR )
-##        image.set_from_pixbuf( image.get_pixbuf().scale_simple(9, 9, 2) )
-##        button.add( image )
-##        button.set_relief(gtk.RELIEF_HALF)
-##        button.set_border_width(0)
-##        button.connect('clicked', self.close_tab)
-##        result.tooltips.set_tip(button, 'Close Tab')
-
-##        hbox = gtk.HBox()
-##        hbox.pack_start(gtk.Label(query['report']))
-##        hbox.pack_start(button, False, False)
-##        hbox.show_all()
-##        self.set_tab_label(scroll, hbox)
-
-
-##        # add toolbar to UI
-##        self.toolbars[idx] = result.toolbar_ui
-
-##        self.show_all()
-##        self.set_current_page(idx)
+        self.set_current_page(self.get_n_pages()-1)
             
 class GTKServer(gtk.Window):
     """ A class which represents the main GTK server window """

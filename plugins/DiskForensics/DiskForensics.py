@@ -175,7 +175,7 @@ class BrowseFS(Reports.report):
                     table='file_%s as f, inode_%s as i' % (fsfd.table,fsfd.table),
                     where="f.inode=i.inode and path=%r and f.mode!='d/d'" % (br),
                     case=query['case'],
-                    links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='View File', fsimage=query['fsimage'],__target__='inode', inode="%s")]
+                    links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='View File Contents', fsimage=query['fsimage'],__target__='inode', inode="%s")]
                     )
         
             result.tree(tree_cb = tree_cb,pane_cb = pane_cb, branch = branch )

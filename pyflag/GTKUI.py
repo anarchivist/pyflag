@@ -36,7 +36,6 @@ This module implements a GTK UI model which is intended to work with the FlagGTK
 
 import re,cgi,types
 import pyflag.FlagFramework as FlagFramework
-import pyflag.FlagGTKServer as FlagGTKServer
 import pyflag.DB as DB
 import pyflag.conf
 import pyflag.UI as UI
@@ -202,37 +201,62 @@ class FlagTreeModel(gtk.GenericTreeModel):
             return None
         else:
             return node[:-1]
-        
+
+class FlagToolbar(gtk.Toolbar):
+    """ Flag Toolbar class """
+    def __init__(self, parent=None):
+        if parent:
+            self.parent = parent
+            self.parent.children.append(self)
+        self.children = []
+
+    def destroy(self):
+        self.parent.delete(self)
+
+    def delete(self, child):
+        try:
+            del self.children[self.children.index(child)]
+            self.redraw()
+        except IndexError,ValueError:
+            pass
+
+    def redraw(self):
+        if self.parent:
+            self.parent.redraw()
+        else:
+            self.display()
+
+    def install(self, hbox):
+        for c in children:
+            c.install(hbox)
+        self.show_all()
+        hbox.pack_start(self)
+
 class FlagNotebook(gtk.Notebook):
     """ A Flag notebook class
     This is used because we need to manage a bunch of toolbar related stuff along with the notebook"""
 
-    def __init__(self, toolhbox):
+    def __init__(self, flagtoolbar):
         gtk.Notebook.__init__(self)
-        self.toolhbox = toolhbox
+        self.flagtoolbar = flagtoolbar
         self.toolbars = {}
         self.views = {}
         self.callbacks = {}
         self.queries = {}
         self.names = {}
-        self.connect("switch-page", self.switch)
+        self.switchid=self.connect("switch-page", self.switch)
         self.pagenum=0
         
     def switch(self, notebook, page, pagenum):
         # just-in-time page drawing stuff
         p = self.get_nth_page(pagenum)
         if not self.views.has_key(pagenum):
-            try:
-                #result=self.__class__(self)
-                result = pyflag.GTKUI.GTKUI(query=self.queries[pagenum])
-                self.callbacks[pagenum](self.queries[pagenum],result)
-                self.views[pagenum]=result.display()
-                self.toolbars[pagenum] = result.toolhbox
-                p.add_with_viewport(self.views[pagenum])
-                p.show_all()
-            except Exception,e:
-                #error_popup(e)
-                raise
+            result = pyflag.GTKUI.GTKUI(query=self.queries[pagenum])
+            self.callbacks[pagenum](self.queries[pagenum],result)
+            self.views[pagenum]=result.display()
+            self.toolbars[pagenum] = result.toolhbox
+            p.add_with_viewport(self.views[pagenum])
+            p.show_all()
             
         # toolbar switching stuff
         try:
@@ -243,52 +267,15 @@ class FlagNotebook(gtk.Notebook):
         if self.toolbars.has_key(pagenum):
             self.toolhbox.add(self.toolbars[pagenum])
         self.toolhbox.show_all()
-        #Remember current pagenumber
-        #self.pagenum=pagenum
-
-#    def switch(self, notebook, page, pagenum):
-#        """ tab switch callback, update toobar """
-#        child = self.toolhbox.get_child()
-#       if child:
-#            self.toolhbox.remove(child)
-#        if self.toolbars.has_key(pagenum):
-#            self.toolhbox.add(self.toolbars[pagenum])
-#        self.toolhbox.show_all()
-#        #Remember current pagenumber
-#        self.pagenum=pagenum
-
-#    def refresh_toolbar(self):
-#        self.switch(None,None,self.pagenum)
-
-
 
     def add_page(self, name, callback, query):
         """ add result (a GTKUI object) as a new tab with given label """
 
         # each new page goes in a scrolled window
+        self.disconnect(self.switchid)
         scroll = gtk.ScrolledWindow()
-        #try:
-        #    scroll.add_with_viewport(result.display())
-        #except Exception,e:
-        #   error_popup(e)
-        #    raise
         scroll.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_AUTOMATIC)
 
-        #idx = self.get_current_page()
-        #if idx != -1:
-        #    oldscroll = self.get_nth_page(idx)
-        #    oldlabelbox = self.get_tab_label(oldscroll)
-        #    oldlabel = oldlabelbox.get_children()[0]
-        #    cur_report = oldlabel.get_text()
-        #else:
-        #    cur_report = ''
-
-        #if (cur_report == query['report']):
-            # reuse existing page if report is unchanged
-        #    self.close_tab(page=idx)
-        #    self.insert_page(scroll, position=idx)
-        #else:
-        #    # add a new page
         idx = self.get_n_pages()
         print 'numpages = %s' % idx
         self.callbacks[idx] = callback
@@ -299,29 +286,8 @@ class FlagNotebook(gtk.Notebook):
         idx = self.append_page(scroll, gtk.Label(name))
         print 'appended page %s' % idx
         #    #self.check_resize()
-        self.set_current_page(idx)
-        # build a label for the tab
-        #button = gtk.Button()
-        #image = gtk.Image()
-        #image.set_from_file( "%s/button_delete.xpm" % config.IMAGEDIR )
-        #image.set_from_pixbuf( image.get_pixbuf().scale_simple(9, 9, 2) )
-        #button.add( image )
-        #button.set_relief(gtk.RELIEF_HALF)
-        #button.set_border_width(0)
-        #button.connect('clicked', self.close_tab)
-        #result.tooltips.set_tip(button, 'Close Tab')
-
-        #hbox = gtk.HBox()
-        #hbox.pack_start(gtk.Label(query['report']))
-        #hbox.pack_start(button, False, False)
-        #hbox.show_all()
-        #self.set_tab_label(scroll, hbox)
-
-
-        # add toolbar to UI
-        #self.toolbars[idx] = result.toolhbox
-
-        #self.show_all()
+        self.switchid=self.connect("switch-page", self.switch)
+                
 
 class GTKUI(UI.GenericUI):
     """ A GTK UI Implementation. """
@@ -499,35 +465,19 @@ class GTKUI(UI.GenericUI):
         """
         query=self.defaults.clone()
         ## If the user supplied a context (a tab which should be open by default)
-        #try:
-        #    context_str=query[context]
+        try:
+            context_str=query[context]
         ## Otherwise we open the first one by default
-        #except:
-        #    context_str=names[0]
+        except:
+            context_str=names[0]
             
-#        self.notebook_views= {}
-        
-#        def switch_cb(notepad, page, pagenum, callbacks, query):
-#            p = notepad.get_nth_page(pagenum)
-#           if not self.notebook_views.has_key(pagenum):
-#               result=self.__class__(self)
-#                callbacks[pagenum](query,result)
-#                self.notebook_views[pagenum]=result.display()
-#                
-#                p.add_with_viewport(self.notebook_views[pagenum])
-#                p.show_all()
-            
-        # draw the notebook
-        #notebook = gtk.Notebook()
-        #notebook.connect('switch-page', switch_cb, callbacks, query)
         notebook = FlagNotebook(self.toolhbox)
         for i in range(len(names)):
             notebook.add_page(names[i],callbacks[i],query)
-            #sw=gtk.ScrolledWindow()
-            #sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-            #notebook.append_page(sw, gtk.Label(name))
             
         self.result.pack_start(notebook)
+        notebook.set_current_page(names.index(context_str))
+
                 
     def link(self,string,target=FlagFramework.query_type(()),**target_options):
         target=target.clone()
