@@ -18,6 +18,8 @@ PROGS	= $(BIN_DIR)/icat $(BIN_DIR)/fls $(BIN_DIR)/dcat \
 	$(BIN_DIR)/istat $(BIN_DIR)/evtool $(BIN_DIR)/dbtool \
 	$(BIN_DIR)/fdd \
 	python_binding
+## Where libraries should go
+TARGET = ../../libs/
 
 defs:
 	@CC="$(CC)" sh ../makedefs
@@ -75,7 +77,7 @@ $(BIN_DIR)/dbtool: dbtool.o $(LIB) $(LIBS)
 python_binding: io.i
 	swig -python io.i
 	$(CC) $(CFLAGS) $(INCL) -I/usr/include/python2.3 io_wrap.c -shared $(LIBOBJ) $(LIBS) -o _iosubsys.so
-	cp _iosubsys.so iosubsys.py ../../
+	cp _iosubsys.so iosubsys.py $(TARGET)/
 
 clean:
 	rm -f $(PROGS) $(LIB) *.o *core *.so

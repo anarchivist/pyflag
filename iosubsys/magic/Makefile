@@ -1,7 +1,7 @@
 INCL 	= -I/usr/include/python2.3 
 LIBS	= -lmagic
 #Path where all the python things live
-PYTHONPATH = ../../
+PYTHONPATH = ../../libs/
 
 $(PYTHONPATH)/magic.py $(PYTHONPATH)/_magic.so:	magic.i
 	swig -python magic.i

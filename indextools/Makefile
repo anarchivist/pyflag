@@ -2,7 +2,7 @@ OPT     = -O0 -Wall
 DEBUG   = -g
 INCL    = -I../iosubsys/misc/
 CFLAGS  = $(DEFS) $(INCL) $(OPT) $(DEBUG)
-
+TARGETS = ../libs/
 LIBS    = ../iosubsys/misc/except.o
 
 index: index.o python_binding
@@ -13,7 +13,7 @@ index.o: index.c index.h
 python_binding: index.i
 	swig -python index.i
 	$(CC) $(CFLAGS) $(INCL) -I/usr/include/python2.3 index_wrap.c -shared $(LIBOBJ) $(LIBS) index.o -o _index.so
-	cp _index.so index.py ../
+	cp _index.so index.py $(TARGETS)/
 
 clean:
-	rm -f *.o index ../_index.so ../index.py
+	rm -f *.o index $(TARGETS)/_index.so $(TARGETS)/index.py

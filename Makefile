@@ -9,7 +9,7 @@ MYSQLCOMMAND =./bin_dist/mysql/bin/mysql --socket=bin_dist/mysql/data/pyflag.soc
 
 all:	bins
 	for dir in $(DIRS); do\
-          (echo Entering directory `pwd`/$$dir; cd $$dir; make "CC=$(CC)" MAKELEVEL= ; echo leaving directory `pwd`/$$dir ); done
+          (echo Entering directory `pwd`/$$dir; cd $$dir; make "CC=$(CC)" MAKELEVEL= ; echo leaving directory $$dir ); done
 
 ## Copy binaries from the system to put into the flag bin dir
 bins:
