@@ -103,7 +103,7 @@ class LookupIP(Reports.report):
         # lookup IP address and show a nice summary of Whois Data
         dbh = self.DBO(None)
         dbh.check_index("whois","id")
-        dbh.execute("SELECT INET_NTOA(start_ip) as start_ip, numhosts, country, descr, status from whois where id=%s",whois_id)
+        dbh.execute("SELECT INET_NTOA(start_ip) as start_ip, numhosts, country, descr, remarks, adminc, techc, status from whois where id=%s",whois_id)
         res = dbh.fetch()
         
         for name in res.keys():

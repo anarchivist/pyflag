@@ -94,8 +94,11 @@ class WhoisRec:
     regex = {'inetnum':re.compile('^inetnum:\s+(.*)$', re.MULTILINE),
              'netname':re.compile('^netname:\s+(.*)$', re.MULTILINE),
              'descr':re.compile('^descr:\s+(.*)$', re.MULTILINE),
+             'remarks':re.compile('^remarks:\s+(.*)$', re.MULTILINE),
              'country':re.compile('^country:\s+(.*)$', re.MULTILINE),
              'status':re.compile('^status:\s+(.*)$', re.MULTILINE),
+             'adminc':re.compile('^admin-c:\s+(.*)$', re.MULTILINE),
+             'techc':re.compile('^tech-c:\s+(.*)$', re.MULTILINE),
              'notify':re.compile('^notify:\s+(.*)$', re.MULTILINE)}
     
     unfold = re.compile('\n\s+')
@@ -123,7 +126,10 @@ class WhoisRec:
 
       self.netname = self._getsingle('netname', string)
       self.country = self._getsingle('country', string)
+      self.adminc = self._getsingle('adminc', string)
+      self.techc = self._getsingle('techc', string)
       self.descr = self._getmulti('descr', string)
+      self.remarks = self._getmulti('remarks', string)
 
       # get status
       status_str = self._getsingle('status', string).lower()
@@ -137,11 +143,14 @@ class WhoisRec:
     def parse_rir(self, string):
       cols = string.split('|')
       self.country = cols[1]
+      self.adminc = ''
+      self.techc = ''
       self.netname=''
       self.start_ip = aton(cols[3])
       self.num_hosts = int(cols[4])
       self.status = cols[6]
       self.descr = ''
+      self.remarks = ''
       
     def _getsingle(self, field, string):
         match = WhoisRec.regex[field].search(string)
@@ -159,8 +168,11 @@ class WhoisRec:
       netname: %s
       num_hosts: %i
       country: %s
+      adminc: %s
+      techc: %s
       status: %s
-      descr: %s""" % (self.start_ip,self.netname,self.num_hosts,self.country,self.status, self.descr)
+      descr: %s
+      remarks: %s""" % (self.start_ip,self.netname,self.num_hosts,self.country,self.adminc,self.techc,self.status, self.descr, self.remarks)
 
 class Whois:
     """ class to process a whois database file """    
@@ -245,12 +257,12 @@ dbh.execute("drop table if exists whois_sources")
 dbh.execute("drop table if exists whois")
 dbh.execute("drop table if exists whois_routes")
 dbh.execute("CREATE TABLE IF NOT EXISTS whois_sources ( `id` int auto_increment, `source` varchar(20), `url` varchar(255), `updated` datetime, key(id))")
-dbh.execute("CREATE TABLE IF NOT EXISTS whois (`id` int auto_increment, `src_id` int, `start_ip` int(10) unsigned, `netname` varchar(50), `numhosts` int, `country` char(2), `descr` varchar(255), `status` enum('assigned','allocated','reserved','unallocated'), key(id))")
+dbh.execute("CREATE TABLE IF NOT EXISTS whois (`id` int auto_increment, `src_id` int, `start_ip` int(10) unsigned, `netname` varchar(50), `numhosts` int, `country` char(2), `adminc` varchar(50), `techc` varchar(50),`descr` varchar(255),`remarks` varchar(255), `status` enum('assigned','allocated','reserved','unallocated'), key(id))")
 dbh.execute("CREATE TABLE IF NOT EXISTS whois_routes ( `network` int(10) unsigned, `netmask` int(10) unsigned, `whois_id` int)")
 
 # add default (fallthrough) route and reserved ranges
 dbh.execute("INSERT INTO whois_sources VALUES ( 0, 'static', 'static', %r )", ':'.join(["%i"% i for i in time.localtime()]))
-dbh.execute("INSERT INTO whois VALUES (0,%s,0,0,'Default','--','Default Fallthrough Route: IP INVALID OR UNASSIGNED', 'unallocated')", str(dbh.cursor.lastrowid))
+dbh.execute("INSERT INTO whois VALUES (0,%s,0,0,'Default','--','','','Default Fallthrough Route: IP INVALID OR UNASSIGNED', '', 'unallocated')", str(dbh.cursor.lastrowid))
 dbh.execute("INSERT INTO whois_routes VALUES (0,0,%s)", str(dbh.cursor.lastrowid))
 
 # process files
@@ -266,10 +278,10 @@ for url in urls:
   
   # process records
   for rec in db:
-    dbh.execute("INSERT INTO whois VALUES (0, %r, %r,%r, %r, %r, %r, %r);", (
+    dbh.execute("INSERT INTO whois VALUES (0, %r, %r,%r, %r, %r, %r, %r, %r, %r, %r);", (
       source_id, "%u" % rec.start_ip,
       rec.netname,
-      rec.num_hosts, rec.country, rec.descr, rec.status))  
+      rec.num_hosts, rec.country, rec.adminc, rec.techc, rec.descr, rec.remarks, rec.status))  
     whois_id = dbh.cursor.lastrowid
 
     #now process the networks (routes)...
