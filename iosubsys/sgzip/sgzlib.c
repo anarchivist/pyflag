@@ -383,7 +383,7 @@ int sgzip_read_random(char *buf, int len, unsigned long long int offs,
     };
   
     //The available amount of data to read:
-    available=header->blocksize-buffer_offset;
+    available=length-buffer_offset;
     if(available>len) {
       available=len;
     };

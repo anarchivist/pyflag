@@ -19,5 +19,5 @@ int main() {
   printf("File containes %s\n",buf);
   close(fd);
 
-  return(0);
+  exit(1);
 }

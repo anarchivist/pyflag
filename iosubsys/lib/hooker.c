@@ -7,57 +7,13 @@
 #include <stdarg.h>
 #include "except.h"
 #include <string.h>
+#include "hooker.h"
+//#include <fcntl.h>
 
-//We call hard exit when hooking exit()
-extern void _exit(int);
-
-#define DEBUG_LEVEL 5
-
-/* Used for Debugging messages*/
-void debug(int level, const char *message, ...)
-{
-	va_list ap;
-	
-	if(DEBUG_LEVEL>level) {
-	  va_start(ap, message);
-	  vfprintf(stderr,message, ap);
-	  fflush(stderr);
-	  va_end(ap);
-	};
-};
-
-struct dispatcher_t {
-  //Handle for libc
-  void *handle;
-  //original hooked functions:
-  int (*open)(const char *pathname, int flags,int mode);
-  int (*open64)(const char *pathname, int flags,int mode);
-  off_t (*lseek)(int fildes, off_t offset, int whence);
-  off_t (*lseek64)(int fildes, off_t offset, int whence);
-  ssize_t (*read)(int fd, void *buf, size_t count);
-  void (*exit)(int status);
-  int (*dup2)(int oldfd, int newfd);
-  int (*close)(int fd);
-} *dispatch=NULL;
-
-#define HOOK(x)   dispatch->x = dlsym(dispatch->handle,#x); check_errors();
-
-
-// This static variable is used to decide when we should hook calls
-// through the library. The library itself will be using the same
-// calls we are trying to hook (i.e. open,read seek etc). When running
-// within the context of the library, we do not want to hook those
-// calls, just use the original so functions. Hence we set the context
-// to UNHOOKED just before we service the call, and return it to
-// HOOKED just after. Note that this is _not_ thread safe - so we will
-// have problems running programs with threads!!!!
-enum context_t {
-  HOOKED, UNHOOKED
-};
+#define O_RDONLY 0
 
 static char *iosubsys=NULL;
-
-static enum context_t context=HOOKED;
+enum context_t context=HOOKED;
 
 //These store the different IO sources which will be opened.
 static IO_INFO *iosources[255];
@@ -81,8 +37,7 @@ void load_library(void) {
   dispatch=(struct dispatcher_t *)malloc(sizeof(*dispatch));
   dispatch->handle=dlopen("libc.so.6",RTLD_NOW);
   if(!dispatch->handle) {
-    fputs(dlerror(),stderr);
-    exit(EXIT_FAILURE);
+    RAISE(E_GENERIC,NULL,dlerror());
   };
 
   //Actually hook all our functions
@@ -91,9 +46,13 @@ void load_library(void) {
   HOOK(lseek);
   HOOK(lseek64);
   HOOK(read);
+  HOOK(write);
   HOOK(exit);
   HOOK(dup2);
   HOOK(close);
+  HOOK(fopen);
+  HOOK(fclose);
+  HOOK(fread);
 };
 
 //This function initialises the hooker
@@ -110,7 +69,6 @@ void init_hooker() {
 
   if(io_name) {
     iosource_count++;
-    //    sleep(10);
 
     context=UNHOOKED;
     iosources[iosource_count] = io_open(io_name);
@@ -133,9 +91,7 @@ int open64(const char *pathname, int flags,int mode) {
   debug(1,"asked to open %s",pathname);  
 
   //If we were not initialised yet, we do so now...
-  if(!dispatch) {
-    init_hooker();
-  };
+  CHECK_INIT;
 
   debug(1,"opening64 %s",file_prefix);
 
@@ -158,7 +114,7 @@ int open64(const char *pathname, int flags,int mode) {
 
 int open(const char *pathname, int flags, ...) {
   va_list ap;
-  int mode;
+  int mode=0;
   va_start(ap,flags);
   mode = (int)*ap;
   va_end(ap);
@@ -167,17 +123,15 @@ int open(const char *pathname, int flags, ...) {
 };
 
 
-int llseek(unsigned int fd,  unsigned  long  offset_high,  unsigned  long  offset_low, loff_t *result, unsigned int whence) {
+int llseek(unsigned int fd,  unsigned  long  offset_high,  unsigned  long  offset_low, 
+	   loff_t *result, unsigned int whence) {
   debug(1,"Called llseek\n");
   return 0;
 };
 
 off_t lseek(int fildes, unsigned long int offset, int whence) {
   debug(1,"Called lseek with %lu\n",offset);
-  //If we were not initialised yet, we do so now...
-  if(!dispatch) {
-    init_hooker();
-  };
+  CHECK_INIT;
 
   if(context==UNHOOKED || !iosubsys || !iosources[fildes]) {
     return dispatch->lseek(fildes,offset ,whence);
@@ -189,10 +143,7 @@ off_t lseek(int fildes, unsigned long int offset, int whence) {
 
 off_t lseek64(int fildes,  off_t  offset, int whence) {
   debug(1,"Called lseek64 with %llu, %u\n",offset,whence);
-  //If we were not initialised yet, we do so now...
-  if(!dispatch) {
-    init_hooker();
-  };
+  CHECK_INIT;
 
   if(context==UNHOOKED || !iosubsys || !iosources[fildes]) {
     return dispatch->lseek64(fildes,offset ,whence);
@@ -203,10 +154,8 @@ off_t lseek64(int fildes,  off_t  offset, int whence) {
 };
 
 ssize_t read(int fd, void *buf, size_t count) {
-    //If we were not initialised yet, we do so now...
-  if(!dispatch) {
-    init_hooker();
-  };
+  //If we were not initialised yet, we do so now...
+  CHECK_INIT;
 
   if(context == UNHOOKED || !iosubsys || !iosources[fd]) {
     debug(1, "reading without hooking");
@@ -214,7 +163,7 @@ ssize_t read(int fd, void *buf, size_t count) {
   } else {
     int read_len;
 
-    debug(1,"read %lu from %lu at %llu\n",count,fd,iosources[fd]);
+    debug(1,"read %lu from %lu at %p\n",count,fd,iosources[fd]);
 
     context = UNHOOKED;
     read_len = iosources[fd]->read_random
@@ -222,15 +171,24 @@ ssize_t read(int fd, void *buf, size_t count) {
 
     if(read_len>0) iosources[fd]->fpos+=read_len;
     context = HOOKED;
-
+    
+    debug(1,"Returned %lu bytes of data\n",read_len);
     return(read_len);
   };
 };
 
 ssize_t write(int fd, const void *buf, size_t count) {
-  debug(1,"not writing %s",buf);
-  //Pretend to have written...
-  return (count);
+  CHECK_INIT;
+  
+  //If the fd is actually an iosource, we pretend to write to it, but do not.
+  if(iosources[fd] && context==HOOKED) {
+    debug(1,"not writing %s",buf);
+    //Pretend to have written...
+    return (count);
+  };
+  
+  //Otherwise, this is a read fd, and we do write to it:
+  return dispatch->write(fd,buf,count);
 };
 
 //Hook exit to prevent stupid programs from exiting suddenly when an
@@ -238,13 +196,15 @@ ssize_t write(int fd, const void *buf, size_t count) {
 //sk. When sk has an abnormal condition, it just dies which stops
 //dbtool. This way we raise an exception allowing dbtool to catch it
 //and keep going.
+
 void exit(int status) {
+  CHECK_INIT;
+
   if(context == HOOKED && status!=0) {
     context = UNHOOKED;
     RAISE(E_GENERIC,NULL,"exit() called with status %d",status);
     context = HOOKED;
   };
-
   _exit(status);
 };
 
@@ -262,12 +222,65 @@ int dup2(int oldfd, int newfd)
 };
 
 int close(int fd) {
+  CHECK_INIT;
 
-  if(iosources[fd]) {
+  if(iosources[fd] && context==HOOKED) {
     iosources[fd]=NULL;
     return 0;
   } else {
     debug(1,"Closing fd %u\n",fd);
     return(dispatch->close(fd));
   }
+};
+
+FILE *fopen(const char *path, const char *mode) {
+  char *file_prefix = getenv("IO_FILENAME");
+
+  CHECK_INIT;
+
+  if( context == HOOKED && !memcmp(path,file_prefix,strlen(file_prefix))) {
+    if(mode[0]=='r') {
+      return ((FILE *)open(path,O_RDONLY));
+    };
+    RAISE(E_GENERIC,NULL,"Writing is not supported to %s",path);
+  };
+
+  return(dispatch->fopen(path,mode));
+};
+
+size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream) 
+{
+  //Stream is actually a hooked io subsys
+  if((unsigned int)stream<256) {
+    return read((int)stream,ptr,size*nmemb);
+  };
+  return dispatch->fread(ptr,size,nmemb,stream);
+};
+
+int getc(FILE *stream) {
+  unsigned char temp;
+  int len;
+
+  CHECK_INIT;
+
+  len=fread(&temp,1,1,stream);
+  if(len>0)
+    return((int)temp);
+  else
+    return(EOF);
+};
+
+int fgetc(FILE *stream) {
+  return getc(stream);
+};
+
+int fclose(FILE *stream) {
+  CHECK_INIT;
+
+  //Thats an iosource:
+  if((unsigned int)stream<256) {
+    iosources[(unsigned int)stream]=NULL;
+    return 0;
+  };
+  return dispatch->fclose(stream);
 };

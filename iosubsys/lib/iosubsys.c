@@ -312,7 +312,8 @@ int sgz_read_random(IO_INFO *self, char *buf, int len, off_t offs,
 
 void sgz_help(void) {
   printf("sgzip subsystem options\n\n");
-  printf("\toffset=bytes\t\tNumber of bytes to seek to in the (uncompressed) image file. Useful if there is some extra data at the start of the dd image (e.g. partition table/other partitions\n");
+  printf("\tfile=filename\t\tFilename to open\n");
+  printf("\toffset=bytes\t\tNumber of bytes to seek to in the (uncompressed) image file. Useful if there is some extra data at the start of the dd image (e.g. partition table/other partitions)\n");
 };
 
 int sgz_open(IO_INFO *self) {
