@@ -9,7 +9,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.75 Date: Sat Feb 12 11:21:40 EST 2005$
+#  Version: FLAG $Version: 0.75 Date: Sat Feb 12 14:00:04 EST 2005$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -82,7 +82,7 @@ class BasicTheme:
     header='''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
         <html>
         <head>
-        <title>FLAG - Forensic Log Analysis GUI - Version %s</title>
+        <title>FLAG - Forensic Log Analysis GUI - %s</title>
         </head>
         <body link=blue vlink=blue bgcolor="#FFFFFF"><table width="100%%">
         <tbody> <script src="images/functions.js" type="text/javascript" language="javascript"></script>
@@ -167,7 +167,7 @@ class BlueTheme(BasicTheme):
     header='''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
         <html>
         <head>
-        <title>FLAG - Forensic Log Analysis GUI - Version %s</title>
+        <title>FLAG - Forensic Log Analysis GUI. %s</title>
         </head>
         <body link=blue vlink=blue bgcolor="#FFFFFF"><table width="100%%">
         <tbody> <script src="images/functions.js" type="text/javascript" language="javascript"></script>

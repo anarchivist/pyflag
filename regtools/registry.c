@@ -1,4 +1,5 @@
 /*
+ * This file is part of PyFlag $Version: $
  * registry.c - registry access routines for regedit (regutils package)
  * Copyright (C) 1998 Memorial University of Newfoundland
  * 

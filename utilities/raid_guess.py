@@ -100,14 +100,23 @@ Trying map %s with %s slots
                     'filename':','.join(["filename=%s" % f for f in permutation]),
                     'block':options.blocksize
                     }
+                print "Running %s:" % s
                 (stdin,stdout,stderr)=os.popen3(s)
                 stdin.close()
                 stderr.close()
-                data = stdout.readlines()
-                print "Running %s produced %s lines of data:\n%s"% (s,len(data),''.join(data))
+                data=[]
+                for line in stdout.readlines():
+                    data.append(line)
+                    sys.stdout.write( line)
+
+                print "- produced %s lines of data:\n"% len(data)
                 if len(data)>best_len:
                     best_len=len(data)
                     best_s=s
+                ## We find another array thats just as good
+                elif len(data)==best_len:
+                    best_s+="\nAnd\n"+s
+                    
                 stdout.close()
 
     print "**********************************************\nBest result produced %s lines with command line:\n%s\n**********************************************" % (best_len,best_s)

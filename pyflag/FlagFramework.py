@@ -8,7 +8,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.75 Date: Sat Feb 12 11:21:40 EST 2005$
+#  Version: FLAG $Version: 0.75 Date: Sat Feb 12 14:00:04 EST 2005$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -30,7 +30,7 @@
 
 @var flag_version: Current version of the flag program
 """ 
-flag_version = "0.76"
+flag_version = "$Version: 0.75 Date: Sat Feb 12 14:00:04 EST 2005$".replace('$','')
 import sys,os
 import pyflag.conf
 config=pyflag.conf.ConfObject()
