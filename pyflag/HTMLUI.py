@@ -8,7 +8,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Name:  $ $Date: 2004/10/22 08:34:33 $
+#  Version: FLAG $Name:  $ $Date: 2004/10/26 00:02:58 $
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -732,8 +732,8 @@ class HTMLUI(UI.GenericUI):
                 result.heading("Select columns to hide:")
                 result.start_form(query, refresh="parent")
                 result.start_table()
-                for name,column in zip(columns,names):
-                    result.checkbox(name,"hide_column",column)
+                for name in names:
+                    result.checkbox(name,"hide_column",name)
                 result.end_table()
                 result.end_form()
  
@@ -748,9 +748,10 @@ class HTMLUI(UI.GenericUI):
             result.type = "text/x-comma-separated-values"
 ##            result.type = "text/plain"
             data = cStringIO.StringIO()
-            cvs_writer = csv.DictWriter(data,names)
-            dbh.execute(query_str_basic + " order by %s" % order,())
             hidden_columns = query.getarray('hide_column')
+            names_list = [ i for i in names if i not in hidden_columns ]
+            cvs_writer = csv.DictWriter(data,names_list)
+            dbh.execute(query_str_basic + " order by %s" % order,())
             for row in dbh:
                 ## If there are any callbacks we respect those now.
                 new_row={}
@@ -766,7 +767,7 @@ class HTMLUI(UI.GenericUI):
                 cvs_writer.writerow(new_row)
 
             data.seek(0)
-            result.result = "#Pyflag Table widget output\n#Query was %s.\n#Fields: %s\n""" %(query," ".join(names))
+            result.result = "#Pyflag Table widget output\n#Query was %s.\n#Fields: %s\n""" %(query," ".join(names_list))
             if condition_text_array:
                 result.result += "#The following conditions are in force\n"
                 for i in condition_text_array:
@@ -1123,7 +1124,6 @@ class HTMLUI(UI.GenericUI):
 
         try:
             if options.has_key('parent'):
-                print " will try to refresh to parent"
                 self.result+="<script language=javascript>self.opener.location=\"%s\"; self.close();</script>" % query
                 return
             

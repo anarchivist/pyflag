@@ -1,1 +1,1 @@
-epydoc --html -o docs/ -n Flag -c default --inheritance grouped  pyflag/*.py plugins/*.py
+epydoc --html -o docs/ -n Flag -c default --inheritance grouped  pyflag/*.py plugins/*.py Scanners/*.py 
