@@ -298,6 +298,12 @@ class execute(pyflagsh.command):
 
     def complete(self,text,state):
         args=self.args
+        t=text
+        
+        ## This is a dirty hack!!! It will fail if the text appears as a seperate word twice in a completion
+        if text:
+            text=args[-1]
+            left=text.index(t)
 
         possibilities=[]
         allreports=[]
@@ -305,13 +311,13 @@ class execute(pyflagsh.command):
         for family in families:
             reports=Registry.REPORTS.family[family]
             for report in reports:
-                possibilities.append("%s" % (report))
+                possibilities.append("%s.%s" % (family,report.name))
                 allreports.append(report)
-                
+        
         if len(args)<2 or len(args)==2 and text:
             for i in range(state,len(possibilities)):
                 if possibilities[i].startswith(text):
-                    return possibilities[i]
+                    return possibilities[i][left:]
         else:
             for i in range(0,len(possibilities)):
                 if possibilities[i] == args[1]:
@@ -320,28 +326,18 @@ class execute(pyflagsh.command):
                         if r.parameters.keys()[i].startswith(text):
                             return r.parameters.keys()[i]
 
-    def execute(self):
-        start_time=time.time()
+    def prepare(self):
+        """ Returns a report, query all ready from the current args """
         args=self.args
-        possibilities=[]
-        allreports=[]
-        families = Registry.REPORTS.get_families()
-        for family in families:
-            reports=Registry.REPORTS.family[family]
-            for report in reports:
-                possibilities.append("%s" % (report))
-                allreports.append(report)
-
-        report=None
-        for i in range(0,len(possibilities)):
-            if possibilities[i] == args[1]:
-                report = allreports[i]
-                break
-            
-        if not report:
-            raise ParserException("Unknown report %s" % args[1])
-        
         query=FlagFramework.query_type(())
+
+        try:
+            query['family'],query['report']=args[1].split('.')
+        except:
+            raise ParserException("Unable to parse %s as a family.report" % args[1])
+        
+        report = Registry.REPORTS.dispatch(query['family'],query['report'])
+        ## Include the report and family:
 
         for arg in args[2:]:
             try:
@@ -357,10 +353,12 @@ class execute(pyflagsh.command):
                     query[arg]=self.environment.__dict__[arg]
                 except KeyError:
                     pass
+        return report,query
 
-        ## Include the report and family:
-        query['family'],query['report']=possibilities[i].split('.')
-
+    def execute(self):
+        start_time=time.time()
+        report,query = self.prepare()
+        
         print "Checking meta cache"
         if self.environment._flag.is_cached(query):
             yield "Report previously run... You need to reset it first."
@@ -386,37 +384,14 @@ class reset(execute):
         """
     def execute(self):
         start_time=time.time()
-        args=self.args
-        try:
-            report=self.reports[args[1]]
-        except KeyError:
-            raise ParserException("Unknown report %s" % args[1])
-        
-        query=FlagFramework.query_type(())
-        
-        for arg in args[2:]:
-            try:
-                del query[arg[:arg.index('=')]]
-                query[arg[:arg.index('=')]]=arg[arg.index('=')+1:]
-            except ValueError:
-                raise ParserException("Argument should be of the form key=value, got %s" % arg)
+        report,query = self.prepare()
 
-        ## Include environment variables in the query:
-        for arg in dir(self.environment):
-            if not arg.startswith('_'):
-                try:
-                    query[arg]=self.environment.__dict__[arg]
-                except KeyError:
-                    pass
-
-        ## Include the report and family:
-        query['family'],query['report']=args[1].split('.')
-
+        print query,"%r" % report
         ## Execute the report:
         try:
+            print "hello1"
             report.do_reset(query)
-            yield "Resetting of %s successful in %s sec" % (args[1],time.time()-start_time)
-            
+            yield "Resetting of %s successful in %s sec" % (args[1],time.time()-start_time)            
         except Exception,e:
             import traceback
             print traceback.print_tb(sys.exc_info()[2])

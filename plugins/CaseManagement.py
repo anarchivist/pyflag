@@ -91,6 +91,9 @@ class DelCase(Reports.report):
     description="Remove database for specified case"
     order = 20
 
+    def do_reset(self,query):
+        pass
+
     def form(self,query,result):
         result.defaults = query
         result.para("Please select the case to delete. Note that all data in this case will be lost.")
