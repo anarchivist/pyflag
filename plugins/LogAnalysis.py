@@ -84,7 +84,7 @@ class ListLogFile(Reports.report):
         except KeyError:
             raise Reports.ReportError("Unable to load the preset %s for table %s " % (row['value'],query['logtable']))
 
-        if 'IP Address' in log.types:
+        if 'IP Address' in log.types and not query.has_key('group_by'):
             tmp=result.__class__(result)
             tmp.icon("whois.png",border=0)
             q=query.clone()
@@ -228,6 +228,7 @@ class DeleteLogPreset(Reports.report):
 
     def form(self,query,result):
         result.selector("Select Preset to delete",'log_preset',"select value,value from meta where property='log_preset'",(),case=None)
+        result.para("This report will drop all tables that have been loaded using this preset.")
         result.checkbox('Click here to confirm deletion','final','ok')
 
     def display(self,query,result):
