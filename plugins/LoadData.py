@@ -209,12 +209,12 @@ class LoadTcpDump(Reports.report):
             ('smtp','key_id',None),
             ('smtp','smtp_req_command',20),
             ('udp','key_id',None),
-            ('udp','udp_srcport'.None),
+            ('udp','udp_srcport',None),
             ('udp','udp_dstport',None)
             )
         
-        for x,y in index:
-            dbh.check_index("%s_%s" % (x,tablename),y,z)
+        for x,y,z in index:
+            dbh.check_index("%s" % x,y,z)
 #            dbh.execute("alter table %s add index(%s)",(x,y))
 
     def display(self,query,result):
