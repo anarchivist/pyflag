@@ -371,10 +371,16 @@ class FileDump(FileThumb):
     ## We dont want to produce any thumbnails
     dispatcher = {}
 
+    def __init__(self,fd,limit=None):
+        self.fd = fd
+        self.limit = limit
+
     ## Copy the binary data out as is.
     def Unknown(self):
         result=''
         for r in self.Extract():
             result+=r
+            if self.limit and len(result)>self.limit:
+                break
 
         return result

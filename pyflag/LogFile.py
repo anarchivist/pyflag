@@ -457,7 +457,8 @@ class IISLog(SimpleLog):
         for row in self.read_record(ignore_comment = False):
             count+=1
             if row.startswith('#Fields: '):
-                self.fields = row.split()[1:]
+                dbh=DB.DBO(None)
+                self.fields = [ dbh.MakeSQLSafe(i) for i in row.split()[1:] ]
                 # Coallesc the date and time field together:
                 try:
                     i = self.fields.index('date')

@@ -146,8 +146,9 @@ class ViewFile(Reports.report):
         iofd = IO.open(query['case'],query['fsimage'])
         fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
         fd = fsfd.open(inode=query['inode'])
-        
-        image = Graph.FileDump(fd)
+
+        ## We only want this much data
+        image = Graph.FileDump(fd,limit=1000000)
         #How big is this file?
         i=fsfd.istat(inode=query['inode'])
         filesize=i['size']

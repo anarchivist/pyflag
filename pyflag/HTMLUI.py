@@ -313,7 +313,6 @@ class HTMLUI(UI.GenericUI):
         if self.form_parms.has_key(name):
             del self.form_parms[name]
             
-
     def const_selector(self,description,name,keys,values,**options):
         if options:
             opt_str = self.opt_to_str(options)
@@ -622,8 +621,8 @@ class HTMLUI(UI.GenericUI):
             where_str=" where %s " % having_str
 
         query_str+=where_str
+        
         ## At this point we can add the group by calculated above, and replace the names and columns arrays from the group by
-
         if group_by_str:
             query_str += " group by %s " % group_by_str
 
@@ -664,7 +663,7 @@ class HTMLUI(UI.GenericUI):
         dbh = DB.DBO(case)
 
         #Do the query, and find out the names of all the columns
-        dbh.execute(query_str,())
+        dbh.execute(query_str)
 
         if group_by_str:
             def table_groupby_popup(query,result):
@@ -708,6 +707,21 @@ class HTMLUI(UI.GenericUI):
                 
             ## Add a popup to allow the user to draw a graph
             self.popup(table_groupby_popup,'Graph',icon='pie.png',toolbar=1,menubar=1)
+        else: ## Not group by
+            def table_configuration_popup(query,result):
+                result.display = result.__str__
+                result.heading("Select columns to hide:")
+                del query['callback_stored']
+                query['__opt__']= 'parent'
+                result.start_form(query)
+                for name,column in zip(columns,names):
+                    result.checkbox(name,"hide_column",column)
+
+                result.end_form()
+                    
+            ## End table_configuration_popup
+
+            self.popup(table_configuration_popup,'Configure',icon='spanner.png',toolbar=1,menubar=1)
 
         ## Write the conditions at the top of the page:
         if conditions:
