@@ -15,8 +15,10 @@
 static char *iosubsys=NULL;
 enum context_t context=HOOKED;
 
+#define IOSNUM 256
+
 //These store the different IO sources which will be opened.
-static IO_INFO *iosources[255];
+static IO_INFO *iosources[IOSNUM];
 static int iosource_count=10;
 
 void check_errors() {
@@ -205,7 +207,8 @@ void exit(int status) {
     RAISE(E_GENERIC,NULL,"exit() called with status %d",status);
     context = HOOKED;
   };
-  _exit(status);
+  dispatch->exit(status);
+  _exit(0);
 };
 
 int dup2(int oldfd, int newfd)
@@ -224,13 +227,14 @@ int dup2(int oldfd, int newfd)
 int close(int fd) {
   CHECK_INIT;
 
+  debug(1,"Called close with %u\n",fd);
   if(iosources[fd] && context==HOOKED) {
     iosources[fd]=NULL;
     return 0;
-  } else {
+  } else if(context==HOOKED) {
     debug(1,"Closing fd %u\n",fd);
     return(dispatch->close(fd));
-  }
+  } else return 0;
 };
 
 FILE *fopen(const char *path, const char *mode) {

@@ -1,16 +1,23 @@
 # This makefile patches and compiles the relevant sources
 BIN		= ../bin/
 ETHEREAL	= ethereal-0.10.2
+SLEUTHKIT	= sleuthkit-1.73
 ## If ethereal should be compiled statically
 STATIC		= yes
 PLOTICUS	= pl230src
 
-PROGS		= $(BIN)/pl $(BIN)/tethereal $(BIN)/prefabs
+PROGS		= $(BIN)/dbtool $(BIN)/pl $(BIN)/tethereal $(BIN)/prefabs 
 
 ## This bit compiles and patches ethereal, note that we expect to have
 ## the ethereal-xxx.tar.bz2 in the sources directory.
 
 all: $(PROGS)
+
+$(BIN)/dbtool:
+	tar -xvzf $(SLEUTHKIT).tar.gz || (echo -e "--------------------------\\r\\nYou must have $(SLEUTHKIT).tar.gz in the sources directory\\r\\nYou can get it from http://sleuthkit.sf.net\\r\\n--------------------------" && exit -1)
+	patch -p0 < ../patches/$(SLEUTHKIT)_dbtool.patch
+	cd $(SLEUTHKIT) && make
+	cp $(SLEUTHKIT)/bin/dbtool $(SLEUTHKIT)/bin/fls $(BIN)
 
 $(BIN)/tethereal:
 	tar -xvjf $(ETHEREAL).tar.bz2 || (echo -e "--------------------------\\r\\nYou must have $(ETHEREAL).tar.gz in the sources directory\\r\\nYou can get it from http://www.ethereal.com\\r\\n--------------------------" && exit -1)
@@ -24,4 +31,4 @@ $(BIN)/pl $(BIN)/prefabs:
 	cp -r $(PLOTICUS)/prefabs $(PLOTICUS)/src/pl $(BIN)
 
 clean:
-	rm -rf $(ETHEREAL) $(PLOTICUS) $(PROGS)
+	rm -rf $(ETHEREAL) $(PLOTICUS) $(PROGS) $(SLEUTHKIT)

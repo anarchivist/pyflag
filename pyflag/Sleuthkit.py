@@ -99,16 +99,20 @@ def load_sleuth(case,fstype,table,iosource):
         ## End mounted filesystem handling
         return
 
-    opts = ""
+    opts = []
     for i in range(len(fd.parameters)-1):
         for j in range(len(fd.options[i+1])):
-            opts += "%s=%s " % (fd.parameters[i+1][3:], fd.options[i+1][j])
+            opts.append("%s=%s" % (fd.parameters[i+1][3:], fd.options[i+1][j]))
+            
     # run sleuthkit
-    sdbh.MySQLHarness("%s -t %s -f %s -i %s %s"%(config.SLEUTHKIT,table,fstype,fd.options[0][0],opts))
+    str= "%s  -i %s -o %s %s -t %s -f %s %s"%(config.IOWRAPPER,fd.options[0][0],
+                                           ','.join(opts),config.SLEUTHKIT,table,fstype,table)
+
+    sdbh.MySQLHarness(
+        str
+        )
 
 def del_sleuth(case, table):
     """ Drops the tables for the given iosource identifier """
     dbh = DB.DBO(case)
     dbh.MySQLHarness("%s -t %s -d drop" %(config.SLEUTHKIT,table))
-
-

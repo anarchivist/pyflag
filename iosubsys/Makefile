@@ -1,6 +1,6 @@
 SHELL	= /bin/sh
 CC	= gcc
-DIRS	= hashtools misc fstools magic sgzip
+DIRS	= hashtools misc magic sgzip lib
 
 all:	
 	for dir in $(DIRS); do\

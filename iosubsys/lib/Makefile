@@ -1,9 +1,9 @@
-INCL = -I../misc/ -I../sgzip/ -I../libevf/
+INCL = -I../misc/ -I../sgzip/ -I../libevf/ -I../hashtools/
 ## Where libraries should go
 TARGET = ../../libs/
 BIN_DIR = ../../bin/
 CFLAGS=-g -Wall `getconf LFS_CFLAGS` $(INCL)
-LIBS = ../misc/except.o iosubsys.o ../sgzip/sgzlib.o ../fstools/libevf.o -lz ../hashtools/md5c.o
+LIBS = ../misc/except.o iosubsys.o ../sgzip/sgzlib.o libevf.o -lz ../hashtools/md5c.o
 
 all: open libio_hooker.so python_binding $(BIN_DIR)/evtool $(BIN_DIR)/iowrapper
 
