@@ -217,7 +217,6 @@ class GTKUI(UI.GenericUI):
         if query: self.defaults=query
         
         self.current_table=None
-        self.nav_query=None
         self.next = None
         self.previous = None
         self.pageno = 0
@@ -229,8 +228,7 @@ class GTKUI(UI.GenericUI):
         self.title = string
         
     def refresh(self, int, query):
-        """ what does this even to? """
-        pass
+        self.link_callback(query)
 
     def __str__(self):
 #        return self.display()
@@ -300,6 +298,7 @@ class GTKUI(UI.GenericUI):
             self.link_callback(target)
 
     def tooltip(self, string):
+        """ redundant, never used """
         pass
         
     def icon(self, path, **options):
@@ -393,8 +392,6 @@ class GTKUI(UI.GenericUI):
         ev.add_events(gtk.gdk.BUTTON_PRESS_MASK)
         ev.connect("button_press_event",self.goto_link)
         self.row(ev)
-        #child=self.buffer.create_child_anchor(self.iter)
-        #self.result.add_child_at_anchor(ev,child)
 
     def const_selector(self,description,name,keys,values,**options):
         combobox = gtk.combo_box_new_text()
@@ -795,10 +792,8 @@ class GTKUI(UI.GenericUI):
         ## so that we can just use stock id's here, then scaling etc will
         ## be done nicely by gtk for us.
 
-        args = None
-        if isinstance(cb, FlagFramework.query_type):
-            args = cb
-            cb = self.link_callback_ui
+        def proxy_cb(widget, cb, result, query):
+            cb(query, result)
         
         i = None
         if icon:
@@ -810,11 +805,15 @@ class GTKUI(UI.GenericUI):
             button = gtk.ToolButton(stock)
         else:
             button = gtk.ToolButton(icon_widget=None, label=text)
-            
-        if args:
-            button.connect('clicked',cb,args)
-        else:
-            button.connect('clicked',cb)
+
+        if not tooltip: tooltip=text
+        tips = gtk.Tooltips()
+        button.set_tooltip(tips, tooltip)
+        print "adding tooltip %s" % tooltip
+        #tips.set_tip(button, tooltip)
+        #tips.enable()
+        
+        button.connect('clicked', proxy_cb, cb, self, self.defaults)
         self.toolbar_ui.insert(button, -1)
 
     def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):
@@ -920,11 +919,12 @@ class GTKUI(UI.GenericUI):
             self.defaults=new_query
             populate_store(store,generator,names)
             
-        self.toolbar(previous_cb,"Prev Page",stock=gtk.STOCK_GO_BACK,tooltip="Go to next page",popup=False)
-        self.toolbar(next_cb,"Next Page",stock=gtk.STOCK_GO_FORWARD,tooltip="Go to Previous page",popup=False)
+        self.toolbar(previous_cb,"Prev Page",stock=gtk.STOCK_GO_BACK,tooltip="Go to Previous page",popup=False)
+        self.toolbar(next_cb,"Next Page",stock=gtk.STOCK_GO_FORWARD,tooltip="Go to Next page",popup=False)
         self.row(treeview)
 
         ## Create a group by selector
+        
         tmp=self.__class__(self)
         tmp.const_selector("Group by a column: ",'group_by',['None']+list(names),['']+list(names))
         self.row(tmp)

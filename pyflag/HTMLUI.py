@@ -299,14 +299,15 @@ class HTMLUI(UI.GenericUI):
         self.result+="<a href='blah?%s' %s>" % (q,self.opt_to_str(options))
         self.result+="%s</a>" % (string)
 
-    def popup(self,callback, label,icon=None,toolbar=0, menubar=0, **options):
+    def popup(self,callback, label,icon=None,toolbar=0, menubar=0, tooltip=None, **options):
         """ This method presents a button on the screen, which when clicked will open a new window and use the callback to render in it.
 
         The new UI will be based on the current UI.
         @arg callback: A callback function to render into the new UI
         """
+        if not tooltip: tooltip = label
         cb = self.store_callback(callback)
-        self.result+="""<script language=javascript>  var client; function open_%s_window() {  client=window.open('%s&callback_stored=%s','client','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=600,scrollbars=yes'); client.moveto(0,0);  }; </script><abbr title=%r>""" % (cb,self.defaults,cb,toolbar,menubar,label)
+        self.result+="""<script language=javascript>  var client; function open_%s_window() {  client=window.open('%s&callback_stored=%s','client','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=600,scrollbars=yes'); client.moveto(0,0);  }; </script><abbr title=%r>""" % (cb,self.defaults,cb,toolbar,menubar,tooltip)
         if icon:
             self.result+="""<a  onclick=\"open_%s_window()\"><img alt=%s border=0 src=images/%s></a>""" % (cb,label,icon)
         else:
@@ -528,7 +529,7 @@ class HTMLUI(UI.GenericUI):
         ## Now draw the left part
         self.row(left,right,valign='top')
 
-    def toolbar(self,cb,text,icon=None,popup=True):
+    def toolbar(self,cb,text,icon=None,popup=True,tooltip=None):
         """ Create a toolbar button.
 
         When the user clicks on the toolbar button, a popup window is created which the callback function then uses to render on.
@@ -536,7 +537,7 @@ class HTMLUI(UI.GenericUI):
         if self.toolbar_ui==None:
             self.toolbar_ui=self.__class__(self)
         
-        self.toolbar_ui.popup(cb,text,icon)
+        self.toolbar_ui.popup(cb,text,icon,tooltip=tooltip)
                 
     def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):
         """ Shows the results of an SQL query in a searchable/groupable/browsable table
@@ -1100,8 +1101,11 @@ class HTMLUI(UI.GenericUI):
         self.row(left,right,valign="top")
         
     def tooltip(self,message):
-        message = message.replace("\n"," ")
-        self.result = "<abbr title=%r>%s</abbr>" % (message,self.result)
+        """ REDUNDANT? AFAIK no report uses it,
+        Tooltips can be specified as parameters for some widgets eg. toolbar"""
+        #message = message.replace("\n"," ")
+        #self.result = "<abbr title=%r>%s</abbr>" % (message,self.result)
+        pass
         
     def start_form(self,target, **hiddens):
         """ start a new form with a local scope for parameters.

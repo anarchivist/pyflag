@@ -89,20 +89,15 @@ class ListLogFile(Reports.report):
             raise Reports.ReportError("Unable to load the preset %s for table %s " % (row['value'],query['logtable']))
 
         if 'IP Address' in log.types and not query.has_key('group_by'):
-            #tmp=result.__class__(result)
-            #tmp.icon("whois.png",border=0)
-            q=query.clone()
-            if query.has_key('whois'):
-                del q['whois']
-                #tmp.tooltip("Click here to remove whois information")
-            else:
-                q['whois']="Yes"
-                #tmp.tooltip("Click here to show whois information")
-            #result.link(tmp,q)
-            def cb(result):
-                result.refresh(query)
+
+            def cb(query, result):
+                if query.has_key('whois'):
+                    del query['whois']
+                else:
+                    query['whois']="Yes"
+                result.refresh(0, query)
                 
-            result.toolbar(cb, 'Show Whois',icon='whois.png')
+            result.toolbar(cb, 'Show Whois',icon='whois.png', tooltip="Show/Hide Whois Data")
 
         #Find the names of all the columns in table:
         dbh.execute("select * from %s_log limit 1",query['logtable'])
