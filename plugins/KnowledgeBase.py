@@ -37,7 +37,7 @@ import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-
+active=False
 import pyflag.DB as DB
 
 class ViewKB(Reports.report):

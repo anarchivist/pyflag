@@ -1041,8 +1041,8 @@ class HTMLUI(UI.GenericUI):
             self.result += "%s%s" % (format,d)
 
         for d in cuts:
-            d = re.sub("\n","<br>\r\n",d)
-            self.text_var += str(d)
+            d = re.sub("\n","<br>\r\n",str(d))
+            self.text_var += d
             if options.has_key('wrap') and options['wrap'] == 'full':
                 try:
                     while self.text_var:

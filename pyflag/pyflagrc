@@ -55,7 +55,7 @@ ploticus_prefabs=%(flag_bin)s/prefabs/
 
 [GUI]
 #Period we wait before refreshing the display when waiting for analysis to complete
-Refresh = 5
+Refresh = 3
 
 HILIGHT = pink
 SELECTED = #FFCC99

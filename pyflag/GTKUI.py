@@ -46,10 +46,8 @@ import re
 
 #config.LOG_LEVEL=7
 
-class GTK_Draw_Form_Exception(Exception):
+class GTKUI_Exception(Exception):
     """ This exception is raised when we want to draw a form """
-    def __init__(self,query):
-        self.query=query
 
 pointer=gtk.gdk.Cursor(gtk.gdk.HAND2)
 
@@ -205,8 +203,10 @@ class FlagTreeModel(gtk.GenericTreeModel):
 class FlagToolbar(gtk.HBox):
     """ Flag Toolbar class.
 
-    Toolbars are areas for GTKUIs to draw tool button on. There are a number of UIs which manager these toolbars, e.g. notebook and tree views. These need to remove and install new toolbars as their contents are updated. This implementation has toolbars forming a tree, with the root toolbar owned by the server. As each management widget hides and redraws new UIs, they remove the toolbars from the tree and splice other ones in.
-
+    Toolbars are areas for GTKUIs to draw tool button on.
+    There is only one application toolbar on the server window, but recursive UIs all need to draw on it. Therefore all UI get access to the toolbar object when they get created.
+    There are a number of UIs which manager these toolbars, e.g. notebook and tree views. By managing the toolbar we mean that these widgets are able to add and remove toolbar icons from their children depending on which is exposed. For example if we have a notebook with a table in one page and something else in the other page, the notebook needs to update its toolbar as pages are changed.
+    This implementation has toolbars forming a tree, with the root toolbar owned by the server. As each management widget hides and redraws new UIs, they remove the toolbars from the tree and splice other ones in.
     """
     def __init__(self,tparent):
         gtk.HBox.__init__(self)
@@ -232,6 +232,7 @@ class FlagToolbar(gtk.HBox):
     def delete(self, child):
         """ Remove this child from our list """
         del self.tchildren[self.tchildren.index(child)]
+        self.redraw()
 
     def redraw(self):
         """ Ask our parent to redraw us """
@@ -245,9 +246,9 @@ class FlagToolbar(gtk.HBox):
         self.show_all()
 
 class FlagNotebook(gtk.Notebook):
-    """ A Flag notebook class
-    This is used because we need to manage a bunch of toolbar related stuff along with the notebook"""
+    """ A Flag notebook class.
 
+    The Flag notebook needs to manage a bunch of toolbar related stuff along with the notebook"""
     def __init__(self, ui):
         gtk.Notebook.__init__(self)
         self.ui = ui # master (parent) toolbar
@@ -260,14 +261,28 @@ class FlagNotebook(gtk.Notebook):
         self.curpage=None
         self.page_id=0
 
+    def remove_page(self,page):
+        if self.curpage!=None:
+            self.toolbars[self.curpage].destroy_toolbar()
+        self.curpage=None        
+        gtk.Notebook.remove_page(self,page)
+        
     def get_page_with_id(self,page_id):
-        """ Gets the page widget for the specified id"""
+        """ Gets the page widget for the specified id
+
+        Page id are given to pages as they are created sequentially. When pages are destroyed, the IDs are used to map pages to their respective slots in the notebook.
+        """
         for tested_page in range(0,self.page_id):
             w=self.get_nth_page(tested_page)
             if w.get_data('page_id')==page_id:
                 return tested_page
         
     def switch(self, notebook, p, pagenum):
+        """ This is called whenever the user switched from one page to the next.
+
+        We check that the new page has been drawn. If it has not been drawn we draw it by calling the relevant callback. This just in time approach makes the notebook very fast.
+        Note that once a UI has been generated for the page, we cache that and will not need to redraw this page again.
+        """
         # just-in-time page drawing stuff
         p = self.get_nth_page(pagenum)
         page_id=p.get_data('page_id')
@@ -303,8 +318,10 @@ class FlagNotebook(gtk.Notebook):
         self.curpage=page_id
 
     def add_page(self, name, callback, query):
-        """ add result (a GTKUI object) as a new tab with given label """
+        """ add a new tab with given label
 
+        This function creates a new tab by storing the callback and query. Note that the page is not drawn until we switch to it.
+        """
         # each new page goes in a scrolled window
         self.disconnect(self.switchid)
         scroll = gtk.ScrolledWindow()
@@ -317,13 +334,18 @@ class FlagNotebook(gtk.Notebook):
         self.names[idx] = name
         self.queries[idx] = query
         
-        idx = self.append_page(scroll, gtk.Label(name))
+        self.append_page(scroll, gtk.Label(name))
         self.switchid=self.connect("switch-page", self.switch)
+        return idx
                 
 
 class GTKUI(UI.GenericUI):
-    """ A GTK UI Implementation. """
-            
+    """ A GTK UI Implementation.
+
+    This is the main UI implementation for GTK. It is different from the HTML UI because in the HTML UI we can count on the server to retransmit the results of the forms each time the user clicks submit. Here, we dont have the same request/response model like HTTP, so we must manager our own widgets. This leads to lots of callbacks and much more complex code :-(.
+
+    We still use the query as a way of passing parameters around though.
+    """
     def __init__(self,default = None,query=None,server=None,ftoolbar=None):
         # Create the Main Widget
         self.result=gtk.VBox()
@@ -354,6 +376,14 @@ class GTKUI(UI.GenericUI):
         if query:
             self.defaults=query
 
+        ## It is critical that we have access to our server, It is now
+        ## illegal to instatiate new UIs like this:
+        ## tmp =result.__class__()
+        ##
+        ## You must do this:
+        ## tmp=result.__class__(result)
+        ##    
+        ## Or an exception will sound!!!
         assert(self.server)
         assert(self.ftoolbar)
         
@@ -369,14 +399,24 @@ class GTKUI(UI.GenericUI):
         self.title = string
         
     def refresh(self, int, query):
-        self.link_callback(query)
+        print "Will refresh to %s" % query
+        self.server.process_query(query)
+
+    def link_callback(self,query):
+        """ Calls the server to add a new page with the given query """
+        self.server.process_query(query)
 
     def __str__(self):
-#        return self.display()
+        """ This method should not be used directly by reports.
+
+        There was a bad habbit, while using the HTML UI, to get access to the raw HTML data by calling this method. This is not legal and is no longer supported!!!
+
+        It breaks this UI (and other future UIs), and goes against the spirit of UI abstraction.
+        """
         return "GTKUI Widget"
     
     def display(self):
-        ## Did the user forget to call end_table??? Dumb user!!!
+        ## Did the user forget to call end_table??? 
         if self.current_table:
             self.end_table()
 
@@ -392,6 +432,7 @@ class GTKUI(UI.GenericUI):
     def start_table(self,**options):
         if not self.current_table:
             # I'm confused, should we allow nested tables in the *same* UI object?
+            # No. UI objects can nest in tables, not tables directly nest in UI objects (MC)
             self.current_table=gtk.Table(1,1,False)
             self.current_table.set_border_width(5)
             self.current_table_row=0
@@ -405,7 +446,8 @@ class GTKUI(UI.GenericUI):
         self.current_table.resize(self.current_table_row,len(columns))
         for i in range(len(columns)):
             col=columns[i]
-            ## If this column is a string, (and therefore not a GTK Widget), we create a new widget for it
+            ## If this column is a string, (and therefore not a GTK
+            ## Widget), we create a new widget for it
             if isinstance(col,self.__class__):
                 col=col.display()
             elif not isinstance(col,gtk.Widget):
@@ -433,17 +475,20 @@ class GTKUI(UI.GenericUI):
             self.current_table=None
 
     def goto_link(self,widget,event,target):
-        """ This is the callback function from links """
-        ## If the target report does not have all its parameters - we
-        ## should invoke the form for it here - this is different than
-        ## the html ui since it takes care of it.
-#        target = widget.get_data('query')
+        """ This is the callback function from links
+
+        If the target report does not have all its parameters - we should invoke the form for it here - this is different than the html ui since the HTML UI passes the link request into the server again. Here we dont, so we need to do same here.
+        
+        @arg target: A query object specifying where to go to.
+        """
+        ## Only respond to left clicks
+        if event.button !=1: return
         try:
             family=target['family']
             report=target['report']
             report = Registry.REPORTS.dispatch(family,report)(FlagFramework.GLOBAL_FLAG_OBJ,ui=FlagFramework.GLOBAL_FLAG_OBJ.ui)
             if not report.check_parameters(target):
-                self.server.draw_form(target)
+                self.server.process_query(target)
         except KeyError:
             pass
 
@@ -494,7 +539,7 @@ class GTKUI(UI.GenericUI):
     def notebook(self,names=[],context="notebook",callbacks=[],descriptions=[]):
         """ Draw a notebook like UI with tabs.
 
-        If no tab is selected, the first tab will be selected.
+        If no tab is selected, the first tab will be selected. Tabs are selected by specifying a page number in query[context].
 
         @arg names: A list of names for each tab
         @arg callbacks: A list of callbacks to call for each name
@@ -502,7 +547,7 @@ class GTKUI(UI.GenericUI):
         @arg descriptions: A list of descriptions to assign to each tab. The description should not be longer than 1 line.
         """
         query=self.defaults.clone()
-        ## If the user supplied a context (a tab which should be open by default)
+        ## If the user supplied a tab which should be open by default
         try:
             context_str=query[context]
         ## Otherwise we open the first one by default
@@ -516,8 +561,11 @@ class GTKUI(UI.GenericUI):
         self.result.pack_start(notebook)
         notebook.set_current_page(names.index(context_str))
 
-                
     def link(self,string,target=FlagFramework.query_type(()),**target_options):
+        """ This method simulates a link by using an event box around a label.
+
+        Clicking the even box will call the link callback. This is a little hack because clicking anywhere within the event box will cause a link to fire - not necessarily on the text.
+        """
         target=target.clone()
         if target_options:
             for k,v in target_options.items():
@@ -615,7 +663,7 @@ class GTKUI(UI.GenericUI):
                     new_query[parameter[0]]=parameter[1]
             except TypeError:
                 pass
-        #print "DEBUG: Submitting Form, new_query is: %s" % new_query
+#        print "DEBUG: Submitting Form, new_query is: %s" % new_query
         self.link_callback(new_query)
 
     def end_form(self,name='Submit'):
@@ -634,7 +682,7 @@ class GTKUI(UI.GenericUI):
     text_widget_iter=None
 
     def create_tags(self, text_buffer):
-        ''' Create a bunch of tags. Note that it's also possible to
+        """Create a bunch of tags. Note that it's also possible to
         create tags with gtk.text_tag_new() then add them to the
         tag table for the buffer, text_buffer.create_tag() is
         just a convenience function. Also note that you don't have
@@ -651,7 +699,7 @@ class GTKUI(UI.GenericUI):
         property affected by an earlier tag will override the earlier
         tag. You can modify tag priorities with
         gtk.text_tag_set_priority().
-        '''
+        """
 
         import pango
         text_buffer.create_tag("font_heading",
@@ -690,7 +738,7 @@ class GTKUI(UI.GenericUI):
         
         text_buffer.create_tag("char_wrap", wrap_mode=gtk.WRAP_CHAR)
         
-        text_buffer.create_tag("no_wrap", wrap_mode=gtk.WRAP_NONE)
+        text_buffer.create_tag("wrap_none", wrap_mode=gtk.WRAP_NONE)
         
         text_buffer.create_tag("center", justification=gtk.JUSTIFY_CENTER)
         
@@ -881,17 +929,18 @@ class GTKUI(UI.GenericUI):
                 #Create a link which deletes the current variable from
                 #the query string, allows the user to remove the
                 #current condition:
-                tmp_query=query.clone()
-                tmp_query.remove(d,v)
-                tmp_link=self.__class__(self)
-                tmp_link.link(condition_text,target=tmp_query)
-                conditions.append(tmp_link)
+##                tmp_query=query.clone()
+##                tmp_query.remove(d,v)
+##                tmp_link=self.__class__(self)
+##                tmp_link.link(condition_text,target=tmp_query)
+##                conditions.append(tmp_link)
 
         having_str = " and ".join(having)
 
         if where:
             query_str+= " where (%s) and (%s) " %(where,having_str)
         elif having:
+            print having,having_str
             query_str+=" where %s " % having_str
             
         if group_by_str:
@@ -1073,7 +1122,8 @@ class GTKUI(UI.GenericUI):
                     del self.filter_text[index]
                     del self.filter_conditions[index]
                     if len(self.filter_conditions):
-                        new_where = "%s and %s" % (where,' and '.join(filter_conditions))
+                        new_where = "%s and %s" % (where,' and '.join(self.filter_conditions))
+                        print "my where is ",where,new_where
                     else: new_where=where
 
                     ## Update the store with the new data
@@ -1081,7 +1131,7 @@ class GTKUI(UI.GenericUI):
                     populate_store(store,generator,names)
 
                 for i in range(len(self.filter_conditions)):
-                    m=gtk.MenuItem("remove %s" % filter_text[i])
+                    m=gtk.MenuItem("remove %s" % self.filter_text[i])
                     m.connect("activate",remove_filter_condition,i)
                     menu.add(m)
 
@@ -1122,12 +1172,12 @@ class GTKUI(UI.GenericUI):
                 column_name=None
                 column_title=None
 
-            widget.connect("button_press_event", process_filter_cb,column_name, column_title, text_entry, self.filter_conditions,store,combobox)
+            widget.connect("button_press_event", process_filter_cb,column_name, column_title, text_entry, store,combobox)
             result.row(widget)
             dialog=result.create_popup_window()
             text_entry.grab_focus()
 
-        def process_filter_cb(widget,event,column_name,column_title,filter_str_widget,filter_conditions,store,comboname):
+        def process_filter_cb(widget,event,column_name,column_title,filter_str_widget,store,comboname):
             """ Filter the data in the store, enforcing filter conditions chosen by right click menu """
             parent=widget.get_parent_window()
             ## If comboname is given, we need to read the column_name,
@@ -1151,12 +1201,13 @@ class GTKUI(UI.GenericUI):
                     break
 
             try:
-                self.filter_text.append(FlagFramework.make_sql_from_filter(filter_str_widget.get_text(),filter_conditions,column_name,column.get_title()))
+                self.filter_text.append(FlagFramework.make_sql_from_filter(filter_str_widget.get_text(),self.filter_conditions,column_name,column.get_title()))
             except IndexError:
                 widget.get_parent_window().destroy()
                 return
-                
-            new_where = "%s and %s" % (where,' and '.join(filter_conditions))
+
+            new_where = ' and '.join(['1']+self.filter_conditions)
+            print "my where is ",where,new_where
 
             ## Update the store with the new data
             generator,new_query,x,y,z = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=new_where,groupby = groupby,case=case,callbacks=callbacks,**opts)
@@ -1444,3 +1495,18 @@ class GTKUI(UI.GenericUI):
         box.pack_start(hbox,False,False)
         self.server.create_window(box)
         raise FlagFramework.DontDraw()
+
+##    def case_selector(self,case='case',message='Case:', **options):
+##        """ In the GTK window we use the case as chosen using the case selector on the tool bar for all reports. """
+##        combo=self.server.case_selector_combo
+##        model = combo.get_model()
+##        active = combo.get_active()
+##        def case_cb(widget):
+##            if active==0: return ('case',None)
+##            return ('case',model[active][0])
+        
+##        self.row("Current case:",model[active][0])
+##        if active>0:
+##            del self.defaults['case']
+##            self.defaults['case']=model[active][0]
+##        self.form_widgets.append((1,case_cb))

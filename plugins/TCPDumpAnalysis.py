@@ -38,6 +38,7 @@ import pyflag.UI as UI
 
 description = "TCPDump Analysis"
 order = 40
+active=False
 
 class ConTable(Reports.report):
     """ Report to create and browse the connection table.

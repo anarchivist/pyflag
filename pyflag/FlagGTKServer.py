@@ -76,7 +76,7 @@ class FlagServerNotebook(FlagNotebook):
         del self.callbacks[page_id]
     
     def add_page(self, name, callback, query):
-        FlagNotebook.add_page(self, name, callback, query)
+        page=FlagNotebook.add_page(self, name, callback, query)
         
         delete_image = gtk.Image()
         delete_image.set_from_file( "%s/button_delete.xpm" % config.IMAGEDIR )
@@ -84,16 +84,17 @@ class FlagServerNotebook(FlagNotebook):
 
         delete_button = gtk.Button()
         delete_button.add(delete_image)
-        delete_button.connect('clicked', self.close_tab, self.page_id-1)
-        print "adding page %s" % (self.page_id-1)
+        delete_button.connect('clicked', self.close_tab, page)
+        print "adding page %s" % (page)
         
         hbox = gtk.HBox()
         hbox.pack_start(gtk.Label(name))
         hbox.pack_start(delete_button, False, False)
         hbox.show_all()
-        child = self.get_nth_page(self.get_page_with_id(self.page_id-1))
+        child = self.get_nth_page(self.get_page_with_id(page))
         self.set_tab_label(child, hbox)
         self.set_current_page(self.get_n_pages()-1)
+        return page
             
 class GTKServer(gtk.Window):
     """ A class which represents the main GTK server window """
@@ -137,8 +138,8 @@ class GTKServer(gtk.Window):
         
         # put the toolbar in a HBox with a case selector
         hbox = gtk.HBox()
-        combobox = self.case_selector()
-        hbox.pack_start(combobox, False)
+        self.case_selector_combo = self.case_selector()
+        hbox.pack_start(self.case_selector_combo, False)
         hbox.pack_start(self.toolhandlebox)
         self.toolhbox.show_all()
 
@@ -146,10 +147,6 @@ class GTKServer(gtk.Window):
         self.vbox.pack_start(self.notebook, True, True)
         self.vbox.pack_end(self.statusbar, False)
                 
-        # install the main UI callback
-        self.flag.ui.link_callback = self.add_page
-
-        # show it
         self.show_all()
 
     def order_families(self, families):
@@ -203,9 +200,11 @@ class GTKServer(gtk.Window):
         family=query['family']
         report=query['report']
         report = Registry.REPORTS.dispatch(family,report)(self.flag,ui=self.flag.ui)
+        print query
         if self.form_dialog:
             child=self.form_dialog.get_child()
-            self.form_dialog.remove(child)
+            if child:
+                self.form_dialog.remove(child)
         else:
             self.form_dialog=gtk.ScrolledWindow()
             self.form_dialog.set_transient_for(self)
@@ -216,7 +215,8 @@ class GTKServer(gtk.Window):
 
         box=gtk.VBox()
         self.form_dialog.add(box)
-        result = self.flag.ui(server=self)
+        toolbar=FlagServerToolbar(box)
+        result = self.flag.ui(server=self,ftoolbar=toolbar)
         try:
             report.progress(query,result)
         except Exception,e:
@@ -228,6 +228,8 @@ class GTKServer(gtk.Window):
         
     def run_analysis(self,report,query):
         """ Run the analysis """
+        print query
+
         try:
             canonical_query = self.flag.canonicalise(query)
             thread_name = threading.currentThread().getName()
@@ -243,92 +245,64 @@ class GTKServer(gtk.Window):
             
             dbh = DB.DBO(query['case'])
             dbh.execute("insert into meta set property=%r,value=%r",('report_executed',canonical_query))
-            ## This thread must never touch GTK stuff or dead lock will occur. We must signal the other threads that we have finished analysis.
+            ## This thread must never touch GTK stuff or dead lock
+            ## will occur. We must signal the other threads that we
+            ## have finished analysis.
             del self.running_threads[query.__str__()]
             return
         except Exception:
             pass
 
     ## A class variable to record currently running threads
-    running_threads ={} 
-    def draw_form(self,query):
-        family=query['family']
-        report=query['report']
-        report = Registry.REPORTS.dispatch(family,report)(self.flag,ui=self.flag.ui)
-        ## Check to see if we have all the parameters we need:
-        if report.check_parameters(query):
-            print "Parameters ok - we can go ahead"
-            ##Check to see if the report is cached in the database:
-            if self.flag.is_cached(query):
-                self.add_page(query)
-                self.form_dialog.destroy()
-                self.form_dialog=None
-                return
-            else:
-                self.running_threads[query.__str__()] = "ready"
-                ## Report is not cached - we shall analyse it in a seperate thread:
-                t = threading.Thread(target=self.run_analysis,args=(report,query))
-                t.start()
-                print "Analysing report"
-                import time
-
-                def progress_thread(t,query):
-                    """ This function is called to refresh the progress window """
-                    ## Ensure to tear down the progress window if the analysis thread is no longer running
-                    if not self.running_threads.has_key(query.__str__()):
-                        self.add_page(query)
-                        self.form_dialog.destroy()
-                        self.form_dialog=None
-                        return
-                    print "progress thread"
-                    if self.form_dialog:
-                        print "drawing progress"
-                        self.run_progress(query)
-                        gtk.timeout_add(1000,progress_thread,t,query)
-                    else:
-                        print "finished progressing"
-                        return
-
-                ## Run the progress cycle in a seperate thread
-                print "Calculating progress"
-                gtk.timeout_add(1000,progress_thread,t,query)
-                return
-
+    running_threads ={}
+    
+    def draw_form(self,query,report):
+        print "Drawing form for %s %s" % (query,self.form_dialog)
+        if self.form_dialog:
+            child=self.form_dialog.get_child()
+            self.form_dialog.remove(child)
         else:
-            if self.form_dialog:
-                child=self.form_dialog.get_child()
-                self.form_dialog.remove(child)
-            else:
-                self.form_dialog=gtk.Window()
-                self.form_dialog.set_transient_for(self)
-                self.form_frame=gtk.Frame("%s" % report.name) 
-                #self.form_dialog.set_position(gtk.WIN_POS_CENTER_ON_PARENT)
-#                self.form_dialog.set_position(gtk.WIN_POS_CENTER_ALWAYS)
-#                self.form_dialog.set_default_size(500,500)
-                self.form_dialog.connect('destroy',self.delete_form)
+            self.form_dialog=gtk.Window()
+            self.form_dialog.set_transient_for(self)
+            self.form_frame=gtk.Frame("%s" % report.name) 
+            self.form_dialog.set_position(gtk.WIN_POS_CENTER_ON_PARENT)
+            #self.form_dialog.set_position(gtk.WIN_POS_CENTER_ALWAYS)
+            #self.form_dialog.set_default_size(500,500)
+            self.form_dialog.connect('destroy',self.delete_form)
 
-            box=gtk.VBox()
-            toolbar=FlagServerToolbar(box)
-            result = self.flag.ui(server=self,ftoolbar=toolbar)
-            result.start_form(query)
-            try:
-                report.form(query,result)
-            except GTKUI.DontDraw,e:
-                return
-            except Exception,e:
-                self.error_popup(e)
-                raise
-            
-            ## Set the callback to ourselves:
-            result.link_callback = self.draw_form
-            result.end_form()
-            
-            if self.form_frame.get_child():
-                self.form_frame.remove(self.form_frame.get_child())
-                
-            self.form_frame.add(result.display())
-            self.form_dialog.add(self.form_frame)
-            self.form_dialog.show_all()
+        box=gtk.VBox()
+        toolbar=FlagServerToolbar(box)
+        result = self.flag.ui(server=self,query=query,ftoolbar=toolbar)
+        result.start_form(query)
+        try:
+            report.form(query,result)
+        except FlagFramework.DontDraw,e:
+            return
+        except Exception,e:
+            self.error_popup(e)
+            raise
+
+        result.end_form()
+
+        if self.form_frame.get_child():
+            self.form_frame.remove(self.form_frame.get_child())
+
+        self.form_frame.add(result.display())
+        self.form_dialog.add(self.form_frame)
+        self.form_dialog.show_all()
+        print "shown form_dialog"
+
+    def draw_about_help(self,action):
+        """ Draws an about page """
+        result=GTKUI.GTKUI(server=main,ftoolbar=main.ftoolbar)
+        result.heading("PyFlag - Forensic and Log Analysis GUI")
+        result.text("""
+        Version: $Version: $
+        Copyright 2004-2005:
+           David Collett <daveco@users.sourceforge.net>
+           Michael Cohen <scudette@users.sourceforge.net>
+           """,font='bold',wrap='none')
+        self.create_window(result.display(),'logo.png')
 
     def draw_report_help(self,action):
         current_page = self.notebook.get_current_page()
@@ -348,20 +322,100 @@ class GTKServer(gtk.Window):
             result.text(report.description)
             self.create_window(result.display(),gtk.STOCK_DIALOG_INFO)
 
-    def add_page(self, query):
-        """ Add a new notebook page, or redraw existing page """
-        family=query['family']
-        report=query['report']
-        report = Registry.REPORTS.dispatch(family,report)(self.flag,ui=self.flag.ui)
-        #result=self.flag.ui(query=query,server=self)
-        #report.display(query,result)
-        self.notebook.add_page(query['report'], report.display, query)
+    def process_query(self,query):
+        """ This is the main entry point for processing queries.
 
+        If the query is incomplete, we draw a form, if its complete, we check that the report has not been run before. If its cached, we open a new page for it. Else we manage the progress/analyse threads.
+        """
+        try:
+            family=query['family']
+            report=query['report']
+            report = Registry.REPORTS.dispatch(family,report)(self.flag,ui=self.flag.ui)
+            print "processing query %s" % query
+            ## Check to see if we have all the parameters we need:
+            if report.check_parameters(query):
+                print "Parameters ok - we can go ahead %s" % query
+                ##Check to see if the report is cached in the database:
+                if self.flag.is_cached(query):
+                    if self.form_dialog:
+                        self.form_dialog.destroy()
+                        self.form_dialog=None
+
+                    ## Add this page to our main notebook
+                    self.add_page(query,report)
+                    return
+                else:
+                    self.running_threads[query.__str__()] = "ready"
+                    ## Report is not cached - we shall analyse it in a seperate thread:
+                    t = threading.Thread(target=self.run_analysis,args=(report,query))
+                    t.start()
+                    print "Analysing report"
+                    import time
+
+                    def progress_thread(t,query):
+                        """ This function is called to refresh the progress window
+
+                        This callback is invoked every few seconds in the same thread as the display. It is up to this function to detect when the analysis method finished.
+                        """
+                        ## Ensure to tear down the progress window if the
+                        ## analysis thread is no longer running. This has
+                        ## to be done here because it seems very dangerous
+                        ## to do gtk stuff in another thread - it seems
+                        ## that gtk is at present single threaded or we
+                        ## get a nasty lockup. Hence its important to
+                        ## ensure that the analysis thread makes _no_ gtk
+                        ## calls at all!!!
+                        if not self.running_threads.has_key(query.__str__()):
+                            if self.form_dialog:
+                                self.form_dialog.destroy()
+                                self.form_dialog=None
+                            self.add_page(query,report)
+                            return
+
+                        if self.form_dialog:
+                            print "drawing progress"
+                            self.run_progress(query)
+                            ## Ensure we get invoked again to monitor the progress
+                            gtk.timeout_add(1000*config.REFRESH,progress_thread,t,query)
+                        else:
+                            print "finished progressing"
+                            self.process_query(query)
+
+                    ## The first check the progress of the analysis is
+                    ## only quite short- this allows trivial analyses
+                    ## methods to complete quickly
+                    gtk.timeout_add(100,progress_thread,t,query)
+                    return
+
+            ## We do not have all the parameters we need:
+            else:
+                ## Draw the form
+                self.draw_form(query,report)
+        except Exception,e:
+            self.error_popup(e)
+            raise
+
+    def add_page(self, query,report):
+        """ Add a new notebook page, or redraw existing page """
+        page=self.notebook.add_page(query['report'], report.display, query)
+
+    def get_current_case(self):
+        """ Gets the current case and returns it.
+
+        @return: current case as selected in the toolbar selector or FLAGDB if none selected
+        """
+        model = self.case_selector_combo.get_model()
+        active = self.case_selector_combo.get_active()
+        if active==0:
+            return config.FLAGDB
+        else: return model[active][0]
+        
     def execute_report_cb(self, action, family, report):
         """ Execute a report based on the clicked action item """
-        query = FlagFramework.query_type((),family=family,report=report,case='pyflag')
-        self.draw_form(query)
-#        self.add_page(query)
+        ## Get the case from the case_selector_combo:
+        print self.get_current_case()
+        query = FlagFramework.query_type((),family=family,report=report,case=self.get_current_case())
+        self.process_query(query)
         
     def build_flag_menu(self):
         # Create an actiongroup
@@ -421,7 +475,7 @@ class GTKServer(gtk.Window):
         actions.add_actions([('Help', None, '_Help'),
                              ('Contents', gtk.STOCK_HELP, '_Contents'),
                              ('Current Report', gtk.STOCK_HELP, '_Report',None,'Current Report',self.draw_report_help),
-                             ('About', gtk.STOCK_DIALOG_INFO, '_About')])
+                             ('About', gtk.STOCK_DIALOG_INFO, '_About',None,'About',self.draw_about_help)])
         ui += '</menubar>\n'
 
         # Add the actions to the uimanager
@@ -438,9 +492,16 @@ class GTKServer(gtk.Window):
         dialog.add(vbox)
         if icon:
             hbox=gtk.HBox(False,8)
-            stock = gtk.image_new_from_stock(
-                icon,
-                gtk.ICON_SIZE_DIALOG)
+
+            ## Is it an image we specified?
+            if icon.endswith(".png"):
+                stock=gtk.Image()
+                stock.set_from_file( "%s/%s" % (config.IMAGEDIR,icon ))
+            else:
+                stock = gtk.image_new_from_stock(
+                    icon,
+                    gtk.ICON_SIZE_DIALOG)
+                
             hbox.pack_start(stock, False, False, 0)
             hbox.pack_start(widget,True,True, 0)
             vbox.pack_start(hbox,True,True, 0)

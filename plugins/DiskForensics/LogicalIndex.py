@@ -42,6 +42,7 @@ import pyflag.logging as logging
 import pyflag.FlagFramework as FlagFramework
 import pyflag.FileSystem as FileSystem
 import pyflag.Reports as Reports
+import pyflag.Registry as Registry
 import pyflag.IO as IO
 from pyflag.Scanner import *
 import index,os
@@ -266,7 +267,7 @@ class SearchIndex(Reports.report):
         table = query['fsimage']
         dbh2.execute("CREATE TABLE if not exists `LogicalKeyword_%s` (`id` INT NOT NULL AUTO_INCREMENT ,`inode` VARCHAR( 20 ) NOT NULL ,`offset` BIGINT NOT NULL ,`text` VARCHAR( 200 ) NOT NULL ,`keyword` VARCHAR(20) NOT NULL ,PRIMARY KEY ( `id` ))",(table))
         iofd = IO.open(query['case'], query['fsimage'])
-        fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
+        fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"], query["fsimage"], iofd)
 
         import index
 
@@ -298,7 +299,7 @@ class SearchIndex(Reports.report):
         
         table = query['fsimage']
         iofd = IO.open(query['case'], query['fsimage'])
-        fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
+        fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"], query["fsimage"], iofd)
 
         ## This stuff is done on the fly because it is time consuming - The disadvantage is that it cannot be searched on.
         def SampleData(string,result=None):
