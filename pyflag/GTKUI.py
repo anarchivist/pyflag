@@ -1222,6 +1222,7 @@ class GTKUI(UI.GenericUI):
                 if len(self.filter_conditions) or column:
                     menu.show_all()
                     menu.popup( None, None, None, event.button, time)
+                    return 1
             return 0
 
         def search_menu_popup(widget,column,data='',table=None):

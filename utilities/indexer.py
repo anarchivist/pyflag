@@ -83,7 +83,7 @@ def display_search(idx,fd,keyword):
     @arg fd: an open file descriptor to the image
     @arg keyword: word to search for
     """
-    CONTEXT=30
+    CONTEXT=10
     print "Searching for the word %r" % keyword
     for offset in idx.search(keyword):
         ## seek to the correct offset and print the output:

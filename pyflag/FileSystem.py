@@ -215,10 +215,14 @@ class DBFS(FileSystem):
                 if root_inode != None:
                     self.dbh.execute("insert into file_%s set path=%r,name=%r,status='alloc',mode='d/d',inode='%s|%s-'",(self.table,path,dirs[d],root_inode,inode))
 #                    self.dbh.execute("update inode_%s  set mode=%r, links=%r where inode=%r",(self.table,40755, 3,inode))
-                    self.dbh.execute("insert into inode_%s  set mode=%r, links=%r , inode='%s|%s-',gid=0,uid=0,size=1",(self.table,40755, 3,root_inode,inode))
+                    self.dbh.execute("insert into inode_%s  set mode=%r, links=%r , inode='%s|%s-',gid=0,uid=0",(self.table,40755, 3,root_inode,inode))
                 else:
                     self.dbh.execute("insert into file_%s set path=%r,name=%r,status='alloc',mode='d/d',inode='%s-'",(self.table,path,dirs[d],inode))
+v v v v v v v
                     self.dbh.execute("insert into inode_%s  set mode=%r, links=%r , inode='%s-',gid=0,uid=0",(self.table,40755, 3,inode))
+*************
+                    self.dbh.execute("insert into inode_%s  set mode=%r, links=%r , inode='%s-',gid=0,uid=0,size=1",(self.table,40755, 4,root_inode,inode))
+^ ^ ^ ^ ^ ^ ^
                     
         path = normpath("%s/%s/" % (filename,os.path.dirname(new_filename)))
         ## Add the file itself to the file table
@@ -233,9 +237,9 @@ class DBFS(FileSystem):
             extra=','+extra
 
         if root_inode!=None:
-            self.dbh.execute("insert into inode_%s set inode='%s|%s',mode=100777,links=3,gid=0,uid=0" + extra ,[self.table, root_inode,inode] + properties.values())
+            self.dbh.execute("insert into inode_%s set inode='%s|%s',mode=100777,links=4,gid=0,uid=0,size=1" + extra ,[self.table, root_inode,inode] + properties.values())
         else:
-            self.dbh.execute("insert into inode_%s set inode='%s',mode=100777,links=3,gid=0,uid=0" + extra ,[self.table, inode] + properties.values())
+            self.dbh.execute("insert into inode_%s set inode='%s',mode=100777,links=4,gid=0,uid=0,size=1" + extra ,[self.table, inode] + properties.values())
         
         ## Set the root file to be a d/d entry so it looks like its a virtual directory:
         self.dbh.execute("select * from file_%s where mode='d/d' and inode=%r and status='alloc'",(self.table,root_inode))
