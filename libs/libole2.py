@@ -37,6 +37,55 @@ import struct,sys
 import format
 from format import *
 
+class Tree:
+    """ A simple tree implementation """
+    def __init__(self,data,parent):
+        self.children=[]
+        self.data=data
+        self.parent=parent
+
+    def add_child(self,data):
+        """ Adds a new child containing data to this node.
+
+        Note, only unique children are allowed.
+        """
+        child = self.__class__(data,self)
+        self.children.append(child)
+        return child
+
+    def add_peer(self,data):
+        return self.parent.add_child(data)
+
+    def find_child(self,data):
+        """ Searches through our children to find a node equal to data.
+
+        @return tree node whose data is the same as data.
+        """
+        if data==self.data: return self
+        
+        for c in self.children:
+            result=c.find_child(data)
+            if result: return result
+
+        return None
+
+    def repr(self):
+        """ The way we would like to represent the data """
+        return self.data
+
+    def __str__(self):
+        result='\n%s' % self.repr()
+        for c in self.children:
+            r=("%s" % c).split("\n")
+            result+="\n    ".join(r)
+
+        return result
+
+class PropertyTree(Tree):
+    """ A Tree specifically designed for printing properties """
+    def repr(self):
+        return self.data['pps_rawname']    
+
 class OLEException(Exception):
     """ OLE specific exception """
 
@@ -130,6 +179,9 @@ class OLEFile:
     blocksize=0x200
     ## The blocksize of small blocks
     small_blocksize=0x40
+
+    ## The index of the root property
+    root_dir_index=0
     
     def __init__(self,data):
         self.data=data
@@ -158,7 +210,10 @@ class OLEFile:
 
         self.small_chain = self.cat(self.properties[0])
 
-        self.root_dir_index=0
+        ## This builds an internal tree representation of the file
+        self.root_tree =PropertyTree(self.properties[0],None)
+        self.add_to_tree(self.properties[0],self.root_tree)
+
 
     def read_depot(self,list,data,blocksize):
         result=[]
@@ -206,17 +261,11 @@ class OLEFile:
         return self.properties[self.root_dir_index]
     
     def ls(self,property):
-        """ Given a property set, returns an array of files under that directory """
-        result=[self.properties[property['pps_dir'].get_value()]]
-        number_of_properties = self.properties.size()/result[0].size()
-        next=result[-1]['pps_next'].get_value()
-        
-        while next>0 and next<number_of_properties:
-            result.append(self.properties[next])
-            next=result[-1]['pps_next'].get_value()
-            
-        return result
-        
+        """ Given a property set, returns an array of file properties under that directory """
+        node=self.root_tree.find_child(property)
+        for child in node.children:
+            yield child.data
+
     def  follow_chain(self,start,depot):
         """ Follows the chain through the given depot returning a list of blocks in the chain.
         
@@ -238,14 +287,34 @@ class OLEFile:
         result = ''.join(result)
         return result
 
+    def add_to_tree(self,p,node):
+        """ This is used to build an internal tree representation of the data """
+        next=p['pps_next'].get_value()
+        if next>0:
+            np=self.properties[next]
+            peer=node.add_peer(np)
+            self.add_to_tree(np,peer)
+
+        prev=p['pps_prev'].get_value()
+        if prev>0:
+            np=self.properties[prev]
+            peer=node.add_peer(np)
+            self.add_to_tree(np,peer)
+
+        child=p['pps_dir'].get_value()
+        if child>0:
+            np=self.properties[child]
+            c=node.add_child(np)
+            self.add_to_tree(np,c)
+
 if __name__ == "__main__":
     fd=open(sys.argv[1],'r')
     data=fd.read()
     fd.close()
-
     print sys.argv[1]
     a = OLEFile(data)
     count=0
+    
     for p in a.properties:
         print "Property %s" % (count)
         print "%r"% p['pps_rawname'].get_value()
@@ -253,6 +322,16 @@ if __name__ == "__main__":
         data = a.cat(p)
         print "Data is %r length %s" % (data[:100],len(data))
         count+=1
+
+    print [ x['pps_rawname'].get_value() for x in a.ls(a.root())]
+    def print_dir(dir,prefix):
+	print "%s" % dir['pps_rawname']
+        for file in a.ls(dir):
+            print "%s%s" % (prefix,file['pps_rawname'])
+            print_dir(file,prefix+"  ")
+
+    print_dir(a.root(),'')
+    
 #    print a.root()
 #    for file in a.ls(a.root()):
 #        print file
