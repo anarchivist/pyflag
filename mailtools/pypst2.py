@@ -130,7 +130,7 @@ class Pstfile:
                 if val:
                     self.data += "%s: %s\n" % (name.title(), val)
         
-    class Journal(Contact):
+    class Journal(Item):
         """ contact item """
         def _read(self):
             self.data = ''
@@ -140,7 +140,7 @@ class Pstfile:
                 if val:
                     self.data += "%s: %s\n" % (name.title(), val)
 
-    class Appointment(Contact):
+    class Appointment(Item):
         """ appointment item """
         def _read(self):
             self.data = ''
