@@ -218,11 +218,7 @@ class DBFS(FileSystem):
                     self.dbh.execute("insert into inode_%s  set mode=%r, links=%r , inode='%s|%s-',gid=0,uid=0",(self.table,40755, 3,root_inode,inode))
                 else:
                     self.dbh.execute("insert into file_%s set path=%r,name=%r,status='alloc',mode='d/d',inode='%s-'",(self.table,path,dirs[d],inode))
-v v v v v v v
-                    self.dbh.execute("insert into inode_%s  set mode=%r, links=%r , inode='%s-',gid=0,uid=0",(self.table,40755, 3,inode))
-*************
                     self.dbh.execute("insert into inode_%s  set mode=%r, links=%r , inode='%s-',gid=0,uid=0,size=1",(self.table,40755, 4,root_inode,inode))
-^ ^ ^ ^ ^ ^ ^
                     
         path = normpath("%s/%s/" % (filename,os.path.dirname(new_filename)))
         ## Add the file itself to the file table
@@ -351,7 +347,7 @@ v v v v v v v
 
 class File:
     """ This abstract base class documents the file like object used to read specific files in PyFlag.
-    Each subclass must implement this interface
+    Each subclass must impliment this interface
     """
     readptr = None
     size = None
