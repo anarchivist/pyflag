@@ -906,14 +906,6 @@ class GTKUI(UI.GenericUI):
 
             populate_store(store,generator,names)
 
-            ## Update the navigation buttons
-            q=self.right_button.get_data('query')
-            del q['limit']
-            q['limit']=0
-            self.right_button.set_data('query',q)
-            self.left_button.set_data('query',q)
-
-
         # add nav toolitems directly to the toolbar
         prev_button = gtk.ToolButton(gtk.STOCK_GO_BACK)
         next_button = gtk.ToolButton(gtk.STOCK_GO_FORWARD)
