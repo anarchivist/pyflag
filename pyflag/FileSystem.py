@@ -37,6 +37,9 @@ The File class abstracts an interface for accessing the data within a specific f
 
 In order for callers to have access to a specific file on the filesystem, they need to instantiate a FileSystem object by using FS_Factory, and then ask this instance for a File object by using the FileSystem.open method. It is discouraged to instantiate a File object directly.
 
+Virtual Filesystems (vfs) are also supported by this subsystem in order to support archives such as zip and pst files. Files within filesystems are uniquely identified in the flag databases by an inode string. The inode string can have multiple parts delimited by the pipe ('|') character indicating that a virtual filesystem is to be used on the file. The first letter in the part indicates the virtual filesystem to use, here is an example:
+'D123|Z14' Here 'D' indicates the DDFS filesystem, Z indicates the Zip vfs.
+This inode therefore refers to the 14 file in the zip archive contained in inode 123 of the DDFS filesystem. VFS
 """
 import os,os.path
 import pyflag.conf
@@ -79,7 +82,26 @@ class FileSystem:
 
         This object can then be used to read data from the specified file.
         @note: Only files may be opened, not directories."""
-        pass
+        
+        if not inode:
+            inode = self.lookup(path)
+        if not inode:
+            raise IOError('Inode not found for file')
+
+        if not path:
+            path = self.lookup(inode=inode)
+        if not path:
+            raise IOError('File not found for inode')
+
+        # open the file, first pass will generally be 'D' or 'M'
+        # then any virtual file systems (vfs) will kick in :)
+        parts = inode.split('|')
+        retfd = self.fd
+        for part in parts[1:]:
+            try:
+                retfd = vfslist[part[0]](self.case, self.table, retfd, part, path)
+            except IndexError:
+                raise IOError, "Unable to open inode: %s, no VFS" % part
 
     def istat(self, path=None, inode=None):
         """ return a dict with information (istat) for the given inode or path. """
@@ -157,23 +179,23 @@ class DBFS(FileSystem):
                 return None
             return res["path"]
     
-    def open(self, path=None, inode=None):
-        if not inode:
-            inode = self.lookup(path)
-        if not inode:
-            raise IOError('Inode not found for file')
-
-        ## Find out which handler is required for this file:
-        try:
-            ## If the inode is special it is of the form inode - type - descriptor. type is Z for zips
-            temp = inode.split('|')
-            if temp[-2] == 'Z':
-                file=DBFS_file(self.case,self.table,self.fd,temp[0])
-                return Zip_file(self.case,self.table,file,'|'.join(temp[:-2]),temp[-1])
-        except IndexError:
-            pass
-
-        return DBFS_file(self.case, self.table, self.fd, inode)
+#    def open(self, path=None, inode=None):
+#        if not inode:
+#            inode = self.lookup(path)
+#        if not inode:
+#            raise IOError('Inode not found for file')
+#
+#        ## Find out which handler is required for this file:
+#        try:
+#            ## If the inode is special it is of the form inode - type - descriptor. type is Z for zips
+#            temp = inode.split('|')
+#            if temp[-2] == 'Z':
+#                file=DBFS_file(self.case,self.table,self.fd,temp[0])
+#                return Zip_file(self.case,self.table,file,'|'.join(temp[:-2]),temp[-1])
+#        except IndexError:
+#            pass
+#
+#        return DBFS_file(self.case, self.table, self.fd, inode)
 
     def istat(self, path=None, inode=None):
         if not inode:
@@ -279,24 +301,34 @@ class DBFS(FileSystem):
         for c in factories:
             c.destroy()
 
-class MountedFS(DBFS):
-    """ This class implements FS access for mounted directories on the host """
-    def open(self, path=None, inode=None):
-        if not path:
-            self.dbh.execute("select path,name from file_%s where inode=%r",(self.table, inode))
-            row=self.dbh.fetch()
-            path=row['path']+"/"+row['name']
-        
-        return MountedFS_file(self.case, self.table, self.fd, inode,os.path.normpath(self.fd.mount_point+path))
+# redundant???
+#class MountedFS(DBFS):
+#    """ This class implements FS access for mounted directories on the host """
+#    def open(self, path=None, inode=None):
+#        if not path:
+#            self.dbh.execute("select path,name from file_%s where inode=%r",(self.table, inode))
+#            row=self.dbh.fetch()
+#            path=row['path']+"/"+row['name']
+#        
+#        return MountedFS_file(self.case, self.table, self.fd, inode,os.path.normpath(self.fd.mount_point+path))
 
 class File:
-    """ This abstract base class documents the file like object used to read specific files in PyFlag. """
+    """ This abstract base class documents the file like object used to read specific files in PyFlag.
+    Each subclass must impliment this interface
+    """
     def __init__(self, case, table, fd, inode):
         """ The constructor for this object.
-
+        @arg case: Case to use
+        @arg table: The base name for all tables
+        @arg fd: An already open data source, may be iosource, or another 'File'
+        @arg inode: The inode of the file to open, only the part relevant to this class
         @note: This is not meant to be called directly, the File object must be created by a valid FileSystem object's open method.
         """
-        pass
+        # each file should remember its own part of the inode
+        self.case = case
+        self.table = table
+        self.fd = fd
+        self.inode = inode
 
     def close(self):
         """ Fake close method. """
@@ -316,11 +348,11 @@ class File:
     
 class DBFS_file(File):
     """ Class for reading files within a loaded dd image, supports typical file-like operations, seek, tell, read """
+    specifier = 'D'
     def __init__(self, case, table, fd, inode):
+        File.__init__(self, case, table, fd, inode)
+
         self.dbh = DB.DBO(case)
-        self.inode=inode
-        self.fd = fd
-        self.table = table
         self.readptr = 0
         try:
             self.dbh.execute("select value from meta_%s where name='block_size'",self.table);
@@ -426,9 +458,20 @@ class DBFS_file(File):
         
         return ddoffset,bytes_left
 
-class MountedFS_file(DBFS_file):
-    def __init__(self, case, table, fd, inode, path):
-#        DBFS_file.__init__(self,case, table, fd, inode)
+class MountedFS_file(File):
+    """ access to real file in filesystem """
+    specifier = 'M'
+    def __init__(self, case, table, fd, inode):
+        File.__init__(self, case, table, fd, inode)
+        #strategy:
+        #must determine path from inode
+        #we can assume this vfs will never be inside another vfs...
+        #just look it up in the database i spose "where inode=inode" ??
+
+        dbh = DB.DBO(case)
+        dbh.execute("select path,name from file_%s where inode=%r",(self.table, inode))
+        row=self.dbh.fetch()
+        path=row['path']+"/"+row['name']
         self.fd=open(path)
     
     def close(self):
@@ -451,27 +494,19 @@ class MountedFS_file(DBFS_file):
 
 class Pst_file(File):
     """ A file like object to read items from within pst files. The pst file is specified as an inode in the DBFS """
+    specifier = 'P'
     blocks=()
 
-    def __init__(self,case,table,file,inode,sub_inode):
-        self.dbh=DB.DBO(case)
-        self.case = case
-        self.table = table
-        self.dbh.execute("select concat(path,name) as filename from file_%s where inode=%r",(table,inode))
-        pstfilename=self.dbh.fetch()['filename']
-        self.dbh.execute("select concat(path,name) as filename from file_%s where inode='%s|Z|%s'",(table,inode,sub_inode))
-        filename=self.dbh.fetch()['filename']
-
-        if not filename.startswith(pstfilename): raise FlagFramework.FlagException("Error in tables: %s does not start with %s" %(filename,pstfilename))
-        filename=filename[len(pstfilename)+1:]
-
-        ## Handle recursive files:
-        p=pypst2.Pstfile(file)
-        # filename should be id below...
-        self.data=p.open(filename).read()
-            
-        self.pos=0
-        self.size=len(self.data)
+    def __init__(self, case, table, fd, inode):
+        File.__init__(self, case, table, fd, inode)
+        # strategy:
+        # cache whole of file in 'fd' to disk
+        # load into pypst2
+        # split inode into item_id and attachment number (if any)
+        # retrieve item using item_id
+        # if attachment, retrieve attachment from item using attachment number
+        # set self.data to either attachment or item
+        self.pos = 0
         
     def read(self,len=None):
         if len:
@@ -488,34 +523,19 @@ class Pst_file(File):
 
 class Zip_file(File):
     """ A file like object to read files from within zip files. Note that the zip file is specified as an inode in the DBFS """
-    blocks=()
+    specifier = 'Z'
     
-    def __init__(self,case,table,file,inode,sub_inode):
-        ## Find the filename relative to the zip file:
-        self.dbh=DB.DBO(case)
-        self.case=case
-        self.table=table
-        self.dbh.execute("select concat(path,name) as filename from file_%s where inode=%r",(table,inode))
-        zipfilename=self.dbh.fetch()['filename']
-        self.dbh.execute("select concat(path,name) as filename from file_%s where inode='%s|Z|%s'",(table,inode,sub_inode))
-        filename=self.dbh.fetch()['filename']
-
-        if not filename.startswith(zipfilename): raise FlagFramework.FlagException("Error in tables: %s does not start with %s" %(filename,zipfilename))
-        filename=filename[len(zipfilename)+1:]
-
-        ## Handle recursive files:
-        temp = inode.split('|')
+    def __init__(self, case, table, fd, inode):
+        File.__init__(self, case, table, fd, inode)
+        # strategy:
+        # inode is the index into the namelist of the zip file (i hope this is consistant!!)
+        # just read that file!
         try:
-            if temp[-2] == 'Z':
-                f=Zip_file(self.case,self.table,file,'|'.join(temp[:-2]),temp[-1])
-                fd=cStringIO.StringIO(f.read())
-                z=zipfile.ZipFile(fd)
-                self.data=z.read(filename)
-                
-        except Exception,e:
-            z=zipfile.ZipFile(file)
-            self.data=z.read(filename)
-            
+            z = zipfile.ZipFile(fd)
+            self.data = z.read(z.namelist[inode[1:]])
+        except (IndexError, KeyError):
+            raise IOError, "Zip_File: cant find index"
+        
         self.pos=0
         self.size=len(self.data)
         
@@ -542,7 +562,16 @@ def FS_Factory(case,table,fd):
     """
     ## If the iosource is special we handle it here:
     class_name = (("%s" % fd.__class__).split("."))[-1]
-    if class_name== "mounted":
-        return MountedFS(case,table,fd)
-    else:
-        return DBFS(case,table,fd)
+    #if class_name== "mounted":
+    #    return MountedFS(case,table,fd)
+    #else:
+    return DBFS(case,table,fd)
+
+# create a dict of all the File subclasses by specifier
+vfslist = {}
+for i in dir(sys.modules['__main__']):
+    try:
+        if issubclass(sys.modules['__main__'].__dict__[i],File):
+            vfslist[sys.modules['__main__'].__dict__[i].specifier] = sys.modules['__main__'].__dict__[i]
+    except TypeError:
+        pass    
