@@ -43,6 +43,18 @@ import pyflag.Scanner as Scanner
 description = "Disk Forensics"
 order=30
 
+def DeletedIcon(value,result=None):
+    """ Callback for rendering deleted items """
+    tmp=result.__class__(result)
+    if value=='alloc':
+        tmp.icon("yes.png")
+    elif value=='deleted':
+        tmp.icon("no.png")
+    else:
+        tmp.icon("question.png")
+
+    return tmp
+
 class BrowseFS(Reports.report):
     """ Report to browse the filesystem"""
     parameters = {'fsimage':'fsimage'}
@@ -70,18 +82,6 @@ class BrowseFS(Reports.report):
                     link = self.ui(result)
                     link.link(i['name'],new_query,open_tree="%s%s" %(path,i['name']), mode='table', where_Filename="%s%s" %(path,i['name']), order='Filename')# ,__mark__="%s%s" %(path,i['name']))
                     yield(([i['name'],link,'branch']))
-
-        def DeletedIcon(value,result=None):
-            """ Callback for deleted items """
-            tmp=self.ui()
-            if value=='alloc':
-                tmp.icon("yes.png")
-            elif value=='deleted':
-                tmp.icon("no.png")
-            else:
-                tmp.icon("question.png")
-
-            return tmp
 
         try:
             # tabular view
@@ -327,17 +327,6 @@ class Timeline(Reports.report):
         dbh = self.DBO(query['case'])
         tablename = dbh.MakeSQLSafe(query['fsimage'])
         
-        def DeletedIcon(value):
-            """ Callback for deleted items """
-            tmp=self.ui()
-            if value=='alloc':
-                tmp.icon("yes.png")
-            elif value=='deleted':
-                tmp.icon("no.png")
-            else:
-                tmp.icon("question.png")
-            return tmp
-
         result.table(
             columns=('from_unixtime(time)','inode','status',
                      "if(m,'m',' ')","if(a,'a',' ')","if(c,'c',' ')","if(d,'d',' ')",'name'),
