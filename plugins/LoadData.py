@@ -355,24 +355,14 @@ class LoadFS(Reports.report):
         fsfd=FileSystem.FS_Factory( query["case"], query["iosource"], iofd)
         ## The scanners that users asked for:
         user_scanners = query.getarray('scan')
-        ## Scanners we already did in the db:
-        dbh.execute("select value from meta where property='scanfs_%s'" , query['iosource'])
-        cached_scanners = [ row['value'] for row in dbh ]
 
-        ## We only run the scanners that were asked for which are not cached. We instantiate the factories themselves:
         scanners = [ ]
         for i in user_scanners:
-            if i not in cached_scanners:
-                try:
-                    tmp  = Registry.SCANNERS.classes[Registry.SCANNERS.scanners.index(i)]
-                    scanners.append(tmp(dbh,query['iosource'],fsfd))
-                except Exception:
-                    logging.log(logging.ERROR,"Unable to initialise scanner %s")
-
-        ## Store the sanners in the meta table:
-        for s in user_scanners:
-            if s not in cached_scanners:
-                dbh.set_meta("scanfs_%s" % query['iosource'], s)
+            try:
+                tmp  = Registry.SCANNERS.classes[Registry.SCANNERS.scanners.index(i)]
+                scanners.append(tmp(dbh,query['iosource'],fsfd))
+            except Exception:
+                logging.log(logging.ERROR,"Unable to initialise scanner %s")
 
         logging.log(logging.DEBUG,"Will invoke the following scanners: %s" % scanners)
         fsfd.scanfs(scanners)

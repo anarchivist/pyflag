@@ -34,8 +34,9 @@ class MD5Scan(GenScanFactory):
     def destroy(self):
         self.dbh.execute('ALTER TABLE md5_%s ADD INDEX(inode, md5)', self.table)
 
-    class Scan:
+    class Scan(BaseScanner):
         def __init__(self, inode,ddfs,outer,factories=None):
+            BaseScanner.__init__(self, inode,ddfs,outer,factories)
             self.inode = inode
             self.ddfs=ddfs
             self.dbh=outer.dbh

@@ -52,8 +52,9 @@ class VirScan(GenScanFactory):
         GenScanFactory.reset(self)
         self.dbh.execute('drop table virus_%s',self.table)
 
-    class Scan:
+    class Scan(BaseScanner):
         def __init__(self, inode,ddfs,outer,factories=None):
+            BaseScanner.__init__(self, inode,ddfs,outer,factories)
             self.inode = inode
             self.window = ''
             self.dbh=outer.dbh

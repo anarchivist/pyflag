@@ -86,8 +86,9 @@ class Index(GenScanFactory):
         ## Destroy our index handle which will close the file and free memory
         del self.index
         
-    class Scan:
+    class Scan(BaseScanner):
         def __init__(self, inode,ddfs,outer,factories=None):
+            BaseScanner.__init__(self, inode,ddfs,outer,factories)
             self.index = outer.index
             self.inode=inode
             self.dbh=outer.dbh

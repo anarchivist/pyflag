@@ -31,10 +31,11 @@ class TypeScan(Scanner.GenScanFactory):
     def destroy(self):
         self.dbh.execute('ALTER TABLE type_%s ADD INDEX(inode)', self.table)
 
-    class Scan:
+    class Scan(Scanner.BaseScanner):
         size=0
         
         def __init__(self, inode,ddfs,outer,factories=None):
+            Scanner.BaseScanner.__init__(self, inode,ddfs,outer,factories)
             self.dbh=outer.dbh
             self.table=outer.table
             self.ddfs = ddfs

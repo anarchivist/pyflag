@@ -77,7 +77,7 @@ class GenScanFactory:
     The Scanner Factory is a specialised class for producing scanner objects. It will be instantiated once per filesystem at the begining of the run, and destroyed at the end of the run. It will be expected to produce a new Scanner object for each file in the filesystem.
     """
     ## Should this scanner be on by default?
-    default=True
+    default=False
     
     def __init__(self,dbh,table,fsfd):
         """ Factory constructor.
@@ -224,8 +224,20 @@ def scanfile(ddfs,fd,factories):
     @arg factories: A list of scanner factories to use when scanning the file.
     """
     buffsize = 1024 * 1024
-    # instantiate a scanner object from each of the factory
-    objs = [c.Scan(fd.inode,ddfs,c,factories=factories) for c in factories]
+    # instantiate a scanner object from each of the factory. We only
+    #instantiate scanners from factories which have not been run on
+    #this inode previously. We find which factories were already run
+    #by checking the meta table.  Note that we still pass the full
+    #list of factories to the Scan class so that it may invoke all of
+    #the scanners on new files it discovers.
+    objs = []
+    for c in factories:
+        ddfs.dbh.execute("select * from meta where property=%r and value=%r",("scan_%s" % c.__class__,fd.inode))
+        if not ddfs.dbh.fetch():
+            objs.append(c.Scan(fd.inode,ddfs,c,factories=factories))
+
+#    print "Scanning %s with %s" % (fd.inode,objs)
+    
     # read data (in chunks)
     while 1:
         ## This dict stores metadata about the file which may be filled in by some scanners in order to indicate some fact to other scanners.

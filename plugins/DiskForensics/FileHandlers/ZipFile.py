@@ -49,6 +49,22 @@ class ZipScan(GenScanFactory):
                 fd.inode = "%s|Z%s" % (self.inode,i)
                 Scanner.scanfile(self.ddfs,fd,self.factories)
                 
+##                if self.factories:
+##                    try:
+##                        data=zip.read(namelist[i])
+##                    except zipfile.zlib.error:
+##                        continue
+
+##                    objs = [c.Scan("%s|Z%s" % (self.inode, str(i)),self.ddfs,c,factories=self.factories) for c in self.factories]
+
+##                    metadata={}
+##                    for o in objs:
+##                        try:
+##                            o.process(data,metadata=metadata)
+##                            o.finish()
+##                        except Exception,e:
+##                            logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
+
 class GZScan(ZipScan):
     """ Recurse into gziped files """
     class Scan(StoreAndScan):

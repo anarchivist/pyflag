@@ -75,8 +75,9 @@ class UnallocatedScan(GenScanFactory):
         self.fsfd.VFSCreate(None,'U%s' % count, "/_unallocated_/%s" % offset)
 
 
-    class Scan:                
+    class Scan(BaseScanner):                
         def __init__(self, inode,ddfs,outer,factories=None):
+            BaseScanner.__init__(self, inode,ddfs,outer,factories)
             self.inode=inode
             self.ddfs=ddfs
             self.outer=outer
