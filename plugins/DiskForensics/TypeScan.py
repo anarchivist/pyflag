@@ -29,7 +29,8 @@ class TypeScan(Scanner.GenScanFactory):
         self.dbh.execute("drop table if exists `type_%s`",self.table)
 
     def destroy(self):
-        self.dbh.execute('ALTER TABLE type_%s ADD INDEX(inode)', self.table)
+        pass
+#        self.dbh.execute('ALTER TABLE type_%s ADD INDEX(inode)', self.table)
 
     class Scan(Scanner.BaseScanner):
         size=0

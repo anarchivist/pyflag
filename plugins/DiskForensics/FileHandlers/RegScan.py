@@ -45,7 +45,7 @@ class RegistryScan(GenScanFactory):
                 self.dbh.execute("insert into regi_%s set dirname=%r,basename=%r",(self.table,k,name))
 
         ## Add indexes:
-        self.dbh.execute("alter table reg_%s add index(path)",self.table)
+        self.dbh.check_index("reg_%s" % self.table,"path")
 
     class Scan(StoreAndScanType):
         types =  (

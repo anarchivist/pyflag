@@ -55,6 +55,7 @@ def lookup_whois(ip):
         
     netmask = 0
     while 1:
+        dbh.check_index("whois_routes","netmask")
         dbh.execute("select whois_id from whois_routes where ( %s & inet_aton('255.255.255.255') & ~%r ) = network and (inet_aton('255.255.255.255') & ~%r) = netmask limit 1 " , (ip,netmask,netmask))
 #        dbh.execute("select whois_id from whois_routes where ( %s & ~(pow(2,%r) -1)) = network and ~(pow(2,%r)-1) = netmask limit 1 " , (ip,netmask,netmask))
         row=dbh.fetch()
@@ -73,6 +74,7 @@ def lookup_whois(ip):
 def identify_network(whois_id):
     """ Returns a uniq netname/country combination """
     dbh = DB.DBO(None)
+    dbh.check_index("whois","id")
     dbh.execute("select netname,country from whois where id=%r" , (whois_id))
     row = dbh.fetch()
     try:
@@ -100,6 +102,7 @@ class LookupIP(Reports.report):
     def display_whois(self,query,result,whois_id):
         # lookup IP address and show a nice summary of Whois Data
         dbh = self.DBO(None)
+        dbh.check_index("whois","id")
         dbh.execute("SELECT INET_NTOA(start_ip) as start_ip, numhosts, country, descr, status from whois where id=%s",whois_id)
         res = dbh.fetch()
         

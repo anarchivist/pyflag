@@ -32,7 +32,8 @@ class MD5Scan(GenScanFactory):
         self.dbh.execute("drop table `md5_%s`",self.table)
 
     def destroy(self):
-        self.dbh.execute('ALTER TABLE md5_%s ADD INDEX(inode, md5)', self.table)
+        pass
+#        self.dbh.execute('ALTER TABLE md5_%s ADD INDEX(inode, md5)', self.table)
 
     class Scan(BaseScanner):
         def __init__(self, inode,ddfs,outer,factories=None):
@@ -44,6 +45,7 @@ class MD5Scan(GenScanFactory):
             self.m = md5.new()
 
             # Check that we have not done this inode before
+            self.dbh.check_index("md5_%s" % self.table,"inode")
             self.dbh.execute("select * from md5_%s where inode=%r",(self.table,inode))
             if self.dbh.fetch():
                 self.ignore=1
@@ -59,6 +61,7 @@ class MD5Scan(GenScanFactory):
                 return
             
             dbh_flag=DB.DBO(None)
+            dbh_flag.check_index("NSRL_hashes","md5",4)
             dbh_flag.execute("select filename,productcode from NSRL_hashes where md5=%r",self.m.digest())
             nsrl=dbh_flag.fetch()
             if not nsrl: nsrl={}
@@ -91,7 +94,10 @@ class HashComparison(Reports.report):
 
     def analyse(self,query):
         dbh = self.DBO(query['case'])
+        pdbh=self.DBO(None)
         tablename = dbh.MakeSQLSafe(query['fsimage'])
+        pdbh.check_index("NSRL_products","Code")
+        dbh.check_index("type_%s" % tablename,"inode")
         dbh.execute("create table `hash_%s` select a.inode as `Inode`,concat(path,b.name) as `Filename`,d.type as `File Type`,if(c.Code=0,'Unknown',c.Name) as `NSRL Product`,c.Code as `NSRL Code`,a.NSRL_filename,md5 as `MD5` from md5_%s as a,%s.NSRL_products as c, type_%s as d left join file_%s as b on a.inode=b.inode   where  a.NSRL_productcode=c.Code and d.inode=a.inode group by Inode,`NSRL Code`,MD5",(tablename,tablename,config.FLAGDB,tablename,tablename))
 
     def display(self,query,result):

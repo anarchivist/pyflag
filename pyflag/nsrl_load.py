@@ -9,11 +9,7 @@ Use this program like so:
 An NSRL directory is one of the CDs, and usually has in it NSRLFile.txt,NSRLProd.txt.
 
 IMPORTANT:
-After uploading all the disk sets you should generate the index by doing:
-
-alter table NSRL_hashes add index(`md5`(4))
-
-You must do that or searching the NSRL will not work!!
+The first time the database is used (in loading a case) the index will be automatically built. This may take a long time, but is only done once.
 """
 
 import DB,conf,sys
@@ -58,6 +54,12 @@ def to_md5(string):
 def MainNSRLHash(dirname):
     fd=csv.reader(file(dirname+"/NSRLFile.txt"))
     print "Starting to import %s/NSRLFile.txt" % dirname
+    ## Ensure the NSRL tables do not have any indexes - this speeds up insert significantly
+    try:
+        dbh.execute("alter table NSRL_hashes drop index md5");
+    except:
+        pass
+
     for row in fd:
         try:
             dbh.execute("insert into NSRL_hashes set md5=%r,filename=%r,productcode=%r,oscode=%r",(to_md5(row[1]),row[3],row[5],row[6]))
@@ -68,6 +70,13 @@ def MainNSRLHash(dirname):
 def ProductTable(dirname):
     fd=csv.reader(file(dirname+"/NSRLProd.txt"))
     print "Starting to import %s/NSRLProd.txt" % dirname
+    ## Ensure the NSRL tables do not have any indexes - this speeds up insert significantly
+    
+    try:
+        dbh.execute("alter table NSRL_products drop index Code");
+    except:
+        pass
+    
     for row in fd:
         try:
             dbh.execute("insert into NSRL_products set Code=%r,Name=%r,Version=%r,OpSystemCode=%r,ApplicationType=%r",(row[0],row[1],row[2],row[3],row[6]))
@@ -76,6 +85,4 @@ def ProductTable(dirname):
 
 if __name__=="__main__":
     MainNSRLHash(dirname)
-    ProductTable(dirname)
-    print "Dont forget to create the index on the table once you have finished uploading all files!!\nALTER TABLE `NSRL_hashes` ADD INDEX  (`md5`(4))"
-    
+    ProductTable(dirname)    

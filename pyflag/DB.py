@@ -67,7 +67,6 @@ class DBO:
     @ivar temp_tables: A variable that keeps track of temporary tables so they may be dropped when this object gets gc'ed
     """
     DBH = {}
-    lock = threading.Lock()
     temp_tables = []
     
     def __init__(self,case):
@@ -75,6 +74,8 @@ class DBO:
 
         @arg case: Case database to connect to. May be None in which case it connects to the default flag database
         """
+        ## Locking is done per object - not per class.
+        self.lock = threading.Lock()
         if not case:
             case = config.FLAGDB
         
@@ -188,6 +189,25 @@ class DBO:
 
         return results
 
+    def check_index(self, table, key, length=None):
+        """ This checks the database to ensure that the said table has an index on said key.
+
+        If an index is missing, we create it here, so we always ensure an index exists once we return. """
+        self.execute("show index from `%s`",table)
+        for row in self:
+            if row['Key_name'] == key:
+                ## We found an index we are looking for
+                return
+
+        if length:
+            sql="(`%s`(%s))" % (key,length)
+        else:
+            sql="(`%s`)" % (key) 
+        
+        logging.log(logging.DEBUG,"Oops... No index found in table %s on field %s - Generating index, this may take a while" %(table,key))
+        ## Index not found, we make it here:
+        self.execute("Alter table `%s` add index%s",(table,sql))
+        
     def get_meta(self, property):
         """ Returns the value for the given property in meta table selected database
 

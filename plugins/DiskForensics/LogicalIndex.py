@@ -227,6 +227,7 @@ class SearchIndex(Reports.report):
         result.heading("Currently searching for %r in image %r" % (query['keyword'],query['fsimage']))
         dbh = self.DBO(query['case'])
         table = query['fsimage']
+        dbh.check_index("LogicalKeyword_%s" % tablename,"keyword")
         dbh.execute("select count(*) as Count from LogicalKeyword_%s where keyword=%r",(table,query['keyword']))
         row=dbh.fetch()
         result.text("Currently found %s occurances" % row['Count'],color='red')
@@ -258,8 +259,8 @@ class SearchIndex(Reports.report):
     def display(self,query,result):
         dbh = self.DBO(query['case'])
         keyword = query['keyword']
-        result.heading("Occurances of %s in logical image %s" %
-                       (keyword,query['fsimage']))
+        result.heading("Previously searched keywords in logical image %s" %
+                       (query['fsimage']))
         table = query['fsimage']
         iofd = IO.open(query['case'], query['fsimage'])
         fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
@@ -271,6 +272,7 @@ class SearchIndex(Reports.report):
             left=offset-10
             if left<0: left=0
 
+            dbh.check_index("LogicalKeyword_%s" % tablename,"inode")
             dbh.execute("select inode,text,offset,keyword from LogicalKeyword_%s where offset = %r and inode=%r ",(table,offset,inode))
             row=dbh.fetch()
             keyword=row['keyword']

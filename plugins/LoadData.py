@@ -192,29 +192,30 @@ class LoadTcpDump(Reports.report):
         #Now load the indexes on the data:
         dbh = self.DBO(query['case'])
         index = (
-            ('tcp','key_id'),
-            ('tcp','tcp_srcport'),
-            ('tcp','tcp_dstport'),
-            ('ip','key_id'),
-            ('ip','ip_dst'),
-            ('ip','ip_src'),
-            ('frame','key_id'),
-            ('eth','key_id'),
-            ('icmp','key_id'),
-            ('dns','key_id'),
-            ('http','key_id'),
-            ('http','http_request_uri(20)'),
-            ('pop','key_id'),
-            ('pop','pop_req_command(20)'),
-            ('smtp','key_id'),
-            ('smtp','smtp_req_command(20)'),
-            ('udp','key_id'),
-            ('udp','udp_srcport'),
-            ('udp','udp_dstport')
+            ('tcp','key_id',None),
+            ('tcp','tcp_srcport',None),
+            ('tcp','tcp_dstport',None),
+            ('ip','key_id',None),
+            ('ip','ip_dst',None),
+            ('ip','ip_src',None),
+            ('frame','key_id',None),
+            ('eth','key_id',None),
+            ('icmp','key_id',None),
+            ('dns','key_id',None),
+            ('http','key_id',None),
+            ('http','http_request_uri',20),
+            ('pop','key_id',None),
+            ('pop','pop_req_command',20),
+            ('smtp','key_id',None),
+            ('smtp','smtp_req_command',20),
+            ('udp','key_id',None),
+            ('udp','udp_srcport'.None),
+            ('udp','udp_dstport',None)
             )
         
         for x,y in index:
-            dbh.execute("alter table %s add index(%s)",(x,y))
+            dbh.check_index("%s_%s" % (x,tablename),y,z)
+#            dbh.execute("alter table %s add index(%s)",(x,y))
 
     def display(self,query,result):
         result.heading("Uploaded PCAP file %r to case %r" % (query['datafile'],query['case']))
@@ -333,14 +334,15 @@ class LoadFS(Reports.report):
             self.progress_str="Creating file and inode indexes"        
             #Add indexes:
             index = (
-                ('file','inode'),
-                ('file','path(100)'),
-                ('file','name(100)'),
-                ('inode','inode'),
-                ('block','inode')
+                ('file','inode',None),
+                ('file','path',100),
+                ('file','name',100),
+                ('inode','inode',None),
+                ('block','inode',None)
                 )
-            for x,y in index:
-                dbh.execute("alter table %s_%s add index(%s)",(x,tablename,y))
+            for x,y,z in index:
+                dbh.check_index("%s_%s" % (x,tablename),y,z)
+#                dbh.execute("alter table %s_%s add index(%s)",(x,tablename,y))
 
             dbh.set_meta('fsimage',query['iosource'])
 
@@ -385,10 +387,15 @@ class LoadFS(Reports.report):
             
         try:
             result.start_table()
-            dbh.execute("select count(*) from file_%s" % tablename)
-            f = dbh.cursor.fetchone()
+            dbh.execute("select count(*) as Count from file_%s" % tablename)
+            row=dbh.fetch()
+            if row:
+                result.row("Uploaded File Entries:", "%s"%row['Count'])
+
+            result.row("System messages:")
+            for row in logging.ring_buffer:
+                result.row(row)
             ## FIXME: This is a horribly slow query...
-  #         result.row("Uploaded File Entries:", "%s"%f[0])
   #          dbh.execute("select count(*) as count,value as total from inode_%s, meta_%s as m where m.name='last_inode' group by total" % (tablename, tablename))
   #          row = dbh.fetch()
   #          result.row("Uploaded Inode Entries:", "%s of %s"%(row['count'],row['total']))

@@ -595,7 +595,7 @@ void sgzip_decompress_fds(int fd,int outfd,const struct sgzip_header *header) {
     stream_write(outfd,dataout,sizeof(*dataout)*lengthout,buffer,&fill,BUFFER_SIZE,"Data write");
 
     if(!(count % 100)) {
-      sgzip_debug(1,"Wrote %lu blocks of %lu bytes = %lu total\r",count,header->blocksize,count*header->blocksize);
+      sgzip_debug(1,"Wrote %lu blocks of %lu bytes = %lu Mb total\r",count,header->blocksize,count*header->blocksize/1024/1024);
     };
   };
 

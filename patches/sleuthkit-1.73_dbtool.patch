@@ -394,7 +394,7 @@ diff -Naur /tmp/sleuthkit-1.73/src/fstools/dbtool.c sleuthkit-1.73/src/fstools/d
 +			        char *unused_context)
 +{
 +  time_t dtime = 0;
-+  char *link;
++  char *link=0;
 +  int lsize;
 +
 +  // print progress message

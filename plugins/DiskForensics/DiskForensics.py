@@ -420,6 +420,7 @@ class Timeline(Reports.report):
         dbh = self.DBO(query['case'])
         tablename = dbh.MakeSQLSafe(query['fsimage'])
         temp_table = dbh.get_temp()
+        dbh.check_index("inode_%s" % tablename,"inode")
         dbh.execute("create temporary table %s select i.inode,f.status,mtime as `time`,1 as `m`,0 as `a`,0 as `c`,0 as `d`,concat(path,name) as `name` from inode_%s as i left join file_%s as f on i.inode=f.inode" %
                     (temp_table, tablename, tablename));
         dbh.execute("insert into %s select i.inode,f.status,atime,0,1,0,0,concat(path,name) from inode_%s as i left join file_%s as f on i.inode=f.inode" % (temp_table, tablename, tablename))
@@ -427,8 +428,7 @@ class Timeline(Reports.report):
         dbh.execute("insert into %s select i.inode,f.status,dtime,0,0,0,1,concat(path,name) from inode_%s as i left join file_%s as f on i.inode=f.inode" % (temp_table, tablename, tablename))
         dbh.execute("create table if not exists mac_%s select inode,status,time,sum(m) as `m`,sum(a) as `a`,sum(c) as `c`,sum(d) as `d`,name from %s where time>0 group by time,name order by time,name" %
                     (tablename, temp_table))
-        dbh.execute("alter table  mac_%s add key(inode)" % tablename)
-        
+        dbh.check_index("mac_%s" % tablename,"inode")
         
     def progress(self, query, result):
         result.heading("Building Timeline")
@@ -469,12 +469,14 @@ class DBFS_file(FileSystem.File):
         except TypeError:
             pass
         # fetch inode data
+        self.dbh.check_index("inode_%s" % self.table,"inode")
         self.dbh.execute("select * from inode_%s where inode=%r and status='alloc'", (self.table, inode))
         self.data = self.dbh.fetch()
         if not self.data:
             raise IOError("Could not locate inode %s"% inode)
 
         self.size = self.data['size']
+        self.dbh.check_index("block_%s" % self.table,"inode")
         self.dbh.execute("select block,count,`index` from block_%s where inode=%r order by `index`", (self.table, inode))
         try:
             self.blocks = [ (row['block'],row['count'],row['index']) for row in self.dbh ]
@@ -497,6 +499,7 @@ class DBFS_file(FileSystem.File):
 
         if not self.blocks:
             # now try to find blocks in the resident table
+            self.dbh.check_index("resident_%s" % self.table,"inode")
             self.dbh.execute("select data from resident_%s where inode=%r" % (self.table, self.data['inode']));
             row = self.dbh.fetch()
             if not row:
@@ -567,6 +570,7 @@ class MountedFS_file(FileSystem.File):
 
         dbh = DB.DBO(case)
         self.dbh=dbh
+        self.dbh.check_index("file_%s" % self.table,"inode")
         dbh.execute("select path,name from file_%s where inode=%r",(self.table, inode))
         row=self.dbh.fetch()
         path=row['path']+"/"+row['name']
