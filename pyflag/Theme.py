@@ -65,7 +65,7 @@ class BasicTheme:
             family_block.row(link)
             
         report_block = flag.ui()
-        if family:
+        if family and family != 'None':
             report_block.start_table()
             report_list = Registry.REPORTS.family[family]
             for r in report_list:
