@@ -380,11 +380,12 @@ class TCPTrace(Reports.report):
             result.end_table()
             result.para("The following objects where found in this connection:")
             result.table(
-                columns=('http_request_uri',),
-                names=("URLs",),
+                columns=('key_id','http_request_uri',),
+                names=("Packet","URLs",),
                 table = ' http, connection_cache',
                 where='con_id=%s and id=key_id and not isnull(http_request_uri)' % query['con_id'],
                 case=query['case'],
+                links=[ FlagFramework.query_type((),case=query['case'],report='HTMLVisualise',family=query['family'],con_id=query['con_id'],__target__='key_id',__opt__='parent') ],
                 )
 
         result.popup(visualise_popup,'HTML Visualise',icon='glasses.png',toolbar=0,menubar=0)
