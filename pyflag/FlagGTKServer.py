@@ -30,11 +30,10 @@
 
 import pygtk
 pygtk.require('2.0')
-import gtk
+import gtk,gtk.gdk
 
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
-import pyflag.GTKUI as UI
 import pyflag.TypeCheck as TypeCheck
 import pyflag.conf
 config=pyflag.conf.ConfObject()
@@ -48,7 +47,9 @@ def error_popup(e):
     @arg e: The exception object to print
     """
     dialog=gtk.Window()
-    result=UI.GTKUI()
+    import pyflag.GTKUI
+    
+    result=pyflag.GTKUI.GTKUI(server=self)
     FlagFramework.get_traceback(e,result)
     frame=gtk.Frame(result.title)
     result.title=None
@@ -136,7 +137,10 @@ class GTKServer(gtk.Window):
         # initialize flag
         self.flag = FlagFramework.Flag()
         FlagFramework.GLOBAL_FLAG_OBJ = self.flag
-        self.flag.ui = UI.GTKUI
+
+        import pyflag.GTKUI
+
+        self.flag.ui = pyflag.GTKUI.GTKUI
 
         # set some window properties
         self.set_title('PyFLAG')
@@ -236,7 +240,7 @@ class GTKServer(gtk.Window):
 
         box=gtk.VBox()
         self.form_dialog.add(box)
-        result = self.flag.ui()
+        result = self.flag.ui(server=self)
         try:
             report.progress(query,result)
         except Exception,e:
@@ -254,7 +258,9 @@ class GTKServer(gtk.Window):
         try:
             report.analyse(query)
         except Exception,e:
+            gtk.gdk.threads_enter()
             error_popup(e)
+            gtk.gdk.threads_leave()
 
         ## Draw the results in their own tab:
         gtk.gdk.threads_enter()
@@ -312,7 +318,7 @@ class GTKServer(gtk.Window):
                 self.form_dialog.connect('destroy',self.delete_form)
             box=gtk.VBox()
             self.form_dialog.add(box)
-            result = self.flag.ui()
+            result = self.flag.ui(server=self)
             result.start_form(query)
             print report
             try:
@@ -332,7 +338,7 @@ class GTKServer(gtk.Window):
         family=query['family']
         report=query['report']
         report = Registry.REPORTS.dispatch(family,report)(self.flag,ui=self.flag.ui)
-        result=self.flag.ui(query=query)
+        result=self.flag.ui(query=query,server=self)
         report.display(query,result)
         self.notebook.add_page(result, query)
 
@@ -408,8 +414,9 @@ class GTKServer(gtk.Window):
         self.uimanager.add_ui_from_string(ui)
 
 ### BEGIN MAIN ####
-main = GTKServer()
+if __name__ == "__main__":
+    main=GTKServer()
 
-import gtk.gdk
-gtk.gdk.threads_init()
-gtk.main()
+    import gtk.gdk
+    gtk.gdk.threads_init()
+    gtk.main()

@@ -33,14 +33,21 @@ The output within flag is abstracted such that it is possible to connect any GUI
 
 import re,cgi,types
 import pyflag.FlagFramework as FlagFramework
+import pyflag.FlagGTKServer as FlagGTKServer
 import pyflag.DB as DB
 import pyflag.conf
 import pyflag.UI as UI
 config=pyflag.conf.ConfObject()
 import gtk,gobject,pango,gtk.gdk
 from gtk import TRUE, FALSE
+import pyflag.Registry as Registry
 
 #config.LOG_LEVEL=7
+
+class GTK_Draw_Form_Exception(Exception):
+    """ This exception is raised when we want to draw a form """
+    def __init__(self,query):
+        self.query=query
 
 pointer=gtk.gdk.Cursor(gtk.gdk.HAND2)
 
@@ -188,7 +195,7 @@ class FlagTreeModel(gtk.GenericTreeModel):
 class GTKUI(UI.GenericUI):
     """ A GTK UI Implementation. """
             
-    def __init__(self,default = None,query=None):
+    def __init__(self,default = None,query=None,server=None):
         # Create the Main Widget
         self.result=gtk.VBox()
 
@@ -199,12 +206,14 @@ class GTKUI(UI.GenericUI):
             ## This is an array of form widgets. Every time we draw a form widget in this UI, we store it here, and then when we submit the widget, we take the values from here.
             self.form_widgets=default.form_widgets
             self.toolbar_ui = default.toolbar_ui
+            self.server=default.server
         else:
             self.form_parms = {}
             self.defaults = FlagFramework.query_type(())
             self.form_widgets=[]
             self.toolbar_ui = gtk.Toolbar()
 
+        if server: self.server=server
         if query: self.defaults=query
         
         self.current_table=None
@@ -273,8 +282,22 @@ class GTKUI(UI.GenericUI):
             self.current_table=None
 
     def goto_link(self,widget,event):
+        """ This is the callback function from links """
+        ## If the target report does not have all its parameters - we
+        ## should invoke the form for it here - this is different than
+        ## the html ui since it takes care of it.
+        target = widget.get_data('query')
+        try:
+            family=target['family']
+            report=target['report']
+            report = Registry.REPORTS.dispatch(family,report)(FlagFramework.GLOBAL_FLAG_OBJ,ui=FlagFramework.GLOBAL_FLAG_OBJ.ui)
+            if not report.check_parameters(target):
+                self.server.draw_form(target)
+        except KeyError:
+            pass
+
         if self.link_callback:
-            self.link_callback(widget.get_data('query'))
+            self.link_callback(target)
 
     def tooltip(self, string):
         pass
@@ -349,6 +372,7 @@ class GTKUI(UI.GenericUI):
         self.result.pack_start(notebook)
                 
     def link(self,string,target=FlagFramework.query_type(()),**target_options):
+        print "target is %s" % target
         target=target.clone()
         if target_options:
             for k,v in target_options.items():
@@ -395,7 +419,11 @@ class GTKUI(UI.GenericUI):
             if active < 0:
                 active = 0
             try:
-                return (widget.get_data('name'), model[active][0])
+                value=model[active][0]
+                for k,v in zip(keys,values):
+                    if value==v:
+                        return (widget.get_data('name'), k)
+                    
             except IndexError:
                 pass
 

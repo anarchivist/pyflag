@@ -365,7 +365,7 @@ class LoadFS(Reports.report):
         
     def display(self,query,result):
         result.heading("Uploaded FS Image from IO Source %s to case %s" % (query['iosource'],query['case']))
-        result.link("Analyse this data", FlagFramework.query_type((), case=query['case'], family="Disk Forensics", fsimage=query['iosource']))
+        result.link("Analyse this data", FlagFramework.query_type((), case=query['case'], family="Disk Forensics", fsimage=query['iosource'],report='BrowseFS'))
                        
     def progress(self,query,result):
         result.heading("Uploading filesystem image to case %s" % query['case'])
