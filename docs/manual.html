@@ -71,8 +71,10 @@ The following components can be seen:
     <li><b>Main Menu:</b> The menu button takes you directly to the main menu for the currently selected module. From there you may select another module to look at or simply another report.</li>
     <li><b>Column Name:</b> Each column in the table has a name. Clicking on the column name indicates that you wish to order the result alphabetically by that column. At any one time, a single column will appear to have a pink background. This indicates that the result is ordered by this column. Clicking the column again flips the sense of the ordering (from ascending to descending and back again). <p>
      Note the colouring of the rows alternating between gray and white. For each unique value of the ordering column these colours alternate. The result is that by ordering the result set on one of the columns, it is quick to see which rows contain identical values with each column, because they will appear like groups of different colours.</li>
-    <li><b>Group by Column:</b> The Group by column allows the user to count how many entries in the result set occur with each value of the column. For example in the figure above, by grouping by Source IP (and ordering by counts), it is possible to see which source IP produced the greatest number of hits.<p>
-   Once in the group by screen, clicking on the individual source IP address allows the user to view all the hits produced by that IP address</li>
+      <li><p><b>Group by Column:</b> The Group by column allows the user to count how many entries in the result set occur with each value of the column. For example in the figure above, by grouping by Source IP (and ordering by counts), it is possible to see which source IP produced the greatest number of hits.</p>
+	<p>Once in the group by screen, clicking on the individual source IP address allows the user to view all the hits produced by that IP address.</p>
+	<p>Within the group by screen it is possible to plot a graph of the most common entries in the grouped by column. This is useful to gain a rapid visual feel to the data.</p>
+      </li>
     <li><b>Search Column:</b> It is often handy to be able to eliminate a subset of the result set from the table, and concentrate on those results which match a specific criteria. For example, we may want to see those hits produced between certain date range, or those IP addresses requesting certain file extensions, or possibly both conditions at once.<p>
    The search capability within the table widget allows for complex search criteria to be performed. Conditions are added cumulatively with a logical "and" seperating them. So for example, you can add the condition date &gt; 2001-10-01 and date &lt; 2002-10-01. The query is entered into the text area where the sense of the query is determined by the first character of the query string. So for example typing "&lt;2001-10-01" in the date column will show all dates prior to october 1st 2001. The following modifiers are supported:
 			  <ul>
@@ -83,7 +85,13 @@ The following components can be seen:
 			    <li><b>Search term with a % in it</b> The values are similar to the specified value with % being the wildcard</li>
 			    <li><b>search term</b> The values are similar to the specified value with wildcards automatically added before and after the search terms (so it may match in the middle of the entry)</li>
 			  </ul>
-   Note that as new searching conditions are added, they will be listed at the top of the table. You may click on any of those links to remove that search term, while still preserving the others.</li>
+<p>   Note that as new searching conditions are added, they will be listed at the top of the table. You may click on any of those links to remove that search term, while still preserving the others.</p></li>
+      <li><b>ToolBar:</b> These icons represent extra functions that may be invoked on the table widget:
+	<ul> 
+	  <li>Customise Table: This allows the hiding of selected columns. This is usefull when the table has many columns or when exporting the data.</li>
+	  <li>Export Data: After selecting the required subset of the data, it is often useful to extract the relevant data for insertion into a different application (e.g. into a report). This function allows the data to be exported into a comma delimited file (CSV) which may be imported into most spreadsheet programs.</li>
+	  </ul>
+	</li>
   </ul>
 
     <h1>Modules</h1>
@@ -325,7 +333,7 @@ Please enter a value for filesystem type: linux-ext2
     <address><a href="mailto:pyflag-users@sourceforge.net"></a></address>
 <!-- Created: Sat Mar 13 21:51:49 EST 2004 -->
 <!-- hhmts start -->
-Last modified: Sat Nov  6 00:25:20 EST 2004
+Last modified: Sun Nov  7 23:41:49 EST 2004
 <!-- hhmts end -->
   </body>
 </html>
