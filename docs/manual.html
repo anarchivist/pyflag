@@ -1,0 +1,292 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+  <head>
+    <title>PyFlag Manual</title>
+  </head>
+
+  <body>
+    <h1>PyFlag Manual</h1>
+    Flag (Forensic and Log Analysis GUI) is a tool designed to simplify the examination of forensic evidence in the form of Hard disk images, logs and network captures. This manual documents some of the basic aspects of FLAG, but is by no means complete. There is a complete API documentation produced by epydoc in the docs directory. The API documentation is designed for developers who wish to contribute to PyFlag development.<p>
+      <h1>Basic Concepts</h1>
+      <h2>Flag Cases</h2>
+    A central concept to flag is the case. A case is simply an area to collect related information regarding a particular incident. Internally a case is kept in its own database, and tables are added to the case as different forms of evidence are added.<p>
+      To create a new case, click the Case Management tab and add a new case. <p>
+      Resetting the case deletes all data from the case, which is essentially equivalent to dropping the case database and recreating it.
+      <h2>IO Sources</h2>
+    Another central concept to FLAG is the IO source. An IO source is simply a way of specifying a source of data for flag. The concept of IO Source is an abstraction of data sources. For example, a hard disk image is a source of data, however we could use a number of different types of hard disk images, e.g. dd images, encase evidence files etc. <p>
+Hence FLAG uses an IO source to handle data, and the specifics of how to access this form of data are abstracted. IO Sources are currently heavily utilised in the disk forensic module, but may be extended to other modules in the future. Although the following examples are concentrating on hard disk images, in the future similar IO Subsystems will be used for other aspects of FLAG, such as log files, and network captures.<p>
+      The following IO Source types are currently supported. Other IO sources may be added in the future:
+    <ul>
+      <li>Standard
+	<ul>
+	  <li>The Standard IO Source is the most basic. It represents a simple linear file stored on disk. For example this might be a dd image of a partition, ready to load directly into FLAG.</li>
+	  <li>In order to take a standard forensic image suitable to be imported into flag, do this for example (Note that we must take a dd image of a partition, not an entire hard disk):<p>
+	    <code>dd if=/dev/hda1 of=image.dd</code>
+	</ul></li>
+      <li>Advanced
+	<ul>
+	  <li>The advanced IO Source allows the image to be split into mutiple files. We can also specify an offset into the image to start analysing from. This allows us to analyse a dd image of an entire hard disk. For example:<p>
+	    <code>dd if=/dev/hda of=image.dd</code></li>
+	  <li>We can find the offset of the partition (we need to specify for FLAG) in the image by doing:<p>
+	    <code>sfdisk -luS /dev/hda</code>
+	</ul></li>
+      <li>SGZIP
+	<ul>
+	  <li>With todays very large hard disks it is sometimes difficult to manipulate dd images. Since dd images are uncompressed, when analysing a 120GB hard disk (which is now commodity on most PCs), the analysis platform must be able to handle a single 120GB file, which may need to be archived etc.<p>
+	      Many people archive very large dd images by using a standard compression program such as gzip or bzip2. This helps the archive of the file, but it is impossible to directly use the compressed file in the analysis without decompressing it first. The main reason for this is because most general purpose compression formats are not designed for seeking randomly through the file.<p>
+	      Most industry standard forensic packages provide a method for manipulating compressed hard disk images directly. FLAG supports a number of different formats at this time namely sgzip, and eyewitness compression format (which is mainly used by Encase(tm), and FTK(tm)).<p>
+	      The sgzip format is based on gzip, but provides a seekable capability. This is achieved by compressing blocks (default size of 32kb) individualy. Then a seek operation simply needs to locate the right 32kb block and decompress that. The specific details of the file format are found in the file sglib.h.<p>
+	      Sgzip is a robust format, which means that if the image file is damaged in some way (e.g. some of it is corrupted, or truncated) it is still possible to retrieve most of the data from within it (contrast this with for example Encase, which can not recover from a corrupted evidence file). To create an sgzip file, use the supplied sgzip utility:<p>
+	      <code>dd if=/dev/hda | sgzip -v > image.sgz</code></li>
+	  <li>It is also possible to decompress the sgzip file back into a regular dd image:<p>
+	    <code>sgzip -vd image.sgz</code></li>
+	</ul></li>
+      <li>EWF (Eye Witness Format)
+	<ul>
+	  <li>Eye witness format is a proprietary format which is mainly used by Encase and FTK. This format also compresses data in 32kb chunks to achieve a seekable compressed file. This file format must also be split across files smaller than 2gb (generally 640mb is used).<p>
+	      Although FLAG can also create EWF files, at this stage they are not (yet) readable by Encase. It is perfectly valid to generate EWF files using FLAG for usage within FLAG, however since the EWF format is fragile (i.e. can not tolerate corruption), this is not recommended and it is better to use sgzip for this purpose. The other major disadvantage of the EWF format is that it is impossible to write an EWF file into a pipe. Hence it is not possible to image over the network (using netcat for example). Sgzip is a better format choice here as well. <p>
+	      Most of the time FLAG is used to analyse images taken using encase, or to repair corrupted encase images (The flag ewf implementation is quite flexible and can be used to repair encase images, whereas encase itself will not import those in most cases). See the evtool for examples of how EWF images can be manipulated. To use EWF images in FLAG simply select all the files (with extension .E01,.E02 etc) files in the IO Sources.
+	      </li></ul></li>
+      <li>Mounted
+	<ul>
+	  <li>PyFlag uses <a href=http://www.sleuthkit.org>The Sleuthkit</a> as the underlying engine for reading filesystems. The Sleuthkit supports a number of filesystems, but not as many as are generally available using the Linux kernel to mount filesystems. To fill in the shortfall the Mounted IO Source is designed to incorporate the contents of a directory (or a mount point) within PyFlag. There are a number of critical points to note when using the Mounted IO Source:
+	    <ul>
+	      <li>The Linux kernel filesystem driver does not know or care about deleted Inodes. It is not designed for forensic work, so it is impossible to recover deleted files with mounted filesystems.</li>
+	      <li>Mounting a filesystem is a privileged operation. Typical only root is allowed to mount the filesystem.</li>
+	      <li>Since the filesystem may contain files with ownerships preventing regular users from accessing those files, it is best to run PyFlag as the root user when using the Mounted IO Source. This is the only time when running PyFlag as a privileged user is necessary, and usually this practice is discouraged.</li>
+	      <li>Since PyFlag is not responsible for actually mounting the filesystem, it is completely the user's responsibility that the filesystem is mounted sensibly, i.e. mounted read only (watch out for journaling filesystems modifying images even when mounted read only). It is recommended that the user perform an md5 sum of the image before and after mounting it.</li>
+	      <li>Clearly since the linux kernel does not support sgzip, or EWF, or split dd images, the image files must be simple raw dd images (possibly with an offset specified) which are understood by the loop driver.</li>
+	      <li>Since a Mounted IO Source is not a real IO Source, there are some limitations with using this IO Source. Namely, certain reports that need access to the raw device will not work, for example Extract Files and Indexing. It is recommended that a seperate IO Source representing the raw device be used for these purposes.</li>
+	      </ul>
+	    <li>The Mounted IO Source can be used to analyse CDROM images (ISO9660), which are not currently supported by Sleuthkit. Even NFS mounts, or SMB mounts can be analysed in this way, if physical access to the hard disk is not possible.</li>
+	  </ul></li> 
+    </ul>
+	      <h2>Table Viewer Widget and the Navigation Bar</h2>
+	      The most powerfull widget in flag is the table viewer. This widget allows for extremely sophisticated searching of the dataset and is so important that an entire section is dedicated to it here. The figure below shows a typical usage of the <i>Table widget</i>, although it is used in many places within PyFlag.<p>
+<img src=images/Table.png border=3><p>
+The following components can be seen:
+  <ul>
+    <li><b>Current Case:</b> This shows the currently selected case name</li>
+    <li><b>Next and Previous Page:</b> Often the number of rows of data can not fit within a single screen full. In this case the Next page arrow will be unshaded indicating that another page is available to view.</li>
+    <li><b>Main Menu:</b> The menu button takes you directly to the main menu for the currently selected module. From there you may select another module to look at or simply another report.</li>
+    <li><b>Column Name:</b> Each column in the table has a name. Clicking on the column name indicates that you wish to order the result alphabetically by that column. At any one time, a single column will appear to have a pink background. This indicates that the result is ordered by this column. Clicking the column again flips the sense of the ordering (from ascending to descending and back again). <p>
+     Note the colouring of the rows alternating between gray and white. For each unique value of the ordering column these colours alternate. The result is that by ordering the result set on one of the columns, it is quick to see which rows contain identical values with each column, because they will appear like groups of different colours.</li>
+    <li><b>Group by Column:</b> The Group by column allows the user to count how many entries in the result set occur with each value of the column. For example in the figure above, by grouping by Source IP (and ordering by counts), it is possible to see which source IP produced the greatest number of hits.<p>
+   Once in the group by screen, clicking on the individual source IP address allows the user to view all the hits produced by that IP address</li>
+    <li><b>Search Column:</b> It is often handy to be able to eliminate a subset of the result set from the table, and concentrate on those results which match a specific criteria. For example, we may want to see those hits produced between certain date range, or those IP addresses requesting certain file extensions, or possibly both conditions at once.<p>
+   The search capability within the table widget allows for complex search criteria to be performed. Conditions are added cumulatively with a logical "and" seperating them. So for example, you can add the condition date &gt; 2001-10-01 and date &lt; 2002-10-01. The query is entered into the text area where the sense of the query is determined by the first character of the query string. So for example typing "&lt;2001-10-01" in the date column will show all dates prior to october 1st 2001. The following modifiers are supported:
+			  <ul>
+			    <li><b>&gt;</b> The values are greater than the specified value</li>
+			    <li><b>&lt;</b> The values are less than the specified value</li>
+			    <li><b>=</b> The values are exactly equal to the specified value</li>
+			    <li><b>!</b> The values are not equal to the specified value</li>
+			    <li><b>Search term with a % in it</b> The values are similar to the specified value with % being the wildcard</li>
+			    <li><b>search term</b> The values are similar to the specified value with wildcards automatically added before and after the search terms (so it may match in the middle of the entry)</li>
+			  </ul>
+   Note that as new searching conditions are added, they will be listed at the top of the table. You may click on any of those links to remove that search term, while still preserving the others.</li>
+  </ul>
+
+    <h1>Modules</h1>
+    PyFlag has an extensible, open architecture which allows developers to add arbitrary modules to the program core easily. The modules all reside within the plugins directory. PyFlag will automatically import all modules within that directory and make these available to the user via the menu.<p>
+      Following is a discussion of each module, and the functionality available through each module.
+      <h2>Disk Forensics</h2>
+      The Flag Disk Forensics Module provides the following capabilities:
+      <ul>
+        <li>Browsing a disk image and searching, viewing and downloading files within it.</li>
+        <li>Calculating a timeline of modified, accessed and created timestamps for all files within an image.</li>
+        <li>Calculting file types (file magic) and hashes (MD5sums) and comapring these against the NIST NSRL hash set (if present).</li>
+        <li>Browsing/Searching windows registry hives.</li>
+      </ul>
+      These map to the reports which appear in the "Disk Forensics" tab in flag.<p>
+      Before using these reports, the filesystem image must be loaded into flag. This is a three stage process:
+      <ul>
+        <li>Create a new case, as described above</li>
+        <li>Create an IO Source using the "Load IO Data Source" report in the "LoadData" tab, this is done by selecting an appropriate IO subsystem as described above and filling out the form appropriatedly</li>
+        <li>Load the filesystem using the "Load Filesystem Image" report in the "LoadData" tab, the form simply asks for the case to load the data into and the IOSource to find the filesystem in. This will invoke the Sleuthkit software which extracts filesystem metadata and loads it into the case database. This step can take a while (10 minutes or so) for very large filesystems.</li>
+      </ul>
+      Once the image is loaded the reports in the DiskForensics tab can be run. Note that the "MD5 Hash Comparison" can take a long time. Currently, before using the "Browse Registry" report, you must extract the registry hives from the image, this can be done my downloading them using the "Browse Filesystem" report.
+
+    <h2>Unstructured Disk Forensics</h2>
+    Sometimes it is impossible to recover files directly off a hard disk image. This may be due to the disk being corrupted, or the files being deleted, while the filesystem does not support file un-deletion (for example NTFS). In these cases it may be possible to recover some files by looking at the raw disk as a big chunk of binary data, without structure or filesystem, hence the term unstructured forensics.<p>
+      Most filesystems try to keep files un-fragmented as much as possible. This is usually a performance consideration, but on the balance, files reside in allocated sequential blocks. This property can be exploited for forensically recovering the files. Since most files have a definite file header (sometimes called file <i>magic</i>), it is possible to search the raw disk for this magic and extract data.<p>
+     This is the purpose of the "Extract Files" report. To look for possible files on the disks. This is not perfect since sometimes files are overwritten, or fragmentation corrupts them. Often though, this is enough evidence that contraband files were found (e.g. illegal pornography), or that document fragments can be retrieved (Often it is possible to read the text of office documents, despite them being corrupted). The image below illustrates the Unstructured Forensics report.<p>
+<img src=images/UnstructuredForensics.png border=3><p>
+As can be seen, thumbnails are generated on the fly for each suspected file type. The filename given to each extracted file consists of the offset within the image, and the extension based on the file type. (Note that Microsoft office documents all have the .doc extension, because all Microsoft office documents have the same magic).<p>
+    By clicking of each image, it is possible to download the file, view a hexdump of the file or see strings within the file.
+
+    <h3>Text Indexing</h3>
+    When analysing hard disk evidence, it is often useful to do keyword searches. A keyword may be embedded within the body of an executable or within a deleted slack space which is crucial to the course of the investigation. <p>
+
+    There are basically two ways for doing a keyword search:
+    <ol>
+      <li><b>string search:</b> 
+	Searches the entire disk for a particular string that may have been uncovered during the course of the investigation. Typically this string is not known in advance and therefore an index can not be created.<p>
+	  Traditionally this kind of search can be done by using the grep utility, or a similar functionality to find the pattern in the image. This technique is suitable when a limited number of search patterns is required, and reads the entire image as the search is being performed. Sometimes a "strings" file is produced using the strings command in order to reduce the size of the data set searching must be performed over. Performance is limited for this technique since the the user must wait for the grep operation to complete each time a new search term is used.
+      </li>
+      <li><b>Index search:</b> 
+	An index is a way of storing offsets of search terms within an index file, for rapidly retrieving later. We index a set of search terms (dubbed a dictionary) within the image. Locating the occurrence of any of the search terms within the image is extremely quick since the offset is already stored in the index. The downside of this technique is that it is impossible to search for a word which is not in the index, after the index has been created, short of re-indexing the file again.<p>
+
+This technique is mostly suitable for searching for a great number of search terms at the same time. (The indexing algorithm used is almost constant time with respect to the number of search terms - i.e. it takes almost as long to index for a dictionary of a single word as the entire English language dictionary). This technique is most suitable for standard forensic work, where a preliminary indexing of the drive can be done in batch mode using the flag shell for example (see flash later).
+      </li>
+   </ol>
+
+    The indexing reports are found in the "Index Tools" family of reports. Building a dictionary of search terms will be saved in the main flag database, and so will persist for all cases. A classification for each word is used to allow quick searching for words related to specific types of forensic investigation. For example the classification <b>Child Porn</b>, may be used for words like "sex","children" etc, while <b>Hackers</b> may be used for words like "haxor", "l33t" etc.<p>
+      
+      By indexing an image, an IO Source is indexed creating a binary index file in the results directory. This file contains offsets to the specific occurrence of every word in the index within the IO source. Once the index is created, the user is then able to search for words in the index. Note that although a user may type any word as a search term, since an index is used, PyFlag is only able to find words which are in the index - it is not searching for new words. For example, if the index dictionary contains both the words "linux" and "linus", searching for "lin" will return both matches for linux and linus, but will not return matches for "linen" for example... <p>
+
+      If disk space is plentiful, it is recommended to add as many words as possible to the dictionary (since indexing is almost constant time this should not slow the indexing process very much). The author often uses a complete dictionary of the English language (often found in <i>/usr/dict/words</i>). A simple script is provided under the "indextools" directory to allow merging of the standard words dictionary into PyFlag. Note that this dictionary will often index about 70-90 thousand different words.
+    
+      <h2>Log Analysis</h2>
+      Flags provides simple yet powerful log analysis capabilities based on the flag table view. Flag allows you to load arbitrary plain text log files by first describing the file format. The loading process is as follows:
+      <ul>
+        <li>Create a new log file type using the "Create Log Preset" report in the "Log Analysis" tab. A form will be displayed which involves the following steps:
+          <ul>
+            <li>Select a sample log file, once selected, click "submit" and the form will be redraws with a preview of the log file</li>
+            <li>Select a field delimiter. Usually a simple delimiter (space, comma) will do, but you can also use a regular expression, in this case the sub-matches (ie. between '()' brackets) will become the fields.</li>
+            <li>Once the delimiter is selected, press "submit" again to update the form, a preview of the split lines will be displayed. You can now select any prefilter to apply to the text before splitting. Prefilters can be used to perform simple processing on the text such as to change date formats etc.</li>
+            <li>Assign names and types to fields. Here you must give each field a name, if the name is "ignore", that field will be discarded when the data is loaded. Choose the most appropriate type for each field, ie. numbers shoud be "int" and times should be "timestamp" if these are selected appropriately, searching will be more powerfull (eg, you can search for date ">2003-01-01" meaning dates after 01/01/2003, this would not be possible if date was a varchar). Here you can also choose which fields to create indexes for, indexes can significantly speedup searches, but will increase the size of the database.</li>
+            <li>Once satisfied that the table preview looks ok, and all fields and types have been assigned, select the checkbox to see a final preview. This will load the data into a temporary database table and display the results. This allows you to see if the types selected are appropriate for the data.</li>
+            <li>Give the preset a name, and store it in the flag database. Note that the new preset log type will now be available to all flag cases.</li>
+          </ul>
+        </li>
+        <li>Load the log file using the "Load Preset Log File" report in the "LoadData" tab. This simply requires choosing a name for the new table, selecting the log file type (as created above) and choosing the log file to load.</li>
+      </ul>
+      Once the logfile data is loaded, it can be analysed using the "List Log File Contents" report in the "LogAnalysis" tab. This report simply shows a table of the loaded log. The table can be search my multiple criteria at a time, and sorted or grouped by any column.
+
+    <h2>Network Packet Analysis</h2>
+    The Network capture analysis is based on dissecting the packets using ethereal and loading the results into the database for analysis. Network analysis can be performed in two modes, corresponding to the flag tabs:
+    <ul>
+      <li>TCPDump Analysis, this involves loading all packet data into the database for close inspection. This level of analysis allows the investigator to do things such as:
+        <ul>
+	  <li>View statistics such as which protocols are used and their relative quantities.</li>
+          <li>Reassemble and view TCP sessions, including replaying HTTP sessions directly to the browser</li>
+          <li>View full packed breakdowns similarly to ethereal</li>
+          <li>Protocol specific analysis for several protocols including HTTP and DNS.</li>
+        </ul>
+      To load a full packet capture, use the "Load Pcap File" report in the "Load Data" tab. You can then use the reports in the "TCPDumpAnalysis" tab to analyse the data.
+      </li>
+      <li>Knowledge Base Analysis. Rather than loading all packet data into the database, the knowledge base mode analyses the traffic and makes assertions based on what it sees, eg. "ip 1.1.1.1 is talking to 2.2.2.2" (because we say an ip packet with those src and dst fields) or "ip 1.1.1.1 is listening on TCP port 80" (because we saw a TCP syn,ack from that ip/port). This mode is faster and creates a much smaller database. The knowledge base objects and relationships can be queried and graphed in various ways using the reports in the 'KnowledgeBase' tab in flag. To load the packet capture into flag, use the "Build Knowledge Base" report in the "Load Data" tab.</li>
+    </ul>
+
+    <h1>FLASH: The flag shell.</h1>
+    PyFlag has a great GUI which allows quick navigation of the results of forensic analysis. However, any forensic practitioner knows that forensics is a slow process, on any hardware. With typical hard disk image sizes increasing exponentially, many forensic investigations do take a long time to proceed. Users of PyFlag may have noticed that PyFlag caches the results of analysis, so it only needs to perform the analysis once. Subsequent navigation of reports loads the cached version making the navigation phase very quick. The analysis phase on the other hand does take some time.<p>
+
+      One of the strengths of PyFlag is that the User Interface (The UI), is abstracted from the program. In other words how the user interacts with the software can be easily changed without altering the main body of code very much. This opens the door to a variety of different GUI options. So far we have been introduced to the HTML GUI, which is the main web front end, and also currently the most functional for certain tasks.<p>
+
+      The command line interface (CLI) has been a central concept in Unix for decades. Although most new users fear the CLI, claiming it is less intuitive and more difficult to use than a GUI, the CLI has stuck around, and is not going anywhere. The reason for that is that CLI is more powerful in certain circumstances, and it allows batching or scripting. PyFlag allows users to use either interface interchangeably, so for those users not comfortable with the CLI, they can still use the GUI.<p>
+
+      <h2>Flash commands</h2>
+    Flash can be started from the main PyFlag directory by typing <i>./flash</i>:
+    <pre>
+mic@debian:~/pyflag$ ./flash
+Welcome to the Flag shell. Type help for help
+Flag Shell: />help
+PyFlag shell allows direct access to the filesystems. Command line expansion is supported.
+ The following commands are defined, type help command to find out more:
+['load', 'execute', 'set', 'help', 'less', 'cd', 'pwd', 'exit', 'ls', 'command', 'cp', 'istat']
+ 
+Flag Shell: />help load
+load case.iosource: loads the iosource within case into the shell.
+</pre>
+    <ul>
+      <li>load: <br>loads a filesystem into the shell for use with the ls,cp etc commands. The filesystem to load must have previously be loaded by the appropriate LoadData report.</li>
+      <li>execute: <br>Allows the user to execute the analysis phase of any report. More on this later.</li>
+      <li>set:<br>Sets an environment variable</li>
+      <li>less:<br>Views a file from the virtual file system using the less pager</li>
+      <li>istat:<br>show information about an inode in the virtual filesystem</li>
+    </ul>
+
+    <h3>The Virtual Filesystem</h3>
+    Imagine performing a forensic investigation: You went on site and imaged a hard disk using sgzip to conserve space, knowing that PyFlag can easily work off that. You took the evidence back to the lab and successfully used PyFlag to locate a directory with some interesting word documents. You want to extract those files for evidence, but there are several hundred such documents in the same directory, and mixed between those are other files of different extensions.<p>
+
+      The problem here is that it will take too long to use the GUI to extract those files. Because each of these files needs to be navigated to, opened and saved. For those users who use linux for forensic analysis, it would be nice to be able to mount the image on a directory, then simply issue a big copy command and thats it. However linux will not mount an sgzipped file!!!<p>
+
+      The flash virtual file system is what is really needed in this case. After the filesystem is loaded into PyFlag (either through the GUI or a script), we can simply load the filesystem into flash (the flag shell) and navigate it as per normal. Consider the following session:
+<pre>
+mic@debian:~/pyflag$ ./flash
+Welcome to the Flag shell. Type help for help
+Flag Shell: />load honey.usr
+Set file to read from as /var/tmp/flag/upload/honeypot.hda5.dd.sgz
+Loaded Filesystem tag usr in case honey
+Flag Shell: />pwd
+Current directory is /
+Flag Shell: />ls -l
+d/d 11 lost+found
+d/d 30785 doc
+d/d 92353 lib
+....
+Flag Shell: />cd man/.Ci/
+current working directory /man/.Ci/
+Flag Shell: /man/.Ci/>cp * /tmp/evidence/
+Copied /man/.Ci/ssh-1.2.27 in image to /tmp/evidence/ssh-1.2.27 on host
+Copied /man/.Ci/named.tar in image to /tmp/evidence/named.tar on host
+....
+Flag Shell: />exit 
+Bibi Then - Have a nice day.
+</pre>
+    As can be seen by the previous session, this is the perfect solution for scripting automated tasks. First the virtual filesystem is loaded into flash. Once that happens it is possible to navigate through the filesystem as though it was actually mounted at the root of flash ("/"). We can cd to different directories, and then we can even use shell globing to copy many files at once.<p>
+      Note the command <i>cp * /tmp/evidence/</i>. Here we are copying many files by using a wild-card to the temporary directory. The directory "/tmp/evidence/" is located on our host (i.e. not in the image). Note that this will also extract deleted files if possible.
+
+      <h3>Flash Scripts</h3>
+    Sometimes forensic investigations are time consuming, much work needs to be done before real evidence is forthcoming. For example the author likes to go through similar steps whenever getting a new hard disk image:
+    <ol>
+      <li>Create an IOSource of a drive</li>
+      <li>Load the drive's filesystems into PyFlag</li>
+      <li>Build the MAC time-line for each filesystem</li>
+      <li>Run an NSRL hash comparison on all the files</li>
+      <li>Virus scan all the files on the drive looking for known trojans</li>
+      <li>Extract files by magic, looking for deleted images/movies/documents</li>
+      <li>Index the drive against the indexing dictionary</li>
+    </ol>
+
+    And then this process must be repeated for every drive found (some jobs have lots of drives!!!). This process is very time consuming, and can take many hours to complete, even on state of the art hardware. <p>
+      The solution for this problem is to be able to script the whole process, leaving it to run on its own. The analyst then only needs to look at the case once all the time consuming tasks have been done automatically, and add the human element to the task.<p>
+
+      All reports in PyFlag are broken down into a number of methods. The two most interesting methods in this context are the analysis method and the display method. The analysis method typically performs time consuming tasks, building a cache of results for future display methods. The display methods, on the other hand, simply format the results for users to navigate through. The result of this design is that analysis methods contain all the time consuming analysis code, which once run, will be cached by PyFlag. Once an analysis method is run for a certain report, the user may issue subsequence display method calls to navigate through the information very quickly.<p>
+      Flash allows the execution of the analysis methods in a scripted fashion, or from within the shell. This is achieved by the <i>execute</i> command:
+<pre>
+Flag Shell: /man/.Ci/>help execute
+        This command executes a flag report giving it the arguments given. 
+The general format of this command is:
+
+execute Family.ReportName arg1=value arg2=value
+
+        Note that environment values are automatically included into the set of args. 
+So you may use set to set args that are commonly used.
+        Note also that command line completion is enabled for this, and so may be 
+used liberally to assist with both the selection of reports and the args needed
+</pre>
+In order to figure out what arguements are required for each report, users can use the GUI to perform the analysis and then copy the URL from the browser here.<p>
+
+For example, Loading a filesystem in the browser produces a URL like this:
+<pre>
+http://127.0.0.1:8000/f?case=blah&iosource=cdrom&report=LoadFS&
+family=LoadData&fstype=mounted
+</pre>
+
+Therefore, in this example, the following command line arguments are required for flash:
+<pre>
+Flag Shell: />execute LoadData.LoadFS case=blah fstype=mounted iosource=cdrom
+Execution of LoadData.LoadFS successful
+</pre>
+
+    This process can be written in a script. Scripts can have variables to be interpolated into them after asking the user a question. For example, the "examples/" directory has a flash script for performing an initial analysis of a drive. Scripts are loaded by flash and variables are interpolated, for example:
+<pre>
+mic@debian:~/pyflag$ ./flash -c examples/load_new_file.flash
+Welcome to the Flag shell. Type help for help
+Please enter a value for case: honey
+Please enter a value for io source: user_partition
+Please enter a value for sgziped filename: /var/tmp/flag/upload/honeypot.hda5.dd.sgz
+Please enter a value for filesystem type: linux-ext2
+....
+</pre>
+    As can be seen flash asks the user some questions, and then launches into performing all the time consuming analysis tasks. Although flash does not support a complete scripting language, this much can be very useful already.
+
+    <hr>
+    <address><a href="mailto:pyflag-users@sourceforge.net"></a></address>
+<!-- Created: Sat Mar 13 21:51:49 EST 2004 -->
+<!-- hhmts start -->
+Last modified: Sun Apr 18 22:29:13 EST 2004
+<!-- hhmts end -->
+  </body>
+</html>

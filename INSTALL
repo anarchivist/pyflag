@@ -1,0 +1,47 @@
+To install pyflag you must have a working mysql server somewhere. It
+may be on a different server than the server used to run pyflag, but
+you will need to have root level access to the database server. This
+is required in order to drop and create databases.
+
+Log into the mysql server by using the mysql utitlity (If you just
+installed mysql there is no root password set, so the -pxxxx can be
+omitted):
+bash$  mysql -u root -pxxxx
+mysql> create database pyflag;
+mysql> grant all on *.* to root@localhost identified by "password";
+mysql> quit
+
+The grant command create a root level account on the database. You can
+replace localhost with the actuall host you intend to log in
+from. Note that mysql does not have a root password by default, but
+PyFlag _requires_ that you have a root password set for the mysql
+server. This is best practice anyway, and you should never consider
+running a mysql server with a blank root password.
+
+Now from the shell, populate the initial database:
+cat setup.db | mysql -u root -ppassword -h 127.0.0.1 pyflag
+
+You may also want to download the NSRL database as well. Consult the
+nsrl_load script to load the databases.
+
+To Start PyFlag, cd into the unpacked binary directory, and run:
+bash$  ./flag.sh
+
+The first time that flag is run, you will be asked to fill in a number
+of parameters. This will create a ~/.pyflagrc file in your home
+directory.
+
+Optional Features:
+==============
+
+Virus scanning: Flag may use a virus scanner if one is available on
+the system. You will need to install the following packages on debian:
+
+libclamav1-dev
+clamav-freshclam
+clamav-base
+clamav
+
+The library is required in order to compile python support for
+clamav. You will then need to run the freshclam script in order to
+download the latest version of the pattern files.

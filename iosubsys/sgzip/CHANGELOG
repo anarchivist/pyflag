@@ -1,0 +1,85 @@
+* Sun May 30 2004: Michael Cohen
+- sgloop module derived from the base cloop module
+
+* Sun Okt 26 01:05:29 CEST 2003 Klaus Knopper
+- Changed format of index pointers to network byte order
+
+* Wed Aug 27 16:31:30 CEST 2003 Klaus Knopper
+- Removed exceed get_file()
+- Changed spinlocking code
+- Not using asynchronous io request queue anymore
+
+* Sat Jul 19 16:31:30 CEST 2003 Klaus Knopper
+- Added multiple cloop device (losetup) support (default 8)
+- Removed Kernel 2.2 support
+- switched to 64bit offsets in cloop file (no backwards compatibility)
+- file=/path/to/file parameter is now optional
+
+* Thu May 15 23:25:40 CEST 2003 Klaus Knopper
+- Replaced offset-buffer kmalloc() by vmalloc() for Kernel 2.4
+  for huge images (DVD)
+- Added atomic stuff for clo_busy
+
+* Wed Jan  8 2003 Eduard Bloch
+- added minimalistic hooks for devfs support, target file is /dev/cloop/0
+
+* Sat Aug 17 2002 Klaus Knopper
+- Removed ll_rw_blk() in favor of do_generic_file_read for
+  better NFS support
+- Modified Kernel messages
+- Changed -EPERM to -EROFS for mount
+
+* Wed Apr 24 2002 Klaus Knopper
+- Added support for block devices as underlying file
+  (Thanks to Rob Browning)
+
+* Wed Mar 21 2002 Klaus Knopper
+- zlib update to 1.1.4
+
+* Mon Dec 25 2001 Klaus Knopper
+- Removed blkdev_dequeue and list_add for clean request handling
+- Moved global variables to cloop_device struct
+
+* Thu Nov 15 2001 Klaus Knopper
+- Added EXPORT_SYMBOL_GPL for new modutils fussiness
+
+* Tue Jul 31 2001 Klaus Knopper
+- Checking filp_open() for IS_ERR() to prevent oopses for nonexistent files
+- Cleanup of create_compressed_fs.c for newer version of gcc
+
+* Fri Jun 15 2001 Klaus Knopper
+- Removed down()/up() because they caused the freeze mentioned earlier
+- replaced by clo_busy variable
+
+* Sat Jun 10 2001 Klaus Knopper
+- Kernel 2.4 compatibility fixes
+- still hunting kernel freeze bug when doing heaving IO!
+
+* Wed Jan 17 2001 Klaus Knopper
+- Kernel 2.4 compatibility (untested)
+
+* Thu Sep 21 2000 Klaus Knopper
+- fixed a memory leak in load_buffer()
+
+* Tue Sep 12 2000 Klaus Knopper
+- whatever it was that caused the deadlocks, the efficiency
+  improvement in load_buffer (read consecutive blocks in a
+  single ll_rw_blk()-call) seems to work around it. Needs
+  more tests.
+
+* Sat Aug 19 2000 Klaus Knopper
+- replaced scratch buffer memory allocation
+
+* Fri Aug 11 2000 Klaus Knopper
+- Fixed Makefile for SMP
+
+* Wed Aug  9 2000 Klaus Knopper
+- Changed vmalloc back to kmalloc (vmalloc occasionally blocks
+  when paging)
+
+* Wed Jun 14 2000 Klaus Knopper
+- Fixed out-of-place brelse,
+- Fixed possible buffer overflow in memcpy,
+- Added 'file=/path/to/file' module option for compressed file name,
+- Added support for underlying devices with varying blocksize,
+- Fixed (?) spinlocking for non-SMP.

@@ -1,0 +1,7 @@
+#Example Flash script for performing initial analysis on hdds
+set case=%(case)s
+execute CaseManagement.NewCase create_case=%(case)s
+execute LoadData.LoadIOSource iosource=%(io source)s subsys=sgzip io_filename=%(sgziped filename)s case=%(case)s
+execute LoadData.LoadFS iosource=%(io source)s fstype=%(filesystem type)s case=%(case)s
+execute DiskForensics.HashComparison fsimage=%(io source)s case=%(case)s
+

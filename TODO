@@ -1,0 +1,24 @@
+Things still to do for pyflag in no order of priority:
+
+- Write a tutorial explaining how to use flag to analyse real life cases. A number of different scenarios can be covered here:
+	* Hacking incident
+	* Searching for porn or inappropriate content
+	* Recovering a raid partition
+	* Log analysis for DoS
+	* network mapping
+
+- Finish the raid reassembly features
+- Write a GTK frontend
+- Move the configuration file into the user's home directory (Done)
+- String and keyword searching
+- Integrate the io subsystems within the sleuthkit. IO subsystems will be:
+	* Mutiple disks, partitions per dd image
+	* sgzip for compressed dd file storage
+	* expert witness compression subsystem for Encase compatibility
+	* Raid reassembly subsystem for (linux raid, lvm etc).
+
+- integrate those subsystems into the GUI
+
+- Automatically install the pyflag database if we cant find it.
+- Automatically create the configuration file if we cant find it using user prompts. (partially done)
+- Add authentication and case management to the web interface. (low priority).

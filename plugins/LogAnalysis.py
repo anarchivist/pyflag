@@ -1,0 +1,258 @@
+# ******************************************************
+# Copyright 2004: Commonwealth of Australia.
+#
+# Developed by the Computer Network Vulnerability Team,
+# Information Security Group.
+# Department of Defence.
+#
+# David Collett <daveco@users.sourceforge.net>
+# Michael Cohen <scudette@users.sourceforge.net>
+#
+# ******************************************************
+#  Version: FLAG 0.4 (12-02-2004)
+# ******************************************************
+#
+# * This program is free software; you can redistribute it and/or
+# * modify it under the terms of the GNU General Public License
+# * as published by the Free Software Foundation; either version 2
+# * of the License, or (at your option) any later version.
+# *
+# * This program is distributed in the hope that it will be useful,
+# * but WITHOUT ANY WARRANTY; without even the implied warranty of
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# * GNU General Public License for more details.
+# *
+# * You should have received a copy of the GNU General Public License
+# * along with this program; if not, write to the Free Software
+# * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# ******************************************************
+
+""" Module for analysing Log files """
+import pyflag.Reports as Reports
+import pyflag.FlagFramework as FlagFramework
+import pyflag.LogFile as LogFile
+import pyflag.conf
+config=pyflag.conf.ConfObject()
+import re
+
+description = "Log Analysis"
+order = 35
+
+class ListLogFile(Reports.report):
+    """ Lists the content of the log file using the table UI object """
+    parameters = {"logtable":"casetable"}
+    name="List log file contents"
+    description="This report simply lists the log entries in a searchable/groupable table"
+
+    def form(self,query,result):
+        result.case_selector()
+        result.meta_selector(query['case'],'Select Log Table','logtable')
+
+    def display(self,query,result):
+        result.heading("Log File in Table %s" % query['logtable'])
+        dbh = self.DBO(query['case'])
+
+        #Find the names of all the columns in table:
+        dbh.execute("select * from %s limit 1",query['logtable'])
+            
+        columns =[]
+        for d in dbh.cursor.description:
+            columns.append(d[0])
+
+        result.table(columns=columns,names=columns,
+                     links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ListLogFile', logtable=query['logtable'],__target__='boo')],
+                     table=query['logtable'], case=query['case'])
+
+class CreateLogPreset(Reports.report):
+    """ Creates a new type of log file in the database, so that they can be loaded using the Load Log File report """
+    parameters = {"log_preset":"sqlsafe", "datafile":"filename",
+                   "final":"alphanum", "preview":"alphanum"}
+    name="Create Log Preset"
+    description="Create new preset log type"
+    order=40
+
+    def display(self,query,result):
+        result.heading("New log file preset %s created" % query['log_preset'])
+        result.link("Load a log file", FlagFramework.query_type((),case=query['case'],family='LoadData',report='LoadPresetLog',log_preset=query['log_preset']))
+        return result
+
+    def form(self,query,result):
+        try:
+            result.start_table()
+            result.ruler()
+            #Check if the user has supplied a name for the table: (if
+            #they did not we throw an exception and return the form so
+            #far - the overall effect is that the form will grow as
+            #the user enters more data.
+            
+            tmp = self.ui()
+            tmp.heading("Step 1:")
+            result.row(tmp,"Select a sample log file for the previewer")
+            result.ruler()
+            #Create a new ui based on our current one
+            tmp = self.ui(default = result)
+            tmp.filebox()
+            result.row("Enter name of log file:",tmp)
+
+            result.ruler()
+            tmp = self.ui()
+            tmp.heading("Step 2:")
+            result.row(tmp,"Select a Log Processor")
+            result.ruler()
+
+            result.const_selector("Select Log Processor", 'delmethod',
+                                  LogFile.plugins.keys() , LogFile.plugins.keys(),
+                                  onclick="this.form.submit();")
+
+##            result.radio("Field Separator Type:","delmethod",('simple','advanced'),onclick="this.form.submit();")
+            # Now we ask the log object to draw its form for us:
+            log = LogFile.plugins[query['delmethod']]('datafile',query)
+
+            #Ask the Log object to draw the form it requires
+            log.form(query,result)
+            result.end_table()
+            result.start_table()
+
+            result.checkbox('Click here and submit to see final preview','preview','ok')
+            query['preview']
+
+            # try to load and display as a final test
+            dbh = self.DBO(query['case'])
+            temp_table = dbh.get_temp()
+            
+            log.load(dbh,temp_table,rows= 3)
+            dbh.execute("select * from %s limit 1",temp_table)
+            columns =[]
+            for d in dbh.cursor.description:
+                columns.append(d[0])
+
+            result.ruler()
+            tmp_final = self.ui(result)
+            tmp_final.table(columns=columns,names=columns,links=[], table=temp_table, case=query['case'], simple=True)
+            result.row(tmp_final,bgcolor='lightgray',colspan=5)
+
+            result.ruler()
+            tmp = self.ui(result)
+            tmp.heading("Step 5:")
+            result.row(tmp,"Give the preset a name",align='left')
+            result.ruler()
+            result.textfield("name for preset:",'log_preset')
+            result.ruler()
+            result.checkbox('Click here when finished','final','ok')
+            result.end_table()
+            return result
+
+        #If any of the required paramters are not there, we pass the form back to the user to complete.
+        except KeyError,e:
+            return result
+
+    def analyse(self, query):
+        """ store this log type in the database """
+        log = LogFile.plugins[query['delmethod']]('datafile',query)
+
+        # pickle it to the database
+        LogFile.store_loader(log, query['log_preset'])
+
+class DeleteLogPreset(Reports.report):
+    """ Deletes an old log preset """
+    parameters = {"log_preset":"sqlsafe",  "final":"alphanum"}
+    name="Delete Log Preset"
+    description="Delete preset log type"
+    order=50
+
+    def form(self,query,result):
+        result.selector("Select Preset to delete",'log_preset',"select value,value from meta where property='log_preset'",(),case=None)
+        result.checkbox('Click here to confirm deletion','final','ok')
+
+    def analyse(self, query):
+        dbh = self.DBO(None)
+        dbh.execute("delete from meta where property='log_preset' and value=%r",query['log_preset'])
+        dbh.execute("delete from meta where property='log_preset_%s'",query['log_preset'])
+
+    def display(self,query,result):
+        result.heading("deleted log preset %s" % query['log_preset'])
+
+class BandWidth(Reports.report):
+    """ Calculates the approximate bandwidth requirements by adding the size of each log entry within time period """
+    parameters = {"logtable":"casetable","timestamp":"sqlsafe","size":"sqlsafe"}
+    name = "Estimate Bandwidth"
+    description="Estimate approximate bandwidth requirements from log file"
+
+    def form(self,query,result):
+        dbh = self.DBO(query['case'])
+        result.para("This report approximates the amount of bandwidth used by the server that produced the log file. This is done by adding the total number of bytes transfered within a specified time preiod (called a bin). Bins are specified in seconds. The result is a graph showing how many bytes were transfered per bin.")
+        try:
+            result.case_selector()
+            result.meta_selector(query['case'],'Select Log Table','logtable')
+            dbh.execute("select * from %s limit 1",query['logtable'])
+            columns = [ d[0] for d in dbh.cursor.description ]
+            result.const_selector("Timestamp column:",'timestamp',columns,columns)
+            result.const_selector("Size column:",'size',columns,columns)
+        except KeyError:
+            pass
+
+    def display(self,query,result):
+        dbh = self.DBO(query['case'])
+        try:
+            bin_size=int(query['bin_size'])
+        except KeyError:
+            bin_size=60
+            query['bin_size']=str(bin_size)
+            
+        result.heading("Bandwidth estimate from log %s"%query['logtable'])
+        result.start_table()
+        result.start_form(query)
+        result.textfield('Bin Size (Seconds):','bin_size')
+        result.end_form(None)
+        result.end_table()
+
+        if query.has_key('graph'):
+            new_query=query.clone()
+            del new_query['graph']
+            del new_query['limit']
+            result.link("Click here to view table",new_query)
+
+            params={'timestamp':query['timestamp'],'bin_size':bin_size,'size':query['size'],'logtable':query['logtable']}
+            try:
+                start=int(query['limit'])
+                if not start: raise KeyError
+            except KeyError:
+                dbh.execute('select unix_timestamp(min(%(timestamp)s)) as `min` from %(logtable)s'%params)
+                start=dbh.fetch()['min']
+
+            params['start']=start
+            
+            result.para("")
+            dbh.execute('select unix_timestamp(%(timestamp)s) as `timestamp`,floor(unix_timestamp(%(timestamp)s)/%(bin_size)s)*%(bin_size)s as `Unix Timestamp`,from_unixtime(floor(unix_timestamp(%(timestamp)s)/%(bin_size)s)*%(bin_size)s) as `DateTime`,sum(%(size)s) as `Count` from %(logtable)s  where `%(timestamp)s`>from_unixtime("%(start)s") and   `%(timestamp)s`<from_unixtime("%(start)s"+100*%(bin_size)s) group by `Unix Timestamp`  order by  `Unix Timestamp` asc   limit 0, 100' % params )
+            x=[]
+            y=[]
+            z=[]
+            for row in dbh:
+                x.append(row['DateTime'])
+                y.append(row['Count'])
+                z.append(row['timestamp'])
+
+            try:
+                result.next=z[-1]
+                result.previous=z[0]-100*bin_size
+            except IndexError:
+                del query['limit']
+                result.refresh(0,query)
+
+            import pyflag.Graph as Graph
+
+            graph=Graph.Graph()
+            graph.hist(x,y,xlabels='yes',stubvert='yes',xlbl="Timestamp Bin",ylbl="Bytes per Bin",ylbldet="adjust=-0.15,0",xlbldet="adjust=0,-1.1")
+            result.image(graph)
+            return
+
+        result.link("Click here to view graph",query,graph=1)
+
+        result.table(
+            columns=('floor(unix_timestamp(%s)/%s)*%s' % (query['timestamp'],bin_size,bin_size) ,'from_unixtime(floor(unix_timestamp(%s)/%s)*%s)' % (query['timestamp'],bin_size,bin_size) ,'sum(%s)'%query['size']), 
+            names=('Unix Timestamp','DateTime','Count'),
+            links=[],
+            table=query['logtable'],
+            case=query['case'],
+            groupby='`Unix Timestamp`'
+            )

@@ -1,0 +1,591 @@
+<HTML>
+<HEAD>
+<TITLE>Trie</TITLE>
+</HEAD>
+
+<BODY>
+<H1 ALIGN=center>Trie</H1>
+<HR>
+
+<P>
+<OL>
+<LI>
+<B>What is a <EM>trie</EM>:</B><P>
+
+You've probably already seen kinds of trees that store things more
+efficiently, such as a <EM>binary search tree</EM>.  Here, we will
+examine another variant of a tree, called a <EM>trie</EM>.
+
+<P>
+<HR ALIGN=left WIDTH="20%">
+<B>Aside:</B>
+The name <B>trie</B> comes from its use for re<B>trie</b>val, but is
+pronounced like "try".
+Here, we will discuss a particular implementation of a trie, which may
+be somewhat different than how it is described elsewhere.
+<HR ALIGN=left WIDTH="20%">
+
+<P>
+We use a trie to store pieces of data that have a <EM>key</EM> (used to
+identify the data) and possibly a <EM>value</EM> (which holds any
+additional data associated with the key).
+
+<P>
+Here, we will use data whose keys are <EM>strings</EM>.
+
+<P>
+Suppose we want to store a bunch of <EM>name/age</EM> pairs for a set
+of people (we'll consider names to be a single string here).
+
+<P>
+Here are some pairs:
+
+<BLOCKQUOTE><PRE>
+amy	56
+ann	15
+emma	30
+rob	27
+roger	52
+</PRE></BLOCKQUOTE>
+
+<P>
+Now, how will we store these name/value pairs in a trie?  A trie allows
+us to share prefixes that are common among keys. Again, our keys are
+names, which are <EM>strings</EM>.
+
+<P>
+Let's start off with <B>amy</B>. We'll build a tree with each character
+in her name in a separate node.  There will also be one node under the
+last character in her name (i.e., under <B>y</B>).  In this final node,
+we'll put the <EM>nul character</EM> (<CODE>\0</CODE>) to represent the
+end of the name.  This last node is also a good place to store the age
+for <B>amy</B>.
+
+<BLOCKQUOTE><PRE>
+      .     &lt;- level 0 (root)
+      |
+      a     &lt;- level 1
+      |
+      m     &lt;- level 2
+      |
+      y     &lt;- level 3
+      |
+    \0 56   &lt;- level 4
+</PRE></BLOCKQUOTE>
+
+<P>
+Note that each <EM>level</EM> in the trie holds a certain character in
+the string <B>amy</B>.  The first character of a string key in the trie
+is <STRONG>always</STRONG> at level 1, the second character at level 2,
+etc.
+
+<P>
+Now, when we go to add <B>ann</B>, we do the same thing; however,
+we already have stored the letter <B>a</B> at level 1, so we don't
+need to store it again, we just reuse that node with <B>a</B> as the
+first character.  Under <B>a</B> (at level 1), however, there is only a
+second character of <B>m</B>...But, since <B>ann</B> has a second character
+of <B>n</B>, we'll have to add a new branch for the rest of
+<B>a<EM>nn</EM></B>, giving:
+
+<BLOCKQUOTE><PRE>
+     .
+     |
+     a
+   /   \
+  m     n
+  |     |
+  y     n
+  |     |
+\0 56 \0 15
+</PRE></BLOCKQUOTE>
+
+<P>
+<HR ALIGN=left WIDTH="20%">
+<B>Note:</B>
+Again, <B>ann</B>'s data (an age of 15) is stored in her last node.
+<HR ALIGN=left WIDTH="20%">
+
+<P>
+Now, let's add <B>emma</B>.
+Remember <B>e</B> is the first character and should go at level 1.
+Since there is no node with character <B>e</B> at level 1, we'll
+have to add it.  In addition, we'll have to add nodes for all the other
+characters of <B>e<EM>mma</EM></B> under the <B>e</B>.  The first
+<B>m</B> will be a child of the <B>e</B>, the next <B>m</B> will be
+below the first <B>m</B>, etc., giving:
+
+<BLOCKQUOTE><PRE>
+          .
+      /       \
+     a         e
+   /   \       |
+  m     n      m
+  |     |      |
+  y     n      m
+  |     |      |
+\0 56 \0 15    a
+               |
+             \0 30
+</PRE></BLOCKQUOTE>
+
+<P>
+Now, let's add the last two names, namely <B>rob</B> and <B>roger</B>,
+giving:
+
+<A NAME="ex1"></A>
+<BLOCKQUOTE><PRE>
+              .
+      /       |      \
+     a        e       r
+   /   \      |       |
+  m     n     m       o
+  |     |     |     /   \
+  y     n     m    b     g
+  |     |     |    |     |
+\0 56 \0 15   a  \0 27   e
+              |          |
+            \0 30        r
+                         |
+                       \0 52
+</PRE></BLOCKQUOTE>
+
+<P>
+Because the key for each piece of data is a sequence of characters, we
+will sometimes refer to that sequence as the <EM>keys</EM> (plural) for
+that data.  For example, <B>ann</B>'s data is referenced using the keys
+<B>a</B>, <B>n</B>, <B>n</B> (in that order).
+
+<P>
+To better understand how a trie works, answer the following questions.
+
+<P>
+<EM>
+<UL>
+<LI>What would the trie look like if we now added <B>anne</B> with
+age <B>67</B>? How about <B>ro</B> with age <B>23</B>?
+<LI>Would the trie look different if we added the names in a different order,
+say: <B>rob, ann, emma, roger, amy</B>?
+<LI>Is this a binary tree, tertiary tree or what?  In other words, each
+node has <B>at most</B> how many children?
+</UL>
+</EM>
+
+<P>
+<LI>
+<B>Trie operations:</B><P>
+
+Here are the operations that we will concern ourselves with for this
+<EM>trie</EM>.  You may need others for a particular use of the trie.
+
+<P>
+<UL>
+<LI><CODE>Add:</CODE><P>
+
+We've already given examples of adding.
+
+<P>
+<LI><CODE>IsMember:</CODE><P>
+
+See if data with a certain string key is in the trie.
+
+<P>
+For example, <NOBR><CODE>IsMember(trie, "amy")</CODE></NOBR> should
+report a true value and and <NOBR><CODE>IsMember(trie,
+"anna")</CODE></NOBR> should report a false value.
+
+<P>
+We can imagine other variations where we do something with the
+<EM>value</EM> (like return it) once we find something with the
+<EM>matching key</EM>.
+
+<P>
+<LI><CODE>Remove:</CODE><P>
+
+Remove something from the trie, given its key.
+
+</UL>
+
+<P>
+<HR ALIGN=left WIDTH="20%">
+
+<P>
+We may want more operations depending on how we'll use the trie.
+
+<P>
+<EM>Since our trie holds data with string keys, which of the operations need
+<B>a key and value</B>, and which just need keys?</EM>
+
+<P>
+<LI>
+<B>IsMember algorithm:</B><P>
+
+Remember that a trie is a special kind of tree.  Since a trie organizes
+its data via the keys (as specified above), it is easy to find whether a
+particular key is present.
+
+<P>
+Finding a key can be done with iteration (looping).
+
+<P>
+Here is an outline of such an algorithm.  It looks in a particular
+<EM>trie</EM> and determines whether data with a particular
+string <EM>key</EM> is present.
+
+<P>
+<A NAME="algorithm"></A>
+<B><CODE>IsMember(<EM>trie</EM>, <EM>key</EM>)</CODE></B> [iterative]
+<PRE>
+1. Search top level for node that
+   matches first character in key
+2. If none,
+     return false
+   Else,
+3. If the matched character is <CODE>\0</CODE>?
+     return true
+   Else,
+4. Move to subtrie that matched this character
+5. Advance to next character in key*
+6. Go to step 1
+</PRE>
+
+<P>
+<HR ALIGN=left WIDTH="20%">
+<B>*</B> I.e., the new search key becomes the old one without its first
+character.
+<HR ALIGN=left WIDTH="20%">
+
+<P>
+The algorithm moves down the tree (to a subtree) at step 6.  Thus,
+the <EM>top level</EM> in step 1 actually may refer to any level in
+the tree depending on what subtree the algorithm is currently at.
+
+<P>
+<LI>
+<B>Trie implementation:</B><P>
+
+Now, let's think about how to actually implement a trie of <EM>name/age
+pairs</EM> in C.
+
+<P>
+As usual, we'll put the data structure in its own module by producing
+the source files <CODE>trie.h</CODE> and <CODE>trie.c</CODE>.
+
+<P>
+The functions needed for our trie are the operations we mentioned:
+
+<BLOCKQUOTE><PRE>
+TrieAdd()
+TrieIsMember()
+TrieRemove()
+</PRE></BLOCKQUOTE>
+
+<P>
+However, we also need additional functions for <EM>setup</EM> and
+<EM>cleanup</EM>:
+
+<BLOCKQUOTE><PRE>
+TrieCreate()
+TrieDestroy()
+</PRE></BLOCKQUOTE>
+
+<P>
+<EM>Now, before we ponder the details of the trie functions, what
+must we decide on?</EM>
+
+<P>
+<LI>
+<B>Organization of data types for a trie:</B><P>
+
+Let's think about the data types for a trie and how to divide them
+between the <EM>interface</EM> (in <CODE>trie.h</CODE>) and the
+implementation (in <CODE>trie.c</CODE>) using ADTs and CDTs.
+
+<P>
+We'll start with the type of a value.  Since our values are ages, we
+have the following:
+
+<BLOCKQUOTE><PRE>
+typedef int trieValueT;
+</PRE></BLOCKQUOTE>
+
+<P>
+Since the type of values is something that people using the trie
+need to know, it goes in the interface (<CODE>trie.h</CODE>).
+
+<P>
+<A NAME="whynoelement"></A>
+Next, we decided that keys will always be strings.  However, we will
+not construct <EM>elements</EM> that are made up of <EM>strings</EM>
+and <EM>values</EM>.  The reason is that we do not store entire string
+keys in nodes of the trie.  Remember, we store only the individual
+characters of the string key in the nodes.
+
+<P>
+Thus, the type of a node begins as:
+
+<BLOCKQUOTE><PRE>
+typedef struct trieNodeTag {
+  char key;
+  trieValueT value;
+  ...
+} trieNodeT;
+</PRE></BLOCKQUOTE>
+
+<P>
+Since it is only a detail of the implementation, it goes in
+<CODE>trie.c</CODE>.
+
+<P>
+<HR ALIGN=left WIDTH="20%">
+<B>Note:</B>
+We could make the trie more generic, by allowing it to handle keys that
+are any type of <EM>array</EM>, i.e., arrays of things other than
+characters.  For other types of arrays, we'd have to determine how
+to represent the end-of-key, which we currently do with the <EM>nul
+character</EM> (<CODE>\0</CODE>).
+
+<P>
+For now, we'll just hardcode the use <EM>character</EM> for the key
+stored at each node, and <EM>string</EM> (i.e., array of character)
+for the entire key (or sequence of keys) associated with each piece
+of data.
+<HR ALIGN=left WIDTH="20%">
+
+<P>
+Now we need to complete the type of a node.  <EM>How will we construct
+a tree whose nodes can have several children?</EM>  One way is to have
+the children of a node be part of a linked list of nodes.
+
+<P>
+<A NAME="structure"></A>
+<H4>Structure</H4>
+
+If we view siblings at a level as being linked in a list, then the trie
+we saw <A HREF="#ex1">above</A> now could be viewed structurally as:
+
+<BLOCKQUOTE><PRE>
+      |
+      a <FONT COLOR="red">---------</FONT> e ----- r
+      <FONT COLOR="magenta">|</FONT>           |       |
+      m --- n     m       o
+      |     |     |       |
+      y     n     m       b ----- g
+      |     |     |       |       |
+    \0 56 \0 15   a     \0 27     e
+                  |               |
+                \0 30             r
+                                  |
+                                \0 52
+</PRE></BLOCKQUOTE>
+
+<P>
+First, the associated nodes at a given level form a linked list (e.g.,
+<B>a</B>, <B>e</B>, <B>r</B> at level 1).  Note, however, that each
+level may have more than one linked lists.  For example, at the second
+level, <B>m</B> and <B>n</B> form their own list (as they are
+associated with <B>a</B> at the first level).  Likewise, <B>m</B> (as
+it is associate with <B>e</B> at the first level) forms its own linked
+list.  And finally, <B>o</B>, which is associated with <B>r</B> at the
+first level, forms its own list.
+
+<P>
+Thus, each node (e.g., <B>a</B> at level 1) has a link to the <FONT
+COLOR="red">next</FONT> node at that level and a link to a list of its
+<FONT COLOR="magenta">children</FONT>.  To implement this structure, we
+will need two pointers in a node, giving:
+
+<BLOCKQUOTE><PRE>
+typedef struct trieNodeTag {
+  char key;
+  trieValueT value;
+  struct trieNodeTag *<FONT COLOR="red">next</FONT>, *<FONT COLOR="magenta">children;</FONT>
+} trieNodeT;
+</PRE></BLOCKQUOTE>
+
+<P>
+<HR ALIGN=left WIDTH="20%">
+<B>Note:</B>
+The <EM>value</EM> part of a node is unused in most cases since we only
+store the value in the node with the nul character (<CODE>\0</CODE>) as
+a key.  If a value was something that was large, we would have to consider
+being smarter about our design.
+<HR ALIGN=left WIDTH="20%">
+
+<P>
+The only types left are those that keep track of the trie.  Based on
+our choice for the <A HREF="#structure">structure</A> of the trie
+implementation, we see we'll need a pointer to the top level's first node.
+
+<P>
+Since this pointer has to do with the <EM>implementation</EM> of the
+trie, we put it in the <EM>concrete type</EM>, <CODE>struct
+trieCDT</CODE>:
+
+<BLOCKQUOTE><PRE>
+typedef struct trieCDT {
+  trieNodeT *root;
+} trieCDT;
+</PRE></BLOCKQUOTE>
+
+<P>
+In the interface, we must fill in what the <EM>abstract type</EM> is as
+follows:
+
+<BLOCKQUOTE><PRE>
+typedef struct trieCDT *trieADT;
+</PRE></BLOCKQUOTE>
+
+<P>
+Finally, we have:
+
+<PRE>
+trie.h                          trie.c
+------				------
+				#include "trie.h"
+
+				typedef struct trieNodeTag {
+				  char key;
+				  trieValueT value;
+typedef int trieValueT;		  struct trieNodeTag *next,
+				                     *children;
+				} trieNodeT;		
+
+typedef struct trieCDT		typedef struct trieCDT {
+	*trieADT;		  trieNodeT *root;
+				} trieCDT;
+</PRE>
+
+<P>
+<LI>
+<B>Using a trie:</B><P>
+
+<P>
+Now that we've decided on the data types for a trie, we can imagine how
+our trie will be used:
+
+<BLOCKQUOTE><PRE>
+trieADT trie;
+
+trie = TrieCreate();
+
+TrieAdd(trie, "amy", 56);
+TrieAdd(trie, "ann", 15);
+
+if (TrieIsMember(trie, "amy"))
+  ...
+</PRE></BLOCKQUOTE>
+
+<P>
+When someone needs a trie, they define a <CODE>trieADT</CODE> variable
+and set it up with <CODE>TrieCreate()</CODE>.
+
+<P>
+<HR ALIGN=left WIDTH="20%">
+<B>Note:</B>
+Since we don't store entire string keys and values together (per our
+discussion <A HREF="#whynoelement">above</A>), you might pass a key and
+a value separately to <CODE>TrieAdd()</CODE>.
+<HR ALIGN=left WIDTH="20%">
+
+<P>
+<LI>
+<B>Filling in trie functions:</B><P>
+
+Let's now consider the prototype for our <CODE>TrieIsMember()</CODE>
+function:
+
+<BLOCKQUOTE><PRE>
+int TrieIsMember(trieADT trie, char keys[]);
+</PRE></BLOCKQUOTE>
+
+<P>
+It must take the trie in which to look for data and the string key
+(i.e., a sequence of character <EM>keys</EM>) used to find that data.
+In addition, it needs to return a true or false value based on whether
+it finds the key or not.
+
+<P>
+Here is an implementation based on the algorithm we already discussed:
+
+<BLOCKQUOTE><PRE>
+int TrieIsMember(trieADT trie, char keys[])
+{
+  /* Start at the top level. */
+  trieNodeT *level = trie-&gt;root;
+
+  /* Start at beginning of key. */
+  int i = 0;
+
+  for (;;) {
+    trieNodeT *found = NULL;
+    trieNodeT *curr;
+
+    for (curr = level; curr != NULL; curr = curr-&gt;next) {
+      /*
+       * Want a node at this level to match
+       * the current character in the key.
+       */
+      if (curr-&gt;key == keys[i]) {
+        found = curr;
+        break;
+      }
+    }
+
+    /*
+     * If either no nodes at this level or none
+     * with next character in key, then key not
+     * present.
+     */
+    if (found == NULL)
+      return 0;
+
+    /* If we matched end of key, it's there! */
+    if (keys[i] == '\0')
+      return 1;
+
+    /* Go to next level. */
+    level = found-&gt;children;
+
+    /* Advance in string key. */
+    i++;
+  }
+}
+</PRE></BLOCKQUOTE>
+
+<P>
+Fill in the prototypes for the rest of the trie functions:
+
+<BLOCKQUOTE><PRE>
+<EM>return-type</EM> TrieCreate(<EM>parameters</EM>);
+<EM>return-type</EM> TrieDestroy(<EM>parameters</EM>);
+<EM>return-type</EM> TrieAdd(<EM>parameters</EM>);
+int         TrieIsMember(trieADT trie, char keys[]);
+<EM>return-type</EM> TrieRemove(<EM>parameters</EM>);
+...
+</PRE></BLOCKQUOTE>
+
+and then implement them.
+
+<P>
+<LI>
+<B>A more generic trie:</B><P>
+
+We can easily redesign the trie so that it can use keys that are different
+kinds of arrays.
+
+</OL>
+
+<P>
+<HR>
+<ADDRESS>
+BU CAS CS - Trie
+<BR>
+Copyright &copy; 1993-2000 by
+<A TARGET=_top
+>Robert I. Pitts</A>
+&lt;<A HREF="mailto:rip@bu.edu">rip@bu.edu</A>&gt;
+All Rights Reserved.
+</ADDRESS>
+</BODY>
+</HTML>

@@ -1,0 +1,134 @@
+	F.L.A.G Forensic and Log Analysis GUI
+	    http://pyflag.sourceforge.net
+
+This application is designed to assist IT security professionals with
+analysing log files, tcpdump files and hard disk images for forensic
+evidence. Flag utilises Ethereal (http://www.ethereal.com) for network
+packet disection and sleuthkit (http://www.sleuthkit.org) for hard
+disk filesystem analysis.
+
+This the official python successor of the original flag written in
+perl. It has been re-written from the ground up to be cleaner, simpler
+and more managable.
+
+pyflag is designed to run on Linux and has been tested on recent
+versions of Redhat/Fedora and Debian (Stable/Testing). It performs
+data analyis using a mysql database. Mysql server and client libraries
+must me installed. It is written in python and should be portable to
+other unix-like systems.
+
+Flag is distributed in two forms:
+
+1. A (mostly) stand-alone binary distribition which includes a python
+interpreter and has very few external dependancies. All binaries were
+built on a debian sarge (glibc 2.3) system and *should* work on most
+linux distributions. THIS IS THE RECOMMENDED WAY TO TRY FLAG. You can
+find the binary distribution at http://pyflag.sourceforge.net
+
+2. A full source distribution
+
+This document describes the installation steps for the source
+distribution which includes pyflag and a few dependancies. This
+procedure may change as the installer matures.
+
+SOURCE INSTALLATION INSTRUCTIONS
+
+System Requirements:
+
+Python 2.3.x
+PyMySQL
+MySQL Server
+
+Flag must build patched versions of ethereal and ploticus.
+To build these packages, several common devel packages are
+required (this is not a complete list):
+
+glib (for ethereal)
+libpcap (for ethereal)
+
+Overview:
+
+Flag will compile all of its files within the pyflag directory. It does not
+install into the system itself, although one can always copy the whole
+directory somewhere.
+
+This directory contains the core pyflag python files. It also contains
+a plugins folder which contains the flag "reports" python files which
+provide the actual functionality. Users wishing to develop their own
+reports can create files in this directory which will be automatically
+loaded by the flag framework. For more information about modifying and
+contributing to flag, see the file CONTRIBUTING if it has been
+written.
+
+The main script which starts pyflag is called flag.sh and exists at the root of
+the pyflag directory.
+
+Steps:
+
+1. Database configuration
+
+Prior to installing flag you will need a working installation of mysql
+as well as a user configured that is allowed to create and drop
+databases (typically root mysql user). 
+
+The source distribution contains a file called db.setup which
+cotains a mysql dump of the pyflag database. This must me loaded into
+mysql. Typically this would be done using the mysql client as follows:
+
+$ echo create database pyflag | mysql -uroot -ppass
+$ mysql -uroot -ppass pyflag < db.setup
+
+Where "root" and "pass" are your database username and password
+respectively.
+
+2. Download External Sources
+
+Flag requires the sources for several external packages which will be
+patched and build in step 3. You must download the following files and
+place them in the "sources" directory in the pyflag distribution.
+
+ethereal-0.9.16.tar.bz2	(www.ethereal.com)
+pl220src.tar.gz			(ploticus.sourceforge.net)
+
+3. Install pyflag
+
+To build the pyflag distribution, just run make at the top level directory:
+
+$ make
+
+If nothing failed you should have a completed pyflag installation.
+
+4. Configure pyflag
+
+After installation, you need to configure a few options. All
+configuration options are stored in the file pyflagrc in the pyflag module
+directory. This is the system level configuration, which is over-ridden by the
+~/.pyflagrc file in users home directory. When pyflag is run the first time, it
+asks enough questions to create a  ~/.pyflagrc file in the users home
+directory. Following are some of the more important parameters that may be set.
+
+User		The database user for flag to use to log into mysql (typically
+                root). This user must have permissions to create and drop 
+		databases.
+Passwd		Database password for mysql user
+UPLOADDIR	The "Load Data" reports will look here for data
+		sources (disk images, tcpdumps, log files) which you
+		wish to load into flag.
+RESULTDIR	If flag reports produce files, eg extracted images
+		etc, it will place them here. This directory should be
+		writable by the user who will run flag.
+
+5. Run pyflag
+
+To start pyflag, run the main program:
+
+$ flag.sh
+
+Flag will now be listening on TCP port 8000. To use flag, connect to
+to it using a web browser. eg.
+
+$ mozilla http://localhost:8000/
+
+Further Documentation:
+----------------------
+More complete documentation many be found in the manual.html withion the docs directory or of the pyflag web site.

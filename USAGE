@@ -1,0 +1,80 @@
+	F.L.A.G Forensic and Log Analysis GUI
+	    http://pyflag.sourceforge.net
+
+This document is an introduction on how to use flag.
+
+
+Introduction to reports:
+
+All flag functionality is provided by reports. A report is an object
+responsible to performing one particular type of analysis. Examples of
+reports are "View file timelines" and "TCPtrace". 
+
+Each report belongs to a report family, example families are "Disk
+Forensics" and "Log File Analysis". When you open flag in a web
+browser, you will see the report families in a menu on the left of the
+screen, clicking on a familiy will display the reports in that family.
+
+A report provides a number of methods which are executed by the flag
+framework, the main ones are, "form", "analysis" and "display". When
+you first click on a report in the flag menu, the framework will run
+the form method which is responsible for gathering any information
+which is needed for that report (ie. parameters). When all parameters
+have been provided by the user and the form is submitted, the
+framework will execute the analysis method. This method is responsible
+for doing any complex processing (if required) and caching the results
+for display. The analysis report will be executed in a separate
+execution thread, and the user will be notified of its progress. When
+the analysis report completes, the framework will run the display
+method which provides the results of the report for viewing by the
+analyst. When a report has been executed, the framework will record
+the event and the parameters used in the analysis. When this report is
+requested again with the same parameters, the framework can skip the
+analysis method and immediately display the cached results.
+
+It is important to note that flag tries to provide a powerfull
+data-mining analysis environment where reports are extensively
+hyper-linked. ie. Quite often the analyst will jump from report to
+report without ever encounering the form method, this is because the
+hyperlinks provide all the parameters required for the report so the
+framework will skip the form and go straight to the
+analysis/display. In fact, some reports don't make a lot of sense to
+be used directly from the main menu, for example a report might
+require a TCP Session id, or a Disk Sector number. Usually these
+reports are marked "hidden" and do not appear in the main menu.
+
+Typical Usage:
+
+There are two special families or reports, "Case Management" and "Load
+Data". These provide reports to create new cases and upload your
+evidence data. A typical flag session will proceed as follows:
+
+Step 1: Create Case Database
+
+Click on the "Case Management" report family
+Click on the "Create New Case" report
+Enter a name for your new case
+Click Submit
+Click the "Home" button in navbar at the top to return to the main menu
+
+Step 2: Load Data
+
+Click on the "Load Data" report family
+Click on the appropriate report report to load your data source
+	(tcpdump, partition dd image, log file etc)
+Fill in the form, you will probably need to enter a name for the new
+	data source and select a file from a list box. The files
+	displayed in the list box come from UPLOADDIR variable in the
+	conf.py config file (see README)
+Click Submit to load the data
+Click the "Home" button in the navbar to return to the main menu
+
+Step 3: Start Working
+
+Click on the report familiy appropriate to your data source. You will
+see all the reports which are available to analyse that type to
+data. Click on something of interest, and start to explore your
+evidence!
+
+More detailed usage instructions and tutorials will hopefully be
+released soon
