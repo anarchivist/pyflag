@@ -28,7 +28,7 @@ bin-dist:
 	## Reset all the time stamps to 0
 	find bin_dist/ -exec touch -a -d19700000 \{\} \;
 	## Run the unit test to touch all the files
-	cd bin_dist/ && ./launch.sh unit_test.py
+	cd bin_dist/ && ./launch.sh pyflag/unit_test.py
 	## Now we cleanup python core (any files that were not touched)
 	find bin_dist/python2.3/ -atime +1 -exec rm {} \;
 

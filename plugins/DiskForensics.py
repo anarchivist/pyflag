@@ -731,10 +731,23 @@ class SearchIndex(Reports.report):
         result.heading("Occurances of %s in logical image %s" %
                        (keyword,query['fsimage']))
         table = query['fsimage']
+        iofd = IO.open(query['case'], query['fsimage'])
+        fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
 
+        def SampleData(string,result=None):
+            offset=int(string)
+            dbh.execute("select inode from LogicalKeyword_%s where offset = %r ",(table,offset))
+            row=dbh.fetch()
+            fd = fsfd.open(inode=row['inode'])
+            fd.seek(offset-10)
+            ## Read some data before and after the keyword
+            data = fd.read(10 + len(keyword) + 20)
+            return data
+            
         result.table(
-            columns = ['inode','text','keyword'],
+            columns = ['inode','offset','keyword'],
             names=['Inode','Data','Keyword'],
+            callbacks = { 'Data': SampleData },
             table='LogicalKeyword_%s' % table,
             case=query['case'],
             )

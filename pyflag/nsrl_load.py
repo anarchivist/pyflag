@@ -18,7 +18,12 @@ You must do that or searching the NSRL will not work!!
 
 import DB,conf,sys
 import csv
+import sys,os
 
+if len(sys.argv)<2:
+    print "Usage: %s path_to_nsrl_directory\n\nAn NSRL directory is one of the CDs, and usually has in it NSRLFile.txt,NSRLProd.txt.\n" % os.path.basename(sys.argv[0])
+    sys.exit(0)
+    
 #Get a handle to our database
 dbh=DB.DBO(None)
 dbh.execute("""CREATE TABLE if not exists `NSRL_hashes` (

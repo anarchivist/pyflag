@@ -1,17 +1,17 @@
 #!/bin/bash
 
-## Start up the mysql server if needed.
-PYFLAG_DATADIR=`pwd`/`ls -d mysql*/data`
-PYFLAG_UNIX_SOCKET=$PYFLAG_DATADIR/pyflag.sock
-
 if [ -d uploads ]; then
-export PYFLAG_UPLOADDIR=uploads
+    export PYFLAG_UPLOADDIR=uploads
 fi
 
 ## Note: If you wish to put the data directory somewhere else you will need to symlink it.
 ## This will be executed if the mysql directory exists (then we are running in a pyflag+mysql distribution)
 if [ -e mysql* ]; then
-    cd mysql* &&   ./bin/mysqld_safe --skip-networking --socket=$PYFLAG_UNIX_SOCKET --skip-grant-tables  --datadir=$PYFLAG_DATADIR &
+    ## Start up the mysql server if needed.
+    PYFLAG_DATADIR=`pwd`/`ls -d mysql*/data`
+    PYFLAG_UNIX_SOCKET=$PYFLAG_DATADIR/pyflag.sock
+
+    cd mysql* &&   ./bin/mysqld_safe --skip-networking --socket=$PYFLAG_UNIX_SOCKET --skip-grant-tables  --datadir=$PYFLAG_DATADIR > /dev/null &
     ## This will override the socket in the config file (This passwd and username may be bogus to force the DB handle to fall back onto the socket to connect if there is a mysql local server)
     export PYFLAG_User=bogus_user
     export PYFLAG_Passwd=password
@@ -25,9 +25,9 @@ if [ -e python2.3 ] ; then
 	export PYTHONHOME=`pwd`/python2.3/
 	export LD_LIBRARY_PATH=`pwd`:`pwd`/libs/
 	export PYTHONPATH=`pwd`:`pwd`/python2.3/:`pwd`/python2.3/site-packages/:`pwd`/python2.3/lib-dynload
-	./bin/python pyflag/$1 $2 $3 $4 $5 $6 $7
+	./bin/python $1 $2 $3 $4 $5 $6 $7
 else
 	# start pyflag, very simple for now
 	export PYTHONPATH=`pwd`
-	env python pyflag/$1 $2 $3 $4 $5 $6 $7
+	env python $1 $2 $3 $4 $5 $6 $7
 fi

@@ -48,5 +48,5 @@ class ConfObject:
                         except KeyError:
                             pass
 
-                        print "Adding paramter %s->%s" % (uparam,value)
+#                        print "Adding paramter %s->%s" % (uparam,value)
                         ConfObject.__dict__[uparam]=value

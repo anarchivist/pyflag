@@ -28,6 +28,8 @@ CREATE TABLE `whois_routes` (
   KEY `network` (`network`)
 ) TYPE=MyISAM;
 
+insert into whois_routes values(0,0,1);
+insert into whois values(1,1,0,0,0,'--','Default Fallthrough Route: IP INVALID OR UNASSIGNED','unallocated');
 -- --------------------------------------------------------
 
 -- 
@@ -1469,5 +1471,7 @@ INSERT INTO enum VALUES ('ip_flags_txt',2,'More Frag');
 CREATE TABLE `dictionary` (
 	`word` VARCHAR( 50 ) NOT NULL ,
 	`class` VARCHAR( 50 ) NOT NULL ,
-	`encoding` SET( 'all', 'asci', 'ucs16' ) NOT NULL
+	`encoding` SET( 'all', 'asci', 'ucs16' ) NOT NULL,
+	PRIMARY KEY  (`word`)
 );
+
