@@ -185,50 +185,6 @@ class FlagTreeModel(gtk.GenericTreeModel):
         else:
             return node[:-1]
 
-## The following is an attempt at creating a generic widget renderer in the table cells - for some reason GTK does not have a generic redered for arbitrary widgets in table cells. This probably indicates that the cell renderers are still immature.
-##def widget_storer(treeviewcolumn, cell_renderer, model, iter):
-##    pyobj = model.get_value(iter, cell_renderer.column)
-##    cell_renderer.widget=pyobj
-##    print "Storing widgets %s" % pyobj
-##    return
-
-##class CellRendererWidget(gtk.GenericCellRenderer):
-##    def __init__(self):
-##        self.__gobject_init__()
-##        print "initialising a new renderer"
-##        self.xpad=-2; self.ypad = -2
-##        self.xalign = 0.5; self.yalign = 0.5
-##        self.active = 0; self.widget=None; self.column=0
-
-##    def on_get_size(self,widget, cell_area=None):
-##        print "getting size %s, %s" % self.widget.size_request()
-##        calc_width,calc_height = self.widget.size_request()
-##        calc_width+=self.xpad * 2
-##        calc_height+=self.ypad * 2
-##        if cell_area:
-##            x_offset = self.xalign * (cell_area.width - calc_width)
-##            x_offset = max(x_offset, 0)
-##            y_offset = self.yalign * (cell_area.height - calc_height)
-##            y_offset = max(y_offset, 0)            
-##        else:
-##            x_offset = 0
-##            y_offset = 0
-            
-##        return (calc_width, calc_height, x_offset, y_offset)
-
-##    def on_render(self,window, widget, background_area, cell_area, expose_area, flags):
-##        print "rendering %s %s" % (cell_area.x,cell_area.y)
-##        x_offset, y_offset, width, height = self.on_get_size(widget, cell_area)
-##        width -= self.xpad*2
-##        height -= self.ypad*2
-        
-##        widget.style.paint_string(window,
-##                                 gtk.STATE_ACTIVE, 
-##                                 cell_area, widget, "cellradio",
-##                                 cell_area.x+1,
-##                                 cell_area.y+y_offset+self.ypad,
-##                                 "hello")
-
 class GTKUI(UI.GenericUI):
     """ A GTK UI Implementation. """
     def __init__(self,default = None):
@@ -286,15 +242,21 @@ class GTKUI(UI.GenericUI):
         self.current_table_row+=1
         self.current_table.resize(self.current_table_row,len(columns))
         for i in range(len(columns)):
-            col=columns[i]
+            try:
+                col=columns[i]
             ## If this column is a string, (and therefore not a GTK Widget), we create a new widget for it
-            if isinstance(col,self.__class__):
-                col=col.display()
-            elif not issubclass(col.__class__,gtk.Widget):
+                if isinstance(col,self.__class__):
+                    col=col.display()
+                elif not issubclass(col.__class__,gtk.Widget):
+                    col = gtk.Label("%s" % col)
+                    col.set_justify(gtk.JUSTIFY_LEFT)
+                    col.set_line_wrap(gtk.TRUE)
+            except AttributeError:
                 col = gtk.Label("%s" % col)
                 col.set_justify(gtk.JUSTIFY_LEFT)
                 col.set_line_wrap(gtk.TRUE)
-
+                
+                
             ##Attach the column to row at the end of the table:
             right_attach = i+1            
             if options.has_key('colspan'):
@@ -322,6 +284,9 @@ class GTKUI(UI.GenericUI):
         image.set_from_file("%s/%s" % (config.IMAGEDIR, path))
         self.row(image)
 
+    def image(self, image, **options):
+        pass
+
     def popup(self,callback, label,icon=None,toolbar=0, menubar=0, **options):
         pass
 
@@ -347,6 +312,68 @@ class GTKUI(UI.GenericUI):
         self.form_widgets.append((checkbox,callback))
         self.row(checkbox)
 
+    def notebook(self,names=[],context="notebook",callbacks=[],descriptions=[]):
+        """ Draw a notebook like UI with tabs.
+
+        If no tab is selected, the first tab will be selected.
+
+        @arg names: A list of names for each tab
+        @arg callbacks: A list of callbacks to call for each name
+        @arg context: A context variable used to allow the selection of names in queries
+        @arg descriptions: A list of descriptions to assign to each tab. The description should not be longer than 1 line.
+        """
+        query=self.defaults.clone()            
+        try:
+            context_str=query[context]
+            cbfunc=callbacks[names.index(context_str)]
+        except (ValueError,KeyError):
+            cbfunc=callbacks[0]
+            context_str=names[0]
+
+        def switch_cb(notepad, page, pagenum, callbacks, query):
+            p = notepad.get_nth_page(pagenum)
+            p.pack_start(callbacks[pagenum](query).display())
+            
+            
+        # draw the notebook
+        notebook = gtk.Notebook()
+        notebook.connect('switch-page', switch_cb, callbacks, query)
+        for n in names:
+            #q=query.clone()
+            #tmplink=self.__class__()
+            #del q[context]
+            #q[context]=i
+            #tmplink.link(i,q)
+            #notebook.append_page(gtk.VBox(),n)
+            #notebook.set_data('query',q)
+            if(n==context_str):
+                cb = cbfunc(query)
+                notebook.append_page(cb.display(), gtk.Label(n))
+            else:
+                notebook.append_page(gtk.VBox(), gtk.Label(n))
+
+        self.result.pack_start(notebook)
+        #out='\n<table border=0 cellspacing=0 cellpadding=0 width=100%><tr><td colspan=50><img height=20 width=1 alt=""></td></tr><tr>'
+        
+        #for i in names:
+        #    q=query.clone()
+        #    tmplink=self.__class__()
+        #    del q[context]
+        #    q[context]=i
+        #    tmplink.link(i,q)
+
+        #    if(i==context_str):
+        #        out+="<td width=15>&nbsp;</td><td bgcolor=#3366cc align=center nowrap><font color=#ffffff size=-1><b>%s</b></font></td>" % i
+        #    else:
+        #        out+='<td width=15>&nbsp;</td><td id=1 bgcolor=#efefef align=center nowrap><font size=-1>%s</font></td>' % (tmplink)
+
+        #out+="<td colspan=50>&nbsp;</td></tr><tr><td colspan=50 bgcolor=#3366cc><img width=1 height=1 alt=""></td></tr>"        
+        #Now draw the results of the callback:
+        #cb=cbfunc(query)
+	#if not self.binary:
+	#        out+="<tr><td colspan=50><table border=1 width=100%%><tr><td>%s</td></tr></table></td></tr></table>" % cb
+       	#	self.result+=out
+                
     def link(self,string,target=FlagFramework.query_type(()),**target_options):
         target=target.clone()
         if target_options:
@@ -892,7 +919,7 @@ class GTKUI(UI.GenericUI):
             self.right_pane=gtk.ScrolledWindow()
 #            self.right_pane.set_size_request(400, 400)
             self.right_pane.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-            self.right_pane.add(result.display())
+            self.right_pane.add_with_viewport(result.display())
             hbox.add2(self.right_pane)
             hbox.show_all()
 
