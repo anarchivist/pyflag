@@ -394,7 +394,7 @@ class TCPTrace(Reports.report):
                 links=[ FlagFramework.query_type((),case=query['case'],report='HTMLVisualise',family=query['family'],con_id=query['con_id'],__target__='key_id',__opt__='parent') ],
                 )
 
-        result.popup(visualise_popup,'HTML Visualise',icon='glasses.png',toolbar=0,menubar=0)
+        result.toolbar(visualise_popup,'HTML Visualise',icon='glasses.png')
 
         #Get all the data from the connection cache:
         dbh.execute("select substring(data.data,size) as data,direction from connection_cache,data where connection_cache.id=data.key_id and con_id=%r group by id order by id",(query['con_id']))

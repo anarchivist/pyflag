@@ -151,7 +151,7 @@ class BrowseFS(Reports.report):
                 result.display = result.__str__
 
             tmp = result.__class__(result)
-            tmp.popup(scan_popup,"Scan all files in directory %s" % br,icon="examine.png")
+            result.toolbar(scan_popup,"Scan all files in directory %s" % br,icon="examine.png")
             tmp2=result.__class__(result)
             tmp2.row("Inspecting branch %s  " % br,tmp)
             result.para(tmp2)
@@ -264,7 +264,7 @@ class ViewFile(Reports.report):
             result.end_form()
             result.display = result.__str__
 
-        result.popup(scan_popup,"Scan this File",icon="examine.png")
+        result.toolbar(scan_popup,"Scan this File",icon="examine.png")
 
         result.heading("Viewing file in inode %s" % (query['inode']))
         try:

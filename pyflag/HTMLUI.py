@@ -59,10 +59,12 @@ class HTMLUI(UI.GenericUI):
         if default != None:
             self.form_parms = default.form_parms
             self.defaults = default.defaults
+            self.toolbar_ui=default.toolbar_ui
         else:
             import pyflag.FlagFramework as FlagFramework
             self.form_parms =FlagFramework.query_type(())
             self.defaults = FlagFramework.query_type(())
+            self.toolbar_ui=None
             
         self.table_depth = 0
         self.type = "text/html"
@@ -96,7 +98,7 @@ class HTMLUI(UI.GenericUI):
             theme=pyflag.Theme.factory(q['theme'])
         except KeyError:
             theme=pyflag.Theme.factory()
-        return theme.render(q,meta=self.meta,data=self.__str__(),next=self.next , previous=self.previous , pageno=self.pageno)
+        return theme.render(q,meta=self.meta,data=self.__str__(),next=self.next , previous=self.previous , pageno=self.pageno, ui=self)
     
     def __str__(self):
         #Check to see that table tags are balanced:
@@ -519,6 +521,16 @@ class HTMLUI(UI.GenericUI):
         
         ## Now draw the left part
         self.row(left,right,valign='top')
+
+    def toolbar(self,cb,text,icon=None,popup=True):
+        """ Create a toolbar button.
+
+        When the user clicks on the toolbar button, a popup window is created which the callback function then uses to render on.
+        """
+        if self.toolbar_ui==None:
+            self.toolbar_ui=self.__class__(self)
+        
+        self.toolbar_ui.popup(cb,text,icon)
                 
     def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):
         """ Shows the results of an SQL query in a searchable/groupable/browsable table
@@ -731,7 +743,8 @@ class HTMLUI(UI.GenericUI):
             ## End of table_groupby_popup
                 
             ## Add a popup to allow the user to draw a graph
-            self.popup(table_groupby_popup,'Graph',icon='pie.png',toolbar=1,menubar=1)
+##            self.popup(table_groupby_popup,'Graph',icon='pie.png',toolbar=1,menubar=1)
+            self.toolbar(table_groupby_popup,'Graph',icon='pie.png')
         else: ## Not group by
             def table_configuration_popup(query,result):
                 try:
@@ -755,9 +768,9 @@ class HTMLUI(UI.GenericUI):
             ## End table_configuration_popup
 
             if query.getarray('hide_column'):
-                self.popup(table_configuration_popup,'Some columns hidden (%s)' % ','.join(query.getarray('hide_column')),icon='spanner.png')
+                self.toolbar(table_configuration_popup,'Some columns hidden (%s)' % ','.join(query.getarray('hide_column')),icon='spanner.png')
             else:
-                self.popup(table_configuration_popup,'Configure Table View',icon='spanner.png')
+                self.toolbar(table_configuration_popup,'Configure Table View',icon='spanner.png')
 
         ## Draw a popup to allow the user to save the entire table in CSV format:
         def save_table(query,result):
@@ -792,7 +805,7 @@ class HTMLUI(UI.GenericUI):
                     result.result += "# %s\n" % i
             result.result += data.read()
                 
-        self.popup(save_table,'Save Table',icon="floppy.png")
+        self.toolbar(save_table,'Save Table',icon="floppy.png")
 
         ## Write the conditions at the top of the page:
         if conditions:

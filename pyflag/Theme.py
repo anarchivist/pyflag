@@ -87,7 +87,7 @@ class BasicTheme:
         <body link=blue vlink=blue bgcolor="#FFFFFF"><table width="100%%">
         <tbody> <script src="images/functions.js" type="text/javascript" language="javascript"></script>
         <tr>
-        <td align=left width=10><img src="/flag/images/flag.png" alt="flag_heading" border="0"></td><td align=center> ''' % FlagFramework.flag_version
+        <td align=left width=10><img src="/flag/images/flag.png" alt="flag_heading" border="0"></td>''' % FlagFramework.flag_version
 
     def menu(self,flag,query):
         """ Draws the menu for the current family.
@@ -157,9 +157,14 @@ class BasicTheme:
 
         return toolbar
 
-    def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None):
+    def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None,ui=None):
         toolbar=self.navbar(query=query , next=next , previous=previous , pageno=pageno)
-        return " ".join((self.header,meta,toolbar,'''</td><td width=10><center><img src="/flag/images/logo.png"><br><font size="+1"><a href="http://www.gnu.org/copyleft/gpl.html"> &copy;GPL</a></font></center></td></tr></tbody></table> </tr></table>\n''', data ,"<table width=100%%><tr><td></td></tr><tr><td align=center>%s</td></tr></table>"%toolbar,self.footer))
+        try:
+            toolbar_str=ui.toolbar_ui.__str__()
+        except:
+            toolbar_str=''
+
+        return " ".join((self.header,meta,"<td align=left>%s</td><td align=center>"%toolbar_str,toolbar,'''</td><td width=10><center><img src="/flag/images/logo.png"><br><font size="+1"><a href="http://www.gnu.org/copyleft/gpl.html"> &copy;GPL</a></font></center></td></tr></tbody></table> </tr></table>\n''', data ,"<table width=100%%><tr><td></td></tr><tr><td align=center>%s</td></tr></table>"%(toolbar),self.footer))
 
 class BlueTheme(BasicTheme):
     """ This class encapsulates the theme elements. The results from this class really depend on the UI used - for example the HTMLUI will expect HTML to come back from here. """
@@ -175,8 +180,8 @@ class BlueTheme(BasicTheme):
         <td align=left width=10><img src="/flag/images/pyflag.png" alt="flag_heading" border="0"></td><td align=center> ''' % FlagFramework.flag_version
 
     hilight_bar = '''<table cellspacing=0 cellpadding=0 width="100%%" background="flag/images/topfill.jpg" border=0> <tbody>
-    <tr><td height=25 width=30%%>&nbsp;</td>
-    <td height=25>%s</td>
+    <tr><td align=left>%s</td>
+    <td height=25 align=center>%s</td>
     <td height=25>
     <div align="right"><font face="Arial, Helvetica, sans-serif" size="2"><font face="Geneva, Arial, Helvetica, san-serif"><b><font face="Georgia, Times New Roman, Times, serif"><i><font face="Verdana, Arial, Helvetica, sans-serif">F</font></i></font></b><font face="Verdana, Arial, Helvetica, sans-serif"><i>orensics 
     and <b>L</b>og <b>A</b>nalysis <b>G</b>UI</i></font></font></font></div>
@@ -216,9 +221,15 @@ class BlueTheme(BasicTheme):
 
         return toolbar
 
-    def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None):
+    def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None,ui=None):
+
+        if not ui.toolbar_ui:
+            toolbar_str='&nbsp;&nbsp;'
+        else:
+            toolbar_str=ui.toolbar_ui.__str__()
+
         toolbar=self.navbar(query=query , next=next , previous=previous , pageno=pageno)
-        return " ".join((self.header,meta,'''</td><td width=10><img src="/flag/images/logo.png"></td></tr></tbody></table> </tr></table>\n''',self.hilight_bar % (toolbar), data ,self.hilight_bar % (toolbar),self.footer))
+        return " ".join((self.header,meta,'''</td><td width=10><img src="/flag/images/logo.png"></td></tr></tbody></table> </tr></table>\n''',self.hilight_bar % (toolbar_str,toolbar), data ,self.hilight_bar % (toolbar_str,toolbar),self.footer))
 
     def menu(self,flag,query):
         """ Draws the menu for the current family.

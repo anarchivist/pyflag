@@ -34,7 +34,7 @@ bin-dist:
 	find bin_dist/python2.3/ -atime +1 -exec rm {} \;
 
 	## Delete source directories
-	cd bin_dist/ && rm -rf sources sgzip regtools raidtools patches libevf iosubsys indextools exgrep docs virustools imagingtools
+	cd bin_dist/ && rm -rf sources sgzip regtools raidtools patches libevf iosubsys indextools exgrep docs virustools imagingtools mailtools
 
 	## General cleanups
 	find bin_dist/ -depth -name CVS -exec rm -rf {} \;
