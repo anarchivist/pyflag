@@ -395,17 +395,17 @@ def FS_Factory(case,table,fd):
 
 # helper to get filename of cached files
 # ofter created by scanners
-def make_filename(case, inode):
-    """ This function should return a fairly unique name for saving the file in the tmp directory.
+##def make_filename(case, inode):
+##    """ This function should return a fairly unique name for saving the file in the tmp directory.
     
-    This class implementes a standard filename formatting convention:
-    $RESULTDIR/$case_$inode
+##    This class implementes a standard filename formatting convention:
+##    $RESULTDIR/$case_$inode
     
-    Where inode is the filename in the filesystem.
-    """
-    dbh = DB.DBO(None)
-    return("%s/%s_%s" % (
-        config.RESULTDIR, case, dbh.MakeSQLSafe(inode)))
+##    Where inode is the filename in the filesystem.
+##    """
+##    dbh = DB.DBO(None)
+##    return("%s/%s_%s" % (
+##        config.RESULTDIR, case, dbh.MakeSQLSafe(inode)))
 
 ### create a dict of all the File subclasses by specifier
 ##import sys

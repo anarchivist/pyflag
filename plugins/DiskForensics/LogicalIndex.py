@@ -55,7 +55,7 @@ class Index(GenScanFactory):
         except: self.block=0
         
         self.table=table
-        self.filename = "%s/LogicalIndex_%s.idx" % (config.RESULTDIR,table)
+        self.filename = "%s/case_%s/LogicalIndex_%s.idx" % (config.RESULTDIR,self.dbh.case,table)
 
     def prepare(self):
         try:
@@ -242,7 +242,7 @@ class SearchIndex(Reports.report):
 
         import index
 
-        idx = index.Load("%s/LogicalIndex_%s.idx" % (config.RESULTDIR,table))
+        idx = index.Load("%s/case_%s/LogicalIndex_%s.idx" % (config.RESULTDIR,query['case'],table))
         for offset in idx.search(keyword):
             ## Find out which inode this offset is in:
             block = offset >> BLOCKSIZE

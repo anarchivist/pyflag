@@ -29,6 +29,11 @@
 """ Creates a new case database for flag """
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
+import os
+import pyflag.conf
+config=pyflag.conf.ConfObject()
+
+from os.path import join
 
 description = "Case management"
 order = 10
@@ -49,15 +54,23 @@ class NewCase(Reports.report):
     def analyse(self,query):
         #Get handle to flag db
         dbh = self.DBO(None)
-        dbh.execute("Create database %s",(query['create_case']))
-        dbh.execute("Insert into meta set property='flag_db',value=%r",query['create_case'])
+        try:
+            dbh.execute("Create database %s",(query['create_case']))
+            dbh.execute("Insert into meta set property='flag_db',value=%r",query['create_case'])
+        except:
+            pass
 
         #Get handle to the case db
         case_dbh = self.DBO(query['create_case'])
-        case_dbh.execute("Create table meta(`time` timestamp(14) NOT NULL,property varchar(50), value text, KEY property(property), KEY value(value(10)))",())
-#        case_dbh.execute("alter table meta add index(property)");
-#        case_dbh.execute("alter table meta add index(value(10))");
-        case_dbh.execute("create table bookmarks (id int(11) auto_increment, canon text, url text,  description text,  bookmark text ,  PRIMARY KEY  (id),  KEY id (id))",())
+        case_dbh.execute("Create table if not exists meta(`time` timestamp(14) NOT NULL,property varchar(50), value text, KEY property(property), KEY value(value(10)))",())
+
+        case_dbh.execute("create table if not exists bookmarks (id int(11) auto_increment, canon text, url text,  description text,  bookmark text ,  PRIMARY KEY  (id),  KEY id (id))",())
+
+        ## Create a directory inside RESULTDIR for this case to store its temporary files:
+        try:
+            os.mkdir("%s/case_%s" % (config.RESULTDIR,query['create_case']))
+        except OSError:
+            pass
 
         #Ensure that the corresponding delete case is reset:
         self.do_reset(FlagFramework.query_type((),family=query['family'], report = 'Remove case', remove_case = query['create_case']))
@@ -91,6 +104,16 @@ class DelCase(Reports.report):
         dbh.execute("drop database %s" ,query['remove_case'])
         dbh.execute("delete from meta where property='flag_db' and value=%r",query['remove_case'])
 
+        ## Delete the temporary directory corresponding to this case and all its content
+        temporary_dir = "%s/case_%s" % (config.RESULTDIR,query['remove_case'])
+        for root, dirs, files in os.walk(temporary_dir,topdown=False):
+            for name in files:
+                os.remove(join(root, name))
+            for name in dirs:
+                os.rmdir(join(root, name))
+
+        os.rmdir(temporary_dir)
+
     def display(self,query,result):
         result.heading("Deleted case")
         result.para("Case %s has been deleted" % query['remove_case'])
@@ -110,7 +133,9 @@ class ResetCase(Reports.report):
         result.case_selector(case="reset_case")
         return result
 
-    def analyse(self,query):
+    def display(self,query,result):
+        result.heading("Reset case")
+        
         dbh = self.DBO(None)
         dbh.execute("drop database %s" ,query['reset_case'])
         dbh.execute("Create database %s",(query['reset_case']))
@@ -120,7 +145,13 @@ class ResetCase(Reports.report):
         case_dbh.execute("Create table meta(`time` timestamp(14) NOT NULL,property varchar(50), value text, KEY property(property),KEY value(value(10)))",())
         case_dbh.execute("create table bookmarks (id int(11) auto_increment, canon text, url text,  description text,  bookmark text ,  PRIMARY KEY  (id),  KEY id (id))",())
 
-    def display(self,query,result):
-        result.heading("Reset case")
+        ## Delete all files from the cases temporary directory:
+        temporary_dir = "%s/case_%s" % (config.RESULTDIR,query['reset_case'])
+        for root, dirs, files in os.walk(temporary_dir,topdown=False):
+            for name in files:
+                os.remove(join(root, name))
+            for name in dirs:
+                os.rmdir(join(root, name))
+
         result.para("Case %s has been reset" % query['reset_case'])
         return result

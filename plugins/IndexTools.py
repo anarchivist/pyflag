@@ -27,6 +27,8 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 
+### This module is obsolete.... It will be removed soon.
+
 """ IndexTools:
 
 This module implements an indexing system to quickly search for keywords in images. There are 3 steps involved:
