@@ -95,7 +95,7 @@ class ListLogFile(Reports.report):
                     del query['whois']
                 else:
                     query['whois']="Yes"
-                result.refresh(0, query)
+                self.display(query,result)
                 
             result.toolbar(cb, 'Show Whois',icon='whois.png', tooltip="Show/Hide Whois Data")
 

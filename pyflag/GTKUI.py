@@ -799,7 +799,7 @@ class GTKUI(UI.GenericUI):
         ## be done nicely by gtk for us.
 
         def proxy_cb(widget, cb, result, query):
-            result=self.server.flag.ui(query=query,server=self)
+            result=self.server.flag.ui(query=query,server=self.server)
             cb(query, result)
             self.server.notebook.add_page(result, query)
         
