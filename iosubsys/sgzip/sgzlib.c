@@ -60,6 +60,36 @@ void sgzip_debug(int level, const char *message, ...)
 };
 
 /*
+This function reads from the fd, until the buffer is full. If a read
+does not return enough bytes to fill the buffer (as would happen if we
+read from a socket or pipe), we retry again.
+
+If however, the read returns no bytes (and its blocking) then we
+assume that the file is finished, and return a short buffer.
+
+If we fail to read, we return the error code back.
+*/
+static int read_from_stream(int fd,void *buf,int length) {
+  int result;
+  char *current_p = (char *)buf;
+
+  while(length>0) {
+    if(length==0)
+      break;
+
+    result=read(fd,current_p,length);
+    if(result<0) { //Error occured
+      return(result);
+    } else if(result==0) { //EOF reached
+      break;
+    };
+    length-=result;
+    current_p+=result;
+  };
+  return(current_p-(char *)buf);
+};
+
+/*
  Produces a default sgzip header. Mallocs its own memory, caller must
  free it.
 */
@@ -87,7 +117,7 @@ struct sgzip_header *sgzip_read_header(int fd) {
     RAISE(E_NOMEMORY,NULL,Malloc);
   lseek(fd,0,SEEK_SET);
 
-  if(read(fd,result,sizeof(*result))<sizeof(*result)) {
+  if(read_from_stream(fd,result,sizeof(*result))<sizeof(*result)) {
     RAISE(E_IOERROR,NULL,Read,"header");
   };
   
@@ -149,36 +179,6 @@ struct sgzip_index_list *add_item(struct sgzip_index_list *index,int block_lengt
   };
 
   return(index);
-};
-
-/*
-This function reads from the fd, until the buffer is full. If a read
-does not return enough bytes to fill the buffer (as would happen if we
-read from a socket or pipe), we retry again.
-
-If however, the read returns no bytes (and its blocking) then we
-assume that the file is finished, and return a short buffer.
-
-If we fail to read, we return the error code back.
-*/
-static int read_from_stream(int fd,char *buf,int length) {
-  int result;
-  char *current_p = buf;
-  
-  while(length>0) {
-    if(length==0) 
-      break;
-
-    result=read(fd,current_p,length);
-    if(result<0) { //Error occured
-      return(result);
-    } else if(result==0) { //EOF reached
-      break;
-    };
-    length-=result;
-    current_p+=result;
-  };
-  return(current_p-buf);
 };
 
 //Size of write chunks
@@ -489,7 +489,7 @@ unsigned long long int *sgzip_calculate_index_from_stream(int fd,
     RAISE(E_NOMEMORY,NULL,Malloc);
   
   TRY {
-    while((read(fd,&length,sizeof(length))>0) && length>0){
+    while((read_from_stream(fd,&length,sizeof(length))>0) && length>0){
       count++;
       /* If we need to read more data than we expected we bail because
 	 the blocksize specified in the header is incorrect */
@@ -503,7 +503,7 @@ unsigned long long int *sgzip_calculate_index_from_stream(int fd,
       result=add_item(result,length);
       
       //Seek length bytes from here for the next value
-      if(read(fd,datain,sizeof(*datain)*length)<length) {
+      if(read_from_stream(fd,datain,sizeof(*datain)*length)<length) {
 	RAISE(E_IOERROR,NULL,Read,"file");
       };
       
@@ -548,7 +548,7 @@ void sgzip_decompress_fds(int fd,int outfd,const struct sgzip_header *header) {
   if(!datain || !dataout || !buffer) 
     RAISE(E_NOMEMORY,NULL,Malloc);
   
-  while((read(fd,&length,sizeof(length))>0) && length>0){
+  while((read_from_stream(fd,&length,sizeof(length))>0) && length>0){
     count++;
     /* If we need to read more data than we expected we bail because
        the blocksize specified in the header is incorrect */
@@ -561,7 +561,7 @@ void sgzip_decompress_fds(int fd,int outfd,const struct sgzip_header *header) {
 
     zoffset+=length;
 
-    if(read(fd,datain,sizeof(*datain)*length)<length) {
+    if(read_from_stream(fd,datain,sizeof(*datain)*length)<length) {
       free(datain);
       free(dataout);
 
