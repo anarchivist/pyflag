@@ -23,6 +23,8 @@ import time
 import gzip
 import os.path
 import pyflag.DB as DB
+import pyflag.conf
+config=pyflag.conf.ConfObject()
 
 # whois database URL's
 # Full databases are available for apnic and ripencc
@@ -33,6 +35,14 @@ urls = ['ftp://ftp.apnic.net/apnic/whois-data/APNIC/split/apnic.db.inetnum.gz',
         'ftp://ftp.ripe.net/ripe/dbase/split/ripe.db.inetnum.gz',
         'ftp://ftp.arin.net/pub/stats/arin/delegated-arin-latest',
         'ftp://ftp.lacnic.net/pub/stats/lacnic/delegated-lacnic-latest']
+
+import sys
+
+def progress(block,blocksize,totalblocks):
+  sys.stdout.write("Retrieved %skb/%skb %u%%\r" % (blocksize*block/1024
+                                                    ,totalblocks/1024
+                                                    ,(block*blocksize*100)/totalblocks))
+  sys.stdout.flush()
 
 # apnic and ripe can be replaced by the below URLs, if only stats are req'd
 # ftp://ftp.apnic.net/pub/stats/apnic/delegated-apnic-latest
@@ -159,13 +169,23 @@ class Whois:
           self.date = ':'.join(["%i"% i for i in time.localtime()])
         else:
           return None
-      
-      fname = urllib.urlretrieve(url)[0]
-      if base.endswith('gz'):
+
+      fname="%s/%s" % (config.RESULTDIR,base)
+      print "searching for %s " % fname
+
+      try:
         self.fp = gzip.open(fname)
-      else:
-        self.fp = open(fname)
-        
+      except IOError:
+        print "retrieving %s into %s " % (url,fname)
+        fname=urllib.urlretrieve(url,fname,progress)[0]
+        self.fp=gzip.open(fname)
+
+      try:
+        self.fp.read(1)
+        self.fp=gzip.open(fname)
+      except IOError:
+        self.fp=open(fname)
+
     def next(self):
       if self.whois:
         return self.next_whois()
@@ -206,14 +226,18 @@ if len(sys.argv) > 1:
 # Since the whois entries often get split into many smaller
 # subnets for routing, we will use two tables to reduce space
 dbh = DB.DBO(None)
-dbh.execute("CREATE TABLE IF NOT EXISTS whois_sources ( `id` int auto_increment, `source` varchar(20), `url` varchar(255), `updated` datetime, key(id));")
-dbh.execute("CREATE TABLE IF NOT EXISTS whois (`id` int auto_increment, `src_id` int, `start_ip` int(10) unsigned, `numhosts` int, `country` char(2), `descr` varchar(255), `status` enum('assigned','allocated','reserved','unallocated'), key(id));")
-dbh.execute("CREATE TABLE IF NOT EXISTS whois_routes ( `network` int(10) unsigned, `netmask` int(10) unsigned, `whois_id` int);")
+## First drop the old tables
+dbh.execute("drop table if exists whois_sources")
+dbh.execute("drop table if exists whois")
+dbh.execute("drop table if exists whois_routes")
+dbh.execute("CREATE TABLE IF NOT EXISTS whois_sources ( `id` int auto_increment, `source` varchar(20), `url` varchar(255), `updated` datetime, key(id))")
+dbh.execute("CREATE TABLE IF NOT EXISTS whois (`id` int auto_increment, `src_id` int, `start_ip` int(10) unsigned, `numhosts` int, `country` char(2), `descr` varchar(255), `status` enum('assigned','allocated','reserved','unallocated'), key(id))")
+dbh.execute("CREATE TABLE IF NOT EXISTS whois_routes ( `network` int(10) unsigned, `netmask` int(10) unsigned, `whois_id` int)")
 
 # add default (fallthrough) route and reserved ranges
-dbh.execute("INSERT INTO whois_sources VALUES ( 0, 'static', 'static', %r );", ':'.join(["%i"% i for i in time.localtime()]))
-dbh.execute("INSERT INTO whois VALUES (0,%s,0,0,'--','Default Fallthrough Route: IP INVALID OR UNASSIGNED', 'unallocated');", str(dbh.cursor.lastrowid))
-dbh.execute("INSERT INTO whois_routes VALUES (0,0,%s);", str(dbh.cursor.lastrowid))
+dbh.execute("INSERT INTO whois_sources VALUES ( 0, 'static', 'static', %r )", ':'.join(["%i"% i for i in time.localtime()]))
+dbh.execute("INSERT INTO whois VALUES (0,%s,0,0,'--','Default Fallthrough Route: IP INVALID OR UNASSIGNED', 'unallocated')", str(dbh.cursor.lastrowid))
+dbh.execute("INSERT INTO whois_routes VALUES (0,0,%s)", str(dbh.cursor.lastrowid))
 
 # process files
 for url in urls:
@@ -221,15 +245,16 @@ for url in urls:
   if not db:
     print "Invalid url: %s" % url
     continue
-  
+
   # add this source to db
   dbh.execute("INSERT INTO whois_sources VALUES (0, %r, %r, %r);", (db.source, url, db.date))
   source_id = dbh.cursor.lastrowid
   
   # process records
   for rec in db:
-    dbh.execute("INSERT INTO whois VALUES (0, %s, %s, %s, %r, %r, %r);", (str(source_id), "%u" % rec.start_ip,
-                                              str(rec.num_hosts), rec.country, rec.descr, rec.status))  
+    dbh.execute("INSERT INTO whois VALUES (0, %s, %s, %s, %r, %r, %r);", (
+      str(source_id), "%u" % rec.start_ip,
+      str(rec.num_hosts), rec.country, rec.descr, rec.status))  
     whois_id = dbh.cursor.lastrowid
 
     #now process the networks (routes)...
