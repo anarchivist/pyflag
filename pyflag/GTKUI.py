@@ -206,7 +206,10 @@ class GTKUI(UI.GenericUI):
             ## This is an array of form widgets. Every time we draw a form widget in this UI, we store it here, and then when we submit the widget, we take the values from here.
             self.form_widgets=default.form_widgets
             self.toolbar_ui = default.toolbar_ui
-            self.server=default.server
+            try:
+                self.server=default.server
+            except:
+                self.server=None
         else:
             self.form_parms = {}
             self.defaults = FlagFramework.query_type(())
@@ -214,8 +217,9 @@ class GTKUI(UI.GenericUI):
             self.toolbar_ui = gtk.Toolbar()
 
         if server: self.server=server
-        if query: self.defaults=query
         
+        if query: self.defaults=query
+
         self.current_table=None
         self.next = None
         self.previous = None
@@ -371,7 +375,6 @@ class GTKUI(UI.GenericUI):
         self.result.pack_start(notebook)
                 
     def link(self,string,target=FlagFramework.query_type(()),**target_options):
-        print "target is %s" % target
         target=target.clone()
         if target_options:
             for k,v in target_options.items():
@@ -639,7 +642,7 @@ class GTKUI(UI.GenericUI):
         button.set_data('filewidget',f)
         button.connect("button_press_event",callback)
         try:
-            label=gtk.Label(self.defaults[target])
+            label=gtk.Label(self.form_parms[target])
         except KeyError:
             label=gtk.Label("")
             

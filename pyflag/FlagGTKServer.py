@@ -299,6 +299,7 @@ class GTKServer(gtk.Window):
                     if self.form_dialog:
                         print "drawing progress"
                         self.run_progress(query)
+                        gtk.timeout_add(1000,progress_thread,t,query)
                     else:
                         print "finished progressing"
                         return
