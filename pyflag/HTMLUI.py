@@ -276,19 +276,25 @@ class HTMLUI(UI.GenericUI):
         if not options:
             options={}
 
-        try:
-            tmp=target['__opt__'].split(',')
-            if 'parent' in tmp:
-                del q['__opt__']
-                options['onclick']="self.opener.location=\"%s\"; self.close();" % q
-        except KeyError:
-            pass
-
         if icon:
             tmp = self.__class__(self)
             tmp.icon(icon,alt=string,border=0)
             tmp.tooltip(string)
             string=tmp
+
+        try:
+            tmp=target['__opt__'].split(',')
+            del q['__opt__']
+            if 'parent' in tmp:
+                del q['__opt__']
+                options['onclick']="self.opener.location=\"%s\"; self.close();" % q
+            if 'popup' in tmp:
+                options['onclick'] ="window.open('%s','client','HEIGHT=600,WIDTH=600,scrollbars=yes')" % q
+#                options['target'] ="_blank"
+                self.result+="<a href=# %s >%s</a>" %(self.opt_to_str(options),string)
+                return
+        except KeyError:
+            pass
 
         self.result+="<a href='blah?%s' %s>" % (q,self.opt_to_str(options))
         self.result+="%s</a>" % (string)

@@ -98,7 +98,6 @@ class ListLogFile(Reports.report):
             else:
                 q['whois']="Yes"
                 tmp.tooltip("Click here to show whois information")
-            
             result.link(tmp,q)
 
         #Find the names of all the columns in table:
@@ -123,7 +122,7 @@ class ListLogFile(Reports.report):
                     callbacks["Whois %s" % d[0]] = render_whois_info
                     table.append('whois as whois_%s' % d[0])
                     where.append("%s = whois_%s.IP" % (d[0],d[0]))
-                    links.append( FlagFramework.query_type((),case=query['case'],family='Log Analysis',report='LookupWhoisID',__target__='id'))
+                    links.append( FlagFramework.query_type((),case=query['case'],family='Log Analysis',report='LookupWhoisID',__target__='id', __opt__='popup'))
                     
             except ValueError:
                 columns.append(d[0])

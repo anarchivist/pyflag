@@ -242,20 +242,14 @@ class GTKUI(UI.GenericUI):
         self.current_table_row+=1
         self.current_table.resize(self.current_table_row,len(columns))
         for i in range(len(columns)):
-            try:
-                col=columns[i]
+            col=columns[i]
             ## If this column is a string, (and therefore not a GTK Widget), we create a new widget for it
-                if isinstance(col,self.__class__):
-                    col=col.display()
-                elif not issubclass(col.__class__,gtk.Widget):
-                    col = gtk.Label("%s" % col)
-                    col.set_justify(gtk.JUSTIFY_LEFT)
-                    col.set_line_wrap(gtk.TRUE)
-            except AttributeError:
+            if isinstance(col,self.__class__):
+                col=col.display()
+            elif not isinstance(col,gtk.Widget):
                 col = gtk.Label("%s" % col)
                 col.set_justify(gtk.JUSTIFY_LEFT)
                 col.set_line_wrap(gtk.TRUE)
-                
                 
             ##Attach the column to row at the end of the table:
             right_attach = i+1            
@@ -355,9 +349,15 @@ class GTKUI(UI.GenericUI):
 
         ## Create an eventbox to catch the click event
         ev=gtk.EventBox()
-        label=gtk.Label()
-        label.set_markup("<span foreground=\"blue\" style=\"italic\" underline=\"single\">%s</span>"%string)
-        ev.set_data('query',target)
+        
+        if isinstance(string,self.__class__):
+            label=string.display()
+        elif not isinstance(string,gtk.Widget):
+            label=gtk.Label()
+            label.set_markup("<span foreground=\"blue\" style=\"italic\" underline=\"single\">%s</span>"%string)
+        else: label=string
+            
+        ev.set_data('query',target)    
         ev.add(label)
         ev.add_events(gtk.gdk.BUTTON_PRESS_MASK)
         ev.connect("button_press_event",self.goto_link)
