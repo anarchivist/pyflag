@@ -244,6 +244,12 @@ class GTKUI(UI.GenericUI):
         ## Did the user forget to call end_table??? Dumb user!!!
         if self.current_table:
             self.end_table()
+
+        ## Apply text wrapping for the text widget:
+        if self.text_widget:
+            start, end = self.text_widget_buffer.get_bounds()
+            self.text_widget_buffer.apply_tag_by_name("wrap_full", start, end)
+
         if self.title:
             frame = gtk.Frame(self.title)
             frame.set_label_align(0.5,0.5)

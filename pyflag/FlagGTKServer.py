@@ -274,27 +274,29 @@ class GTKServer(gtk.Window):
         
     def run_analysis(self,report,query):
         """ Run the analysis """
-        canonical_query = self.flag.canonicalise(query)
-        thread_name = threading.currentThread().getName()
-        print "Current thread is %s" % thread_name
         try:
-            report.analyse(query)
-        except Exception,e:
-            gtk.gdk.threads_enter()
-            error_popup(e)
-            gtk.gdk.threads_leave()
+            canonical_query = self.flag.canonicalise(query)
+            thread_name = threading.currentThread().getName()
+            print "Current thread is %s" % thread_name
+            try:
+                report.analyse(query)
+                print "analysed report"
+            except Exception,e:
+                gtk.gdk.threads_enter()
+                error_popup(e)
+                gtk.gdk.threads_leave()
+                return
+            
+            dbh = DB.DBO(query['case'])
+            dbh.execute("insert into meta set property=%r,value=%r",('report_executed',canonical_query))
+            ## This thread must never touch GTK stuff or dead lock will occur. We must signal the other threads that we have finished analysis.
+            del self.running_threads[query.__str__()]
+            return
+        except Exception:
+            pass
 
-        ## Draw the results in their own tab:
-        gtk.gdk.threads_enter()
-        self.add_page(query)
-        self.form_dialog.destroy()
-        self.form_dialog=None
-        gtk.gdk.threads_leave()
-        
-        dbh = DB.DBO(query['case'])
-        dbh.execute("insert into meta set property=%r,value=%r",('report_executed',canonical_query))
-        return
-
+    ## A class variable to record currently running threads
+    running_threads ={} 
     def draw_form(self,query):
         family=query['family']
         report=query['report']
@@ -309,6 +311,7 @@ class GTKServer(gtk.Window):
                 self.form_dialog=None
                 return
             else:
+                self.running_threads[query.__str__()] = "ready"
                 ## Report is not cached - we shall analyse it in a seperate thread:
                 t = threading.Thread(target=self.run_analysis,args=(report,query))
                 t.start()
@@ -317,6 +320,12 @@ class GTKServer(gtk.Window):
 
                 def progress_thread(t,query):
                     """ This function is called to refresh the progress window """
+                    ## Ensure to tear down the progress window if the analysis thread is no longer running
+                    if not self.running_threads.has_key(query.__str__()):
+                        self.add_page(query)
+                        self.form_dialog.destroy()
+                        self.form_dialog=None
+                        return
                     print "progress thread"
                     if self.form_dialog:
                         print "drawing progress"
