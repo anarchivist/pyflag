@@ -1,7 +1,7 @@
 ## Top level include makefile
 BIN	= bin/
 DIRS	= iosubsys imagingtools/dd_rescue/ raidtools indextools regtools virustools mailtools sources
-PYTHONVER = 2.4
+PYTHONVER = 2.3
 SYSBINS = cjpeg djpeg
 PYTHONLIB = /usr/lib/python$(PYTHONVER)/
 PYTHONINCL = /usr/include/python$(PYTHONVER)/
