@@ -8,6 +8,10 @@ import pyflag.IO as IO
 import pyflag.FileSystem as FileSystem
 import time
 import pyflag.Registry as Registry
+import pyflag.logging as logging
+import pyflag.conf
+config=pyflag.conf.ConfObject()
+
 
 class load(pyflagsh.command):
     def help(self):
@@ -316,14 +320,17 @@ class execute(pyflagsh.command):
             for i in range(0,len(possibilities)):
                 if possibilities[i] == args[1]:
                     r = allreports[i]
-                    for i in range(state,len(r.parameters.keys())):
-                        if r.parameters.keys()[i].startswith(text):
-                            return r.parameters.keys()[i]
+                    params = r.parameters.keys()
+                    params.append('case')
+                    for i in range(state,len(params)):
+                        if params[i].startswith(text):
+                            return params[i]
 
     def prepare(self):
         """ Returns a report, query all ready from the current args """
         args=self.args
         query=FlagFramework.query_type(())
+        del query['case']
 
         try:
             query['family'],query['report']=args[1].split('.')
@@ -335,25 +342,30 @@ class execute(pyflagsh.command):
 
         for arg in args[2:]:
             try:
-                del query[arg[:arg.index('=')]]
+#                del query[arg[:arg.index('=')]]
                 query[arg[:arg.index('=')]]=arg[arg.index('=')+1:]
             except ValueError:
                 raise ParserException("Argument should be of the form key=value, got %s" % arg)
 
         ## Include environment variables in the query:
         for arg in dir(self.environment):
-            if not arg.startswith('_'):
+            if not arg.startswith('_') and not query.has_key(arg):
                 try:
                     query[arg]=self.environment.__dict__[arg]
                 except KeyError:
                     pass
+
+        if not query.has_key('case'): query['case']=config.FLAGDB
         return report,query
 
     def execute(self):
         start_time=time.time()
         report,query = self.prepare()
-        
-        print "Checking meta cache"
+
+        logging.log(logging.DEBUG, "Will execute the following query %s" % query)
+
+        ## Instantiate the report
+        report=report(self.environment._flag)
         if self.environment._flag.is_cached(query):
             yield "Report previously run... You need to reset it first."
             return
@@ -364,7 +376,7 @@ class execute(pyflagsh.command):
             dbh = self.environment._DBO(query['case'])
             canonical_query = self.environment._flag.canonicalise(query)
             dbh.execute("insert into meta set property=%r,value=%r",('report_executed',canonical_query))
-            yield "Execution of %s successful in %s sec" % (args[1],time.time()-start_time)
+            yield "Execution of %s successful in %s sec" % (self.args[1],time.time()-start_time)
         except Exception,e:
             import traceback
             print traceback.print_tb(sys.exc_info()[2])
@@ -380,12 +392,13 @@ class reset(execute):
         start_time=time.time()
         report,query = self.prepare()
 
-        print query,"%r" % report
+        ## Instantiate the report:
+        report=report(self.environment._flag)
+        
         ## Execute the report:
         try:
-            print "hello1"
             report.do_reset(query)
-            yield "Resetting of %s successful in %s sec" % (args[1],time.time()-start_time)            
+            yield "Resetting of %s successful in %s sec" % (self.args[1],time.time()-start_time)            
         except Exception,e:
             import traceback
             print traceback.print_tb(sys.exc_info()[2])

@@ -1,7 +1,9 @@
-#Example Flash script for performing initial analysis on hdds
+#Example Flash script for loading a filesystem
+execute Case\ Management.Remove\ case remove_case=%(case)s
+reset Case\ Management.Create\ new\ case create_case=%(case)s
+execute Case\ Management.Create\ new\ case create_case=%(case)s
 set case=%(case)s
-execute CaseManagement.NewCase create_case=%(case)s
-execute LoadData.LoadIOSource iosource=%(io source)s subsys=sgzip io_filename=%(sgziped filename)s case=%(case)s
-execute LoadData.LoadFS iosource=%(io source)s fstype=%(filesystem type)s case=%(case)s
-execute DiskForensics.HashComparison fsimage=%(io source)s case=%(case)s
 
+execute Load\ Data.Load\ IO\ Data\ Source iosource=test subsys=sgzip io_filename=%(Image filename)s io_offset=0 
+
+execute Load\ Data.Load\ Filesystem\ image iosource=test fstype=linux-ext2 scan=TypeScan scan=DeletedScan scan=MD5Scan scan=IEIndex scan=RegistryScan scan=PstScan scan=Index
