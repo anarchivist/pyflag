@@ -55,7 +55,7 @@ class TemplateReport(Reports.report):
         result.heading("I am calling the display method")
         branch = ['/']
 
-        sys.exit(0)
+#        sys.exit(0)
         #We are testing the graphing widget:
 #        import pyflag.Graph as Graph
 
