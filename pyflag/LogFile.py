@@ -34,6 +34,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.logging as logging
 import pickle
+import plugins.LogAnalysis.Whois as Whois
 
 class Log:
     """ This base class abstracts Loading of log files.
@@ -174,8 +175,6 @@ class Log:
                     tablename,
                     self.fields[field_number]))
                 for row in dbh:
-                    import plugins.Whois as Whois
-                    
                     whois_id = Whois.lookup_whois(row['IP'])
                     dbh_pyflag.execute("select * from whois where id=%r",(whois_id))
                     row2=dbh_pyflag.fetch()

@@ -38,7 +38,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
 import pyflag.LogFile as LogFile
-import plugins.LogAnalysis as LogAnalysis
+import plugins.LogAnalysis.LogAnalysis as LogAnalysis
 import pyflag.logging as logging
 
 description = "Load Data"
@@ -85,6 +85,7 @@ class LoadPresetLog(Reports.report):
             
     def form(self, query, result):
         try:
+            result.start_table()
             result.case_selector()
             result.meta_selector(config.FLAGDB,'Select preset type','log_preset',onclick="this.form.submit();")
             # get existing tables
@@ -103,7 +104,10 @@ class LoadPresetLog(Reports.report):
             else:
                 return result
 
+            result.end_table()
+            
             # show preview
+            result.start_table()
             dbh = self.DBO(query['case'])
             temp_table = dbh.get_temp()
             for progress in log.load(dbh,temp_table, rows=3):
@@ -112,6 +116,8 @@ class LoadPresetLog(Reports.report):
             # retrieve and display the temp table
             dbh.execute("select * from %s limit 1",temp_table)
             LogAnalysis.display_test_log(dbh,log,result,query)
+
+            result.end_table()
             
             result.checkbox('Click here when finished','final','ok')
             
@@ -458,26 +464,3 @@ class LoadKB(LoadTcpDump):
 
     def reset(self,query):
         Ethereal.clear_kb(query['case'])
-
-
-#### TESTING
-### An array of block/count for storing the unallocated
-### chunks. Basically we search the blocks table to find holes between
-### the allocated files
-##unalloc_blocks = []
-###iofd = IO.open('demo','test')
-###fsfd = DiskForensics.FS_Factory('demo','test',iofd)
-
-##last = (0,0,None)
-##dbh=DB.DBO("demo")
-##dbh.execute("select * from block_test order by block asc")
-##for row in dbh:
-##    ## We make a list of all blocks which are unallocated:
-##    print " %s: %s - %s" % (row['inode'],row['block'],row['count'])
-##    ## This is the end of the unallocated block just before this one:
-##    new_block = ( last[0],row['block']-last[0])
-##    if new_block[1]>0:
-##        print "new_block is %s" % (new_block,)
-##        unalloc_blocks.append(new_block)
-        
-##    last=(row['block']+row['count'],0,row['inode'])

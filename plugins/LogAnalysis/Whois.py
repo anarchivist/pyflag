@@ -30,7 +30,6 @@
 import pyflag.Reports as Reports
 import pyflag.DB as DB
 import pyflag.FlagFramework as FlagFramework
-import pyflag.LogFile as LogFile
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import re

@@ -42,17 +42,20 @@ class IISLog(Simple.SimpleLog):
         # automatically index the non-varchar fields, leave the rest
         self.types=[]
         self.indexes=[]
+
+        ## Note the original log file has -ip, -status etc, but afterm
+        ## MakeSQLSafe dashes turn to underscores.
         for field in self.fields:
             if field == 'time':
                 self.types.append('datetime')
                 self.indexes.append(True)
-            elif '-ip' in field:
+            elif '_ip' in field:
                 self.types.append('IP Address')
                 self.indexes.append(True)
-            elif '-status' in field:
+            elif '_status' in field:
                 self.types.append('int')
                 self.indexes.append(True)
-            elif '-bytes' in field:
+            elif '_bytes' in field:
                 self.types.append('int')
                 self.indexes.append(True)
             else:
