@@ -1,3 +1,4 @@
+#!/bin/sh
 # start pyflag, very simple for now
 export PYTHONPATH=`pwd`:`pwd`/libs/
 # Add our libs dir to the LD_LIBRARY_PATH to run our hooker.

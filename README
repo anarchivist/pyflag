@@ -16,21 +16,23 @@ versions of Redhat/Fedora and Debian (Stable/Testing). It performs
 data analyis using a mysql database. It is written in python and
 should be portable to other unix-like systems.
 
-Flag is distributed in three ways:
+Flag is distributed in four ways:
 
-1. A complete stand alone binary distribition which contains an
-embedded mysql server. This should word on most reasonably recent
-Linux distributions . THIS IS THE RECOMMENDED WAY TO TRY PyFLAG. If
+1.  A debian package.  This the easiest way to try pyFLAG.  If
 you have problems with the other distributions, try this one.
 
-2. A (mostly) stand-alone binary distribition which includes a python
+2. A complete stand alone binary distribition which contains an
+embedded mysql server. This should work on most reasonably recent
+Linux distributions.
+
+3. A (mostly) stand-alone binary distribition which includes a python
 interpreter, but does not include the MySQL server. All binaries were
 built on a debian sarge (glibc 2.3) system and *should* work on most
 linux distributions.. You can find the binary distribution at
 http://pyflag.sourceforge.net. Read the INSTALL file for more
 information.
 
-3. A full source distribution.
+4. A full source distribution.
 
 This document describes the installation steps for the source
 distribution which includes pyflag and a few dependancies. This
@@ -44,12 +46,21 @@ Python 2.3.x
 PyMySQL
 MySQL Server
 
-Flag must build patched versions of ethereal and ploticus.
-To build these packages, several common devel packages are
-required (this is not a complete list):
+To compile pyflag the following packages are also required:
+libjpeg-progs
+python-dev
+libmagic-dev
+zlib1g-dev
+libclamav-dev
+
+To extend functionality, Flag can optionally build patched versions 
+of ethereal and ploticus.  To build these packages change the 
+sources/Makefile and make sure the following packages are installed:
 
 glib (for ethereal)
 libpcap (for ethereal)
+libx11-dev (for ploticus)
+libpng12-dev (for ploticus)
 
 Overview:
 
@@ -86,11 +97,13 @@ $ mysql -uroot -ppass pyflag < db.setup
 Where "root" and "pass" are your database username and password
 respectively.
 
-2. Download External Sources
+2. [Optional] Download External Sources
 
-Flag requires the sources for several external packages which will be
-patched and build in step 3. You must download the following files and
-place them in the "sources" directory in the pyflag distribution.
+To extend functionality Flag can build and patch several external packages.
+You must download the following files and place them in the "sources"
+directory in the pyflag distribution.  Then modify the sources/Makefile to
+include the extra Makefile targets.  If the Makefile is not modified these
+packages will not be compiled by default.
 
 ethereal-0.9.16.tar.bz2	(www.ethereal.com)
 pl230src.tar.gz		(ploticus.sourceforge.net)
@@ -108,6 +121,9 @@ If nothing failed you should have a completed pyflag installation.
  If you want to make a binary stand alone distribution, type make bin-dist in the toplevel directory.
 
  If a binary+MySQL distribution is needed, you will need to download the binary mysql distribution from the mysql site, put the tar ball in the sources/ directory and type make mysql.
+ 
+ If you would like to build the pyflag debian package, use make deb-pkg.  Note
+ that this step requires 'sudo' privileges.
 
 4. Configure pyflag
 

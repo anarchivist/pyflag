@@ -1,0 +1,16 @@
+Package: pyflag
+Version: 0.0.20050225
+Section: utils
+Priority: optional
+Maintainer: Michael Cohen and David Collett <pyflag-support@lists.sourceforge.net>
+Architecture: i386
+Depends: python (>= 2.3), libmagic1, libclamav1, python2.3-mysqldb, mysql-server (>= 4.0.23), libjpeg-progs
+Recommends: ploticus (>= 2.20), sleuthkit
+Description: python-based forensic tool
+ The python Forensic Log Analysis GUI was designed to simplify the process of
+ log file analysis and forensic investigations.  Often when investigating a 
+ large case, a great deal of data needs to be analysed and correlated. Flag 
+ uses a database as a backend to assist in managing the large volumes of data.
+ This allows flag to remain responsive and expedite data manipulation
+ operations.  Flag started off as a project in the Australian Department of 
+ Defence.  It is now hosted on sourceforge.

@@ -1,0 +1,99 @@
+#! /bin/sh
+# postinst script for pyflag
+#
+# see: dh_installdeb(1)
+
+
+# summary of how this script can be called:
+#        * <postinst> `configure' <most-recently-configured-version>
+#        * <old-postinst> `abort-upgrade' <new version>
+#        * <conflictor's-postinst> `abort-remove' `in-favour' <package>
+#          <new-version>
+#        * <deconfigured's-postinst> `abort-deconfigure' `in-favour'
+#          <failed-install-package> <version> `removing'
+#          <conflicting-package> <version>
+# for details, see http://www.debian.org/doc/debian-policy/ or
+# the debian-policy package
+#
+
+export PATH=$PATH:/sbin:/usr/sbin:/bin:/usr/bin
+
+#This was causing the postinstall to hang so I commented it out.
+#. /usr/share/debconf/confmodule
+test $DEBIAN_SCRIPT_DEBUG && set -v -x
+
+# This command can be used as pipe to syslog. With "-s" it also logs to stderr.
+ERR_LOGGER="logger -p daemon.err -t /etc/init.d/pyflag -i"
+
+invoke() {
+  if [ -x /usr/sbin/invoke-rc.d ]; then
+    invoke-rc.d pyflag $1 > /dev/null 2>&1
+  else
+    /etc/init.d/pyflag $1 > /dev/null 2>&1
+  fi
+}
+
+# This is necessary because mysql_install_db removes the pid file in /var/run
+# and because changed configuration options should take effect immediately.
+# In case the server wasn't running at all it should be ok if the stop
+# script fails. I can't tell at this point because of the cleaned /var/run.
+set +e; invoke stop; set -e
+
+case "$1" in
+    configure)
+    
+    # Create the default database, assume no root password has been set
+	#echo 'create database pyflag;' | mysql -u root
+	
+	#echo 'grant all on *.* to pyflag@localhost identified by "pyflag";'  | mysql -u root
+	#cat /usr/share/pyflag/db.setup | mysql -u root -pmysql -h localhost pyflag
+
+    pyflag_datadir=/usr/share/pyflag
+    pyflag_statedir=/var/lib/pyflag
+    pyflag_rundir=/var/run/pyflagd
+    pyflag_logdir=/var/log
+    pyflag_cfgdir=/etc/pyflag
+    pyflag_newlogdir=/var/log/pyflag
+    
+    # ensure the existence and right permissionsa for the database and
+    # log files
+    if test ! -d $pyflag_statedir;	then mkdir $pyflag_statedir; fi
+    if test ! -d $pyflag_statedir/pyflag;	then mkdir $pyflag_statedir/pyflag; fi
+    if test ! -d $pyflag_statedir/test;	then mkdir $pyflag_statedir/test; fi
+    if test ! -d $pyflag_newlogdir;	then mkdir $pyflag_newlogdir; fi
+    # when creating an ext3 jounal on an already mounted filesystem like e.g.
+    # /var/lib/pyflag, you get a .journal file that is not modifyable by chown
+    set +e
+    chown -R pyflag:pyflag $pyflag_datadir $pyflag_statedir $pyflag_rundir
+	chown root:root /etc/init.d/pyflag
+	chmod 755 /etc/init.d/pyflag
+    chown -R pyflag:adm $pyflag_newlogdir;	chmod 2750 $pyflag_newlogdir;
+    for i in log err; do
+      touch             $pyflag_logdir/pyflag.$i
+      chown pyflag:adm   $pyflag_logdir/pyflag.$i
+      chmod 0640        $pyflag_logdir/pyflag.$i
+    done
+    set -e
+
+    update-rc.d pyflag defaults >/dev/null
+	rm -f /etc/pyflag/dpkg__pyflag_was_running
+
+	#####start the service#######
+	echo "Starting pyflagd"
+	invoke start
+	
+	#Create the pyflag databases
+	mysql --user=root --socket=/var/run/pyflagd/pyflag.sock --host=localhost --exec='source /usr/share/pyflag/db.setup;' pyflag
+    ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+
+    ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+exit 0

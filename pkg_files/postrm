@@ -1,0 +1,66 @@
+#!/bin/bash -e
+
+. /usr/share/debconf/confmodule
+test $DEBIAN_SCRIPT_DEBUG && set -v -x
+
+PYFLAG_INSTALLDIR=/usr/share/pyflag
+PYFLAG_LOGDIR=/var/log/pyflag
+PYFLAG_DATADIR=/var/lib/pyflag
+PYFLAG_CFGDIR=/etc/pyflag
+PYFLAG_RUNDIR=/var/run/pyflagd
+PYFLAG_UNIX_SOCKET=$PYFLAG_RUNDIR/pyflag.sock
+MYADMIN="/usr/bin/mysqladmin --port=$PYFLAG_PORT --socket=$PYFLAG_UNIX_SOCKET"
+
+
+# Try to stop the server in a sane way. If it does not success let the admin
+# do it himself. No database directories should be removed while the server
+# is running!
+stop_server() {
+  set +e
+  if [ -x /usr/sbin/invoke-rc.d ]; then
+    invoke-rc.d pyflag stop
+  else
+    /etc/init.d/pyflag stop
+  fi
+  errno=$?
+  set -e
+
+  if [ "$?" != 0 ]; then
+    echo "Trying to stop the pyflag server resulted in exitcode $?." >&2
+    echo "Stop it yourself and try again!" >&2
+    exit 1
+  fi
+}
+
+case "$1" in
+  purge|remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+    if [ -n "`$MYADMIN ping 2>/dev/null`" ]; then
+      stop_server
+      sleep 2
+    fi
+  ;;
+  *)
+    echo "postrm called with unknown argument '$1'" >&2
+    exit 1
+  ;;
+esac
+
+if [ "$1" = "purge" ]; then
+  # we remove the pyflag user only after all his owned files are purged
+  rm -f $PYFLAG_LOGDIR.{log,err}{,.0,.[1234567].gz}
+  rm -rf $PYFLAG_LOGDIR
+  
+  rm -rf $PYFLAG_CFGDIR
+  rm -rf $PYFLAG_DATADIR
+  rm -rf $PYFLAG_RUNDIR
+  rm -rf $PYFLAG_INSTALLDIR
+  deluser pyflag
+
+  if [ -e /usr/share/debconf/confmodule ]; then
+	. /usr/share/debconf/confmodule
+	db_purge
+  fi
+
+  update-rc.d pyflag remove >/dev/null || exit 0
+  rm -f /etc/init.d/pyflag
+fi

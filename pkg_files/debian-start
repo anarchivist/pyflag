@@ -1,0 +1,43 @@
+#!/bin/sh
+#
+# This script is executed by "/etc/init.d/pyflag" on every (re)start.
+# 
+# Changes to this file will be preserved when updating the Debian package.
+#
+set -e
+set -u
+
+PYFLAG_RUNDIR=/var/run/pyflagd
+PYFLAG_PORT=3310
+PYFLAG_UNIX_SOCKET=$PYFLAG_RUNDIR/pyflag.sock
+MYADMIN="/usr/bin/mysqladmin --port=$PYFLAG_PORT --socket=$PYFLAG_UNIX_SOCKET"
+MYCHECK="/usr/bin/mysqlcheck --port=$PYFLAG_PORT --socket=$PYFLAG_UNIX_SOCKET"
+MYCHECK_SUBJECT="WARNING: mysqlcheck has found corrupt tables"
+
+# Now, as the server seems to be up, check all unclosed tables.
+# But do it in the background to not stall the boot process.
+echo "Checking for crashed MySQL tables in the background."
+(
+  logger -p daemon.info -i -t$0 "Checking for crashed MySQL tables."
+
+  # Checking for $? is unreliable so the size of the output is checked.
+  # Some table handlers like HEAP do not support CHECK TABLE.
+  tempfile=`tempfile`
+  $MYCHECK --all-databases --fast --silent \
+    2>&1 \
+    | perl -e '$_=join("", <>); s/^[^\n]+\nerror\s+: The handler for the table doesn.t support check\n//smg;print;' \
+    > $tempfile
+  if [ -s $tempfile ]; then
+    (
+      /bin/echo -e "\n" \
+	"Improperly closed tables are also reported if clients are accessing\n" \
+	"the tables *now*. A list of current connections is below.\n";
+      $MYADMIN processlist status
+    ) >> $tempfile
+    mailx -e -s"$MYCHECK_SUBJECT" root < $tempfile
+    (echo "$MYCHECK_SUBJECT"; cat $tempfile) | logger -p daemon.warn -i -t$0
+  fi
+  rm $tempfile
+) &
+
+exit 0

@@ -1,0 +1,63 @@
+.TH PYFLAG 1 "FEB 2005" "User Manuals"
+.SH NAME
+pyflag \- python Forensic Log Analysis GUI
+.SH SYNOPSIS
+.B pyflag [
+.I port_number
+.B ] 
+.SH DESCRIPTION
+.B pyflag
+starts the python Forensic Log Analysis GUI on 
+.I port_number
+serving HTTP on the local host.  If 
+.I port_number
+is not given, 8000 is used by default.
+
+The first time python is run, a config file
+.I .pyflagrc
+needs to created in the user's home directory.  This can be achieved using the GUI by pointing a web browser to
+.I http://127.0.0.1:8000
+and entering the details as prompted by pyFLAG (see below for details).  This process will create the
+.I .pyflagrc
+file in the users home directory in the correct format.  pyFLAG must then be restarted.
+
+.SH CONFIGURATION FILE PARAMETERS
+The
+.I uploaddir
+path must be set in 
+.I .pyflagrc
+to tell pyFLAG where to look for case data to be uploaded and analysed.  It is possible to specify other
+options in the
+.I .pyflagrc
+that override the default settings in
+.I /usr/share/pyflag/pyflag/pyflagrc.
+See
+.I /usr/share/pyflag/pyflag/pyflagrc
+for a complete list of options.
+
+.SH EXAMPLE
+$ pyflag 9000
+.SH "SEE ALSO"
+.BR python (1),
+.BR mysql (1),
+.BR magic (1)
+.SH REQUIREMENTS
+The python Forensic Log Analysis GUI requires
+.B python
+and associated MySQL interface,
+.B MySQL
+database,
+.B libmagic
+File type-determination library,
+.B libclamav
+Unix anti-virus utility library.
+
+.SH LICENSE
+.na
+.nf
+This software is distributed under the GNU Public License.
+
+.SH AUTHOR
+Michael Cohen and David Collet <pyflag-support@lists.sourceforge.net>
+
+
