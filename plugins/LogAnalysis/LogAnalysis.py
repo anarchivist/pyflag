@@ -99,7 +99,10 @@ class ListLogFile(Reports.report):
                 q['whois']="Yes"
                 #tmp.tooltip("Click here to show whois information")
             #result.link(tmp,q)
-            result.toolbar(q, 'Show Whois',icon='whois.png')
+            def cb(result):
+                result.refresh(query)
+                
+            result.toolbar(cb, 'Show Whois',icon='whois.png')
 
         #Find the names of all the columns in table:
         dbh.execute("select * from %s_log limit 1",query['logtable'])

@@ -42,6 +42,22 @@ import pyflag.Registry as Registry
 import pyflag.DB as DB
 import threading
 
+def error_popup(e):
+    """ Draw the text in an error message box
+
+    @arg e: The exception object to print
+    """
+    dialog=gtk.Window()
+    result=UI.GTKUI()
+    FlagFramework.get_traceback(e,result)
+    frame=gtk.Frame(result.title)
+    result.title=None
+    box=gtk.VBox()
+    box.add(result.display())
+    frame.add(box)
+    dialog.add(frame)
+    dialog.show_all()
+
 class GTKServer(gtk.Window):
     """ A class which represents the main GTK server window """
 
@@ -80,7 +96,7 @@ class GTKServer(gtk.Window):
             try:
                 scroll.add_with_viewport(result.display())
             except Exception,e:
-                self.error_popup(e)
+                error_popup(e)
                 raise
             scroll.set_policy(gtk.POLICY_AUTOMATIC,gtk.POLICY_AUTOMATIC)
             
@@ -187,6 +203,9 @@ class GTKServer(gtk.Window):
 
         families.sort(sort_function)
 
+    def delete_form(self,widget):
+        self.form_dialog=None
+
     def case_selector(self):
         """ helper function to draw a case selector """
         combobox = gtk.combo_box_new_text()
@@ -203,22 +222,6 @@ class GTKServer(gtk.Window):
     def navigate_cb(action):
         pass
 
-    def error_popup(self, e):
-        """ Draw the text in an error message box
-
-        @arg e: The exception object to print
-        """
-        dialog=gtk.Window()
-        result=self.flag.ui()
-        FlagFramework.get_traceback(e,result)
-        frame=gtk.Frame(result.title)
-        result.title=None
-        box=gtk.VBox()
-        box.add(result.display())
-        frame.add(box)
-        dialog.add(frame)
-        dialog.show_all()
-
     def run_progress(self,query):
         family=query['family']
         report=query['report']
@@ -229,6 +232,7 @@ class GTKServer(gtk.Window):
         else:
             self.form_dialog=gtk.Window()
             self.form_dialog.set_default_size(500,500)
+            self.form_dialog.connect('destroy',self.delete_form)
 
         box=gtk.VBox()
         self.form_dialog.add(box)
@@ -236,7 +240,7 @@ class GTKServer(gtk.Window):
         try:
             report.progress(query,result)
         except Exception,e:
-            self.error_popup(e)
+            error_popup(e)
             raise
         
         box.add(result.display())
@@ -250,13 +254,17 @@ class GTKServer(gtk.Window):
         try:
             report.analyse(query)
         except Exception,e:
-            self.error_popup(e)
-            return
+            error_popup(e)
 
         ## Draw the results in their own tab:
+        gtk.gdk.threads_enter()
         self.add_page(query)
         self.form_dialog.destroy()
         self.form_dialog=None
+        gtk.gdk.threads_leave()
+        
+        dbh = DB.DBO(query['case'])
+        dbh.execute("insert into meta set property=%r,value=%r",('report_executed',canonical_query))
         return
 
     def draw_form(self,query):
@@ -279,21 +287,19 @@ class GTKServer(gtk.Window):
                 print "Analysing report"
                 import time
 
-                def progess_thread(t,query):
+                def progress_thread(t,query):
                     """ This function is called to refresh the progress window """
                     print "progress thread"
-                    while 1:
-                        time.sleep(1)
-                        if self.form_dialog:
-                            print "drawing progress"
-                            self.run_progress(query)
-                        else:
-                            return
+                    if self.form_dialog:
+                        print "drawing progress"
+                        self.run_progress(query)
+                    else:
+                        print "finished progressing"
+                        return
 
                 ## Run the progress cycle in a seperate thread
-                t2 = threading.Thread(target=progess_thread,args=(t,query))
-                t2.start()
                 print "Calculating progress"
+                gtk.timeout_add(1000,progress_thread,t,query)
                 return
 
         else:
@@ -303,7 +309,7 @@ class GTKServer(gtk.Window):
             else:
                 self.form_dialog=gtk.Window()
                 self.form_dialog.set_default_size(500,500)
-
+                self.form_dialog.connect('destroy',self.delete_form)
             box=gtk.VBox()
             self.form_dialog.add(box)
             result = self.flag.ui()
@@ -312,7 +318,7 @@ class GTKServer(gtk.Window):
             try:
                 report.form(query,result)
             except Exception,e:
-                self.error_popup(e)
+                error_popup(e)
                 raise
             
             ## Set the callback to ourselves:
@@ -326,8 +332,8 @@ class GTKServer(gtk.Window):
         family=query['family']
         report=query['report']
         report = Registry.REPORTS.dispatch(family,report)(self.flag,ui=self.flag.ui)
-        result=self.flag.ui()
-        result=report.display(query,result)
+        result=self.flag.ui(query=query)
+        report.display(query,result)
         self.notebook.add_page(result, query)
 
     def execute_report_cb(self, action, family, report):
@@ -402,6 +408,8 @@ class GTKServer(gtk.Window):
         self.uimanager.add_ui_from_string(ui)
 
 ### BEGIN MAIN ####
-
 main = GTKServer()
+
+import gtk.gdk
+gtk.gdk.threads_init()
 gtk.main()

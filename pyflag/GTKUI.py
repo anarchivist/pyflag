@@ -188,7 +188,7 @@ class FlagTreeModel(gtk.GenericTreeModel):
 class GTKUI(UI.GenericUI):
     """ A GTK UI Implementation. """
             
-    def __init__(self,default = None):
+    def __init__(self,default = None,query=None):
         # Create the Main Widget
         self.result=gtk.VBox()
 
@@ -204,7 +204,9 @@ class GTKUI(UI.GenericUI):
             self.defaults = FlagFramework.query_type(())
             self.form_widgets=[]
             self.toolbar_ui = gtk.Toolbar()
-            
+
+        if query: self.defaults=query
+        
         self.current_table=None
         self.nav_query=None
         self.next = None
@@ -333,6 +335,7 @@ class GTKUI(UI.GenericUI):
         def switch_cb(notepad, page, pagenum, callbacks, query):
             p = notepad.get_nth_page(pagenum)
             if not self.notebook_views.has_key(pagenum):
+                print "query is %s, cb is %s" % (query,callbacks[pagenum])
                 self.notebook_views[pagenum]=callbacks[pagenum](query).display()
                 p.pack_start(self.notebook_views[pagenum])
                 p.show_all()
@@ -829,15 +832,15 @@ class GTKUI(UI.GenericUI):
         treeview = gtk.TreeView(store)
         treeview.set_rules_hint(TRUE)
             
-        ## callback for all the links:
-        def link_callback(widget,event=None):
-            """ Get the query object from the widget and refresh to it, after appending various form parameters. """
-            q=widget.get_data('query')
-            for widget,callback in self.form_widgets:
-                parameter=callback(widget)
-                if parameter[0]=='group_by' and parameter[1]!='':
-                    q['group_by']=parameter[1]
-            self.link_callback(q)
+##        ## callback for all the links:
+##        def table_link_callback(widget,event=None):
+##            """ Get the query object from the widget and refresh to it, after appending various form parameters. """
+##            q=widget.get_data('query')
+##            for widget,callback in self.form_widgets:
+##                parameter=callback(widget)
+##                if parameter[0]=='group_by' and parameter[1]!='':
+##                    q['group_by']=parameter[1]
+##            self.link_callback(q)
 
         def column_callback(column,event=None):
             store=column.get_data('store')
@@ -954,6 +957,7 @@ class GTKUI(UI.GenericUI):
                 del new_query['__target__']
                 del new_query[target]
                 new_query[target] = model.get_value(iter,column.get_data('column_number'))
+                print "new value is %s" % new_query
                 self.link_callback(new_query)
                 
         treeview.connect('button-press-event',click_callback)                    

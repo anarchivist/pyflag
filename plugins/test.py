@@ -120,13 +120,9 @@ class TemplateReport(Reports.report):
 
     def analyse(self,query):
         #Note that analyse does not need to return anything, if it does it is ignored.
-        result =self.ui()
-        result.heading("I am calling the analyse method. Analysing:")
         import time
         
         time.sleep(10)
-        result.para( "Done")
-        return result
     
     def form(self,query,result):
         result.defaults = query
