@@ -151,9 +151,9 @@ extern int optind;
 #include <linux/types.h>
 #include <inttypes.h>
 
-#define USE_MYLSEEK
-#define HAVE_LLSEEK
-#define LSEEK		mylseek
+//#define USE_MYLSEEK
+//#define HAVE_LLSEEK
+#define LSEEK		lseek64
 #define OFF_T		off_t
 #define STRTOUL		strtoul
 #define DADDR_T		daddr_t

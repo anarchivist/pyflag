@@ -4,7 +4,7 @@ We overload the open,close, seek and read system calls to be
 initialised through the correct IO subsystem.
 
 */
-#include "fs_io.h"
+#include "iosubsys.h"
 #include "sgzlib.h"
 #include "libevf.h"
 #include "except.h"

@@ -3,8 +3,7 @@
 %include exception.i
 %cstring_output_withsize(char *buf, int *len);
 %{
-#include "fs_tools.h"
-#include "fs_io.h"
+#include "iosubsys.h"
 #include "except.h"
   
   /* These functions are wrapped in order to ensure we trap C exceptions and emit SWIG exceptions for python */
