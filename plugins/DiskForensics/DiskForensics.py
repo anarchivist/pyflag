@@ -385,7 +385,7 @@ class ViewFile(Reports.report):
                 result.start_table(width="100%")
                 result.row(left,right,valign='top',align="left")
             else:
-                result.join(left)
+                result=left
             return result
 
         result.notebook(

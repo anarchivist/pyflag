@@ -1206,6 +1206,6 @@ class HTMLUI(UI.GenericUI):
         
         #Now draw the results of the callback:
         cb=cbfunc(query)
-	if not self.binary:
-	        out+="<tr><td colspan=50><table border=1 width=100%%><tr><td>%s</td></tr></table></td></tr></table>" % cb
-       		self.result+=out
+        if not self.binary:
+            out+="<tr><td colspan=50><table border=1 width=100%%><tr><td>%s</td></tr></table></td></tr></table>" % cb
+            self.result+=out

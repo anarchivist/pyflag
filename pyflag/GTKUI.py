@@ -9,7 +9,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG 0.4 (12-02-2004)
+#  Version: FLAG $Version: $
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -322,57 +322,37 @@ class GTKUI(UI.GenericUI):
         @arg context: A context variable used to allow the selection of names in queries
         @arg descriptions: A list of descriptions to assign to each tab. The description should not be longer than 1 line.
         """
-        query=self.defaults.clone()            
+        query=self.defaults.clone()
+        ## If the user supplied a context (a tab which should be open by default)
         try:
             context_str=query[context]
-            cbfunc=callbacks[names.index(context_str)]
-        except (ValueError,KeyError):
-            cbfunc=callbacks[0]
+        ## Otherwise we open the first one by default
+        except:
             context_str=names[0]
-
+            
+        self.notebook_views= {}
+        
         def switch_cb(notepad, page, pagenum, callbacks, query):
             p = notepad.get_nth_page(pagenum)
-            p.pack_start(callbacks[pagenum](query).display())
-            
+            if not self.notebook_views.has_key(pagenum):
+                self.notebook_views[pagenum]=callbacks[pagenum](query).display()
+                p.pack_start(self.notebook_views[pagenum])
+                p.show_all()
             
         # draw the notebook
         notebook = gtk.Notebook()
         notebook.connect('switch-page', switch_cb, callbacks, query)
-        for n in names:
-            #q=query.clone()
-            #tmplink=self.__class__()
-            #del q[context]
-            #q[context]=i
-            #tmplink.link(i,q)
-            #notebook.append_page(gtk.VBox(),n)
-            #notebook.set_data('query',q)
-            if(n==context_str):
-                cb = cbfunc(query)
-                notebook.append_page(cb.display(), gtk.Label(n))
+        
+        for n in range(len(names)):
+            ## If a context is set, we render it now.
+            if(names[n]==context_str):
+                cb = callbacks[n](query)
+                self.notebook_views[n]=cb.display()
+                notebook.append_page(self.notebook_views[n], gtk.Label(names[n]))
             else:
-                notebook.append_page(gtk.VBox(), gtk.Label(n))
+                notebook.append_page(gtk.VBox(), gtk.Label(names[n]))
 
         self.result.pack_start(notebook)
-        #out='\n<table border=0 cellspacing=0 cellpadding=0 width=100%><tr><td colspan=50><img height=20 width=1 alt=""></td></tr><tr>'
-        
-        #for i in names:
-        #    q=query.clone()
-        #    tmplink=self.__class__()
-        #    del q[context]
-        #    q[context]=i
-        #    tmplink.link(i,q)
-
-        #    if(i==context_str):
-        #        out+="<td width=15>&nbsp;</td><td bgcolor=#3366cc align=center nowrap><font color=#ffffff size=-1><b>%s</b></font></td>" % i
-        #    else:
-        #        out+='<td width=15>&nbsp;</td><td id=1 bgcolor=#efefef align=center nowrap><font size=-1>%s</font></td>' % (tmplink)
-
-        #out+="<td colspan=50>&nbsp;</td></tr><tr><td colspan=50 bgcolor=#3366cc><img width=1 height=1 alt=""></td></tr>"        
-        #Now draw the results of the callback:
-        #cb=cbfunc(query)
-	#if not self.binary:
-	#        out+="<tr><td colspan=50><table border=1 width=100%%><tr><td>%s</td></tr></table></td></tr></table>" % cb
-       	#	self.result+=out
                 
     def link(self,string,target=FlagFramework.query_type(()),**target_options):
         target=target.clone()
