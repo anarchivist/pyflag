@@ -293,11 +293,18 @@ int fclose(FILE *stream) {
 };
 
 int stat(const char *file_name, struct stat *buf) {
+  CHECK_INIT;
   buf->st_size=-1;
   return(0);
 };
 
 int __xstat64 (int __ver, __const char *__filename, struct stat *buf) {
+  CHECK_INIT;
   buf->st_size=-1;
   return(0);
+};
+
+int fileno(FILE *stream) {
+  CHECK_INIT;
+	return((int)stream);
 };

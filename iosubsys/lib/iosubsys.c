@@ -812,7 +812,10 @@ int raid_open(IO_INFO *self) {
 
   while(tmp_element) {
     tmp_element->fd=open(tmp_element->name,O_RDONLY);
-    if(tmp_element->fd<0) RAISE(E_IOERROR,NULL,"Could not open file %s",tmp_element->name);
+    if(tmp_element->fd<0) {
+	    //RAISE(E_IOERROR,NULL,"Could not open file %s",tmp_element->name);
+	    fprintf(stderr,"Could not open file %s, marking as missing\n",tmp_element->name);
+    }
     tmp_element=tmp_element->next;
   };
 
@@ -825,7 +828,8 @@ int raid_close(IO_INFO *self) {
   struct raid_element *tmp_element=io->disks;
 
   while(tmp_element) {
-    close(tmp_element->fd);
+    if(tmp_element->fd != -1)
+	close(tmp_element->fd);
     tmp_element=tmp_element->next;
   };
   return(1);
@@ -853,10 +857,34 @@ int raid_slack_read(IO_INFO_RAID *io, char *buf, int len, off_t offs) {
   slot=io->map[relative_logical_block].slot;
   physical_block=slot+period_number*io->number_of_slots;
 
+  //  printf("slot=%u(%llu) disk= %u relative_logical_block=%u relative_offs %llu\n",slot,physical_block, io->map[relative_logical_block].disk->number, relative_logical_block,relative_offs);
+
   len_to_read = min (len, io->block_size-relative_offs);
   fd=io->map[relative_logical_block].disk->fd;
 
-  //  printf("slot=%u(%llu) disk= %u relative_logical_block=%u relative_offs %llu\n",slot,physical_block, io->map[relative_logical_block].disk->number, relative_logical_block,relative_offs);
+  //Handle the case where we need to reconstruct a disk:
+  if(fd==-1) {
+	  char temp_buf[len_to_read+10];
+	  struct raid_element *i;
+	  int j;
+
+	  memset(buf,0,len);
+
+	  for(i=io->disks;i;i=i->next) {
+		if(i->fd != -1) {
+  			//grab the other blocks and generate the missing one
+			  if(lseek(i->fd,physical_block * io->block_size+relative_offs,SEEK_SET)<0) {
+			    RAISE(E_IOERROR,NULL,"Could not seek\n");
+		  	};
+
+			  if(read(i->fd,temp_buf, len_to_read) != len_to_read) {
+			    RAISE(E_IOERROR,NULL,"Unable to read %u from file %s at offset %llu\n",len_to_read,io->map[slot].disk->name,physical_block * io->block_size+relative_offs);
+			  };
+			  for(j=0;j<len_to_read;j++) buf[j]^=temp_buf[j];
+		};
+	  };
+  } else {
+ //this is the normal case
 
   if(lseek(fd,physical_block * io->block_size+relative_offs,SEEK_SET)<0) {
     RAISE(E_IOERROR,NULL,"Could not seek\n");
@@ -865,6 +893,7 @@ int raid_slack_read(IO_INFO_RAID *io, char *buf, int len, off_t offs) {
   if(read(fd,buf, len_to_read) != len_to_read) {
     RAISE(E_IOERROR,NULL,"Unable to read %u from file %s at offset %llu\n",len_to_read,io->map[slot].disk->name,physical_block * io->block_size+relative_offs);
   };
+  }
 
   return(len_to_read);
 };
