@@ -1,6 +1,6 @@
 """ This module implements a Log driver for IIS logs """
 import pyflag.LogFile as LogFile
-import Simple
+import plugins.LogAnalysis.Simple as Simple
 
 class IISLog(Simple.SimpleLog):
     """ Log parser for IIS (W3C Extended) log files """

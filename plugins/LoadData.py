@@ -271,7 +271,7 @@ class LoadIOSource(Reports.report):
 import pyflag.Sleuthkit as Sleuthkit
 
 class LoadFS(Reports.report):
-    """ Loads Filesystem Image using the modified sleuthkit. """
+    """ Loads Filesystem Image into the database. """
     parameters = {"iosource":"iosource","fstype":"sqlsafe","scan":"alphanum"}
     name = "Load Filesystem image"
     family="Load Data"
@@ -353,8 +353,8 @@ class LoadFS(Reports.report):
         dbh.execute("select value from meta where property='scanfs_%s'" , query['iosource'])
         cached_scanners = [ row['value'] for row in dbh ]
 
-        ## We only run the scanners that were asked for which are not cached:
-        scanners = [ Registry.SCANNERS.classes[Registry.SCANNERS.scanners.index(i)] for i in user_scanners if i not in cached_scanners ]
+        ## We only run the scanners that were asked for which are not cached. We instantiate the factories themselves:
+        scanners = [ Registry.SCANNERS.classes[Registry.SCANNERS.scanners.index(i)](dbh,query['iosource'],fsfd) for i in user_scanners if i not in cached_scanners ]
 
         ## Store the sanners in the meta table:
         for s in user_scanners:
@@ -403,7 +403,11 @@ class LoadFS(Reports.report):
         Sleuthkit.del_sleuth(query['case'],tablename)
         iofd=IO.open(query['case'],query['iosource'])
         fsfd=FileSystem.FS_Factory( query["case"], query["iosource"], iofd)
-        fsfd.scanfs(Registry.SCANNERS.classes ,action='reset')
+
+        ## Instantiate all scanners for reset
+        scanners = [ i(dbh,query['iosource'],fsfd) for i in Registry.SCANNERS.classes ]
+
+        fsfd.resetscanfs(scanners)
         dbh.execute("delete from meta where property=%r and value=%r",('fsimage',query['iosource']))
         dbh.execute("delete from meta where property like 'scanfs_%s'",query['iosource'])
 
@@ -455,3 +459,25 @@ class LoadKB(LoadTcpDump):
     def reset(self,query):
         Ethereal.clear_kb(query['case'])
 
+
+#### TESTING
+### An array of block/count for storing the unallocated
+### chunks. Basically we search the blocks table to find holes between
+### the allocated files
+##unalloc_blocks = []
+###iofd = IO.open('demo','test')
+###fsfd = DiskForensics.FS_Factory('demo','test',iofd)
+
+##last = (0,0,None)
+##dbh=DB.DBO("demo")
+##dbh.execute("select * from block_test order by block asc")
+##for row in dbh:
+##    ## We make a list of all blocks which are unallocated:
+##    print " %s: %s - %s" % (row['inode'],row['block'],row['count'])
+##    ## This is the end of the unallocated block just before this one:
+##    new_block = ( last[0],row['block']-last[0])
+##    if new_block[1]>0:
+##        print "new_block is %s" % (new_block,)
+##        unalloc_blocks.append(new_block)
+        
+##    last=(row['block']+row['count'],0,row['inode'])

@@ -38,8 +38,8 @@ The File class abstracts an interface for accessing the data within a specific f
 In order for callers to have access to a specific file on the filesystem, they need to instantiate a FileSystem object by using FS_Factory, and then ask this instance for a File object by using the FileSystem.open method. It is discouraged to instantiate a File object directly.
 
 Virtual Filesystems (vfs) are also supported by this subsystem in order to support archives such as zip and pst files. Files within filesystems are uniquely identified in the flag databases by an inode string. The inode string can have multiple parts delimited by the pipe ('|') character indicating that a virtual filesystem is to be used on the file. The first letter in the part indicates the virtual filesystem to use, here is an example:
-'D123|Z14' Here 'D' indicates the DDFS filesystem, Z indicates the Zip vfs.
-This inode therefore refers to the 14 file in the zip archive contained in inode 123 of the DDFS filesystem. VFS
+'D123|Z14' Here 'D' indicates the DBFS filesystem, Z indicates the Zip vfs.
+This inode therefore refers to the 14 file in the zip archive contained in inode 123 of the DBFS filesystem. VFS
 """
 import os,os.path
 import pyflag.conf
@@ -48,6 +48,7 @@ config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
 import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
+from pyflag.FlagFramework import normpath
 import pyflag.Registry as Registry
 import pyflag.logging as logging
 import time
@@ -67,6 +68,12 @@ class FileSystem:
         """ list directory content longly """
         pass
 
+    def VFSCreate(self,root_inode,inode):
+        """ This method creates inodes within the virtual filesystem.
+
+        This facility allows callers to extend the VFS to include more virtual files.
+        """
+
     def ls(self, path="/", dirs=None):
         """list directory contents"""
         pass
@@ -85,10 +92,6 @@ class FileSystem:
         This object can then be used to read data from the specified file.
         @note: Only files may be opened, not directories."""
 
-
-        #print "trying to open a file"
-        #print "%s" % vfslist
-        
         if not inode:
             inode = self.lookup(path)
         if not inode:
@@ -124,7 +127,10 @@ class FileSystem:
     def exists(self,path):
         """ Returns 1 if path exists, 0 otherwise """
         pass
-    
+
+    def resetscanfs(self,callbacks):
+        """ This is called to reset all the scanners. """
+        
     def scanfs(self, callbacks):
         """ Read every file in fs, and call given scanner callbacks for each file.
         
@@ -149,6 +155,58 @@ class DBFS(FileSystem):
         self.table = table
         self.case = case
         self.dbh = DB.DBO(case)
+        try:
+            self.dbh.execute("select value from meta_%s where name='block_size'",self.table);
+            self.block_size = int(self.dbh.fetch()["value"])
+        except:
+            self.blocksize = 1024
+
+    def VFSCreate(self,root_inode,inode,new_filename,**properties):
+        """ Extends the DB filesystem to include further virtual filesystem entries.
+
+        Note that there must be an appropriate VFS driver for the added inodes, or else they may not be viewable.
+        @arg root_inode: The inode that will serve as the root for the new inode
+        @arg inode: The proposed inode name for the new inode (without the | to the root_inode). This needs to be understood by the VFS driver.
+        @arg new_filename: The prposed new filename for the VFS file. This may contain directories in which case sub directories will also be created.
+        """
+        ## filename is the filename in the filesystem for the zip file.
+        filename = self.lookup(inode=root_inode)
+
+        ## Check if the directories all exist properly:
+        dirs = os.path.dirname(new_filename).split('/')
+        name = os.path.basename(new_filename)
+
+        print dirs,filename,new_filename
+
+        for d in range(len(dirs)):
+            if not dirs[d]: continue
+            if d>0:
+                path = normpath("%s/%s/" % (filename,"/".join(dirs[:d])))
+            else:
+                path = normpath("%s/" % filename)
+
+            print "Path is %s" % path
+            self.dbh.execute("select * from file_%s where path=%r and name=%r",(self.table, path, dirs[d]))
+            if not self.dbh.fetch():
+                self.dbh.execute("insert into file_%s set path=%r,name=%r,status='alloc',mode='d/d',inode='%s|%s-'",(self.table,path,dirs[d],root_inode,inode))
+
+        path = normpath("%s/%s/" % (filename,os.path.dirname(new_filename)))
+        ## Add the file itself to the file table
+        self.dbh.execute("insert into file_%s set status='alloc',mode='r/r',inode='%s|%s',path=%r, name=%r",(self.table,root_inode,inode,normpath(path+'/'),name))
+
+        ## Add the file to the inode table:
+        extra = ','.join(["%s=%%r" % p for p in properties.keys()])
+        if extra:
+            extra=','+extra
+            
+        self.dbh.execute("insert into inode_%s set inode='%s|%s'" + extra ,[self.table, root_inode,inode] + properties.values())
+        
+        ## Set the root file to be a d/d entry so it looks like its a virtual directory:
+        self.dbh.execute("select * from file_%s where mode='d/d' and inode=%r and status='alloc'",(self.table,root_inode))
+        if not self.dbh.fetch():
+            self.dbh.execute("select * from file_%s where mode='r/r' and inode=%r and status='alloc'",(self.table,root_inode))
+            row = self.dbh.fetch()
+            self.dbh.execute("insert into file_%s set mode='d/d',inode=%r,status='alloc',path=%r,name=%r",(self.table,root_inode,row['path'],row['name']))
 
     def longls(self,path='/'):
         self.dbh.execute("select mode,inode,name from file_%s where path=%r", (self.table, path))
@@ -215,20 +273,20 @@ class DBFS(FileSystem):
         else:
             return 0
 
+    def resetscanfs(self,scanners):
+        for i in scanners:
+            try:
+                i.reset()
+            except DB.DBError,e:
+                logging.log(logging.ERRORS,"Could not reset Scanner %s: %s" % (i,e))
+        
     def scanfs(self, scanners, action=None):
+        ## Prepare the scanner factory for scanning:
+        for s in scanners:
+            s.prepare()
+        
         dbh2 = DB.DBO(self.case)
         dbh3=DB.DBO(self.case)
-        # Instatiate a factory class for each of the given scanners
-        factories = [ d(self.dbh,self.table) for d in scanners ]
-
-        ## If the user asked to reset the scanners we do so here
-        if action=='reset':
-            for i in factories:
-                try:
-                    i.reset()
-                except DB.DBError,e:
-                    logging.log(logging.ERRORS,"Could not reset Scanner %s: %s" % (i,e))
-            return
 
 #        dbh3.execute('select inode, concat(path,name) as filename from file_%s where mode="r/r" and status="alloc" and inode not like "%%-Z-%%"',self.table)
         dbh3.execute('select inode, concat(path,name) as filename from file_%s where mode="r/r" and status="alloc"',self.table)
@@ -237,16 +295,16 @@ class DBFS(FileSystem):
             # open file
             count+=1
             if not count % 100:
-                print "File (%s) is inode %s (%s)" % (count,row['inode'],row['filename'])
+                logging.log(logging.INFO,"File (%s) is inode %s (%s)" % (count,row['inode'],row['filename']))
                 
             try:
                 fd = self.open(inode=row['inode'])
-                Scanner.scanfile(self,fd,factories)
+                Scanner.scanfile(self,fd,scanners)
             except Exception,e:
                 logging.log(logging.ERRORS,"%r: %s" % (e,e))
                 continue
         
-        for c in factories:
+        for c in scanners:
             c.destroy()
 
 # redundant???

@@ -15,7 +15,7 @@ class TypeScan(Scanner.GenScanFactory):
     In addition to recording the file type, this class can also perform
     an action based on the mime type of the file"""
     order=5
-    def __init__(self,dbh, table):
+    def __init__(self,dbh, table,fsfd):
         dbh.execute(""" CREATE TABLE IF NOT EXISTS `type_%s` (
         `inode` varchar( 20 ) NOT NULL,
         `mime` varchar( 50 ) NOT NULL,

@@ -16,7 +16,7 @@ import md5
 class MD5Scan(GenScanFactory):
     """ scan file and record file Hash (MD5Sum) """
 
-    def __init__(self,dbh, table):
+    def __init__(self,dbh, table,fsfd):
         dbh.execute(""" CREATE TABLE IF NOT EXISTS `md5_%s` (
         `inode` varchar( 20 ) NOT NULL default '',
         `md5` varchar( 35 ) NOT NULL default '',

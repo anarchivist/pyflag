@@ -36,7 +36,7 @@ def escape(string):
 
 class Index(GenScanFactory):
     """ Keyword Index files """
-    def __init__(self,dbh,table):
+    def __init__(self,dbh,table,fsfd):
         """ This creates the LogicalIndex table and initialised the index file """
         self.dbh=dbh
         ## These keep the current offset in the logical image. FIXME:
@@ -46,8 +46,10 @@ class Index(GenScanFactory):
         self.block=0
         
         self.table=table
-        self.dbh.execute("create table if not exists `LogicalIndex_%s` (`inode` VARCHAR( 20 ) NOT NULL ,`block` BIGINT NOT NULL, primary key(block))",(table))
         self.filename = "%s/LogicalIndex_%s.idx" % (config.RESULTDIR,table)
+
+    def prepare(self):
+        self.dbh.execute("create table if not exists `LogicalIndex_%s` (`inode` VARCHAR( 20 ) NOT NULL ,`block` BIGINT NOT NULL, primary key(block))",(self.table))
         try:
             ## Is the file already there?
             self.index = index.Load(self.filename)
@@ -62,7 +64,11 @@ class Index(GenScanFactory):
     def reset(self):
         """ This deletes the index file and drops the LogicalIndex table """
         ## First destroy the object and then try to remove the index file
-        del self.index
+        try:
+            del self.index
+        except AttributeError:
+            pass
+        
         try:
             os.remove(self.filename)
         except OSError:

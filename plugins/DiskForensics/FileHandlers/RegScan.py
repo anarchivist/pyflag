@@ -9,7 +9,7 @@ import plugins.DiskForensics.DiskForensics as DiskForensics
 
 class RegistryScan(GenScanFactory):
     """ Load in Windows Registry files """
-    def __init__(self,dbh, table):
+    def __init__(self,dbh, table,fsfd):
         self.dbh=dbh
         self.table=table
         self.dbh.execute('create table if not exists reg_%s (`path` CHAR(250), `size` SMALLINT, `type` CHAR(12),`reg_key` VARCHAR(200),`value` text)',self.table)

@@ -11,10 +11,12 @@ import pyflag.Reports as Reports
 
 class IEIndex(Scanner.GenScanFactory):
     """ Load in IE History files """
-    def __init__(self,dbh, table):
+    def __init__(self,dbh, table,fsfd):
         self.dbh=dbh
         self.table=table
-        dbh.MySQLHarness("pasco -t %s -g create " % (table))
+
+    def prepare(self):
+        self.dbh.MySQLHarness("pasco -t %s -g create " % (self.table))
 
     def reset(self):
         self.dbh.MySQLHarness("pasco -t %s -g drop " % (self.table))

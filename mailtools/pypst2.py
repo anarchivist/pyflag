@@ -173,7 +173,7 @@ class Pstfile:
         """ close pst file """
         self.pst.close()
         
-    def walk(self, id, topdown=True):
+    def walk(self, id=None, topdown=True):
         """ emulate the os.walk directory tree generator
         It has some peculiarities: The input arg is an (id, path) 2-tuple, where path
         can be empty in which case the results will be rooted there (it becomes ('/')).
@@ -187,6 +187,9 @@ class Pstfile:
         @arg id: a two-tuple (id, path) where path may be an empty string or None
         @arg topdown: specifies the output order, default True"""
 
+        if not id:
+            id = (self.rootid,'')
+            
         def pjoin(a, b):
             if a.endswith('/'):
                 a = a[:-1]

@@ -44,6 +44,37 @@ class GenScanFactory:
     
     The Scanner Factory is a specialised class for producing scanner objects. It will be instantiated once per filesystem at the begining of the run, and destroyed at the end of the run. It will be expected to produce a new Scanner object for each file in the filesystem.
     """
+    def __init__(self,dbh,table,fsfd):
+        """ Factory constructor.
+
+        @arg dbh: A valid database handle
+        @arg table: The name of the filesystem we are currently operating on
+        @arg fsfd: A filesystem object for the filesystem we are about to scan.
+        """
+        self.dbh=dbh
+        self.table=table
+        self.fsfd = fsfd
+
+    def prepare(self):
+        """ This is called before the scanner is used.
+
+        Generally the constructor should be very brief (because it might be called to reset rather than to actually scan). And most work should be done in this method.
+        """
+
+    def destroy(self):
+        """ Final destructor called on the factory to finish the scan operation.
+
+        This is sometimes used to make indexes etc. 
+        """
+        pass
+
+    def reset(self):
+        """ This method drops the relevant tables in the database, restoring the db to the correct state for rescanning to take place. """
+        pass
+
+    ## Relative order of scanners - Higher numbers come later in the order
+    order=10
+    
     class Scan:
         """ This is the actual scanner class that will be instanitated once for each file in the filesystem.
 
@@ -51,9 +82,10 @@ class GenScanFactory:
         outer is a reference to the generator object that is used to instantiate these classes.
         
         Note that this is a nested class since it may only be instantiated by first instantiating a Factory object. """
-        def __init__(self, inode,outer,factories=None):
+        def __init__(self, inode,ddfs,outer,factories=None):
             self.inode = inode
             self.size = 0
+            self.ddfs = ddfs
 
         def process(self, data, metadata={}):
             """ process the chunk of data.
@@ -72,24 +104,6 @@ class GenScanFactory:
             """
             pass
 
-    def __init__(self,dbh, table):
-        """ do any initialisation tasks, such as creating tables.
-        """
-        pass
-
-    def destroy(self):
-        """ Final destructor called on the factory to finish the scan operation.
-
-        This is sometimes used to make indexes etc. 
-        """
-        pass
-
-    def reset(self):
-        """ This method drops the relevant tables in the database, restoring the db to the correct state for rescanning to take place. """
-        pass
-
-    ## Relative order of scanners - Higher numbers come later in the order
-    order=10
 
 class StoreAndScan:
     """ A Scanner designed to store a temporary copy of the scanned file to be able to invoke an external program on it.
@@ -180,7 +194,7 @@ def scanfile(ddfs,fd,factories):
 
             ## If there are not enough blocks to do a reasonable chunk of the file, we skip them as well...
             if c>0 and c*fd.block_size<fd.size:
-                print "Skipping inode %s because there are not enough blocks %s < %s" % (fd.inode,c*fd.block_size,fd.size)
+                logging.log(logging.WARNING,"Skipping inode %s because there are not enough blocks %s < %s" % (fd.inode,c*fd.block_size,fd.size))
                 return
 
         except AttributeError:

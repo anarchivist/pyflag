@@ -38,7 +38,7 @@ class VScan:
 
 class VirScan(GenScanFactory):
     """ Scan file for viruses """
-    def __init__(self,dbh, table):
+    def __init__(self,dbh, table,fsfd):
         dbh.execute(""" CREATE TABLE IF NOT EXISTS `virus_%s` (
         `inode` varchar( 20 ) NOT NULL,
         `virus` tinytext NOT NULL )""", table)
