@@ -10,10 +10,6 @@ from libole2 import OLEFile
 from format import *
 import sys,re
 
-fd=open(sys.argv[1],'r')
-data=fd.read()
-fd.close()
-
 prop_lookup = {
     '001A': 'Message class',
     '0037': 'Subject',
@@ -266,8 +262,13 @@ dispatch = {
     "SummaryInformation":parse_summary_info,
     }
 
-a=OLEFile(data)
-for p in a.properties:
-    for i in dispatch.keys():
-        if re.search(i,p['pps_rawname'].get_value()):
-            dispatch[i](p,a)
+if __name__ == "__main__":
+    fd=open(sys.argv[1],'r')
+    data=fd.read()
+    fd.close()
+
+    a=OLEFile(data)
+    for p in a.properties:
+        for i in dispatch.keys():
+            if re.search(i,p['pps_rawname'].get_value()):
+                dispatch[i](p,a)
