@@ -1,0 +1,29 @@
+=================================================
+Keyword Searching and Indexing of Forensic Images
+=================================================
+
+Introduction
+------------
+Keyword searching is a powerful technique during a forensic investigation. Often a particular key word is searched within the image to locate a region of interest within file, deleted files and slack space. This paper deals with the issue of indexing - the process of pre-calculating the location of keywords in advance of the search in order to speed up the search process. Indexing allows the time consuming task of keyword searching to be divided into an indexing phase which may run unattended and an interactive searching phase where the index is used to rapidly locate keywords.
+
+The most intuitive method for keyword searching is to provide a single keyword, and have the tool search for occurance of that keyword within a dataset such as a hard disk image. This is how the *grep* program works. To use an analogy we are searching for a *needle* (the keyword we search for) within the *heystack* (the disk image).
+
+Although this method is obvious it is very time consuming, since the searching engine needs to read all the data, and then search for the keyword within it. A better way is to index the data first - a process which can be done without user intervention, and then simply use the index to read the offsets of the keywords when asked.
+
+An index is in a sense simply a list of offsets for occurances of keywords. A number of indexing techniques are available, for example (FIXME: Find url here). However, when using the previous analogy the indexing engine must find the needle in a stack of other needles (i.e. keywords are data segments which are indistingishable from the rest of the image). Even worse, we do not tell the engine which needle we are interested in - This typically creates an index which is larger than the initial image, and takes a very long time to generate.
+
+Typically when indexing the entire image indiscrimantly, the tool tries to distinguish key words from random data in the image. A common technique is simply to index the result of running the image through the strings program - i.e. we assume that key words consist of sequences of 4 or more printable characters. This arbitrary restriction on the type of keywords which are indexed is required in order to limit the complexity and size of the index, however this very restriction breaks when considering keywords which are binary in nature. Such keywords may occur in foreign language systems using unicode for example, or when indexing for file headers.
+
+Although it may seem more convenient to index the entire image for all the possible keywords that may occur within it, it is extremely inefficient. Most investigators are unlikely to search for arbitrary sequences of printable characters which may appear within the image. Usually investigators have a list of words - a hit on these words signifies an area of interest.
+
+Index tools - PyFlag indexing component
+---------------------------------------
+PyFlag is an advanced forensic package which includes too many features to list here. This paper will concentrate on the *Index tools* - A command line tool, a C library and python bindings to perform extremely fast and efficient indexing. We first discuss how the index tools may be used as a stand alone utility, and then discuss how PyFlag utilises these tools.
+
+Terminology
+~~~~~~~~~~~
+We first introduce a number of definitions:
+
+ - *Words* are arbitrary byte sequences, which may contain unicode representations in foreign character sets.
+
+ - A *dictionary* is defined as a list of *words*. This list may exist in a flat file, one word per line(As required by the command line indextool), or may be stored in the PyFlag database permanently.
