@@ -52,9 +52,6 @@ class GTKServer(gtk.Window):
         def __init__(self, toolhbox):
             gtk.Notebook.__init__(self)
             self.toolhbox = toolhbox
-            self.cur_merge_id = None
-            self.cur_page = None
-            self.cur_action_grp = None
             self.toolbars = {}
             self.connect("switch-page", self.switch)
             
@@ -66,7 +63,6 @@ class GTKServer(gtk.Window):
             if self.toolbars.has_key(pagenum):
                 self.toolhbox.add(self.toolbars[pagenum])
             self.toolhbox.show_all()
-            self.cur_page = pagenum
 
         def close_tab(self, action=None, page=None):
             """ close current tab """
@@ -141,12 +137,13 @@ class GTKServer(gtk.Window):
         self.add(self.vbox)
         self.vbox.pack_start(self.menubar, False)
         
-        # but the toolbar in a HBox with a case selector
-        #combobox = self.case_selector()
-        #self.hbox.pack_start(combobox, False)
-        #hbox.pack_start(self.toolbar)
+        # put the toolbar in a HBox with a case selector
+        hbox = gtk.HBox()
+        combobox = self.case_selector()
+        hbox.pack_start(combobox, False)
+        hbox.pack_start(self.toolhbox)
 
-        self.vbox.pack_start(self.toolhbox, False)
+        self.vbox.pack_start(hbox, False)
         self.vbox.pack_start(self.notebook)
         self.vbox.pack_end(self.statusbar, False)
                 
@@ -295,36 +292,12 @@ class GTKServer(gtk.Window):
                              ('Contents', gtk.STOCK_HELP, '_Contents'),
                              ('About', gtk.STOCK_DIALOG_INFO, '_About')])
         ui += '</menubar>\n'
-        # Add the Navigation Toolbar
-        #ui += """<toolbar name="Toolbar">
-        #           <toolitem action="Prev Page"/>
-        #           <toolitem action="Next Page"/>
-        #           <separator/>
-        #           <placeholder name="ReportTools">
-        #           </placeholder>
-        #           <separator/>
-        #           <toolitem action="Close Tab"/>
-        #           <separator/>
-        #         </toolbar>"""
-        #actions.add_actions([('Prev Page', gtk.STOCK_GO_BACK, '_Prev Page', 
-        #                        None, 'Navigate to Previous Page', self.execute_report_cb),
-        #                     ('Next Page', gtk.STOCK_GO_FORWARD, '_Next Page', 
-        #                        None, 'Navigate to Next Page', self.execute_report_cb),
-        #                     ('Close Tab', gtk.STOCK_CLOSE, '_Close Tab', 
-        #                        None, 'Close current Tab', self.notebook.close_tab)])
 
         # Add the actions to the uimanager
         self.uimanager.insert_action_group(actions, 0)
 
         # Add a UI description
-        #print ui
         self.uimanager.add_ui_from_string(ui)
-
-        # gray out the nav buttons for now
-        #button = self.uimanager.get_widget('/Toolbar/Next Page')
-        #button.set_sensitive(gtk.FALSE)
-        #button = self.uimanager.get_widget('/Toolbar/Prev Page')
-        #button.set_sensitive(gtk.FALSE)
 
 ### BEGIN MAIN ####
 

@@ -756,14 +756,13 @@ class GTKUI(UI.GenericUI):
         """ wrapper function to satisfy clicked signal callback prototype """
         self.link_callback(query)
 
-    def toolbar(self, cb, text, icon=None, popup=True, tooltip=None):
+    def toolbar(self, cb, text, icon=None, popup=True, tooltip=None, stock=None):
         """ Add an item to the toolbar
         cb may be a query item rather than a callback
         in which case the query is run by flag and the results displayed in the pane"""
         ## FIXME: maby have a icon set or factory or whatever
         ## so that we can just use stock id's here, then scaling etc will
         ## be done nicely by gtk for us.
-        ## FIXME: expand API to have short name + tooltip text
 
         args = None
         if isinstance(cb, FlagFramework.query_type):
@@ -775,7 +774,12 @@ class GTKUI(UI.GenericUI):
             i = gtk.Image()
             i.set_from_file('%s/%s' % (config.IMAGEDIR, icon))
             i.show()
-        button = gtk.ToolButton(icon_widget=i, label=text)
+            button = gtk.ToolButton(icon_widget=i, label=text)
+        elif stock:
+            button = gtk.ToolButton(stock)
+        else:
+            button = gtk.ToolButton(icon_widget=None, label=text)
+            
         if args:
             button.connect('clicked',cb,args)
         else:
@@ -862,16 +866,13 @@ class GTKUI(UI.GenericUI):
             self.right_button.set_data('query',q)
             self.left_button.set_data('query',q)
 
-        ## Create buttons for navigation: FIXME: This code should really be in the application window's toolbar, and be global for the entire app.
-        #if not self.nav_query:
-        #    q = self.defaults.clone()          
-        #    q['__target__']='limit'
-
         def previous_cb(widget):
             del self.defaults['limit']
             self.defaults['limit']=self.previous
             self.previous-=config.PAGESIZE
-            if self.previous<0: self.previous=0
+            if self.previous<0:
+                self.previous=0
+                #widget.set_sensitive(gtk.FALSE)
 
             ## Get new SQL iterator:
             generator,new_query = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks)
@@ -888,8 +889,8 @@ class GTKUI(UI.GenericUI):
             self.defaults=new_query
             populate_store(store,generator,names)
             
-        self.toolbar(previous_cb,"Prev Page",icon=gtk.STOCK_GO_BACK,tooltip="Go to next page",popup=False)
-        self.toolbar(next_cb,"Next Page",icon=gtk.STOCK_GO_FORWARD,tooltip="Go to Previous page",popup=False)
+        self.toolbar(previous_cb,"Prev Page",stock=gtk.STOCK_GO_BACK,tooltip="Go to next page",popup=False)
+        self.toolbar(next_cb,"Next Page",stock=gtk.STOCK_GO_FORWARD,tooltip="Go to Previous page",popup=False)
         self.row(treeview)
 
         ## Create a group by selector
