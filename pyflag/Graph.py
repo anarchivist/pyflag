@@ -8,7 +8,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG 0.4 (12-02-2004)
+#  Version: FLAG $Version: FLAG 0.4 (12-02-2004)$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -32,6 +32,7 @@ The Abstract base class must be extended for implementation of graph drawing. Re
 
 import pyflag.conf
 config=pyflag.conf.ConfObject()
+import re
 
 import os,pipes
 
@@ -267,10 +268,28 @@ class Thumbnailer(Image):
         except IOError:
             result=self.Extract_size(1000000)
 
+        r='1/1'
+        #Try to determine the best ratio - we want the thumbnail to be about 300 pixels wide:
+        if self.width:
+            print "Image width is %s we need 300" % self.width
+            self.ratio=300.0/int(self.width)
+            print "We need ratio %s" % self.ratio
+            possible_ratios = {1:'1/1',0.5:'1/2',0.25:'1/4',0.125:'1/8'}
+            fractions=possible_ratios.keys()
+            fractions.sort()
+            r=1
+            for i in range(len(fractions)):
+                if i>0 and fractions[i]>self.ratio:
+                    r=fractions[i-1]
+                    break
+
+            r=possible_ratios[r]
+            print "my ratio is %s" % r
+
         #If the file is not there, make it.
         try:
             t = pipes.Template()
-            t.append("%s/djpeg -scale 1/2" % config.FLAG_BIN,'--')
+            t.append("%s/djpeg -scale %s" % (config.FLAG_BIN,r),'--')
             t.append("%s/cjpeg" % config.FLAG_BIN,'--')
             writer = t.open("%s/%s/%s.jpg" % (config.RESULTDIR,self.tempdir,self.temp_name),'w')
             writer.write(result)
@@ -308,6 +327,11 @@ class Thumbnailer(Image):
         """ A do nothing constructor. Derived classes will want to extend this as they see fit. """
         self.tempdir=tempdir
         self.temp_name=temp_name
+        ## This will hold the output from identify
+        self.identify=""
+        self.width=0
+        self.height=0
+        self.ratio=1
  
     def display(self):
         generator=self.Extract()
@@ -326,6 +350,20 @@ class Thumbnailer(Image):
         self.content_type=magic.buffer(self.data)
         magic=FlagFramework.Magic()
         self.magic=magic.buffer(self.data)
+        try:
+            p_in,p_out = os.popen2("identify -")
+            p_in.write(self.data)
+            p_in.close()
+        
+            self.identify=p_out.read()
+            
+            ## Try to identify the size of the image
+            print "Identify string is %s" % self.identify
+            m=re.search("(\d+)x(\d+)",self.identify)
+            self.width=int(m.group(1))
+            self.height=int(m.group(2))
+        except:
+            pass
 
         ## Use the content type to access the thumbnail
         try:

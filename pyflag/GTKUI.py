@@ -43,6 +43,7 @@ import pyflag.UI as UI
 config=pyflag.conf.ConfObject()
 import gtk,gobject,pango,gtk.gdk
 import pyflag.Registry as Registry
+import re
 
 #config.LOG_LEVEL=7
 
@@ -284,7 +285,6 @@ class GTKUI(UI.GenericUI):
             if isinstance(col,self.__class__):
                 col=col.display()
             elif not isinstance(col,gtk.Widget):
-                print "Creating a Widget"
                 l = gtk.Label("%s" % col)
                 l.set_justify(gtk.JUSTIFY_LEFT)
                 l.set_line_wrap(True)
@@ -1227,13 +1227,8 @@ class GTKUI(UI.GenericUI):
     def image(self,image,**options):
         """ Draw the image inside this GTKUI """
         pixbuf_loader=gtk.gdk.PixbufLoader()
-##        if options.has_key('width'):
-##            def calculate_size(widget,width,height):
-##                pixbuf_loader.set_size(options['width'],options['width']/width*height)
-
-##            pixbuf_loader.connect("size-prepared",calculate_size)
-        pixbuf_loader.set_size(200,300)
-        pixbuf_loader.write(image.display())
+        data=image.display()
+        pixbuf_loader.write(data)
         pixbuf_loader.close()
         pixbuf=pixbuf_loader.get_pixbuf()
         pix = gtk.Image()
