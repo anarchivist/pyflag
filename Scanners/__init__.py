@@ -66,6 +66,7 @@ class StoreAndScan:
         self.table=table
         self.dbh=dbh
         self.ddfs=ddfs
+        self.factories=factories
 
     def boring(self,metadata):
         """ This function decides if this file is boring (i.e. we should ignore it).
