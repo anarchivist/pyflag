@@ -1,7 +1,13 @@
 #!/usr/bin/python2.3
 """ An interactive shell for examining file systems loaded into flag """
+try:
+    import readline
 
-import readline,sys
+    readline.parse_and_bind("tab: complete")
+except ImportError:
+    pass
+
+import sys
 import pyflag.DB as DB
 import pyflag.IO as IO
 import shlex,os,os.path,re,fnmatch
@@ -12,8 +18,6 @@ import pyflag.Registry as Registry
 
 ## Make sure the registry is properly initialised
 #Registry.Init()
-
-readline.parse_and_bind("tab: complete")
 
 class ParserException(Exception):
     """ Exception thrown by the parser when we cant parse the line """
