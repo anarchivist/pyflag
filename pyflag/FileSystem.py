@@ -537,6 +537,13 @@ class Zip_file(File):
     
     def __init__(self, case, table, fd, inode):
         File.__init__(self, case, table, fd, inode)
+        tmp1=open('/tmp/test.zip','w')
+        tmp1.write(fd.read())
+        tmp1.close()
+        tmp1=open('/tmp/test.zip','r')
+        tmp1.seek(0)
+        fd.seek(0)
+
         # strategy:
         # inode is the index into the namelist of the zip file (i hope this is consistant!!)
         # just read that file!

@@ -9,7 +9,7 @@ import re
 class Pstfile:
     """ higher level shadow class for libpst
     impliments an filesystem-like interface into pst files
-    for use in flag """
+    for use in pyflag """
 
     class Item:
         """ Base class to represent pst items (email, contact, journal, appointment, folder)
@@ -26,6 +26,8 @@ class Pstfile:
             pypst._pst_freeItem(self._item)
 
         def __del__(self):
+            """ Object destructor, frees memory in the C module
+            I hope we can rely on this, it does seem to get called appropriately """
             if self._item:
                 self.free()
 
@@ -105,7 +107,6 @@ class Pstfile:
                 #fd = open('/tmp/attachment_%s' % a.filename1, 'w')
                 #fd.write(a.data)
                 #fd.close()
-                #retstr += a.data
 
             return retstr
 
@@ -145,8 +146,11 @@ class Pstfile:
             raise IOError, "Pstfile: Can't load index"
         if self.pst.load_extended_attributes() == -1:
             raise IOError, "Pstfile: Can't load extended attributes"
-        ptr = self.pst.getTopOfFolders(self.pst.get_item(self.pst.d_head))
+        item = self.pst.get_item(self.pst.d_head)
+        ptr = self.pst.getTopOfFolders(item)
         self.rootid = ptr.id
+        self.name = item.file_as
+        pypst._pst_freeItem(item)
 
     def close(self):
         """ close pst file """
@@ -155,7 +159,7 @@ class Pstfile:
     def walk(self, id, topdown=True):
         """ emulate the os.walk directory tree generator, uses item ids, NOT strings """
         if not id:
-            print "WTF happened"
+            print "WTF happened?"
 
         dirs, nondirs = self.listitems(id)
                 
@@ -164,6 +168,44 @@ class Pstfile:
 
         for mydir in dirs:
             for x in self.walk(mydir, topdown):
+                yield x
+
+        if not topdown:
+            yield id, dirs, nondirs
+
+    def walk2(self, id, topdown=True):
+        """ emulate the os.walk directory tree generator
+        It has some peculiarities: The input arg is an (id, path) 2-tuple, where path
+        can be empty in which case the results will be rooted there (it becomes ('/')).
+        It yields a three-tuple (path, dirs, non-dirs) where each of these is itself
+        a two-tuple (id, path) (for path) or list of two-tuples (for dirs, non-dirs).
+        This makes sense at the moment, but it is late...
+        The reason is that it is difficult/expensive to optain a path from an id and vice-versa
+        Therefore we will do both here since we're retrieving items anyway, and you wont have to
+        do any further lookups with the result.
+        The names or nondirs are of the form Class:id eg. Email:123456, Contact:654321 etc
+        @arg id: a two-tuple (id, path) where path may be an empty string or None
+        @arg topdown: specifies the output order, default True"""
+
+        def pjoin(a, b):
+            if a.endswith('/'):
+                a = a[:-1]
+            if b.startswith('/'):
+                b = b[1:]
+            return "%s/%s" % (a, b)
+
+        if not id[1]:
+            id = (id[0], '/')
+
+        dirs, nondirs = self.listitems2(id)
+                
+        if topdown:
+            yield id, dirs, nondirs
+
+        for mydir in dirs:
+            tmp = (mydir[0], pjoin(id[1], mydir[1]))
+            #tmp = (mydir[0], "%s/%s" % (id[1], mydir[1]))
+            for x in self.walk2(tmp, topdown):
                 yield x
 
         if not topdown:
@@ -191,6 +233,21 @@ class Pstfile:
             ptr = ptr.next
         return (tuple(dirs), tuple(nondirs))
     
+    def listitems2(self, id):
+        """ return a tuple of lists of tuples(!!!) (dirs, nondirs) of all the items in this folder """
+        dirs, nondirs = [], []
+        ptr = self.pst.get_ptr(id[0])
+        ptr = ptr.child
+        while(ptr):
+            item = self.getitem(ptr.id)
+            if item:
+                if isinstance(item, Pstfile.Folder):
+                    dirs.append((ptr.id, item.file_as))
+                else:
+                    nondirs.append((ptr.id, "%s:%i" % (item.__class__.__name__,ptr.id)))
+            ptr = ptr.next
+        return (dirs, nondirs)
+
     def getitem(self, id):
         """ item dispatcher, returns an allocated item (consumes memory) """
         ptr = self.pst.get_ptr(id)
