@@ -65,6 +65,7 @@ class BrowseFS(Reports.report):
     """ Report to browse the filesystem"""
     parameters = {'fsimage':'fsimage'}
     hidden = False
+    order=5
     name = "Browse Filesystem"
     family = "Disk Forensics"
     description = "Display filesystem in a browsable format"

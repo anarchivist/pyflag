@@ -3,7 +3,7 @@ This feature complements the PST virtual filesystem driver to ensure that pst fi
 """
 import os.path
 import pyflag.logging as logging
-from Scanners import *
+from pyflag.Scanner import *
 import pypst2
 
 class PstScan(GenScanFactory):

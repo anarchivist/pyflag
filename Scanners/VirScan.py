@@ -6,7 +6,7 @@ import pyflag.FileSystem as FileSystem
 import pyflag.DB as DB
 import os.path
 import pyflag.logging as logging
-from Scanners import *
+from pyflag.Scanner import *
 
 import clamav
 

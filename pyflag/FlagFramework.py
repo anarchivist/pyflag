@@ -37,15 +37,11 @@ config=pyflag.conf.ConfObject()
 import magic
 import pyflag.logging as logging
 import index
+import pyflag.Registry as Registry
 
 class FlagException(Exception):
     """ Generic Flag Exception """
     pass
-
-class DispatchError(FlagException):
-    """ Errors invoked from the Dispatcher. This is only used for fatal errors stopping the dispatcher """
-    pass
-
 
 class query_type:
     """ A generic wrapper for holding CGI parameters.
@@ -229,7 +225,6 @@ class Flag:
     This object is responsible with maintaining configuration data, dispatching reports and processing queries.
     
     """
-    dispatch = ''
     def __init__(self,ui=None):
         import pyflag.HTMLUI as UI
 
@@ -249,9 +244,10 @@ class Flag:
             plugins.extend(sys.modules['pyflag.plugins'].__path__)
         except ImportError:
             pass
-                
-        self.dispatch = module_dispatcher(plugins,self,ui=ui)
 
+        ## Initialise the registry:
+        Registry.Init()
+                
     def canonicalise(self,query):
         """ Converts the query into the canonical form.
 
@@ -259,7 +255,7 @@ class Flag:
         if not query['report'] or not query['family']:
             raise FlagException,"No report or family in canonicalise query"
 
-        report = self.dispatch.get(query['family'],query['report'])
+        report = Registry.REPORTS.dispatch(query['family'],query['report'])
 
         tmp = []
         for x,y in query:
@@ -357,8 +353,11 @@ class Flag:
         
         #Check to see if the report is valid:
         try:
-            report = self.dispatch.get(query['family'],query['report'])
-        except DispatchError,e:
+            report = Registry.REPORTS.dispatch(query['family'],query['report'])
+            ## Instantiate the report:
+            report = report(self,ui=self.ui)
+            
+        except (IndexError):
             result.heading("Report Or family not recognized")
             result.para("It is possible that the appropriate module is not installed.")
             return result
@@ -484,111 +483,7 @@ class Flag:
         ## Now check that we can create a database connection: FIXME
         self.checked=1
         return 0
-        
-
-class module_dispatcher:
-    """ Generic class to manage access to report objects obtained from plugins. """
-    family = {}
-    modules = {}
-
-    def get(self,family,name):
-        """ Resolves the report named by family/name pair """
-        try:
-            return self.family[family][name]
-        except KeyError,e:
-            print self.family
-            raise DispatchError, e
-
-    def __init__(self,plugins,flag,ui=None):
-        """ Searchs plugin directory and loads the modules into the program.
-
-        Classes which are derived from report are loaded into the dispatcher and sorted into family/name combination in the self.family data structure. If we get error in certain modules we ignore those modules or reports and keep going after printing a warning to stdout.
-        """
-        import os,imp
-        for plugin in plugins:
-            for dirpath, dirnames, filenames in os.walk(plugin):
-                for filename in filenames:
-                    #Lose the extension for the module name
-                    module_name = filename[:-3]
-                    if filename.endswith(".py"):
-                        logging.log(logging.DEBUG,"Will attempt to load plugin '%s/%s'" % (dirpath,filename))
-                        try:
-                            try:
-                                #open the plugin file
-                                fd = open(dirpath+'/'+filename ,"r")
-                            except Exception,e:
-                                logging.log(logging.DEBUG, "Unable to open plugin file '%s': %s" % (filename,e))
-                                continue
-
-                            import imp
-
-                            #load the module into our namespace
-                            try:
-                                module = imp.load_source(module_name,dirpath+'/'+filename,fd)
-                            except Exception,e:
-                                logging.log(logging.ERRORS, "*** Unable to load module %s: %s" % (module_name,e))
-                                continue
-
-                            fd.close()
-
-                            #Is this module active?
-                            try:
-                                if module.hidden: continue
-                            except AttributeError:
-                                pass
-
-                            #find the module description
-                            try:
-                                module_desc = module.description
-                            except AttributeError:
-                                module_desc = module_name
-
-                            module_desc=module_name
-                            ## Do we already have this module?
-                            if self.modules.has_key(module_desc):
-                                logging.log(logging.WARNINGS, "Module %s is already loaded, skipping...." % module_desc)
-                                continue
-
-                            #Now we enumerate all the classes in the module to see which one is a report class
-                            for cls in dir(module):
-                                #We check to see if each class is derived from the report class
-                                try:
-                                    import pyflag.Reports as Reports
-
-                                    if issubclass(module.__dict__[cls],Reports.report):
-                                        #If it is we instantiate it and store it in the dispatcher
-                                        new_report = module.__dict__[cls](flag,ui=ui)
-                                        new_report.conf = conf
-
-                                        #here we check to see if the new report has all the methods we need. TBYL :
-                                        try:
-                                            new_report.display, new_report.analyse, new_report.progress, new_report.form, new_report.name, new_report.parameters
-                                        except AttributeError,e:
-                                            err = "Failed to load report '%s': %s" % (cls,e)
-                                            logging.log(logging.WARNINGS, err)
-                                            continue
-
-                                        if not self.family.has_key(module_desc):
-                                            self.family[module_desc] = {}
-                                            logging.log(logging.DEBUG, "Added new family '%s' in module '%s.py'" % (module_desc,module_name))
-
-                                        self.family[module_desc][cls] = new_report
-
-                                        try:
-                                            self.modules[module_desc] = module.order
-                                        except AttributeError:
-                                            self.modules[module_desc] = 0
-
-                                        logging.log(logging.DEBUG, "Added report '%s:%s'" % (module_desc,cls))
-
-                                # Oops: it isnt a class...
-                                except (TypeError, NameError) , e:
-                                    continue
-
-                        except TypeError, e:
-                            logging.log(logging.ERRORS, "Could not compile module %s: %s" % (module_name,e))
-                            continue
-        
+                
 class HexDump:
     """ Class manages displaying arbitrary data as hex dump.
 
@@ -726,9 +621,8 @@ def reset_all(**query):
     Callers need to provide at least a report name, case and a family or an exception is raised.
     """
     flag = GLOBAL_FLAG_OBJ
-    report = flag.dispatch.get(query['family'],query['report'])
+    report =Registry.REPORTS.dispatch(query['family'],query['report'])
     dbh=DB.DBO(query['case'])
-    print query
     dbh.execute("select value from meta where property='report_executed' and value like 'family=%s%%'" % query['family'])
     for row in dbh:
         import cgi

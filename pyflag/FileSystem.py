@@ -54,6 +54,7 @@ import math
 import bisect
 import zipfile
 import cStringIO
+import pyflag.Scanner as Scanner
 
 class FileSystem:
     """ This is the base class for accessing file systems in PyFlag. This class is abstract and is here purely for documentation purposes """
@@ -185,25 +186,7 @@ class DBFS(FileSystem):
             if not res:
                 return None
             return res["path"]
-    
-#    def open(self, path=None, inode=None):
-#        if not inode:
-#            inode = self.lookup(path)
-#        if not inode:
-#            raise IOError('Inode not found for file')
-#
-#        ## Find out which handler is required for this file:
-#        try:
-#            ## If the inode is special it is of the form inode - type - descriptor. type is Z for zips
-#            temp = inode.split('|')
-#            if temp[-2] == 'Z':
-#                file=DBFS_file(self.case,self.table,self.fd,temp[0])
-#                return Zip_file(self.case,self.table,file,'|'.join(temp[:-2]),temp[-1])
-#        except IndexError:
-#            pass
-#
-#        return DBFS_file(self.case, self.table, self.fd, inode)
-
+        
     def istat(self, path=None, inode=None):
         if not inode:
             inode = self.lookup(path)
@@ -231,49 +214,6 @@ class DBFS(FileSystem):
         else:
             return 0
 
-    def scanfile(self,fd,factories,inode):
-        """ Given a file object and a list of factories, this function scans this file using the given factories """
-        buffsize = 1024 * 1024
-        # instantiate a scanner object from each of the factory
-        objs = [c.Scan(inode,self,c,factories=factories) for c in factories]
-        # read data (in chunks)
-        while 1:
-            ## This dict stores metadata about the file which may be filled in by some scanners in order to indicate some fact to other scanners.
-            metadata = {}
-            ## If the file is too fragmented, we skip it because it might take too long... NTFS is a shocking filesystem, with some files so fragmented that it takes a really long time to read them. In our experience these files are not important for scanning so we disable them here. Maybe this should be tunable?
-            try:
-                if len(fd.blocks)>1000 or fd.size>100000000:
-                    return
-
-                c=0
-                for i in fd.blocks:
-                    c+=i[1]
-
-                ## If there are not enough blocks to do a reasonable chunk of the file, we skip them as well...
-                if c>0 and c*fd.block_size<fd.size:
-                    print "Skipping inode %s because there are not enough blocks %s < %s" % (fd.inode,c*fd.block_size,fd.size)
-                    return
-                
-            except AttributeError:
-                pass
-            
-            try:
-                data = fd.read(buffsize)
-                if not data: break
-            except IOError:
-                break
-            # call process method of each class
-            for o in objs:
-                try:
-                    o.process(data,metadata=metadata)
-                except Exception,e:
-                    logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
-
-        fd.close()
-        # call finish object of each method
-        for o in objs:
-                o.finish()
-
     def scanfs(self, scanners, action=None):
         dbh2 = DB.DBO(self.case)
         dbh3=DB.DBO(self.case)
@@ -300,7 +240,7 @@ class DBFS(FileSystem):
                 
             try:
                 fd = self.open(inode=row['inode'])
-                self.scanfile(fd,factories,row['inode'])
+                Scanner.scanfile(self,fd,factories)
             except Exception,e:
                 logging.log(logging.ERRORS,"%r: %s" % (e,e))
                 continue

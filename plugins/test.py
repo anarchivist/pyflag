@@ -30,7 +30,6 @@
 """ An example of a test plugin """
 
 import pyflag.Reports as Reports
-import pyflag.FlagFramework as FlagFramework
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 

@@ -7,9 +7,9 @@ import pyflag.FileSystem as FileSystem
 import pyflag.DB as DB
 import os.path
 import pyflag.logging as logging
-from Scanners import *
+import pyflag.Scanner as Scanner
 
-class TypeScan(GenScanFactory):
+class TypeScan(Scanner.GenScanFactory):
     """ scan file and record file type (magic)
 
     In addition to recording the file type, this class can also perform

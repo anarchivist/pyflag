@@ -4,11 +4,11 @@ We use the files's magic to trigger this scanner off - so its imperative that th
 """
 import os.path
 import pyflag.logging as logging
-from Scanners import *
+import pyflag.Scanner as Scanner
 
 ## raise Exception("This module not finished yet")
 
-class IEIndex(GenScanFactory):
+class IEIndex(Scanner.GenScanFactory):
     """ Load in IE History files """
     def __init__(self,dbh, table):
         self.dbh=dbh
@@ -21,7 +21,7 @@ class IEIndex(GenScanFactory):
     def destroy(self):
         self.dbh.execute('ALTER TABLE history_%s ADD INDEX(url(10))', self.table)
 
-    class Scan(StoreAndScan):
+    class Scan(Scanner.StoreAndScan):
         def boring(self,metadata):
             if metadata['mime']=='application/x-ie-index':
                 return False

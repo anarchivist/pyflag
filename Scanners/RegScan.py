@@ -4,7 +4,7 @@ We use the files's magic to trigger this scanner off - so its imperative that th
 """
 import os.path
 import pyflag.logging as logging
-from Scanners import *
+from pyflag.Scanner import *
 
 class RegistryScan(GenScanFactory):
     """ Load in Windows Registry files """

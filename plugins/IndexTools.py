@@ -274,7 +274,7 @@ class SearchIndex(IndexImage):
                     right.text(data[prior:prior+len(word)],color='red',sanitise='full',font='typewriter')
                     right.text(data[prior+len(word):],color='black',sanitise='full',font='typewriter')
                     left=self.ui()
-                    left.link(offset,case=query['case'],iosource=query['iosource'],family="UnstructuredDisk",report="BrowseDiskSector",limit=offset-prior)
+                    left.link(offset,case=query['case'],iosource=query['iosource'],family="Unstructured Disk",report="BrowseDiskSector",limit=offset-prior)
                     
                     output.row(left,right)
 

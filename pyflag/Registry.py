@@ -12,7 +12,6 @@ classes in the same plugin and have them all automatically loaded.
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import os,sys,imp
-import pyflag.Reports as Reports
 import pyflag.logging as logging
 
 class Registry:
@@ -29,6 +28,13 @@ class Registry:
         
         These will be considered as implementations and added to our internal registry.
         """
+        ## Create instance variables
+        self.modules = []
+        self.module_desc = []
+        self.classes = []
+        self.class_names = []
+        self.order = []
+        
         ## Recurse over all the plugin directories recursively
         for path in config.PLUGINS.split(':'):
             for dirpath, dirnames, filenames in os.walk(path):
@@ -82,9 +88,8 @@ class Registry:
                             #module to see which one is a ParentClass:
                             for cls in dir(module):
                                 try:
-                                    if issubclass(module.__dict__[cls],ParentClass):
-                                        Class = module.__dict__[cls]
-
+                                    Class = module.__dict__[cls]
+                                    if issubclass(Class,ParentClass) and Class!=ParentClass:
                                         ## Check the class for consitency
                                         try:
                                             self.check_class(Class)
@@ -134,7 +139,33 @@ class ReportRegistry(Registry):
                 self.family[cls.family].append(cls)
             except KeyError:
                 self.family[cls.family]=[cls]
+
+        ## Sort all reports in all families:
+        def sort_function(x,y):
+            a=x.order
+            b=y.order
+            if a<b:
+                return -1
+            elif a==b: return 0
+            return 1
         
+        for family in self.family.keys():
+            self.family[family].sort(sort_function)
+
+
+    def dispatch(self,family,report):
+        """ Returns the report object referenced by family and report
+
+        For backward compatibility we allow report to be the classes name or the report.name attatibute.
+        """
+        ## Find the requested report in the registry:
+        f = self.family[family]
+        result= [ i for i in f if i.name==report]
+        if not result:
+            result= [ i for i in f if report == ("%s" % i).split('.')[-1]]
+
+        return result[0]
+    
     def check_class(self,Class):
         Class.display
         Class.analyse
@@ -143,6 +174,42 @@ class ReportRegistry(Registry):
         Class.name
         Class.parameters
 
-REPORTS = ReportRegistry(Reports.report)
+class ScannerRegistry(Registry):
+    """ A class to register Scanners. """
+    def __init__(self,ParentClass):
+        Registry.__init__(self,ParentClass)
+        ## Sort all reports in all families:
+        def sort_function(x,y):
+            a=x.order
+            b=y.order
+            if a<b:
+                return -1
+            elif a==b: return 0
+            return 1
 
-print REPORTS.family
+        self.classes.sort(sort_function)
+        self.scanners = [ ("%s" % i).split(".")[-1] for i in self.classes ]
+
+    def dispatch(self,scanner_name):
+        return self.classes[self.scanners.index(scanner_name)]
+
+REPORTS = None
+SCANNERS = None
+
+## This is required for late initialisation to avoid dependency nightmare.
+def Init():
+    ## Do the reports here
+    import pyflag.Reports as Reports
+    global REPORTS
+    
+    REPORTS=ReportRegistry(Reports.report)
+
+    ## Now do the scanners
+    print "Importing scanners now:"
+    import pyflag.Scanner as Scanner
+    global SCANNERS
+    SCANNERS = ScannerRegistry(Scanner.GenScanFactory)
+
+    print "Scanners are %s" % SCANNERS.scanners
+    print "Scanners are %s" % SCANNERS.classes
+    

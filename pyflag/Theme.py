@@ -32,6 +32,7 @@
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.FlagFramework as FlagFramework
+import pyflag.Registry as Registry
 
 class BasicTheme:
     """ Basic default theme """
@@ -46,28 +47,6 @@ class BasicTheme:
         <tr>
         <td align=left width=10><img src="/flag/images/flag.png" alt="flag_heading" border="0"></td><td align=center> ''' % FlagFramework.flag_version
 
-    def list_modules(self,flag):
-        """ Lists the modules taking their order into account """
-        def module_cmp(a,b):
-            """ Sort function for modules """
-            return cmp(a[1],b[1])
-
-        #Produce the module list
-        module_list = flag.dispatch.modules.items()
-        module_list.sort(module_cmp)
-        return [ k for k,v in module_list ]
-
-    def list_reports(self,flag,family):
-        """ Lists all reports in a given module with regard to the order of the reports """
-        def report_cmp(a,b):
-            """ Sort comparator. a,b are reports """
-            return cmp(a[1].order,b[1].order)
-
-        report_list = flag.dispatch.family[family].items()
-        report_list.sort(report_cmp)
-        report_list = [ (k,v) for k,v in report_list if not v.hidden ]
-        return report_list
-
     def menu(self,flag,query):
         """ Draws the menu for the current family.
 
@@ -78,31 +57,26 @@ class BasicTheme:
         family_block = flag.ui()
         family_block.start_table()
 
-        module_list = self.list_modules(flag)
+        module_list = Registry.REPORTS.family.keys()
         
-        for k in module_list:
-            ## Dont list modules with no reports in them.
-            r = flag.dispatch.family[k].items()
-            r = [ 1 for kk,v in r if not v.hidden ]
-            if len(r)==0: continue
+        for m in module_list:
             link = flag.ui()
-            link.link(k,family=k)
+            link.link(m,family=m)
             family_block.row(link)
             
         report_block = flag.ui()
-
         if family:
             report_block.start_table()
-            report_list = self.list_reports(flag,family)
-            for k,v in report_list:
+            report_list = Registry.REPORTS.family[family]
+            for r in report_list:
                 link = flag.ui()
-                link.link(v.name,case=query['case'],family=family,report=k)
+                link.link(r.name,case=query['case'],family=family,report=r.name)
 
                 #Add the module doc as a tooltip
-                link.tooltip(v.__doc__)
+                link.tooltip(r.__doc__)
 
                 report_block.row(link,colspan=2)
-                report_block.row(" ",v.description)
+                report_block.row(" ",r.description)
 
         result = flag.ui()
         result.heading("Flag Main Menu")

@@ -17,7 +17,7 @@ Note that if a single file is larger than the blocksize, we have multiple entrie
 """
 import pyflag.logging as logging
 import pyflag.FlagFramework as FlagFramework
-from Scanners import *
+from pyflag.Scanner import *
 import index,os
 import pyflag.conf
 config=pyflag.conf.ConfObject()
@@ -62,7 +62,7 @@ class Index(GenScanFactory):
         
         self.dbh.execute("drop table if exists `LogicalIndex_%s`",(self.table))
         ## Here we reset all reports that searched this disk
-        FlagFramework.reset_all(case=self.dbh.case,report='SearchIndex', family='DiskForensics')
+        FlagFramework.reset_all(case=self.dbh.case,report='SearchIndex', family='Disk Forensics')
         self.dbh.execute("drop table if exists `LogicalKeyword_%s`",(self.table))
 
     def destroy(self):

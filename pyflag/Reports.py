@@ -28,10 +28,10 @@
 
 """ Module defines base classes for reports and various classes used to manage them """
 
-import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
+import pyflag.Registry as Registry
 
-class ReportError(FlagFramework.FlagException):
+class ReportError(Exception):
     """ Base class for errors in reports """
     pass
 
@@ -116,8 +116,9 @@ class report:
         First a query string is constructed using the named parameters in params. These parameters should be as though the target report was called with those parameters.
         Next the reset method of the report is called and then the meta tables are adjusted accordingly. Derived classes probably do not need to override this method, although they may need to call it so that they can reset other reports """
         #Get a handle to the target report
-        report = self.flag.dispatch.get(query['family'],query['report'])
-
+        report = Registry.REPORTS.dispatch(query['family'],query['report'])
+        report = report(self.flag)
+        
         #Get the canonicalised string relative to the target report:
         canonical_query = self.flag.canonicalise(query)
 
@@ -146,7 +147,7 @@ class report:
         else:
             #Are we currently executing the report?
 #            result = self.flag.check_progress(report,query)
-            self.flag.run_analysis(self.flag.dispatch.get(query['family'],query['report']),query)
+            self.flag.run_analysis(Registry.REPORTS.dispatch(query['family'],query['report']),query)
 
             return
 

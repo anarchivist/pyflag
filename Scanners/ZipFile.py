@@ -4,7 +4,7 @@ This feature complements the ZIP filesystem driver to ensure that zip files are 
 """
 import os.path
 import pyflag.logging as logging
-from Scanners import *
+from pyflag.Scanner import *
 import zipfile,gzip
 
 class ZipScan(GenScanFactory):

@@ -30,6 +30,7 @@
 """ Main HTTP server module """
 
 import SimpleHTTPServer
+import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
 import pyflag.HTMLUI as UI
 import pyflag.TypeCheck as TypeCheck

@@ -33,6 +33,7 @@ import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
 import pyflag.FileSystem as FileSystem
 import pyflag.Scanner as Scanner
+import pyflag.Registry as Registry
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
@@ -57,7 +58,7 @@ class LoadPresetLog(Reports.report):
         result.para("Successfully uploaded the following files into case %s, table %s:" % (query['case'],query['table']))
         for fn in query.getarray('datafile'):
             result.para(fn)
-        result.link("Browse this log file", FlagFramework.query_type((), case=query['case'], family="LogAnalysis", report="ListLogFile", logtable="%s"%query['table']))
+        result.link("Browse this log file", FlagFramework.query_type((), case=query['case'], family="Log Analysis", report="ListLogFile", logtable="%s"%query['table']))
         return result
     
     def progress(self,query,result):
@@ -254,9 +255,9 @@ class LoadIOSource(Reports.report):
 
     def display(self,query,result):
         result.heading("Data Source %s successfully added" % query['iosource'])
-        result.link("Load Filesystem", FlagFramework.query_type((), case=query['case'], family="LoadData", report="LoadFS", iosource=query['iosource']))
+        result.link("Load Filesystem", FlagFramework.query_type((), case=query['case'], family="Load Data", report="LoadFS", iosource=query['iosource']))
         result.para('')
-        result.link("Extract Files", FlagFramework.query_type((), case=query['case'], family="UnstructuredDisk", report="ExtractFiles", iosource=query['iosource']))
+        result.link("Extract Files", FlagFramework.query_type((), case=query['case'], family="Unstructured Disk", report="ExtractFiles", iosource=query['iosource']))
 
 
 import pyflag.Sleuthkit as Sleuthkit
@@ -287,12 +288,13 @@ class LoadFS(Reports.report):
             ## Draw a list of checkboxes for all our scanners:
             result.ruler()
             result.row("Choose Scanners to run:","",bgcolor='pink')
-            for i in range(len(Scanner.scanner_names)):
-                desc = Scanner.scanners[i].__doc__.splitlines()
+            scanner_desc = [ i.__doc__.splitlines()[0] for i in Registry.SCANNERS.classes ]
+            for i in range(len(scanner_desc)):
                 ## Ensure that the checkbox is ticked by default.
-                if Scanner.scanner_names[i] not in query.getarray('scan'):
-                    query['scan']=Scanner.scanner_names[i]
-                result.checkbox(desc[0],"scan", Scanner.scanner_names[i])
+                scanner_name = Registry.SCANNERS.scanners[i] 
+                if scanner_name not in query.getarray('scan'):
+                    query['scan']=scanner_name 
+                result.checkbox(scanner_desc[i],"scan",scanner_name )
 
             ## Try to get a magic hint
             try:
@@ -344,7 +346,7 @@ class LoadFS(Reports.report):
         cached_scanners = [ row['value'] for row in dbh ]
 
         ## We only run the scanners that were asked for which are not cached:
-        scanners = [ Scanner.scanners[Scanner.scanner_names.index(i)] for i in user_scanners if i not in cached_scanners ]
+        scanners = [ Registry.SCANNERS.classes[Registry.SCANNERS.scanners.index(i)] for i in user_scanners if i not in cached_scanners ]
 
         ## Store the sanners in the meta table:
         for s in user_scanners:
@@ -356,7 +358,7 @@ class LoadFS(Reports.report):
         
     def display(self,query,result):
         result.heading("Uploaded FS Image from IO Source %s to case %s" % (query['iosource'],query['case']))
-        result.link("Analyse this data", FlagFramework.query_type((), case=query['case'], family="DiskForensics", fsimage=query['iosource']))
+        result.link("Analyse this data", FlagFramework.query_type((), case=query['case'], family="Disk Forensics", fsimage=query['iosource']))
                        
     def progress(self,query,result):
         result.heading("Uploading filesystem image to case %s" % query['case'])
@@ -393,7 +395,7 @@ class LoadFS(Reports.report):
         Sleuthkit.del_sleuth(query['case'],tablename)
         iofd=IO.open(query['case'],query['iosource'])
         fsfd=FileSystem.FS_Factory( query["case"], query["iosource"], iofd)
-        fsfd.scanfs(Scanner.scanners,action='reset')
+        fsfd.scanfs(Registry.SCANNERS.classes ,action='reset')
         dbh.execute("delete from meta where property=%r and value=%r",('fsimage',query['iosource']))
         dbh.execute("delete from meta where property like 'scanfs_%s'",query['iosource'])
 
@@ -432,7 +434,7 @@ class LoadKB(LoadTcpDump):
     def display(self,query,result):
         result.heading("Calculated the Knowledge Base in case %s " % query['case'])
         link = self.ui(result)
-        link.link('Analyse this data',FlagFramework.query_type((),family='KnowledgeBase'))
+        link.link('Analyse this data',FlagFramework.query_type((),family='Knowledge Base'))
         result.para(link)
 
     def progress(self,query,result):
