@@ -622,8 +622,7 @@ class BrowseRegistry(BrowseFS):
                         context="display_mode"
                         )
 
-
-            except KeyError:
+            except KeyError,e:
                 ## Display tree output
                 del new_q['mode']
                 del new_q['open_tree']
@@ -636,6 +635,7 @@ class BrowseRegistry(BrowseFS):
 
                     # now display keys in table
                     new_q['mode'] = 'display'
+                    new_q['path']=path
                     table.table(
                         columns=['reg_key','type','size',"if(length(value)<50,value,concat(left(value,50),' .... '))"],
                         names=('Key','Type','Size','Value'),

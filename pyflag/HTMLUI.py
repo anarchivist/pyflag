@@ -767,6 +767,7 @@ class HTMLUI(UI.GenericUI):
                 cvs_writer.writerow(new_row)
 
             data.seek(0)
+            del query['callback_stored']
             result.result = "#Pyflag Table widget output\n#Query was %s.\n#Fields: %s\n""" %(query," ".join(names_list))
             if condition_text_array:
                 result.result += "#The following conditions are in force\n"
