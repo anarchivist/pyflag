@@ -156,7 +156,7 @@ class CreateLogPreset(Reports.report):
 
     def form(self,query,result):
         def step1(query,result):
-            result.row("Select a sample log file for the previewer")
+            result.row("Select a sample log file for the previewer",stretch=False)
             tmp = result.__class__(result)
             tmp.filebox(target='datafile')
             result.row("Enter name of log file:",tmp)

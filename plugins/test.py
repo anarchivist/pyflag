@@ -80,7 +80,7 @@ class TemplateReport(Reports.report):
         
         #We are testing the tree widget. Note this could have been written as a generator for faster performance...
         def tree_cb(branch):
-            path ='/'.join(branch)  + '/'
+            path ='/'+'/'.join(branch)  + '/'
             print path,branch
             
             try:
@@ -150,3 +150,20 @@ class SomeClass:
 def mod_fun(a,b):
     """ A module private function. """
     return b
+
+class test2(Reports.report):
+    """ A sample report.
+    
+    Note that all reports must inherit from Reports.report and should override the methods and attributes listed below.
+    """
+    hidden = False
+    name = "Test report2"
+    family = "Test"
+    def display(self,query,result):
+        result.start_table()
+        result.row("e","f")
+        result.row("a","b","c","d")
+        result.end_table()
+        result.start_table()
+        result.row("absabsdajhdfsfds skjsdfkljdfs fdsalkj fdsalkjsfd lkjfdsa lfskdj sfdalkj fdsalkj fdsalkjsfd lksfdj sfdalkj sfdlkjfsda lkfsdaj lksfdaj dfsalkj fdsalk jsfdalkj sdaflkj fsdalk jsfdalk jdsfalk jdfsalk jsfdalkjsfdalk jdfsalk jfdsalkj fdsalk jfsda")
+        result.end_table()

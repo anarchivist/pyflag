@@ -388,6 +388,7 @@ class GTKUI(UI.GenericUI):
         assert(self.ftoolbar)
         
         self.current_table=None
+        self.current_table_options={}
         self.next = None
         self.previous = None
         self.pageno = 0
@@ -430,50 +431,135 @@ class GTKUI(UI.GenericUI):
         return self.result
 
     def start_table(self,**options):
-        if not self.current_table:
+        if self.current_table==None:
             # I'm confused, should we allow nested tables in the *same* UI object?
             # No. UI objects can nest in tables, not tables directly nest in UI objects (MC)
-            self.current_table=gtk.Table(1,1,False)
-            self.current_table.set_border_width(5)
-            self.current_table_row=0
-
+##            self.current_table=gtk.Table(1,1,False)
+##            self.current_table.set_border_width(5)
+##            self.current_table.set_homogeneous(False)
+##            self.current_table_row=0
+            self.current_table_size=[0,0]
+            self.current_table=[]
+            self.current_table_opts=[]
+        self.current_table_options.update(options)
+            
     def row(self,*columns, **options):
-        if not self.current_table:
+#        print "Adding columns %s %s" % (columns,len(columns))
+        if self.current_table==None:
             self.start_table()
 
         ## Add an extra row on the end
-        self.current_table_row+=1
-        self.current_table.resize(self.current_table_row,len(columns))
+        self.current_table_size[0]+=1
+        if self.current_table_size[1]<len(columns):
+            self.current_table_size[1]=len(columns)
+
+##        self.current_table_row+=1
+##        self.current_table.resize(self.current_table_row,len(columns))
+##        if self.current_table_size[1]<len(columns):
+##            self.current_table_size[1]=len(columns)
+            
+##        self.current_table_size[0]=self.current_table_row
+        column_widgets=[]
         for i in range(len(columns)):
             col=columns[i]
             ## If this column is a string, (and therefore not a GTK
             ## Widget), we create a new widget for it
             if isinstance(col,self.__class__):
-                col=col.display()
+##                col=col.display()
+                frame=gtk.Frame()
+                frame.add(col.display())
+                col=frame
             elif not isinstance(col,gtk.Widget):
-                l = gtk.Label("%s" % col)
-                l.set_justify(gtk.JUSTIFY_LEFT)
-                l.set_line_wrap(True)
-                col = gtk.Alignment(0,0,0,0)
-                col.add(l)
-                
-            ##Attach the column to row at the end of the table:
-            right_attach = i+1            
-            if options.has_key('colspan'):
-                right_attach = i+options['colspan']
+                if 1:
+                    t="%s" % col
+                    l = gtk.Label(t)
+                    l.set_justify(gtk.JUSTIFY_LEFT)
+                    l.set_line_wrap(True)
+                    col = gtk.Alignment(0,0,0,1)
+                    col.add(l)
+                else:
+                    l=gtk.TextView()
+                    l.set_editable(False)
+                    l.set_cursor_visible(False)
+                    lb = l.get_buffer()
+                    l.set_wrap_mode(gtk.WRAP_WORD)
+                    #                l.set_wrap_mode(gtk.WRAP_NONE)
+                    lb.set_text("%s"%col)
+                    col=l
+            column_widgets.append(col)
+            
+        ##Attach the column to row at the end of the table:
+        self.current_table.append(column_widgets)
+        self.current_table_opts.append(options)
+##            right_attach = i+1            
+##            if options.has_key('colspan'):
+##                print "Colspan %s" % options['colspan']
+##                right_attach = i+options['colspan']
+##                if right_attach>self.current_table_size[1]:
+##                    right_attach=self.current_table_size[1]
+##                print right_attach,self.current_table_size
 
-            stretch = gtk.EXPAND | gtk.FILL
-            if options.has_key('stretch'):
-                stretch =gtk.EXPAND | gtk.FILL
-                
-            self.current_table.attach(col, i, right_attach, self.current_table_row-1, self.current_table_row, stretch, 0, 0, 0)
+##            if options.has_key('stretch'):
+##                if options['stretch']:
+##                    stretch =gtk.EXPAND | gtk.FILL | gtk.SHRINK
+##                else:
+##                    stretch = 0
+##            else:
+##                stretch = gtk.EXPAND | gtk.FILL
+
+##            self.current_table.attach(col, i, right_attach, self.current_table_row-1, self.current_table_row,gtk.EXPAND | gtk.FILL, stretch, 0, 0)
 
     def end_table(self):
-        ## Add the table to the result UI:
-        if self.current_table:
-            self.result.pack_start(self.current_table,True,True)
-            self.current_table=None
+        table=gtk.Table(self.current_table_size[0],self.current_table_size[1],homogeneous=False)
+        table.set_border_width(5)
+        for row_index in range(len(self.current_table)):
+            row=self.current_table[row_index]
+            options=self.current_table_opts[row_index]
+            stretch = gtk.EXPAND | gtk.FILL
+            try:
+                if not options['stretch']:
+                    stretch = 0
+            except:
+                pass
+                    
+            hstrech=gtk.EXPAND | gtk.FILL
+            try:
+                if not options['hstrech']:
+                    hstrech=0
+            except:
+                pass
 
+            table_hstretch=True
+            try:
+                table_hstretch=self.current_table_options['hstretch']
+            except:
+                pass
+            
+            for i in range(len(row)):
+                col=row[i]
+                right_attach=i+1
+#                print "%s %s %s" % (i,len(row),self.current_table_size)
+                if len(row)<self.current_table_size[1] and i==len(row)-1:
+                    right_attach=self.current_table_size[1]
+#                print "Attaching to %s %s %s %s" % (i,right_attach,row_index,row_index+1)
+                table.attach(col, i,right_attach, row_index,row_index+1,hstrech, stretch, 0, 0)
+
+        ## Add the table to the result UI:
+#        frame=gtk.Frame("table %s" % (self.current_table_size,))
+#        frame.add(table)
+
+        if table_hstretch:
+            self.result.pack_start(table,True,True)
+        else:
+            hbox=gtk.HBox()
+            hbox.pack_start(table,False,False)
+            self.result.pack_start(hbox,True,True)
+            
+##            self.result.pack_start(self.current_table,True,True)
+        self.current_table=None
+        self.current_table_options={}
+##            self.start_table()
+            
     def goto_link(self,widget,event,target):
         """ This is the callback function from links
 
@@ -496,7 +582,7 @@ class GTKUI(UI.GenericUI):
     def icon(self, path, **options):
         image = gtk.Image()
         image.set_from_file("%s/%s" % (config.IMAGEDIR, path))
-        self.row(image)
+        self.row(image,stretch=False)
 
     def image(self, image, **options):
         pass
@@ -511,7 +597,7 @@ class GTKUI(UI.GenericUI):
     def ruler(self):
         """ Ruler, spans all columns """
         ruler = gtk.HSeparator()
-        self.row(ruler, colspan=50)
+        self.row(ruler, colspan=50,stretch=False)
 
     def checkbox(self,description,name,value,**options):
         """ Create a checkbox input for the name,value pair given. """
@@ -528,7 +614,7 @@ class GTKUI(UI.GenericUI):
                 pass
 
         self.form_widgets.append((checkbox,callback))
-        self.row(checkbox)
+        self.row(checkbox,stretch=False)
 
     def notebook(self,names=[],context="notebook",callbacks=[],descriptions=[]):
         """ Draw a notebook like UI with tabs.
@@ -552,7 +638,7 @@ class GTKUI(UI.GenericUI):
         for i in range(len(names)):
             notebook.add_page(names[i],callbacks[i],query)
             
-        self.result.pack_start(notebook)
+        self.result.pack_start(notebook,True,True)
         notebook.set_current_page(names.index(context_str))
 
     def link(self,string,target=FlagFramework.query_type(()),**target_options):
@@ -581,7 +667,7 @@ class GTKUI(UI.GenericUI):
         ev.add(label)
         ev.add_events(gtk.gdk.BUTTON_PRESS_MASK)
         ev.connect("button_press_event",self.goto_link,target)
-        self.row(ev)
+        self.row(ev,stretch=False)
 
     def const_selector(self,description,name,keys,values,**options):
         combobox = gtk.combo_box_new_text()
@@ -614,7 +700,7 @@ class GTKUI(UI.GenericUI):
                 pass
 
         self.form_widgets.append((combobox,callback))
-        self.row(description,combobox)
+        self.row(description,combobox,stretch=False)
 
     def start_form(self,target, **hiddens):
         for k,v in hiddens.items():
@@ -635,7 +721,7 @@ class GTKUI(UI.GenericUI):
             return (widget.get_data('name'),widget.get_text())
 
         self.form_widgets.append((widget,callback))
-        self.row(description,widget)
+        self.row(description,widget,stretch=False)
 
     def submit(self,widget,event=None,data=None):
         new_query=FlagFramework.query_type(())
@@ -660,16 +746,20 @@ class GTKUI(UI.GenericUI):
 #        print "DEBUG: Submitting Form, new_query is: %s" % new_query
         self.link_callback(new_query)
 
-    def end_form(self,name='Submit'):
+    def end_form(self,name='Submit',toplevel_window=None):
         def callback(a):
             return (a,self.form_parms[a])
 
         for k in self.form_parms.keys():
             self.form_widgets.append((k,callback))
             
-        widget=gtk.Button("Submit")
-        widget.connect("button_press_event",self.submit)
-        self.row(widget)
+        ok=gtk.Button(label="Submit",stock=gtk.STOCK_OK)
+        ok.connect("button_press_event",self.submit)
+        if toplevel_window:
+            cancel=gtk.Button(label="Cancel",stock=gtk.STOCK_CANCEL)
+            cancel.connect("button_press_event",lambda x,y: toplevel_window.hide())
+            self.row(ok,cancel,stretch=False)
+        else: self.row(ok,stretch=False)
 
     text_widget = None
     text_widget_buffer = None
@@ -838,7 +928,7 @@ class GTKUI(UI.GenericUI):
         f.set_data('label',label)
 #        del self.form_parms[target]
         self.form_widgets.append((label,get_my_filename))
-        self.row(label,'   ',button)
+        self.row(label,'   ',button,stretch=False)
         try:
             del self.form_parms[target]
         except KeyError:
@@ -1153,12 +1243,12 @@ class GTKUI(UI.GenericUI):
                     combobox.append_text(c.get_data('name'))
                 hbox.pack_start(gtk.Label("Column to filter:"))
                 hbox.pack_start(combobox)
-                result.row(hbox)
+                result.row(hbox,stretch=False)
                 
             text_entry = gtk.Entry()
             text_entry.set_text(data)
-            result.row(text_entry)
-            widget=gtk.Button("Submit")
+            result.row(text_entry,stretch=False)
+            widget=gtk.Button("Submit",stock=gtk.STOCK_OK)
             if column:
                 column_name=columns[names.index(column.get_title())]
                 column_title=column.get_title()
@@ -1167,7 +1257,7 @@ class GTKUI(UI.GenericUI):
                 column_title=None
 
             widget.connect("button_press_event", process_filter_cb,column_name, column_title, text_entry, store,combobox)
-            result.row(widget)
+            result.row(widget,stretch=False)
             dialog=result.create_popup_window()
             text_entry.grab_focus()
 
@@ -1430,13 +1520,13 @@ class GTKUI(UI.GenericUI):
                 
         selection.set_mode(gtk.SELECTION_SINGLE)
         selection.connect('changed', selection_changed)
-        self.result.pack_start(hbox)
+        self.result.pack_start(hbox,True,True)
         hbox.set_position(200)
 
     def download(self,file):
         self.text("Click the button below to save the file to disk")
         button=gtk.Button("Save As")
-        self.row(button)
+        self.row(button,stretch=False)
         
         def button_cb(widget,event):
             f=gtk.FileSelection("Save File as")

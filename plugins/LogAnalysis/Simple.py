@@ -175,15 +175,14 @@ class SimpleLog(LogFile.Log):
     def form(self,query,result):
         """ This draws the form required to fulfill all the parameters for this report
         """
-        print "My query is %s" % query
-        print "result's query is %s" % result.defaults.q
-
+        result.start_table(hstretch=False)
         result.const_selector("Simple Field Separator:",'delimiter',delimiters.values(), delimiters.keys())
         if not query.has_key('delimiter'):
             query['delimiter'] = ' '
 
         result.end_table()
-        result.row("Unprocessed text from file",colspan=5)
+        result.start_table()
+        result.row("Unprocessed text from file")
         sample = []
         count =0
         for line in self.read_record():
@@ -198,8 +197,9 @@ class SimpleLog(LogFile.Log):
         result.start_table()
         result.ruler()
         tmp = result.__class__(result)
-        tmp.heading("Step 3:")
-        result.row(tmp,"Select pre-filter(s) to use on the data")
+        tmp.text("Step 3:",font='bold')
+        tmp.text("  Select pre-filter(s) to use on the data")
+        result.row(tmp)
         result.ruler()
         
         pre_selector(result)

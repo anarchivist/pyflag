@@ -125,7 +125,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                       result = theme.menu(flag,query)
                       result.defaults=query
                   else:
-                      result = flag.process_request(query)              
+                      result = flag.process_request(query)
               except Exception,e:
                   result = flag.ui()
                   result.defaults = query

@@ -283,7 +283,7 @@ class GTKServer(gtk.Window):
             self.error_popup(e)
             raise
 
-        result.end_form()
+        result.end_form(toplevel_window=self.form_dialog)
 
         if self.form_frame.get_child():
             self.form_frame.remove(self.form_frame.get_child())
@@ -490,6 +490,7 @@ class GTKServer(gtk.Window):
         vbox=gtk.VBox(False,8)
         button=gtk.Button("Dismiss")
         dialog=gtk.Window()
+#        dialog.modify_bg(gtk.STATE_NORMAL,'white')
         dialog.add(vbox)
         if icon:
             hbox=gtk.HBox(False,8)

@@ -116,6 +116,8 @@ class HTMLUI(UI.GenericUI):
             theme=pyflag.Theme.factory()
         if self.decoration=='naked':
             return theme.naked_render(data=self.__str__(), ui=self,title=self.title)
+        elif self.decoration=='raw':
+            return self.__str__()
         else:
             return theme.render(q,meta=self.meta,data=self.__str__(),next=self.next , previous=self.previous , pageno=self.pageno, ui=self)
     
@@ -190,7 +192,7 @@ class HTMLUI(UI.GenericUI):
         #Ask the image whats its ct:
         tmp.result = image.display()
         tmp.type = image.GetContentType()
-        tmp.decoration='naked'
+        tmp.decoration='raw'
         #Redefine our display method to just dump the binary object back
         if tmp.type.startswith("image"):
             self.result +=  '<img type=%r src="f?draw_stored=%s" %s />'  % (tmp.type,self.store(tmp),opt)
@@ -1041,7 +1043,8 @@ class HTMLUI(UI.GenericUI):
             self.result += "%s%s" % (format,d)
 
         for d in cuts:
-            d = re.sub("\n","<br>\r\n",str(d))
+            if not (options.has_key('font') and options['font']=='typewriter'):
+                d = re.sub("\n","<br>\r\n",str(d))
             self.text_var += d
             if options.has_key('wrap') and options['wrap'] == 'full':
                 try:
@@ -1268,24 +1271,15 @@ class HTMLUI(UI.GenericUI):
 
             if page<len(names)-1:
                 result.result += "<input type=submit value='Next' name=submit>\n"
-    #            self.end_form("Next",name='submit')
-    #            self.result+="%s<input type=button value=Next onclick=\"window.location=\'%s&%s=%s\'\"; />" % (page,new_query,context,page+1)
             elif page==len(names)-1:
                 result.result += "<input type=submit value='Finish' name=submit>\n"
-    #            self.end_form("Finish",name='submit')
-    #            self.result+="%s<input type=button value=Finish onclick=\"self.opener.location=\'%s\'; self.close();\" />" % (page,new_query)
 
             result.decoration='naked'
 
         cb = self.store_callback(wizard_cb)
-##        try:
-##            page=int(query[context])
-##            cbfunc=callbacks[page]
-##        except (ValueError,KeyError):
         self.result+="""<script language=javascript>var client; function open_wizard_window() {window.open('%s&%s=0&callback_stored=%s','client','toolbar=0,menubar=0,HEIGHT=600,WIDTH=800,scrollbars=yes')}; open_wizard_window(); </script><abbr title=\"It your browser blocks popups, click here to popup a wizard\"><a onclick=\"open_wizard_window()\">Click here to launch wizard</a></abbr>""" % (self.defaults,context,cb)
         raise FlagFramework.DontDraw()
-        
-        
+                
     def notebook(self,names=[],context="notebook",callbacks=[],descriptions=[]):
         """ Draw a notebook like UI with tabs.
 

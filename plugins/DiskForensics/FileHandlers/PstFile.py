@@ -318,7 +318,7 @@ class PstExplorer(Reports.report):
             dbh.execute('select distinct email.inode, concat(file.path,file.name) as path from email_%s as email, file_%s as file where file.inode = email.inode', (tablename, tablename))
             result.row('Email was found in the following files, select the file to browse:',colspan=2)
             for row in dbh:
-                tmp=self.ui()
+                tmp=self.ui(result)
                 tmp.link("%s" % (row['path']),query,inode=row['inode'],where_Inode=row['inode'])
                 result.row(tmp)
             
@@ -331,8 +331,7 @@ class PstExplorer(Reports.report):
         dbh=self.DBO(query['case'])
         tablename = dbh.MakeSQLSafe(query['fsimage'])
         
-        def email(query):
-            output = self.ui(result)
+        def email(query,output):
             output.table(
                 columns=('inode','vfsinode','date','`from`','`to`','subject'),
                 names=('Inode','VFSInode','Arrival Date','From','To','Subject'),
@@ -341,8 +340,7 @@ class PstExplorer(Reports.report):
                 )
             return output
         
-        def contacts(query):
-            output = self.ui(result)
+        def contacts(query,output):
             output.table(
                 columns=('inode','vfsinode','name','email','address','phone'),
                 names=('Inode','VFSInode','Name','Email','Address','Phone'),
@@ -351,8 +349,7 @@ class PstExplorer(Reports.report):
                 )
             return output
         
-        def appts(query):
-            output = self.ui(result)
+        def appts(query,output):
             output.table(
                 columns=('inode','vfsinode','startdate','enddate','location','comment'),
                 names=('Inode','VFSInode','Start Date','End Date','Location','Comment'),
@@ -361,8 +358,7 @@ class PstExplorer(Reports.report):
                 )
             return output
         
-        def journal(query):
-            output = self.ui(result)
+        def journal(query,output):
             output.table(
                 columns=('inode','vfsinode','startdate','enddate','type','comment'),
                 names=('Inode','VFSInode','Start Date','End Date','Type','Comment'),

@@ -423,7 +423,8 @@ class Flag:
 
                    #Nope - we should run the display method now...
                    if not progress_result:
-                       report.display(query,result)
+                       progress_result=result
+                       report.display(query,progress_result)
 
                    return progress_result
                 ## Report analysis returned an error
