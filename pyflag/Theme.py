@@ -182,7 +182,7 @@ class BlueTheme(BasicTheme):
         @arg query: The user query
         """
         family = query['family']
-        module_list = self.list_modules(flag)
+        module_list = Registry.REPORTS.family.keys()
         result=flag.ui()
 
         result.result='''<table cellspacing=0 cellpadding=0 width="100%" border=0 
@@ -219,21 +219,20 @@ class BlueTheme(BasicTheme):
                   <p><font size="1" face="Arial, Helvetica, sans-serif">'''
         
         for k in module_list:
-            r = flag.dispatch.family[k].items()
-            r = [ 1 for kk,v in r if not v.hidden ]
-            if len(r)==0: continue
             link = flag.ui()
             link.link(k,family=k)
             result.result+='''&nbsp;&nbsp;%s<br />\n''' % link
 
             if family==k:
-                report_list = self.list_reports(flag,family)
-                for k,v in report_list:
+                report_list = Registry.REPORTS.family[family]
+                for r in report_list:
+                    if r.hidden: continue
                     link = flag.ui()
-                    link.link(v.name,case=query['case'],family=family,report=k)
-
-                    #Add the module doc as a tooltip
-                    link.tooltip(v.__doc__)
+                    link.link(r.name,case=query['case'],family=family,report=r.name)
+                    
+                    ## Add the module doc as a tooltip
+                    link.tooltip(r.__doc__)
+                    
                     result.result+="&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong><big>&middot;</big></strong>&nbsp;%s <br />\n" % link
                 result.result+="<br/>"
 

@@ -30,7 +30,7 @@ linux distributions.. You can find the binary distribution at
 http://pyflag.sourceforge.net. Read the INSTALL file for more
 information.
 
-2. A full source distribution.
+3. A full source distribution.
 
 This document describes the installation steps for the source
 distribution which includes pyflag and a few dependancies. This
@@ -107,7 +107,7 @@ If nothing failed you should have a completed pyflag installation.
 
  If you want to make a binary stand alone distribution, type make bin-dist in the toplevel directory.
 
-  If a binary+MySQL distribution is needed, you will need to download the binary mysql distribution from the mysql site, put the tar ball in the sources/ directory and type make mysql.
+ If a binary+MySQL distribution is needed, you will need to download the binary mysql distribution from the mysql site, put the tar ball in the sources/ directory and type make mysql.
 
 4. Configure pyflag
 

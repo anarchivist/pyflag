@@ -52,7 +52,6 @@ iowrapper = %(flag_bin)s/iowrapper
 #If you chose to use ploticus as the graph renderer, this variable is required for setting the prefab directory
 ploticus=%(flag_bin)s/pl
 ploticus_prefabs=%(flag_bin)s/prefabs/
-scanner_directory = %(pyflagdir)s/Scanners/
 
 [GUI]
 #Period we wait before refreshing the display when waiting for analysis to complete
@@ -72,5 +71,8 @@ GraphFormat=png
 #Maximum size of hex dump
 MAX_DATA_DUMP_SIZE=2048
 
+# This can be BlueTheme or BasicTheme at the moment
+theme = BlueTheme
+
 [misc]
-LOG_LEVEL = 1
+LOG_LEVEL = 10
