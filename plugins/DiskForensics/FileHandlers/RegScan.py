@@ -93,87 +93,34 @@ class BrowseRegistry(DiskForensics.BrowseFS):
         #Make a tree call back:
         def treecb(branch):
             """ This call back will render the branch within the registry file. """
-            path ='/'.join(branch)
+            path =FlagFramework.normpath('/'.join(branch))
+            if path=='/': path=''
             dbh = self.DBO(query['case'])
 
             ##Show the directory entries:
             dbh.execute("select basename from regi_%s where dirname=%r and length(basename)>1 group by basename",(tablename,path))
             for row in dbh:
-                tmp=self.ui()
-                tmp.link(row['basename'],new_q,mode='table',where_Path="%s/%s" %(path,row['basename']))
-                yield(([row['basename'],tmp,'branch']))
+                yield(([row['basename'],row['basename'],'branch']))
                 
         ## End Tree Callback
-
         try:
-            try:
-                if query['mode']=='table':
-                    del new_q['mode']
-                    for i in new_q.keys():
-                        if i.startswith('where_'):
-                            del new_q[i]
-
-                    left=self.ui(result)
-                    left.link("View Tree",new_q)
-                    result.row(left)
-                    result.table(
-                        columns=['path','type','reg_key','from_unixtime(modified)','size','value'],
-                        names=['Path','Type','Key','Modified','Size','Value'],
-                        links=[ result.make_link(new_q,'open_tree',mark='target') ],
-                        table='reg_%s'%tablename,
-                        case=query['case'],
-                        )
-
-                elif query['mode']=='display':
-                    del new_q['mode']
-                    key = query['key']
-                    path=query['path']
-                    del new_q['key']
-                    del new_q['path']
-                    left=self.ui(result)
-                    left.link("View Tree",new_q)
-                    result.row(left)
-                    result.end_table()
-                    result.para("Key %s/%s:" % (path,key))
-
-                    def hexdump(query):
-                        """ Show the hexdump for the key """
-                        out = self.ui()
-                        dbh.execute("select value from reg_%s where path=%r and reg_key=%r",(tablename,path,key))
-                        row=dbh.fetch()
-                        if row:
-                            FlagFramework.HexDump(row['value'],out).dump()
-                        return out
-
-                    def strings(query):
-                        """ Draw the strings in the key """
-                        out = self.ui()
-                        out.para("not implimented yet")
-                        return out
-
-                    def stats(query):
-                        """ display stats on a key """
-                        out = self.ui()
-                        out.para("not implimented yet")
-                        return out
-
-                    result.notebook(
-                        names=["HexDump","Strings","Statistics"],
-                        callbacks=[hexdump,strings,stats],
-                        context="display_mode"
-                        )
-
-            except KeyError,e:
-                ## Display tree output
+            def table_notebook_cb(query,result):
                 del new_q['mode']
-                del new_q['open_tree']
+                del new_q['mark']
+                result.table(
+                    columns=['path','type','reg_key','from_unixtime(modified)','size','value'],
+                    names=['Path','Type','Key','Modified','Size','Value'],
+                    links=[ result.make_link(new_q,'open_tree',mark='target',mode='Tree View') ],
+                    table='reg_%s'%tablename,
+                    case=query['case'],
+                    )
 
+            def tree_notebook_cb(query,result):
                 if (query.has_key("open_tree") and query['open_tree'] != '/'):
                     br = query['open_tree']
                 else:
                     br = '/'
-
-                result.row("Inspecting branch %s" % br,colspan=5)
+                    
                 tmp=result.__class__(result)
                 dbh.execute("select from_unixtime(modified) as time from reg_%s where path=%r",(tablename,br))
                 row=dbh.fetch()
@@ -184,10 +131,7 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                     pass
                     
                 def pane_cb(branch,table):
-                    try:
-                        path=query['open_tree']
-                    except KeyError:
-                        path = '/'.join(branch);
+                    path = FlagFramework.normpath('/'.join(branch))
 
                     # now display keys in table
                     new_q['mode'] = 'display'
@@ -198,16 +142,18 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                         table='reg_%s' % tablename,
                         where="path=%r" % path,
                         case=query['case'],
-                        links=[ result.make_link(new_q, 'key') ]
+                        links=[ FlagFramework.query_type(family=query['family'],report='BrowseRegistryKey',fsimage=query['fsimage'],path=path,__target__='key',case=query['case'])],
                         )
-
-                left=self.ui(result)
-                left.link("View Table",new_q,mode='table')
-                result.row(left)
 
                 # display paths in tree
                 result.tree(tree_cb=treecb,pane_cb=pane_cb,branch=[''])
 
+            result.notebook(
+                names=['Tree View','Table View'],
+                callbacks=[tree_notebook_cb,table_notebook_cb],
+                context='mode',
+                )
+            
         except DB.DBError,e:
             result.heading("Error occured")
             result.text('It appears that no registry tables are available. Maybe no registry files were found during scanning.')
@@ -219,3 +165,45 @@ class BrowseRegistry(DiskForensics.BrowseFS):
         
         dbh.execute('drop table if exists reg_%s',tablename)
         dbh.execute('drop table if exists regi_%s',tablename)
+
+class BrowseRegistryKey(BrowseRegistry):
+    """ Display the content of a registry key """
+    parameters= {'fsimage':'fsimage','key':'string','path':'string'}
+    hidden=True
+    name="BrowseRegistryKey"
+    family="Disk Forensics"
+    description =    """ Display the content of a registry key """
+
+    def display(self,query,result):
+        path=query['path']
+        key=query['key']
+        result.heading("Registry Key Contents from Filesystem %s" % query['fsimage'])
+        result.text("Key %s/%s:" % (path,key),color='red',font='typewriter')
+        dbh=DB.DBO(query['case'])
+        tablename=query['fsimage']
+
+        def hexdump(query,out):
+            """ Show the hexdump for the key """
+            dbh.execute("select value from reg_%s where path=%r and reg_key=%r",(tablename,path,key))
+            row=dbh.fetch()
+            if row:
+                FlagFramework.HexDump(row['value'],out).dump()
+            return out
+
+        def strings(query,out):
+            """ Draw the strings in the key """
+            out.para("not implimented yet")
+            return out
+
+        def stats(query,out):
+            """ display stats on a key """
+            out.para("not implimented yet")
+            return out
+
+        result.notebook(
+            names=["HexDump","Strings","Statistics"],
+            callbacks=[hexdump,strings,stats],
+            context="display_mode"
+            )
+
+

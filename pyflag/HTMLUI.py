@@ -427,6 +427,7 @@ class HTMLUI(UI.GenericUI):
         if query.has_key('open_tree'):
             open = query['open_tree']
             branch = [ d for d in open.split('/') ]
+            branch[0]='/'
 
         #Start building the tree using the branch.
         def draw_branch(depth,tree_array):
@@ -440,7 +441,7 @@ class HTMLUI(UI.GenericUI):
             found =0
             tmp = []
             #We search through all the items until we find the one that matches the branch for this depth, then recurse into it.
-            branch_array=branch[:depth] 
+            branch_array=branch[:depth]
             for k,v,t in tree_cb(branch_array):
                 if not k: return
                 if not t: continue
@@ -450,7 +451,7 @@ class HTMLUI(UI.GenericUI):
                     if found and len(tmp)>config.MAXTREESIZE:
                         tree_array += tmp
                         if len(tmp) > config.MAXTREESIZE:
-                            tree_array.append((depth,tmp[-1][1],'<img src=/flag/images/down.png> ...','special'))
+                            tree_array.append((depth,tmp[-1][1],'<img src=/flag/images/down.png border=0> ...','special'))
                         return
 
                     #Do we find the current item in the list?
@@ -462,7 +463,7 @@ class HTMLUI(UI.GenericUI):
                             start = 0
                         else:
                             start = match_pos - config.MAXTREESIZE
-                            tree_array.append((depth,tmp[start-1][1],'<img src=/flag/images/up.png> ...','special'))
+                            tree_array.append((depth,tmp[start-1][1],'<img src=/flag/images/up.png border=0> ...','special'))
                         
                         tree_array += tmp[start:]
 
@@ -480,7 +481,7 @@ class HTMLUI(UI.GenericUI):
             split =  tmp[:config.MAXTREESIZE]
             tree_array += split
             if len(split) == config.MAXTREESIZE:
-                tree_array.append( (depth,split[-1][1],'<img src=/flag/images/down.png> ...','special'))
+                tree_array.append( (depth,split[-1][1],'<img src=/flag/images/down.png border=0> ...','special'))
 
         #### End draw_branch
 
@@ -497,7 +498,7 @@ class HTMLUI(UI.GenericUI):
         draw_branch(1,tree_array)       
 
         del link['open_tree']
-        link['open_tree'] = "%s" % '/'.join(branch[:-1])
+        link['open_tree'] = FlagFramework.normpath("%s" % '/'.join(branch[:-1]))
         if not link['open_tree']:
             del link['open_tree']
             link['open_tree']='/'
@@ -510,15 +511,15 @@ class HTMLUI(UI.GenericUI):
         #Now we draw the stuff saved in tree_array according to its classification
         for depth,k,v,t in tree_array:
             del link['open_tree']
-            link['open_tree'] = "/".join(branch[:depth] + [k])
+            link['open_tree'] = FlagFramework.normpath("/".join(branch[:depth] + [k]))
             open_tree = FlagFramework.urlencode(link['open_tree'])
+            sv=v.__str__().replace(' ','&nbsp;')
             if t =='branch':
-                left.result+="%s%s%s<br>\n" % ("<img src=/flag/images/spacer.png width=20 height=20>" * depth , "<a name=%s href=f?%s#%s><img  border=0 height=16 src=/flag/images/folder.png width=20 height=20></a>  " % (open_tree,link,open_tree) , str(v) )
+                left.result+="%s%s%s<br>\n" % ("<img src=/flag/images/spacer.png width=20 height=20>" * depth , "<a name=%s href=f?%s#%s><img  border=0 height=16 src=/flag/images/folder.png width=20 height=20></a>&nbsp;&nbsp;" % (open_tree,link,open_tree) , str(sv) )
             elif t == 'special':
                 left.result+="%s%s<br>\n" % ("<img src=/flag/images/spacer.png width=20 height=20>" * depth , "<a name=%s href=f?%s#%s>%s</a>  " % (open_tree,link,open_tree, str(v) ))
             else:
                 left.result+="%s%s%s<br>\n" % ("<img src=/flag/images/spacer.png width=20 height=20>" * depth , "<a name=%s /><img border=0 height=16 src=/flag/images/corner.png width=20 height=20>  " % open_tree, v )
-        #right=self.__class__()
         right=self.__class__(self)
         try:
             ## Get the right part:
@@ -1215,7 +1216,8 @@ class HTMLUI(UI.GenericUI):
         out+="<td colspan=50>&nbsp;</td></tr><tr><td colspan=50 bgcolor=#3366cc><img width=1 height=1 alt=""></td></tr>"
         
         #Now draw the results of the callback:
-        cb=cbfunc(query)
+        result=self.__class__(self)
+        cbfunc(query,result)
         if not self.binary:
-            out+="<tr><td colspan=50><table border=1 width=100%%><tr><td>%s</td></tr></table></td></tr></table>" % cb
+            out+="<tr><td colspan=50><table border=1 width=100%%><tr><td>%s</td></tr></table></td></tr></table>" % result
             self.result+=out

@@ -163,9 +163,9 @@ class BrowseFS(Reports.report):
 
                 for i in fsfd.dent_walk(path): 
                     if i['mode']=="d/d" and i['status']=='alloc':
-                        link = self.ui(result)
-                        link.link(i['name'],new_query,open_tree="%s%s" %(path,i['name']), mode='table', where_Filename="%s%s" %(path,i['name']), order='Filename')# ,__mark__="%s%s" %(path,i['name']))
-                        yield(([i['name'],link,'branch']))
+#                        link = self.ui(result)
+#                        link.link(i['name'],new_query,open_tree="%s%s" %(path,i['name']), mode='table', where_Filename="%s%s" %(path,i['name']), order='Filename')# ,__mark__="%s%s" %(path,i['name']))
+                        yield(([i['name'],i['name'],'branch']))
 
             def pane_cb(branch,tmp):
                 query['order']='Filename'
@@ -177,7 +177,7 @@ class BrowseFS(Reports.report):
                     table='file_%s as f, inode_%s as i' % (fsfd.table,fsfd.table),
                     where="f.inode=i.inode and path=%r and f.mode!='d/d'" % (br),
                     case=query['case'],
-                    links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='View File', fsimage=query['fsimage'],__target__='inode', inode="%s")]
+                    links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile', fsimage=query['fsimage'],__target__='inode', inode="%s")]
                     )
         
             result.tree(tree_cb = tree_cb,pane_cb = pane_cb, branch = branch )
