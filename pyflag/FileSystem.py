@@ -218,18 +218,18 @@ class DBFS(FileSystem):
             if row:
                 self.dbh.execute("insert into file_%s set mode='d/d',inode=%r,status='alloc',path=%r,name=%r",(self.table,root_inode,row['path'],row['name']))
 
-    def longls(self,path='/'):
-        self.dbh.execute("select mode,inode,name from file_%s where path=%r", (self.table, path))
+    def longls(self,path='/', dirs = None):
+        if(dirs == 1):
+            self.dbh.execute("select path,mode,inode,name from file_%s where path=%r and mode like 'd%%'", (self.table, path))
+        elif(dirs == 0):
+            self.dbh.execute("select path,mode,inode,name from file_%s where path=%r and mode like 'r%%'", (self.table, path))
+        else:
+            self.dbh.execute("select path,mode,inode,name from file_%s where path=%r", (self.table, path))
+            
         return [ dent for dent in self.dbh ]
     
     def ls(self, path="/", dirs=None):
-        if(dirs == 1):
-            self.dbh.execute("select name from file_%s where path=%r and mode='d/d'", (self.table, path))
-        elif(dirs == 0):
-            self.dbh.execute("select name from file_%s where path=%r and mode='r/r'", (self.table, path))
-        else:
-            self.dbh.execute("select name from file_%s where path=%r", (self.table, path))
-        return [ dent['name'] for dent in self.dbh ]
+        return [ dent['name'] for dent in self.longls(path,dirs) ]
 
     def dent_walk(self, path='/'):
         self.dbh.execute("select name, mode, status from file_%s where path=%r order by name" % (self.table, path))

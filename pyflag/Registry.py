@@ -208,6 +208,23 @@ class VFSFileRegistry(Registry):
                 raise Exception("Class %s has the same specifier as %s. (%s)" % (cls,self.vfslist[cls.specifier],cls.specifier))
             self.vfslist[cls.specifier] = cls
 
+class ShellRegistry(Registry):
+    """ A class to manage Flash shell commands """
+    commands = {}
+    def __getitem__(self,command_name):
+        """ Return the command objects by name """
+        return self.commands[command_name]
+    
+    def __init__(self,ParentClass):
+        Registry.__init__(self,ParentClass)
+        for cls in self.classes:
+            ## The name of the class is the command name
+            command = ("%s" % cls).split('.')[-1]
+            try:
+                raise Exception("Command %s has already been defined by %s" % (command,self.commands[command]))
+            except KeyError:
+                self.commands[command]=cls
+
 class LogDriverRegistry(Registry):
     """ A class taking care of Log file drivers """
     drivers = {}
@@ -216,13 +233,20 @@ class LogDriverRegistry(Registry):
         for cls in self.classes:
             self.drivers[cls.name]=cls
 
+LOCK = 0
 REPORTS = None
 SCANNERS = None
 VFS_FILES = None
 LOG_DRIVERS = None
+SHELL_COMMANDS = None
 
 ## This is required for late initialisation to avoid dependency nightmare.
 def Init():
+    ## We may only register things once. LOCK will ensure that we only initialise once
+    global LOCK
+    if LOCK:
+        return
+    LOCK=1
     ## Do the reports here
     import pyflag.Reports as Reports
     global REPORTS
@@ -236,10 +260,14 @@ def Init():
     ## Pick up all VFS drivers:
     import pyflag.FileSystem as FileSystem
     global VFS_FILES
-    
     VFS_FILES = VFSFileRegistry(FileSystem.File)
+    
     ## Pick all Log File drivers:
     import pyflag.LogFile as LogFile
-    
     global LOG_DRIVERS
     LOG_DRIVERS = LogDriverRegistry(LogFile.Log)
+    
+    ## Register all shell commands:
+    import pyflag.pyflagsh as pyflagsh
+    global SHELL_COMMANDS
+    SHELL_COMMANDS = ShellRegistry(pyflagsh.command)
