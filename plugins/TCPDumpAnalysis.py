@@ -31,7 +31,7 @@ import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import re
+
 import pyflag.DB as DB
 
 import pyflag.UI as UI
@@ -368,26 +368,13 @@ class TCPTrace(Reports.report):
         rs=dbh.fetch()
 
         result.start_table()
-        row=("Connection ",rs['source'],": ",rs['src_port']," -> ",rs['dest'],": ",rs['dest_port'])
-        result.row(*row)
+        result.row("Connection ",rs['source'],": ",rs['src_port']," -> ",rs['dest'],": ",rs['dest_port'])
+        tmp = self.ui(result)
+        del query['report']
+        query['report'] = 'HTMLVisualise'
+        tmp.link('Visualise',query)
+        result.row(tmp, colspan = '50')
         result.end_table()
-
-        ## Allow the user to visualise a HTTP object.
-        def visualise_popup(query,result):
-            result.display=result.__str__
-            result.heading("Visualise a HTTP Object")
-            result.row(*row)
-            result.end_table()
-            result.para("The following objects where found in this connection:")
-            result.table(
-                columns=('http_request_uri',),
-                names=("URLs",),
-                table = ' http, connection_cache',
-                where='con_id=%s and id=key_id and not isnull(http_request_uri)' % query['con_id'],
-                case=query['case'],
-                )
-
-        result.popup(visualise_popup,'HTML Visualise',icon='glasses.png',toolbar=0,menubar=0)
 
         #Get all the data from the connection cache:
         dbh.execute("select substring(data.data,size) as data,direction from connection_cache,data where connection_cache.id=data.key_id and con_id=%r group by id order by id",(query['con_id']))
@@ -406,7 +393,7 @@ class HTMLVisualise(TCPTrace):
     name = "HTML Visualise"
     hidden = "yes"
     description = "Visualise HTML pages"
-    parameters={"con_id" : "numeric", 'key_id': "numeric"}
+    parameters={"con_id" : "numeric"}
 
     def analyse(self,query):
         #Check that we ran the tcptrace report on this already
@@ -421,70 +408,77 @@ class HTMLVisualise(TCPTrace):
             result.heading("Error")
             result.para("This report will currently only work with the HTML UI")
             return 
-
-        #Find the next object after the specified one:
-        dbh.execute("select id from http, connection_cache where con_id=%r and id=key_id and not isnull(http_request_uri) and id>%r limit 1",(query['con_id'],query['key_id']))
-        row=dbh.fetch()
         
-        #Get all the data for this object from the connection cache:
-        dbh.execute("select substring(data.data,size) as data,direction from connection_cache,data where connection_cache.id=data.key_id and con_id=%r and key_id>%r and key_id<%r group by id order by id",(query['con_id'],query['key_id'],row['id']))
-        data= ''.join([ row['data'] for row in dbh])
+        #Get all the data from the connection cache:
+        dbh.execute("select substring(data.data,size) as data,direction from connection_cache,data where connection_cache.id=data.key_id and con_id=%r group by id order by id",(query['con_id']))
+        import re
+        data=''
+        for i in (1,2):
+            tmp = ''
+            while 1:
+                rs = dbh.fetch()
+                if not rs: break
+                tmp += rs['data']
+                c=re.compile("Content-Type:([^\r]+)")
+                pattern = c.search(tmp)
+                if pattern:
+                    result.type = pattern.group(1)
+                    print "Setting result type to %s" % result.type
 
-        ## Find the content type:
-        c=re.compile(r"Content-Type:([^\r]+)")
-        pattern = c.search(data)
-        if pattern:
-            result.type = pattern.group(1)
-                    
+                header=tmp.find("\r\n\r\n")
+                if not header:
+                    break
+                else:
+                    data=tmp[header:]
+
+                header=data.find("\r\n\r\n")
+                if not header:
+                    break
+                else:
+                    data=data[header:]
+
         def find_url(pattern):
-            """ This function queries the database to find the url of the object mentioned in pattern. It then returns a URL that redirects back to HTMLVisualise to view it. pattern is a match object. """
+            """ This function queries the database to find the url of the object mentioned in pattern. It then returns a URL that redirects back to HTMLVis to view it. pattern is a match object. """
             dbh2= self.DBO(query['case'])
             url = pattern.group(2)
 
             file_match = re.match("(http://[^\/]*/)?(.*)",url)
-
-            #Find the con_id and key_id for each of those urls
+            print file_match.group(2)
+            #Find the con_id for each of those urls
             dbh2.execute("select key_id from http where http_request_uri like '%%%s%%'",file_match.group(2))
-            rs = dbh2.fetch()
-            if not rs: return "<%s nosrc=%r" % (pattern.group(1),file_match.group(2))
-
-            key_id=rs['key_id']
-            
+            rs = dbh2.cursor.fetchone()
+            if not rs: return "<img nosrc=%r" % file_match.group(2)
             #now find the con_id:
-            dbh2.execute("select ip_src,ip_dst from ip where key_id=%s",key_id)
+            dbh2.execute("select ip_src,ip_dst from ip where key_id=%s",rs[0])
             ip = dbh2.fetch()
-            dbh2.execute("select tcp_srcport , tcp_dstport from tcp where key_id=%s",key_id)
+            dbh2.execute("select tcp_srcport , tcp_dstport from tcp where key_id=%s",rs[0])
             ports = dbh2.fetch()
 
             dbh2.execute("select con_id from connection_table where ( src_ip=%s and src_port = %s and dest_ip = %s and dest_port = %s) or ( src_ip=%s and src_port = %s and dest_ip = %s and dest_port = %s)",(ip['ip_src'],ports['tcp_srcport'],ip['ip_dst'],ports['tcp_dstport'],ip['ip_dst'],ports['tcp_dstport'],ip['ip_src'],ports['tcp_srcport']))
-            
-            rs = dbh2.fetch()
-            if not rs: return "<%s nosrc=%r" % (pattern.group(1),file_match.group(2))
-            con_id=rs['con_id']
-            
+            rs = dbh2.cursor.fetchone()
+            if not rs: return "<img nosrc=%r" % file_match.group(2)
             del query['con_id']
-            del query['key_id']
-            query['con_id'] = con_id
-            query['key_id']=key_id
-            
-            return "<%s src=\"%s\"" % (pattern.group(1),query)
-        
-        sanitise_re = re.compile(r"(?is)<\s*([^<>]+)src=['\"]?([^\s'\"]+)['\"]?")
+            query['con_id'] = rs[0]
+            print "My conid is %s " % query
+            return "%sf?%s" % (pattern.group(1),query)
+
         def sanitise(s):
             """ Sanitises s from javascript and rewrites the img tags so they point back at flag for reconstruction """
             #Find all the urls:
-            s=sanitise_re.sub(find_url,s)
+            s=re.sub("(<\s*?img.*?src=['\"]?)([^\s'\"]*)",find_url,s)
             return s
 
-        data=sanitise(data)
-        ## Shave the headers off
-        tmp = '\r\n\r\n'
-        result.result=data[data.index(tmp)+len(tmp):]
+        san=sanitise(data)
+        result.text(san,sanitise='none')
+        while 1:
+            rs = dbh.fetch()
+            if not rs: break
+            san =sanitise(rs['data'])
+            result.text(san,sanitise='none')
+            
+        result.text(finish=1)
 
-        #This tricky call overloads the UI's display method with its
-        #stream method - this has the effect of dumping out the HTML
-        #verbatim into the browser. (Note this only makes sense for
-        #the HTMLUI).
+        #This tricky call overloads the UI's display method with its stream method - this has the effect of dumping out the HTML verbatim into the browser. (Note this only makes sense for the HTMLUI).
         result.display = result.__str__
 
 class HTTPURLs(Reports.report):
