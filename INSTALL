@@ -64,18 +64,36 @@ have all library dependencies satisfied. Since the list of library
 dependencies changes very often, we will not provide an exhaustive
 list here.
 
-At the very least swig and python-dev are required, as well as
-python-mysqldb, clamav. Also ploticus, and ethereal sources are
-required (If you do not wish to use the TCPDump modules, the ethereal
-sources are not needed - flag should be ready to run by the time
-ethereal is compiled).
+At the very least the following packages are required:
 
-A a recent (Feb 05) build on a sarge (debian) machine required the
-following to be downloaded to the sources/ directory:
+  swig
+  python-dev are
+  python-mysqldb
+  clamav
+  libjpeg-progs
+  zlib1g-dev
+  libx11-dev,
+  libpng12-dev
+  g++
+  libglib1.2-dev
+
+On debian you can check to see if these are installed as follows:
+
+   dpkg -l | grep clamav
+
+and install new packags as
+
+   apt-get install clamav
+
+Also ploticus, and ethereal sources are required (If you do not wish
+to use the TCPDump modules, the ethereal sources are not needed - flag
+should be ready to run by the time ethereal is compiled).
+
+The following should be downloaded to the sources/ directory:
 
   ethereal-0.10.2.tar.bz2
-  libpng-2.2.8-config.tar.gz
-  pl230src.tar.gz
+  libpng-1.2.8-config.tar.gz
+  pl231src.tar.gz
   msleuthkit-1.73.tar.gz
 
 Tarballs in the sources/ directory are built automatically when 
