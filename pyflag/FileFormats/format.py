@@ -76,6 +76,9 @@ class Buffer:
 
     def clone(self):
         return self.__class__(fd=self.fd)
+
+    def __len__(self):
+        return self.size
     
     def set_offset(self,offset):
         """ This sets the absolute offset.
@@ -173,12 +176,23 @@ class BasicType(DataType):
 class WORD(BasicType):
     """ Reads a word (short int) from the data in big endian """
     fmt = 'H'
+    def __str__(self):
+        if not self.data:
+            self.initialise()
+
+        return "0x%X" % (self.data,)
 
 class LONG(BasicType):
     fmt='l'
 
 class ULONG(BasicType):
     fmt='L'
+    
+    def __str__(self):
+        if not self.data:
+            self.initialise()
+
+        return "0x%X" % (self.data,)
 
 class LONGLONG(BasicType):
     fmt='q'
@@ -262,7 +276,7 @@ class SimpleStruct(DataType):
                     desc,
                     item['Function'](self.data[item['Name']]))
             except IndexError,e:
-                tmp = "\n   ".join(("%s" % self.data[item['Name']]).splitlines())
+                tmp = "\n   ".join(("%r" % self.data[item['Name']].__str__()).splitlines())
                 result+="%04X - %s(%s): %s\n" % (
                     self.offsets[item['Name']],
                     item['Name'],
@@ -289,12 +303,17 @@ class POINTER(LONG):
     def __init__(self,buffer,*args,**kwargs):
         LONG.__init__(self,buffer,*args,**kwargs)
         self.pointed=None
-        
+
+    def calc_offset(self,data,offset):
+        """ Given the offset we just read, return a buffer from data pointing to the correct place """
+        ## The data is pointed to is relative to our parents structure
+        offset=self.parent.buffer.offset+offset
+        data.set_offset(offset)
+        return data
+    
     def read(self,data):
         result=LONG.read(self,data)
-        ## The data is pointed to is relative to our parents structure
-        offset=self.parent.buffer.offset+result
-        data.set_offset(offset)
+        data=self.calc_offset(data,result)
         self.pointed = self.target_class(data,parent=self.parent)
         return result
 
@@ -307,7 +326,7 @@ class POINTER(LONG):
         if not self.data:
             self.initialise()
             
-        result="*%s\n" % self.data
+        result="->%s" % self.data
         return result
 
 class StructArray(SimpleStruct):
@@ -495,7 +514,11 @@ class UCS16_STR(STRING):
     def  read(self,data):
         result=STRING.read(self,data)
         ## This is the common encoding for windows system:
-        return result.decode("utf_16_le")
+        try:
+            return result.decode("utf_16_le")
+        except UnicodeDecodeError:
+            print "Unable to decode %s" % result
+            raise
 
     def __str__(self):
         if not self.data:

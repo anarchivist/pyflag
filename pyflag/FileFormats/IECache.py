@@ -1,3 +1,34 @@
+# ******************************************************
+# Copyright 2004: Commonwealth of Australia.
+#
+# Developed by the Computer Network Vulnerability Team,
+# Information Security Group.
+# Department of Defence.
+#
+# Michael Cohen <scudette@users.sourceforge.net>
+#
+# ******************************************************
+#  Version: FLAG $Version: 0.75 Date: Sat Feb 12 14:00:04 EST 2005$
+# ******************************************************
+#
+# * This program is free software; you can redistribute it and/or
+# * modify it under the terms of the GNU General Public License
+# * as published by the Free Software Foundation; either version 2
+# * of the License, or (at your option) any later version.
+# *
+# * This program is distributed in the hope that it will be useful,
+# * but WITHOUT ANY WARRANTY; without even the implied warranty of
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# * GNU General Public License for more details.
+# *
+# * You should have received a copy of the GNU General Public License
+# * along with this program; if not, write to the Free Software
+# * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# ******************************************************
+""" A library for handling IE History index.dat files
+
+Supports IE versions from IE 5 onwards.
+"""
 import format,sys
 from format import *
 
@@ -10,11 +41,6 @@ class Header(SimpleStruct):
             [ WORD_ARRAY,7,'unknown'],
             [ LONG,1,'blocksize'],
             ]
-
-    def read(self,data):
-        result=SimpleStruct.read(self,data)
-        blocksize=result['blocksize'].get_value()
-        return result
     
 ## The default blocksize
 blocksize=0x80
@@ -105,7 +131,8 @@ class Content(SimpleStruct):
 
     def read(self,data):
         magic = LONG(data,1)
-        ## The magic refers to a special structure
+        ## The magic refers to a special structure if its there,
+        ## otherwise its just a null terminated string:
         if magic!=0x0020010:
             result={}
             result['data']=TERMINATED_STRING(data)
@@ -137,6 +164,7 @@ class ContentType(WORD_ENUM):
         0x0000: "No Data",
         0x1F10: "Title",
         0x1E0E: "ClsID",
+        ## Private types - not seen in the wild:
         0xffff: "Header",
         }
 
@@ -185,8 +213,9 @@ class IEHistoryFile:
             for key in ('content_type','data'):
                 result[key]=c[key]
                 
-        return result
-
+            return result
+        
+        return None
 
 if __name__ == "__main__":
     fd=open(sys.argv[1],'r')
@@ -196,7 +225,9 @@ if __name__ == "__main__":
     
     history=IEHistoryFile(fd)
     for event in history:
-        r=["%s=%r" % (k,"%s"%v) for k,v in event.items() if k!='event' ]
-        print '\n'.join(r)
+        if event:
+#            print event['event']
+            r=["%s=%r" % (k,"%s"%v) for k,v in event.items() if k!='event' ]
+            print '\n'.join(r)
 
     sys.stderr.write("Completed in %s seconds\n" % (time.time()-a))

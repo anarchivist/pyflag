@@ -135,20 +135,19 @@ class DepotList(LONG_ARRAY):
 class PPS_TYPE(BYTE_ENUM):
     types = { 1:'dir', 2:'file', 5:'root' }
 
-class RawString(SimpleStruct):
-    """ String based on string/length """
-    def init(self):
-        self.fields=[
-            [ UCS16_STR, 0x40, 'pps_rawname'],
-            [ WORD, 1, 'pps_sizeofname'],
-            ]
+class RawString(UCS16_STR):
+    """ Unicode String based on string/length """        
+    def read(self,data):
+        size=WORD(data[0x40:]).get_value()
+        if size>0:
+            result=UCS16_STR(data,size).read(data)
+        else:
+            result =''
+        return result
 
-    def get_value(self):
-        return self.__str__()
-    
-    def __str__(self):
-        if not self.data: self.initialise()
-        return ("%s" % self['pps_rawname'])[0:self['pps_sizeofname'].get_value()/2]
+    def size(self):
+        ## This is a fixed size record
+        return 0x40+2
     
 class PropertySet(SimpleStruct):
     """ A property set """
