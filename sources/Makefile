@@ -3,9 +3,9 @@ BIN		= ../bin/
 ETHEREAL	= ethereal-0.10.2
 ## If ethereal should be compiled statically
 STATIC		= yes
-PLOTICUS	= pl220src
+PLOTICUS	= pl230src
 
-PROGS		= $(BIN)/tethereal $(BIN)/pl $(BIN)/prefabs
+PROGS		= $(BIN)/pl $(BIN)/tethereal $(BIN)/prefabs
 
 ## This bit compiles and patches ethereal, note that we expect to have
 ## the ethereal-xxx.tar.bz2 in the sources directory.

@@ -732,7 +732,7 @@ class HTMLUI(UI.GenericUI):
                 for k,v in row.items():
                     try:
                         row[k]=callbacks[k](v)
-                    except KeyError:
+                    except (KeyError,Exception):
                         pass
                 cvs_writer.writerow(row)
 
