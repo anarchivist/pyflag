@@ -63,7 +63,7 @@ static u_int8_t
 dstat (FS_INFO *fs, DADDR_T addr, char *buf, int flags, char *ptr)
 {
 	switch (fs->ftype & FSMASK) {
-	  case EXT2FS_TYPE:
+	  case EXTxFS_TYPE:
 	  case FFS_TYPE:
 		printf("Fragment: %lu\n", (ULONG)addr);
 		break;
@@ -85,9 +85,10 @@ dstat (FS_INFO *fs, DADDR_T addr, char *buf, int flags, char *ptr)
         FFS_INFO *ffs = (FFS_INFO *) fs;
         printf("Group: %lu\n", (ULONG)ffs->cg_num);
     }
-    else if ((fs->ftype & FSMASK) == EXT2FS_TYPE) {
+    else if ((fs->ftype & FSMASK) == EXTxFS_TYPE) {
         EXT2FS_INFO *ext2fs = (EXT2FS_INFO *) fs;
-        printf("Group: %lu\n", (ULONG)ext2fs->grpnum);
+	if (ext2fs->grpnum != -1)
+        	printf("Group: %lu\n", (ULONG)ext2fs->grpnum);
     }	
 	else if ((fs->ftype & FSMASK) == FATFS_TYPE) {
 		FATFS_INFO *fatfs = (FATFS_INFO *) fs;

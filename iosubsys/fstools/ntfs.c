@@ -141,6 +141,8 @@ uni2ascii(char *uni, int ulen, char *asc, int alen)
  **********************************************************************/
 
 
+
+
 /*
  * Lookup up a given MFT entry (mftnum) in the MFT and save it in its
  * raw format in *mft.
@@ -157,7 +159,7 @@ ntfs_mft_lookup(NTFS_INFO *ntfs, ntfs_mft *mft, u_int32_t mftnum)
 	FS_INFO *fs = (FS_INFO *)&ntfs->fs_info;
 	FS_DATA_RUN *data_run;
 	ntfs_upd *upd;
-	u_int16_t orig_seq;
+	u_int16_t sig_seq;
 
 	/* sanity checks */
 	if (!mft)
@@ -282,12 +284,19 @@ ntfs_mft_lookup(NTFS_INFO *ntfs, ntfs_mft *mft, u_int32_t mftnum)
 		ntfs->mnum = mftnum;
 
 	/* Sanity Check */
-	/* @@@ What else should we do with a BAAD entry ... */
+#if 0
+	/* This is no longer applied because it caused too many problems
+	 * with images that had 0 and 1 etc. as values.  Testing shows that
+	 * even Windows XP doesn't care if entries have an invalid entry, so
+	 * this is no longer checked.  The update sequence check should find
+	 * corrupt entries
+	 * */
 	if ((getu32(fs, mft->magic) != NTFS_MFT_MAGIC) &&
 	 (getu32(fs, mft->magic) != NTFS_MFT_MAGIC_BAAD) &&
 	 (getu32(fs, mft->magic) != NTFS_MFT_MAGIC_ZERO))
 		error ("entry %d has an invalid MFT magic: %x", mftnum,
 		  getu32(fs, mft->magic));
+#endif
 
 	/* The MFT entries have error and integrity checks in them
 	 * called update sequences.  They must be checked and removed
@@ -307,23 +316,24 @@ ntfs_mft_lookup(NTFS_INFO *ntfs, ntfs_mft *mft, u_int32_t mftnum)
 	upd = (ntfs_upd *)((int)mft + getu16(fs, mft->upd_off));
 	
 	/* Get the sequence value that each 16-bit value should be */
-	orig_seq = getu16(fs, upd->upd_val);
+	sig_seq = getu16(fs, upd->upd_val);
 
 	/* cycle through each sector */
 	for (i = 1; i < getu16(fs, mft->upd_cnt); i++) {
-        /* The offset into the buffer of the value to analyze */
+
+		/* The offset into the buffer of the value to analyze */
 		int offset = i * ntfs->ssize_b - 2;
 		u_int8_t *new, *old;
 
 		/* get the current sequence value */
 		u_int16_t cur_seq = getu16(fs, (int)mft + offset);
 
-		if (cur_seq != orig_seq) {
+		if (cur_seq != sig_seq) {
 			/* get the replacement value */
 			u_int16_t cur_repl =
 			  getu16(fs, &upd->upd_seq + (i-1) * 2);
-			error ("Incorrect update sequence value in index buffer\nUpdate Value: 0x%x Actual Value: 0x%x Replacement Value: 0x%x\nThis is typically because of a corrupted entry",
-			  orig_seq, cur_seq, cur_repl);
+			error ("Incorrect update sequence value in MFT entry\nUpdate Value: 0x%x Actual Value: 0x%x Replacement Value: 0x%x\nThis is typically because of a corrupted entry",
+			  sig_seq, cur_seq, cur_repl);
 		}
 
 		new = &upd->upd_seq + (i-1) * 2;
@@ -344,32 +354,51 @@ ntfs_mft_lookup(NTFS_INFO *ntfs, ntfs_mft *mft, u_int32_t mftnum)
 
 
 /*
- * given a cluster, return the cluster address containing the bitmap
- * for the given cluster
+ * given a cluster, return the allocation status 
  */
-static u_int64_t
-ntfs_bmap_addr (NTFS_INFO *ntfs, u_int32_t cluster)
+static int
+is_clust_alloc (NTFS_INFO *ntfs, u_int32_t addr)
 {
-	int bit_p_cl = ntfs->fs_info.block_size * 8;
-	int c;
-	FS_DATA_RUN *run;
+	FS_INFO *fs = (FS_INFO *)&ntfs->fs_info;
+	int	bits_p_clust, base, b;
+	bits_p_clust = 8 * ntfs->fs_info.block_size;
 
-	if (cluster > ntfs->fs_info.last_block)
-		error ("ntfs_bmap_lookup: cluster too large");
+	/* Is the cluster too big? */
+	if (addr > ntfs->fs_info.last_block)
+		error ("is_clust_alloc: cluster too large");
 
-	/* identify which cluster in the run we want */
-	c = cluster / bit_p_cl;
+	/* identify the base cluster in the bitmap file */
+	base = addr / bits_p_clust;
+	b = addr % bits_p_clust;
 
-	for (run = ntfs->bmap; run; run = run->next) {
-		if (run->len <= c) {
-			c -= run->len;
-			continue;
+	/* is this the same as in the cached buffer? */
+	if (base != ntfs->bmap_buf_off) {
+		u_int32_t c =  base;
+		FS_DATA_RUN *run;
+		u_int64_t	fsaddr = 0;
+
+
+		/* get the file system address of the bitmap cluster */
+		for (run = ntfs->bmap; run; run = run->next) {
+			if (run->len <= c) {
+				c -= run->len;
+			}
+			else {
+				fsaddr = run->addr + c;
+			}
 		}
-		return run->addr + c; 
+
+		if (fsaddr == 0)
+			error ("is_clust_alloc: cluster not found in bitmap: %d", c);
+
+		ntfs->bmap_buf_off = base;
+
+		fs->read_block(fs, ntfs->bmap_buf, ntfs->fs_info.block_size, fsaddr, "bmap");
 	}
 
-	error ("ntfs_bmap_lookup: cluster not found");
-	return 1;
+	/* identify if the cluster is allocated or not */
+	return ((ntfs->bmap_buf->data[b/8]) & (0x1 << (b % 8)) ) ?
+	  1:0;
 }
 
 
@@ -534,7 +563,6 @@ ntfs_make_data_run(NTFS_INFO *ntfs, ntfs_runlist *runlist,
  * FS_FLAG_FILE_NOSPARSE, FS_FLAG_FILE_NOAOBRT
  *
  * Action uses: FS_FLAG_DATA_CONT
- * @@@ Not implemented FS_FLAG_DATA_ALLOC _UNALLOC yet
  *
  * No notion of META
  */
@@ -559,7 +587,7 @@ ntfs_data_walk(NTFS_INFO *ntfs, FS_DATA *fs_data,
 			memcpy(buf, fs_data->buf, fs_data->size);
 		}
 
-		myflags = FS_FLAG_DATA_CONT;
+		myflags = FS_FLAG_DATA_CONT | FS_FLAG_DATA_ALLOC;
 		action(fs, ntfs->root_mft_addr, buf, fs_data->size, myflags, ptr);
 			
 		if (buf)
@@ -647,6 +675,8 @@ ntfs_data_walk(NTFS_INFO *ntfs, FS_DATA *fs_data,
 					bufsize = (int)fsize;
 
 				myflags = FS_FLAG_DATA_CONT;
+				myflags |= is_clust_alloc(ntfs, addr) ?
+				  FS_FLAG_DATA_ALLOC : FS_FLAG_DATA_UNALLOC;
 
 				/* Only do sparse clusters if NOSPARSE is not set */
 				if ((fs_data_run->flags & FS_DATA_SPARSE) && 
@@ -856,7 +886,7 @@ ntfs_proc_attrseq (NTFS_INFO *ntfs, FS_INODE *fs_inode, ntfs_attr *attrseq,
 			if (fs_inode->name) {
 				for (fs_name = fs_inode->name; 
 			  	  (fs_name) && (fs_name->next != NULL);
-			      fs_name = fs_name->next) { }
+				  fs_name = fs_name->next) { }
 		
 				/* add to the end of the existing list */
 				fs_name->next = (FS_NAME *)mymalloc(sizeof(FS_NAME));
@@ -971,23 +1001,28 @@ ntfs_proc_attrseq (NTFS_INFO *ntfs, FS_INODE *fs_inode, ntfs_attr *attrseq,
  */
 static char *act_buf;
 static int act_bufleft;
+static int act_unalloc = 0;
 
 static u_int8_t
 buffer_action(FS_INFO *fs, DADDR_T addr, char *buf, int size, 
   int flags, char *ptr)
 {
-    int len;
+	int len;
 
-    if (!act_buf)
-        RAISE(E_IOERROR,NULL,"The Action Buffer is NULL (?)");
+	if (!act_buf)
+		RAISE(E_IOERROR,NULL,"The Action Buffer is NULL (?)");
 
-    len = ((size < act_bufleft) ? size : act_bufleft);
+	len = ((size < act_bufleft) ? size : act_bufleft);
 
-    memcpy(act_buf, buf, len);
-    act_buf = (char *)((int)act_buf + (int)len);
-    act_bufleft -= len;
+	memcpy(act_buf, buf, len);
+	act_buf = (char *)((int)act_buf + (int)len);
+	act_bufleft -= len;
+   
+       	/* If any cluster is unallocated, then set a flag */	
+	if (flags & FS_FLAG_DATA_UNALLOC) 
+		act_unalloc = 1;
 
-    return ((act_bufleft > 0) ? WALK_CONT : WALK_STOP);
+	return ((act_bufleft > 0) ? WALK_CONT : WALK_STOP);
 }
 
 
@@ -1036,6 +1071,7 @@ ntfs_proc_attrlist(NTFS_INFO *ntfs, FS_INODE *fs_inode,
 	if (act_bufleft > 0)
 		error ("proc_attrlist: listleft > 0");
 
+
 	/* Process the list & and call ntfs_proc_attr */
 	for (list = (ntfs_attrlist *)buf;
 	  (list) && ((DADDR_T)list < endaddr);
@@ -1080,8 +1116,20 @@ ntfs_proc_attrlist(NTFS_INFO *ntfs, FS_INODE *fs_inode,
 		/* Sanity check. */
 		if (mftnum < ntfs->fs_info.first_inum || 
 		  mftnum > ntfs->fs_info.last_inum) {
-			RAISE(E_IOERROR,NULL,"Invalid MFT file reference (%lu) in the attribute list of MFT %lu", 
-			  (ULONG) mftnum, ntfs->mnum);
+
+			/* Only make a message if it is allocated */
+			if ((getu16(fs, ntfs->mft->flags) & NTFS_MFT_INUSE) != 0) {
+				remark("Invalid MFT file reference (%lu) in the attribute list of MFT %lu", 
+				  (ULONG) mftnum, ntfs->mnum);
+			}
+			else if (verbose) {
+				/* this case can easily occur if the attribute list was non-resident and the cluster has been reallocated */
+
+				fprintf(logfp, "Invalid MFT file reference (%lu) in the unallocated attribute list of MFT %lu", 
+				  (ULONG) mftnum, ntfs->mnum);
+			}
+
+			continue;
 		}
 
 		ntfs_mft_lookup(ntfs, mft, mftnum);
@@ -1251,10 +1299,10 @@ ntfs_load_attrdef (NTFS_INFO *ntfs)
 	if (ntfs->attrdef)
 		return;
 
-    fs_inode = ntfs_inode_lookup(fs, NTFS_MFT_ATTR);
-    fs_data = fs_data_lookup(fs_inode->attr, NTFS_ATYPE_DATA, 0);
-    if (!fs_data)
-        error ("Data attribute not found in $Attr");
+	fs_inode = ntfs_inode_lookup(fs, NTFS_MFT_ATTR);
+	fs_data = fs_data_lookup_noid(fs_inode->attr, NTFS_ATYPE_DATA);
+	if (!fs_data)
+		error ("Data attribute not found in $Attr");
  
     act_bufleft = fs_data->size; 
 	act_buf = mymalloc(act_bufleft);
@@ -1297,7 +1345,7 @@ ntfs_attrname_lookup(FS_INFO *fs, u_int16_t type, char *name, int len)
 }
 
 
-/* Load the block bitmap $Data run */
+/* Load the block bitmap $Data run  and allocate a buffer for a cache */
 static void
 ntfs_load_bmap(NTFS_INFO *ntfs)
 {
@@ -1307,25 +1355,32 @@ ntfs_load_bmap(NTFS_INFO *ntfs)
 	/* Get data on the bitmap */
 	ntfs_dinode_lookup (ntfs, NTFS_MFT_BMAP);
 
-    attr = (ntfs_attr *) ( (int)ntfs->mft + 
+	attr = (ntfs_attr *) ( (int)ntfs->mft + 
 	  (int)getu16(fs, ntfs->mft->attr_off));
 
 	/* cycle through them */
-    while (((int)attr >= (int)ntfs->mft) &&
+	while (((int)attr >= (int)ntfs->mft) &&
         ((int)attr <= ((int)ntfs->mft + (int)ntfs->mft_rsize_b)) &&
         (getu32(fs, attr->len) > 0 &&
         (getu32(fs, attr->type) != 0xffffffff) &&
         (getu32(fs, attr->type) != NTFS_ATYPE_DATA))) {
-			attr = (ntfs_attr *)((int)attr + getu32(fs, attr->len));
-    }
+		attr = (ntfs_attr *)((int)attr + getu32(fs, attr->len));
+	}
 
 	/* did we get it? */
-    if (getu32(fs, attr->type) != NTFS_ATYPE_DATA) 
+	if (getu32(fs, attr->type) != NTFS_ATYPE_DATA) 
 		error ("Error Finding Bitmap Data Attribute");
 
 	/* convert to generic form */
 	ntfs->bmap = ntfs_make_data_run(ntfs, 
 	  (ntfs_runlist *) ((int)attr + getu16(fs, attr->c.nr.run_off)), NULL);
+
+	ntfs->bmap_buf = fs_buf_alloc(fs->block_size);
+
+	/* Load the first cluster so that we ahve something there */
+	ntfs->bmap_buf_off = 0;
+	fs->read_block(fs, ntfs->bmap_buf, fs->block_size, ntfs->bmap->addr, "bmap");
+
 }
 
 
@@ -1343,7 +1398,7 @@ ntfs_load_ver (NTFS_INFO *ntfs)
 	fs_inode = ntfs_inode_lookup(fs, NTFS_MFT_VOL);
 
 	/* cache the data attribute */
-	fs_data = fs_data_lookup(fs_inode->attr, NTFS_ATYPE_VINFO, 0);
+	fs_data = fs_data_lookup_noid(fs_inode->attr, NTFS_ATYPE_VINFO);
 
 	if (!fs_data)
 		error ("Volume Info attribute not found in $Volume");
@@ -1378,7 +1433,7 @@ ntfs_load_ver (NTFS_INFO *ntfs)
 /*
  *
  * flag values: FS_FLAG_FILE_AONLY, FS_FLAG_FILE_SLACK, FS_FLAG_FILE_NOSPARSE
- *  FS_FLAG_FILE_NOABORT
+ *  FS_FLAG_FILE_NOABORT, FS_FLAG_FILE_NOID
  * 
  * nothing special is done for FS_FLAG_FILE_RECOVER
  *
@@ -1411,9 +1466,17 @@ ntfs_file_walk(FS_INFO *fs, FS_INODE *fs_inode, u_int32_t type, u_int16_t id,
 	/* 
 	 * Find the record with the correct type value 
 	*/
-	fs_data = fs_data_lookup(fs_inode->attr, type, id);
-	if (!fs_data)
-		error ("type %i-%i not found in file", type, id);
+	if (flags & FS_FLAG_FILE_NOID) {
+		fs_data = fs_data_lookup_noid(fs_inode->attr, type);
+		if (!fs_data)
+			error ("type %i not found in file", type);
+	}
+	else {
+		fs_data = fs_data_lookup(fs_inode->attr, type, id);
+		if (!fs_data)
+			error ("type %i-%i not found in file", type, id);
+	}
+
 
 	/* process the content */
 	ntfs_data_walk(ntfs, fs_data, flags, action, ptr);
@@ -1437,59 +1500,36 @@ ntfs_block_walk(FS_INFO *fs, DADDR_T start, DADDR_T last, int flags,
 {
 	char *myname = "ntfs_block_walk";
 	NTFS_INFO *ntfs = (NTFS_INFO *)fs;
-	DADDR_T	addr, curaddr;
+	DADDR_T	addr;
 	FS_BUF *fs_buf = fs_buf_alloc(fs->block_size);	/* allocate a cluster */
 	int myflags;
-	int	bits_p_clust, base, curbase;
-	FS_BUF *bmap = fs_buf_alloc(fs->block_size);
 
-    /*
-     * Sanity checks.
-     */
+	/*
+	 * Sanity checks.
+	 */
 	if (start < fs->first_block || start > fs->last_block)
 		RAISE(E_IOERROR,NULL,"%s: invalid start block number: %lu", myname, (ULONG) start);
 	if (last < fs->first_block || last > fs->last_block)
 		RAISE(E_IOERROR,NULL,"%s: invalid last block number: %lu", myname, (ULONG) last);
 
-	bits_p_clust = 8 * fs->block_size;
-
-	/* identify the cluster of the bitmap for the starting location */
-	curbase = start / bits_p_clust;
-	curaddr = ntfs_bmap_addr (ntfs, start);
-	fs->read_block(fs, bmap, fs->block_size, curaddr, "bmap");
-
 	/* Cycle through the blocks */
 	for (addr = start; addr <= last; addr++) {
-		int b;
-	
-		/* identify the data for this address (bitmap cluster) */
-		base = addr / bits_p_clust;
-
-		/* is this the same as in the buffer? */
-		if (base != curbase) {
-			curbase = base;
-			curaddr = ntfs_bmap_addr(ntfs, addr);
-			fs->read_block(fs, bmap, fs->block_size, curaddr, "bmap");
-		}
 
 		/* identify if the cluster is allocated or not */
-		b = addr % bits_p_clust;
-		myflags = (((bmap->data[b/8]) & (0x1 << (b % 8)) ) ?
-		  FS_FLAG_DATA_ALLOC : FS_FLAG_DATA_UNALLOC);
+		myflags = is_clust_alloc(ntfs, addr) ?
+		  FS_FLAG_DATA_ALLOC : FS_FLAG_DATA_UNALLOC;
 
 		if (flags & myflags) {
 			fs->read_block(fs, fs_buf, fs->block_size, addr, "data block");
 
 			if (WALK_STOP == action(fs, addr, fs_buf->data, myflags, ptr)) {
 				fs_buf_free(fs_buf);
-				fs_buf_free(bmap);
 				return;
 			}
 		}
 	}
 
 	fs_buf_free(fs_buf);
-	fs_buf_free(bmap);
 	return;
 }
 
@@ -1608,7 +1648,7 @@ ntfs_fsstat(FS_INFO *fs, FILE *hFile)
 	 * Volume 
 	 */
 	fs_inode = ntfs_inode_lookup(fs, NTFS_MFT_VOL);
-	fs_data = fs_data_lookup(fs_inode->attr, NTFS_ATYPE_VNAME, 0);
+	fs_data = fs_data_lookup_noid(fs_inode->attr, NTFS_ATYPE_VNAME);
 	if (!fs_data)
 		error ("Volume Name attribute not found in $Volume");
 	
@@ -1630,7 +1670,7 @@ ntfs_fsstat(FS_INFO *fs, FILE *hFile)
 		fprintf(hFile, "Version: Windows XP\n");
 
 
-    fprintf(hFile, "\nMETA-DATA INFORMATION\n");
+    fprintf(hFile, "\nMETADATA INFORMATION\n");
     fprintf(hFile, "--------------------------------------------\n");
 
 	fprintf(hFile, "First Cluster of MFT: %"PRIu64"\n",
@@ -1650,7 +1690,7 @@ ntfs_fsstat(FS_INFO *fs, FILE *hFile)
 
 
 
-    fprintf(hFile, "\nCONTENT-DATA INFORMATION\n");
+    fprintf(hFile, "\nCONTENT INFORMATION\n");
     fprintf(hFile, "--------------------------------------------\n");
     fprintf(hFile, "Sector Size: %d\n", ntfs->ssize_b);
     fprintf(hFile, "Cluster Size: %d\n", ntfs->csize_b);
@@ -1756,7 +1796,7 @@ ntfs_istat (FS_INFO *fs, FILE *hFile, INUM_T inum, int numblock,
 
 
 	/* STANDARD_INFORMATION info */
-	fs_data = fs_data_lookup(fs_inode->attr, NTFS_ATYPE_SI, 0);
+	fs_data = fs_data_lookup_noid(fs_inode->attr, NTFS_ATYPE_SI);
 	if (fs_data) {
         ntfs_attr_si *si = (ntfs_attr_si *)fs_data->buf;
 		int a = 0;
@@ -1867,7 +1907,7 @@ ntfs_istat (FS_INFO *fs, FILE *hFile, INUM_T inum, int numblock,
 	}
 
 	/* $FILE_NAME Information */
-	fs_data = fs_data_lookup(fs_inode->attr, NTFS_ATYPE_FNAME, 0);
+	fs_data = fs_data_lookup_noid(fs_inode->attr, NTFS_ATYPE_FNAME);
 	if(fs_data) {
 
         ntfs_attr_fname *fname = (ntfs_attr_fname *)fs_data->buf;
@@ -1992,7 +2032,7 @@ ntfs_istat (FS_INFO *fs, FILE *hFile, INUM_T inum, int numblock,
 
 
 	/* $OBJECT_ID Information */
-	fs_data = fs_data_lookup(fs_inode->attr, NTFS_ATYPE_OBJID, 0);
+	fs_data = fs_data_lookup_noid(fs_inode->attr, NTFS_ATYPE_OBJID);
 	if(fs_data) {
         ntfs_attr_objid *objid = (ntfs_attr_objid *)fs_data->buf;
 		u_int64_t id1, id2;
@@ -2049,7 +2089,7 @@ ntfs_istat (FS_INFO *fs, FILE *hFile, INUM_T inum, int numblock,
 	}
 
 	/* Attribute List Information */
-	fs_data = fs_data_lookup(fs_inode->attr, NTFS_ATYPE_ATTRLIST, 0);
+	fs_data = fs_data_lookup_noid(fs_inode->attr, NTFS_ATYPE_ATTRLIST);
 	if(fs_data) {
 		char *buf;
 		ntfs_attrlist *list;
@@ -2126,13 +2166,14 @@ egress:
 static void
 ntfs_close(FS_INFO *fs)
 {
-    NTFS_INFO *ntfs = (NTFS_INFO *)fs;
-    fs->io->close(fs->io);
+	NTFS_INFO *ntfs = (NTFS_INFO *)fs;
+	fs->io->close(fs->io);
 	free((char *)ntfs->mft);
 	free((char *)ntfs->fs);
 	fs_data_run_free(ntfs->bmap);
+	fs_buf_free(ntfs->bmap_buf);
 	fs_inode_free(ntfs->mft_inode);
-    free(fs);
+	free(fs);
 }
 
 
@@ -2153,46 +2194,42 @@ ntfs_open(IO_INFO *io, unsigned char ftype)
 	if ((ftype & FSMASK) != NTFS_TYPE) {
 		return(NULL);
 		error ("Invalid FS type in ntfs_open");
-	};
+	}
 
-    //if ((ntfs->fs_info.fd = open(name, O_RDONLY)) < 0)
-    //    error("%s: open %s: %m", myname, name);
+	//if ((ntfs->fs_info.fd = open(name, O_RDONLY)) < 0)
+	//	error("%s: open %s: %m", myname, name);
 
-    fs->ftype = ftype;
-    fs->flags = FS_HAVE_SEQ;
+	fs->ftype = ftype;
+	fs->flags = FS_HAVE_SEQ;
 
 	len = roundup(sizeof(ntfs_sb), NTFS_DEV_BSIZE);
 	ntfs->fs = (ntfs_sb *) mymalloc(len);
-    if (fs->io->read_random(fs->io, (char *) ntfs->fs, len,0,"read magic") != len)
+	if (fs->io->read_random(fs->io, (char *) ntfs->fs, len,0,"read magic") != len)
 		RAISE(E_IOERROR,NULL,"Can't read superblock");
 
 	/* Check the magic value */
-	//if (guessu32(fs, ntfs->fs->magic, NTFS_FS_MAGIC)) 
 	if (guessu16(fs, ntfs->fs->magic, NTFS_FS_MAGIC)) {
 		return(NULL);
 		//error("Error: %s is not a NTFS file system", name);
 	}
 
-	//if (getu16(fs, ntfs->fs->magic2) != NTFS_FS_MAGIC2) 
-	//	error("Error: Invalid Magic 2 in NTFS boot sector");
 
 	/*
-     * block calculations : although there are no blocks in ntfs,
+	 * block calculations : although there are no blocks in ntfs,
 	 * we are using a cluster as a "block"
 	 */
 	
 	ntfs->ssize_b = getu16(fs, ntfs->fs->ssize);
 	ntfs->csize_b = ntfs->fs->csize * ntfs->ssize_b;
-    fs->first_block = 0;
+	fs->first_block = 0;
 
 	/* This field is defined as 64-bits but according to the
 	 * NTFS drivers in Linux, windows only uses 32-bits
 	 */
-    fs->block_count = (DADDR_T)getu32(fs, ntfs->fs->vol_size_s) / ntfs->fs->csize;
-    fs->last_block = fs->block_count - 1;
-    fs->block_size = ntfs->csize_b;
-    fs->file_bsize = fs->block_size;
-    fs->dev_bsize = NTFS_DEV_BSIZE;
+	fs->block_count = (DADDR_T)getu32(fs, ntfs->fs->vol_size_s) / ntfs->fs->csize;
+	fs->last_block = fs->block_count - 1;
+	fs->block_size = ntfs->csize_b;
+	fs->dev_bsize = NTFS_DEV_BSIZE;
 
 
 	if (ntfs->fs->mft_rsize_c > 0)
@@ -2209,21 +2246,21 @@ ntfs_open(IO_INFO *io, unsigned char ftype)
 
 	ntfs->root_mft_addr = getu64(fs, ntfs->fs->mft_clust) * ntfs->csize_b;
 
-    /*
-     * Other initialization: caches, callbacks.
-     */
-    fs->seek_pos = -1;
+	/*
+	 * Other initialization: caches, callbacks.
+	 */
+	fs->seek_pos = -1;
    
-    fs->inode_walk = ntfs_inode_walk;
-    fs->read_block = fs_read_block;
-    fs->block_walk = ntfs_block_walk;
-    fs->file_walk = ntfs_file_walk;
-    fs->inode_lookup = ntfs_inode_lookup;
-    fs->dent_walk = ntfs_dent_walk;
+	fs->inode_walk = ntfs_inode_walk;
+	fs->read_block = fs_read_block;
+	fs->block_walk = ntfs_block_walk;
+	fs->file_walk = ntfs_file_walk;
+	fs->inode_lookup = ntfs_inode_lookup;
+	fs->dent_walk = ntfs_dent_walk;
 	fs->fsstat = ntfs_fsstat;
 	fs->fscheck = ntfs_fscheck;
 	fs->istat = ntfs_istat;
-    fs->close = ntfs_close;
+	fs->close = ntfs_close;
 
 
 	/*
@@ -2245,17 +2282,17 @@ ntfs_open(IO_INFO *io, unsigned char ftype)
 	loading_the_MFT = 1;
 	ntfs_mft_lookup(ntfs, ntfs->mft, NTFS_MFT_MFT);
 
-    ntfs->mft_inode = fs_inode_alloc(NTFS_NDADDR, NTFS_NIADDR);
-    ntfs_copy_inode(ntfs, ntfs->mft_inode);
+	ntfs->mft_inode = fs_inode_alloc(NTFS_NDADDR, NTFS_NIADDR);
+	ntfs_copy_inode(ntfs, ntfs->mft_inode);
 
-    /* cache the data attribute 
+	/* cache the data attribute 
 	 *
 	 * This will likely be done already by proc_attrseq, but this
 	 * should be quick
 	 */
-    ntfs->mft_data = fs_data_lookup(ntfs->mft_inode->attr, NTFS_ATYPE_DATA, 0);
-    if (!ntfs->mft_data)
-        error ("Data Attribute not found in $MFT");
+	ntfs->mft_data = fs_data_lookup_noid(ntfs->mft_inode->attr, NTFS_ATYPE_DATA);
+	if (!ntfs->mft_data)
+		error ("Data Attribute not found in $MFT");
 
 
 	/* Get the inode count based on the table size */
@@ -2267,6 +2304,7 @@ ntfs_open(IO_INFO *io, unsigned char ftype)
 
 	/* load the version of the file system */
 	ntfs_load_ver(ntfs);
+
 
 	/* load the data block bitmap data run into ntfs_info */
 	ntfs_load_bmap(ntfs);

@@ -23,17 +23,18 @@ typedef struct {
 } FS_TYPES;
 
 FS_TYPES fs_open_table[] = {
-    {"bsdi", FFS_1, "BSDi FFS"},
+	{"bsdi", FFS_1, "BSDi FFS"},
 	{"fat", MSAUTO_FAT, "auto-detect FAT"},
 	{"fat12", MS12_FAT, "FAT12"},
 	{"fat16", MS16_FAT, "FAT16"},
 	{"fat32", MS32_FAT, "FAT32"},
-    {"freebsd", FFS_1, "FreeBSD FFS"},
+	{"freebsd", FFS_1, "FreeBSD FFS"},
+	{"linux-ext", EXTAUTO, "auto-detect Linux EXTxFS"},
 	{"linux-ext2", EXT2FS, "Linux EXT2FS"},
-	{"linux-ext3", EXT3FS_1, "Linux EXT3FS"},
-    {"netbsd", FFS_1, "NetBSD FFS"},
+	{"linux-ext3", EXT3FS, "Linux EXT3FS"},
+	{"netbsd", FFS_1, "NetBSD FFS"},
 	{"ntfs", NTFS, "NTFS"},
-    {"openbsd", FFS_1, "OpenBSD FFS"},
+	{"openbsd", FFS_1, "OpenBSD FFS"},
 	{"raw", RAW, "Raw Data"},
 	{"solaris", FFS_2, "Solaris FFS"},
 	{"swap", SWAP, "Swap Space"},
@@ -57,7 +58,7 @@ fs_parse_type(const char *str)
 void 
 fs_print_types() 
 {
-    FS_TYPES *sp;
+	FS_TYPES *sp;
 	for (sp = fs_open_table; sp->name; sp++)
 		printf("\t%s (%s)\n", sp->name, sp->comment);
 }

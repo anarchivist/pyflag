@@ -103,7 +103,7 @@ assume that the file is finished, and return a short buffer.
 
 If we fail to read, we return the error code back.
 */
-static int read_from_stream(int fd,void *buf,int length) {
+int read_from_stream(int fd,void *buf,int length) {
   int result;
   char *current_p = (char *)buf;
   
@@ -121,6 +121,29 @@ static int read_from_stream(int fd,void *buf,int length) {
     current_p+=result;
   };
   return(current_p-(char *)buf);
+};
+
+int advance_stream(int fd, int length) {
+  int result;
+  int count = 0;
+  char current_p;
+
+  fprintf(stderr, "  hrmm...asked to advance: %i\n", length);
+
+  while(length>0) {
+    if(length==0) 
+      break;
+
+    result=read(fd,&current_p,1);
+    if(result<0) { //Error occured
+      return(result);
+    } else if(result==0) { //EOF reached
+      break;
+    };
+    length-=result;
+    count += result;
+  };
+  return(count);
 };
 
 struct evf_file_header *evf_read_header(int fd) {
@@ -406,6 +429,7 @@ void evf_decompress_fds(struct offset_table *offsets,int outfd) {
 	memset(data,0,offsets->chunk_size);
       };
     } else {
+      fprintf(stderr, "Block %i is UNCOMPRESSED\n", i);
       memcpy(data,cdata,length);
     };
 

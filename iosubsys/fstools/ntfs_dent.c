@@ -75,8 +75,8 @@ ntfs_dent_copy(NTFS_INFO *ntfs, ntfs_idxentry *idxe, FS_DENT *fs_dent)
  *
  */
 
-static char *curbuf;
-static int bufleft;
+static char *curbuf = NULL;
+static int bufleft = 0;
 
 static u_int8_t
 idxalloc_action(FS_INFO *fs, DADDR_T addr, char *buf, int size, 
@@ -152,11 +152,13 @@ ntfs_dent_idxentry(NTFS_INFO *ntfs, ntfs_idxentry *idxe,
 
 	/* cycle through the index entries, based on provided size */
 	while (((int)&(idxe->stream) + sizeof(ntfs_attr_fname)) < endaddr) {
+
 		ntfs_attr_fname *fname = (ntfs_attr_fname *)&idxe->stream;
+
 
 		if (verbose)
 			fprintf(logfp,
-			  "ntfs_dent_idxentry: Idxe: %lu $FILE_NAME Entry: %lu  File Ref: %lu  IdxEnt Len: %lu  StrLen: %lu\n",
+			  "ntfs_dent_idxentry: New IdxEnt: %lu $FILE_NAME Entry: %lu  File Ref: %lu  IdxEnt Len: %lu  StrLen: %lu\n",
 			  (ULONG)idxe, (ULONG)fname, (ULONG)getu48(fs, idxe->file_ref), 
 			  (ULONG)getu16(fs, idxe->idxlen), (ULONG)getu16(fs, idxe->strlen));
 
@@ -233,7 +235,7 @@ ntfs_dent_idxentry(NTFS_INFO *ntfs, ntfs_idxentry *idxe,
 
 		if (verbose)
 			fprintf(logfp,
-			  "ntfs_dent_idxentry: Deletion Details of %s: Str Len: %lu  Len to end: %lu\n",
+			  "ntfs_dent_idxentry: Deletion Check Details of %s: Str Len: %lu  Len to end after current: %lu\n",
 			  fs_dent->name, 
 			  (ULONG)getu16(fs, idxe->strlen), 
 			  (ULONG)(endaddr_alloc - (int)idxe - getu16(fs, idxe->idxlen)));
@@ -252,7 +254,7 @@ ntfs_dent_idxentry(NTFS_INFO *ntfs, ntfs_idxentry *idxe,
 			 * people with invalid data
 			 */
 			if (fs_dent->inode == 0) {
-				free(fs_dent->fsi);
+				fs_inode_free(fs_dent->fsi);
 				fs_dent->fsi = NULL;
 			}
 			myflags = FS_FLAG_NAME_UNALLOC;
@@ -274,22 +276,21 @@ ntfs_dent_idxentry(NTFS_INFO *ntfs, ntfs_idxentry *idxe,
 		   ((fs_dent->fsi->mode & FS_INODE_FMT) == FS_INODE_DIR) &&
 		   (fs_dent->inode)) {
 
-            if (depth < MAX_DEPTH) {
-                didx[depth] = &dirs[strlen(dirs)];
+			if (depth < MAX_DEPTH) {
+				didx[depth] = &dirs[strlen(dirs)];
 				strncpy(didx[depth], fs_dent->name, DIR_STRSZ - strlen(dirs));
-                strncat(dirs, "/", DIR_STRSZ);
-            }
-            depth++;
+				strncat(dirs, "/", DIR_STRSZ);
+			}
+			depth++;
 
 			ntfs_dent_walk(&(ntfs->fs_info), fs_dent->inode, flags,
 			  action, ptr);
 
-            depth--;
-            if (depth < MAX_DEPTH)
+			depth--;
+			if (depth < MAX_DEPTH)
 				*didx[depth] = '\0';
 
 		} /* end of recurse */
-
 
 incr_entry:
 
@@ -338,38 +339,38 @@ ntfs_fix_idxrec(NTFS_INFO *ntfs, ntfs_idxrec *idxrec, u_int32_t len)
 		  "ntfs_fix_idxrec: Fixing idxrec: %lu  Len: %lu\n",
 		  (ULONG)idxrec, (ULONG)len);
 
-    /* sanity check so we don't run over in the next loop */
-    if ((getu16(fs, idxrec->upd_cnt) - 1) * ntfs->ssize_b > len)
-        error ("More Update Sequence Entries than idx record size");
+	/* sanity check so we don't run over in the next loop */
+	if ((getu16(fs, idxrec->upd_cnt) - 1) * ntfs->ssize_b > len)
+		error ("More Update Sequence Entries than idx record size");
 
-    /* Apply the update sequence structure template */
-    upd = (ntfs_upd *)((int)idxrec + getu16(fs, idxrec->upd_off));
+	/* Apply the update sequence structure template */
+	upd = (ntfs_upd *)((int)idxrec + getu16(fs, idxrec->upd_off));
    
-    /* Get the sequence value that each 16-bit value should be */
-    orig_seq = getu16(fs, upd->upd_val);
+	/* Get the sequence value that each 16-bit value should be */
+	orig_seq = getu16(fs, upd->upd_val);
 
-    /* cycle through each sector */
-    for (i = 1; i < getu16(fs, idxrec->upd_cnt); i++) {
+	/* cycle through each sector */
+	for (i = 1; i < getu16(fs, idxrec->upd_cnt); i++) {
 
-        /* The offset into the buffer of the value to analyze */
+		/* The offset into the buffer of the value to analyze */
 		int offset = i * ntfs->ssize_b - 2;
 		u_int8_t *new, *old;
 
-        /* get the current sequence value */
+		/* get the current sequence value */
 		u_int16_t cur_seq = getu16(fs, (int)idxrec + offset);
 
 		if (cur_seq != orig_seq) {
 			/* get the replacement value */
 		  	u_int16_t cur_repl = getu16(fs, &upd->upd_seq + (i-1) * 2);
 
-            error ("Incorrect update sequence value in index buffer\nUpdate Value: 0x%x Actual Value: 0x%x Replacement Value: 0x%x\nThis is typically because of a corrupted entry",
-              orig_seq, cur_seq, cur_repl);
+			error ("Incorrect update sequence value in index buffer\nUpdate Value: 0x%x Actual Value: 0x%x Replacement Value: 0x%x\nThis is typically because of a corrupted entry",
+			  orig_seq, cur_seq, cur_repl);
 		}
 
 		new = &upd->upd_seq + (i-1) * 2;
 		old = (u_int8_t *)(int)idxrec + offset;
 
-        if (verbose)
+		if (verbose)
 			fprintf(logfp,
 			  "ntfs_fix_idxrec: upd_seq %i   Replacing: %.4x   With: %.4x\n",
 			  i, getu16(fs, old), getu16(fs, new));
@@ -393,18 +394,18 @@ void
 ntfs_dent_walk(FS_INFO *fs, INUM_T inum, int flags,
   FS_DENT_WALK_FN action, char *ptr)
 {
-	NTFS_INFO 		*ntfs = (NTFS_INFO *)fs;
-	FS_INODE 		*fs_inode;
-	FS_DATA 		*fs_data_root, *fs_data_alloc;
-	char 			*idxalloc;
+	NTFS_INFO 	*ntfs = (NTFS_INFO *)fs;
+	FS_INODE 	*fs_inode;
+	FS_DATA 	*fs_data_root, *fs_data_alloc;
+	char 		*idxalloc;
 	ntfs_idxentry 	*idxe;
 	ntfs_idxroot 	*idxroot;
 	ntfs_idxelist 	*idxelist;
 	ntfs_idxrec 	*idxrec_p, *idxrec;
-	int off, idxalloc_len;
+	int 		off, idxalloc_len;
 
 	/* sanity check */
-    if (inum < fs->first_inum || inum > fs->last_inum)
+	if (inum < fs->first_inum || inum > fs->last_inum)
 		error("invalid inode value: %i\n", inum);
 
 	if (verbose)
@@ -412,7 +413,7 @@ ntfs_dent_walk(FS_INFO *fs, INUM_T inum, int flags,
 			(ULONG)inum);
 
 	/* Get the inode and verify it has attributes */
-    fs_inode = fs->inode_lookup(fs, inum);
+	fs_inode = fs->inode_lookup(fs, inum);
 	if (!fs_inode->attr)
 		error("Error: Directory MFT has no attributes");
 
@@ -492,7 +493,7 @@ ntfs_dent_walk(FS_INFO *fs, INUM_T inum, int flags,
 	/* 
 	 * Read & process the Index Root Attribute 
 	 */
-    fs_data_root = fs_data_lookup(fs_inode->attr, NTFS_ATYPE_IDXROOT, 0);
+	fs_data_root = fs_data_lookup_noid(fs_inode->attr, NTFS_ATYPE_IDXROOT);
 	if (!fs_data_root)
 		error ("$IDX_ROOT not found in MFT %d", inum);
 
@@ -524,7 +525,7 @@ ntfs_dent_walk(FS_INFO *fs, INUM_T inum, int flags,
 	 * get the index allocation attribute if it exists (it doesn't for 
 	 * small directories 
 	 */
-    fs_data_alloc = fs_data_lookup(fs_inode->attr, NTFS_ATYPE_IDXALLOC, 0);
+	fs_data_alloc = fs_data_lookup_noid(fs_inode->attr, NTFS_ATYPE_IDXALLOC);
 
 
 	/* if we don't have an index alloc then return, we have processed
@@ -544,6 +545,10 @@ ntfs_dent_walk(FS_INFO *fs, INUM_T inum, int flags,
 	/* 
 	 * Copy the index allocation run into a big buffer
 	 */
+	if (curbuf != NULL) 
+		error ("global idxalloc buffer is not NULL - recursive?");
+	
+
 	bufleft = idxalloc_len = (int)fs_data_alloc->runlen;
 	curbuf = idxalloc = mymalloc (bufleft);
 
@@ -556,6 +561,9 @@ ntfs_dent_walk(FS_INFO *fs, INUM_T inum, int flags,
 	if (bufleft > 0)
 		error ("ntfs_dent_walk: Buffer not filled when copying $IDX_ALLOC (%d)",
 		  bufleft);
+
+	/* reset the global variable */
+	curbuf = NULL;
 
 
 	/*
@@ -625,8 +633,7 @@ ntfs_dent_walk(FS_INFO *fs, INUM_T inum, int flags,
 		list_len = (int)idxrec - (int)idxe;
 
 		/* process the list of index entries */
-		ntfs_dent_idxentry (ntfs, idxe, 
-		  list_len,
+		ntfs_dent_idxentry (ntfs, idxe, list_len,
 		  getu32(fs, idxelist->end_off) - getu32(fs, idxelist->begin_off),
 		  flags, action, ptr);
 
@@ -656,7 +663,7 @@ ntfs_dent_walk(FS_INFO *fs, INUM_T inum, int flags,
 		  getu32(fs, idxelist->begin_off));
 
 		/* This is the length of the idx entries */
-		list_len = rec_len - getu32(fs, idxelist->begin_off);
+		list_len = ((int)idxalloc + idxalloc_len) - (int)idxe;
 
 		/* process the list of index entries */
 		ntfs_dent_idxentry (ntfs, idxe, list_len, 
@@ -813,7 +820,7 @@ ntfs_find_file (FS_INFO *fs, INUM_T inode_toid, u_int32_t type_toid,
 	char *attr = NULL;
 
 	/* sanity check */
-    if (inode_toid < fs->first_inum || inode_toid > fs->last_inum)
+	if (inode_toid < fs->first_inum || inode_toid > fs->last_inum)
 		error("invalid inode value: %i\n", inode_toid);
 
 	/* in this function, we use the dirs array in the opposite order.
@@ -831,13 +838,13 @@ ntfs_find_file (FS_INFO *fs, INUM_T inode_toid, u_int32_t type_toid,
 
 	/* lookup the inode and get its allocation status */
 	fs_dent->inode = inode_toid;
-    fs_dent->fsi = fs_inode = fs->inode_lookup(fs, inode_toid);
+	fs_dent->fsi = fs_inode = fs->inode_lookup(fs, inode_toid);
 	myflags = ((getu16(fs, ntfs->mft->flags) & NTFS_MFT_INUSE) ?
 		  FS_FLAG_NAME_ALLOC : FS_FLAG_NAME_UNALLOC);
 
 	/* Get the name for the attribute - if specified */
 	if (type_toid != 0) {
-    	FS_DATA *fs_data = fs_data_lookup(fs_inode->attr, type_toid, id_toid);
+		FS_DATA *fs_data = fs_data_lookup(fs_inode->attr, type_toid, id_toid);
 		if (!fs_data) {
 			error ("Type %d Id %d not found in MFT %d", type_toid, id_toid,
 			  inode_toid);

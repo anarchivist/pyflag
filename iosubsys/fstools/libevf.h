@@ -95,3 +95,5 @@ void evf_decompress_fds(struct offset_table *offsets,int outfd);
 int evf_read_random(char *buf, int len, unsigned long long int offs,
 		    const struct offset_table *offsets);
 void evf_compress_fds(int chunk_size,int infd, char *filename,int size);
+int advance_stream(int fd, int length);
+int read_from_stream(int fd,void *buf,int length);

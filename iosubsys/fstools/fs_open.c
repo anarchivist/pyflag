@@ -153,7 +153,7 @@ FS_INFO *fs_open(IO_INFO *io, const char *type)
 	switch (ftype & FSMASK) {
 		case FFS_TYPE:
 			return ffs_open( io,ftype);
-		case EXT2FS_TYPE:
+		case EXTxFS_TYPE:
 			return ext2fs_open(io,ftype);
 		case FATFS_TYPE:
 			return fatfs_open(io,ftype);
@@ -164,17 +164,7 @@ FS_INFO *fs_open(IO_INFO *io, const char *type)
 //		case SWAPFS_TYPE:
 //			return swapfs_open(io, ftype);
 		case UNSUPP_FS:
-		  /* This does not work yet!!!
-		  // We try and guess the filesystem type here:
-		  for(i=0; fs_open_table[i].name != NULL;i++) {
-		    ftype = fs_parse_type (fs_open_table[i].name);
-		    if((temp=ffs_open(io,ftype)) || (temp=ext2fs_open(io,ftype)) ||
-		       (temp=fatfs_open(io,ftype)) || (temp=ntfs_open(io,ftype)) ) {
-		      return (temp);
-		    };
-		  };
-		  */
-	                 default:
+		default:
 			printf("unknown filesystem type: %s\n", type);
 			printf("known types:\n");
 			fs_print_types();

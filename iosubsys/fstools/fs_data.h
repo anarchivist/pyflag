@@ -13,6 +13,7 @@ extern FS_DATA *fs_data_put_run(FS_DATA *, u_int64_t, u_int64_t,
   FS_DATA_RUN *, char *, u_int32_t, u_int16_t, u_int64_t, u_int8_t);
 
 extern FS_DATA *fs_data_lookup(FS_DATA *, u_int32_t, u_int16_t);
+extern FS_DATA *fs_data_lookup_noid(FS_DATA *, u_int32_t);
 
 extern void fs_data_run_free (FS_DATA_RUN *);
 extern void fs_data_free (FS_DATA *);

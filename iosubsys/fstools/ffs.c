@@ -46,16 +46,16 @@
 
 /* ffs_cgroup_lookup - look up cached cylinder group info */
 
-static ffs_cg 
+static ffs_cgd 
 *ffs_cgroup_lookup(FFS_INFO *ffs, CGNUM_T cgnum)
 {
-    DADDR_T addr;
+	DADDR_T addr;
 	FS_INFO *fs = (FS_INFO *)&ffs->fs_info;
 
     /*
      * Sanity check
      */
-    if (cgnum < 0 || cgnum >= gets32(fs, ffs->fs->fs_ncg))
+    if (cgnum < 0 || cgnum >= gets32(fs, ffs->fs.sb1->cg_num))
 		error("invalid cylinder group number: %lu", (ULONG) cgnum);
 
     /*
@@ -63,17 +63,17 @@ static ffs_cg
      * group always fits within a logical disk block (as promised in the
      * 4.4BSD <ufs/ffs/fs.h> include file).
      */
-    if (ffs->cg_buf == 0)
-		ffs->cg_buf = fs_buf_alloc(gets32(fs, ffs->fs->fs_bsize));
+	if (ffs->cg_buf == 0)
+		ffs->cg_buf = fs_buf_alloc(ffs->ffsbsize_b);
 
-    addr = cgtod_lcl(fs, ffs->fs, cgnum);
-    if (ffs->cg_buf->addr != addr) 
+	addr = cgtod_lcl(fs, ffs->fs.sb1, cgnum);
+	if (ffs->cg_buf->addr != addr) 
 		fs->read_block(fs, ffs->cg_buf, ffs->cg_buf->size, addr,
 		      "cylinder block");
    
 	ffs->cg_num = cgnum;
 
-    return (ffs_cg *)ffs->cg_buf->data;
+	return (ffs_cgd *)ffs->cg_buf->data;
 }
 
 /* ffs_cgroup_free - destroy cylinder group info cache */
@@ -106,9 +106,9 @@ ffs_dinode_lookup(FFS_INFO *ffs, INUM_T inum)
      * Allocate/read the inode buffer on the fly.
 	 */
 	if (ffs->dino_buf == 0)
-		ffs->dino_buf = fs_buf_alloc(gets32(fs, ffs->fs->fs_bsize));
+		ffs->dino_buf = fs_buf_alloc(ffs->ffsbsize_b);
 
-    addr = itod_lcl(fs, ffs->fs, inum);
+    addr = itod_lcl(fs, ffs->fs.sb1, inum);
     if (ffs->dino_buf->addr != addr)
 		fs->read_block(fs, ffs->dino_buf, ffs->dino_buf->size, addr,
 		      "inode block");
@@ -117,7 +117,7 @@ ffs_dinode_lookup(FFS_INFO *ffs, INUM_T inum)
      * Copy the inode, in order to avoid alignment problems when accessing
      * structure members.
      */
-    offs = itoo_lcl(fs, ffs->fs, inum) * sizeof(ffs_inode1);
+    offs = itoo_lcl(fs, ffs->fs.sb1, inum) * sizeof(ffs_inode1);
 
     memcpy((char *) ffs->dinode, ffs->dino_buf->data + offs, 
  	  sizeof(ffs_inode1));
@@ -148,7 +148,7 @@ ffs_copy_inode(FFS_INFO *ffs, FS_INODE *fs_inode)
     int     i, j, count;
 	FS_INFO *fs = &(ffs->fs_info);
 	CGNUM_T cg_num;
-	ffs_cg *cg;
+	ffs_cgd *cg;
 	unsigned char *inosused = NULL;
 	INUM_T ibase;
 
@@ -254,6 +254,7 @@ ffs_copy_inode(FFS_INFO *ffs, FS_INODE *fs_inode)
 			}
 		} /* end of symlink */
 	}
+	/* FFS_2 */
 	else {
 		ffs_inode2	*in = (ffs_inode2 *)ffs->dinode;
 
@@ -312,10 +313,10 @@ ffs_copy_inode(FFS_INFO *ffs, FS_INODE *fs_inode)
 	}
 
 	/* set the flags */
-	cg_num = itog_lcl(fs, ffs->fs, ffs->inum);
+	cg_num = itog_lcl(fs, ffs->fs.sb1, ffs->inum);
 	cg = ffs_cgroup_lookup(ffs, cg_num);
 	inosused = (unsigned char *) cg_inosused_lcl(fs, cg);
-	ibase = cg_num * gets32(fs, ffs->fs->fs_ipg);
+	ibase = cg_num * gets32(fs, ffs->fs.sb1->cg_inode_num);
 
 	/* get the alloc flag */
 	fs_inode->flags = (isset(inosused, ffs->inum - ibase) ?
@@ -373,7 +374,7 @@ ffs_inode_walk(FS_INFO *fs, INUM_T start, INUM_T last, int flags,
     char   *myname = "ffs_inode_walk";
     FFS_INFO *ffs = (FFS_INFO *) fs;
     CGNUM_T cg_num;
-    ffs_cg *cg = 0;
+    ffs_cgd *cg = 0;
     INUM_T  inum;
     unsigned char *inosused = NULL;
     FS_INODE *fs_inode = fs_inode_alloc(FFS_NDADDR, FFS_NIADDR);
@@ -398,12 +399,12 @@ ffs_inode_walk(FS_INFO *fs, INUM_T start, INUM_T last, int flags,
 		/*
 	 	* Be sure to use the proper cylinder group data.
 	 	*/
-		cg_num = itog_lcl(fs, ffs->fs, inum);
+		cg_num = itog_lcl(fs, ffs->fs.sb1, inum);
 
 		if (cg == 0 || gets32(fs, cg->cg_cgx) != cg_num) {
 			cg = ffs_cgroup_lookup(ffs, cg_num);
 			inosused = (unsigned char *) cg_inosused_lcl(fs, cg);
-			ibase = cg_num * gets32(fs, ffs->fs->fs_ipg);
+			ibase = cg_num * gets32(fs, ffs->fs.sb1->cg_inode_num);
 		}
 
 		/*
@@ -472,9 +473,9 @@ ffs_block_walk(FS_INFO *fs, DADDR_T start, DADDR_T last, int flags,
 {
     char   *myname = "ffs_block_walk";
     FFS_INFO *ffs = (FFS_INFO *) fs;
-    FS_BUF *fs_buf = fs_buf_alloc(fs->block_size * ffs->block_frags);
+    FS_BUF *fs_buf = fs_buf_alloc(fs->block_size * ffs->ffsbsize_f);
     CGNUM_T cg_num;
-    ffs_cg *cg = 0;
+    ffs_cgd *cg = 0;
     DADDR_T dbase = 0;
     DADDR_T dmin = 0;           /* first data block in group */
     DADDR_T sblock = 0;         /* super block in group */
@@ -495,7 +496,7 @@ ffs_block_walk(FS_INFO *fs, DADDR_T start, DADDR_T last, int flags,
     if (last < fs->first_block || last > fs->last_block || last < start)
 		error("%s: invalid last block number: %lu", myname, (ULONG) last);
 
-    if ((flags & FS_FLAG_DATA_ALIGN) && (start % ffs->block_frags) != 0)
+    if ((flags & FS_FLAG_DATA_ALIGN) && (start % ffs->ffsbsize_f) != 0)
 		error("%s: specify -b or specify block-aligned start block", myname);
 
     /*
@@ -515,18 +516,18 @@ ffs_block_walk(FS_INFO *fs, DADDR_T start, DADDR_T last, int flags,
      * composed of a number of fragment blocks. For example, the 4.4BSD
      * filesystem has logical blocks of 8 fragments.
      */
-    for (addr = start; addr <= last; addr += ffs->block_frags) {
+    for (addr = start; addr <= last; addr += ffs->ffsbsize_f) {
 
 	/*
 	 * Be sure to use the right cylinder group information.
 	 */
-	cg_num = dtog_lcl(fs, ffs->fs, addr);
+	cg_num = dtog_lcl(fs, ffs->fs.sb1, addr);
 	if (cg == 0 || gets32(fs, cg->cg_cgx) != cg_num) {
 		cg = ffs_cgroup_lookup(ffs, cg_num);
 		freeblocks = (unsigned char *) cg_blksfree_lcl(fs, cg);
-		dbase = cgbase_lcl(fs, ffs->fs, cg_num);
-		dmin = cgdmin_lcl(fs, ffs->fs, cg_num);
-		sblock = cgsblock_lcl(fs, ffs->fs, cg_num);
+		dbase = cgbase_lcl(fs, ffs->fs.sb1, cg_num);
+		dmin = cgdmin_lcl(fs, ffs->fs.sb1, cg_num);
+		sblock = cgsblock_lcl(fs, ffs->fs.sb1, cg_num);
 	}
 	if (addr < dbase)
 		remark("impossible: cyl group %lu: block %lu < cgbase %lu",
@@ -537,8 +538,8 @@ ffs_block_walk(FS_INFO *fs, DADDR_T start, DADDR_T last, int flags,
 	/*
 	 * Prepare for file systems that have a partial last logical block.
 	 */
-	frags = (last + 1 - addr > ffs->block_frags ?
-		 ffs->block_frags : last + 1 - addr);
+	frags = (last + 1 - addr > ffs->ffsbsize_f ?
+		 ffs->ffsbsize_f : last + 1 - addr);
 
 	/*
 	 * See if this logical block contains any fragments of interest. If
@@ -580,7 +581,7 @@ ffs_block_walk(FS_INFO *fs, DADDR_T start, DADDR_T last, int flags,
 					return;
 				}
 	    } else {
-			if (fs_buf->addr < 0 || faddr >= fs_buf->addr + ffs->block_frags) {
+			if (fs_buf->addr < 0 || faddr >= fs_buf->addr + ffs->ffsbsize_f) {
 				fs->read_block(fs, fs_buf, fs->block_size * frags, addr,
 				  "data block");
 			}
@@ -770,10 +771,11 @@ void
 ffs_file_walk(FS_INFO *fs, FS_INODE *inode, u_int32_t type, u_int16_t id,
     int flags, FS_FILE_WALK_FN action, char *ptr)
 {    
-    size_t   length;
-    FS_BUF **buf;
-    int     n;
-    int     level, retval;
+	FFS_INFO *ffs = (FFS_INFO *) fs;
+	size_t   length;
+	FS_BUF **buf;
+	int     n;
+	int     level, retval;
               
     /*
      * Initialize a buffer for each level of indirection that is supported by
@@ -782,7 +784,7 @@ ffs_file_walk(FS_INFO *fs, FS_INODE *inode, u_int32_t type, u_int16_t id,
      * indirect blocks.
      */
     buf = (FS_BUF **) mymalloc(sizeof(*buf) * (inode->indir_count + 1));
-    buf[0] = fs_buf_alloc(fs->file_bsize);
+    buf[0] = fs_buf_alloc(ffs->ffsbsize_b);
     
     length = inode->size;
 	/* If we want the slack of the last fragment, then roundup */
@@ -808,7 +810,7 @@ ffs_file_walk(FS_INFO *fs, FS_INODE *inode, u_int32_t type, u_int16_t id,
 
 		/* allocate buffers */
 		for (level = 1; level <= inode->indir_count; level++)
-			buf[level] = fs_buf_alloc(fs->file_bsize);
+			buf[level] = fs_buf_alloc(ffs->ffsbsize_b);
 
 		for (level = 1; length > 0 && level <= inode->indir_count; level++) {
 			retval = ffs_file_walk_indir(fs, buf, length,
@@ -844,56 +846,96 @@ ffs_fsstat(FS_INFO *fs, FILE *hFile)
 {
 	int i;
 	time_t tmptime;
+	ffs_csum  *csum = NULL;
+	ffs_cgd	 *cgd = NULL;
 
-    FFS_INFO *ffs = (FFS_INFO *) fs;
-	ffs_sb *sb = ffs->fs;
+	FFS_INFO *ffs = (FFS_INFO *) fs;
+	ffs_sb1 *sb1 = ffs->fs.sb1;
+	ffs_sb2 *sb2 = ffs->fs.sb2;
 
 	fprintf(hFile, "FILE SYSTEM INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");   
+	fprintf(hFile, "--------------------------------------------\n");   
 
-	fprintf(hFile, "File System Type: FFS\n");
-	tmptime = getu32(fs, sb->fs_time);
-	fprintf(hFile, "Last Written: %s", asctime(localtime(&tmptime)));
+	if (ffs->ver == FFS_UFS1) {
+		fprintf(hFile, "File System Type: UFS 1\n");
+		tmptime = getu32(fs, sb1->wtime);
+		fprintf(hFile, "Last Written: %s", asctime(localtime(&tmptime)));
+		fprintf(hFile, "Last Mount Point: %s\n",
+		  sb1->last_mnt);
+	}
+	else {
+		fprintf(hFile, "File System Type: UFS 2\n");
+		tmptime = getu32(fs, sb2->wtime);
+		fprintf(hFile, "Last Written: %s", asctime(localtime(&tmptime)));
+		fprintf(hFile, "Last Mount Point: %s\n",
+		  sb2->last_mnt);
+		fprintf(hFile, "Volume Name: %s\n",
+		  sb2->volname);
+		fprintf(hFile, "System UID: %"PRIu64"\n",
+		  getu64(fs, sb2->swuid));
+	}
 
 
 
-    fprintf(hFile, "\nMETA-DATA INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
+	fprintf(hFile, "\nMETADATA INFORMATION\n");
+	fprintf(hFile, "--------------------------------------------\n");
 
 	fprintf(hFile, "Inode Range: %lu - %lu\n", 
 	  (ULONG)fs->first_inum, (ULONG)fs->last_inum);
 	fprintf(hFile, "Root Directory: %lu\n", (ULONG)fs->root_inum);
+	fprintf(hFile, "Num of Avail Inodes: %"PRIu32"\n",
+		       getu32(fs, sb1->cstotal.ino_free));	
+	fprintf(hFile, "Num of Directories: %"PRIu32"\n",
+		       getu32(fs, sb1->cstotal.dir_num));	
 
 
-    fprintf(hFile, "\nCONTENT-DATA INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
+	fprintf(hFile, "\nCONTENT INFORMATION\n");
+	fprintf(hFile, "--------------------------------------------\n");
 
 	fprintf(hFile, "Fragment Range: %lu - %lu\n", 
 	  (ULONG)fs->first_block, (ULONG)fs->last_block);
 
-	fprintf(hFile, "Block Size: %lu\n", (ULONG)fs->file_bsize);
+	fprintf(hFile, "Block Size: %lu\n", (ULONG)ffs->ffsbsize_b);
 	fprintf(hFile, "Fragment Size: %lu\n", (ULONG)fs->block_size);
 
-    fprintf(hFile, "\nCYLINDER GROUP INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
+	fprintf(hFile, "Num of Avail Full Blocks: %"PRIu32"\n",
+		       getu32(fs, sb1->cstotal.blk_free));	
+	fprintf(hFile, "Num of Avail Fragments: %"PRIu32"\n",
+		       getu32(fs, sb1->cstotal.frag_free));	
 
-	fprintf(hFile, "Number of Cylinder Groups: %d\n", gets32(fs, sb->fs_ncg));
-	fprintf(hFile, "Inodes per group: %d\n", gets32(fs, sb->fs_ipg));
-	fprintf(hFile, "Fragments per group: %d\n", gets32(fs, sb->fs_fpg));
+	fprintf(hFile, "\nCYLINDER GROUP INFORMATION\n");
+	fprintf(hFile, "--------------------------------------------\n");
 
-	for (i = 0; i < gets32(fs, sb->fs_ncg); i++) {
+	fprintf(hFile, "Number of Cylinder Groups: %d\n", gets32(fs, sb1->cg_num));
+	fprintf(hFile, "Inodes per group: %d\n", gets32(fs, sb1->cg_inode_num));
+	fprintf(hFile, "Fragments per group: %d\n", gets32(fs, sb1->cg_frag_num));
+
+
+	if (getu32(fs, sb1->cg_ssize_b)) {
+		csum = (ffs_csum *)mymalloc(getu32(fs, sb1->cg_ssize_b));
+		fs->io->read_random(fs->io, (char *) csum, getu32(fs, sb1->cg_ssize_b),
+		  getu32(fs, sb1->cg_saddr) * fs->block_size, "group descriptor");
+	}
+
+	for (i = 0; i < gets32(fs, sb1->cg_num); i++) {
+
+		cgd = ffs_cgroup_lookup(ffs, i);
 
 		fprintf(hFile, "\nGroup %d:\n", i);
+		if (cgd) {
+			tmptime = getu32(fs, cgd->wtime);
+			fprintf(hFile, "  Last Written: %s", asctime(localtime(&tmptime)));
+		}
 		
 		fprintf(hFile, "  Inode Range: %lu - %lu\n", 
-		  (ULONG)(gets32(fs, sb->fs_ipg) * i),
-		  (((ULONG)(gets32(fs, sb->fs_ipg) * (i + 1)) - 1) < fs->last_inum) ?
-		  ((ULONG)(gets32(fs, sb->fs_ipg) * (i + 1)) - 1) : fs->last_inum) ;
+		  (ULONG)(gets32(fs, sb1->cg_inode_num) * i),
+		  (((ULONG)(gets32(fs, sb1->cg_inode_num) * (i + 1)) - 1) < fs->last_inum) ?
+		  ((ULONG)(gets32(fs, sb1->cg_inode_num) * (i + 1)) - 1) : fs->last_inum) ;
 
 		fprintf(hFile, "  Fragment Range: %lu - %lu\n",
-		  (ULONG)cgbase_lcl(fs, sb, i), 
-          (((ULONG)cgbase_lcl(fs, sb, i + 1) - 1) < fs->last_block) ?
-		  ((ULONG)cgbase_lcl(fs, sb, i + 1) - 1) : fs->last_block);
+		  (ULONG)cgbase_lcl(fs, sb1, i), 
+		  (((ULONG)cgbase_lcl(fs, sb1, i + 1) - 1) < fs->last_block) ?
+		  ((ULONG)cgbase_lcl(fs, sb1, i + 1) - 1) : fs->last_block);
 
 		/* The first group is special because the first 16 sectors are
 		 * reserved for the boot block.  
@@ -906,23 +948,23 @@ ffs_fsstat(FS_INFO *fs, FILE *hFile)
 			fprintf(hFile, "    Super Block: %lu - %lu\n",
 			  (ULONG)(16 * 512 / fs->block_size),
 			  (ULONG)(16 * 512 / fs->block_size) + 
-			  ((roundup(sizeof(ffs_sb), fs->block_size) / fs->block_size) - 1));
+			  ((roundup(sizeof(ffs_sb1), fs->block_size) / fs->block_size) - 1));
 		}
 
 		fprintf(hFile, "    Super Block: %lu - %lu\n",
-		  (ULONG)cgsblock_lcl(fs, sb, i),
-		  (ULONG)(cgsblock_lcl(fs, sb, i) + 
-		  ((roundup(sizeof(ffs_sb), fs->block_size) / fs->block_size) - 1)));
+		  (ULONG)cgsblock_lcl(fs, sb1, i),
+		  (ULONG)(cgsblock_lcl(fs, sb1, i) + 
+		  ((roundup(sizeof(ffs_sb1), fs->block_size) / fs->block_size) - 1)));
 
 		fprintf(hFile, "    Group Desc: %lu - %lu\n", 
-		  (ULONG)cgtod_lcl(fs, sb, i),
-		  (ULONG)(cgtod_lcl(fs, sb, i) + 
-		  ((roundup(sizeof(ffs_cg), fs->block_size) / fs->block_size) - 1)));
+		  (ULONG)cgtod_lcl(fs, sb1, i),
+		  (ULONG)(cgtod_lcl(fs, sb1, i) + 
+		  ((roundup(sizeof(ffs_cgd), fs->block_size) / fs->block_size) - 1)));
 
 		fprintf(hFile, "    Inode Table: %lu - %lu\n", 
-		  (ULONG)cgimin_lcl(fs, sb, i),
-		  (ULONG)(cgimin_lcl(fs, sb, i) + 
-		  ((roundup(gets32(fs, sb->fs_ipg)*sizeof(ffs_inode1), fs->block_size) 
+		  (ULONG)cgimin_lcl(fs, sb1, i),
+		  (ULONG)(cgimin_lcl(fs, sb1, i) + 
+		  ((roundup(gets32(fs, sb1->cg_inode_num)*sizeof(ffs_inode1), fs->block_size) 
 		  / fs->block_size) - 1)));
 
 		fprintf(hFile, "    Data Fragments: ");
@@ -932,13 +974,54 @@ ffs_fsstat(FS_INFO *fs, FILE *hFile)
 		 */
 		if (i)
 			fprintf(hFile, "%lu - %lu, ",
-			  (ULONG)cgbase_lcl(fs, sb, i), 
-			  (ULONG)cgsblock_lcl(fs, sb, i) - 1);
+			  (ULONG)cgbase_lcl(fs, sb1, i), 
+			  (ULONG)cgsblock_lcl(fs, sb1, i) - 1);
 			  
 		fprintf(hFile, "%lu - %lu\n",
-		  (ULONG)cgdmin_lcl(fs, sb, i),
-          (((ULONG)cgbase_lcl(fs, sb, i + 1) - 1) < fs->last_block) ?
-		  ((ULONG)cgbase_lcl(fs, sb, i + 1) - 1) : fs->last_block);
+		  (ULONG)cgdmin_lcl(fs, sb1, i),
+		  (((ULONG)cgbase_lcl(fs, sb1, i + 1) - 1) < fs->last_block) ?
+		  ((ULONG)cgbase_lcl(fs, sb1, i + 1) - 1) : fs->last_block);
+
+
+		if ((csum) && ((i+1)*sizeof(ffs_csum) < getu32(fs, sb1->cg_ssize_b)) ) {
+			fprintf(hFile, "  Global Summary (from the super block):\n");
+			fprintf(hFile, "    Num of Dirs: %"PRIu32"\n", 
+				getu32(fs, &csum[i].dir_num));
+			fprintf(hFile, "    Num of Avail Blocks: %"PRIu32"\n", 
+				getu32(fs, &csum[i].blk_free));
+			fprintf(hFile, "    Num of Avail Inodes: %"PRIu32"\n", 
+				getu32(fs, &csum[i].ino_free));
+			fprintf(hFile, "    Num of Avail Frags: %"PRIu32"\n", 
+				getu32(fs, &csum[i].frag_free));
+		}
+
+
+		if (cgd) {
+			fprintf(hFile, "  Local Summary (from the group descriptor):\n");
+			fprintf(hFile, "    Num of Dirs: %"PRIu32"\n", 
+				getu32(fs, &cgd->cs.dir_num));
+			fprintf(hFile, "    Num of Avail Blocks: %"PRIu32"\n", 
+				getu32(fs, &cgd->cs.blk_free));
+			fprintf(hFile, "    Num of Avail Inodes: %"PRIu32"\n", 
+				getu32(fs, &cgd->cs.ino_free));
+			fprintf(hFile, "    Num of Avail Frags: %"PRIu32"\n", 
+				getu32(fs, &cgd->cs.frag_free));
+
+			fprintf(hFile, "    Last Block Allocated: %"PRIu32"\n", 
+				getu32(fs, &cgd->last_alloc_blk) +
+		  		cgbase_lcl(fs, sb1, i));
+
+			fprintf(hFile, "    Last Fragment Allocated: %"PRIu32"\n", 
+				getu32(fs, &cgd->last_alloc_frag) +
+		  		cgbase_lcl(fs, sb1, i));
+
+			fprintf(hFile, "    Last Inode Allocated: %"PRIu32"\n", 
+				getu32(fs, &cgd->last_alloc_ino) + 
+				(gets32(fs, sb1->cg_inode_num) * i));
+
+		}
+
+
 	}
 
 	return;
@@ -1044,14 +1127,15 @@ ffs_istat (FS_INFO *fs, FILE *hFile, INUM_T inum, int numblock,
 	fprintf(hFile, "File Modified:\t%s", ctime(&fs_inode->mtime));
 	fprintf(hFile, "Inode Modified:\t%s", ctime(&fs_inode->ctime));
 
-    /* A bad hack to force a specified number of blocks */
-    if (numblock > 0)
-        fs_inode->size = numblock * fs->file_bsize;
+	/* A bad hack to force a specified number of blocks */
+	if (numblock > 0)
+		fs_inode->size = numblock * ffs->ffsbsize_b;
 
 	fprintf (hFile, "\nDirect Blocks:\n");
 
 	indir_idx = 0;
-    fs->file_walk(fs, fs_inode, 0, 0, FS_FLAG_FILE_AONLY | FS_FLAG_FILE_META, 
+	fs->file_walk(fs, fs_inode, 0, 0, 
+	  FS_FLAG_FILE_AONLY | FS_FLAG_FILE_META | FS_FLAG_FILE_NOID, 
 	  print_addr_act, (char *)hFile);
 
     if (printidx != 0)
@@ -1089,7 +1173,7 @@ ffs_close(FS_INFO *fs)
     fs->io->close(fs->io);
     ffs_cgroup_free(ffs);
     ffs_dinode_free(ffs);
-    free((char *) ffs->fs);
+    free((char *) ffs->fs.sb1);
     free(ffs->dinode);
     free(ffs);
 }
@@ -1099,91 +1183,128 @@ ffs_close(FS_INFO *fs)
 FS_INFO *
 ffs_open(IO_INFO *io, unsigned char ftype)
 {
-    char   *myname = "ffs_open";
-    FFS_INFO *ffs = (FFS_INFO *) mymalloc(sizeof(*ffs));
-    int     len;
+	char   *myname = "ffs_open";
+	FFS_INFO *ffs = (FFS_INFO *) mymalloc(sizeof(*ffs));
+	int     len;
 	FS_INFO	*fs = &(ffs->fs_info);
 	//Initialise the io subsystem in the fs object
 	fs->io=io;
 
-	if (ftype != UNSUPP_FS && (ftype & FSMASK) != FFS_TYPE) {
-	  return(NULL);
-	  error ("Invalid FS Type in ffs_open");
-	};
+	if ((ftype & FSMASK) != FFS_TYPE) {
+		return(NULL);
+		error ("Invalid FS Type in ffs_open");
+	}
 
-    /*
-     * Open the raw device and read the superblock. We must use a read buffer
-     * that is a multiple of the physical blocksize, because attempts to read
-     * a partial physical block can fail. XXX How does one know the physical
-     * blocksize without reading the disk? One assumes.
-     */
+	/* Open the image */
+	//if ((fs->fd = open(name, O_RDONLY)) < 0)
+	//	error("%s: open %s: %m", myname, name);
 
 	fs->ftype = ftype;
 	fs->flags = 0;
 
 
-    /*
-     * Read the superblock.
-     */
-    len = roundup(sizeof(ffs_sb), FFS_DEV_BSIZE);
-    ffs->fs = (ffs_sb *) mymalloc(len);
+	/*
+	 * Try UFS 1 first
+	 */
+	/* ffs_sb2 is bigger, so allocate space for it */
+	len = roundup(sizeof(ffs_sb2), FFS_DEV_BSIZE);
+	ffs->fs.sb1 = (ffs_sb1 *) mymalloc(len);
 
-    fs->io->read_random(fs->io,(char *) ffs->fs, len,FFS_SBOFF,myname);
+	fs->io->read_random(fs->io,(char *) ffs->fs.sb1, sizeof(ffs_sb1), UFS1_SBOFF,myname);
+
 	/* check the magic and figure out the endian ordering */
-    if (guessu32(fs, ffs->fs->fs_magic, FFS_FS_MAGIC)) {
-      return(NULL);
-      error("Error: This is not a FFS file system");
-    };
+	if (guessu32(fs, ffs->fs.sb1->magic, UFS1_FS_MAGIC)) {
 
-    /*
-     * Translate some filesystem-specific information to generic form.
-     */
-	fs->inum_count = gets32(fs, ffs->fs->fs_ncg) * gets32(fs, ffs->fs->fs_ipg);
+		fs->io->read_random(fs->io,(char *) ffs->fs.sb2, sizeof(ffs_sb2),UFS2_SBOFF,myname);
 
-    fs->root_inum = FFS_ROOTINO;
+		/* If that didn't work, try the 256KB location */
+		if (guessu32(fs, ffs->fs.sb2->magic, UFS2_FS_MAGIC)) {
+
+			fs->io->read_random(fs->io,(char *) ffs->fs.sb2, sizeof(ffs_sb2),UFS2_SBOFF2,myname);
+
+			if (guessu32(fs, ffs->fs.sb2->magic, UFS2_FS_MAGIC)) {
+				return(NULL);
+				//error("Error: %s is not a FFS file system", name);
+			}
+		
+		}
+		ffs->ver = FFS_UFS2;
+	}
+	else {
+		ffs->ver = FFS_UFS1;
+	}
+
+
+	/*
+	 * Translate some filesystem-specific information to generic form.
+	 */
+	if (ffs->ver == FFS_UFS1) {
+		fs->inum_count = gets32(fs, ffs->fs.sb1->cg_num) * gets32(fs, ffs->fs.sb1->cg_inode_num);
+	} 
+	else {
+		fs->inum_count = gets32(fs, ffs->fs.sb2->cg_num) * gets32(fs, ffs->fs.sb2->cg_inode_num);
+
+	}
+
+	fs->root_inum = FFS_ROOTINO;
 	fs->first_inum = FFS_FIRSTINO;
-    fs->last_inum = fs->inum_count - 1;
+	fs->last_inum = fs->inum_count - 1;
 
-	fs->block_count = gets32(fs, ffs->fs->fs_size);
-    fs->first_block = 0;
-    fs->last_block = fs->block_count - 1;
-    fs->block_size = gets32(fs, ffs->fs->fs_fsize);
-    fs->file_bsize = gets32(fs, ffs->fs->fs_bsize);
-    ffs->block_frags = gets32(fs, ffs->fs->fs_frag);
+
+	if (ffs->ver == FFS_UFS1) {
+		fs->block_count = gets32(fs, ffs->fs.sb1->frag_num);
+		fs->block_size = gets32(fs, ffs->fs.sb1->fsize_b);
+		ffs->ffsbsize_b = gets32(fs, ffs->fs.sb1->bsize_b);
+		ffs->ffsbsize_f = gets32(fs, ffs->fs.sb1->bsize_frag);
+	}
+	else {
+		fs->block_count = gets64(fs, ffs->fs.sb2->frag_num);
+		fs->block_size = gets32(fs, ffs->fs.sb2->fsize_b);
+		ffs->ffsbsize_b = gets32(fs, ffs->fs.sb2->bsize_b);
+		ffs->ffsbsize_f = gets32(fs, ffs->fs.sb2->bsize_frag);
+	}
+
+	fs->first_block = 0;
+	fs->last_block = fs->block_count - 1;
 	fs->dev_bsize = FFS_DEV_BSIZE;
 
-    /*
-     * Other initialization: caches, callbacks.
-     */
-    ffs->cg_buf = 0;
-	ffs->cg_num = -1;
-    ffs->dino_buf = 0;
-    fs->seek_pos = -1;
 
-    fs->inode_walk = ffs_inode_walk;
-    fs->read_block = fs_read_block;
-    fs->block_walk = ffs_block_walk;
-    fs->inode_lookup = ffs_inode_lookup;
-    fs->dent_walk = ffs_dent_walk;
-    fs->file_walk = ffs_file_walk;
+	/*
+	 * Other initialization: caches, callbacks.
+	 */
+	ffs->cg_buf = 0;
+	ffs->cg_num = -1;
+	ffs->dino_buf = 0;
+	fs->seek_pos = -1;
+
+	fs->inode_walk = ffs_inode_walk;
+	fs->read_block = fs_read_block;
+	fs->block_walk = ffs_block_walk;
+	fs->inode_lookup = ffs_inode_lookup;
+	fs->dent_walk = ffs_dent_walk;
+	fs->file_walk = ffs_file_walk;
 	fs->fsstat = ffs_fsstat;
 	fs->fscheck = ffs_fscheck;
 	fs->istat = ffs_istat;
-    fs->close = ffs_close;
+	fs->close = ffs_close;
 
 	/* allocate the dinode buffer */
-    ffs->dinode = (char *) mymalloc(sizeof(ffs_inode1));
+	if (ffs->ver == FFS_UFS1) 
+		ffs->dinode = (char *) mymalloc(sizeof(ffs_inode1));
+	else
+		ffs->dinode = (char *) mymalloc(sizeof(ffs_inode1));
 
-    /*
-     * Print some stats.
-     */
-    if (verbose)
-	fprintf(logfp,
+	/*
+	 * Print some stats.
+	 */
+	if (verbose)
+		fprintf(logfp,
 		"inodes %lu root ino %lu cyl groups %lu blocks %lu\n",
 		(ULONG) fs->inum_count,
 		(ULONG) fs->root_inum,
-	    (ULONG) gets32(fs, ffs->fs->fs_ncg),
+		(ULONG) gets32(fs, ffs->fs.sb1->cg_num),
 		(ULONG) fs->block_count);
-    return (fs);
+
+	return (fs);
 }
 

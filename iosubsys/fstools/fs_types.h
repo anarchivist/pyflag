@@ -30,16 +30,11 @@ extern void fs_print_types();
 #define FFS_1			0x11	/* FreeBSD, OpenBSD, BSDI ... */
 #define FFS_2			0x12	/* Solaris (no type) */
 
-/* The only difference between LINUX1 and LINUX2 is the directory entry
-** structure.  LINUX2 has the type field and LINUX1 does not.  Current
-** file systems use 2, which is default */
 
-#define	EXT2FS_TYPE		0x20
-
-#define EXT2FS_1		0x21	/* Old */
-#define EXT2FS_2		0x22	/* New Format (with type) */
-#define EXT2FS			0x23	/* temp holder until _1 or _2 is id */
-#define EXT3FS_1		0x24	/* Ext 3 format (mostly same as ext2) */
+#define	EXTxFS_TYPE		0x20
+#define EXT2FS			0x21	
+#define EXT3FS			0x22	
+#define EXTAUTO			0x23
 
 /* FAT */
 #define FATFS_TYPE		0x30

@@ -433,7 +433,7 @@ fs_dent_print_mac(FILE *hFile, FS_DENT *fs_dent, int flags,
 	}
 
 	/* block size and num of blocks */
-	fprintf(hFile, "%lu|0\n", (fs) ? (ULONG)fs->file_bsize : 0);
+	fprintf(hFile, "%lu|0\n", (fs) ? (ULONG)fs->block_size : 0);
 
 }
 

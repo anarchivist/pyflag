@@ -39,7 +39,7 @@ usage()
 	printf("\t-s: Display slack space at end of file\n");
 	printf("\t-v: verbose to stderr\n");
 	printf("\t-V: Print version\n");
-    printf("\t-f fstype: Image file system type\n");
+	printf("\t-f fstype: Image file system type\n");
 	printf("Supported file system types:\n");
 	fs_print_types();
 
@@ -64,18 +64,18 @@ icat_action(FS_INFO *fs, DADDR_T addr, char *buf, int size,
 int
 main(int argc, char **argv)
 {
-    FS_INFO *fs;
-    char   	*cp;
-    INUM_T  inum;
-	int		flags = 0;
-    int     ch;
-    char   	*fstype = DEF_FSTYPE;
+	FS_INFO *fs;
+	char   	*cp;
+	INUM_T  inum;
+	int	flags = 0;
+	int     ch;
+	char   	*fstype = DEF_FSTYPE;
 	FS_INODE *inode;
 	char *io_subsys=NULL;
 	char *io_subsys_opts=NULL;
 	IO_INFO *io;
 
-    progname = argv[0];
+	progname = argv[0];
 
     while ((ch = getopt(argc, argv, "f:hi:o:rsvV")) > 0) {
 	switch (ch) {
@@ -134,9 +134,9 @@ main(int argc, char **argv)
     
     fs = fs_open(io,fstype);
 
-    while (argv[++optind]) {
+	while (argv[++optind]) {
 		int type = 0;
-		int id = 0;
+		int id = 0, id_used = 0;
 		char 	*dash;
 
 		/* simple inode usage */
@@ -160,6 +160,7 @@ main(int argc, char **argv)
 				dash2++;
 
 				id = STRTOUL(dash2, &cp, 0);
+				id_used = 1;
 				if (*cp || cp == dash2)
 					usage();
 			}
@@ -177,10 +178,14 @@ main(int argc, char **argv)
 		if (!inode)
 			error ("error getting inode");
 
-		fs->file_walk(fs, inode, type, id, flags, icat_action, "");
+		if (id_used)
+			fs->file_walk(fs, inode, type, id, flags, icat_action, "");
+		/* If the id value was not used, then set the flag accordingly so the '0' value is ignored */
+		else 
+			fs->file_walk(fs, inode, type, id, flags | FS_FLAG_FILE_NOID, icat_action, "");
 
 		fs_inode_free(inode);
-    }
-    fs->close(fs);
-    exit(0);
+	}
+	fs->close(fs);
+	exit(0);
 }

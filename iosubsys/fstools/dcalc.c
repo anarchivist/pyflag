@@ -180,7 +180,7 @@ count_slack_inode_act(FS_INFO *fs, INUM_T inum, FS_INODE *fs_inode, int flags,
 	if ((fs->ftype & FSMASK) != NTFS_TYPE) {
 		flen = fs_inode->size;
 		fs->file_walk(fs, fs_inode, 0, 0,
-		  FS_FLAG_FILE_SLACK | FS_FLAG_FILE_NOABORT,
+		  FS_FLAG_FILE_SLACK | FS_FLAG_FILE_NOABORT | FS_FLAG_FILE_NOID,
 		  count_slack_file_act, ptr);
 	}
 

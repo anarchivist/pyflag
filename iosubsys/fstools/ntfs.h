@@ -422,9 +422,9 @@ typedef struct {
 	u_int8_t	flags;			
 	u_int8_t	f1[3];
 	u_int8_t	stream;			/* length of strlen - invalid for last entry*/
-								/* loc of subnode is found in last 8-bytes
-								 * of idx entry (idxlen - 8).  use macro 
-								 */
+						/* loc of subnode is found in last 8-bytes
+						 * of idx entry (idxlen - 8).  use macro 
+						 */
 } ntfs_idxentry;
 
 #define NTFS_IDX_SUB	0x01	/* Entry points to a sub-node */
@@ -476,21 +476,23 @@ typedef struct {
 /************************************************************************
 */
 typedef struct {
-	FS_INFO	fs_info;		/* super class */
-	ntfs_sb	*fs;
+	FS_INFO		fs_info;	/* super class */
+	ntfs_sb		*fs;
 	u_int8_t	ver;		/* version of NTFS - uses the VINFO flag */
 	FS_INODE 	*mft_inode;	/* contains the data for the mft entry for the mft */
 	FS_DATA 	*mft_data;	/* Data run for MFT entry for MFT */
-	ntfs_mft	*mft;			/* cache for on-disk inode */	
-	INUM_T	mnum;			/* number of above cached mft */
-	u_int16_t	csize_b;	 /* number of bytes in a cluster */
-	u_int16_t	ssize_b;	 /* number of bytes in a sector */
-	u_int16_t	mft_rsize_b; /* number of bytes per mft record */
-	u_int16_t	idx_rsize_b; /* number of bytes per idx record */
+	ntfs_mft	*mft;		/* cache for on-disk inode */	
+	INUM_T		mnum;		/* number of above cached mft */
+	u_int16_t	csize_b;	/* number of bytes in a cluster */
+	u_int16_t	ssize_b;	/* number of bytes in a sector */
+	u_int16_t	mft_rsize_b;	/* number of bytes per mft record */
+	u_int16_t	idx_rsize_b;	/* number of bytes per idx record */
 	DADDR_T		root_mft_addr;	/* address of first mft entry */
 	
-	FS_DATA_RUN *bmap;		/* Run of bitmap for clusters (linked list) */
-	ntfs_attrdef *attrdef;
+	FS_DATA_RUN 	*bmap;		/* Run of bitmap for clusters (linked list) */
+	FS_BUF 		*bmap_buf;	/* buffer to hold cached copy of bitmap */
+	u_int32_t 	bmap_buf_off;	/* offset cluster in cached bitmap */
+	ntfs_attrdef	*attrdef;
 
 } NTFS_INFO;
 

@@ -93,6 +93,7 @@ ffs_dent_copy(FFS_INFO *ffs, char *ffs_dent, FS_DENT *fs_dent)
 		fs_dent->ent_type = dir->d_type;
 
 	}
+	/* FFS_2 */
 	else {
 		ffs_dentry2  *dir = (ffs_dentry2 *)ffs_dent;
 
@@ -164,6 +165,7 @@ ffs_dent_parse_block (FFS_INFO *ffs, char *buf, int len,
 			namelen = dir->d_namlen;
 			reclen = getu16(fs, dir->d_reclen);
 		}
+		/* FFS_2 */
 		else {
 			ffs_dentry2 *dir = (ffs_dentry2 *)dirPtr;
 			inode = getu32(fs, dir->d_ino);
@@ -310,7 +312,8 @@ ffs_dent_walk(FS_INFO *fs, INUM_T inode, int flags,
 	curdirptr = dirbuf = mymalloc(size);
 	dirleft = size;
 
-	fs->file_walk(fs, fs_inode, 0, 0, FS_FLAG_FILE_SLACK,
+	fs->file_walk(fs, fs_inode, 0, 0, 
+	  FS_FLAG_FILE_SLACK | FS_FLAG_FILE_NOID,
 	  ffs_dent_action, "");
 
 	curdirptr = NULL;

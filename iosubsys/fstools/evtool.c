@@ -83,6 +83,53 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307\n\
 USA\n");
 };
 
+/* my version of "uncompress" from zlib
+   upon entry destLen is size of dest buffer
+   upon exit destLen is size copied into dest buffer
+       (ie. the uncompressed size)
+   upon entry sourceLen is size of source buffer
+   upon exit sourceLen is amount consumed from source buffer
+       (ie. compressed size)
+*/
+
+int myuncompress (dest, destLen, source, sourceLen)
+    Bytef *dest;
+    uLongf *destLen;
+    const Bytef *source;
+    uLongf *sourceLen;
+{
+    z_stream stream;
+    int err;
+
+    stream.next_in = (Bytef*)source;
+    stream.avail_in = (uInt)*sourceLen;
+    /* Check for source > 64K on 16-bit machine: */
+    if ((uLong)stream.avail_in != *sourceLen) return Z_BUF_ERROR;
+
+    stream.next_out = dest;
+    stream.avail_out = (uInt)*destLen;
+    if ((uLong)stream.avail_out != *destLen) return Z_BUF_ERROR;
+
+    stream.zalloc = (alloc_func)0;
+    stream.zfree = (free_func)0;
+
+    err = inflateInit(&stream);
+    if (err != Z_OK) return err;
+
+    err = inflate(&stream, Z_FINISH);
+    if (err != Z_STREAM_END) {
+        inflateEnd(&stream);
+        if (err == Z_NEED_DICT || (err == Z_BUF_ERROR && stream.avail_in == 0))
+            return Z_DATA_ERROR;
+        return err;
+    }
+    *destLen = stream.total_out;
+    *sourceLen = stream.total_in;
+
+    err = inflateEnd(&stream);
+    return err;
+}
+
 int main(int argc, char **argv) {
   char c;
 
@@ -166,6 +213,191 @@ int main(int argc, char **argv) {
     }
   };
 
+  /* alternate algorithm for processing ewf from stdin
+     does so without knowledge of the offsets table etc
+     unsure how reliable it is, but worked in basic tests!
+          Dave <daveco@users.sourceforge.net>
+  */
+  if (mode == 'd' && (optind == argc || strcmp(argv[optind],"-") == 0)) {
+    int fd;
+    struct evf_file_header *file_header;
+    int readcount; //keep track of possition in segment
+    int done = 0;
+    fd = 0; // stdin
+    int segcount = 1;
+    int chunk_size = 0;
+    int total_chunks = 0;
+    int chunk_count = 0;
+
+    // process each segment
+    while(!done) {
+      readcount = 0;
+      file_header = evf_read_header(fd);
+      readcount += sizeof(*file_header);
+
+      if(file_header->segment != segcount) {
+	fprintf(stderr, "Got segment %i, expecting %i, are files in order?\n", file_header->segment, segcount);
+	if(!force)
+	  exit(0);
+      }
+      //fprintf(stderr, "reading segment %i from stdin\n", file_header->segment);
+      
+      // process each section
+      int last_section = 0;
+      while(!last_section) {
+
+	// read a section header
+	section=evf_read_section(fd);
+	readcount += sizeof(*section);
+	fprintf(stderr, "  reading section: %s size: %lli next: %lli\n", section->type,
+		section->size, section->next);
+
+	if(!strncmp(section->type, "volume", strlen("volume"))) {
+	  //read in volume header
+	  struct evf_volume_header *volume;
+	  volume=(struct evf_volume_header *)malloc(sizeof(*volume));
+	  if(!volume) RAISE(E_NOMEMORY,NULL,Malloc);
+	  
+	  if(read_from_stream(fd,volume,sizeof(*volume))<sizeof(*volume)) 
+	    RAISE(E_IOERROR,NULL,"Error reading volume header");
+	  readcount += sizeof(*volume);
+
+	  total_chunks = volume->chunk_count;
+	  chunk_size = volume->sectors_per_chunk * volume->bytes_per_sector;
+
+	  if(chunk_size != 32*1024)
+	    fprintf(stderr, "Got unexpected chunk_size: %i\n", chunk_size);
+	  free(volume);
+	}
+	else if(!strncmp(section->type, "sectors", strlen("sectors"))) {
+	  // process the actual compressed data
+
+	  int data_size = chunk_size;
+	  int cdata_size = chunk_size+1024;
+	  char *data, *cdata;
+	  data = (char *)malloc(data_size);
+	  cdata = (char *)malloc(cdata_size);
+	  if(!data || !cdata) RAISE(E_NOMEMORY,NULL,Malloc);
+
+	  int toread; //amount to try and read
+	  int result;
+	  int compcount = 0; //amount processed so far
+	  int uncompcount = 0; //data produced to far
+	  int compreadcount = 0; //amount read so far
+	  int comp = 0, uncomp = 0; //processed in this loop
+
+	  char *ptr = cdata; //write pointer into cdata buffer
+
+	  /* process the compressed data
+	     we dont know how big each compressed chunk is
+	     so we have to read more than we need, and then keep rotating 
+	     and topping up the compressed buffer as needed until we've
+	     read and processed all the compressed data.
+	  */
+	  int total = section->size - sizeof(*section); //size of this section
+	  while(compcount < total) {
+
+	    // rotate the buffer
+	    if(comp > 0) {
+	      memmove(cdata, (cdata + comp), (cdata_size - comp));
+	      ptr = cdata + (cdata_size - comp);
+	      toread = comp;
+	    }
+	    else {
+	      // this is the first pass
+	      toread = cdata_size;
+	    }
+
+	    // make sure we dont read past the end of the section
+	    if((compreadcount + toread) > total) {
+	      toread = total - compreadcount;
+	    }
+	    
+	    //top up the buffer
+	    if(toread > 0) {
+	      if(read_from_stream(fd,ptr,toread) < toread)
+	      	RAISE(E_IOERROR,NULL,"Error reading sector Data");
+	      //fprintf(stderr, "read another %i bytes from stdin\n", toread);
+	      readcount += toread;
+	      compreadcount += toread;
+	    }
+	    
+	    //uncompress the mofo
+	    uncomp = data_size; //set to buffer sizes on input
+	    comp = cdata_size;
+
+	    //fprintf(stderr, "uncompressing a block\n");
+	    result = myuncompress(data,(long int *)&uncomp,cdata,(long int *)&comp);
+	    if(result!=Z_OK) {
+	      //fprintf(stderr, "ERROR in myuncompress: %i block: %i\n", result, chunk_count);	      
+	      // decompression failed, the chunk is either uncompressed or the data is corrupt
+	      // lets assume that the block is uncompressed, and copy it verbatim
+	      // If it turns out to be an error, the rest of the image is completely screwed
+	      // Whats more there's not a lot you can do about it here!!!
+	      // (how much compressed data u gonna skip? ...thought so)
+	      // I suppose you could keep a record, then when you get to the table, compare which ones
+	      // we think are uncompressed with which ones actually are, then you can at least you
+	      // can report the error, but who can be bothered??
+	      // OR maby you can keep advancing a pointer by one and trying to decompress until you
+	      // sucessfully get 32k out of it, again, too much work, maby another day.
+	      memcpy(data, cdata, data_size);
+	      comp = uncomp = data_size;
+	    }
+	    if(uncomp != data_size) {
+	      fprintf(stderr, "Probable ERROR: Compression returned unexpected volume %i\n", uncomp);
+	    }
+	    compcount += comp;
+	    uncompcount += uncomp;
+	    
+	    //fprintf(stderr, "comp: %i uncomp: %i\n", comp, uncomp);
+	    //write the output
+	    if(write(outfd,data,uncomp)<uncomp) {
+	      free(data);
+	      free(cdata); 
+	      RAISE(E_IOERROR,NULL,"Write failure in decompression");
+	    }
+	    chunk_count++;
+	  }
+	  free(data);
+	  free(cdata);
+	}
+	else if(!strncmp(section->type, "done", strlen("done"))) {
+	  done = 1;
+	}
+	
+	// move on to next section
+	if(readcount < section->next) {
+	  if(advance_stream(fd, section->next - readcount) < section->next - readcount)
+	    RAISE(E_IOERROR,NULL,"Reached end of stream");
+	  readcount = section->next;
+	}
+	else if(readcount > section->next) {
+	  if(readcount == (section->next - sizeof(*section)) || section->size == 0) {
+	    // i think this means we're at a 'next' or 'done' section, just continue
+	    last_section = 1;
+	  }
+	  else {
+	    //dont know how that happened, but we're screwed now
+	    RAISE(E_IOERROR,NULL,"Got too far ahead in stream: %i vs: %i", readcount, section->next);
+	  }
+	}
+	free(section);
+      }
+
+      //Check to see if we are done?
+      //if(strcasecmp(section->type,"done") && !force) 
+      //  RAISE(E_IOERROR,NULL,"No ending section, Cant find the last segment file\n");
+      
+      free(file_header);
+      segcount++;
+    }
+    if(chunk_count < total_chunks) {
+      fprintf(stderr, "only processed %i of %i chunks!\n", chunk_count, total_chunks);
+    }
+    return(0);
+  }
+
+  /* return to the reliable method (where the evt file must be a seekable file) */
   /* Get our filenames */
   if (optind < argc) {
     while (optind < argc) {
@@ -237,3 +469,4 @@ int main(int argc, char **argv) {
   evf_decompress_fds(&offsets,outfd);
   return(0);
 };
+

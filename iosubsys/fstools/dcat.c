@@ -226,7 +226,6 @@ main(int argc, char **argv)
 		fs->last_block = fs->block_count - 1; 
 
 		fs->block_size = usize;
-		fs->file_bsize = usize;
 	}
 
 	if (format & STAT) {

@@ -42,7 +42,6 @@
 #include "mymalloc.h"
 #include "error.h"
 
-
 /* ext2fs_group_lookup - look up group descriptor info */
 
 static void 
@@ -170,10 +169,10 @@ ext2fs_dinode_lookup(EXT2FS_INFO *ext2fs, INUM_T inum)
     /*
      * Look up the group descriptor for this inode. 
      */
-    grpnum = (inum - fs->first_inum) / 
+	grpnum = (inum - fs->first_inum) / 
 	  getu32(fs, ext2fs->fs->s_inodes_per_group);
 
-    if (ext2fs->grpnum != grpnum)
+	if (ext2fs->grpnum != grpnum)
 		ext2fs_group_lookup(ext2fs, grpnum);
 
     /*
@@ -182,9 +181,9 @@ ext2fs_dinode_lookup(EXT2FS_INFO *ext2fs, INUM_T inum)
     offs = (inum - 1) - getu32(fs, ext2fs->fs->s_inodes_per_group) * grpnum;
     addr = (OFF_T) getu32(fs, ext2fs->group->bg_inode_table) * 
 	  (OFF_T)fs->block_size
-	  + offs * (OFF_T)sizeof(ext2fs_inode);
+	  + offs * (OFF_T)ext2fs->inode_size;
 
-    fs->io->read_random(fs->io,(char *) dino, sizeof(ext2fs_inode),
+    fs->io->read_random(fs->io, (char *) dino, ext2fs->inode_size,
 	  addr, "inode block");
 
     ext2fs->inum = inum;
@@ -197,8 +196,8 @@ ext2fs_dinode_lookup(EXT2FS_INFO *ext2fs, INUM_T inum)
 		  (ULLONG) (getu32(fs, dino->i_size) + 
 		    (getu16(fs, dino->i_mode) & EXT2_IN_REG) ?
 		    (u_int64_t) getu32(fs, dino->i_size_high) << 32 : 0),
-		  getu16(fs, dino->i_uid),
-		  getu16(fs, dino->i_gid),
+		  getu16(fs, dino->i_uid) + (getu16(fs, dino->i_uid_high)<<16),
+		  getu16(fs, dino->i_gid) + (getu16(fs, dino->i_gid_high)<<16),
 		  (ULONG) getu32(fs, dino->i_mtime),
 		  (ULONG) getu32(fs, dino->i_atime),
 		  (ULONG) getu32(fs, dino->i_ctime),
@@ -236,8 +235,8 @@ ext2fs_copy_inode(EXT2FS_INFO *ext2fs, FS_INODE *fs_inode)
 		fs_inode->size +=  ((u_int64_t)getu32(fs, in->i_size_high) << 32);
 	}
 
-	fs_inode->uid =  getu16(fs, in->i_uid);
-	fs_inode->gid =  getu16(fs, in->i_gid);
+	fs_inode->uid =  getu16(fs, in->i_uid) + (getu16(fs, in->i_uid_high)<<16);
+	fs_inode->gid =  getu16(fs, in->i_gid) + (getu16(fs, in->i_gid_high)<<16);
 	fs_inode->mtime =  getu32(fs, in->i_mtime);
 	fs_inode->atime =  getu32(fs, in->i_atime);
 	fs_inode->ctime =  getu32(fs, in->i_ctime);
@@ -488,17 +487,18 @@ ext2fs_block_walk(FS_INFO *fs, DADDR_T start, DADDR_T last, int flags,
 	 * Be sure to use the right group descriptor information. XXX There
 	 * appears to be an off-by-one discrepancy between bitmap offsets and
 	 * disk block numbers.
-     *
-     * Addendum: this offset is controlled by the super block's
-     * s_first_data_block field.
-     */
+	 *
+	 * Addendum: this offset is controlled by the super block's
+	 * s_first_data_block field.
+	 */
 #define INODE_TABLE_SIZE(ext2fs) \
-    ((getu32(fs, ext2fs->fs->s_inodes_per_group) * sizeof(ext2fs_inode) - 1) \
+    ((getu32(fs, ext2fs->fs->s_inodes_per_group) * ext2fs->inode_size - 1) \
            / fs->block_size + 1)
 
 	/* This is meta data that is not described in the groups */
 	if (addr < getu32(fs, ext2fs->fs->s_first_data_block)) {
 		myflags = FS_FLAG_DATA_META | FS_FLAG_DATA_ALLOC;
+		ext2fs->grpnum = -1;
 
 		if ((flags & myflags) == myflags) {
 			fs->read_block(fs,fs_buf, fs->block_size, addr, "data block");
@@ -589,10 +589,10 @@ static int
 ext2fs_file_walk_direct(FS_INFO *fs, FS_BUF *buf[],
   size_t length, DADDR_T addr, int flags, FS_FILE_WALK_FN action, char *ptr)
 {
-    int     read_count;
+	int     read_count;
 	int 	myflags;
 
-    read_count = (length < buf[0]->size ? length : buf[0]->size);
+	read_count = (length < buf[0]->size ? length : buf[0]->size);
 
 	if (addr > fs->last_block) {
 		if (flags & FS_FLAG_FILE_NOABORT)  {
@@ -612,7 +612,7 @@ ext2fs_file_walk_direct(FS_INFO *fs, FS_BUF *buf[],
 	// @@@ We do not check allocation status here
 	myflags = FS_FLAG_DATA_CONT;
 
-    if (addr == 0) {
+	if (addr == 0) {
 		if (0 == (flags & FS_FLAG_FILE_NOSPARSE)) {
 
 			if ((flags & FS_FLAG_FILE_AONLY) == 0) 
@@ -622,7 +622,7 @@ ext2fs_file_walk_direct(FS_INFO *fs, FS_BUF *buf[],
 			  myflags, ptr)) 
 				return 0;
 		}
-    } else {
+	} else {
 		if ((flags & FS_FLAG_FILE_AONLY) == 0) {
 			fs->read_block(fs, buf[0], 
 			  roundup(read_count, EXT2FS_DEV_BSIZE), addr,
@@ -632,8 +632,9 @@ ext2fs_file_walk_direct(FS_INFO *fs, FS_BUF *buf[],
 		if (WALK_STOP == action(fs, addr, buf[0]->data, read_count, 
 		  myflags, ptr))
 			return 0;
-    }
-    return (read_count);
+	}
+
+	return (read_count);
 } 
 
 
@@ -745,7 +746,7 @@ ext2fs_file_walk(FS_INFO *fs, FS_INODE *inode, u_int32_t type, u_int16_t id,
      * indirect blocks.
      */
     buf = (FS_BUF **) mymalloc(sizeof(*buf) * (inode->indir_count + 1));
-    buf[0] = fs_buf_alloc(fs->file_bsize);
+    buf[0] = fs_buf_alloc(fs->block_size);
 
     length = inode->size;
 
@@ -757,8 +758,8 @@ ext2fs_file_walk(FS_INFO *fs, FS_INODE *inode, u_int32_t type, u_int16_t id,
      * Read the file blocks. First the direct blocks, then the indirect ones.
      */
 
-    for (n = 0; length > 0 && n < inode->direct_count; n++) {
-    	retval = ext2fs_file_walk_direct(fs, buf, length, 
+	for (n = 0; length > 0 && n < inode->direct_count; n++) {
+		retval = ext2fs_file_walk_direct(fs, buf, length, 
 		  inode->direct_addr[n],  flags, action, ptr);
 
 		if (retval)
@@ -771,7 +772,7 @@ ext2fs_file_walk(FS_INFO *fs, FS_INODE *inode, u_int32_t type, u_int16_t id,
 
 	if (length > 0) {
 		for (level = 1; level <= inode->indir_count; level++)
-			buf[level] = fs_buf_alloc(fs->file_bsize);
+			buf[level] = fs_buf_alloc(fs->block_size);
 
 		for (level = 1; length > 0 && level <= inode->indir_count; level++) {
 			retval = ext2fs_file_walk_indir(fs, buf, length, 
@@ -810,18 +811,23 @@ ext2fs_fsstat(FS_INFO *fs, FILE *hFile)
 	time_t tmptime;
 
 
-    fprintf(hFile, "FILE SYSTEM INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
+	fprintf(hFile, "FILE SYSTEM INFORMATION\n");
+	fprintf(hFile, "--------------------------------------------\n");
 
-	fprintf(hFile, "File System Type: EXT2FS\n");
+	fprintf(hFile, "File System Type: %s\n",
+		(fs->ftype == EXT3FS)? "EXT3FS" : "EXT2FS");
 	fprintf(hFile, "Volume Name: %s\n", sb->s_volume_name);
+	fprintf(hFile, "Volume ID: %"PRIx64"%"PRIx64"\n",
+	  getu64(fs, &sb->s_uuid[8]), 
+	  getu64(fs, &sb->s_uuid[0]));
+
+	tmptime = getu32(fs, sb->s_wtime);
+	fprintf(hFile, "\nLast Writen at: %s", asctime(localtime(&tmptime))); 
+	tmptime = getu32(fs, sb->s_lastcheck);
+	fprintf(hFile, "Last Checked at: %s", asctime(localtime(&tmptime))); 
 
 	tmptime = getu32(fs, sb->s_mtime);
-	fprintf(hFile, "Last Mount: %s", asctime(localtime(&tmptime))); 
-	tmptime = getu32(fs, sb->s_wtime);
-	fprintf(hFile, "Last Write: %s", asctime(localtime(&tmptime))); 
-	tmptime = getu32(fs, sb->s_lastcheck);
-	fprintf(hFile, "Last Check: %s", asctime(localtime(&tmptime))); 
+	fprintf(hFile, "\nLast Mounted at: %s", asctime(localtime(&tmptime))); 
 
 	/* State of the file system */
 	if (getu16(fs, sb->s_state) & EXT2FS_STATE_VALID)
@@ -829,9 +835,10 @@ ext2fs_fsstat(FS_INFO *fs, FILE *hFile)
 	else
 		fprintf(hFile, "Unmounted Improperly\n");
 
-	fprintf(hFile, "Last mounted on: %s\n", sb->s_last_mounted);
+	if (sb->s_last_mounted != '\0')
+		fprintf(hFile, "Last mounted on: %s\n", sb->s_last_mounted);
 
-	fprintf(hFile, "Operating System: ");
+	fprintf(hFile, "\nSource OS: ");
 	switch (getu32(fs, sb->s_creator_os)) {
 	  case EXT2FS_OS_LINUX:
 		fprintf(hFile, "Linux\n");
@@ -858,7 +865,6 @@ ext2fs_fsstat(FS_INFO *fs, FILE *hFile)
 	else
 		fprintf(hFile, "Dynamic Structure\n");
 
-	/* @@@ WHERE DOES THE MINOR REV WORK IN HERE */
 
 	/* add features */
 	if (getu32(fs, sb->s_feature_compat)) {
@@ -922,39 +928,89 @@ ext2fs_fsstat(FS_INFO *fs, FILE *hFile)
 
 	}
 
-    fprintf(hFile, "\nMETA-DATA INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
+	/* Print journal information */
+	if (getu32(fs, sb->s_feature_compat) & 
+	  EXT2FS_FEATURE_COMPAT_HAS_JOURNAL) {
 
-    fprintf(hFile, "Inode Range: %lu - %lu\n",
-      (ULONG)fs->first_inum, (ULONG)fs->last_inum);
-    fprintf(hFile, "Root Directory: %lu\n", (ULONG)fs->root_inum);
+		fprintf(hFile, "\nJournal ID: %"PRIx64"%"PRIx64"\n",
+		  getu64(fs, &sb->s_journal_uuid[8]), 
+		  getu64(fs, &sb->s_journal_uuid[0]));
+
+		if (getu32(fs, sb->s_journal_inum) != 0)
+			fprintf(hFile, "Journal Inode: %"PRIu32"\n",
+			  getu32(fs, sb->s_journal_inum));
+
+		if (getu32(fs, sb->s_journal_dev) != 0)
+			fprintf(hFile, "Journal Device: %"PRIu32"\n",
+			  getu32(fs, sb->s_journal_dev));
 
 
-    fprintf(hFile, "\nCONTENT-DATA INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
+	}
 
-    fprintf(hFile, "Fragment Range: %lu - %lu\n",
-      (ULONG)fs->first_block, (ULONG)fs->last_block);
+	fprintf(hFile, "\nMETADATA INFORMATION\n");
+	fprintf(hFile, "--------------------------------------------\n");
 
-    fprintf(hFile, "Block Size: %lu\n", (ULONG)fs->file_bsize);
-    fprintf(hFile, "Fragment Size: %lu\n", (ULONG)fs->block_size);
+	fprintf(hFile, "Inode Range: %lu - %lu\n",
+	  (ULONG)fs->first_inum, (ULONG)fs->last_inum);
+	fprintf(hFile, "Root Directory: %lu\n", (ULONG)fs->root_inum);
 
-    fprintf(hFile, "\nBLOCK GROUP INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
+	fprintf(hFile, "Free Inodes: %"PRIu32"\n",
+	  getu32(fs, sb->s_free_inode_count));
 
-    fprintf(hFile, "Number of Block Groups: %d\n", ext2fs->groups_count);
 
-    fprintf(hFile, "Inodes per group: %d\n", 
+	/* @@@ NEED TO TEST THIS */
+#if 0
+	if (getu32(fs, sb->s_last_orphan)) {
+		u_int32_t	or_in;
+		fprintf(hFile, "Orphan Inodes: ");
+		or_in = getu32(fs, sb->s_last_orphan);
+		while (or_in) {
+			FS_INODE *fsi;
+
+			if ((or_in > fs->last_inum) || (or_in < fs->first_inum))
+				break;
+
+			fprintf(hFile, "%"PRIu32", ", or_in);
+
+			/* Get the next one */
+			fsi = ext2fs_inode_lookup(fs, or_in);
+			if (!fsi)
+				break;
+
+			or_in = fsi->dtime;
+		}
+	}
+#endif
+
+	fprintf(hFile, "\nCONTENT INFORMATION\n");
+	fprintf(hFile, "--------------------------------------------\n");
+
+	fprintf(hFile, "Block Range: %lu - %lu\n",
+	  (ULONG)fs->first_block, (ULONG)fs->last_block);
+
+	fprintf(hFile, "Block Size: %lu\n", (ULONG)fs->block_size);
+
+	if (getu32(fs, sb->s_first_data_block)) 
+		fprintf(hFile, "Reserved Area Before Block Groups: %"PRIu32"\n",
+		  getu32(fs, sb->s_first_data_block));
+
+	fprintf(hFile, "Free Blocks: %"PRIu32"\n",
+	  getu32(fs, sb->s_free_blocks_count));
+
+	fprintf(hFile, "\nBLOCK GROUP INFORMATION\n");
+	fprintf(hFile, "--------------------------------------------\n");
+
+	fprintf(hFile, "Number of Block Groups: %d\n", ext2fs->groups_count);
+
+	fprintf(hFile, "Inodes per group: %d\n", 
 	  getu32(fs, sb->s_inodes_per_group));
-    fprintf(hFile, "Blocks per group: %d\n", 
+	fprintf(hFile, "Blocks per group: %d\n", 
 	  getu32(fs, sb->s_blocks_per_group));
-    fprintf(hFile, "Fragments per group: %d\n", 
-	  getu32(fs, sb->s_frags_per_group));
 
 
 	/* number of blocks the inodes consume */
-	ibpg = (getu32(fs, sb->s_inodes_per_group) * sizeof (ext2fs_inode) +
-	  fs->file_bsize - 1) /  fs->file_bsize;
+	ibpg = (getu32(fs, sb->s_inodes_per_group) * ext2fs->inode_size +
+	  fs->block_size - 1) /  fs->block_size;
 
 	for (i = 0; i < ext2fs->groups_count; i++) {
 		GRPNUM_T cg_base;
@@ -964,7 +1020,7 @@ ext2fs_fsstat(FS_INFO *fs, FILE *hFile)
 		fprintf(hFile, "\nGroup: %d:\n", i);
 
 		inum = fs->first_inum + gets32(fs, sb->s_inodes_per_group) * i;
-        fprintf(hFile, "  Inode Range: %lu - ", (ULONG)inum);
+		fprintf(hFile, "  Inode Range: %lu - ", (ULONG)inum);
 
 		if ((inum + gets32(fs, sb->s_inodes_per_group) - 1) < fs->last_inum) 
 			fprintf(hFile, "%lu\n", 
@@ -975,16 +1031,18 @@ ext2fs_fsstat(FS_INFO *fs, FILE *hFile)
    
 		cg_base = ext2_cgbase_lcl(fs, sb, i);
 
-        fprintf(hFile, "  Block Range: %lu - %lu\n",
-          (ULONG)cg_base,
-          (((ULONG)ext2_cgbase_lcl(fs, sb, i + 1) - 1) < fs->last_block) ?
-          ((ULONG)ext2_cgbase_lcl(fs, sb, i + 1) - 1) : fs->last_block);
+		fprintf(hFile, "  Block Range: %lu - %lu\n",
+		  (ULONG)cg_base,
+		  (((ULONG)ext2_cgbase_lcl(fs, sb, i + 1) - 1) < fs->last_block) ?
+		  ((ULONG)ext2_cgbase_lcl(fs, sb, i + 1) - 1) : fs->last_block);
 
+
+		fprintf(hFile, "  Layout:\n");
 
 		/* only print the super block data if we are not in a sparse
 		 * group 
 		 */
-    	if ((getu32(fs, ext2fs->fs->s_feature_ro_compat) & 
+		if ((getu32(fs, ext2fs->fs->s_feature_ro_compat) & 
 	  	  EXT2FS_FEATURE_RO_COMPAT_SPARSE_SUPER) && 
 		  (cg_base != getu32(fs, ext2fs->group->bg_block_bitmap)) ) {
 			OFF_T boff;
@@ -993,17 +1051,17 @@ ext2fs_fsstat(FS_INFO *fs, FILE *hFile)
 			fprintf(hFile, "    Super Block: %lu - %lu\n",
 			  (ULONG)cg_base,
 			  (ULONG)cg_base +
-			  ((sizeof (ext2fs_sb) + fs->file_bsize - 1) / fs->file_bsize) - 1);
+			  ((sizeof (ext2fs_sb) + fs->block_size - 1) / fs->block_size) - 1);
 
-			boff = roundup(sizeof(ext2fs_sb), fs->file_bsize);
+			boff = roundup(sizeof(ext2fs_sb), fs->block_size);
 
 			/* Group Descriptors */
 			fprintf(hFile, "    Group Descriptor Table: %lu - ",
-			  (ULONG)(cg_base + (boff + fs->file_bsize - 1) / fs->file_bsize) );
+			  (ULONG)(cg_base + (boff + fs->block_size - 1) / fs->block_size) );
 
 			boff += (ext2fs->groups_count * sizeof (ext2fs_gd));
 			fprintf(hFile, "%lu\n",
-			  (ULONG)((cg_base + (boff + fs->file_bsize - 1) / fs->file_bsize)
+			  (ULONG)((cg_base + (boff + fs->block_size - 1) / fs->block_size)
 			  - 1));
 		}
 
@@ -1028,7 +1086,7 @@ ext2fs_fsstat(FS_INFO *fs, FILE *hFile)
 		fprintf(hFile, "    Data Blocks: ");
 
 		/* If we are in a sparse group, display the other addresses */
-    	if ((getu32(fs, ext2fs->fs->s_feature_ro_compat) & 
+		if ((getu32(fs, ext2fs->fs->s_feature_ro_compat) & 
 	  	  EXT2FS_FEATURE_RO_COMPAT_SPARSE_SUPER) && 
 		  (cg_base == getu32(fs, ext2fs->group->bg_block_bitmap)) ) {
 
@@ -1044,9 +1102,23 @@ ext2fs_fsstat(FS_INFO *fs, FILE *hFile)
 
 		fprintf(hFile, "%lu - %lu\n", 
 		  (ULONG)getu32(fs, ext2fs->group->bg_inode_table) + ibpg,
-          (((ULONG)ext2_cgbase_lcl(fs, sb, i + 1) - 1) < fs->last_block) ?
-          ((ULONG)ext2_cgbase_lcl(fs, sb, i + 1) - 1) : fs->last_block);
+		  (((ULONG)ext2_cgbase_lcl(fs, sb, i + 1) - 1) < fs->last_block) ?
+		  ((ULONG)ext2_cgbase_lcl(fs, sb, i + 1) - 1) : fs->last_block);
 
+
+		/* Print the free info */
+		fprintf(hFile, "  Free Inodes: %"PRIu16" (%d%%)\n",
+		  getu16(fs, ext2fs->group->bg_free_inodes_count),
+		  (100 * getu16(fs, ext2fs->group->bg_free_inodes_count)) / 
+		  getu32(fs, sb->s_inodes_per_group));
+
+		fprintf(hFile, "  Free Blocks: %"PRIu16" (%d%%)\n",
+		  getu16(fs, ext2fs->group->bg_free_blocks_count),
+		  (100 * getu16(fs, ext2fs->group->bg_free_blocks_count)) / 
+		  getu32(fs, sb->s_blocks_per_group));
+
+		fprintf(hFile, "  Total Directories: %"PRIu16"\n",
+		  getu16(fs, ext2fs->group->bg_used_dirs_count));
 	}
 
 	return;
@@ -1055,6 +1127,36 @@ ext2fs_fsstat(FS_INFO *fs, FILE *hFile)
 
 /************************* istat *******************************/
  
+static void
+ext2fs_make_acl_str (char *str, int len, u_int16_t perm)
+{
+	int i = 0;
+
+	if (perm & EXT2_PACL_PERM_READ) {
+		snprintf(&str[i], len - 1, "Read");
+		i += 4;
+	}
+	if (perm & EXT2_PACL_PERM_WRITE) {
+		if (i) {
+			snprintf(&str[i], len - 1, ", ");
+			i += 2;
+		}
+		snprintf(&str[i], len - 1, "Write");
+		i += 5;
+	}
+	if (perm & EXT2_PACL_PERM_EXEC) {
+		if (i) {
+			snprintf(&str[i], len - 1, ", ");
+			i += 2;
+		}
+		snprintf(&str[i], len - 1, "Execute");
+		i += 7;
+	}
+
+}
+
+
+
 static int printidx = 0;
 #define WIDTH   8
   
@@ -1071,7 +1173,7 @@ print_addr_act (FS_INFO *fs, DADDR_T addr, char *buf,
 
     if (flags & FS_FLAG_DATA_CONT) {
         int i, s;
-        /* cycle through the fragments if they exist */
+        /* cycle through the blocks if they exist */
         for (i = 0, s = size; s > 0; s-= fs->block_size, i++) {
 
             /* sparse file */
@@ -1100,26 +1202,25 @@ static void
 ext2fs_istat (FS_INFO *fs, FILE *hFile, INUM_T inum, int numblock,
   int32_t sec_skew)
 {
-    EXT2FS_INFO *ext2fs = (EXT2FS_INFO *) fs;
-    FS_INODE *fs_inode;
-    char ls[12];
+	EXT2FS_INFO *ext2fs = (EXT2FS_INFO *) fs;
+	FS_INODE *fs_inode;
+	char ls[12];
 
-    fs_inode = ext2fs_inode_lookup (fs, inum);
-    fprintf(hFile, "inode: %lu\n", (ULONG) inum);
-    fprintf(hFile, "%sAllocated\n",
-      (fs_inode->flags & FS_FLAG_META_ALLOC)?"":"Not ");
+	fs_inode = ext2fs_inode_lookup (fs, inum);
+	fprintf(hFile, "inode: %lu\n", (ULONG) inum);
+	fprintf(hFile, "%sAllocated\n",
+	  (fs_inode->flags & FS_FLAG_META_ALLOC)?"":"Not ");
 
-    fprintf(hFile, "Group: %lu\n", (ULONG)ext2fs->grpnum);
+	fprintf(hFile, "Group: %lu\n", (ULONG)ext2fs->grpnum);
 
-    if (fs_inode->link)
-        fprintf(hFile, "symbolic link to: %s\n", fs_inode->link);
+	if (fs_inode->link)
+		fprintf(hFile, "symbolic link to: %s\n", fs_inode->link);
 
-    fprintf(hFile, "uid / gid: %d / %d\n",
-      (int)fs_inode->uid, (int)fs_inode->gid);
+	fprintf(hFile, "uid / gid: %d / %d\n",
+	  (int)fs_inode->uid, (int)fs_inode->gid);
 
-
-    make_ls(fs_inode->mode, ls, 12);
-    fprintf(hFile, "mode: %s\n", ls);
+	make_ls(fs_inode->mode, ls, 12);
+	fprintf(hFile, "mode: %s\n", ls);
 
 	if (getu32(fs, ext2fs->dinode->i_flags)) {
 		fprintf(hFile, "Flags: ");
@@ -1150,33 +1251,210 @@ ext2fs_istat (FS_INFO *fs, FILE *hFile, INUM_T inum, int numblock,
 		fprintf(hFile, "\n");
 	}
 
-    fprintf(hFile, "size: %llu\n", (ULLONG) fs_inode->size);
-    fprintf(hFile, "num of links: %lu\n", (ULONG) fs_inode->nlink);
+	fprintf(hFile, "size: %llu\n", (ULLONG) fs_inode->size);
+	fprintf(hFile, "num of links: %lu\n", (ULONG) fs_inode->nlink);
 
-    if (sec_skew != 0) {
-        fprintf(hFile, "\nAdjusted Inode Times:\n");                  
-        fs_inode->mtime -= sec_skew;
-        fs_inode->atime -= sec_skew;
-        fs_inode->ctime -= sec_skew;
-   
-        fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
-        fprintf(hFile, "File Modified:\t%s", ctime(&fs_inode->mtime));
-        fprintf(hFile, "Inode Modified:\t%s", ctime(&fs_inode->ctime));
+	/* Ext attribute are stored in a block with a header and a list
+	 * of entries that are aligned to 4-byte boundaries.  The attr
+	 * value is stored at the end of the block.  There are 4 null bytes
+	 * in between the headers and values 
+	 */
+	if (getu32(fs, ext2fs->dinode->i_file_acl) != 0) {
+		FS_BUF *fs_buf = fs_buf_alloc(fs->block_size);
+		ext2fs_ea_header *ea_head;
+		ext2fs_ea_entry *ea_entry;
 
-		if (fs_inode->dtime) {
-        	fs_inode->dtime -= sec_skew;
-			fprintf(hFile, "Deleted:\t%s", ctime(&fs_inode->dtime));
-        	fs_inode->dtime += sec_skew;
+		fprintf(hFile, "\nExtended Attributes  (Block: %"PRIu32")\n",
+		  getu32(fs, ext2fs->dinode->i_file_acl));
+
+		/* Is the value too big? */
+		if (getu32(fs, ext2fs->dinode->i_file_acl) > fs->last_block) {
+			fprintf(hFile, "Extended Attributes block is larger than file system\n");
+			goto egress_ea;
 		}
 
-        fs_inode->mtime += sec_skew;
-        fs_inode->atime += sec_skew;
-        fs_inode->ctime += sec_skew;
+		fs_read_block(fs, fs_buf, fs->block_size, 
+		  getu32(fs, ext2fs->dinode->i_file_acl),
+		  "extended attribute block");
 
-        fprintf(hFile, "\nOriginal Inode Times:\n");             
-    }
-    else
-        fprintf(hFile, "\nInode Times:\n");
+
+
+		/* Check the header */
+		ea_head = (ext2fs_ea_header *)fs_buf->data;
+		if (getu32(fs, ea_head->magic) != EXT2_EA_MAGIC) {
+			fprintf(hFile, "Incorrect extended attribute header: %x\n", 
+			  getu32(fs, ea_head->magic));
+		}
+
+
+		/* Cycle through each entry - at the top of the block */
+		for (ea_entry = (ext2fs_ea_entry *)&ea_head->entry;
+
+		  ((int)ea_entry < ((int)fs_buf->data + fs->block_size - sizeof(ext2fs_ea_entry))) ;
+
+		  ea_entry = (ext2fs_ea_entry *) ((int)ea_entry + 
+		    EXT2_EA_LEN(ea_entry->nlen))) {
+
+			char name[256];
+
+			/* Stop if the first four bytes are NULL */
+			if ((ea_entry->nlen == 0) && (ea_entry->nidx == 0) &&
+		  	  (getu16(fs, ea_entry->val_off) == 0))
+				break;
+
+			/* The Linux src does not allow this */
+			if (getu32(fs, ea_entry->val_blk) != 0) {
+				fprintf(hFile, "Attribute has non-zero value block - skipping\n");
+				continue;
+			}
+
+
+			/* Is the value location and size valid? */
+			if ((getu32(fs, ea_entry->val_off) > fs->block_size) || 
+			  ((getu16(fs, ea_entry->val_off)  + getu32(fs, ea_entry->val_size)) > fs->block_size) ) {
+				continue;
+			}	
+
+
+			/* Copy the name into a buffer - not NULL term */
+			strncpy(name, &ea_entry->name, 
+			  ea_entry->nlen);
+			name[ea_entry->nlen] = '\0';
+
+
+			/* User assigned attributes - setfattr / getfattr */
+			if ((ea_entry->nidx == EXT2_EA_IDX_USER) ||
+			  (ea_entry->nidx == EXT2_EA_IDX_TRUSTED) ||
+			  (ea_entry->nidx == EXT2_EA_IDX_SECURITY) ) {
+				char val[256];
+
+				strncpy(val, &fs_buf->data[getu16(fs, ea_entry->val_off)], 
+				  getu32(fs, ea_entry->val_size) > 256 ? 
+				  256 : getu32(fs, ea_entry->val_size));
+
+				val[getu32(fs, ea_entry->val_size) > 256 ? 
+				  256 : getu32(fs, ea_entry->val_size)] = '\0';
+
+				if (ea_entry->nidx == EXT2_EA_IDX_USER) 
+					fprintf(hFile, "user.%s=%s\n",
+						name, val);
+				else if (ea_entry->nidx == EXT2_EA_IDX_TRUSTED) 
+					fprintf(hFile, "trust.%s=%s\n",
+						name, val);
+				else if (ea_entry->nidx == EXT2_EA_IDX_SECURITY) 
+					fprintf(hFile, "security.%s=%s\n",
+						name, val);
+
+			}
+
+
+			/* POSIX ACL - setfacl / getfacl stuff */
+			else if ((ea_entry->nidx == EXT2_EA_IDX_POSIX_ACL_ACCESS)  ||
+			  (ea_entry->nidx == EXT2_EA_IDX_POSIX_ACL_DEFAULT)) {
+
+				ext2fs_pos_acl_entry_lo  *acl_lo;
+				ext2fs_pos_acl_head  *acl_head;
+
+				if (ea_entry->nidx == EXT2_EA_IDX_POSIX_ACL_ACCESS) 
+					fprintf(hFile, "POSIX Access Control List Entries:\n");
+				else if (ea_entry->nidx == EXT2_EA_IDX_POSIX_ACL_DEFAULT)
+					fprintf(hFile, "POSIX Default Access Control List Entries:\n");
+
+				/* examine the header */
+				acl_head = (ext2fs_pos_acl_head *)&fs_buf->data[getu16(fs, ea_entry->val_off)];
+
+				if (getu32(fs, acl_head->ver) != 1) {
+					fprintf(hFile, "Invalid ACL Header Version: %d\n", getu32(fs, acl_head->ver));
+					continue;
+				}
+
+				/* The first entry starts after the header */
+				acl_lo = (ext2fs_pos_acl_entry_lo *)((int)acl_head + sizeof(ext2fs_pos_acl_head));
+
+
+				/* Cycle through the values */
+				while ((int)acl_lo < ((int)fs_buf->data + getu16(fs, ea_entry->val_off) + getu32(fs, ea_entry->val_size))) {
+
+					char perm[64];
+					int len;
+
+					/* Make a string from the permissions */
+					ext2fs_make_acl_str (perm, 64, getu16(fs, acl_lo->perm));
+
+					switch (getu16(fs, acl_lo->tag)) {
+						case EXT2_PACL_TAG_USERO:
+
+							fprintf(hFile, "  uid: %d: %s\n", fs_inode->uid, perm);
+							len = sizeof(ext2fs_pos_acl_entry_sh);
+							break;
+
+						case EXT2_PACL_TAG_GRPO:
+							fprintf(hFile, "  gid: %d: %s\n", fs_inode->gid, perm);
+							len = sizeof(ext2fs_pos_acl_entry_sh);
+							break;
+						case EXT2_PACL_TAG_OTHER:
+							fprintf(hFile, "  other: %s\n", perm);
+							len = sizeof(ext2fs_pos_acl_entry_sh);
+							break;
+						case EXT2_PACL_TAG_MASK:
+							fprintf(hFile, "  mask: %s\n", perm);
+							len = sizeof(ext2fs_pos_acl_entry_sh);
+							break;
+
+
+						case EXT2_PACL_TAG_GRP:
+							fprintf(hFile, "  gid: %d: %s\n", getu32(fs, acl_lo->id), perm);
+							len = sizeof(ext2fs_pos_acl_entry_lo);
+							break;
+
+						case EXT2_PACL_TAG_USER:
+							fprintf(hFile, "  uid: %d: %s\n", getu32(fs, acl_lo->id), perm);
+
+							len = sizeof(ext2fs_pos_acl_entry_lo);
+							break;
+
+						default:
+							fprintf(hFile, "Unknown ACL tag: %d\n", getu16(fs, acl_lo->tag));
+							len = sizeof(ext2fs_pos_acl_entry_sh);
+							break;
+					}
+					acl_lo = (ext2fs_pos_acl_entry_lo *)((int)acl_lo + len);
+				}
+			}
+			else {
+				fprintf(hFile, "Unsupported Extended Attr Type: %d\n", ea_entry->nidx);
+			}
+		}
+egress_ea:
+
+		fs_buf_free(fs_buf);
+	}
+
+	if (sec_skew != 0) {
+		fprintf(hFile, "\nAdjusted Inode Times:\n");                  
+		fs_inode->mtime -= sec_skew;
+		fs_inode->atime -= sec_skew;
+		fs_inode->ctime -= sec_skew;
+   
+		fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
+		fprintf(hFile, "File Modified:\t%s", ctime(&fs_inode->mtime));
+		fprintf(hFile, "Inode Modified:\t%s", ctime(&fs_inode->ctime));
+
+		if (fs_inode->dtime) {
+			fs_inode->dtime -= sec_skew;
+			fprintf(hFile, "Deleted:\t%s", ctime(&fs_inode->dtime));
+			fs_inode->dtime += sec_skew;
+		}
+
+		fs_inode->mtime += sec_skew;
+		fs_inode->atime += sec_skew;
+		fs_inode->ctime += sec_skew;
+
+		fprintf(hFile, "\nOriginal Inode Times:\n");             
+	}
+	else {
+		fprintf(hFile, "\nInode Times:\n");
+	}
 
 	fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
 	fprintf(hFile, "File Modified:\t%s", ctime(&fs_inode->mtime));
@@ -1185,38 +1463,38 @@ ext2fs_istat (FS_INFO *fs, FILE *hFile, INUM_T inum, int numblock,
 	if (fs_inode->dtime) 
 		fprintf(hFile, "Deleted:\t%s", ctime(&fs_inode->dtime));
 		
-    if (numblock > 0)
-        fs_inode->size = numblock * fs->file_bsize;
+	if (numblock > 0)
+		fs_inode->size = numblock * fs->block_size;
 
-    fprintf (hFile, "\nDirect Blocks:\n");
+	fprintf (hFile, "\nDirect Blocks:\n");
 
-    indir_idx = 0;
-    fs->file_walk(fs, fs_inode, 0, 0, 
-	  (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_META),
+	indir_idx = 0;
+	fs->file_walk(fs, fs_inode, 0, 0, 
+	  (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_META | FS_FLAG_FILE_NOID),
 	  print_addr_act, (char *)hFile);
 
-    if (printidx != 0)
-        fprintf(hFile, "\n");
+	if (printidx != 0)
+		fprintf(hFile, "\n");
 
-    /* print indirect blocks */
-    if (indir_idx > 0) {
-        int i;
-        fprintf(hFile, "\nIndirect Blocks:\n");
+	/* print indirect blocks */
+	if (indir_idx > 0) {
+		int i;
+		fprintf(hFile, "\nIndirect Blocks:\n");
 
-        printidx = 0;
+		printidx = 0;
 
-        for (i = 0; i < indir_idx; i++) {
-            fprintf(hFile, "%lu ", (unsigned long) indirl[i]);
-            if (++printidx == WIDTH) {
-                fprintf(hFile, "\n");
-                printidx = 0;
-            }
-        }
-        if (printidx != 0)
-            fprintf(hFile, "\n");
-    }
+		for (i = 0; i < indir_idx; i++) {
+			fprintf(hFile, "%lu ", (unsigned long) indirl[i]);
+			if (++printidx == WIDTH) {
+				fprintf(hFile, "\n");
+				printidx = 0;
+			}
+		}
+		if (printidx != 0)
+			fprintf(hFile, "\n");
+	}
 
-    return;
+	return;
 }
 
 
@@ -1225,15 +1503,15 @@ ext2fs_istat (FS_INFO *fs, FILE *hFile, INUM_T inum, int numblock,
 static void 
 ext2fs_close(FS_INFO *fs)
 {
-    EXT2FS_INFO *ext2fs = (EXT2FS_INFO *) fs;
+	EXT2FS_INFO *ext2fs = (EXT2FS_INFO *) fs;
 
-    fs->io->close(fs->io);
+	fs->io->close(fs->io);
 	free((char *)ext2fs->fs);
 	free((char *)ext2fs->dinode);
 	free((char *)ext2fs->group);
 	free((char *)ext2fs->block_map);
 	free((char *)ext2fs->inode_map);
-    free(ext2fs);
+	free(ext2fs);
 }
 
 /* ext2fs_open - open an ext2fs file system */
@@ -1241,141 +1519,165 @@ ext2fs_close(FS_INFO *fs)
 FS_INFO *
 ext2fs_open(IO_INFO *io, unsigned char ftype)
 {
-    char   *myname = "extXfs_open";
-    EXT2FS_INFO *ext2fs = (EXT2FS_INFO *) mymalloc(sizeof(*ext2fs));
-    int     len;
+	//char   *myname = "extXfs_open";
+	EXT2FS_INFO *ext2fs = (EXT2FS_INFO *) mymalloc(sizeof(*ext2fs));
+	int     len;
 	FS_INFO *fs = &(ext2fs->fs_info);
-	/* Initialize the FS_INFO object */
-	fs->io=io;
 
-	if ((ftype & FSMASK) != EXT2FS_TYPE) {
-	  return(NULL);
-	  error ("Invalid FS Type in ext2fs_open");
-	};
+    /* Initialize the FS_INFO object */
+    fs->io=io;
+	
+	if ((ftype & FSMASK) != EXTxFS_TYPE) 
+		error ("Invalid FS Type in ext2fs_open");
 
-    /*
-     * Open the block device; linux has no raw character disk device.
-     */
-    //if ((fs->fd = open(name, O_RDONLY)) < 0)
-	//	error("%s: open %s: %m", myname, name);
+	/*
+	* Open the block device; linux has no raw character disk device.
+	*/
+//	if ((fs->fd = open(name, O_RDONLY)) < 0)
+//		error("%s: open %s: %m", myname, name);
 
 	fs->ftype = ftype;
 	fs->flags = 0;
 	fs->flags |= FS_HAVE_DTIME;
 
-    /*
-     * Read the superblock.
-     */
+	/*
+	 * Read the superblock.
+	 */
 	len = sizeof(ext2fs_sb);
 	ext2fs->fs = (ext2fs_sb *)mymalloc (len);
 
-	/*  Commented out in favour of generic io_subsystem calls
-    if (LSEEK(fs->fd, EXT2FS_SBOFF, SEEK_SET) != EXT2FS_SBOFF)
+    /*  Commented out in favour of generic io_subsystem calls
+	if (LSEEK(fs->fd, EXT2FS_SBOFF, SEEK_SET) != EXT2FS_SBOFF)
 		error("%s: lseek: %m", myname);
-    if (read(fs->fd, ext2fs->fs, len) != len)
+	if (read(fs->fd, ext2fs->fs, len) != len)
 		error("%s: read superblock: %m", name);
-	*/
-	fs->io->read_random(fs->io,(char *)ext2fs->fs,len,EXT2FS_SBOFF,"Checking for EXT2FS");
+    */
+    fs->io->read_random(fs->io,(char *)ext2fs->fs,len,EXT2FS_SBOFF,"Checking for EXT2FS");
 
 	/* 
-	 * Verify we are looking at an EXT2FS image
+	 * Verify we are looking at an EXTxFS image
 	 */
-
 	if (guessu16(fs, ext2fs->fs->s_magic, EXT2FS_FS_MAGIC)) {
-	  return(NULL);
-	    error("Error: This is not an %s file system",
-		  (ftype == EXT3FS_1)?"EXT3FS":"EXT2FS");
+		return(NULL);
+		//error("Error: %s is not an EXTxFS file system", name);
 	}
 
-    if (verbose) {
-    	if (getu32(fs, ext2fs->fs->s_feature_ro_compat) & 
+	if (verbose) {
+    		if (getu32(fs, ext2fs->fs->s_feature_ro_compat) & 
 	  	  EXT2FS_FEATURE_RO_COMPAT_SPARSE_SUPER)
-        	fprintf(logfp, "File system has sparse super blocks\n");
+			fprintf(logfp, "File system has sparse super blocks\n");
 
-    	fprintf(logfp, "First data block is %d\n", 
+		fprintf(logfp, "First data block is %d\n", 
 	  	  (int) getu32(fs, ext2fs->fs->s_first_data_block));
-    }
+	}
 
-
-	/* we need to figure out ver 1 or ver 2 */
-	if (fs->ftype == EXT2FS) {
-		if (getu32(fs, ext2fs->fs->s_feature_incompat) & 
-			EXT2FS_FEATURE_INCOMPAT_FILETYPE) 
-				fs->ftype = EXT2FS_2;
-		else
-				fs->ftype = EXT2FS_1;
+	/* If autodetect was given, look for the journal */
+	if (ftype == EXTAUTO) {
+		if (getu32(fs, ext2fs->fs->s_feature_compat) & 
+		  EXT2FS_FEATURE_COMPAT_HAS_JOURNAL)
+			fs->ftype = EXT3FS;
+		else 
+			fs->ftype = EXT2FS;
 	}	
 
 
-    /*
-     * Translate some filesystem-specific information to generic form.
-     */
-    fs->inum_count = getu32(fs, ext2fs->fs->s_inodes_count);
-    fs->last_inum = fs->inum_count;
-    fs->first_inum = EXT2FS_FIRSTINO;
-    fs->root_inum = EXT2FS_ROOTINO;
+	/* we need to figure out if dentries are v1 or v2 */
+	if (getu32(fs, ext2fs->fs->s_feature_incompat) & 
+	  EXT2FS_FEATURE_INCOMPAT_FILETYPE) 
+		ext2fs->deentry_type = EXT2_DE_V2;
+	else
+		ext2fs->deentry_type = EXT2_DE_V1;
 
-    fs->block_count = getu32(fs, ext2fs->fs->s_blocks_count);
-    fs->first_block = 0;
-    fs->last_block = fs->block_count - 1;
-    fs->block_size =
-	fs->file_bsize =
+
+	/*
+	* Translate some filesystem-specific information to generic form.
+	*/
+	fs->inum_count = getu32(fs, ext2fs->fs->s_inodes_count);
+	fs->last_inum = fs->inum_count;
+	fs->first_inum = EXT2FS_FIRSTINO;
+	fs->root_inum = EXT2FS_ROOTINO;
+
+
+	/* Set the size of the inode, but default to our data structure
+	 * size if it is larger */
+	ext2fs->inode_size = getu16(fs, ext2fs->fs->s_inode_size);
+	if (ext2fs->inode_size < sizeof (ext2fs_inode))  {
+		ext2fs->inode_size = sizeof (ext2fs_inode); 
+		if (verbose)
+			fprintf(logfp, "SB inode size is too small, using default");
+	}
+
+
+	fs->block_count = getu32(fs, ext2fs->fs->s_blocks_count);
+	fs->first_block = 0;
+	fs->last_block = fs->block_count - 1;
+
+
+	if (getu32(fs, ext2fs->fs->s_log_block_size) != 
+	  getu32(fs, ext2fs->fs->s_log_frag_size)) {
+		error("This file system has fragments that are a different size than blocks, which is not currently supported\nContact brian with details of the system that created this image");
+	}
+
+	fs->block_size = 
 		EXT2FS_MIN_BLOCK_SIZE << getu32(fs, ext2fs->fs->s_log_block_size);
 
 	fs->dev_bsize = EXT2FS_DEV_BSIZE;
 
-    ext2fs->group_offset = getu32(fs, ext2fs->fs->s_log_block_size) ? 
-	   fs->block_size : 2 * EXT2FS_MIN_BLOCK_SIZE;
+	/* The group descriptors are located in the block following the 
+	 * super block
+	 */
 
-    ext2fs->groups_count = ( getu32(fs, ext2fs->fs->s_blocks_count) - 
+	ext2fs->group_offset = roundup ((EXT2FS_SBOFF + sizeof(ext2fs_sb)), fs->block_size);
+
+	ext2fs->groups_count = ( getu32(fs, ext2fs->fs->s_blocks_count) - 
 	  getu32(fs, ext2fs->fs->s_first_data_block) + 
 	  getu32(fs, ext2fs->fs->s_blocks_per_group) - 1) /
 	  getu32(fs, ext2fs->fs->s_blocks_per_group);
 
-    fs->seek_pos = -1;
+	fs->seek_pos = -1;
 
 	/* callbacks */
-    fs->inode_walk = ext2fs_inode_walk;
+	fs->inode_walk = ext2fs_inode_walk;
     fs->read_block = fs_read_block;
-    fs->block_walk = ext2fs_block_walk;
-    fs->inode_lookup = ext2fs_inode_lookup;
+	fs->block_walk = ext2fs_block_walk;
+	fs->inode_lookup = ext2fs_inode_lookup;
 	fs->dent_walk = ext2fs_dent_walk;
 	fs->file_walk = ext2fs_file_walk;
 	fs->fsstat = ext2fs_fsstat;
 	fs->fscheck = ext2fs_fscheck;
 	fs->istat = ext2fs_istat;
-    fs->close = ext2fs_close;
+	fs->close = ext2fs_close;
 
 	/* allocate buffers */
 
 	/* inode map */
-    ext2fs->inode_map = (unsigned char *) mymalloc(fs->block_size);
-    ext2fs->imap_num = -1;
+	ext2fs->inode_map = (unsigned char *) mymalloc(fs->block_size);
+	ext2fs->imap_num = -1;
 
 	/* block map */
-    ext2fs->block_map = (unsigned char *) mymalloc(fs->block_size);
-    ext2fs->bmap_num = -1;
+	ext2fs->block_map = (unsigned char *) mymalloc(fs->block_size);
+	ext2fs->bmap_num = -1;
 
 	/* dinode */
-	ext2fs->dinode = (ext2fs_inode *) mymalloc(sizeof(ext2fs_inode));
-    ext2fs->inum = -1;
+	ext2fs->dinode = (ext2fs_inode *) mymalloc(ext2fs->inode_size);
+	ext2fs->inum = -1;
 
 	/* group descriptor */
 	ext2fs->group = (ext2fs_gd *) mymalloc(sizeof(ext2fs_gd));
-    ext2fs->grpnum = -1;
+	ext2fs->grpnum = -1;
 
 
-    /*
-     * Print some stats.
-     */
-    if (verbose)
-	fprintf(logfp,
+	/*
+	* Print some stats.
+	*/
+	if (verbose)
+		fprintf(logfp,
 		"inodes %lu root ino %lu blocks %lu blocks/group %lu\n",
 		(ULONG) getu32(fs, ext2fs->fs->s_inodes_count),
 		(ULONG) fs->root_inum,
 		(ULONG) getu32(fs, ext2fs->fs->s_blocks_count),
 		(ULONG) getu32(fs, ext2fs->fs->s_blocks_per_group));
 
-    return (fs);
+	return (fs);
 }
 

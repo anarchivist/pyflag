@@ -154,7 +154,7 @@ find_inode_path (FS_INFO *fs, FS_DENT *fs_dent, int flags, char *ptr)
 	 * All non-matches will return from these checks
 	 */
 
-	if (((fs->ftype & FSMASK) == EXT2FS_TYPE) ||
+	if (((fs->ftype & FSMASK) == EXTxFS_TYPE) ||
 	  ((fs->ftype & FSMASK) == FFS_TYPE)) {
 		if (strcmp(fs_dent->name, cur_dir) != 0) {
 			return WALK_CONT;
@@ -390,7 +390,7 @@ find_inode(FS_INFO *fs, INUM_T inum, FS_INODE *fsi, int flags, char *ptr)
 		return WALK_CONT;
 	}
 	else if ((fs->ftype & FSMASK) == FATFS_TYPE) {
-		file_flags |= FS_FLAG_FILE_SLACK;
+		file_flags |= (FS_FLAG_FILE_SLACK | FS_FLAG_FILE_NOID);
 		fs->file_walk(fs, fsi, 0, 0, file_flags, 
 		  find_inode_file_act, ptr);
 	}
@@ -399,6 +399,7 @@ find_inode(FS_INFO *fs, INUM_T inum, FS_INODE *fsi, int flags, char *ptr)
 	 * correlated with the incorrect inode
 	 */
 	else {
+		file_flags |= (FS_FLAG_FILE_NOID);
 		fs->file_walk(fs, fsi, 0, 0, file_flags, 
 		  find_inode_file_act, ptr);
 	}
@@ -498,6 +499,11 @@ main(int argc, char **argv)
 	if ((optind + 1) !=  argc) {
 		fprintf(stderr, "Missing image name or too many arguments\n");
 		usage(argv[0]);
+	}
+
+	if (0 == (localflags & (USE_PATH | USE_DATA | USE_PAR))) {
+		fprintf(stderr, "-d, -n, or -p must be given\n");
+		exit(1);
 	}
 
 	fs = fs_open(argv[optind++], fstype);

@@ -282,7 +282,7 @@ class LoadFS(Reports.report):
 
             ## Draw a list of checkboxes for all our scanners:
             result.ruler()
-            result.heading("Choose Scanners to run")
+            result.row("Choose Scanners to run:","",bgcolor='pink')
             for i in range(len(Scanner.scanner_names)):
                 desc = Scanner.scanners[i].__doc__.splitlines()
                 ## Ensure that the checkbox is ticked by default.

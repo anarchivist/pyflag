@@ -68,7 +68,7 @@ ext2fs_dent_copy(EXT2FS_INFO *ext2fs, char *ext2_dent, FS_DENT *fs_dent)
 {
 	FS_INFO *fs = &(ext2fs->fs_info);
 	
-	if (fs->ftype == EXT2FS_1) {
+	if (ext2fs->deentry_type == EXT2_DE_V1) {
 		ext2fs_dentry1 *dir = (ext2fs_dentry1 *)ext2_dent;
 
 		fs_dent->inode = getu32(fs, dir->inode);
@@ -187,7 +187,7 @@ ext2fs_dent_parse_block(EXT2FS_INFO *ext2fs, char *buf, int len,
 		unsigned int namelen;
 		dirPtr = &buf[idx];
 
-		if (fs->ftype == EXT2FS_1) {
+		if (ext2fs->deentry_type == EXT2_DE_V1) {
 			ext2fs_dentry1 *dir = (ext2fs_dentry1 *)dirPtr;
 			inode =  getu32(fs, dir->inode);
 			namelen = getu16(fs, dir->name_len);
@@ -358,7 +358,7 @@ ext2fs_dent_walk(FS_INFO *fs, INUM_T inode, int flags,
     curdirptr = dirbuf = mymalloc(size); 
     dirleft = size;
     
-    fs->file_walk(fs, fs_inode, 0, 0, FS_FLAG_FILE_SLACK,
+    fs->file_walk(fs, fs_inode, 0, 0, FS_FLAG_FILE_SLACK | FS_FLAG_FILE_NOID,
 	  ext2fs_dent_action, "");
 
     curdirptr = NULL;

@@ -80,7 +80,7 @@ print_list_head(FS_INFO *fs, char *image)
     now = time((time_t *) 0);
 
     switch (fs->ftype & FSMASK) {
-      case EXT2FS_TYPE:
+      case EXTxFS_TYPE:
       case FFS_TYPE:
 		strncpy(unit, "fragment", 32);
         break;
@@ -181,7 +181,7 @@ slack_inode_act(FS_INFO *fs, INUM_T inum, FS_INODE *fs_inode, int flags,
 	if ((fs->ftype & FSMASK) != NTFS_TYPE) {
 		flen = fs_inode->size;
 		fs->file_walk(fs, fs_inode, 0, 0, 
-		  FS_FLAG_FILE_SLACK | FS_FLAG_FILE_NOABORT,
+		  FS_FLAG_FILE_SLACK | FS_FLAG_FILE_NOABORT | FS_FLAG_FILE_NOID,
 		  slack_file_act, ptr);
 	}
 

@@ -9,7 +9,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Name:  $ $Date: 2004/10/07 13:03:56 $
+#  Version: FLAG $Name:  $ $Date: 2004/10/19 04:36:15 $
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -120,14 +120,7 @@ class BrowseFS(Reports.report):
                     links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile', fsimage=query['fsimage'],__target__='inode', inode="%s")]
                     )
         
-#            tmp2 = self.ui(result)
             result.tree(tree_cb = tree_cb,pane_cb = pane_cb, branch = branch )
-#            result.start_table()
-#            result.row(tmp2, tmp, valign="top")
-#            result.end_table()
-#            result.next = tmp.next
-#            result.previous = tmp.previous
-#            result.pageno = tmp.pageno
             return result
 
     def form(self,query,result):
@@ -413,14 +406,7 @@ class IEHistory(Reports.report):
             table=('history_%s' % (tablename)),
             case=query['case']
             )
-        
-        #    columns=('a.inode','concat(path,name)', 'virus'),
-        #    names=('Inode','Filename','Virus Detected'),
-        #    table='virus_%s as a join file_%s as b on a.inode=b.inode ' % (tablename,tablename),
-        #    case=query['case'],
-        #    links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='inode')]
-        #    )
-        
+                
 class VirusScan(Reports.report):
     """ Scan Filesystem for Viruses using clamav"""
     parameters = {'fsimage':'fsimage'}

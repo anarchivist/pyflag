@@ -24,6 +24,7 @@
 #include "fs_tools.h"
 #include "mymalloc.h"
 #include "error.h"
+#include "ntfs.h"
 
 /* 
  * Allocates and initializes a new structure.  
@@ -188,7 +189,6 @@ fs_data_getnew_attr(FS_DATA *begin, u_int8_t type)
 	return data;
 }
 
-
 /*
  * Search the list of FS_DATA structures for an entry with the same
  * type and id.  If _id_ is 0, then the lowest id of the given type
@@ -205,33 +205,56 @@ fs_data_lookup(FS_DATA *data_head, u_int32_t type, u_int16_t id)
 	if (!data_head)
 		return NULL;
 
-    if (id != 0) {
-        while ((fs_data) && (fs_data->flags & FS_DATA_INUSE) &&
-          ((fs_data->type != type) || (fs_data->id != id)))
-            fs_data = fs_data->next;
+	while ((fs_data) && (fs_data->flags & FS_DATA_INUSE) &&
+	  ((fs_data->type != type) || (fs_data->id != id)))
+		fs_data = fs_data->next;
 
-        if ((!fs_data) || (fs_data->type != type) || (fs_data->id != id))
-			return NULL;
-    }
-    else {
-		/* If no id was given, then we will return the entry with the
-		 * lowest id of the given type (if more than one exists) 
-		 */
-		FS_DATA *fs_data_ret = NULL;
-	
-        while ((fs_data) && (fs_data->flags & FS_DATA_INUSE)) {
-        	if (fs_data->type == type) {
-				if ((!fs_data_ret) || (fs_data_ret->id > fs_data->id))
-					fs_data_ret = fs_data;
-			}
-            fs_data = fs_data->next;
-		}
-
-		/* fs_data_ret is either NULL or the lowest id of the type */
-		fs_data = fs_data_ret;
-    }
+	if ((!fs_data) || (fs_data->type != type) || (fs_data->id != id))
+		return NULL;
 
 	return fs_data;
+}
+
+/*
+ * Search the list of FS_DATA structures for an entry with the same
+ * type.  The attribute with the lowest id or the default $Data attribute
+ * is returned.
+ */
+
+FS_DATA *
+fs_data_lookup_noid(FS_DATA *data_head, u_int32_t type)
+{
+	FS_DATA *fs_data = data_head;
+	FS_DATA *fs_data_ret = NULL;
+
+	if (!data_head)
+		return NULL;
+
+	/* If no id was given, then we will return the entry with the
+	 * lowest id of the given type (if more than one exists) 
+	 */
+	
+	while ((fs_data) && (fs_data->flags & FS_DATA_INUSE)) {
+		if (fs_data->type == type) {
+
+			/* replace existing if new is lower */
+			if ( (!fs_data_ret) || 
+			  (fs_data_ret->id > fs_data->id) )
+				fs_data_ret = fs_data;
+
+			/* If we are looking for NTFS $Data, 
+			 * then return default when we see it */
+			if ((fs_data->type == NTFS_ATYPE_DATA) && 
+			  (fs_data->nsize > 5) && 
+			  (strncmp(fs_data->name, "$Data",5) == 0) ) {
+				fs_data_ret = fs_data;
+				break;
+			}
+		}
+		fs_data = fs_data->next;
+	}
+
+	return fs_data_ret;
 }
 
 

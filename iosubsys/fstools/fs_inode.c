@@ -40,17 +40,17 @@
 
 FS_INODE *fs_inode_alloc(int direct_count, int indir_count)
 {
-    FS_INODE *fs_inode;
+	FS_INODE *fs_inode;
 
-    fs_inode = (FS_INODE *) mymalloc(sizeof(*fs_inode));
+	fs_inode = (FS_INODE *) mymalloc(sizeof(*fs_inode));
 
-    fs_inode->direct_count = direct_count;
-    fs_inode->direct_addr =
-	(DADDR_T *) mymalloc(direct_count * sizeof(DADDR_T));
+	fs_inode->direct_count = direct_count;
+	fs_inode->direct_addr =
+	  (DADDR_T *) mymalloc(direct_count * sizeof(DADDR_T));
 
-    fs_inode->indir_count = indir_count;
-    fs_inode->indir_addr =
-	(DADDR_T *) mymalloc(indir_count * sizeof(DADDR_T));
+	fs_inode->indir_count = indir_count;
+	fs_inode->indir_addr =
+ 	  (DADDR_T *) mymalloc(indir_count * sizeof(DADDR_T));
 
 	fs_inode->attr = NULL;
 	fs_inode->name = NULL;
@@ -59,7 +59,7 @@ FS_INODE *fs_inode_alloc(int direct_count, int indir_count)
 	fs_inode->atime = fs_inode->mtime = fs_inode->ctime = 
 	  fs_inode->crtime = fs_inode->dtime = 0;
 
-    return (fs_inode);
+	return (fs_inode);
 }
 
 /* fs_inode_realloc - resize generic inode structure */
@@ -87,11 +87,11 @@ void    fs_inode_free(FS_INODE *fs_inode)
 {
 	FS_NAME *fs_name, *fs_name2;
 
-    if (fs_inode->direct_addr) 
+	if (fs_inode->direct_addr) 
 		free((char *) fs_inode->direct_addr);
 	fs_inode->direct_addr = NULL;
 
-    if (fs_inode->indir_addr)
+	if (fs_inode->indir_addr)
 		free((char *) fs_inode->indir_addr);
 	fs_inode->indir_addr = NULL;
 
@@ -110,6 +110,7 @@ void    fs_inode_free(FS_INODE *fs_inode)
 		free(fs_name);
 		fs_name = fs_name2;
 	}
-    free((char *) fs_inode);
+
+	free((char *) fs_inode);
 }
 

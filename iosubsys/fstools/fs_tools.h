@@ -131,7 +131,6 @@ struct FS_INFO {
 	DADDR_T first_block;		/* in case start at 1 */
 	DADDR_T last_block;			/* in case start at 1 */
 	int     block_size;			/* block size in bytes */
-	int     file_bsize;			/* file block size in bytes */
 	int		dev_bsize;			/* value of DEV_BSIZE constant */
 
 
@@ -202,6 +201,7 @@ struct FS_INFO {
 #define FS_FLAG_FILE_META	(1<<3)		/* return meta data units too */
 #define FS_FLAG_FILE_NOSPARSE (1<<4)	/* don't return sparse data units */
 #define FS_FLAG_FILE_NOABORT (1<<5)		/* do not abort when errors are found*/
+#define FS_FLAG_FILE_NOID	(1<<6)		/* Ignore the id field in the argument - use only type */
 
 
 /***************************************************************

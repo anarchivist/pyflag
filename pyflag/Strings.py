@@ -57,7 +57,7 @@ class StringExtracter:
 
     @cvar regex: A regular extression used to isolate strings.
     """
-    regex="(?sm)[\w.#!@$%^&*()_\-\\\\`+={}\|\\:;'\"<>,.\[\]?/\t ]{4,}"
+    regex="(?sm)(?:[\w.#!@$%^&*()_\-\\\\`+={}\|\\:;'\"<>,.\[\]?/\t ]\x00?){4,}"
     re=None
     def __init__(self,fd):
         """ Initialise class.
@@ -84,7 +84,7 @@ class StringExtracter:
             f=self.fd.read(blocksize)
             if not f: break
             for match in re.finditer(rex,f):
-                yield (match.start()+count,match.group(0))
+                yield (match.start()+count,match.group(0).replace('\x00',''))
 
             count+=blocksize
 

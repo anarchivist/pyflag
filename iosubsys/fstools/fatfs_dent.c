@@ -643,14 +643,14 @@ fatfs_dent_walk(FS_INFO *fs, INUM_T inode, int flags,
 
 
 	/* Allocate a buffer for the directory contents */
-    if (g_curdirptr != NULL)
-        error ("fatfs_dent_walk: g_curdirptr is set! recursive?");
+	if (g_curdirptr != NULL)
+		error ("fatfs_dent_walk: g_curdirptr is set! recursive?");
 
 	dirbuf = mymalloc(size);
 
 	/* Set the global variables that are used during the copy */
-    g_curdirptr = dirbuf;
-    g_dirleft = size;
+	g_curdirptr = dirbuf;
+	g_dirleft = size;
 
 
 	/* We are going to save the address of each sector in the directory
@@ -668,7 +668,7 @@ fatfs_dent_walk(FS_INFO *fs, INUM_T inode, int flags,
 
 	/* save the directory contents into dirbuf */
 	if (g_recdel == 0) {
-    	fs->file_walk(fs, fs_inode, 0, 0, FS_FLAG_FILE_SLACK,
+		fs->file_walk(fs, fs_inode, 0, 0, FS_FLAG_FILE_SLACK | FS_FLAG_FILE_NOID,
 		  fatfs_dent_action, "");
 
 		if (g_dirleft > 0) {
@@ -677,8 +677,8 @@ fatfs_dent_walk(FS_INFO *fs, INUM_T inode, int flags,
 		}
 	} 
 	else { 
-    	fs->file_walk(fs, fs_inode, 0, 0, 
-		  FS_FLAG_FILE_SLACK | FS_FLAG_FILE_RECOVER,
+		fs->file_walk(fs, fs_inode, 0, 0, 
+		  FS_FLAG_FILE_SLACK | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOID,
 		  fatfs_dent_action, "");
 
 		/* We did not copy the entire directory 
@@ -687,6 +687,13 @@ fatfs_dent_walk(FS_INFO *fs, INUM_T inode, int flags,
 		 * return content if it can recover the entire file
 		 */
 		if (g_dirleft > 0) {
+
+			/* Reset the global pointers */
+			free(g_curdirptr);
+			g_curdirptr = NULL;
+			free(g_curaddrbuf);
+ 			g_curaddrbuf = NULL;
+
 			return;
 		}
 	}
@@ -699,13 +706,13 @@ fatfs_dent_walk(FS_INFO *fs, INUM_T inode, int flags,
 	addrbuf = g_curaddrbuf;
 
 	/* Reset the global pointers */
-    g_curdirptr = NULL;
+	g_curdirptr = NULL;
  	g_curaddrbuf = NULL;
 
 	/* cycle through the directory and parse the contents */
-    dirptr = dirbuf;
+	dirptr = dirbuf;
 	for (i = 0; size > 0; i++) {
-        int len = (fatfs->ssize < size) ? fatfs->ssize : size;
+		int len = (fatfs->ssize < size) ? fatfs->ssize : size;
 		int retval;
 
 		/* This should never happen because we wouldn't have been able

@@ -361,7 +361,13 @@ dos2unixtime(u_int16_t date, u_int16_t time)
 	if ((tm1.tm_mon < 0) || (tm1.tm_mon > 11))
 		tm1.tm_mon = 0;
 
+	/* There is a limit to the year because the UNIX time value is
+	 * a 32-bit value 
+	 * the maximum UNIX time is Tue Jan 19 03:14:07 2038
+	 */
 	tm1.tm_year = ((date & FATFS_YEAR_MASK) >> FATFS_YEAR_SHIFT) + 80;
+	if ((tm1.tm_year < 0) || (tm1.tm_year > 137))
+		tm1.tm_year = 0;
 
 	/* set the daylight savings variable to -1 so that mktime() figures
 	 * it out */
@@ -369,15 +375,18 @@ dos2unixtime(u_int16_t date, u_int16_t time)
 
 	ret = mktime (&tm1);
 
-	if (-1 == ret)  
-		error ("dos2unixtime: Error running mktime(): %d:%d:%d %d/%d/%d",
-	((time & FATFS_HOUR_MASK) >> FATFS_HOUR_SHIFT),
-	((time & FATFS_MIN_MASK) >> FATFS_MIN_SHIFT),
-	((time & FATFS_SEC_MASK) >> FATFS_SEC_SHIFT) * 2,
-	((date & FATFS_MON_MASK) >> FATFS_MON_SHIFT) - 1,
-	((date & FATFS_DAY_MASK) >> FATFS_DAY_SHIFT),
-	((date & FATFS_YEAR_MASK) >> FATFS_YEAR_SHIFT) + 80
-		  );
+	if (-1 == ret) { 
+		if (verbose)
+			fprintf (logfp, "dos2unixtime: Error running mktime(): %d:%d:%d %d/%d/%d",
+			((time & FATFS_HOUR_MASK) >> FATFS_HOUR_SHIFT),
+			((time & FATFS_MIN_MASK) >> FATFS_MIN_SHIFT),
+			((time & FATFS_SEC_MASK) >> FATFS_SEC_SHIFT) * 2,
+			((date & FATFS_MON_MASK) >> FATFS_MON_SHIFT) - 1,
+			((date & FATFS_DAY_MASK) >> FATFS_DAY_SHIFT),
+			((date & FATFS_YEAR_MASK) >> FATFS_YEAR_SHIFT) + 80
+			);
+		return 0;
+	}
 	
 
 	return ret;
@@ -1401,7 +1410,7 @@ fatfs_fsstat(FS_INFO *fs, FILE *hFile)
 	}
 
 
-	fprintf(hFile, "\nMETA-DATA INFORMATION\n");
+	fprintf(hFile, "\nMETADATA INFORMATION\n");
 	fprintf(hFile, "--------------------------------------------\n");
 
 	fprintf(hFile, "Range: %lu - %lu\n", (ULONG)fs->first_inum, 
@@ -1409,7 +1418,7 @@ fatfs_fsstat(FS_INFO *fs, FILE *hFile)
 	fprintf(hFile, "Root Directory: %lu\n", (ULONG)fs->root_inum);
 
 
-	fprintf(hFile, "\nCONTENT-DATA INFORMATION\n");
+	fprintf(hFile, "\nCONTENT INFORMATION\n");
 	fprintf(hFile, "--------------------------------------------\n");
 	fprintf(hFile, "Sector Size: %d\n", fatfs->ssize);
 	fprintf(hFile, "Cluster Size: %d\n", fatfs->csize * fatfs->ssize);
@@ -1604,7 +1613,7 @@ fatfs_istat (FS_INFO *fs, FILE *hFile, INUM_T inum, int numblock,
 	g_istat_seen = 0;
 	g_printidx = 0;
 	fs->file_walk(fs, fs_inode, 0, 0, 
-	  (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_SLACK),
+	  (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_SLACK | FS_FLAG_FILE_NOID),
 	  print_addr_act, (char *)hFile);
 
 	if (g_printidx != 0)
@@ -1617,7 +1626,7 @@ fatfs_istat (FS_INFO *fs, FILE *hFile, INUM_T inum, int numblock,
 		g_istat_seen = 0;
 		g_printidx = 0;
 		fs->file_walk(fs, fs_inode, 0, 0, 
-		  (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_SLACK | FS_FLAG_FILE_RECOVER),
+		  (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_SLACK | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOID),
 		  print_addr_act, (char *)hFile);
 
 		if (g_istat_seen == 0) {
@@ -1816,7 +1825,7 @@ fatfs_open(IO_INFO *io, unsigned char ftype)
     fs->first_block = 0;
     fs->block_count = sectors;
     fs->last_block = fs->block_count - 1;
-	fs->block_size = fs->file_bsize = fatfs->ssize;
+	fs->block_size = fatfs->ssize;
 	fs->dev_bsize = FATFS_DEV_BSIZE;
 
 
