@@ -61,7 +61,7 @@ class Buffer:
 
     The advantage here is that when we do string slicing, we are not duplicating strings all over the place (better performace). Also it is always possible to tell where a particular piece of data came from.
     """
-    def __init__(self,string='',fd=None,offset=0,size=0):
+    def __init__(self,string='',fd=None,offset=0,size=None):
         """ We can either specify a string, or a fd """
         self.offset=offset
         if fd!=None:
@@ -88,7 +88,7 @@ class Buffer:
 
         It is useful in files which specify an absolute offset into the file within some of the data structures.
         """
-        self.offset=offset
+        return self.__class__(fd=self.fd,offset=offset)
 
     def __getitem__(self,offset):
         """ Return a single char from the string """
@@ -251,6 +251,15 @@ class SimpleStruct(DataType):
 
     def init(self):
         raise AttributeError("%r: You must override this method and set self.fields in here!!!" % self)
+
+    def add_element(self,dict,element,name):
+        """ Adds an element to the dict as well as to the fields table.
+
+        This function allows users to dynamically add new elements to the struct from the read() method.
+        """
+        dict[name]=element
+        self.fields.append([element.__class__,element.size(),name])
+        self.offsets[name]=element.buffer.offset-self.buffer.offset
     
     def read(self,data):
         fields = NamedArray(self.fields,self.field_names)
@@ -290,9 +299,11 @@ class SimpleStruct(DataType):
             except:
                 desc = item['Name']
 
-            tmp = "\n   ".join((self.data[item['Name']].__str__()).splitlines())
+            element=self.data[item['Name']]
+            tmp = "\n   ".join((element.__str__()).splitlines())
             result+="%04X - %s(%s): %s\n" % (
-                self.offsets[item['Name']] + self.buffer.offset,
+#                self.offsets[item['Name']] + self.buffer.offset,
+                element.buffer.offset,
                 item['Name'],
                 desc,tmp)
                                   
@@ -319,28 +330,35 @@ class POINTER(LONG):
         self.pointed=None
 
     def calc_offset(self,data,offset):
-        """ Given the offset we just read, return a buffer from data pointing to the correct place """
+        """ Given the offset we just read, return an new offset.
+
+        Note that it is expected that this method update the offsets within data to point to the correct place """
         ## The data is pointed to is relative to our parents structure
         offset=self.parent.buffer.offset+offset
-        data.set_offset(offset)
-        return data
+        return data.set_offset(offset)
     
     def read(self,data):
         result=LONG.read(self,data)
         data=self.calc_offset(data,result)
-        self.pointed = self.target_class(data,parent=self.parent)
+        if data:
+            result=data.offset
+        
+        if result>0:
+            self.pointed = self.target_class(data,parent=self.parent)
+        else: self.pointed=None
         return result
 
     def p(self):
         if not self.pointed:
             self.initialise()
+            
         return self.pointed
     
     def __str__(self):
         if not self.data:
             self.initialise()
             
-        result="->%s" % self.data
+        result="->%s (0x%08X)" % (self.data,self.data)
         return result
 
 class StructArray(SimpleStruct):

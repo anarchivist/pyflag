@@ -135,9 +135,7 @@ class Content(SimpleStruct):
         ## otherwise its just a null terminated string:
         if magic!=0x0020010:
             result={}
-            result['data']=TERMINATED_STRING(data)
-            self.fields.append([TERMINATED_STRING,1,'data'])
-            self.offsets['data']=0
+            self.add_element(result,TERMINATED_STRING(data),'data')
             result['content_type']=ContentType("\xff\xff",1)
             return result
 
@@ -146,15 +144,13 @@ class Content(SimpleStruct):
         if length:
             ## Sometimes this is unicode, sometimes not depending on the type
             if result['content_type']=="Title":
-                result['data']=UCS16_STR(data[20:],length)
-                self.fields.append([UCS16_STR,1,'data'])
+                data=UCS16_STR(data[20:],length)
             else:
-                result['data']=STRING(data[20:],length)
-                self.fields.append([STRING,1,'data'])
+                data=STRING(data[20:],length)
         else:
-            result['data']=STRING('',0)
-            
-        self.offsets['data']=20
+            data=STRING('',0)
+
+        self.add_element(result,data,'data')
 
         return result
 

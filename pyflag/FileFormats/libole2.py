@@ -111,7 +111,7 @@ class OLEHeader(SimpleStruct):
             [ LONG,1,'sbd_startblock'],
             [ LONG,1,'no_sbd'],
             [ LONG,1,'metab_start'],
-	    [ LONG,1,'number_metab'],
+            [ LONG,1,'number_metab'],
             [ DepotList,1, 'bbd_list'],
             ]
 
@@ -142,7 +142,7 @@ class RawString(UCS16_STR):
         if size>0:
             result=UCS16_STR(data,size).read(data)
         else:
-            result =''
+            result =STRING('',0)
         return result
 
     def size(self):
@@ -150,7 +150,10 @@ class RawString(UCS16_STR):
         return 0x40+2
     
 class PropertySet(SimpleStruct):
-    """ A property set """
+    """ A property set.
+
+    This is effectively an inode in the OLE2 filesystem. Each PropertySet belongs in the tree below its parent and next to its prev/next peers. Note that prev/next do not form a complete list (i.e. the next PropertySet might not have us as a prev link at all).
+    """
     def init(self):
         self.fields=[
             [ RawString,1,'pps_rawname'],
@@ -330,7 +333,3 @@ if __name__ == "__main__":
             print_dir(file,prefix+"  ")
 
     print_dir(a.root(),'')
-    
-#    print a.root()
-#    for file in a.ls(a.root()):
-#        print file
