@@ -34,6 +34,35 @@ config=pyflag.conf.ConfObject()
 import pyflag.FlagFramework as FlagFramework
 import pyflag.Registry as Registry
 
+## This places approximate order on families
+dynasty = {
+    "Case Management": 10,
+    "Load Data":20,
+    }
+
+def order_families(families):
+    """ orders the list of the provided families based of the dynasty.
+
+    If a family is not in the dynasty it gets a score of 100. Note, list is ordered in place.
+    """
+    def sort_function(x,y):
+        try:
+            xscore=dynasty[x]
+        except KeyError:
+            xscore=ord(x[0])
+
+        try:
+            yscore=dynasty[y]
+        except KeyError:
+            yscore=ord(y[0])
+            
+        if xscore<yscore:
+            return -1
+        elif xscore==yscore: return 0
+        return 1
+
+    families.sort(sort_function)
+    
 class BasicTheme:
     """ Basic default theme """
     footer = "</body></html>"
@@ -57,7 +86,8 @@ class BasicTheme:
         family_block = flag.ui()
         family_block.start_table()
 
-        module_list = Registry.REPORTS.family.keys()
+        module_list = Registry.REPORTS.get_families()
+        order_families(module_list)
         
         for m in module_list:
             link = flag.ui()
@@ -182,7 +212,9 @@ class BlueTheme(BasicTheme):
         @arg query: The user query
         """
         family = query['family']
-        module_list = Registry.REPORTS.family.keys()
+        module_list = Registry.REPORTS.get_families()
+        order_families(module_list)
+        
         result=flag.ui()
 
         result.result='''<table cellspacing=0 cellpadding=0 width="100%" border=0 
@@ -216,7 +248,7 @@ class BlueTheme(BasicTheme):
                 <td width=5 
                       background="flag/images/sidebarleft.gif">&nbsp;</td>
                 <td valign=top width="918"> 
-                  <p><font size="1" face="Arial, Helvetica, sans-serif">'''
+                  <p><font size="+1" face="Arial, Helvetica, sans-serif">'''
         
         for k in module_list:
             link = flag.ui()

@@ -66,11 +66,19 @@ class Registry:
 
                                 #Is this module active?
                                 try:
-                                    if module.hidden: continue
-                                    if not module.active: continue
+                                    if module.hidden:
+                                        logging.log(logging.DEBUG, "*** Will not load Module %s: Module Hidden"% (module_name))
+                                        continue
                                 except AttributeError:
                                     pass
-
+                                
+                                try:
+                                    if not module.active:
+                                        logging.log(logging.WARNINGS, "*** Will not load Module %s: Module not active" % (module_name))
+                                        continue
+                                except AttributeError:
+                                    pass
+                                
                                 #find the module description
                                 try:
                                     module_desc = module.description
@@ -154,6 +162,9 @@ class ReportRegistry(Registry):
         for family in self.family.keys():
             self.family[family].sort(sort_function)
 
+    def get_families(self):
+        """ Returns a list of families we have detected """
+        return self.family.keys()
 
     def dispatch(self,family,report):
         """ Returns the report object referenced by family and report

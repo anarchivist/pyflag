@@ -59,6 +59,8 @@ The algorithm implemented here is:
 
 description = "Unstructured Forensics"
 order = 80
+active = False
+
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
 import pyflag.conf

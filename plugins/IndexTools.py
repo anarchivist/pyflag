@@ -55,10 +55,12 @@ import os
 ## The size of the buffer to index at a time
 BLOCKSIZE=1024*1024
 
+## This is obsolete...
 class IndexImage(Reports.report):
     """ Indexes an IO Source using the global dictionary """
     parameters={"iosource":"iosource"}
     name="Index Image"
+    hidden=True
     family="Index Tools"
     description = "Index image using global dictionary "
     order=50
@@ -134,10 +136,12 @@ class IndexImage(Reports.report):
             case=None,
             )
 
+## This is obsolete
 class SearchIndex(IndexImage):
     """ Search the index for a word """
     parameters={"iosource":"iosource","word":"alphanum"}
     name="Search Index"
+    hidden = True
     description = "Search the index for occurances of word"
     order=60
 
