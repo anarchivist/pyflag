@@ -254,7 +254,8 @@ int adv_initialiser(IO_INFO *self,IO_OPT *args) {
       fprintf(stderr, "Set file to read from as %s\n",i->value);
       continue;
     } else if(CHECK_OPTION(i,offset)) {
-      io->offset=atoll(i->value);
+      io->offset=parse_offsets(i->value);
+      //      printf("Set offset to %llu bytes\n",io->offset);
       continue;
     };
 
@@ -359,7 +360,7 @@ int sgz_initialiser(IO_INFO *self,IO_OPT *args) {
       fprintf(stderr, "Set file to read from as %s\n",i->value);
       continue;
     } else if(CHECK_OPTION(i,offset)) {
-      io->offset=atoll(i->value);
+      io->offset=parse_offsets(i->value);
       continue;
     };
 
@@ -494,7 +495,7 @@ int ewf_initialiser(IO_INFO *self,IO_OPT *args) {
       return(ewf_add_file(io,strdup(i->value)));
 
     } else if(CHECK_OPTION(i,offset)) {
-      io->offs=atoll(i->value);
+      io->offs=parse_offsets(i->value);
       continue;
     };
 
@@ -947,7 +948,7 @@ int remote_initialiser(IO_INFO *self,IO_OPT *args) {
 
   for(i=args;i;i=i->next) {
     if(CHECK_OPTION(i,offset)) {
-      io->offset=atoll(i->value);
+      io->offset=parse_offsets(i->value);
       continue;
     } else if(CHECK_OPTION(i,host)) {
       io->remote_host = strdup(i->value);
@@ -967,6 +968,7 @@ int remote_initialiser(IO_INFO *self,IO_OPT *args) {
     // error:
     RAISE(E_GENERIC,NULL,"option %s not recognised",i->option);
   };
+  return(0);
 };
 
 int remote_open(IO_INFO *self) {
@@ -983,6 +985,7 @@ int remote_open(IO_INFO *self) {
   argv[6]=0;
 
   remote_open_server(io->hndl, argv);
+  return(0);
 };
 
 int remote_close(IO_INFO *self) {
@@ -990,6 +993,7 @@ int remote_close(IO_INFO *self) {
 
   printf("Trying to kill process %u\n",io->hndl->pid);
   kill(io->hndl->pid,SIGTERM);
+  return(0);
 };
 
 /* These serve as classes (i.e. templates which each object
@@ -1123,41 +1127,37 @@ IO_INFO *io_open(char *name) {
   return(NULL);
 };
 
-///* This is the generic read block function which all the fs call */
-//void  fs_read_block(FS_INFO *fs, FS_BUF *buf, int len, DADDR_T addr,
-//		    const char *comment)
-//{
-//  char   *myname = "fs_read_block";
-//  off_t  offs;
-//  
-//  /*
-//   * Sanity checks.
-//   */
-//  
-//  if (len % fs->dev_bsize)
-//    RAISE(E_IOERROR,NULL,"%s: Block Read Request with length (%d) not a multiple of %d (%s)", 
-//	  myname, len, fs->dev_bsize, comment);
-//  
-//  if (len > buf->size)
-//    RAISE(E_IOERROR,NULL,"%s: Buffer length is too short for read (%d > %d) (%s)", 
-//	  myname, len, buf->size, comment);
-//  
-//  if (addr > fs->last_block)
-//    RAISE(E_IOERROR,NULL,"%s: Read Error (address is too large for image %lu) (%s)", 
-//	  myname, (ULONG)addr, comment);
-//  
-//  buf->addr = addr;
-//  offs = (off_t) addr *fs->block_size;
-//  
-//  
-//    debug(2, "%s: read block %lu offs %llu len %d (%s)\n",
-//	    myname, (ULONG) addr, (ULLONG) offs, len, comment);
-//  
-//  // Call the random read method to do the actual reading...
-//  fs->io->read_random(fs->io,buf->data,len,offs,comment);
-//  
-//  fs->seek_pos = offs + len;
-//  buf->used = len;
-//  return;
-//}
-//
+/* Parses the string for a number. Can interpret the following suffixed:
+
+  k - means 1024 bytes
+  M - Means 1024*1024 bytes
+  S - Menas 512 bytes (sector size)
+*/
+long long unsigned int parse_offsets(char *string) 
+{
+  long long unsigned int result=0;
+  int multiplier=1;
+  int offs=0;
+  
+  result=atoll(string);
+  offs = strcspn(string,"KkMmSs");
+
+  if(offs) {
+    switch(string[offs]) {
+    case 'K':
+    case 'k':
+      multiplier=1024;
+      break;
+    case 'm':
+    case 'M':
+      multiplier=1024*1024;
+      break;
+    case 'S':
+    case 's':
+      multiplier=512;
+      break;
+    };
+  };
+
+  return(multiplier*result);
+};

@@ -54,3 +54,11 @@ void io_help(char *name) ;
 
 #define CHECK_OPTION(i,x) !strncasecmp(i->option, #x, strlen(#x))
 #define NEW(x) (x *)malloc(sizeof(x))
+
+/* Parses the string for a number. Can interpret the following suffixed:
+
+  k - means 1024 bytes
+  M - Means 1024*1024 bytes
+  S - Menas 512 bytes (sector size)
+*/
+long long unsigned int parse_offsets(char *string);
