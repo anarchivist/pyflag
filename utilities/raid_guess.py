@@ -1,4 +1,24 @@
 #!/usr/bin/env python
+# Michael Cohen <scudette@users.sourceforge.net>
+#
+# ******************************************************
+#  Version: FLAG $Name:  $ $Date: 2004/10/26 01:07:53 $
+# ******************************************************
+#
+# * This program is free software; you can redistribute it and/or
+# * modify it under the terms of the GNU General Public License
+# * as published by the Free Software Foundation; either version 2
+# * of the License, or (at your option) any later version.
+# *
+# * This program is distributed in the hope that it will be useful,
+# * but WITHOUT ANY WARRANTY; without even the implied warranty of
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# * GNU General Public License for more details.
+# *
+# * You should have received a copy of the GNU General Public License
+# * along with this program; if not, write to the Free Software
+# * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# ******************************************************
 import optparse,os,sys
 
 def getPermutations(a):
@@ -36,6 +56,16 @@ if __name__=="__main__":
         (5,5, '0.1.2.3.P.4.5.6.P.7.8.9.P.10.11.12.P.13.14.15.P.16.17.18.19'),
         (6,6, '0.1.2.3.4.P.5.6.7.8.P.9.10.11.12.P.13.14.15.16.P.17.18.19.20.P.21.22.23.24.P.25.26.27.28.29'),
         (7,7, '0.1.2.3.4.5.P.6.7.8.9.10.P.11.12.13.14.15.P.16.17.18.19.20.P.21.22.23.24.25.P.26.27.28.29.30.P.31.32.33.34.35.P.36.37.38.39.40.41'),
+
+        ## More diagonal maps:
+        ## P.0.1
+        ## 2.P.3
+        ## 4.5.P
+        (3,3,'P.0.1.2.P.3.4.5.P'),
+        (4,4,'P.0.1.2.3.P.4.5.6.7.P.8.9.10.11.P'),
+        (5,5,'P.0.1.2.3.4.P.5.6.7.8.9.P.10.11.12.13.14.P.15.16.17.18.19.P'),
+        (6,6,'P.0.1.2.3.4.5.P.6.7.8.9.10.11.P.12.13.14.15.16.17.P.18.19.20.21.22.23.P.24.25.26.27.28.29.P'),
+        (7,7,'P.0.1.2.3.4.5.6.P.7.8.9.10.11.12.13.P.14.15.16.17.18.19.20.P.21.22.23.24.25.26.27.P.28.29.30.31.32.33.34.P.35.36.37.38.39.40.41.P'),
 
         ## These are some more maps:
         ## 0.1.P
