@@ -44,6 +44,8 @@ import pyflag.Scanner as Scanner
 description = "Disk Forensics"
 order=30
 
+BLOCKSIZE=20
+
 def DeletedIcon(value,result=None):
     """ Callback for rendering deleted items """
     tmp=result.__class__(result)
@@ -708,9 +710,12 @@ class SearchIndex(Reports.report):
         idx = index.Load("%s/LogicalIndex_%s.idx" % (config.RESULTDIR,table))
         for offset in idx.search(keyword):
             ## Find out which inode this offset is in:
-            dbh.execute("select inode,offset from LogicalIndex_%s where offset <= %r order by offset desc,id desc",(query['fsimage'],offset))
+            block = offset >> BLOCKSIZE
+            dbh.execute("select inode,min(block) as minblock from LogicalIndex_%s where block = %r group by block",(query['fsimage'],block))
             row=dbh.fetch()
-            off = offset - int(row['offset'])
+            if not row: continue
+            ## Here we remove the block number part from the int. If there are a number of blocks in the database for this inode, we account for the extra blocks.
+            off = offset - ((2*block - row['minblock']) << BLOCKSIZE)
             if off<10: off=10
             dbh2.execute("insert into LogicalKeyword_%s set inode=%r, offset=%r, keyword=%r",(table,row['inode'],off,keyword))
         
