@@ -56,7 +56,7 @@ class GenScanFactory:
         """ This method drops the relevant tables in the database, restoring the db to the correct state for rescanning to take place. """
         pass
 
-    ## Relative order of scanners
+    ## Relative order of scanners - Higher numbers come later in the order
     order=10
 
 class StoreAndScan:

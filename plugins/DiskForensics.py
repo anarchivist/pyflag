@@ -744,6 +744,7 @@ class SearchIndex(Reports.report):
             names=['Inode','Data','Keyword'],
             callbacks = { 'Data': SampleData },
             table='LogicalKeyword_%s' % table,
+            links = [ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',fsimage=query['fsimage'],mode='HexDump',__target__='inode') ],
             case=query['case'],
             )
             

@@ -235,7 +235,6 @@ class DBFS(FileSystem):
         buffsize = 1024 * 1024
         # instantiate a scanner object from each of the factory
         objs = [c.Scan(inode,self,c,factories=factories) for c in factories]
-        objs.reverse()
         # read data (in chunks)
         while 1:
             ## This dict stores metadata about the file which may be filled in by some scanners in order to indicate some fact to other scanners.

@@ -4,6 +4,7 @@ logging verbosity is controlled through the configuration variable LOG_LEVEL
 """
 import pyflag.conf
 config=pyflag.conf.ConfObject()
+import sys,traceback
 
 ## These are predefined logging levels:
 ERRORS=1
@@ -17,3 +18,6 @@ def log(level,message):
     """ Prints the message out only if the configured verbosity is higher than the message's level."""
     if config.LOG_LEVEL>=level:
         print "%s: %s" % (lookup[level],message)
+        
+    if level<ERRORS:
+        print traceback.print_tb(sys.exc_info()[2])
