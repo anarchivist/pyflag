@@ -122,7 +122,7 @@ class Ploticus(GenericGraph):
         @arg opts: Options
         """
         #Array with all the colors in it:
-        colors="red orange green purple yellow blue".split(" ")
+        colors="red orange green purple yellow blue magenta tan1 coral tan2 claret pink brightgreen brightblue limegreen yellowgreen lavender powderblue redorange lightorange".split(" ")
 
         try:
             colors = opts['colors'].split(" ")
@@ -165,13 +165,14 @@ class Ploticus(GenericGraph):
 
     def display(self):
         import popen2
-        
+
         p = popen2.Popen3("%s/pl  -%s -o stdout  %s " % (config.FLAG_BIN,self.out_format,self.cmd))
         p.tochild.write(self.input)
         p.tochild.close()
-        return p.fromchild.read()
+        data=p.fromchild.read()
+        return data
 
-Graph = GenericGraph
+Graph = Ploticus
 
 class Thumbnailer(Image):
     """ An image class to display thumbnails files.

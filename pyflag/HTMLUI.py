@@ -570,6 +570,7 @@ class HTMLUI(UI.GenericUI):
         #Work out the having clause.
         having=['1']
         conditions=[]
+        condition_text_array=[]
         for d,v in query:
             if d.startswith('where_'):
                 #Find the column for that name
@@ -602,14 +603,16 @@ class HTMLUI(UI.GenericUI):
                 tmp_link=self.__class__(self)
                 tmp_link.link(condition_text,target=tmp_query)
                 conditions.append(tmp_link)
+                condition_text_array.append(condition_text)
 
         having_str = " and ".join(having)
 
         if where:
-            query_str+= " where (%s) and (%s) " %(where,having_str)
+            where_str= " where (%s) and (%s) " %(where,having_str)
         elif having:
-            query_str+=" where %s " % having_str
+            where_str=" where %s " % having_str
 
+        query_str+=where_str
         ## At this point we can add the group by calculated above, and replace the names and columns arrays from the group by
 
         if group_by_str:
@@ -635,6 +638,8 @@ class HTMLUI(UI.GenericUI):
                 order = " `%s` asc " % names[0]
                 ordered_col = 0
 
+        ## This is used to render things in the popups. The query string here is naked without order by clauses
+        query_str_basic = query_str
         query_str+= " order by %s " % order
 
         #Calculate limits
@@ -651,6 +656,44 @@ class HTMLUI(UI.GenericUI):
 
         #Do the query, and find out the names of all the columns
         dbh.execute(query_str,())
+
+        if group_by_str:
+            def table_groupby_popup(query,result):
+                result.display = result.__str__
+                result.heading("Most commonly seen %s" % query['group_by'])
+                if condition_text_array:
+                    result.start_table()
+                    result.row("The following filter conditions are enforced")
+                    for i in condition_text_array:
+                        result.row(i)
+                    result.end_table()
+                    result.start_table()
+
+                #Find out how many results there are all up
+                dbh.execute("select count(*) as total from %s %s" %(table, where_str))
+                total = dbh.fetch()['total']
+                dbh.execute(query_str_basic+" order by `Count` desc limit 8",())
+                values=[]
+                labels=[]
+                count=0
+                for row in dbh:
+                    values.append(row['Count'])
+                    count+=int(row['Count'])
+                    labels.append("%s\\n (%s)" % (row[names[1]],row['Count']))
+
+                ## Insert an others entry:
+                values.append(total - count)
+                labels.append("Others (%s)" % (total-count))
+                
+                import pyflag.Graph as Graph
+                ##Create a new pie chart:
+                pie = Graph.Graph()
+                pie.pie(labels,values,explode="0.1", legend='yes')
+                print labels,values
+                result.image(pie)
+                
+            ## Add a popup to allow the user to draw a graph
+            self.popup(table_groupby_popup,'Graph',toolbar=1,menubar=1)
 
         ## Write the conditions at the top of the page:
         if conditions:

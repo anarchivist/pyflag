@@ -90,6 +90,11 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         print query
         if query.has_key('draw_stored') and UI.HTMLUI.store_dict.has_key(query['draw_stored']):
             result = UI.HTMLUI.store_dict[query['draw_stored']]
+        elif query.has_key('callback_stored') and UI.HTMLUI.callback_dict.has_key(query['callback_stored']):
+            result=flag.ui()
+            result.defaults = query
+            cb=UI.HTMLUI.callback_dict[query['callback_stored']]
+            cb(query,result)
 
         #Nope - just do it
         else:            
