@@ -1,0 +1,4 @@
+Email [\w\.]+@[\w\.]+
+URL	(http:|https:|ftp:|mail:)\S+
+IPv4x.x.x.21 \d+\.\d+\.\d+\.21
+continent    antartica
