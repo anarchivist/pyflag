@@ -462,8 +462,6 @@ class GTKUI(UI.GenericUI):
         self.text("\r\n",widget)
 
     def text(self,*cuts,**options):
-        print cuts
-        print "Class is: %s" % self.__class__
         for d in cuts:
             if not d:
                 continue
@@ -471,7 +469,6 @@ class GTKUI(UI.GenericUI):
                 child=self.buffer.create_child_anchor(self.iter)
                 self.result.add_child_at_anchor(d,child)
             elif isinstance(d,self.__class__):
-                print "WOOT"
                 widget=d.display()
                 child=self.buffer.create_child_anchor(self.iter)
                 self.result.add_child_at_anchor(widget,child)
@@ -479,8 +476,6 @@ class GTKUI(UI.GenericUI):
                 self.buffer.insert_with_tags_by_name(self.iter,d,'text')
 
     def para(self,string,**options):
-        print "WTF?"
-        print string
         #FIXME, whats the difference between 'para' and 'text'
         self.text(string, options)
         #self.buffer.insert_with_tags_by_name(self.iter,string+"\r\n\r\n",'text')

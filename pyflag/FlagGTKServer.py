@@ -132,8 +132,38 @@ def build_flag_menu(window, uimanager):
     # Create an actiongroup
     actions = gtk.ActionGroup('menu_actions')
 
-    # Build the UI XML    
-    ui = '<menubar name="MenuBar">\n'
+    # Build the basic Menu UI
+    ui = """<menubar name="MenuBar">
+                <menu action="Flag">
+                    <menuitem action="Create new case"/>
+                    <menuitem action="Open Existing Case"/>
+                    <menuitem action="Reset Case"/>
+                    <menuitem action="Remove case"/>
+                    <menuitem action="Close"/>
+                    <menuitem action="Quit"/>
+                </menu>
+                <menu action="Edit">
+                    <menuitem action="Preferences"/>
+                </menu>
+                <menu action="View">
+                </menu>
+         """
+    actions.add_actions([('Flag', None, '_Flag'),])
+    actions.add_actions([('Create new case', None, 'Create new case', None, 'Create new case', execute_report_cb)], ('Case Management','Create new case'))
+    actions.add_actions([('Open Existing Case', None, 'Open Existing Case', None, 'Open Existing Case', execute_report_cb)], ('Case Management','Open Existing Case'))
+    actions.add_actions([('Reset Case', None, 'Reset Case', None, 'Reset Case', execute_report_cb)], ('Case Management', 'Reset Case'))
+    actions.add_actions([('Remove case', None, 'Remove case', None, 'Remove case', execute_report_cb)], ('Case Management','Remove case'))
+    actions.add_actions([('Close', gtk.STOCK_CLOSE, '_Close', 
+                            None, 'Close Current Tab', execute_report_cb),
+                         ('Quit', gtk.STOCK_QUIT, '_Quit', 
+                            None, 'Quit pyFLAG', execute_report_cb),
+                         ('Edit', None, '_Edit'),
+                         ('Preferences', gtk.STOCK_PREFERENCES, '_Preferences'),
+                         ('View', None, 'View')])
+    
+    # Add the Reports
+    ui += '<menu action="Reports">\n'
+    actions.add_actions([('Reports', None, '_Reports')])
     family_list = Registry.REPORTS.get_families()
     order_families(family_list)
     for family in family_list:
@@ -145,9 +175,16 @@ def build_flag_menu(window, uimanager):
             ui += '\t\t<menuitem action="%s"/>\n' % r.name
             actions.add_actions([(r.name, None, r.name, None, r.name, execute_report_cb)], (family,r.name))
         ui += '\t</menu>\n'
-
-    # Add the Navigation Toolbar
+    ui += '</menu>'
+    ui += """<menu action="Help">
+                <menuitem action="Contents"/>
+                <menuitem action="About"/>
+             </menu>"""
+    actions.add_actions([('Help', None, '_Help'),
+                         ('Contents', gtk.STOCK_HELP, '_Contents'),
+                         ('About', gtk.STOCK_DIALOG_INFO, '_About')])
     ui += '</menubar>\n'
+    # Add the Navigation Toolbar
     ui += """<toolbar name="NaviBar">
                <toolitem action="Prev Page"/>
                <separator/>
@@ -167,6 +204,7 @@ def build_flag_menu(window, uimanager):
     uimanager.insert_action_group(actions, 0)
     
     # Add a UI description
+    #print ui
     uimanager.add_ui_from_string(ui)
 
 #### BEGIN MAIN ####
