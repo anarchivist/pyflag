@@ -1223,3 +1223,20 @@ class GTKUI(UI.GenericUI):
             f.show_all()
 
         button.connect("button_press_event",button_cb)
+
+    def image(self,image,**options):
+        """ Draw the image inside this GTKUI """
+        pixbuf_loader=gtk.gdk.PixbufLoader()
+##        if options.has_key('width'):
+##            def calculate_size(widget,width,height):
+##                pixbuf_loader.set_size(options['width'],options['width']/width*height)
+
+##            pixbuf_loader.connect("size-prepared",calculate_size)
+        pixbuf_loader.set_size(200,300)
+        pixbuf_loader.write(image.display())
+        pixbuf_loader.close()
+        pixbuf=pixbuf_loader.get_pixbuf()
+        pix = gtk.Image()
+        pix.set_from_pixbuf(pixbuf)
+
+        self.row(pix)

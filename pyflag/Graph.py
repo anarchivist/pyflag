@@ -210,7 +210,7 @@ class Thumbnailer(Image):
 
     def Unknown(self):
         """ Default handler """
-        return self.set_image("broken.png")
+        return self.set_image("unknown.png")
 
     def PDFHandler(self):
         """ Handle PDF Documents """
