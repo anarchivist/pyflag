@@ -275,8 +275,6 @@ class LoadIOSource(Reports.report):
     def display(self,query,result):
         result.refresh(0, FlagFramework.query_type((), case=query['case'], family="Load Data", report="LoadFS", iosource=query['iosource']))
 
-import pyflag.Sleuthkit as Sleuthkit
-
 class LoadFS(Reports.report):
     """ Loads Filesystem Image into the database. """
     parameters = {"iosource":"iosource","fstype":"string","scan":"alphanum"}
