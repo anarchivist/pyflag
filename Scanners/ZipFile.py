@@ -70,7 +70,10 @@ class ZipScan(GenScanFactory):
                             logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
 
             ## Set the zip file to be a d/d entry so it looks like its a virtual directory:
-            self.ddfs.dbh.execute("update file_%s set mode='d/d' where inode=%r",(self.ddfs.table,self.inode))
+            self.ddfs.dbh.execute("select * from file_%s where mode='r/r' and inode=%r",(self.ddfs.table,self.inode))
+            row=self.ddfs.dbh.fetch()
+            self.ddfs.dbh.execute("insert into file_%s set mode='d/d',inode=%r,status=%r,path=%r,name=%r",(self.ddfs.table,self.inode,row['status'],row['path'],row['name']))
+#            self.ddfs.dbh.execute("update file_%s set mode='d/d' where inode=%r",(self.ddfs.table,self.inode))
 
 class GZScan(ZipScan):
     """ Recurse into gziped files """
@@ -106,8 +109,7 @@ class GZScan(ZipScan):
                     except Exception,e:
                         logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
 
-            ## Make the gzipped inode into a directory so we can recurse into it
-#            self.ddfs.dbh.execute("update file_%s set mode='d/d',inode='%s|Gdir%s' where inode=%r",(self.ddfs.table, self.inode))
-
             ## Set the gzip file to be a d/d entry so it looks like its a virtual directory:
-            self.ddfs.dbh.execute("update file_%s set mode='d/d' where inode=%r",(self.ddfs.table,self.inode))
+            self.ddfs.dbh.execute("select * from file_%s where mode='r/r' and inode=%r",(self.ddfs.table,self.inode))
+            row=self.ddfs.dbh.fetch()
+            self.ddfs.dbh.execute("insert into file_%s set mode='d/d',inode=%r,status=%r,path=%r,name=%r",(self.ddfs.table,self.inode,row['status'],row['path'],row['name']))
