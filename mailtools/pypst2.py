@@ -5,7 +5,8 @@
 
 import pypst
 import re
-
+import base64
+        
 class Pstfile:
     """ higher level shadow class for libpst
     impliments an filesystem-like interface into pst files
@@ -61,8 +62,7 @@ class Pstfile:
 
     class Email(Item):
         """ email item """
-        import base64
-        
+
         class Attachment:
             """ Email attachment """
             def __init__(self, pst, ref):
@@ -103,10 +103,15 @@ class Pstfile:
                 if m:
                     base64enc = True
             if email.body:
-                if base64enc:
-                    self.data += base64.decodestring(email.body)
-                else:
-                    self.data += email.body.replace('\r','')
+                ##Try to decode it - but maybe its not encoded?
+                try:
+                    if base64enc:
+                        self.data += base64.decodestring(email.body)
+                    else:
+                        self.data += email.body.replace('\r','')
+                except:
+                    self.data += email.body
+                    
             if email.htmlbody:
                 if base64enc:
                     self.data += base64.decodestring(email.htmlbody)

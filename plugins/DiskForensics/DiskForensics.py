@@ -202,10 +202,13 @@ class ViewFile(Reports.report):
             result.heading("Scan this file")
             result.ruler()
             result.start_form(query,refresh="parent")
+            result.start_table()
             ScannerUtils.draw_scanners(query,result)
+            result.end_table()
             result.end_form()
+            result.display = result.__str__
 
-        result.popup(scan_popup,"Scan this File")
+        result.popup(scan_popup,"Scan this File",icon="examine.png")
 
         result.heading("Viewing file in inode %s" % (query['inode']))
         try:
