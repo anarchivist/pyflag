@@ -443,7 +443,7 @@ if 0:
         """ Scan Filesystem for Viruses using clamav"""
         parameters = {'fsimage':'fsimage'}
         name = "Virus Scan (clamav)"
-        description="This report will scan for viruses and display a table of viruses found"
+        description="This report will display a table of viruses found during the scanning on Loading the filesystem "
         progress_dict = {}
 
         def form(self,query,result):

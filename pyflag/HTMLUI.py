@@ -740,7 +740,10 @@ class HTMLUI(UI.GenericUI):
                     
             ## End table_configuration_popup
 
-            self.popup(table_configuration_popup,'Configure',icon='spanner.png',toolbar=1,menubar=1)
+            if query.getarray('hide_column'):
+                self.popup(table_configuration_popup,'Some columns hidden (%s)' % ','.join(query.getarray('hide_column')),icon='spanner.png')
+            else:
+                self.popup(table_configuration_popup,'Configure Table View',icon='spanner.png')
 
         ## Draw a popup to allow the user to save the entire table in CSV format:
         def save_table(query,result):
@@ -939,7 +942,7 @@ class HTMLUI(UI.GenericUI):
             tmp_links.append(tmp)
 
         self.row(*tmp_links)
-        self.row(*names)
+        self.row(*[ names[i] for i in range(len(names)) if i not in hidden_columns ])
 
         #If our row count is smaller than the page size, then we dont have another page, set next page to None
         if count < config.PAGESIZE:
