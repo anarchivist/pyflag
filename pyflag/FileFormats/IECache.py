@@ -53,10 +53,6 @@ class Hash(LONG_ARRAY):
     Note that the hash section may point at more hash sections, which  we automatically traverse all sections, so callers do not need to worry about looking for more hash sections.
     """
     def read(self,data):
-        ## This is a handle for the entire file
-        buffer=data.clone()
-        buffer.set_offset(0)
-        
         magic=STRING(data,4)
         # Check the magic for this section
         if magic!='HASH':
@@ -70,7 +66,7 @@ class Hash(LONG_ARRAY):
             if record_type!=0x3:
                 off = LONG(data[offset+4:],1)
                 ## If the offsets are nonsensical we dont add them (i.e. point at 0xBADF00D are null)
-                if off!=0 and LONG(buffer[off.get_value():])!=0xBADF00D:
+                if off!=0 and LONG(data.set_offset(off.get_value()))!=0xBADF00D:
                     self.data.append(off)
                     
             ## Go to the next offset in the list
@@ -78,7 +74,7 @@ class Hash(LONG_ARRAY):
                 
         ## Add the next section to our list:
         if next_hash:
-            data.set_offset(next_hash)
+            data=data.set_offset(next_hash)
             self.read(data)
 
         return self.data
@@ -110,7 +106,7 @@ class HIST_STR_PTR(LONG):
         offset=LONG.read(self,data)
 
         ## set our absolute offset to the start of our section
-        data.set_offset(section_offset)
+        data=data.set_offset(section_offset)
 
         ## Return the null terminated string:
         return TERMINATED_STRING(data[offset:])

@@ -209,12 +209,8 @@ class NK_key(SimpleStruct):
         data=data.set_offset(FIRST_PAGE_OFFSET+4+offs_vk_list)
         no_values=result['no_values'].get_value()
         ## Try to find the vk lists:
-        try:
-            tmp=vk_key(data)
-            result['offs_vk_list'] = VK_Array(data,no_values)
-        except IOError:
-            result['offs_vk_list']=VK_Array(data,1)
-
+        result['offs_vk_list'] = VK_Array(data,no_values)
+        
         return result
         
 class KEY_NAME(STRING):

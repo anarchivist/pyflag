@@ -486,18 +486,27 @@ class TERMINATED_STRING(DataType):
         tmp=''
         end=-1
         while end<0:
-            tmp=data[:blocksize].__str__()
-            if len(tmp)<blocksize:
+            tmp=data[0:blocksize].__str__()
+            end=tmp.find(self.terminator)
+            
+            if len(tmp)<blocksize and end<0:
                 end=blocksize
                 break
 
-            end=tmp.find(self.terminator)
             blocksize*=2
             if blocksize>self.max_blocksize:
                 end=self.max_blocksize
                 break
 
-        return data[0:end]
+        ## The size of this string includes the terminator
+        self.raw_size=end+len(self.terminator)
+        return data[0:self.raw_size]
+    
+    def size(self):
+        if not self.data:
+            self.initialise()
+            
+        return self.raw_size
 
     def get_value(self):
         if not self.data:
@@ -577,6 +586,17 @@ class CLSID(ULONG_ARRAY):
             result.append("%0.8X" % i.get_value())
 
         return "{%s}" % '-'.join(result)
+
+class TIMESTAMP(LONG):
+    """ A standard unix timestamp.
+
+    Number of seconds since the epoch (1970-1-1)
+    """
+    def __str__(self):
+        if not self.data:
+            self.initialise()
+            
+        return "%s" % time.ctime(self.data)
 
 class WIN_FILETIME(SimpleStruct):
     """ A FileTime 8 byte time commonly see in windows.
