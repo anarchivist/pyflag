@@ -5,7 +5,7 @@ This module contains a scanner to trigger off on registry files and scan them se
 import os.path
 import pyflag.logging as logging
 from pyflag.Scanner import *
-import plugins.DiskForensics as DiskForensics
+import plugins.DiskForensics.DiskForensics as DiskForensics
 
 class RegistryScan(GenScanFactory):
     """ Load in Windows Registry files """

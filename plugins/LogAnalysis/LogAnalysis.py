@@ -34,7 +34,7 @@ import pyflag.LogFile as LogFile
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import re
-import plugins.Whois as Whois
+import plugins.LogAnalysis.Whois as Whois
 import pyflag.Registry as Registry
 
 description = "Log Analysis"
