@@ -56,6 +56,9 @@ class GenScanFactory:
         """ This method drops the relevant tables in the database, restoring the db to the correct state for rescanning to take place. """
         pass
 
+    ## Relative order of scanners
+    order=10
+
 class StoreAndScan:
     """ A Scanner designed to store a temporary copy of the scanned file to be able to invoke an external program on it.
 

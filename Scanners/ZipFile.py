@@ -9,6 +9,7 @@ import zipfile
 
 class ZipScan(GenScanFactory):
     """ Recurse into Zip Files """
+    order=99
     def __init__(self,dbh, table):
         self.dbh=dbh
         self.table=table

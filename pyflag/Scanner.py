@@ -65,3 +65,22 @@ for file in os.listdir(config.SCANNER_DIRECTORY):
                     scanner_names.append(cls)
             except (TypeError, NameError) , e:
                 continue
+
+def sort_function(x,y):
+    a=scanners[scanner_names.index(x[1])].order
+    b=scanners[scanner_names.index(y[1])].order
+    if a<b:
+        return -1
+    elif a==b: return 0
+    else: return 1
+
+#Order the scanners by their order parameter:
+tmp=zip(scanners,scanner_names)
+tmp.sort(sort_function)
+scanners=[]
+scanner_names=[]
+for i in tmp:
+    scanners.append(i[0])
+    scanner_names.append(i[1])
+
+print "Scanner order is: %s" % scanner_names
