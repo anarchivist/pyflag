@@ -297,4 +297,5 @@ for url in urls:
 
 # add indexes
 dbh.execute("ALTER TABLE whois ADD index(src_id);")
+dbh.execute("ALTER TABLE whois ADD index(netname);")
 dbh.execute("ALTER TABLE whois_routes ADD index(network);")

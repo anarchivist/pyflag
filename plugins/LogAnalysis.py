@@ -34,6 +34,7 @@ import pyflag.LogFile as LogFile
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import re
+import plugins.Whois as Whois
 
 description = "Log Analysis"
 order = 35
@@ -60,13 +61,8 @@ def display_test_log(dbh,log,result,query):
     tmp_final.table(columns=columns,names=names,links=[], table=temp_table, case=query['case'], simple=True)
     result.row(tmp_final,bgcolor='lightgray',colspan=5)
 
-def whois_callback(value,result=None):
-    """ Returns a whois resolution of the given IP address in value """
-    import plugins.Whois as Whois
-    tmp = result.__class__(result)
-    whois = Whois.identify_network(value)
-    tmp.text(whois)
-    return tmp
+def render_whois_info(string,result=None):
+    return Whois.identify_network(string)
 
 class ListLogFile(Reports.report):
     """ Lists the content of the log file using the table UI object """
@@ -104,6 +100,8 @@ class ListLogFile(Reports.report):
         names = []
         callbacks = {}
         links = []
+        where = []
+        table = [query['logtable']+'_log']
         for d in dbh.cursor.description:
             names.append(d[0])
             try:
@@ -112,9 +110,12 @@ class ListLogFile(Reports.report):
                 links.append(None)
                 if type == "IP Address" and query.has_key('whois'):
                     names.append("Whois %s" % d[0])
-                    columns.append(LogFile.types[type].sql_out % d[0])
-                    callbacks["Whois %s" % d[0]]=whois_callback
-                    links.append( FlagFramework.query_type((),case=query['case'],family='Whois',report='LookupIP',__target__='address'))
+##                    columns.append("concat(whois_%s.country,'/',whois_%s.NetName)" % (d[0],d[0]))
+                    columns.append("whois_%s.whois_id" % (d[0]))
+                    callbacks["Whois %s" % d[0]] = render_whois_info
+                    table.append('whois as whois_%s' % d[0])
+                    where.append("%s = whois_%s.IP" % (d[0],d[0]))
+                    links.append( FlagFramework.query_type((),case=query['case'],family='Whois',report='LookupWhoisID',__target__='id'))
                     
             except ValueError:
                 columns.append(d[0])
@@ -124,8 +125,9 @@ class ListLogFile(Reports.report):
             columns=columns,
             names=names,
             links= links,
-            table=query['logtable']+'_log',
+            table= ','.join(table),
             callbacks = callbacks,
+            where=" and ".join(where),
             case=query['case']
             )
 

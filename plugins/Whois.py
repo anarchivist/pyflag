@@ -46,9 +46,12 @@ def lookup_whois(ip):
     Returns a whois id. This id can be used to display the whois table.
     """
     dbh = DB.DBO(None)
-    if type(ip) == type(1):
-        ip="%r" % ip
-    else:
+    ## Polymorphic code - if its numeric we use it as such - if its a
+    ## string it must be an IP in dot notation.
+    try:
+        ip/2
+        ip=str(ip)
+    except TypeError:
         ip = "inet_aton(%r)" % ip
         
     netmask = 0
@@ -59,20 +62,22 @@ def lookup_whois(ip):
         ## If we found it, we return that, else we increase the
         ## netmask one more step and keep trying. Worst case we should
         ## pick off the 0.0.0.0 network which is our exit condition.
-        if row:
-            break
+        if row or netmask>pow(2,32):
+            raise Reports.ReportError("Unable to find whois entry for %s " % ip)
 
         netmask = netmask * 2 + 1
 
     return row['whois_id']
 
-def identify_network(ip):
+def identify_network(whois_id):
     """ Returns a uniq netname/country combination """
     dbh = DB.DBO(None)
-    whois_id = lookup_whois(ip)
     dbh.execute("select netname,country from whois where id=%r" , (whois_id))
     row = dbh.fetch()
-    return "%s/%s" % (row['country'],row['netname'])
+    try:
+        return "%s/%s" % (row['country'],row['netname'])
+    except TypeError:
+        return ''
 
 class LookupIP(Reports.report):
     """ Display Whois data for the given IP address """
@@ -85,14 +90,27 @@ class LookupIP(Reports.report):
         result.textfield("Enter IP Address:",'address')
 
     def display(self, query, result):
+        ## get route id
+        result.heading("Whois Search Results For: %s" % query['address'])
+        whois_id = lookup_whois(query['address'])
+        self.display_whois(query,result,whois_id)
+
+    def display_whois(self,query,result,whois_id):
         # lookup IP address and show a nice summary of Whois Data
         dbh = self.DBO(None)
-        ## get route id
-        whois_id = lookup_whois(query['address'])
         dbh.execute("SELECT INET_NTOA(start_ip) as start_ip, numhosts, country, descr, status from whois where id=%s",whois_id)
         res = dbh.fetch()
-        result.heading("Whois Search Results For: %s" % query['address'])
         
         for name in res.keys():
             result.text("%s:\n" % name, color='red',font='typewriter')
             result.text("%s\n\n" % (res[name]),color='black',font='typewriter')
+
+class LookupWhoisID(LookupIP):
+    """ A report to show the IP by netname """
+    parameters = {'id':'numeric'}
+    hidden=True
+
+    def display(self,query,result):
+        result.heading("Whois Search Results")
+        self.display_whois(query,result,int(query['id']))
+

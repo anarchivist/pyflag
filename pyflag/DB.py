@@ -61,7 +61,7 @@ class DBExpander:
 class DBO:
     """ Singlton class controlling access to DB handles
 
-    We need to be careful here since the mysql library is not multi-threaded. We must ensure that every thread obtains a unique lock on the connection object prior to issuing exec calls.
+    We need to be careful here since the mysql library is not multi-threaded (This comment is no longer true, but we still maintain locks just in case we are running single threaded libraries). We must ensure that every thread obtains a unique lock on the connection object prior to issuing exec calls.
     @cvar DBH: A dict containing cached database connection objects
     @cvar lock: the unique lock that each thread must hold before executing new SQL
     @ivar temp_tables: A variable that keeps track of temporary tables so they may be dropped when this object gets gc'ed
@@ -95,6 +95,10 @@ class DBO:
         self.cursor = DBO.DBH[case].cursor()
         self.temp_tables = []
         self.case=case
+
+    def clone(self):
+        """ Returns a new database object for the same case database """
+        return self.__class__(self.case)
 
     def execute(self,query_str,params=()):
         """  SQL execution method.

@@ -34,7 +34,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.logging as logging
 import re
-import cPickle,csv
+import pickle,csv
 
 delimiters = {'Space':' ', 'Comma':',', 'Colon':':', 'Semi-Colon':';', 'Hyphen':'-'}
 
@@ -252,7 +252,33 @@ class Log:
 
             if rows and count > rows:
                 break
-
+            
+        ## Add the IP addresses to the whois table if required:
+        dbh.execute("create table if not exists `whois` (`IP` INT NOT NULL ,`country` VARCHAR( 4 ) NOT NULL ,`NetName` VARCHAR( 50 ) NOT NULL ,`whois_id` INT NOT NULL ,PRIMARY KEY ( `IP` )) COMMENT = 'A local case specific collection of whois information'")
+        for field_number in range(len(self.fields)):
+            if self.types[field_number] == 'IP Address':
+                dbh2=dbh.clone()
+                #Handle for the pyflag db
+                dbh_pyflag = DB.DBO(None)
+                dbh.execute("select `%s` as IP from %s group by `%s`", (
+                    self.fields[field_number],
+                    tablename,
+                    self.fields[field_number]))
+                for row in dbh:
+                    import plugins.Whois as Whois
+                    whois_id = Whois.lookup_whois(row['IP'])
+                    dbh_pyflag.execute("select * from whois where id=%r",(whois_id))
+                    row2=dbh_pyflag.fetch()
+                    try:
+                        dbh2.execute("insert into whois set IP=%r,country=%r,NetName=%r,whois_id=%r",(
+                            row['IP'],
+                            row2['country'],
+                            row2['netname'],
+                            whois_id))
+                    except DB.DBError:
+                        pass
+                                
+                    
     def pickle(self):
         """ Pickles this object
 
@@ -264,7 +290,7 @@ class Log:
         ## Clear stuff that is not relevant
         self.datafile = None
         self.query = None
-        return cPickle.dumps(self)
+        return pickle.dumps(self)
 
     def draw_type_selector(self,result):
         """ Draws an interactive GUI allowing users to specify field names, types and choice of indexes """
@@ -470,7 +496,7 @@ def get_loader(name,datafile):
     We also initialise the object to the datafile list of filenames to use.
     """
     dbh = DB.DBO(config.FLAGDB)
-    log=cPickle.loads(dbh.get_meta('log_preset_%s' % name))
+    log=pickle.loads(dbh.get_meta('log_preset_%s' % name))
     log.datafile = datafile
     return log
     
