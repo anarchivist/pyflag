@@ -194,7 +194,7 @@ class BrowseFS(Reports.report):
 
 class ViewFile(Reports.report):
     """ Report to browse the filesystem """
-    parameters = {'fsimage':'fsimage','inode':'sqlsafe'}
+    parameters = {'fsimage':'fsimage','inode':'string'}
     hidden = True
     family = "Disk Forensics"
     name = "View File Contents"

@@ -58,35 +58,85 @@ class DBExpander:
     def __repr__(self):
         return "'%s'"% MySQLdb.escape_string(self.string)
 
-class DBO:
-    """ Singlton class controlling access to DB handles
+class DBPool:
+    """ This class implements a pool of connection handles which many threads may share at the same time.
+    """
+    def __init__(self,case):
+        self.case = case
+        self.locks = []
+        self.dbh = []
+        self.self_lock = threading.RLock()
 
-    We need to be careful here since the mysql library is not multi-threaded (This comment is no longer true, but we still maintain locks just in case we are running single threaded libraries). We must ensure that every thread obtains a unique lock on the connection object prior to issuing exec calls.
+    def get(self):
+        """ Get a new dbh from our array. """
+        for lock,dbh in zip(self.locks,self.dbh):
+            ## If we are able to lock the handle, we return it
+            if lock.acquire(blocking=0):
+                return dbh
+
+        ## No suitable dbh is found - we lock ourself to protect
+        ## access to the pool, and add a new element to the pool
+        self.self_lock.acquire()
+        self.locks.append(threading.RLock())
+        self.dbh.append(self.connect())
+        lock=self.locks[-1]
+        lock.acquire()
+        
+        dbh=self.dbh[-1]
+        self.self_lock.release()
+        return dbh
+
+    def release(self,dbh):
+        """ Release the current handle.
+
+        Note: dbh must be a handle returned via self.get
+        """
+        try:
+            i = self.dbh.index(dbh)
+            self.locks[i].release()
+        except ValueError:
+            raise DBError("Unable to find handle %s in pool for case %s" %(dbh,self.case))
+    
+    def connect(self):
+        """ Connect specified case and return a new connection handle """
+        case=self.case
+        try:
+            #Try to connect over TCP
+            dbh = MySQLdb.Connect(user = config.USER, passwd = config.PASSWD,db = case, host=config.HOST, port=config.PORT)
+            self.mysql_bin_string = "%s -f -u %r -p%r -h%s -P%s" % (config.MYSQL_BIN,config.USER,config.PASSWD,config.HOST,config.PORT)
+        except Exception,e:
+            #or maybe over the socket?
+            dbh = MySQLdb.Connect(user = config.USER, passwd = config.PASSWD,db = case, unix_socket = config.UNIX_SOCKET)
+            self.mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.USER,config.PASSWD,config.UNIX_SOCKET)
+
+        return dbh
+
+class DBO:
+    """ Class controlling access to DB handles
+
+    We implement a pool of connection threads. This gives us both worlds - the advantage of reusing connection handles without running the risk of exhausting them, as well as the ability to issue multiple simultaneous queries from different threads.
+
     @cvar DBH: A dict containing cached database connection objects
-    @cvar lock: the unique lock that each thread must hold before executing new SQL
+    @cvar lock: an array of unique locks that each thread must hold before executing new SQL
     @ivar temp_tables: A variable that keeps track of temporary tables so they may be dropped when this object gets gc'ed
     """
+    DBH={}
     temp_tables = []
     
-    def __init__(self,case):
+    def __init__(self,case=None):
         """ Constructor for DB access. Note that this object implements database connection caching and so should be instantiated whenever needed. If case is None, the handler returned is for the default flag DB
 
         @arg case: Case database to connect to. May be None in which case it connects to the default flag database
         """
-        ## Locking is done per object - not per class.
-        self.lock = threading.Lock()
         if not case:
             case = config.FLAGDB
-        
-        try:
-            #Try to connect over TCP
-            self.dbh = MySQLdb.Connect(user = config.USER, passwd = config.PASSWD,db = case, host=config.HOST, port=config.PORT)
-            self.mysql_bin_string = "%s -f -u %r -p%r -h%s -P%s" % (config.MYSQL_BIN,config.USER,config.PASSWD,config.HOST,config.PORT)
-        except Exception,e:
-            #or maybe over the socket?
-            self.dbh = MySQLdb.Connect(user = config.USER, passwd = config.PASSWD,db = case, unix_socket = config.UNIX_SOCKET)
-            self.mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.USER,config.PASSWD,config.UNIX_SOCKET)
 
+        try:
+            self.dbh=self.DBH[case].get()
+        except KeyError:
+            self.DBH[case] = DBPool(case)
+            self.dbh=self.DBH[case].get()
+            
         self.cursor = self.dbh.cursor()
         self.temp_tables = []
         self.case=case
@@ -118,14 +168,9 @@ class DBO:
                 params=(DBExpander(params),)
 
             string= query_str % params
-        #Try to obtain the lock:
-        self.lock.acquire()
+            
         try:
-            try:
-                self.cursor.execute(string,None)
-            #We must release the lock even if we throw an exception
-            finally:
-                self.lock.release()
+            self.cursor.execute(string,None)
         #If anything went wrong we raise it as a DBError
         except Exception,e:
             str = "%s" % e
@@ -153,23 +198,17 @@ class DBO:
 
         It is encouraged to use this function over cursor.fetchone to ensure that if columns get reordered in the future code does not break. The result of this function is a dictionary with keys being the column names and values being the values """
         results = {}
-        #acquire the lock for getting a row back
-        self.lock.acquire()
-        try:
-            temp = self.cursor.fetchone()
-            temp2=[]
-            if temp:
-                for i in temp:
-                    try:
-                        temp2.append(i.tostring())
-                    except AttributeError:
-                        temp2.append(i)
-                        pass
-                temp = temp2
-                
-        finally:
-            self.lock.release()
-            
+        temp = self.cursor.fetchone()
+        temp2=[]
+        if temp:
+            for i in temp:
+                try:
+                    temp2.append(i.tostring())
+                except AttributeError:
+                    temp2.append(i)
+                    pass
+            temp = temp2
+                            
         if not temp: return None
         
         column = 0
@@ -249,9 +288,13 @@ class DBO:
 
     def __del__(self):
         """ Destructor that gets called when this object is gced """
-        for i in self.temp_tables:
-            self.execute('drop table if exists %s',i)
-        self.dbh.close()
+        try:
+            for i in self.temp_tables:
+                self.execute('drop table if exists %s' % i)
+#            print "%s %s" % ( self.DBH[self.case].dbh, self.case)
+            self.DBH[self.case].release(self.dbh)
+        except TypeError:
+            pass
 
     def MySQLHarness(self,client):
         """ A function to abstact the harness pipes for all programs emitting SQL.
@@ -262,10 +305,10 @@ class DBO:
         if not client.startswith(config.FLAG_BIN):
             client = "%s/%s" % (config.FLAG_BIN, client)
             
-        print "Will shell out to run %s " % client
+        logging.log(logging.DEBUG, "Will shell out to run %s " % client)
 
         import os
-        p_mysql=os.popen("%s -D%s" % (self.mysql_bin_string,self.case),'w')
+        p_mysql=os.popen("%s -D%s" % (self.DBH[self.case].mysql_bin_string,self.case),'w')
         p_client=os.popen(client,'r')
         while 1:
             data= p_client.read(1000)

@@ -246,9 +246,10 @@ class HTMLUI(UI.GenericUI):
                         
         self.result+="<tr %s>\n" % self.opt_to_str(options)
         for column in columns:
+            ## This does not seem to be needed any more and it makes text blocks look bad inside a row
             #Replace \n in column with <br>\n:
-            import re
-            column = re.sub(r"([^>])\n",r"\1<br>\n",str(column))
+#            import re
+#            column = re.sub(r"([^>])\n",r"\1<br>\n",str(column))
 
             self.result += "<%s %s>%s</%s>" % (type,self.opt_to_str(td_opts),column,type)
 
