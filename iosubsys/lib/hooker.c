@@ -298,6 +298,12 @@ int stat(const char *file_name, struct stat *buf) {
   return(0);
 };
 
+int lstat64(const char *file_name, struct stat *buf) {
+  CHECK_INIT;
+  buf->st_size=-1;
+  return(0);
+};
+
 int __xstat64 (int __ver, __const char *__filename, struct stat *buf) {
   CHECK_INIT;
   buf->st_size=-1;

@@ -15,11 +15,12 @@ class RegistryScan(GenScanFactory):
     def __init__(self,dbh, table,fsfd):
         self.dbh=dbh
         self.table=table
-        self.dbh.execute('create table if not exists reg_%s (`path` CHAR(250), `size` SMALLINT, `type` CHAR(12),`reg_key` VARCHAR(200),`value` text)',self.table)
+        dbh.MySQLHarness("regtool -t reg_%s -d create" % table)
 
     def reset(self):
         GenScanFactory.reset(self)
-        self.dbh.execute('drop table if exists reg_%s',self.table)
+        self.dbh.MySQLHarness("regtool -t reg_%s -d drop" % self.table)
+        #self.dbh.execute('drop table if exists reg_%s',self.table)
         self.dbh.execute('drop table if exists regi_%s',self.table)
         
     def destroy(self):
@@ -95,8 +96,8 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                     left.link("View Tree",new_q)
                     result.row(left)
                     result.table(
-                        columns=['path','type','reg_key','size','value'],
-                        names=['Path','Type','Key','Size','Value'],
+                        columns=['path','type','reg_key','from_unixtime(modified)','size','value'],
+                        names=['Path','Type','Key','Modified','Size','Value'],
                         links=[ result.make_link(new_q,'open_tree',mark='target') ],
                         table='reg_%s'%tablename,
                         case=query['case'],
@@ -146,6 +147,21 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                 del new_q['mode']
                 del new_q['open_tree']
 
+                if (query.has_key("open_tree") and query['open_tree'] != '/'):
+                    br = query['open_tree']
+                else:
+                    br = '/'
+
+                result.row("Inspecting branch %s" % br,colspan=5)
+                tmp=result.__class__(result)
+                dbh.execute("select from_unixtime(modified) as time from reg_%s where path=%r",(tablename,br))
+                row=dbh.fetch()
+                try:
+                    tmp.text("Last modified %s " % row['time'],color='red')
+                    result.row(tmp)
+                except TypeError:
+                    pass
+                    
                 def pane_cb(branch,table):
                     try:
                         path=query['open_tree']
