@@ -11,7 +11,7 @@
 //We call hard exit when hooking exit()
 extern void _exit(int);
 
-#define DEBUG_LEVEL 0
+#define DEBUG_LEVEL 5
 
 /* Used for Debugging messages*/
 void debug(int level, const char *message, ...)
@@ -36,7 +36,12 @@ struct dispatcher_t {
   off_t (*lseek64)(int fildes, off_t offset, int whence);
   ssize_t (*read)(int fd, void *buf, size_t count);
   void (*exit)(int status);
+  int (*dup2)(int oldfd, int newfd);
+  int (*close)(int fd);
 } *dispatch=NULL;
+
+#define HOOK(x)   dispatch->x = dlsym(dispatch->handle,#x); check_errors();
+
 
 // This static variable is used to decide when we should hook calls
 // through the library. The library itself will be using the same
@@ -80,18 +85,15 @@ void load_library(void) {
     exit(EXIT_FAILURE);
   };
 
-  dispatch->open = dlsym(dispatch->handle,"open");
-  check_errors();
-  dispatch->open64 = dlsym(dispatch->handle,"open64");
-  check_errors();
-  dispatch->lseek = dlsym(dispatch->handle,"lseek");
-  check_errors();
-  dispatch->lseek64 = dlsym(dispatch->handle,"lseek64");
-  check_errors();
-  dispatch->read = dlsym(dispatch->handle,"read");
-  check_errors();
-  dispatch->exit = dlsym(dispatch->handle,"exit");
-  check_errors();
+  //Actually hook all our functions
+  HOOK(open);
+  HOOK(open64);
+  HOOK(lseek);
+  HOOK(lseek64);
+  HOOK(read);
+  HOOK(exit);
+  HOOK(dup2);
+  HOOK(close);
 };
 
 //This function initialises the hooker
@@ -244,4 +246,28 @@ void exit(int status) {
   };
 
   _exit(status);
+};
+
+int dup2(int oldfd, int newfd)
+{
+  //If the oldfd is an iosource, we make the new one an io source:
+  if(iosources[oldfd]) {
+    //Is the new one already assigned?
+    if(iosources[newfd]) return -1;
+    iosources[newfd]=iosources[oldfd];
+    return 0;
+  };
+  
+  return(dispatch->dup2(oldfd,newfd));
+};
+
+int close(int fd) {
+
+  if(iosources[fd]) {
+    iosources[fd]=NULL;
+    return 0;
+  } else {
+    debug(1,"Closing fd %u\n",fd);
+    return(dispatch->close(fd));
+  }
 };
