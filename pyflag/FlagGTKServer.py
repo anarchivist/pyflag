@@ -52,14 +52,32 @@ class GTKServer(gtk.Window):
         def __init__(self, uimanager):
             gtk.Notebook.__init__(self)
             self.uimanager = uimanager
-            self.merge_ids = {}
+            self.cur_merge_id = None
+            self.cur_page = None
+            self.cur_action_grp = None
             self.toolbar_uis = {}
             self.toolbar_actions = {}
             self.connect("switch-page", self.switch)
 
+        def rem_toolbar(self, page):
+            if self.cur_merge_id:
+                self.uimanager.remove_ui(self.cur_merge_id)
+            if self.toolbar_actions.has_key(page):
+                self.uimanager.remove_action_group(self.toolbar_actions[page])
+
+        def add_toolbar(self, page):
+            if self.toolbar_actions.has_key(page):
+                self.uimanager.insert_action_group(self.toolbar_actions[page], -1)
+                self.cur_action_grp = self.toolbar_actions[page]
+            if self.toolbar_uis.has_key(page):
+                self.cur_merge_id = self.uimanager.add_ui_from_string(self.toolbar_uis[page])
+            
         def switch(self, notebook, page, pagenum):
-            """ tab switch callback """
-            widget = notebook.get_nth_page(pagenum)
+            """ tab switch callback, update toobar """
+            print "SWITCH TABS"
+            self.rem_toolbar(pagenum)    
+            self.add_toolbar(pagenum)
+            self.cur_page = pagenum
 
         def close_tab(self, action=None, page=None):
             """ close current tab """
@@ -67,8 +85,9 @@ class GTKServer(gtk.Window):
                 page = self.get_current_page()
             self.remove_page(page)
             try:
-                del toolbar_uis[page]
-                del toolbar_actions[page]
+                self.rem_toolbar(page)
+                del self.toolbar_uis[page]
+                del self.toolbar_actions[page]
             except KeyError:
                 pass
 
@@ -94,25 +113,28 @@ class GTKServer(gtk.Window):
                 # add a new page
                 idx = self.append_page(scroll, gtk.Label(label))
 
-            # update toolbar
-            #self.
+            # set toolbar vars
+            try:
+                self.rem_toolbar(idx)
+                del self.toolbar_uis[idx]
+                del self.toolbar_actions[idx]
+            except KeyError:
+                pass
 
-            # show results
-            self.show_all()
-            self.set_current_page(idx)
+            if result.toolbar_items:
+                self.toolbar_actions[idx] = gtk.ActionGroup('ReportActions')
+                self.toolbar_uis[idx] = '<toolbar name="Toolbar"><placeholder name="ReportTools">'
+                for t in result.toolbar_items:
+                    self.toolbar_uis[idx] += '<toolitem action="%s"/>' % t.name
+                    self.toolbar_actions[idx].add_actions([(t.name, None, t.name, None, t.name, t.callback)])
+                self.toolbar_uis[idx] += '</placeholder></toolbar>'
 
-        def update_toolbar(uimanager, tools):
-            """ Update the global UI toolbar with report specific buttons
-            Called whenever current report view changes """
-
-            actions = gtk.ActionGroup()
-            ui = '<toolbar name="Toolbar"><placeholder name="ReportTools">'
-
-            for t in tools:
-                ui += '<toolitem action="%s"/>' % t.name
-                actions.add_actions([(t.name, None, t.name, None, t.name, t.callback)])
-            ui += '</placeholder></toolbar>'
+                # FIXME: have to put icons on toolbuttons but cant retrieve widget until added to ui in switch
+                # this is going to have to be jumbled around...
             
+            # show results, should fire the switch cb which will actually populate the uimanager
+            self.show_all()
+            self.set_current_page(idx)            
 
     def __init__(self):
         """ GTKServer Main Function
