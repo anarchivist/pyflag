@@ -196,6 +196,7 @@ class GTKUI(UI.GenericUI):
     """ A GTK UI Implementation. """
             
     def __init__(self,default = None,query=None,server=None):
+        print "GTKUI CREATED"
         # Create the Main Widget
         self.result=gtk.VBox()
 
@@ -206,6 +207,7 @@ class GTKUI(UI.GenericUI):
             ## This is an array of form widgets. Every time we draw a form widget in this UI, we store it here, and then when we submit the widget, we take the values from here.
             self.form_widgets=default.form_widgets
             self.toolbar_ui = default.toolbar_ui
+            self.tooltips = default.tooltips
             try:
                 self.server=default.server
             except:
@@ -215,6 +217,7 @@ class GTKUI(UI.GenericUI):
             self.defaults = FlagFramework.query_type(())
             self.form_widgets=[]
             self.toolbar_ui = gtk.Toolbar()
+            self.tooltips = gtk.Tooltips()
 
         if server: self.server=server
         
@@ -812,11 +815,7 @@ class GTKUI(UI.GenericUI):
             button = gtk.ToolButton(icon_widget=None, label=text)
 
         if not tooltip: tooltip=text
-        tips = gtk.Tooltips()
-        button.set_tooltip(tips, tooltip)
-        print "adding tooltip %s" % tooltip
-        #tips.set_tip(button, tooltip)
-        #tips.enable()
+        button.set_tooltip(self.tooltips, tooltip)
 
         button.connect('clicked', proxy_cb, cb, self, self.defaults)
         self.toolbar_ui.insert(button, -1)

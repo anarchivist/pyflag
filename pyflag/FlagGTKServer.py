@@ -120,6 +120,7 @@ class GTKServer(gtk.Window):
                 result.toolbar_ui.insert(gtk.SeparatorToolItem(), -1)
             button = gtk.ToolButton(gtk.STOCK_CLOSE)
             button.connect('clicked', self.close_tab)
+            button.set_tooltip(result.tooltips, 'Close Tab')
             result.toolbar_ui.insert(button, -1)
             self.toolbars[idx] = result.toolbar_ui
 
@@ -234,7 +235,10 @@ class GTKServer(gtk.Window):
             self.form_dialog.remove(child)
         else:
             self.form_dialog=gtk.Window()
-            self.form_dialog.set_default_size(500,500)
+            self.form_dialog.set_transient_for(self)
+            #self.form_dialog.set_position(gtk.WIN_POS_CENTER_ON_PARENT)
+            self.form_dialog.set_position(gtk.WIN_POS_CENTER_ALWAYS)
+            #self.form_dialog.set_default_size(500,500)
             self.form_dialog.connect('destroy',self.delete_form)
 
         box=gtk.VBox()
@@ -314,7 +318,10 @@ class GTKServer(gtk.Window):
                 self.form_dialog.remove(child)
             else:
                 self.form_dialog=gtk.Window()
-                self.form_dialog.set_default_size(500,500)
+                self.form_dialog.set_transient_for(self)
+                #self.form_dialog.set_position(gtk.WIN_POS_CENTER_ON_PARENT)
+                self.form_dialog.set_position(gtk.WIN_POS_CENTER_ALWAYS)
+                #self.form_dialog.set_default_size(500,500)
                 self.form_dialog.connect('destroy',self.delete_form)
             box=gtk.VBox()
             self.form_dialog.add(box)
