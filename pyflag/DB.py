@@ -293,7 +293,7 @@ class DBO:
                 self.execute('drop table if exists %s' % i)
 #            print "%s %s" % ( self.DBH[self.case].dbh, self.case)
             self.DBH[self.case].release(self.dbh)
-        except TypeError:
+        except (TypeError,AssertionError):
             pass
 
     def MySQLHarness(self,client):

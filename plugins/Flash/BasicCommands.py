@@ -2,6 +2,7 @@
 import pyflag.pyflagsh as pyflagsh
 from pyflag.pyflagsh import ParserException
 import sys,os
+import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 import pyflag.IO as IO
 import pyflag.FileSystem as FileSystem
@@ -294,37 +295,50 @@ class execute(pyflagsh.command):
     def __init__(self,args,environment):
         self.args=args
         self.environment=environment
-        try:
-            self.environment._flag
-        except AttributeError:
-            self.environment._flag=FlagFramework.Flag()
-            
-        self.reports={}
-        for key in self.environment._flag.dispatch.family.keys():
-            for report in self.environment._flag.dispatch.family[key].values():
-                self.reports["%s" % report.__class__]=report
 
     def complete(self,text,state):
         args=self.args
-        if not text: args.append('')
-        
-        if len(args)<=2:
-            items=self.reports.keys()
+
+        possibilities=[]
+        allreports=[]
+        families = Registry.REPORTS.get_families()
+        for family in families:
+            reports=Registry.REPORTS.family[family]
+            for report in reports:
+                possibilities.append("%s" % (report))
+                allreports.append(report)
+                
+        if len(args)<2 or len(args)==2 and text:
+            for i in range(state,len(possibilities)):
+                if possibilities[i].startswith(text):
+                    return possibilities[i]
         else:
-            report=self.reports[args[1]]
-            items=report.parameters.keys()
-            items.append('case')
-        
-        for i in range(state,len(items)):
-            if items[i].startswith(text):
-                return items[i]
+            for i in range(0,len(possibilities)):
+                if possibilities[i] == args[1]:
+                    r = allreports[i]
+                    for i in range(state,len(r.parameters.keys())):
+                        if r.parameters.keys()[i].startswith(text):
+                            return r.parameters.keys()[i]
 
     def execute(self):
         start_time=time.time()
         args=self.args
-        try:
-            report=self.reports[args[1]]
-        except KeyError:
+        possibilities=[]
+        allreports=[]
+        families = Registry.REPORTS.get_families()
+        for family in families:
+            reports=Registry.REPORTS.family[family]
+            for report in reports:
+                possibilities.append("%s" % (report))
+                allreports.append(report)
+
+        report=None
+        for i in range(0,len(possibilities)):
+            if possibilities[i] == args[1]:
+                report = allreports[i]
+                break
+            
+        if not report:
             raise ParserException("Unknown report %s" % args[1])
         
         query=FlagFramework.query_type(())
@@ -345,7 +359,7 @@ class execute(pyflagsh.command):
                     pass
 
         ## Include the report and family:
-        query['family'],query['report']=args[1].split('.')
+        query['family'],query['report']=possibilities[i].split('.')
 
         print "Checking meta cache"
         if self.environment._flag.is_cached(query):

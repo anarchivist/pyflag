@@ -208,7 +208,17 @@ def shell_execv(*argv):
     return string
 
 if __name__ == "__main__":
+    ## Handle a history file
+    histfile = os.path.join(os.environ["HOME"], ".flashhist")
+    try:
+        readline.read_history_file(histfile)
+    except IOError:
+        pass
+    import atexit
+    atexit.register(readline.write_history_file, histfile)
+    
     readline.set_completer(completer)
+    
     env=environment()
     parser=command_parse(env)
     print "Welcome to the Flag shell. Type help for help"

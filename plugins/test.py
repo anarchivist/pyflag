@@ -35,11 +35,11 @@ config=pyflag.conf.ConfObject()
 
 import pyflag.DB as DB
 
-import os,os.path
+import os,os.path,sys
 
 description = "Test Class"
 #Remove this line to ensure this appears in the menu
-hidden = True
+hidden = False
 
 class TemplateReport(Reports.report):
     """ A sample report.
@@ -47,7 +47,7 @@ class TemplateReport(Reports.report):
     Note that all reports must inherit from Reports.report and should override the methods and attributes listed below.
     """
     parameters = {'a':'numeric','b':'alphanum'}
-    hidden = True
+    hidden = False
     name = "Test report"
     family = "Test"
     
@@ -55,6 +55,7 @@ class TemplateReport(Reports.report):
         result.heading("I am calling the display method")
         branch = ['/']
 
+        sys.exit(0)
         #We are testing the graphing widget:
 #        import pyflag.Graph as Graph
 
