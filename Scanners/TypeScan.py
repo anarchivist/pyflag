@@ -24,9 +24,7 @@ class TypeScan(GenScanFactory):
         self.table=table
 
     def reset(self):
-        self.dbh.execute("drop table `type_%s`",self.table)
-        self.dbh.execute("delete from `inode_%s` where inode like '%%|Z|%%'",self.table)
-        self.dbh.execute("delete from `file_%s` where inode like '%%|Z|%%'",self.table)
+        self.dbh.execute("drop table if exists `type_%s`",self.table)
 
     def destroy(self):
         self.dbh.execute('ALTER TABLE type_%s ADD INDEX(inode)', self.table)

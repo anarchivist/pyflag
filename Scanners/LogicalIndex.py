@@ -1,6 +1,7 @@
 """ This scanner uses the indexing tools to scan the logical files within an image. This allows us to do keyword matching against compressed files, PST files etc.
 """
 import pyflag.logging as logging
+import pyflag.FlagFramework as FlagFramework
 from Scanners import *
 import index,os
 import pyflag.conf
@@ -13,7 +14,7 @@ class Index(GenScanFactory):
         """ This creates the LogicalIndex table and initialised the index file """
         self.dbh=dbh
         ## This keeps the current offset in the logical image. FIXME:
-        ## When running is a distributed environment this is not
+        ## When running in a distributed environment this is not
         ## accessible - maybe we need to pass this in the metadata?
         self.offset = 0
         self.table=table
@@ -29,14 +30,16 @@ class Index(GenScanFactory):
             pydbh.execute("select word from dictionary")
             for row in pydbh:
                 self.index.add(row['word'])
-            
-
+                
     def reset(self):
         """ This deletes the index file and drops the LogicalIndex table """
         ## First destroy the object and then try to remove the index file
         del self.index
         os.remove(self.filename)
-        self.dbh.execute("drop table if exist `LogicalIndex_%s`",(self.table))
+        self.dbh.execute("drop table if exists `LogicalIndex_%s`",(self.table))
+        ## Here we reset all reports that searched this disk
+        FlagFramework.reset_all(case=self.dbh.case,report='SearchIndex', family='DiskForensics')
+        self.dbh.execute("drop table if exists `LogicalKeyword_%s`",(self.table))
 
     def destroy(self):
         ## Destroy our index handle which will close the file and free memory
@@ -51,8 +54,9 @@ class Index(GenScanFactory):
             self.dbh.execute("insert into `LogicalIndex_%s` set inode=%r,offset=%r",(outer.table,inode,self.offset))
 
         def process(self,data,metadata=None):
-            self.index.index_buffer(self.offset,data)
-            self.offset+=len(data)
+            self.index.index_buffer(self.outer.offset,data)
+            self.outer.offset+=len(data)
 
         def finish(self):
-            self.outer.offset=self.offset
+            pass
+#            self.outer.offset=self.offset

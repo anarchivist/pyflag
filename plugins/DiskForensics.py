@@ -675,13 +675,30 @@ class SearchIndex(Reports.report):
             result.textfield("Keyword to search:",'keyword')
         except KeyError:
             return
-        
-    def display(self,query,result):
+
+    def reset(self,query):
         dbh = self.DBO(query['case'])
-        keyword = query['keyword']
-        result.heading("Occurances of %s in logical image %s" %
-                       (keyword,query['fsimage']))
         table = query['fsimage']
+        keyword = query['keyword']
+        try:
+            dbh.execute("delete from LogicalKeyword_%s where keyword = %r" , (table,query['keyword']))
+        except DB.DBError:
+            pass
+
+    def progress(self,query,result):
+        result.heading("Currently searching for %r in image %r" % (query['keyword'],query['fsimage']))
+        dbh = self.DBO(query['case'])
+        table = query['fsimage']
+        dbh.execute("select count(*) as Count from LogicalKeyword_%s where keyword=%r",(table,query['keyword']))
+        row=dbh.fetch()
+        result.text("Currently found %s occurances" % row['Count'],color='red')
+        
+    def analyse(self,query):
+        dbh = self.DBO(query['case'])
+        dbh2= self.DBO(query['case'])
+        keyword = query['keyword']
+        table = query['fsimage']
+        dbh2.execute("CREATE TABLE if not exists `LogicalKeyword_%s` (`id` INT NOT NULL AUTO_INCREMENT ,`inode` VARCHAR( 20 ) NOT NULL ,`offset` BIGINT NOT NULL ,`text` VARCHAR( 200 ) NOT NULL ,`keyword` VARCHAR(20) NOT NULL ,PRIMARY KEY ( `id` ))",(table))
         iofd = IO.open(query['case'], query['fsimage'])
         fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
 
@@ -690,15 +707,31 @@ class SearchIndex(Reports.report):
         idx = index.Load("%s/LogicalIndex_%s.idx" % (config.RESULTDIR,table))
         for offset in idx.search(keyword):
             ## Find out which inode this offset is in:
-            dbh.execute("select inode,offset from LogicalIndex_%s where offset <= %r order by offset desc,id desc limit 2",(query['fsimage'],offset))
+            dbh.execute("select inode,offset from LogicalIndex_%s where offset <= %r order by offset desc,id desc",(query['fsimage'],offset))
             for row in dbh:
                 fd = fsfd.open(inode=row['inode'])
-                off = offset - int(row['offset']) - 10
-                if off<0: off=0
-                fd.seek(off)
+                off = offset - int(row['offset'])
+                if off<10: off=10
+                fd.seek(off-10)
                 data = fd.read(10 + len(keyword) + 20)
-                tmp = result.__class__(result)
-                tmp.link("View file",FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',fsimage=query['fsimage'],inode=row['inode'],mode='HexDump'))
-                if data[10:10+len(keyword)].lower() == keyword:
-                    result.text(data,"        ",tmp,"\n")
+                if data[10:10+len(keyword)].lower()==keyword.lower():
+                    dbh2.execute("insert into LogicalKeyword_%s set inode=%r, offset=%r, text=%r, keyword=%r",(table,row['inode'],off,data,keyword))
+                    break
+                else:
+                    logging.log(logging.DEBUG,"Error: Could not find keyword %s in data %s (inode should be %s) " %(keyword,data,row['inode']))
                 fd.close()
+        
+    def display(self,query,result):
+        dbh = self.DBO(query['case'])
+        keyword = query['keyword']
+        result.heading("Occurances of %s in logical image %s" %
+                       (keyword,query['fsimage']))
+        table = query['fsimage']
+
+        result.table(
+            columns = ['inode','text','keyword'],
+            names=['Inode','Data','Keyword'],
+            table='LogicalKeyword_%s' % table,
+            case=query['case'],
+            )
+            

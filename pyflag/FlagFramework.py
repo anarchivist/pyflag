@@ -717,3 +717,33 @@ class Curry:
             kw = kwargs or self.kwargs
 
         return self.fun(*(self.pending+args), **kw)
+
+GLOBAL_FLAG_OBJ=None
+
+def reset_all(**query):
+    """ This searchs for all executed reports with the provided parameters in them and resets them all.
+
+    Callers need to provide at least a report name, case and a family or an exception is raised.
+    """
+    flag = GLOBAL_FLAG_OBJ
+    report = flag.dispatch.get(query['family'],query['report'])
+    dbh=DB.DBO(query['case'])
+    print query
+    dbh.execute("select value from meta where property='report_executed' and value like 'family=%s%%'" % query['family'])
+    for row in dbh:
+        import cgi
+        
+        q = query_type(cgi.parse_qsl(row['value']),case=query['case'])
+        try:
+            for k in query.keys():
+                if q[k]!=query[k]:
+                    raise KeyError()
+
+            ## This report should now be reset:
+            print "Will now reset %s" %q
+             
+            report.reset(q)
+            dbh2 = DB.DBO(query['case'])
+            dbh2.execute("delete from meta where property='report_executed' and value=%r",row['value'])
+        except KeyError:
+            pass

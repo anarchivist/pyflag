@@ -156,6 +156,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     flag = FlagFramework.Flag()
+    FlagFramework.GLOBAL_FLAG_OBJ =flag
     #Set the UI module to produce HTML
     flag.ui = UI.HTMLUI
 

@@ -256,8 +256,8 @@ class DBFS(FileSystem):
             for i in factories:
                 try:
                     i.reset()
-                except DB.DBError:
-                    pass
+                except DB.DBError,e:
+                    logging.log(logging.ERRORS,"Could not reset Scanner %s: %s" % (i,e))
             return
 
 #        dbh3.execute('select inode, concat(path,name) as filename from file_%s where mode="r/r" and status="alloc" and inode not like "%%-Z-%%"',self.table)
