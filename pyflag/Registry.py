@@ -16,9 +16,9 @@ import pyflag.logging as logging
 
 class Registry:
     """ Main class to register classes derived from a given parent class. """
-
     modules = []
     module_desc = []
+    module_paths = []
     classes = []
     class_names = []
     order = []
@@ -29,8 +29,6 @@ class Registry:
         These will be considered as implementations and added to our internal registry.
         """
         ## Create instance variables
-        self.modules = []
-        self.module_desc = []
         self.classes = []
         self.class_names = []
         self.order = []
@@ -42,47 +40,52 @@ class Registry:
                     #Lose the extension for the module name
                     module_name = filename[:-3]
                     if filename.endswith(".py"):
-                        logging.log(logging.DEBUG,"Will attempt to load plugin '%s/%s'"
-                                    % (dirpath,filename))
+                        path = dirpath+'/'+filename
                         try:
-                            try:
-                                #open the plugin file
-                                fd = open(dirpath+'/'+filename ,"r")
-                            except Exception,e:
-                                logging.log(logging.DEBUG, "Unable to open plugin file '%s': %s"
-                                            % (filename,e))
-                                continue
+                            if path not in self.module_paths:
+                                logging.log(logging.DEBUG,"Will attempt to load plugin '%s/%s'"
+                                            % (dirpath,filename))
+                                ## If we do not have the module in the cache, we load it now
+                                try:
+                                    #open the plugin file
+                                    fd = open(path ,"r")
+                                except Exception,e:
+                                    logging.log(logging.DEBUG, "Unable to open plugin file '%s': %s"
+                                                % (filename,e))
+                                    continue
 
-                            #load the module into our namespace
-                            try:
-                                module = imp.load_source(module_name,dirpath+'/'+filename,fd)
-                            except Exception,e:
-                                logging.log(logging.ERRORS, "*** Unable to load module %s: %s"
-                                            % (module_name,e))
-                                continue
+                                #load the module into our namespace
+                                try:
+                                    module = imp.load_source(module_name,dirpath+'/'+filename,fd)
+                                except Exception,e:
+                                    logging.log(logging.ERRORS, "*** Unable to load module %s: %s"
+                                                % (module_name,e))
+                                    continue
 
-                            fd.close()
+                                fd.close()
 
-                            #Is this module active?
-                            try:
-                                if module.hidden: continue
-                                if not module.active: continue
-                            except AttributeError:
-                                pass
+                                #Is this module active?
+                                try:
+                                    if module.hidden: continue
+                                    if not module.active: continue
+                                except AttributeError:
+                                    pass
 
-                            #find the module description
-                            try:
-                                module_desc = module.description
-                            except AttributeError:
-                                module_desc = module_name
+                                #find the module description
+                                try:
+                                    module_desc = module.description
+                                except AttributeError:
+                                    module_desc = module_name
 
-                            ## Do we already have this module?
-                            if module_desc in self.modules:
-                                logging.log(logging.WARNINGS, "Module %s is already loaded, skipping...." % module_desc)
-                                continue
-                            else:
+                                ## Store information about this module here.
                                 self.modules.append(module)
                                 self.module_desc.append(module_desc)
+                                self.module_paths.append(path)
+                                
+                            else:
+                                ## We already have the module in the cache:
+                                module = self.modules[self.module_paths.index(path)]
+                                module_desc = self.module_desc[self.module_paths.index(path)]
 
                             #Now we enumerate all the classes in the
                             #module to see which one is a ParentClass:
@@ -99,15 +102,14 @@ class Registry:
                                             continue
 
                                         self.classes.append(Class)
-                                        self.class_names.append(cls)
-                                        try:
-                                            self.order.append(Class.order)
-                                        except:
-                                            self.order.append(0)
-                                            
                                         logging.log(logging.DEBUG, "Added %s '%s:%s'"
                                                     % (ParentClass,module_desc,cls))
 
+                                        try:
+                                            self.order.append(Class.order)
+                                        except:
+                                            self.order.append(10)
+                                            
                                 # Oops: it isnt a class...
                                 except (TypeError, NameError) , e:
                                     continue
@@ -193,8 +195,18 @@ class ScannerRegistry(Registry):
     def dispatch(self,scanner_name):
         return self.classes[self.scanners.index(scanner_name)]
 
+class VFSFileRegistry(Registry):
+    """ A class to register VFS (Virtual File System) File classes """
+    vfslist = {}
+    def __init__(self,ParentClass):
+        Registry.__init__(self,ParentClass)
+        for cls in self.classes:
+            self.vfslist[cls.specifier] = cls
+
 REPORTS = None
 SCANNERS = None
+VFS_FILES = None
+LOG_DRIVERS = None
 
 ## This is required for late initialisation to avoid dependency nightmare.
 def Init():
@@ -205,11 +217,12 @@ def Init():
     REPORTS=ReportRegistry(Reports.report)
 
     ## Now do the scanners
-    print "Importing scanners now:"
     import pyflag.Scanner as Scanner
     global SCANNERS
     SCANNERS = ScannerRegistry(Scanner.GenScanFactory)
 
-    print "Scanners are %s" % SCANNERS.scanners
-    print "Scanners are %s" % SCANNERS.classes
+    ## Pick up all VFS drivers:
+    import pyflag.FileSystem as FileSystem
+    global VFS_FILES
     
+    VFS_FILES = VFSFileRegistry(FileSystem.File)

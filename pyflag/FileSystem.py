@@ -48,6 +48,7 @@ config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
 import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
+import pyflag.Registry as Registry
 import pyflag.logging as logging
 import time
 import math
@@ -106,7 +107,7 @@ class FileSystem:
         for part in parts:
             sofar.append(part)
             try:
-                retfd = vfslist[part[0]](self.case, self.table, retfd, '|'.join(sofar))
+                retfd = Registry.VFS_FILES.vfslist[part[0]](self.case, self.table, retfd, '|'.join(sofar))
             except IndexError:
                 raise IOError, "Unable to open inode: %s, no VFS" % part
 
@@ -297,283 +298,6 @@ class File:
         """ Returns a dict of statistics about the content of the file. """
         pass
     
-class DBFS_file(File):
-    """ Class for reading files within a loaded dd image, supports typical file-like operations, seek, tell, read """
-    specifier = 'D'
-    def __init__(self, case, table, fd, inode):
-        File.__init__(self, case, table, fd, inode)
-
-        self.dbh = DB.DBO(case)
-        self.readptr = 0
-        try:
-            self.dbh.execute("select value from meta_%s where name='block_size'",self.table);
-            self.block_size = int(self.dbh.fetch()["value"])
-        except TypeError:
-            pass
-        # fetch inode data
-        self.dbh.execute("select * from inode_%s where inode=%r and status='alloc'", (self.table, inode))
-        self.data = self.dbh.fetch()
-        if not self.data:
-            raise IOError("Could not locate inode %s"% inode)
-
-        self.size = self.data['size']
-        self.dbh.execute("select block,count,`index` from block_%s where inode=%r order by `index`", (self.table, inode))
-        try:
-            self.blocks = [ (row['block'],row['count'],row['index']) for row in self.dbh ]
-        except KeyError:
-            self.blocks = None
-        self.index = [ d[2] for d in self.blocks ]
-        
-    def getval(property):
-        try:
-            return self.data[property]
-        except KeyError:
-            return None
-        
-    def seek(self, offset, rel=None):
-        """ fake seeking routine, doesnt really seek, just updates the read pointer """
-        if rel==1:
-            self.readptr += offset
-        elif rel==2:
-            self.readptr = self.size + offset
-        else:
-            self.readptr = offset
-            
-        if(self.readptr > self.size):
-            self.readptr = self.size
-
-    def read(self, length=None):
-        if (length == None) or ((length + self.readptr) > self.size):
-            length = self.size - self.readptr
-
-        if length == 0:
-            return ''
-
-        if not self.blocks:
-            # now try to find blocks in the resident table
-            self.dbh.execute("select data from resident_%s where inode=%r" % (self.table, self.data['inode']));
-            row = self.dbh.fetch()
-            if not row:
-                raise IOError("Cant find any file data")
-            data = row['data'][self.readptr:length+self.readptr]
-	    self.readptr += length
-	    return data
-
-        fbuf=''
-        while length>0:
-        ## Where are we in the chunk?
-            ddoffset,bytes_left = self.offset(self.readptr)
-            
-            self.fd.seek(ddoffset)
-            if(bytes_left > length):
-                fbuf += self.fd.read(length)
-                self.readptr+=length
-                return fbuf
-            else:
-                fbuf += self.fd.read(bytes_left)
-                length-=bytes_left
-                self.readptr+=bytes_left
-
-        return fbuf
-     
-    def tell(self):
-        return self.readptr
-
-    def offset(self,offset):
-        """ returns the offset into the current block group where the given offset is found"""
-        ## The block in the file where the offset is found
-        block = int(offset/self.block_size)
-
-        ##Obtain the index of blocks array where the chunk is. This is the index at which self.index is 
-        blocks_index=0
-        try:
-            while 1:
-                if self.index[blocks_index]<=block<self.index[blocks_index+1]: break
-                blocks_index+=1
-
-        except IndexError:
-            blocks_index=len(self.index)-1
-
-        #If the end of the chunk found occurs before the block we seek, there is something wrong!!!
-        if self.blocks[blocks_index][1]+self.blocks[blocks_index][2]<=block:
-            raise IOError("Block table does not span seek block %s"%block,offset)
-
-        ## Look the chunk up in the blocks array
-        ddblock,count,index=self.blocks[blocks_index]
-
-        ## The offset into the chunk in bytes
-        chunk_offset = offset-index*self.block_size
-
-        ## The dd offset in bytes
-        ddoffset=ddblock*self.block_size+chunk_offset
-
-        ## The number of bytes remaining in this chunk
-        bytes_left = count*self.block_size-chunk_offset
-        
-        return ddoffset,bytes_left
-
-class MountedFS_file(File):
-    """ access to real file in filesystem """
-    specifier = 'M'
-    def __init__(self, case, table, fd, inode):
-        File.__init__(self, case, table, fd, inode)
-        #strategy:
-        #must determine path from inode
-        #we can assume this vfs will never be inside another vfs...
-        #just look it up in the database i spose "where inode=inode" ??
-
-        dbh = DB.DBO(case)
-        self.dbh=dbh
-        dbh.execute("select path,name from file_%s where inode=%r",(self.table, inode))
-        row=self.dbh.fetch()
-        path=row['path']+"/"+row['name']
-        self.fd=open(fd.mount_point+'/'+path,'r')
-    
-    def close(self):
-        self.fd.close()
-
-    def seek(self, offset, rel=None):
-        if rel!=None:
-            self.fd.seek(offset,rel)
-        else:
-            self.fd.seek(offset)
-
-    def read(self, length=None):
-        if length!=None:
-            return self.fd.read(length)
-        else:
-            return self.fd.read()
-
-    def tell(self):
-        return self.fd.tell()
-
-try:
-    import pypst2
-    class Pst_file(File):
-        """ A file like object to read items from within pst files. The pst file is specified as an inode in the DBFS """
-        specifier = 'P'
-        blocks=()
-        size=None
-        def __init__(self, case, table, fd, inode):
-            File.__init__(self, case, table, fd, inode)
-            # strategy:
-            # cache whole of file in 'fd' to disk
-            # load into pypst2
-            # split inode into item_id and attachment number (if any)
-            # retrieve item using item_id
-            # if attachment, retrieve attachment from item using attachment number
-            # set self.data to either attachment or item
-            parts = inode.split('|')
-            pstinode = '|'.join(parts[:-1])
-            thispart = parts[-1]
-
-            # open the pst file from disk cache
-            # or from fd if cached file does not exist
-            fname = make_filename(case, pstinode)
-
-            if not os.path.isfile(fname):
-                outfd = open(fname, 'w')
-                outfd.write(fd.read())
-                outfd.close()
-
-            pst = pypst2.Pstfile(fname)
-            item = pst.open(thispart[1:])
-            self.data = item.read()
-            self.pos = 0
-            self.size=len(self.data)
-
-        def read(self,len=None):
-            if len:
-                temp=self.data[self.pos:self.pos+len]
-                self.pos+=len
-                return temp
-            else: return self.data
-
-        def close(self):
-            pass
-
-        def tell(self):
-            return self.pos
-        
-        def seek(self,pos,rel=0):
-            if rel==1:
-                self.pos+=pos
-            elif rel==2:
-                self.pos=len(self.data)+pos
-            else:
-                self.pos=pos
-            
-except ImportError:
-    class Pst_file:
-        pass
-
-class Zip_file(File):
-    """ A file like object to read files from within zip files. Note that the zip file is specified as an inode in the DBFS """
-    specifier = 'Z'
-    
-    def __init__(self, case, table, fd, inode):
-        File.__init__(self, case, table, fd, inode)
-        # strategy:
-        # inode is the index into the namelist of the zip file (i hope this is consistant!!)
-        # just read that file!
-        parts = inode.split('|')
-        try:
-            z = zipfile.ZipFile(fd,'r')
-            self.data = z.read(z.namelist()[int(parts[-1][1:])])
-        except (IndexError, KeyError):
-            raise IOError, "Zip_File: cant find index"
-        
-        self.pos=0
-        self.size=len(self.data)
-        
-    def read(self,len=None):
-        if len:
-            temp=self.data[self.pos:self.pos+len]
-            self.pos+=len
-            return temp
-        else: return self.data
-
-    def close(self):
-        pass
-        
-    def seek(self,pos):
-        self.pos=pos
-
-import gzip
-
-class GZip_file(File):
-    """ A file like object to read gziped files. """
-    specifier="G"
-    
-    def __init__(self, case, table, fd, inode):
-        File.__init__(self, case, table, fd, inode)
-        try:
-            self.gz = gzip.GzipFile(fileobj=fd)
-        except Exception,e:
-            raise IOError, "GZip_File: Error %s" %e
-
-        self.size=0
-        self.pos=0
-
-    def read(self,len=None):
-        if len!=None:
-            self.pos+=len
-            return self.gz.read(len)
-        else:
-            self.pos=self.size
-            return self.gz.read()
-
-    def close(self):
-        self.gz.close()
-        
-    def seek(self,pos,rel=None):
-        if rel==1:
-            self.pos+=pos
-        else:
-            self.pos=pos
-            
-        self.gz.seek(self.pos)
-
 def FS_Factory(case,table,fd):
     """ This is the filesystem factory, it will create the most appropriate filesystem object available.
 
@@ -603,13 +327,13 @@ def make_filename(case, inode):
     return("%s/%s_%s" % (
         config.RESULTDIR, case, dbh.MakeSQLSafe(inode)))
 
-# create a dict of all the File subclasses by specifier
-import sys
-vfslist={}
-for cls in dir():
-    try:
-        CLS=sys.modules[__name__].__dict__[cls]
-        if issubclass(CLS,File) and CLS != File:
-            vfslist[CLS.specifier]=CLS
-    except TypeError:
-        pass
+### create a dict of all the File subclasses by specifier
+##import sys
+##vfslist={}
+##for cls in dir():
+##    try:
+##        CLS=sys.modules[__name__].__dict__[cls]
+##        if issubclass(CLS,File) and CLS != File:
+##            vfslist[CLS.specifier]=CLS
+##    except TypeError:
+##        pass

@@ -39,6 +39,7 @@ This module provides reports for the entire process.
 """
 
 description = "Index Tools"
+active=False
 order = 90
 
 import pyflag.Reports as Reports
@@ -51,87 +52,6 @@ import os
 
 ## The size of the buffer to index at a time
 BLOCKSIZE=1024*1024
-
-class BuildDictionary(Reports.report):
-    """ Manipulate dictionary of search terms to index on """
-    parameters = {}
-    name="Build Dictionary"
-    family="Index Tools"
-    description = "Builds a dictionary for indexing "
-
-    def form(self,query,result):
-        pass
-
-    def analyse(self,query):
-        pass
-
-    def display(self,query,result):
-        ## The dictionary is site wide and lives in the FlagDB
-        dbh=self.DBO(None)
-
-        ## class_override the class variable:
-        try:
-            if len(query['class_override'])>3:
-                del query['class']
-                query['class']=query['class_override']
-                del query['class_override']
-                
-        except KeyError:
-            pass
-
-        ## Do we need to add a new entry:
-        try:
-            if len(query['word'])<3:
-                raise DB.DBError("Word is too short to index, minimum of 3 letter words")
-
-            if query['action']=='insert':
-                if len(query['class'])<3:
-                    raise DB.DBError("Class name is too short, minimum of 3 letter words are used as class names")
-                dbh.execute("insert into dictionary set word=%r,class=%r",(query['word'],query['class']))
-                
-            elif query['action']=='delete':
-                dbh.execute("delete from dictionary where word=%r",query['word'])
-                
-        except KeyError:
-            pass
-        except DB.DBError,e:
-            result.text("Error: %s" % e,color='red')
-            result.text("",color='black')
-            
-        result.heading("Building Dictionary")
-
-        ## Draw a form allowing users to add or delete words from the dictionary
-        form=self.ui(result)
-        form.start_form(query)
-        form.start_table()
-        form.const_selector("Action:",'action',('delete','insert'),('Delete','Add'))
-        form.textfield('Word:','word')        
-        form.selector('Classification:','class','select class,class from dictionary group by class order by class',())
-        form.textfield('(Or create a new class:)','class_override')
-        form.end_table()
-        form.end_form('Go')
-
-        table=self.ui(result)
-        try:
-            table.table(
-                columns=['word','class'],
-                names=['Word','Class'],
-                table='dictionary',
-                case=None,
-                )
-            ## If the table is not there, we may be upgrading from an old version of flag, We just recreate it:
-        except DB.DBError:
-            dbh.execute("""CREATE TABLE `dictionary` (
-            `word` VARCHAR( 50 ) NOT NULL ,
-            `class` VARCHAR( 50 ) NOT NULL ,
-            `encoding` SET( 'all', 'ascii', 'ucs16' ) DEFAULT 'all' NOT NULL ,
-            PRIMARY KEY ( `word` )
-            ) """)
-
-            result.para("Just created a new empty dictionary")
-            result.refresh(3,query)
-            
-        result.row(table,form,valign='top')
 
 class IndexImage(Reports.report):
     """ Indexes an IO Source using the global dictionary """

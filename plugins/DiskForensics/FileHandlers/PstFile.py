@@ -1,10 +1,16 @@
-""" This scanner recurses into Microsoft Outlook personal file folders (pst files), executing the scanner factory train on files within the pst file, such files include email bodies and attachments, contact details, appointments and journal entries.
+""" This module adds support for Microsoft Outlook personal file folders (pst files).
+
+There is a scanner which executs the scanner factory train on files within the pst file, such files include email bodies and attachments, contact details, appointments and journal entries.
+
 This feature complements the PST virtual filesystem driver to ensure that pst files are transparently viewable by the FLAG GUI.
 """
 import os.path
 import pyflag.logging as logging
 from pyflag.Scanner import *
 import pypst2
+import pyflag.FileSystem as FileSystem
+from pyflag.FileSystem import File
+import pyflag.Reports as Reports
 
 class PstScan(GenScanFactory):
     """ Recurse into Pst Files """
@@ -101,3 +107,58 @@ class PstScan(GenScanFactory):
             self.ddfs.dbh.execute("select * from file_%s where mode='r/r' and inode=%r order by status",(self.table,self.inode))
             row=self.ddfs.dbh.fetch()
             self.ddfs.dbh.execute("insert into file_%s set mode='d/d',inode=%r,status=%r,path=%r,name=%r",(self.table,self.inode,row['status'],row['path'],row['name']))
+
+## The correspoding VFS module:
+class Pst_file(File):
+    """ A file like object to read items from within pst files. The pst file is specified as an inode in the DBFS """
+    specifier = 'P'
+    blocks=()
+    size=None
+    def __init__(self, case, table, fd, inode):
+        File.__init__(self, case, table, fd, inode)
+        # strategy:
+        # cache whole of file in 'fd' to disk
+        # load into pypst2
+        # split inode into item_id and attachment number (if any)
+        # retrieve item using item_id
+        # if attachment, retrieve attachment from item using attachment number
+        # set self.data to either attachment or item
+        parts = inode.split('|')
+        pstinode = '|'.join(parts[:-1])
+        thispart = parts[-1]
+
+        # open the pst file from disk cache
+        # or from fd if cached file does not exist
+        fname = FileSystem.make_filename(case, pstinode)
+
+        if not os.path.isfile(fname):
+            outfd = open(fname, 'w')
+            outfd.write(fd.read())
+            outfd.close()
+
+        pst = pypst2.Pstfile(fname)
+        item = pst.open(thispart[1:])
+        self.data = item.read()
+        self.pos = 0
+        self.size=len(self.data)
+
+    def read(self,len=None):
+        if len:
+            temp=self.data[self.pos:self.pos+len]
+            self.pos+=len
+            return temp
+        else: return self.data
+
+    def close(self):
+        pass
+
+    def tell(self):
+        return self.pos
+
+    def seek(self,pos,rel=0):
+        if rel==1:
+            self.pos+=pos
+        elif rel==2:
+            self.pos=len(self.data)+pos
+        else:
+            self.pos=pos
