@@ -428,7 +428,11 @@ class HTMLVisualise(TCPTrace):
         row=dbh.fetch()
         
         #Get all the data for this object from the connection cache:
-        dbh.execute("select substring(data.data,size) as data,direction from connection_cache,data where connection_cache.id=data.key_id and con_id=%r and key_id>%r and key_id<%r group by id order by id",(query['con_id'],query['key_id'],row['id']))
+        try:
+            dbh.execute("select substring(data.data,size) as data,direction from connection_cache,data where connection_cache.id=data.key_id and con_id=%r and key_id>%r and key_id<%r group by id order by id",(query['con_id'],query['key_id'],row['id']))
+        except TypeError:
+            dbh.execute("select substring(data.data,size) as data,direction from connection_cache,data where connection_cache.id=data.key_id and con_id=%r and key_id>%r group by id order by id",(query['con_id'],query['key_id']))
+            
         data= ''.join([ row['data'] for row in dbh])
 
         ## Find the content type:
