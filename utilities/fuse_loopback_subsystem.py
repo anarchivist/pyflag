@@ -22,8 +22,8 @@ from stat import *
 import thread
 
 class Xmp(Fuse):
-    def __init__(self,io=None ):    
-        Fuse.__init__(self)
+    def __init__(self,io=None,*args,**kw ):
+        Fuse.__init__(self, *args, **kw)
         self.io=io
         
     def mythread(self):    
@@ -35,10 +35,10 @@ class Xmp(Fuse):
     flags = 1
     
     def getattr(self, path):
-        if path.endswith('/'):
-            return (16877, 1L, 0L, 3L, 0, 0, 8192L, 0, 0, 0)
-        else:
-            return (33188, 1, 0, 1L, 0L, 0L, 10*1024*1024*1024*1024L, 0L, 0L, 0L)
+        ## FIXME: There seems to be a 32 bit overflow in the size
+        ## parameter- is this a problem with fuse or the python
+        ## bindings?
+        return (33188, 1, 0, 1L, 0L, 0L, 1024*1024*1024L, 0L, 0L, 0L)
 
     def readlink(self, path):
         raise IOError("No symbolic links supported on forensic filesystem at %s" % path)
@@ -89,11 +89,7 @@ class Xmp(Fuse):
         return self.io.read(length)
     
     def write(self, path, buf, off):
-        ## We do not modify the data, but we need to pretend that we
-        ## are so callers dont panic - this is handy when mounting
-        ## ext3 filesystems over loopback, where the kernel really
-        ## wants to update the journal and would freak if it can't.
-        return len(buf)
+        raise IOError("Unable to write to forensic filesystem on %s" % path)
     
     def release(self, path, flags):
         return 0
