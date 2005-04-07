@@ -347,7 +347,7 @@ class DBFS(FileSystem):
 
 class File:
     """ This abstract base class documents the file like object used to read specific files in PyFlag.
-    Each subclass must impliment this interface
+    Each subclass must implement this interface
     """
     readptr = None
     size = None

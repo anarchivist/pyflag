@@ -59,7 +59,7 @@ class Xmp(Fuse):
     flags = 1
     
     def getattr(self, path):
-        if path=='/': return (0,0,0,0,0,0,0,0,0,0)
+        if path=='/': return (16877, 1L, 0L, 3L, 0, 0, 8192L, 0, 0, 0)
 
         result = self.fs.istat(path=path)
 
