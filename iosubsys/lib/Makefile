@@ -5,9 +5,18 @@ INCL = -I../misc/ -I../sgzip/ -I../libevf/ -I../hashtools/
 TARGET = ../../libs/
 BIN_DIR = ../../bin/
 CFLAGS=-g -Wall `getconf LFS_CFLAGS` $(INCL)
-LIBS = ../misc/except.o iosubsys.o ../sgzip/sgzlib.o libevf.o -lz ../hashtools/md5c.o remote_client.o
+MISCLIBS=../misc/except.o ../hashtools/md5c.o
+LIBS = $(MISCLIBS) iosubsys.o ../sgzip/sgzlib.o libevf.o -lz  remote_client.o
 
 all: open libio_hooker.so python_binding $(BIN_DIR)/evtool $(BIN_DIR)/iowrapper $(BIN_DIR)/remote_server
+
+win32:  evtool.exe remote_server.exe
+
+evtool.exe: libevf.o evtool.c
+	$(CC) $(CFLAGS) -DCYGWIN evtool.c -o $@ libevf.o $(MISCLIBS) $(STATIC_LIB_PATH)/libz.a
+
+remote_server.exe: remote_server.c
+	$(CC) $(CFLAGS) -o $@ remote_server.c  $(LIBS)
 
 libio_hooker.so: $(LIBS) hooker.c
 	$(CC) -fPIC -rdynamic $(CFLAGS) -c hooker.c

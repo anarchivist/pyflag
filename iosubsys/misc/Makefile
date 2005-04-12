@@ -15,6 +15,8 @@ defs:
 
 all:	$(LIB)
 
+win32:	$(LIBOBJ)
+
 manpages: 
 
 $(LIB):	$(LIBOBJ)

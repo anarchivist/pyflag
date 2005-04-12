@@ -3,6 +3,7 @@
 BIN_DIR	= ../../bin
 LIBS	= ../misc/aux_lib.a ../hashtools/md5c.o ../misc/except.o -lz
 INCL	= -I../misc -I../hashtools
+MISCLIBS=../misc/except.o ../hashtools/md5c.o
 
 KERNEL_DIR?=/usr/src/linux
 
@@ -31,6 +32,11 @@ endif
 KERNOBJ:=sgloop.o
 
 all: $(BIN_DIR)/sgzip
+
+win32: sgzip.exe
+
+sgzip.exe: sgzip.c sgzlib.c
+	$(CC) $(CFLAGS) -DCYGWIN $(INCL)  sgzip.c sgzlib.c -o $@ $(MISCLIBS) $(STATIC_LIB_PATH)/libz.a
 
 $(BIN_DIR)/sgzip: sgzip.o sgzlib.o
 	$(CC) -o $@  $(CFLAGS) $(LIB) $(LIBS) $(SYSLIBS) sgzip.o sgzlib.o

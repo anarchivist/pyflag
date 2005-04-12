@@ -544,7 +544,7 @@ unsigned long long int *sgzip_calculate_index_from_stream(int fd,
       
       //Seek length bytes from here for the next value
       if(read_from_stream(fd,datain,sizeof(*datain)*length)<length) {
-	RAISE(E_IOERROR,NULL,Read,"file");
+	RAISE(E_IOERROR,NULL,Read,"file1");
       };
       
       offset+=sgzip->header->blocksize;
@@ -573,6 +573,7 @@ unsigned long long int *sgzip_calculate_index_from_stream(int fd,
 void sgzip_decompress_fds(int fd,int outfd,struct sgzip_obj *sgzip) {
   int length=0;
   long int lengthout=0;
+  int read_len;
   int result;
   int zoffset=0;
   char *datain,*dataout,*buffer;
@@ -600,12 +601,12 @@ void sgzip_decompress_fds(int fd,int outfd,struct sgzip_obj *sgzip) {
     };
 
     zoffset+=length;
-
-    if(read_from_stream(fd,datain,sizeof(*datain)*length)<length) {
+    read_len=read_from_stream(fd,datain,sizeof(*datain)*length);
+    if(read_len<length) {
       free(datain);
       free(dataout);
 
-      RAISE(E_IOERROR,NULL,Read,"file");
+      RAISE(E_IOERROR,NULL,"Only read %u bytes from stream, wanted %u",read_len,length);
     };
     
     //Now uncompress this block:
