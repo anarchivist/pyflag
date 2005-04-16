@@ -7,6 +7,7 @@ BIN_DIR = ../../bin/
 CFLAGS=-g -Wall `getconf LFS_CFLAGS` $(INCL)
 MISCLIBS=../misc/except.o ../hashtools/md5c.o
 LIBS = $(MISCLIBS) iosubsys.o ../sgzip/sgzlib.o libevf.o -lz  remote_client.o
+STATIC_LIB_PATH = /usr/i586-mingw32msvc/lib/
 
 all: open libio_hooker.so python_binding $(BIN_DIR)/evtool $(BIN_DIR)/iowrapper $(BIN_DIR)/remote_server
 
@@ -16,7 +17,7 @@ evtool.exe: libevf.o evtool.c
 	$(CC) $(CFLAGS) -DCYGWIN evtool.c -o $@ libevf.o $(MISCLIBS) $(STATIC_LIB_PATH)/libz.a
 
 remote_server.exe: remote_server.c
-	$(CC) $(CFLAGS) -o $@ remote_server.c  $(LIBS)
+	$(CC) $(CFLAGS) -DCYGWIN -o $@ remote_server.c  $(MISCLIBS)
 
 libio_hooker.so: $(LIBS) hooker.c
 	$(CC) -fPIC -rdynamic $(CFLAGS) -c hooker.c

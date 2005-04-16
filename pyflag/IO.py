@@ -117,7 +117,6 @@ class IO:
                 options=tuple([query.getarray(i) for i in self.parameters])
                                
             self.options = options
-            
             try:
                 self.io=IO.cache[self.options]
             except KeyError:
@@ -199,7 +198,7 @@ class standard(IO):
 
 class raid(IO):
     """ Subsystem used to access raid devices """
-    parameters=('subsys','file','blocksize','slots','map')
+    parameters=('subsys','io_filename','io_blocksize','io_slots','io_map','io_offset')
 
     def form(self,query,result):
         tmp = result.__class__(result)
@@ -230,6 +229,19 @@ class advanced(IO):
         
         tmp.row("Enter partition offset in file:",tmp2)
         result.textfield(tmp,'io_offset')
+
+class remote(IO):
+    parameters=('subsys','io_host','io_user','io_server_path','io_device')
+
+    def form(self,query,result):
+        if not query.has_key('io_offset'):
+            query['io_offset']='0'
+
+        result.textfield("Host",'io_host');
+        result.textfield("User to logon as:",'io_user')
+        result.textfield("Full servlet path:",'io_server_path')
+        result.textfield("Remote device:",'io_device')
+        
 
 class ewf(IO):
     parameters=('subsys','io_filename','io_offset')
@@ -292,6 +304,8 @@ subsystems=FlagFramework.query_type([
             ('ewf',ewf),
             ('standard',standard),
             ('mounted',mounted),
+            ## This is currently broken
+#            ('remote',remote),
             ('raid',raid),
             ])
 
@@ -309,3 +323,4 @@ def open(case, iosource):
     opts = marshal.loads(optstr)
     io=subsystems[opts[0][0]]
     return io(options=opts)
+ 

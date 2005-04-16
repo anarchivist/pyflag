@@ -38,7 +38,7 @@ class Xmp(Fuse):
         if path.endswith('/'):
             return (16877, 1L, 0L, 3L, 0, 0, 8192L, 0, 0, 0)
         else:
-            return (33188, 1, 0, 1L, 0L, 0L, 100*1024*1024*1024L, 0L, 0L, 0L)
+            return (33188, 1, 0, 1L, 0L, 0L, 10*1024*1024*1024*1024L, 0L, 0L, 0L)
 
     def readlink(self, path):
         raise IOError("No symbolic links supported on forensic filesystem at %s" % path)

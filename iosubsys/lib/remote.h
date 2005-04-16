@@ -32,7 +32,13 @@
 #include <signal.h>
 #include "except.h"
 #include <sys/types.h>
+
+#ifdef CYGWIN
+#include <winsock.h>
+#else
 #include <sys/socket.h>
+#endif
+
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
