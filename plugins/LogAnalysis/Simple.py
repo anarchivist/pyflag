@@ -151,7 +151,7 @@ class SimpleLog(LogFile.Log):
         try:
             self.delimiter=query['delimiter']
         except KeyError:
-            self.delimiter=' '
+            self.delimiter=delimiters.values()[0]
             query['delimiter']=self.delimiter
     
     def prefilter_record(self,string):
@@ -176,9 +176,11 @@ class SimpleLog(LogFile.Log):
         """ This draws the form required to fulfill all the parameters for this report
         """
         result.start_table(hstretch=False)
-        result.const_selector("Simple Field Separator:",'delimiter',delimiters.values(), delimiters.keys())
         if not query.has_key('delimiter'):
-            query['delimiter'] = ' '
+            query['delimiter'] = delimiters.values()[0]
+            
+        result.const_selector("Simple Field Separator:",'delimiter',delimiters.values(), delimiters.keys())
+
 
         result.end_table()
         result.start_table()
@@ -191,7 +193,7 @@ class SimpleLog(LogFile.Log):
             if count>3:
                 break
             
-        result.row('\n'.join(sample),bgcolor='lightgray')
+        [result.row(s,bgcolor='lightgray') for s in sample]
         result.end_table()
 
         result.start_table()
@@ -208,7 +210,7 @@ class SimpleLog(LogFile.Log):
         ## Show the filtered sample:
         result.row("Prefiltered data:",align="left")
         sample=[ self.prefilter_record(record) for record in sample ]
-        result.row('\n'.join(sample),bgcolor='lightgray')
+        [result.row(s,bgcolor='lightgray') for s in sample]
         result.end_table()
         
         self.draw_type_selector(result)
