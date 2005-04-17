@@ -1,5 +1,5 @@
 Package: pyflag
-Version: 0.0.20050225
+Version: 0.76.200504
 Section: utils
 Priority: optional
 Maintainer: Michael Cohen and David Collett <pyflag-support@lists.sourceforge.net>
