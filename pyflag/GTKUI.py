@@ -9,7 +9,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: $
+#  Version: FLAG $Version: 0.76 Date: Sun Apr 17 21:48:37 EST 2005$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or

@@ -1476,10 +1476,10 @@ CREATE TABLE `dictionary` (
 );
 
 CREATE TABLE `regexps` (
-	`description` VARCHAR( 50 ) NOT NULL ,
-	`regexp` VARCHAR( 50 ) NOT NULL ,
+	`pattern` VARCHAR( 50 ) NOT NULL ,
+	`class` VARCHAR( 50 ) NOT NULL ,
 	`encoding` SET( 'all', 'asci', 'ucs16' ) NOT NULL,
-	PRIMARY KEY  (`regexp`)
+	PRIMARY KEY  (`pattern`)
 );
 
 -- 

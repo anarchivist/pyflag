@@ -9,7 +9,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.75 Date: Sat Feb 12 14:00:04 EST 2005$
+#  Version: FLAG $Version: 0.76 Date: Sun Apr 17 21:48:37 EST 2005$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -368,8 +368,8 @@ class LoadFS(Reports.report):
             try:
                 tmp  = Registry.SCANNERS.dispatch(i)
                 scanners.append(tmp(dbh,query['iosource'],fsfd))
-            except Exception:
-                logging.log(logging.ERRORS,"Unable to initialise scanner %s")
+            except Exception,e:
+                logging.log(logging.ERRORS,"Unable to initialise scanner %s (%s)" % (i,e))
 
         logging.log(logging.DEBUG,"Will invoke the following scanners: %s" % scanners)
         fsfd.scanfs(scanners)
