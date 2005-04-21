@@ -29,6 +29,7 @@ deb-pkg:	pkg-bin-distro
 
 	#Fix all the permissions
 	for exec in $(EXECUTABLE_SCRIPTS); do chmod 755 $(BASE_DIR)/flag_deb/debian/usr/share/pyflag/$$exec; done
+	for exec in $(PACKAGE_SCRIPTS); do chmod 755 $(BASE_DIR)/flag_deb/debian/$$exec; done
 
 	#Build .deb package
 	fakeroot dpkg-deb --build flag_deb/debian
