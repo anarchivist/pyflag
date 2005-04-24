@@ -160,7 +160,7 @@ class Log:
             if self.indexes[field_number] and index:
                 ## interpolate the column name into the index declaration
                 index = index % self.fields[field_number]
-                dbh.execute("Alter table %s add index(%s)" % (tablename,index))
+                dbh.execute("Alter table %s add index(`%s`)" % (tablename,index))
                 yield "Created index on %s " % index
                 
         ## Add the IP addresses to the whois table if required:
@@ -208,7 +208,7 @@ class Log:
         result.start_table()
         result.ruler()
         tmp = result.__class__(result)
-        tmp.heading("Step 4:")
+        tmp.heading("Step:")
         result.row(tmp,"Assign field names and Types to each field")
         result.ruler()
         result.end_table()

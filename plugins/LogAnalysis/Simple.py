@@ -199,9 +199,8 @@ class SimpleLog(LogFile.Log):
         result.start_table()
         result.ruler()
         tmp = result.__class__(result)
-        tmp.text("Step 3:",font='bold')
-        tmp.text("  Select pre-filter(s) to use on the data")
-        result.row(tmp)
+        tmp.heading("Step:")
+        result.row(tmp,  " Select pre-filter(s) to use on the data")
         result.ruler()
         
         pre_selector(result)
