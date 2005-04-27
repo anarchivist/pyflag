@@ -75,7 +75,8 @@ case "$1" in
 	invoke start
 	
 	#If it doesn't exist, create the pyflag database
-	if !(mysql --user=root --socket=/var/run/pyflagd/pyflag.sock --host=localhost --exec='SHOW TABLES;' pyflag > /dev/null); then
+	tables_present=`mysql --user=root --socket=/var/run/pyflagd/pyflag.sock --host=localhost --exec='SHOW TABLES;' pyflag | wc -l`
+	if [ $tables_present == 0 ] ; then
 		mysql --user=root --socket=/var/run/pyflagd/pyflag.sock --host=localhost --exec='source /usr/share/pyflag/db.setup;' pyflag
 	fi
     ;;
