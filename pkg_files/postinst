@@ -18,8 +18,6 @@
 
 export PATH=$PATH:/sbin:/usr/sbin:/bin:/usr/bin
 
-#This was causing the postinstall to hang so I commented it out.
-#. /usr/share/debconf/confmodule
 test $DEBIAN_SCRIPT_DEBUG && set -v -x
 
 # This command can be used as pipe to syslog. With "-s" it also logs to stderr.
@@ -42,12 +40,6 @@ set +e; invoke stop; set -e
 case "$1" in
     configure)
     
-    # Create the default database, assume no root password has been set
-	#echo 'create database pyflag;' | mysql -u root
-	
-	#echo 'grant all on *.* to pyflag@localhost identified by "pyflag";'  | mysql -u root
-	#cat /usr/share/pyflag/db.setup | mysql -u root -pmysql -h localhost pyflag
-
     pyflag_datadir=/usr/share/pyflag
     pyflag_statedir=/var/lib/pyflag
     pyflag_rundir=/var/run/pyflagd
@@ -55,7 +47,7 @@ case "$1" in
     pyflag_cfgdir=/etc/pyflag
     pyflag_newlogdir=/var/log/pyflag
     
-    # ensure the existence and right permissionsa for the database and
+    # ensure the existence and right permissions for the database and
     # log files
     if test ! -d $pyflag_statedir;	then mkdir $pyflag_statedir; fi
     if test ! -d $pyflag_statedir/pyflag;	then mkdir $pyflag_statedir/pyflag; fi
@@ -82,8 +74,10 @@ case "$1" in
 	echo "Starting pyflagd"
 	invoke start
 	
-	#Create the pyflag databases
-	mysql --user=root --socket=/var/run/pyflagd/pyflag.sock --host=localhost --exec='source /usr/share/pyflag/db.setup;' pyflag
+	#If it doesn't exist, create the pyflag database
+	if !(mysql --user=root --socket=/var/run/pyflagd/pyflag.sock --host=localhost --exec='SHOW TABLES;' pyflag > /dev/null); then
+		mysql --user=root --socket=/var/run/pyflagd/pyflag.sock --host=localhost --exec='source /usr/share/pyflag/db.setup;' pyflag
+	fi
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
