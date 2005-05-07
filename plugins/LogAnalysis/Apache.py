@@ -25,6 +25,15 @@ import plugins.LogAnalysis.Simple as Simple
 import pyflag.DB as DB
 import re
 
+def trans_date(time):
+    """ convert time from apache ([01/Oct/2001:04:09:20 -0400]) to mysql (2001/10/01:04:09:20) """
+    m = date_regex.match(time)
+    if not m:
+        return '0'
+    else:
+        f = m.groups()
+        return "%s/%s/%s/:%s:%s:%s" % (f[2],months[f[1]],f[0],f[3],f[4],f[5])
+
 # here are some standard apache formats taken from a debian httpd.conf
 # add new ones here...
 formats = { 'debian_full':"%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\" \"%{forensic-id}n\" %T %v",
@@ -56,7 +65,7 @@ field_codes={ 'a':['remote_ip', 'IP Address'],
               'q':['query_string', 'varchar(250)'],
               'r':['request', 'varchar(250)'],
               's':['status', 'int'],
-              't':['time', 'datetime', trans_date], # {strftime format} (optional)
+              't':['time', 'datetime', trans_date ], # {strftime format} (optional)
               'T':['serve_time', 'int'],
               'u':['ruser', 'varchar(250)'],
               'U':['url', 'varchar(250)'],
@@ -83,15 +92,6 @@ months = { 'Jan':1, 'Feb':2, 'Mar':3, 'Apr':4,
 
 # a regex to match standard apache time format
 date_regex = re.compile('\[(\d\d)/(\w+)/(\d\d\d\d):(\d\d):(\d\d):(\d\d)\s([+-]\w+)\]')
-
-def trans_date(time):
-    """ convert time from apache ([01/Oct/2001:04:09:20 -0400]) to mysql (2001/10/01:04:09:20) """
-    m = date_regex.match(time)
-    if not m:
-        return '0'
-    else:
-        f = m.groups()
-        return "%s/%s/%s/:%s:%s:%s" % (f[2],months[f[1]],f[0],f[3],f[4],f[5])
 
 class ApacheLog(LogFile.Log):
     """ Log parser for apache log files """

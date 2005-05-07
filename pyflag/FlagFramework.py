@@ -35,9 +35,7 @@ flag_version=flag_version.replace('$','')
 import sys,os
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import magic
 import pyflag.logging as logging
-import index
 import pyflag.Registry as Registry
 
 class DontDraw(Exception):
@@ -585,34 +583,40 @@ class HexDump:
 
             ui.text(finish=1)
 
-class Magic:
-    """ Singleton class to manage magic library access """
-    ## May need to do locking in future, if libmagic is not reentrant.
-    magic = None
-    mimemagic = None
-    
-    def __init__(self,mode=None):
-        if not Magic.magic:
-            Magic.magic=magic.magic_open(magic.MAGIC_NONE)
-            if magic.magic_load(Magic.magic,config.MAGICFILE) < 0:
-                raise IOError("Could not open magic file %s" % config.MAGICFILE)
-            
-        if not Magic.mimemagic:
-            Magic.mimemagic=magic.magic_open(magic.MAGIC_MIME)
-            if magic.magic_load(Magic.mimemagic,config.MAGICFILE) < 0:
-                raise IOError("Could not open magic file %s" % config.MAGICFILE)
-        self.mode=mode
+try:
+    import magic
 
-    def buffer(self,buf):
-        """ Return the string representation of the buffer """
-        if self.mode:
-            result=magic.magic_buffer(Magic.mimemagic,buf)
-        else:
-            result=magic.magic_buffer(Magic.magic,buf)
+    class Magic:
+        """ Singleton class to manage magic library access """
+        ## May need to do locking in future, if libmagic is not reentrant.
+        magic = None
+        mimemagic = None
 
-        if not result:
-            return "text/plain"
-        else: return result
+        def __init__(self,mode=None):
+            if not Magic.magic:
+                Magic.magic=magic.magic_open(magic.MAGIC_NONE)
+                if magic.magic_load(Magic.magic,config.MAGICFILE) < 0:
+                    raise IOError("Could not open magic file %s" % config.MAGICFILE)
+
+            if not Magic.mimemagic:
+                Magic.mimemagic=magic.magic_open(magic.MAGIC_MIME)
+                if magic.magic_load(Magic.mimemagic,config.MAGICFILE) < 0:
+                    raise IOError("Could not open magic file %s" % config.MAGICFILE)
+            self.mode=mode
+
+        def buffer(self,buf):
+            """ Return the string representation of the buffer """
+            if self.mode:
+                result=magic.magic_buffer(Magic.mimemagic,buf)
+            else:
+                result=magic.magic_buffer(Magic.magic,buf)
+
+            if not result:
+                return "text/plain"
+            else: return result
+
+except ImportError:
+    pass
 
 class Curry:
     """ This class makes a curried object available for simple inlined functions.

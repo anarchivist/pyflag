@@ -67,6 +67,9 @@ class TypeChecker:
         if not string.isdigit():
             raise ReportInvalidParamter,"Not numeric input"
 
+    def any(self,field,query):
+        """ A Generic type which will OK everything """
+
     def alphanum(self,field,query):
         """ Tests input for alphanumeric chars """
         string = query[field]

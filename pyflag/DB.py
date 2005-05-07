@@ -184,6 +184,12 @@ class DBO:
     def __iter__(self):
         return self
 
+    def autoincrement(self):
+        """ Returns the value of the last autoincremented key """
+        self.execute("select LAST_INSERT_ID() as result")
+        row=self.fetch()
+        return row['result']
+
     def next(self):
         """ The db object supports an iterator so that callers can simply iterate over the result set.
 
