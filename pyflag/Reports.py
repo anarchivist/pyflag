@@ -30,6 +30,9 @@
 
 import pyflag.DB as DB
 import pyflag.Registry as Registry
+import pyflag.conf
+config=pyflag.conf.ConfObject()
+import pyflag.logging as logging
 
 class ReportError(Exception):
     """ Base class for errors in reports """
@@ -66,7 +69,30 @@ class report:
     flag = None
     hidden = False
     order = 10
-    
+
+    def authenticate(self, query, result):
+        """ This method is called first by FlagFramework to evaluate authentication and determine if the user is allowed to execute this report."""
+        ## By default everyone is authorised
+        try:
+            ## If it exists config.AUTHORISE consists of a line looking like:
+            ## authorise = mic:password,joe:letmein
+            tokens = config.AUTHORISE.split(",")
+            for token in tokens:
+                try:
+                    username, password = token.split(':')
+                    if username.lstrip().rstrip()==query.user and password.lstrip().rstrip()==query.passwd:
+                        logging.log(logging.DEBUG,"Accepted Authentication from %s" % query.user)
+                        return True
+                except ValueError:
+                    logging.log(logging.WARNINGS,"Parse error in Authentication Token %r - ignoring this token " % token)
+        except AttributeError,e:
+            ## If config.AUTHORISE does not exist, we dont require authentication
+            return True
+
+        result.heading("Authentication denied")
+        result.para("This report requires authentication by system administrator. Edit ~/.pyflagrc to add more usernames and passwords")
+        return False
+
     def is_executing(self,canonical_query):
         """ Checks to see if a report is executing curently by looking at the lock data structure. If the report is currently executing, we return a tuple, containing the thread name and the task dict. """
         try:

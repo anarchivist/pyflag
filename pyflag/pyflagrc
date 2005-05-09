@@ -76,3 +76,7 @@ theme = BlueTheme
 
 [misc]
 LOG_LEVEL = 10
+
+# If you require HTTP authentication add more tokens to this comma
+# seperated list of username:passwords - Or override in ~/.pyflagrc
+# authorise = mic:password, joe:letmein

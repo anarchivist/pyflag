@@ -43,7 +43,12 @@ class DontDraw(Exception):
 
     This is mainly used by the form method to allow a UI to manage its own window
     """
-
+    
+class AuthError(Exception):
+    """ Exception raised when Authentication fails """
+    def __init__(self,result):
+        self.result=result
+        
 def get_traceback(e,result):
     import sys
     import traceback
@@ -71,8 +76,13 @@ class query_type:
 
     since if the paramter is not deleted first, it will simply be appended to produce a report array.
     """
-    def __init__(self,query_list=None,**params):
+    def __init__(self,query_list=None,user=None,passwd=None,**params):
         """ Constructor initialises from a CGI list of (key,value) pairs or named keywords. These may repeat as needed """
+
+        # Authentication Stuff
+        self.user = user
+        self.passwd = passwd
+        
         self.q=[]
         if isinstance(query_list,list):
             self.q = query_list
@@ -374,7 +384,7 @@ class Flag:
 
         def show_help(query,result):
             result.heading("Help for %s" % report.name)
-            result.text(report.description,wrap='full')
+            result.text(report.__doc__)
             result.decoration='naked'
 
         #Since flag must always operate on a case, if there is no case, we use the default flagdb as a case
@@ -385,6 +395,10 @@ class Flag:
 
         import pyflag.TypeCheck as TypeCheck
 
+        # First check authentication, do this always
+        if not report.authenticate(query, result):
+            raise AuthError(result)
+                
         #Check to see if the query string has enough parameters in it:
         try:
             if report.check_parameters(query):

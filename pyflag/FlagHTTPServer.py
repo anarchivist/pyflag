@@ -33,7 +33,6 @@ import SimpleHTTPServer
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
 import pyflag.HTMLUI as UI
-import pyflag.TypeCheck as TypeCheck
 import cgi
 import re,time,sys
 import pyflag.conf
@@ -45,16 +44,28 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
     Dispatches the relevant reports depending on HTTP requests """
     
-    server_version = "Flag Server, "+FlagFramework.flag_version
+    server_version = "PyFlag Server, "+FlagFramework.flag_version.replace(":",'-')
     def do_GET(self):
         i = self.path.rfind('?')
         result = flag.ui()
         result.generator=UI.HTTPObject()
-        
+
+        # check for authentication and pull out auth fields to add to
+        # query type
+        user = passwd = None
+        try:
+            import base64
+            authtype, authtoken = self.headers['Authorization'].split()
+            user, passwd = base64.decodestring(authtoken).split(':')
+        except KeyError:
+            # if authentication is required, the reports will
+            # throw an exception later, dont worry about it here.
+            pass
+
         if i >= 0:
-            base, query = self.path[:i], FlagFramework.query_type(cgi.parse_qsl(self.path[i+1:]))
+            base, query = self.path[:i], FlagFramework.query_type(cgi.parse_qsl(self.path[i+1:]), user=user, passwd=passwd)
         else:
-            base,query = (self.path , FlagFramework.query_type([]))
+            base, query = (self.path , FlagFramework.query_type([], user=user, passwd=passwd ))
 
         ct=''
         if base.endswith(".js"):
@@ -125,7 +136,18 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                       result = theme.menu(flag,query)
                       result.defaults=query
                   else:
-                      result = flag.process_request(query)
+                      try:
+                          result = flag.process_request(query)
+                      except FlagFramework.AuthError, e:
+                          # deal with authentication issues here
+                          self.send_response(401)
+                          self.send_header("WWW-Authenticate", "Basic realm=%r" % self.server_version)
+                          self.end_headers()
+                          try:
+                              self.wfile.write(e.result.display())
+                          except (IndexError, AttributeError):
+                              self.wfile.write("<html><body>Authentication Required for this page</body></html>")
+                          return
               except Exception,e:
                   result = flag.ui()
                   result.defaults = query
