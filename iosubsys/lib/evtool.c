@@ -480,6 +480,12 @@ int main(int argc, char **argv) {
       if(lseek(offsets.files[i],section->next,SEEK_SET)<0) {
 	RAISE(E_IOERROR,NULL,"Could not seek");
       };
+
+      //If we hit a next section, we need to move to the next disk
+      if(!strcmp(section->type,"next")) {
+	break;
+      };
+
       free(section);
     };
   };

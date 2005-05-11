@@ -556,6 +556,11 @@ int ewf_open(IO_INFO *self) {
       
       //This will update offsets.fds and offsets.offset
       process_section(section,i,&(io->offsets));
+
+      //If we hit a next section, we need to move to the next disk
+      if(!strcmp(section->type,"next")) {
+	break;
+      };
       
       //Go to the next section
       if(lseek(io->offsets.files[i],section->next,SEEK_SET)<0) {
