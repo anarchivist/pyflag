@@ -45,11 +45,11 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     Dispatches the relevant reports depending on HTTP requests """
     
     server_version = "PyFlag Server, "+FlagFramework.flag_version.replace(":",'-')
-    def do_GET(self):
-        i = self.path.rfind('?')
-        result = flag.ui()
-        result.generator=UI.HTTPObject()
+    def parse_query(self):
+        """ Parses the query and prepares a query object.
 
+        Returns query object prepared from the request
+        """
         # check for authentication and pull out auth fields to add to
         # query type
         user = passwd = None
@@ -62,27 +62,76 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             # throw an exception later, dont worry about it here.
             pass
 
-        if i >= 0:
-            base, query = self.path[:i], FlagFramework.query_type(cgi.parse_qsl(self.path[i+1:]), user=user, passwd=passwd)
+        ## Use the cgi module to parse out the request. This allows us
+        ## to use POST, upload files etc:
+        i = self.path.rfind('?')
+        if i>=0:
+            rest, query = self.path[:i], self.path[i+1:]
         else:
-            base, query = (self.path , FlagFramework.query_type([], user=user, passwd=passwd ))
+            rest,query = self.path,''
+            
+        env = {}
+        env['GATEWAY_INTERFACE'] = 'CGI/1.1'
+        env['SERVER_PROTOCOL'] = self.protocol_version
+        env['REQUEST_METHOD'] = self.command
+        if self.headers.typeheader is None:
+            env['CONTENT_TYPE'] = self.headers.type
+        else:
+            env['CONTENT_TYPE'] = self.headers.typeheader
+            
+        length = self.headers.getheader('content-length')
+        if length:
+            env['CONTENT_LENGTH'] = length
+            
+        if query:
+            env['QUERY_STRING'] = query
 
+        form = cgi.FieldStorage(fp=self.rfile,headers = None, environ=env)
+        query=FlagFramework.query_type(base=rest,user=user, passwd=passwd)
+        
+        for key in form.keys():
+            try:
+                query[key]=form[key].value
+            except AttributeError:
+                for value in form[key]:
+                    query[key]=value.value
+
+        self.query=query
+        return query
+##            self.wfile.write("%s = %s <br>\n" % (key,form[key]))
+
+##        if i >= 0:
+##            base, query = self.path[:i], FlagFramework.query_type(cgi.parse_qsl(self.path[i+1:]), user=user, passwd=passwd)
+##        else:
+##            base, query = (self.path , FlagFramework.query_type([], user=user, passwd=passwd ))
+
+    def do_POST(self):
+        self.do_GET()
+    
+    def do_GET(self):
+        result = flag.ui()
+        result.generator=UI.HTTPObject()
+
+        ## Calculate the query from the request.
+        query=self.parse_query()
+
+        ## Work out if the request was for a static object
         ct=''
-        if base.endswith(".js"):
+        if query.base.endswith(".js"):
             ct="text/javascript"
             
         #Is this a request for an image?
-        if re.search("\.(png|jpg|gif)$",base):
+        if re.search("\.(png|jpg|gif)$",query.base):
             ct="image/jpeg"
             
         if ct:
-            i=base.rfind('/')
+            i=query.base.rfind('/')
             try:
                 import sys
                 self.send_response(200)
                 self.send_header("Content-type",ct)
                 self.end_headers()
-                fd = open(config.IMAGEDIR + base[i+1:])
+                fd = open(config.IMAGEDIR + query.base[i+1:])
                 f = fd.read()
                 self.wfile.write(f)
                 fd.close()
@@ -143,6 +192,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                           self.send_response(401)
                           self.send_header("WWW-Authenticate", "Basic realm=%r" % self.server_version)
                           self.end_headers()
+                          # if e is a UI, it is what the report wanted us to display as an error page
                           try:
                               self.wfile.write(e.result.display())
                           except (IndexError, AttributeError):

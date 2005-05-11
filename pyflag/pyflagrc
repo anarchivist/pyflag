@@ -56,6 +56,8 @@ ploticus_prefabs=%(flag_bin)s/prefabs/
 [GUI]
 #Period we wait before refreshing the display when waiting for analysis to complete
 Refresh = 3
+# This forces the HTTP GUI to use GET or POST
+Method = POST
 
 HILIGHT = pink
 SELECTED = #FFCC99

@@ -76,12 +76,18 @@ class query_type:
 
     since if the paramter is not deleted first, it will simply be appended to produce a report array.
     """
-    def __init__(self,query_list=None,user=None,passwd=None,**params):
-        """ Constructor initialises from a CGI list of (key,value) pairs or named keywords. These may repeat as needed """
+    def __init__(self,query_list=(),user=None,passwd=None,base='',**params):
+        """ Constructor initialises from a CGI list of (key,value) pairs or named keywords. These may repeat as needed.
 
+        @arg query_list: A list of lists as obtained from cgi.parse_qsl. This way of initialising query_type is obsolete - do not use.
+        @arg user: The username or None if unauthenticated.
+        @arg passwd: The password used or None if unauthenticated.
+        @arg base: The base of the query. This is the part of the URL before the ?.
+        """
         # Authentication Stuff
         self.user = user
         self.passwd = passwd
+        self.base= base
         
         self.q=[]
         if isinstance(query_list,list):
@@ -113,7 +119,7 @@ class query_type:
         for i in self.q:
             result.append("%s=%s" %(urlencode(i[0]),urlencode(i[1])))
 
-        return 'f?'+'&'.join(result)+mark
+        return '%s?' % self.base +'&'.join(result)+mark
 
     def __delitem__(self,item):
         """ Removes all instance of item from the CGI object """

@@ -318,6 +318,26 @@ class HTMLUI(UI.GenericUI):
         else:
             self.result+="<a href='blah?%s' %s>%s</a>" % (q,self.opt_to_str(options),string)
 
+    def toolbar_popup(self,callback, label,icon=None,toolbar=0, menubar=0, tooltip=None, **options):
+        """ This method presents a button on the screen, which when
+        clicked will open a new window and use the callback to render
+        in it.
+
+        The new UI will be based on the current UI.
+        @arg callback: A callback function to render into the new UI
+        """
+        if not tooltip: tooltip = label
+        cb = self.store_callback(callback)
+
+        self.result+="""<script language=javascript>  var client; function open_%s_window() {  client=window.open('%s&callback_stored=%s','client','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=600,scrollbars=yes');  }; </script><abbr title=%r>""" % (cb,self.defaults,cb,toolbar,menubar,tooltip)
+
+        if icon:
+            self.result+="""<a  onclick=\"open_%s_window()\"><img alt=%s border=0 src=images/%s></a>""" % (cb,label,icon)
+        else:
+            self.result+="""<input type=button value=%r onclick=\"open_%s_window()\"> """ % (label,cb)
+
+        self.result+="</abbr>"
+
     def popup(self,callback, label,icon=None,toolbar=0, menubar=0, tooltip=None, **options):
         """ This method presents a button on the screen, which when clicked will open a new window and use the callback to render in it.
 
@@ -326,7 +346,33 @@ class HTMLUI(UI.GenericUI):
         """
         if not tooltip: tooltip = label
         cb = self.store_callback(callback)
-        self.result+="""<script language=javascript>  var client; function open_%s_window() {  client=window.open('%s&callback_stored=%s','client','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=600,scrollbars=yes'); client.moveto(0,0);  }; </script><abbr title=%r>""" % (cb,self.defaults,cb,toolbar,menubar,tooltip)
+        ## Here we have a snippet of javascript which reads the values
+        ## of all form parameters which have been filled already -
+        ## this allows the subwindow to return back to this page with
+        ## form members filled, even without submitting. Note that we
+        ## need to remove the submit parameter itself in order to
+        ## allow the engine to differentiate between a refresh to this
+        ## page with pre-filled parameters and a form which was
+        ## submitted by the user.
+        self.result+="""<script language=javascript>
+        var client;
+        function open_%s_window() {
+           var query='';
+           //Here we read the forms contents, so we can let the popup window know the values of currently filled in fields (Before submitting).
+           for(var i=0; i<document.pyflag_form.elements.length; i++) {
+              //Checkboxes should only be added if they are checked
+              if(document.pyflag_form.elements[i].type=='checkbox' && !document.pyflag_form.elements[i].checked) {
+                continue;
+              };
+              //We must leave the submit button off, so that when the popup window refreshes to its parent we know it wasnt actually submitted.
+              if(document.pyflag_form.elements[i].type!='submit' ) {
+                 query+=document.pyflag_form.elements[i].name+'='+escape(document.pyflag_form.elements[i].value)+'&';
+              };
+           };
+           client=window.open('%s&'+query+'&callback_stored=%s','client','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=600,scrollbars=yes');
+        }; </script><abbr title=%r>
+        """ % (cb,self.defaults,cb,toolbar,menubar,tooltip)
+        
         if icon:
             self.result+="""<a  onclick=\"open_%s_window()\"><img alt=%s border=0 src=images/%s></a>""" % (cb,label,icon)
         else:
@@ -375,6 +421,7 @@ class HTMLUI(UI.GenericUI):
             else:
                 tmp +="<option value='%s'>%s</option>\n" % (k,v)
 
+        tmp+="</select>\n"
         #Remove this from the form_parms
         if self.form_parms.has_key(name):
             del self.form_parms[name]
@@ -556,7 +603,8 @@ class HTMLUI(UI.GenericUI):
     def toolbar(self,cb=None,text=None,icon=None,popup=True,tooltip=None,link=None):
         """ Create a toolbar button.
 
-        When the user clicks on the toolbar button, a popup window is created which the callback function then uses to render on.
+        When the user clicks on the toolbar button, a popup window is
+        created which the callback function then uses to render on.
         """
         if self.toolbar_ui==None:
             self.toolbar_ui=self.__class__(self)
@@ -564,7 +612,7 @@ class HTMLUI(UI.GenericUI):
         if link:
             self.toolbar_ui.link(text,target=link,icon=icon,tooltip=tooltip)
         else:
-            self.toolbar_ui.popup(cb,text,icon,tooltip=tooltip)
+            self.toolbar_ui.toolbar_popup(cb,text,icon,tooltip=tooltip)
                 
     def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):
         """ Shows the results of an SQL query in a searchable/groupable/browsable table
@@ -1145,13 +1193,13 @@ class HTMLUI(UI.GenericUI):
         for k,v in hiddens.items():
             self.form_parms[k]=v
 
-        self.result += "<form method=get action='/f'>\n"
+        self.result += "<form name=pyflag_form method=%s action='/f'>\n" % config.METHOD
 
-    def end_form(self,value='Submit',**opts):
+    def end_form(self,value='Submit',name='submit',**opts):
         for k,v in self.form_parms:
             self.result += "<input type=hidden name='%s' value='%s'>\n" % (k,v)
         
-        self.result += "<input type=submit value='%s' %s></form>\n" % (value,self.opt_to_str(opts))
+        self.result += "<input type=submit name=%s value='%s' %s></form>\n" % (name,value,self.opt_to_str(opts))
 
     def join(self,ui):
         """ Joins the supplied ui object with this object """
@@ -1319,3 +1367,9 @@ class HTMLUI(UI.GenericUI):
         cbfunc(query,result)
         out+="<tr><td colspan=50><table border=1 width=100%%><tr><td>%s</td></tr></table></td></tr></table>" % result
         self.result+=out
+
+    def upload(description,name,**options):
+        """ Implements a file upload mechanism.
+
+        The user is able to upload a file using this UI
+        """
