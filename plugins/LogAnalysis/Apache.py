@@ -93,6 +93,14 @@ months = { 'Jan':1, 'Feb':2, 'Mar':3, 'Apr':4,
 # a regex to match standard apache time format
 date_regex = re.compile('\[(\d\d)/(\w+)/(\d\d\d\d):(\d\d):(\d\d):(\d\d)\s([+-]\w+)\]')
 
+def legend(query, result):
+    """ Draw apache log file legend onto the given UI """
+    result.heading("Apache log file format characters")
+    result.start_table()
+    for key in field_codes.keys():
+        result.row(key, field_codes[key][0])
+    result.end_table()
+
 class ApacheLog(LogFile.Log):
     """ Log parser for apache log files """
     name = "Apache Log"
@@ -104,16 +112,40 @@ class ApacheLog(LogFile.Log):
         self.trans = []
         self.indexes = []
         self.fields = []
+        self.format = ''
+        self.split_req = ''
+        
         if not query.has_key('format'):
             query['format'] = formats[formats.keys()[0]]
-        self.format = query['format']
+        try:
+            self.format = query['format']
+            self.split_req = query['split_req']
+        except KeyError:
+            pass
+
         self.parse_format()
 
+        # should any fields be ignored?
+        for n in range(len(self.fields)):
+            try:
+                if query['ignore%s' % n] == 'true':
+                    self.fields[n] = 'ignore'
+                    self.indexes[n] = False
+            except KeyError:
+                pass
+            
     def parse_format(self):
         """ Do this:
         find '%', consume modifier, check/consume field code,
         find/consume delimiter(extra stuff), repeat
         """
+
+        # fixup string to split request into method/request/version
+        if self.split_req == 'true':
+            newformat = re.sub("%r", "%m %r %H", self.format)
+            if newformat and len(newformat) > len(self.format):
+                self.format = newformat
+                
         done = 0
         while 1:
             idx = self.format.find('%', done)
@@ -168,6 +200,9 @@ class ApacheLog(LogFile.Log):
             arr = []
             for sep in self.separators:
                 idx2 = row.find(sep, idx)
+                # the last sep will be ''
+                if idx2 == idx:
+                    idx2 = len(row)
                 f = row[idx:idx2]
                 idx = idx2 + len(sep)
                 arr.append(f)
@@ -181,7 +216,6 @@ class ApacheLog(LogFile.Log):
         """
 
         # show a preview, may help user choose format
-        result.start_table()
         result.row("Unprocessed text from file")
         sample = []
         count =0
@@ -191,12 +225,17 @@ class ApacheLog(LogFile.Log):
             if count>3:
                 break
             
-        [result.row(s,bgcolor='lightgray') for s in sample]
-        result.end_table()
-
+        [result.row(s,bgcolor='lightgray',colspan=50) for s in sample]
         result.ruler()
-
         # select an existing format string
         result.const_selector("Choose Format String", 'format', formats.values(), formats.keys())
-
+        #result.popup(legend, "Display format string legend")
+        #legend(None, result)
         result.row("Current Selection:",self.format)
+        result.ruler()
+        result.row("Select Filters:")
+        result.checkbox("Split Request into Method/URL/Version", "split_req", "true")
+        result.ruler()
+        result.row("Select Fields to ignore:")
+        for i in range(len(self.fields)):
+            result.checkbox(self.fields[i], 'ignore%s' % i, 'true') 
