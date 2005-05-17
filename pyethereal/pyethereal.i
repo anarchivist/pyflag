@@ -58,11 +58,13 @@ ethereal_fill_in_fdata(frame_data *fdata, int count,
   fdata->flags.ref_time = 0;
 }
 
-void proto_tree_print_node(proto_node *node, gpointer data)
+void proto_tree_print_node(proto_node *node)
 {
   gchar *label_ptr;
   gchar label_str[ITEM_LABEL_LENGTH];
 	
+  if(!node || !node->finfo) return;
+
   if(node->finfo->rep) {
     label_ptr = node->finfo->rep->representation;
   } else {
@@ -95,6 +97,11 @@ wtap *open_file(char *filename) {
   // Open the capture file for reading
   wth = wtap_open_offline(filename, &err, &err_info, FALSE);
   return wth;
+};
+
+void free_dissection(epan_dissect_t *edt) {
+  if(edt)
+    epan_dissect_free(edt);
 };
 
 //Pulls the next packet off the file and dissects it.
@@ -144,34 +151,70 @@ proto_node *ethereal_tree_next_node(proto_node *node)
 proto_node *get_first_node(epan_dissect_t *edt) {
   proto_node *node;
 
-   if(!edt || !node) return (NULL);
+   if(!edt) return (NULL);
    node=edt->tree;
    return(node);
 };
 
- int print_tree_node(proto_node *node) {
-   int data=0;
+proto_node *get_next_peer_node(proto_node *node) {
+  if(node) {
+    return node->next;
+  } else {
+    return NULL;
+  };
+};
+
+proto_node *get_child_node(proto_node *node) {
+  if(node) {
+    return node->first_child;
+  } else {
+    return NULL;
+  };
+};
+
+proto_node *get_node_by_name(epan_dissect_t *edt,char *name) {
+  proto_node *node=get_first_node(edt);
+
+  if(!edt) return(NULL);
+  do {
+    if(node && node->finfo) {
+      printf("Checking %s %s\n",node->finfo->hfinfo->abbrev,name);
+      if(!strcmp(node->finfo->hfinfo->abbrev,name)) 
+	break;
+    };
+    node=ethereal_tree_next_node(node);
+  } while(node);
+
+  return(node);
+};
+
+struct field_info *get_field_info(proto_node *node) {
+  return node->finfo;
+};
+
+int print_tree_node(proto_node *node) {
+  int data=0;
    
-   node = node->first_child;
-   while (node != NULL) {
-     proto_tree_print_node(node, NULL);
-     print_tree_node(node);
-     node = node->next;
-   }
-   return 0;
- };
+  node = node->first_child;
+  while (node != NULL) {
+    proto_tree_print_node(node);
+    print_tree_node(node);
+    node = node->next;
+  }
+  return 0;
+};
 
- int print_tree(epan_dissect_t *edt) {
-   int data=0;
-   proto_node *node=get_first_node(edt);
-
+int print_tree(epan_dissect_t *edt) {
+  int data=0;
+  proto_node *node=get_first_node(edt);
+  
    // if(!edt || !node) return (-1);
 
-   do {
-     if(node && node->finfo)
-       proto_tree_print_node(node, NULL);
-   } while(node=ethereal_tree_next_node(node));
- }
+  do {
+    if(node && node->finfo)
+      proto_tree_print_node(node);
+  } while(node=ethereal_tree_next_node(node));
+}
 
 /*
 int main(int argc, char **argv) 
@@ -235,6 +278,19 @@ int main(int argc, char **argv ) {
   };  
 };
 */
+
+char *get_node_rep(proto_node *node) {
+  if(!node || !node->finfo) return("");
+
+  return node->finfo->rep->representation;
+};
+
+char *get_node_name(proto_node *node){
+    if(!node || !node->finfo) return("");
+
+    return node->finfo->hfinfo->abbrev;
+};
+
 %}
 
 %exception print_tree {
@@ -251,9 +307,52 @@ int main(int argc, char **argv ) {
     };
 }
 
+%exception read_and_dissect_next_packet {
+  $action
+    if(result==0) {
+      SWIG_exception(SWIG_IOError,"Unable to read packets");
+    };
+}
+
+%exception ethereal_tree_next_node {
+  $action
+    if(result==0) {
+      SWIG_exception(SWIG_IOError,"No more nodes in tree");
+    };
+}
+
+%exception get_node_by_name {
+  $action
+    if(result==0) {
+      SWIG_exception(SWIG_IOError,"No Node by this name");
+    };
+}
+
+%exception get_next_peer_node {
+  $action
+    if(result==0) {
+      SWIG_exception(SWIG_IOError,"No next node");
+    };
+}
+
+%exception get_child_node {
+  $action
+    if(result==0) {
+      SWIG_exception(SWIG_IOError,"No next node");
+    };
+}
+
 proto_node *ethereal_tree_next_node(proto_node *node);
-void proto_tree_print_node(proto_node *node, gpointer data);
+void proto_tree_print_node(proto_node *node);
 proto_node *get_first_node(epan_dissect_t *edt);
 wtap *open_file(char *filename);
 epan_dissect_t *read_and_dissect_next_packet(wtap *file);
 int print_tree(epan_dissect_t *tree);
+void free_dissection(epan_dissect_t *edt);
+proto_node *get_node_by_name(epan_dissect_t *edt,char *name);
+struct field_info *get_field_info(proto_node *node);
+
+proto_node *get_child_node(proto_node *node);
+proto_node *get_next_peer_node(proto_node *node);
+char *get_node_rep(proto_node *node);
+char *get_node_name(proto_node *node);

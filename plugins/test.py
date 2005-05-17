@@ -39,7 +39,7 @@ import os,os.path,sys
 
 description = "Test Class"
 #Remove this line to ensure this appears in the menu
-active = False
+active = True
 
 class TemplateReport(Reports.report):
     """ A sample report.
@@ -167,3 +167,41 @@ class test2(Reports.report):
         result.start_table()
         result.row("absabsdajhdfsfds skjsdfkljdfs fdsalkj fdsalkjsfd lkjfdsa lfskdj sfdalkj fdsalkj fdsalkjsfd lksfdj sfdalkj sfdlkjfsda lkfsdaj lksfdaj dfsalkj fdsalk jsfdalkj sdaflkj fsdalk jsfdalk jdsfalk jdfsalk jsfdalkjsfdalk jdfsalk jfdsalkj fdsalk jfsda")
         result.end_table()
+
+import pyethereal
+
+class EtherealTest(Reports.report):
+    """ A sample ethereal report """
+    name="Ethereal Test"
+    family="Test"
+    def display(self,query,result):
+        a=pyethereal.open_file("/tmp/test.pcap")
+        proto_tree = pyethereal.read_and_dissect_next_packet(a)
+
+        def tree_cb(branch):
+            node_name = branch[-1]
+            print "will try to find %s" % node_name
+            if node_name=='/':
+                node = pyethereal.get_first_node(proto_tree)
+                node = pyethereal.get_child_node(node)
+            else:
+                node = pyethereal.get_node_by_name(proto_tree,node_name)
+                node = pyethereal.get_child_node(node)
+            result = []
+            try:
+                while 1:
+                    result.append( (
+                        pyethereal.get_node_name(node),
+                        pyethereal.get_node_rep(node),
+                        'branch'))
+                    node=pyethereal.get_next_peer_node(node)
+            except Exception,e:
+                print "%s" % e
+                pass
+#            result.append(('/',None,'branch'))
+            return result
+
+        def pane_cb(branch,result):
+            pass
+
+        result.tree(tree_cb=tree_cb, pane_cb=pane_cb, branch=['/'])
