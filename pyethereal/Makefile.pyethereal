@@ -1,0 +1,8 @@
+include Makefile
+INCL    = -I/usr/include/python2.3/ -I. -Iwiretap/
+#pyethereal: pyethereal.o
+#	$(LINK) $(tethereal_LDFLAGS) pyethereal.o $(tethereal_LDADD) $(LIBS)
+
+pyethereal: pyethereal.i
+	swig -python pyethereal.i
+	$(LINK) -g $(INCL) $(tethereal_LDFLAGS) $@_wrap.c -shared $(tethereal_LDADD) $(LIBS) -o _$@.so

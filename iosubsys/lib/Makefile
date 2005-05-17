@@ -16,8 +16,8 @@ win32:  evtool.exe remote_server.exe
 evtool.exe: libevf.o evtool.c
 	$(CC) $(CFLAGS) -DCYGWIN evtool.c -o $@ libevf.o $(MISCLIBS) $(STATIC_LIB_PATH)/libz.a
 
-remote_server.exe: remote_server.c
-	$(CC) $(CFLAGS) -DCYGWIN -o $@ remote_server.c  $(MISCLIBS)
+remote_server.exe: remote_server_win32.c
+	$(CC) $(CFLAGS) -o $@ remote_server_win32.c  $(STATIC_LIB_PATH)/libws2_32.a $(STATIC_LIB_PATH)/libiberty.a
 
 libio_hooker.so: $(LIBS) hooker.c
 	$(CC) -fPIC -rdynamic $(CFLAGS) -c hooker.c
