@@ -172,10 +172,46 @@ proto_node *get_child_node(proto_node *node) {
   };
 };
 
+/* This is a recursive function that looks for name in subtree of
+   node. We return the found node in found */
+gboolean _find_node_by_name(proto_node *node,char *name, proto_node **found) {
+  if(!node) return 0;
+
+  if(node->finfo) {
+    printf("Comparing %s to %s\n",node->finfo->hfinfo->abbrev,name);
+    if(!strcmp(node->finfo->hfinfo->abbrev,name)) { //Found it:
+      *found = node;
+      return 1;
+    }
+  };
+
+  //Recurse to child first
+  if(node->first_child &&  _find_node_by_name(node->first_child,name,found)) {
+    return 1;
+  };
+  
+  //Then to peers
+  if(node->next &&  _find_node_by_name(node->next,name,found)) {
+    return 1;
+  };
+
+  return 0;
+};
+
+proto_node *get_node_by_name(epan_dissect_t *edt,char *name) {
+  proto_node *result;
+  proto_node *node= edt->tree;
+  
+  _find_node_by_name(node,name,&result);
+  return result;
+};
+
+/*
 proto_node *get_node_by_name(epan_dissect_t *edt,char *name) {
   proto_node *node=get_first_node(edt);
 
   if(!edt) return(NULL);
+
   do {
     if(node && node->finfo) {
       printf("Checking %s %s\n",node->finfo->hfinfo->abbrev,name);
@@ -187,6 +223,7 @@ proto_node *get_node_by_name(epan_dissect_t *edt,char *name) {
 
   return(node);
 };
+*/
 
 struct field_info *get_field_info(proto_node *node) {
   return node->finfo;
@@ -280,14 +317,24 @@ int main(int argc, char **argv ) {
 */
 
 char *get_node_rep(proto_node *node) {
-  if(!node || !node->finfo) return("");
+  char *result;
 
-  return node->finfo->rep->representation;
+  if(!node || !node->finfo) return("");
+  result=node->finfo->rep->representation;
+
+  //FIXME - This leaks.
+  if(!result) {
+    result=(char *)malloc(ITEM_LABEL_LENGTH);
+    proto_item_fill_label(node->finfo, result);
+  };
+  printf("node Representation is %s \n",result);
+  return result;
 };
 
 char *get_node_name(proto_node *node){
     if(!node || !node->finfo) return("");
 
+    printf("node name is %s ",node->finfo->hfinfo->abbrev);
     return node->finfo->hfinfo->abbrev;
 };
 
@@ -339,6 +386,13 @@ char *get_node_name(proto_node *node){
   $action
     if(result==0) {
       SWIG_exception(SWIG_IOError,"No next node");
+    };
+}
+
+%exception open_file {
+  $action
+    if(result==0) {
+      SWIG_exception(SWIG_IOError,"Cant open file\n");
     };
 }
 

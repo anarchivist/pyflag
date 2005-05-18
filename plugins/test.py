@@ -186,14 +186,27 @@ class EtherealTest(Reports.report):
                 node = pyethereal.get_child_node(node)
             else:
                 node = pyethereal.get_node_by_name(proto_tree,node_name)
-                node = pyethereal.get_child_node(node)
+                try:
+                    node = pyethereal.get_child_node(node)
+                except:
+                    print "Unable to find child node"
+                    pass
             result = []
             try:
                 while 1:
-                    result.append( (
-                        pyethereal.get_node_name(node),
-                        pyethereal.get_node_rep(node),
-                        'branch'))
+                    try:
+                        print "child node is %s" % pyethereal.get_child_node(node)
+                        result.append( (
+                            pyethereal.get_node_name(node),
+                            pyethereal.get_node_rep(node),
+                            'branch'))
+                    except:
+                        result.append( (
+                            pyethereal.get_node_name(node),
+                            pyethereal.get_node_rep(node),
+                            'leaf'))
+                        print "No child node"
+
                     node=pyethereal.get_next_peer_node(node)
             except Exception,e:
                 print "%s" % e
