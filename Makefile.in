@@ -2,7 +2,7 @@
 BIN	= bin/
 DIRS	= iosubsys imagingtools/dd_rescue/ raidtools indextools regtools virustools mailtools sources
 CLEAN_DIRS = pkg_bin_dist flag_deb bin_dist
-PYTHONVER = 2.3
+PYTHONVER = 2.4
 SYSBINS = cjpeg djpeg
 PYTHONLIB = /usr/lib/python$(PYTHONVER)/
 PYTHONINCL = /usr/include/python$(PYTHONVER)/

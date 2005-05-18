@@ -53,6 +53,10 @@ struct dispatcher_t {
   int (*dup2)(int oldfd, int newfd);
   int (*close)(int fd);
   FILE * (*fopen)(const char *path, const char *mode);
+  long (*ftell)(FILE *stream);
+  int (*fgets)(char *s, int size, FILE *stream);
+  FILE * (*fseek)(FILE *stream, long offset, int whence);
+  FILE * (*fdopen)(int fd, const char *mode);
   size_t (*fread)(void *ptr, size_t size, size_t nmemb, FILE *stream);
   int (*fclose)(FILE *stream);
   ssize_t (*write)(int fd, const void *buf, size_t count);

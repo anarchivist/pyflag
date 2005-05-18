@@ -75,8 +75,12 @@ void load_library(void) {
   HOOK(dup2);
   HOOK(close);
   HOOK(fopen);
+  HOOK(fseek);
+  HOOK(fdopen);
   HOOK(fclose);
   HOOK(fread);
+  HOOK(ftell);
+  HOOK(fgets);
 
   //Remove the LD_PRELOAD now that we are already hooked. This is needed if something else needs to fork later:
     unsetenv("LD_PRELOAD");
@@ -199,6 +203,27 @@ off_t lseek64(int fildes,  off_t  offset, int whence) {
   };
 };
 
+int fseek(FILE *stream, long offset, int whence) {
+  int fd=(int)stream;
+  lseek(fd, offset,whence);
+  return 0;
+};
+
+long ftell(FILE *stream) {
+  int fd=(int)stream;
+
+  return lseek(fd, 0, SEEK_CUR);
+};
+
+char *fgets(char *s, int size, FILE *stream) {
+  int fd=(int)stream;
+
+  read(fd, s, size);
+  return s;
+};
+
+
+
 ssize_t read(int fd, void *buf, size_t count) {
   //If we were not initialised yet, we do so now...
   CHECK_INIT;
@@ -294,6 +319,21 @@ FILE *fopen(const char *path, const char *mode) {
   };
 
   return(dispatch->fopen(path,mode));
+};
+
+FILE *fdopen(int fd, const char *mode) {
+  CHECK_INIT;
+
+  //Check if fd is one of ours:
+  if( context == HOOKED && iosources[fd]) {
+    if(mode[0]=='r') {
+      printf("hooking fd %u\n",fd);
+      return ((FILE *)fd);
+    };
+    RAISE(E_GENERIC,NULL,"Writing is not supported to file descriptor %u",fd);
+  };
+
+  return(dispatch->fdopen(fd,mode));
 };
 
 size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream) 
