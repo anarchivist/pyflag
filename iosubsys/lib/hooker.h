@@ -59,6 +59,7 @@ struct dispatcher_t {
   FILE * (*fdopen)(int fd, const char *mode);
   size_t (*fread)(void *ptr, size_t size, size_t nmemb, FILE *stream);
   int (*fclose)(FILE *stream);
+  int (*__fxstat64)(int filedes, struct stat *buf);
   ssize_t (*write)(int fd, const void *buf, size_t count);
 } *dispatch=NULL;
 

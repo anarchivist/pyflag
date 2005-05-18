@@ -81,9 +81,10 @@ void load_library(void) {
   HOOK(fread);
   HOOK(ftell);
   HOOK(fgets);
+  HOOK(__fxstat64);
 
   //Remove the LD_PRELOAD now that we are already hooked. This is needed if something else needs to fork later:
-    unsetenv("LD_PRELOAD");
+  unsetenv("LD_PRELOAD");
 };
 
 //This function initialises the hooker
@@ -117,6 +118,7 @@ int open64(const char *pathname, int flags,int mode) {
   //We only hook files which start with this prefix. If the system
   //wants to open other files, thats ok.
   char *file_prefix = getenv("IO_FILENAME");
+  int new_fd;
 
   //If we were not initialised yet, we do so now...
   debug(1,"asked to open %s",pathname);  
@@ -129,7 +131,25 @@ int open64(const char *pathname, int flags,int mode) {
   if(context == UNHOOKED || !iosubsys || 
      (file_prefix && memcmp(pathname,file_prefix,strlen(file_prefix)))) {
     debug(1, "Opened %s without hooking",pathname);
-    return (dispatch->open64(pathname,flags,mode));
+    /* This is a strage bug reported by gmjones:
+
+       Glibc's open may return an fd which is already occupied by an
+       io source fd. IO Sources use the range of fds larger than
+       iosource_count, but it is still possible for an iosource fd to
+       be dup2ed into the low range. Since iosource fds are not real,
+       and the kernel does not know about them, the kernel may issue
+       the same fd as an iosource. We need to prevent that by checking
+       to see that there is no iosource already assigned to that
+       psuedo fd, and if it is, we repeat the open operation to force
+       a new fd to be issued by the kernel.
+
+    */
+    do {
+      new_fd = dispatch->open64(pathname,flags,mode);
+    } while(iosources[new_fd]);
+
+    debug(1,"returned unhooked fd=%u",new_fd);
+    return new_fd;
   } else {
     // Turn off hooking. NOTE: This makes us non-reentrant!!!
     context = UNHOOKED;
@@ -215,15 +235,6 @@ long ftell(FILE *stream) {
   return lseek(fd, 0, SEEK_CUR);
 };
 
-char *fgets(char *s, int size, FILE *stream) {
-  int fd=(int)stream;
-
-  read(fd, s, size);
-  return s;
-};
-
-
-
 ssize_t read(int fd, void *buf, size_t count) {
   //If we were not initialised yet, we do so now...
   CHECK_INIT;
@@ -246,6 +257,13 @@ ssize_t read(int fd, void *buf, size_t count) {
     debug(1,"Returned %lu bytes of data\n",read_len);
     return(read_len);
   };
+};
+
+char *fgets(char *s, int size, FILE *stream) {
+  int fd=(int)stream;
+
+  read(fd, s, size);
+  return s;
 };
 
 ssize_t write(int fd, const void *buf, size_t count) {
@@ -287,7 +305,7 @@ int dup2(int oldfd, int newfd)
     //Is the new one already assigned?
     if(iosources[newfd]) return -1;
     iosources[newfd]=iosources[oldfd];
-    return 0;
+    return newfd;
   };
   
   return(dispatch->dup2(oldfd,newfd));
@@ -327,7 +345,6 @@ FILE *fdopen(int fd, const char *mode) {
   //Check if fd is one of ours:
   if( context == HOOKED && iosources[fd]) {
     if(mode[0]=='r') {
-      printf("hooking fd %u\n",fd);
       return ((FILE *)fd);
     };
     RAISE(E_GENERIC,NULL,"Writing is not supported to file descriptor %u",fd);
@@ -389,6 +406,19 @@ int __xstat64 (int __ver, __const char *__filename, struct stat *buf) {
   CHECK_INIT;
   buf->st_size=-1;
   return(0);
+};
+
+
+int __fxstat64(int filedes, struct stat *buf) {
+  CHECK_INIT;
+
+  if(iosources[filedes]){
+    buf->st_size=-1;
+    return(0);
+  } else {
+    dispatch->__fxstat64(filedes,buf);
+    return 0;
+  };
 };
 
 int fileno(FILE *stream) {

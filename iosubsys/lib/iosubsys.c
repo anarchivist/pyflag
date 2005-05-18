@@ -459,6 +459,7 @@ int ewf_add_file(IO_INFO_EWF *self,char *filename) {
   int fd;
   struct evf_file_header *file_header;
 
+  printf("will add %s as a filename\n",filename);
   fd=open(filename,O_RDONLY);
   if(fd<0) {
     RAISE(E_IOERROR,NULL,"Could not open %s",filename);
@@ -514,10 +515,12 @@ int ewf_initialiser(IO_INFO *self,IO_OPT *args) {
     //If we are not given an option=value pair, we interpret the whole
     //thing as a filename:
     } else if(i->option && (!i->value || strlen(i->value)==0)) {
-      return(ewf_add_file(io,strdup(i->option)));
+      ewf_add_file(io,strdup(i->option));
+      continue;
 
     }else if(CHECK_OPTION(i,file)) {
-      return(ewf_add_file(io,strdup(i->value)));
+      ewf_add_file(io,strdup(i->value));
+      continue;
 
     } else if(CHECK_OPTION(i,offset)) {
       io->offs=parse_offsets(i->value);
@@ -545,22 +548,24 @@ int ewf_open(IO_INFO *self) {
   };
 
   for(i=1;i<=io->offsets.max_segment;i++) {
+    printf("looking at segment %u\n",i);
     if(io->offsets.files[i]<0) {
       RAISE(E_IOERROR,NULL,"Missing a segment file for segment %u",i);
     };
     
     //Now process each file in order until we build the whole index
     for(section=evf_read_section(io->offsets.files[i]);
-	section->size>0;
+	section->size>0 && strcmp(section->type,"next");
 	section=evf_read_section(io->offsets.files[i])) {
       
       //This will update offsets.fds and offsets.offset
       process_section(section,i,&(io->offsets));
 
-      //If we hit a next section, we need to move to the next disk
+      /* If we hit a next section, we need to move to the next disk
       if(!strcmp(section->type,"next")) {
 	break;
       };
+      */
       
       //Go to the next section
       if(lseek(io->offsets.files[i],section->next,SEEK_SET)<0) {
@@ -1131,7 +1136,7 @@ void io_parse_options(IO_INFO *io_obj,char *opts) {
       *x='\0';
       x++;
     };
-
+    
     //Go to the end of the opts list
     if(options) {
       for(io=options;io->next;io=io->next);
