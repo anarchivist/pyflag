@@ -354,19 +354,23 @@ void process_section(struct evf_section_header *header,int image_number,struct o
 
     old_offset=old_offset  & 0x7fffffff;
 
+    //Make sure we have enough memory to store the table data):
+    offsets->fd=(int *)realloc(offsets->fd,(offsets->max_chunk+2+table->count)*sizeof(int));
+    offsets->offset=(unsigned int *)realloc(offsets->offset,(offsets->max_chunk+2+table->count)*sizeof(*offsets->offset));
+    offsets->size=(unsigned short int *)realloc(offsets->size,(offsets->max_chunk+2+table->count)*sizeof(*offsets->offset));
+    if(!offsets->fd || !offsets->offset || !offsets->size) RAISE(E_NOMEMORY,NULL,Malloc);
+
+    //Now read the table data from the file into memory:
+    if(read_from_stream(fd, offsets->offset + offsets->max_chunk+1
+			,table->count * sizeof(offset))
+       < table->count * sizeof(offset)) {
+      free(table);
+      
+      RAISE(E_IOERROR,NULL,Read,"Table header");
+    };
+
     for(i=0;i<table->count-1;i++) {
-      if(read_from_stream(fd,&offset,sizeof(offset))<sizeof(offset)) {
-	free(table);
-
-	RAISE(E_IOERROR,NULL,Read,"Table header");
-      };
-
-      offset = offset  & 0x7fffffff;
-      //Add this offset to the offsets struct (Make sure we have enough memory to store this data):
-      offsets->fd=(int *)realloc(offsets->fd,(offsets->max_chunk+2)*sizeof(int));
-      offsets->offset=(unsigned int *)realloc(offsets->offset,(offsets->max_chunk+2)*sizeof(*offsets->offset));
-      offsets->size=(unsigned short int *)realloc(offsets->size,(offsets->max_chunk+2)*sizeof(*offsets->offset));
-      if(!offsets->fd || !offsets->offset || !offsets->size) RAISE(E_NOMEMORY,NULL,Malloc);
+      offset = offsets->offset[offsets->max_chunk+1] & 0x7fffffff;
 
       offsets->fd[offsets->max_chunk]=fd;
       offsets->offset[offsets->max_chunk]=old_offset;
@@ -376,8 +380,14 @@ void process_section(struct evf_section_header *header,int image_number,struct o
       old_offset=offset;
     };
 
-    //Now we need to work out the offset for the last entry. We do
-    //this by finding out how big this section is:
+    /*
+      Now we need to work out the offset for the last entry. This is
+      complex because we dont know how large the last compressed chunk
+      is, all we know is where it starts in the file. We need to find
+      the sectors section in the file, work out how large it is, and
+      then we assume that the last sector fills the sectors section
+      out
+    */
     for(tmp_section=offsets->section_list;tmp_section->next;tmp_section=tmp_section->next) {
       if(tmp_section->fd==fd && tmp_section->start_offset<offset && offset<tmp_section->end_offset) {
 	offsets->fd[offsets->max_chunk]=fd;
