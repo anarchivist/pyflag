@@ -22,6 +22,8 @@
 */
 %module pyethereal
 %include exception.i
+%include cstring.i
+%apply (char *STRING, int LENGTH) { (char *buff, int len) };
 
 %{
 #include "config.h"
@@ -99,12 +101,13 @@ epan_dissect_t *read_and_dissect_next_packet(wtap *file) {
     epan_dissect_t *edt = epan_dissect_new(TRUE, TRUE);
     frame_data fd;
     guchar *pd;
-
+    int count=0;
+    
     if(!wtap_read(file,&err,&err_info,&data_offset)) return NULL;
     hdr = wtap_phdr(file);
     pd=wtap_buf_ptr(file);
 
-    ethereal_fill_in_fdata(&fd,0,hdr,data_offset);
+    ethereal_fill_in_fdata(&fd,count,hdr,data_offset);
     //Dissect the packet using the dissector chain. The protocol tree
     //is found in edt.
     dissect_packet(edt,wtap_pseudoheader(file), pd, &fd, NULL);
@@ -112,11 +115,49 @@ epan_dissect_t *read_and_dissect_next_packet(wtap *file) {
   };
 };
 
-/*
-char *dissector_node_get_value(epan_dissect_t *edt, char *name) {
-  while(
+ epan_dissect_t *dissect_buffer(char *buff,int len, int frame_number){
+   epan_dissect_t *edt = epan_dissect_new(TRUE, TRUE);
+   frame_data fd;
+   struct wtap_pkthdr hdr;
+   union wtap_pseudo_header phdr;
+
+   memset(&hdr,0,sizeof(hdr));
+   memset(&phdr,0,sizeof(phdr));
+   
+   hdr.caplen = len;
+   hdr.len=len;
+   hdr.pkt_encap=1;
+   
+   ethereal_fill_in_fdata(&fd,frame_number,&hdr,0);
+   dissect_packet(edt,&phdr, buff, &fd, NULL);
+   return(edt);
+ };
+
+
+ // Returns the enumerated type stored in node
+enum ftenum get_type(proto_node *node) {
+  if(!node || !node->finfo) return FT_NONE;
+  return node->finfo->hfinfo->type;
 };
-*/
+
+//Gets the value of node as a long long int
+ long int get_int_value(proto_node *node) {
+   field_info *fi;
+   if(!node || !node->finfo) return 0;
+
+   fi=node->finfo;
+   
+   return fvalue_get_integer(&fi->value);
+ };
+
+ //Gets the value of node as a string
+ char *get_str_value(proto_node *node) {
+   field_info *fi;
+   if(!node || !node->finfo) return 0;
+
+   fi=node->finfo;
+   return (char *)fi->value.value.string;
+ };
 
 proto_node *get_first_node(epan_dissect_t *edt) {
   proto_node *node;
@@ -233,6 +274,42 @@ class Node:
            raise IOError("Invalid Node provided")
        self.node=node
 
+   def value(self):
+       """ Returns the value of this node according to its type """
+       type = get_type(self.node)
+       
+       def bool(node):
+           i = get_int_value(node)
+           if i: return True
+           return False
+       
+       dispatch = {
+           FT_NONE:       None,
+           FT_BOOLEAN:    bool,
+           FT_BYTES:      get_str_value,
+           FT_UINT_BYTES: get_str_value,
+           FT_STRING:     get_str_value,
+           FT_STRINGZ:    get_str_value,
+           FT_UINT8:      get_int_value,
+           FT_UINT16:     get_int_value,
+           FT_UINT24:     get_int_value,
+           FT_UINT32:     get_int_value,
+#           FT_UINT64:     get_int_value,
+           FT_INT8:       get_int_value,
+           FT_INT16:      get_int_value,
+           FT_INT24:      get_int_value,
+           FT_INT32:      get_int_value,
+           FT_INT64:      get_int_value,
+           FT_FRAMENUM:   get_int_value,
+
+           }
+       try:
+           return dispatch[type](self.node)
+       except TypeError:
+           return dispatch[type]
+       except KeyError:
+           return self.__str__()
+
    def get_child(self):
        """ Returns the first child of this node as another Node
        object. If we do not have children we return None."""
@@ -287,6 +364,11 @@ class ReadPacket(Node):
         """ Free memory as required """
         free_dissection(self.dissector)
 
+class Packet(ReadPacket):
+    """ A class representing a packet dissected from a buffer """
+    def __init__(self,buffer,frame_number=0):
+        self.dissector = dissect_buffer(buffer,frame_number)
+        Node.__init__(self,get_first_node(self.dissector))
 %}
 
 proto_node *get_first_node(epan_dissect_t *edt);
@@ -301,3 +383,27 @@ proto_node *get_child_node(proto_node *node);
 proto_node *get_next_peer_node(proto_node *node);
 char *get_node_rep(proto_node *node);
 char *get_node_name(proto_node *node);
+epan_dissect_t *dissect_buffer(char *buff,int len,int frame_number);
+enum ftenum get_type(proto_node *node);
+long long int get_int_value(proto_node *node);
+char *get_str_value(proto_node *node);
+
+enum ftenum {
+           FT_NONE,
+           FT_BOOLEAN,
+           FT_BYTES,
+           FT_UINT_BYTES,
+           FT_STRING,
+           FT_STRINGZ,
+           FT_UINT8,
+           FT_UINT16,
+           FT_UINT24,
+           FT_UINT32,
+           FT_UINT64,
+           FT_INT8,
+           FT_INT16,
+           FT_INT24,
+           FT_INT32,
+           FT_INT64,
+           FT_FRAMENUM,
+};
