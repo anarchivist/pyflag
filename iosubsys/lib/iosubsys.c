@@ -548,14 +548,19 @@ int ewf_open(IO_INFO *self) {
   };
 
   for(i=1;i<=io->offsets.max_segment;i++) {
-    printf("looking at segment %u\n",i);
     if(io->offsets.files[i]<0) {
       RAISE(E_IOERROR,NULL,"Missing a segment file for segment %u",i);
     };
     
     //Now process each file in order until we build the whole index
     for(section=evf_read_section(io->offsets.files[i]);
-	section->size>0 && strcmp(section->type,"next");
+	/* This ensures that the next section occurs _after_ the
+	   current section.  There are some sections in the EVF file
+	   which point back at themself, like done or next. When we
+	   hit these, we give up reading the file and move to the next
+	   file because its impossible to find the next section in the
+	   chain. */
+	lseek(io->offsets.files[i],0,SEEK_CUR)<=section->next;
 	section=evf_read_section(io->offsets.files[i])) {
       
       //This will update offsets.fds and offsets.offset

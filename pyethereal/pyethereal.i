@@ -239,7 +239,7 @@ class Node:
        result = get_child_node(self.node)
        if not result: return None
        return Node(result)
-
+   
    def __str__(self):
        """ We return Ethereals representation (The text which is printed in the GUI """
        return get_node_rep(self.node)

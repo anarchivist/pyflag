@@ -471,7 +471,15 @@ int main(int argc, char **argv) {
       RAISE(E_IOERROR,NULL,"Missing a segment file for segment %u",i);
     }
     //Now process each file in order until we build the whole index
-    for(section=evf_read_section(offsets.files[i]);section->size>0;section=evf_read_section(offsets.files[i])) {
+    for(section=evf_read_section(offsets.files[i]);
+	/* This ensures that the next section occurs _after_ the
+	   current section.  There are some sections in the EVF file
+	   which point back at themself, like done or next. When we
+	   hit these, we give up reading the file and move to the next
+	   file because its impossible to find the next section in the
+	   chain. */
+	lseek(offsets.files[i],0,SEEK_CUR)<=section->next;
+	section=evf_read_section(offsets.files[i])) {
 
       //This will update offsets.fds and offsets.offset
       process_section(section,i,&offsets);
@@ -479,11 +487,6 @@ int main(int argc, char **argv) {
       //Go to the next section
       if(lseek(offsets.files[i],section->next,SEEK_SET)<0) {
 	RAISE(E_IOERROR,NULL,"Could not seek");
-      };
-
-      //If we hit a next section, we need to move to the next disk
-      if(!strcmp(section->type,"next")) {
-	break;
       };
 
       free(section);
@@ -494,7 +497,8 @@ int main(int argc, char **argv) {
   if(strcasecmp(section->type,"done") && !force) 
     RAISE(E_IOERROR,NULL,"No ending section, Cant find the last segment file\n");
 
-  evf_decompress_fds(&offsets,outfd);
+  if(evf_verbose>10)
+    evf_decompress_fds(&offsets,outfd);
   return(0);
 };
 
