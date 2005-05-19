@@ -58,22 +58,6 @@ ethereal_fill_in_fdata(frame_data *fdata, int count,
   fdata->flags.ref_time = 0;
 }
 
-void proto_tree_print_node(proto_node *node)
-{
-  gchar *label_ptr;
-  gchar label_str[ITEM_LABEL_LENGTH];
-	
-  if(!node || !node->finfo) return;
-
-  if(node->finfo->rep) {
-    label_ptr = node->finfo->rep->representation;
-  } else {
-    label_ptr=label_str;
-    proto_item_fill_label(node->finfo, label_str);
-  };
-  printf("Item %s(%s) \"%s\"\n",node->finfo->hfinfo->name,node->finfo->hfinfo->abbrev,label_ptr);
-};
-
 static int is_initialised=0;
 
 static void ethereal_init() {
@@ -134,20 +118,6 @@ char *dissector_node_get_value(epan_dissect_t *edt, char *name) {
 };
 */
 
-proto_node *ethereal_tree_next_node(proto_node *node) 
-{
-  if(!node) return(NULL);
-
-  //If this is a blank node, we skip it...
-  if(!node->finfo) return(ethereal_tree_next_node(node->first_child));
-
-  if(!node->next) {
-    return node->first_child;
-  } else {
-    return node->next;
-  };
-};
-
 proto_node *get_first_node(epan_dissect_t *edt) {
   proto_node *node;
 
@@ -178,7 +148,6 @@ gboolean _find_node_by_name(proto_node *node,char *name, proto_node **found) {
   if(!node) return 0;
 
   if(node->finfo) {
-    printf("Comparing %s to %s\n",node->finfo->hfinfo->abbrev,name);
     if(!strcmp(node->finfo->hfinfo->abbrev,name)) { //Found it:
       *found = node;
       return 1;
@@ -199,122 +168,16 @@ gboolean _find_node_by_name(proto_node *node,char *name, proto_node **found) {
 };
 
 proto_node *get_node_by_name(epan_dissect_t *edt,char *name) {
-  proto_node *result;
+  proto_node *result=NULL;
   proto_node *node= edt->tree;
   
   _find_node_by_name(node,name,&result);
   return result;
 };
 
-/*
-proto_node *get_node_by_name(epan_dissect_t *edt,char *name) {
-  proto_node *node=get_first_node(edt);
-
-  if(!edt) return(NULL);
-
-  do {
-    if(node && node->finfo) {
-      printf("Checking %s %s\n",node->finfo->hfinfo->abbrev,name);
-      if(!strcmp(node->finfo->hfinfo->abbrev,name)) 
-	break;
-    };
-    node=ethereal_tree_next_node(node);
-  } while(node);
-
-  return(node);
-};
-*/
-
 struct field_info *get_field_info(proto_node *node) {
   return node->finfo;
 };
-
-int print_tree_node(proto_node *node) {
-  int data=0;
-   
-  node = node->first_child;
-  while (node != NULL) {
-    proto_tree_print_node(node);
-    print_tree_node(node);
-    node = node->next;
-  }
-  return 0;
-};
-
-int print_tree(epan_dissect_t *edt) {
-  int data=0;
-  proto_node *node=get_first_node(edt);
-  
-   // if(!edt || !node) return (-1);
-
-  do {
-    if(node && node->finfo)
-      proto_tree_print_node(node);
-  } while(node=ethereal_tree_next_node(node));
-}
-
-/*
-int main(int argc, char **argv) 
-{
-  wtap  *wth;
-  char *fname="/tmp/test.pcap";
-  epan_dissect_t *edt;
-  int data=0;
-
-  ethereal_init();
-  wth = open_file(fname);
-  
-  while(edt=read_and_dissect_next_packet(wth)) {
-    proto_tree_children_foreach(edt->tree, proto_tree_print_node, &data);
-    free(edt);
-  };
-
-};
-  					  
-int main(int argc, char **argv ) {
-  wtap  *wth;
-  char *table="pcap";
-  int err=0;
-  gchar *err_info;
-  char err_msg[2048+1];
-  char *fname="/tmp/test.pcap";
-  long data_offset;
-  int id=0;
-  int data=0;
-
-  // Initialise the main ethereal core
-  epan_init(PLUGIN_DIR,register_all_protocols,register_all_protocol_handoffs,
-            NULL,NULL,NULL);
-
-  // init the dissectors data structures
-  init_dissection();
-
-  // Open the capture file for reading
-  wth = wtap_open_offline(fname, &err, &err_info, FALSE);
-
-  //Read a packet at the time
-  while(wtap_read(wth,&err,&err_info,&data_offset)) {
-    struct wtap_pkthdr *hdr = wtap_phdr(wth);
-    epan_dissect_t *edt = epan_dissect_new(TRUE, TRUE);
-    //This gives a pointer to the contents of the file
-    guchar *pd=wtap_buf_ptr(wth);
-    frame_data fd;
-
-    fill_in_fdata(&fd,id,hdr,data_offset);
-
-    //Dissect the packet using the dissector chain. The protocol tree
-    //is found in edt.
-    dissect_packet(edt,wtap_pseudoheader(wth), pd, &fd, NULL);
-
-    proto_tree_children_foreach(edt->tree, proto_tree_print_node, &data);
-
-    printf("insert into %s set id='%lu',offset='%lu',length='%lu';\n",table,id,data_offset,hdr->caplen);
-    id++;
-
-    epan_dissect_free(edt);
-  };  
-};
-*/
 
 char *get_node_rep(proto_node *node) {
   char *result;
@@ -327,25 +190,16 @@ char *get_node_rep(proto_node *node) {
     result=(char *)malloc(ITEM_LABEL_LENGTH);
     proto_item_fill_label(node->finfo, result);
   };
-  printf("node Representation is %s \n",result);
   return result;
 };
 
 char *get_node_name(proto_node *node){
     if(!node || !node->finfo) return("");
 
-    printf("node name is %s ",node->finfo->hfinfo->abbrev);
     return node->finfo->hfinfo->abbrev;
 };
 
 %}
-
-%exception print_tree {
-  $action
-    if(result<0) {
-      SWIG_exception(SWIG_IOError,"Invalid Protocol Tree");
-    };
-}
 
 %exception get_first_node {
   $action
@@ -361,34 +215,6 @@ char *get_node_name(proto_node *node){
     };
 }
 
-%exception ethereal_tree_next_node {
-  $action
-    if(result==0) {
-      SWIG_exception(SWIG_IOError,"No more nodes in tree");
-    };
-}
-
-%exception get_node_by_name {
-  $action
-    if(result==0) {
-      SWIG_exception(SWIG_IOError,"No Node by this name");
-    };
-}
-
-%exception get_next_peer_node {
-  $action
-    if(result==0) {
-      SWIG_exception(SWIG_IOError,"No next node");
-    };
-}
-
-%exception get_child_node {
-  $action
-    if(result==0) {
-      SWIG_exception(SWIG_IOError,"No next node");
-    };
-}
-
 %exception open_file {
   $action
     if(result==0) {
@@ -396,12 +222,77 @@ char *get_node_name(proto_node *node){
     };
 }
 
-proto_node *ethereal_tree_next_node(proto_node *node);
-void proto_tree_print_node(proto_node *node);
+%pythoncode %{   
+class Node:
+   """ Node is a class which represents a node in the dissection tree """
+   def __init__(self,node):
+       """ This base class is instantiated with a swig proto_node
+       object, derived classes should get new ways for getting such an
+       opaque object"""
+       if not node:
+           raise IOError("Invalid Node provided")
+       self.node=node
+
+   def get_child(self):
+       """ Returns the first child of this node as another Node
+       object. If we do not have children we return None."""
+       result = get_child_node(self.node)
+       if not result: return None
+       return Node(result)
+
+   def __str__(self):
+       """ We return Ethereals representation (The text which is printed in the GUI """
+       return get_node_rep(self.node)
+
+   def __iter__(self):
+       """ We can iterate over all the peers of this node """
+       self.current_iter = self.node
+       return self
+
+   def next(self):
+       if self.current_iter:
+           result=Node(self.current_iter)
+           self.current_iter = get_next_peer_node(self.current_iter)
+           return result
+       else:
+           raise StopIteration()
+
+   def name(self):
+       """ This is the abbrev of this node's field name. """
+       return get_node_name(self.node)
+
+class ReadPacket(Node):
+    def __init__(self,file):
+        """ Gets the next packet from the file.
+        
+        Note that file must be a wtap object obtained from open_file.
+        """
+        self.dissector = read_and_dissect_next_packet(file)
+        Node.__init__(self,get_first_node(self.dissector))
+
+    def __getitem__(self,name):
+       """ We can get a node by using its abbreviation. Note that this
+       search is recursive so we can ask the root of the tree if there
+       is a certain node in the tree.
+
+       We raise a KeyError exception if we cant find such a node.
+       """
+       result = get_node_by_name(self.dissector,name)
+       if not result:
+           raise KeyError("Uable to find node %s" % name)
+
+       return Node(result)
+   
+    def __del__(self):
+        """ Free memory as required """
+        free_dissection(self.dissector)
+
+%}
+
 proto_node *get_first_node(epan_dissect_t *edt);
 wtap *open_file(char *filename);
 epan_dissect_t *read_and_dissect_next_packet(wtap *file);
-int print_tree(epan_dissect_t *tree);
+
 void free_dissection(epan_dissect_t *edt);
 proto_node *get_node_by_name(epan_dissect_t *edt,char *name);
 struct field_info *get_field_info(proto_node *node);

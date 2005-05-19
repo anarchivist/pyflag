@@ -464,7 +464,7 @@ class HTMLUI(UI.GenericUI):
         >>> def tree_cb(branch):
 
         The call back function is a generator which is expected to yield (name,value,state) tuples representing the entries under the requested branch:
-              - name: The name of the tree branch. This name will be used to access the tree branches and may have limitations on the characters that may be present.
+              - name: The name of the tree branch. This name will be used to access the tree branches and may have limitations on the characters that may be present. __This can not be empty, or the line will be rejected___.
               - value: A string or a UI object that will be displayed at that position in the tree
               - state: Indicates if this is a \"branch\" (i.e. can be opened up) or a leaf.
 
@@ -509,7 +509,7 @@ class HTMLUI(UI.GenericUI):
             #it.
             branch_array=branch[:depth]
             for k,v,t in tree_cb(branch_array):
-                if not k: return
+                if not k: continue
                 if not t: continue
                 tmp.append((depth,k,v,t))
                 try:
@@ -534,11 +534,11 @@ class HTMLUI(UI.GenericUI):
                             tree_array.append((depth,tmp[start-1][1],'<img src=/flag/images/up.png border=0> ...','special'))
                         
                         tree_array += tmp[start:]
-
                         tmp = []
                         found = 1
                         #Recurse into the next level in the tree
                         draw_branch(depth+1,tree_array)
+                        print tree_array
                                                 
                 except IndexError,e:
                     #This is triggered when there is no deeper level in the tree

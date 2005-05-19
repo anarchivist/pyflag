@@ -151,7 +151,7 @@ class FlagTreeModel(gtk.GenericTreeModel):
             return
         
         path=self.path_from_node(branch)
-        self.cache[branch]=[ d for d in self.callback(path[1:]) ]
+        self.cache[branch]=[ d for d in self.callback(path[1:]) if d[0] ]
         if len(self.cache[branch])==0 or self.cache[branch][0][0]==None:
             self.cache[branch]=[("(empty)",None,'leaf')]
 

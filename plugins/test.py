@@ -176,44 +176,26 @@ class EtherealTest(Reports.report):
     family="Test"
     def display(self,query,result):
         a=pyethereal.open_file("/tmp/test.pcap")
-        proto_tree = pyethereal.read_and_dissect_next_packet(a)
+        proto_tree = pyethereal.ReadPacket(a)
 
         def tree_cb(branch):
-            node_name = branch[-1]
-            print "will try to find %s" % node_name
-            if node_name=='/':
-                node = pyethereal.get_first_node(proto_tree)
-                node = pyethereal.get_child_node(node)
-            else:
-                node = pyethereal.get_node_by_name(proto_tree,node_name)
-                try:
-                    node = pyethereal.get_child_node(node)
-                except:
-                    print "Unable to find child node"
-                    pass
-            result = []
             try:
-                while 1:
-                    try:
-                        print "child node is %s" % pyethereal.get_child_node(node)
-                        result.append( (
-                            pyethereal.get_node_name(node),
-                            pyethereal.get_node_rep(node),
-                            'branch'))
-                    except:
-                        result.append( (
-                            pyethereal.get_node_name(node),
-                            pyethereal.get_node_rep(node),
-                            'leaf'))
-                        print "No child node"
+                if branch:
+                    node = proto_tree[branch[-1]]
+                else:
+                    node = proto_tree
+            except KeyError:
+                node=proto_tree
 
-                    node=pyethereal.get_next_peer_node(node)
-            except Exception,e:
-                print "%s" % e
-                pass
-#            result.append(('/',None,'branch'))
-            return result
-
+            child = node.get_child()
+            if not child: return
+            for peer in child:
+                print peer.name(),peer
+                if peer.get_child():
+                    yield  ( peer.name(), "%s" % peer,'branch')
+                else:
+                    yield  ( peer.name(),"%s" % peer,'leaf')
+        
         def pane_cb(branch,result):
             pass
 
