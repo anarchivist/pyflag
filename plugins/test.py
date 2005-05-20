@@ -194,7 +194,7 @@ class EtherealTest(Reports.report):
                 if peer.get_child():
                     yield  ( peer.name(), "%s" % peer,'branch')
                 else:
-                    yield  ( peer.name(),"%s" % peer,'leaf')
+                    yield  ( peer.name(),"%s value=%s" % (peer,peer.value()),'leaf')
         
         def pane_cb(branch,result):
             pass

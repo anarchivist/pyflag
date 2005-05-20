@@ -266,13 +266,20 @@ char *get_node_name(proto_node *node){
 %pythoncode %{   
 class Node:
    """ Node is a class which represents a node in the dissection tree """
-   def __init__(self,node):
+   def __init__(self,node,dissector=None):
        """ This base class is instantiated with a swig proto_node
        object, derived classes should get new ways for getting such an
-       opaque object"""
+       opaque object
+
+       We allow dissectors to set themselves as an attribute in this
+       node. This is required in order to ensure that dissectors do not
+       get gced, because we will typically really need them here. It
+       also allows us to get at the dissectors if we need to.
+       """
        if not node:
            raise IOError("Invalid Node provided")
        self.node=node
+       self.dissector_obj=dissector
 
    def value(self):
        """ Returns the value of this node according to its type """
@@ -315,7 +322,7 @@ class Node:
        object. If we do not have children we return None."""
        result = get_child_node(self.node)
        if not result: return None
-       return Node(result)
+       return Node(result,self.dissector_obj)
    
    def __str__(self):
        """ We return Ethereals representation (The text which is printed in the GUI """
@@ -328,7 +335,7 @@ class Node:
 
    def next(self):
        if self.current_iter:
-           result=Node(self.current_iter)
+           result=Node(self.current_iter,self.dissector_obj)
            self.current_iter = get_next_peer_node(self.current_iter)
            return result
        else:
@@ -345,7 +352,7 @@ class ReadPacket(Node):
         Note that file must be a wtap object obtained from open_file.
         """
         self.dissector = read_and_dissect_next_packet(file)
-        Node.__init__(self,get_first_node(self.dissector))
+        Node.__init__(self,get_first_node(self.dissector),self)
 
     def __getitem__(self,name):
        """ We can get a node by using its abbreviation. Note that this
@@ -358,7 +365,7 @@ class ReadPacket(Node):
        if not result:
            raise KeyError("Uable to find node %s" % name)
 
-       return Node(result)
+       return Node(result,self)
    
     def __del__(self):
         """ Free memory as required """
@@ -368,7 +375,8 @@ class Packet(ReadPacket):
     """ A class representing a packet dissected from a buffer """
     def __init__(self,buffer,frame_number=0):
         self.dissector = dissect_buffer(buffer,frame_number)
-        Node.__init__(self,get_first_node(self.dissector))
+        Node.__init__(self,get_first_node(self.dissector),self)
+
 %}
 
 proto_node *get_first_node(epan_dissect_t *edt);

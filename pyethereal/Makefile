@@ -12,17 +12,16 @@ MISC_LIBS = ../libs/
 
 ## These are the files which make up our sources:
 SOURCES = Makefile.pyethereal pyethereal.i
+
 all:
-	## Added for pcap parsing tool
-	make -f Makefile.pcap_parse all
-	mv pcap_parse ../bin/
-			
 	if [ -d "$(ETHEREAL_SRC)" ]; then cp $(SOURCES) $(ETHEREAL_SRC); else echo Unable to find Ethereal source code in ../sources/ && false; fi
 	cd $(ETHEREAL_SRC); make -f Makefile.pyethereal pyethereal
 	for f in `ls $(ETHEREAL_LIBS)`; do cp $$f $(MISC_LIBS); done
 
+pcap_parse:
+	make -f Makefile.pcap_parse all
+	mv pcap_parse ../bin/
+
 clean:
 	for f in `ls $(ETHEREAL_LIBS)`; do rm -f $(MISC_LIBS)/`basename $$f`; done
-
-	## Added for pcap parsing tool
 	rm -f ../bin/pcap_parse	

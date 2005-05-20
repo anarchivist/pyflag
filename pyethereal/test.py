@@ -19,7 +19,7 @@ fd=open(FILENAME)
 fd.seek(40)
 data=fd.read(74)
 n=pyethereal.Packet(data,10)
-output( "Print the top level nodes:")
+output( "Print the content of frame: (We allow n to go out of scope here to test reference count)")
 n=n['frame']
 print n
 for i in n.get_child():
