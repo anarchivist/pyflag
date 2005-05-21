@@ -194,9 +194,18 @@ class EtherealTest(Reports.report):
                 if peer.get_child():
                     yield  ( peer.name(), "%s" % peer,'branch')
                 else:
-                    yield  ( peer.name(),"%s value=%s" % (peer,peer.value()),'leaf')
+                    yield  ( peer.name(),"%s" % (peer),'leaf')
         
         def pane_cb(branch,result):
-            pass
+            try:
+                if branch:
+                    node = proto_tree[branch[-1]]
+                else:
+                    node = proto_tree
+            except KeyError:
+                node=proto_tree
+
+            result.heading("%s" % node.name())
+            result.text("value is %s" % node.value(),color='red')
 
         result.tree(tree_cb=tree_cb, pane_cb=pane_cb, branch=['/'])

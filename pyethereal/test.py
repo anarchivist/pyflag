@@ -11,7 +11,7 @@ for i in n.get_child():
     print i
 
 #output( "Find and print the tcp node:")
-v=n['udp'].value()
+v=n['udp.srcport'].value()
 print v,type(v)
 
 output("Testing buffer dissection: Frame 10")
@@ -20,7 +20,7 @@ fd.seek(40)
 data=fd.read(74)
 n=pyethereal.Packet(data,10)
 output( "Print the content of frame: (We allow n to go out of scope here to test reference count)")
-n=n['frame']
+n=n['udp']
 print n
 for i in n.get_child():
     print i

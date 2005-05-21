@@ -319,10 +319,11 @@ class LoadFS(Reports.report):
 
                 result.const_selector("Enter Filesystem type",'fstype',fs_types,fs_types)
                 result.ruler()
-            except FlagFramework.FlagException:
+            except FlagFramework.FlagException,e:
                 result.hidden('fstype','Mounted')
-            
-        except (KeyError,IOError,TypeError):
+        except IOError,e:
+            result.text("IOError %s" % e,color='red')
+        except (KeyError,TypeError),e:
             pass
 
     def analyse(self,query):

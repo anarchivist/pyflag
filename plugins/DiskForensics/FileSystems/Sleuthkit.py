@@ -21,9 +21,8 @@ class Ext2(DBFS):
     name = "Linux ext2"
 
     def load(self):
+        DBFS.load(self)
         sdbh = DB.DBO(self.case)
-        sdbh.MySQLHarness("%s -t %s -d create blah" %(config.SLEUTHKIT,self.table))
-
         opts = []
         for i in range(len(self.iosource.parameters)-1):
             for j in range(len(self.iosource.options[i+1])):
@@ -38,10 +37,6 @@ class Ext2(DBFS):
         sdbh.MySQLHarness(
             string
             )
-
-    def delete(self):
-        dbh = DB.DBO(self.case)
-        dbh.MySQLHarness("%s -t %s -d drop" %(config.SLEUTHKIT,self.table))
 
 class Ext3(Ext2):
     sk_type = "linux-ext3"

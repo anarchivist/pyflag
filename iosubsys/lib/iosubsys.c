@@ -181,8 +181,8 @@ int    adv_read_random(IO_INFO *self, char *buf, int len, off_t offs,
 
     while(len>0) {
       if(!file)
-	RAISE(E_IOERROR,NULL,"read random seek error: offset %llu:", 
-	      (off_t) offs);
+	//If we dont have any more data, we break and return what we have.
+	break;
       
       // Now find out how much we can read from this file:
       available= file->end_offset - offs;

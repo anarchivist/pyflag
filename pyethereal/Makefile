@@ -11,16 +11,16 @@ ETHEREAL_LIBS = $(ETHEREAL_SRC)/wiretap/.libs/libwiretap.so.0* $(ETHEREAL_SRC)/e
 MISC_LIBS = ../libs/
 
 ## These are the files which make up our sources:
-SOURCES = Makefile.pyethereal pyethereal.i
+SOURCES = Makefile.pyethereal pyethereal.i pcaptool.c
 
-all:
+all: pcaptool
 	if [ -d "$(ETHEREAL_SRC)" ]; then cp $(SOURCES) $(ETHEREAL_SRC); else echo Unable to find Ethereal source code in ../sources/ && false; fi
 	cd $(ETHEREAL_SRC); make -f Makefile.pyethereal pyethereal
 	for f in `ls $(ETHEREAL_LIBS)`; do cp $$f $(MISC_LIBS); done
 
-pcap_parse:
-	make -f Makefile.pcap_parse all
-	mv pcap_parse ../bin/
+pcaptool:
+	cd $(ETHEREAL_SRC); make -f Makefile.pyethereal pcaptool	
+	mv $(ETHEREAL_SRC)/pcaptool ../bin/
 
 clean:
 	for f in `ls $(ETHEREAL_LIBS)`; do rm -f $(MISC_LIBS)/`basename $$f`; done

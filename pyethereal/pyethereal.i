@@ -121,6 +121,9 @@ epan_dissect_t *read_and_dissect_next_packet(wtap *file) {
    struct wtap_pkthdr hdr;
    union wtap_pseudo_header phdr;
 
+   //Ensure that ethereal is initialised before we try to use it:
+   if(!is_initialised) ethereal_init();
+
    memset(&hdr,0,sizeof(hdr));
    memset(&phdr,0,sizeof(phdr));
    

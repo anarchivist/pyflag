@@ -184,11 +184,23 @@ class DBFS(FileSystem):
         except:
             self.blocksize = 1024
 
+    def load(self):
+        """ Sets up the schema for loading the filesystem.
+
+        Note that derived classes need to actually do the loading
+        after they call the base class.
+        """
+        sdbh = DB.DBO(self.case)
+        sdbh.MySQLHarness("%s -t %s -d create blah" %(config.SLEUTHKIT,self.table))
+    def delete(self):
+        dbh = DB.DBO(self.case)
+        dbh.MySQLHarness("%s -t %s -d drop" %(config.SLEUTHKIT,self.table))
+
     def VFSCreate(self,root_inode,inode,new_filename,**properties):
         """ Extends the DB filesystem to include further virtual filesystem entries.
 
         Note that there must be an appropriate VFS driver for the added inodes, or else they may not be viewable.
-        @arg root_inode: The inode that will serve as the root for the new inode
+        @arg root_inode: The inode that will serve as the root for the new inode. If None, we create a root Inode.
         @arg inode: The proposed inode name for the new inode (without the | to the root_inode). This needs to be understood by the VFS driver.
         @arg new_filename: The prposed new filename for the VFS file. This may contain directories in which case sub directories will also be created.
         """
