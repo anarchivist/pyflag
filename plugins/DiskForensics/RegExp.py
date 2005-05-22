@@ -54,7 +54,7 @@ class RegScan(GenScanFactory):
         self.dbh.execute('drop table regexp_%s',self.table)
 
     class Scan(MemoryScan):
-        def __init__(self, inode,ddfs,outer,factories=None):
+        def __init__(self, inode,ddfs,outer,factories=None,fd=None):
             MemoryScan.__init__(self, inode,ddfs,outer,factories)
             self.window = ''
             self.listfound = None

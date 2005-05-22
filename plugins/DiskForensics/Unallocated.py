@@ -98,21 +98,12 @@ class UnallocatedScan(GenScanFactory):
 
 
     class Scan(BaseScanner):                
-        def __init__(self, inode,ddfs,outer,factories=None):
-            BaseScanner.__init__(self, inode,ddfs,outer,factories)
-            self.inode=inode
-            self.ddfs=ddfs
-            self.outer=outer
-            self.factories=factories
-            ## This stores the absolute offset in the file we are scanning
-            self.offset=0
-            
         def process(self,data,metadata=None):
             ## We only scan top level Unallocated inodes
             if self.inode.startswith('U') and "|" not in self.inode:
                 for cut in Exgrep.process_string(data):
                     ## Create a VFS node:
-                    offset = cut['offset']+self.offset
+                    offset = cut['offset']+self.fd.tell()
                     self.outer.fsfd.VFSCreate(self.inode,'U%s' % offset,"%s.%s" % (offset,cut['type']),size=cut['length'])
                     self.outer.dbh.execute("insert into unallocated_%s set inode='%s|U%s',offset=%r,size=%r" , (self.outer.table,self.inode,offset,offset,cut['length']))
 
@@ -124,7 +115,6 @@ class UnallocatedScan(GenScanFactory):
                     print "inode is %s" % fd.inode
                     Scanner.scanfile(self.ddfs,fd,self.factories)
                 ## End of for
-                self.offset += len(data)
                 
         def finish(self):
             pass

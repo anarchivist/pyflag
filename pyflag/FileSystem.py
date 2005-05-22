@@ -196,13 +196,14 @@ class DBFS(FileSystem):
         dbh = DB.DBO(self.case)
         dbh.MySQLHarness("%s -t %s -d drop" %(config.SLEUTHKIT,self.table))
 
-    def VFSCreate(self,root_inode,inode,new_filename,**properties):
+    def VFSCreate(self,root_inode,inode,new_filename,directory=False ,**properties):
         """ Extends the DB filesystem to include further virtual filesystem entries.
 
         Note that there must be an appropriate VFS driver for the added inodes, or else they may not be viewable.
         @arg root_inode: The inode that will serve as the root for the new inode. If None, we create a root Inode.
         @arg inode: The proposed inode name for the new inode (without the | to the root_inode). This needs to be understood by the VFS driver.
         @arg new_filename: The prposed new filename for the VFS file. This may contain directories in which case sub directories will also be created.
+        @arg directory: If true we create a directory node.
         """
         ## filename is the filename in the filesystem for the zip file.
         if root_inode:
@@ -214,6 +215,7 @@ class DBFS(FileSystem):
         dirs = os.path.dirname(new_filename).split('/')
         name = os.path.basename(new_filename)
 
+        ## This creates subdirectories for node if they are missing.
         for d in range(len(dirs)):
             if not dirs[d]: continue
             if d>0:
@@ -230,7 +232,7 @@ class DBFS(FileSystem):
                     self.dbh.execute("insert into inode_%s  set mode=%r, links=%r , inode='%s|%s-',gid=0,uid=0,size=1",(self.table,40755, 4,root_inode,inode))
                 else:
                     self.dbh.execute("insert into file_%s set path=%r,name=%r,status='alloc',mode='d/d',inode='%s-'",(self.table,path,dirs[d],inode))
-                    self.dbh.execute("insert into inode_%s  set mode=%r, links=%r , inode='%s-',gid=0,uid=0,size=1",(self.table,40755, 4,root_inode,inode))
+                    self.dbh.execute("insert into inode_%s  set mode=%r, links=%r , inode='%s-',gid=0,uid=0,size=1",(self.table,40755, 4,inode))
                     
         path = normpath("%s/%s/" % (filename,os.path.dirname(new_filename)))
         ## Add the file itself to the file table

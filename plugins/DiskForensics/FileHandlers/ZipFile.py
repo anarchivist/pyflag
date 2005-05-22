@@ -38,10 +38,7 @@ class ZipScan(GenScanFactory):
     """ Recurse into Zip Files """
     order=99
     default = False
-    def __init__(self,dbh, table,fsfd):
-        self.dbh=dbh
-        self.table=table
-        
+    
     def destroy(self):
         pass
     

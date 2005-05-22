@@ -62,6 +62,21 @@ ethereal_fill_in_fdata(frame_data *fdata, int count,
 
 static int is_initialised=0;
 
+//Ethereal attempts to modify pref. Even if it restores it - we should
+//wrap it with strdup/free. Note: The format of preference is
+//module.preference:value.
+ static int set_pref(char *pref) {
+   char *str=strdup(pref);
+   int result;
+
+   //Ensure that ethereal is initialised before we try to use it:
+   if(!is_initialised) ethereal_init();
+
+   result=prefs_set_pref(str);
+   free(str);
+   return(result);
+ };
+
 static void ethereal_init() {
   /* Initialise the main ethereal core */
   epan_init(PLUGIN_DIR,register_all_protocols,register_all_protocol_handoffs,
@@ -69,6 +84,7 @@ static void ethereal_init() {
 
   /* init the dissectors data structures */
   init_dissection();
+
   is_initialised=1;
 };
 
@@ -143,8 +159,15 @@ enum ftenum get_type(proto_node *node) {
   return node->finfo->hfinfo->type;
 };
 
+//Get the ip address as a 32 bit int
+ unsigned int get_ip_as_int(proto_node *node) {
+   if(!node || !node->finfo) return 0;
+
+   return node->finfo->value.value.integer;
+ };
+
 //Gets the value of node as a long long int
- long int get_int_value(proto_node *node) {
+unsigned long int get_int_value(proto_node *node) {
    field_info *fi;
    if(!node || !node->finfo) return 0;
 
@@ -243,6 +266,20 @@ char *get_node_name(proto_node *node){
     return node->finfo->hfinfo->abbrev;
 };
 
+//Return the start of this node in the packet buffer (tvb)
+ int get_node_start(proto_node *node) {
+   if(!node || !node->finfo) return(0);
+
+   return node->finfo->start;   
+ };
+
+ //Return the length in bytes of this node in the packet
+ int get_node_length(proto_node *node) {
+   if(!node || !node->finfo) return(0);
+
+   return node->finfo->length;   
+ };
+
 %}
 
 %exception get_first_node {
@@ -284,6 +321,14 @@ class Node:
        self.node=node
        self.dissector_obj=dissector
 
+   def length(self):
+       """ Returns the number of bytes taken by this node in the packet """
+       return get_node_length(self.node)
+
+   def start(self):
+       """ Retruns the starts byte of this node in the packet """
+       return get_node_start(self.node)
+
    def value(self):
        """ Returns the value of this node according to its type """
        type = get_type(self.node)
@@ -311,7 +356,7 @@ class Node:
            FT_INT32:      get_int_value,
            FT_INT64:      get_int_value,
            FT_FRAMENUM:   get_int_value,
-
+           FT_IPv4:       get_ip_as_int,
            }
        try:
            return dispatch[type](self.node)
@@ -396,8 +441,12 @@ char *get_node_rep(proto_node *node);
 char *get_node_name(proto_node *node);
 epan_dissect_t *dissect_buffer(char *buff,int len,int frame_number);
 enum ftenum get_type(proto_node *node);
-long long int get_int_value(proto_node *node);
+unsigned long long int get_int_value(proto_node *node);
 char *get_str_value(proto_node *node);
+unsigned int get_ip_as_int(proto_node *node);
+static int set_pref(char *pref);
+int get_node_start(proto_node *node);
+int get_node_length(proto_node *node);
 
 enum ftenum {
            FT_NONE,
@@ -417,4 +466,5 @@ enum ftenum {
            FT_INT32,
            FT_INT64,
            FT_FRAMENUM,
+           FT_IPv4,
 };

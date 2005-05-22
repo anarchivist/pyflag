@@ -46,14 +46,19 @@ class BaseScanner:
     outer is a reference to the generator object that is used to instantiate these classes.
     
     Note that this is a nested class since it may only be instantiated by first instantiating a Factory object. """
-    def __init__(self, inode,ddfs,outer,factories=None):
+    def __init__(self, inode,ddfs,outer,factories=None,fd=None):
+        """
+        @arg fd: The file descriptor which is being scanned. Note that scanners must not interfere with fd (i.e. never change the current file pointer).
+        """
         self.inode = inode
+        self.fd=fd
         self.size = 0
         self.ddfs = ddfs
         self.ddfs.dbh.set_meta("scan_%s" % outer.__class__, inode)
         self.dbh=outer.dbh
         self.table=outer.table
-#        print "Scanning inode %s with %s" % (inode, outer)
+        self.outer=outer
+        self.factories=factories
 
     def process(self, data, metadata={}):
         """ process the chunk of data.
@@ -124,7 +129,7 @@ class MemoryScan(BaseScanner):
     This scanner implements a sliding window, i.e. each buffer scanned begins with OVERLAP/BUFFERSIZE from the previous buffer. This allows regex, and virus definitions to locate matches that are broken across a block boundary.
     """
     windowsize=200
-    def __init__(self, inode,ddfs,outer,factories=None):
+    def __init__(self, inode,ddfs,outer,factories=None,fd=None):
         BaseScanner.__init__(self, inode,ddfs,outer,factories)
         self.window = ''
         self.offset=0
@@ -146,14 +151,8 @@ class StoreAndScan(BaseScanner):
 
     Note that this is a scanner inner class (which should be defined inside the factory class). This class should be extended by Scanner factories to provide real implementations to the 'boring','make_filename' and 'external_process' methods.
     """
-    def __init__(self, inode,ddfs,outer,factories=None):
+    def __init__(self, inode,ddfs,outer,factories=None,fd=None):
         BaseScanner.__init__(self, inode,ddfs,outer,factories)
-        self.inode = inode
-        self.table=outer.table
-        self.dbh=outer.dbh
-        self.ddfs=ddfs
-        self.factories=factories
-        self.outer=outer
         self.file = None
         self.name = None
         self.boring_status = True
@@ -265,7 +264,7 @@ def scanfile(ddfs,fd,factories):
     for c in factories:
         ddfs.dbh.execute("select * from meta where property=%r and value=%r",("scan_%s" % c.__class__,fd.inode))
         if not ddfs.dbh.fetch():
-            objs.append(c.Scan(fd.inode,ddfs,c,factories=factories))
+            objs.append(c.Scan(fd.inode,ddfs,c,factories=factories,fd=fd))
 
 #    print "Scanning %s with %s" % (fd.inode,objs)
     

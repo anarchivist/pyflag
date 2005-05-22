@@ -108,14 +108,15 @@ class PCAPFile(File):
         dbh = DB.DBO(self.case)
         self.dbh=dbh
         
-        dbh.execute("select count(*) as size from pcap")
+        dbh.execute("select max(id) as max from pcap")
         row=dbh.fetch()
-        self.size = row['size']
+        self.size = row['max']
 
     def read(self,length=None):
         ## If we dont specify the length we get the full packet. Must
         ## be smaller than MAXINT
         if length==None: length=sys.maxint
+        if self.readptr>=self.size: return ''
 
         ## Find out the offset in the file of the packet:
         self.dbh.execute("select * from pcap where id=%r",(self.readptr,))
@@ -146,8 +147,12 @@ class ViewDissectedPacket(Reports.report):
             pass
 
     def display(self,query,result):
+        ## Set some useful ethereal options:
+        pyethereal.set_pref("tcp.analyze_sequence_numbers:false")
+        
         ## Get the IO Source
         io=IO.open(query['case'],query['fsimage'])
+
         ## Open the PCAPFS filesystem
         fsfd = Registry.FILESYSTEMS.fs['PCAPFS']( query["case"], query["fsimage"], io)
         ## Open the root file in the filesystem
@@ -162,6 +167,7 @@ class ViewDissectedPacket(Reports.report):
         packet = fd.read()
 
         print "%r" % packet,len(packet)
+
         ## Now dissect it.
         proto_tree = pyethereal.Packet(packet,id)
         
@@ -196,3 +202,15 @@ class ViewDissectedPacket(Reports.report):
             result.text("value is %s" % node.value(),color='red')
 
         result.tree(tree_cb=tree_cb, pane_cb=pane_cb, branch=['/'])
+
+        ## We add forward and back toolbar buttons to let people move
+        ## to next or previous packet:
+        new_query=query.clone()
+        if id>0:
+            del new_query['id']
+            new_query['id']=id-1
+            result.toolbar(text="Previous Packet",icon="stock_left.png",link=new_query)
+        if id<fd.size:
+            del new_query['id']
+            new_query['id']=id+1
+            result.toolbar(text="Next Packet",icon="stock_right.png",link=new_query)

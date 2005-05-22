@@ -74,7 +74,7 @@ class VirScan(GenScanFactory):
         self.dbh.execute('drop table virus_%s',self.table)
 
     class Scan(MemoryScan):
-        def __init__(self, inode,ddfs,outer,factories=None):
+        def __init__(self, inode,ddfs,outer,factories=None,fd=None):
             MemoryScan.__init__(self, inode,ddfs,outer,factories)
             self.virus = None
             self.scanner = VScan()

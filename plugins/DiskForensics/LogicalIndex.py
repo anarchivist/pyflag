@@ -117,12 +117,9 @@ class Index(GenScanFactory):
         del self.index
         
     class Scan(BaseScanner):
-        def __init__(self, inode,ddfs,outer,factories=None):
+        def __init__(self, inode,ddfs,outer,factories=None,fd=None):
             BaseScanner.__init__(self, inode,ddfs,outer,factories)
             self.index = outer.index
-            self.inode=inode
-            self.dbh=outer.dbh
-            self.outer=outer
             self.outer.rel_offset=0
             self.outer.block+=1
             self.dbh.execute("select max(block) as `max` from `LogicalIndex_%s`",(outer.table))

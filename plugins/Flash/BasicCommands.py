@@ -1,3 +1,4 @@
+
 """ These are basic flash commnads for the flag shell """
 # Michael Cohen <scudette@users.sourceforge.net>
 # David Collett <daveco@users.sourceforge.net>
@@ -32,7 +33,7 @@ import pyflag.Registry as Registry
 import pyflag.logging as logging
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-
+import pyflag.HTMLUI as HTMLUI
 
 class load(pyflagsh.command):
     def help(self):
@@ -388,7 +389,11 @@ class execute(pyflagsh.command):
         ## Instantiate the report
         report=report(self.environment._flag)
         if self.environment._flag.is_cached(query):
-            yield "Report previously run... You need to reset it first."
+            ## Run the display method
+            result=HTMLUI.HTMLUI(query=query)
+            result.form_parms={}
+            report.display(query,result)           
+#            yield "Report previously run... You need to reset it first."
             return
             
         ## Execute the report:
@@ -397,6 +402,11 @@ class execute(pyflagsh.command):
             dbh = self.environment._DBO(query['case'])
             canonical_query = self.environment._flag.canonicalise(query)
             dbh.execute("insert into meta set property=%r,value=%r",('report_executed',canonical_query))
+
+            ## We call the display method just in case this report
+            ## does something in the display
+            result=HTMLUI.HTMLUI(query)
+            report.display(query,result)
             yield "Execution of %s successful in %s sec" % (self.args[1],time.time()-start_time)
         except Exception,e:
             import traceback
@@ -428,6 +438,7 @@ class reset(execute):
 class find(ls):
     """ A command to find files in the filesystem """
     long_opts = [ "name=", "type=" ]
+    
     def execute(self):
         for path in self.args[1:]:
             for file in self.list(path):

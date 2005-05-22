@@ -57,12 +57,8 @@ class MD5Scan(GenScanFactory):
 #        self.dbh.execute('ALTER TABLE md5_%s ADD INDEX(inode, md5)', self.table)
 
     class Scan(BaseScanner):
-        def __init__(self, inode,ddfs,outer,factories=None):
+        def __init__(self, inode,ddfs,outer,factories=None,fd=None):
             BaseScanner.__init__(self, inode,ddfs,outer,factories)
-            self.inode = inode
-            self.ddfs=ddfs
-            self.dbh=outer.dbh
-            self.table=outer.table
             self.m = md5.new()
 
             # Check that we have not done this inode before

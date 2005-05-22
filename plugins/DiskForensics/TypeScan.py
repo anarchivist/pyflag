@@ -55,13 +55,9 @@ class TypeScan(Scanner.GenScanFactory):
     class Scan(Scanner.BaseScanner):
         size=0
         
-        def __init__(self, inode,ddfs,outer,factories=None):
+        def __init__(self, inode,ddfs,outer,factories=None,fd=None):
             Scanner.BaseScanner.__init__(self, inode,ddfs,outer,factories)
-            self.dbh=outer.dbh
-            self.table=outer.table
-            self.ddfs = ddfs
             self.filename=self.ddfs.lookup(inode=inode)
-            self.inode = inode
             self.type_mime = None
             self.type_str = None
         
