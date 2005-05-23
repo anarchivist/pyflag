@@ -1,7 +1,7 @@
 diff -Naur /tmp/sleuthkit-2.00/src/fstools/dbtool.c sleuthkit-2.00/src/fstools/dbtool.c
 --- /tmp/sleuthkit-2.00/src/fstools/dbtool.c	1970-01-01 10:00:00.000000000 +1000
-+++ sleuthkit-2.00/src/fstools/dbtool.c	2005-05-23 14:55:12.000000000 +1000
-@@ -0,0 +1,723 @@
++++ sleuthkit-2.00/src/fstools/dbtool.c	2005-05-23 22:54:25.084757504 +1000
+@@ -0,0 +1,726 @@
 +/*
 +** flag dbtool
 +
@@ -161,12 +161,15 @@ diff -Naur /tmp/sleuthkit-2.00/src/fstools/dbtool.c sleuthkit-2.00/src/fstools/d
 +
 +	for(i=0; i<len; i++) {
 +		if(name[i] < 20 || name[i] > 126) {
++			char_count+=6;
++		}
++		else if(name[i] == 46) {
 +			char_count++;
 +		}
 +	}
 +
 +	//if(char_count > len/2) {
-+	if(char_count > 0) {
++	if(char_count > 5) {
 +		strncpy(name, "<UNKNOWN>", len);
 +	}
 +	return;
@@ -727,7 +730,7 @@ diff -Naur /tmp/sleuthkit-2.00/src/fstools/dbtool.c sleuthkit-2.00/src/fstools/d
 +}
 diff -Naur /tmp/sleuthkit-2.00/src/fstools/fatfs_dent.c sleuthkit-2.00/src/fstools/fatfs_dent.c
 --- /tmp/sleuthkit-2.00/src/fstools/fatfs_dent.c	2005-03-16 11:42:30.000000000 +1100
-+++ sleuthkit-2.00/src/fstools/fatfs_dent.c	2005-05-23 22:18:51.828061816 +1000
++++ sleuthkit-2.00/src/fstools/fatfs_dent.c	2005-05-23 22:44:03.091314880 +1000
 @@ -179,14 +179,10 @@
  		fs_dent->name[fs_dent->namlen++] =
  		    fatfs->lfn[fatfs->lfn_len - 1 - i];
@@ -793,7 +796,7 @@ diff -Naur /tmp/sleuthkit-2.00/src/fstools/fatfs_dent.c sleuthkit-2.00/src/fstoo
  	    }
 diff -Naur /tmp/sleuthkit-2.00/src/fstools/Makefile sleuthkit-2.00/src/fstools/Makefile
 --- /tmp/sleuthkit-2.00/src/fstools/Makefile	2005-03-16 11:42:30.000000000 +1100
-+++ sleuthkit-2.00/src/fstools/Makefile	2005-05-23 14:55:12.000000000 +1000
++++ sleuthkit-2.00/src/fstools/Makefile	2005-05-23 22:44:03.091314880 +1000
 @@ -4,10 +4,12 @@
  # OPT	= -O -Wall -static
  OPT	= -O -Wall 

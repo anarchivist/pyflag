@@ -1,7 +1,7 @@
 # This makefile patches and compiles the relevant sources
 BIN		= ../bin/
 ETHEREAL	= ethereal-0.10.2
-SLEUTHKIT	= sleuthkit-1.73
+SLEUTHKIT	= sleuthkit-2.00
 ## If ethereal should be compiled statically
 STATIC		= yes
 PLOTICUS	= pl231src
