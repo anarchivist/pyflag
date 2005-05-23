@@ -361,9 +361,15 @@ class DBFS(FileSystem):
 
 class File:
     """ This abstract base class documents the file like object used to read specific files in PyFlag.
+
+    @cvar stat_cbs: A list of callbacks that should be used to render specific statistics displays about this file. These are basically callbacks for the notebook interface cb(query,result).
+    @cvar stat_names: A list of names for the above callbacks.
     """
     readptr = None
     size = None
+    stat_cbs = None
+    stat_names = None
+    
     def __init__(self, case, table, fd, inode):
         """ The constructor for this object.
         @arg case: Case to use

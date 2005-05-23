@@ -28,6 +28,7 @@ import struct,sys,cStringIO
 import pyflag.DB as DB
 from pyflag.FileSystem import File
 import pyflag.IO as IO
+import pyflag.FlagFramework as FlagFramework
 
 def IP2str(ip):
     """ Returns a string representation of the 32 bit network order ip """
@@ -44,6 +45,7 @@ class StreamReassembler(GenScanFactory):
     connection and some shortcuts to access their data.
     """
     default = True
+
     def prepare(self):
         ## We create the tables we need
         self.dbh.execute(
@@ -105,21 +107,41 @@ class StreamReassembler(GenScanFactory):
             
             ## check the connection_details table to see if we have
             ## done this connection previously:
-            self.dbh.execute("select * from connection_details_%s where src_ip=%r and src_port=%r and dest_ip=%r and dest_port=%r",(
-                self.table, ipsrc,tcpsrcport, ipdest, tcpdestport))
-            
-            row=self.dbh.fetch()
-            if not row:
-                ## We insert into the connection_details table...
-                ## FIXME: This is a potential race in multithreaded mode.
-                self.dbh.execute("insert into connection_details_%s set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r",(
-                    self.table, ipsrc,tcpsrcport, ipdest, tcpdestport))
+            self.dbh.execute("select * from connection_details_%s where (src_ip=%r and src_port=%r and dest_ip=%r and dest_port=%r) or (src_ip=%r and src_port=%r and dest_ip=%r and dest_port=%r)",(
+                self.table,
+                ipsrc,tcpsrcport, ipdest, tcpdestport,
+                ipdest, tcpdestport,ipsrc,tcpsrcport,
+                ))
 
-                ## Create a New VFS directory structure for this connection:
-                con_id=self.dbh.autoincrement()
-                self.ddfs.VFSCreate(None,"S%s" % (con_id) , "%s-%s/%s:%s/forward" % (IP2str(ipsrc),IP2str(ipdest),tcpsrcport, tcpdestport))
-            else:
-                con_id=row['con_id']
+            con_id=-1
+            row=None
+            
+            for row in self.dbh:
+                ## This row represents our connection
+                print row['src_ip'],ipsrc
+                if row['src_ip']==ipsrc:
+                    con_id=row['con_id']
+                    break
+
+            if con_id<0:
+                ## The opposite stream is found but not this stream
+                if row:
+                    ## We insert into the connection_details table...
+                    ## FIXME: This is a potential race in multithreaded mode.
+                    self.dbh.execute("insert into connection_details_%s set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r",(
+                        self.table, row['dest_ip'],row['dest_port'],row['src_ip'],row['src_port']))
+
+                    ## Create a New VFS directory structure for this connection:
+                    con_id=self.dbh.autoincrement()
+                    self.ddfs.VFSCreate(None,"S%s" % (con_id) , "%s-%s/%s:%s/reverse" % (IP2str(row['src_ip']),IP2str(row['dest_ip']),row['src_port'], row['dest_port']))
+                else:
+                    self.dbh.execute("insert into connection_details_%s set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r",(
+                        self.table,
+                        ipsrc,tcpsrcport, ipdest, tcpdestport))
+
+                    ## Create a New VFS directory structure for this connection:
+                    con_id=self.dbh.autoincrement()
+                    self.ddfs.VFSCreate(None,"S%s" % (con_id) , "%s-%s/%s:%s/forward" % (IP2str(ipsrc),IP2str(ipdest),tcpsrcport, tcpdestport))
 
             ## Now insert into connection table:
             packet_id = self.fd.tell()-1
@@ -132,6 +154,16 @@ class StreamReassembler(GenScanFactory):
             packet_offset = tcp_node.start()+tcp_node.length()
 
             self.dbh.execute("insert into connection_%s set con_id=%r,packet_id=%r,seq=%r,length=%r,packet_offset=%r",(self.table,con_id,packet_id,seq,length,packet_offset))
+
+def show_packets(query,result):
+    """ Shows the packets which belong in this stream """
+    result.table(
+        columns = ('packet_id','seq','length'),
+        names = ('Packet ID','Sequence Number','Length'),
+        links = [ FlagFramework.query_type((),family="Network Forensics",report='View Packet',case=query['case'],fsimage=query['fsimage'],__target__='id')],
+        table= 'connection_%s' % query['fsimage'],
+        case=query['case']
+        )
             
 class StreamFile(File):
     """ A File like object to reassemble the stream from individual packets.
@@ -139,7 +171,9 @@ class StreamFile(File):
     Note that this is currently a very Naive reassembler. Stream Reassembling is generally considered a very difficult task. The approach we take is to make a very simple reassembly, and have a different scanner check the stream for potetial inconsistancies.
     """
     specifier = 'S'
-
+    stat_cbs = [ show_packets ]
+    stat_names = [ "Show Packets"]
+    
     def __init__(self, case, table, fd, inode):
         File.__init__(self, case, table, fd, inode)
 

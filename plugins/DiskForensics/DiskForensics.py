@@ -382,9 +382,16 @@ class ViewFile(Reports.report):
                 result=left
             return result
 
+        names=["Statistics","HexDump","Download","Strings"]
+        callbacks=[stats,hexdump,download,strings]
+        
+        if fd.stat_cbs:
+            names.extend(fd.stat_names)
+            callbacks.extend(fd.stat_cbs)
+
         result.notebook(
-            names=["Statistics","HexDump","Download","Strings"],
-            callbacks=[stats,hexdump,download,strings],
+            names=names,
+            callbacks=callbacks,
             context="mode"
             )
             
