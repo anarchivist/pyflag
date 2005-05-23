@@ -24,7 +24,10 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 from pyflag.Scanner import *
 import pyethereal
-import struct
+import struct,sys,cStringIO
+import pyflag.DB as DB
+from pyflag.FileSystem import File
+import pyflag.IO as IO
 
 def IP2str(ip):
     """ Returns a string representation of the 32 bit network order ip """
@@ -114,12 +117,12 @@ class StreamReassembler(GenScanFactory):
 
                 ## Create a New VFS directory structure for this connection:
                 con_id=self.dbh.autoincrement()
-                self.ddfs.VFSCreate(None,"Sf%s" % (con_id) , "%s-%s/%s:%s/forward" % (IP2str(ipsrc),IP2str(ipdest),tcpsrcport, tcpdestport))
+                self.ddfs.VFSCreate(None,"S%s" % (con_id) , "%s-%s/%s:%s/forward" % (IP2str(ipsrc),IP2str(ipdest),tcpsrcport, tcpdestport))
             else:
                 con_id=row['con_id']
 
             ## Now insert into connection table:
-            packet_id = self.fd.tell()
+            packet_id = self.fd.tell()-1
             seq = proto_tree['tcp.seq'].value()
             length = proto_tree['tcp.len'].value()
             tcp_node = proto_tree['tcp']
@@ -130,3 +133,117 @@ class StreamReassembler(GenScanFactory):
 
             self.dbh.execute("insert into connection_%s set con_id=%r,packet_id=%r,seq=%r,length=%r,packet_offset=%r",(self.table,con_id,packet_id,seq,length,packet_offset))
             
+class StreamFile(File):
+    """ A File like object to reassemble the stream from individual packets.
+
+    Note that this is currently a very Naive reassembler. Stream Reassembling is generally considered a very difficult task. The approach we take is to make a very simple reassembly, and have a different scanner check the stream for potetial inconsistancies.
+    """
+    specifier = 'S'
+
+    def __init__(self, case, table, fd, inode):
+        File.__init__(self, case, table, fd, inode)
+
+        ## Strategy: We determine the ISN of this stream at
+        ## startup. When requested to read a range we select all those
+        ## packets whose seq number fall within the range, we then
+        ## initialise the output buffer and copy the data from each of
+        ## the hits onto the buffer at the correct spot. This allows
+        ## us to have missing packets, as we will simply return 0 for
+        ## the byte sequences we are missing.
+        
+        self.fd = IO.open(case,table)
+        
+        self.con_id = int(inode[1:])
+        self.dbh = DB.DBO(self.case)
+        self.dbh.execute("select min(seq) as isn from connection_%s where con_id=%s",(self.table,self.con_id))
+        row=self.dbh.fetch()
+        if not row:
+            raise IOError("No stream with connection ID %s" % self.con_id)
+
+        self.isn = row['isn']
+
+    def readpkt(self,pkt_id,packet_offset,start,end,result,result_offset):
+        """ This function gets the data from pkt_id and pastes it into
+        the file like object in result at offset result_offset.
+
+        We basically do this: pkt_id.data[start:end] -> result[result_offset]
+        @arg pkt_id: The packet ID
+        @arg packet_offset: The offset within the packet where the data starts
+        @arg start: The start within the data segment where we want to copy from
+        @arg end: The end point to copy till
+        @arg result: A cStringIO object to copy the data to
+        @arg result_offset: The position in the cStringIO to paste to
+        """
+        dbh = DB.DBO(self.case)
+        dbh.execute("select * from pcap where id=%r",pkt_id)
+        row = dbh.fetch()
+
+        self.fd.seek(row['offset']+packet_offset+start)
+        
+        data = self.fd.read(end-start)
+        result.seek(result_offset)
+        result.write(data)
+
+    def read(self,len = None):
+        if len==None:
+            len=sys.maxint
+            
+        ##Initialise the output buffer:
+        result = cStringIO.StringIO()
+
+        ## Find out which packets fall within the range of interest
+        self.dbh.execute("select * from connection_%s where con_id=%r and seq+length>=%r and seq<=%r",(
+            self.table,
+            self.con_id,
+            self.isn+self.readptr, ## Start of range
+            self.isn+self.readptr+len, ## End of range
+            ))
+
+        for row in self.dbh:
+            ## This is the case where we start reading half way
+            ## through a packet
+
+            ##    row['seq']|--------->| row['len']
+            ##      self.isn----->| readptr
+            ##We are after  |<--->|
+            if row['seq'] <= self.isn+self.readptr :
+                start = self.isn + self.readptr - row['seq']
+            else:
+                start = 0
+
+            ## This is the case where the packet extends past where we
+            ## want to read:
+            ## LHS = Where the packet ends in the seq number space
+            ## RHS = Where we want to stop reading
+
+            ##        row['seq']|------->| row['len']
+            ## self.isn--->readptr--->| len
+            ##     We are after |<--->|
+            if row['seq']+row['length']>=self.isn+self.readptr+len:
+                end=self.isn + self.readptr + len - row['seq']
+
+            ##    row['seq']|------->| row['len']
+            ## self.isn--->readptr------>| len
+            ## We are after |<------>|
+            else:
+                end=row['length']
+
+            ## We create the output buffer here:
+            ## current packet         |<--->|  (begings at start+row[seq])
+            ## self.isn--->readptr|---------->| len
+            ## Output buffer      |<--------->|
+            ## We want the offset |<->|  for result_offset
+         
+            self.readpkt(
+                row['packet_id'],
+                row['packet_offset'],
+                start,
+                end,
+                result,
+                start+row['seq']-self.isn-self.readptr)
+
+        result.seek(0)
+        data=result.read()
+        result.close()
+        self.readptr+=len
+        return data
