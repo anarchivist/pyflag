@@ -1,6 +1,6 @@
 diff -Naur /tmp/sleuthkit-2.00/src/fstools/dbtool.c sleuthkit-2.00/src/fstools/dbtool.c
 --- /tmp/sleuthkit-2.00/src/fstools/dbtool.c	1970-01-01 10:00:00.000000000 +1000
-+++ sleuthkit-2.00/src/fstools/dbtool.c	2005-05-23 14:55:12.400267872 +1000
++++ sleuthkit-2.00/src/fstools/dbtool.c	2005-05-23 14:55:12.000000000 +1000
 @@ -0,0 +1,723 @@
 +/*
 +** flag dbtool
@@ -725,9 +725,75 @@ diff -Naur /tmp/sleuthkit-2.00/src/fstools/dbtool.c sleuthkit-2.00/src/fstools/d
 +	/* drop tables */
 +	printf("DROP TABLE IF EXISTS meta_%s, inode_%s, file_%s, block_%s, resident_%s;\n", name, name, name, name, name);
 +}
+diff -Naur /tmp/sleuthkit-2.00/src/fstools/fatfs_dent.c sleuthkit-2.00/src/fstools/fatfs_dent.c
+--- /tmp/sleuthkit-2.00/src/fstools/fatfs_dent.c	2005-03-16 11:42:30.000000000 +1100
++++ sleuthkit-2.00/src/fstools/fatfs_dent.c	2005-05-23 22:18:51.828061816 +1000
+@@ -179,14 +179,10 @@
+ 		fs_dent->name[fs_dent->namlen++] =
+ 		    fatfs->lfn[fatfs->lfn_len - 1 - i];
+ 
+-	    /* we will have the short name appended as (xxxxxxx.xxx) */
+-	    if (fs_dent->namlen + 2 < FATFS_MAXNAMLEN) {
+-		fs_dent->name[fs_dent->namlen++] = ' ';
+-		fs_dent->name[fs_dent->namlen++] = '(';
+-	    }
+-
++	    fs_dent->name[fs_dent->namlen] = '\0';
+ 	}
+ 
++	else {
+ 	if (fs_dent->namlen + 12 < FATFS_MAXNAMLEN) {
+ 	    /* copy in the short name, skipping spaces and putting in the . */
+ 	    for (i = 0; i < 8; i++) {
+@@ -221,15 +217,6 @@
+ 	    }
+ 	    fs_dent->name[fs_dent->namlen] = '\0';
+ 	}
+-
+-	/* If we put the LFN and the short in () then add ) */
+-	if (fatfs->lfn_len != 0) {
+-	    if (fs_dent->namlen + 1 < FATFS_MAXNAMLEN)
+-		fs_dent->name[fs_dent->namlen++] = ')';
+-	    fs_dent->name[fs_dent->namlen] = '\0';
+-
+-	    /* reset the stored length */
+-	    fatfs->lfn_len = 0;
+ 	}
+     }
+ 
+@@ -453,28 +440,8 @@
+ 
+ 	    /* we are going to append only the short name */
+ 	    if ((g_save_state) && (g_depth < MAX_DEPTH)) {
+-		char tmpname[13];
+-
+-		if ((strlen(fs_dent->name) > 12) ||
+-		    (strrchr(fs_dent->name, '('))) {
+-		    int i;
+-		    char *ptr;
+-
+-		    ptr = strrchr(fs_dent->name, '(');
+-		    ptr++;
+-
+-		    for (i = 0; i < 12 && ptr[i] != ')'; i++)
+-			tmpname[i] = ptr[i];
+-
+-		    tmpname[i] = '\0';
+-
+-		}
+-		else {
+-		    strncpy(tmpname, fs_dent->name, 13);
+-		}
+-
+ 		g_didx[g_depth] = &g_dirs[strlen(g_dirs)];
+-		strncpy(g_didx[g_depth], tmpname,
++		strncpy(g_didx[g_depth], fs_dent->name,
+ 			DIR_STRSZ - strlen(g_dirs));
+ 		strncat(g_dirs, "/", DIR_STRSZ);
+ 	    }
 diff -Naur /tmp/sleuthkit-2.00/src/fstools/Makefile sleuthkit-2.00/src/fstools/Makefile
 --- /tmp/sleuthkit-2.00/src/fstools/Makefile	2005-03-16 11:42:30.000000000 +1100
-+++ sleuthkit-2.00/src/fstools/Makefile	2005-05-23 14:55:12.399268024 +1000
++++ sleuthkit-2.00/src/fstools/Makefile	2005-05-23 14:55:12.000000000 +1000
 @@ -4,10 +4,12 @@
  # OPT	= -O -Wall -static
  OPT	= -O -Wall 
