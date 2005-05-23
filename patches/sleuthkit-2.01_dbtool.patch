@@ -1,6 +1,6 @@
-diff -Naur sleuthkit-2.01/src/fstools/dbtool.c sleuthkit-2.01-new/src/fstools/dbtool.c
---- sleuthkit-2.01/src/fstools/dbtool.c	1970-01-01 10:00:00.000000000 +1000
-+++ sleuthkit-2.01-new/src/fstools/dbtool.c	2005-05-24 09:17:53.409108848 +1000
+diff -Naur /tmp/sleuthkit-2.01/src/fstools/dbtool.c sleuthkit-2.01/src/fstools/dbtool.c
+--- /tmp/sleuthkit-2.01/src/fstools/dbtool.c	1970-01-01 10:00:00.000000000 +1000
++++ sleuthkit-2.01/src/fstools/dbtool.c	2005-05-24 09:22:25.561735360 +1000
 @@ -0,0 +1,726 @@
 +/*
 +** flag dbtool
@@ -728,10 +728,10 @@ diff -Naur sleuthkit-2.01/src/fstools/dbtool.c sleuthkit-2.01-new/src/fstools/db
 +	/* drop tables */
 +	printf("DROP TABLE IF EXISTS meta_%s, inode_%s, file_%s, block_%s, resident_%s;\n", name, name, name, name, name);
 +}
-diff -Naur sleuthkit-2.01/src/fstools/fatfs_dent.c sleuthkit-2.01-new/src/fstools/fatfs_dent.c
---- sleuthkit-2.01/src/fstools/fatfs_dent.c	2005-04-09 06:10:03.000000000 +1000
-+++ sleuthkit-2.01-new/src/fstools/fatfs_dent.c	2005-05-24 09:17:53.414108088 +1000
-@@ -177,14 +177,10 @@
+diff -Naur /tmp/sleuthkit-2.01/src/fstools/fatfs_dent.c sleuthkit-2.01/src/fstools/fatfs_dent.c
+--- /tmp/sleuthkit-2.01/src/fstools/fatfs_dent.c	2005-04-09 06:10:03.000000000 +1000
++++ sleuthkit-2.01/src/fstools/fatfs_dent.c	2005-05-24 09:47:16.583065664 +1000
+@@ -177,14 +177,11 @@
  		fs_dent->name[fs_dent->namlen++] =
  		    fatfs->lfn[fatfs->lfn_len - 1 - i];
  
@@ -742,13 +742,14 @@ diff -Naur sleuthkit-2.01/src/fstools/fatfs_dent.c sleuthkit-2.01-new/src/fstool
 -	    }
 -
 +	    fs_dent->name[fs_dent->namlen] = '\0';
++	    fatfs->lfn_len = 0; 
  	}
  
 +	else {
  	if (fs_dent->namlen + 12 < FATFS_MAXNAMLEN) {
  	    /* copy in the short name, skipping spaces and putting in the . */
  	    for (i = 0; i < 8; i++) {
-@@ -219,15 +215,6 @@
+@@ -219,15 +216,6 @@
  	    }
  	    fs_dent->name[fs_dent->namlen] = '\0';
  	}
@@ -764,7 +765,7 @@ diff -Naur sleuthkit-2.01/src/fstools/fatfs_dent.c sleuthkit-2.01-new/src/fstool
  	}
      }
  
-@@ -451,28 +438,8 @@
+@@ -451,28 +439,8 @@
  
  	    /* we are going to append only the short name */
  	    if ((g_save_state) && (g_depth < MAX_DEPTH)) {
@@ -794,9 +795,9 @@ diff -Naur sleuthkit-2.01/src/fstools/fatfs_dent.c sleuthkit-2.01-new/src/fstool
  			DIR_STRSZ - strlen(g_dirs));
  		strncat(g_dirs, "/", DIR_STRSZ);
  	    }
-diff -Naur sleuthkit-2.01/src/fstools/Makefile sleuthkit-2.01-new/src/fstools/Makefile
---- sleuthkit-2.01/src/fstools/Makefile	2005-04-09 06:10:03.000000000 +1000
-+++ sleuthkit-2.01-new/src/fstools/Makefile	2005-05-24 09:17:53.415107936 +1000
+diff -Naur /tmp/sleuthkit-2.01/src/fstools/Makefile sleuthkit-2.01/src/fstools/Makefile
+--- /tmp/sleuthkit-2.01/src/fstools/Makefile	2005-04-09 06:10:03.000000000 +1000
++++ sleuthkit-2.01/src/fstools/Makefile	2005-05-24 09:22:25.565734752 +1000
 @@ -4,10 +4,12 @@
  # OPT	= -O -Wall -static
  OPT	= -O -Wall 
