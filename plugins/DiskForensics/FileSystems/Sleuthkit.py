@@ -23,15 +23,11 @@ class Ext2(DBFS):
     def load(self):
         DBFS.load(self)
         sdbh = DB.DBO(self.case)
-        opts = []
-        for i in range(len(self.iosource.parameters)-1):
-            for j in range(len(self.iosource.options[i+1])):
-                opts.append("%s=%s" % (self.iosource.parameters[i+1][3:], self.iosource.options[i+1][j]))
 
         # run sleuthkit
         string= "%s  -i %s -o %s %s -t %s -f %s %s"%(config.IOWRAPPER,
-                                                     self.iosource.options[0][0],
-                                                     ','.join(opts),config.SLEUTHKIT,
+                                                     self.iosource.subsystem,
+                                                     self.iosource.make_parameter_list(),config.SLEUTHKIT,
                                                      self.table,self.sk_type,self.table)
 
         sdbh.MySQLHarness(

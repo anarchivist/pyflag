@@ -1,4 +1,4 @@
-""" These are some basic scanners which users should usually want to run.
+""" This module implements a simple stream reassembler.
 """
 # Michael Cohen <scudette@users.sourceforge.net>
 #

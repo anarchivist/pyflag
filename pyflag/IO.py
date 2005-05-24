@@ -100,6 +100,15 @@ class IO:
     parameters=()
     options = ()
 
+    def make_parameter_list(self):
+        """ Returns a parameter list formatted as parameter=value,parameter=value """
+        opts = []
+        for i in range(len(self.parameters)-1):
+            for j in range(len(self.options[i+1])):
+                opts.append("%s=%s" % (self.parameters[i+1][3:], self.options[i+1][j]))
+
+        return ','.join(opts)
+
     def set_options(self,key,value):
         """ Sets key and value to the susbsystem """
 
@@ -117,11 +126,18 @@ class IO:
                 options=tuple([query.getarray(i) for i in self.parameters])
                                
             self.options = options
+
+            ## Restore the subsystem type
+            try:
+                self.subsystem = query[subsys]
+            except TypeError:
+                self.subsystem=self.options[0][0]
+
             try:
                 self.io=IO.cache[self.options]
             except KeyError:
                 #Try and make the subsystem based on the args
-                self.io=iosubsys.Open(self.options[0][0])
+                self.io=iosubsys.Open(self.subsystem)
                 try:
                     for k in range(len(self.options) - 1):
                         for j in range(len(self.options[k+1])):

@@ -78,7 +78,14 @@ class PCAPFS(DBFS):
         ## This sets up the schema for pcap
         sdbh.MySQLHarness("%s/pcaptool -c -t %s" %(config.FLAG_BIN,self.table))
         ## This populates it
-        sdbh.MySQLHarness("%s/pcaptool -t %s" % (config.FLAG_BIN,self.table))
+        sql =  "%s  -i %s -o %s -- %s/pcaptool -t %s foo"%(config.IOWRAPPER,
+                                                     self.iosource.subsystem,
+                                                     self.iosource.make_parameter_list(),config.FLAG_BIN,
+                                                     self.table)
+
+        print "Will launch %s "% sql
+
+        sdbh.MySQLHarness(sql)
 
         ## Add our VFS node
         self.VFSCreate(None,"p0",'rawdata');
@@ -183,7 +190,6 @@ class ViewDissectedPacket(Reports.report):
             child = node.get_child()
             if not child: return
             for peer in child:
-                print peer.name(),peer
                 if peer.get_child():
                     yield  ( peer.name(), "%s" % peer,'branch')
                 else:
