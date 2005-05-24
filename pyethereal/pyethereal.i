@@ -26,7 +26,7 @@
 %apply (char *STRING, int LENGTH) { (char *buff, int len) };
 
 %{
-#include "config.h"
+#include <config.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -39,6 +39,20 @@
 #include "register.h"
 #include "epan/epan_dissect.h"
 #include "epan/packet.h"
+
+static int is_initialised=0;
+
+static void ethereal_init() {
+  printf("I am initialising ethereal!!!");
+  /* Initialise the main ethereal core */
+  epan_init(PLUGIN_DIR,register_all_protocols,register_all_protocol_handoffs,
+            NULL,NULL,NULL);
+
+  /* init the dissectors data structures */
+  init_dissection();
+
+  is_initialised=1;
+};
 
 static void
 ethereal_fill_in_fdata(frame_data *fdata, int count,
@@ -60,8 +74,6 @@ ethereal_fill_in_fdata(frame_data *fdata, int count,
   fdata->flags.ref_time = 0;
 }
 
-static int is_initialised=0;
-
 //Ethereal attempts to modify pref. Even if it restores it - we should
 //wrap it with strdup/free. Note: The format of preference is
 //module.preference:value.
@@ -76,17 +88,6 @@ static int is_initialised=0;
    free(str);
    return(result);
  };
-
-static void ethereal_init() {
-  /* Initialise the main ethereal core */
-  epan_init(PLUGIN_DIR,register_all_protocols,register_all_protocol_handoffs,
-            NULL,NULL,NULL);
-
-  /* init the dissectors data structures */
-  init_dissection();
-
-  is_initialised=1;
-};
 
 wtap *open_file(char *filename) {
   wtap  *wth;
@@ -246,6 +247,8 @@ struct field_info *get_field_info(proto_node *node) {
   return node->finfo;
 };
 
+ static char buffer[1024];
+
 char *get_node_rep(proto_node *node) {
   char *result;
 
@@ -254,7 +257,8 @@ char *get_node_rep(proto_node *node) {
 
   //FIXME - This leaks.
   if(!result) {
-    result=(char *)malloc(ITEM_LABEL_LENGTH);
+    //result=(char *)malloc(ITEM_LABEL_LENGTH);
+    result=buffer;
     proto_item_fill_label(node->finfo, result);
   };
   return result;
@@ -422,6 +426,7 @@ class ReadPacket(Node):
 class Packet(ReadPacket):
     """ A class representing a packet dissected from a buffer """
     def __init__(self,buffer,frame_number=0):
+	self.buffer=buffer
         self.dissector = dissect_buffer(buffer,frame_number)
         Node.__init__(self,get_first_node(self.dissector),self)
 

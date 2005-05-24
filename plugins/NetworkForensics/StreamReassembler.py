@@ -118,7 +118,6 @@ class StreamReassembler(GenScanFactory):
             
             for row in self.dbh:
                 ## This row represents our connection
-                print row['src_ip'],ipsrc
                 if row['src_ip']==ipsrc:
                     con_id=row['con_id']
                     break
@@ -209,7 +208,7 @@ class StreamFile(File):
         @arg result_offset: The position in the cStringIO to paste to
         """
         dbh = DB.DBO(self.case)
-        dbh.execute("select * from pcap where id=%r",pkt_id)
+        dbh.execute("select * from pcap_%s where id=%r",(self.table,pkt_id))
         row = dbh.fetch()
 
         self.fd.seek(row['offset']+packet_offset+start)

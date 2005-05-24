@@ -16,13 +16,13 @@ int main(int argc, char **argv) {
   int err=0;
   gchar *err_info;
   char *fname=NULL;
-  long data_offset;
-  int packet_id = 0;
+  long unsigned int data_offset;
+  long unsigned int packet_id = 0;
   int file_id = 0;
   int createNewTable = 0;
   char *tableName = NULL;
   int index, c;
- 
+
   while ((c = getopt (argc, argv, "t:c")) != -1) {
     switch(c) {
     case 'c':
@@ -45,18 +45,13 @@ int main(int argc, char **argv) {
   if (createNewTable == TRUE) {
     /* will prob need to do some validation of tableName */
     printf ("CREATE TABLE `%s` ( \n", tableName);
-    printf ("  `file_id` INT NOT NULL , \n");
-    printf ("  `packet_id` INT NOT NULL , \n");
+    printf ("  `id` INT NOT NULL , \n");
     printf ("  `offset` INT NOT NULL , \n");
     printf ("  `length` INT NOT NULL , \n");
+    printf ("  `ts_sec` INT NOT NULL , \n");
+    printf ("  `ts_usec` INT NOT NULL \n");
     printf ("); \n\n");
 
-    /* Should the name of this table be a command line arg? */
-    printf ("CREATE TABLE `filename` ( \n");
-    printf ("  `file_id` INT NOT NULL ,\n");
-    printf ("  `filename` VARCHAR( 255 ) NOT NULL ,\n");
-    printf ("  PRIMARY KEY ( `file_id` )\n");
-    printf (");\n\n");
     exit(0);
   }
 
@@ -69,9 +64,8 @@ int main(int argc, char **argv) {
     if (wth == NULL)
       printf("Problem opening %s. Error code: %i\n", fname, err);
     else {
-      printf ("INSERT INTO `filename` (`file_id`,`filename`) VALUES (%i, '%s');\n", file_id, fname);
       while(wtap_read(wth,&err,&err_info,&data_offset)) {
-        printf("INSERT INTO `%s` (`file_id`,`packet_id`,`offset`,`length`) VALUES (%i,%i,%li,%i);\n", tableName, file_id, packet_id, data_offset, wth->phdr.caplen);
+        printf("INSERT INTO `%s` VALUES (%lu,%lu,%u,%lu,%lu);\n", tableName, packet_id, data_offset,(int) wth->phdr.caplen,(long unsigned int)wth->phdr.ts.tv_sec,(long unsigned int)wth->phdr.ts.tv_usec);
         packet_id++;
       }
       file_id++;

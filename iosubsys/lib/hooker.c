@@ -23,7 +23,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <dlfcn.h>
 #include "iosubsys.h"
 #include <stdarg.h>
@@ -419,6 +418,10 @@ int __fxstat64(int filedes, struct stat *buf) {
     dispatch->__fxstat64(filedes,buf);
     return 0;
   };
+};
+
+int __xstat(int __ver,int filedes,struct stat *buf) {
+  __fxstat64(filedes,buf);
 };
 
 int fileno(FILE *stream) {

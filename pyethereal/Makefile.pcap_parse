@@ -1,8 +1,0 @@
-ETHEREAL_SRC = ../sources/ethereal-0.10.11/
-LDFLAGS = -L$(ETHEREAL_SRC)/wiretap/.libs/ -lwiretap
-
-CFLAGS=-Wall -g -I$(ETHEREAL_SRC)/wiretap/ `glib-config --cflags`
-all: pcap_parse
-
-clean:
-	rm -f pcap_parse

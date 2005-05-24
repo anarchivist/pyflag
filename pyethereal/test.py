@@ -1,18 +1,32 @@
-import pyethereal
-FILENAME="/tmp/test.pcap"
+import pyethereal,sys, gc
+
+FILENAME="/var/tmp/demo/quiet.dump"
 f=pyethereal.open_file(FILENAME)
-n=pyethereal.ReadPacket(f)
 
 def output(message):
     print "\n\n%s\n-------------------------------------------"  % message
 
-output( "Print the top level nodes:")
-for i in n.get_child():
-    print i
+count=0
+for i in range(0,1000):
+    n=pyethereal.ReadPacket(f)
+    output( "Print the top level nodes:")
+    for i in n.get_child():
+        print i
+        
+    try:
+        output( "Find and print the tcp node:")
+        v=n['tcp.srcport'].value()
+        print v,type(v)
+    except:
+        pass
 
-#output( "Find and print the tcp node:")
-v=n['udp.srcport'].value()
-print v,type(v)
+#    n.__del__()
+#    print "Read packet %s" % count
+    count+=1
+
+gc.set_debug(gc.DEBUG_LEAK)
+gc.collect()
+sys.exit(0)
 
 output("Testing buffer dissection: Frame 10")
 fd=open(FILENAME)

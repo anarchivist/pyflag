@@ -76,9 +76,12 @@ class PCAPFS(DBFS):
         DBFS.load(self)
         sdbh = DB.DBO(self.case)
         ## This sets up the schema for pcap
-        sdbh.MySQLHarness("%s/pcaptool -c -t %s" %(config.FLAG_BIN,self.table))
-        ## This populates it
-        sql =  "%s  -i %s -o %s -- %s/pcaptool -t %s foo"%(config.IOWRAPPER,
+        sdbh.MySQLHarness("%s/pcaptool -c -t pcap_%s" %(config.FLAG_BIN,self.table))
+        ## This populates it (libwiretap needs to stat something
+        ## before it opens it. Because we have trouble hooking stat we
+        ## need to provide a real file for it to stat. We can
+        ## guarantee that /etc/passwd exists so we use it here).
+        sql =  "%s  -i %s -o %s -- %s/pcaptool -t pcap_%s /etc/passwd"%(config.IOWRAPPER,
                                                      self.iosource.subsystem,
                                                      self.iosource.make_parameter_list(),config.FLAG_BIN,
                                                      self.table)
@@ -90,10 +93,13 @@ class PCAPFS(DBFS):
         ## Add our VFS node
         self.VFSCreate(None,"p0",'rawdata');
 
+        ## Creates indexes on id:
+        sdbh.check_index("pcap_%s" % self.table,'id')
+
     def delete(self):
         DBFS.delete(self)
         sdbh = DB.DBO(self.case)
-        sdbh.MySQLHarness("%s/pcaptool -d -t %s" % (config.FLAG_BIN,self.table))
+        sdbh.MySQLHarness("%s/pcaptool -d -t pcap_%s" % (config.FLAG_BIN,self.table))
 
 class PCAPFile(File):
     """ A file like object to read packets from a pcap file.
@@ -115,7 +121,7 @@ class PCAPFile(File):
         dbh = DB.DBO(self.case)
         self.dbh=dbh
         
-        dbh.execute("select max(id) as max from pcap")
+        dbh.execute("select max(id) as max from pcap_%s" % table)
         row=dbh.fetch()
         self.size = row['max']
 
@@ -126,7 +132,7 @@ class PCAPFile(File):
         if self.readptr>=self.size: return ''
 
         ## Find out the offset in the file of the packet:
-        self.dbh.execute("select * from pcap where id=%r",(self.readptr,))
+        self.dbh.execute("select * from pcap_%s where id=%r",(self.table,self.readptr,))
         row=self.dbh.fetch()
         self.fd.seek(row['offset'])
         
