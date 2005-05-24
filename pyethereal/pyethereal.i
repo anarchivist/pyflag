@@ -323,7 +323,8 @@ class Node:
        if not node:
            raise IOError("Invalid Node provided")
        self.node=node
-       self.dissector_obj=dissector
+       if dissector:
+           self.dissector=dissector
 
    def length(self):
        """ Returns the number of bytes taken by this node in the packet """
@@ -374,7 +375,7 @@ class Node:
        object. If we do not have children we return None."""
        result = get_child_node(self.node)
        if not result: return None
-       return Node(result,self.dissector_obj)
+       return Node(result,self.dissector)
    
    def __str__(self):
        """ We return Ethereals representation (The text which is printed in the GUI """
@@ -387,7 +388,7 @@ class Node:
 
    def next(self):
        if self.current_iter:
-           result=Node(self.current_iter,self.dissector_obj)
+           result=Node(self.current_iter,self.dissector)
            self.current_iter = get_next_peer_node(self.current_iter)
            return result
        else:
@@ -404,7 +405,7 @@ class ReadPacket(Node):
         Note that file must be a wtap object obtained from open_file.
         """
         self.dissector = read_and_dissect_next_packet(file)
-        Node.__init__(self,get_first_node(self.dissector),self)
+        Node.__init__(self,get_first_node(self.dissector),self.dissector)
 
     def __getitem__(self,name):
        """ We can get a node by using its abbreviation. Note that this
@@ -428,7 +429,7 @@ class Packet(ReadPacket):
     def __init__(self,buffer,frame_number=0):
 	self.buffer=buffer
         self.dissector = dissect_buffer(buffer,frame_number)
-        Node.__init__(self,get_first_node(self.dissector),self)
+        Node.__init__(self,get_first_node(self.dissector),self.dissector)
 
 %}
 

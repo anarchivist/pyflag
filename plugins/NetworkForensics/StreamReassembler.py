@@ -156,11 +156,14 @@ class StreamReassembler(GenScanFactory):
 
 def show_packets(query,result):
     """ Shows the packets which belong in this stream """
+    con_id = int(query['inode'][1:])
+        
     result.table(
         columns = ('packet_id','seq','length'),
         names = ('Packet ID','Sequence Number','Length'),
         links = [ FlagFramework.query_type((),family="Network Forensics",report='View Packet',case=query['case'],fsimage=query['fsimage'],__target__='id')],
         table= 'connection_%s' % query['fsimage'],
+        where = 'con_id=%r' % con_id,
         case=query['case']
         )
             
