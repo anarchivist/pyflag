@@ -36,6 +36,29 @@ def IP2str(ip):
     tmp.reverse()
     return ".".join(["%s" % i for i in tmp])
 
+class NetworkScanner(BaseScanner):
+    """ This is the base class for all network scanners.
+    """
+    def process(self,data,metadata=None):
+        """ Pre-process the data for all other network scanners """
+        ## We try to get previously set proto_tree. We store it in
+        ## a metadata structure so that scanners that follow us
+        ## can reuse it. This ensure we do not un-necessarily
+        ## dissect each packet.
+        try:
+            self.packet_id = self.fd.tell()-1
+            self.proto_tree = metadata['proto_tree'][packet_id]
+        except:
+            ## Ensure ethereal doesnt fiddle with the sequence numbers
+            ## for us:
+            pyethereal.set_pref("tcp.analyze_sequence_numbers:false")
+
+            ## Now dissect it.
+            self.proto_tree = pyethereal.Packet(data,self.packet_id)
+
+            ## Store it for the future
+            metadata['proto_tree']={ packet_id: self.proto_tree }
+
 class StreamReassembler(GenScanFactory):
     """ This scanner reassembles the packets into the streams.
 
@@ -74,9 +97,6 @@ class StreamReassembler(GenScanFactory):
         self.dbh.check_index("connection_details_%s" % self.table,'dest_ip')
         self.dbh.check_index("connection_details_%s" % self.table,'dest_port')
 
-        ## We start counting packets
-        self.count=0
-
     def reset(self):
         self.dbh.execute("drop table connection_%s",(self.table,))
         self.dbh.execute("drop table connection_details_%s",(self.table,))
@@ -88,14 +108,6 @@ class StreamReassembler(GenScanFactory):
 
             We dissect it and add it to the connection table.
             """
-            ## Ensure ethereal doesnt fiddle with the sequence numbers
-            ## for us:
-            pyethereal.set_pref("tcp.analyze_sequence_numbers:false")
-            
-            ## Now dissect it.
-            proto_tree = pyethereal.Packet(data,self.outer.count)
-            self.outer.count+=1
-
             ## See if we can find what we need in this packet
             try:
                 ipsrc=proto_tree['ip.src'].value()
@@ -153,6 +165,9 @@ class StreamReassembler(GenScanFactory):
             packet_offset = tcp_node.start()+tcp_node.length()
 
             self.dbh.execute("insert into connection_%s set con_id=%r,packet_id=%r,seq=%r,length=%r,packet_offset=%r",(self.table,con_id,packet_id,seq,length,packet_offset))
+
+        def finish(self):
+            self.dbh.check_index("connection_%s" % self.table, 'con_id')
 
 def show_packets(query,result):
     """ Shows the packets which belong in this stream """
