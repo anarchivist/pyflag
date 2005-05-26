@@ -2,9 +2,8 @@
 #include <time.h>
 #include <stdlib.h>
 #include <glib.h>
-#include <wtap.h>
+#include "wiretap.h"
 #include <unistd.h>
-#include <wtap-int.h>
 
 void printUsage() {
   printf ("\nUSAGE: $ ./pcap_parse -t tablename [-c] inputfile [inputfile]...\n");

@@ -1,0 +1,13 @@
+FLAG_MISC = ../../../../iosubsys/misc/
+DBTOOL_INCL =  -I$(FLAG_MISC)
+DBTOOL_LIBOBJ = $(FLAG_MISC)/except.o
+
+first:
+	@CC="$(CC)" sh ../makedefs
+
+include Makefile.sleuthkit
+
+all: dbtool
+
+dbtool: dbtool.c
+	$(CC) $(INCL) $(CFLAGS) $(DBTOOL_INCL) $@.c -o $@ $(LIB) $(LIBS) $(SYSLIBS)  $(DBTOOL_LIBOBJ)

@@ -26,19 +26,16 @@
 %apply (char *STRING, int LENGTH) { (char *buff, int len) };
 
 %{
-#include <config.h>
+#define PLUGIN_DIR "."
 #include <stdlib.h>
 #include <stdio.h>
+#include <glib.h>
 #include <string.h>
-#include <ctype.h>
 #include <locale.h>
 #include <limits.h>
 
 #include <unistd.h>
-#include "wtap.h"
-#include "register.h"
-#include "epan/epan_dissect.h"
-#include "epan/packet.h"
+#include "ethereal.h"
 
 static int is_initialised=0;
 

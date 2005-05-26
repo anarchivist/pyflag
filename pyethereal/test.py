@@ -1,6 +1,6 @@
 import pyethereal,sys, gc
 
-FILENAME="/var/tmp/demo/quiet.dump"
+FILENAME="/tmp/test.pcap"
 f=pyethereal.open_file(FILENAME)
 
 def output(message):

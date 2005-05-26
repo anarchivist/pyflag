@@ -1,11 +1,12 @@
 ## Top level makefile
 include Makefile.in
+CWD = $(shell pwd)
 
 all:	pyflag-target
 
 pyflag-target:	bins
 	for dir in $(DIRS); do\
-          (echo Entering directory `pwd`/$$dir; cd $$dir; make "CC=$(CC)" MAKELEVEL= ; echo leaving directory $$dir ); done
+          (echo Entering directory $(CWD)/$$dir; cd $$dir; make "CC=$(CC)" MAKELEVEL= TOPLEVEL=$(CWD); echo leaving directory $$dir ); done
 
 ## Copy binaries from the system to put into the flag bin dir
 bins:
@@ -15,7 +16,7 @@ clean:
 	for dir in $(DIRS); do\
           (cd $$dir; make clean "CC=$(CC)" MAKELEVEL=); done
 	for dir in $(CLEAN_DIRS); do rm -rf $$dir; done
-	  
+
 deb-pkg:	pkg-bin-distro
 
 	#Put the package control file in the right place
