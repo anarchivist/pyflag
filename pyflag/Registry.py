@@ -57,6 +57,8 @@ class Registry:
         ## Recurse over all the plugin directories recursively
         for path in config.PLUGINS.split(':'):
             for dirpath, dirnames, filenames in os.walk(path):
+                sys.path.append(dirpath)
+                
                 for filename in filenames:
                     #Lose the extension for the module name
                     module_name = filename[:-3]
@@ -154,6 +156,28 @@ class Registry:
         If there is any problem, we chuck an exception.
         """
 
+    def import_module(self,name=None,load_as=None):
+        """ Loads the named module into the system module name space.
+        After calling this it is possible to do:
+
+        import load_as
+
+        in all other modules. Note that to avoid race conditions its best to only attempt to use the module after the registry is initialised (i.e. at run time not load time).
+
+        @arg load_as: name to use in the systems namespace.
+        @arg name: module name to import
+        @note: If there are several modules of the same name (which should be avoided)  the last one encountered during registring should persist. This may lead to indereminate behaviour.
+        """
+        if not load_as: load_as=name
+        
+        for module in self.modules:
+            if name==module.__name__:
+                sys.modules[load_as] = module
+                return
+
+        raise ImportError("No module by name %s" % name)
+
+                
 class ReportRegistry(Registry):
     """ A class to register reports.
 
@@ -327,3 +351,8 @@ def Init():
     import pyflag.FileSystem as FileSystem
     global FILESYSTEMS
     FILESYSTEMS = FileSystemRegistry(FileSystem.FileSystem)
+
+
+def import_module(name,load_as=None):
+    Init()
+    REPORTS.import_module(name,load_as)

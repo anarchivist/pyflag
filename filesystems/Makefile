@@ -1,3 +1,5 @@
+include $(TOPLEVEL)/Makefile.in
+
 SLEUTHKITSRC = "$(shell find ../sources/ -name sleuthkit\* -type d | head -n1 )"/src/fstools/
 
 SRC = dbtool.c
