@@ -420,10 +420,6 @@ int __fxstat64(int filedes, struct stat *buf) {
   };
 };
 
-int __xstat(int __ver,int filedes,struct stat *buf) {
-  __fxstat64(filedes,buf);
-};
-
 int fileno(FILE *stream) {
   CHECK_INIT;
 	return((int)stream);

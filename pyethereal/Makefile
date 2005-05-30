@@ -13,7 +13,7 @@ pcaptool: pcaptool.c check_headers
 
 pyethereal: pyethereal.i check_headers
 	swig -python $@.i
-	gcc -I /usr/include/python2.3/ `glib-config --cflags glib` pyethereal_wrap.c  -shared  -o _pyethereal.so -lz -lm /usr/lib/libgmodule-2.0.so  -Wl,--export-dynamic  $(ETHEREAL_LIB)/libethereal.so.0 -Wl,--export-dynamic $(ETHEREAL_LIB)/libwiretap.so.0
+	gcc -I /usr/include/python2.3/ `glib-config --cflags glib` pyethereal_wrap.c  -shared  -o _pyethereal.so $$(ldd $$(which tethereal ethereal | head -n 1) | awk '{print $$3};')
 	mv _pyethereal.so pyethereal.py $(MISC_LIBS)/
 
 check_headers:
@@ -23,6 +23,8 @@ check_headers:
 headers: wiretap_includes.h ethereal_includes.h
 	cpp -nostdinc -P $(ETHEREAL_SRC_INCLUDES) wiretap_includes.h > wiretap.h 2>/dev/null || true
 	cpp -nostdinc -P $(ETHEREAL_SRC_INCLUDES) ethereal_includes.h  > ethereal.h 2>/dev/null || true
+
+# Ethereal library dependency is a nightmare... libethereal does not import all the symbols it needs
 
 clean:
 	rm -f *.o pcaptool _pyethereal.so pyethereal.py pyethereal_wrap.c

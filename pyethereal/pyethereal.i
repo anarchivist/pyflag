@@ -396,6 +396,8 @@ class Node:
        return get_node_name(self.node)
 
 class ReadPacket(Node):
+    dissector = None
+    
     def __init__(self,file):
         """ Gets the next packet from the file.
         
@@ -417,10 +419,11 @@ class ReadPacket(Node):
 
        return Node(result,self)
    
-    def __del__(self):
-        """ Free memory as required """
-        free_dissection(self.dissector)
-
+   def __del__(self):
+       """ Free memory as required """
+       if self.dissector:
+           free_dissection(self.dissector)
+           
 class Packet(ReadPacket):
     """ A class representing a packet dissected from a buffer """
     def __init__(self,buffer,frame_number=0):
