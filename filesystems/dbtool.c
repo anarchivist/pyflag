@@ -669,6 +669,11 @@ main(int argc, char **argv)
 	fprintf(stderr, "Loading Directory Entries\n");
 	fs->dent_walk(fs, fs->root_inum, f_flags, (FS_DENT_WALK_FN) print_dent, (char *)0); 
 
+	fs->close(fs);
+	fs = NULL;
+	fs = fs_open(img, fstype);
+	if(!fs) RAISE(E_GENERIC,NULL,"Unable to open file system as %s",fstype);
+
 	/* inode walk
 	 * This fills in the inode table, the callback also calls file_walk
 	 * which fills in the blocks table.
