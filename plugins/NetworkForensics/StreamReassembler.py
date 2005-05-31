@@ -51,6 +51,7 @@ class StreamReassembler(GenScanFactory):
             `src_port` int(11) unsigned NOT NULL default '0',
             `dest_ip` int(11) unsigned NOT NULL default '0',
             `dest_port` int(11) unsigned NOT NULL default '0',
+            `isn` int(100) unsigned NOT NULL default 0,
             KEY `con_id` (`con_id`)
             )""",(self.table,))
         self.dbh.execute(
@@ -81,13 +82,15 @@ class StreamReassembler(GenScanFactory):
 
             We dissect it and add it to the connection table.
             """
+            NetworkScanner.process(self,data,metadata)
+
             ## See if we can find what we need in this packet
             try:
-                ipsrc=proto_tree['ip.src'].value()
-                ipdest=proto_tree['ip.dst'].value()
-                tcpsrcport=proto_tree['tcp.srcport'].value()
-                tcpdestport=proto_tree['tcp.dstport'].value()
-            except:
+                ipsrc=self.proto_tree['ip.src'].value()
+                ipdest=self.proto_tree['ip.dst'].value()
+                tcpsrcport=self.proto_tree['tcp.srcport'].value()
+                tcpdestport=self.proto_tree['tcp.dstport'].value()
+            except IndexError:
                 return
             
             ## check the connection_details table to see if we have
@@ -105,6 +108,7 @@ class StreamReassembler(GenScanFactory):
                 ## This row represents our connection
                 if row['src_ip']==ipsrc:
                     con_id=row['con_id']
+                    isn = row['isn']
                     break
 
             if con_id<0:
@@ -112,16 +116,22 @@ class StreamReassembler(GenScanFactory):
                 if row:
                     ## We insert into the connection_details table...
                     ## FIXME: This is a potential race in multithreaded mode.
-                    self.dbh.execute("insert into connection_details_%s set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r",(
-                        self.table, row['dest_ip'],row['dest_port'],row['src_ip'],row['src_port']))
+                    isn = self.proto_tree['tcp.seq'].value()
+
+                    self.dbh.execute("insert into connection_details_%s set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r ",(
+                        self.table, row['dest_ip'],row['dest_port'],
+                        row['src_ip'],row['src_port'],
+                        isn))
 
                     ## Create a New VFS directory structure for this connection:
                     con_id=self.dbh.autoincrement()
                     self.ddfs.VFSCreate(None,"S%s" % (con_id) , "%s-%s/%s:%s/reverse" % (IP2str(row['src_ip']),IP2str(row['dest_ip']),row['src_port'], row['dest_port']))
                 else:
-                    self.dbh.execute("insert into connection_details_%s set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r",(
+                    isn = self.proto_tree['tcp.seq'].value()
+                    self.dbh.execute("insert into connection_details_%s set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r",(
                         self.table,
-                        ipsrc,tcpsrcport, ipdest, tcpdestport))
+                        ipsrc,tcpsrcport, ipdest, tcpdestport,
+                        isn))
 
                     ## Create a New VFS directory structure for this connection:
                     con_id=self.dbh.autoincrement()
@@ -129,9 +139,9 @@ class StreamReassembler(GenScanFactory):
 
             ## Now insert into connection table:
             packet_id = self.fd.tell()-1
-            seq = proto_tree['tcp.seq'].value()
-            length = proto_tree['tcp.len'].value()
-            tcp_node = proto_tree['tcp']
+            seq = self.proto_tree['tcp.seq'].value()
+            length = self.proto_tree['tcp.len'].value()
+            tcp_node = self.proto_tree['tcp']
             
             ## We consider anything that follows the tcp header as
             ## data belonging to the stream:
@@ -139,19 +149,31 @@ class StreamReassembler(GenScanFactory):
 
             self.dbh.execute("insert into connection_%s set con_id=%r,packet_id=%r,seq=%r,length=%r,packet_offset=%r",(self.table,con_id,packet_id,seq,length,packet_offset))
 
+            ## Signal this inode to our clients
+            metadata['inode']= "S%s" % con_id
+
+            ## Note this connection's ISN to our clients
+            metadata['isn']=isn
+
+            ## Note the offset of this packet in the stream:
+            metadata['stream_offset'] = seq-isn
+
         def finish(self):
             self.dbh.check_index("connection_%s" % self.table, 'con_id')
 
 def show_packets(query,result):
     """ Shows the packets which belong in this stream """
-    con_id = int(query['inode'][1:])
-        
+    tmp = query['inode'][1:].split(":")
+    
+    con_id = int(tmp[0])
+    offset = int(tmp[1])
+    
     result.table(
         columns = ('packet_id','seq','length'),
         names = ('Packet ID','Sequence Number','Length'),
         links = [ FlagFramework.query_type((),family="Network Forensics",report='View Packet',case=query['case'],fsimage=query['fsimage'],__target__='id')],
         table= 'connection_%s' % query['fsimage'],
-        where = 'con_id=%r' % con_id,
+        where = 'con_id=%r ' % con_id,
         case=query['case']
         )
             
@@ -159,6 +181,12 @@ class StreamFile(File):
     """ A File like object to reassemble the stream from individual packets.
 
     Note that this is currently a very Naive reassembler. Stream Reassembling is generally considered a very difficult task. The approach we take is to make a very simple reassembly, and have a different scanner check the stream for potetial inconsistancies.
+
+    The inode format is:
+    Scod_id[:offset]
+
+    con_id is the connection ID
+    offset is an optional offset
     """
     specifier = 'S'
     stat_cbs = [ show_packets ]
@@ -167,6 +195,13 @@ class StreamFile(File):
     def __init__(self, case, table, fd, inode):
         File.__init__(self, case, table, fd, inode)
 
+        tmp = inode[1:].split(":")
+        try:
+            self.offset = int(tmp[1])
+        except IndexError:
+            self.offset = 0
+
+        self.con_id = int(tmp[0])
         ## Strategy: We determine the ISN of this stream at
         ## startup. When requested to read a range we select all those
         ## packets whose seq number fall within the range, we then
@@ -177,9 +212,8 @@ class StreamFile(File):
         
         self.fd = IO.open(case,table)
         
-        self.con_id = int(inode[1:])
         self.dbh = DB.DBO(self.case)
-        self.dbh.execute("select min(seq) as isn from connection_%s where con_id=%s",(self.table,self.con_id))
+        self.dbh.execute("select isn from connection_details_%s where con_id=%r",(self.table,self.con_id))
         row=self.dbh.fetch()
         if not row:
             raise IOError("No stream with connection ID %s" % self.con_id)
@@ -219,8 +253,8 @@ class StreamFile(File):
         self.dbh.execute("select * from connection_%s where con_id=%r and seq+length>=%r and seq<=%r",(
             self.table,
             self.con_id,
-            self.isn+self.readptr, ## Start of range
-            self.isn+self.readptr+len, ## End of range
+            self.isn+self.readptr+self.offset, ## Start of range
+            self.isn+self.readptr+self.offset+len, ## End of range
             ))
 
         for row in self.dbh:
@@ -230,8 +264,8 @@ class StreamFile(File):
             ##    row['seq']|--------->| row['len']
             ##      self.isn----->| readptr
             ##We are after  |<--->|
-            if row['seq'] <= self.isn+self.readptr :
-                start = self.isn + self.readptr - row['seq']
+            if row['seq'] <= self.isn+self.readptr+self.offset :
+                start = self.isn + self.readptr +self.offset - row['seq']
             else:
                 start = 0
 
@@ -243,8 +277,8 @@ class StreamFile(File):
             ##        row['seq']|------->| row['len']
             ## self.isn--->readptr--->| len
             ##     We are after |<--->|
-            if row['seq']+row['length']>=self.isn+self.readptr+len:
-                end=self.isn + self.readptr + len - row['seq']
+            if row['seq']+row['length']>=self.isn+self.readptr+self.offset+len:
+                end=self.isn + self.readptr+self.offset + len - row['seq']
 
             ##    row['seq']|------->| row['len']
             ## self.isn--->readptr------>| len
@@ -264,10 +298,46 @@ class StreamFile(File):
                 start,
                 end,
                 result,
-                start+row['seq']-self.isn-self.readptr)
+                start+row['seq']-self.isn-(self.readptr+self.offset))
 
         result.seek(0)
         data=result.read()
         result.close()
         self.readptr+=len
         return data
+
+    def seek(self,offset,rel=None):
+        result= File.seek(self,offset,rel)
+        return result
+
+class OffsetFile(File):
+    """ A simple offset:length file driver.
+
+    The inode name specifies an offset and a length into our parent Inode.
+    The format is offset:length
+    """
+    specifier = 'o'
+    def __init__(self, case, table, fd, inode):
+        File.__init__(self, case, table, fd, inode)
+        tmp = inode.split('|')[-1]
+        tmp = tmp[1:].split(":")
+        self.offset = int(tmp[0])
+        try:
+            self.size=int(tmp[1])
+        except IndexError:
+            self.size=0
+
+    def seek(self,offset,rel=None):
+        result = File.seek(self,offset,rel)
+
+        self.fd.seek(self.readptr + self.offset)
+        return result
+    
+    def read(self,length=None):
+        if length==None:
+            result=self.fd.read()
+        else:
+            result=self.fd.read(length)
+            
+        self.readptr+=len(result)
+        return result

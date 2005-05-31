@@ -14,7 +14,7 @@ bins:
 
 clean:
 	for dir in $(DIRS); do\
-          (cd $$dir; make clean "CC=$(CC)" MAKELEVEL=); done
+          (cd $$dir; make clean "CC=$(CC)" MAKELEVEL= TOPLEVEL=$(CWD)); done
 	for dir in $(CLEAN_DIRS); do rm -rf $$dir; done
 
 deb-pkg:	pkg-bin-distro

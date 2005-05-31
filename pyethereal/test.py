@@ -7,7 +7,7 @@ def output(message):
     print "\n\n%s\n-------------------------------------------"  % message
 
 count=0
-for i in range(0,1000):
+for i in range(0,10):
     n=pyethereal.ReadPacket(f)
     output( "Print the top level nodes:")
     for i in n.get_child():
@@ -23,10 +23,6 @@ for i in range(0,1000):
 #    n.__del__()
 #    print "Read packet %s" % count
     count+=1
-
-gc.set_debug(gc.DEBUG_LEAK)
-gc.collect()
-sys.exit(0)
 
 output("Testing buffer dissection: Frame 10")
 fd=open(FILENAME)

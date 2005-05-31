@@ -1249,7 +1249,7 @@ class HTMLUI(UI.GenericUI):
         ## We do both javascript refresh as well as meta refresh to
         ## ensure that the browser supports either method
         self.result+=""" <script>function refresh() {window.location="%s";}; setTimeout("refresh()",%s) </script>""" % (query,int(interval)*1000)
-        self.meta += "<META HTTP-EQUIV=Refresh Content=\"%s; URL=/f?%s\">" % (interval,query)
+        self.meta += "<META HTTP-EQUIV=Refresh Content=\"%s; URL=%s\">" % (interval,query)
 
     def icon(self, path, **options):
         """ This allows the insertion of a small static icon picture. The image should reside in the images directory."""

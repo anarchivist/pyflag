@@ -205,7 +205,7 @@ class DBFS(FileSystem):
         @arg new_filename: The prposed new filename for the VFS file. This may contain directories in which case sub directories will also be created.
         @arg directory: If true we create a directory node.
         """
-        ## filename is the filename in the filesystem for the zip file.
+        ## filename is the filename in the filesystem for the parent directory.
         if root_inode:
             filename = self.lookup(inode=root_inode)
         else:
@@ -365,8 +365,6 @@ class File:
     @cvar stat_cbs: A list of callbacks that should be used to render specific statistics displays about this file. These are basically callbacks for the notebook interface cb(query,result).
     @cvar stat_names: A list of names for the above callbacks.
     """
-    readptr = None
-    size = None
     stat_cbs = None
     stat_names = None
     
@@ -394,6 +392,8 @@ class File:
         """ Seeks to a specified position inside the file """
         if rel==1:
             self.readptr += offset
+
+        ## Seek relative to size
         elif rel==2:
             self.readptr = self.size + offset
         else:
@@ -401,6 +401,10 @@ class File:
             
         if(self.size>0 and self.readptr > self.size):
             self.readptr = self.size
+
+        if self.readptr<0: self.readptr=0
+        
+        return self.readptr
          
     def tell(self):
         """ returns the current read pointer"""

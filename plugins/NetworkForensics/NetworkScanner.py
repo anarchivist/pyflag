@@ -28,7 +28,7 @@ class NetworkScanner(BaseScanner):
         try:
             self.packet_id = self.fd.tell()-1
             self.proto_tree = metadata['proto_tree'][packet_id]
-        except:
+        except Exception,e:
             ## Ensure ethereal doesnt fiddle with the sequence numbers
             ## for us:
             pyethereal.set_pref("tcp.analyze_sequence_numbers:false")
@@ -37,4 +37,4 @@ class NetworkScanner(BaseScanner):
             self.proto_tree = pyethereal.Packet(data,self.packet_id)
 
             ## Store it for the future
-            metadata['proto_tree']={ packet_id: self.proto_tree }
+            metadata['proto_tree']={ 'packet_id': self.proto_tree }

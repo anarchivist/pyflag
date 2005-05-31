@@ -419,7 +419,7 @@ class ReadPacket(Node):
 
        return Node(result,self)
    
-   def __del__(self):
+    def __del__(self):
        """ Free memory as required """
        if self.dissector:
            free_dissection(self.dissector)

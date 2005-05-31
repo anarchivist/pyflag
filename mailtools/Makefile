@@ -1,5 +1,6 @@
-include ../Makefile.in
-PSTVER = `echo libpst-*`
+include $(TOPLEVEL)/Makefile.in
+
+PSTVER = $(shell echo libpst-*)
 INCL    = -I$(PYTHONINCL) -I$(PSTVER)
 TARGET = ../libs/
 LIBS	=$(PSTVER)/libpst.o $(PSTVER)/timeconv.o $(PSTVER)/libstrfunc.o $(PSTVER)/debug.o $(PSTVER)/lzfu.o
