@@ -29,6 +29,7 @@ from pyflag.FileSystem import File
 import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
+import pyflag.Reports as Reports
 
 class HTTPScanner(GenScanFactory):
     """ Collect information about HTTP Transactions.
@@ -137,3 +138,37 @@ class HTTPScanner(GenScanFactory):
                     
             except KeyError,e:
                 pass
+
+
+class BrowseHTTPRequests(Reports.report):
+    """ This allows users to search the HTTP Requests that were loaded as part of the PCAP File system.
+    """
+    parameters = { 'fsimage':'fsimage' }
+
+    name = "Browse HTTP Requests"
+    family = "Network Forensics"
+    def form(self,query,result):
+        try:
+            result.case_selector()
+            result.meta_selector(case=query['case'],property='fsimage')
+        except KeyError:
+            pass
+
+    def display(self,query,result):
+        result.heading("Requested URIs in %s" % query['fsimage'])
+        result.table(
+            columns = ['inode','packet','method','host','request'],
+            names = [ 'Inode', "Packet", "Method" ," Host","Request URI" ],
+            table="http_request_%s" % query['fsimage'],
+            links = [
+            FlagFramework.query_type((),
+                                     family="Disk Forensics",case=query['case'],
+                                     report="View File Contents",mode="HexDump",
+                                     fsimage=query['fsimage'],__target__="inode"),
+            FlagFramework.query_type((),
+                                     family=query['family'], report="View Packet",
+                                     fsimage=query['fsimage'],case=query['case'],
+                                     __target__='id')
+            ], 
+            case=query['case']
+            )
