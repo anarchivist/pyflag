@@ -86,10 +86,10 @@ class StreamReassembler(GenScanFactory):
 
             ## See if we can find what we need in this packet
             try:
-                ipsrc=self.proto_tree['ip.src'].value()
-                ipdest=self.proto_tree['ip.dst'].value()
                 tcpsrcport=self.proto_tree['tcp.srcport'].value()
                 tcpdestport=self.proto_tree['tcp.dstport'].value()
+                ipsrc=self.proto_tree['ip.src'].value()
+                ipdest=self.proto_tree['ip.dst'].value()
             except KeyError,e:
                 print "Got exception %s" % e
                 return

@@ -215,10 +215,14 @@ class ViewDissectedPacket(Reports.report):
             except KeyError:
                 node=proto_tree
 
-            result.heading("%s" % node.name())
-            result.text("value is %s" % node.value(),color='red')
+            result.heading("%s" % node)
+            start = node.start()
+            length = node.length()
+            ## Draw the hexdump
+            h=FlagFramework.HexDump(packet,result)
+            h.dump(highlight=start,length=length)
 
-        result.tree(tree_cb=tree_cb, pane_cb=pane_cb, branch=['/'])
+        result.tree(tree_cb=tree_cb, pane_cb=pane_cb, branch=['/'],layout="vertical")
 
         ## We add forward and back toolbar buttons to let people move
         ## to next or previous packet:

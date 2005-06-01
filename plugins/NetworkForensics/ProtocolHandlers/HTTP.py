@@ -82,9 +82,8 @@ class HTTPScanner(GenScanFactory):
                 ## The offset is calculated as the offset from the
                 ## start of this stream inode to the start of the
                 ## request header:
-                offset = (metadata['stream_offset']
-                    + self.proto_tree['http'].start())
-                
+                offset = metadata['stream_offset']
+
                 ## Store in the request table
                 self.dbh.execute("insert into http_request_%s set inode=%r,offset=%r,packet=%r,method=%r,host=%r,request=%r",(self.table, metadata['inode'],offset,self.packet_id,method,host,uri))
             except KeyError:

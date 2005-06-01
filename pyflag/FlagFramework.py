@@ -545,7 +545,7 @@ class HexDump:
         self.data = data
         self.ui = ui
 
-    def dump(self,offset=0,limit=10240,base_offset=0):
+    def dump(self,offset=0,limit=10240,base_offset=0,highlight=0,length=0):
         """ Dumps out the data.
 
         If a UI was specified in the constructor, we use it to display the data.
@@ -558,7 +558,7 @@ class HexDump:
         ui = self.ui
         offset_format =  "%06x   "
         char_format = "%02x "
-        text_format = "   %s\n"
+        text_format = "   %s"
         initial_offset=offset
 
         #Do the headers:
@@ -577,30 +577,36 @@ class HexDump:
             result += offset_format % offset
             text = ''
 
-            for i in range(self.width):
+            tmp_offset=offset
+            for offset in range(tmp_offset,tmp_offset+self.width):
                 try:
-                    ui.text(char_format % ord(self.data[offset]),color='black',font='typewriter')  
+                    if offset>=highlight and offset<highlight+length:
+                        ui.text(char_format % ord(self.data[offset]),color='black',font='typewriter',highlight=1)  
+                    else:
+                        ui.text(char_format % ord(self.data[offset]),color='black',font='typewriter')  
                     result += char_format % ord(self.data[offset])
                 except IndexError:
                     ui.text("   ")
                     result += "   "
                     finished = 1
 
+            for offset in range(tmp_offset,tmp_offset+self.width):
+                if offset>=highlight and offset<highlight+length:
+                    highlight_flag=1
+                else:
+                    highlight_flag=0
+                    
                 try:
                     if 32 < ord(self.data[offset]) < 127:
-                        text += self.data[offset]
+                        ui.text(self.data[offset],color='red',font='typewriter',sanitise='full',highlight=highlight_flag)
+                        result+=self.data[offset]
                     else:
-                        text += '.'
+                        ui.text('.',color='red',font='typewriter',sanitise='full',highlight=highlight_flag)
+                        result+='.'
                 except IndexError:
-                    text += ' '
                     finished = 1
-                    
-                offset += 1
 
-            ## Add the text at the end of each line
-            ui.text(text_format % text,color='red',font='typewriter',sanitise='full')
-            result+=text_format % text
-
+            ui.text("\n",font='typewriter',sanitise='full')
             ui.text(finish=1)
 
 try:

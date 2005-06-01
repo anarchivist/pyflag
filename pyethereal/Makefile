@@ -13,7 +13,7 @@ pcaptool: pcaptool.c check_headers
 
 pyethereal: pyethereal.i check_headers
 	swig -python $@.i
-	gcc -g -Wall -I /usr/include/python2.3/ `glib-config --cflags glib` pyethereal_wrap.c  -shared  -o _pyethereal.so $$(ldd $$(which tethereal ethereal | head -n 1) | awk '{print $$3};')
+	gcc -g -Wall -I $(PYTHONINCL) `glib-config --cflags glib` pyethereal_wrap.c  -shared  -o _pyethereal.so $$(ldd $$(which tethereal ethereal | head -n 1) | awk '{print $$3};')
 	mv _pyethereal.so pyethereal.py $(MISC_LIBS)/
 
 check_headers:

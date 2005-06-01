@@ -86,6 +86,7 @@ class HTMLUI(UI.GenericUI):
         self.pageno = 0
         self.meta = ''
         self.color=None
+        self.bgcolor=None
         self.font = None
         self.text_var = ''
         self.text_line_count = 0
@@ -456,7 +457,7 @@ class HTMLUI(UI.GenericUI):
 
         return q
 
-    def tree(self,tree_cb = None, pane_cb=None, branch = ('/')):
+    def tree(self,tree_cb = None, pane_cb=None, branch = ('/'), layout="horizontal"):
         """ A tree widget.
 
         This widget works by repeatadly calling the call back function for information about entries in the current tree. The format of the callback is:
@@ -538,7 +539,6 @@ class HTMLUI(UI.GenericUI):
                         found = 1
                         #Recurse into the next level in the tree
                         draw_branch(depth+1,tree_array)
-                        print tree_array
                                                 
                 except IndexError,e:
                     #This is triggered when there is no deeper level in the tree
@@ -598,7 +598,11 @@ class HTMLUI(UI.GenericUI):
             pane_cb(['/'],right)
         
         ## Now draw the left part
-        self.row(left,right,valign='top')
+        if layout=="vertical":            
+            self.row(left)
+            self.row(right)
+        else:
+            self.row(left,right,valign='top')
 
     def toolbar(self,cb=None,text=None,icon=None,popup=True,tooltip=None,link=None):
         """ Create a toolbar button.
@@ -1067,10 +1071,10 @@ class HTMLUI(UI.GenericUI):
         def do_options(d,options):
             """ Process options """
             format = ''
-            if options.has_key('color') and options['color'] != self.color:
+            if (options.has_key('color') and options['color'] != self.color):
                 format += "</font><font color=%r>" %(options['color'])
                 self.color = options['color']
-       
+
             if options.has_key('font') and options['font'] != self.font:
                 if options['font'] == 'typewriter':
                     format += "</pre><pre>"
@@ -1088,7 +1092,10 @@ class HTMLUI(UI.GenericUI):
                     d = re.sub("[\x80-\xFF\x01-\x09\x0e-\x1f\x00]",".",d)
                     d = d.replace("\t","    ")
 
-            self.result += "%s%s" % (format,d)
+            if options.has_key('highlight') and options['highlight']:
+                self.result += "%s<span style='background-color:yellow'>%s</span>" % (format,d)
+            else:
+                self.result += "%s%s" % (format,d)
 
         for d in cuts:
             if not (options.has_key('font') and options['font']=='typewriter'):
