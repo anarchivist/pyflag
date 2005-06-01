@@ -51,6 +51,12 @@ class TypeChecker:
 
     def check_type(self,type,field,query):
         """ Looks through introspection at this modules methods and calls them if they match the string passed """
+        
+        # this allows arbirtary meta table properties to become types
+        if type.startswith('meta_'):
+            type = type[len('meta_'):]
+            return self.metatype(type, field, query)
+
         for a in dir(self):
             if a==type:
                 #Set the calling function to the string indicated by type
@@ -59,6 +65,15 @@ class TypeChecker:
                 return fn(self,field,query)
 
         raise ReportInvalidParamter, "Type %s not recognised " % type
+
+    def metatype(self, type, field, query):
+        """ Test for matches against meta entries in the meta table """
+        string = query[field]
+
+        dbh = DB.DBO(None)
+        dbh.execute("select * from meta where property=%r and value=%r",(type, string))
+        if not dbh.cursor.fetchone():
+            return False
 
     def numeric(self,field,query):
         """ Tests input for numeric values """
@@ -79,13 +94,7 @@ class TypeChecker:
 
     def flag_db(self,field,query):
         """ Tests to see if the string is a valid flag case database """
-        string = query[field]
-
-        dbh = DB.DBO(None)
-        dbh.execute("select * from meta where property='flag_db' and value=%r",string)
-        if not dbh.cursor.fetchone():
-            return False
-            raise ReportInvalidParamter, "%s is not a valid flag database" % string
+        return self.metatype('flag_db', field, query)
 
     def filename(self,field,query):
         """ Tests to see if the string is a valid filename within the upload dir """
@@ -133,21 +142,11 @@ class TypeChecker:
 
     def iosource(self,field,query):
         """ Check that the given string is a valid IO system identifier """
-        
-        dbh = DB.DBO(query['case'])
-        dbh.execute("select * from meta where property='iosource' and value=%r",query[field])
-        if not dbh.cursor.fetchone():
-            return False
-##            raise ReportInvalidParamter, "%s is not a valid IO Data Source" % query[field]
+        return metatype('iosource', field, query)
 
     def fsimage(self,field,query):
         """ Check that the given string is a valid Filesystem identifier """
-        
-        dbh = DB.DBO(query['case'])
-        dbh.execute("select * from meta where property='fsimage' and value=%r",query[field])
-        if not dbh.cursor.fetchone():
-            return False
-##            raise ReportInvalidParamter, "%s is not a loaded FS Image" % query[field]
+        return metatype('fsimage', field, query)
 
     def casetable(self,field,query):
         """ Checks that field is a table within the case given as query[case]. This is not a fatal error, we just return false if not. """
@@ -166,7 +165,7 @@ class TypeChecker:
         
     def any(self,field,query):
         """ A default type that accepts anything """
-        pass
+        return True
 
     def string(self,field,query):
         """ A default type that accepts anything """
