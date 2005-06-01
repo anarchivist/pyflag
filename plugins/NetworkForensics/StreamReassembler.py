@@ -90,7 +90,8 @@ class StreamReassembler(GenScanFactory):
                 ipdest=self.proto_tree['ip.dst'].value()
                 tcpsrcport=self.proto_tree['tcp.srcport'].value()
                 tcpdestport=self.proto_tree['tcp.dstport'].value()
-            except IndexError:
+            except KeyError,e:
+                print "Got exception %s" % e
                 return
             
             ## check the connection_details table to see if we have
@@ -166,7 +167,6 @@ def show_packets(query,result):
     tmp = query['inode'][1:].split(":")
     
     con_id = int(tmp[0])
-    offset = int(tmp[1])
     
     result.table(
         columns = ('packet_id','seq','length'),

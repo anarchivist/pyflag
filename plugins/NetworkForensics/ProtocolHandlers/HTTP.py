@@ -137,7 +137,4 @@ class HTTPScanner(GenScanFactory):
                         response_id))
                     
             except KeyError,e:
-                print "Got exception %s" % e
                 pass
-
-                  

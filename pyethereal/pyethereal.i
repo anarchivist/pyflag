@@ -129,7 +129,7 @@ epan_dissect_t *read_and_dissect_next_packet(wtap *file) {
   };
 };
 
- epan_dissect_t *dissect_buffer(char *buff,int len, int frame_number){
+ epan_dissect_t *dissect_buffer(char *buff,int len, int frame_number, int link_type){
    epan_dissect_t *edt = epan_dissect_new(TRUE, TRUE);
    frame_data fd;
    struct wtap_pkthdr hdr;
@@ -143,9 +143,11 @@ epan_dissect_t *read_and_dissect_next_packet(wtap *file) {
    
    hdr.caplen = len;
    hdr.len=len;
-   hdr.pkt_encap=1;
+   hdr.pkt_encap=link_type;
    
    ethereal_fill_in_fdata(&fd,frame_number,&hdr,0);
+   fd.lnk_t = link_type;
+
    dissect_packet(edt,&phdr, buff, &fd, NULL);
    return(edt);
  };
@@ -415,7 +417,7 @@ class ReadPacket(Node):
        """
        result = get_node_by_name(self.dissector,name)
        if not result:
-           raise KeyError("Uable to find node %s" % name)
+           raise KeyError("Unable to find node %s" % name)
 
        return Node(result,self)
    
@@ -425,10 +427,16 @@ class ReadPacket(Node):
            free_dissection(self.dissector)
            
 class Packet(ReadPacket):
-    """ A class representing a packet dissected from a buffer """
-    def __init__(self,buffer,frame_number=0):
+    """ A class representing a packet dissected from a buffer
+
+    @arg buffer: The binary buffer which contains the data
+    @arg frame_number: The number to attribute to this frame
+    @arg link_type: The type of link this was obtained from (see wtap.h)
+          type of 1 is etherenet, 25 linux cooked etc.
+    """
+    def __init__(self,buffer,frame_number=0,link_type=1):
 	self.buffer=buffer
-        self.dissector = dissect_buffer(buffer,frame_number)
+        self.dissector = dissect_buffer(buffer,frame_number,link_type)
         Node.__init__(self,get_first_node(self.dissector),self.dissector)
 
 %}
@@ -445,7 +453,7 @@ proto_node *get_child_node(proto_node *node);
 proto_node *get_next_peer_node(proto_node *node);
 char *get_node_rep(proto_node *node);
 char *get_node_name(proto_node *node);
-epan_dissect_t *dissect_buffer(char *buff,int len,int frame_number);
+epan_dissect_t *dissect_buffer(char *buff,int len,int frame_number,int link_type);
 enum ftenum get_type(proto_node *node);
 unsigned long long int get_int_value(proto_node *node);
 char *get_str_value(proto_node *node);

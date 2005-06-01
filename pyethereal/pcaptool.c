@@ -48,7 +48,8 @@ int main(int argc, char **argv) {
     printf ("  `offset` INT NOT NULL , \n");
     printf ("  `length` INT NOT NULL , \n");
     printf ("  `ts_sec` INT NOT NULL , \n");
-    printf ("  `ts_usec` INT NOT NULL \n");
+    printf ("  `ts_usec` INT NOT NULL, \n");
+    printf ("  `link_type`  TINYINT not null\n");
     printf ("); \n\n");
 
     exit(0);
@@ -64,7 +65,7 @@ int main(int argc, char **argv) {
       printf("Problem opening %s. Error code: %i\n", fname, err);
     else {
       while(wtap_read(wth,&err,&err_info,&data_offset)) {
-        printf("INSERT INTO `%s` VALUES (%lu,%lu,%u,%lu,%lu);\n", tableName, packet_id, data_offset,(int) wth->phdr.caplen,(long unsigned int)wth->phdr.ts.tv_sec,(long unsigned int)wth->phdr.ts.tv_usec);
+        printf("INSERT INTO `%s` VALUES (%lu,%lu,%u,%lu,%lu,%u);\n", tableName, packet_id, data_offset,(int) wth->phdr.caplen,(long unsigned int)wth->phdr.ts.tv_sec,(long unsigned int)wth->phdr.ts.tv_usec,wth->phdr.pkt_encap);
         packet_id++;
       }
       file_id++;

@@ -135,7 +135,8 @@ class PCAPFile(File):
         self.dbh.execute("select * from pcap_%s where id=%r",(self.table,self.readptr,))
         row=self.dbh.fetch()
         self.fd.seek(row['offset'])
-        
+
+        self.link_type = row['link_type']
         self.readptr+=1
         
         if length<row['length']:
@@ -179,10 +180,14 @@ class ViewDissectedPacket(Reports.report):
         ## This is the binary dump of the packet
         packet = fd.read()
 
-        print "%r" % packet,len(packet)
+        ## This is the link type of the packet (Etherenet by default)
+        try:
+            link_type = fd.link_type
+        except AttributeError:
+            link_type = 1
 
         ## Now dissect it.
-        proto_tree = pyethereal.Packet(packet,id)
+        proto_tree = pyethereal.Packet(packet,id,link_type)
         
         def tree_cb(branch):
             try:
