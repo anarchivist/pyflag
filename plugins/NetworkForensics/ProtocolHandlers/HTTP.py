@@ -22,7 +22,7 @@
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 from pyflag.Scanner import *
-import pyethereal
+import pyethereal,sys
 import struct,sys,cStringIO
 import pyflag.DB as DB
 from pyflag.FileSystem import File
@@ -111,7 +111,7 @@ class HTTPScanner(GenScanFactory):
                 try:
                     content_length = self.proto_tree['http.content_length'].value()
                 except:
-                    content_length = -1
+                    content_length = sys.maxint
 
                 ## The offset is the position in the stream where the
                 ## data starts:

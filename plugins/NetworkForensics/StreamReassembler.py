@@ -91,7 +91,6 @@ class StreamReassembler(GenScanFactory):
                 ipsrc=self.proto_tree['ip.src'].value()
                 ipdest=self.proto_tree['ip.dst'].value()
             except KeyError,e:
-                print "Got exception %s" % e
                 return
             
             ## check the connection_details table to see if we have
@@ -162,18 +161,73 @@ class StreamReassembler(GenScanFactory):
         def finish(self):
             self.dbh.check_index("connection_%s" % self.table, 'con_id')
 
+def combine_streams(query,result):
+    """ Show both ends of the stream combined.
+
+    In each screenfull we show a maximum of MAXSIZE characters per connection. We stop as soon as either direction reaches this many characters.
+    """
+    ## FIXME: Implement sensible paging here.
+    
+    ## First we find the reverse connection:
+    table = query['fsimage']
+    fd = IO.open(query['case'],table)
+    
+    forward_inode = query['inode']
+    forward_cid = int(forward_inode[1:])
+
+    dbh = DB.DBO(query['case'])
+    dbh.execute("select * from connection_details_%s where con_id=%r",(table,forward_cid))
+    row=dbh.fetch()
+    
+    dbh.execute("select con_id from connection_details_%s where src_ip=%r and src_port=%r and dest_ip=%r and dest_port=%r",(table,row['dest_ip'],row['dest_port'],row['src_ip'],row['src_port']))
+    row = dbh.fetch()
+    reverse_cid = row['con_id']
+
+    dbh.execute("select con_id,offset,packet_offset,connection_%s.length as length from connection_%s join pcap_%s on packet_id=id where con_id=%r or con_id=%r order by packet_id",(table,table,table,forward_cid,reverse_cid))
+    for row in dbh:
+        ## Get the data:
+        fd.seek(row['offset']+row['packet_offset'])
+        data=fd.read(row['length'])
+        if row['con_id']==forward_cid:
+            result.text(data,color="blue",font='typewriter',sanitise='full')
+        else:
+            result.text(data,color="red",font='typewriter',sanitise='full')
+    
+    
 def show_packets(query,result):
     """ Shows the packets which belong in this stream """
-    tmp = query['inode'][1:].split(":")
+    tmp = query['inode'][1:]
+    table = query['fsimage']
+    fd = IO.open(query['case'],table)
+    dbh = DB.DBO(query['case'])
     
-    con_id = int(tmp[0])
+    con_id = int(tmp)
+
+    def show_data(value,result):
+        length,packet_offset,packet_id = value.split(",")
+        length=int(length)
+        dbh.execute("select offset from pcap_%s where id=%s",(table,packet_id))
+        row = dbh.fetch()
+        fd.seek(row['offset'] + int(packet_offset))
+        ## We read at most this many chars from the packet:
+        elipses=''
+        
+        if length>50:
+            length=50
+            elipses=' ... '
+            
+        data=fd.read(length)
+
+        ## Sanitise data
+        return data+elipses
     
     result.table(
-        columns = ('packet_id','seq','length'),
-        names = ('Packet ID','Sequence Number','Length'),
+        columns = ('packet_id','from_unixtime(ts_sec)','ts_usec','seq','con.length','concat(con.length,",",packet_offset,",",packet_id)'),
+        names = ('Packet ID','Timestamp','uSec','Sequence Number','Length',"Data"),
         links = [ FlagFramework.query_type((),family="Network Forensics",report='View Packet',case=query['case'],fsimage=query['fsimage'],__target__='id')],
-        table= 'connection_%s' % query['fsimage'],
-        where = 'con_id=%r ' % con_id,
+        table= 'connection_%s as con , pcap_%s' % (query['fsimage'],query['fsimage']),
+        where = 'con_id=%r and packet_id=id ' % con_id,
+        callbacks = { 'Data': show_data },
         case=query['case']
         )
             
@@ -189,19 +243,13 @@ class StreamFile(File):
     offset is an optional offset
     """
     specifier = 'S'
-    stat_cbs = [ show_packets ]
-    stat_names = [ "Show Packets"]
+    stat_cbs = [ show_packets, combine_streams ]
+    stat_names = [ "Show Packets", "Combined streams"]
     
     def __init__(self, case, table, fd, inode):
         File.__init__(self, case, table, fd, inode)
 
-        tmp = inode[1:].split(":")
-        try:
-            self.offset = int(tmp[1])
-        except IndexError:
-            self.offset = 0
-
-        self.con_id = int(tmp[0])
+        self.con_id = int(inode[1:])
         ## Strategy: We determine the ISN of this stream at
         ## startup. When requested to read a range we select all those
         ## packets whose seq number fall within the range, we then
@@ -253,8 +301,8 @@ class StreamFile(File):
         self.dbh.execute("select * from connection_%s where con_id=%r and seq+length>=%r and seq<=%r",(
             self.table,
             self.con_id,
-            self.isn+self.readptr+self.offset, ## Start of range
-            self.isn+self.readptr+self.offset+len, ## End of range
+            self.isn+self.readptr, ## Start of range
+            self.isn+self.readptr+len, ## End of range
             ))
 
         for row in self.dbh:
@@ -264,8 +312,8 @@ class StreamFile(File):
             ##    row['seq']|--------->| row['len']
             ##      self.isn----->| readptr
             ##We are after  |<--->|
-            if row['seq'] <= self.isn+self.readptr+self.offset :
-                start = self.isn + self.readptr +self.offset - row['seq']
+            if row['seq'] <= self.isn+self.readptr :
+                start = self.isn + self.readptr - row['seq']
             else:
                 start = 0
 
@@ -277,8 +325,8 @@ class StreamFile(File):
             ##        row['seq']|------->| row['len']
             ## self.isn--->readptr--->| len
             ##     We are after |<--->|
-            if row['seq']+row['length']>=self.isn+self.readptr+self.offset+len:
-                end=self.isn + self.readptr+self.offset + len - row['seq']
+            if row['seq']+row['length']>=self.isn+self.readptr+len:
+                end=self.isn + self.readptr + len - row['seq']
 
             ##    row['seq']|------->| row['len']
             ## self.isn--->readptr------>| len
@@ -298,7 +346,7 @@ class StreamFile(File):
                 start,
                 end,
                 result,
-                start+row['seq']-self.isn-(self.readptr+self.offset))
+                start+row['seq']-self.isn-(self.readptr))
 
         result.seek(0)
         data=result.read()

@@ -29,6 +29,7 @@
 """ Module used for sanity checking of strings according to classifications """
 import pyflag.DB as DB
 import pyflag.Reports as Reports
+import pyflag.logging as logging
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import os.path,os
@@ -62,7 +63,10 @@ class TypeChecker:
                 #Set the calling function to the string indicated by type
                 fn = TypeChecker.__dict__[type]
                 #call it
-                return fn(self,field,query)
+                result=fn(self,field,query)
+#                if not result:
+#                    logging.log(logging.DEBUG,"Failed to check %s for %s of type %s" % (query,field,type))
+                return result
 
         raise ReportInvalidParamter, "Type %s not recognised " % type
 
@@ -70,10 +74,12 @@ class TypeChecker:
         """ Test for matches against meta entries in the meta table """
         string = query[field]
 
-        dbh = DB.DBO(None)
+        dbh = DB.DBO(query['case'])
         dbh.execute("select * from meta where property=%r and value=%r",(type, string))
-        if not dbh.cursor.fetchone():
-            return False
+        if dbh.cursor.fetchone():
+            return True
+        
+        return False
 
     def numeric(self,field,query):
         """ Tests input for numeric values """
@@ -142,11 +148,11 @@ class TypeChecker:
 
     def iosource(self,field,query):
         """ Check that the given string is a valid IO system identifier """
-        return metatype('iosource', field, query)
+        return self.metatype('iosource', field, query)
 
     def fsimage(self,field,query):
         """ Check that the given string is a valid Filesystem identifier """
-        return metatype('fsimage', field, query)
+        return self.metatype('fsimage', field, query)
 
     def casetable(self,field,query):
         """ Checks that field is a table within the case given as query[case]. This is not a fatal error, we just return false if not. """

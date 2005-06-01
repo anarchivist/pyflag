@@ -1459,7 +1459,7 @@ class GTKUI(UI.GenericUI):
                 
         treeview.connect('button-press-event',click_callback)                    
 
-    def tree(self,tree_cb = None, pane_cb=None, branch = ('/')):
+    def tree(self,tree_cb = None, pane_cb=None, branch = ('/'),layout='horizontal'):
         """ This tree uses the FlagTreeModel to represent the data.
 
         @arg tree_cb: is a callback required to enumerate the tree branches as they are being manipulated. This is used by the data store model (FlagTreeModel).
