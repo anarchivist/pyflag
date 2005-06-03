@@ -16,9 +16,45 @@ def IP2str(ip):
     tmp.reverse()
     return ".".join(["%s" % i for i in tmp])
 
+class Storage:
+    """ This class enables Network scanners to store persistant information between packets.
+
+    We need to ensure that this persistant information does not consume too much memory. Every time a new piece of information is stored, we store the current packet number where it came from. Periodically we go through and expire those items which are too old.
+    """
+    data = {}
+    ages = {}
+    time_to_check = 100
+    _time_to_check = 100
+    max_age = 0
+    too_old = 100
+    
+    def store(self,age,key,value):
+        self.data[key]=value
+        self.ages[key]=age
+        if age>self.max_age:
+            self.max_age=age
+
+        self.check_me()
+
+    def __getitem__(self,item):
+        self.check_me()
+        return self.data[item]
+
+    def check_me(self):
+        if self._time_to_check<=0:
+            self._time_to_check=self.time_to_check
+            for k in data.keys():
+                if self.ages[k]+self.too_old<self.max_age:
+                    del self.data[k]
+                    del self.ages[k]
+                    
+        self._time_to_check-=1
+                
 class NetworkScanner(BaseScanner):
     """ This is the base class for all network scanners.
     """
+    ## Note that Storage is the same object across all NetworkScanners:
+    store = Storage()
     def process(self,data,metadata=None):
         """ Pre-process the data for all other network scanners """
         ## We try to get previously set proto_tree. We store it in
