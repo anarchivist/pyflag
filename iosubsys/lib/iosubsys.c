@@ -547,41 +547,41 @@ int ewf_open(IO_INFO *self) {
     RAISE(E_IOERROR,NULL,"No Files given");
   };
 
+  printf("max segments = %u\n",io->offsets.max_segment);
   for(i=1;i<=io->offsets.max_segment;i++) {
-    if(io->offsets.files[i]<0) {
+    int old_section_offset=0;
+
+    if(io->offsets.files[i]<=0) {
       RAISE(E_IOERROR,NULL,"Missing a segment file for segment %u",i);
     };
-    
+
     //Now process each file in order until we build the whole index
-    for(section=evf_read_section(io->offsets.files[i]);
-	/* This ensures that the next section occurs _after_ the
-	   current section.  There are some sections in the EVF file
-	   which point back at themself, like done or next. When we
-	   hit these, we give up reading the file and move to the next
-	   file because its impossible to find the next section in the
-	   chain. */
-	lseek(io->offsets.files[i],0,SEEK_CUR)<=section->next;
-	section=evf_read_section(io->offsets.files[i])) {
-      
+    while(1) {
+      section=evf_read_section(io->offsets.files[i]);
+
       //This will update offsets.fds and offsets.offset
       process_section(section,i,&(io->offsets));
 
-      /* If we hit a next section, we need to move to the next disk
-      if(!strcmp(section->type,"next")) {
-	break;
-      };
-      */
-      
-      //Go to the next section
-      if(lseek(io->offsets.files[i],section->next,SEEK_SET)<0) {
-	RAISE(E_IOERROR,NULL,"Could not seek\n");
+      /* This ensures that the next section occurs _after_ the
+	 current section.  There are some sections in the EVF file
+	 which point back at themself, like done or next. When we
+	 hit these, we give up reading the file and move to the next
+	 file because its impossible to find the next section in the
+	 chain. */
+      if(old_section_offset >= section->next) break;
+
+      //Go to the next section - If the next section is not found in
+      //this file, there is something very wrong!
+      if(lseek(io->offsets.files[i],section->next,SEEK_SET)!=section->next) {
+	RAISE(E_IOERROR,NULL,"Could not seek");
       };
 
-      strncpy(tmp,section->type,250);
+      strncpy(tmp,section->type,16);
       free(section);
+      old_section_offset=section->next;
     };
   };
-
+   
   //Check to see if we are done?
   if(strcasecmp(tmp,"done") && io->force) 
     RAISE(E_IOERROR,NULL,"No ending section, Cant find the last segment file");

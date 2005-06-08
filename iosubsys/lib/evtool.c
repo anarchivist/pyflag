@@ -463,6 +463,8 @@ int main(int argc, char **argv) {
   //go. So we just check for consistency that we do not have any files
   //that were not specified:
   for(i=1;i<=offsets.max_segment;i++) {
+    int old_section_offset=0;
+    
     if(offsets.files[i]<0) {
       if(force) {
 	evf_warn("Missing a segment file for segment %u, but will continue anyway as requested\n",i);
@@ -470,26 +472,30 @@ int main(int argc, char **argv) {
       };
       RAISE(E_IOERROR,NULL,"Missing a segment file for segment %u",i);
     }
+
     //Now process each file in order until we build the whole index
-    for(section=evf_read_section(offsets.files[i]);
-	/* This ensures that the next section occurs _after_ the
-	   current section.  There are some sections in the EVF file
-	   which point back at themself, like done or next. When we
-	   hit these, we give up reading the file and move to the next
-	   file because its impossible to find the next section in the
-	   chain. */
-	lseek(offsets.files[i],0,SEEK_CUR)<=section->next;
-	section=evf_read_section(offsets.files[i])) {
+    while(1) {
+      section=evf_read_section(offsets.files[i]);
 
       //This will update offsets.fds and offsets.offset
       process_section(section,i,&offsets);
 
-      //Go to the next section
-      if(lseek(offsets.files[i],section->next,SEEK_SET)<0) {
+      /* This ensures that the next section occurs _after_ the
+	 current section.  There are some sections in the EVF file
+	 which point back at themself, like done or next. When we
+	 hit these, we give up reading the file and move to the next
+	 file because its impossible to find the next section in the
+	 chain. */
+      if(old_section_offset >= section->next) break;
+
+      //Go to the next section - If the next section is not found in
+      //this file, there is something very wrong!
+      if(lseek(offsets.files[i],section->next,SEEK_SET)!=section->next) {
 	RAISE(E_IOERROR,NULL,"Could not seek");
       };
 
       free(section);
+      old_section_offset=section->next;
     };
   };
 
