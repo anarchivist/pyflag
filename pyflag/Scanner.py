@@ -245,6 +245,24 @@ class StoreAndScanType(StoreAndScan):
                 return row['mime'] not in self.types
             else: return True
 
+class ScanIfType(StoreAndScanType):
+    """ Only Scans if the type matches self.types.
+
+    Just like StoreAndScanType but without creating the file.
+    """
+    def __init__(self, inode,ddfs,outer,factories=None,fd=None):
+        BaseScanner.__init__(self, inode,ddfs,outer,factories)
+        self.boring_status = True
+
+    def process(self, data,metadata=None):
+        ## If this file is boring, we check to see if there is new
+        ## information which makes it not boring:
+        if self.boring_status:
+            self.boring_status = self.boring(metadata)
+
+    def finish(self):
+        pass
+    
 ### This is used to scan a file with all the requested scanner factories
 def scanfile(ddfs,fd,factories):
     """ Given a file object and a list of factories, this function scans this file using the given factories

@@ -28,9 +28,10 @@ This feature complements the ZIP and Gzip filesystem driver to ensure that zip a
 import os.path
 import pyflag.logging as logging
 from pyflag.Scanner import *
-import zipfile,gzip
+import zipfile,gzip,tarfile
 from pyflag.FileSystem import File
-import time
+import pyflag.FlagFramework as FlagFramework
+import time,re,os
 import StringIO
 import pyflag.Scanner as Scanner
 
@@ -61,52 +62,107 @@ class ZipScan(GenScanFactory):
                     t = time.mktime(list(zip.infolist()[i].date_time) +[0,0,0])
                 except:
                     t=0
+
+                ## If the entry corresponds to just a directory we ignore it.
+                if not os.path.basename(namelist[i]): continue
+
                 self.ddfs.VFSCreate(self.inode,"Z%s" % i,namelist[i],size=zip.infolist()[i].file_size,mtime=t)
 
                 ## Now call the scanners on this new file (FIXME limit the recursion level here)
                 fd = StringIO.StringIO(zip.read(namelist[i]))
                 fd.inode = "%s|Z%s" % (self.inode,i)
                 Scanner.scanfile(self.ddfs,fd,self.factories)
-                
+
 class GZScan(ZipScan):
-    """ Recurse into gziped files """
-    default= False
-    class Scan(StoreAndScanType):
+    """ Decompress Gzip files """
+    
+    class Scan(ScanIfType):
+        """ If we hit a gzip file, we just create a new Inode entry in the VFS """
         types = (
-            'application/x-gzip',
+            'application/x-gzip' ,
             )
         
+        def __init__(self, inode,ddfs,outer,factories=None,fd=None):
+            print "Initialising scanner %r" %  self
+            ScanIfType.__init__(self, inode,ddfs,outer,factories)
+            self.filename = None
+
+        def process(self, data, metadata=None):
+            ScanIfType.process(self,data,metadata)
+            if not self.boring_status and not self.filename:
+                ## We need to find the name of the original uncompressed
+                ## file so we can set a sensible VFS file name. This is
+                ## the algorithm used:
+                ## 1) We try to decompress the first data block from the file to see if the original name is in the header
+                ## 2) Failing this we check if the inodes filename ends with .gz
+                ## 3) Failing that, we call the new file "data"
+                a=FlagFramework.Magic()
+                a.buffer(data)
+                match = re.search(a.magic,'was "([^"]+)"')
+                if match:
+                    self.filename = match.groups(1)
+                    return
+
+                original_filename = os.path.basename(self.ddfs.lookup(inode=self.inode))
+                if original_filename.endswith(".gz"):
+                    self.filename=original_filename[:-3]
+                    return
+
+                self.filename="Uncompressed"
+
+        def finish(self):
+            if self.filename:
+                print "Adding a gzip node for file %s" % self.filename
+                self.ddfs.VFSCreate(self.inode,"G0",self.filename)
+
+                new_inode="%s|G0" % (self.inode)
+                ## Scan the new file using the scanner train:
+                fd=self.ddfs.open(inode=new_inode)
+                Scanner.scanfile(self.ddfs,fd,self.factories)
+                fd.close()            
+
+class TarScan(GenScanFactory):
+    """ Recurse into Tar Files """
+    order=99
+    default = False
+    
+    def destroy(self):
+        pass
+    
+    class Scan(StoreAndScanType):
+        types = (
+            'application/x-tar, POSIX',
+            )
+
         def external_process(self,name):
-            gz=gzip.open(name)
-            i=0
-            ## filename is the filename in the filesystem for the zip file.
-            filename = self.ddfs.lookup(inode=self.inode)
-
-            ## Add a psuedo file in the filesystem
-            self.ddfs.dbh.execute("insert into file_%s set path=%r,name=%r,status='alloc',mode='r/r',inode='%s|G0'",(self.ddfs.table,filename+'/','data',self.inode))
-
-            data=gz.read()
+            """ This is run on the extracted file """
+	        #Get a TarFile object
+            tar=tarfile.TarFile(name)
             
-            ## Add the file to the inode table:
-            self.ddfs.dbh.execute("insert into inode_%s set inode='%s|G0',size=%r",(self.ddfs.table, self.inode,len(data)))
+            ## List all the files in the tar file:
+            dircount = 0
+            namelist = tar.getnames()
+            for i in range(len(namelist)):
 
-            ## Now call the scanners on this new file (FIXME limit the recursion level here. FIXME: Implement a generic scanner method for progressive scanning of files)
-            if self.factories:
-                objs = [c.Scan("%s|G%s" % (self.inode, str(i)),self.ddfs,c,factories=self.factories) for c in self.factories]
-                    
-                metadata={}
-                for o in objs:
-                    try:
-                        o.process(data,metadata=metadata)
-                        o.finish()
-                    except Exception,e:
-                        logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
-
-            ## Set the gzip file to be a d/d entry so it looks like its a virtual directory:
-            self.ddfs.dbh.execute("select * from file_%s where mode='r/r' and inode=%r order by status",(self.ddfs.table,self.inode))
-            row=self.ddfs.dbh.fetch()
-            self.ddfs.dbh.execute("insert into file_%s set mode='d/d',inode=%r,status=%r,path=%r,name=%r",(self.ddfs.table,self.inode,row['status'],row['path'],row['name']))
-
+                ## If the entry corresponds to just a directory we ignore it.
+                if not os.path.basename(namelist[i]): continue
+                
+                ## Add the file into the VFS
+                self.ddfs.VFSCreate(
+                    self.inode,"T%s" % i,namelist[i],
+                    size=tar.getmember(namelist[i]).size,
+                    mtime=tar.getmember(namelist[i]).mtime,
+                    uid=tar.getmember(namelist[i]).uid,
+                    gid=tar.getmember(namelist[i]).gid,
+                    mode=oct(tar.getmember(namelist[i]).mode),
+                    )
+                
+                new_inode="%s|T%s" % (self.inode,i)
+                ## Scan the new file using the scanner train:
+                fd=self.ddfs.open(inode=new_inode)
+                Scanner.scanfile(self.ddfs,fd,self.factories)
+                fd.close()
+		
 ## These are the corresponding VFS modules:
 class Zip_file(File):
     """ A file like object to read files from within zip files. Note that the zip file is specified as an inode in the DBFS """
@@ -136,15 +192,12 @@ class Zip_file(File):
 
     def close(self):
         pass
-        
-    def seek(self,pos):
-        self.pos=pos
 
 
 import gzip
 
 class GZip_file(File):
-    """ A file like object to read gziped files. """
+    """ A file like object to read gzipped files. """
     specifier="G"
     
     def __init__(self, case, table, fd, inode):
@@ -155,23 +208,49 @@ class GZip_file(File):
             raise IOError, "GZip_File: Error %s" %e
 
         self.size=0
-        self.pos=0
+        self.readptr=0
 
     def read(self,len=None):
         if len!=None:
-            self.pos+=len
+            self.readptr+=len
             return self.gz.read(len)
         else:
-            self.pos=self.size
+            self.readptr=self.size
             return self.gz.read()
 
     def close(self):
         self.gz.close()
         
-    def seek(self,pos,rel=None):
-        if rel==1:
-            self.pos+=pos
-        else:
-            self.pos=pos
-            
-        self.gz.seek(self.pos)
+    def seek(self,pos,rel=0):
+        File.seek(self,pos,rel)
+        self.gz.seek(self.readptr)
+
+class Tar_file(File):
+    """ A file like object to read files from within tar files. Note that the tar file is specified as an inode in the DBFS """
+    specifier = 'T'
+    
+    def __init__(self, case, table, fd, inode):
+        File.__init__(self, case, table, fd, inode)
+        # strategy:
+        # inode is the index into the namelist of the tar file (i hope this is consistant!!)
+        # just read that file!
+        parts = inode.split('|')
+        try:
+            t = tarfile.TarFile(fileobj=fd)
+            name=t.getnames()[int(parts[-1][1:])]
+            self.data = t.extractfile(name).read()
+        except (IndexError, KeyError):
+            raise IOError, "Tar_File: cant find index"
+        
+        self.readptr=0
+        self.size=t.getmember(name).size
+                
+    def read(self,len=None):
+        if len:
+            temp=self.data[self.readptr:self.readptr+len]
+            self.readptr+=len
+            return temp
+        else: return self.data
+
+    def close(self):
+        pass

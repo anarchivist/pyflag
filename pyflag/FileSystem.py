@@ -123,7 +123,7 @@ class FileSystem:
         if not path:
             path = self.lookup(inode=inode)
         if not path:
-            raise IOError('File not found for inode')
+            raise IOError('File not found for inode %s' % inode)
 
         # open the file, first pass will generally be 'D' or 'M'
         # then any virtual file systems (vfs) will kick in
@@ -196,7 +196,7 @@ class DBFS(FileSystem):
         dbh = DB.DBO(self.case)
         dbh.MySQLHarness("%s -t %s -d drop" %(config.SLEUTHKIT,self.table))
 
-    def VFSCreate(self,root_inode,inode,new_filename,directory=False ,**properties):
+    def VFSCreate(self,root_inode,inode,new_filename,directory=False ,gid=0, uid=0, mode=100777, **properties):
         """ Extends the DB filesystem to include further virtual filesystem entries.
 
         Note that there must be an appropriate VFS driver for the added inodes, or else they may not be viewable.
@@ -235,7 +235,9 @@ class DBFS(FileSystem):
                     self.dbh.execute("insert into inode_%s  set mode=%r, links=%r , inode='%s-',gid=0,uid=0,size=1",(self.table,40755, 4,inode))
                     
         path = normpath("%s/%s/" % (filename,os.path.dirname(new_filename)))
-        ## Add the file itself to the file table
+        ## Add the file itself to the file table (only if name was specified)
+#      if not name: return
+        
         if root_inode:
             self.dbh.execute("insert into file_%s set status='alloc',mode='r/r',inode='%s|%s',path=%r, name=%r",(self.table,root_inode,inode,normpath(path+'/'),name))
         else:
@@ -247,9 +249,9 @@ class DBFS(FileSystem):
             extra=','+extra
 
         if root_inode!=None:
-            self.dbh.execute("insert into inode_%s set inode='%s|%s',mode=100777,links=4,gid=0,uid=0" + extra ,[self.table, root_inode,inode] + properties.values())
+            self.dbh.execute("insert into inode_%s set inode='%s|%s',mode=%s,links=4,gid=%s,uid=%s" + extra ,[self.table, root_inode,inode,mode,gid,uid] + properties.values())
         else:
-            self.dbh.execute("insert into inode_%s set inode='%s',mode=100777,links=4,gid=0,uid=0" + extra ,[self.table, inode] + properties.values())
+            self.dbh.execute("insert into inode_%s set inode='%s',mode=%s,links=4,gid=%s,uid=%s" + extra ,[self.table, inode,mode,gid,uid] + properties.values())
         
         ## Set the root file to be a d/d entry so it looks like its a virtual directory:
         self.dbh.execute("select * from file_%s where mode='d/d' and inode=%r and status='alloc'",(self.table,root_inode))
