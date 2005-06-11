@@ -48,8 +48,8 @@ class AuthError(Exception):
     """ Exception raised when Authentication fails """
     def __init__(self,result):
         self.result=result
-        
-def get_traceback(e,result):
+
+def get_bt_string(e):
     import sys
     import traceback
     import cStringIO
@@ -57,9 +57,13 @@ def get_traceback(e,result):
     a = cStringIO.StringIO()
     traceback.print_tb(sys.exc_info()[2], file=a)
     a.seek(0)
-    result.heading("%s: %s" % (sys.exc_info()[0],sys.exc_info()[1]))
-    result.text(a.read())            
+    result = a.read()
     a.close()
+    return result
+    
+def get_traceback(e,result):
+    result.heading("%s: %s" % (sys.exc_info()[0],sys.exc_info()[1]))
+    result.text(get_bt_string(e))            
 
 class FlagException(Exception):
     """ Generic Flag Exception """

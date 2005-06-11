@@ -39,6 +39,11 @@ class SMTPScanner(GenScanFactory):
     default = True
 
     def prepare(self):
+        ## This table simply stores the fact that a certain Inode is
+        ## an SMTP String. We deduce this by checking if ethereal
+        ## decodes it as such. I guess if we want to parse SMTP
+        ## streams which are not on port 25, we need to tell ethereal
+        ## this via its config file.
         self.dbh.execute(
             """ CREATE TABLE if not exists `smtp_%s` (
             `inode` VARCHAR(255) NOT NULL,

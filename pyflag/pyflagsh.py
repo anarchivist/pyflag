@@ -212,12 +212,16 @@ def process_line(line):
 
     except (ParserException,getopt.GetoptError,DB.DBError,TypeError),e:
         print "Error: %s" % e
+#        print FlagFramework.get_bt_string(e)
     except IOError,e:
         print "IOError: %s" % e
+#        print FlagFramework.get_bt_string(e)
     except ValueError,e:
         print "ValueError: %s" %e
+#        print FlagFramework.get_bt_string(e)
     except Exception,e:
         print "Unknown error: %r %s" % (e,e)
+#        print FlagFramework.get_bt_string(e)
 
 def shell_execv_iter(*argv):
     """ A helper routine to execute a shell command.

@@ -192,6 +192,7 @@ class DBFS(FileSystem):
         """
         sdbh = DB.DBO(self.case)
         sdbh.MySQLHarness("%s -t %s -d create blah" %(config.SLEUTHKIT,self.table))
+
     def delete(self):
         dbh = DB.DBO(self.case)
         dbh.MySQLHarness("%s -t %s -d drop" %(config.SLEUTHKIT,self.table))
@@ -310,8 +311,9 @@ class DBFS(FileSystem):
         return self.dbh.fetch()
 
     def isdir(self,directory):
-        directory=FlagFramework.normpath(directory)
-        self.dbh.execute("select mode from file_%s where path=%r and name=%r and mode like 'd%%' ",(self.table,os.path.dirname(directory)+'/',os.path.basename(directory)))
+        directory=os.path.normpath(directory)
+        dirname=FlagFramework.normpath(os.path.dirname(directory)+'/')
+        self.dbh.execute("select mode from file_%s where path=%r and name=%r and mode like 'd%%' ",(self.table,dirname,os.path.basename(directory)))
         row=self.dbh.fetch()
         if row:
             return 1

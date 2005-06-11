@@ -103,26 +103,23 @@ class ls(pyflagsh.command):
                 if not path.endswith('/'):
                     path=path+'/'
 
-                if self.opts.has_key('-l'):
-                    for dir in self.environment._FS.longls(path=path):
-                        yield "%s %s %s" % (dir['mode'],dir['inode'],dir['name'])
-                        
-                else:
-                    for dir in self.environment._FS.ls(path=path,dirs=1):
-                        yield "[%s]"%dir
-                        
-                    for file in self.environment._FS.ls(path=path,dirs=0):
-                        yield " %s " % file
-
-                ## Do we need to recurse?
-                if self.opts.has_key('-R'):
-                    for dir in self.environment._FS.ls(path=path,dirs=1):
-                        print "Directory %s:" % (path+dir)
-                        for file in self.list(path+dir):
-                            yield file
+            if self.opts.has_key('-l'):
+                for dir in self.environment._FS.longls(path=path):
+                    yield "%s %s %s" % (dir['mode'],dir['inode'],dir['name'])
 
             else:
-                yield path
+                for dir in self.environment._FS.ls(path=path,dirs=1):
+                    yield "[%s]"%dir
+
+                for file in self.environment._FS.ls(path=path,dirs=0):
+                    yield " %s " % file
+
+            ## Do we need to recurse?
+            if self.opts.has_key('-R'):
+                for dir in self.environment._FS.ls(path=path,dirs=1):
+                    print "Directory %s:" % (path+dir)
+                    for file in self.list(path+dir):
+                        yield file
 
         except AttributeError:
             raise ParserException("No Filesystem loaded, do you need to load a filesystem first?")
@@ -157,9 +154,11 @@ class cd(ls):
         if not new_path.endswith('/'):
             new_path+='/'
 
-        #Now check if the new path actually exists (There is an edge case here with / does have an inode):
-        if not self.environment._FS.isdir(new_path):
-            raise ParserException("No such directory: %s" % new_path)
+        path=FlagFramework.normpath(new_path)
+        if new_path!='/':
+        ## Now check if the new path actually exists (There is an edge case here with / does have an inode):
+            if not self.environment._FS.isdir(new_path):
+                raise ParserException("No such directory: %s" % new_path)
         
         self.environment.CWD=new_path
         yield 'current working directory %s' % self.environment.CWD
@@ -405,13 +404,13 @@ class execute(pyflagsh.command):
 
             ## We call the display method just in case this report
             ## does something in the display
-            result=HTMLUI.HTMLUI(query)
+            result=HTMLUI.HTMLUI(query=query)
             report.display(query,result)
             yield "Execution of %s successful in %s sec" % (self.args[1],time.time()-start_time)
         except Exception,e:
             import traceback
             print traceback.print_tb(sys.exc_info()[2])
-            raise ParserException("%s: %s after %s sec" %  (sys.exc_info()[0],sys.exc_info()[1]),time.time()-start_time)
+            raise ParserException("%s: %s after %s sec" %  (sys.exc_info()[0],sys.exc_info()[1],time.time()-start_time))
 
 class reset(execute):
     """ Resets the given report """
