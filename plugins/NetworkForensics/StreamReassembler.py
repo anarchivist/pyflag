@@ -31,6 +31,7 @@ from pyflag.FileSystem import File
 import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
+import struct
 
 class StreamReassembler(GenScanFactory):
     """ This scanner reassembles the packets into the streams.
@@ -70,6 +71,7 @@ class StreamReassembler(GenScanFactory):
         self.dbh.check_index("connection_details_%s" % self.table,'src_port')
         self.dbh.check_index("connection_details_%s" % self.table,'dest_ip')
         self.dbh.check_index("connection_details_%s" % self.table,'dest_port')
+        self.connection_cache={}
 
     def reset(self):
         self.dbh.execute("drop table connection_%s",(self.table,))
@@ -92,41 +94,40 @@ class StreamReassembler(GenScanFactory):
                 ipdest=self.proto_tree['ip.dst'].value()
             except KeyError,e:
                 return
-            
-            ## check the connection_details table to see if we have
-            ## done this connection previously:
-            self.dbh.execute("select * from connection_details_%s where (src_ip=%r and src_port=%r and dest_ip=%r and dest_port=%r) or (src_ip=%r and src_port=%r and dest_ip=%r and dest_port=%r)",(
-                self.table,
-                ipsrc,tcpsrcport, ipdest, tcpdestport,
-                ipdest, tcpdestport,ipsrc,tcpsrcport,
-                ))
 
-            con_id=-1
-            row=None
-            
-            for row in self.dbh:
-                ## This row represents our connection
-                if row['src_ip']==ipsrc:
-                    con_id=row['con_id']
-                    isn = row['isn']
-                    break
+            ## Here we try and cache connection information in memory
+            ## so we dont hit the db so much
+            forward_key = struct.pack("iiii",ipsrc,ipdest,tcpsrcport,tcpdestport)
 
-            if con_id<0:
-                ## The opposite stream is found but not this stream
-                if row:
-                    ## We insert into the connection_details table...
-                    ## FIXME: This is a potential race in multithreaded mode.
+            ## The following tests the cache for both forward or
+            ## reverse connections, creating them if needed.
+            try:
+                con_id,isn = self.outer.connection_cache[forward_key]
+            except KeyError:
+                #We dont have the forward connection, maybe we have
+                #the reverse?
+                try:
+                    reverse_key = struct.pack("iiii",ipdest,ipsrc,tcpdestport,tcpsrcport)
+                    con_id,isn = self.outer.connection_cache[reverse_key]
+
+                    ## Create the current connection for this one:
                     isn = self.proto_tree['tcp.seq'].value()
 
                     self.dbh.execute("insert into connection_details_%s set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r ",(
-                        self.table, row['dest_ip'],row['dest_port'],
-                        row['src_ip'],row['src_port'],
+                        self.table, ipdest,tcpdestport,
+                        ipsrc,tcpsrcport,
                         isn))
-
+                    
                     ## Create a New VFS directory structure for this connection:
                     con_id=self.dbh.autoincrement()
-                    self.ddfs.VFSCreate(None,"S%s" % (con_id) , "%s-%s/%s:%s/reverse" % (IP2str(row['src_ip']),IP2str(row['dest_ip']),row['src_port'], row['dest_port']))
-                else:
+                    self.ddfs.VFSCreate(None,"S%s" % (con_id) , "%s-%s/%s:%s/reverse" % (IP2str(ipdest),IP2str(ipsrc),tcpdestport, tcpsrcport))
+                    ## Cache it:
+                    self.outer.connection_cache[forward_key]=(con_id,isn)
+                    
+                except KeyError:
+                    ## Nope - we dont have that either, we need to
+                    ## create a new node for the forward stream:
+                    
                     isn = self.proto_tree['tcp.seq'].value()
                     self.dbh.execute("insert into connection_details_%s set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r",(
                         self.table,
@@ -136,7 +137,12 @@ class StreamReassembler(GenScanFactory):
                     ## Create a New VFS directory structure for this connection:
                     con_id=self.dbh.autoincrement()
                     self.ddfs.VFSCreate(None,"S%s" % (con_id) , "%s-%s/%s:%s/forward" % (IP2str(ipsrc),IP2str(ipdest),tcpsrcport, tcpdestport))
+                    
+                    ## Cache it:
+                    self.outer.connection_cache[forward_key]=(con_id,isn)
 
+                    ## END CREATE FORWARD STREAM
+                    
             ## Now insert into connection table:
             packet_id = self.fd.tell()-1
             seq = self.proto_tree['tcp.seq'].value()
