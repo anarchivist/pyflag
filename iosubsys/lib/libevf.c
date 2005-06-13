@@ -103,6 +103,8 @@ void evf_warn(const char *message, ...)
 	va_end(ap);
 };
 
+int evf_listonly=0;
+
 int evf_verbose=0;
 /* Used for Debugging messages*/
 void evf_debug(int threshold,const char *message, ...)
@@ -150,7 +152,7 @@ int advance_stream(int fd, int length) {
   int count = 0;
   char current_p;
 
-  fprintf(stderr, "  hrmm...asked to advance: %i\n", length);
+  evf_warn("  hrmm...asked to advance: %i\n", length);
 
   while(length>0) {
     if(length==0) 
@@ -186,8 +188,8 @@ struct evf_file_header *evf_read_header(int fd) {
     RAISE(E_IOERROR,NULL,"File format not recognised as EWF");
   };
 
-  evf_debug(9,"Opened EVF file\n");
-  evf_debug(9,"Segment %u\n",file->segment);
+  evf_debug(2,"Opened EVF file\n");
+  evf_debug(2,"Segment %u\n",file->segment);
   return(file);
 };
 
@@ -220,19 +222,35 @@ struct evf_section_header *evf_read_section(int fd) {
   if(read_from_stream(fd,section,sizeof(*section))<sizeof(*section)) 
     RAISE(E_IOERROR,NULL,Read,"Section Header");
 
+
+  if(!memcmp(section->type,"header",strlen("header"))) {
 #ifdef CYGWIN
-  //Windows does not have llu formatter...
-  evf_debug(9,"section %s: next header: %lu, Section size: %lu crc %u(%u)\n",
-	    section->type,(unsigned int)section->next,(unsigned int)section->size,section->crc,evf_crc(section,sizeof(*section)-4,1));
+    //Windows does not have llu formatter...
+    evf_debug(1,"section %s: next header: %lu, Section size: %lu crc %u(%u)\n",
+	      section->type,(unsigned int)section->next,(unsigned int)section->size,section->crc,evf_crc(section,sizeof(*section)-4,1));
 #else
-  evf_debug(9,"section %s: next header: %llu, Section size: %llu crc %u(%u)\n",
-	    section->type,section->next,section->size,section->crc,evf_crc(section,sizeof(*section)-4,1));
+    evf_debug(1,"section %s: next header: %llu, Section size: %llu crc %u(%u)\n",
+	      section->type,section->next,section->size,section->crc,evf_crc(section,sizeof(*section)-4,1));
 #endif
+
+  } else {
+#ifdef CYGWIN
+    //Windows does not have llu formatter...
+    evf_debug(2,"section %s: next header: %lu, Section size: %lu crc %u(%u)\n",
+	      section->type,(unsigned int)section->next,(unsigned int)section->size,section->crc,evf_crc(section,sizeof(*section)-4,1));
+#else
+    evf_debug(2,"section %s: next header: %llu, Section size: %llu crc %u(%u)\n",
+	      section->type,section->next,section->size,section->crc,evf_crc(section,sizeof(*section)-4,1));
+#endif
+  }
+    
+
+
   return section;
 };
 
 /* Prints the MD5 sum as a string */
-void printable_md5(char *md5,char *data) {
+void evf_printable_md5(char *md5,char *data) {
   int i;
 
   for(i=0;i<16;i++) {
@@ -300,7 +318,7 @@ void process_section(struct evf_section_header *header,int image_number,struct o
     
     //Null terminate the data just in case
     data[length]=0;
-    evf_debug(9,"Header data: %s\n",data);
+    evf_debug(1,"Header data: %s\n",data);
     free(data);
     free(cdata);
     return;
@@ -315,7 +333,7 @@ void process_section(struct evf_section_header *header,int image_number,struct o
     if(read_from_stream(fd,volume,sizeof(*volume))<sizeof(*volume)) 
       RAISE(E_IOERROR,NULL,Read,"Volume header");
 
-    evf_debug(9,"This volume has %u chunks of %u bytes each. crc %u(%u)\n",volume->chunk_count,volume->sectors_per_chunk*volume->bytes_per_sector,volume->crc,evf_crc(volume,sizeof(*volume)-4,1));
+    evf_debug(3,"This volume has %u chunks of %u bytes each. crc %u(%u)\n",volume->chunk_count,volume->sectors_per_chunk*volume->bytes_per_sector,volume->crc,evf_crc(volume,sizeof(*volume)-4,1));
 
     //Malloc enough memory for the index:
     offsets->chunk_size=volume->sectors_per_chunk*volume->bytes_per_sector;
@@ -344,7 +362,7 @@ void process_section(struct evf_section_header *header,int image_number,struct o
       RAISE(E_IOERROR,NULL,Read,"Table header");
     };
 
-    evf_debug(9,"Table is of size %u chunks crc %u(%u)\n",table->count,table->crc,evf_crc(table,sizeof(*table)-4,1));
+    evf_debug(3,"Table is of size %u chunks crc %u(%u)\n",table->count,table->crc,evf_crc(table,sizeof(*table)-4,1));
     
     if(read_from_stream(fd,&old_offset,sizeof(old_offset))<sizeof(old_offset)) {
       free(table);
@@ -375,7 +393,7 @@ void process_section(struct evf_section_header *header,int image_number,struct o
       offsets->fd[offsets->max_chunk]=fd;
       offsets->offset[offsets->max_chunk]=old_offset;
       offsets->size[offsets->max_chunk]=(unsigned short int)(offset-old_offset);
-      evf_debug(10,"offset %u in file %u has size %u\n",offsets->max_chunk,old_offset,offset-old_offset);
+      evf_debug(3,"offset %u in file %u has size %u\n",offsets->max_chunk,old_offset,offset-old_offset);
       offsets->max_chunk++;
       old_offset=offset;
     };
@@ -394,7 +412,7 @@ void process_section(struct evf_section_header *header,int image_number,struct o
 	offsets->offset[offsets->max_chunk]=offset & 0x7fffffff;
 	offsets->size[offsets->max_chunk]=tmp_section->end_offset-offset;
 	offsets->max_chunk++;
-	evf_debug(9,"Last chunk is %u big on fd %u\n",tmp_section->end_offset-offset,fd);
+	evf_debug(3,"Last chunk is %u big on fd %u\n",tmp_section->end_offset-offset,fd);
 	break;
       };
     };
@@ -466,35 +484,38 @@ void evf_decompress_fds(struct offset_table *offsets,int outfd) {
 	// we dont bother checking it for compressed blocks because
 	// zlib does its own checking and any errors should be reported there
 	if(evf_crc(cdata, length, 1) != *((unsigned int *)(cdata+length))) {
-	  fprintf(stderr, "WARNING: CRC error in block %i\n", i);
+	  evf_warn("WARNING: CRC error in block %i\n", i);
 	}
       }
-      fprintf(stderr, "Block %i is UNCOMPRESSED\n", i);
+      evf_debug(1,"Block %i of %i is UNCOMPRESSED (%%%i)\r",i,offsets->max_chunk, offsets->max_chunk > 0 ? (i*100)/offsets->max_chunk : 1);
       memcpy(data,cdata,length);
     };
 
     /* Calculate the MD5 sum for the buffer */
     MD5Update(&md5,data,length);
-    if(evf_verbose<5) {
-      if(write(outfd,data,length)<length) {
-	free(data);
-	free(cdata);
-	
-	RAISE(E_IOERROR,NULL,Write,"to decompress file");
-      };
+
+    if(write(outfd,data,length)<length) {
+      free(data);
+      free(cdata);
+      
+      RAISE(E_IOERROR,NULL,Write,"to decompress file");
     };
   };
 
-  printable_md5(offsets->md5,data);
-  evf_debug(9,"MD5 Sum is: %s",data);
-
   MD5Final(cdata,&md5);
 
+  evf_printable_md5(offsets->md5,data);
+  evf_debug(0,"Stored MD5 Sum is: %s,  ",data);
+
+  evf_printable_md5(cdata,data);
+  evf_debug(0,"Computed MD5 Sum is: %s.  ",data);
+
+
   if(!memcmp(cdata,offsets->md5,16)) {
-    evf_debug(9," (Correct)\n");
+    evf_debug(0,"Correct.\n");
   }else {
-    printable_md5(cdata,data);
-    evf_debug(9,"(%s) Incorrect",data);
+    evf_debug(0,"INCORRECT HASH !!!\n");
+    exit(1);
   };
 
   free(data);

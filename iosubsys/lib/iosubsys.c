@@ -459,7 +459,7 @@ int ewf_add_file(IO_INFO_EWF *self,char *filename) {
   int fd;
   struct evf_file_header *file_header;
 
-  printf("will add %s as a filename\n",filename);
+  /*  printf("will add %s as a filename\n",filename);*/
   fd=open(filename,O_RDONLY);
   if(fd<0) {
     RAISE(E_IOERROR,NULL,"Could not open %s",filename);
@@ -547,7 +547,7 @@ int ewf_open(IO_INFO *self) {
     RAISE(E_IOERROR,NULL,"No Files given");
   };
 
-  printf("max segments = %u\n",io->offsets.max_segment);
+  /*  printf("max segments = %u\n",io->offsets.max_segment); */
   for(i=1;i<=io->offsets.max_segment;i++) {
     int old_section_offset=0;
 

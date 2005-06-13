@@ -54,20 +54,21 @@
 static char Malloc[]="Cant Malloc\n";
 static char Open[]="Cant open %s for reading\n";
 extern int evf_verbose;
+extern int evf_listonly;
 
 /* Prints usage information for evftool */
 void usage() {
   printf("evtool - Expert Witness Format conversion utility\n");
   printf("(c) 2004\n");
   printf("usage: evftool [options] [file1] [file2]\n");
-  printf("  -d --decompress filename\tdecompress into a filename\n");
+  printf("  -d --decompress filename\tdecompress into a filename.  Incompatable with -l.\n");
   printf("  -s --size INT\tSets the approximate size of the output files in bytes. This is only important for compression\n");
   printf("  -c --compress filename\tcompresses stdin into the series of files given by filename (with the last 2 chars replaced with the segment number)\n");
   printf("  -h --help\t\tgive this help\n");
-  printf("  -l --list file\tTests index integrity for file and list stats\n");
+  printf("  -l --list file\tTests index integrity for file and list stats.  Incompatable with -d.\n");
   printf("  -f --force\t\tIgnore errors and process files anyway - you should have -v with this\n");
   printf("  -L --license\t\tdisplay software license\n");
-  printf("  -v --verbose\t\tverbose mode\n");
+  printf("  -v --verbose\t\tverbose mode (use multiple times for more verbosity, max 3\n");
   printf("  -V --version\t\tdisplay version number\n");
   printf("  file... files to (de)compress. If none given, use standard input/output.\n");
 };
@@ -163,6 +164,8 @@ int main(int argc, char **argv) {
   int i,outfd=1;
   //Should we stop on errors?
   int force=0;
+  int openout=0;
+  char *outfile;
   struct evf_section_header *section=NULL;
 
   //Initialise the offset table:
@@ -221,13 +224,18 @@ int main(int argc, char **argv) {
       break;
     case 'd':
       mode='d';
-	if(strcmp(optarg,"-")){
-		outfd=open(optarg,O_CREAT|O_WRONLY|O_TRUNC|O_BINARY,S_IRWXU);
-	} else outfd=1;
-	break;
+      if(strcmp(optarg,"-")){
+	/* If given a filename, remember it, mark it to be opened */
+	openout = 1;
+	outfile = (char *) malloc(strlen(optarg)+1);
+	if(!outfile) RAISE(E_NOMEMORY,NULL,Malloc);
+	memcpy(outfile,optarg,strlen(optarg));
+	outfile[strlen(optarg)] = 0;
+      } else outfd=1;
+      break;
     case 'l':
       {
-	evf_verbose+=10;
+	evf_listonly = 1;
 	break;
       };
     default:
@@ -235,12 +243,26 @@ int main(int argc, char **argv) {
     }
   };
 
+  if (evf_listonly && openout) {
+    RAISE(E_GENERIC,NULL,"Incompatable options.  Only one of -l and -d may be specified.\n");
+  }
+
+
+  /* Open the output file if needed*/
+
+  if (openout) {
+    debug(2,"Openning file %s for create/write.\n",outfile);
+    outfd=open(outfile,O_CREAT|O_WRONLY|O_TRUNC|O_BINARY,S_IRWXU); 
+    if(outfd<0) RAISE(E_IOERROR,NULL,Open,outfile);
+  }
+
   /* alternate algorithm for processing ewf from stdin
      does so without knowledge of the offsets table etc
      unsure how reliable it is, but worked in basic tests!
           Dave <daveco@users.sourceforge.net>
   */
   if (mode == 'd' && (optind == argc || strcmp(argv[optind],"-") == 0)) {
+  debug(3,"dump from stdin");
     int fd;
     struct evf_file_header *file_header;
     int readcount; //keep track of possition in segment
@@ -422,13 +444,17 @@ int main(int argc, char **argv) {
   /* return to the reliable method (where the evt file must be a seekable file) */
   /* Get our filenames */
   if (optind < argc) {
+
+
+    debug(3,"fds open from files");
+
     while (optind < argc) {
       int fd;
       struct evf_file_header *file_header;
 
+      debug(2,"Openning file %s\n",argv[optind]);
       fd=open(argv[optind],O_RDONLY|O_BINARY);
       if(fd<0) RAISE(E_IOERROR,NULL,Open,argv[optind]);
-      debug(2,"Openning file %s\n",argv[optind]);
 
       file_header=evf_read_header(fd);
       
@@ -503,8 +529,25 @@ int main(int argc, char **argv) {
   if(strcasecmp(section->type,"done") && !force) 
     RAISE(E_IOERROR,NULL,"No ending section, Cant find the last segment file\n");
 
-  if(evf_verbose>10)
+
+  if (evf_listonly) {
+
+    /* Print the stored MD5 hash.
+       If we call decompress (i.e. not just listing), the decompress
+       routine will print the stored hash, as well as calculating the hash 
+       from the data and compairing it to the stored value.
+     */
+
+    char *data=(char *)malloc(offsets.chunk_size);
+    evf_printable_md5(offsets.md5,data);
+    debug(0,"Stored MD5 Sum is: %s\n",data);
+  } else {
     evf_decompress_fds(&offsets,outfd);
+  }
+
   return(0);
 };
+
+
+
 

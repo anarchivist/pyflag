@@ -114,6 +114,7 @@ struct evf_section_header *evf_read_section(int fd);
 void process_section(struct evf_section_header *header,
 		     int image_number,struct offset_table *offsets);
 void evf_decompress_fds(struct offset_table *offsets,int outfd);
+void evf_printable_md5(char *md5,char *data);
 int evf_read_random(char *buf, int len, unsigned long long int offs,
 		    const struct offset_table *offsets);
 void evf_compress_fds(int chunk_size,int infd, char *filename,int size);
