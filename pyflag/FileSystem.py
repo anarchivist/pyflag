@@ -120,10 +120,14 @@ class FileSystem:
         if not inode:
             raise IOError('Inode not found for file')
 
-        if not path:
-            path = self.lookup(inode=inode)
-        if not path:
-            raise IOError('File not found for inode %s' % inode)
+        ## We should be allowed to open inodes which do not exist in
+        ## the filesystem proper, but the VFS may be able to do
+        ## something with them -- all it means is that we cant really
+        ## navigate to them.
+#        if not path:
+#            path = self.lookup(inode=inode)
+#        if not path:
+#            raise IOError('File not found for inode %s' % inode)
 
         # open the file, first pass will generally be 'D' or 'M'
         # then any virtual file systems (vfs) will kick in
@@ -387,6 +391,7 @@ class File:
         self.inode = inode
         self.readptr =0
         self.size=0
+        self.dbh=DB.DBO(case)
 
     def close(self):
         """ Fake close method. """

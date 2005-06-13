@@ -61,8 +61,9 @@ class NetworkScanner(BaseScanner):
         ## a metadata structure so that scanners that follow us
         ## can reuse it. This ensure we do not un-necessarily
         ## dissect each packet.
+        self.packet_id = self.fd.tell()-1
+          
         try:
-            self.packet_id = self.fd.tell()-1
             self.proto_tree = metadata['proto_tree'][self.packet_id]
         except KeyError,e:
             ## Ensure ethereal doesnt fiddle with the sequence numbers
@@ -73,4 +74,4 @@ class NetworkScanner(BaseScanner):
             self.proto_tree = pyethereal.Packet(data,self.packet_id,self.fd.link_type)
 
             ## Store it for the future
-            metadata['proto_tree']={ 'packet_id': self.proto_tree }
+            metadata['proto_tree']={ self.packet_id: self.proto_tree }

@@ -214,11 +214,11 @@ class ViewFile(Reports.report):
         image = Graph.FileThumb(fd)
         #How big is this file?
         i=fsfd.istat(inode=query['inode'])
-        filesize=i['size']
+#        filesize=i['size']
         
         #Add the filename into the headers:
         path=fsfd.lookup(inode=query['inode'])
-        if not path: raise IOError("No path for Inode %s" % query['inode'])
+        if not path: path=query['inode']
         path,name=os.path.split(path)
         image.headers=[("Content-Disposition","attachment; filename=%s" % name),]
         ## This fails in cases where the File object does not know its own size in advance (e.g. Pst).

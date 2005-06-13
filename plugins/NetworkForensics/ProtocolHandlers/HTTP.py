@@ -163,7 +163,7 @@ class BrowseHTTPRequests(Reports.report):
             links = [
             FlagFramework.query_type((),
                                      family="Disk Forensics",case=query['case'],
-                                     report="View File Contents",mode="HexDump",
+                                     report="View File Contents",mode="Combined streams",
                                      fsimage=query['fsimage'],__target__="inode"),
             FlagFramework.query_type((),
                                      family=query['family'], report="View Packet",
