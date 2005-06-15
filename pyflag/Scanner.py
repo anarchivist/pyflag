@@ -69,6 +69,7 @@ class BaseScanner:
         is called (See the StoreAndScan classes for examples).
         
         @arg data: Some limited amount of data from the file. The size of the data is unspecified but more than 1000 bytes.
+        
         @arg metadata: A dict specifying meta data that was deduced about this file by other scanners. Scanners may add meta data to this dict in order to indicate certain facts to other scanners about this file. For example the TypeScan scanner will store the magic in this dict to indicate when the PST scanner should scan the file etc. Note that the order of scanner invocation is important, and is controlled by the order parameter in the Scanner's GenScanFactory class.
         """
         pass

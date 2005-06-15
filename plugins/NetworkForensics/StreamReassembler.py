@@ -45,7 +45,10 @@ class StreamReassembler(GenScanFactory):
     order=5
 
     def prepare(self):
-        ## We create the tables we need
+        ## We create the tables we need: The connection_details table
+        ## stores information about each connection, while the
+        ## connection table store all the packets belonging to each
+        ## connection.
         self.dbh.execute(
             """CREATE TABLE if not exists `connection_details_%s` (
             `inode` varchar(250),
@@ -251,10 +254,11 @@ class StreamFile(File):
     Note that this is currently a very Naive reassembler. Stream Reassembling is generally considered a very difficult task. The approach we take is to make a very simple reassembly, and have a different scanner check the stream for potetial inconsistancies.
 
     The inode format is:
-    Scod_id[:offset]
+    Scon_id/con_id/con_id
 
-    con_id is the connection ID
-    offset is an optional offset
+    con_ids are the connection IDs. If more than one con_id is
+    specified we merge all connections into the same stream based on
+    arrival time.
     """
     specifier = 'S'
     stat_cbs = [ show_packets, combine_streams ]
@@ -304,6 +308,7 @@ class StreamFile(File):
 
     def create_new_stream(self,stream_ids):
         """ Creates a new stream by combining the streams given by the list stream_ids.
+        
         @return the new stream id.
         """
         ## Store the new stream in the cache:

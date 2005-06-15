@@ -124,16 +124,17 @@ class HTTPScanner(GenScanFactory):
                      ## Inode:
                       "o%s:%s" % (offset,content_length),
                      ## Path to new file:
-                      "HTTP response %s" % (
+                      "HTTP/Response %s" % (
                             response_id))
 
+                ## This code should not be needed!!!
                 ## Handle gziped encoding:
                 if content_encoding=='gzip':
                     self.ddfs.VFSCreate(metadata['inode'],
                                         ## Inode:
                                         "o%s:%s|G1" % (offset,content_length),
                                         ## Path to new file:
-                                        "HTTP response %s (uncompressed)" % (
+                                        "Response %s (uncompressed)" % (
                         response_id))
                     
             except KeyError,e:
