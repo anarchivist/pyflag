@@ -45,7 +45,7 @@ import pyflag.Reports as Reports
 import pyflag.Registry as Registry
 import pyflag.IO as IO
 from pyflag.Scanner import *
-import index,os
+import index,os,time
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
@@ -69,6 +69,11 @@ class Index(GenScanFactory):
         ## accessible - maybe we need to pass this in the metadata?
         self.rel_offset = 0
         self.dbh.execute("create table if not exists `LogicalIndex_%s` (`inode` VARCHAR( 20 ) NOT NULL ,`block` BIGINT NOT NULL, primary key(block))",(table))
+        
+        self.dbh.execute("""create table if not exists `LogicalIndexOffsets_%s` (
+        `id` INT NOT NULL ,
+        `offset` BIGINT NOT NULL
+        )""",(table))
         ## The block number must be the largest that is available in the database.
         self.dbh.execute("select max(block) as `max` from `LogicalIndex_%s`",(table))
         row=self.dbh.fetch()
@@ -77,37 +82,27 @@ class Index(GenScanFactory):
         except: self.block=0
         
         self.table=table
-        self.filename = "%s/case_%s/LogicalIndex_%s.idx" % (config.RESULTDIR,self.dbh.case,table)
 
     def prepare(self):
-        try:
-            ## Is the file already there?
-            self.index = index.Load(self.filename)
-            print "Loading old index filename %s" % self.filename
-        except IOError:
-            ## If not we create it
-            self.index = index.index(self.filename)
-            pydbh = DB.DBO(None)
-            pydbh.execute("select word from dictionary")
-            for row in pydbh:
-                self.index.add(row['word'])
+        ## Create new index trie - This takes a serious amount of time
+        ## for large dictionaries (about 2 sec for 70000 words):
+        self.index = index.index()
+        pydbh = DB.DBO(None)
+        logging.log(logging.DEBUG,"Index Scanner: Building index trie")
+        start_time=time.time()
+        pydbh.execute("select word,id from dictionary")
+        for row in pydbh:
+            self.index.add_word(row['word'],row['id'])
+
+        logging.log(logging.DEBUG,"Index Scanner: Done in %s seconds..." % (time.time()-start_time))
                 
     def reset(self):
         """ This deletes the index file and drops the LogicalIndex table """
         GenScanFactory.reset(self)
-        ## First destroy the object and then try to remove the index file
-        try:
-            del self.index
-        except AttributeError:
-            pass
+        del self.index
 
         self.dbh.execute("drop table if exists `LogicalIndex_%s`",self.table)
-        try:
-            os.remove(self.filename)
-        except OSError:
-            pass
-        
-        self.dbh.execute("drop table if exists `LogicalIndex_%s`",(self.table))
+        self.dbh.execute("drop table if exists `LogicalIndexOffsets_%s`",self.table)
         ## Here we reset all reports that searched this disk
         FlagFramework.reset_all(case=self.dbh.case,report='SearchIndex', family='Disk Forensics')
         self.dbh.execute("drop table if exists `LogicalKeyword_%s`",(self.table))
@@ -115,6 +110,9 @@ class Index(GenScanFactory):
     def destroy(self):
         ## Destroy our index handle which will close the file and free memory
         del self.index
+
+        ## Ensure indexes are built on the offset table:
+        self.dbh.check_index("LogicalIndexOffsets_%s" % self.table,"id")
         
     class Scan(BaseScanner):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
@@ -131,9 +129,22 @@ class Index(GenScanFactory):
             self.dbh.execute("insert into `LogicalIndex_%s` set inode=%r,block=%r",(outer.table,inode,self.outer.block))
 
         def process(self,data,metadata=None):
-            self.index.index_buffer(self.outer.block * pow(2, BLOCKSIZE) + self.outer.rel_offset ,data)
-            self.outer.rel_offset+=len(data)
-            ## If the file is longer than a block, we create a new block, and adjust the relative offset
+            self.index.index_buffer(data)
+            results = []
+            ## Store any hits in the database - NOTE: We use extended
+            ## insert syntax here for speed (This may not be portable
+            ## to other databases):
+            for i in self.index.get_offsets():
+#                print self.outer.rel_offset,self.outer.block
+                results.append("(%s,%s)" % (i.id,i.offset+self.outer.rel_offset+self.outer.block * pow(2, BLOCKSIZE)))
+
+            if results:
+                self.dbh.execute("insert into LogicalIndexOffsets_%s values %s",(self.table,",".join(results)))
+            
+            self.outer.rel_offset += len(data)
+            
+            ## If the file is longer than a block, we create a new
+            ## block, and adjust the relative offset
             if self.outer.rel_offset > pow(2,BLOCKSIZE):
                 self.outer.block+=1
                 self.outer.rel_offset -= pow(2,BLOCKSIZE)
@@ -266,14 +277,18 @@ class SearchIndex(Reports.report):
         iofd = IO.open(query['case'], query['fsimage'])
         fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"], query["fsimage"], iofd)
 
-        import index
-
-        idx = index.Load("%s/case_%s/LogicalIndex_%s.idx" % (config.RESULTDIR,query['case'],table))
-        for offset in idx.search(keyword):
+        pdbh = DB.DBO(None)
+        pdbh.execute("select id from dictionary where word=%r",(keyword))
+        row=pdbh.fetch()
+        keyword_id=row['id']
+        
+        dbh.execute("select offset from LogicalIndexOffsets_%s where id=%r",(table,keyword_id))
+        for row in dbh:
+            offset =  row['offset']
             ## Find out which inode this offset is in:
             block = offset >> BLOCKSIZE
-            dbh.execute("select inode,min(block) as minblock from LogicalIndex_%s where block = %r group by block",(query['fsimage'],block))
-            row=dbh.fetch()
+            dbh2.execute("select inode,min(block) as minblock from LogicalIndex_%s where block = %r group by block",(query['fsimage'],block))
+            row=dbh2.fetch()
             if not row: continue
             ## Here we remove the block number part from the int. If
             ## there are a number of blocks in the database for this

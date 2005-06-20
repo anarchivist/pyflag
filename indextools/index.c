@@ -221,7 +221,7 @@ void idx_add_to_offset_list(struct offset_list *list,int offset, int id)
   off[list->last].offset=offset;
   off[list->last].id=id;
   list->last++;
-  if(list->last>=list->size) {
+  if(list->last * sizeof(struct offset) >= list->size) {
     list->size+=INITIAL_OFFSET_LIST_SIZE;
     list->offsets=(struct offset *)realloc(list->offsets,list->size);
   };

@@ -324,7 +324,7 @@ class LoadFS(Reports.report):
         except IOError,e:
             result.text("IOError %s" % e,color='red')
         except (KeyError,TypeError),e:
-            FlagFramework.get_traceback(e,result)
+#            FlagFramework.get_traceback(e,result)
             pass
 
     def analyse(self,query):

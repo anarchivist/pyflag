@@ -1469,10 +1469,12 @@ INSERT INTO enum VALUES ('ip_flags_txt',4,'Dont Frag');
 INSERT INTO enum VALUES ('ip_flags_txt',2,'More Frag');
 
 CREATE TABLE `dictionary` (
+	`id` int auto_increment,
 	`word` VARCHAR( 50 ) NOT NULL ,
 	`class` VARCHAR( 50 ) NOT NULL ,
 	`encoding` SET( 'all', 'asci', 'ucs16' ) NOT NULL,
-	PRIMARY KEY  (`word`)
+	`type` set ( 'String','Regular Expression' ),
+	PRIMARY KEY  (`id`)
 );
 
 CREATE TABLE `regexps` (

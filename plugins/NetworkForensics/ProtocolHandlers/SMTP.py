@@ -51,7 +51,8 @@ class SMTPScanner(GenScanFactory):
             `length` int,
             `from` VARCHAR(255) NOT NULL,
             `to` VARCHAR(255) NOT NULL,
-            `message_id` int(11) unsigned NOT NULL auto_increment
+            `message_id` int(11) unsigned NOT NULL auto_increment,
+            key `message_id`
             ) """,(self.table,))
             
         def reset(self):

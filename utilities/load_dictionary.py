@@ -23,7 +23,8 @@ The dictionary is expected to have one word per line, for example
 Options:
 
   -c|--class	Specify a class for the words.  The default class is 'English'.
-  -d|--drop	Drop old regexp table before loading
+  -d|--drop	Drop old table before loading
+  -r|--regex    Add entries as regular expressions rather than strings.
   -h|--help	Print help (this message)
   -v|--verbose	Be verbose
   """ % os.path.basename(sys.argv[0])
@@ -34,7 +35,7 @@ Options:
 #
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "hdvc:", ["help", "drop","verbose","class"])
+    opts, args = getopt.getopt(sys.argv[1:], "rhdvc:", ["regex","help", "drop","verbose","class"])
 except getopt.GetoptError:
     # print help information and exit:
     usage()
@@ -49,6 +50,7 @@ if not args:
 drop = False
 verbose = False
 wordclass = "English"
+type="String"
 
 # parse options
 
@@ -62,7 +64,9 @@ for o, a in opts:
         sys.exit()
     if o in ("-d", "--drop"):
         drop = True
-
+    if o in ("-r", "--regex"):
+        type="Regular Expression"
+        
 print "wordclass is /%s/" % wordclass
 
 dbh=DB.DBO(None)
@@ -71,7 +75,15 @@ if drop:
     print "Dropping old dictionary"
     dbh.execute("DROP TABLE dictionary")
 
-dbh.execute("CREATE TABLE if not exists `dictionary` (`word` VARCHAR( 50 ) NOT NULL ,`class` VARCHAR( 50 ) NOT NULL ,`encoding` SET( 'all', 'asci', 'ucs16' ) NOT NULL,PRIMARY KEY  (`word`))")
+dbh.execute(
+    """ CREATE TABLE if not exists `dictionary` (
+    `id` int auto_increment,
+    `word` VARCHAR( 50 ) NOT NULL ,
+    `class` VARCHAR( 50 ) NOT NULL ,
+    `encoding` SET( 'all', 'asci', 'ucs16' ) NOT NULL,
+    `type` set ( 'String','Regular Expression' ),
+    PRIMARY KEY  (`id`)
+    )""")
 
 count=0
 for file in args[0:]:
@@ -80,7 +92,7 @@ for file in args[0:]:
     for line in fd:
         if len(line)>3 and not "'" in line:
             try:
-                dbh.execute("insert into dictionary set word=%r,class=\"%s\";" % (line[:-1],wordclass))
+                dbh.execute("insert into dictionary set word=%r,class=\"%s\",type=%r" % (line[:-1],wordclass,type))
                 count+=1
             except DB.DBError:
                 pass

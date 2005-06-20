@@ -18,6 +18,7 @@
     *slen=trie->list->last * sizeof(struct offset);
     *s = (char *)malloc(*slen);
     memcpy(*s,trie->list->offsets,*slen);
+//    printf("Allocating %u bytes for %u elements\n",*slen,trie->list->last);
   };
 
 %}
@@ -41,6 +42,7 @@ class offsets:
        return self
 
    def next(self):
+#       print "Getting %s element (%s)" % (self.element,len(self.data))
        try:
            s=self.data[self.element:self.element+self.size]
            
