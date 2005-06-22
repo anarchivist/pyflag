@@ -92,6 +92,7 @@ class StreamReassembler(GenScanFactory):
             except KeyError,e:
                 return
 
+            print type(ipdest),type(tcpdestport)
             ## Here we try and cache connection information in memory
             ## so we dont hit the db so much
             forward_key = struct.pack("iiii",ipsrc,ipdest,tcpsrcport,tcpdestport)
