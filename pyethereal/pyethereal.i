@@ -163,7 +163,7 @@ enum ftenum get_type(proto_node *node) {
  unsigned int get_ip_as_int(proto_node *node) {
    if(!node || !node->finfo) return 0;
 
-   return node->finfo->value.value.integer;
+   return (unsigned int)(node->finfo->value.value.integer);
  };
 
 //Gets the value of node as a long long int

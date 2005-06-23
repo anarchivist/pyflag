@@ -92,10 +92,9 @@ class StreamReassembler(GenScanFactory):
             except KeyError,e:
                 return
 
-            print type(ipdest),type(tcpdestport)
             ## Here we try and cache connection information in memory
             ## so we dont hit the db so much
-            forward_key = struct.pack("iiii",ipsrc,ipdest,tcpsrcport,tcpdestport)
+            forward_key = struct.pack("IIII",ipsrc,ipdest,tcpsrcport,tcpdestport)
 
             ## The following tests the cache for both forward or
             ## reverse connections, creating them if needed.
@@ -105,7 +104,7 @@ class StreamReassembler(GenScanFactory):
                 #We dont have the forward connection, maybe we have
                 #the reverse?
                 try:
-                    reverse_key = struct.pack("iiii",ipdest,ipsrc,tcpdestport,tcpsrcport)
+                    reverse_key = struct.pack("IIII",ipdest,ipsrc,tcpdestport,tcpsrcport)
                     con_id,isn = self.outer.connection_cache[reverse_key]
 
                     ## Create the current connection for this one:
