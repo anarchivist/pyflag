@@ -437,3 +437,18 @@ class File:
             return data
         else:
             raise StopIteration
+
+    def readline(self,delimiter='\n'):
+        """ Emulates a readline by reading upto the \n """
+        buffer = ''
+        start = self.tell()
+        while 1:
+            try:
+                o = buffer.index(delimiter)+1
+                self.seek(start+o)
+                return buffer[:o]
+            except ValueError:
+                data=self.read(256)
+                if len(data)==0: return buffer
+                buffer += data
+            

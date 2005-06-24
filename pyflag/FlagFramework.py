@@ -749,3 +749,9 @@ def make_sql_from_filter(filter_str,having,column,name):
         condition_text="%s like %s" % (name,"%%%s%%" % filter_str)
 
     return condition_text
+
+def get_temp_path(case,filename):
+    """ Returns the full path to a temporary file based on filename.
+    """
+    filename = filename.replace('/','-')
+    return "%s/case_%s/%s" % (config.RESULTDIR,case,filename)

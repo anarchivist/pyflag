@@ -23,7 +23,91 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 from pyflag.Scanner import *
 import re
-from NetworkScanning import *
+from NetworkScanner import *
+
+class POPException(Exception):
+    """ Raised if line is an invalid pop command """
+
+class POP:
+    """ Class managing the pop connection information """
+    def __init__(self,fd):
+        self.fd=fd
+        self.dispatcher={
+            "+OK"   :self.NOOP,
+            "-ERR"  :self.NOOP,
+            "DELE"  :self.NOOP,
+            "QUIT"  :self.NOOP,
+            }
+        self.username=''
+        self.password=''
+        self.files=[]
+
+    def read_multi_response(self):
+        """ Reads the next few lines off fd and returns a combined response """
+        result=''
+        while 1:
+            line = self.fd.readline()
+            if not line or line=='.\r\n':
+                return result
+
+            ## This cleans out escaped lines as mentioned in the RFC
+            if line.startswith('.'): line=line[1:]
+            result+=line
+
+    def NOOP(self,args):
+        """ A do nothing parser """
+
+    def CAPA(self,args):
+        ## We just ignore this
+        self.read_multi_response()
+
+    def USER(self,args):
+        response=self.fd.readline()
+        self.username=args[0]
+
+    def PASS(self,args):
+        response=self.fd.readline()
+        if response.startswith("+OK"):
+            self.password=args[0]
+            print "Login for %s successful with password %s" % (self.username,self.password)
+
+    def STAT(self,args):
+        """ We ignore STAT commands """
+        response=self.fd.readline()
+
+    def LIST(self,args):
+        """ We ignore LIST commands """
+        self.read_multi_response()
+
+    def UIDL(self,args):
+        self.read_multi_response()
+
+    def RETR(self,args):
+        ## Read the first line to see if it has been successful:
+        response=self.fd.readline()
+        if response.startswith("+OK"):
+            start = self.fd.tell()
+            data = self.read_multi_response()
+            length = len(data)
+            print "File %s starts at %s and is %s long" % (args[0],start,length)
+            self.files.append((args[0],"%s:%s" % (start,length)))
+                                                           
+    def parse(self):
+        line = self.fd.readline().strip()
+        if not line: return 0
+        tmp = line.split(" ")
+        command=tmp[0]
+        args=tmp[1:]
+        ## Dispatch the command handler:
+        try:
+            self.__class__.__dict__[command](self,args)
+        except KeyError,e:
+            try:
+                self.dispatcher[command](args)
+            except KeyError:
+                raise POPException("Command %r not implemented." % (command))
+
+        return line
 
 class POPScanner(GenScanFactory):
     """ Collect information about POP transactions.
@@ -33,30 +117,24 @@ class POPScanner(GenScanFactory):
     default = True
 
     def prepare(self):
-        self.pop_connections={}
-        
-    ## Do we want to store pop specific things at all here???
-##    def prepare(self):
-##        ## This dict simply stores the fact that a certain Inode is
-##        ## a POP stream. We deduce this by checking if ethereal
-##        ## decodes it as such. I guess if we want to parse POP
-##        ## streams which are not on port 110, we need to tell ethereal
-##        ## this via its config file.
-##        self.pop_connections = {}
+        ## This dict simply stores the fact that a certain Inode is
+        ## a POP stream. We deduce this by checking if ethereal
+        ## decodes it as such. I guess if we want to parse POP
+        ## streams which are not on port 110, we need to tell ethereal
+        ## this via its config file.
+        self.pop_connections = {}
 
-##        ## This one stores messages within the pop stream. Note that a
-##        ## single pop stream may contain multiple messages.
-##        self.dbh.execute(
-##            """ CREATE TABLE if not exists `pop_messages_%s` (
-##            `id` int(11) unsigned NOT NULL auto_increment,
-##            `inode` VARCHAR(255) NOT NULL,
-##            `offset` int,
-##            `length` int,
-##            key `id` (`id`)
-##            ) """,(self.table,))
+        ## This table stores common usernames/passwords:
+        self.dbh.execute(
+            """ CREATE TABLE if not exists `passwords_%s` (
+            `inode` VARCHAR(255) NOT NULL,
+            `username` VARCHAR(255) NOT NULL,
+            `password` VARCHAR(255) NOT NULL,
+            `type` VARCHAR(255) NOT NULL
+            ) """,(self.table,))
             
-##    def reset(self):
-##        self.dbh.execute("drop table if exists pop_messages_%s",(self.table,))
+    def reset(self):
+        self.dbh.execute("delete from passwords_%s where type='POP3'",(self.table,))
 
     class Scan(NetworkScanner):
         def process(self,data,metadata=None):
@@ -82,16 +160,24 @@ class POPScanner(GenScanFactory):
                 reverse_stream=row['con_id']
                 combined_inode = "S%s/%s" % (forward_stream,reverse_stream)
 
-                print "inode S%s/%s is a pop connection" % (forward_stream,reverse_stream)
-
                 ## We open the file and scan it for emails:
                 fd = self.ddfs.open(inode=combined_inode)
-                offset=0
+                p=POP(fd)
                 while 1:
-                    data = fd.read(10000)
-                    if len(data)==0: break
-                    for match in re.finditer(r"(?sim)RETR\s+(\d+)\r?\n\+OK\s+(\d+)[^\n]*",data):
-                        ## Add a new VFS node
-                        path=self.ddfs.lookup(inode="S%s" % forward_stream)
-                        path=os.path.dirname(path)
-                        self.ddfs.VFSCreate(None,combined_inode+"|o%s:%s" % (match.end()+offset , match.group(2)),path+"/POP/Message_" + match.group(1))
+                    try:
+                        if not p.parse():
+                            break
+                    except POPException,e:
+                        logging.log(logging.DEBUG,"%s" % e)
+
+                for f in p.files:
+                    ## Add a new VFS node
+                    path=self.ddfs.lookup(inode="S%s" % forward_stream)
+                    path=os.path.dirname(path)
+                    self.ddfs.VFSCreate(None,"%s|o%s" % (combined_inode,f[1]),path+"/POP/Message_"+f[0])
+                    print "Added file %s at offset %s" % (f[1],f[0])
+
+                ## If there is any authentication information in here,
+                ## we save it for Ron:
+                if p.username and p.password:
+                    self.dbh.execute("insert into passwords_%s set inode=%r,username=%r,password=%r,type='POP3'",(self.table,key,p.username,p.password))

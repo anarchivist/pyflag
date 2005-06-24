@@ -260,7 +260,7 @@ class StreamFile(File):
     specified we merge all connections into the same stream based on
     arrival time.
     """
-    specifier = 'S'
+    specifier = ' '
     stat_cbs = [ show_packets, combine_streams ]
     stat_names = [ "Show Packets", "Combined streams"]
     
@@ -422,7 +422,65 @@ class StreamFile(File):
     def get_packet_id(self):
         """ Gets the current packet id (where the readptr is currently at) """
         return self.seq
-    
+
+class CachedStreamFile(StreamFile):
+    """ A StreamFile VFS node with file based cache.
+
+    Due to complex operations required to reassemble the streams on the fly we find that its quicker to cache these streams on disk.
+    """
+    specifier = 'S'
+
+    def read(self,length=None):
+        try:
+            self.cached_fd.seek(self.tell())
+
+            if len:
+                return self.cached_fd.read(length)
+            else:
+                return self.cached_fd.read()
+        except AttributeError:
+            cached_filename = FlagFramework.get_temp_path(self.case,self.inode)
+            try:
+                ## open the previously cached copy
+                self.cached_fd = open(cached_filename,'r')
+            except IOError,e:
+                ## It does not exist: Create a new cached copy:
+                self.cached_fd = open(cached_filename,'w')
+
+                ## Save the current file position
+                current= self.tell()
+                self.seek(0)
+
+                ## Copy ourself into the file
+                while 1:
+                    data=StreamFile.read(self,1024*1024)
+                    if len(data)==0: break
+                    self.cached_fd.write(data)
+
+                ## Reopen file for reading
+                self.cached_fd = open(self.cached_fd.name,'r')
+
+                ## Restore current file position
+                self.seek(current)
+
+            return self.read(length)
+
+    def readline(self):
+        try:
+            return self.cached_fd.readline()
+        except AttributeError:
+            current = self.tell()
+            self.read(1)
+            self.seek(current)
+            self.cached_fd.seek(current)
+            return self.cached_fd.readline()
+
+    def tell(self):
+        try:
+            return self.cached_fd.tell()
+        except AttributeError:
+            return StreamFile.tell(self)
+        
 class OffsetFile(File):
     """ A simple offset:length file driver.
 
