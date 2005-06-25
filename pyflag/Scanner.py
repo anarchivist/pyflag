@@ -38,6 +38,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.logging as logging
 import os,imp
+import re
 
 class BaseScanner:
     """ This is the actual scanner class that will be instanitated once for each file in the filesystem.
@@ -241,13 +242,21 @@ class StoreAndScanType(StoreAndScan):
     
     def boring(self,metadata):
         try:
-            return metadata['mime'] not in self.types
+            mime_type = metadata['mime']
         except KeyError:
             self.dbh.execute("select mime from type_%s where inode=%r",(self.table,self.inode))
             row=self.dbh.fetch()
             if row:
-                return row['mime'] not in self.types
-            else: return True
+                mime_type = row['mime']
+            else: mime_type = ""
+
+        for t in self.types:
+            if re.search(t,mime_type):
+                ## Not boring:
+                return False
+
+        return True
+
 
 class ScanIfType(StoreAndScanType):
     """ Only Scans if the type matches self.types.

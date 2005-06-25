@@ -260,7 +260,6 @@ class StreamFile(File):
     specified we merge all connections into the same stream based on
     arrival time.
     """
-    specifier = ' '
     stat_cbs = [ show_packets, combine_streams ]
     stat_names = [ "Show Packets", "Combined streams"]
     
@@ -429,57 +428,53 @@ class CachedStreamFile(StreamFile):
     Due to complex operations required to reassemble the streams on the fly we find that its quicker to cache these streams on disk.
     """
     specifier = 'S'
-
-    def read(self,length=None):
+    cached_fd = None
+    
+    def cache(self):
+        """ Creates and maintains the cache file """
+        cached_filename = FlagFramework.get_temp_path(self.case,self.inode)
         try:
-            self.cached_fd.seek(self.tell())
+            ## open the previously cached copy
+            self.cached_fd = open(cached_filename,'r')
+        except IOError,e:
+            ## It does not exist: Create a new cached copy:
+            self.cached_fd = open(cached_filename,'w')
 
-            if len:
-                return self.cached_fd.read(length)
-            else:
-                return self.cached_fd.read()
-        except AttributeError:
-            cached_filename = FlagFramework.get_temp_path(self.case,self.inode)
-            try:
-                ## open the previously cached copy
-                self.cached_fd = open(cached_filename,'r')
-            except IOError,e:
-                ## It does not exist: Create a new cached copy:
-                self.cached_fd = open(cached_filename,'w')
+            ## Copy ourself into the file
+            while 1:
+                data=StreamFile.read(self,1024*1024)
+                if len(data)==0: break
+                self.cached_fd.write(data)
 
-                ## Save the current file position
-                current= self.tell()
-                self.seek(0)
-
-                ## Copy ourself into the file
-                while 1:
-                    data=StreamFile.read(self,1024*1024)
-                    if len(data)==0: break
-                    self.cached_fd.write(data)
-
-                ## Reopen file for reading
-                self.cached_fd = open(self.cached_fd.name,'r')
-
-                ## Restore current file position
-                self.seek(current)
-
-            return self.read(length)
+            ## Reopen file for reading
+            self.cached_fd = open(self.cached_fd.name,'r')
+        
+    def read(self,length=None):
+        if not self.cached_fd:
+            self.cache()
+            
+        if length:
+            return self.cached_fd.read(length)
+        else:
+            return self.cached_fd.read()
 
     def readline(self):
-        try:
-            return self.cached_fd.readline()
-        except AttributeError:
-            current = self.tell()
-            self.read(1)
-            self.seek(current)
-            self.cached_fd.seek(current)
-            return self.cached_fd.readline()
+        if not self.cached_fd:
+            self.cache()
+            
+        return self.cached_fd.readline()
 
     def tell(self):
-        try:
-            return self.cached_fd.tell()
-        except AttributeError:
-            return StreamFile.tell(self)
+        if not self.cached_fd:
+            self.cache()
+
+        return self.cached_fd.tell()
+
+    def seek(self,offset,whence=0):
+        if not self.cached_fd:
+            self.cache()
+
+        self.cached_fd.seek(offset,whence)
         
 class OffsetFile(File):
     """ A simple offset:length file driver.
@@ -490,25 +485,32 @@ class OffsetFile(File):
     specifier = 'o'
     def __init__(self, case, table, fd, inode):
         File.__init__(self, case, table, fd, inode)
+
+        ## We parse out the offset and length from the inode string
         tmp = inode.split('|')[-1]
         tmp = tmp[1:].split(":")
         self.offset = int(tmp[0])
+
+        ## Seek our parent file to its initial position
+        self.fd.seek(self.offset)
+
         try:
             self.size=int(tmp[1])
         except IndexError:
-            self.size=0
+            self.size=sys.maxint
 
-    def seek(self,offset,rel=None):
-        result = File.seek(self,offset,rel)
+    def seek(self,offset,whence=0):
+        self.fd.seek(offset + self.offset,whence)
 
-        self.fd.seek(self.readptr + self.offset)
-        return result
+    def tell(self):
+        return self.fd.tell()-self.offset
     
     def read(self,length=None):
-        if length==None:
-            result=self.fd.read()
-        else:
-            result=self.fd.read(length)
-            
-        self.readptr+=len(result)
+        if not length:
+            length=self.size
+        
+        if length > self.size - self.tell():
+            length = self.size - self.tell()
+        
+        result=self.fd.read(length)
         return result

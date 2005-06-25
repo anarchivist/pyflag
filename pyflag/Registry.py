@@ -261,6 +261,9 @@ class VFSFileRegistry(Registry):
     def __init__(self,ParentClass):
         Registry.__init__(self,ParentClass)
         for cls in self.classes:
+            ## We ignore VFS drivers without specifiers
+            if not cls.specifier: continue
+            
             if self.vfslist.has_key(cls.specifier):
                 raise Exception("Class %s has the same specifier as %s. (%s)" % (cls,self.vfslist[cls.specifier],cls.specifier))
             self.vfslist[cls.specifier] = cls
