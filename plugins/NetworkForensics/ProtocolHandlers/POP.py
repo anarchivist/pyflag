@@ -22,6 +22,7 @@
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 from pyflag.Scanner import *
+import pyflag.Scanner as Scanner
 import re
 from NetworkScanner import *
 
@@ -69,7 +70,7 @@ class POP:
         response=self.fd.readline()
         if response.startswith("+OK"):
             self.password=args[0]
-            print "Login for %s successful with password %s" % (self.username,self.password)
+            logging.log(logging.DEBUG,"Login for %s successful with password %s" % (self.username,self.password))
 
     def STAT(self,args):
         """ We ignore STAT commands """
@@ -89,7 +90,7 @@ class POP:
             start = self.fd.tell()
             data = self.read_multi_response()
             length = len(data)
-            print "File %s starts at %s and is %s long" % (args[0],start,length)
+            logging.log(logging.DEBUG,"Message %s starts at %s in stream and is %s long" % (args[0],start,length))
             self.files.append((args[0],"%s:%s" % (start,length)))
                                                            
     def parse(self):
@@ -109,7 +110,7 @@ class POP:
 
         return line
 
-class POPScanner(GenScanFactory):
+class POPScanner(NetworkScanFactory):
     """ Collect information about POP transactions.
 
     This is an example of a scanner which uses the Ethereal packet dissection, as well as the result of the Stream reassembler.
@@ -174,8 +175,13 @@ class POPScanner(GenScanFactory):
                     ## Add a new VFS node
                     path=self.ddfs.lookup(inode="S%s" % forward_stream)
                     path=os.path.dirname(path)
-                    self.ddfs.VFSCreate(None,"%s|o%s" % (combined_inode,f[1]),path+"/POP/Message_"+f[0])
-                    print "Added file %s at offset %s" % (f[1],f[0])
+                    new_inode="%s|o%s" % (combined_inode,f[1])
+                    self.ddfs.VFSCreate(None,new_inode,path+"/POP/Message_"+f[0])
+
+                    ## Scan the new file using the scanner train. If
+                    ## the user chose the RFC2822 scanner, we will be
+                    ## able to understand this:
+                    self.scan_as_file(new_inode)
 
                 ## If there is any authentication information in here,
                 ## we save it for Ron:

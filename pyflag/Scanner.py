@@ -297,8 +297,6 @@ def scanfile(ddfs,fd,factories):
         if not ddfs.dbh.fetch():
             objs.append(c.Scan(fd.inode,ddfs,c,factories=factories,fd=fd))
 
-#    print "Scanning %s with %s" % (fd.inode,objs)
-    
     # read data (in chunks)
     while 1:
         ## This dict stores metadata about the file which may be filled in by some scanners in order to indicate some fact to other scanners.

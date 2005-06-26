@@ -694,7 +694,7 @@ void create_tables(char *name) {
 	printf("CREATE TABLE IF NOT EXISTS meta_%s (`name` VARCHAR(25) NOT NULL, `value` VARCHAR(25) NOT NULL);\n\n", name);
 
 	printf("CREATE TABLE IF NOT EXISTS inode_%s (\n" \
-	"	`inode` VARCHAR(20) NOT NULL,\n" \
+	"	`inode` VARCHAR(250) NOT NULL,\n" \
 	"	`status` INT,\n" \
 	"	`uid` INT,\n" \
 	"	`gid` INT,\n" \
@@ -708,20 +708,20 @@ void create_tables(char *name) {
 	"	`size` BIGINT NOT NULL);\n\n", name);;
 
 	printf("CREATE TABLE IF NOT EXISTS file_%s (\n" \
-	"	`inode` VARCHAR(20) NOT NULL,\n" \
+	"	`inode` VARCHAR(250) NOT NULL,\n" \
 	"	`mode` VARCHAR(3) NOT NULL,\n" \
 	"	`status` VARCHAR(8) NOT NULL,\n" \
 	"	`path` TEXT,\n" \
 	"	`name` TEXT);\n\n", name);
 
 	printf("CREATE TABLE IF NOT EXISTS block_%s (\n" \
-	"	`inode` VARCHAR(20) NOT NULL,\n" \
+	"	`inode` VARCHAR(250) NOT NULL,\n" \
 	"	`index` INT NOT NULL,\n" \
 	"	`block` BIGINT NOT NULL,\n" \
 	"	`count` INT NOT NULL);\n\n", name);
 
 	printf("CREATE TABLE IF NOT EXISTS resident_%s (\n" \
-	"	`inode` VARCHAR(20) NOT NULL,\n" \
+	"	`inode` VARCHAR(250) NOT NULL,\n" \
 	"	`data` TEXT);\n\n", name);
 }
 

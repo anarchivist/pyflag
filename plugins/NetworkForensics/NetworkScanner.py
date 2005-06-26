@@ -3,6 +3,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.Registry as Registry
 from pyflag.Scanner import *
+import pyflag.Scanner as Scanner
 import pyethereal
 import struct,sys,cStringIO
 import pyflag.DB as DB
@@ -16,6 +17,7 @@ def IP2str(ip):
     tmp.reverse()
     return ".".join(["%s" % i for i in tmp])
 
+## FIXME: This is currently not implemented...
 class Storage:
     """ This class enables Network scanners to store persistant information between packets.
 
@@ -49,12 +51,25 @@ class Storage:
                     del self.ages[k]
                     
         self._time_to_check-=1
+
+class NetworkScanFactory(GenScanFactory):
+    """ All network scanner factories come from here.
+
+    This is used for scanners which need to invoke factories on VFS
+    nodes. The VFS nodes are not network packets, so we only invoke
+    those scanners which do not derive from this class. This class is
+    therefore used to tag those scanners which only make sense to
+    run on network traffic.
+    """
+    pass
                 
 class NetworkScanner(BaseScanner):
     """ This is the base class for all network scanners.
     """
     ## Note that Storage is the same object across all NetworkScanners:
     store = Storage()
+    proto_tree = {}
+    
     def process(self,data,metadata=None):
         """ Pre-process the data for all other network scanners """
         ## We try to get previously set proto_tree. We store it in
@@ -75,3 +90,12 @@ class NetworkScanner(BaseScanner):
 
             ## Store it for the future
             metadata['proto_tree']={ self.packet_id: self.proto_tree }
+
+    def scan_as_file(self,inode):
+        """ Scans inode as a file (i.e. without any network scanners). """
+        fd=self.ddfs.open(inode=inode)
+        factories = [ x for x in self.factories if not isinstance(x,NetworkScanFactory) ]
+
+        Scanner.scanfile(self.ddfs,fd,factories)
+        fd.close()
+

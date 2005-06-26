@@ -507,3 +507,62 @@ class CachedFile:
         self.cached_fd.seek(offset,whence)
         
 
+
+class CachedFile:
+    """ This class is used to give a VFS driver automatic file caching capability. This should speed it up if re-creating the file on the fly is too expensive.
+
+    To use, inherit from this class as well as the class you wish to cache and set target_class to the VFS driver. E.g:
+    class CachedStreamFile(CachedFile,StreamFile):
+        specifier = 'S'
+        target_class = StreamFile
+
+    """
+    cached_fd = None
+    target_class = None
+
+    def cache(self):
+        """ Creates and maintains the cache file """
+        cached_filename = FlagFramework.get_temp_path(self.case,self.inode)
+        try:
+            ## open the previously cached copy
+            self.cached_fd = open(cached_filename,'r')
+        except IOError,e:
+            ## It does not exist: Create a new cached copy:
+            self.cached_fd = open(cached_filename,'w')
+
+            ## Copy ourself into the file
+            while 1:
+                data=self.target_class.read(self,1024*1024)
+                if len(data)==0: break
+                self.cached_fd.write(data)
+
+            ## Reopen file for reading
+            self.cached_fd = open(self.cached_fd.name,'r')
+        
+    def read(self,length=None):
+        if not self.cached_fd:
+            self.cache()
+            
+        if length:
+            return self.cached_fd.read(length)
+        else:
+            return self.cached_fd.read()
+
+    def readline(self):
+        if not self.cached_fd:
+            self.cache()
+            
+        return self.cached_fd.readline()
+
+    def tell(self):
+        if not self.cached_fd:
+            self.cache()
+
+        return self.cached_fd.tell()
+
+    def seek(self,offset,whence=0):
+        if not self.cached_fd:
+            self.cache()
+
+        self.cached_fd.seek(offset,whence)
+    

@@ -340,7 +340,6 @@ class LoadFS(Reports.report):
             print query['fstype']
             fsobj=Registry.FILESYSTEMS.filesystems[query['fstype']](query['case'],tablename,io)
             fsobj.load()
-##            Sleuthkit.load_sleuth(query['case'],query['fstype'],tablename,query['iosource'])
 
             self.progress_str="Creating file and inode indexes"        
             #Add indexes:
@@ -353,7 +352,6 @@ class LoadFS(Reports.report):
                 )
             for x,y,z in index:
                 dbh.check_index("%s_%s" % (x,tablename),y,z)
-#                dbh.execute("alter table %s_%s add index(%s)",(x,tablename,y))
 
             dbh.set_meta('fsimage',query['iosource'])
 
@@ -361,7 +359,7 @@ class LoadFS(Reports.report):
         ## Scan the filesystem for hashes and viruses etc.
         iofd=IO.open(query['case'],query['iosource'])
         fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'],query['iosource'],iofd)
-##        fsfd=FileSystem.FS_Factory( query["case"], query["iosource"], iofd)
+
         ## The scanners that users asked for:
         user_scanners = query.getarray('scan')
 
@@ -372,6 +370,17 @@ class LoadFS(Reports.report):
                 scanners.append(tmp(dbh,query['iosource'],fsfd))
             except Exception,e:
                 logging.log(logging.ERRORS,"Unable to initialise scanner %s (%s)" % (i,e))
+
+        ## Now sort the scanners by their specified order:
+        def cmpfunc(x,y):
+            if x.order>y.order:
+                return 1
+            elif x.order<y.order:
+                return -1
+
+            return 0
+
+        scanners.sort(cmpfunc)
 
         logging.log(logging.DEBUG,"Will invoke the following scanners: %s" % scanners)
         fsfd.scanfs(scanners)

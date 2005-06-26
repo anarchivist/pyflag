@@ -27,13 +27,13 @@ from pyflag.Scanner import *
 import pyethereal
 import struct,sys,cStringIO
 import pyflag.DB as DB
-from pyflag.FileSystem import File
+from pyflag.FileSystem import File,CachedFile
 import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
 import struct
 
-class StreamReassembler(GenScanFactory):
+class StreamReassembler(NetworkScanFactory):
     """ This scanner reassembles the packets into the streams.
 
     We internally use two tables. The first is connection_details,
@@ -422,60 +422,15 @@ class StreamFile(File):
         """ Gets the current packet id (where the readptr is currently at) """
         return self.seq
 
-class CachedStreamFile(StreamFile):
+class CachedStreamFile(CachedFile,StreamFile):
     """ A StreamFile VFS node with file based cache.
 
     Due to complex operations required to reassemble the streams on the fly we find that its quicker to cache these streams on disk.
     """
     specifier = 'S'
-    cached_fd = None
-    
-    def cache(self):
-        """ Creates and maintains the cache file """
-        cached_filename = FlagFramework.get_temp_path(self.case,self.inode)
-        try:
-            ## open the previously cached copy
-            self.cached_fd = open(cached_filename,'r')
-        except IOError,e:
-            ## It does not exist: Create a new cached copy:
-            self.cached_fd = open(cached_filename,'w')
+    target_class = StreamFile
 
-            ## Copy ourself into the file
-            while 1:
-                data=StreamFile.read(self,1024*1024)
-                if len(data)==0: break
-                self.cached_fd.write(data)
 
-            ## Reopen file for reading
-            self.cached_fd = open(self.cached_fd.name,'r')
-        
-    def read(self,length=None):
-        if not self.cached_fd:
-            self.cache()
-            
-        if length:
-            return self.cached_fd.read(length)
-        else:
-            return self.cached_fd.read()
-
-    def readline(self):
-        if not self.cached_fd:
-            self.cache()
-            
-        return self.cached_fd.readline()
-
-    def tell(self):
-        if not self.cached_fd:
-            self.cache()
-
-        return self.cached_fd.tell()
-
-    def seek(self,offset,whence=0):
-        if not self.cached_fd:
-            self.cache()
-
-        self.cached_fd.seek(offset,whence)
-        
 class OffsetFile(File):
     """ A simple offset:length file driver.
 
