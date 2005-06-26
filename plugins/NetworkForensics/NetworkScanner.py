@@ -99,3 +99,14 @@ class NetworkScanner(BaseScanner):
         Scanner.scanfile(self.ddfs,fd,factories)
         fd.close()
 
+def find_reverse_stream(forward_stream,table,dbh):
+    """ Given a connection ID and a table name, finds the reverse connection. """
+    dbh.execute("select * from connection_details_%s where con_id=%r",
+                (table,forward_stream))
+    
+    row=dbh.fetch()
+    
+    dbh.execute("select con_id from connection_details_%s where src_ip=%r and src_port=%r and dest_ip=%r and dest_port=%r",(table,row['dest_ip'],row['dest_port'],row['src_ip'],row['src_port']))
+    row=dbh.fetch()
+    
+    return row['con_id']

@@ -520,6 +520,11 @@ class CachedFile:
     cached_fd = None
     target_class = None
 
+    def __init__(self, case, table, fd, inode):
+        File.__init__(self, case, table, fd, inode)
+        
+        self.cache()
+
     def cache(self):
         """ Creates and maintains the cache file """
         cached_filename = FlagFramework.get_temp_path(self.case,self.inode)
@@ -529,6 +534,9 @@ class CachedFile:
         except IOError,e:
             ## It does not exist: Create a new cached copy:
             self.cached_fd = open(cached_filename,'w')
+
+            ## Init ourself:
+            self.target_class.__init__(self,self.case,self.table,self.fd,self.inode)
 
             ## Copy ourself into the file
             while 1:

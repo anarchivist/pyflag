@@ -5444,6 +5444,7 @@
 0	string		Return-Path:	smtp mail text
 0	string		Path:		news text
 0	string		Xref:		news text
+0 	string		Message-ID:	RFC 822 mail text
 0	string		From:		news or mail text
 0	string		Article 	saved news text
 0	string		BABYL		Emacs RMAIL text

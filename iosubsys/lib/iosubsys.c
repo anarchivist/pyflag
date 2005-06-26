@@ -89,8 +89,9 @@ int    std_read_random(IO_INFO *self, char *buf, int len, off_t offs,
     if (lseek(io->fd, offs, SEEK_SET) != offs)
       RAISE(E_IOERROR,NULL,"read random seek error: offset %llu: %m (%s)", 
 	    (off_t) offs, comment);
-    
-    if ((count = read(io->fd, buf, len)) != len)
+
+    count = read(io->fd, buf, len);
+    if (count<0)
       RAISE(E_IOERROR,NULL,"read random read error (%d@%llu): %m (%s)", 
 	    len, (off_t) offs, comment);
 

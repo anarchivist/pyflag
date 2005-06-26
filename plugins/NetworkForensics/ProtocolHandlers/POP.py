@@ -152,13 +152,9 @@ class POPScanner(NetworkScanFactory):
         def finish(self):
             for key in self.outer.pop_connections.keys():
                 forward_stream = key[1:]
-                ## Find the reverse stream:
-                self.dbh.execute("select * from connection_details_%s where con_id=%r",(self.table,forward_stream))
-                row=self.dbh.fetch()
-
-                self.dbh.execute("select con_id from connection_details_%s where src_ip=%r and src_port=%r and dest_ip=%r and dest_port=%r",(self.table,row['dest_ip'],row['dest_port'],row['src_ip'],row['src_port']))
-                row=self.dbh.fetch()
-                reverse_stream=row['con_id']
+                reverse_stream = find_reverse_stream(
+                    forward_stream,self.table,self.dbh)
+                
                 combined_inode = "S%s/%s" % (forward_stream,reverse_stream)
 
                 ## We open the file and scan it for emails:
@@ -176,7 +172,7 @@ class POPScanner(NetworkScanFactory):
                     path=self.ddfs.lookup(inode="S%s" % forward_stream)
                     path=os.path.dirname(path)
                     new_inode="%s|o%s" % (combined_inode,f[1])
-                    self.ddfs.VFSCreate(None,new_inode,path+"/POP/Message_"+f[0])
+                    self.ddfs.VFSCreate(None,new_inode,"%s/POP/Message_%s" % (path,f[0]))
 
                     ## Scan the new file using the scanner train. If
                     ## the user chose the RFC2822 scanner, we will be

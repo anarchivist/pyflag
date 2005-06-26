@@ -31,7 +31,97 @@ import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
 import pyflag.Reports as Reports
 
-class SMTPScanner(GenScanFactory):
+class SMTPException(Exception):
+    """ Raised if line is an invalid SMTP command """
+
+class SMTP:
+    """ Class managing the SMTP State """
+    def __init__(self,fd,dbh,ddfs):
+        self.fd=fd
+        self.dbh = dbh
+        self.ddfs = ddfs
+        self.dispatcher = {
+            'EHLO': self.NOOP,
+            'MAIL': self.MAIL,
+            'RCPT': self.RCPT,
+            'DATA': self.DATA,
+            'QUIT': self.NOOP,
+            }
+        self.mail_from = ''
+        self.rcpt_to = []
+        self.count=0
+
+    def read_response(self):
+        """ This reads the SMTP responses. SMTP is a little nicer than
+        POP because we know when a multiline response is finished (by
+        the presence of a code followed by space).
+        """
+        result = ''
+        while 1:
+            line = self.fd.readline()
+            result+=line
+            ## Responses with a space after the error code signify end
+            ## of response:
+            if line[3]==' ':
+                return result
+
+            try:
+                int(line[:3])
+            except:
+                raise SMTPException("Invalid response %r" % line)
+
+    def NOOP(self,args):
+        self.read_response()
+
+    def MAIL(self,args):
+        self.mail_from = args
+        self.read_response()
+        print "Set mail from to %s " % self.mail_from
+
+    def RCPT(self,args):
+        self.rcpt_to = args
+        self.read_response()
+        print "Set RCPT to %s" % self.rcpt_to
+
+    def DATA(self,args):
+        result=self.read_response()
+        if result[0]=='3':
+            start = self.fd.tell()
+            while 1:
+                line = self.fd.readline()
+                if not line or line=='.\r\n':
+                    break
+                
+            end = self.fd.tell()
+            length = end-start
+            self.count += 1
+            logging.log(logging.DEBUG,"Message starts at %s in stream and is %s long" % (start,length))
+            return (self.count,"%s:%s" % (start,length))
+
+    def parse(self):
+        while 1:
+            line = self.fd.readline().strip()
+
+            ## Stop iteration if we are at the end
+            if line=='':
+                return
+
+            ## If the line has an error code at the start, we are looking
+            ## at a response.
+            try:
+                int(line[:3])
+                continue
+            except:
+                pass
+
+            tmp = line.split(":")
+            command = tmp[0].split(" ")
+            try:
+                yield(self.dispatcher[command[0].upper()](tmp[-1]))
+            except KeyError:
+                logging.log(logging.DEBUG,"SMTP Command %r not implemented." % command[0])
+        
+class SMTPScanner(NetworkScanFactory):
     """ Collect information about SMTP transactions.
 
     This is an example of a scanner which uses the Ethereal packet dissection, as well as the result of the Stream reassembler.
@@ -44,36 +134,46 @@ class SMTPScanner(GenScanFactory):
         ## decodes it as such. I guess if we want to parse SMTP
         ## streams which are not on port 25, we need to tell ethereal
         ## this via its config file.
-        self.dbh.execute(
-            """ CREATE TABLE if not exists `smtp_%s` (
-            `inode` VARCHAR(255) NOT NULL,
-            `offset` int,
-            `length` int,
-            `from` VARCHAR(255) NOT NULL,
-            `to` VARCHAR(255) NOT NULL,
-            `message_id` int(11) unsigned NOT NULL auto_increment,
-            key `message_id`
-            ) """,(self.table,))
+        self.smtp_connections = {}
+
+    class Scan(NetworkScanner):
+        def process(self,data,metadata=None):
+            NetworkScanner.process(self,data,metadata)
             
-        def reset(self):
-            self.dbh.execute("drop table if exists smtp_%s",(self.table,))
+            ## Is this an SMTP request?
+            try:
+                request = self.proto_tree['smtp.req']
+                
+                self.outer.smtp_connections[metadata['inode']]=1
+            except KeyError:
+                pass
 
-        class Scan(NetworkScanner):
-            def process(self,data,metadata=None):
-                NetworkScanner.process(self,data,metadata)
+        def finish(self):
+            for key in self.outer.smtp_connections.keys():
+                forward_stream = key[1:]
+                reverse_stream = find_reverse_stream(
+                    forward_stream,self.table,self.dbh)
+                
+                combined_inode = "S%s/%s" % (forward_stream,reverse_stream)
 
-                ## Is this an SMTP request?
-                try:
-                    request = self.proto_tree['smtp.req.command'].value()
-                    value = self.proto_tree['smtp.req.parameter'].value()
+                logging.log(logging.DEBUG,"Openning %s for SMTP" % combined_inode)
+                ## We open the file and scan it for emails:
+                fd = self.ddfs.open(inode=combined_inode)
+                p=SMTP(fd,self.dbh,self.ddfs)
 
-                    ## Check the store to see if we are currently tracking this:
-                    key = "smtp_%s" % metadata['inode']
-                    try:
-                        track = self.store[key]
-                    except KeyError:
-                        track = {}
-                        self.store.store(self.packet_id,key,track)
-                except KeyError:
-                    pass
+                ## Iterate over all the messages in this connection
+                for f in p.parse():
+                    if not f: continue
+
+                    ## Create the VFS node:
+                    path=self.ddfs.lookup(inode="S%s" % forward_stream)
+                    path=os.path.dirname(path)
+                    new_inode="%s|o%s" % (combined_inode,f[1])
+                    self.ddfs.VFSCreate(None,new_inode,"%s/SMTP/Message_%s" % (path,f[0]))
                     
+                    ## Scan the new file using the scanner train. If
+                    ## the user chose the RFC2822 scanner, we will be
+                    ## able to understand this:
+                    self.scan_as_file(new_inode)
+
+

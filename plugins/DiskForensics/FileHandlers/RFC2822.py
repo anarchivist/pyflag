@@ -27,13 +27,15 @@ import pyflag.Reports as Reports
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import email
-from pyflag.FileSystem import File
+from pyflag.FileSystem import File,CachedFile
 
 class RFC2822(Scanner.GenScanFactory):
     """ Scan RFC2822 Mail messages """
     default = True
     class Scan(Scanner.StoreAndScanType):
-        types = [ 'text/x-mail.*' ]
+        types = [ 'text/x-mail.*',
+                  'message/rfc822',
+                  ]
 
         def external_process(self,name):
             count = 0
@@ -74,7 +76,6 @@ class RFC2822(Scanner.GenScanFactory):
 
 class RFC2822_File(File):
     """ A VFS Driver for reading mail attachments """
-    specifier = "m"
 
     def __init__(self, case, table, fd, inode):
         File.__init__(self, case, table, fd, inode)
@@ -105,3 +106,7 @@ class RFC2822_File(File):
 
         self.readptr+=len(result)
         return result
+
+class RFC2822CachedFile(CachedFile, RFC2822_File):
+    specifier = 'm'
+    target_class = RFC2822_File

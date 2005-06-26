@@ -408,7 +408,8 @@
 0	string		Return-Path:	message/rfc822	7bit
 0	string		Path:		message/news	8bit
 0	string		Xref:		message/news	8bit
-0	string		From:		message/rfc822	7bit
+0	string		From:		message/rfc822
+0	string		Message-ID:	message/rfc822
 0	string		Article 	message/news	8bit
 #------------------------------------------------------------------------------
 # msword: file(1) magic for MS Word files
