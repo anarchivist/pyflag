@@ -131,7 +131,7 @@ class TarScan(GenScanFactory):
     
     class Scan(StoreAndScanType):
         types = (
-            'application/x-tar, POSIX',
+            'application/x-tar',
             )
 
         def external_process(self,name):
@@ -210,10 +210,10 @@ class GZip_file(File):
         self.size=0
         self.readptr=0
 
-    def read(self,len=None):
-        if len!=None:
-            self.readptr+=len
-            return self.gz.read(len)
+    def read(self,length=None):
+        if length!=None:
+            self.readptr+=length
+            return self.gz.read(length)
         else:
             self.readptr=self.size
             return self.gz.read()

@@ -31,14 +31,14 @@ import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
 import pyflag.Reports as Reports
 
-class HTTPScanner(GenScanFactory):
+class HTTPScanner(NetworkScanFactory):
     """ Collect information about HTTP Transactions.
     """
     default = True
 
     def prepare(self):
         ## This is the information we store about each http request:
-        ## inode - the inode this belongs too (comes from the StreamReassembler)
+        ## inode - the inode this belongs to (comes from the StreamReassembler)
         ## offset- The offset into the inode where the request begins
         ## method- HTTP Method
         ## host  - The Host this is directed to
@@ -87,6 +87,8 @@ class HTTPScanner(GenScanFactory):
 
                 ## Store in the request table
                 self.dbh.execute("insert into http_request_%s set inode=%r,offset=%r,packet=%r,method=%r,host=%r,request=%r",(self.table, metadata['inode'],offset,self.packet_id,method,host,uri))
+
+                return
             except KeyError:
                 pass
 
@@ -120,23 +122,42 @@ class HTTPScanner(GenScanFactory):
 
                 self.dbh.execute("insert into http_response_%s set inode=%r,offset=%r, packet=%r, content_length=%r,content_type=%r,content_encoding=%r",(self.table,metadata['inode'],offset,self.packet_id,content_length,content_type,content_encoding))
                 response_id = self.dbh.autoincrement()
-                self.ddfs.VFSCreate(metadata['inode'],
-                     ## Inode:
-                      "o%s:%s" % (offset,content_length),
-                     ## Path to new file:
-                      "HTTP/Response %s" % (
-                            response_id))
+                path=self.ddfs.lookup(inode=metadata['inode'])
+                path=os.path.dirname(path)
+                new_inode = "%s|o%s:%s" % (metadata['inode'],offset,content_length)
 
-                ## This code should not be needed!!!
+                ## Handle chnunked encodings
+                try:
+                    transfer_encoding = self.proto_tree['http.transfer_encoding'].value().lower()
+
+                    if "chunked" in transfer_encoding:
+                        new_inode=new_inode+"|c0"
+                except:
+                    pass
+                
+                self.ddfs.VFSCreate(
+                    None,
+                    ## Inode:
+                    new_inode,
+                    ## Path to new file:
+                    "%s/HTTP/Response %s" % (path,response_id)
+                    )
+
+                ## This code is needed because magic does not always
+                ## identify the gzip nodes correctly.
                 ## Handle gziped encoding:
                 if content_encoding=='gzip':
-                    self.ddfs.VFSCreate(metadata['inode'],
-                                        ## Inode:
-                                        "o%s:%s|G1" % (offset,content_length),
-                                        ## Path to new file:
-                                        "Response %s (uncompressed)" % (
-                        response_id))
-                    
+                    self.ddfs.VFSCreate(
+                        None,
+                        ## Inode:
+                        "%s|G1" % new_inode,
+                        ## Path to new file:
+                        "%s/HTTP/Response %s (uncompressed)" % (path,response_id)
+                        )
+
+                ## Now recursively scan the nodes:
+                self.scan_as_file(new_inode)
+
             except KeyError,e:
                 pass
 
@@ -173,3 +194,48 @@ class BrowseHTTPRequests(Reports.report):
             ], 
             case=query['case']
             )
+
+
+class Chunked(File):
+    """ This reads chunked HTTP Streams.
+
+    """
+    specifier = 'c'
+
+    def create_file(self,filename):
+        delimiter="\r\n"
+        
+        self.cached_fd = open(filename,'w')
+        self.data = self.fd.read()
+        while 1:
+            end = self.data.find(delimiter)+len(delimiter)
+            if end<0: break
+            
+            size = int(self.data[:end],16)
+            print "size is %s" % size
+            if size==0: break
+            self.cached_fd.write(self.data[end:end+size])
+            self.data=self.data[end+size+len(delimiter):]
+
+        self.cached_fd.close()
+        
+    def __init__(self, case, table, fd, inode):
+        File.__init__(self, case, table, fd, inode)
+
+        self.filename = FlagFramework.get_temp_path(self.case,self.inode)
+
+        try:
+            self.cached_fd=open(self.filename,'r')
+        except IOError:
+            self.create_file(self.filename)
+            self.cached_fd=open(self.filename,'r')
+            
+
+    def seek(self,offset,whence=0):
+        self.cached_fd.seek(offset,whence)
+
+    def tell(self):
+        return self.cached_fd.tell()
+
+    def read(self,length=sys.maxint):
+        return self.cached_fd.read(length)

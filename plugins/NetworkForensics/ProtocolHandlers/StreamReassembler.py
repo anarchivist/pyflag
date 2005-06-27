@@ -304,6 +304,9 @@ class StreamFile(File):
             raise IOError("No stream with connection ID %s" % self.con_id)
 
         self.isn = row['isn']
+        self.dbh.execute("select max(seq)+length as size from connection_%s where con_id=%r",(self.table,self.con_id))
+        row=self.dbh.fetch()
+        self.size=row['size']
 
     def create_new_stream(self,stream_ids):
         """ Creates a new stream by combining the streams given by the list stream_ids.
@@ -352,7 +355,9 @@ class StreamFile(File):
     def read(self,len = None):
         if len==None:
             len=sys.maxint
-            
+
+        if len>self.size-self.readptr:
+            len=self.size-self.readptr
         ##Initialise the output buffer:
         result = cStringIO.StringIO()
 
@@ -455,17 +460,26 @@ class OffsetFile(File):
             self.size=sys.maxint
 
     def seek(self,offset,whence=0):
-        self.fd.seek(offset + self.offset,whence)
+        if whence==2:
+            self.readptr=self.size+offset
+        elif whence==1:
+            self.readptr+=offset
+        else:
+            self.readptr=offset
+            
+        self.fd.seek(offset + self.offset+self.readptr)
 
     def tell(self):
         return self.fd.tell()-self.offset
     
     def read(self,length=None):
         if not length:
-            length=self.size
-        
-        if length > self.size - self.tell():
-            length = self.size - self.tell()
-        
-        result=self.fd.read(length)
+            result=self.fd.read(length)
+        else:
+            if length > self.size - self.readptr:
+                length = self.size - self.readptr
+
+            result=self.fd.read(length)
+            
+        self.readptr+=len(result)
         return result
