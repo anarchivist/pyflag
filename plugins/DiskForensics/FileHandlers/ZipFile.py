@@ -29,11 +29,12 @@ import os.path
 import pyflag.logging as logging
 from pyflag.Scanner import *
 import zipfile,gzip,tarfile
-from pyflag.FileSystem import File
+from pyflag.FileSystem import File , CachedFile
 import pyflag.FlagFramework as FlagFramework
 import time,re,os
 import StringIO
 import pyflag.Scanner as Scanner
+import gzip
 
 class ZipScan(GenScanFactory):
     """ Recurse into Zip Files """
@@ -193,38 +194,18 @@ class Zip_file(File):
     def close(self):
         pass
 
-
-import gzip
-
-class GZip_file(File):
+class GZ_file(CachedFile):
     """ A file like object to read gzipped files. """
-    specifier="G"
-    
-    def __init__(self, case, table, fd, inode):
-        File.__init__(self, case, table, fd, inode)
-        try:
-            self.gz = gzip.GzipFile(fileobj=fd)
-        except Exception,e:
-            raise IOError, "GZip_File: Error %s" %e
-
-        self.size=0
-        self.readptr=0
-
-    def read(self,length=None):
-        if length!=None:
-            self.readptr+=length
-            return self.gz.read(length)
-        else:
-            self.readptr=self.size
-            return self.gz.read()
-
-    def close(self):
-        self.gz.close()
+    specifier = 'G'
+    def cache(self,fd):
+        self.gz = gzip.GzipFile(fileobj=self.fd)
+        ## Copy ourself into the file
+        while 1:
+            data=self.gz.read(1024*1024)
+            print "Read %s" % len(data)
+            if len(data)==0: break
+            fd.write(data)
         
-    def seek(self,pos,rel=0):
-        File.seek(self,pos,rel)
-        self.gz.seek(self.readptr)
-
 class Tar_file(File):
     """ A file like object to read files from within tar files. Note that the tar file is specified as an inode in the DBFS """
     specifier = 'T'

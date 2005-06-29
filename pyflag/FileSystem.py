@@ -453,7 +453,7 @@ class File:
                 if len(data)==0: return buffer
                 buffer += data
 
-class CachedFile:
+class CachedFile(File):
     """ This class is used to give a VFS driver automatic file caching capability. This should speed it up if re-creating the file on the fly is too expensive.
 
     To use, inherit from this class as well as the class you wish to cache and set target_class to the VFS driver. E.g:
@@ -467,11 +467,7 @@ class CachedFile:
 
     def __init__(self, case, table, fd, inode):
         File.__init__(self, case, table, fd, inode)
-        
-        self.cache()
 
-    def cache(self):
-        """ Creates and maintains the cache file """
         cached_filename = FlagFramework.get_temp_path(self.case,self.inode)
         try:
             ## open the previously cached copy
@@ -480,17 +476,24 @@ class CachedFile:
             ## It does not exist: Create a new cached copy:
             self.cached_fd = open(cached_filename,'w')
 
-            ## Init ourself:
-            self.target_class.__init__(self,self.case,self.table,self.fd,self.inode)
-
-            ## Copy ourself into the file
-            while 1:
-                data=self.target_class.read(self,1024*1024)
-                if len(data)==0: break
-                self.cached_fd.write(data)
-
+            self.cache(self.cached_fd)
+            
             ## Reopen file for reading
             self.cached_fd = open(self.cached_fd.name,'r')
+
+    def cache(self,fd):
+        """ Creates the cache file given by fd.
+
+        Note the fd is already open for writing, we just need to write into it.
+        """
+        ## Init ourself:
+        self.target_class.__init__(self,self.case,self.table,self.fd,self.inode)
+
+        ## Copy ourself into the file
+        while 1:
+            data=self.target_class.read(self,1024*1024)
+            if len(data)==0: break
+            fd.write(data)
         
     def read(self,length=None):
         if not self.cached_fd:
