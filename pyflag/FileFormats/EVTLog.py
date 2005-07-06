@@ -96,8 +96,29 @@ class TERMINATED_UCS16(TERMINATED_STRING):
 
 class TERMINATED_UCS16_Array(ARRAY):
     target_class=TERMINATED_UCS16
+
     
-class Event(SimpleStruct):
+class Header(SimpleStruct):
+    """ This is the header of the event file. """
+    def init(self):
+        self.fields = [
+            [ LONG,1,'size'],
+            [ STRING,4,'Magic'],
+            [ LONG,1,'RecordNumber'],
+            [ LONG,1,'FirstEventID'],
+            [ LONG,1,'FirstEventOffset'],
+            [ LONG,1,'LastEventOffset'],
+            [ LONG,1,'LastEventID'],
+            ]
+
+    def size(self):
+        """ The size of this structure is determined by the size element """
+        if not self.data:
+            self.initialise()
+            
+        return self['size'].get_value()
+    
+class Event(Header):
     """ The Event log file is a sequence of event structures followed by a list of NULL terminated UCS16 strings.
     """
     def init(self):
@@ -124,18 +145,16 @@ class Event(SimpleStruct):
         NumStrings=result['NumStrings'].get_value()
         self.add_element(result,TERMINATED_UCS16_Array(data[14*4:],NumStrings),'Strings')
         return result
-    
-    def size(self):
-        """ The size of this structure is determined by the size element """
-        if not self.data:
-            self.initialise()
-            
-        return self['size'].get_value()
-       
+        
 if __name__ == "__main__":
     fd=open(sys.argv[1],'r')
 
     buffer = Buffer(fd=fd)
+    ## Read the header:
+    header = Header(buffer)
+    print header
+    buffer=buffer[header.size():]
+    
     while 1:
         try:
             event = Event(buffer)
