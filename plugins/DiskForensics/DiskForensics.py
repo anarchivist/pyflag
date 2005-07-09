@@ -357,6 +357,12 @@ class ViewFile(Reports.report):
 
             return output
 
+        def textdump(query,result):
+            """ Dumps the file in a text window """
+            ## FIXME - Implement proper paging here.
+            fd.seek(0)
+            result.text(fd.read(1024*10),font='typewriter',sanitise="full",color="red",wrap="full")
+
         def stats(query,result):
             """ Show statistics about the file """
             istat = fsfd.istat(inode=query['inode'])
@@ -382,8 +388,8 @@ class ViewFile(Reports.report):
                 result=left
             return result
 
-        names=["Statistics","HexDump","Download","Strings"]
-        callbacks=[stats,hexdump,download,strings]
+        names=["Statistics","HexDump","Download","Strings","Text"]
+        callbacks=[stats,hexdump,download,strings,textdump]
         
         if fd.stat_cbs:
             names.extend(fd.stat_names)

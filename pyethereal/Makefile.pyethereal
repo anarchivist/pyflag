@@ -1,0 +1,34 @@
+## This makefile is designed to be run by itself
+MISC_LIBS = ../libs/
+## The python version 
+PYTHONVER = $(shell python -c 'import sys; print "%s.%s" % (sys.version_info[0],sys.version_info[1])')
+## We need this to build the fully contained binary version
+PYTHONLIB = /usr/lib/python$(PYTHONVER)/
+PYTHONINCL = /usr/include/python$(PYTHONVER)/
+PYTHONBIN = `which python$(PYTHONVER)`
+
+all: pcaptool pyethereal
+
+pcaptool: pcaptool.c check_headers
+	gcc `glib-config --cflags glib` $@.c -o $@ -L$(ETHEREAL_LIB) -Wl,--export-dynamic /usr/lib/ethereal/libwiretap.so.0
+	cp $@ ../bin/
+
+pyethereal: pyethereal.i check_headers
+	swig -python $@.i
+	gcc -g -Wall -I $(PYTHONINCL) `glib-config --cflags glib` pyethereal_wrap.c  -shared  -o _pyethereal.so $$(ldd $$(which tethereal ethereal | head -n 1) | awk '{print $$3};')
+
+check_headers:
+	if [ ! -e wiretap.h -o ! -e ethereal.h ]; then echo -e \\n\\n Required headers are missing. Please edit this Makefile for the location of ethereal source tree and type make headers; false ; fi
+
+#This target generates headers from ethereal sources for use in our own code. This is done so we can distribute these headers and people can compile our code without needing the ethereal codebase. Maybe one day distributions can package the headers in a ethereal-dev package or something like that...
+headers: wiretap_includes.h ethereal_includes.h
+	cpp -nostdinc -P $(ETHEREAL_SRC_INCLUDES) wiretap_includes.h > wiretap.h 2>/dev/null || true
+	cpp -nostdinc -P $(ETHEREAL_SRC_INCLUDES) ethereal_includes.h  > ethereal.h 2>/dev/null || true
+
+# Ethereal library dependency is a nightmare... libethereal does not import all the symbols it needs
+
+clean:
+	rm -f *.o pcaptool _pyethereal.so pyethereal.py pyethereal_wrap.c
+
+dist-clean: clean
+	rm -f wiretap.h ethereal.h

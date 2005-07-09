@@ -199,13 +199,18 @@ class GZ_file(CachedFile):
     specifier = 'G'
     def cache(self,fd):
         self.gz = gzip.GzipFile(fileobj=self.fd)
+        count = 0
+        
         ## Copy ourself into the file
         while 1:
             data=self.gz.read(1024*1024)
+            count += len(data)
             print "Read %s" % len(data)
             if len(data)==0: break
             fd.write(data)
-        
+
+        return count
+
 class Tar_file(File):
     """ A file like object to read files from within tar files. Note that the tar file is specified as an inode in the DBFS """
     specifier = 'T'

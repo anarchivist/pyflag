@@ -304,9 +304,9 @@ class StreamFile(File):
             raise IOError("No stream with connection ID %s" % self.con_id)
 
         self.isn = row['isn']
-        self.dbh.execute("select max(seq)+length as size from connection_%s where con_id=%r",(self.table,self.con_id))
+        self.dbh.execute("select max(seq+length) as size from connection_%s where con_id=%r",(self.table,self.con_id))
         row=self.dbh.fetch()
-        self.size=row['size']
+        self.size=row['size']-self.isn
 
     def create_new_stream(self,stream_ids):
         """ Creates a new stream by combining the streams given by the list stream_ids.
@@ -442,7 +442,6 @@ class OffsetFile(File):
     The inode name specifies an offset and a length into our parent Inode.
     The format is offset:length
     """
-    specifier = 'o'
     def __init__(self, case, table, fd, inode):
         File.__init__(self, case, table, fd, inode)
 
@@ -450,7 +449,8 @@ class OffsetFile(File):
         tmp = inode.split('|')[-1]
         tmp = tmp[1:].split(":")
         self.offset = int(tmp[0])
-
+        self.readptr=0
+        
         ## Seek our parent file to its initial position
         self.fd.seek(self.offset)
 
@@ -466,20 +466,28 @@ class OffsetFile(File):
             self.readptr+=offset
         else:
             self.readptr=offset
-            
-        self.fd.seek(offset + self.offset+self.readptr)
+
+        self.fd.seek(self.offset + self.readptr)
 
     def tell(self):
-        return self.fd.tell()-self.offset
+        return self.readptr
     
     def read(self,length=None):
-        if not length:
-            result=self.fd.read(length)
+        available = self.size - self.readptr
+        if length==None:
+            length=available
         else:
-            if length > self.size - self.readptr:
-                length = self.size - self.readptr
+            if length > available:
+                length = available
 
-            result=self.fd.read(length)
-            
+        if(length<0): return ''
+
+        result=self.fd.read(length)
+        
         self.readptr+=len(result)
         return result
+
+
+class CachedOffsetFile(CachedFile, OffsetFile):
+    target_class = OffsetFile
+    specifier = 'o'

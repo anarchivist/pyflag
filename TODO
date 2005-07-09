@@ -41,3 +41,7 @@ disk structure shell out to mmls in load io sources popup
 Order families in menu
 * Lead from load io source to load data directly - ignoring the load data
 * Allow recursive scanning of a directory
+
+* Write a vfs driver test suite:
+  - read(0), read(-10), read(maxint)
+  - seek(0), seek(maxint), seek(100), seek(0,1), seek(10,1), seek(-10,1), seek(0,2), seek(10,2), seek(-10,2)

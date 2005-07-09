@@ -464,61 +464,98 @@ class CachedFile(File):
     """
     cached_fd = None
     target_class = None
+    
+    def get_temp_path(self):
+        """ Returns the full path to a temporary file based on filename.
+        """
+        filename = self.inode.replace('/','-')
+        result= "%s/case_%s/%s" % (config.RESULTDIR,self.case,filename)
+        return result
 
     def __init__(self, case, table, fd, inode):
         File.__init__(self, case, table, fd, inode)
 
-        cached_filename = FlagFramework.get_temp_path(self.case,self.inode)
+        cached_filename = self.get_temp_path()
         try:
             ## open the previously cached copy
             self.cached_fd = open(cached_filename,'r')
+
+            ## Find our size:
+            self.cached_fd.seek(0,2)
+            self.size=self.cached_fd.tell()
+            
         except IOError,e:
             ## It does not exist: Create a new cached copy:
-            self.cached_fd = open(cached_filename,'w')
+            fd = open(cached_filename,'w')
 
-            self.cache(self.cached_fd)
+            self.size=self.cache(fd)
             
             ## Reopen file for reading
-            self.cached_fd = open(self.cached_fd.name,'r')
+            self.cached_fd = open(cached_filename,'r')
+
+        self.cached_fd.seek(0)
+        self.readptr=0
 
     def cache(self,fd):
         """ Creates the cache file given by fd.
 
         Note the fd is already open for writing, we just need to write into it.
+        @return: the total size of the written file.
         """
         ## Init ourself:
         self.target_class.__init__(self,self.case,self.table,self.fd,self.inode)
-
+        
+        size=0
         ## Copy ourself into the file
         while 1:
             data=self.target_class.read(self,1024*1024)
             if len(data)==0: break
             fd.write(data)
+            size+=len(data)
+            
+        return size
         
     def read(self,length=None):
         if not self.cached_fd:
             self.cache()
+
+        if length!=None:
+            ## The amount of data available to read:
+            available = self.size-self.readptr
             
-        if length:
-            return self.cached_fd.read(length)
+            if length>available:
+                length=available
+                
+            result=self.cached_fd.read(length)
         else:
-            return self.cached_fd.read()
+            result=self.cached_fd.read(self.size-self.readptr)
+
+        self.readptr+=len(result)
+        return result
 
     def readline(self):
         if not self.cached_fd:
             self.cache()
             
-        return self.cached_fd.readline()
+        result=self.cached_fd.readline()
+        self.readptr+=len(result)
+        return result
 
     def tell(self):
         if not self.cached_fd:
             self.cache()
 
-        return self.cached_fd.tell()
+        return self.readptr
 
     def seek(self,offset,whence=0):
         if not self.cached_fd:
             self.cache()
 
-        self.cached_fd.seek(offset,whence)
+        if whence==0:
+            self.readptr=offset
+        elif whence==1:
+            self.readptr+=offset
+        elif whence==2:
+            self.readptr=self.size+offset
     
+        self.cached_fd.seek(self.readptr)

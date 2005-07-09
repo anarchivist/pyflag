@@ -37,6 +37,13 @@ class HTTPScanner(NetworkScanFactory):
     default = True
 
     def prepare(self):
+        ## This stores a list of the inodes we discover during initial
+        ## processing. Note that we are unable to rescan the newly
+        ## discovered as soon as we find them, because we have not
+        ## finalised the streams yet. Rescanning must only be done in
+        ## the finish method to allow the stream reassembler to
+        ## classify all the streams.
+        self.http_inodes = []
         ## This is the information we store about each http request:
         ## inode - the inode this belongs to (comes from the StreamReassembler)
         ## offset- The offset into the inode where the request begins
@@ -116,9 +123,14 @@ class HTTPScanner(NetworkScanFactory):
                     content_length = sys.maxint
 
                 ## The offset is the position in the stream where the
-                ## data starts:
+                ## data starts. The data starts after the \r\n\r\n
+                ## sequence. Sometimes this can be in the next packet,
+                ## in which case we will miss it here.
                 http = self.proto_tree['http']
-                offset = metadata['stream_offset'] + http.length()
+                delimiter = "\r\n\r\n"
+                end_of_headers = data[http.start():].find(delimiter)+len(delimiter)
+                if end_of_headers<0: end_of_headers=http.length()
+                offset = metadata['stream_offset'] + end_of_headers
 
                 self.dbh.execute("insert into http_response_%s set inode=%r,offset=%r, packet=%r, content_length=%r,content_type=%r,content_encoding=%r",(self.table,metadata['inode'],offset,self.packet_id,content_length,content_type,content_encoding))
                 response_id = self.dbh.autoincrement()
@@ -126,7 +138,7 @@ class HTTPScanner(NetworkScanFactory):
                 path=os.path.dirname(path)
                 new_inode = "%s|o%s:%s" % (metadata['inode'],offset,content_length)
 
-                ## Handle chnunked encodings
+                ## Handle chunked encodings
                 try:
                     transfer_encoding = self.proto_tree['http.transfer_encoding'].value().lower()
 
@@ -156,11 +168,18 @@ class HTTPScanner(NetworkScanFactory):
                         )
 
                 ## Now recursively scan the nodes:
-                self.scan_as_file(new_inode)
+                self.outer.http_inodes.append(new_inode)
 
             except KeyError,e:
                 pass
 
+        def finish(self):
+            """ Rescan all the discovered inodes """
+            for inode in self.outer.http_inodes:
+                try:
+                    self.scan_as_file(inode)
+                except Exception,e:
+                    logging.log(logging.ERRORS,"CRITICAL: %s" % e)
 
 class BrowseHTTPRequests(Reports.report):
     """ This allows users to search the HTTP Requests that were loaded as part of the PCAP File system.
@@ -206,15 +225,18 @@ class Chunked(File):
         delimiter="\r\n"
         
         self.cached_fd = open(filename,'w')
+        self.fd.seek(0)
         self.data = self.fd.read()
+        self.size=0
+        
         while 1:
             end = self.data.find(delimiter)+len(delimiter)
             if end<0: break
-            
+
             size = int(self.data[:end],16)
-            print "size is %s" % size
             if size==0: break
             self.cached_fd.write(self.data[end:end+size])
+            self.size+=size
             self.data=self.data[end+size+len(delimiter):]
 
         self.cached_fd.close()
@@ -237,5 +259,8 @@ class Chunked(File):
     def tell(self):
         return self.cached_fd.tell()
 
-    def read(self,length=sys.maxint):
+    def read(self,length=None):
+        if length==None:
+            length=self.size-self.tell()
+            
         return self.cached_fd.read(length)
