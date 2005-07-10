@@ -56,7 +56,7 @@ BLOCKSIZE=20
 def escape(string):
     return ("%r" % string)[1:-1]
 
-class Index(GenScanFactory):
+class IndexScan(GenScanFactory):
     """ Keyword Index files """
     ## Indexing must occur after all scanners have run.
     order=200
@@ -240,13 +240,79 @@ class SearchIndex(Reports.report):
     description = "Search for words that were indexed during filesystem load. Words must be in dictionary to be indexed. "
     name = "Search Indexed Keywords"
     family = "Disk Forensics"
-    parameters={'fsimage':'fsimage','keyword':'any'}
+    parameters={'fsimage':'fsimage','final':'any'}
 
     def form(self,query,result):
         try:
+            query['keyword']=query['new_keyword']
+            del query['new_keyword']
+        except:
+            pass
+
+        try:
+            query['range']
+        except:
+            query['range']=100
+
+        def remove_word_cb(query,result,word):
+            """ Removes word from the query string """
+            del query['callback_stored']
+            del query['new_keyword']
+            keys = [ k for k in query.getarray('keyword') if k != word ]
+            del query['keyword']
+            for k in keys:
+                query['keyword']=k
+
+            result.heading("Removing word %s" % word)
+            result.refresh(0,query,parent='yes')
+        
+        def add_word_cb(query,result):
+            """ Call back to add a new word to the list of words to
+            search for"""
+            result.heading("Add a word to search terms")
+            q=query.clone()
+            del q['callback_stored']
+            q['__opt__']='parent'
+            q['__target__']='new_keyword'
+            result.table(
+                columns = ('word','class','type'),
+                names = ("Word","Class","Type"),
+                links = [ q ],
+                table = "dictionary",
+                case=None
+                )
+            
+        try:
             result.case_selector()
             result.meta_selector(case=query['case'],property='fsimage')
-            result.textfield("Keyword to search:",'keyword')
+            words = list(query.getarray('keyword'))
+            del result.form_parms['keyword']
+
+            group = result.__class__(result)
+            
+            ## Make sure that words are unique
+            words.sort()
+            old=None
+            for keyword in words:
+                if keyword!=old:
+                    tmp = result.__class__(result)
+                    tmp.text("%s\n" % keyword,color='red')
+                    icon = result.__class__(result)
+                    icon.popup(
+                        FlagFramework.Curry(remove_word_cb,word=keyword),
+                        "Remove Word", tooltip="Remove word", icon="no.png"
+                        )
+                    old=keyword
+                    result.hidden('keyword',keyword)
+                    group.row(icon,tmp)
+
+            tmp = result.__class__(result)
+            tmp.popup(add_word_cb, "Add word", tooltip = "Add word",icon="red-plus.png")
+            result.toolbar(cb=add_word_cb, text="Add word", tooltip = "Add word",icon="red-plus.png")
+            result.row("Search for",group,tmp,valign="top")
+            result.textfield("Within characters","range")
+            result.checkbox("Tick this when ready","final",False)
+
         except KeyError:
             return
 

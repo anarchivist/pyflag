@@ -366,13 +366,14 @@ class HTMLUI(UI.GenericUI):
                 continue;
               };
               //We must leave the submit button off, so that when the popup window refreshes to its parent we know it wasnt actually submitted.
-              if(document.pyflag_form.elements[i].type!='submit' ) {
+              if(document.pyflag_form.elements[i].type!='submit' && document.pyflag_form.elements[i].name.length>0 ) {
                  query+=document.pyflag_form.elements[i].name+'='+escape(document.pyflag_form.elements[i].value)+'&';
               };
            };
            client=window.open('%s&'+query+'&callback_stored=%s','client','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=600,scrollbars=yes');
         }; </script><abbr title=%r>
-        """ % (cb,self.defaults,cb,toolbar,menubar,tooltip)
+        """ %(cb,'f?',cb,toolbar,menubar,tooltip)
+        #(cb,self.defaults,cb,toolbar,menubar,tooltip)
         
         if icon:
             self.result+="""<a  onclick=\"open_%s_window()\"><img alt=%s border=0 src=images/%s></a>""" % (cb,label,icon)
@@ -1146,6 +1147,8 @@ class HTMLUI(UI.GenericUI):
                 default = cgi.escape(self.defaults[name],quote=True)
             except KeyError:
                 pass
+            except AttributeError:
+                default = str(self.defaults[name])
             
             ## And remove if from the form
             if self.form_parms.has_key(name):
@@ -1171,7 +1174,7 @@ class HTMLUI(UI.GenericUI):
             import cgi
             try:
                 default = cgi.escape(self.defaults[name],quote=True)
-            except KeyError:
+            except (KeyError,AttributeError):
                 pass
             
             ## And remove if from the form

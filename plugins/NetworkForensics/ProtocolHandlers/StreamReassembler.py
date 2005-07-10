@@ -442,6 +442,7 @@ class OffsetFile(File):
     The inode name specifies an offset and a length into our parent Inode.
     The format is offset:length
     """
+    specifier = 'o'
     def __init__(self, case, table, fd, inode):
         File.__init__(self, case, table, fd, inode)
 
@@ -487,7 +488,7 @@ class OffsetFile(File):
         self.readptr+=len(result)
         return result
 
-
-class CachedOffsetFile(CachedFile, OffsetFile):
-    target_class = OffsetFile
-    specifier = 'o'
+## There is no point in caching the offset file since its basically
+## not doing much underlying stuff
+##class CachedOffsetFile(CachedFile, OffsetFile):
+##    target_class = OffsetFile
