@@ -40,13 +40,22 @@ extern int errno;
 static struct pool *idx_new_pool(void)
 {
   struct pool *p = NEW(struct pool);
+  int max_size = INITIAL_POOL_SIZE;
 
-  //  p->pool = (char *)malloc(INITIAL_POOL_SIZE);
-  p->pool = (char *)mmap(0,INITIAL_POOL_SIZE, PROT_READ|PROT_WRITE,
-			 MAP_PRIVATE|MAP_ANONYMOUS,0,0);
-  p->size = INITIAL_POOL_SIZE;
+  //  This should continue until we are able to allocate a serious
+  //  amount of memory:
+  do {
+    p->pool = (char *)mmap(0,max_size, PROT_READ|PROT_WRITE,
+			   MAP_PRIVATE|MAP_ANONYMOUS,0,0);
+    p->size = max_size;
+    
+    //This is the minimum amount of memory we can afford to have
+    if(max_size<10*1024*1024) break;
+    max_size/=2;
+  } while(p->pool==MAP_FAILED );
+  
+  if(p->pool==MAP_FAILED) RAISE(E_NOMEMORY,NULL,"Unable to allocate memory for pool (%u bytes)",INITIAL_POOL_SIZE);
 
-  if(!p->pool) RAISE(E_NOMEMORY,NULL,"Unable to allocate memory for pool");
   return p;
 };
 
