@@ -240,7 +240,7 @@ class SearchIndex(Reports.report):
     description = "Search for words that were indexed during filesystem load. Words must be in dictionary to be indexed. "
     name = "Search Indexed Keywords"
     family = "Disk Forensics"
-    parameters={'fsimage':'fsimage','final':'any'}
+    parameters={'fsimage':'fsimage','final':'any','keyword':'any','range':'numeric'}
 
     def form(self,query,result):
         try:
@@ -335,8 +335,41 @@ class SearchIndex(Reports.report):
         result.text("Currently found %s occurances" % row['Count'],color='red')
         
     def analyse(self,query):
-        dbh = self.DBO(query['case'])
-        dbh2= self.DBO(query['case'])
+        dbh = DB.DBO(query['case'])
+        dbh2= DB.DBO(query['case'])
+        pyflag_dbh= DB.DBO(None)
+        range=int(query['range'])/2
+        old_temp_table = None
+        offset_columns=[]
+        word_ids = []
+        
+        ## We start off by isolating offset ranges of interest
+        for word in query.getarray('keyword'):
+            temp_table = dbh.get_temp()
+            pyflag_dbh.execute("select id from dictionary where word=%r",(word))
+            row=pyflag_dbh.fetch()
+            word_id = row['id']
+            word_ids.append(word_id)
+
+            if not old_temp_table:
+                offset_columns.append("offset_%s" % word_id)
+                dbh.execute("create table %s select offset-%s as low,offset+%s as high, offset as offset_%s from LogicalIndexOffsets_test where id=%r",(temp_table,range,range,word_id,word_id))
+            else:
+                dbh.execute("create table %s select least(offset-%s,low) as low, greatest(offset+%s,high) as high, %s, offset as offset_%s from %s, LogicalIndexOffsets_test where id=%r and offset<high and offset>low",
+                            (temp_table,range,range,
+                             ','.join(offset_columns),word_id,
+                             old_temp_table,word_id))
+
+            old_temp_table=temp_table
+
+        ## Now we create a cache table for each set of word
+        ## combinations. We need to find a unique identifier for this
+        ## request to name the table with. For example if we ask for
+        ## "foo" and "bar" within 100 bytes of each other we should
+        ## cache one set of results, while if we ask for "foo" and
+        ## "word" this is a very different set.
+        dbh.execute("create table foo select * from %s",(temp_table))
+        
         keyword = query['keyword']
         table = query['fsimage']
         dbh2.execute("CREATE TABLE if not exists `LogicalKeyword_%s` (`id` INT NOT NULL AUTO_INCREMENT ,`inode` VARCHAR( 20 ) NOT NULL ,`offset` BIGINT NOT NULL ,`text` VARCHAR( 200 ) NOT NULL ,`keyword` VARCHAR(20) NOT NULL ,PRIMARY KEY ( `id` ))",(table))
@@ -379,7 +412,8 @@ class SearchIndex(Reports.report):
         iofd = IO.open(query['case'], query['fsimage'])
         fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"], query["fsimage"], iofd)
 
-        ## This stuff is done on the fly because it is time consuming - The disadvantage is that it cannot be searched on.
+        ## This stuff is done on the fly because it is time consuming
+        ## - The disadvantage is that it cannot be searched on.
         def SampleData(string,result=None):
             inode,offset=string.split(',')
             offset=int(offset)
