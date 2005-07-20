@@ -43,7 +43,6 @@ import datetime
 ## Some useful display actions
 def textarea(description = None, variable= None, ui=None, **options):
     """ Draws a textarea as form input for input """
-    print description,variable
     ui.textarea(description,variable,rows=5,cols=40,**options)
 
 def date_selector(description = None, callback=None, variable= None, ui=None, label=None, **options):
@@ -63,28 +62,25 @@ def date_selector(description = None, callback=None, variable= None, ui=None, la
 
 def draw_calendar(query,ui,target=None):
     """ Draw the calendar for popup window """
-    ui.display = ui.__str__
+    ui.decoration='naked'
+    
     try:
         date=query[target]
-        date = datetime.date(int(date[0:4]),int(date[4:6]),int(date[6:8]))
-    except (KeyError,ValueError):
+        print "Query is %s" % query[target]
+        date = datetime.date(int(date[0:4]),int(date[5:7]),int(date[8:10]))
+    except (KeyError,ValueError),e:
+        print "%s"% e
         date=datetime.date.today()
+
+    print "Date is %s" % date
         
     ui.heading(date.strftime("%B %Y"))
 
-    last_year = ui.__class__(ui)
     q=query.clone()
     del q[target]
     q[target]="%04u-%02u-%02u" % (date.year-1,date.month,15)
-    last_year.link("<<", q)
+    ui.toolbar(text="Previous Year",icon="stock_left-with-subpoints.png",link=q)
 
-    next_year = ui.__class__(ui)
-    q=query.clone()
-    del q[target]
-    q[target]="%04u-%02u-%02u" % (date.year+1,date.month,15)
-    next_year.link(">>", q)
-
-    last_month = ui.__class__(ui)
     q=query.clone()
     del q[target]
     month=date.month-1
@@ -93,9 +89,8 @@ def draw_calendar(query,ui,target=None):
         month=12
         year-=1
     q[target]="%04u-%02u-%02u" % (year,month,15)
-    last_month.link("<", q)
-    
-    next_month = ui.__class__(ui)
+    ui.toolbar(text="Previous Month",icon="stock_left.png",link=q)
+        
     q=query.clone()
     month=date.month+1
     year=date.year
@@ -104,11 +99,12 @@ def draw_calendar(query,ui,target=None):
         year+=1
     del q[target]
     q[target]="%04u-%02u-%02u" % (year,month,15)
-    next_month.link(">", q)
+    ui.toolbar(text="Next Month",icon="stock_right.png",link=q)
 
-    ui.start_table()
-    ui.row(last_year,"   ",last_month,"       ",next_month,"  ",next_year)
-    ui.end_table()
+    q=query.clone()
+    del q[target]
+    q[target]="%04u-%02u-%02u" % (date.year+1,date.month,15)
+    ui.toolbar(text="Next Year",icon="stock_right-with-subpoints.png",link=q)
     
     del query['callback_stored']
     del query['__opt__']
@@ -196,7 +192,7 @@ def selector_constraint(table_object,fieldname,proposed_value,query=None,id=None
     try:
         tmp=query["new_%s" % fieldname]
         del query["new_%s" % fieldname]
-        if not tmp==None:
+        if tmp and len(tmp)>0 and tmp!="None":
             del query[fieldname]
             query[fieldname]=tmp
     except KeyError:
@@ -209,12 +205,13 @@ def time_input(description=None,ui=None, target=None, **options):
     ## First convert any time to displayable time units:
     try:
         t = ("%s"%ui.defaults[target]).split(':')
-        ui.defaults["%s_hours" % target] = t[0]
-        ui.defaults["%s_mins" % target] = t[1]
-        
+        if len(t)<2: t[1]='0'
     except (KeyError,IndexError):
-        pass
-    
+        t = "0:0".split(':')
+
+    ui.defaults["%s_hours" % target] = t[0]
+    ui.defaults["%s_mins" % target] = t[1]        
+
     tmp=ui.__class__(ui)
     tmp.textfield('Hours:',"%s_hours" % target,size=4)
     tmp2=ui.__class__(ui)
@@ -278,3 +275,80 @@ def combine_constraints(table_object, fieldname,proposed_value,query=None,id=Non
     """
     for c in constraints:
         c(table_object,fieldname,proposed_value,query,id,result)
+
+import tempfile,os
+
+def FileUploadConstraint(table_object,fieldname,proposed_value,query=None,id=None, result=None, server_filename_field=None):
+    """ This function saves the file in the results directory and replaces query[fieldname] with the filename to the uploaded file """
+    try:
+        filename = query['%s_filename' % fieldname]
+    except:
+        filename = ""
+
+    ## The user did not upload a new file at all - we reset these to
+    ## the values they used to be
+    if(id and len(filename)<2):
+        t = table_object[id]
+        del query[fieldname]
+        query[fieldname] = t[fieldname]
+        del query[server_filename_field]
+        query[server_filename_field] = t[server_filename_field]
+        return
+    
+    data = query[fieldname]
+    
+    del query[fieldname]
+    query[fieldname]=filename
+    
+    fd , server_filename= tempfile.mkstemp("bin","ISGDB_",config.RESULTDIR)
+    os.write(fd, data)
+    
+    del query[server_filename_field]
+    query[server_filename_field]=server_filename
+
+    os.close(fd)
+
+def draw_icon(value,result,icon=None,tooltip=None):
+    """ A generic function to draw an icon in a table """
+    tmp=result.__class__(result)
+    tmp.icon(icon,tooltip=tooltip)
+    return tmp
+
+def get_user_record(username):
+    """ Given a username, returns the ID or None if no such user """
+    dbh=DB.DBO(None)
+    dbh.execute("select * from users where username=%r",username)
+    row=dbh.fetch()
+    if row:
+        return row
+
+def get_user_id(username):
+    """ Given a username, returns the ID or None if no such user """
+    dbh=DB.DBO(None)
+    dbh.execute("select id from users where username=%r",username)
+    row=dbh.fetch()
+    if row:
+        return int(row['id'])
+
+def get_user_priv(username):
+    """ Given a username, returns the privileges of this user. """
+    dbh=DB.DBO(None)
+    dbh.execute("select priviledges from users where username=%r",username)
+    row=dbh.fetch()
+    if row:
+        return int(row['priviledges'])
+    
+def table_popup(description = None, variable= None, ui=None, callback= None, label=None, table_obj=None, **options):
+    """ Open a new popup window with callback being the target """
+    tmp=ui.__class__(ui)
+    try:
+        t = table_obj()
+        t.show(tmp.defaults[variable],tmp)
+        ui.hidden(variable,tmp.defaults[variable])
+        tmp.end_table()
+    except (AttributeError, TypeError),e:
+        raise
+
+    tmp.popup(callback,label,**options)
+    ui.row(description,tmp)
+

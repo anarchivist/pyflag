@@ -310,6 +310,14 @@ class LogDriverRegistry(Registry):
         for cls in self.classes:
             self.drivers[cls.name]=cls
 
+class ThemeRegistry(Registry):
+    """ A class registering all the themes """
+    themes = {}
+    def __init__(self,ParentClass):
+        Registry.__init__(self,ParentClass)
+        for cls in self.classes:
+            self.themes[("%s" % cls).split('.')[-1]]=cls
+    
 LOCK = 0
 REPORTS = None
 SCANNERS = None
@@ -317,6 +325,7 @@ VFS_FILES = None
 LOG_DRIVERS = None
 SHELL_COMMANDS = None
 FILESYSTEMS = None
+THEMES = None
 
 ## This is required for late initialisation to avoid dependency nightmare.
 def Init():
@@ -330,6 +339,12 @@ def Init():
     global REPORTS
     
     REPORTS=ReportRegistry(Reports.report)
+
+    ## Collect all themes
+    import pyflag.Theme as Theme
+    global THEMES
+    THEMES = ThemeRegistry(Theme.BasicTheme)
+
     ## Now do the scanners
     import pyflag.Scanner as Scanner
     global SCANNERS

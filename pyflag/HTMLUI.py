@@ -36,8 +36,9 @@ import pyflag.DB as DB
 import pyflag.conf
 import pyflag.UI as UI
 config=pyflag.conf.ConfObject()
-import pyflag.Theme
+import pyflag.Theme as Theme
 import cStringIO,csv
+import pyflag.Registry as Registry
 
 class HTMLException(Exception):
     """ An exception raised within the UI - should not escape from this module """
@@ -111,10 +112,8 @@ class HTMLUI(UI.GenericUI):
             q['family'] =''
             
         ## Get the right theme
-        try:
-            theme=pyflag.Theme.factory(q['theme'])
-        except KeyError:
-            theme=pyflag.Theme.factory()
+        theme=Theme.get_theme(q)
+        
         if self.decoration=='naked':
             return theme.naked_render(data=self.__str__(), ui=self,title=self.title)
         elif self.decoration=='raw':
@@ -175,7 +174,12 @@ class HTMLUI(UI.GenericUI):
         file.seek(0)
         data=file.read(1000)
         self.generator.content_type=magic.buffer(data)
-        self.generator.headers=[("Content-Disposition","attachment; filename=%s" % file.inode),]
+        try:
+            self.generator.headers=[("Content-Disposition","attachment; filename=%s" % file.inode),]
+        except AttributeError:
+            self.generator.headers=[("Content-Disposition","attachment; filename=%s" % file.name),]
+
+        file.seek(0)
         self.generator.generator=file
         
     def image(self,image,**options):
@@ -284,6 +288,13 @@ class HTMLUI(UI.GenericUI):
         self.result += "<pre>%s</pre>" % string
 
     def link(self,string,target=None,options=None,icon=None,tooltip=None,**target_options):
+        ## If the user specified a URL, we just use it as is:
+        try:
+            self.result+="<a href='%s'>%s</a>" % (target_options['url'],string)
+            return
+        except KeyError:
+            pass
+        
         if target==None:
             target=FlagFramework.query_type(())
         q=target.clone()
@@ -590,7 +601,7 @@ class HTMLUI(UI.GenericUI):
             elif t == 'special':
                 left.result+="%s%s<br>\n" % ("<img src=/flag/images/spacer.png width=20 height=20>" * depth , "<a name=%s href=f?%s#%s>%s</a>  " % (open_tree,link,open_tree, str(v) ))
             else:
-                left.result+="%s%s%s<br>\n" % ("<img src=/flag/images/spacer.png width=20 height=20>" * depth , "<a name=%s href=f?%s#%s><img border=0 height=16 src=/flag/images/corner.png width=20 height=20></a>&nbsp;&nbsp;" % (open_tree,link,open_tree), v )
+                left.result+="%s%s%s<br>\n" % ("<img src=/flag/images/spacer.png width=20 height=20>" * depth , "<a name=%s href=f?%s#%s><img border=0 height=16 src=/flag/images/corner.png width=20 height=20></a>&nbsp;&nbsp;" % (open_tree,link,open_tree), str(sv) )
         right=self.__class__(self)
         try:
             ## Get the right part:
@@ -775,8 +786,10 @@ class HTMLUI(UI.GenericUI):
         if not query.has_key('limit'):
             query['limit'] = "0"
 
-        self.previous = int(query['limit']) - config.PAGESIZE
-        self.next = int(query['limit']) + config.PAGESIZE
+        ## Add next and previous button as needed:
+        previous = int(query['limit']) - config.PAGESIZE
+        next = int(query['limit']) + config.PAGESIZE
+        
         self.pageno =  int(query['limit']) /config.PAGESIZE
                 
         query_str+=" limit %u, %u" % (int(query['limit']) , config.PAGESIZE)
@@ -962,7 +975,8 @@ class HTMLUI(UI.GenericUI):
 
                 ## Check if the user specified a callback for this column
                 if callbacks.has_key(names[i]):
-                    value=callbacks[names[i]](value,result=self)
+                    value=callbacks[names[i]](value)
+#                    value=callbacks[names[i]](value,result=self)
 
                 ## Now add links if they are required
                 try:
@@ -1036,10 +1050,10 @@ class HTMLUI(UI.GenericUI):
             #callbacks, so we do not need to show the form.
             if callbacks.has_key(names[d]):
                 try:
-                    cb_result=callbacks[names[d]](query['where_%s' % names[d]])
+#                    cb_result=callbacks[names[d]](query['where_%s' % names[d]])
                     new_q=query.clone()
                     del new_q['where_%s' % names[d]]
-                    tmp.link(cb_result,new_q)
+#                    tmp.link(cb_result,new_q)
                 except KeyError:
                     pass
             else:
@@ -1057,7 +1071,18 @@ class HTMLUI(UI.GenericUI):
         #If our row count is smaller than the page size, then we dont
         #have another page, set next page to None
         if count < config.PAGESIZE:
-            self.next = None
+            next = None
+
+        new_query=query.clone()
+        if previous>=0:
+            del new_query['limit']
+            new_query['limit']=previous        
+            self.toolbar(text="Previous page", icon="stock_left.png", link=new_query)
+
+        if next:
+            del new_query['limit']
+            new_query['limit']=next
+            self.toolbar(text="Next page", icon="stock_right.png", link=new_query)
 
     def text(self,*cuts,**options):
         wrap = config.WRAP
@@ -1126,6 +1151,15 @@ class HTMLUI(UI.GenericUI):
             else:
                 do_options(self.text_var,options)
                 self.text_var = ''
+
+    def upload_file(self, description, name, **options):
+        # FIXME - Implement a proper file upload mechanism here to be
+        # able to handle large files...
+        """ Supply a file upload widget.
+
+        After uploading the file, query[name] will contain the file data (We hope files are not too large at the moment).
+        """
+        self.textfield(description,name,type='file',**options)
 
     def textfield(self,description,name,**options):
         """ Draws a text field in the form.
@@ -1203,7 +1237,8 @@ class HTMLUI(UI.GenericUI):
         for k,v in hiddens.items():
             self.form_parms[k]=v
 
-        self.result += "<form name=pyflag_form method=%s action='/f'>\n" % config.METHOD
+#        self.result += "<form name=pyflag_form method=%s action='/f'>\n" % config.METHOD
+        self.result += '<form name=pyflag_form method=%s action="/f" enctype="multipart/form-data">\n' % config.METHOD
 
     def end_form(self,value='Submit',name='submit',**opts):
         for k,v in self.form_parms:
@@ -1261,10 +1296,13 @@ class HTMLUI(UI.GenericUI):
         self.result+=""" <script>function refresh() {window.location="%s";}; setTimeout("refresh()",%s) </script>""" % (query,int(interval)*1000)
         self.meta += "<META HTTP-EQUIV=Refresh Content=\"%s; URL=%s\">" % (interval,query)
 
-    def icon(self, path, **options):
+    def icon(self, path, tooltip=None, **options):
         """ This allows the insertion of a small static icon picture. The image should reside in the images directory."""
         option_str = self.opt_to_str(options)
-        self.result += "<img src=/flag/images/%s %s />" % (path, option_str)
+        data = "<img border=0 src=/flag/images/%s %s />" % (path, option_str)
+        if tooltip:
+            data = "<abbr title='%s'>%s</abbr>" % (tooltip,data)
+        self.result += data
 
     def wizard(self,names=[],context="wizard",callbacks=[],title=''):
         """ This implements a wizard.
@@ -1377,9 +1415,3 @@ class HTMLUI(UI.GenericUI):
         cbfunc(query,result)
         out+="<tr><td colspan=50><table border=1 width=100%%><tr><td>%s</td></tr></table></td></tr></table>" % result
         self.result+=out
-
-    def upload(description,name,**options):
-        """ Implements a file upload mechanism.
-
-        The user is able to upload a file using this UI
-        """

@@ -90,6 +90,13 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         query=FlagFramework.query_type(base=rest,user=user, passwd=passwd)
         
         for key in form.keys():
+            ## See if key has a filename, if so we store it ala php:
+            try:
+                if form[key].filename:
+                    query["%s_filename" % key] = form[key].filename
+            except AttributeError:
+                pass
+            
             try:
                 query[key]=form[key].value
             except AttributeError:
@@ -123,6 +130,9 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         #Is this a request for an image?
         if re.search("\.(png|jpg|gif)$",query.base):
             ct="image/jpeg"
+        
+        if re.search("\.(css)$",query.base):
+            ct="text/css"
             
         if ct:
             i=query.base.rfind('/')
@@ -178,10 +188,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                   #Did the user request a report?
                   if not query.has_key('family') or not query.has_key('report'):
                       query['family'] = None
-                      try:
-                          theme=pyflag.Theme.factory(query['theme'])
-                      except KeyError:
-                          theme=pyflag.Theme.factory()
+                      theme=pyflag.Theme.get_theme(query)
                       result = theme.menu(flag,query)
                       result.defaults=query
                   else:

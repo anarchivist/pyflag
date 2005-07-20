@@ -86,7 +86,7 @@ class TableObj:
         self._column_names = [ self.columns[i] for i in range(0,len(self.columns)) if i % 2 ]
 
     def _make_column_sql(self):
-        return ','.join([ "%s as %r" % (self._column_keys[i],self._column_names[i]) for i in range(len(self._column_keys)) ])
+        return ','.join([ "%s as %r" % (self._column_keys[i],self._column_names[i]) for i in range(len(self._column_keys)) ] + self._column_keys)
 
     def __getitem__(self,id):
         """ Emulates a table accessor.
@@ -171,7 +171,8 @@ class TableObj:
 
                 ## Here we check if there are special form functions to be executed:
                 try:
-                    if not query.has_key(k):
+                    if not query.has_key(k) or query[k]==None:
+                        del query[k]
                         query[k]=''
                     
                     self.form_actions[k](description=v,ui=results,variable=k)
