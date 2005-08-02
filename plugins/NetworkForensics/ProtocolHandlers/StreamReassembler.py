@@ -423,9 +423,19 @@ class StreamFile(File):
         result= File.seek(self,offset,rel)
         return result
 
-    def get_packet_id(self):
+    def get_packet_id(self, position=None):
         """ Gets the current packet id (where the readptr is currently at) """
-        return self.seq
+        if not position:
+            position = self.tell()
+            
+        self.dbh.execute("select con_id,isn from connection_details_%s where inode=%r",(self.table,self.inode))
+        row=self.dbh.fetch()
+        con_id,isn = row['con_id'],row['isn']
+        self.dbh.execute("""select packet_id from connection_%s where
+                         con_id = %r and seq < (%r+%r) order by seq desc limit 1""",
+                         (self.table, con_id, isn, position))
+        row=self.dbh.fetch()
+        return row['packet_id']
 
 class CachedStreamFile(CachedFile,StreamFile):
     """ A StreamFile VFS node with file based cache.
@@ -434,7 +444,6 @@ class CachedStreamFile(CachedFile,StreamFile):
     """
     specifier = 'S'
     target_class = StreamFile
-
 
 class OffsetFile(File):
     """ A simple offset:length file driver.

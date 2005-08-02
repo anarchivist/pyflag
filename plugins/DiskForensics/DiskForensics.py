@@ -390,10 +390,12 @@ class ViewFile(Reports.report):
 
         names=["Statistics","HexDump","Download","Strings","Text"]
         callbacks=[stats,hexdump,download,strings,textdump]
-        
-        if fd.stat_cbs:
+
+        try:
             names.extend(fd.stat_names)
             callbacks.extend(fd.stat_cbs)
+        except AttributeError:
+            pass
 
         result.notebook(
             names=names,
