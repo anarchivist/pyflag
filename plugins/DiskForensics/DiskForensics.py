@@ -47,18 +47,6 @@ order=30
 
 BLOCKSIZE=20
 
-def DeletedIcon(value,result=None):
-    """ Callback for rendering deleted items """
-    tmp=result.__class__(result)
-    if value=='alloc':
-        tmp.icon("yes.png")
-    elif value=='deleted':
-        tmp.icon("no.png")
-    else:
-        tmp.icon("question.png")
-
-    return tmp
-
 class BrowseFS(Reports.report):
     """ Report to browse the filesystem"""
     parameters = {'fsimage':'fsimage'}
@@ -79,7 +67,19 @@ class BrowseFS(Reports.report):
         
         branch = ['']
         new_query = result.make_link(query, '')
-            
+
+        def DeletedIcon(value):
+            """ Callback for rendering deleted items """
+            tmp=result.__class__(result)
+            if value=='alloc':
+                tmp.icon("yes.png")
+            elif value=='deleted':
+                tmp.icon("no.png")
+            else:
+                tmp.icon("question.png")
+
+            return tmp
+
         def tabular_view(query,result):
             result.table(
                 columns=['f.inode','f.mode','concat(path,name)','f.status','size','from_unixtime(mtime)','from_unixtime(atime)','from_unixtime(ctime)'],

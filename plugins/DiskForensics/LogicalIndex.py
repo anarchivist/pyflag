@@ -240,7 +240,7 @@ class SearchIndex(Reports.report):
     description = "Search for words that were indexed during filesystem load. Words must be in dictionary to be indexed. "
     name = "Search Indexed Keywords"
     family = "Disk Forensics"
-    parameters={'fsimage':'fsimage','final':'any','keyword':'any','range':'numeric'}
+    parameters={'fsimage':'fsimage','keyword':'any','range':'numeric'}
 
     def form(self,query,result):
         try:
@@ -368,7 +368,13 @@ class SearchIndex(Reports.report):
         ## "foo" and "bar" within 100 bytes of each other we should
         ## cache one set of results, while if we ask for "foo" and
         ## "word" this is a very different set.
-        dbh.execute("create table foo select * from %s",(temp_table))
+        canonicalised_query = FlagFramework.canonicalise(query)
+
+        ## We use the timestamp as a unique reference
+        dbh.execute("select `time` from meta where value=%r",canonicalised_query);
+        row=dbh.fetch()
+        print "Time is %s "% row
+#        dbh.execute("create table foo select * from %s",(temp_table))
         
         keyword = query['keyword']
         table = query['fsimage']
@@ -414,7 +420,7 @@ class SearchIndex(Reports.report):
 
         ## This stuff is done on the fly because it is time consuming
         ## - The disadvantage is that it cannot be searched on.
-        def SampleData(string,result=None):
+        def SampleData(string):
             inode,offset=string.split(',')
             offset=int(offset)
             left=offset-10

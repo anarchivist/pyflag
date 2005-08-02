@@ -443,7 +443,7 @@ class LoadFS(Reports.report):
 
         ## Here we remove from the meta table any reference to this report regardless of the scanners used:
         del query['scan']
-        canonical_query = self.flag.canonicalise(query)
+        canonical_query = FlagFramework.canonicalise(query)
         dbh.execute("delete from meta where property='report_executed' and value like '%s%%'",(canonical_query))
 
 class LoadKB(LoadTcpDump):

@@ -399,7 +399,7 @@ class execute(pyflagsh.command):
         try:
             report.analyse(query)
             dbh = self.environment._DBO(query['case'])
-            canonical_query = self.environment._flag.canonicalise(query)
+            canonical_query = FlagFramework.canonicalise(query)
             dbh.execute("insert into meta set property=%r,value=%r",('report_executed',canonical_query))
 
             ## We call the display method just in case this report

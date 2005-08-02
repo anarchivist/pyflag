@@ -43,6 +43,23 @@ class DontDraw(Exception):
 
     This is mainly used by the form method to allow a UI to manage its own window
     """
+
+def canonicalise(query):
+    """ Converts the query into the canonical form.
+
+    The canonical form is defined as the sorted urlified key=value pairs of the parameters defined in the reports.parameters dict. This is used to uniquely identify the request in order to manage the caching."""
+    if not query['report'] or not query['family']:
+        raise FlagException,"No report or family in canonicalise query"
+
+    report = Registry.REPORTS.dispatch(query['family'],query['report'])
+
+    tmp = []
+    for x,y in query:
+        if report.parameters.has_key(x) or x=='family' or x=='report':
+            tmp.append("%s=%s" %(urlencode(x),urlencode(y)))
+
+    tmp.sort()
+    return '&'.join(tmp)
     
 class AuthError(Exception):
     """ Exception raised when Authentication fails """
@@ -287,34 +304,17 @@ class Flag:
         ## Initialise the registry:
         Registry.Init()
                 
-    def canonicalise(self,query):
-        """ Converts the query into the canonical form.
-
-        The canonical form is defined as the sorted urlified key=value pairs of the parameters defined in the reports.parameters dict. This is used to uniquely identify the request in order to manage the caching."""
-        if not query['report'] or not query['family']:
-            raise FlagException,"No report or family in canonicalise query"
-
-        report = Registry.REPORTS.dispatch(query['family'],query['report'])
-
-        tmp = []
-        for x,y in query:
-            if report.parameters.has_key(x) or x=='family' or x=='report':
-                tmp.append("%s=%s" %(urlencode(x),urlencode(y)))
-
-        tmp.sort()
-        return '&'.join(tmp)
-    
     def is_cached(self,query):
         """ Checks the database to see if the report has been cached """
         dbh = DB.DBO(query['case'])
-        dbh.execute("select * from meta where property=%r and value=%r",("report_executed",self.canonicalise(query)))
+        dbh.execute("select * from meta where property=%r and value=%r",("report_executed",canonicalise(query)))
         if dbh.fetch():
             return True
         else:
             return False
 
     def run_analysis(self,report,query):
-        canonical_query = self.canonicalise(query)
+        canonical_query = canonicalise(query)
         #Find our thread name
         thread_name = threading.currentThread().getName()
         print "Current thread is %s" % thread_name
@@ -347,7 +347,7 @@ class Flag:
 
     def check_progress(self,report,query):
         """ Checks the progress of a report. If the report is not running this method returns None. If the report is still running or has died due to an error, this method returns a UI object containing either the error message or a progress report called from the report's own progress method """
-        canonical_query = self.canonicalise(query)
+        canonical_query = canonicalise(query)
         if report.is_executing(canonical_query):
             #Did the analysis thread die with an error?
             thread_name = report.is_executing(canonical_query)
@@ -412,7 +412,7 @@ class Flag:
         #Check to see if the query string has enough parameters in it:
         try:
             if report.check_parameters(query):
-                canonical_query = self.canonicalise(query)
+                canonical_query = canonicalise(query)
                 #Parameters ok, lets go
                 result.toolbar(show_help,text="Help",icon="help.png")
 
