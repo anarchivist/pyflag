@@ -98,7 +98,7 @@ class Mounted(DBFS):
         def insert_into_table(mode,root,name):
             rel_root="/"+root[len(self.iosource.mount_point):]+"/"
             if rel_root=="//": rel_root="/"
-            s=os.stat(os.path.join(root,name))
+            s=os.lstat(os.path.join(root,name))
             dbh.execute("insert into file_%s set inode='M%s',mode=%r,status='alloc',path=%r,name=%r",(self.table, s.st_ino, mode, rel_root, name))
             try:
                 link=os.readlink("%s/%s" % (root,name))

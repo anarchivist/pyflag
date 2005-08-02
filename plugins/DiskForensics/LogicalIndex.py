@@ -374,7 +374,7 @@ class SearchIndex(Reports.report):
         dbh.execute("select `time` from meta where value=%r",canonicalised_query);
         row=dbh.fetch()
         print "Time is %s "% row
-#        dbh.execute("create table foo select * from %s",(temp_table))
+        dbh.execute("create table LogicalIndexCache_%s select * from %s",(row['time'],temp_table))
         
         keyword = query['keyword']
         table = query['fsimage']

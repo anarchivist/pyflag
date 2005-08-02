@@ -32,7 +32,7 @@ import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import os,os.path,time,re
+import os,os.path,time,re, cStringIO
 import pyflag.FileSystem as FileSystem
 import pyflag.logging as logging
 import pyflag.Graph as Graph
@@ -208,10 +208,16 @@ class ViewFile(Reports.report):
         # retrieve the iosource for this fsimage
         iofd = IO.open(query['case'],query['fsimage'])
         fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"], query["fsimage"], iofd)
-        fd = fsfd.open(inode=query['inode'])
+        try:
+            fd = fsfd.open(inode=query['inode'])
+            ## We only want this much data
+            image = Graph.FileThumb(fd)
 
-        ## We only want this much data
-        image = Graph.FileThumb(fd)
+        except IOError:
+##            fd = cStringIO.StringIO('')
+            fd = None
+            image = None
+            
         #How big is this file?
         i=fsfd.istat(inode=query['inode'])
 #        filesize=i['size']
@@ -220,7 +226,8 @@ class ViewFile(Reports.report):
         path=fsfd.lookup(inode=query['inode'])
         if not path: path=query['inode']
         path,name=os.path.split(path)
-        image.headers=[("Content-Disposition","attachment; filename=%s" % name),]
+        if image:
+            image.headers=[("Content-Disposition","attachment; filename=%s" % name),]
         ## This fails in cases where the File object does not know its own size in advance (e.g. Pst).
 ##                       ("Content-Length",filesize)]
 
@@ -272,6 +279,8 @@ class ViewFile(Reports.report):
         except IOError,e:
             result.text("Unable to classify file, no blocks: %s" % e)
             image = None
+        except:
+            pass
 
         def download(query,result):
             """ Used for dumping the entire file into the browser """
@@ -316,6 +325,7 @@ class ViewFile(Reports.report):
 
         def strings(query,result):
             """ Draw the strings in a file """
+            if not fd: return
             str = pyflag.Strings.StringExtracter(fd)
             try:
                 offset=query['stroffset']
@@ -359,6 +369,7 @@ class ViewFile(Reports.report):
 
         def textdump(query,result):
             """ Dumps the file in a text window """
+            if not fd: return
             ## FIXME - Implement proper paging here.
             fd.seek(0)
             result.text(fd.read(1024*10),font='typewriter',sanitise="full",color="red",wrap="full")
@@ -372,10 +383,11 @@ class ViewFile(Reports.report):
                 left.row('%s:' % k,'',v)
 
             ## File specific statistics:
-            istat = fd.stats()
-            if istat:
-                for k,v in istat.iteritems():
-                    left.row('%s:' % k,'',v)
+            if fd:
+                istat = fd.stats()
+                if istat:
+                    for k,v in istat.iteritems():
+                        left.row('%s:' % k,'',v)
             
             left.end_table()
 
@@ -385,8 +397,8 @@ class ViewFile(Reports.report):
                 result.start_table(width="100%")
                 result.row(left,right,valign='top',align="left")
             else:
-                result=left
-            return result
+                result.start_table(width="100%")
+                result.row(left,valign='top',align="left")
 
         names=["Statistics","HexDump","Download","Strings","Text"]
         callbacks=[stats,hexdump,download,strings,textdump]
