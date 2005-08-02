@@ -36,7 +36,7 @@ import pyflag.Registry as Registry
 
 def propegate(query,new_query):
     """ This copies certain parameters from query into new_query if they exist in query """
-    propegated = ['family','case','fsimage','iosubsys']
+    propegated = ['case','fsimage','iosubsys']
     for i in propegated:
         try:
             del new_query[i]

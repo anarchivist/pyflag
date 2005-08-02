@@ -38,7 +38,6 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
 import pyflag.TypeCheck as TypeCheck
-import plugins.Global as Global
 
 class ConstraintError(Exception):
     """ This exception is thrown when a contraint failed when adding or updating a row in the db.

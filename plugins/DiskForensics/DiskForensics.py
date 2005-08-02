@@ -47,6 +47,18 @@ order=30
 
 BLOCKSIZE=20
 
+def DeletedIcon(value,result):
+    """ Callback for rendering deleted items """
+    tmp=result.__class__(result)
+    if value=='alloc':
+        tmp.icon("yes.png")
+    elif value=='deleted':
+        tmp.icon("no.png")
+    else:
+        tmp.icon("question.png")
+
+    return tmp
+
 class BrowseFS(Reports.report):
     """ Report to browse the filesystem"""
     parameters = {'fsimage':'fsimage'}
@@ -68,23 +80,11 @@ class BrowseFS(Reports.report):
         branch = ['']
         new_query = result.make_link(query, '')
 
-        def DeletedIcon(value):
-            """ Callback for rendering deleted items """
-            tmp=result.__class__(result)
-            if value=='alloc':
-                tmp.icon("yes.png")
-            elif value=='deleted':
-                tmp.icon("no.png")
-            else:
-                tmp.icon("question.png")
-
-            return tmp
-
         def tabular_view(query,result):
             result.table(
                 columns=['f.inode','f.mode','concat(path,name)','f.status','size','from_unixtime(mtime)','from_unixtime(atime)','from_unixtime(ctime)'],
                 names=('Inode','Mode','Filename','Del','File Size','Last Modified','Last Accessed','Created'),
-                callbacks={'Del':DeletedIcon},
+                callbacks={'Del':FlagFramework.Curry(DeletedIcon,result=result)},
                 table='file_%s as f, inode_%s as i' % (fsfd.table,fsfd.table),
                 where="f.inode=i.inode",
                 case=query['case'],
@@ -457,12 +457,12 @@ class Timeline(Reports.report):
     def display(self, query, result):
         dbh = self.DBO(query['case'])
         tablename = dbh.MakeSQLSafe(query['fsimage'])
-        
+        result.heading("File Timeline for Filesystem %s" % tablename)
         result.table(
             columns=('from_unixtime(time)','inode','status',
                      "if(m,'m',' ')","if(a,'a',' ')","if(c,'c',' ')","if(d,'d',' ')",'name'),
             names=('Timestamp', 'Inode','Del','m','a','c','d','Filename'),
-            callbacks={'Del':DeletedIcon},
+            callbacks={'Del':FlagFramework.Curry(DeletedIcon,result=result)},
             table=('mac_%s' % tablename),
             case=query['case'],
 #            links=[ None, None, None, None, None, None, None, FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='filename')]
