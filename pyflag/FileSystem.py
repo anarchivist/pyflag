@@ -375,8 +375,8 @@ class File:
     """
     specifier = None
     ## These can be overridden by the caller if they want to add stats to the ViewFile report
-    stat_cbs = None
-    stat_names = None
+    #stat_cbs = None
+    #stat_names = None
     
     def __init__(self, case, table, fd, inode):
         """ The constructor for this object.

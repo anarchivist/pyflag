@@ -874,8 +874,16 @@ class HTMLUI(UI.GenericUI):
             result.type = "text/x-comma-separated-values"
             data = cStringIO.StringIO()
             hidden_columns = query.getarray('hide_column')
+
+            ## FIXME - We dont usually want to save called back
+            ## columns becuase they rarely make sense (but sometimes
+            ## they do?? which should we do here???)
+            for i in callbacks.keys():
+                if i not in hidden_columns:
+                    hidden_columns.append(i)
+                    
             names_list = [ i for i in names if i not in hidden_columns ]
-            cvs_writer = csv.DictWriter(data,names_list)
+            cvs_writer = csv.DictWriter(data,names_list,dialect='excel')
             dbh.execute(query_str_basic + " order by %s" % order,())
             for row in dbh:
                 ## If there are any callbacks we respect those now.
@@ -887,7 +895,14 @@ class HTMLUI(UI.GenericUI):
                     except (KeyError,Exception):
                         pass
 
-                    new_row[k]=row[k]
+                    ## Escape certain characters from the rows - some
+                    ## spreadsheets dont like these even though they
+                    ## are probably ok:
+                    tmp=str(row[k])
+                    tmp=tmp.replace("\r","\\r")
+                    tmp=tmp.replace("\n","\\n")
+                    
+                    new_row[k]=tmp
                     
                 cvs_writer.writerow(new_row)
 

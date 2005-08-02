@@ -394,7 +394,7 @@ class ViewFile(Reports.report):
         try:
             names.extend(fd.stat_names)
             callbacks.extend(fd.stat_cbs)
-        except AttributeError:
+        except:
             pass
 
         result.notebook(

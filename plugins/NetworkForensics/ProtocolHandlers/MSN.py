@@ -37,6 +37,8 @@ class message:
         self.dbh=dbh
         self.table=table
         self.fd=fd
+        self.client_id=''
+        self.session_id = -1
 
     def parse(self):
         """ We parse the first message from the file like object in
@@ -59,7 +61,7 @@ class message:
 #            return "Oops, command %s not understood" % self.cmdline
         
     def get_data(self):
-        return "\n      ".join(self.msg_array[self.header_offset:])
+        return "\n".join(self.msg_array[self.header_offset+1:])
 
     def NLN(self):
         """ Notifies Client when users go offline or online state changes """
@@ -87,6 +89,34 @@ class message:
                 self.headers[header.lower()]=value.lower().strip()
             except ValueError:
                 pass
+
+    def ANS(self):
+        """ Logs into the Switchboard session.
+
+        We use this to store the current session ID for the entire TCP connection.
+        """
+        words = self.cmdline.split()
+        try:
+            self.session_id = int(words[-1])
+            self.dbh.execute("insert into msn_session_%s set id=%r, user=%r",
+                             (self.table,self.session_id, words[2]))
+            ## This stores the current clients username
+            self.client_id = words[2]
+            print "%s has logged into a session id %s" % (words[2],self.session_id)
+        except: pass
+
+    def IRO(self):
+        words = self.cmdline.split()
+        self.dbh.execute("insert into msn_session_%s set id=%r, user=%r",
+                         (self.table,self.session_id, words[4]))
+#        print "%s belongs to session %s" % (words[4],self.session_id)
+
+    def JOI(self):
+        words = self.cmdline.split()
+        self.dbh.execute("insert into msn_session_%s set id=%r, user=%r",
+                         (self.table,self.session_id, words[1]))
+                         
+    # print "%s joins session %s" % (words[1],self.session_id)
             
     def MSG(self):
         """ Sends message to members of the current session
@@ -103,7 +133,7 @@ class message:
         try:
             ## If the second word is a transaction id (int) its a message from client to server
             int(words[1])
-            sender = "Client"
+            sender = "%s (Target)" % self.client_id
             friendly_sender = "Implied Client Machine"
         except ValueError:
             sender = words[1]
@@ -122,10 +152,10 @@ class message:
         timestamp = row['ts_sec']
 
         self.dbh.execute(""" insert into msn_messages_%s set sender=%r,friendly_name=%r,
-        inode=%r, packet_id=%r, content_type=%r, data=%r, ts_sec=%r
+        inode=%r, packet_id=%r, content_type=%r, data=%r, ts_sec=%r, session=%r
         """,(
             self.table,sender,friendly_sender,self.fp.inode, packet_id,
-            content_type,self.get_data(), timestamp
+            content_type,self.get_data(), timestamp, self.session_id
             ))
             
     def OUT(self):
@@ -158,9 +188,16 @@ class MSNScanner(NetworkScanFactory):
             `content_type` VARCHAR( 50 ) NOT NULL ,
             `inode` VARCHAR(50) NOT NULL,
             `packet_id` INT,
+            `session` INT,
             `ts_sec` int(11),
             `data` TEXT NOT NULL
             )""",(self.table,))
+        self.dbh.execute(
+            """ CREATE TABLE if not exists `msn_session_%s` (
+            `id` INT,
+            `user` VARCHAR( 250 ) NOT NULL
+            )""",(self.table,))
+        
         self.msn_connections = {}
 
     class Scan(NetworkScanner):
@@ -214,15 +251,42 @@ class BrowseMSNChat(Reports.report):
     def display(self,query,result):
         result.heading("MSN Chat sessions in %s " % query['fsimage'])
         result.table(
-            columns = [ 'from_unixtime(ts_sec)','packet_id','sender','data'],
-            names = ['Time Stamp','Packet','Sender Nick','Text'],
+            columns = [ 'from_unixtime(ts_sec)','packet_id','session','sender','data'],
+            names = ['Time Stamp','Packet','Session','Sender Nick','Text'],
             table = "msn_messages_%s" % query['fsimage'],
             where = "content_type like 'text/plain%' ",
             links = [None,
                      FlagFramework.query_type((),
                                               family="Network Forensics", case=query['case'],
                                               report='View Packet', fsimage=query['fsimage'],
-                                              __target__='id')],
+                                              __target__='id'),
+                     FlagFramework.query_type((),
+                                              family="Network Forensics", case=query['case'],
+                                              report='BrowseMSNSessions', fsimage=query['fsimage'],
+                                              __target__='where_Session ID'),
+                     ],
+            case = query['case']
+            )
+
+class BrowseMSNSessions(Reports.report):
+    """ This shows MSN Session users. """
+    parameters = { 'fsimage':'fsimage' }
+    name = "Browse MSN Sessions"
+    family = "Network Forensics"
+    hidden = True
+    def form(self,query,result):
+        try:
+            result.case_selector()
+            result.meta_selector(case=query['case'],property='fsimage')
+        except KeyError:
+            pass
+
+    def display(self,query,result):
+        result.heading("MSN Chat sessions in %s " % query['fsimage'])
+        result.table(
+            columns = [ 'id','user'],
+            names = ['Session ID','Users'],
+            table = "msn_session_%s" % query['fsimage'],
             case = query['case']
             )
 
