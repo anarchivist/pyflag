@@ -220,7 +220,7 @@ def show_packets(query,result):
         row=dbh.fetch()
         con_id=row['con_id']
             
-    def show_data(value,result):
+    def show_data(value):
         length,packet_offset,packet_id = value.split(",")
         length=int(length)
         dbh.execute("select offset from pcap_%s where id=%s",(table,packet_id))
@@ -352,21 +352,21 @@ class StreamFile(File):
         result.seek(result_offset)
         result.write(data)
 
-    def read(self,len = None):
-        if len==None:
-            len=sys.maxint
+    def read(self,length = None):
+        if length==None:
+            length=sys.maxint
 
-        if len>self.size-self.readptr:
-            len=self.size-self.readptr
+        if length>self.size-self.readptr:
+            length=self.size-self.readptr
         ##Initialise the output buffer:
         result = cStringIO.StringIO()
 
         ## Find out which packets fall within the range of interest
-        self.dbh.execute("select * from connection_%s where con_id=%r and seq+length>=%r and seq<=%r",(
+        self.dbh.execute("select * from connection_%s where con_id=%r and seq+length>=%r and seq<=%r order by seq",(
             self.table,
             self.con_id,
             self.isn+self.readptr, ## Start of range
-            self.isn+self.readptr+len, ## End of range
+            self.isn+self.readptr+length, ## End of range
             ))
 
         for row in self.dbh:
@@ -374,7 +374,7 @@ class StreamFile(File):
             ## This is the case where we start reading half way
             ## through a packet
 
-            ##    row['seq']|--------->| row['len']
+            ##    row['seq']|--------->| row['length']
             ##      self.isn----->| readptr
             ##We are after  |<--->|
             if self.seq <= self.isn+self.readptr :
@@ -387,21 +387,21 @@ class StreamFile(File):
             ## LHS = Where the packet ends in the seq number space
             ## RHS = Where we want to stop reading
 
-            ##        row['seq']|------->| row['len']
-            ## self.isn--->readptr--->| len
+            ##        row['seq']|------->| row['length']
+            ## self.isn--->readptr--->| length
             ##     We are after |<--->|
-            if self.seq+row['length']>=self.isn+self.readptr+len:
-                end=self.isn + self.readptr + len - self.seq
+            if self.seq+row['length']>=self.isn+self.readptr+length:
+                end=self.isn + self.readptr + length - self.seq
 
-            ##    row['seq']|------->| row['len']
-            ## self.isn--->readptr------>| len
+            ##    row['seq']|------->| row['length']
+            ## self.isn--->readptr------>| length
             ## We are after |<------>|
             else:
                 end=row['length']
 
             ## We create the output buffer here:
             ## current packet         |<--->|  (begings at start+row[seq])
-            ## self.isn--->readptr|---------->| len
+            ## self.isn--->readptr|---------->| length
             ## Output buffer      |<--------->|
             ## We want the offset |<->|  for result_offset
          
@@ -416,7 +416,7 @@ class StreamFile(File):
         result.seek(0)
         data=result.read()
         result.close()
-        self.readptr+=len
+        self.readptr+=len(data)
         return data
 
     def seek(self,offset,rel=None):
@@ -430,6 +430,10 @@ class StreamFile(File):
             
         self.dbh.execute("select con_id,isn from connection_details_%s where inode=%r",(self.table,self.inode))
         row=self.dbh.fetch()
+        if not row:
+            self.dbh.execute("select con_id,isn from connection_details_%s where con_id=%r",(self.table,self.inode[1:]))
+            row=self.dbh.fetch()
+            
         con_id,isn = row['con_id'],row['isn']
         self.dbh.execute("""select packet_id from connection_%s where
                          con_id = %r and seq < (%r+%r) order by seq desc limit 1""",

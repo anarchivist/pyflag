@@ -24,19 +24,27 @@ config=pyflag.conf.ConfObject()
 from pyflag.Scanner import *
 import struct,sys,cStringIO
 import pyflag.DB as DB
-from pyflag.FileSystem import File
+from pyflag.FileSystem import CachedFile
 import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
 import pyflag.Reports as Reports
+import base64
+
+def get_temp_path(case,inode):
+    """ Returns the full path to a temporary file based on filename.
+    """
+    filename = inode.replace('/','-')
+    result= "%s/case_%s/%s" % (config.RESULTDIR,case,filename)
+    return result
 
 class message:
     """ A class representing the message """
-    def __init__(self,fp, dbh,table,fd):
-        self.fp=fp
+    def __init__(self,dbh,table,fd,ddfs):
         self.dbh=dbh
         self.table=table
         self.fd=fd
+        self.ddfs = ddfs
         self.client_id=''
         self.session_id = -1
 
@@ -45,7 +53,7 @@ class message:
         fp, thereby consuming it"""
         
         # Read the first command:
-        self.cmdline=self.fp.readline()
+        self.cmdline=self.fd.readline()
         if len(self.cmdline)==0: raise IOError("Unable to command from stream")
 
         try:
@@ -56,12 +64,12 @@ class message:
         ## Dispatch the command handler
         try:
             return getattr(self,self.cmd)()
-        except AttributeError:
+        except AttributeError,e:
+            print "Unable to handle command %r" % self.cmd
             return None
-#            return "Oops, command %s not understood" % self.cmdline
-        
+
     def get_data(self):
-        return "\n".join(self.msg_array[self.header_offset+1:])
+        return self.data
 
     def NLN(self):
         """ Notifies Client when users go offline or online state changes """
@@ -71,24 +79,20 @@ class message:
         """ Parse the contents of the headers """
         words = self.cmdline.split()
         self.length = int(words[-1])
-        self.offset = self.fp.tell()
-        data = self.fp.read(self.length)
+        self.offset = self.fd.tell()
         self.headers = {}
-        
-        self.msg_array = data.splitlines()
-        ## This is the offset after which the data starts and before which
-        ## the headers start
-        self.header_offset = len(self.msg_array)
-        for i in range(len(self.msg_array)):
-            if len(self.msg_array[i])==0:
-                self.header_offset=i
-                break
-            
+        ## Read the headers:
+        while 1:
+            line = self.fd.readline()
+            if line =='\r\n': break
             try:
-                header,value = self.msg_array[i].split(":")
+                header,value = line.split(":")
                 self.headers[header.lower()]=value.lower().strip()
             except ValueError:
                 pass
+
+        current_position = self.fd.tell()
+        self.data = self.fd.read(self.length-(current_position-self.offset))
 
     def ANS(self):
         """ Logs into the Switchboard session.
@@ -117,6 +121,78 @@ class message:
                          (self.table,self.session_id, words[1]))
                          
     # print "%s joins session %s" % (words[1],self.session_id)
+
+    def plain_handler(self,content_type,sender,friendly_sender):
+        """ A handler for content type text/plain """
+        ## Try to find the time stamp of this request:
+        packet_id = self.fd.get_packet_id(position=self.offset)
+        self.dbh.execute("select ts_sec from pcap_%s where id = %s "
+                         ,(self.table,packet_id))
+        row = self.dbh.fetch()
+        timestamp = row['ts_sec']
+
+        self.dbh.execute(""" insert into msn_messages_%s set sender=%r,friendly_name=%r,
+        inode=%r, packet_id=%r, content_type=%r, data=%r, ts_sec=%r, session=%r
+        """,(
+            self.table,sender,friendly_sender,self.fd.inode, packet_id,
+            content_type,self.get_data(), timestamp, self.session_id
+            ))
+
+    def p2p_handler(self,content_type,sender,friendly_sender):
+        """ Handle a p2p transfer """
+        data = self.get_data()
+        ## Now we break out the header:
+        ( channel_sid, id, offset, total_data_size, message_size ) = struct.unpack(
+            "IIQQI",data[:4+4+8+8+4])
+#        print "channel_sid %s, id %s, offset %s, total_data_size %s, message_size %s, packet_id %s" % (channel_sid, id, offset, total_data_size, message_size, self.fd.get_packet_id(self.offset))
+        data = data[48:48+message_size]
+        
+        ## When channel session id is 0 we are negotiating a transfer
+        ## channel
+        if channel_sid==0:
+            fd = cStringIO.StringIO(data)
+            request_type=fd.readline()
+            if request_type.startswith("INVITE"):
+                ## We parse out the invite headers here:
+                headers = {}
+                while 1:
+                    line = fd.readline()
+                    if not line: break
+                    tmp = line.find(":")
+                    key,value = line[:tmp],line[tmp+1:]
+                    headers[key.lower()]=value.strip()
+
+                context = base64.decodestring(headers['context'])
+                self.dbh.execute("insert into msn_p2p_%s set session_id = %r, channel_id = %r, to_user= %r, from_user= %r, context=%r",
+                                 (self.table,self.session_id,headers['sessionid'],
+                                  headers['to'],headers['from'],context))
+
+                ## Add a VFS entry for this file:
+                path=self.ddfs.lookup(inode=self.fd.inode)
+                path=os.path.dirname(path)
+                new_inode = "CMSN%s-%s" % (headers['sessionid'],self.session_id)
+                ## Parse the context line:
+                parser = ContextParser()
+                parser.feed(context)
+                ## The filename and size is given in the context
+                self.ddfs.VFSCreate(None,new_inode, "%s/MSN/%s" %
+                                    (path, parser.context_meta_data['location']),
+                                    size=parser.context_meta_data['size'])
+
+        ## We have a real channel id so this is an actual file:
+        else:
+            filename = get_temp_path(self.dbh.case,"MSN%s-%s" % (channel_sid,self.session_id))
+            fd=os.open(filename,os.O_RDWR | os.O_CREAT)
+            os.lseek(fd,offset,0)
+            bytes = os.write(fd,data)
+            if bytes <message_size:
+                print "Unable to write as much data as needed into MSN p2p file. Needed %s, write %d." %(message_size,bytes)
+            os.close(fd)
+            
+    ct_dispatcher = {
+        'text/plain': plain_handler,
+        'application/x-msnmsgrp2p': p2p_handler,
+        }
             
     def MSG(self):
         """ Sends message to members of the current session
@@ -132,10 +208,11 @@ class message:
         words = self.cmdline.split()
         try:
             ## If the second word is a transaction id (int) its a message from client to server
-            int(words[1])
+            tid = int(words[1])
             sender = "%s (Target)" % self.client_id
             friendly_sender = "Implied Client Machine"
         except ValueError:
+            tid = 0
             sender = words[1]
             friendly_sender = words[2]
 
@@ -144,37 +221,24 @@ class message:
         except:
             content_type = "unknown/unknown"
 
-        ## Now we try to find the time stamp of this request:
-        packet_id = self.fp.get_packet_id(position=self.offset)
-        self.dbh.execute("select ts_sec from pcap_%s where id = %s "
-                         ,(self.table,packet_id))
-        row = self.dbh.fetch()
-        timestamp = row['ts_sec']
-
-        self.dbh.execute(""" insert into msn_messages_%s set sender=%r,friendly_name=%r,
-        inode=%r, packet_id=%r, content_type=%r, data=%r, ts_sec=%r, session=%r
-        """,(
-            self.table,sender,friendly_sender,self.fp.inode, packet_id,
-            content_type,self.get_data(), timestamp, self.session_id
-            ))
+        ## Now dispatch the relevant handler according to the content
+        ## type:
+        try:
+            ct = content_type.split(';')[0]
+            self.ct_dispatcher[ct](self,content_type,sender,friendly_sender)
+        except KeyError:
+            print "Unable to handle content-type %s - ignoring message %s " % (content_type,tid)
             
     def OUT(self):
         """ Ends a session """
         print "Ended session"
 
-def parse_msg(data):
-    """ Parses a message out of data """
-    fp = cStringIO.StringIO(data)
-    m = message(fp)
-    while 1:
-        try:
-            result = m.parse()
-            if result:
-                print result
-        except IOError:
-            break
+from HTMLParser import HTMLParser
 
-    return result
+class ContextParser(HTMLParser):
+    """ This is a simple parser to parse the MSN Context line """
+    def handle_starttag(self, tag, attrs):
+        self.context_meta_data = FlagFramework.query_type(attrs)
 
 class MSNScanner(NetworkScanFactory):
     """ Collect information about MSN Instant messanger traffic """
@@ -197,7 +261,16 @@ class MSNScanner(NetworkScanFactory):
             `id` INT,
             `user` VARCHAR( 250 ) NOT NULL
             )""",(self.table,))
-        
+        self.dbh.execute(
+            """ CREATE TABLE if not exists `msn_p2p_%s` (
+            `inode` VARCHAR(250),
+            `session_id` INT,
+            `channel_id` INT,
+            `to_user` VARCHAR(250),
+            `from_user` VARCHAR(250),
+            `context` VARCHAR(250)
+            )""",(self.table,))
+            
         self.msn_connections = {}
 
     class Scan(NetworkScanner):
@@ -209,33 +282,40 @@ class MSNScanner(NetworkScanFactory):
                 request = self.proto_tree['msnms']
                 dest_port = self.proto_tree['tcp.dstport'].value()
 
-                if dest_port==1863:
-                    self.outer.msn_connections[metadata['inode']]=1
+                self.outer.msn_connections[metadata['inode']]=1
             except KeyError:
                 pass
 
         def finish(self):
             for key in self.outer.msn_connections.keys():
-                forward_stream = key[1:]
-
-                reverse_stream = find_reverse_stream(
-                    forward_stream,self.table,self.dbh)
-
-                if reverse_stream:
-                    combined_inode = "S%s/%s" % (forward_stream,reverse_stream)
-                else:
-                    combined_inode = "S%s" % (forward_stream)
-                    
-                logging.log(logging.DEBUG,"Openning %s for MSN Scanner" % combined_inode)
-                ## We open the file and scan it for emails:
-                fd = self.ddfs.open(inode=combined_inode)
-                m=message(fd,self.dbh,self.table,fd)
+                ## First parse the forward stream
+                fd = self.ddfs.open(inode=key)
+                m=message(self.dbh,self.table,fd,self.ddfs)
                 while 1:
                     try:
                         result=m.parse()
                     except IOError:
-                        break        
-
+                        break
+                    
+                
+class MSNFile(CachedFile):
+    """ VFS driver for reading the cached MSN files """
+    specifier = 'C'
+    
+    def __init__(self,case, table, fd, inode):
+        File.__init__(self, case, table, fd, inode)
+        ## Figure out the filename
+        cached_filename = get_temp_path(case,inode[1:])
+        print "Getting file %s" % cached_filename
+        ## open the previously cached copy
+        self.cached_fd = open(cached_filename,'r')
+        
+        ## Find our size:
+        self.cached_fd.seek(0,2)
+        self.size=self.cached_fd.tell()
+        self.cached_fd.seek(0)
+        self.readptr=0
+    
 class BrowseMSNChat(Reports.report):
     """ This allows MSN chat messages to be browsed. """
     parameters = { 'fsimage':'fsimage' }
