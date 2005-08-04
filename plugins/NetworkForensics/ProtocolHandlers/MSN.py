@@ -1,4 +1,11 @@
-""" This module implements processing for MSN Instant messager traffic """
+""" This module implements processing for MSN Instant messager traffic
+
+Most of the information for this protocol was taken from:
+http://www.hypothetic.org/docs/msn/ietf_draft.txt
+http://www.hypothetic.org/docs/msn/client/file_transfer.php
+http://www.hypothetic.org/docs/msn/notification/authentication.php
+
+"""
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
@@ -29,6 +36,7 @@ import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
 import pyflag.Reports as Reports
+import pyflag.logging as logging
 import base64
 
 def get_temp_path(case,inode):
@@ -57,7 +65,14 @@ class message:
         if len(self.cmdline)==0: raise IOError("Unable to command from stream")
 
         try:
-            self.cmd = self.cmdline.split()[0]
+            ## We take the last 3 letters of the line as the
+            ## command. If we lose sync at some point, readline will
+            ## resync up to the next command automatically
+            self.cmd = self.cmdline.split()[0][-3:]
+
+            ## All commands are in upper case - if they are not we
+            ## must have lost sync:
+            if self.cmd != self.cmd.upper() or not self.cmd.isalpha(): return None
         except IndexError:
             return ''
 
@@ -65,15 +80,11 @@ class message:
         try:
             return getattr(self,self.cmd)()
         except AttributeError,e:
-            print "Unable to handle command %r" % self.cmd
+            logging.log(logging.VERBOSE_DEBUG,"Unable to handle command %r from line %s" % (self.cmd,self.cmdline.split()[0]))
             return None
 
     def get_data(self):
         return self.data
-
-    def NLN(self):
-        """ Notifies Client when users go offline or online state changes """
-        print "NLN changed"
 
     def parse_mime(self):
         """ Parse the contents of the headers """
@@ -106,22 +117,19 @@ class message:
                              (self.table,self.session_id, words[2]))
             ## This stores the current clients username
             self.client_id = words[2]
-            print "%s has logged into a session id %s" % (words[2],self.session_id)
+            logging.log(logging.DEBUG, "MSN: %s has logged into a session id %s" % (words[2],self.session_id))
         except: pass
 
     def IRO(self):
         words = self.cmdline.split()
         self.dbh.execute("insert into msn_session_%s set id=%r, user=%r",
                          (self.table,self.session_id, words[4]))
-#        print "%s belongs to session %s" % (words[4],self.session_id)
 
     def JOI(self):
         words = self.cmdline.split()
         self.dbh.execute("insert into msn_session_%s set id=%r, user=%r",
                          (self.table,self.session_id, words[1]))
                          
-    # print "%s joins session %s" % (words[1],self.session_id)
-
     def plain_handler(self,content_type,sender,friendly_sender):
         """ A handler for content type text/plain """
         ## Try to find the time stamp of this request:
@@ -132,10 +140,10 @@ class message:
         timestamp = row['ts_sec']
 
         self.dbh.execute(""" insert into msn_messages_%s set sender=%r,friendly_name=%r,
-        inode=%r, packet_id=%r, content_type=%r, data=%r, ts_sec=%r, session=%r
+        inode=%r, packet_id=%r, data=%r, ts_sec=%r, session=%r
         """,(
             self.table,sender,friendly_sender,self.fd.inode, packet_id,
-            content_type,self.get_data(), timestamp, self.session_id
+            self.get_data(), timestamp, self.session_id
             ))
 
     def p2p_handler(self,content_type,sender,friendly_sender):
@@ -144,7 +152,8 @@ class message:
         ## Now we break out the header:
         ( channel_sid, id, offset, total_data_size, message_size ) = struct.unpack(
             "IIQQI",data[:4+4+8+8+4])
-#        print "channel_sid %s, id %s, offset %s, total_data_size %s, message_size %s, packet_id %s" % (channel_sid, id, offset, total_data_size, message_size, self.fd.get_packet_id(self.offset))
+
+        ## MSN header is 48 bytes long
         data = data[48:48+message_size]
         
         ## When channel session id is 0 we are negotiating a transfer
@@ -186,7 +195,7 @@ class message:
             os.lseek(fd,offset,0)
             bytes = os.write(fd,data)
             if bytes <message_size:
-                print "Unable to write as much data as needed into MSN p2p file. Needed %s, write %d." %(message_size,bytes)
+                logging.log(logging.WARNINGS,  "Unable to write as much data as needed into MSN p2p file. Needed %s, write %d." %(message_size,bytes))
             os.close(fd)
             
     ct_dispatcher = {
@@ -227,12 +236,8 @@ class message:
             ct = content_type.split(';')[0]
             self.ct_dispatcher[ct](self,content_type,sender,friendly_sender)
         except KeyError:
-            print "Unable to handle content-type %s - ignoring message %s " % (content_type,tid)
+            logging.log(logging.VERBOSE_DEBUG, "Unable to handle content-type %s - ignoring message %s " % (content_type,tid))
             
-    def OUT(self):
-        """ Ends a session """
-        print "Ended session"
-
 from HTMLParser import HTMLParser
 
 class ContextParser(HTMLParser):
@@ -249,7 +254,6 @@ class MSNScanner(NetworkScanFactory):
             """CREATE TABLE if not exists `msn_messages_%s` (
             `sender` VARCHAR( 250 ) NOT NULL ,
             `friendly_name` VARCHAR( 255 ) NOT NULL ,
-            `content_type` VARCHAR( 50 ) NOT NULL ,
             `inode` VARCHAR(50) NOT NULL,
             `packet_id` INT,
             `session` INT,
@@ -306,7 +310,6 @@ class MSNFile(CachedFile):
         File.__init__(self, case, table, fd, inode)
         ## Figure out the filename
         cached_filename = get_temp_path(case,inode[1:])
-        print "Getting file %s" % cached_filename
         ## open the previously cached copy
         self.cached_fd = open(cached_filename,'r')
         
@@ -334,7 +337,6 @@ class BrowseMSNChat(Reports.report):
             columns = [ 'from_unixtime(ts_sec)','packet_id','session','sender','data'],
             names = ['Time Stamp','Packet','Session','Sender Nick','Text'],
             table = "msn_messages_%s" % query['fsimage'],
-            where = "content_type like 'text/plain%' ",
             links = [None,
                      FlagFramework.query_type((),
                                               family="Network Forensics", case=query['case'],

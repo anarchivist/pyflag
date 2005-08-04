@@ -82,6 +82,11 @@ class StreamReassembler(NetworkScanFactory):
             We dissect it and add it to the connection table.
             """
             NetworkScanner.process(self,data,metadata)
+            try:
+                self.proto_tree['icmp']
+                return
+            except KeyError:
+                pass
 
             ## See if we can find what we need in this packet
             try:
@@ -149,6 +154,7 @@ class StreamReassembler(NetworkScanFactory):
             ## We consider anything that follows the tcp header as
             ## data belonging to the stream:
             packet_offset = tcp_node.start()+tcp_node.length()
+            metadata['packet_offset'] = packet_offset
 
             self.dbh.execute("insert into connection_%s set con_id=%r,packet_id=%r,seq=%r,length=%r,packet_offset=%r",(self.table,con_id,packet_id,seq,length,packet_offset))
 
@@ -436,7 +442,7 @@ class StreamFile(File):
             
         con_id,isn = row['con_id'],row['isn']
         self.dbh.execute("""select packet_id from connection_%s where
-                         con_id = %r and seq < (%r+%r) order by seq desc limit 1""",
+                         con_id = %r and seq <= (%r+%r) order by seq desc, length desc limit 1""",
                          (self.table, con_id, isn, position))
         row=self.dbh.fetch()
         return row['packet_id']

@@ -32,11 +32,18 @@ ERRORS=1
 WARNINGS=2
 INFO=3
 DEBUG=7
+VERBOSE_DEBUG=12
 RING_BUFFER_SIZE=20
 
 ring_buffer = []
 
-lookup = { ERRORS: "Critical Error", WARNINGS: "Warning", INFO:"Infomation",DEBUG:"Debug"}
+lookup = {
+    ERRORS: "Critical Error",
+    WARNINGS: "Warning",
+    INFO:"Infomation",
+    DEBUG:"Debug",
+    VERBOSE_DEBUG: "Debug++",
+    }
 
 def log(level,message):
     """ Prints the message out only if the configured verbosity is higher than the message's level."""
