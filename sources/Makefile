@@ -1,6 +1,6 @@
 # This makefile patches and compiles the relevant sources
 BIN		= ../bin/
-SLEUTHKIT	= sleuthkit-2.01
+SLEUTHKIT	= sleuthkit-2.02
 ## If ethereal should be compiled statically
 STATIC		= yes
 PLOTICUS	= pl231src

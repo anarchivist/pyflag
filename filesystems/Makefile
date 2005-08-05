@@ -2,7 +2,7 @@ include $(TOPLEVEL)/Makefile.in
 
 SLEUTHKITSRC = "$(shell find ../sources/ -name sleuthkit\* -type d | head -n1 )"/src/fstools/
 
-SRC = dbtool.c
+SRC = dbtool.c fatfs_dent.c
 
 all:
 	if [ ! -d $(SLEUTHKITSRC) ] ; then echo -e \\n\\n Unable to find sleuthkit sources... Please download the latest sleuthkit sources and place in $(TOPLEVEL)/sources; false; fi

@@ -55,7 +55,7 @@ void print_dent2(FILE *hFile, FS_DENT *fs_dent, int flags, FS_INFO *fs,
   FS_DATA *fs_data);
 
 static u_int8_t
-print_inode(FS_INFO *fs, INUM_T inum, FS_INODE *fs_inode, int flags,
+print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
 			        char *unused_context);
 void print_sql_string(FILE *fh, const unsigned char *ptr, int length);
 
@@ -186,7 +186,7 @@ void usage(char *myProg) {
     	printf("\t-f fstype: Image file system type\n");
     	printf("\t-d (create|drop): Print create of drop table strings\n");
 	printf("Supported file system types:\n");
-	fs_print_types();
+	fs_print_types(stderr);
 
 	exit(1);
 }
@@ -356,7 +356,7 @@ print_dent2(FILE *hFile, FS_DENT *fs_dent, int flags, FS_INFO *fs,
  * call back action function for inode_walk
  */
 static u_int8_t
-print_inode(FS_INFO *fs, INUM_T inum, FS_INODE *fs_inode, int flags,
+print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
 			        char *unused_context)
 {
   time_t dtime = 0;
@@ -410,7 +410,7 @@ print_inode(FS_INFO *fs, INUM_T inum, FS_INODE *fs_inode, int flags,
 					RUN *ptr;
 
 					run.addr = -1;
-					run.inum = inum;
+					run.inum = fs_inode->addr;
 					run.type = fs_data->type;
 					run.id = fs_data->id;
 					run.next = NULL;
@@ -419,7 +419,7 @@ print_inode(FS_INFO *fs, INUM_T inum, FS_INODE *fs_inode, int flags,
 					printf("INSERT INTO inode_%s VALUES('D%lu-%d-%d','%c','%d','%d','%lu'," \
 					       "'%lu','%lu',%lu,'%lo','%d','%s','%lu');\n",
 					       tbl_name,
-					       (ULONG) inum, fs_data->type, fs_data->id,
+					       (ULONG) fs_inode->addr, fs_data->type, fs_data->id,
 					       (flags & FS_FLAG_META_ALLOC) ? 'a' : 'f',
 					       (int) fs_inode->uid, (int) fs_inode->gid,
 					       (ULONG) fs_inode->mtime, (ULONG) fs_inode->atime,
@@ -431,7 +431,7 @@ print_inode(FS_INFO *fs, INUM_T inum, FS_INODE *fs_inode, int flags,
 					     FS_FLAG_FILE_AONLY | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOSPARSE | FS_FLAG_FILE_NOABORT,
 	 	              			(FS_FILE_WALK_FN) print_addr, (char *)&ptr);
 		
-					print_blocks(inum, fs_data->type, fs_data->id, &run);
+					print_blocks(fs_inode->addr, fs_data->type, fs_data->id, &run);
 	 		       	}
 			}
 			fs_data = fs_data->next;
@@ -442,7 +442,7 @@ print_inode(FS_INFO *fs, INUM_T inum, FS_INODE *fs_inode, int flags,
 	  printf("INSERT INTO inode_%s VALUES('D%lu','%c','%d','%d','%lu'," \
 		 "'%lu','%lu',%lu,'%lo','%d','%s','%lu');\n",
 		 tbl_name,
-		 (ULONG) inum, (flags & FS_FLAG_META_ALLOC) ? 'a' : 'f',
+		 (ULONG) fs_inode->addr, (flags & FS_FLAG_META_ALLOC) ? 'a' : 'f',
 		 (int) fs_inode->uid, (int) fs_inode->gid,
 		 (ULONG) fs_inode->mtime, (ULONG) fs_inode->atime,
 		 (ULONG) fs_inode->ctime, (ULONG) dtime,
@@ -460,7 +460,7 @@ print_inode(FS_INFO *fs, INUM_T inum, FS_INODE *fs_inode, int flags,
 			  (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOSPARSE | FS_FLAG_FILE_NOABORT),
 			  (FS_FILE_WALK_FN) print_addr, (char *)&ptr);
 	    
-	    print_blocks(inum, 0, 0, &run);
+	    print_blocks(fs_inode->addr, 0, 0, &run);
 	  }
 	}
 
