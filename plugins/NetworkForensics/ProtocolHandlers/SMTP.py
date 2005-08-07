@@ -127,6 +127,7 @@ class SMTPScanner(NetworkScanFactory):
     This is an example of a scanner which uses the Ethereal packet dissection, as well as the result of the Stream reassembler.
     """
     default = True
+    depends = ['StreamReassembler']
 
     def prepare(self):
         ## This table simply stores the fact that a certain Inode is
@@ -149,6 +150,8 @@ class SMTPScanner(NetworkScanFactory):
                 pass
 
         def finish(self):
+            if not NetworkScanner.finish(self): return
+            
             for key in self.outer.smtp_connections.keys():
                 forward_stream = key[1:]
                 reverse_stream = find_reverse_stream(

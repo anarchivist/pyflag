@@ -43,6 +43,14 @@ class PstScan(GenScanFactory):
     """ Recurse into Pst Files """
     default = True
     order=99
+    depends = ['TypeScan']
+
+    class Drawer(Scanner.Drawer):
+        description = "Windows Related Scanners"
+        name = "Windows Scanners"
+        contains = [ 'PstScan','IEIndex', 'RegistryScan']
+        default = True
+        
     def __init__(self,dbh, table,fsfd):
         self.dbh=dbh
         self.table=table

@@ -94,66 +94,18 @@ class BrowseFS(Reports.report):
                 )
 
         def tree_view(query,result):
-            # FIXME: This should be fixed to install the toolbar in the tree cb only...
-            # default to tree view
             if (query.has_key("open_tree") and query['open_tree'] != '/'):
                 br = query['open_tree']
             else:
                 br = '/'
-
-            def scan_popup(query,result):
-                try:
-                    if query["refresh"]:
-                        ## Actually scan this file:
-
-                        scanners = [ ]
-                        for i in query.getarray('scan'):
-                            try:
-                                tmp  = Registry.SCANNERS.dispatch(i)
-                                scanners.append(tmp(dbh,query['fsimage'],fsfd))
-                            except Exception,e:
-                                logging.log(logging.ERRORS,"Unable to initialise scanner %s" % e)
-
-                        ## Prepare the scanner factories for scanning:
-                        for s in scanners:
-                            s.prepare()
-
-                        def process_directory(root):
-                            ## First scan all the files in the directory
-                            for stat in fsfd.longls(path=root,dirs=0):
-                                try:
-                                    fd=fsfd.open(inode=stat['inode'])
-                                    Scanner.scanfile(fsfd,fd,scanners)
-                                except Exception,e:
-                                    logging.log(logging.ERRORS,"Unable to open file %s: %s" % (stat['inode'],e))
-
-                            ## Now recursively scan all the directories in this directory:
-                            for directory in fsfd.ls(path=root,dirs=1):
-                                new_path = "%s%s/" % (root,directory)
-                                process_directory(new_path)
-
-                        process_directory(FlagFramework.normpath(br+'/'))
-                        
-                        ## Return to the original page
-                        del query['refresh']
-                        del query['callback_stored']
-                        del query['scan']
-                        result.refresh(0,query,parent=1)
-                        return
-                except KeyError:
-                    pass
-
-                result.heading("Scan all files under this branch")
-                result.ruler()
-                result.start_form(query,refresh="parent")
-                result.start_table()
-                ScannerUtils.draw_scanners(query,result)
-                result.end_table()
-                result.end_form()
-                result.decoration='naked'
-
-#            tmp = result.__class__(result)
-            main_result.toolbar(scan_popup,"Scan this directory",icon="examine.png")
+                
+            if not query.has_key('open_tree'): query['open_tree']='/'
+            main_result.toolbar(text="Scan this directory",icon="examine.png",
+                    link=FlagFramework.query_type((),
+                      family="Load Data", report="ScanFS",
+                      path=query['open_tree'],
+                      fsimage=query['fsimage'],case=query['case'],
+                    ))
 
             def tree_cb(branch):
                 path =FlagFramework.normpath('/'.join(branch)+'/')
@@ -231,47 +183,13 @@ class ViewFile(Reports.report):
         ## This fails in cases where the File object does not know its own size in advance (e.g. Pst).
 ##                       ("Content-Length",filesize)]
 
-        ## Create a popup to allow scanning of this file:
-        def scan_popup(query,result):
-            try:
-                if query["refresh"]:
-                    ## Actually scan this file:
-
-                    scanners = [ ]
-                    for i in query.getarray('scan'):
-                        try:
-                            tmp  = Registry.SCANNERS.dispatch(i)
-                            scanners.append(tmp(dbh,query['fsimage'],fsfd))
-                        except Exception,e:
-                            logging.log(logging.ERRORS,"Unable to initialise scanner %s" % e)
-
-                    ## Prepare the scanner factories for scanning:
-                    for s in scanners:
-                        s.prepare()
-                        
-                    print "Will now scan inode %s with %s" % (query['inode'],scanners)
-                    fd.seek(0)
-                    Scanner.scanfile(fsfd,fd,scanners)
-                    
-                    ## Return to the original page
-                    del query['refresh']
-                    del query['callback_stored']
-                    del query['scan']
-                    result.refresh(0,query,options={'parent':1})
-                    return
-            except KeyError:
-                pass
-                
-            result.heading("Scan this file")
-            result.ruler()
-            result.start_form(query,refresh="parent")
-            result.start_table()
-            ScannerUtils.draw_scanners(query,result)
-            result.end_table()
-            result.end_form()
-#            result.display = result.__str__
-
-        result.toolbar(scan_popup,"Scan this File",icon="examine.png")
+        result.toolbar(text="Scan this File",icon="examine.png",
+                   link=FlagFramework.query_type((),
+                      family="Load Data", report="ScanFS",
+                      path=fsfd.lookup(inode=query['inode']),
+                      fsimage=query['fsimage'],case=query['case'],
+                       )
+                   )
 
         result.heading("Viewing file in inode %s" % (query['inode']))
         try:

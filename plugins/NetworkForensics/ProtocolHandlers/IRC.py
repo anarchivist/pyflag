@@ -33,8 +33,9 @@ import pyflag.logging as logging
 import cStringIO,re
 
 class IRCScanner(NetworkScanFactory):
-    """ Collect information about MSN Instant messanger traffic """
+    """ Collect information about IRC traffic """
     default = True
+    depends = ['StreamReassembler']
     
     def prepare(self):
         self.dbh.execute(
@@ -163,6 +164,8 @@ class IRCScanner(NetworkScanFactory):
                 return
 
         def finish(self):
+            if not NetworkScanner.finish(self): return
+            
             for key in self.outer.irc_connections.keys():
                 forward_stream = key[1:]
                 reverse_stream = find_reverse_stream(
@@ -204,9 +207,9 @@ class BrowseIRCChat(Reports.report):
                 base_stream_inode = value
                 
             tmp.link(value,target = FlagFramework.query_type((),
-                                                             family='Disk Forensics', case=query['case'],
-                                                             fsimage=query['fsimage'], inode=base_stream_inode,
-                                                             report='View File Contents', mode="Combined streams"
+                    family='Disk Forensics', case=query['case'],
+                    fsimage=query['fsimage'], inode=base_stream_inode,
+                    report='View File Contents', mode="Combined streams"
                                                              ))
             return tmp
 
@@ -218,14 +221,14 @@ class BrowseIRCChat(Reports.report):
 #            callbacks = { 'Stream':  Stream_cb },
             links = [None, None,
                      FlagFramework.query_type((),
-                                              family='Disk Forensics', case=query['case'],
-                                              fsimage=query['fsimage'], __target__='inode',
-                                              report='View File Contents', mode="Combined streams"
-                                              ),
+                        family='Disk Forensics', case=query['case'],
+                        fsimage=query['fsimage'], __target__='inode',
+                        report='View File Contents', mode="Combined streams"
+                        ),
                      FlagFramework.query_type((),
-                                              family="Network Forensics", case=query['case'],
-                                              report='View Packet', fsimage=query['fsimage'],
-                                              __target__='id'),
+                        family="Network Forensics", case=query['case'],
+                        report='View Packet', fsimage=query['fsimage'],
+                        __target__='id'),
                      ],
             case = query['case']
             )

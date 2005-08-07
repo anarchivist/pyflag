@@ -45,6 +45,7 @@ import pyflag.Reports as Reports
 import pyflag.Registry as Registry
 import pyflag.IO as IO
 from pyflag.Scanner import *
+import pyflag.Scanner as Scanner
 import index,os,time
 import pyflag.conf
 config=pyflag.conf.ConfObject()
@@ -61,6 +62,13 @@ class IndexScan(GenScanFactory):
     ## Indexing must occur after all scanners have run.
     order=200
     default = True
+
+    class Drawer(Scanner.Drawer):
+        description = "General Forensics"
+        name = "General Forensics"
+        contains = ['IndexScan','MD5Scan','VirScan']
+        default = True
+    
     def __init__(self,dbh,table,fsfd):
         """ This creates the LogicalIndex table and initialised the index file """
         self.dbh=dbh

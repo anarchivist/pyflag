@@ -39,6 +39,8 @@ config=pyflag.conf.ConfObject()
 import pyflag.logging as logging
 import os,imp
 import re
+import pyflag.Registry as Registry
+import pyflag.DB as DB
 
 class BaseScanner:
     """ This is the actual scanner class that will be instanitated once for each file in the filesystem.
@@ -90,6 +92,11 @@ class GenScanFactory:
     """
     ## Should this scanner be on by default?
     default=False
+
+    ## This is a list of scanner names which we depend on. Depending
+    ## on a scanner will force it to be enabled whenever we are
+    ## enabled.
+    depends = []
     
     def __init__(self,dbh,table,fsfd):
         """ Factory constructor.
@@ -336,3 +343,122 @@ def scanfile(ddfs,fd,factories):
             o.finish()
         except Exception,e:
             logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
+
+
+class Drawer:
+    """ This class is responsible for rendering scanners of similar classes.
+
+    This class should be declared as an inner class of the scanner.
+    """
+    description = "Description of main scanner"
+    name = "name of main scanner"
+    contains = []
+    default = True
+
+    def get_group_name(self):
+        return "scangroup_%s" % self.name
+
+    def get_parameters(self):
+        for i in self.contains:
+            yield "scan_%s" % i,'onoff'
+
+    def add_defaults(self,dest_query,src_query):
+        """ Given a src_query object with some scan_ entries, we add
+        scan_ entries initialised to their default values until
+        the full contained set is represented.
+        """
+        try:
+            scan_group_name = self.get_group_name()
+
+            if src_query[scan_group_name]=='on':
+                for i in self.contains:
+                    cls = Registry.SCANNERS.dispatch(i)
+                    scan_name = 'scan_%s' % i
+                    del dest_query[scan_name]
+
+                    ## If i is not specified, we use the default for
+                    ## this scanner:
+                    if not src_query.has_key('scan_%s' % i):
+                        if cls.default:
+                            dest_query[scan_name]='on'
+                        else:
+                            dest_query[scan_name]='off'
+                    else:
+                        dest_query[scan_name]=src_query[scan_name]
+        except KeyError:
+            pass
+
+    def form(self,query,result):
+        left = result.__class__(result)
+        scan_group_name = self.get_group_name()
+
+        ## If there is no scan_group defined, we use the default value
+        if not query.has_key(scan_group_name):
+            if self.default:
+                query[scan_group_name]='on'
+                result.defaults[scan_group_name]='on'
+            else:
+                query[scan_group_name]='off'
+                result.defaults[scan_group_name]='off'
+
+        ## Add defaults for the scanners contained:
+        for i in self.contains:
+            cls = Registry.SCANNERS.dispatch(i)
+            if not query.has_key('scan_%s' % i):
+                if cls.default:
+                    result.hidden('scan_%s' % i,'on')
+                else:
+                    result.hidden('scan_%s' % i,'off')
+
+        def configure_cb(query,result):
+            try:
+                if query['refresh']:
+                    del query['refresh']
+                    del query['callback_stored']
+                    result.refresh(0,query,parent=1)
+            except KeyError:
+                pass
+
+            ## Draw the gui for all the classes we manage:
+            result.start_form(query,refresh="parent")
+            result.start_table()
+
+            self.add_defaults(query,query.clone())
+
+            for i in self.contains:
+                cls = Registry.SCANNERS.dispatch(i)                        
+                scanner_desc = cls.__doc__.splitlines()[0]
+
+                ## Add an enable/disable selector
+                result.const_selector(scanner_desc,"scan_%s" % i,[
+                    'on','off'],['Enabled','Disabled'] )
+
+            result.end_table()
+            result.end_form()
+
+
+        right=result.__class__(result)
+        right.popup(configure_cb,"Configure",icon="spanner.png")
+        left.row(right,self.description)
+        result.const_selector(left,
+                           scan_group_name,
+                           ['on','off'],['Enabled','Disabled'])
+
+class FSSpecialisedDrawer(Drawer):
+    """ A drawer which only draws the form if the current filesystem is derived from a given filesystem name """
+    special_fs_name = ''
+
+    def form(self,query,result):
+        """ It only makes sense to run these scanners when the
+        base filesystem is derived from the PCAPFS. Otherwise
+        we just hide these options.
+        """
+        dbh = DB.DBO(query['case'])
+        fstype = dbh.get_meta('fstype_%s' % query['fsimage'])
+        fs_class = Registry.FILESYSTEMS.filesystems[fstype]
+        if issubclass(fs_class,Registry.FILESYSTEMS.fs[self.special_fs_name]):
+            Drawer.form(self,query,result)
+        else:
+            result.hidden(self.get_group_name(),'off')
+            for i in self.contains:
+                result.hidden("scan_%s" % i,'off')

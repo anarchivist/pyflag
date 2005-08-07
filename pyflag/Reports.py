@@ -159,6 +159,7 @@ class report:
     executing = {}
 
     def __init__(self,flag,ui=None):
+        ## This is here to avoid circular dependancy
         import pyflag.TypeCheck as TypeCheck
         import pyflag.HTMLUI as UI
         if not ui: ui = UI.HTMLUI

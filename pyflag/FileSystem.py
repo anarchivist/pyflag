@@ -268,12 +268,13 @@ class DBFS(FileSystem):
                 self.dbh.execute("update inode_%s  set mode=%r, links=%r where inode=%r",(self.table,40755, 3,root_inode))
 
     def longls(self,path='/', dirs = None):
+        mode =''
         if(dirs == 1):
-            self.dbh.execute("select path,mode,inode,name from file_%s where path=%r and mode like 'd%%'", (self.table, path))
+            mode=" and mode like 'd%'"
         elif(dirs == 0):
-            self.dbh.execute("select path,mode,inode,name from file_%s where path=%r and mode like 'r%%'", (self.table, path))
-        else:
-            self.dbh.execute("select path,mode,inode,name from file_%s where path=%r", (self.table, path))
+            mode=" and mode like 'r%'"
+
+        self.dbh.execute("select path,mode,inode,name from file_%s where path=%r or (path=%r and name=%r) %s", (self.table, path,os.path.dirname(path),os.path.basename(path),mode))
 
         ## This is done rather than return the generator to ensure that self.dbh does not get interfered with...
         return [dent for dent in self.dbh]

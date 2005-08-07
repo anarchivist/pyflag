@@ -248,6 +248,7 @@ class ContextParser(HTMLParser):
 class MSNScanner(NetworkScanFactory):
     """ Collect information about MSN Instant messanger traffic """
     default = True
+    depends = [ 'StreamReassembler']
 
     def prepare(self):
         self.dbh.execute(
@@ -291,6 +292,8 @@ class MSNScanner(NetworkScanFactory):
                 pass
 
         def finish(self):
+            if not NetworkScanner.finish(self): return
+            
             for key in self.outer.msn_connections.keys():
                 ## First parse the forward stream
                 fd = self.ddfs.open(inode=key)

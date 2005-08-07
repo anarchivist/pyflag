@@ -69,9 +69,24 @@ class NetworkScanner(BaseScanner):
     ## Note that Storage is the same object across all NetworkScanners:
     store = Storage()
     proto_tree = {}
+
+    def finish(self):
+        """ Only allow scanners to operate on pcapfs inodes """
+        try:
+            if self.fd.link_type:
+                return True
+        except:
+            return False
     
     def process(self,data,metadata=None):
         """ Pre-process the data for all other network scanners """
+        try:
+            ## We may only scan network related filesystems like
+            ## pcapfs.
+            link_type = self.fd.link_type
+        except:
+            return
+        
         ## We try to get previously set proto_tree. We store it in
         ## a metadata structure so that scanners that follow us
         ## can reuse it. This ensure we do not un-necessarily
@@ -86,7 +101,7 @@ class NetworkScanner(BaseScanner):
             pyethereal.set_pref("tcp.analyze_sequence_numbers:false")
 
             ## Now dissect it.
-            self.proto_tree = pyethereal.Packet(data,self.packet_id,self.fd.link_type)
+            self.proto_tree = pyethereal.Packet(data,self.packet_id,link_type)
 
             ## Store it for the future
             metadata['proto_tree']={ self.packet_id: self.proto_tree }

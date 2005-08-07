@@ -44,6 +44,14 @@ class UnallocatedScan(GenScanFactory):
     """
     order=100
     default = False
+
+    class Drawer(Scanner.FSSpecialisedDrawer):
+        description = "Filesystem Specific Analysis"
+        name = "Filesystem Analysis"
+        contains = ['UnallocatedScan','DeletedScan']
+        default = True
+        special_fs_name = 'Ext2'
+        
     def reset(self):
         GenScanFactory.reset(self)
         self.dbh.execute("drop table if exists unallocated_%s" ,self.table)

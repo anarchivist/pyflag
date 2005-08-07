@@ -33,6 +33,8 @@ import pyflag.FlagFramework as FlagFramework
 class RegistryScan(GenScanFactory):
     """ Load in Windows Registry files """
     default = True
+    depends = ['TypeScan']
+    
     def __init__(self,dbh, table,fsfd):
         self.dbh=dbh
         self.table=table

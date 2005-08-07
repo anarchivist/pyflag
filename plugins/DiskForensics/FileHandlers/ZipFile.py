@@ -39,7 +39,8 @@ import gzip
 class ZipScan(GenScanFactory):
     """ Recurse into Zip Files """
     order=99
-    default = False
+    default = True
+    depends = 'TypeScan'
     
     def destroy(self):
         pass
@@ -76,7 +77,13 @@ class ZipScan(GenScanFactory):
 
 class GZScan(ZipScan):
     """ Decompress Gzip files """
-    
+
+    class Drawer(Scanner.Drawer):
+        description = "Compressed file support"
+        name = "Compressed File"
+        contains = ['GZScan','TarScan','ZipScan']
+        default = False
+        
     class Scan(ScanIfType):
         """ If we hit a gzip file, we just create a new Inode entry in the VFS """
         types = (
@@ -125,8 +132,9 @@ class GZScan(ZipScan):
 class TarScan(GenScanFactory):
     """ Recurse into Tar Files """
     order=99
-    default = False
-    
+    default = True
+    depends = [ 'TypeScan' ]
+
     def destroy(self):
         pass
     

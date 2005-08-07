@@ -1,3 +1,4 @@
+""" Utilities related to scanners """
 # Michael Cohen <scudette@users.sourceforge.net>
 # David Collett <daveco@users.sourceforge.net>
 #
@@ -20,15 +21,53 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 import pyflag.Registry as Registry
+import pyflag.logging as logging
+import pyflag.FlagFramework as FlagFramework
 
-def draw_scanners(query,result):
-    result.row("Choose Scanners to run:","",bgcolor='pink')
-    scanner_desc = [ i.__doc__.splitlines()[0] for i in Registry.SCANNERS.classes]
-    for i in range(len(scanner_desc)):
-        scanner_name = Registry.SCANNERS.scanners[i]
-        scanner_factory = Registry.SCANNERS.classes[i]
-        ## should the checkbox be ticked by default?
-        if scanner_name not in query.getarray('scan') and scanner_factory.default:
-            result.defaults['scan']=scanner_name
+def scan_groups_gen():
+    """ A Generator yielding all the scan groups (those scanners with
+    a Draw subclass)
+    """
+    for cls in Registry.SCANNERS.classes:
+        try:
+            drawer_cls = cls.Drawer
+        except AttributeError:
+            continue
 
-        result.checkbox(scanner_desc[i],"scan",scanner_name )
+        yield cls
+
+def ResetScanners(query):
+    ## FIXME : This is not currently working
+    """ Reset all the scanners specified in query """
+    iofd=IO.open(query['case'],query['iosource'])
+    fsfd=FileSystem.FS_Factory( query["case"], query["iosource"], iofd)
+
+    ## Instantiate all scanners for reset
+    scanners = [ i(dbh,query['iosource'],fsfd) for i in Registry.SCANNERS.classes ]
+
+    fsfd.resetscanfs(scanners)
+    dbh.execute("delete from meta where property=%r and value=%r",('fsimage',query['iosource']))
+    dbh.execute("delete from meta where property like 'scanfs_%s'",query['iosource'])
+
+    ## Here we remove from the meta table any reference to this report regardless of the scanners used:
+    del query['scan']
+    canonical_query = FlagFramework.canonicalise(query)
+    dbh.execute("delete from meta where property='report_executed' and value like '%s%%'",(canonical_query))
+
+def fill_in_dependancies(scanners):
+    """ Will add scanner names to scanners to satisfy all dependancies """
+    while 1:
+        modified = False
+
+        for s in scanners:
+            cls = Registry.SCANNERS.dispatch(s)
+            if type(cls.depends)==type(''):
+                d = [cls.depends]
+            else:
+                d = cls.depends
+            for dependancy in d:
+                if dependancy not in scanners:
+                    logging.log(logging.WARNINGS,"%s depends on %s, which was not enabled - enabling to satisfy dependancy" % (s,dependancy))
+                    scanners.append(dependancy)
+                    modified = True
+        if not modified: break

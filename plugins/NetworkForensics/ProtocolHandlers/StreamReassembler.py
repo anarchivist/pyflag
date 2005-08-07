@@ -44,6 +44,14 @@ class StreamReassembler(NetworkScanFactory):
     default = True
     order=5
 
+    class Drawer(Scanner.FSSpecialisedDrawer):
+        description = "Network Scanners"
+        name = "NetworkScanners"
+        contains = [ "IRCScanner", "MSNScanner", "HTTPScanner", "POPScanner","SMTPScanner","RFC2822" ]
+        default = True
+        special_fs_name = 'PCAPFS'
+
+            
     def prepare(self):
         ## We create the tables we need: The connection_details table
         ## stores information about each connection, while the
@@ -75,6 +83,7 @@ class StreamReassembler(NetworkScanFactory):
         self.dbh.execute("drop table connection_details_%s",(self.table,))
 
     class Scan(NetworkScanner):
+
         """ Each packet will cause a new instantiation of this class. """
         def process(self,data, metadata=None):
             """ We get a complete packet in data.
@@ -168,6 +177,8 @@ class StreamReassembler(NetworkScanFactory):
             metadata['stream_offset'] = seq-isn
 
         def finish(self):
+            if not NetworkScanner.finish(self): return
+            
             self.dbh.check_index("connection_%s" % self.table, 'con_id')
             ## Ensure that the connection_details table has indexes. We
             ## need the indexes because we are about to do lots of selects

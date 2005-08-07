@@ -35,7 +35,8 @@ class HTTPScanner(NetworkScanFactory):
     """ Collect information about HTTP Transactions.
     """
     default = True
-
+    depends = ['StreamReassembler']
+    
     def prepare(self):
         ## This stores a list of the inodes we discover during initial
         ## processing. Note that we are unable to rescan the newly
@@ -76,6 +77,8 @@ class HTTPScanner(NetworkScanFactory):
     def reset(self):
         self.dbh.execute("drop table if exists http_request_%s",(self.table,))
         self.dbh.execute("drop table if exists http_response_%s",(self.table,))
+
+    
 
     class Scan(NetworkScanner):
         def process(self,data,metadata=None):
@@ -175,6 +178,8 @@ class HTTPScanner(NetworkScanFactory):
 
         def finish(self):
             """ Rescan all the discovered inodes """
+            if not NetworkScanner.finish(self): return
+            
             for inode in self.outer.http_inodes:
                 try:
                     self.scan_as_file(inode)

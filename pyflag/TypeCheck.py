@@ -70,11 +70,15 @@ class TypeChecker:
 
         raise ReportInvalidParamter, "Type %s not recognised " % type
 
-    def metatype(self, type, field, query):
+    def metatype(self, type, field, query, case='query'):
         """ Test for matches against meta entries in the meta table """
         string = query[field]
 
-        dbh = DB.DBO(query['case'])
+        if not case:
+            dbh = DB.DBO(None)
+        else:
+            dbh = DB.DBO(query['case'])
+            
         dbh.execute("select * from meta where property=%r and value=%r",(type, string))
         if dbh.cursor.fetchone():
             return True
@@ -100,7 +104,7 @@ class TypeChecker:
 
     def flag_db(self,field,query):
         """ Tests to see if the string is a valid flag case database """
-        return self.metatype('flag_db', field, query)
+        return self.metatype('flag_db', field, query,case = None)
 
     def filename(self,field,query):
         """ Tests to see if the string is a valid filename within the upload dir """
@@ -177,3 +181,8 @@ class TypeChecker:
         """ A default type that accepts anything """
         pass
 
+    def onoff(self,field,query):
+        if query[field]=='on' or query[field]=='off':
+            return True
+        
+        raise ReportInvalidParamter("Field %s must be either 'on' or 'off'" % field)

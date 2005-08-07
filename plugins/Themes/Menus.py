@@ -65,7 +65,16 @@ class Menu(Theme.BasicTheme):
             report_list = Registry.REPORTS.family[k]
             for r in report_list:
                 if r.hidden: continue
-                result+='menu.addSubItem("%s", "%s","%s","%s","");' % (k,r.name,r.name,Theme.propegate(query,FlagFramework.query_type((),family=k,report=r.name)))
+                ## Only propegate if we stay within the same family:
+                try:
+                    if query['family']==k:
+                        result+='menu.addSubItem("%s", "%s","%s","%s","");' % (k,r.name,r.name,Theme.propegate(query,FlagFramework.query_type((),family=k,report=r.name)))
+                        continue
+                except KeyError:
+                    pass
+                
+                result+='menu.addSubItem("%s", "%s","%s","%s","");' % (k,r.name,r.name,FlagFramework.query_type((),family=k,report=r.name))
+                
 
         return result+"menu.showMenu(); }</script>"
 

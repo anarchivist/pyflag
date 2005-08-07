@@ -52,6 +52,10 @@ def canonicalise(query):
         raise FlagException,"No report or family in canonicalise query"
 
     report = Registry.REPORTS.dispatch(query['family'],query['report'])
+    ## We instantiate the report before we determine its parameters
+    ## list. This allows reports to have dynamic parameters list which
+    ## gets built in the __init__
+    report = report(None,None)
 
     tmp = []
     for x,y in query:
