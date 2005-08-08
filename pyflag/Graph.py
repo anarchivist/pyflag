@@ -32,7 +32,7 @@ The Abstract base class must be extended for implementation of graph drawing. Re
 
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import re
+import re,cStringIO
 
 import os,pipes
 
@@ -175,10 +175,12 @@ class Ploticus(GenericGraph):
 
 Graph = Ploticus
 
+## We use the python imaging library to manipulate all the images:
+import PIL.Image
+
 class Thumbnailer(Image):
     """ An image class to display thumbnails files.
     
-    Users of this class need to implement the Extract method, and an appropriate initialiser.
     This object is derived from the Image class, and knows how to create thumbnails of itself.
     Any type of object may be stored here and used in the UI.image method. The content type will be deduced automatically using magic.
 
@@ -186,28 +188,44 @@ class Thumbnailer(Image):
 
     @cvar dispatcher: A dictionary that manages access to the different thumbnail creation routines. The keys should be the relevant mime type, while the values are the string name of the method.
     """
-    def Extract(self):
-        """ Returns the original file as a binary string
-        @note: This function is a generator yielding a small amount on each call.
-        """
+    def __init__(self,fd,size_x):
+        """ fd is the image, size_x is the requested width of the image. The height will be calculated to preserve aspect ratio """
+        self.size_x = size_x
+        self.fd = fd
+        self.width = 0
+        self.height = 0
+        ## This stores a small amount of data to determine the magic
+        self.header = self.fd.read(1000)
+        self.fd.seek(0)
+        ## Calculate the magic of this file:
+            
+        import pyflag.FlagFramework as FlagFramework
+            
+        magic=FlagFramework.Magic(mode='mime')
+        self.content_type=magic.buffer(self.header)
+        magic=FlagFramework.Magic()
+        self.magic=magic.buffer(self.header)
 
-    def Extract_size(self,size):
-        """ Calls Extract until it obtains at least size bytes. """
-        result=''
-        for i in self.Extract():
-            result+=i
-            if len(result)>size:
-                break
+        ## Now use the magic to dispatch the correct handler:
+        ## Use the content type to access the thumbnail
+        try:
+            method=getattr(self,self.dispatcher[self.content_type])
+        except KeyError:
+            self.Unknown()
+            return
 
-        return result
+        method()
+
+        ## Note that handler are expected to set
+        ## self.width,self.height as well as self.thumbnail which
+        ## should be a generator to generate the thumbnail
 
     def set_image(self,name):
         """ Sets the thumbnail to a constant image """
-        fd = open("%s/%s" % (config.IMAGEDIR,name))
-        result = fd.read()
-        fd.close()
+        self.thumbnail = open("%s/%s" % (config.IMAGEDIR,name))
         self.content_type='image/png'
-        return result
+        self.width = self.size_x
+        self.height = 0
 
     def Unknown(self):
         """ Default handler """
@@ -221,100 +239,57 @@ class Thumbnailer(Image):
         """ Handle MSOffice Documents """
         return self.set_image("msoffice.png")
 
-    def MpegHandler(self):
-        """ Perform Video Thumbnailing with mplayer """
+##    def MpegHandler(self):
+##        """ Perform Video Thumbnailing with mplayer """
 
-        # try to create thumbnail
-        try:
-            mplayer = os.popen('cd /tmp; mplayer -vo png -ao null -frames 1 -', 'w')
-            mplayer.write(self.Extract_size(1000000))
-            mplayer.close()
-        except IOError:
-            pass
+##        # try to create thumbnail
+##        try:
+##            mplayer = os.popen('cd /tmp; mplayer -vo png -ao null -frames 1 -', 'w')
+##            mplayer.write(self.Extract_size(1000000))
+##            mplayer.close()
+##        except IOError:
+##            pass
 
-        try:
-            # see if the thumb was created
-            fd = open('/tmp/00000001.png')
-            result = fd.read()
-            fd.close()
-            try:
-                import glob
-                for i in glob.glob('/tmp/000*.png'):
-                    os.remove(i)
-            except OSError, e:
-                pass
-            self.content_type='image/png'
-            return result
-        except (IOError,OSError), e:
-            return self.set_image("broken.png")
+##        try:
+##            # see if the thumb was created
+##            fd = open('/tmp/00000001.png')
+##            result = fd.read()
+##            fd.close()
+##            try:
+##                import glob
+##                for i in glob.glob('/tmp/000*.png'):
+##                    os.remove(i)
+##            except OSError, e:
+##                pass
+##            self.content_type='image/png'
+##            return result
+##        except (IOError,OSError), e:
+##            return self.set_image("broken.png")
         
     def JpegHandler(self):
-        """ Handles Jpeg thumbnails
-
-        @arg data: binary string representing the image
+        """ Handles Jpeg thumbnails.
         """
-        try:
-            os.mkdir("%s/%s/" %(config.RESULTDIR,self.tempdir))
-        except OSError:
-            pass
+        print "Handling jpeg"
+        ## Calculate some basic statistics 
+        self.image = PIL.Image.open(self.fd)
+        ## Ask the imaging library to rescale us to the requested size:
+        self.width, self.height = self.image.size
+
+        ratio = float(self.width)/float(self.height)
         
-        #First try to see if the file is already there from last time.
-        try:
-            reader=open("%s/%s/%s.jpg" % (config.RESULTDIR,self.tempdir,self.temp_name),'r')
-            result = reader.read()
-            reader.close()
-            print "Read file from  cache %s/%s/%s.jpg" % (config.RESULTDIR,self.tempdir,self.temp_name)
-            return result
-        except IOError:
-            result=self.Extract_size(1000000)
-
-        r='1/1'
-        #Try to determine the best ratio - we want the thumbnail to be about 300 pixels wide:
-        if self.width:
-            print "Image width is %s we need 300" % self.width
-            self.ratio=300.0/int(self.width)
-            print "We need ratio %s" % self.ratio
-            possible_ratios = {1:'1/1',0.5:'1/2',0.25:'1/4',0.125:'1/8'}
-            fractions=possible_ratios.keys()
-            fractions.sort()
-            r=1
-            for i in range(len(fractions)):
-                if i>0 and fractions[i]>self.ratio:
-                    r=fractions[i-1]
-                    break
-
-            r=possible_ratios[r]
-            print "my ratio is %s" % r
-
-        #If the file is not there, make it.
-        try:
-            t = pipes.Template()
-            t.append("%s/djpeg -scale %s" % (config.FLAG_BIN,r),'--')
-            t.append("%s/cjpeg" % config.FLAG_BIN,'--')
-            writer = t.open("%s/%s/%s.jpg" % (config.RESULTDIR,self.tempdir,self.temp_name),'w')
-            writer.write(result)
-            writer.close()
-            print "Made file %s/%s/%s.jpg" % (config.RESULTDIR,self.tempdir,self.temp_name)
-        except IOError:
-            pass
-
-        #Now try to open it again
-        try:
-            reader=open("%s/%s/%s.jpg" % (config.RESULTDIR,self.tempdir,self.temp_name),'r')
-            result = reader.read()
-            reader.close()
-        except IOError:
-            pass        
-
-        #If that failed, just return the original file.
-        return result
+        self.image.thumbnail((self.size_x,self.size_x / ratio), PIL.Image.NEAREST)
+        self.thumbnail = cStringIO.StringIO()
+        self.image.save(self.thumbnail,self.image.format)
+        self.thumbnail.seek(0)
+        
+        self.width, self.height = self.image.size
 
     def Null(self):
         """ A do nothing method that just returns the original image as its thumbnail. """
-        return self.Extract_size(1000000)
+        self.thumbnail = self.fd
         
     dispatcher ={"image/jpg":"JpegHandler","image/jpeg":"JpegHandler",
-                 "image/png":"Null","image/gif":"Null",
+                 "image/png":"JpegHandler","image/gif":"JpegHandler",
 # commented out mplayer stuff cos its kinda slow, cool but...
 #                 "video/mpeg":"MpegHandler","video/x-msvideo":"MpegHandler",
 #                 "video/x-ms-asf":"MpegHandler",
@@ -323,105 +298,16 @@ class Thumbnailer(Image):
                  "application/msword":"MSOffice",
 		 "application/msaccess":"MSOffice",
                  }    
-    def __init__(self,tempdir,temp_name):
-        """ A do nothing constructor. Derived classes will want to extend this as they see fit. """
-        self.tempdir=tempdir
-        self.temp_name=temp_name
-        ## This will hold the output from identify
-        self.identify=""
-        self.width=0
-        self.height=0
-        self.ratio=1
- 
-    def display(self):
-        generator=self.Extract()
-        try:
-            self.data=generator.next()
-        except AttributeError:
-            self.data=generator
-            generator=()
-        except StopIteration:
-            self.data=''
-            generator=()
-            
-        import pyflag.FlagFramework as FlagFramework
-            
-        magic=FlagFramework.Magic(mode='mime')
-        self.content_type=magic.buffer(self.data)
-        magic=FlagFramework.Magic()
-        self.magic=magic.buffer(self.data)
-        try:
-            p_in,p_out = os.popen2("identify -")
-            p_in.write(self.data)
-            p_in.close()
-        
-            self.identify=p_out.read()
-            
-            ## Try to identify the size of the image
-            print "Identify string is %s" % self.identify
-            m=re.search("(\d+)x(\d+)",self.identify)
-            self.width=int(m.group(1))
-            self.height=int(m.group(2))
-        except:
-            pass
 
-        ## Use the content type to access the thumbnail
-        try:
-            method=getattr(self,self.dispatcher[self.content_type])
-            return method()
-        except KeyError:
-            return self.Unknown()
+    def display(self):
+        return self.thumbnail.read()
 
     def GetMagic(self):
-        try:
-            return self.magic
-        except AttributeError:
-            #We call our display method so that the content type gets set
-            self.display()
-            return self.magic
+        return self.magic
 
     def GetContentType(self):
-        try:
-            return self.content_type
-        except AttributeError:
-            #We call our display method so that the content type gets set
-            self.display()
-            return self.content_type
+        return self.content_type
 
     def SetFormat(self,format):
         """ We only support jpeg here """
         return 'jpeg'
-
-class FileThumb(Thumbnailer):
-    """ Simple thumbnailer for file-like objects. """
-    def Extract(self):
-        self.fd.seek(0)
-        while 1:
-            f=self.fd.read(self.limit)
-            if not f: return
-            yield f
-
-    def __init__(self,fd,limit=1024*1024):
-        Thumbnailer.__init__(self,"case_%s" % (fd.case),"%s_%s" % (fd.table,fd.inode))
-        self.fd = fd
-        self.limit=limit
-
-class FileDump(FileThumb):
-    """ This simply returns the file with an appropriate mime type"""
-    ## We dont want to produce any thumbnails
-    dispatcher = {}
-
-    def __init__(self,fd,limit=None):
-        FileThumb.__init__(self,fd,limit)
-        self.fd = fd
-        self.limit = limit
-
-    ## Copy the binary data out as is.
-    def Unknown(self):
-        result=''
-        for r in self.Extract():
-            result+=r
-            if self.limit and len(result)>self.limit:
-                break
-
-        return result

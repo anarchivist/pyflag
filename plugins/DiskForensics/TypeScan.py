@@ -28,6 +28,10 @@ import pyflag.DB as DB
 import os.path
 import pyflag.logging as logging
 import pyflag.Scanner as Scanner
+import pyflag.Reports as Reports
+import pyflag.Graph as Graph
+import pyflag.IO as IO
+import pyflag.Registry as Registry
 
 class TypeScan(Scanner.GenScanFactory):
     """ scan file and record file type (magic)
@@ -80,3 +84,62 @@ class TypeScan(Scanner.GenScanFactory):
             self.dbh.execute('INSERT INTO type_%s VALUES(%r, %r, %r)', (self.table, self.inode, self.type_mime, self.type_str))
             # if we have a mime handler for this data, call it
             logging.log(logging.DEBUG, "Handling inode %s = %s, mime type: %s, magic: %s" % (self.inode,self.filename,self.type_mime, self.type_str))
+
+
+## A report to examine the Types of different files:
+class ViewFileTypes(Reports.report):
+    """ Browse the file types discovered.
+
+    This shows all the files in the filesystem with their file types as detected by magic. By searching and grouping for certain file types it is possible narrow down only files of interest.
+
+    A thumbnail of the file is also shown for rapid previewing of images etc.
+    """
+    parameters = {'fsimage':'fsimage'}
+    name = "Browse Types"
+    family = "Disk Forensics"
+    
+    def form(self,query,result):
+        try:
+            result.case_selector()
+            if query['case']!=config.FLAGDB:
+               result.meta_selector(case=query['case'],property='fsimage')
+        except KeyError:
+            return
+
+    def display(self,query,result):
+        io = IO.open(query['case'],query['fsimage'])
+        fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"], query["fsimage"], io)
+        
+        def thumbnail_cb(inode):
+            fd = fsfd.open(inode=inode)
+            image = Graph.Thumbnailer(fd,200)
+            tmp = result.__class__(result)
+            if image.height>0:
+                tmp.image(image,width=image.width,height=image.height)
+            else:
+                tmp.image(image,width=image.width)
+                
+            return tmp
+
+        def view_file_cb(filename):
+            inode = fsfd.lookup(path=filename)
+            tmp = result.__class__(result)
+            tmp.link( filename, target = 
+                      FlagFramework.query_type((), case=query['case'],
+                        fsimage=query['fsimage'], inode=inode,
+                        family = "Disk Forensics", report = "ViewFile"),
+                      tooltip=inode
+                      )
+            return tmp
+        
+        
+        result.table(
+            columns = ['a.inode','concat(path,name)','type'],
+            names = [ 'Thumbnail', 'Filename', 'Type'],
+            table = 'file_test as a, type_test as b ',
+            where = ' a.inode=b.inode and mode like "r%" ',
+            callbacks  = { 'Thumbnail': thumbnail_cb,
+                           'Filename': view_file_cb
+                           },
+            case = query['case']
+            )

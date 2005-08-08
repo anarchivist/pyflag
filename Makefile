@@ -2,7 +2,7 @@
 include Makefile.in
 CWD = $(shell pwd)
 
-all:	pyflag-target
+all:	bootstrap pyflag-target
 
 pyflag-target:	bins
 	for dir in $(DIRS); do\
@@ -142,3 +142,7 @@ mysql:
 	## Now we create the database:
 	export MYSQL=`ls -d ./bin_dist/mysql*` && echo 'CREATE DATABASE pyflag;' | $$MYSQL/bin/mysql --socket=$$MYSQL/data/pyflag.sock	
 	export MYSQL=`ls -d ./bin_dist/mysql*` && cat db.setup | $$MYSQL/bin/mysql --socket=$$MYSQL/data/pyflag.sock pyflag
+
+## A target to initialise the repository
+bootstrap:
+	for i in $(EXECUTABLE_SCRIPTS); do chmod +x $$i; done

@@ -163,7 +163,7 @@ class ViewFile(Reports.report):
         try:
             fd = fsfd.open(inode=query['inode'])
             ## We only want this much data
-            image = Graph.FileThumb(fd)
+            image = Graph.Thumbnailer(fd,300)
 
         except IOError:
 ##            fd = cStringIO.StringIO('')
