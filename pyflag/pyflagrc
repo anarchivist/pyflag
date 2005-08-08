@@ -74,7 +74,7 @@ GraphFormat=png
 MAX_DATA_DUMP_SIZE=2048
 
 # This can be BlueTheme or BasicTheme at the moment
-THEME = BlueTheme
+THEME = Menu
 
 [misc]
 LOG_LEVEL = 10
