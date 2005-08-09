@@ -247,7 +247,7 @@ class ScanFS(Reports.report):
             result.case_selector()
             if query['case']!=config.FLAGDB:
                result.meta_selector(case=query['case'],property='fsimage')
-               result.textfield('Scan under directory','path',size=100)
+               result.textfield('Scan under directory','path',size=50)
 
                ## Draw the form for each scan group:
                for cls in ScannerUtils.scan_groups_gen():

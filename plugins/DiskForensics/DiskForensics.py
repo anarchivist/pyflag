@@ -266,6 +266,8 @@ class ViewFile(Reports.report):
                     new_query['hexlimit']=previous
                     result.toolbar(text="Previous page", icon="stock_left.png",
                                    link = new_query )
+                else:
+                    result.toolbar(text="Previous page", icon="stock_left_gray.png")
 
                 next=limit+max
                 ## If we did not read a full page, we do not display
@@ -275,6 +277,8 @@ class ViewFile(Reports.report):
                     new_query['hexlimit']=next
                     result.toolbar(text="Next page", icon="stock_right.png",
                                    link = new_query )
+                else:
+                    result.toolbar(text="Next page", icon="stock_right_gray.png")
                     
                 ## Allow the user to skip to a certain page directly:
                 result.toolbar(

@@ -661,8 +661,10 @@ class HTMLUI(UI.GenericUI):
 
         if link:
             self.toolbar_ui.link(text,target=link,icon=icon,tooltip=tooltip)
-        else:
+        elif cb:
             self.toolbar_ui.toolbar_popup(cb,text,icon,tooltip=tooltip)
+        else:
+            self.toolbar_ui.icon(icon,tooltip=text)
                 
     def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):
         """ Shows the results of an SQL query in a searchable/groupable/browsable table
@@ -1130,11 +1132,15 @@ class HTMLUI(UI.GenericUI):
             del new_query['limit']
             new_query['limit']=previous        
             self.toolbar(text="Previous page", icon="stock_left.png", link=new_query)
+        else:
+            self.toolbar(text="Previous page", icon="stock_left_gray.png")
 
         if next:
             del new_query['limit']
             new_query['limit']=next
             self.toolbar(text="Next page", icon="stock_right.png", link=new_query)
+        else:
+            self.toolbar(text="Next page", icon="stock_right_gray.png",popup=False)
 
         ## Add a skip to row toolbar icon:
         self.toolbar(
