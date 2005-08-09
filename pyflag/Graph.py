@@ -269,7 +269,6 @@ class Thumbnailer(Image):
     def JpegHandler(self):
         """ Handles Jpeg thumbnails.
         """
-        print "Handling jpeg"
         ## Calculate some basic statistics 
         self.image = PIL.Image.open(self.fd)
         ## Ask the imaging library to rescale us to the requested size:

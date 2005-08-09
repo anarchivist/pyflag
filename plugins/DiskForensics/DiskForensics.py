@@ -144,6 +144,37 @@ class BrowseFS(Reports.report):
         except KeyError:
             return result
 
+def goto_page_cb(query,result,variable):
+    limit = query[variable]
+
+    try:
+        if query['refresh']:
+            del query['refresh']
+            del query['callback_stored']
+
+            ## Accept hex representation for limits
+            if limit.startswith('0x'):
+                del query[variable]
+                query[variable]=int(limit,16)
+            
+            result.refresh(0,query,parent=1)            
+    except KeyError:
+        pass
+
+    result.decoration = 'naked'
+    result.heading("Skip directly to an offset")
+    result.para("You may specify the offset in hex by preceeding it with 0x")
+    result.start_form(query, refresh="parent")
+    result.start_table()
+    if limit.startswith('0x'):
+        limit=int(limit,16)
+    else:
+        limit=int(limit)
+        
+    result.textfield('Offset in bytes (%s)' % hex(limit),variable)
+    result.end_table()
+    result.end_form()
+
 class ViewFile(Reports.report):
     """ Report to browse the filesystem """
     parameters = {'fsimage':'fsimage','inode':'string'}
@@ -205,13 +236,10 @@ class ViewFile(Reports.report):
             if fd:
                 result.download(fd)
                 
-        def hexdump(query,out):
+        def hexdump(query,result):
             """ Show the hexdump for the file """
             if fd:
-                try:
-                    max=config.MAX_DATA_DUMP_SIZE
-                except AttributeError:
-                    max=1024
+                max=config.MAX_DATA_DUMP_SIZE
 
                 #Set limits for the dump
                 try:
@@ -220,26 +248,45 @@ class ViewFile(Reports.report):
                     limit=0
                     
                 fd.seek(limit)
-                dump = FlagFramework.HexDump(fd.read(max),out)
-                dump.dump(offset=limit,limit=max)
+                data = fd.read(max+1)
+                dump = FlagFramework.HexDump(data,result)
+                dump.dump(base_offset=limit,limit=max)
 
                 #Do the navbar
-                result.next=limit+max
-                if result.next>fd.size:
-                    result.next=None
-                result.previous=limit-max
-                if result.previous<0:
+                new_query = query.clone()
+                previous=limit-max
+                if previous<0:
                     if limit>0:
-                        result.previous = 0
+                        previous = 0
                     else:
-                        result.previous=None
-                result.pageno=limit/max
-                result.nav_query=query.clone()
-                result.nav_query['__target__']='hexlimit'
-            else:
-                out.text("No Data Available")
+                        previous=None
 
-            return out
+                if previous != None:
+                    del new_query['hexlimit']
+                    new_query['hexlimit']=previous
+                    result.toolbar(text="Previous page", icon="stock_left.png",
+                                   link = new_query )
+
+                next=limit+max
+                ## If we did not read a full page, we do not display
+                ## the next arrow:
+                if len(data)>=max:
+                    del new_query['hexlimit']
+                    new_query['hexlimit']=next
+                    result.toolbar(text="Next page", icon="stock_right.png",
+                                   link = new_query )
+                    
+                ## Allow the user to skip to a certain page directly:
+                result.toolbar(
+                    cb = FlagFramework.Curry(goto_page_cb, variable='hexlimit'),
+                    text="Skip to offset",
+                    icon="stock_next-page.png"
+                    )
+
+            else:
+                result.text("No Data Available")
+
+            return result
 
         def strings(query,result):
             """ Draw the strings in a file """
@@ -318,8 +365,8 @@ class ViewFile(Reports.report):
                 result.start_table(width="100%")
                 result.row(left,valign='top',align="left")
 
-        names=["Statistics","HexDump","Download","Strings","Text"]
-        callbacks=[stats,hexdump,download,strings,textdump]
+        names=["Statistics","HexDump","Download","Text"]
+        callbacks=[stats,hexdump,download,textdump]
 
         try:
             names.extend(fd.stat_names)

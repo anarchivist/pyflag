@@ -586,7 +586,7 @@ class HexDump:
             text = ''
 
             tmp_offset=offset
-            for offset in range(tmp_offset,tmp_offset+self.width):
+            for offset in range(tmp_offset+1,tmp_offset+self.width+1):
                 try:
                     if offset>=highlight and offset<highlight+length:
                         ui.text(char_format % ord(self.data[offset]),color='black',font='typewriter',highlight=1)  
@@ -598,7 +598,7 @@ class HexDump:
                     result += "   "
                     finished = 1
 
-            for offset in range(tmp_offset,tmp_offset+self.width):
+            for offset in range(tmp_offset+1,tmp_offset+self.width+1):
                 if offset>=highlight and offset<highlight+length:
                     highlight_flag=1
                 else:

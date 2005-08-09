@@ -49,6 +49,40 @@ class HTTPObject:
         self.generator=None
         self.headers=None
 
+
+def goto_row_cb(query,result,variable='limit'):
+    """ This is used by the table widget to allow users to skip to a
+    certain row"""
+    limit = query[variable]
+
+    try:
+        if query['refresh']:
+            del query['refresh']
+            del query['callback_stored']
+
+            ## Accept hex representation for limits
+            if limit.startswith('0x'):
+                del query[variable]
+                query[variable]=int(limit,16)
+            
+            result.refresh(0,query,parent=1)            
+    except KeyError:
+        pass
+
+    result.decoration = 'naked'
+    result.heading("Skip directly to a row")
+    result.para("You may specify the row number in hex by preceeding it with 0x")
+    result.start_form(query, refresh="parent")
+    result.start_table()
+    if limit.startswith('0x'):
+        limit=int(limit,16)
+    else:
+        limit=int(limit)
+        
+    result.textfield('Row to skip to', variable)
+    result.end_table()
+    result.end_form()
+
 class HTMLUI(UI.GenericUI):
     """ A HTML UI implementation.
 
@@ -1089,6 +1123,9 @@ class HTMLUI(UI.GenericUI):
             next = None
 
         new_query=query.clone()
+        if previous<0 and int(query['limit'])>0:
+            previous=0
+            
         if previous>=0:
             del new_query['limit']
             new_query['limit']=previous        
@@ -1098,6 +1135,14 @@ class HTMLUI(UI.GenericUI):
             del new_query['limit']
             new_query['limit']=next
             self.toolbar(text="Next page", icon="stock_right.png", link=new_query)
+
+        ## Add a skip to row toolbar icon:
+        self.toolbar(
+            cb = goto_row_cb,
+            text="Row %s" % query['limit'],
+            icon="stock_next-page.png"
+            )
+
 
     def text(self,*cuts,**options):
         wrap = config.WRAP

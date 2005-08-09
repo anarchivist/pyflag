@@ -420,6 +420,7 @@ class Drawer:
                 pass
 
             ## Draw the gui for all the classes we manage:
+            result.decoration = 'naked'
             result.start_form(query,refresh="parent")
             result.start_table()
 
