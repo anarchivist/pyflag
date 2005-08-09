@@ -109,6 +109,16 @@ class ViewFileTypes(Reports.report):
     def display(self,query,result):
         io = IO.open(query['case'],query['fsimage'])
         fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"], query["fsimage"], io)
+
+        def view_icon(inode):
+            tmp = result.__class__(result)
+            tmp.link( 'View File Details', target = 
+                      FlagFramework.query_type((), case=query['case'],
+                        fsimage=query['fsimage'], inode=inode,
+                        family = "Disk Forensics", report = "ViewFile"),
+                      tooltip=inode, icon="examine.png",
+                      )
+            return tmp
         
         def thumbnail_cb(inode):
             fd = fsfd.open(inode=inode)
@@ -120,26 +130,14 @@ class ViewFileTypes(Reports.report):
                 tmp.image(image,width=image.width)
                 
             return tmp
-
-        def view_file_cb(filename):
-            inode = fsfd.lookup(path=filename)
-            tmp = result.__class__(result)
-            tmp.link( filename, target = 
-                      FlagFramework.query_type((), case=query['case'],
-                        fsimage=query['fsimage'], inode=inode,
-                        family = "Disk Forensics", report = "ViewFile"),
-                      tooltip=inode
-                      )
-            return tmp
-        
         
         result.table(
-            columns = ['a.inode','concat(path,name)','type'],
-            names = [ 'Thumbnail', 'Filename', 'Type'],
+            columns = ['a.inode','a.inode','concat(path,name)','type'],
+            names = [ 'Thumbnail','View', 'Filename', 'Type'],
             table = 'file_test as a, type_test as b ',
             where = ' a.inode=b.inode and mode like "r%" ',
             callbacks  = { 'Thumbnail': thumbnail_cb,
-                           'Filename': view_file_cb
+                           'View': view_icon
                            },
             case = query['case']
             )
