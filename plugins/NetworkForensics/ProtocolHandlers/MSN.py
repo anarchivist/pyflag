@@ -39,6 +39,20 @@ import pyflag.Reports as Reports
 import pyflag.logging as logging
 import base64
 
+def safe_base64_decode(s):
+    """ This attempts to decode the string s, even if it has incorrect padding """
+    tmp = s
+    for i in range(1,5):
+        try:
+            return base64.decodestring(tmp)
+        except:
+            tmp=tmp[:-i]
+            continue
+
+    return s
+
+allowed_file_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_ "
+
 def get_temp_path(case,inode):
     """ Returns the full path to a temporary file based on filename.
     """
@@ -80,7 +94,7 @@ class message:
         try:
             return getattr(self,self.cmd)()
         except AttributeError,e:
-            logging.log(logging.VERBOSE_DEBUG,"Unable to handle command %r from line %s" % (self.cmd,self.cmdline.split()[0]))
+            logging.log(logging.VERBOSE_DEBUG,"Unable to handle command %r from line %s (%s)" % (self.cmd,self.cmdline.split()[0],e))
             return None
 
     def get_data(self):
@@ -171,7 +185,8 @@ class message:
                     key,value = line[:tmp],line[tmp+1:]
                     headers[key.lower()]=value.strip()
 
-                context = base64.decodestring(headers['context'])
+                context = safe_base64_decode(headers['context'])
+
                 self.dbh.execute("insert into msn_p2p_%s set session_id = %r, channel_id = %r, to_user= %r, from_user= %r, context=%r",
                                  (self.table,self.session_id,headers['sessionid'],
                                   headers['to'],headers['from'],context))
@@ -180,13 +195,23 @@ class message:
                 path=self.ddfs.lookup(inode=self.fd.inode)
                 path=os.path.dirname(path)
                 new_inode = "CMSN%s-%s" % (headers['sessionid'],self.session_id)
+                try:
                 ## Parse the context line:
-                parser = ContextParser()
-                parser.feed(context)
+                    parser = ContextParser()
+                    parser.feed(context)
+                    filename = parser.context_meta_data['location']
+                    size=parser.context_meta_data['size']
+                    if len(filename)<1: raise IOError
+                except:
+                    ## If the context line is not a valid xml line, we
+                    ## just make a filename off its printables.
+                    filename = ''.join([ a for a in context if a in allowed_file_chars ])
+                    size=0
+                
                 ## The filename and size is given in the context
                 self.ddfs.VFSCreate(None,new_inode, "%s/MSN/%s" %
-                                    (path, parser.context_meta_data['location']),
-                                    size=parser.context_meta_data['size'])
+                                    (path,filename) ,
+                                    size=size)
 
         ## We have a real channel id so this is an actual file:
         else:
@@ -235,8 +260,8 @@ class message:
         try:
             ct = content_type.split(';')[0]
             self.ct_dispatcher[ct](self,content_type,sender,friendly_sender)
-        except KeyError:
-            logging.log(logging.VERBOSE_DEBUG, "Unable to handle content-type %s - ignoring message %s " % (content_type,tid))
+        except KeyError,e:
+            logging.log(logging.VERBOSE_DEBUG, "Unable to handle content-type %s(%s) - ignoring message %s " % (content_type,e,tid))
             
 from HTMLParser import HTMLParser
 
