@@ -200,7 +200,7 @@ def combine_streams(query,result):
     fd = IO.open(query['case'],table)
 
     #extract stream id from inode
-    m=re.match("S(\d)+",query['inode'])
+    m=re.match("S(\d+)",query['inode'])
     
     forward_inode = m.group(1)
     forward_cid = int(forward_inode)

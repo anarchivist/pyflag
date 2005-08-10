@@ -248,7 +248,8 @@ class SearchIndex(Reports.report):
     description = "Search for words that were indexed during filesystem load. Words must be in dictionary to be indexed. "
     name = "Search Indexed Keywords"
     family = "Disk Forensics"
-    parameters={'fsimage':'fsimage','keyword':'any','range':'numeric'}
+    parameters={'fsimage':'fsimage','keyword':'any',
+                'range':'numeric','final':'any'}
 
     def form(self,query,result):
         try:
@@ -377,13 +378,30 @@ class SearchIndex(Reports.report):
         ## cache one set of results, while if we ask for "foo" and
         ## "word" this is a very different set.
         canonicalised_query = FlagFramework.canonicalise(query)
+ 
+        ## We store this canonical query
+        dbh.execute("""CREATE TABLE if not exists `LogicalIndexCache_reference` (
+        `id` INT NOT NULL AUTO_INCREMENT ,
+        `query` TEXT NOT NULL ,
+        `fsimage` VARCHAR( 200 ) NOT NULL,
+        index (`id`)
+        )""")
 
-        ## We use the timestamp as a unique reference
-        dbh.execute("select `time` from meta where value=%r",canonicalised_query);
+        ## First is it already here?
+        dbh.execute("select * from `LogicalIndexCache_reference` where fsimage=%r and query=%r",(query['fsimage'],canonicalised_query))
         row=dbh.fetch()
-        print "Time is %s "% row
-        dbh.execute("create table LogicalIndexCache_%s select * from %s",(row['time'],temp_table))
+
+        ## The cache table already exists, we dont need to do anything.
+        if row: return
+
+        ## Create a new cache table and populate it:
+        dbh.execute("insert into `LogicalIndexCache_reference` set fsimage=%r, query=%r",(query['fsimage'],canonicalised_query))
+        cache_id = dbh.autoincrement()
         
+        dbh.execute("create table LogicalIndexCache_%s select * from %s",(cache_id,temp_table))
+
+        return
+    
         keyword = query['keyword']
         table = query['fsimage']
         dbh2.execute("CREATE TABLE if not exists `LogicalKeyword_%s` (`id` INT NOT NULL AUTO_INCREMENT ,`inode` VARCHAR( 20 ) NOT NULL ,`offset` BIGINT NOT NULL ,`text` VARCHAR( 200 ) NOT NULL ,`keyword` VARCHAR(20) NOT NULL ,PRIMARY KEY ( `id` ))",(table))
@@ -455,6 +473,15 @@ class SearchIndex(Reports.report):
             output.text(escape(data[offset-left+len(keyword):]),color='black',sanitise='full')
             return output
 
+        ## Find the cache table:
+        canonicalised_query = FlagFramework.canonicalise(query)
+        ## First is it already here?
+        dbh.execute("select * from `LogicalIndexCache_reference` where fsimage=%r and query=%r",(query['fsimage'],canonicalised_query))
+        row=dbh.fetch()
+
+        print "Cache id is %s" % row['id']
+        return
+    
         result.table(
             columns = ['a.inode','name','concat(a.inode,",",offset)','keyword','offset'],
             names=['Inode','Filename','Data','Keyword','Offset'],
