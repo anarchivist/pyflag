@@ -346,9 +346,19 @@ class MSNFile(CachedFile):
         self.size=self.cached_fd.tell()
         self.cached_fd.seek(0)
         self.readptr=0
-    
+
+
 class BrowseMSNChat(Reports.report):
-    """ This allows MSN chat messages to be browsed. """
+    """ This allows MSN chat messages to be browsed.
+
+    Note that to the left of each column there is an icon with an
+    arrow pointing downwards. Clicking on this icon shows the full msn
+    messages for all sessions from 60 seconds prior to this message.
+
+    This is useful if you have isolated a specific message by
+    searching for it, but want to see what messages were sent around
+    the same time to get some context.
+    """
     parameters = { 'fsimage':'fsimage' }
     name = "Browse MSN Chat"
     family = "Network Forensics"
@@ -360,12 +370,31 @@ class BrowseMSNChat(Reports.report):
             pass
 
     def display(self,query,result):
+        """ This callback renders an icon which when clicked shows the
+        full msn messages for all sessions from 60 seconds prior to
+        this message."""
+        
         result.heading("MSN Chat sessions in %s " % query['fsimage'])
+
+        def draw_prox_cb(value):
+            tmp = result.__class__(result)
+            tmp.link('Go To Approximate Time',
+              target=FlagFramework.query_type((),
+                family=query['family'], report=query['report'],
+                fsimage=query['fsimage'], where_Prox = ">%s" % (int(value)-60),
+                case = query['case'],
+              ),
+              icon = "stock_down-with-subpoints.png",
+                     )
+
+            return tmp
+
         result.table(
-            columns = [ 'from_unixtime(ts_sec)','packet_id','session','sender','data'],
-            names = ['Time Stamp','Packet','Session','Sender Nick','Text'],
+            columns = ['ts_sec', 'from_unixtime(ts_sec)','packet_id','session','sender','data'],
+            names = ['Prox','Time Stamp','Packet','Session','Sender Nick','Text'],
             table = "msn_messages_%s" % query['fsimage'],
-            links = [None,
+            callbacks = {'Prox':draw_prox_cb},
+            links = [None, None,
                      FlagFramework.query_type((),
                                               family="Network Forensics", case=query['case'],
                                               report='View Packet', fsimage=query['fsimage'],

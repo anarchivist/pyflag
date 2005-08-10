@@ -581,12 +581,12 @@ class HexDump:
         finished=0
         
         while not finished and initial_offset+limit>offset:
+            tmp_offset=offset
             ui.text(offset_format % (offset+base_offset), color='blue',font='typewriter')
             result += offset_format % offset
             text = ''
 
-            tmp_offset=offset
-            for offset in range(tmp_offset+1,tmp_offset+self.width+1):
+            for offset in range(tmp_offset,tmp_offset+self.width):
                 try:
                     if offset>=highlight and offset<highlight+length:
                         ui.text(char_format % ord(self.data[offset]),color='black',font='typewriter',highlight=1)  
@@ -598,7 +598,7 @@ class HexDump:
                     result += "   "
                     finished = 1
 
-            for offset in range(tmp_offset+1,tmp_offset+self.width+1):
+            for offset in range(tmp_offset,tmp_offset+self.width):
                 if offset>=highlight and offset<highlight+length:
                     highlight_flag=1
                 else:
@@ -616,6 +616,7 @@ class HexDump:
 
             ui.text("\n",font='typewriter',sanitise='full')
             ui.text(finish=1)
+            offset+=1
 
 try:
     import magic

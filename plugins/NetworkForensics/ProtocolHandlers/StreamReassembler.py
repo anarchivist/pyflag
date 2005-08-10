@@ -219,9 +219,9 @@ def combine_streams(query,result):
         fd.seek(row['offset']+row['packet_offset'])
         data=fd.read(row['length'])
         if row['con_id']==forward_cid:
-            result.text(data,color="blue",font='typewriter',sanitise='full')
+            result.text(data,color="blue",font='typewriter',sanitise='full',wrap='full')
         else:
-            result.text(data,color="red",font='typewriter',sanitise='full')    
+            result.text(data,color="red",font='typewriter',sanitise='full',wrap='full')    
     
 def show_packets(query,result):
     """ Shows the packets which belong in this stream """

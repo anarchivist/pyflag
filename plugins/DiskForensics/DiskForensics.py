@@ -59,6 +59,23 @@ def DeletedIcon(value,result):
 
     return tmp
 
+def make_inode_link(query,result, variable='inode'):
+    """ Returns a ui based on result with links to each level of the
+    inode"""
+    out = result.__class__(result)
+    
+    tmp =  query[variable].split('|')
+    for i in range(len(tmp)):
+        new_query = query.clone()
+        del new_query[variable]
+        new_query[variable]= '|'.join(tmp[:i+1])
+        tmp_result = result.__class__(result)
+        tmp_result.link(tmp[i],target=new_query)
+        out.text(" ")
+        out.text(tmp_result)
+
+    return out
+
 class BrowseFS(Reports.report):
     """ Report to browse the filesystem"""
     parameters = {'fsimage':'fsimage'}
@@ -185,30 +202,33 @@ class ViewFile(Reports.report):
     
     def display(self,query,result):
         new_q = result.make_link(query, '')
+        is_directory = False
         if not query.has_key('limit'): query['limit']= 0
         dbh = self.DBO(query['case'])
 
         # retrieve the iosource for this fsimage
         iofd = IO.open(query['case'],query['fsimage'])
         fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"], query["fsimage"], iofd)
-        try:
-            fd = fsfd.open(inode=query['inode'])
-            ## We only want this much data
-            image = Graph.Thumbnailer(fd,300)
+        ## If this is a directory, only show the stats
+        path = fsfd.lookup(inode=query['inode'])
+        fd = None
+        image = None
 
-        except IOError:
-##            fd = cStringIO.StringIO('')
-            fd = None
-            image = None
+        if path and fsfd.isdir(path):
+            is_directory=True
+        else:
+            try:
+                fd = fsfd.open(inode=query['inode'])
+                image = Graph.Thumbnailer(fd,300)
+            except IOError:
+                pass
             
         #How big is this file?
         i=fsfd.istat(inode=query['inode'])
-#        filesize=i['size']
         
         #Add the filename into the headers:
-        path=fsfd.lookup(inode=query['inode'])
         if not path: path=query['inode']
-        path,name=os.path.split(path)
+        base_path,name=os.path.split(path)
         if image:
             image.headers=[("Content-Disposition","attachment; filename=%s" % name),]
         ## This fails in cases where the File object does not know its own size in advance (e.g. Pst).
@@ -222,14 +242,11 @@ class ViewFile(Reports.report):
                        )
                    )
 
-        result.heading("Viewing file in inode %s" % (query['inode']))
-        try:
-            result.text("Classified as %s by magic" % image.GetMagic())
-        except IOError,e:
-            result.text("Unable to classify file, no blocks: %s" % e)
-            image = None
-        except:
-            pass
+        ## Make a series of links to each level of this inode - this
+        ## way we can view parents of this inode.
+        tmp = result.__class__(result)
+        tmp.text("Viewing file in inode ",make_inode_link(query,result))
+        result.heading(tmp)
 
         def download(query,result):
             """ Used for dumping the entire file into the browser """
@@ -347,16 +364,27 @@ class ViewFile(Reports.report):
             """ Show statistics about the file """
             istat = fsfd.istat(inode=query['inode'])
             left=self.ui(result)
-            left.row("Filename:",'',FlagFramework.normpath("%s/%s"%(path,name)))
-            for k,v in istat.iteritems():
-                left.row('%s:' % k,'',v)
+            link = result.__class__(result)
+            link.link(path,
+                      FlagFramework.query_type((),family="Disk Forensics",
+                          report='BrowseFS',fsimage=query['fsimage'],
+                          open_tree=base_path, case=query['case'])
+                      )
+            left.row("Filename:",'',link)
+            try:
+                for k,v in istat.iteritems():
+                    left.row('%s:' % k,'',v)
+            except AttributeError:
+                pass
 
             ## File specific statistics:
             if fd:
                 istat = fd.stats()
-                if istat:
+                try:
                     for k,v in istat.iteritems():
                         left.row('%s:' % k,'',v)
+                except AttributeError:
+                    pass
             
             left.end_table()
 
@@ -378,11 +406,28 @@ class ViewFile(Reports.report):
         except:
             pass
 
-        result.notebook(
-            names=names,
-            callbacks=callbacks,
-            context="mode"
-            )
+        
+        if is_directory:
+            result.text("This is a directory")
+            
+            result.notebook(
+                names = ["Statistics"],
+                callbacks=[stats],
+                )
+        else:
+            try:
+                result.text("Classified as %s by magic" % image.GetMagic())
+            except IOError,e:
+                result.text("Unable to classify file, no blocks: %s" % e)
+                image = None
+            except:
+                pass
+
+            result.notebook(
+                names=names,
+                callbacks=callbacks,
+                context="mode"
+                )
             
     def form(self,query,result):
         result.defaults = query

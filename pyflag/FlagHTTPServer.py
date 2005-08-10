@@ -116,6 +116,8 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         self.do_GET()
     
     def do_GET(self):
+        headers = {}
+        
         result = flag.ui()
         result.generator=UI.HTTPObject()
 
@@ -161,12 +163,20 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         #Is this a request for a saved UI?
         if query.has_key('draw_stored') and UI.HTMLUI.store_dict.has_key(query['draw_stored']):
             result = UI.HTMLUI.store_dict[query['draw_stored']]
+            
+            ## This expires stored pictures in case pyflag is
+            ## restarted
+            headers['Expires']='-1'
         elif query.has_key('callback_stored') and UI.HTMLUI.callback_dict.has_key(query['callback_stored']):
             result=flag.ui(query=query)
             cb=query['callback_stored']
 #            del query['callback_stored']
             cb=UI.HTMLUI.callback_dict[cb]
+#            del UI.HTMLUI.callback_dict[cb]
             cb(query,result)
+            ## This ensures that callbacks are recalled each time they
+            ## are drawn
+            headers['Expires']='-1'
 
         #Nope - just do it
         else:            
@@ -221,11 +231,8 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                   
         ## If the UI has some headers, we send those as well:
         self.send_response(200)
-        try:
-            for i in result.headers:
-                self.send_header(i[0],i[1])
-        except AttributeError:
-            pass
+        for k,v in headers.items():
+            self.send_header(k,v)
         
         if result.generator and result.generator.generator:
             self.send_header("Content-type", result.generator.content_type)

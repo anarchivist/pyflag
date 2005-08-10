@@ -631,7 +631,7 @@ class HTMLUI(UI.GenericUI):
             open_tree = FlagFramework.urlencode(link['open_tree'])
             sv=v.__str__().replace(' ','&nbsp;')
             if t =='branch':
-                left.result+="%s%s%s<br>\n" % ("<img src=/flag/images/spacer.png width=20 height=20>" * depth , "<a name=%s href=f?%s#%s><img  border=0 height=16 src=/flag/images/folder.png width=20 height=20></a>&nbsp;&nbsp;" % (open_tree,link,open_tree) , str(sv) )
+                left.result+="%s%s%s<br>\n" % ("<img src=/flag/images/spacer.png width=20 height=20>" * depth , "<a name=%s href=f?%s#%s><abbr title='%s'><img  border=0 height=16 src=/flag/images/folder.png width=20 height=20></abbr></a>&nbsp;&nbsp;" % (open_tree,link,open_tree,link['open_tree']) , str(sv),  )
             elif t == 'special':
                 left.result+="%s%s<br>\n" % ("<img src=/flag/images/spacer.png width=20 height=20>" * depth , "<a name=%s href=f?%s#%s>%s</a>  " % (open_tree,link,open_tree, str(v) ))
             else:
@@ -1192,7 +1192,7 @@ class HTMLUI(UI.GenericUI):
         for d in cuts:
             if not (options.has_key('font') and options['font']=='typewriter'):
                 d = re.sub("\n","<br>\r\n",str(d))
-            self.text_var += d
+            self.text_var += str(d)
             if options.has_key('wrap') and options['wrap'] == 'full':
                 try:
                     while self.text_var:
