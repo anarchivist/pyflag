@@ -117,13 +117,6 @@ class BrowseFS(Reports.report):
                 br = '/'
                 
             if not query.has_key('open_tree'): query['open_tree']='/'
-            main_result.toolbar(text="Scan this directory",icon="examine.png",
-                    link=FlagFramework.query_type((),
-                      family="Load Data", report="ScanFS",
-                      path=query['open_tree'],
-                      fsimage=query['fsimage'],case=query['case'],
-                    ))
-
             def tree_cb(branch):
                 path =FlagFramework.normpath('/'.join(branch)+'/')
                 ## We need a local copy of the filesystem factory so
@@ -147,6 +140,13 @@ class BrowseFS(Reports.report):
                     )
         
             result.tree(tree_cb = tree_cb,pane_cb = pane_cb, branch = branch )
+            main_result.toolbar(text="Scan this directory",icon="examine.png",
+                    link=FlagFramework.query_type((),
+                      family="Load Data", report="ScanFS",
+                      path=query['open_tree'],
+                      fsimage=query['fsimage'],case=query['case'],
+                    ))
+
         
         result.notebook(
             names=["Tree View","Table View"],
@@ -202,7 +202,6 @@ class ViewFile(Reports.report):
     
     def display(self,query,result):
         new_q = result.make_link(query, '')
-        is_directory = False
         if not query.has_key('limit'): query['limit']= 0
         dbh = self.DBO(query['case'])
 
@@ -214,14 +213,11 @@ class ViewFile(Reports.report):
         fd = None
         image = None
 
-        if path and fsfd.isdir(path):
-            is_directory=True
-        else:
-            try:
-                fd = fsfd.open(inode=query['inode'])
-                image = Graph.Thumbnailer(fd,300)
-            except IOError:
-                pass
+        try:
+            fd = fsfd.open(inode=query['inode'])
+            image = Graph.Thumbnailer(fd,300)
+        except IOError:
+            pass
             
         #How big is this file?
         i=fsfd.istat(inode=query['inode'])
@@ -233,14 +229,6 @@ class ViewFile(Reports.report):
             image.headers=[("Content-Disposition","attachment; filename=%s" % name),]
         ## This fails in cases where the File object does not know its own size in advance (e.g. Pst).
 ##                       ("Content-Length",filesize)]
-
-        result.toolbar(text="Scan this File",icon="examine.png",
-                   link=FlagFramework.query_type((),
-                      family="Load Data", report="ScanFS",
-                      path=fsfd.lookup(inode=query['inode']),
-                      fsimage=query['fsimage'],case=query['case'],
-                       )
-                   )
 
         ## Make a series of links to each level of this inode - this
         ## way we can view parents of this inode.
@@ -407,27 +395,27 @@ class ViewFile(Reports.report):
             pass
 
         
-        if is_directory:
-            result.text("This is a directory")
-            
-            result.notebook(
-                names = ["Statistics"],
-                callbacks=[stats],
-                )
-        else:
-            try:
-                result.text("Classified as %s by magic" % image.GetMagic())
-            except IOError,e:
-                result.text("Unable to classify file, no blocks: %s" % e)
-                image = None
-            except:
-                pass
+        try:
+            result.text("Classified as %s by magic" % image.GetMagic())
+        except IOError,e:
+            result.text("Unable to classify file, no blocks: %s" % e)
+            image = None
+        except:
+            pass
 
-            result.notebook(
-                names=names,
-                callbacks=callbacks,
-                context="mode"
-                )
+        result.notebook(
+            names=names,
+            callbacks=callbacks,
+            context="mode"
+            )
+
+        result.toolbar(text="Scan this File",icon="examine.png",
+                   link=FlagFramework.query_type((),
+                      family="Load Data", report="ScanFS",
+                      path=fsfd.lookup(inode=query['inode']),
+                      fsimage=query['fsimage'],case=query['case'],
+                       )
+                   )
             
     def form(self,query,result):
         result.defaults = query

@@ -31,7 +31,7 @@ from pyflag.FileSystem import File,CachedFile
 import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
-import struct
+import struct,re
 
 class StreamReassembler(NetworkScanFactory):
     """ This scanner reassembles the packets into the streams.
@@ -198,9 +198,12 @@ def combine_streams(query,result):
     ## First we find the reverse connection:
     table = query['fsimage']
     fd = IO.open(query['case'],table)
+
+    #extract stream id from inode
+    m=re.match("S(\d)+",query['inode'])
     
-    forward_inode = query['inode']
-    forward_cid = int(forward_inode[1:])
+    forward_inode = m.group(1)
+    forward_cid = int(forward_inode)
 
     dbh = DB.DBO(query['case'])
     dbh.execute("select * from connection_details_%s where con_id=%r",(table,forward_cid))
