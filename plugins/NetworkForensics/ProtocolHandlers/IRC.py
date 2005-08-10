@@ -77,7 +77,46 @@ class IRCScanner(NetworkScanFactory):
 
     class Scan(NetworkScanner):
         command_lookup = {
+            001: "Welcome Reply",
+            002: "Host Server",
+            003: "Server Creation Date",
+            004: "Server Modes",
+            005: "Server Info",
+            251: "LUSER Client Reply",
+            252: "LUSER OP Reply",
+            253: "LUSER Unknown Reply",
+            254: "LUSER Channel Reply",
+            255: "LUSER Clients-Servers",
+            256: "ADMIN Reply",
+            265: "Curent Local Users",
+            266: "Current Global Users",
+            301: "NICK away Reply",
             303: "ISON Reply",
+            311: "WHOISUSER Reply",
+            312: "WHOISSERVER Reply",
+            313: "WHOISOPERATOR Reply",
+            317: "WHOIS IDLE Reply",
+            318: "WHOIS End",
+            319: "WHOIS Reply Channel OP",
+            322: "LIST Reply",
+            329: "Channel Creation Time",
+            324: "MODE Channel",
+            332: "TOPIC Reply",
+            333: "TOPIC Reply WHO TIME",
+            341: "INVITE Reply",
+            353: "NAME Reply",
+            366: "NAME End",
+            372: "MOTD Reply",
+            375: "MOTD Start",
+            376: "MOTD End",
+            377: "MOTD Reply",
+            378: "MOTD Reply",
+            381: "OPER Success Reply",
+            382: "REHASHING Reply",
+            465: "ERROR Banned",
+            482: "ERROR Not OP",
+            
+            
             }
 
         def rewrite_reply(self,prefix,command,line):

@@ -316,7 +316,7 @@ class ScanFS(Reports.report):
             """ Recursive function for scanning directories """
             ## First scan all the files in the directory
             for stat in fsfd.longls(path=root,dirs=0):
-                logging.log(logging.DEBUG,"Scanning file %s%s (inode %s0)" % (stat['path'],stat['name'],stat['inode']))
+                logging.log(logging.DEBUG,"Scanning file %s%s (inode %s)" % (stat['path'],stat['name'],stat['inode']))
                 try:
                     fd=fsfd.open(inode=stat['inode'])
                     Scanner.scanfile(fsfd,fd,scanners)

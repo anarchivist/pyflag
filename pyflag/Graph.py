@@ -275,13 +275,17 @@ class Thumbnailer(Image):
         self.width, self.height = self.image.size
 
         ratio = float(self.width)/float(self.height)
-        
-        self.image.thumbnail((self.size_x,self.size_x / ratio), PIL.Image.NEAREST)
+
         self.thumbnail = cStringIO.StringIO()
-        self.image.save(self.thumbnail,self.image.format)
-        self.thumbnail.seek(0)
+        try:
+            self.image.thumbnail((self.size_x,self.size_x / ratio), PIL.Image.NEAREST)
+            self.image.save(self.thumbnail,self.image.format)
+            self.thumbnail.seek(0)
+            self.width, self.height = self.image.size
+        except:
+            self.size_x=24
+            self.set_image("no.png")
         
-        self.width, self.height = self.image.size
 
     def Null(self):
         """ A do nothing method that just returns the original image as its thumbnail. """

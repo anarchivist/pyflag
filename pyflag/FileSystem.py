@@ -502,8 +502,13 @@ class CachedFile(File):
             ## It does not exist: Create a new cached copy:
             fd = open(cached_filename,'w')
 
-            self.size=self.cache(fd)
-            
+            try:
+                self.size=self.cache(fd)
+                ## If we can not open the original file, we bail
+            except:
+                os.unlink(cached_filename)
+                raise
+                
             ## Reopen file for reading
             self.cached_fd = open(cached_filename,'r')
 

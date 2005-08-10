@@ -186,8 +186,8 @@ class Zip_file(File):
         try:
             z = zipfile.ZipFile(fd,'r')
             self.data = z.read(z.namelist()[int(parts[-1][1:])])
-        except (IndexError, KeyError):
-            raise IOError, "Zip_File: cant find index"
+        except (IndexError, KeyError, zipfile.BadZipfile),e:
+            raise IOError, "Zip_File: (%s)" % e
         
         self.pos=0
         self.size=len(self.data)

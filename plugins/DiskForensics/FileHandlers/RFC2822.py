@@ -32,6 +32,8 @@ from pyflag.FileSystem import File,CachedFile
 class RFC2822(Scanner.GenScanFactory):
     """ Scan RFC2822 Mail messages """
     default = True
+    depends = 'TypeScan'
+    
     class Scan(Scanner.StoreAndScanType):
         types = [ 'text/x-mail.*',
                   'message/rfc822',
