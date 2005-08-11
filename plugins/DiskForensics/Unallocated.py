@@ -118,9 +118,7 @@ class UnallocatedScan(GenScanFactory):
                     ## Now scan the newfound file:
                     fd = self.ddfs.open(inode='%s|U%s' % (self.inode,offset))
                     tmp = fd.read(100)
-                    print "%r" % tmp
                     fd.seek(0)
-                    print "inode is %s" % fd.inode
                     Scanner.scanfile(self.ddfs,fd,self.factories)
                 ## End of for
                 

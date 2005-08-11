@@ -91,7 +91,6 @@ class GZScan(ZipScan):
             )
         
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
-            print "Initialising scanner %r" %  self
             ScanIfType.__init__(self, inode,ddfs,outer,factories)
             self.filename = None
 
@@ -120,7 +119,6 @@ class GZScan(ZipScan):
 
         def finish(self):
             if self.filename:
-                print "Adding a gzip node for file %s" % self.filename
                 self.ddfs.VFSCreate(self.inode,"G0",self.filename)
 
                 new_inode="%s|G0" % (self.inode)
@@ -213,7 +211,6 @@ class GZ_file(CachedFile):
         while 1:
             data=self.gz.read(1024*1024)
             count += len(data)
-            print "Read %s" % len(data)
             if len(data)==0: break
             fd.write(data)
 

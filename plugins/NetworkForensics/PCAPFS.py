@@ -86,8 +86,6 @@ class PCAPFS(DBFS):
                                                      self.iosource.make_parameter_list(),config.FLAG_BIN,
                                                      self.table)
 
-        print "Will launch %s "% sql
-
         sdbh.MySQLHarness(sql)
 
         ## Add our VFS node

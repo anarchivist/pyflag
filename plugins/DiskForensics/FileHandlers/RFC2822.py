@@ -87,7 +87,6 @@ class RFC2822_File(File):
         attachment_number = int(my_part[1:])
         count = 0
 
-        print "Looking for attachment %s" % attachment_number
         for part in a.walk():
             if part.get_content_maintype() == 'multipart':
                 continue

@@ -222,7 +222,7 @@ class IRCScanner(NetworkScanFactory):
                         ## Dispatch a command handler:
                         self.dispatch(m.group(1),m.group(2),m.group(3))
                     except IndexError,e:
-                        print "unable to parse line %s (%s)" % (line,e)
+                        logging.log(logging.WARNINGS, "unable to parse line %s (%s)" % (line,e))
 
 class BrowseIRCChat(Reports.report):
     """ This allows chat messages to be browsed. """

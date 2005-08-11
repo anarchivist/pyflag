@@ -30,6 +30,7 @@ import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
 import pyflag.Reports as Reports
+import pyflag.logging as logging
 
 class SMTPException(Exception):
     """ Raised if line is an invalid SMTP command """
@@ -76,13 +77,13 @@ class SMTP:
     def MAIL(self,args):
         self.mail_from = args
         self.read_response()
-        print "Set mail from to %s " % self.mail_from
+        logging.log(logging.VERBOSE_DEBUG,"Set mail from to %s " % self.mail_from)
 
     def RCPT(self,args):
         self.rcpt_to = args
         self.read_response()
-        print "Set RCPT to %s" % self.rcpt_to
-
+        logging.log(logging.VERBOSE_DEBUG, "Set RCPT to %s" % self.rcpt_to)
+        
     def DATA(self,args):
         result=self.read_response()
         if result[0]=='3':

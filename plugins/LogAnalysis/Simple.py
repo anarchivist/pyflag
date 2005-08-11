@@ -147,7 +147,6 @@ class SimpleLog(LogFile.Log):
     def __init__(self,variable,query):
         LogFile.Log.__init__(self,variable,query)
         self.prefilters = query.getarray('prefilter')
-        print "log has query as %s" % query
         try:
             self.delimiter=query['delimiter']
         except KeyError:

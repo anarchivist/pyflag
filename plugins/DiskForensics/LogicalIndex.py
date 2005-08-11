@@ -70,7 +70,7 @@ class IndexScan(GenScanFactory):
         default = True
     
     def __init__(self,dbh,table,fsfd):
-        """ This creates the LogicalIndex table and initialised the index file """
+        """ This creates the LogicalIndex table and initialise the index file """
         self.dbh=dbh
         ## These keep the current offset in the logical image. FIXME:
         ## When running in a distributed environment this is not

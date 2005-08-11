@@ -1,0 +1,9 @@
+execute Case\ Management.Remove\ case remove_case=demo
+execute Case\ Management.Create\ new\ case create_case=demo
+set case=demo
+
+execute Load\ Data.Load\ IO\ Data\ Source iosource=test subsys=sgzip io_filename=/tmp/stdcapture_0.2.pcap.sgz io_offset=0
+
+execute Load\ Data.Load\ Filesystem\ image iosource=test fstype=PCAP\ Filesystem
+
+execute Load\ Data.ScanFS fsimage=test path=/ scangroup_NetworkScanners=on scangroup_Windows\ Scanners=on scangroup_Compressed\ File=off scangroup_General\ Forensics=on final=ok

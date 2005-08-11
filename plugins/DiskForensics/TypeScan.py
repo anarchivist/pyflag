@@ -83,7 +83,7 @@ class TypeScan(Scanner.GenScanFactory):
             # insert type into DB
             self.dbh.execute('INSERT INTO type_%s VALUES(%r, %r, %r)', (self.table, self.inode, self.type_mime, self.type_str))
             # if we have a mime handler for this data, call it
-            logging.log(logging.DEBUG, "Handling inode %s = %s, mime type: %s, magic: %s" % (self.inode,self.filename,self.type_mime, self.type_str))
+#            logging.log(logging.DEBUG, "Handling inode %s = %s, mime type: %s, magic: %s" % (self.inode,self.filename,self.type_mime, self.type_str))
 
 
 ## A report to examine the Types of different files:
