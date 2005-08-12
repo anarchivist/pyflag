@@ -196,6 +196,10 @@ class query_type:
                 tmp.append(i[1])
 
         return tuple(tmp)
+
+    def poparray(self,array):
+        """ Remove last member of array from query """
+        
     
     def has_key(self,key):
         for i in self.q:

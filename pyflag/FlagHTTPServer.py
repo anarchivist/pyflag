@@ -168,8 +168,10 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             ## restarted
             headers['Expires']='-1'
         elif query.has_key('callback_stored') and UI.HTMLUI.callback_dict.has_key(query['callback_stored']):
+            cb = query.getarray('callback_stored')[-1]
+
             result=flag.ui(query=query)
-            cb=query['callback_stored']
+#            cb=query['callback_stored']
 #            del query['callback_stored']
             cb=UI.HTMLUI.callback_dict[cb]
 #            del UI.HTMLUI.callback_dict[cb]

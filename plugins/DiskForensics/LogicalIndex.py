@@ -52,7 +52,8 @@ config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
 
 ## This blocksize is in bits (2^20)
-BLOCKSIZE=20
+BLOCKBITS=10
+BLOCKSIZE=pow(2,BLOCKBITS)
 
 def escape(string):
     return ("%r" % string)[1:-1]
@@ -76,7 +77,7 @@ class IndexScan(GenScanFactory):
         ## When running in a distributed environment this is not
         ## accessible - maybe we need to pass this in the metadata?
         self.rel_offset = 0
-        self.dbh.execute("create table if not exists `LogicalIndex_%s` (`inode` VARCHAR( 20 ) NOT NULL ,`block` BIGINT NOT NULL, primary key(block))",(table))
+        self.dbh.execute("create table if not exists `LogicalIndex_%s` (`inode` VARCHAR( 20 ) NOT NULL ,`block` INT NOT NULL auto_increment, `block_number` int not null, primary key(block))",(table))
         
         self.dbh.execute("""create table if not exists `LogicalIndexOffsets_%s` (
         `id` INT NOT NULL ,
@@ -126,15 +127,11 @@ class IndexScan(GenScanFactory):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
             BaseScanner.__init__(self, inode,ddfs,outer,factories)
             self.index = outer.index
-            self.outer.rel_offset=0
-            self.outer.block+=1
-            self.dbh.execute("select max(block) as `max` from `LogicalIndex_%s`",(outer.table))
-            row=self.dbh.fetch()
-            try:
-                self.outer.block=int(row['max'])+1
-            except: self.outer.block=0
-
-            self.dbh.execute("insert into `LogicalIndex_%s` set inode=%r,block=%r",(outer.table,inode,self.outer.block))
+            self.rel_offset=0
+            self.block_number = 0
+            self.dbh.execute("insert into `LogicalIndex_%s` set inode=%r,block_number=%r",(outer.table,inode,self.block_number))
+            ## Note the current block number
+            self.block = self.dbh.autoincrement()
 
         def process(self,data,metadata=None):
             self.index.index_buffer(data)
@@ -143,20 +140,21 @@ class IndexScan(GenScanFactory):
             ## insert syntax here for speed (This may not be portable
             ## to other databases):
             for i in self.index.get_offsets():
-#                print self.outer.rel_offset,self.outer.block
-                results.append("(%s,%s)" % (i.id,i.offset+self.outer.rel_offset+self.outer.block * pow(2, BLOCKSIZE)))
+                ## If the file is longer than a block, we create a new
+                ## block, and adjust the relative offset
+                if self.rel_offset+i.offset > BLOCKSIZE:
+                    self.block_number+=1
+                    self.rel_offset -= BLOCKSIZE
+                    self.dbh.execute("insert into `LogicalIndex_%s` set inode=%r,block_number=%r",(self.outer.table,self.inode,self.block_number))
+                    self.block = self.dbh.autoincrement()
+                    
+                results.append("(%s,(%s<<%s)+%s+%s)" % (i.id,self.block,BLOCKBITS,i.offset,self.rel_offset))
 
             if results:
                 self.dbh.execute("insert into LogicalIndexOffsets_%s values %s",(self.table,",".join(results)))
             
-            self.outer.rel_offset += len(data)
+            self.rel_offset += len(data)
             
-            ## If the file is longer than a block, we create a new
-            ## block, and adjust the relative offset
-            if self.outer.rel_offset > pow(2,BLOCKSIZE):
-                self.outer.block+=1
-                self.outer.rel_offset -= pow(2,BLOCKSIZE)
-                self.dbh.execute("insert into `LogicalIndex_%s` set inode=%r,block=%r",(self.outer.table,self.inode,self.outer.block))
                 
         def finish(self):
             pass
@@ -320,7 +318,7 @@ class SearchIndex(Reports.report):
             result.toolbar(cb=add_word_cb, text="Add word", tooltip = "Add word",icon="red-plus.png")
             result.row("Search for",group,tmp,valign="top")
             result.textfield("Within characters","range")
-            result.checkbox("Tick this when ready","final",False)
+            result.checkbox("Tick this when ready","final",True)
 
         except KeyError:
             return
@@ -351,7 +349,35 @@ class SearchIndex(Reports.report):
         old_temp_table = None
         offset_columns=[]
         word_ids = []
-        
+
+        ## Now we create a cache table for each set of word
+        ## combinations. We need to find a unique identifier for this
+        ## request to name the table with. For example if we ask for
+        ## "foo" and "bar" within 100 bytes of each other we should
+        ## cache one set of results, while if we ask for "foo" and
+        ## "word" this is a very different set.
+        canonicalised_query = FlagFramework.canonicalise(query)
+ 
+        ## We store this canonical query - We could use the meta table
+        ## for this, but the report does not get cached until the
+        ## analyse method is finished, which does not allow us to
+        ## create the other tables
+        dbh.execute("""CREATE TABLE if not exists `LogicalIndexCache_reference` (
+        `id` INT NOT NULL AUTO_INCREMENT ,
+        `query` TEXT NOT NULL ,
+        `fsimage` VARCHAR( 200 ) NOT NULL,
+        index (`id`)
+        )""")
+
+        ## First is it already here? - This should not happen, since
+        ## we will never be run again with the same set of data, but
+        ## better be safe:
+        dbh.execute("select * from `LogicalIndexCache_reference` where fsimage=%r and query=%r",(query['fsimage'],canonicalised_query))
+        row=dbh.fetch()
+
+        ## The cache table already exists, we dont need to do anything.
+        if row: return
+
         ## We start off by isolating offset ranges of interest
         for word in query.getarray('keyword'):
             temp_table = dbh.get_temp()
@@ -371,124 +397,79 @@ class SearchIndex(Reports.report):
 
             old_temp_table=temp_table
 
-        ## Now we create a cache table for each set of word
-        ## combinations. We need to find a unique identifier for this
-        ## request to name the table with. For example if we ask for
-        ## "foo" and "bar" within 100 bytes of each other we should
-        ## cache one set of results, while if we ask for "foo" and
-        ## "word" this is a very different set.
-        canonicalised_query = FlagFramework.canonicalise(query)
- 
-        ## We store this canonical query
-        dbh.execute("""CREATE TABLE if not exists `LogicalIndexCache_reference` (
-        `id` INT NOT NULL AUTO_INCREMENT ,
-        `query` TEXT NOT NULL ,
-        `fsimage` VARCHAR( 200 ) NOT NULL,
-        index (`id`)
-        )""")
-
-        ## First is it already here?
-        dbh.execute("select * from `LogicalIndexCache_reference` where fsimage=%r and query=%r",(query['fsimage'],canonicalised_query))
-        row=dbh.fetch()
-
-        ## The cache table already exists, we dont need to do anything.
-        if row: return
-
         ## Create a new cache table and populate it:
         dbh.execute("insert into `LogicalIndexCache_reference` set fsimage=%r, query=%r",(query['fsimage'],canonicalised_query))
         cache_id = dbh.autoincrement()
         
         dbh.execute("create table LogicalIndexCache_%s select * from %s",(cache_id,temp_table))
-
         return
-    
-        keyword = query['keyword']
-        table = query['fsimage']
-        dbh2.execute("CREATE TABLE if not exists `LogicalKeyword_%s` (`id` INT NOT NULL AUTO_INCREMENT ,`inode` VARCHAR( 20 ) NOT NULL ,`offset` BIGINT NOT NULL ,`text` VARCHAR( 200 ) NOT NULL ,`keyword` VARCHAR(20) NOT NULL ,PRIMARY KEY ( `id` ))",(table))
-        iofd = IO.open(query['case'], query['fsimage'])
-        fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"], query["fsimage"], iofd)
-
-        pdbh = DB.DBO(None)
-        pdbh.execute("select id from dictionary where word=%r",(keyword))
-        row=pdbh.fetch()
-        keyword_id=row['id']
-        
-        dbh.execute("select offset from LogicalIndexOffsets_%s where id=%r",(table,keyword_id))
-        for row in dbh:
-            offset =  row['offset']
-            ## Find out which inode this offset is in:
-            block = offset >> BLOCKSIZE
-            dbh2.execute("select inode,min(block) as minblock from LogicalIndex_%s where block = %r group by block",(query['fsimage'],block))
-            row=dbh2.fetch()
-            if not row: continue
-            ## Here we remove the block number part from the int. If
-            ## there are a number of blocks in the database for this
-            ## inode, we account for the extra blocks.
-            off = offset - ((2*block - row['minblock'])*pow(2, BLOCKSIZE))
-            dbh2.execute("insert into LogicalKeyword_%s set inode=%r, offset=%r, keyword=%r",(table,row['inode'],off,keyword))
         
     def display(self,query,result):
-        dbh = self.DBO(query['case'])
-        keyword = query['keyword']
-        if not query.has_key('showall'):
-            query['where_Keyword']="=%s" % keyword
-            
-        result.heading("Previously searched keywords in logical image %s" %
-                       (query['fsimage']))
-
-        q=query.clone()
-        del q['where_Keyword']
-        result.link("Show all previously cached keywords",q,showall='y',icon='examine.png')
+        result.heading("Searching for '%s' in image %s" % ('\',\''.join(query.getarray('keyword')),query['fsimage']))
         
+        dbh = self.DBO(query['case'])
         table = query['fsimage']
         iofd = IO.open(query['case'], query['fsimage'])
         fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"], query["fsimage"], iofd)
-
-        ## This stuff is done on the fly because it is time consuming
-        ## - The disadvantage is that it cannot be searched on.
-        def SampleData(string):
-            inode,offset=string.split(',')
-            offset=int(offset)
-            left=offset-10
-            if left<0: left=0
-
-            dbh.check_index("LogicalKeyword_%s" % table,"inode")
-            dbh.execute("select inode,text,offset,keyword from LogicalKeyword_%s where offset = %r and inode=%r ",(table,offset,inode))
-            row=dbh.fetch()
-            keyword=row['keyword']
-            right=offset+len(keyword)+20
-
-            if len(row['text'])<len(keyword):                
-                fd = fsfd.open(inode=row['inode'])
-                fd.seek(left)
-                ## Read some data before and after the keyword
-                data = fd.read(right-left)
-                dbh.execute("update LogicalKeyword_%s set text=%r where offset=%r and inode=%r",(table,data,offset,row['inode']))
-            else:
-                data=row['text']
-
-            output = result.__class__(result)
-            output.text(escape(data[0:offset-left]),sanitise='full')
-            output.text(escape(data[offset-left:offset-left+len(keyword)]),color='red',sanitise='full')
-            output.text(escape(data[offset-left+len(keyword):]),color='black',sanitise='full')
-            return output
 
         ## Find the cache table:
         canonicalised_query = FlagFramework.canonicalise(query)
-        ## First is it already here?
+
+        ## This should be here because we create it in the analyse
+        ## method.
         dbh.execute("select * from `LogicalIndexCache_reference` where fsimage=%r and query=%r",(query['fsimage'],canonicalised_query))
         row=dbh.fetch()
+        cache_id=row['id']
+        
+        ## Find the offset columns:
+        dbh.execute("desc LogicalIndexCache_%s" % cache_id)
+        offset_columns =[ row['Field'] for row in dbh if row['Field'].startswith('offset_') ]
 
-        print "Cache id is %s" % row['id']
-        return
-    
+        ## Relate the offsets to actual words
+        pydbh = DB.DBO(None)
+
+        words = []
+        for word in offset_columns:
+            print "searching for %s" % word
+            pydbh.execute("select word,id from dictionary where id=%r" % word[len("offset_"):])
+            row=pydbh.fetch()
+            words.append(row['word'])
+
+        print words
+        ## This stuff is done on the fly because it is time consuming
+        ## - The disadvantage is that it cannot be searched on.
+        def SampleData(string):
+            row = string.split(',')
+            inode = row[0]
+            low=int(row[1])
+            high=int(row[2])
+            offsets =[ int(a) for a in [low]+row[3:]+[high] ]
+            fd = fsfd.open(inode=inode)
+            fd.seek(low)
+            data=fd.read(high-low)
+
+            out=result.__class__(result)
+            word=''
+            for i in range(1,len(offsets)):
+                out.text(data[offsets[i-1]-low+len(word):offsets[i]-low],color='black')
+                try:
+                    word = words[i-1]
+                except:
+                    word = ''
+
+                out.text(data[offsets[i]-low:offsets[i]-low+len(word)],color='red')
+            
+            return out
+
+        tmp = ['(block_number <<%s) + (%s & ((1<<%s)-1))' % (BLOCKBITS,a,BLOCKBITS) for a in offset_columns ]
+        
         result.table(
-            columns = ['a.inode','name','concat(a.inode,",",offset)','keyword','offset'],
-            names=['Inode','Filename','Data','Keyword','Offset'],
-            callbacks = { 'Data': SampleData },
-            table='LogicalKeyword_%s as a, file_%s as b' % (table,table),
-            where='a.inode=b.inode',
-            links = [ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',fsimage=query['fsimage'],mode='HexDump',__target__='inode') ],
+            columns = ['inode','(block_number <<%s) + (low & ((1<<%s)-1))' % (BLOCKBITS,BLOCKBITS), 'concat(%s)' % ',",",'.join(['inode','(block_number <<%s) + (low & ((1<<%s)-1))' % (BLOCKBITS,BLOCKBITS),'(block_number <<%s) + (high & ((1<<%s)-1))' % (BLOCKBITS,BLOCKBITS)]+tmp)],
+            names=['Inode','Offset','Data'],
+            table='LogicalIndexCache_%s, LogicalIndex_%s ' % (cache_id,table),
+            where = " low>>%s = block " % BLOCKBITS,
+            callbacks = { 'Data' : SampleData },
+#            links = [ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',fsimage=query['fsimage'],mode='HexDump',__target__='inode') ],
             case=query['case'],
             )
         
