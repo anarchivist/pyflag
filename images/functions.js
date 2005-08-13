@@ -127,3 +127,11 @@ function setPointer(theRow, theRowNum, theAction, theDefaultColor, thePointerCol
 
     return true;
 }
+
+function SendAsPost(query) {
+  var tmp;
+  tmp=document.getElementById('pseudo_post_query');
+  tmp.value=query;
+  PseudoForm.target = 'child_window_%s';
+  PseudoForm.submit();
+};

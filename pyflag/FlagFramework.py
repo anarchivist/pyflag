@@ -144,7 +144,10 @@ class query_type:
         for i in self.q:
             result.append("%s=%s" %(urlencode(i[0]),urlencode(i[1])))
 
-        return '%s?' % self.base +'&'.join(result)+mark
+        if self.base:
+            return '%s?' % self.base +'&'.join(result)+mark
+        else:
+            return '&'.join(result)+mark
 
     def __delitem__(self,item):
         """ Removes all instance of item from the CGI object """

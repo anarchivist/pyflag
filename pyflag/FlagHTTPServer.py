@@ -103,6 +103,17 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                 for value in form[key]:
                     query[key]=value.value
 
+        ## This handles the case where the entire query is submitted
+        ## in a single parameter called pseudo_post_query. This is
+        ## done for stupid browsers like IE which refuse to handle
+        ## long queries using get - so we post the entire query
+        ## through javascript:
+        try:
+            query = FlagFramework.query_type(cgi.parse_qsl(query['pseudo_post_query']),user=user, passwd=passwd)
+            print "posted query is %s" % query
+        except KeyError:
+            pass
+
         self.query=query
         return query
 ##            self.wfile.write("%s = %s <br>\n" % (key,form[key]))

@@ -95,8 +95,13 @@ class HTMLUI(UI.GenericUI):
     callback_dict = {}
     callback_time_dict={}
     time_dict={}
+    ## This is used as a unique count of ids
+    id=0
     
     def __init__(self,default = None,query=None):
+        
+        HTMLUI.id+=1
+        
         self.result = ''
         
         if default != None:
@@ -133,6 +138,10 @@ class HTMLUI(UI.GenericUI):
         self.title=''
         
     def display(self):
+        ## If the method is post, we need to emit the pseudo post form:
+        if config.METHOD=='POST':
+            self.result="<form name=PseudoForm method=POST action='/post'><input type=hidden id=pseudo_post_query name=pseudo_post_query value='' /></form><script>window.name='ID%s';</script>" % self.id + self.result
+
         #Make a toolbar
         if not self.nav_query:
             q = self.defaults.clone()
@@ -159,7 +168,7 @@ class HTMLUI(UI.GenericUI):
         #Check to see that table tags are balanced:
         while self.table_depth>0:
             self.end_table()
-            
+
         return self.result
 
     def heading(self,string):
@@ -346,12 +355,10 @@ class HTMLUI(UI.GenericUI):
             tooltip=string
             string=tmp
 
+        tmp = []
         try:
             tmp=target['__opt__'].split(',')
             del q['__opt__']
-            if 'parent' in tmp:
-                del q['__opt__']
-                options['onclick']="self.opener.location=\"%s\"; self.close();" % q
             if 'popup' in tmp:
                 options['onclick'] ="window.open('%s','client','HEIGHT=600,WIDTH=600,scrollbars=yes')" % q
                 self.result+="<a href=# %s >%s</a>" %(self.opt_to_str(options),string)
@@ -359,10 +366,21 @@ class HTMLUI(UI.GenericUI):
         except KeyError:
             pass
 
-        if tooltip:
-            self.result+="<abbr title='%s'><a href='blah?%s' %s>%s</a></abbr>" % (tooltip,q,self.opt_to_str(options),string)
+        if config.METHOD=='POST':
+            if 'parent' in tmp:
+                base = '<a href="" %s onclick="PseudoForm.target=self.opener.window.name; document.getElementById(\'pseudo_post_query\').value=\'%s\';  PseudoForm.submit(); self.close();" >%s</a>' % (self.opt_to_str(options),q,string)
+            else:
+                base = '<a href="" %s onclick=SendAsPost(\'%s\')>%s</a>' % (self.opt_to_str(options),q,string)
         else:
-            self.result+="<a href='blah?%s' %s>%s</a>" % (q,self.opt_to_str(options),string)
+            if 'parent' in tmp:
+                options['onclick']="self.opener.location=\"%s\"; self.close();" % q
+
+            base ="<a href='blah?%s' %s>%s</a>" % (q,self.opt_to_str(options),string)
+            
+        if tooltip:
+            self.result+="<abbr title='%s'>%s</abbr>" % (tooltip,base)
+        else:
+            self.result+=base
 
     def toolbar_popup(self,callback, label,icon=None,toolbar=0, menubar=0, tooltip=None, **options):
         """ This method presents a button on the screen, which when
@@ -400,10 +418,17 @@ class HTMLUI(UI.GenericUI):
         ## allow the engine to differentiate between a refresh to this
         ## page with pre-filled parameters and a form which was
         ## submitted by the user.
+
+        ## Unfortunately MS Internet Explorer is a very brain damaged
+        ## browser and it seems to truncate the GET query string at an
+        ## arbitrary location. This means we need to do some
+        ## gymnastics to get the browser to submit in POST or we risk
+        ## losing a lot of our parameters.
         self.result+="""<script language=javascript>
-        var client;
+        var tmp;
         function open_%s_window() {
            var query='';
+           window.open('','child_window_%s','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=600,scrollbars=yes');
            //Here we read the forms contents, so we can let the popup window know the values of currently filled in fields (Before submitting).
            for(var i=0; i<document.pyflag_form.elements.length; i++) {
               //Checkboxes should only be added if they are checked
@@ -415,9 +440,12 @@ class HTMLUI(UI.GenericUI):
                  query+=document.pyflag_form.elements[i].name+'='+escape(document.pyflag_form.elements[i].value)+'&';
               };
            };
-           client=window.open('%s&'+query+'&callback_stored=%s','client','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=600,scrollbars=yes');
+           tmp=document.getElementById('pseudo_post_query');
+           tmp.value=query+'&callback_stored=%s';
+           PseudoForm.target = 'child_window_%s';
+           PseudoForm.submit();
         }; </script><abbr title=%r>
-        """ %(cb,'f?',cb,toolbar,menubar,tooltip)
+        """ %(cb,cb,toolbar,menubar,cb,cb,tooltip)
         #(cb,self.defaults,cb,toolbar,menubar,tooltip)
         
         if icon:
@@ -1351,7 +1379,10 @@ class HTMLUI(UI.GenericUI):
 
         try:
             if options.has_key('parent'):
-                self.result+="<script language=javascript>self.opener.location=\"%s\"; self.close();</script>" % query
+                if config.METHOD=="POST":
+                    self.result+="<script language=javascript>PseudoForm.target=self.opener.window.name; document.getElementById(\'pseudo_post_query\').value=\'%s\';  PseudoForm.submit(); self.close();</script>" % query
+                else:
+                    self.result+="<script language=javascript>self.opener.location=\"%s\"; self.close();</script>" % query
                 return
             
         except KeyError:
