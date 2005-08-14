@@ -201,7 +201,7 @@ class IEHistoryFile:
                 result[key]=entry[key]
 
             c=entry['content'].p()
-#            result['data']=c
+            result['data']=c
             for key in ('content_type','data'):
                 result[key]=c[key]
                 
@@ -221,5 +221,7 @@ if __name__ == "__main__":
 #            print event['event']
             r=["%s=%r" % (k,"%s"%v) for k,v in event.items() if k!='event' ]
             print '\n'.join(r)
+
+            print "url is %s" % event['event']
 
     sys.stderr.write("Completed in %s seconds\n" % (time.time()-a))

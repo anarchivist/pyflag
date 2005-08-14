@@ -29,6 +29,7 @@ import pyflag.Scanner as Scanner
 import pyflag.Reports as Reports
 import pyflag.conf
 config=pyflag.conf.ConfObject()
+import pyflag.FileFormats.IECache as IECache
 
 ## raise Exception("This module not finished yet")
 
@@ -42,20 +43,41 @@ class IEIndex(Scanner.GenScanFactory):
         self.table=table
 
     def prepare(self):
-        self.dbh.MySQLHarness("pasco -t %s -g create " % (self.table))
+        self.dbh.execute("""CREATE TABLE IF NOT EXISTS history_%s (
+        `path` TEXT NOT NULL,
+        `type` VARCHAR(20) NOT NULL,
+        `url` TEXT NOT NULL,
+        `modified` DATETIME NOT NULL,
+        `accessed` DATETIME NOT NULL,
+        `filename` VARCHAR(250),
+        `filepath` VARCHAR(250),
+        `headers` TEXT)""" % self.table)        
+#        self.dbh.MySQLHarness("pasco -t %s -g create " % (self.table))
 
     def reset(self):
         Scanner.GenScanFactory.reset(self)
-        self.dbh.MySQLHarness("pasco -t %s -g drop " % (self.table))
+        self.dbh.execute("DROP TABLE IF EXISTS history_%s" % self.table)
+#        self.dbh.MySQLHarness("pasco -t %s -g drop " % (self.table))
         
     def destroy(self):
-        self.dbh.execute('ALTER TABLE history_%s ADD INDEX(url(10))', self.table)
+        self.dbh.check_index("history_%s" % self.table,"url",10)
+#        self.dbh.execute('ALTER TABLE history_%s ADD INDEX(url(10))', self.table)
 
     class Scan(Scanner.StoreAndScanType):
         types = ['application/x-ie-index']
 
         def external_process(self,name):
-            self.dbh.MySQLHarness("pasco -t %s -p %r %s " % (self.table,self.ddfs.lookup(inode=self.inode),name))
+            fd = open(name,'r')
+            history = IECache.IEHistoryFile(fd)
+            for event in history:
+                if event:                    
+                    r=["%s=%r" % (k,"%s"%v) for k,v in event.items() if k!='event' ]
+                    self.dbh.execute("INSERT INTO history_%s VALUES(%r,%r,%r,%r,%r,%r,%r,%r)",(self.table, self.ddfs.lookup(inode=self.inode),
+               event['type'],event['url'],event['modified_time'],
+               event['accessed_time'],
+               event['filename'],'',event['data']))
+
+                    # self.dbh.MySQLHarness("pasco -t %s -p %r %s " % (self.table,self.ddfs.lookup(inode=self.inode),name))
 
 class IEHistory(Reports.report):
     """ View IE browsing history with pasco"""

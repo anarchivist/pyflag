@@ -1,4 +1,4 @@
-all: ../bin/regtool ../bin/pasco
+all: ../bin/regtool
 
 ../bin/regtool: regtool.c registry.c misc.c ntreg.c
 	gcc -g -o ../bin/regtool regtool.c ntreg.c registry.c misc.c timeconv.c
