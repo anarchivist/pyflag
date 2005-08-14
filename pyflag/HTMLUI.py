@@ -368,9 +368,9 @@ class HTMLUI(UI.GenericUI):
 
         if config.METHOD=='POST':
             if 'parent' in tmp:
-                base = '<a href="" %s onclick="PseudoForm.target=self.opener.window.name; document.getElementById(\'pseudo_post_query\').value=\'%s\';  PseudoForm.submit(); self.close();" >%s</a>' % (self.opt_to_str(options),q,string)
+                base = '<a href="about:none" %s onclick="PseudoForm.target=self.opener.window.name; document.getElementById(\'pseudo_post_query\').value=\'%s\';  PseudoForm.submit(); self.close();" >%s</a>' % (self.opt_to_str(options),q,string)
             else:
-                base = '<a href="" %s onclick=SendAsPost(\'%s\')>%s</a>' % (self.opt_to_str(options),q,string)
+                base = '<a href="about:none" %s onClick="document.getElementById(\'pseudo_post_query\').value=\'%s\';PseudoForm.method=\'POST\';  PseudoForm.submit();">%s</a>' % (self.opt_to_str(options),q,string)
         else:
             if 'parent' in tmp:
                 options['onclick']="self.opener.location=\"%s\"; self.close();" % q

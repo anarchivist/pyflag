@@ -68,7 +68,7 @@ class Menu(Theme.BasicTheme):
                 ## Only propegate if we stay within the same family:
                 try:
                     if query['family']==k:
-                        result+='menu.addSubItem("%s", "%s","%s","%s","");' % (k,r.name,r.name,Theme.propegate(query,FlagFramework.query_type((),family=k,report=r.name)))
+                        result+='menu.addSubItem("%s", "%s","%s","f?%s","");' % (k,r.name,r.name,Theme.propegate(query,FlagFramework.query_type((),family=k,report=r.name)))
                         continue
                 except KeyError:
                     pass

@@ -241,6 +241,15 @@ class BuildDictionary(Reports.report):
             
         result.row(table,form,valign='top')
 
+def resolve_offset(dbh, encoded_offset):
+    """ Converts the encoded_offset to an offset within its Inode.
+
+    As mentioned above the encoded offset includes a bit mask with block number. This makes the encoded offset unique within the entire image.
+    """
+    dbh.execute("select (block_number <<10) + (%r & ((1<<10)-1)) as `Offset` from LogicalIndex_test where ( %r >>10 = block )",(encoded_offset,encoded_offset))
+    row=dbh.fetch()
+    return row['Offset']
+    
 class SearchIndex(Reports.report):
     """ Search for indexed keywords """
     description = "Search for words that were indexed during filesystem load. Words must be in dictionary to be indexed. "
@@ -325,21 +334,20 @@ class SearchIndex(Reports.report):
 
     def reset(self,query):
         dbh = self.DBO(query['case'])
+        dbh2 = self.DBO(query['case'])
         table = query['fsimage']
         keyword = query['keyword']
         try:
-            dbh.execute("delete from LogicalKeyword_%s where keyword = %r" , (table,query['keyword']))
+            dbh.execute("select * from LogicalIndexCache_reference")
+            for row in dbh:
+                dbh2.execute("drop table LogicalIndexCache_%s" % row['id'])
+
+            dbh.execute("drop table LogicalIndexCache_reference")
         except DB.DBError:
             pass
 
     def progress(self,query,result):
-        result.heading("Currently searching for %r in image %r" % (query['keyword'],query['fsimage']))
-        dbh = self.DBO(query['case'])
-        table = query['fsimage']
-        dbh.check_index("LogicalKeyword_%s" % table,"keyword")
-        dbh.execute("select count(*) as Count from LogicalKeyword_%s where keyword=%r",(table,query['keyword']))
-        row=dbh.fetch()
-        result.text("Currently found %s occurances" % row['Count'],color='red')
+        result.heading("Searching for '%s' in image %s" % ('\',\''.join(query.getarray('keyword')),query['fsimage']))
         
     def analyse(self,query):
         dbh = DB.DBO(query['case'])
@@ -430,41 +438,42 @@ class SearchIndex(Reports.report):
 
         words = []
         for word in offset_columns:
-            print "searching for %s" % word
             pydbh.execute("select word,id from dictionary where id=%r" % word[len("offset_"):])
             row=pydbh.fetch()
             words.append(row['word'])
 
-        print words
         ## This stuff is done on the fly because it is time consuming
         ## - The disadvantage is that it cannot be searched on.
         def SampleData(string):
             row = string.split(',')
             inode = row[0]
-            low=int(row[1])
-            high=int(row[2])
-            offsets =[ int(a) for a in [low]+row[3:]+[high] ]
+            low=resolve_offset(dbh,row[1])
+            high=resolve_offset(dbh,row[2])
+            offsets = [ resolve_offset(dbh,a) for a in row[3:] ]
+            sorted_offsets = [low] + offsets[:] + [high]
+            sorted_offsets.sort()
+#            offsets =[ int(a) for a in [low]+row[3:]+[high] ]
             fd = fsfd.open(inode=inode)
             fd.seek(low)
             data=fd.read(high-low)
 
             out=result.__class__(result)
             word=''
-            for i in range(1,len(offsets)):
-                out.text(data[offsets[i-1]-low+len(word):offsets[i]-low],color='black')
+            for i in range(1,len(sorted_offsets)):
+                out.text(data[sorted_offsets[i-1]-low+len(word):sorted_offsets[i]-low],color='black')
                 try:
-                    word = words[i-1]
+                    word = words[offsets.index(sorted_offsets[i])]
                 except:
                     word = ''
 
-                out.text(data[offsets[i]-low:offsets[i]-low+len(word)],color='red')
+                out.text(data[sorted_offsets[i]-low:sorted_offsets[i]-low+len(word)],color='red')
             
             return out
 
         tmp = ['(block_number <<%s) + (%s & ((1<<%s)-1))' % (BLOCKBITS,a,BLOCKBITS) for a in offset_columns ]
         
         result.table(
-            columns = ['inode','(block_number <<%s) + (low & ((1<<%s)-1))' % (BLOCKBITS,BLOCKBITS), 'concat(%s)' % ',",",'.join(['inode','(block_number <<%s) + (low & ((1<<%s)-1))' % (BLOCKBITS,BLOCKBITS),'(block_number <<%s) + (high & ((1<<%s)-1))' % (BLOCKBITS,BLOCKBITS)]+tmp)],
+            columns = ['inode','(block_number <<%s) + (low & ((1<<%s)-1))' % (BLOCKBITS,BLOCKBITS), 'concat(%s)' % ',",",'.join(['inode','low','high']+offset_columns)],
             names=['Inode','Offset','Data'],
             table='LogicalIndexCache_%s, LogicalIndex_%s ' % (cache_id,table),
             where = " low>>%s = block " % BLOCKBITS,
