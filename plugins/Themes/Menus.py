@@ -73,7 +73,7 @@ class Menu(Theme.BasicTheme):
                 except KeyError:
                     pass
                 
-                result+='menu.addSubItem("%s", "%s","%s","%s","");' % (k,r.name,r.name,FlagFramework.query_type((),family=k,report=r.name))
+                result+='menu.addSubItem("%s", "%s","%s","f?%s","");' % (k,r.name,r.name,FlagFramework.query_type((),family=k,report=r.name))
                 
 
         return result+"menu.showMenu(); }</script>"

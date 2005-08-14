@@ -396,7 +396,11 @@ class SearchIndex(Reports.report):
 
             if not old_temp_table:
                 offset_columns.append("offset_%s" % word_id)
-                dbh.execute("create table %s select offset-%s as low,offset+%s as high, offset as offset_%s from LogicalIndexOffsets_test where id=%r",(temp_table,range,range,word_id,word_id))
+                try:
+                    dbh.execute("create table %s select offset-%s as low,offset+%s as high, offset as offset_%s from LogicalIndexOffsets_test where id=%r",(temp_table,range,range,word_id,word_id))
+                except DB.DBError:
+                    raise Reports.ReportError("Unable to find a LogicalIndexOffsets table for current image. Did you run the LogicalIndex Scanner?")
+                
             else:
                 dbh.execute("create table %s select least(offset-%s,low) as low, greatest(offset+%s,high) as high, %s, offset as offset_%s from %s, LogicalIndexOffsets_test where id=%r and offset<high and offset>low",
                             (temp_table,range,range,
@@ -478,7 +482,7 @@ class SearchIndex(Reports.report):
             table='LogicalIndexCache_%s, LogicalIndex_%s ' % (cache_id,table),
             where = " low>>%s = block " % BLOCKBITS,
             callbacks = { 'Data' : SampleData },
-#            links = [ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',fsimage=query['fsimage'],mode='HexDump',__target__='inode') ],
+            links = [ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',fsimage=query['fsimage'],mode='HexDump',__target__='inode') ],
             case=query['case'],
             )
         
