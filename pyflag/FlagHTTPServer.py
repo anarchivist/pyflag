@@ -67,8 +67,11 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         i = self.path.rfind('?')
         if i>=0:
             rest, query = self.path[:i], self.path[i+1:]
+        elif '=' in self.path:
+            rest,query = '',self.path[1:]
         else:
             rest,query = self.path,''
+            
             
         env = {}
         env['GATEWAY_INTERFACE'] = 'CGI/1.1'
@@ -110,9 +113,10 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         ## through javascript:
         try:
             query = FlagFramework.query_type(cgi.parse_qsl(query['pseudo_post_query']),user=user, passwd=passwd)
-            print "posted query is %s" % query
+#            print "pseudo posted query is %s" % query
         except KeyError:
             pass
+#            print "posted query is %s" % query
 
         self.query=query
         return query

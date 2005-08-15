@@ -368,9 +368,9 @@ class HTMLUI(UI.GenericUI):
 
         if config.METHOD=='POST':
             if 'parent' in tmp:
-                base = '<a href="about:none" %s onclick="PseudoForm.target=self.opener.window.name; document.getElementById(\'pseudo_post_query\').value=\'%s\';  PseudoForm.submit(); self.close();" >%s</a>' % (self.opt_to_str(options),q,string)
+                base = '<a %s href="javascript: document.PseudoForm.target=self.opener.window.name; document.getElementById(\'pseudo_post_query\').value=\'%s\';  document.PseudoForm.submit(); self.close();" >%s</a>' % (self.opt_to_str(options),q,string)
             else:
-                base = '<a href="about:none" %s onClick="document.getElementById(\'pseudo_post_query\').value=\'%s\';PseudoForm.method=\'POST\';  PseudoForm.submit();">%s</a>' % (self.opt_to_str(options),q,string)
+                base = '<a %s href="javascript: document.getElementById(\'pseudo_post_query\').value=\'%s\';document.PseudoForm.method=\'POST\';  PseudoForm.submit();">%s</a>' % (self.opt_to_str(options),q,string)
         else:
             if 'parent' in tmp:
                 options['onclick']="self.opener.location=\"%s\"; self.close();" % q
@@ -428,7 +428,7 @@ class HTMLUI(UI.GenericUI):
         var tmp;
         function open_%s_window() {
            var query='';
-           window.open('','child_window_%s','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=600,scrollbars=yes');
+           client_page = window.open('','child_window_%s','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=600,scrollbars=yes,dependent');
            //Here we read the forms contents, so we can let the popup window know the values of currently filled in fields (Before submitting).
            for(var i=0; i<document.pyflag_form.elements.length; i++) {
               //Checkboxes should only be added if they are checked
@@ -442,8 +442,8 @@ class HTMLUI(UI.GenericUI):
            };
            tmp=document.getElementById('pseudo_post_query');
            tmp.value=query+'&callback_stored=%s';
-           PseudoForm.target = 'child_window_%s';
-           PseudoForm.submit();
+           document.PseudoForm.target = 'child_window_%s';
+           document.PseudoForm.submit();
         }; </script><abbr title=%r>
         """ %(cb,cb,toolbar,menubar,cb,cb,tooltip)
         #(cb,self.defaults,cb,toolbar,menubar,tooltip)
@@ -1374,15 +1374,19 @@ class HTMLUI(UI.GenericUI):
             self.result += "<hr />\n"
         
     def refresh(self,interval,query,**options):
+        target_window = "'_self'"
+        target_js = 'window'
+        close = ''
         if not options:
             options={}
 
         try:
             if options.has_key('parent'):
                 if config.METHOD=="POST":
-                    self.result+="<script language=javascript>PseudoForm.target=self.opener.window.name; document.getElementById(\'pseudo_post_query\').value=\'%s\';  PseudoForm.submit(); self.close();</script>" % query
+                    target_window = "self.opener.window.name"
+                    close = "self.close();"
                 else:
-                    self.result+="<script language=javascript>self.opener.location=\"%s\"; self.close();</script>" % query
+                    target_js = 'self.opener'
                 return
             
         except KeyError:
@@ -1390,8 +1394,18 @@ class HTMLUI(UI.GenericUI):
 
         ## We do both javascript refresh as well as meta refresh to
         ## ensure that the browser supports either method
-        self.result+=""" <script>function refresh() {window.location="%s";}; setTimeout("refresh()",%s) </script>""" % (query,int(interval)*1000)
-        self.meta += "<META HTTP-EQUIV=Refresh Content=\"%s; URL=%s\">" % (interval,query)
+        if config.METHOD=="POST":
+            self.result+="""<script language=javascript>
+            function refresh() {
+            document.PseudoForm.target=%s;
+            document.getElementById(\'pseudo_post_query\').value=\'%s\';
+            document.PseudoForm.submit(); %s
+            };
+            window.setTimeout(refresh, %s);
+            </script>""" % (target_window,query,close,1000 * interval)
+        else:
+            self.result+=""" <script>function refresh() {%s.location="%s";}; setTimeout("refresh()",%s) </script>""" % (target_js,query,int(interval)*1000)
+            self.meta += "<META HTTP-EQUIV=Refresh Content=\"%s; URL=%s\">" % (interval,query)
 
     def icon(self, path, tooltip=None, **options):
         """ This allows the insertion of a small static icon picture. The image should reside in the images directory."""

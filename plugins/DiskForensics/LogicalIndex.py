@@ -52,7 +52,7 @@ config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
 
 ## This blocksize is in bits (2^20)
-BLOCKBITS=10
+BLOCKBITS=20
 BLOCKSIZE=pow(2,BLOCKBITS)
 
 def escape(string):

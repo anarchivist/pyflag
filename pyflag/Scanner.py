@@ -360,7 +360,11 @@ class Drawer:
 
     def get_parameters(self):
         for i in self.contains:
-            yield "scan_%s" % i,'onoff'
+            try:
+                scanner = Registry.SCANNERS.dispatch(i)
+                yield "scan_%s" % i,'onoff'
+            except:
+                continue
 
     def add_defaults(self,dest_query,src_query):
         """ Given a src_query object with some scan_ entries, we add
@@ -372,7 +376,12 @@ class Drawer:
 
             if src_query[scan_group_name]=='on':
                 for i in self.contains:
-                    cls = Registry.SCANNERS.dispatch(i)
+                    try:
+                        cls = Registry.SCANNERS.dispatch(i)
+                    except:
+                        ## Ignore scanners in contains which do not exist
+                        continue
+                    
                     scan_name = 'scan_%s' % i
                     del dest_query[scan_name]
 
@@ -403,13 +412,16 @@ class Drawer:
 
         ## Add defaults for the scanners contained:
         for i in self.contains:
-            cls = Registry.SCANNERS.dispatch(i)
-            if not query.has_key('scan_%s' % i):
-                if cls.default:
-                    result.hidden('scan_%s' % i,'on')
-                else:
-                    result.hidden('scan_%s' % i,'off')
-
+            try:
+                cls = Registry.SCANNERS.dispatch(i)
+                if not query.has_key('scan_%s' % i):
+                    if cls.default:
+                        result.hidden('scan_%s' % i,'on')
+                    else:
+                        result.hidden('scan_%s' % i,'off')
+            except ValueError:
+                pass
+            
         def configure_cb(query,result):
             try:
                 if query['refresh']:
@@ -427,7 +439,11 @@ class Drawer:
             self.add_defaults(query,query.clone())
 
             for i in self.contains:
-                cls = Registry.SCANNERS.dispatch(i)                        
+                try:
+                    cls = Registry.SCANNERS.dispatch(i)
+                except:
+                    continue
+                
                 scanner_desc = cls.__doc__.splitlines()[0]
 
                 ## Add an enable/disable selector

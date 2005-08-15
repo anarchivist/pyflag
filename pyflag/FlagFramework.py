@@ -145,7 +145,7 @@ class query_type:
             result.append("%s=%s" %(urlencode(i[0]),urlencode(i[1])))
 
         if self.base:
-            return '%s?' % self.base +'&'.join(result)+mark
+            return '&'.join(result)+mark
         else:
             return '&'.join(result)+mark
 
