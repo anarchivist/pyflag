@@ -106,7 +106,7 @@ def draw_calendar(query,ui,target=None):
     q[target]="%04u-%02u-%02u" % (date.year+1,date.month,15)
     ui.toolbar(text="Next Year",icon="stock_right-with-subpoints.png",link=q)
     
-    del query['callback_stored']
+    query.poparray('callback_stored')
     del query['__opt__']
     del query[target]
     query['__opt__'] = 'parent'

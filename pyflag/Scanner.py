@@ -426,7 +426,7 @@ class Drawer:
             try:
                 if query['refresh']:
                     del query['refresh']
-                    del query['callback_stored']
+
                     result.refresh(0,query,parent=1)
             except KeyError:
                 pass

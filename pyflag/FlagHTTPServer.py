@@ -274,7 +274,10 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         self.wfile.write(result.display())
         return
 
-class FlagHTTPServer( SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
+#class FlagHTTPServer( SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
+#    pass
+
+class FlagHTTPServer( BaseHTTPServer.HTTPServer):
     pass
 
 def Server(HandlerClass = FlagServerHandler,

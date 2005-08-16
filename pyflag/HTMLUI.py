@@ -58,7 +58,6 @@ def goto_row_cb(query,result,variable='limit'):
     try:
         if query['refresh']:
             del query['refresh']
-            del query['callback_stored']
 
             ## Accept hex representation for limits
             if limit.startswith('0x'):
@@ -974,7 +973,7 @@ class HTMLUI(UI.GenericUI):
                 csv_writer.writerow(new_row)
 
             data.seek(0)
-            query.poparray('callback_stored')
+            del query['callback_stored']
             result.result = "#Pyflag Table widget output\n#Query was %s.\n#Fields: %s\n""" %(query," ".join(names_list))
             if condition_text_array:
                 result.result += "#The following conditions are in force\n"
@@ -1407,13 +1406,9 @@ class HTMLUI(UI.GenericUI):
                             ## stored_query information from the
                             ## query:
                             callback_stored = query.poparray('callback_stored')
-                            print "my callback %s " % callback_stored
-
                             stored_query = query['stored_query_%s' % callback_stored]
                             stored_query = FlagFramework.query_type(cgi.parse_qsl(stored_query))
                             del query['stored_query_%s' % callback_stored]
-                            
-                            print "my stored_query %s " % stored_query
                             target_window =  "%r"%stored_query['parent_window']
                             print "set target to %s" % target_window
                         except KeyError:
