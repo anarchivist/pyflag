@@ -139,16 +139,9 @@ class query_type:
         if self.has_key('__mark__'):
             mark='#'+self.__getitem__('__mark__')
             self.__delitem__('__mark__')
-            
-        result = []
-        for i in self.q:
-            result.append("%s=%s" %(urlencode(i[0]),urlencode(i[1])))
 
-        if self.base:
-            return '&'.join(result)+mark
-        else:
-            return '&'.join(result)+mark
-
+        return cgi.urllib.urlencode(self.q)+mark
+    
     def __delitem__(self,item):
         """ Removes all instance of item from the CGI object """
         to_remove=[ d for d in self.q if d[0] == item ]
@@ -200,9 +193,12 @@ class query_type:
 
         return tuple(tmp)
 
-    def poparray(self,array):
+    def poparray(self,key):
         """ Remove last member of array from query """
-        
+        tmp = [ i for i in self.q if i[0]==key ]
+        self.remove(tmp[-1][0],tmp[-1][1])
+
+        return tmp[-1][1]
     
     def has_key(self,key):
         for i in self.q:
@@ -269,7 +265,7 @@ class query_type:
 
 import pyflag.DB as DB
 import threading
-import re
+import re,cgi
 import conf
 
 def urlencode(string):
@@ -279,8 +275,7 @@ def urlencode(string):
     result = ''
     for c in str(string):
         if not c.isalnum():
-            h = hex(ord(c))
-            result +="%%%s" % h[2:]
+            result +="%%%02X" % ord(c)
         else:
             result += c
 

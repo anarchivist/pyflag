@@ -162,12 +162,14 @@ class BrowseFS(Reports.report):
             return result
 
 def goto_page_cb(query,result,variable):
-    limit = query[variable]
+    try:
+        limit = query[variable]
+    except KeyError:
+        limit='0'
 
     try:
         if query['refresh']:
             del query['refresh']
-            del query['callback_stored']
 
             ## Accept hex representation for limits
             if limit.startswith('0x'):

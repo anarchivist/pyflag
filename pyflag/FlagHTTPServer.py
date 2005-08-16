@@ -29,7 +29,7 @@
 
 """ Main HTTP server module """
 
-import SimpleHTTPServer
+import BaseHTTPServer, SimpleHTTPServer, SocketServer
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
 import pyflag.HTMLUI as UI
@@ -112,11 +112,15 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         ## long queries using get - so we post the entire query
         ## through javascript:
         try:
-            query = FlagFramework.query_type(cgi.parse_qsl(query['pseudo_post_query']),user=user, passwd=passwd)
-#            print "pseudo posted query is %s" % query
+            qsl = query['pseudo_post_query']
+            if '?' in qsl:
+                qsl=qsl[qsl.find('?')+1:]
+                
+            query = FlagFramework.query_type(cgi.parse_qsl(qsl),user=user, passwd=passwd)
+            print "pseudo posted query is %s" % query
         except KeyError:
-            pass
-#            print "posted query is %s" % query
+            if self.command=='POST':
+                print "posted query is %s" % query
 
         self.query=query
         return query
@@ -270,6 +274,27 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         self.wfile.write(result.display())
         return
 
+class FlagHTTPServer( SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
+    pass
+
+def Server(HandlerClass = FlagServerHandler,
+           ServerClass = FlagHTTPServer, protocol="HTTP/1.0"):
+
+    ## FIXME: This needs to be properly parsed
+    if sys.argv[1:]:
+        port = int(sys.argv[1])
+    else:
+        port = 8000
+
+    server_address = ('',port)
+
+    HandlerClass.protocol_version = protocol
+    httpd = ServerClass(server_address, HandlerClass)
+    httpd.socket.settimeout(1.0)
+    sa = httpd.socket.getsockname()
+    print "Serving PyFlag requests on %s" % (sa,)
+    httpd.serve_forever()
+
 if __name__ == "__main__":
     flag = FlagFramework.Flag()
     FlagFramework.GLOBAL_FLAG_OBJ =flag
@@ -281,4 +306,4 @@ if __name__ == "__main__":
 
     Graph.Graph = Graph.Ploticus
 
-    SimpleHTTPServer.test(HandlerClass = FlagServerHandler)
+    Server(HandlerClass = FlagServerHandler)

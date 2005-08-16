@@ -246,7 +246,7 @@ def resolve_offset(dbh, encoded_offset):
 
     As mentioned above the encoded offset includes a bit mask with block number. This makes the encoded offset unique within the entire image.
     """
-    dbh.execute("select (block_number <<10) + (%r & ((1<<10)-1)) as `Offset` from LogicalIndex_test where ( %r >>10 = block )",(encoded_offset,encoded_offset))
+    dbh.execute("select (block_number <<%s) + (%r & ((1<<%s)-1)) as `Offset` from LogicalIndex_test where ( %r >>%s = block )",(BLOCKBITS,encoded_offset,BLOCKBITS,encoded_offset, BLOCKBITS))
     row=dbh.fetch()
     return row['Offset']
     
@@ -272,7 +272,6 @@ class SearchIndex(Reports.report):
 
         def remove_word_cb(query,result,word):
             """ Removes word from the query string """
-            del query['callback_stored']
             del query['new_keyword']
             keys = [ k for k in query.getarray('keyword') if k != word ]
             del query['keyword']

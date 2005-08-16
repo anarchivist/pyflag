@@ -140,7 +140,7 @@ class HTMLUI(UI.GenericUI):
     def display(self):
         ## If the method is post, we need to emit the pseudo post form:
         if config.METHOD=='POST' and self.decoration!='raw':
-            self.result="<form name=PseudoForm method=POST action='/post'><input type=hidden id=pseudo_post_query name=pseudo_post_query value='' /></form><script>window.name='ID%s';</script>" % self.id + self.result
+            self.result="<form name=PseudoForm method=POST action='/post'><input type=hidden id=pseudo_post_query name=pseudo_post_query value='' /></form><script>if(!window.name) window.name='ID%s'; </script>" % self.id + self.result
 
         #Make a toolbar
         if not self.nav_query:
@@ -368,9 +368,10 @@ class HTMLUI(UI.GenericUI):
 
         if config.METHOD=='POST':
             if 'parent' in tmp:
-                base = '<a %s href="javascript: document.PseudoForm.target=self.opener.window.name; document.getElementById(\'pseudo_post_query\').value=\'%s\';  document.PseudoForm.submit(); self.close();" >%s</a>' % (self.opt_to_str(options),q,string)
+                action = "javascript: document.PseudoForm.target=self.opener.window.name; document.getElementById(\'pseudo_post_query\').value=\'%s\';  document.PseudoForm.submit(); self.close();" % (q,)
             else:
-                base = '<a %s href="javascript: document.getElementById(\'pseudo_post_query\').value=\'%s\';document.PseudoForm.method=\'POST\';  PseudoForm.submit();">%s</a>' % (self.opt_to_str(options),q,string)
+                action = "javascript: document.getElementById(\'pseudo_post_query\').value=\'%s\';document.PseudoForm.method=\'POST\';  PseudoForm.submit();" % (q,)
+            base = '<a %s href="%s" onclick="%s" >%s</a>' % (self.opt_to_str(options),action,action,string)
         else:
             if 'parent' in tmp:
                 options['onclick']="self.opener.location=\"%s\"; self.close();" % q
@@ -393,10 +394,10 @@ class HTMLUI(UI.GenericUI):
         if not tooltip: tooltip = label
         cb = self.store_callback(callback)
 
-        self.result+="""<script language=javascript>  var client; function open_%s_window() {  client=window.open('%s&callback_stored=%s','client','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=600,scrollbars=yes');  }; </script><abbr title=%r>""" % (cb,self.defaults,cb,toolbar,menubar,tooltip)
+        self.result+="""<script language=javascript>  var client_%s; function open_%s_window() { query = '%s&parent_window='+window.name; query += "&stored_query_%s="+escape(query); client_%s=window.open(query+'&callback_stored=%s','client_%s','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=600,scrollbars=yes');  }; </script><abbr title=%r>""" % (cb,cb,self.defaults,cb,cb,cb,cb,toolbar,menubar,tooltip)
 
         if icon:
-            self.result+="""<a  onclick=\"open_%s_window()\"><img alt=%s border=0 src=images/%s></a>""" % (cb,label,icon)
+            self.result+="""<a href=\"javascript:open_%s_window()\" onclick=\"javascript:open_%s_window()\"><img alt=%s border=0 src=images/%s></a>""" % (cb,cb,label,icon)
         else:
             self.result+="""<input type=button value=%r onclick=\"open_%s_window()\"> """ % (label,cb)
 
@@ -437,19 +438,21 @@ class HTMLUI(UI.GenericUI):
               };
               //We must leave the submit button off, so that when the popup window refreshes to its parent we know it wasnt actually submitted.
               if(document.pyflag_form.elements[i].type!='submit' && document.pyflag_form.elements[i].name.length>0 ) {
-                 query+=document.pyflag_form.elements[i].name+'='+escape(document.pyflag_form.elements[i].value)+'&';
+                 query+=document.pyflag_form.elements[i].name+'='+encodeURIComponent(document.pyflag_form.elements[i].value)+'&';
               };
            };
+           query+= "&parent_window="+self.name;
+           query+="&stored_query_%s="+escape(query);
            tmp=document.getElementById('pseudo_post_query');
            tmp.value=query+'&callback_stored=%s';
            document.PseudoForm.target = 'child_window_%s';
            document.PseudoForm.submit();
         }; </script><abbr title=%r>
-        """ %(cb,cb,toolbar,menubar,cb,cb,tooltip)
+        """ %(cb,cb,toolbar,menubar,cb,cb,cb,tooltip)
         #(cb,self.defaults,cb,toolbar,menubar,tooltip)
         
         if icon:
-            self.result+="""<a  onclick=\"open_%s_window()\"><img alt=%s border=0 src=images/%s></a>""" % (cb,label,icon)
+            self.result+="""<a  href=\"javascript:open_%s_window()\" onclick=\"javascript:open_%s_window()\"><img alt=%s border=0 src=images/%s></a>""" % (cb,cb,label,icon)
         else:
             self.result+="""<input type=button value=%r onclick=\"open_%s_window()\"> """ % (label,cb)
 
@@ -910,12 +913,12 @@ class HTMLUI(UI.GenericUI):
                 try:
                     if query['refresh']:
                         del query['refresh']
-                        del query['callback_stored']
+##                        del query['callback_stored']
                         result.refresh(0,query,parent=1)
                 except KeyError:
                     pass
                 
-                result.display = result.__str__
+                result.decoration = 'naked'
                 result.heading("Select columns to hide:")
                 result.start_form(query, refresh="parent")
                 result.start_table()
@@ -934,10 +937,10 @@ class HTMLUI(UI.GenericUI):
 
         ## Draw a popup to allow the user to save the entire table in CSV format:
         def save_table(query,result):
-            result.display=result.__str__
-            result.type = "text/x-comma-separated-values"
+            result.decoration='raw'
+            result.type = "text/plain"
             data = cStringIO.StringIO()
-            hidden_columns = query.getarray('hide_column')
+            hidden_columns = list(query.getarray('hide_column'))
 
             ## FIXME - We dont usually want to save called back
             ## columns becuase they rarely make sense (but sometimes
@@ -947,7 +950,7 @@ class HTMLUI(UI.GenericUI):
                     hidden_columns.append(i)
                     
             names_list = [ i for i in names if i not in hidden_columns ]
-            cvs_writer = csv.DictWriter(data,names_list,dialect='excel')
+            csv_writer = csv.DictWriter(data,names_list,dialect='excel')
             dbh.execute(query_str_basic + " order by %s" % order,())
             for row in dbh:
                 ## If there are any callbacks we respect those now.
@@ -967,18 +970,18 @@ class HTMLUI(UI.GenericUI):
                     tmp=tmp.replace("\n","\\n")
                     
                     new_row[k]=tmp
-                    
-                cvs_writer.writerow(new_row)
+
+                csv_writer.writerow(new_row)
 
             data.seek(0)
-            del query['callback_stored']
+            query.poparray('callback_stored')
             result.result = "#Pyflag Table widget output\n#Query was %s.\n#Fields: %s\n""" %(query," ".join(names_list))
             if condition_text_array:
                 result.result += "#The following conditions are in force\n"
                 for i in condition_text_array:
                     result.result += "# %s\n" % i
             result.result += data.read()
-                
+            
         self.toolbar(save_table,'Save Table',icon="floppy.png")
 
         ## Write the conditions at the top of the page:
@@ -1377,18 +1380,49 @@ class HTMLUI(UI.GenericUI):
         target_window = "'_self'"
         target_js = 'window'
         close = ''
+        if int(interval)>0:
+            timeout = "window.setTimeout(refresh,%s);" % (1000*int(interval))
+        else:
+            timeout = "refresh();"
+
         if not options:
             options={}
 
         try:
             if options.has_key('parent'):
                 if config.METHOD=="POST":
-                    target_window = "self.opener.window.name"
+                    ## This is required because some browsers forget
+                    ## which window opened this one so self.opener
+                    ## does not work. We therefore try to pass this
+                    ## information in the query to ensure that the
+                    ## correct parent is opened.
+                    try:
+                        if options['parent'].startswith("ID"):
+                            target_window = "%r" % options['parent']
+                        else:
+                            raise AttributeError
+                    except AttributeError:
+                        try:
+                            ## Pop off the parent_window and the
+                            ## stored_query information from the
+                            ## query:
+                            callback_stored = query.poparray('callback_stored')
+                            print "my callback %s " % callback_stored
+
+                            stored_query = query['stored_query_%s' % callback_stored]
+                            stored_query = FlagFramework.query_type(cgi.parse_qsl(stored_query))
+                            del query['stored_query_%s' % callback_stored]
+                            
+                            print "my stored_query %s " % stored_query
+                            target_window =  "%r"%stored_query['parent_window']
+                            print "set target to %s" % target_window
+                        except KeyError:
+                            target_window = "self.opener.window.name"
+                        
                     close = "self.close();"
                 else:
                     target_js = 'self.opener'
-                return
-            
+
         except KeyError:
             pass
 
@@ -1401,8 +1435,8 @@ class HTMLUI(UI.GenericUI):
             document.getElementById(\'pseudo_post_query\').value=\'%s\';
             document.PseudoForm.submit(); %s
             };
-            window.setTimeout(refresh, %s);
-            </script>""" % (target_window,query,close,1000 * interval)
+            %s
+            </script>""" % (target_window,query,close,timeout)
         else:
             self.result+=""" <script>function refresh() {%s.location="%s";}; setTimeout("refresh()",%s) </script>""" % (target_js,query,int(interval)*1000)
             self.meta += "<META HTTP-EQUIV=Refresh Content=\"%s; URL=%s\">" % (interval,query)
