@@ -195,7 +195,12 @@ class BuildDictionary(Reports.report):
             if query['action']=='insert':
                 if len(query['class'])<3:
                     raise DB.DBError("Class name is too short, minimum of 3 letter words are used as class names")
-                dbh.execute("insert into dictionary set word=%r,class=%r",(query['word'],query['class']))
+                ## We only insert into the dictionary if the word is
+                ## not in there again:
+                dbh.execute("select * from dictionary where word=%r",(query['word']))
+                row = dbh.fetch()
+                if not row:
+                    dbh.execute("insert into dictionary set word=%r,class=%r",(query['word'],query['class']))
                 
             elif query['action']=='delete':
                 dbh.execute("delete from dictionary where word=%r",query['word'])

@@ -138,7 +138,7 @@ class HTMLUI(UI.GenericUI):
         
     def display(self):
         ## If the method is post, we need to emit the pseudo post form:
-        if config.METHOD=='POST' and self.decoration!='raw':
+        if self.decoration!='raw':
             self.result="<form name=PseudoForm method=POST action='/post'><input type=hidden id=pseudo_post_query name=pseudo_post_query value='' /></form><script>if(!window.name) window.name='ID%s'; </script>" % self.id + self.result
 
         #Make a toolbar
@@ -660,12 +660,18 @@ class HTMLUI(UI.GenericUI):
             link['open_tree'] = FlagFramework.normpath("/".join(branch[:depth] + [k]))
             open_tree = FlagFramework.urlencode(link['open_tree'])
             sv=v.__str__().replace(' ','&nbsp;')
+            left.icon("spacer.png",width=20*depth,height=20)
             if t =='branch':
-                left.result+="%s%s%s<br>\n" % ("<img src=/flag/images/spacer.png width=20 height=20>" * depth , "<a name=%s href=f?%s#%s><abbr title='%s'><img  border=0 height=16 src=/flag/images/folder.png width=20 height=20></abbr></a>&nbsp;&nbsp;" % (open_tree,link,open_tree,link['open_tree']) , str(sv),  )
+                new_query = link
+                left.link(str(sv),tooltip=link['open_tree'],target=link, name=open_tree,icon="folder.png")
+                left.text("&nbsp;%s\n" % str(sv),color='black')
             elif t == 'special':
-                left.result+="%s%s<br>\n" % ("<img src=/flag/images/spacer.png width=20 height=20>" * depth , "<a name=%s href=f?%s#%s>%s</a>  " % (open_tree,link,open_tree, str(v) ))
+                left.link(str(v),tooltip=link['open_tree'],target=link, name=open_tree)
+                left.text("\n")
             else:
-                left.result+="%s%s%s<br>\n" % ("<img src=/flag/images/spacer.png width=20 height=20>" * depth , "<a name=%s href=f?%s#%s><img border=0 height=16 src=/flag/images/corner.png width=20 height=20></a>&nbsp;&nbsp;" % (open_tree,link,open_tree), str(sv) )
+                left.link(str(sv),tooltip=link['open_tree'],target=link, name=open_tree,icon="corner.png")
+                left.text("&nbsp;%s\n" % str(sv),color='black')
+
         right=self.__class__(self)
         try:
             ## Get the right part:
