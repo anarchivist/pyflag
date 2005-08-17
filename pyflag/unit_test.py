@@ -99,3 +99,9 @@ import clamav
 ## Initialise registry to load all modules in.
 import pyflag.Registry as Registry
 Registry.Init()
+
+import pyethereal
+import PIL.Image
+
+import traceback,cStringIO, struct, email, clamav, index, zipfile
+import math, bisect, cgi, pickle, urllib, base64

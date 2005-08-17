@@ -6,4 +6,4 @@ s/^UNIX_SOCKET.*$/UNIX_SOCKET\ =\ \/var\/run\/pyflagd\/pyflag.sock/
 s/^DATADIR.*$/DATADIR=\/var\/lib\/pyflag/
 s/^ploticus=.*$/ploticus=\/usr\/bin\/ploticus/
 s/^ploticus_prefabs.*$/ploticus_prefabs=\/usr\/share\/ploticus/
-s/^LOG_LEVEL.*$/LOG_LEVEL\ =\ 0/
+s/^LOG_LEVEL.*$/LOG_LEVEL\ =\ 10/

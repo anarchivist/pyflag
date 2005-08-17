@@ -134,7 +134,7 @@ class ViewFileTypes(Reports.report):
         result.table(
             columns = ['a.inode','a.inode','concat(path,name)','type'],
             names = [ 'Thumbnail','View', 'Filename', 'Type'],
-            table = 'file_%s as a, type_%s as b ' % (query['fsimage'],query['fsimage']), 
+            table = 'file_%s as a, type_%s as b ' % (query['fsimage'],query['fsimage']),
             where = ' a.inode=b.inode and mode like "r%" ',
             callbacks  = { 'Thumbnail': thumbnail_cb,
                            'View': view_icon

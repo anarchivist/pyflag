@@ -67,18 +67,23 @@ case "$1" in
     done
     set -e
 
-    update-rc.d pyflag defaults >/dev/null
-	rm -f /etc/pyflag/dpkg__pyflag_was_running
+    ## Ensure that pyethereal is properly linked into this systems
+    ## libethereal - this is because libethereal does not import its
+    ## own libraries ???
+    ld $pyflag_datadir/libs/pyethereal_wrap.o  -shared  -o $pyflag_datadir/libs/_pyethereal.so $(ldd $(which tethereal ethereal | head -n 1) | awk '{print $3};')
 
-	#####start the service#######
-	echo "Starting pyflagd"
-	invoke start
+    update-rc.d pyflag defaults >/dev/null
+    rm -f /etc/pyflag/dpkg__pyflag_was_running
+
+    #####start the service#######
+    echo "Starting pyflagd"
+    invoke start
 	
-	#If it doesn't exist, create the pyflag database
-	tables_present=`mysql --user=root --socket=/var/run/pyflagd/pyflag.sock --host=localhost --exec='SHOW TABLES;' pyflag | wc -l`
-	if [ $tables_present == 0 ] ; then
-		mysql --user=root --socket=/var/run/pyflagd/pyflag.sock --host=localhost --exec='source /usr/share/pyflag/db.setup;' pyflag
-	fi
+    #If it doesn't exist, create the pyflag database
+    tables_present=`mysql --user=root --socket=/var/run/pyflagd/pyflag.sock --host=localhost --exec='SHOW TABLES;' pyflag | wc -l`
+    if [ $tables_present == 0 ] ; then
+	mysql --user=root --socket=/var/run/pyflagd/pyflag.sock --host=localhost --exec='source /usr/share/pyflag/db.setup;' pyflag
+    fi
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

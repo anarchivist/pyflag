@@ -1,20 +1,21 @@
 include $(TOPLEVEL)/Makefile.in
 
-ETHEREAL_SRC = ../sources/ethereal-0.10.11/
-ETHEREAL_SRC_INCLUDES =  -I $(ETHEREAL_SRC) -I $(ETHEREAL_SRC)/epan/ -I $(ETHEREAL_SRC)/wiretap/
+ETHEREAL_SRC = $(shell find ../sources/ -type d -maxdepth 1 -name ethereal\*)
+ETHEREAL_SRC_INCLUDES =  -I $(ETHEREAL_SRC) -I $(ETHEREAL_SRC)/epan/ -I $(ETHEREAL_SRC)/wiretap/ -I.
 
 MISC_LIBS = ../libs/
 
 all: pcaptool pyethereal
 
 pcaptool: pcaptool.c check_headers
-	gcc `glib-config --cflags glib` $@.c -o $@ -L$(ETHEREAL_LIB) -Wl,--export-dynamic /usr/lib/ethereal/libwiretap.so.0
+	gcc `glib-config --cflags glib` $@.c -o $@ $(ETHEREAL_SRC_INCLUDES) -L$(ETHEREAL_LIB) -Wl,--export-dynamic /usr/lib/ethereal/libwiretap.so.0
 	cp $@ ../bin/
 
 pyethereal: pyethereal.i check_headers
 	swig -python $@.i
-	gcc -g -Wall -I $(PYTHONINCL) `glib-config --cflags glib` pyethereal_wrap.c  -shared  -o _pyethereal.so $$(ldd $$(which tethereal ethereal | head -n 1) | awk '{print $$3};')
-	mv _pyethereal.so pyethereal.py $(MISC_LIBS)/
+	gcc -g -Wall -I $(PYTHONINCL) $(ETHEREAL_SRC_INCLUDES) `glib-config --cflags glib` -c pyethereal_wrap.c  -o pyethereal_wrap.o
+	ld pyethereal_wrap.o  -shared  -o _pyethereal.so $$(ldd $$(which tethereal ethereal | head -n 1) | awk '{print $$3};')
+	mv pyethereal_wrap.o _pyethereal.so pyethereal.py $(MISC_LIBS)/
 
 check_headers:
 	if [ ! -e wiretap.h -o ! -e ethereal.h ]; then echo -e \\n\\n Required headers are missing. Please edit this Makefile for the location of ethereal source tree and type make headers; false ; fi

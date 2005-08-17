@@ -29,7 +29,7 @@ EXECUTABLE_SCRIPTS = flash examine.py flag.sh launch.sh gendoc.sh gtk.sh libs/py
 PACKAGE_SCRIPTS = DEBIAN/postinst DEBIAN/preinst DEBIAN/postrm DEBIAN/prerm etc/pyflag/debian-start etc/init.d/pyflag
 #If the package version is changed, the control file in pkg_files must also
 #be changed.
-PACKAGE_VERSION = 0.76
+PACKAGE_VERSION = 0.78-1
 
 ## The system wide location for libethereal.so
 ETHEREAL_LIB = $(shell dirname $$(ldd $$(which ethereal) | grep libethereal | awk '{print $$3}')  )
