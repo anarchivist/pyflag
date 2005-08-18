@@ -2,7 +2,7 @@
 ##This little utility function is used to update the version information in all files:
 
 DIRS="plugins pyflag"
-NEWVERSION=0.76
+NEWVERSION=0.78
 
 exp="s/\\\$Version:.*\\\$/\\\$Version: $NEWVERSION Date: "`date`"\\\$/"
 

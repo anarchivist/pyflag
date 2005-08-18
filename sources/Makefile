@@ -28,7 +28,7 @@ $(BIN)/pl $(BIN)/prefabs:
 ## pyethereal support - This needs to be done prior to compiling
 ## pyethereal.
 ethereal_base:
-	tar -xvzf $(ETHEREAL).tar.bz2 || (echo -e "--------------------------\\r\\nYou must have $(ETHEREAL).tar.bz2 in the sources directory\\r\\nYou can get it from http://www.ethereal.com/\\r\\n--------------------------" && exit -1)
+	tar -xvjf $(ETHEREAL).tar.bz2 || (echo -e "--------------------------\\r\\nYou must have $(ETHEREAL).tar.bz2 in the sources directory\\r\\nYou can get it from http://www.ethereal.com/\\r\\n--------------------------" && exit -1)
 	cd $(ETHEREAL)/ && ./configure --disable-ethereal --without-zlib --without-pcre --without-ssl --without-net-snmp --without-ucd-snmp --without-krb5 --without-adns --without-plugins --disable-ipv6 && make
 
 clean:

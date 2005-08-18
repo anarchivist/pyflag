@@ -8,7 +8,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: Q Branch Database 2.0.1 (Based on Pyflag 0.76) Date: Thu Apr 28 23:08:32 EST 2005$
+#  Version: FLAG $Version: 0.78 Date: Fri Aug 19 00:47:14 EST 2005$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or

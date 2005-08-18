@@ -8,7 +8,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.76 Date: Sun Apr 17 21:48:37 EST 2005$
+#  Version: FLAG $Version: 0.78 Date: Fri Aug 19 00:47:14 EST 2005$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -1231,8 +1231,11 @@ class HTMLUI(UI.GenericUI):
             line_break="<br>\n"
             if (options.has_key('font') and options['font']=='typewriter'):
                 line_break = "\n"
+            else:
+                self.text_var=self.text_var.replace("\n","<br>")
+                
             if options.has_key('wrap') and options['wrap'] == 'full':
-                for line in self.text_var.splitlines():
+                for line in self.text_var.splitlines(True):
                     new_lines = textwrap.wrap(line,wrap)
                     for i in range(len(new_lines)):
                         new_line = new_lines[i]

@@ -4,5 +4,8 @@ import pyflag.FlagFramework as FlagFramework
 import pyflag.IO as IO
 Registry.Init()
 
-io=IO.open("demo","test")
-fsfd = Registry.FILESYSTEMS.fs['DBFS']('demo','test',io)
+case = "demo"
+fsimage = "test"
+
+io=IO.open(case,fsimage)
+fsfd = Registry.FILESYSTEMS.fs['DBFS'](case,fsimage,io)

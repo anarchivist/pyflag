@@ -9,7 +9,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.76 Date: Sun Apr 17 21:48:37 EST 2005$
+#  Version: FLAG $Version: 0.78 Date: Fri Aug 19 00:47:14 EST 2005$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -229,9 +229,7 @@ class ViewFile(Reports.report):
         base_path,name=os.path.split(path)
         if image:
             image.headers=[("Content-Disposition","attachment; filename=%s" % name),]
-        ## This fails in cases where the File object does not know its own size in advance (e.g. Pst).
-##                       ("Content-Length",filesize)]
-
+            
         ## Make a series of links to each level of this inode - this
         ## way we can view parents of this inode.
         tmp = result.__class__(result)
@@ -267,7 +265,7 @@ class ViewFile(Reports.report):
                     limit=int(query['hexlimit'])
                 except KeyError:
                     limit=0
-                    
+
                 fd.seek(limit)
                 data = fd.read(max+1)
                 

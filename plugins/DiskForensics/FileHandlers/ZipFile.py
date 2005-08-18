@@ -2,7 +2,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.76 Date: Sun Apr 17 21:48:37 EST 2005$
+#  Version: FLAG $Version: 0.78 Date: Fri Aug 19 00:47:14 EST 2005$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -187,13 +187,13 @@ class Zip_file(File):
         except (IndexError, KeyError, zipfile.BadZipfile),e:
             raise IOError, "Zip_File: (%s)" % e
         
-        self.pos=0
+        self.readptr=0
         self.size=len(self.data)
         
     def read(self,len=None):
         if len:
-            temp=self.data[self.pos:self.pos+len]
-            self.pos+=len
+            temp=self.data[self.readptr:self.readptr+len]
+            self.readptr+=len
             return temp
         else: return self.data
 
