@@ -128,7 +128,7 @@ bin-dist:
 
 	## Strip all binaries:
 	find bin_dist/ -perm +0111 -exec strip {} \; 2> /dev/null
-	strip bin_dist/libs/*.so
+	strip bin_dist/libs/*.so*
 
 	## Adding miscelaneous libraries that need to be present in the binary distribution to work.
 	for i in $(MISC_LIBS); do cp $$i bin_dist/libs/; done

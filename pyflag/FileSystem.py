@@ -484,8 +484,6 @@ class CachedFile(File):
         """
         filename = self.inode.replace('/','-')
         result= "%s/case_%s/%s" % (config.RESULTDIR,self.case,filename)
-        print "temp filename %s" % result
-
         return result
 
     def __init__(self, case, table, fd, inode):
