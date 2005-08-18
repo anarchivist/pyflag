@@ -30,7 +30,7 @@
 
 The output within flag is abstracted such that it is possible to connect any GUI backend with any GUI Front end. This is done by use of UI objects. When a report runs, it will generate a UI object, which will be built during report execution. The report then returns the object to the calling framework which will know how to handle it. Therefore the report doesnt really know or care how the GUI is constructed """
 
-import re,cgi,types
+import re,cgi,types,textwrap
 import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 import pyflag.conf
@@ -1204,6 +1204,7 @@ class HTMLUI(UI.GenericUI):
                 self.color = options['color']
 
             if options.has_key('font') and options['font'] != self.font:
+##            if options.has_key('font'):
                 if options['font'] == 'typewriter':
                     format += "</pre><pre>"
                 elif options['font'] == 'bold':
@@ -1226,33 +1227,25 @@ class HTMLUI(UI.GenericUI):
                 self.result += "%s%s" % (format,d)
 
         for d in cuts:
-            if not (options.has_key('font') and options['font']=='typewriter'):
-                d = re.sub("\n","<br>\r\n",str(d))
-            self.text_var += str(d)
+            self.text_var = str(d)
+            line_break="<br>\n"
+            if (options.has_key('font') and options['font']=='typewriter'):
+                line_break = "\n"
             if options.has_key('wrap') and options['wrap'] == 'full':
-                try:
-                    while self.text_var:
-                        index = self.text_var.find("\n")
-                        
-                        if index<0 or index>self.text_var.find("\r"):
-                            index = self.text_var.find("\r")
-                            
-                        if index<0:
-                            index=len(self.text_var)
-                            
-                        if index > wrap:
-                            do_options(self.text_var[0:wrap],options)
-                            self.text_var = self.text_var[wrap:]
-                            self.result+="<img src='/flag/images/next_line.png'><br>\n"
-                        else:
-                            do_options("%s\n" % self.text_var[:index],options)
-                            self.text_var = self.text_var[index+1:]
-                except ValueError:
-                    pass
-                
+                for line in self.text_var.splitlines():
+                    new_lines = textwrap.wrap(line,wrap)
+                    for i in range(len(new_lines)):
+                        new_line = new_lines[i]
+                        do_options(new_line,options)
+                        ## Only put line break if the line was
+                        ## actually broken, and then not on the very
+                        ## last line
+                        if len(new_line)<len(line) and i<len(new_lines)-1:
+                            self.result+="&nbsp;" * (wrap-len(new_line))
+                            self.result+="<img src='next_line.png'>"
+                        self.result+=line_break                
             else:
                 do_options(self.text_var,options)
-                self.text_var = ''
 
     def upload_file(self, description, name, **options):
         # FIXME - Implement a proper file upload mechanism here to be
