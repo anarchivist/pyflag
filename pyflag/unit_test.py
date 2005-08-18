@@ -72,6 +72,7 @@ import zipfile
 import pickle
 import md5
 import threading
+import readline
 
 a=pickle.dumps("hello world")
 if "hello world"!=pickle.loads(a):

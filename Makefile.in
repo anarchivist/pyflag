@@ -20,7 +20,7 @@ PYTHONINCL = /usr/include/python$(PYTHONVER)/
 PYTHONBIN = `which python$(PYTHONVER)`
 DATA_DIR = `grep -i DATA_DIR pyflag/pyflagrc | cut -d= -f2`
 MYSQLCOMMAND =./bin_dist/mysql/bin/mysql --socket=bin_dist/mysql/data/pyflag.sock
-MISC_LIBS = /usr/lib/libgmp.so.3 /usr/lib/libmysqlclient_r.so.10 /usr/lib/libmagic.so.1
+MISC_LIBS = /usr/lib/libgmp.so.3 /usr/lib/libmysqlclient_r.so.12 /usr/lib/libmagic.so.1 /lib/libreadline.so.5 /usr/lib/libglib-2.0.so.0 
 #Package variables 
 BASE_DIR = $(shell pwd)
 DOC_LIST = CONTRIBUTING README USAGE TODO

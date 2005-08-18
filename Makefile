@@ -119,7 +119,7 @@ bin-dist:
 	find bin_dist/python$(PYTHONVER)/ -atime +1 -exec rm {} \;
 
 	## Delete source directories
-	cd bin_dist/ && rm -rf sources sgzip regtools raidtools patches libevf iosubsys indextools exgrep docs virustools imagingtools mailtools
+	cd bin_dist/ && rm -rf sources sgzip regtools raidtools patches libevf iosubsys indextools exgrep docs virustools imagingtools mailtools pyethereal filesystems
 
 	## General cleanups
 	find bin_dist/ -depth -name CVS -exec rm -rf {} \;
@@ -128,6 +128,7 @@ bin-dist:
 
 	## Strip all binaries:
 	find bin_dist/ -perm +0111 -exec strip {} \; 2> /dev/null
+	strip bin_dist/libs/*.so
 
 	## Adding miscelaneous libraries that need to be present in the binary distribution to work.
 	for i in $(MISC_LIBS); do cp $$i bin_dist/libs/; done
