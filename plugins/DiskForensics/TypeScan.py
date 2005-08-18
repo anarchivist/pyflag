@@ -34,7 +34,7 @@ import pyflag.IO as IO
 import pyflag.Registry as Registry
 
 class TypeScan(Scanner.GenScanFactory):
-    """ scan file and record file type (magic)
+    """ Detect File Type (magic).
 
     In addition to recording the file type, this class can also perform
     an action based on the mime type of the file"""
@@ -130,14 +130,19 @@ class ViewFileTypes(Reports.report):
                 tmp.image(image,width=image.width)
                 
             return tmp
-        
-        result.table(
-            columns = ['a.inode','a.inode','concat(path,name)','type'],
-            names = [ 'Thumbnail','View', 'Filename', 'Type'],
-            table = 'file_%s as a, type_%s as b ' % (query['fsimage'],query['fsimage']),
-            where = ' a.inode=b.inode and mode like "r%" ',
-            callbacks  = { 'Thumbnail': thumbnail_cb,
-                           'View': view_icon
-                           },
-            case = query['case']
-            )
+
+        try:
+            result.table(
+                columns = ['a.inode','a.inode','concat(path,name)','type'],
+                names = [ 'Thumbnail','View', 'Filename', 'Type'],
+                table = 'file_%s as a, type_%s as b ' % (query['fsimage'],query['fsimage']),
+                where = ' a.inode=b.inode and mode like "r%" ',
+                callbacks  = { 'Thumbnail': thumbnail_cb,
+                               'View': view_icon
+                               },
+                case = query['case']
+                )
+        except DB.DBError,e:
+            result.para("Error reading the type table. Did you remember to run the TypeScan scanner?")
+            result.para("Error reported was:")
+            result.text(e,color="red")

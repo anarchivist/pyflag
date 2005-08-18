@@ -2514,7 +2514,7 @@ int put_dword(struct hive *hdesc, int vofs, char *path, int dword)
   ALLOC(kr,1,sizeof(int)+sizeof(int));
   
   kr->len = sizeof(int);
-  (int)kr->data = dword;
+  //  (int)kr->data = dword;
 
   r = put_buf2val(hdesc, kr, vofs, path, REG_DWORD);
 

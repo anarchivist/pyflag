@@ -65,6 +65,21 @@ import pyethereal
 
 description = "Network Forensics"
 
+def draw_only_PCAPFS(query,result):
+    """ Draws a selector with only PCAPFS filesystems """
+    dbh = DB.DBO(query['case'])
+    dbh2 = DB.DBO(query['case'])
+    images = []
+    ## Get a list of filesystems which are of type PCAPFS:
+    dbh.execute("select * from meta where property='fsimage'")
+    for row in dbh:
+        t=dbh2.get_meta("fstype_%s" % row['value'])
+        if t.startswith("PCAP"):
+            images.append(row['value'])
+
+    result.const_selector("Select filesystem",'fsimage',images,images)
+
+
 class PCAPFS(DBFS):
     """ This implements a simple filesystem for PCAP files.
 
@@ -153,7 +168,7 @@ class ViewDissectedPacket(Reports.report):
         try:
             result.case_selector()
             if query['case']!=config.FLAGDB:
-                result.meta_selector(case=query['case'],property='fsimage')
+                draw_only_PCAPFS(query,result)
             result.textfield('Packet ID','id')
         except KeyError:
             pass

@@ -115,10 +115,17 @@ class HashComparison(Reports.report):
         dbh = self.DBO(query['case'])
         pdbh=self.DBO(None)
         tablename = dbh.MakeSQLSafe(query['fsimage'])
-        pdbh.check_index("NSRL_products","Code")
-        dbh.check_index("type_%s" % tablename,"inode")
-        dbh.execute("create table `hash_%s` select a.inode as `Inode`,concat(path,b.name) as `Filename`,d.type as `File Type`,if(c.Code=0,'Unknown',c.Name) as `NSRL Product`,c.Code as `NSRL Code`,a.NSRL_filename,md5 as `MD5` from md5_%s as a,%s.NSRL_products as c, type_%s as d left join file_%s as b on a.inode=b.inode   where  a.NSRL_productcode=c.Code and d.inode=a.inode group by Inode,`NSRL Code`,MD5",(tablename,tablename,config.FLAGDB,tablename,tablename))
-
+        try:
+            pdbh.check_index("NSRL_products","Code")
+        except DB.DBError,e:
+            raise Reports.ReportError("Unable to find an NSRL table in the pyflag database. Create one using the utilities/load_nstl.py script." % e)
+            
+        try:
+            dbh.check_index("type_%s" % tablename,"inode")
+            dbh.execute("create table `hash_%s` select a.inode as `Inode`,concat(path,b.name) as `Filename`,d.type as `File Type`,if(c.Code=0,'Unknown',c.Name) as `NSRL Product`,c.Code as `NSRL Code`,a.NSRL_filename,md5 as `MD5` from md5_%s as a,%s.NSRL_products as c, type_%s as d left join file_%s as b on a.inode=b.inode   where  a.NSRL_productcode=c.Code and d.inode=a.inode group by Inode,`NSRL Code`,MD5",(tablename,tablename,config.FLAGDB,tablename,tablename))
+        except DB.DBError,e:
+            raise Reports.ReportError("Unable to find the types table for the current image. Did you run the TypeScan Scanner?.\n Error received was %s" % e)
+        
     def display(self,query,result):
         result.heading("MD5 Hash comparisons for %s" % query['fsimage'])
         dbh=self.DBO(query['case'])
@@ -132,11 +139,17 @@ class HashComparison(Reports.report):
                 tmp.icon("no.png")
 
             return tmp
-        
-        result.table(
-            columns=('Inode','Filename', '`File Type`', '`NSRL Product`','NSRL_filename', '`MD5`'),
-            names=('Inode','Filename','File Type','NSRL Product','NSRLFilename','MD5'),
-            table='hash_%s ' % (tablename),
-            case=query['case'],
-            links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='inode')]
-            )
+
+        try:
+            result.table(
+                columns=('Inode','Filename', '`File Type`', '`NSRL Product`','NSRL_filename', '`MD5`'),
+                names=('Inode','Filename','File Type','NSRL Product','NSRLFilename','MD5'),
+                table='hash_%s ' % (tablename),
+                case=query['case'],
+                links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='inode')]
+                )
+        except DB.DBError,e:
+            result.para("Error reading the MD5 hash table. Did you remember to run the MD5Scan scanner?")
+            result.para("Error reported was:")
+            result.text(e,color="red")
+         

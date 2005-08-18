@@ -25,7 +25,7 @@ class Ext2(DBFS):
         sdbh = DB.DBO(self.case)
 
         # run sleuthkit
-        string= "%s  -i %s -o %s %s -t %s -f %s %s"%(config.IOWRAPPER,
+        string= "%s -i %r -o %r %r -t %r -f %r %r"%(config.IOWRAPPER,
                                                      self.iosource.subsystem,
                                                      self.iosource.make_parameter_list(),config.SLEUTHKIT,
                                                      self.table,self.sk_type,self.table)

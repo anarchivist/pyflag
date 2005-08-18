@@ -31,6 +31,7 @@ from NetworkScanner import *
 import pyflag.Reports as Reports
 import pyflag.logging as logging
 import cStringIO,re
+import plugins.NetworkForensics.PCAPFS as PCAPFS
 
 class IRCScanner(NetworkScanFactory):
     """ Collect information about IRC traffic """
@@ -232,7 +233,7 @@ class BrowseIRCChat(Reports.report):
     def form(self,query,result):
         try:
             result.case_selector()
-            result.meta_selector(case=query['case'],property='fsimage')
+            PCAPFS.draw_only_PCAPFS(query,result)
         except KeyError:
             pass
 

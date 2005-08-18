@@ -153,8 +153,9 @@ class BrowseRegistry(DiskForensics.BrowseFS):
             
         except DB.DBError,e:
             result.heading("Error occured")
-            result.text('It appears that no registry tables are available. Maybe no registry files were found during scanning.')
-            result.para('The Error returned by the database is %s' % e)
+            result.text('It appears that no registry tables are available. Did you remember to run the RegistryScan scanner?')
+            result.para('The Error returned by the database is:')
+            result.text(e,color='red')
             
     def reset(self,query):
         dbh = self.DBO(query['case'])

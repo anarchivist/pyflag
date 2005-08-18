@@ -30,6 +30,7 @@ import pyflag.Reports as Reports
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.FileFormats.IECache as IECache
+import pyflag.DB as DB
 
 ## raise Exception("This module not finished yet")
 
@@ -98,9 +99,14 @@ class IEHistory(Reports.report):
         dbh=self.DBO(query['case'])
         tablename = dbh.MakeSQLSafe(query['fsimage'])
 
-        result.table(
-            columns=('path','type','url','modified','accessed','concat(filepath,filename)','headers'),
-            names=('Path','Type','URL','Modified','Accessed','Filename','Headers'),
-            table=('history_%s' % (tablename)),
-            case=query['case']
-            )
+        try:
+            result.table(
+                columns=('path','type','url','modified','accessed','concat(filepath,filename)','headers'),
+                names=('Path','Type','URL','Modified','Accessed','Filename','Headers'),
+                table=('history_%s' % (tablename)),
+                case=query['case']
+                )
+        except DB.DBError,e:
+            result.para("Error reading the history table. Did you remember to run the IEHistory scanner?")
+            result.para("Error reported was:")
+            result.text(e,color="red")

@@ -46,9 +46,9 @@ class PstScan(GenScanFactory):
     depends = ['TypeScan']
 
     class Drawer(Scanner.Drawer):
-        description = "Windows Related Scanners"
-        name = "Windows Scanners"
-        contains = [ 'PstScan','IEIndex', 'RegistryScan']
+        description = "File Type Related Scanners"
+        name = "File Scanners"
+        contains = [ 'PstScan','IEIndex', 'RegistryScan', 'TypeScan']
         default = True
         
     def __init__(self,dbh, table,fsfd):
@@ -323,12 +323,18 @@ class PstExplorer(Reports.report):
             # show a list of files where email was found
             dbh = self.DBO(query['case'])
             tablename = dbh.MakeSQLSafe(query['fsimage'])
-            dbh.execute('select distinct email.inode, concat(file.path,file.name) as path from email_%s as email, file_%s as file where file.inode = email.inode', (tablename, tablename))
-            result.row('Email was found in the following files, select the file to browse:',colspan=2)
-            for row in dbh:
-                tmp=self.ui(result)
-                tmp.link("%s" % (row['path']),query,inode=row['inode'],where_Inode=row['inode'])
-                result.row(tmp)
+            try:
+                dbh.execute('select distinct email.inode, concat(file.path,file.name) as path from email_%s as email, file_%s as file where file.inode = email.inode', (tablename, tablename))
+                result.row('Email was found in the following files, select the file to browse:',colspan=2)
+                for row in dbh:
+                    tmp=self.ui(result)
+                    tmp.link("%s" % (row['path']),query,inode=row['inode'],where_Inode=row['inode'])
+                    result.row(tmp)
+            except DB.DBError,e:
+                result.para("Error reading the email table. Did you remember to run the PstExplorer scanner?")
+                result.para("Error reported was:")
+                result.text(e,color="red")
+                
             
         except KeyError:
             return result

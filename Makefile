@@ -113,6 +113,8 @@ bin-dist:
 	find bin_dist/ -exec touch -a -d19700000 \{\} \;
 	## Run the unit test to touch all the files
 	cd bin_dist/ && ./launch.sh pyflag/unit_test.py
+	## Ensure that these python files are left for PIL:
+	touch bin_dist/python$(PYTHONVER)/site-packages/PIL/*
 	## Now we cleanup python core (any files that were not touched)
 	find bin_dist/python$(PYTHONVER)/ -atime +1 -exec rm {} \;
 

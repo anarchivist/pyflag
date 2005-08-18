@@ -402,8 +402,8 @@ class SearchIndex(Reports.report):
                 offset_columns.append("offset_%s" % word_id)
                 try:
                     dbh.execute("create table %s select offset-%s as low,offset+%s as high, offset as offset_%s from LogicalIndexOffsets_test where id=%r",(temp_table,range,range,word_id,word_id))
-                except DB.DBError:
-                    raise Reports.ReportError("Unable to find a LogicalIndexOffsets table for current image. Did you run the LogicalIndex Scanner?")
+                except DB.DBError,e:
+                    raise Reports.ReportError("Unable to find a LogicalIndexOffsets table for current image. Did you run the LogicalIndex Scanner?.\n Error received was %s" % e)
                 
             else:
                 dbh.execute("create table %s select least(offset-%s,low) as low, greatest(offset+%s,high) as high, %s, offset as offset_%s from %s, LogicalIndexOffsets_test where id=%r and offset<high and offset>low",
@@ -468,13 +468,13 @@ class SearchIndex(Reports.report):
             out=result.__class__(result)
             word=''
             for i in range(1,len(sorted_offsets)):
-                out.text(data[sorted_offsets[i-1]-low+len(word):sorted_offsets[i]-low],color='black')
+                out.text(data[sorted_offsets[i-1]-low+len(word):sorted_offsets[i]-low],color='black',sanitise='full')
                 try:
                     word = words[offsets.index(sorted_offsets[i])]
                 except:
                     word = ''
 
-                out.text(data[sorted_offsets[i]-low:sorted_offsets[i]-low+len(word)],color='red')
+                out.text(data[sorted_offsets[i]-low:sorted_offsets[i]-low+len(word)],color='red',sanitise='full')
             
             return out
 

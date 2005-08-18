@@ -101,7 +101,10 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                 pass
             
             try:
-                query[key]=form[key].value
+                value = form[key].value
+                ## We only accept non-empty args
+                if len(value)>0:
+                    query[key]= value
             except AttributeError:
                 for value in form[key]:
                     query[key]=value.value

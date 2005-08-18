@@ -44,7 +44,7 @@ import os,re
 import pyflag.logging as logging
 
 def mmls_popup(query,result,option_str=None,subsys=None,offset=None):
-    result.display=result.__str__
+    result.decoration = "naked"
     try:
         if query['update']:
             query[offset]=query['update']
@@ -61,30 +61,35 @@ def mmls_popup(query,result,option_str=None,subsys=None,offset=None):
 
     s=pexpect.spawn(config.IOWRAPPER,args)
     s.expect(pexpect.EOF)
-    if s.exitstatus==0:
-        output = s.before.splitlines()
-        try:
-            result.start_table()
-            result.para(output[0])
-            result.para(output[1])
-            columns = output[3].split()
-            result.row(" ",*columns)
-            del query[offset]
-            for row in output:
-                m = re.match("^(\S+:)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)",row)
-                if m:
-                    row = list(m.groups())
-                    tmp = result.__class__(result)
-                    del query['update']
-                    query['update']="%ss" % row[2]
-                    tmp.link(row[2],query)
-                    row[2]=tmp
-                    result.row(*row)
-        except IndexError:
-            pass
-        result.end_table()
-    else:
+    ## There is an error in the output
+    if "Exception" in s.before:
+        result.para("Error occured reading the partition table.")
+        result.para("Maybe you do not have the correct driver set for this IO Source? Could the image be an image of a partition? Could the image have a non-dos partition type?")
+        result.para("These are the errors returned by mmls:")
         result.text(s.before,color="red",font='typewriter')
+        return
+    
+    try:
+        output = s.before.splitlines()
+        result.start_table()
+        result.para(output[0])
+        result.para(output[1])
+        columns = output[3].split()
+        result.row(" ",*columns)
+        del query[offset]
+        for row in output:
+            m = re.match("^(\S+:)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)",row)
+            if m:
+                row = list(m.groups())
+                tmp = result.__class__(result)
+                del query['update']
+                query['update']="%ss" % row[2]
+                tmp.link(row[2],query)
+                row[2]=tmp
+                result.row(*row)
+    except IndexError:
+        pass
+    result.end_table()
 
 class IO:
     """ class for IO subsystem, provides basic contructor and read/seek functions

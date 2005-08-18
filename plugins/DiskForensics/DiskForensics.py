@@ -348,7 +348,7 @@ class ViewFile(Reports.report):
             if not fd: return
             ## FIXME - Implement proper paging here.
             fd.seek(0)
-            result.text(fd.read(1024*10),font='typewriter',sanitise="full",color="red",wrap="full")
+            result.text(fd.read(1024*10),font='typewriter',color="red",wrap="full")
 
         def stats(query,result):
             """ Show statistics about the file """

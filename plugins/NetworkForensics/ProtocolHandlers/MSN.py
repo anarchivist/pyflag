@@ -38,6 +38,7 @@ from NetworkScanner import *
 import pyflag.Reports as Reports
 import pyflag.logging as logging
 import base64
+import plugins.NetworkForensics.PCAPFS as PCAPFS
 
 def safe_base64_decode(s):
     """ This attempts to decode the string s, even if it has incorrect padding """
@@ -365,7 +366,7 @@ class BrowseMSNChat(Reports.report):
     def form(self,query,result):
         try:
             result.case_selector()
-            result.meta_selector(case=query['case'],property='fsimage')
+            PCAPFS.draw_only_PCAPFS(query,result)
         except KeyError:
             pass
 
@@ -407,19 +408,12 @@ class BrowseMSNChat(Reports.report):
             case = query['case']
             )
 
-class BrowseMSNSessions(Reports.report):
+class BrowseMSNSessions(BrowseMSNChat):
     """ This shows MSN Session users. """
     parameters = { 'fsimage':'fsimage' }
     name = "Browse MSN Sessions"
     family = "Network Forensics"
     hidden = True
-    def form(self,query,result):
-        try:
-            result.case_selector()
-            result.meta_selector(case=query['case'],property='fsimage')
-        except KeyError:
-            pass
-
     def display(self,query,result):
         result.heading("MSN Chat sessions in %s " % query['fsimage'])
         result.table(
