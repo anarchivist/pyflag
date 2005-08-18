@@ -617,7 +617,7 @@ class HexDump:
                     finished = 1
 
             ui.text("\n",font='typewriter',sanitise='full')
-            ui.text(finish=1)
+#            ui.text(finish=1)
             offset+=1
 
 try:

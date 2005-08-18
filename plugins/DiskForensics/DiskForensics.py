@@ -242,12 +242,26 @@ class ViewFile(Reports.report):
             """ Used for dumping the entire file into the browser """
             if fd:
                 result.download(fd)
-                
         def hexdump(query,result):
-            """ Show the hexdump for the file """
-            if fd:
-                max=config.MAX_DATA_DUMP_SIZE
+            """ Show the hexdump for the file."""
+            max=config.MAX_DATA_DUMP_SIZE
+                
+            def hexdumper(offset,data,result):
+                dump = FlagFramework.HexDump(data,result)
+                dump.dump(base_offset=offset,limit=max)
 
+            return display_data(query,result,max,hexdumper)
+            
+        def display_data(query,result,max,cb):
+            """ Displays the data.
+
+            The callback takes care of paging the data from fd. The callback cb is used to actually render the data:
+
+            def cb(offset,data,result)
+
+            offset is the offset in the file where we start, data is the data.
+            """
+            if fd:
                 #Set limits for the dump
                 try:
                     limit=int(query['hexlimit'])
@@ -256,9 +270,9 @@ class ViewFile(Reports.report):
                     
                 fd.seek(limit)
                 data = fd.read(max+1)
-                dump = FlagFramework.HexDump(data,result)
-                dump.dump(base_offset=limit,limit=max)
-
+                
+                cb(limit,data,result)
+                
                 #Do the navbar
                 new_query = query.clone()
                 previous=limit-max
@@ -290,7 +304,7 @@ class ViewFile(Reports.report):
                 ## Allow the user to skip to a certain page directly:
                 result.toolbar(
                     cb = FlagFramework.Curry(goto_page_cb, variable='hexlimit'),
-                    text="Skip to offset",
+                    text="Current Offset %s" % limit,
                     icon="stock_next-page.png"
                     )
 
@@ -345,11 +359,12 @@ class ViewFile(Reports.report):
 
         def textdump(query,result):
             """ Dumps the file in a text window """
-            if not fd: return
-            ## FIXME - Implement proper paging here.
-            fd.seek(0)
-            result.text(fd.read(1024*10),font='typewriter',color="red",wrap="full")
+            max=config.MAX_DATA_DUMP_SIZE
+            def textdumper(offset,data,result):
+                result.text(data,font='typewriter',color="red",wrap="full")
 
+            return display_data(query,result,max,textdumper)
+        
         def stats(query,result):
             """ Show statistics about the file """
             istat = fsfd.istat(inode=query['inode'])
