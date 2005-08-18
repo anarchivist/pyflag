@@ -35,6 +35,7 @@
     module.
 """
 import iosubsys
+import pexpect
 import pyflag.FlagFramework as FlagFramework
 import pyflag.conf
 config=pyflag.conf.ConfObject()
@@ -54,31 +55,36 @@ def mmls_popup(query,result,option_str=None,subsys=None,offset=None):
         pass
 
     result.heading("Output of mmls on io source")
-    string = "%s -i %s -o %s %s/mmls -t dos foo" % (config.IOWRAPPER, subsys, option_str,config.FLAG_BIN)
-    logging.log(logging.DEBUG,"Will launch %s" % string)
-    (stdin, stdout, stderr ) = os.popen3(string)
-    output = stdout.readlines()
-    try:
-        result.start_table()
-        result.para(output[0])
-        result.para(output[1])
-        columns = output[3].split()
-        result.row(" ",*columns)
-        del query[offset]
-        for row in output:
-            m = re.match("^(\S+:)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)",row)
-            if m:
-                row = list(m.groups())
-                tmp = result.__class__(result)
-                del query['update']
-                query['update']="%ss" % row[2]
-                tmp.link(row[2],query)
-                row[2]=tmp
-                result.row(*row)
-    except IndexError:
-        pass
-    result.end_table()    
-    result.text(stderr.read(),color="red",font='typewriter')
+    args = ["-i", subsys, "-o",option_str, "%s/mmls" % config.FLAG_BIN,  "-t", "dos",  "foo" ]
+    
+    logging.log(logging.DEBUG,"Will launch %s %s" % (config.IOWRAPPER, args))
+
+    s=pexpect.spawn(config.IOWRAPPER,args)
+    s.expect(pexpect.EOF)
+    if s.exitstatus==0:
+        output = s.before.splitlines()
+        try:
+            result.start_table()
+            result.para(output[0])
+            result.para(output[1])
+            columns = output[3].split()
+            result.row(" ",*columns)
+            del query[offset]
+            for row in output:
+                m = re.match("^(\S+:)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)",row)
+                if m:
+                    row = list(m.groups())
+                    tmp = result.__class__(result)
+                    del query['update']
+                    query['update']="%ss" % row[2]
+                    tmp.link(row[2],query)
+                    row[2]=tmp
+                    result.row(*row)
+        except IndexError:
+            pass
+        result.end_table()
+    else:
+        result.text(s.before,color="red",font='typewriter')
 
 class IO:
     """ class for IO subsystem, provides basic contructor and read/seek functions

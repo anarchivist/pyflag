@@ -57,7 +57,6 @@ dbh=DB.DBO(None)
 dbh.execute("select from_unixtime(0)")
 dbh.fetch()
 
-import pyflag.Ethereal
 import pyflag.Exgrep
 
 import pyflag.Graph as Graph
@@ -105,3 +104,4 @@ import PIL.Image
 
 import traceback,cStringIO, struct, email, clamav, index, zipfile
 import math, bisect, cgi, pickle, urllib, base64
+import pexpect
