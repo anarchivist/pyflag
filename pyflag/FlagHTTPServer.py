@@ -157,7 +157,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         
         if re.search("\.(css)$",query.base):
             ct="text/css"
-            
+
         if ct:
             i=query.base.rfind('/')
             try:

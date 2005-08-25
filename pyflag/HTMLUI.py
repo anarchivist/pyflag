@@ -365,12 +365,13 @@ class HTMLUI(UI.GenericUI):
         except KeyError:
             pass
 
+        ## If the user right clicked, we open in a new window
         if config.METHOD=='POST':
             if 'parent' in tmp:
                 action = "javascript: document.PseudoForm.target=self.opener.window.name; document.getElementById(\'pseudo_post_query\').value=\'%s\';  document.PseudoForm.submit(); self.close();" % (q,)
             else:
-                action = "javascript: document.getElementById(\'pseudo_post_query\').value=\'%s\';document.PseudoForm.method=\'POST\';  PseudoForm.submit();" % (q,)
-            base = '<a %s href="%s" onclick="%s" >%s</a>' % (self.opt_to_str(options),action,action,string)
+                action = "javascript: if(isMiddleClick(event) || isLeftClick(event)) { if(isMiddleClick(event)){ document.PseudoForm.target='new_page';} else {document.PseudoForm.target=window.name;};  document.getElementById(\'pseudo_post_query\').value=\'%s\';document.PseudoForm.method=\'POST\';  PseudoForm.submit();};" % (q,)
+            base = '<a %s href="%s" onmousedown="%s" >%s</a>' % (self.opt_to_str(options),action,action,string)
         else:
             if 'parent' in tmp:
                 options['onclick']="self.opener.location=\"%s\"; self.close();" % q

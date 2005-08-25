@@ -134,3 +134,25 @@ function SendAsPost(query) {
   tmp.value=query;
   PseudoForm.submit();
 };
+
+function isMiddleClick(e) 
+{
+  var click;
+  var e;
+
+  if (e.which) click = (e.which == 2);
+  else if (e.button) click = (e.button == 4);
+  
+  return click;
+};
+
+function isLeftClick(e) 
+{
+  var click;
+  var e;
+
+  if (e.which) click = (e.which == 1);
+  else if (e.button) click = (e.button == 1);
+
+  return click;
+};
