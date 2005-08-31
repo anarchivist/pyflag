@@ -156,7 +156,7 @@ class DBO:
                @arg query_str: A format string with only %r and %s format sequences
                @arg params: A list of strings which will be formatted into query_str. If there is only one format string and the programmer is truely lazy, a string is ok. """
 
-        if not params:
+        if params==None:
             string = query_str
         else:
             try:

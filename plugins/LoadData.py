@@ -330,6 +330,10 @@ class ScanFS(Reports.report):
                     
         process_directory(query['path'])
 
+        ## Destroy the scanner factories:
+        for s in scanners:
+            s.destroy()
+
     def progress(self,query,result):
         result.heading("Scanning filesystem %s in path %s" % (query['fsimage'],query['path']))
         scanners = self.calculate_scanners(query)

@@ -246,12 +246,12 @@ class BuildDictionary(Reports.report):
             
         result.row(table,form,valign='top')
 
-def resolve_offset(dbh, encoded_offset):
+def resolve_offset(dbh, encoded_offset, fsimage):
     """ Converts the encoded_offset to an offset within its Inode.
 
     As mentioned above the encoded offset includes a bit mask with block number. This makes the encoded offset unique within the entire image.
     """
-    dbh.execute("select (block_number <<%s) + (%r & ((1<<%s)-1)) as `Offset` from LogicalIndex_test where ( %r >>%s = block )",(BLOCKBITS,encoded_offset,BLOCKBITS,encoded_offset, BLOCKBITS))
+    dbh.execute("select (block_number <<%s) + (%r & ((1<<%s)-1)) as `Offset` from LogicalIndex_%s where ( %r >>%s = block )",(BLOCKBITS,encoded_offset,BLOCKBITS,fsimage,encoded_offset, BLOCKBITS))
     row=dbh.fetch()
     return row['Offset']
     
@@ -401,15 +401,16 @@ class SearchIndex(Reports.report):
             if not old_temp_table:
                 offset_columns.append("offset_%s" % word_id)
                 try:
-                    dbh.execute("create table %s select offset-%s as low,offset+%s as high, offset as offset_%s from LogicalIndexOffsets_test where id=%r",(temp_table,range,range,word_id,word_id))
+                    dbh.execute("create table %s select offset-%s as low,offset+%s as high, offset as offset_%s from LogicalIndexOffsets_%s where id=%r",(temp_table,range,range,word_id,query['fsimage'],word_id))
                 except DB.DBError,e:
                     raise Reports.ReportError("Unable to find a LogicalIndexOffsets table for current image. Did you run the LogicalIndex Scanner?.\n Error received was %s" % e)
                 
             else:
-                dbh.execute("create table %s select least(offset-%s,low) as low, greatest(offset+%s,high) as high, %s, offset as offset_%s from %s, LogicalIndexOffsets_test where id=%r and offset<high and offset>low",
+                dbh.execute("create table %s select least(offset-%s,low) as low, greatest(offset+%s,high) as high, %s, offset as offset_%s from %s, LogicalIndexOffsets_%s where id=%r and offset<high and offset>low",
                             (temp_table,range,range,
                              ','.join(offset_columns),word_id,
-                             old_temp_table,word_id))
+                             old_temp_table, query['fsimage'],
+                             word_id))
 
             old_temp_table=temp_table
 
