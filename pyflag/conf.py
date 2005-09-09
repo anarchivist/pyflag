@@ -42,7 +42,11 @@ class ConfObject:
         """ This utility function loads the configuration file from the users home directory.
       
         """
-        ConfObject.config = ConfigParser.SafeConfigParser({"prefix":sys.prefix,"pyflagdir":"%s/../"%sys.modules['pyflag'].__path__[0]})
+        ConfObject.config = ConfigParser.SafeConfigParser({
+            "home": os.getenv("HOME"),
+            "prefix":sys.prefix,
+            "pyflagdir":"%s/../"%sys.modules['pyflag'].__path__[0]})
+        
         ConfObject.config.read([sys.modules['pyflag'].__path__[0]+"/pyflagrc",os.path.expanduser('~/.pyflagrc')])
 
     def __init__(self):

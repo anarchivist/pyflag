@@ -39,8 +39,13 @@
 
 static int is_initialised=0;
 
+ static int is_it_initialised(void) {
+   return is_initialised;
+ };
+
 static void ethereal_init() {
   printf("I am initialising ethereal!!!");
+
   /* Initialise the main ethereal core */
   epan_init(PLUGIN_DIR,register_all_protocols,register_all_protocol_handoffs,
             NULL,NULL,NULL);
@@ -50,6 +55,23 @@ static void ethereal_init() {
 
   is_initialised=1;
 };
+
+/* Disable the protocol given by name */
+ static void ethereal_disable_protocol(char *name) {
+   gint i;
+
+   if(!is_initialised)
+     ethereal_init();
+
+   i= proto_get_id_by_filter_name(name);
+   
+   if (i == -1) {
+      /* XXX - complain here? */
+    } else {
+      if (proto_can_toggle_protocol(i))
+	proto_set_decoding(i, FALSE);
+    }
+ };
 
 static void
 ethereal_fill_in_fdata(frame_data *fdata, int count,
@@ -74,7 +96,7 @@ ethereal_fill_in_fdata(frame_data *fdata, int count,
 //Ethereal attempts to modify pref. Even if it restores it - we should
 //wrap it with strdup/free. Note: The format of preference is
 //module.preference:value.
- static int set_pref(char *pref) {
+ int set_pref(char *pref) {
    char *str=strdup(pref);
    int result;
 
@@ -458,7 +480,7 @@ enum ftenum get_type(proto_node *node);
 unsigned long long int get_int_value(proto_node *node);
 char *get_str_value(proto_node *node);
 unsigned int get_ip_as_int(proto_node *node);
-static int set_pref(char *pref);
+int set_pref(char *pref);
 int get_node_start(proto_node *node);
 int get_node_length(proto_node *node);
 
@@ -482,3 +504,6 @@ enum ftenum {
            FT_FRAMENUM,
            FT_IPv4,
 };
+
+static void ethereal_disable_protocol(char *name);
+static int is_it_initialised(void);

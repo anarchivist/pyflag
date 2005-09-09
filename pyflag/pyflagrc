@@ -20,6 +20,9 @@ FlagDB = pyflag
 #Two paramters are supplied by the parser, home and prefix corresponding to the current users home directory and the installed prefix.
 #If you wish to keep the same path structure, but move it somewhere, simply override homedir within the user specific config file.
 [paths]
+## ethereal's disabled protocols file
+disabled_proto = %(home)s/.ethereal/disabled_protos
+
 #Directory where we can find the graphviz binaries
 dotdir = /usr/local/bin
 #Flag can only read files from this directory

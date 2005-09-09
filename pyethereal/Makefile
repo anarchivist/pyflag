@@ -24,7 +24,7 @@ pyethereal: pyethereal.i check_headers
 	swig -python $@.i
 	gcc -g -Wall -I $(PYTHONINCL) $(ETHEREAL_SRC_INCLUDES) `glib-config --cflags glib` -c pyethereal_wrap.c  -o pyethereal_wrap.o
 	cp $(LIBETHEREAL) $(MISC_LIBS)/libethereal.so.0
-	ld pyethereal_wrap.o  -shared  -o _pyethereal.so $(MISC_LIBS)/libwiretap.so.0  $(MISC_LIBS)/libethereal.so.0 $$(ldd $(ETHEREAL_BINARY) | grep -v "not found" | grep -v ethereal | awk '{print $$3};')
+	ld pyethereal_wrap.o  -shared  -o _pyethereal.so $(MISC_LIBS)/libwiretap.so.0  $(MISC_LIBS)/libethereal.so.0 $$(ldd $(ETHEREAL_BINARY) | grep -v "not found" | grep -v ethereal | grep -v gate | awk '{print $$3};')
 	cp pyethereal_wrap.o _pyethereal.so pyethereal.py $(MISC_LIBS)/
 
 check_headers:

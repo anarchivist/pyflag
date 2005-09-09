@@ -7,4 +7,4 @@
 #include "register.h"
 #include "epan/epan_dissect.h"
 #include "epan/packet.h"
-
+#include "epan/prefs.h"

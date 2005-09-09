@@ -11,6 +11,22 @@ from pyflag.FileSystem import File
 import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
 
+if not pyethereal.is_it_initialised():
+    try:
+        ## Ensure ethereal doesnt fiddle with the sequence numbers
+        ## for us:
+        pyethereal.set_pref("tcp.analyze_sequence_numbers:false")
+        
+        fd = open(config.DISABLED_PROTO)
+        for i in fd:
+            i=i.strip()
+            logging.log(logging.VERBOSE_DEBUG,"Ethereal: Disabling protocol %s" % i)
+            pyethereal.ethereal_disable_protocol(i)
+
+        fd.close()
+    except IOError:
+        pass
+
 def IP2str(ip):
     """ Returns a string representation of the 32 bit network order ip """
     tmp = list(struct.unpack('BBBB',struct.pack('L',ip)))
@@ -96,10 +112,6 @@ class NetworkScanner(BaseScanner):
         try:
             self.proto_tree = metadata['proto_tree'][self.packet_id]
         except KeyError,e:
-            ## Ensure ethereal doesnt fiddle with the sequence numbers
-            ## for us:
-            pyethereal.set_pref("tcp.analyze_sequence_numbers:false")
-
             ## Now dissect it.
             self.proto_tree = pyethereal.Packet(data,self.packet_id,link_type)
 
