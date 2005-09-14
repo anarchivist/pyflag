@@ -29,6 +29,7 @@ from pyflag.Scanner import *
 import plugins.DiskForensics.DiskForensics as DiskForensics
 import pyflag.DB as DB
 import pyflag.FlagFramework as FlagFramework
+import pyflag.Reports as Reports
 
 class RegistryScan(GenScanFactory):
     """ Load in Windows Registry files """
@@ -203,5 +204,56 @@ class BrowseRegistryKey(BrowseRegistry):
             callbacks=[hexdump,strings,stats],
             context="display_mode"
             )
+         
 
+class InterestingRegKey(Reports.report):
+    """ Displays values of interesting registry keys, grouped into categories """
+    parameters = {'fsimage':'fsimage'}
+    name = "Interesting Reg Keys"
+    family = "Disk Forensics"
+    description="This report shows the values of interesting registry keys on the disk"
+    progress_dict = {}
 
+    def form(self,query,result):
+        try:
+            result.case_selector()
+            if query['case']!=config.FLAGDB:
+               result.meta_selector(case=query['case'],property='fsimage')
+        except KeyError:
+            return result
+
+    def progress(self,query,result):
+        result.heading("Looking for registry key values");
+
+    def reset(self,query):
+        dbh = self.DBO(query['case'])
+        tablename = dbh.MakeSQLSafe(query['fsimage'])
+        dbh.execute('drop table interestingregkeys_%s',tablename);
+
+    def analyse(self,query):
+        dbh = self.DBO(query['case'])
+        pdbh=self.DBO(None)
+        tablename = dbh.MakeSQLSafe(query['fsimage'])
+        try:
+			dbh.execute("create table `interestingregkeys_%s` select a.path, a.size, a.modified, a.remainder, a.type, a.reg_key, a.value, b.category, b.description from reg_%s as a, %s.registrykeys as b where a.path LIKE concat('%%',b.path,'%%') AND a.reg_key LIKE concat('%%',b.reg_key,'%%')",(tablename,tablename,config.FLAGDB))
+        except DB.DBError,e:
+            raise Reports.ReportError("Unable to find the registry table for the current image. Did you run the Registry Scanner?.\n Error received was %s" % e)
+    
+    def display(self,query,result):
+        result.heading("Interesting Registry Keys for %s" % query['fsimage'])
+        dbh=self.DBO(query['case'])
+        tablename = dbh.MakeSQLSafe(query['fsimage'])
+
+        try:
+            result.table(
+                columns=('Path','reg_key','Value','from_unixtime(modified)','category','Description'),
+                names=('Path','Key','Value','Last Modified','Category','Description'),
+                table='interestingregkeys_%s ' % (tablename),
+                case=query['case'],
+                #TODO make a link to view the rest of the reg info
+                #links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='BrowseRegistryKey')]
+                )
+        except DB.DBError,e:
+            result.para("Error reading the registry keys table. Did you remember to run the registry scanner?")
+            result.para("Error reported was:")
+            result.text(e,color="red")

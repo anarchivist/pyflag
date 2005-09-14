@@ -1477,6 +1477,15 @@ CREATE TABLE `dictionary` (
 	PRIMARY KEY  (`id`)
 );
 
+CREATE TABLE `registrykeys` (
+	`id` int auto_increment,
+	`path` VARCHAR( 250 ) ,
+	`reg_key` VARCHAR( 200 ) ,
+	`category` VARCHAR( 100 ),
+	`description` VARCHAR( 200 ) ,
+	PRIMARY KEY  (`id`)
+);
+
 CREATE TABLE `regexps` (
 	`pattern` VARCHAR( 50 ) NOT NULL ,
 	`class` VARCHAR( 50 ) NOT NULL ,
