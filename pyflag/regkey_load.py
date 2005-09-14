@@ -23,7 +23,7 @@
 """
 Loads a table of interesting registry keys into flag from a CSV File.
 
-Default regkeys.txt is in utilities directory
+Default regkeys.txt is in data directory
 
 """
 
@@ -33,7 +33,7 @@ import re
 import sys,os
 
 if len(sys.argv)<2:
-    print "Usage: %s path_to_regkey_csv_file.  Default regkeys.txt is in utilities directory\n" % os.path.basename(sys.argv[0])
+    print "Usage: %s path_to_regkey_csv_file.  Default regkeys.txt is in data directory\n" % os.path.basename(sys.argv[0])
     sys.exit(0)
 
 #Get a handle to our database
@@ -55,7 +55,7 @@ if __name__=="__main__":
         filename = sys.argv[1]
         fd=csv.reader(file(filename))
     except (IndexError,IOError),e:
-        print "Usage: %s path_to_regkey_csv_file.  Default regkeys.txt is in utilities directory\n" % sys.argv[0]
+        print "Usage: %s path_to_regkey_csv_file.  Default regkeys.txt is in data directory\n" % sys.argv[0]
         sys.exit(0)
     print "Importing %s" % filename
     for row in fd:

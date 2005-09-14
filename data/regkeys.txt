@@ -1,0 +1,164 @@
+###regkeys.txt
+#Format: Key,Category,Description
+############# User Activity #######################
+HKCU\Software\Microsoft\CurrentVersion\Applets\Paint\Recent File List,User Activity,Maintains a list of image files accessed with Paint
+HKCU\Software\Microsoft\CurrentVersion\Applets\RegEdit,User Activity,The LastKey value maintains the last key accessed using RegEdit
+HKCU\Software\Microsoft\CurrentVersion\Applets\RegEdit\Favorites,User Activity,Maintains a list of favorites added through Favorites menu item in RegEdit
+HKCU\Software\Microsoft\CurrentVersion\Applets\WordPad\Recent File List,User Activity,List of files accessed/saved in WordPad
+HKCU\Software\Microsoft\Search Assistant\ACMru,User Activity,Maintains a list of items searched for via Start->Search; the subkeys (5001, 5603, 5604, etc.) correspond to the textfields where the user enters search parameters.
+HKCU\Software\Microsoft\Internet Explorer\TypedURLs,User Activity,Maintains a list of URLs typed into the IE Address bar
+HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\RecentDocs,User Activity,RecentDocs
+HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\ComDlg32\LastVisitedMRU,User Activity,Maintains a list of programs accessed, and their locations within the file system.  Sort via the MRUList.
+HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\ComDlg32\OpenSaveMRU,User Activity,Maintains a list of files that are opened or saved via Windows Explorer-style dialog boxes
+HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\StreamMRU,User Activity,streamMRU
+HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU,User Activity,Maintains a list of entries typed into the Start->Run box
+HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Doc Find Spec MRU,User Activity,Do find
+HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FindComputerMRU,User Activity,Maintains a list of entries for computers searched for via Windows Explorer
+HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist,User Activity,There are two GUID subkeys beneath this key.  Beneath each of these keys is the Count subkey, which contains a list of ROT-13 'encrypted' values.  The CLSID beginning with 5E6 pertains to the IE Toolbar; the CLSID beginning with 750 corresponds to Active Desktop
+HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Map Network Drive MRU,User Activity,Maintains a list of drive mapped via the Map Network Drive Wizard.
+HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\ComputerDescriptions,User Activity,Values beneath this key are names or IP addresses of machines connected to.
+HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\MountPoints2,User Activity,Subkeys that start with # are paths to drives that have been mounted; includes the use of the net use command.  BaseClass value will usually be Drive.
+HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\MountPoints2\CPC\Volume,User Activity,Each GUID subkey includes a Data value.  This value is a volume identifier.
+HKCU\Software\Microsoft\MediaPlayer\Player\RecentFileList,User Activity,List of files (movies - .mpg, etc.) accessed via Media Player
+HKCU\Software\Microsoft\MediaPlayer\Player\RecentURLList,User Activity,recent url list
+HKCU\Software\Microsoft\Office\{version}\Common\Open Find\{product}\Settings\Open\File Name MRU,User Activity,Value is Reg_Multi_SZ containing a list of file names
+HKCU\Software\Microsoft\Office\{version}\Common\Open Find\{product}\Settings\Save As\File Name MRU,User Activity,Value is Reg_Multi_SZ containing a list of file names
+HKCU\Software\Nico Mak Computing\WinZip\filemenu,User Activity,List of recently used WinZip archives
+############# Launch Points #######################
+HKCU\Control Panel\Desktop\SCRNSAVE.EXE,Launch Point,LaunchPoint
+HKCU\Software\Microsoft\Command Processor\AutoRun,Launch Point,Launch Point
+HKCU\Software\Microsoft\Internet Explorer\Explorer Bars,Launch Point,Launch Point
+HKCU\Software\Microsoft\Internet Explorer\Extensions,Launch Point,Launch Point
+HKCU\Software\Microsoft\Internet Explorer\Toolbar\ShellBrowser,Launch Point,All
+HKCU\Software\Microsoft\Internet Explorer\Toolbar\WebBrowser,Launch Point,Launch Point
+HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run,Launch Point,Launch Point W2K/WXP
+HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run\any subkey,Launch Point,Launch Point W2K
+HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System\Shell,Launch Point,Launch Point W2K/WXP
+HKCU\Software\Microsoft\Windows\CurrentVersion\Run,Launch Point,Launch Point All
+HKCU\Software\Microsoft\Windows\CurrentVersion\Run\any subkey,Launch Point,Launch Point W2K
+HKCU\Software\Microsoft\Windows\CurrentVersion\RunOnce,Launch Point,Launch Point All
+HKCU\Software\Microsoft\Windows\CurrentVersion\RunOnce\any subkey,Launch Point,Launch Point W2K
+HKCU\Software\Microsoft\Windows\CurrentVersion\ShellServiceObjectDelayLoad,Launch Point,Launch Point All
+HKCU\Software\Microsoft\Windows NT\CurrentVersion\Windows\load,Launch Point,Launch Point
+HKCU\Software\Microsoft\Windows NT\CurrentVersion\Windows\run,Launch Point,Launch Point NT4+
+HKCU\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Shell,Launch Point,Launch Point NT4+
+HKCU\Software\Policies\Microsoft\Windows\System\Scripts,Launch Point,Launch Point W2K/WXP
+HKLM\Software\Classes\ CLASSID Stopped by REAPOFF\{ CLASSID Stopped by REAPOFF}\Implemented Categories\{00021493-0000-0000-C000-000000000046},Launch Point,Launch Point
+HKLM\Software\Classes\ CLASSID Stopped by REAPOFF\{ CLASSID Stopped by REAPOFF}\Implemented Categories\{00021494-0000-0000-C000-000000000046}\ 	All (1),Launch Point,Launch Point
+HKLM\Software\Classes\.bat\shell\open\command,Launch Point,Launch Point All
+HKLM\Software\Classes\.cmd\shell\open\command,Launch Point,Launch Point NT4+
+HKLM\Software\Classes\.com\shell\open\command,Launch Point,Launch Point All
+HKLM\Software\Classes\.exe\shell\open\command,Launch Point,Launch Point All
+HKLM\Software\Classes\.hta\shell\open\command,Launch Point,Launch Point All
+HKLM\Software\Classes\.pif\shell\open\command,Launch Point,Launch Point All
+HKLM\Software\Classes\.scr\shell\open\command,Launch Point,Launch Point
+HKLM\Software\Classes\batfile\shell\open\command,Launch Point,Launch Point All
+HKLM\Software\Classes\cmdfile\shell\open\command,Launch Point,Launch Point NT4+
+HKLM\Software\Classes\comfile\shell\open\command,Launch Point,Launch Point All
+HKLM\Software\Classes\exefile\shell\open\command,Launch Point,Launch Point All
+HKLM\Software\Classes\htafile\shell\open\command,Launch Point,Launch Point All
+HKLM\Software\Classes\piffile\shell\open\command,Launch Point,Launch Point All
+HKLM\Software\Classes\scrfile\shell\open\command,Launch Point,Launch Point All
+HKLM\Software\Classes\*\shellex\ContextMenuHandlers,Launch Point,Launch Point
+HKLM\Software\Classes\Directory\shellex\ContextMenuHandlers,Launch Point,Launch Point
+HKLM\Software\Classes\Folder\shellex\ContextMenuHandlers,Launch Point,Launch Point All
+HKLM\Software\Classes\Protocols\Filter,Launch Point,Launch Point All
+HKLM\Software\Microsoft\Active Setup\Installed Components,Launch Point,Launch Point All
+HKLM\Software\Microsoft\Command Processor\AutoRun,Launch Point,Launch Point NT4+
+HKLM\Software\Microsoft\Internet Explorer\Explorer Bars,Launch Point,Launch Point  All
+HKLM\Software\Microsoft\Internet Explorer\Extensions,Launch Point,Launch Point All
+HKLM\Software\Microsoft\Internet Explorer\Toolbar,Launch Point,Launch Point All
+HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\Browser Helper Objects,Launch Point,Launch Point All
+HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\SharedTaskScheduler,Launch Point,Launch Point All
+HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\ShellExecuteHooks,Launch Point,Launch Point All
+HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run,Launch Point,Launch Point W2K/WXP
+HKLM\Software\Microsoft\Windows\CurrentVersion\Run,Launch Point,Launch Point All
+HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnce,Launch Point,Launch Point All
+HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnce\Setup,Launch Point,Launch Point All
+HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnceEx,Launch Point,Launch Point All
+HKLM\Software\Microsoft\Windows\CurrentVersion\RunServices,Launch Point,Launch Point W9x
+HKLM\Software\Microsoft\Windows\CurrentVersion\RunServicesOnce,Launch Point,Launch Point W9x
+HKLM\Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved,Launch Point,Launch Point All
+HKLM\Software\Microsoft\Windows\CurrentVersion\ShellServiceObjectDelayLoad,Launch Point,Launch Point All
+HKLM\Software\Microsoft\Windows NT\CurrentVersion\Image File Execution Options,Launch Point,Launch Point NT4+
+HKLM\Software\Microsoft\Windows NT\CurrentVersion\Windows\AppInit_DLLs,Launch Point,Launch Point NT4+
+HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\GinaDLL,Launch Point,Launch Point
+HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Shell,Launch Point,Launch Point
+HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\System,Launch Point,Launch Point
+HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Taskman,Launch Point,Launch Point
+HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Userinit,Launch Point,Launch PointNT4+
+HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Notify,Launch Point,Launch PointW2K/WXP
+HKLM\Software\Policies\Microsoft\Windows\System\Scripts,Launch Point,Launch PointW2K/WXP
+HKLM\System\CurrentControlSet\Control\Class\{4D36E96B-E325-11CE-BFC1-08002BE10318}\UpperFilters,Launch Point,Launch Point W2K/WXP
+HKLM\System\CurrentControlSet\Control\Session Manager\BootExecute,Launch Point,Launch Point NT4+
+HKLM\System\CurrentControlSet\Services,Launch Point,Launch Point NT4+
+HKLM\System\CurrentControlSet\Services\Winsock2\Parameters\NameSpace_Catalog5\Catalog_Entries,Launch Point,Launch Point
+HKLM\System\CurrentControlSet\Services\Winsock2\Parameters\Protocol_Catalog9\Catalog_Entries,Launch Point,Launch Point All
+############# Hijack Points #######################
+HKCU\Software\Microsoft\Internet Explorer\Desktop\Components,Hijack Points,Hijack Points All
+HKCU\Software\Microsoft\Internet Explorer\Main,Hijack Points,Hijack Points All (4)
+HKCU\Software\Microsoft\Internet Explorer\SearchURL,Hijack Points,Hijack Points All (4)
+HKCU\Software\Microsoft\Internet Explorer\URLSearchHooks,Hijack Points,Hijack Points All
+HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\ShellState,Hijack Points,Hijack Points All
+HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\ActiveDesktop,Hijack Points,Hijack Points
+HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer,Hijack Points,Hijack Points
+HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System,Hijack Points,Hijack Points
+HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\WindowsUpdate,Hijack Points,Hijack PointsAll
+HKCU\Software\Policies\Microsoft\Internet Explorer\Control Panel,Hijack Points,Hijack Points
+HKCU\Software\Policies\Microsoft\Internet Explorer\Restrictions,Hijack Points,Hijack Points All
+HKLM\Software\Microsoft\Internet Explorer\Main,Hijack Points,Hijack Points All (4)
+HKLM\Software\Microsoft\Internet Explorer\Search,Hijack Points,Hijack Points All (4)
+HKLM\Software\Microsoft\Internet Explorer\AboutURLs,Hijack Points,Hijack Points All
+HKLM\Software\Microsoft\Windows\CurrentVersion\URL\DefaultPrefix,Hijack Points,Hijack Points All
+HKLM\Software\Microsoft\Windows\CurrentVersion\URL\Prefixes,Hijack Points,Hijack Points All
+HKLM\Software\Policies\Microsoft\Windows NT\SystemRestore,Hijack Points,Hijack Points WXP
+HKLM\System\CurrentControlSet\Services\Tcpip\Parameters\DataBasePath,Hijack Points,Hijack Points NT4+
+############# Auto Start #######################
+HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run,Auto Start,Lists programs to be run when system starts.
+HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run\any subkey,Auto Start,Lists programs to be run when system starts.
+HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run,Auto Start,Auto Start
+HKLM\Software\Microsoft\Windows\CurrentVersion\Run,Auto Start,Lists programs to be run when system starts.  On 2K and XP these entries are ignored when booted to Safe Mode; however entries preceded by * will be processed even when booted to Safe Mode.  On XP these 'Run' keys are referred to as the 'legacy Run list' as they are provided for backwards compatibility with previous versions of Windows.
+HKLM\Software\Microsoft\Windows\CurrentVersion\Run\any subkey,Auto Start,Andy Aronoff owner of SilentRunners.org says that the contents of any subkey will be launched.  At this point I haven't tested it.
+HKCU\Software\Microsoft\Windows\CurrentVersion\Run,Auto Start,Auto Start
+HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnce,Auto Start,Lists programs to be run once when the system starts and deleted.  The commands listed here are deleted before the actual commands are run.  If the command is preceded by ! the command is deleted after the command is run.
+HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnce\Setup,Auto Start,Auto Start
+HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnce\any subkey,Auto Start,Auto Start
+HKCU\Software\Microsoft\Windows\CurrentVersion\RunOnce,Auto Start,Auto Start
+HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnceEx,Auto Start,Auto Start
+HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\Browser Helper Objects,Auto Start,Browser Helper Objects (BHOs) are in-process COM components loaded each time Internet Explorer starts up.  These components run in the same memory context as the browser.  with Active Desktop Windows Explorer will also support BHOs.
+HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\SharedTaskScheduler,Auto Start,Entries in this key are automatically loaded by Explorer.exe when Windows starts.
+HKLM\Software\Classes\exefile\shell\open\command,Auto Start,The Default setting for these entries is '%1 %*'.  Some malware will add entries to have other things run.  Also may need to examine other file types under the Classes key as well (ie any file classes that point to an app with a .exe extension).  These entires map to HKCR\{ext}file\shell\open\command.  Other entries under the HKLM\Software\Classes (and HKCR) key are succeptible to this same sort of subversion.  For example navigate via RegEdit to the HKCR\Drive\shell\cmd\command key right-click on the Default value and choose Modify.  In the textfield add && notepad.exe and click OK.  Open My Computer select a drive right-click and choose Open Command Prompt here......both cmd.exe and notepad.exe will run.
+HKLM\Software\Microsoft\Command Processor\AutoRun,Auto Start,Commands listed here are executed before all other options listed at the command line; disabled by /d switch; REG_SZ data type.
+HKCU\Software\Microsoft\Command Processor\AutoRun,Auto Start,Commands listed here are executed before all other options listed at the command line; disabled by /d switch; REG_SZ data type.
+HKCU\Control Panel\Desktop\SCRNSAVE.EXE,Auto Start,Designates the user's screen saver which is launched based on parameters set through the Control Panel.
+HKLM\Software\Microsoft\Windows\CurrentVersion\ShellServiceObjectDelayLoad\ ,Auto Start,Points to the InProcServer for a CLSID; The values found in this key can be mapped to HKLM\Software\Classes\CLSID\{GUID}\InProcServer; Items listed here are loaded by Explorer when Windows starts; Used by malware
+HKCU\Software\Microsoft\Windows\CurrentVersion\ShellServiceObjectDelayLoad,Auto Start,Auto Start
+HKCU\Software\Microsoft\Windows NT\CurrentVersion\Windows\load,Auto Start,Replaces the use of the load= line in Win.ini
+HKCU\Software\Microsoft\Windows NT\CurrentVersion\Windows\run,Auto Start,Replaces the use of the run= line in Win.ini
+HKLM\Software\Policies\Microsoft\Windows\System\Scripts,Auto Start,Points to scripts for various events (ie logon logoff shutdown etc.); Usually handled via GPOs but can also be configured via local security policies
+HKCU\Software\Policies\Microsoft\Windows\System\Scripts,Auto Start,Auto Start
+HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System\Shell,Auto Start,Can specify an alternate user shell
+HKLM\Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved,Auto Start,Contains a list of approved shell extensions.
+HKLM\Software\Microsoft\Windows NT\CurrentVersion\Windows\AppInit_DLLs,Auto Start,DLLs specified within this key are loaded whenever a Windows-based (GUI) application is launched.
+HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\GinaDLL,Auto Start,This entry can be subverted to load an alternate GINA capable of capturing the user's login information in plain text (ie FakeGINA.DLL from NTSecurity.nu).  This is loaded and used by WinLogon.exe.
+HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Shell,Auto Start,Indicates executable files launched by Userinit.exe and expected at user shell startup. 
+HKCU\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Shell,Auto Start,Auto Start
+HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\System,Auto Start,Indicates programs to be executed in System mode.
+HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\TaskMan,Auto Start,Specifies the Task Manager to be used by Windows.  The default is TaskMan.exe but the SysInternals.com tool Process Explorer can replace this value.
+HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\UserInit,Auto Start,Lists programs to be automatically run when the user logs in.  Userinit.exe is responsible for shell execution.  Nddeagnt.exe is responsible for NetDDE.  Multiple programs may be listed.
+HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Notify,Auto Start,Specifies programs to be run when certain system events (ie logon logoff startup shutdown startscreensaver stopscreensaver) occur.  The event is generated by Winlogon.exe at which point the system will look for a DLL within this key to handle the event.
+HKLM\System\CurrentControlSet\Control\Session Manager\BootExecute,Auto Start,Specifies the applications services and commands executed during startup.
+HKLM\System\CurrentControlSet\Services,Auto Start,Subkeys list services to be executed most of which are run as LocalSystem.  The Hacker Defender rootkit installs as a service.
+HKLM\Software\Microsoft\Active Setup\Installed Components,Auto Start,Auto Start
+HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders\Common Startup,Auto Start,Designates location of Startup folders; ie Autostart directory
+HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders\Startup,Auto Start,Auto Start
+HKLM\Software\Microsoft\Windows\CurrentVersion\explorer\User Shell Folders\Common Startup,Auto Start,Auto Start
+HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders\Startup,Auto Start,Auto Start
+HKLM\Software\Microsoft\Windows\CurrentVersion\App Paths,Auto Start,Each subkey contains the path to the specific application; paths and the actual executables should be verified as legitimate apps may be set in other autostart locations and the linked-to application subverted or trojaned.
+HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options,Auto Start,This Registry location is used to designate a debugger for an application.  Testing shows that it's an excellent redirection facility.  For example adding notepad.exe as a key and then adding a Debugger value of cmd.exe will cause the command prompt to be opened whenever Notepad is launched.  File binding utilities will allow an attacker to bind a backdoor to a legitimate program and then redirect that legit program to the Trojaned one.
+############# Misc #######################
+HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer\NoDriveAutoRun,Misc,Misc
+HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer\NoDriveAutoRun,Misc,Misc
+HKLM\SYSTEM\CurrentControlSet\Control\FileSystem\NtfsDisableLastAccessUpdate,Misc,Misc,If set to 1 updating of last access times is disabled.  This can be "very bad' for forensics.	
+HKLM\System\CurrentControlSet\Control\Session Manager\KnownDLLs,Misc,Misc,Contains a list of DLLs to be loaded at system start	
+HKCU\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\ParseAuotExec,Misc,Misc,By default Windows 2K+ systems do not parse the autoexec.bat file.  Set this Registry entry to "1" to enable parsing of the file.  This can be used for reading environment variables etc.
