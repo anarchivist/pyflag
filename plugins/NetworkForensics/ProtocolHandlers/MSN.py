@@ -7,6 +7,9 @@ http://www.hypothetic.org/docs/msn/notification/authentication.php
 
 """
 # Michael Cohen <scudette@users.sourceforge.net>
+# Gavin Jackson <gavz@users.sourceforge.net>
+
+#   Added recipient column to table
 #
 # ******************************************************
 #  Version: FLAG $Version: 0.78 Date: Fri Aug 19 00:47:14 EST 2005$
@@ -119,31 +122,51 @@ class message:
 
         current_position = self.fd.tell()
         self.data = self.fd.read(self.length-(current_position-self.offset))
+    
+    def CAL(self):
+        """
+	GJ: Sets the session ID when we try calling out
+	"""
+	words = self.cmdline.split()
+	if ((self.state == "USR")&(words[2] != "RINGING")):
+	  logging.log(logging.DEBUG, "Recipient is %s" % (words[2]))
+	  self.recipient = words[2]
+        self.state = "CAL"
 
+    def USR(self):
+        """
+	GJ: Sets the session ID when we try calling out
+	"""
+	words = self.cmdline.split()
+	self.state = "USR"
+		
     def ANS(self):
         """ Logs into the Switchboard session.
 
         We use this to store the current session ID for the entire TCP connection.
         """
         words = self.cmdline.split()
-        try:
+	
+	try:
             self.session_id = int(words[-1])
             self.dbh.execute("insert into msn_session_%s set id=%r, user=%r",
                              (self.table,self.session_id, words[2]))
             ## This stores the current clients username
             self.client_id = words[2]
-            logging.log(logging.DEBUG, "MSN: %s has logged into a session id %s" % (words[2],self.session_id))
         except: pass
-
+	self.state = "ANS"
+	
     def IRO(self):
         words = self.cmdline.split()
         self.dbh.execute("insert into msn_session_%s set id=%r, user=%r",
                          (self.table,self.session_id, words[4]))
+	self.state = "IRO"
 
     def JOI(self):
         words = self.cmdline.split()
         self.dbh.execute("insert into msn_session_%s set id=%r, user=%r",
                          (self.table,self.session_id, words[1]))
+	self.state = "JOI"
                          
     def plain_handler(self,content_type,sender,friendly_sender):
         """ A handler for content type text/plain """
@@ -155,9 +178,9 @@ class message:
         timestamp = row['ts_sec']
 
         self.dbh.execute(""" insert into msn_messages_%s set sender=%r,friendly_name=%r,
-        inode=%r, packet_id=%r, data=%r, ts_sec=%r, session=%r
+        recipient=%r, inode=%r, packet_id=%r, data=%r, ts_sec=%r, session=%r
         """,(
-            self.table,sender,friendly_sender,self.fd.inode, packet_id,
+            self.table,sender,friendly_sender, self.recipient, self.fd.inode, packet_id,
             self.get_data(), timestamp, self.session_id
             ))
 
@@ -246,11 +269,12 @@ class message:
             tid = int(words[1])
             sender = "%s (Target)" % self.client_id
             friendly_sender = "Implied Client Machine"
+	    #self.recipient = ""
         except ValueError:
             tid = 0
             sender = words[1]
             friendly_sender = words[2]
-
+	    self.recipient = "(Target)"
         try:
             content_type = self.headers['content-type']
         except:
@@ -263,7 +287,8 @@ class message:
             self.ct_dispatcher[ct](self,content_type,sender,friendly_sender)
         except KeyError,e:
             logging.log(logging.VERBOSE_DEBUG, "Unable to handle content-type %s(%s) - ignoring message %s " % (content_type,e,tid))
-            
+        self.state = "MSG"
+	
 from HTMLParser import HTMLParser
 
 class ContextParser(HTMLParser):
@@ -281,6 +306,7 @@ class MSNScanner(NetworkScanFactory):
             """CREATE TABLE if not exists `msn_messages_%s` (
             `sender` VARCHAR( 250 ) NOT NULL ,
             `friendly_name` VARCHAR( 255 ) NOT NULL ,
+	    `recipient` VARCHAR( 255 ),
             `inode` VARCHAR(50) NOT NULL,
             `packet_id` INT,
             `session` INT,
@@ -339,6 +365,7 @@ class MSNFile(CachedFile):
         File.__init__(self, case, table, fd, inode)
         ## Figure out the filename
         cached_filename = get_temp_path(case,inode[1:])
+
         ## open the previously cached copy
         self.cached_fd = open(cached_filename,'r')
         
@@ -386,16 +413,21 @@ class BrowseMSNChat(Reports.report):
                 case = query['case'],
               ),
               icon = "stock_down-with-subpoints.png",
-                     )
+	                     )
 
-            return tmp
+            return tmp	
 
         result.table(
-            columns = ['ts_sec', 'from_unixtime(ts_sec)','packet_id','session','sender','data'],
-            names = ['Prox','Time Stamp','Packet','Session','Sender Nick','Text'],
+            columns = ['ts_sec', 'from_unixtime(ts_sec)', 'inode', 'packet_id', 'session', 'sender', 'recipient','data'],
+            names = ['Prox','Time Stamp','Stream', 'Packet', 'Session', 'Sender Nick', 'Recipient Nick','Text'],
             table = "msn_messages_%s" % query['fsimage'],
             callbacks = {'Prox':draw_prox_cb},
-            links = [None, None,
+            links = [
+	    	     None,None,
+		     FlagFramework.query_type((),
+                                              family="Disk Forensics", case=query['case'],
+                                              report='View File Contents', fsimage=query['fsimage'],
+                                              __target__='inode', mode="Combined streams"),
                      FlagFramework.query_type((),
                                               family="Network Forensics", case=query['case'],
                                               report='View Packet', fsimage=query['fsimage'],

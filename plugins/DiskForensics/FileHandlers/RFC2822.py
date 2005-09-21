@@ -1,6 +1,7 @@
 """ This scanner handles RFC2822 type messages, creating VFS nodes for all their children """
 # Michael Cohen <scudette@users.sourceforge.net>
 # David Collett <daveco@users.sourceforge.net>
+# Gavin Jackson <gavz@users.sourceforge.net>
 #
 # ******************************************************
 #  Version: FLAG $Version: 0.78 Date: Fri Aug 19 00:47:14 EST 2005$
@@ -24,28 +25,73 @@ import os.path
 import pyflag.logging as logging
 import pyflag.Scanner as Scanner
 import pyflag.Reports as Reports
+import pyflag.DB as DB
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import email
 from pyflag.FileSystem import File,CachedFile
 
 class RFC2822(Scanner.GenScanFactory):
-    """ Scan RFC2822 Mail messages """
+    """ Scan RFC2822 Mail messages and insert record into email_ table"""
     default = True
-    depends = 'TypeScan'
+    depends = ['TypeScan','PstScan']
     
+    def __init__(self,dbh, table,fsfd):
+        self.dbh=dbh
+        self.table=table
+        self.dbh.execute("CREATE TABLE IF NOT EXISTS `email_%s` (`inode` VARCHAR(250), `vfsinode` VARCHAR(250), `date` DATETIME, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));", self.table)
+
     class Scan(Scanner.StoreAndScanType):
         types = [ 'text/x-mail.*',
                   'message/rfc822',
                   ]
-
+ 
         def external_process(self,name):
-            count = 0
+            def month_str_to_int(str): 
+	        if (str == "Jan"):
+	            return 1
+	        elif (str == "Feb"):
+		    return 2
+	        elif (str == "Mar"):
+		    return 3
+	        elif (str == "Apr"):
+		    return 4
+	        elif (str == "May"):
+		    return 5
+	        elif (str == "Jun"):
+		    return 6
+	        elif (str == "Jul"):
+		    return 7
+	        elif (str == "Aug"):
+		    return 8
+	        elif (str == "Sep"):
+		    return 9
+	        elif (str == "Oct"):
+		    return 10
+	        elif (str == "Nov"):
+		    return 11
+	        elif (str == "Dec"):
+		    return 12
+		    
+	    count = 0
             fd = open(name,'r')
 
             try:
                 a=email.message_from_file(fd)
-                for part in a.walk():
+		
+		#Mysql is really picky about the date formatting
+		strng = a.get('Date')
+		flds = strng.split()
+		datesql = flds[3] + "-" + str(month_str_to_int(flds[2])) + "-" + flds[1] + " " + flds[4] + " " + flds[5]
+		print datesql
+		self.dbh.execute("INSERT INTO `email_%s` SET `inode`=%r,`vfsinode`=%r,`date`=%r,`to`=%r,`from`=%r,`subject`=%r", (self.table, self.inode, name, datesql, a.get('To'), a.get('From'), a.get('Subject')))
+
+		#self.dbh.execute("INSERT INTO `email_%s` SET `inode`=%r,`vfsinode`='P%s',`date`=from_unixtime(%s),`to`=%r,`from`=%r,`subject`=%r", (self.table, self.inode, name, a.get('Date'), a.get('To'), a.get('From'), a.get('Subject')))
+
+                #print ("**************************************************") 
+                #print a.get("Date") + a.get("To") + a.get("From") + a.get("Subject") + a.get_payload()
+		#print ("**************************************************")
+		for part in a.walk():
                     if part.get_content_maintype() == 'multipart':
                         continue
 

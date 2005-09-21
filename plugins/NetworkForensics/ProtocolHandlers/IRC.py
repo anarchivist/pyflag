@@ -2,6 +2,8 @@
 
 """
 # Michael Cohen <scudette@users.sourceforge.net>
+# Gavin Jackson <gavz@users.sourceforge.net>
+#   Added recipient column to table
 #
 # ******************************************************
 #  Version: FLAG $Version: 0.78 Date: Fri Aug 19 00:47:14 EST 2005$
@@ -44,6 +46,7 @@ class IRCScanner(NetworkScanFactory):
             `id` int auto_increment,
             `sender` VARCHAR( 250 ) NOT NULL ,
             `full_sender` VARCHAR( 255 ) NOT NULL ,
+            `recipient` VARCHAR(50),
             `command` VARCHAR(255) NOT NULL,
             `inode` VARCHAR(50) NOT NULL,
             `packet_id` INT,
@@ -150,11 +153,14 @@ class IRCScanner(NetworkScanFactory):
                 base_stream_inode = self.fd.inode[:self.fd.inode.index('/')]
             except IndexError:
                 base_stream_inode = self.fd.inode
-                
+	    if (line != None):
+	        recipient = line.split(':')[0]
+	    else:
+	        recipient = ""
             self.dbh.execute(""" insert into irc_messages_%s set sender=%r,full_sender=%r,
-            inode=%r, packet_id=%r, data=%r, ts_sec=%r, command = %r """,(
+            inode=%r, packet_id=%r, data=%r, ts_sec=%r, command = %r, recipient = %r""",(
                 self.table,short_name,prefix,base_stream_inode, packet_id,
-                line, timestamp, command
+                line, timestamp, command, recipient 
                 ))
 
         password = ''
@@ -228,7 +234,7 @@ class IRCScanner(NetworkScanFactory):
 class BrowseIRCChat(Reports.report):
     """ This allows chat messages to be browsed. """
     parameters = { 'fsimage':'fsimage' }
-    name = "Browse Chat"
+    name = "Browse IRC Chat"
     family = "Network Forensics"
     def form(self,query,result):
         try:
@@ -255,8 +261,8 @@ class BrowseIRCChat(Reports.report):
 
         
         result.table(
-            columns = ['id', 'from_unixtime(ts_sec)','inode','packet_id','command','sender','data'],
-            names = ['ID','Time Stamp','Stream','Packet','Command','Sender Nick','Text'],
+            columns = ['id', 'from_unixtime(ts_sec)','inode','packet_id','command','sender','recipient', 'data'],
+            names = ['ID','Time Stamp','Stream','Packet','Command','Sender Nick','Recipient','Text'],
             table = "irc_messages_%s" % query['fsimage'],
 #            callbacks = { 'Stream':  Stream_cb },
             links = [None, None,
