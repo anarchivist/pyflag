@@ -67,7 +67,8 @@ class Hash(LONG_ARRAY):
                 off = LONG(data[offset+4:],1)
                 ## If the offsets are nonsensical we dont add them (i.e. point at 0xBADF00D are null)
                 if off!=0 and LONG(data.set_offset(off.get_value()))!=0xBADF00D:
-                    self.data.append(off)
+                    if off.get_value() not in self.data:
+                        self.data.append(off.get_value())
                     
             ## Go to the next offset in the list
             offset+=8
@@ -193,9 +194,9 @@ class IEHistoryFile:
     def next(self):
         result={}
         offset=self.hash_iter.next()
-        entry_type = STRING(self.buffer[offset.get_value():],4).__str__()
+        entry_type = STRING(self.buffer[offset:],4).__str__()
         if entry_type == 'URL ':
-            entry=URLEntry(self.buffer[offset.get_value():],1)
+            entry=URLEntry(self.buffer[offset:],1)
             result['event']=entry
             for key in ('type','modified_time','accessed_time','url','filename'):
                 result[key]=entry[key]

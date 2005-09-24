@@ -643,7 +643,9 @@ class WIN_FILETIME(SimpleStruct):
     def __str__(self):
         t = self.to_unixtime()
         if t<0: return "Invalid Timestamp"
-        return "%s" % (time.ctime(t))
+        return time.strftime("%Y%m%d%H%M%S",time.localtime(t))
+#        return "%s" % (time.ctime(t))
+
 
 class WIN12_FILETIME(WIN_FILETIME):
     """ A 12 byte variant of above. Last LONG is just all zeros usually so we ignore it """

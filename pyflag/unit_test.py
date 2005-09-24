@@ -103,7 +103,7 @@ Registry.Init()
 import pyethereal
 import PIL.Image
 
-import traceback,cStringIO, struct, email, clamav, index, zipfile
+import traceback,cStringIO, struct, email, clamav, index, zipfile, email.Parser
 import math, bisect, cgi, pickle, urllib, base64
 import pexpect
 
