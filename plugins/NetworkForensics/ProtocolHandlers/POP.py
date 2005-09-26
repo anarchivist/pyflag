@@ -1,5 +1,6 @@
 """ This module implements features specific for POP Processing """
 # Michael Cohen <scudette@users.sourceforge.net>
+# Gavin Jackson <Gavz@users.sourceforge.net>
 #
 # ******************************************************
 #  Version: FLAG $Version: 0.78 Date: Fri Aug 19 00:47:14 EST 2005$
@@ -82,6 +83,17 @@ class POP:
 
     def UIDL(self,args):
         self.read_multi_response()
+
+    #GJ: We _really_ needed to handle this command 
+    def TOP(self,args):
+        ## Read the first line to see if it has been successful:
+        response=self.fd.readline()
+        if response.startswith("+OK"):
+            start = self.fd.tell()
+            data = self.read_multi_response()
+            length = len(data)
+            logging.log(logging.DEBUG,"Message %s starts at %s in stream and is %s long" % (args[0],start,length))
+            self.files.append((args[0],"%s:%s" % (start,length)))
 
     def RETR(self,args):
         ## Read the first line to see if it has been successful:
