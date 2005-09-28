@@ -1,5 +1,6 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 # David Collett <daveco@users.sourceforge.net>
+# Gavin Jackson <gavz@users.sourceforge.net>
 #
 # ******************************************************
 #  Version: FLAG $Version: 0.78 Date: Fri Aug 19 00:47:14 EST 2005$
@@ -35,6 +36,7 @@ import getopt
 import pyflag.FlagFramework as FlagFramework
 import pyflag.UI as UI
 import pyflag.Registry as Registry
+from optparse import OptionParser
 
 ## Make sure the registry is properly initialised
 #Registry.Init()
@@ -260,20 +262,35 @@ if __name__ == "__main__":
     env=environment()
     parser=command_parse(env)
     print "Welcome to the Flag shell. Type help for help"
-    ## Parse commandline args:
-    opts,args=getopt.gnu_getopt(sys.argv,"c:")
-    opts=FlagFramework.query_type(opts)
+    
+    # Parse commandline args:
+    clparser = OptionParser()
+    clparser.add_option("-c", "--config", dest="filename",
+                  help="execute flash script from FILE", metavar="FILE")
 
-    if opts.has_key("-c"):
-        asker=Asker()
-        fd=open(opts['-c'])
-        file=fd.read()
-        
-        ## Ask the user to fill in variables in the file
-        file=file % asker
-        for f in file.split('\n'):
-            print "# %s" % f
-            process_line(f)
+    clparser.add_option("-p", "--params", dest="params", 
+                      help="comma seperated list of KEY:VALUE for flash scripts",
+                      metavar="PARAMS")
+
+    (options, args) = clparser.parse_args()
+
+    if options.filename != None:
+      asker=Asker()
+      fd=open(options.filename)
+      file = fd.read()
+      
+      #Initialise variable cache from parameters (if they are provided)
+      if options.params != None:
+        params = options.params.split(",")
+        for keypair in params:
+          keyvalue = keypair.split(":")
+          asker.cache[keyvalue[0]] = keyvalue[1]
+      
+      # Ask the user to fill in variables in the file
+      file=file % asker
+      for f in file.split('\n'):
+      	print "# %s" % f
+    	process_line(f)
             
     else:
         while(1):
@@ -285,4 +302,3 @@ if __name__ == "__main__":
                 sys.exit(0)
             except KeyboardInterrupt:
                 print "\nInterrupted"
-

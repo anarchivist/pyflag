@@ -13,7 +13,7 @@ execute Case\ Management.Create\ new\ case create_case=%(case)s
 set case=%(case)s
 
 #Select the filesystem image (PCAP file) to load
-execute Load\ Data.Load\ IO\ Data\ Source iosource=%(iosource)s subsys=standard io_filename=%(Image filename)s 
+execute Load\ Data.Load\ IO\ Data\ Source iosource=%(iosource)s subsys=standard io_filename=%(iofilename)s 
 
 #Set this as the default io source
 set iosource=%(iosource)s
