@@ -32,12 +32,10 @@ HKCU\Software\Microsoft\Internet Explorer\Extensions,Launch Point,Launch Point
 HKCU\Software\Microsoft\Internet Explorer\Toolbar\ShellBrowser,Launch Point,All
 HKCU\Software\Microsoft\Internet Explorer\Toolbar\WebBrowser,Launch Point,Launch Point
 HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run,Launch Point,Launch Point W2K/WXP
-HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run\any subkey,Launch Point,Launch Point W2K
 HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System\Shell,Launch Point,Launch Point W2K/WXP
-HKCU\Software\Microsoft\Windows\CurrentVersion\Run,Launch Point,Launch Point All
-HKCU\Software\Microsoft\Windows\CurrentVersion\Run\any subkey,Launch Point,Launch Point W2K
-HKCU\Software\Microsoft\Windows\CurrentVersion\RunOnce,Launch Point,Launch Point All
-HKCU\Software\Microsoft\Windows\CurrentVersion\RunOnce\any subkey,Launch Point,Launch Point W2K
+HKLM\Software\Microsoft\Windows\CurrentVersion\Run,Launch Point,Lists programs to be run when system starts.  On 2K and XP these entries are ignored when booted to Safe Mode; Andy Aronoff owner of SilentRunners.org says that the contents of any subkey will be launched.  At this point I haven't tested it.
+HKCU\Software\Microsoft\Windows\CurrentVersion\Run,Launch Point,Auto Start
+HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnce,Launch Point,Lists programs to be run once when the system starts and deleted.  The commands listed here are deleted before the actual commands are run.  If the command is preceded by ! the command is deleted after the command is run.
 HKCU\Software\Microsoft\Windows\CurrentVersion\ShellServiceObjectDelayLoad,Launch Point,Launch Point All
 HKCU\Software\Microsoft\Windows NT\CurrentVersion\Windows\load,Launch Point,Launch Point
 HKCU\Software\Microsoft\Windows NT\CurrentVersion\Windows\run,Launch Point,Launch Point NT4+
@@ -115,16 +113,7 @@ HKLM\Software\Policies\Microsoft\Windows NT\SystemRestore,Hijack Points,Hijack P
 HKLM\System\CurrentControlSet\Services\Tcpip\Parameters\DataBasePath,Hijack Points,Hijack Points NT4+
 ############# Auto Start #######################
 HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run,Auto Start,Lists programs to be run when system starts.
-HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run\any subkey,Auto Start,Lists programs to be run when system starts.
 HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run,Auto Start,Auto Start
-HKLM\Software\Microsoft\Windows\CurrentVersion\Run,Auto Start,Lists programs to be run when system starts.  On 2K and XP these entries are ignored when booted to Safe Mode; however entries preceded by * will be processed even when booted to Safe Mode.  On XP these 'Run' keys are referred to as the 'legacy Run list' as they are provided for backwards compatibility with previous versions of Windows.
-HKLM\Software\Microsoft\Windows\CurrentVersion\Run\any subkey,Auto Start,Andy Aronoff owner of SilentRunners.org says that the contents of any subkey will be launched.  At this point I haven't tested it.
-HKCU\Software\Microsoft\Windows\CurrentVersion\Run,Auto Start,Auto Start
-HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnce,Auto Start,Lists programs to be run once when the system starts and deleted.  The commands listed here are deleted before the actual commands are run.  If the command is preceded by ! the command is deleted after the command is run.
-HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnce\Setup,Auto Start,Auto Start
-HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnce\any subkey,Auto Start,Auto Start
-HKCU\Software\Microsoft\Windows\CurrentVersion\RunOnce,Auto Start,Auto Start
-HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnceEx,Auto Start,Auto Start
 HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\Browser Helper Objects,Auto Start,Browser Helper Objects (BHOs) are in-process COM components loaded each time Internet Explorer starts up.  These components run in the same memory context as the browser.  with Active Desktop Windows Explorer will also support BHOs.
 HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer\SharedTaskScheduler,Auto Start,Entries in this key are automatically loaded by Explorer.exe when Windows starts.
 HKLM\Software\Classes\exefile\shell\open\command,Auto Start,The Default setting for these entries is '%1 %*'.  Some malware will add entries to have other things run.  Also may need to examine other file types under the Classes key as well (ie any file classes that point to an app with a .exe extension).  These entires map to HKCR\{ext}file\shell\open\command.  Other entries under the HKLM\Software\Classes (and HKCR) key are succeptible to this same sort of subversion.  For example navigate via RegEdit to the HKCR\Drive\shell\cmd\command key right-click on the Default value and choose Modify.  In the textfield add && notepad.exe and click OK.  Open My Computer select a drive right-click and choose Open Command Prompt here......both cmd.exe and notepad.exe will run.

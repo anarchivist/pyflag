@@ -4,7 +4,7 @@ Section: utils
 Priority: optional
 Maintainer: Michael Cohen and David Collett <pyflag-support@lists.sourceforge.net>
 Architecture: i386
-Depends: python (>= 2.3), libmagic1, libclamav1, python-mysqldb, mysql-server (>= 4.0.23), python-imaging, ethereal
+Depends: python (>= 2.3), libmagic1, libclamav1, python-mysqldb, mysql-server (>= 4.0.23), python-imaging, ethereal, libpcre3
 Recommends: ploticus (>= 2.20), sleuthkit
 Description: python-based forensic tool
  The python Forensic Log Analysis GUI was designed to simplify the process of

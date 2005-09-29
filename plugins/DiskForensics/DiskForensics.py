@@ -242,11 +242,19 @@ class ViewFile(Reports.report):
                 result.download(fd)
         def hexdump(query,result):
             """ Show the hexdump for the file."""
+            highlight=0
+            length=0
+            try:
+                highlight=int(query['highlight'])
+                length=int(query['length'])
+            except:
+                pass
+            
             max=config.MAX_DATA_DUMP_SIZE
                 
             def hexdumper(offset,data,result):
                 dump = FlagFramework.HexDump(data,result)
-                dump.dump(base_offset=offset,limit=max)
+                dump.dump(base_offset=offset,limit=max,highlight=highlight-offset,length=length)
 
             return display_data(query,result,max,hexdumper)
             

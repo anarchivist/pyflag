@@ -18,6 +18,7 @@
 # * You should have received a copy of the GNU General Public License
 # * along with this program; if not, write to the Free Software
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+
 # ******************************************************
 """ This module uses the indexing tools to scan the logical files within an image. This allows us to do keyword matching against compressed files, PST files etc.
 
@@ -456,9 +457,9 @@ class SearchIndex(Reports.report):
         def SampleData(string):
             row = string.split(',')
             inode = row[0]
-            low=resolve_offset(dbh,row[1])
-            high=resolve_offset(dbh,row[2])
-            offsets = [ resolve_offset(dbh,a) for a in row[3:] ]
+            low=resolve_offset(dbh,row[1],query['fsimage'])
+            high=resolve_offset(dbh,row[2],query['fsimage'])
+            offsets = [ resolve_offset(dbh,a,query['fsimage']) for a in row[3:] ]
             sorted_offsets = [low] + offsets[:] + [high]
             sorted_offsets.sort()
 #            offsets =[ int(a) for a in [low]+row[3:]+[high] ]
@@ -480,13 +481,20 @@ class SearchIndex(Reports.report):
             return out
 
         tmp = ['(block_number <<%s) + (%s & ((1<<%s)-1))' % (BLOCKBITS,a,BLOCKBITS) for a in offset_columns ]
+
+        def offset_link_cb(value):
+            inode,offset,offset_list = value.split(',')
+            tmp = result.__class__(result)
+            #The highlighting is not very good.  Only highlights one occurrence and picks a fixed length to highlight (5 at the moment)
+            tmp.link( offset, target=FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',fsimage=query['fsimage'],mode='HexDump',inode=inode,hexlimit=offset,highlight=int(offset)+int(query['range'])/2, length=5) )
+            return tmp
         
         result.table(
-            columns = ['inode','(block_number <<%s) + (low & ((1<<%s)-1))' % (BLOCKBITS,BLOCKBITS), 'concat(%s)' % ',",",'.join(['inode','low','high']+offset_columns)],
+            columns = ['inode','concat(inode,",",(block_number <<%s) + (low & ((1<<%s)-1)),",",%s)' % (BLOCKBITS,BLOCKBITS,',",",'.join(offset_columns)), 'concat(%s)' % ',",",'.join(['inode','low','high']+offset_columns)],
             names=['Inode','Offset','Data'],
             table='LogicalIndexCache_%s, LogicalIndex_%s ' % (cache_id,table),
             where = " low>>%s = block " % BLOCKBITS,
-            callbacks = { 'Data' : SampleData },
+            callbacks = { 'Data' : SampleData, 'Offset' : offset_link_cb },
             links = [ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',fsimage=query['fsimage'],mode='HexDump',__target__='inode') ],
             case=query['case'],
             )
