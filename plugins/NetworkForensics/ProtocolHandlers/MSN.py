@@ -8,8 +8,8 @@ http://www.hypothetic.org/docs/msn/notification/authentication.php
 """
 # Michael Cohen <scudette@users.sourceforge.net>
 # Gavin Jackson <gavz@users.sourceforge.net>
-
-#   Added recipient column to table
+#
+# GJ: Added recipient column to table
 #
 # ******************************************************
 #  Version: FLAG $Version: 0.78 Date: Fri Aug 19 00:47:14 EST 2005$
@@ -29,6 +29,7 @@ http://www.hypothetic.org/docs/msn/notification/authentication.php
 # * along with this program; if not, write to the Free Software
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
+
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 from pyflag.Scanner import *
@@ -80,7 +81,7 @@ class message:
         
         # Read the first command:
         self.cmdline=self.fd.readline()
-        if len(self.cmdline)==0: raise IOError("Unable to command from stream")
+        if len(self.cmdline)==0: raise IOError("Unable to read command from stream")
 
         try:
             ## We take the last 3 letters of the line as the

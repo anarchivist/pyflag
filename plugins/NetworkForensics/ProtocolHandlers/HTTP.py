@@ -1,5 +1,8 @@
 """ This module implements features specific for HTTP Processing """
 # Michael Cohen <scudette@users.sourceforge.net>
+# Gavin Jackson <gavz@users.sourceforge.net>
+#
+# GJ: Added ts_sec field to request and response tables (and updated report)
 #
 # ******************************************************
 #  Version: FLAG $Version: 0.78 Date: Fri Aug 19 00:47:14 EST 2005$
@@ -57,6 +60,7 @@ class HTTPScanner(NetworkScanFactory):
             `inode` VARCHAR( 255 ) NOT NULL ,
             `offset` INT NOT NULL ,
             `packet` int not null,
+            `ts_sec` int(11),
             `method` VARCHAR( 10 ) NOT NULL ,
             `host` VARCHAR( 255 ) NOT NULL,
             `request` VARCHAR( 255 ) NOT NULL 
@@ -69,6 +73,7 @@ class HTTPScanner(NetworkScanFactory):
             `inode` VARCHAR( 255 ) NOT NULL ,
             `offset` INT NOT NULL ,
             `packet` int not null,
+            `ts_sec` int(11),
             `content_length` INT NOT NULL ,
             `content_type` VARCHAR( 255 ) NOT NULL,
             `content_encoding` VARCHAR( 255 ) NOT NULL,
@@ -96,8 +101,14 @@ class HTTPScanner(NetworkScanFactory):
                 ## request header:
                 offset = metadata['stream_offset']
 
+                ## Try to find the time stamp of this request:
+                self.dbh.execute("select ts_sec from pcap_%s where id = %s "
+                                 ,(self.table,self.packet_id))
+                row = self.dbh.fetch()
+                timestamp = row['ts_sec']
+                
                 ## Store in the request table
-                self.dbh.execute("insert into http_request_%s set inode=%r,offset=%r,packet=%r,method=%r,host=%r,request=%r",(self.table, metadata['inode'],offset,self.packet_id,method,host,uri))
+                self.dbh.execute("insert into http_request_%s set inode=%r,offset=%r,packet=%r,ts_sec=%r,method=%r,host=%r,request=%r",(self.table, metadata['inode'],offset,self.packet_id,timestamp,method,host,uri))
 
                 return
             except KeyError:
@@ -136,7 +147,13 @@ class HTTPScanner(NetworkScanFactory):
                 if end_of_headers<0: end_of_headers=http.length()
                 offset = metadata['stream_offset'] + end_of_headers
 
-                self.dbh.execute("insert into http_response_%s set inode=%r,offset=%r, packet=%r, content_length=%r,content_type=%r,content_encoding=%r",(self.table,metadata['inode'],offset,self.packet_id,content_length,content_type,content_encoding))
+                ## Try to find the time stamp of this request:
+                self.dbh.execute("select ts_sec from pcap_%s where id = %s "
+                                 ,(self.table,self.packet_id))
+                row = self.dbh.fetch()
+                timestamp = row['ts_sec']
+
+                self.dbh.execute("insert into http_response_%s set inode=%r,offset=%r, packet=%r, ts_sec=%r, content_length=%r,content_type=%r,content_encoding=%r",(self.table,metadata['inode'],offset,self.packet_id,timestamp,content_length,content_type,content_encoding))
                 response_id = self.dbh.autoincrement()
                 path=self.ddfs.lookup(inode=metadata['inode'])
                 path=os.path.dirname(path)
@@ -204,10 +221,11 @@ class BrowseHTTPRequests(Reports.report):
     def display(self,query,result):
         result.heading("Requested URIs in %s" % query['fsimage'])
         result.table(
-            columns = ['inode','packet','method','host','request'],
-            names = [ 'Inode', "Packet", "Method" ," Host","Request URI" ],
+            columns = ['from_unixtime(ts_sec)','inode','packet','method','host','request'],
+            names = [ 'Time Stamp', 'Inode', "Packet", "Method" ," Host","Request URI" ],
             table="http_request_%s" % query['fsimage'],
             links = [
+            None,
             FlagFramework.query_type((),
                                      family="Disk Forensics",case=query['case'],
                                      report="View File Contents",mode="Combined streams",
