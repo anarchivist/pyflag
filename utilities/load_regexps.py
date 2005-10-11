@@ -71,7 +71,7 @@ def main():
         print "Dropping old regexps table"
         dbh.execute("DROP TABLE regexps")
     
-    dbh.execute("CREATE TABLE if not exists `regexps` (`pattern` VARCHAR( 50 ) NOT NULL ,`class` VARCHAR( 50 ) NOT NULL ,`encoding` SET( 'all', 'asci', 'ucs16' ) NOT NULL,PRIMARY KEY  (`pattern`))")
+#    dbh.execute("CREATE TABLE if not exists `regexps` (`pattern` VARCHAR( 50 ) NOT NULL ,`class` VARCHAR( 50 ) NOT NULL ,`encoding` SET( 'all', 'asci', 'ucs16' ) NOT NULL,PRIMARY KEY  (`pattern`))")
 
 
     count=0
@@ -79,15 +79,15 @@ def main():
         fd=open(file)
         print "Reading File %s" % file
         for line in fd:
-            line = line.strip();
+            line = line.strip()
             myclass,pattern = line.split(None,1)
             
             if (myclass != "") and (pattern != ""):
                 try:
-                    dbh.execute("insert into regexps set class=%r,pattern=%r;", (myclass, pattern))
+                    dbh.execute("insert into dictionary set id=NULL,class=%r,word=%r,encoding='all',type='regex';", (myclass, pattern))
                     count+=1
                     if verbose:
-                        print "Added class=%s,pattern=%s" % (myclass,pattern)
+                        print "Added class=%s,word=%s" % (myclass,pattern)
                 except DB.DBError:
                     pass
                 

@@ -68,7 +68,7 @@ class IndexScan(GenScanFactory):
     class Drawer(Scanner.Drawer):
         description = "General Forensics"
         name = "General Forensics"
-        contains = ['IndexScan','MD5Scan','VirScan']
+        contains = ['RegExpScan','IndexScan','MD5Scan','VirScan']
         default = True
     
     def __init__(self,dbh,table,fsfd):
@@ -100,7 +100,7 @@ class IndexScan(GenScanFactory):
         pydbh = DB.DBO(None)
         logging.log(logging.DEBUG,"Index Scanner: Building index trie")
         start_time=time.time()
-        pydbh.execute("select word,id from dictionary")
+        pydbh.execute("select word,id from dictionary where type='literal'")
         for row in pydbh:
             self.index.add_word(row['word'],row['id'])
 
@@ -192,20 +192,20 @@ class BuildDictionary(Reports.report):
         try:
             if len(query['word'])<3:
                 raise DB.DBError("Word is too short to index, minimum of 3 letter words")
-
+            
             if query['action']=='insert':
                 if len(query['class'])<3:
                     raise DB.DBError("Class name is too short, minimum of 3 letter words are used as class names")
                 ## We only insert into the dictionary if the word is
-                ## not in there again:
+                ## not in there already:
                 dbh.execute("select * from dictionary where word=%r",(query['word']))
                 row = dbh.fetch()
                 if not row:
-                    dbh.execute("insert into dictionary set word=%r,class=%r",(query['word'],query['class']))
-                
+                    dbh.execute("insert into dictionary set word=%r,class=%r,type=%r",(query['word'],query['class'],query['type']))
+                    
             elif query['action']=='delete':
-                dbh.execute("delete from dictionary where word=%r",query['word'])
-                
+                dbh.execute("delete from dictionary where word=%r,type=%r",query['word'],query['type'])
+                                
         except KeyError:
             pass
         except DB.DBError,e:
@@ -218,30 +218,32 @@ class BuildDictionary(Reports.report):
         form=self.ui(result)
         form.start_form(query)
         form.start_table()
-        form.const_selector("Action:",'action',('delete','insert'),('Delete','Add'))
+        form.const_selector("Action:",'action',('insert','delete'),('Add','Delete'))
         form.textfield('Word:','word')        
         form.selector('Classification:','class','select class,class from dictionary group by class order by class',())
         form.textfield('(Or create a new class:)','class_override')
+        form.const_selector('Type:','type',('literal','regex'),('Literal','RegEx'))
         form.end_table()
         form.end_form('Go')
 
         table=self.ui(result)
         try:
             table.table(
-                columns=['word','class'],
-                names=['Word','Class'],
+                columns=['word','class','type'],
+                names=['Word','Class','Type'],
                 table='dictionary',
                 case=None,
                 )
             ## If the table is not there, we may be upgrading from an old version of flag, We just recreate it:
         except DB.DBError:
             dbh.execute("""CREATE TABLE `dictionary` (
-            `word` VARCHAR( 50 ) NOT NULL ,
+            `id` int auto_increment,
+            `word` VARCHAR( 50 ) binary NOT NULL ,
             `class` VARCHAR( 50 ) NOT NULL ,
-            `encoding` SET( 'all', 'ascii', 'ucs16' ) DEFAULT 'all' NOT NULL ,
-            PRIMARY KEY ( `word` )
-            ) """)
-
+            `encoding` SET( 'all', 'asci', 'ucs16' ) DEFAULT 'all' NOT NULL,
+            `type` set ( 'literal','regex' ) DEFAULT 'literal' NOT NULL,
+            PRIMARY KEY  (`id`))""")
+            
             result.para("Just created a new empty dictionary")
             result.refresh(3,query)
             

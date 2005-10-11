@@ -32,8 +32,9 @@ from pyflag.Scanner import *
 
 import re
 
-class RegScan(GenScanFactory):
-    """ Scan file for regexps """
+class RegExpScan(GenScanFactory):
+    """ Scan file for regexps in dictionary using re """
+    
     def __init__(self,dbh, table,fsfd):
         dbh.execute(""" CREATE TABLE IF NOT EXISTS `regexp_%s` (
         `inode` varchar( 20 ) NOT NULL,
@@ -43,8 +44,8 @@ class RegScan(GenScanFactory):
         self.dbh=dbh
         self.table=table
         pydbh = DB.DBO(None)
-        pydbh.execute("select class,pattern from regexps")
-        self.RegexpRows = [ (row['class'],re.compile(row['pattern'])) for row in pydbh ] 
+        pydbh.execute("select class,word from dictionary where type='regex'")
+        self.RegexpRows = [ (row['class'],re.compile(row['word'])) for row in pydbh ] 
 
     def destroy(self):
         self.dbh.execute('ALTER TABLE regexp_%s ADD INDEX(inode)', self.table)
@@ -67,12 +68,12 @@ class RegScan(GenScanFactory):
                 for match in row[1].finditer(data):
                     self.dbh.execute("INSERT INTO regexp_%s set `inode`=%r,`class`=%r, `match`=%r,`offset`=%r", (self.table, self.inode, row[0],match.group(0),self.offset+match.start()))
 
-class RegExpScan(Reports.report):
-    """ Scan Filesystem for RegExpes using re"""
+class ViewRegExp(Reports.report):
+    """ View RegExp Scan Results"""
     parameters = {'fsimage':'fsimage'}
-    name = "RegExp Scan"
+    name = "RegExp Scan Results"
     family = "Disk Forensics"
-    description="This report will scan for regexps and display a table of regexpss found"
+    description="This report shows the results of the regexp scan"
     def form(self,query,result):
         try:
             result.case_selector()
@@ -86,12 +87,19 @@ class RegExpScan(Reports.report):
         dbh=self.DBO(query['case'])
         tablename = dbh.MakeSQLSafe(query['fsimage'])
 
+        def offset_link_cb(value):
+            inode,offset = value.split(',')
+            tmp = result.__class__(result)
+            #The highlighting is not very good.  Only highlights one occurrence and picks a fixed length to highlight (5 at the moment)
+            tmp.link( offset, target=FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',fsimage=query['fsimage'],mode='HexDump',inode=inode,hexlimit=offset) )
+            return tmp
         try:
             result.table(
-                columns=('a.inode','concat(path,name)', 'a.match','a.class'),
-                names=('Inode','Filename','RegExp Found','RegExp Type'),
+                columns=('a.inode','concat(a.inode,",",a.offset)','concat(path,name)', 'a.match','a.class'),
+                names=('Inode','Offset','Filename','RegExp Found','RegExp Type'),
                 table='regexp_%s as a join file_%s as b on a.inode=b.inode ' % (tablename,tablename),
                 case=query['case'],
+                callbacks = { 'Offset' : offset_link_cb },
                 links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='inode')]
                 )
         except DB.DBError,e:
