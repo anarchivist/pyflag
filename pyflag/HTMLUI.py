@@ -429,7 +429,7 @@ class HTMLUI(UI.GenericUI):
         var tmp;
         function open_%s_window() {
            var query='';
-           client_page = window.open('','child_window_%s','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=600,scrollbars=yes,dependent');
+           client_page = window.open('','child_window_%s','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=900,scrollbars=yes,dependent');
            //Here we read the forms contents, so we can let the popup window know the values of currently filled in fields (Before submitting).
            for(var i=0; i<document.pyflag_form.elements.length; i++) {
               //Checkboxes should only be added if they are checked

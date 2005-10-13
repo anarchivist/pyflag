@@ -84,6 +84,18 @@ class IndexScan(GenScanFactory):
         `id` INT NOT NULL ,
         `offset` BIGINT NOT NULL
         )""",(table))
+
+        #Create a table that will hold our stats: number of occurrences of each word id we are searching for.
+        dbh.execute("""CREATE TABLE if not exists `LogicalIndexStats_%s` (
+        `id` int NOT NULL,
+        `word` VARCHAR( 50 ) binary NOT NULL,
+        `class` VARCHAR( 50 ) NOT NULL,
+        `hits` INT NOT NULL,
+        PRIMARY KEY  (`id`)
+        )""",(table))
+
+       
+            
         ## The block number must be the largest that is available in the database.
         self.dbh.execute("select max(block) as `max` from `LogicalIndex_%s`",(table))
         row=self.dbh.fetch()
@@ -98,6 +110,7 @@ class IndexScan(GenScanFactory):
         ## for large dictionaries (about 2 sec for 70000 words):
         self.index = index.index()
         pydbh = DB.DBO(None)
+        #Do word index (literal) prep
         logging.log(logging.DEBUG,"Index Scanner: Building index trie")
         start_time=time.time()
         pydbh.execute("select word,id from dictionary where type='literal'")
@@ -105,17 +118,26 @@ class IndexScan(GenScanFactory):
             self.index.add_word(row['word'],row['id'])
 
         logging.log(logging.DEBUG,"Index Scanner: Done in %s seconds..." % (time.time()-start_time))
+
+        #Do regex prep
+        logging.log(logging.DEBUG,"Index Scanner: Compiling regex")
+        start_time=time.time()
+        pydbh.execute("select word,id from dictionary where type='regex'")
+        self.RegexpRows = [ (re.compile(row['word'],re.IGNORECASE),row['id']) for row in pydbh ]
+        logging.log(logging.DEBUG,"Index Scanner: Done in %s seconds..." % (time.time()-start_time))
                 
     def reset(self):
         """ This deletes the index file and drops the LogicalIndex table """
         GenScanFactory.reset(self)
         del self.index
+        del self.RegexpRows
 
         self.dbh.execute("drop table if exists `LogicalIndex_%s`",self.table)
         self.dbh.execute("drop table if exists `LogicalIndexOffsets_%s`",self.table)
         ## Here we reset all reports that searched this disk
         FlagFramework.reset_all(case=self.dbh.case,report='SearchIndex', family='Disk Forensics')
         self.dbh.execute("drop table if exists `LogicalKeyword_%s`",(self.table))
+        self.dbh.execute("drop table if exists `LogicalIndexStats_%s`",(self.table))
 
     def destroy(self):
         ## Destroy our index handle which will close the file and free memory
@@ -128,44 +150,82 @@ class IndexScan(GenScanFactory):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
             BaseScanner.__init__(self, inode,ddfs,outer,factories)
             self.index = outer.index
+            self.RegexpRows = outer.RegexpRows
             self.rel_offset=0
             self.block_number = 0
             self.dbh.execute("insert into `LogicalIndex_%s` set inode=%r,block_number=%r",(outer.table,inode,self.block_number))
             ## Note the current block number
             self.block = self.dbh.autoincrement()
+            #A dictionary for counting hit stats
+            self.stats_count={}
 
         def process(self,data,metadata=None):
             self.index.index_buffer(data)
-            results = []
+            offsets=[]
+            #Store the offsets we got from the index C code
+            for i in self.index.get_offsets():
+                offsets.append((i.id, i.offset))
+                try:
+                    self.stats_count[i.id]+=1
+                except KeyError:
+                    #Must be a new id for the dictionary
+                    self.stats_count[i.id]=1
+                
+            #Now search for all the regex's in the dictionary and store the results
+            for row in self.RegexpRows:
+                for match in row[0].finditer(data):
+                    offsets.append((row[1],match.start()))
+                    try:
+                        self.stats_count[row[1]]+=1
+                    except KeyError:
+                        #Must be a new id for the dictionary
+                        self.stats_count[row[1]]=1
+            
+            #Sort the results so the offsets are in order
+            #element 0 is ID, element 1 is offset
+            offsets.sort(key=lambda x:  x[1])
+            
+            # Store indexing results in the dbase
             ## Store any hits in the database - NOTE: We use extended
             ## insert syntax here for speed (This may not be portable
             ## to other databases):
-            for i in self.index.get_offsets():
+            results = []
+            for i in offsets:
                 ## If the file is longer than a block, we create a new
                 ## block, and adjust the relative offset
-                if self.rel_offset+i.offset > BLOCKSIZE:
+                if self.rel_offset+i[1] > BLOCKSIZE:
                     self.block_number+=1
                     self.rel_offset -= BLOCKSIZE
-                    self.dbh.execute("insert into `LogicalIndex_%s` set inode=%r,block_number=%r",(self.outer.table,self.inode,self.block_number))
+                    self.dbh.execute("insert into LogicalIndex_%s set inode=%r,block_number=%r",(self.outer.table,self.inode,self.block_number))
+                    #block is the current block number we are looking at
                     self.block = self.dbh.autoincrement()
-                    
-                results.append("(%s,(%s<<%s)+%s+%s)" % (i.id,self.block,BLOCKBITS,i.offset,self.rel_offset))
+
+                #Final result ie. absolute offset is (current block number * blocksize) + (offset from start of data chunk where we found the term + offset of the data block)
+                results.append("(%s,(%s<<%s)+%s+%s)" % (i[0],self.block,BLOCKBITS,i[1],self.rel_offset))
 
             if results:
                 self.dbh.execute("insert into LogicalIndexOffsets_%s values %s",(self.table,",".join(results)))
-            
+                
             self.rel_offset += len(data)
-            
                 
         def finish(self):
-            pass
-
+            #Store the stats table with the hits for the search
+            pydbh = DB.DBO(None)
+            for row in self.stats_count.iteritems():
+                pydbh.execute("select word,class from dictionary where id=%s",row[0])
+                class_hit=pydbh.fetch()
+                try:
+                    self.dbh.execute("insert into LogicalIndexStats_%s set id=%r,word=%r,class=%r,hits=%r",(self.table,row[0],class_hit['word'],class_hit['class'],row[1]))
+                except DB.DBError:
+                    #Maybe we already ran a search so I should just update the stats
+                     self.dbh.execute("update LogicalIndexStats_%s set hits=hits+%r where id=%r",(self.table,row[1],row[0]))
+ 
 ## These reports allow the management of the Index Dictionary:
 class BuildDictionary(Reports.report):
     """ Manipulate dictionary of search terms to index on """
     parameters = {}
     name="Build Dictionary"
-    family="Index Tools"
+    family="Keyword Indexing"
     description = "Builds a dictionary for indexing "
 
     def form(self,query,result):
@@ -262,7 +322,7 @@ class SearchIndex(Reports.report):
     """ Search for indexed keywords """
     description = "Search for words that were indexed during filesystem load. Words must be in dictionary to be indexed. "
     name = "Search Indexed Keywords"
-    family = "Disk Forensics"
+    family = "Keyword Indexing"
     parameters={'fsimage':'fsimage','keyword':'any',
                 'range':'numeric','final':'any'}
 
@@ -280,6 +340,7 @@ class SearchIndex(Reports.report):
 
         def remove_word_cb(query,result,word):
             """ Removes word from the query string """
+            result.decoration = 'naked'
             del query['new_keyword']
             keys = [ k for k in query.getarray('keyword') if k != word ]
             del query['keyword']
@@ -291,18 +352,19 @@ class SearchIndex(Reports.report):
         
         def add_word_cb(query,result):
             """ Call back to add a new word to the list of words to
-            search for"""
+            search for (shows stats from search)"""
+            result.decoration = 'naked'
             result.heading("Add a word to search terms")
             q=query.clone()
             del q['callback_stored']
             q['__opt__']='parent'
             q['__target__']='new_keyword'
             result.table(
-                columns = ('word','class','type'),
-                names = ("Word","Class","Type"),
+                columns = ['word','class','hits'],
+                names=['Index Term','Dictionary Class','Number of Hits'],
                 links = [ q ],
-                table = "dictionary",
-                case=None
+                table='LogicalIndexStats_%s' % query['fsimage'],
+                case=query['case'],
                 )
             
         try:
@@ -383,7 +445,7 @@ class SearchIndex(Reports.report):
         `fsimage` VARCHAR( 200 ) NOT NULL,
         index (`id`)
         )""")
-
+        
         ## First is it already here? - This should not happen, since
         ## we will never be run again with the same set of data, but
         ## better be safe:
@@ -485,14 +547,14 @@ class SearchIndex(Reports.report):
         tmp = ['(block_number <<%s) + (%s & ((1<<%s)-1))' % (BLOCKBITS,a,BLOCKBITS) for a in offset_columns ]
 
         def offset_link_cb(value):
-            inode,offset,offset_list = value.split(',')
+            inode,offset = value.split(',')
             tmp = result.__class__(result)
             #The highlighting is not very good.  Only highlights one occurrence and picks a fixed length to highlight (5 at the moment)
             tmp.link( offset, target=FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',fsimage=query['fsimage'],mode='HexDump',inode=inode,hexlimit=offset,highlight=int(offset)+int(query['range'])/2, length=5) )
             return tmp
         
         result.table(
-            columns = ['inode','concat(inode,",",(block_number <<%s) + (low & ((1<<%s)-1)),",",%s)' % (BLOCKBITS,BLOCKBITS,',",",'.join(offset_columns)), 'concat(%s)' % ',",",'.join(['inode','low','high']+offset_columns)],
+            columns = ['inode','concat(inode,",",(block_number <<%s) + (low & ((1<<%s)-1)))' % (BLOCKBITS,BLOCKBITS), 'concat(%s)' % ',",",'.join(['inode','low','high']+offset_columns)],
             names=['Inode','Offset','Data'],
             table='LogicalIndexCache_%s, LogicalIndex_%s ' % (cache_id,table),
             where = " low>>%s = block " % BLOCKBITS,
@@ -501,3 +563,34 @@ class SearchIndex(Reports.report):
             case=query['case'],
             )
         
+
+class BrowseIndexKeywords(Reports.report):
+    """ Show a summary of the results of the index keywords search.  The search indexed keywords report can then be used to view the results."""
+    parameters = {'fsimage':'fsimage'}
+    name = "Keyword Index Results Summary"
+    family = "Keyword Indexing"
+    description="This report summarises the results of the index scanning"
+    def form(self,query,result):
+        try:
+            result.case_selector()
+            if query['case']!=config.FLAGDB:
+               result.meta_selector(case=query['case'],property='fsimage')
+        except KeyError:
+            return result
+
+    def display(self,query,result):
+        result.heading("Keyword Index Scanning Result Summary for %s" % query['fsimage'])
+        dbh=self.DBO(query['case'])
+        #pydbh = DB.DBO(None)
+        tablename = dbh.MakeSQLSafe(query['fsimage'])
+        
+        try:
+            result.table(
+            columns = ['word','class','hits'],
+            names=['Index Term','Dictionary Class','Number of Hits'],
+            table='LogicalIndexStats_%s' % tablename,
+            case=query['case'],
+            )
+        except DB.DBError,e:
+            result.para("Unable to display index search results.  Did you run the index scanner?")
+            result.para("The error I got was %s"%e)
