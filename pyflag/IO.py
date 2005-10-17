@@ -54,7 +54,22 @@ def mmls_popup(query,result,option_str=None,subsys=None,offset=None):
     except KeyError:
         pass
 
-    result.heading("Output of mmls on io source")
+    if os.path.exists('/usr/bin/disktype'):
+        #You have disktype install so we will give you some extra info
+        result.heading("Output of disktype and mmls on io source")
+        result.text('------------------ disktype results ------------------',font='bold')
+        option_str=option_str.strip('filename=')
+        logging.log(logging.DEBUG,"Will launch: disktype %s" % option_str)
+        disktype_output=pexpect.spawn('/usr/bin/disktype %s' % option_str)
+        disktype_output.expect(pexpect.EOF)
+        result.text('',font='normal')
+        result.text(disktype_output.before,font='typewriter')
+        result.text('',font='normal')
+        result.text('------------------ mmls results ------------------',font='bold')
+    else:
+        result.heading("Output of mmls on io source")
+        logging.log(logging.DEBUG,"Disktype not run, can't be found at /usr/bin/disktype")
+        
     args = ["-i", subsys, "-o",option_str, "%s/mmls" % config.FLAG_BIN,  "-t", "dos",  "foo" ]
     
     logging.log(logging.DEBUG,"Will launch %s %s" % (config.IOWRAPPER, args))
@@ -63,17 +78,17 @@ def mmls_popup(query,result,option_str=None,subsys=None,offset=None):
     s.expect(pexpect.EOF)
     ## There is an error in the output
     if "Exception" in s.before:
-        result.para("Error occured reading the partition table.")
-        result.para("Maybe you do not have the correct driver set for this IO Source? Could the image be an image of a partition? Could the image have a non-dos partition type?")
-        result.para("These are the errors returned by mmls:")
+        result.text("\nError occured reading the partition table.",color='red',font='bold')
+        result.text("\nPossible reasons include:\n\n - Do you have the correct driver set for this IO Source?\n - Could the image be an image of a partition not a disk image?\n - Could the image have a non-dos partition type?\n\n",font='normal')
+        result.text("These are the errors returned by mmls:\n")
         result.text(s.before,color="red",font='typewriter')
         return
     
     try:
         output = s.before.splitlines()
         result.start_table()
-        result.para(output[0])
-        result.para(output[1])
+        result.text('\n'+output[0]+'\n')
+        result.text(output[1]+'\n')
         columns = output[3].split()
         result.row(" ",*columns)
         del query[offset]
