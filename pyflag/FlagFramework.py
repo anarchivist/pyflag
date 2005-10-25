@@ -196,7 +196,10 @@ class query_type:
     def poparray(self,key):
         """ Remove last member of array from query """
         tmp = [ i for i in self.q if i[0]==key ]
-        self.remove(tmp[-1][0],tmp[-1][1])
+        try:
+            self.remove(tmp[-1][0],tmp[-1][1])
+        except IndexError:
+            raise KeyError
 
         return tmp[-1][1]
     
