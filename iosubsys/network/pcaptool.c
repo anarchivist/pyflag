@@ -1,9 +1,17 @@
+/****************************************************************
+   Uses libpcap to parse pcap files and emit SQL to index them.
+
+   We queue up many packets so that we can emit a single SQL insert
+   for all of them. Using sql extended insert syntax makes the db
+   _much_ faster.
+*****************************************************************/
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
-#include <glib.h>
-#include "wiretap.h"
+#include <pcap.h>
 #include <unistd.h>
+
+#define TRUE 1
 
 struct packet_data_t {
   long unsigned int packet_id;
@@ -19,7 +27,7 @@ struct packet_data_t {
 static struct packet_data_t buffer[MAX_BUFF_SIZE+1];
 static int buffer_count=0;
 
-void print_buffer(tableName) {
+void print_buffer(char *tableName) {
   int i;
   struct packet_data_t *p=buffer;
 
@@ -36,21 +44,24 @@ void print_buffer(tableName) {
 };
 
 void printUsage() {
-  printf ("\nUSAGE: $ ./pcap_parse -t tablename [-c] inputfile [inputfile]...\n");
+  printf ("\nUSAGE: $ ./pcaptool -t tablename [-c] inputfile [inputfile]...\n");
   printf ("-c: create new tables before insertion\n\n");
 }
 
 int main(int argc, char **argv) {
-  wtap  *wth;
-  int err=0;
-  gchar *err_info;
+  pcap_t *pfh;
+  struct pcap_pkthdr *header;
+  u_char *data;
+  char err_info[PCAP_ERRBUF_SIZE];
   char *fname=NULL;
+  FILE *fp;
   long unsigned int data_offset;
   long unsigned int packet_id = 0;
   int file_id = 0;
   int createNewTable = 0;
   char *tableName = NULL;
   int index, c;
+  int pkt_encap;
 
   while ((c = getopt (argc, argv, "t:c")) != -1) {
     switch(c) {
@@ -89,18 +100,27 @@ int main(int argc, char **argv) {
      try the next file */
   for (index = optind; index < argc; index++) {
     fname = argv[index];
-    wth = wtap_open_offline(fname, &err, &err_info, FALSE);
+    pfh = pcap_open_offline(fname, err_info);
     
-    if (wth == NULL)
-      printf("Problem opening %s. Error code: %i\n", fname, err);
+    if (pfh == NULL)
+      printf("Problem opening %s: %s\n", fname, err_info);
     else {
-      while(wtap_read(wth,&err,&err_info,&data_offset)) {
+      fp = pcap_file(pfh);
+      pkt_encap = pcap_datalink(pfh);
+
+      while(1) {
+	data_offset = ftell(fp)+sizeof(*header);
+
+	if(pcap_next_ex(pfh, &header, (const u_char **)&data)<0) {
+	  break;
+	};
+
 	buffer[buffer_count].packet_id = packet_id;
 	buffer[buffer_count].data_offset=data_offset;
-	buffer[buffer_count].caplen = (int) wth->phdr.caplen;
-	buffer[buffer_count].sec = (long unsigned int)wth->phdr.ts.tv_sec;
-	buffer[buffer_count].usec= (long unsigned int)wth->phdr.ts.tv_usec;
-	buffer[buffer_count].encap= wth->phdr.pkt_encap;
+	buffer[buffer_count].caplen = (int) header->caplen;
+	buffer[buffer_count].sec = (long unsigned int)header->ts.tv_sec;
+	buffer[buffer_count].usec= (long unsigned int)header->ts.tv_usec;
+	buffer[buffer_count].encap= pkt_encap;
 	buffer_count++;
 
 	if(buffer_count>=MAX_BUFF_SIZE) {
@@ -115,7 +135,7 @@ int main(int argc, char **argv) {
 	print_buffer(tableName);
       
       file_id++;
-      wtap_close(wth);
+      pcap_close(pfh);
     }
   }
 

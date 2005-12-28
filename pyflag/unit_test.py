@@ -108,4 +108,4 @@ import math, bisect, cgi, pickle, urllib, base64
 import pexpect
 
 ## This is used in format library
-"hello".decode("utf_16_le")
+#"hello".decode("utf_16_le")

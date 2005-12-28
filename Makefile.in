@@ -3,16 +3,14 @@
 BIN	= bin/
 
 ## These are the directories which will be built
-DIRS	= iosubsys raidtools indextools regtools virustools mailtools pyethereal sources filesystems
+DIRS	= iosubsys raidtools indextools regtools virustools mailtools sources filesystems
 
 ## These will be cleaned with make clean
 CLEAN_DIRS = pkg_bin_dist flag_deb bin_dist
 
-## These binaries will be copied from the system to the $BIN directory
-SYSBINS = 
-
 ## The python version 
-PYTHONVER = $(shell python -c 'import sys; print "%s.%s" % (sys.version_info[0],sys.version_info[1])')
+#PYTHONVER = $(shell python -c 'import sys; print "%s.%s" % (sys.version_info[0],sys.version_info[1])')
+PYTHONVER = 2.4
 
 ## We need this to build the fully contained binary version
 PYTHONLIB = /usr/lib/python$(PYTHONVER)/
@@ -30,6 +28,3 @@ PACKAGE_SCRIPTS = DEBIAN/postinst DEBIAN/preinst DEBIAN/postrm DEBIAN/prerm etc/
 #If the package version is changed, the control file in pkg_files must also
 #be changed.
 PACKAGE_VERSION = 0.78-1
-
-## The system wide location for libethereal.so
-ETHEREAL_LIB = $(shell dirname $$(ldd $$(which ethereal) | grep libethereal | awk '{print $$3}')  )

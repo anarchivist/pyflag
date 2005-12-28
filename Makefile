@@ -4,17 +4,13 @@ CWD = $(shell pwd)
 
 all:	bootstrap pyflag-target
 
-pyflag-target:	bins
+pyflag-target:
 	for dir in $(DIRS); do\
-          (echo Entering directory $(CWD)/$$dir; cd $$dir; make "CC=$(CC)" MAKELEVEL= TOPLEVEL=$(CWD); echo leaving directory $$dir ); done
-
-## Copy binaries from the system to put into the flag bin dir
-bins:
-	for i in $(SYSBINS); do cp `which $$i` $(BIN); done
+          echo Entering directory $(CWD)/$$dir; (cd $$dir && make "CC=$(CC)" MAKELEVEL= TOPLEVEL=$(CWD)) || exit -1; echo leaving directory $$dir; done
 
 clean:
 	for dir in $(DIRS); do\
-          (cd $$dir; make clean "CC=$(CC)" MAKELEVEL= TOPLEVEL=$(CWD)); done
+          (cd $$dir; make clean "CC=$(CC)" MAKELEVEL= TOPLEVEL=$(CWD)) || exit -1; done
 	for dir in $(CLEAN_DIRS); do rm -rf $$dir; done
 
 deb-pkg:	pkg-bin-distro
@@ -119,7 +115,7 @@ bin-dist:
 	find bin_dist/python$(PYTHONVER)/ -atime +1 -exec rm {} \;
 
 	## Delete source directories
-	cd bin_dist/ && rm -rf sources sgzip regtools raidtools patches libevf iosubsys indextools exgrep docs virustools imagingtools mailtools pyethereal filesystems
+	cd bin_dist/ && rm -rf sources sgzip regtools raidtools patches libevf iosubsys indextools exgrep docs virustools imagingtools mailtools filesystems
 
 	## General cleanups
 	find bin_dist/ -depth -name CVS -exec rm -rf {} \;
