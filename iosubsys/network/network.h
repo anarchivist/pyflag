@@ -108,6 +108,9 @@ struct tcp_struct {
   uint16_t window_size;
   uint16_t checksum;
 
+  /** Private derived data */
+  int len;
+
   /** The payload data portion */
   int data_len;
   char *data;

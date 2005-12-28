@@ -1,8 +1,8 @@
 import dissect
 
-filename = "/var/tmp/demo/old_capture.pcap"
-start = 302
-length = 144
+filename = "/var/tmp/demo/stdcapture_0.1.pcap"
+start = 40
+length = 74
 link_type = 1
 
 fd=open(filename)

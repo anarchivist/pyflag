@@ -81,6 +81,7 @@ void load_library(void) {
   HOOK(ftell);
   HOOK(fgets);
   HOOK(__fxstat64);
+  HOOK(ferror);
 
   //Remove the LD_PRELOAD now that we are already hooked. This is needed if something else needs to fork later:
   unsetenv("LD_PRELOAD");
@@ -206,7 +207,7 @@ off_t lseek(int fildes, unsigned long int offset, int whence) {
     } else if(whence==SEEK_CUR) {
       iosources[fildes]->fpos += offset;
     };
-    return offset;
+    return iosources[fildes]->fpos;
   };
 };
 
@@ -218,7 +219,7 @@ off_t lseek64(int fildes,  off_t  offset, int whence) {
     return dispatch->lseek64(fildes,offset ,whence);
   } else {
     iosources[fildes]->fpos = offset;
-    return offset;
+    return iosources[fildes]->fpos;
   };
 };
 
@@ -427,4 +428,10 @@ int fileno(FILE *stream) {
 
 int fcntl(int fd, int cmd, void *lock) {
   return( 0);
+};
+
+int ferror(FILE *stream) {
+  CHECK_INIT;
+
+  return 0;
 };

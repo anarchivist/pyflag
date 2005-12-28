@@ -95,7 +95,9 @@ int main(int argc, char **argv) {
 
     exit(0);
   }
-
+  
+  //sleep(10);
+  
   /* If there's an error with an input file, print an error and then
      try the next file */
   for (index = optind; index < argc; index++) {

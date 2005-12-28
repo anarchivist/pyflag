@@ -72,6 +72,11 @@ int Find_Property(OUT Packet *node, OUT struct struct_property_t **p,
   struct struct_property_t *i;
   
   if(!strcasecmp(NAMEOF(*node) , node_name)) {
+    /** If a property_name was not given we return the node itself */
+    if(!strlen(property_name)) {
+      *p=NULL;
+      return True;
+    };
 
     /** Now search for the property_name in that node */
     *p=get_field_by_name(*node, property_name);

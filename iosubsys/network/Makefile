@@ -3,7 +3,7 @@ CFLAGS = -g -Wall -D__DEBUG__ -I/usr/include/python2.4/ -I../include/
 LDFLAGS = -lpcap
 OBJS = ../lib/class.o ../lib/stringio.o ../lib/struct.o ../lib/talloc.o ../lib/packet.o ../lib/misc.o network.o
 
-all: deps main pcaptool dissect.so
+all: deps main pcaptool _dissect.so copy_pcap
 
 main: $(OBJS)
 
@@ -13,9 +13,11 @@ deps: $(OBJS)
 	@nm --defined-only $(OBJS) | grep __MODULE_INIT | awk '{ print $$3"();" }' > init.c
 
 ## This is the python binding:
-dissect.so: dissect.o $(OBJS)
+_dissect.so: dissect.o $(OBJS)
 	gcc -o $@ -shared  $(OBJS) dissect.o -ldl -lutil
-	cp $@ $(LIB_TARGET)
+	cp dissect.py $@ $(LIB_TARGET)
+
+copy_pcap: pcaptool
 	cp pcaptool $(BIN_DIR)
 
 clean:

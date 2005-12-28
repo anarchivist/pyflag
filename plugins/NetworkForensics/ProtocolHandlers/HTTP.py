@@ -25,7 +25,7 @@
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 from pyflag.Scanner import *
-import pyethereal,sys
+import dissect,sys
 import struct,sys,cStringIO
 import pyflag.DB as DB
 from pyflag.FileSystem import File

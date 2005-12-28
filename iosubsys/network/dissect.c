@@ -40,6 +40,7 @@ static PyObject *get_field(PyObject *self, PyObject *args) {
   char *element;
   char *e;
   char *property;
+  int len;
   Packet root;
   struct struct_property_t *p;
   
@@ -51,18 +52,36 @@ static PyObject *get_field(PyObject *self, PyObject *args) {
   if(!root) 
     return PyErr_Format(PyExc_RuntimeError, "node is not valid");
 
-  for(property=e; *property; property++) 
+  len=strlen(element);
+
+  for(property=e; property<e+len; property++) 
     if(*property=='.') {
       *property=0;
       property++;
       break;
     };
 
+  if(property> e+len) property=e+len;
+
   if(Find_Property(&root, &p, e, property)) {
-    void *item = (void *) ((char *)(root->struct_p) + p->item);
+    void *item;
     int size=0;
 
     talloc_free(e);
+
+    /** If there was no property, we just return the node itself as an
+	opaque object 
+    */
+    if(!p) {
+      /** Ensure that we increase root's reference count, because we
+	  will try to free it after it gets gc'd
+      */
+      talloc_increase_ref_count(root);
+
+      return PyCObject_FromVoidPtr(root, (void (*)(void *))root->destroy);
+    };
+
+    item = (void *) ((char *)(root->struct_p) + p->item);
 
     if(!p->size) {
       size = *(int *)((char *)(root->struct_p) + p->size_p);
@@ -74,6 +93,8 @@ static PyObject *get_field(PyObject *self, PyObject *args) {
     */    
     switch(p->field_type) {
     case FIELD_TYPE_IP_ADDR:
+      result = PyLong_FromUnsignedLong(*(unsigned int *)item); break;
+
     case FIELD_TYPE_INT:
     case FIELD_TYPE_INT_X:
       result = Py_BuildValue("i",*(unsigned int *)item); break;
@@ -100,7 +121,7 @@ static PyObject *get_field(PyObject *self, PyObject *args) {
   } else {
 
     talloc_free(e);
-    return PyErr_Format(PyExc_AttributeError, 
+    return PyErr_Format(PyExc_KeyError, 
 			"Can not find field %s.%s", e,property);
   };
 };
@@ -114,7 +135,7 @@ static PyMethodDef DissectMethods[] = {
   {NULL, NULL, 0, NULL}
 };
 
-PyMODINIT_FUNC initdissect(void) {
-  (void) Py_InitModule("dissect", DissectMethods);
+PyMODINIT_FUNC init_dissect(void) {
+  (void) Py_InitModule("_dissect", DissectMethods);
 #include "init.c"
 }

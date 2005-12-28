@@ -145,13 +145,14 @@ int TCP_Read(Packet self, StringIO input) {
 
   this->__super__->Read(self, input);
 
+  this->packet.len  = this->packet.header_length * 4;
+
   /** Now we seek to the spot in the input stream where the data
       payload is supposed to start. This could be a few bytes after
       our current position in case the packet has options that we did
       not account for.
   */
-  CALL(input, seek, self->start + this->packet.header_length * 4 , 
-       SEEK_SET);
+  CALL(input, seek, self->start + this->packet.len , SEEK_SET);
 
   /** Now populate the data payload of the tcp packet 
 
@@ -174,6 +175,7 @@ VIRTUAL(TCP, Packet)
      NAME_ACCESS(packet, dest_port, FIELD_TYPE_SHORT);
      NAME_ACCESS(packet, seq, FIELD_TYPE_INT);
      NAME_ACCESS(packet, ack, FIELD_TYPE_INT);
+     NAME_ACCESS(packet, len, FIELD_TYPE_INT);
      NAME_ACCESS(packet, flags, FIELD_TYPE_CHAR_X);
      NAME_ACCESS(packet, window_size, FIELD_TYPE_SHORT);
      NAME_ACCESS_SIZE(packet, data, FIELD_TYPE_STRING, data_len);

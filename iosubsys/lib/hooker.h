@@ -61,6 +61,7 @@ struct dispatcher_t {
   int (*fclose)(FILE *stream);
   int (*__fxstat64)(int filedes, struct stat *buf);
   ssize_t (*write)(int fd, const void *buf, size_t count);
+  int (*ferror)(FILE *stream);
 } *dispatch=NULL;
 
 #define HOOK(x)   dispatch->x = dlsym(dispatch->handle,#x); check_errors();

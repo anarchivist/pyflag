@@ -168,7 +168,7 @@ class test2(Reports.report):
         result.row("absabsdajhdfsfds skjsdfkljdfs fdsalkj fdsalkjsfd lkjfdsa lfskdj sfdalkj fdsalkj fdsalkjsfd lksfdj sfdalkj sfdlkjfsda lkfsdaj lksfdaj dfsalkj fdsalk jsfdalkj sdaflkj fsdalk jsfdalk jdsfalk jdfsalk jsfdalkjsfdalk jdfsalk jfdsalkj fdsalk jfsda")
         result.end_table()
 
-import pyethereal
+import dissect
 
 class EtherealTest(Reports.report):
     """ A sample ethereal report """

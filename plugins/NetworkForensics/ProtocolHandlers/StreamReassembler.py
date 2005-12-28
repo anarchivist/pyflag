@@ -24,7 +24,6 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.Registry as Registry
 from pyflag.Scanner import *
-import pyethereal
 import struct,sys,cStringIO
 import pyflag.DB as DB
 from pyflag.FileSystem import File,CachedFile
@@ -83,7 +82,6 @@ class StreamReassembler(NetworkScanFactory):
         self.dbh.execute("drop table connection_details_%s",(self.table,))
 
     class Scan(NetworkScanner):
-
         """ Each packet will cause a new instantiation of this class. """
         def process(self,data, metadata=None):
             """ We get a complete packet in data.
@@ -91,18 +89,13 @@ class StreamReassembler(NetworkScanFactory):
             We dissect it and add it to the connection table.
             """
             NetworkScanner.process(self,data,metadata)
-            try:
-                self.proto_tree['icmp']
-                return
-            except KeyError:
-                pass
 
             ## See if we can find what we need in this packet
             try:
-                tcpsrcport=self.proto_tree['tcp.srcport'].value()
-                tcpdestport=self.proto_tree['tcp.dstport'].value()
-                ipsrc=self.proto_tree['ip.src'].value()
-                ipdest=self.proto_tree['ip.dst'].value()
+                tcpsrcport=self.proto_tree['tcp.src_port']
+                tcpdestport=self.proto_tree['tcp.dest_port']
+                ipsrc=self.proto_tree['ip.src']
+                ipdest=self.proto_tree['ip.dest']
             except KeyError,e:
                 return
 
@@ -122,7 +115,7 @@ class StreamReassembler(NetworkScanFactory):
                     con_id,isn = self.outer.connection_cache[reverse_key]
 
                     ## Create the current connection for this one:
-                    isn = self.proto_tree['tcp.seq'].value()
+                    isn = self.proto_tree['tcp.seq']
 
                     self.dbh.execute("insert into connection_details_%s set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r ",(
                         self.table, ipsrc,tcpsrcport,
@@ -139,7 +132,7 @@ class StreamReassembler(NetworkScanFactory):
                     ## Nope - we dont have that either, we need to
                     ## create a new node for the forward stream:
                     
-                    isn = self.proto_tree['tcp.seq'].value()
+                    isn = self.proto_tree['tcp.seq']
                     self.dbh.execute("insert into connection_details_%s set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r",(
                         self.table,
                         ipsrc,tcpsrcport, ipdest, tcpdestport,
@@ -156,8 +149,8 @@ class StreamReassembler(NetworkScanFactory):
                     
             ## Now insert into connection table:
             packet_id = self.fd.tell()-1
-            seq = self.proto_tree['tcp.seq'].value()
-            length = self.proto_tree['tcp.len'].value()
+            seq = self.proto_tree['tcp.seq']
+            length = self.proto_tree['tcp.len']
             tcp_node = self.proto_tree['tcp']
             
             ## We consider anything that follows the tcp header as

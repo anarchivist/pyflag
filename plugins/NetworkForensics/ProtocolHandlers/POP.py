@@ -125,7 +125,7 @@ class POP:
 class POPScanner(NetworkScanFactory):
     """ Collect information about POP transactions.
 
-    This is an example of a scanner which uses the Ethereal packet dissection, as well as the result of the Stream reassembler.
+    This is an example of a scanner which uses packet dissection, as well as the result of the Stream reassembler.
     """
     default = True
     depends = ['StreamReassembler']

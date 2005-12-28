@@ -22,7 +22,7 @@
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 from pyflag.Scanner import *
-import pyethereal,sys
+import dissect,sys
 import struct,sys,cStringIO
 import pyflag.DB as DB
 from pyflag.FileSystem import File
@@ -125,7 +125,7 @@ class SMTP:
 class SMTPScanner(NetworkScanFactory):
     """ Collect information about SMTP transactions.
 
-    This is an example of a scanner which uses the Ethereal packet dissection, as well as the result of the Stream reassembler.
+    This is an example of a scanner which uses packet dissection, as well as the result of the Stream reassembler.
     """
     default = True
     depends = ['StreamReassembler']

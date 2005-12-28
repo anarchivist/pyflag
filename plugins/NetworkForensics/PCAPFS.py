@@ -1,13 +1,10 @@
 """ Implements a Pyflag filesystem driver for processing of pcap files.
 
-We require libethereal for actually doing the processing, and access
-to pyethereal - the python bindings for libethereal.
-
-When a pcap file (or really any format that is supported by ethereal)
-is loaded into a case, we create a virtual file in the VFS called
-'/rawdata' at the root directory. This file will be scanned by the
-scanners. The scanners will use the PCAPFile object to read this
-file. We use an inode driver specifier of 'p' for this special file.
+When a pcap file is loaded into a case, we create a virtual file in
+the VFS called '/rawdata' at the root directory. This file will be
+scanned by the scanners. The scanners will use the PCAPFile object to
+read this file. We use an inode driver specifier of 'p' for this
+special file.
 
 The PCAPFile driver is a little unusual:
 
@@ -61,7 +58,7 @@ import pyflag.Scanner as Scanner
 import pyflag.ScannerUtils as ScannerUtils
 import pyflag.Registry as Registry
 import os,sys
-import pyethereal
+import dissect
 
 description = "Network Forensics"
 
@@ -92,11 +89,8 @@ class PCAPFS(DBFS):
         sdbh = DB.DBO(self.case)
         ## This sets up the schema for pcap
         sdbh.MySQLHarness("%s/pcaptool -c -t pcap_%s" %(config.FLAG_BIN,self.table))
-        ## This populates it (libwiretap needs to stat something
-        ## before it opens it. Because we have trouble hooking stat we
-        ## need to provide a real file for it to stat. We can
-        ## guarantee that /etc/passwd exists so we use it here).
-        sql =  "%s  -i %s -o %s -- %s/pcaptool -t pcap_%s /etc/passwd"%(config.IOWRAPPER,
+        ## This populates it 
+        sql =  "%s  -i %s -o %s -f foo -- %s/pcaptool -t pcap_%s foo"%(config.IOWRAPPER,
                                                      self.iosource.subsystem,
                                                      self.iosource.make_parameter_list(),config.FLAG_BIN,
                                                      self.table)
@@ -173,10 +167,7 @@ class ViewDissectedPacket(Reports.report):
         except KeyError:
             pass
 
-    def display(self,query,result):
-        ## Set some useful ethereal options:
-        pyethereal.set_pref("tcp.analyze_sequence_numbers:false")
-        
+    def display(self,query,result):        
         ## Get the IO Source
         io=IO.open(query['case'],query['fsimage'])
 
@@ -200,7 +191,7 @@ class ViewDissectedPacket(Reports.report):
             link_type = 1
 
         ## Now dissect it.
-        proto_tree = pyethereal.Packet(packet,id,link_type)
+        proto_tree = dissect.dissector(packet,link_type)
         
         def tree_cb(branch):
             try:

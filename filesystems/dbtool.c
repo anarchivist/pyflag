@@ -57,7 +57,7 @@ void print_dent2(FILE *hFile, FS_DENT *fs_dent, int flags, FS_INFO *fs,
 static u_int8_t
 print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
 			        char *unused_context);
-void print_sql_string(FILE *fh, const unsigned char *ptr, int length);
+void print_sql_string(FILE *fh, const char *ptr, int length);
 
 static u_int8_t
 print_addr(FS_INFO *fs, DADDR_T addr, char *buf,
@@ -69,7 +69,7 @@ void create_tables(char *name);
 void drop_tables(char *name);
 
 //Function prints the string given in ptr as an SQL escaped string sequence. 
-void print_sql_string(FILE *fh, const unsigned char *ptr, int length) {
+void print_sql_string(FILE *fh, const char *ptr, int length) {
   int i;
   for(i=0;i<length;i++) {
     switch(*(ptr+i)) {
@@ -99,7 +99,7 @@ void print_sql_string(FILE *fh, const unsigned char *ptr, int length) {
 //expected to have been malloced. The string is realloced if its not
 //large enough to ensure that it is not overflown. Caller must free string.
 //If string is NULL, memory is malloced.
-int escape_sql_string(char **string, int *strlen, const unsigned char *ptr, int length) {
+int escape_sql_string(char **string, int *strlen, const char *ptr, int length) {
   int i=0;
   int j=0;
 
