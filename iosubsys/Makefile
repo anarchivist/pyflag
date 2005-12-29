@@ -1,7 +1,7 @@
 include ../Makefile.in
 
 SHELL	= /bin/sh
-DIRS	= hashtools misc magic sgzip lib network
+DIRS	= hashtools misc sgzip lib network
 STATIC_LIB_PATH = /usr/i586-mingw32msvc/lib/
 WIN32PATHS = misc hashtools sgzip lib
 CWD = `pwd`

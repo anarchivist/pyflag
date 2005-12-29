@@ -85,3 +85,15 @@ LOG_LEVEL = 10
 # If you require HTTP authentication add more tokens to this comma
 # seperated list of username:passwords - Or override in ~/.pyflagrc
 # authorise = mic:password, joe:letmein
+
+## This section configures the network scanners. Many of these setting
+## influence which streams will get dissected as a certain
+## protocol. If you have a capture which uses a common protocol on a
+## non-standard port, you may add this here.
+[network]
+
+HTTP_Ports = 80,8000,8080
+SMTP_Ports = 25
+POP3_Ports = 110
+IRC_Ports = 6667
+MSN_Ports = 1863

@@ -155,12 +155,8 @@ class POPScanner(NetworkScanFactory):
             NetworkScanner.process(self,data,metadata)
 
             ## Is this a POP request?
-            try:
-                request = self.proto_tree['pop.request'].value()
-
+            if self.proto_tree.is_protocol_to_server("POP3"):
                 self.outer.pop_connections[metadata['inode']]=1
-            except KeyError:
-                pass
 
         def finish(self):
             if not NetworkScanner.finish(self): return

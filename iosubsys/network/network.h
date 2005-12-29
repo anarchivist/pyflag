@@ -111,6 +111,9 @@ struct tcp_struct {
   /** Private derived data */
   int len;
 
+  /* The offset in the packet where the data portion starts */
+  int data_offset;
+
   /** The payload data portion */
   int data_len;
   char *data;

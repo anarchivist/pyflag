@@ -202,12 +202,9 @@ class IRCScanner(NetworkScanFactory):
 
         def process(self,data,metadata=None):
             NetworkScanner.process(self,data,metadata)
-            try:
-                irc = self.proto_tree['irc']
-                if self.proto_tree['tcp.dstport'].value()==6667:
-                    self.outer.irc_connections[metadata['inode']]=1
-            except KeyError:
-                return
+
+            if self.proto_tree.is_protocol_to_server("IRC"):
+                self.outer.irc_connections[metadata['inode']]=1
 
         def finish(self):
             if not NetworkScanner.finish(self): return

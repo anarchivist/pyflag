@@ -68,7 +68,7 @@ class NetworkScanner(BaseScanner):
     """
     ## Note that Storage is the same object across all NetworkScanners:
     store = Storage()
-    proto_tree = {}
+    proto_tree = dissect.empty_dissector()
 
     def finish(self):
         """ Only allow scanners to operate on pcapfs inodes """

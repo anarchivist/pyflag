@@ -634,22 +634,22 @@ try:
 
         def __init__(self,mode=None):
             if not Magic.magic:
-                Magic.magic=magic.magic_open(magic.MAGIC_NONE)
-                if magic.magic_load(Magic.magic,config.MAGICFILE) < 0:
+                Magic.magic=magic.open(magic.MAGIC_NONE)
+                if Magic.magic.load(config.MAGICFILE) < 0:
                     raise IOError("Could not open magic file %s" % config.MAGICFILE)
 
             if not Magic.mimemagic:
-                Magic.mimemagic=magic.magic_open(magic.MAGIC_MIME)
-                if magic.magic_load(Magic.mimemagic,config.MAGICFILE) < 0:
+                Magic.mimemagic=magic.open(magic.MAGIC_MIME)
+                if Magic.mimemagic.load(config.MAGICFILE) < 0:
                     raise IOError("Could not open magic file %s" % config.MAGICFILE)
             self.mode=mode
 
         def buffer(self,buf):
             """ Return the string representation of the buffer """
             if self.mode:
-                result=magic.magic_buffer(Magic.mimemagic,buf)
+                result=Magic.mimemagic.buffer(buf)
             else:
-                result=magic.magic_buffer(Magic.magic,buf)
+                result=Magic.magic.buffer(buf)
 
             if not result:
                 return "text/plain"

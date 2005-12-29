@@ -152,7 +152,8 @@ int TCP_Read(Packet self, StringIO input) {
       our current position in case the packet has options that we did
       not account for.
   */
-  CALL(input, seek, self->start + this->packet.len , SEEK_SET);
+  this->packet.data_offset = self->start + this->packet.len ;
+  CALL(input, seek, this->packet.data_offset, SEEK_SET);
 
   /** Now populate the data payload of the tcp packet 
 
@@ -178,6 +179,8 @@ VIRTUAL(TCP, Packet)
      NAME_ACCESS(packet, len, FIELD_TYPE_INT);
      NAME_ACCESS(packet, flags, FIELD_TYPE_CHAR_X);
      NAME_ACCESS(packet, window_size, FIELD_TYPE_SHORT);
+     NAME_ACCESS(packet, data_offset, FIELD_TYPE_INT);
+     NAME_ACCESS(packet, data_len, FIELD_TYPE_INT);
      NAME_ACCESS_SIZE(packet, data, FIELD_TYPE_STRING, data_len);
 
      VMETHOD(super.Read) = TCP_Read;

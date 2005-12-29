@@ -61,11 +61,15 @@ class ConfObject:
                     uparam=param.upper()
                     ## We can not trash our own methods, because we use upper case here
                     if not ConfObject.__dict__.has_key(uparam):
+                        parameter = self.config.get(section,param)
+                        
                         ## Try storing values as integers first, then as string
                         try:
-                           value=int(self.config.get(section,param))
+                           value=[int(x) for x in parameter.split(',')]
                         except ValueError:
-                            value=self.config.get(section,param)
+                            value=parameter.split(',')
+
+                        if len(value)==1: value=value[0]
 
                         ## If there is an environment variable - it overrrides this:
                         try:

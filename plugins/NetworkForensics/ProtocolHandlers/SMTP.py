@@ -137,18 +137,18 @@ class SMTPScanner(NetworkScanFactory):
         ## streams which are not on port 25, we need to tell ethereal
         ## this via its config file.
         self.smtp_connections = {}
+        try:
+            config.SMTP_PORTS[0]
+        except:
+            config.SMTP_PORTS=[config.SMTP_PORTS]
 
     class Scan(NetworkScanner):
         def process(self,data,metadata=None):
             NetworkScanner.process(self,data,metadata)
             
             ## Is this an SMTP request?
-            try:
-                request = self.proto_tree['smtp.req']
-                
+            if self.proto_tree.is_protocol_to_server("SMTP"):
                 self.outer.smtp_connections[metadata['inode']]=1
-            except KeyError:
-                pass
 
         def finish(self):
             if not NetworkScanner.finish(self): return

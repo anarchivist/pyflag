@@ -35,5 +35,5 @@ else
 	export PYTHONPATH=`pwd`:`pwd`/libs/
 	# Add our libs dir to the LD_LIBRARY_PATH to run our hooker.
 	export LD_LIBRARY_PATH=`pwd`/libs/:$ETHEREAL_LIB
-	python2.4 "$@"
+	python2.3 "$@"
 fi

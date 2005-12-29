@@ -96,6 +96,7 @@ class StreamReassembler(NetworkScanFactory):
                 tcpdestport=self.proto_tree['tcp.dest_port']
                 ipsrc=self.proto_tree['ip.src']
                 ipdest=self.proto_tree['ip.dest']
+                packet_offset = self.proto_tree['tcp.data_offset']
             except KeyError,e:
                 return
 
@@ -115,7 +116,7 @@ class StreamReassembler(NetworkScanFactory):
                     con_id,isn = self.outer.connection_cache[reverse_key]
 
                     ## Create the current connection for this one:
-                    isn = self.proto_tree['tcp.seq']
+                    isn = self.proto_tree['tcp.seq']+1
 
                     self.dbh.execute("insert into connection_details_%s set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r ",(
                         self.table, ipsrc,tcpsrcport,
@@ -132,7 +133,7 @@ class StreamReassembler(NetworkScanFactory):
                     ## Nope - we dont have that either, we need to
                     ## create a new node for the forward stream:
                     
-                    isn = self.proto_tree['tcp.seq']
+                    isn = self.proto_tree['tcp.seq']+1
                     self.dbh.execute("insert into connection_details_%s set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r",(
                         self.table,
                         ipsrc,tcpsrcport, ipdest, tcpdestport,
@@ -150,15 +151,9 @@ class StreamReassembler(NetworkScanFactory):
             ## Now insert into connection table:
             packet_id = self.fd.tell()-1
             seq = self.proto_tree['tcp.seq']
-            length = self.proto_tree['tcp.len']
-            tcp_node = self.proto_tree['tcp']
+            length = self.proto_tree['tcp.data_len']
             
-            ## We consider anything that follows the tcp header as
-            ## data belonging to the stream:
-            packet_offset = tcp_node.start()+tcp_node.length()
-            metadata['packet_offset'] = packet_offset
-
-            self.dbh.execute("insert into connection_%s set con_id=%r,packet_id=%r,seq=%r,length=%r,packet_offset=%r",(self.table,con_id,packet_id,seq,length,packet_offset))
+            self.dbh.execute("insert into connection_%s set con_id=%r,packet_id=%r,seq=%r,length=%r, packet_offset=%r",(self.table,con_id,packet_id,seq,length, packet_offset))
 
             ## Signal this inode to our clients
             metadata['inode']= "S%s" % con_id

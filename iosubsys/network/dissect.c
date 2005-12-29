@@ -92,12 +92,10 @@ static PyObject *get_field(PyObject *self, PyObject *args) {
 	returned 
     */    
     switch(p->field_type) {
-    case FIELD_TYPE_IP_ADDR:
-      result = PyLong_FromUnsignedLong(*(unsigned int *)item); break;
-
     case FIELD_TYPE_INT:
     case FIELD_TYPE_INT_X:
-      result = Py_BuildValue("i",*(unsigned int *)item); break;
+    case FIELD_TYPE_IP_ADDR:
+      result = PyLong_FromUnsignedLong(*(unsigned int *)item); break;
 
     case FIELD_TYPE_CHAR_X:
     case FIELD_TYPE_CHAR:

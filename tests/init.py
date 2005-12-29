@@ -1,5 +1,7 @@
 import pyflag.Registry as Registry
 import pyflag.FlagFramework as FlagFramework
+import pyflag.conf
+config=pyflag.conf.ConfObject()
 
 import pyflag.IO as IO
 Registry.Init()

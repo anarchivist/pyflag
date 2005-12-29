@@ -337,10 +337,8 @@ class MSNScanner(NetworkScanFactory):
             
             ## Is this an MSN packet bound to the server?
             try:
-                request = self.proto_tree['msnms']
-                dest_port = self.proto_tree['tcp.dstport'].value()
-
-                self.outer.msn_connections[metadata['inode']]=1
+                if self.proto_tree.is_protocol("MSN"):
+                    self.outer.msn_connections[metadata['inode']]=1
             except KeyError:
                 pass
 
