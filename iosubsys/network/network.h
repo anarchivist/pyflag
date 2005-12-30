@@ -26,6 +26,25 @@ CLASS(Root, Packet)
      struct root_node_struct packet;
      int link_type;
 END_CLASS
+/***********************************************
+    Linux Cooked capture (The Any device)
+*************************************************/
+struct cooked_struct {
+  uint16_t packet_type;
+  uint16_t link_layer_addr_type;
+  uint16_t link_layer_addr_len;
+  char link_layer_header[8];
+  uint16_t type;
+  Packet payload;
+} __attribute__((packed));
+
+#define cooked_Format q(STRUCT_SHORT, STRUCT_SHORT, STRUCT_SHORT, \
+			STRUCT_ETH_ADDR, STRUCT_CHAR, STRUCT_CHAR, \
+			STRUCT_SHORT)
+
+CLASS(Cooked, Packet)
+     struct cooked_struct packet;
+END_CLASS
 
 /***********************************************
     Ethernet headers
@@ -33,7 +52,7 @@ END_CLASS
 struct ethernet_2_struct {
   unsigned char destination[6];
   unsigned char source[6];
-  int type;
+  uint16_t type;
   Packet payload;
 }  __attribute__((packed));
 

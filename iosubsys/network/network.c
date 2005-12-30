@@ -31,6 +31,10 @@ int Root_Read(Packet self, StringIO input) {
     this->packet.eth = (Packet)CONSTRUCT(ETH_II, Packet, super.Con, self);
     return CALL(this->packet.eth, Read, input);
 
+  case DLT_LINUX_SLL:
+    this->packet.eth = (Packet)CONSTRUCT(Cooked, Packet, super.Con, self);
+    return CALL(this->packet.eth, Read, input);
+
   default:
     DEBUG("unable to parse link type of %u\n", this->link_type);
     return -1;
@@ -43,6 +47,37 @@ VIRTUAL(Root, Packet)
      NAME_ACCESS(packet, eth, FIELD_TYPE_PACKET);
 
      VMETHOD(super.Read) = Root_Read;
+END_VIRTUAL
+/****************************************************
+   Cooked headers
+*****************************************************/
+int Cooked_Read(Packet self, StringIO input) {
+  Cooked this=(Cooked)self;
+  int len;
+
+  len=this->__super__->Read(self, input);
+
+  switch(this->packet.type) {
+  case 0x800:
+    this->packet.payload = (Packet)CONSTRUCT(IP, Packet, super.Con, self);
+    len += CALL(this->packet.payload, Read, input);
+    break;
+
+  default:
+    DEBUG("Unknown ethernet payload type 0x%x.\n", 
+	  this->packet.type);
+  };
+
+  return len;
+};
+
+VIRTUAL(Cooked,Packet)
+     INIT_STRUCT(packet, cooked_Format);
+
+     NAME_ACCESS(packet, type, FIELD_TYPE_SHORT_X);
+     NAME_ACCESS(packet, payload, FIELD_TYPE_PACKET);
+
+     VMETHOD(super.Read) = Cooked_Read;
 END_VIRTUAL
 
 /****************************************************
