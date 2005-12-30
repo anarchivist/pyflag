@@ -237,3 +237,12 @@ class TEXTUI(UI.GenericUI):
         pane_cb(branch, right)
 
         self.row(left, right)
+
+    def refresh(self, int, query):
+        pass
+
+    def link(self,string,target=FlagFramework.query_type(()),**target_options):
+        pass
+
+    def para(self,string,**options):
+        self.result += string + "\r\n\r\n"

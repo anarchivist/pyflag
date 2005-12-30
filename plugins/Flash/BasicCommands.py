@@ -406,8 +406,9 @@ class execute(pyflagsh.command):
 
             ## We call the display method just in case this report
             ## does something in the display
-            result=HTMLUI.HTMLUI(query=query)
+            result=TEXTUI.TEXTUI(query=query)
             report.display(query,result)
+            print result.display()
             yield "Execution of %s successful in %s sec" % (self.args[1],time.time()-start_time)
         except Exception,e:
             import traceback
