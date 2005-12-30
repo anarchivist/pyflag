@@ -243,3 +243,124 @@ class GenericUI:
                      - (None): No sanitation is done
         """
         logging.log(logging.DEBUG, "text not implemented")
+
+    def _make_sql(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):
+        """ An SQL generator for the table widget (private) """
+        #in case the user forgot and gave us a tuple, we forgive them:
+        names=list(names)
+        columns = list(columns)
+
+        #First work out what is the query string:
+        query_str = sql;
+        query = self.defaults
+        
+        #The new_query is the same one we got minus all the UI
+        #specific commands. The following section, just add UI
+        #specific commands onto the clean sheet
+        new_query = query.clone()
+        del new_query['dorder']
+        del new_query['order']
+        del new_query['limit']
+
+        #find the group by clause - if we get a group by clause we
+        #need to change the rest of the query so heavily that we need
+        #check the group by last.
+        if not groupby:
+            group_by_str = ",".join([ " `%s`" % d for d in query.getarray('group_by') ])
+            if group_by_str:
+                 #If we have a group by, we actually want to only show
+                 #a count and those columns that are grouped by, so we
+                 #over ride columns and names...  Mask contains those
+                 #indexes for which names array matches the group_by
+                 #clause
+                 try:
+                     mask = [ names.index(d) for d in query.getarray('group_by') ]
+                     links = [None]+ [ self.make_link(query,"where_%s" % names[d],target_format="=%s") for d in mask ]
+                     for d in links:
+                         if d:
+                             #For links we dont want these variables to be there
+                             del d['group_by']
+                             del d['limit']
+
+                     names = ['Count'] + [ names[d] for d in mask ]
+                     columns = [ 'count(*)' ] +  [ columns[d] for d in mask ]
+
+                     #Note that you cant have a group_by and a having
+                     #clause together - so if you get a group_by we
+                     #drop the having conditions
+                     for d in query.keys():
+                         if d.startswith('where_'):
+                             del query[d]
+                        
+                 #if the user asked for a weird group by , we ignore it.
+                 except ValueError:
+                     group_by_str = None
+        else:
+            group_by_str = groupby
+
+        #Form the columns in the sql
+        tmp = [ k+ " as `" +v+"`" for (k,v) in zip(columns,names) ]
+            
+        query_str+=",".join(tmp) 
+
+        #Form the table and where clause
+        query_str+=" from %s " % table
+
+        #Work out the having clause.
+        having=['1']
+        conditions=[]
+        for d,v in query:
+            if d.startswith('where_'):
+                #Find the column for that name
+                try:
+                    index=names.index(d[len('where_'):])
+                except ValueError:
+                    ## If we dont know about this name, we ignore it.
+                    continue
+
+                self.filter_text.append(FlagFramework.make_sql_from_filter(v,self.filter_conditions,columns[index],d[len('where_'):]))
+
+                #Create a link which deletes the current variable from
+                #the query string, allows the user to remove the
+                #current condition:
+##                tmp_query=query.clone()
+##                tmp_query.remove(d,v)
+##                tmp_link=self.__class__(self)
+##                tmp_link.link(condition_text,target=tmp_query)
+##                conditions.append(tmp_link)
+
+        having_str = " and ".join(having)
+
+        if where:
+            query_str+= " where (%s) and (%s) " %(where,having_str)
+        elif having:
+            query_str+=" where %s " % having_str
+            
+        if group_by_str:
+            query_str += " group by %s " % group_by_str
+
+        #Find the order by clause - We look at self.sort to establish which column needs to be sorted. We assume self.sort is correctly initialised first.
+        if self.sort[1]=='order':
+            order= " `%s` asc " % names[self.sort[0]]
+        else:
+            order= " `%s` desc " % names[self.sort[0]]
+
+        query_str+= " order by %s " % order
+
+        #Calculate limits
+        if not query.has_key('limit'):
+            query['limit'] = "0"
+
+        self.previous = int(query['limit']) - config.PAGESIZE
+        if self.previous<0: self.previous=0
+
+        self.next = int(query['limit']) + config.PAGESIZE
+        self.pageno =  int(query['limit']) /config.PAGESIZE
+                
+        query_str+=" limit %s, %s" % (int(query['limit']) , config.PAGESIZE)
+
+        dbh = DB.DBO(case)
+
+        #Do the query, and find out the names of all the columns
+        dbh.execute(query_str,())
+        return dbh,new_query,names,columns,links

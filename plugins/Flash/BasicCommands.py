@@ -33,7 +33,7 @@ import pyflag.Registry as Registry
 import pyflag.logging as logging
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import pyflag.HTMLUI as HTMLUI
+import pyflag.TEXTUI as TEXTUI
 
 class load(pyflagsh.command):
     def help(self):
@@ -388,10 +388,12 @@ class execute(pyflagsh.command):
         ## Instantiate the report
         report=report(self.environment._flag)
         if self.environment._flag.is_cached(query):
+            print query
+            
             ## Run the display method
-            result=HTMLUI.HTMLUI(query=query)
-            result.form_parms={}
+            result=TEXTUI.TEXTUI(query=query)
             report.display(query,result)           
+            print result
 #            yield "Report previously run... You need to reset it first."
             return
             

@@ -558,7 +558,7 @@ class HTMLUI(UI.GenericUI):
         >>> /usr/share/local = ('usr','share','local')
         
         """
-        if not self.defaults: raise UIException, "Must have default query for tree widget"
+        if not self.defaults: raise UIException("Must have default query for tree widget")
         query = self.defaults
 
         #This is needed if we want to have more than one tree per

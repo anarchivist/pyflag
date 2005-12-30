@@ -130,6 +130,7 @@ class BrowseFS(Reports.report):
             def pane_cb(branch,tmp):
                 query['order']='Filename'
                 br=FlagFramework.normpath('/'.join(branch)+'/')
+                print "br %s %s" % (br,branch)
                 tmp.table(
                     columns=['f.inode','name','f.status','size', 'from_unixtime(mtime)','f.mode'],
                     names=('Inode','Filename','Del','File Size','Last Modified','Mode'),

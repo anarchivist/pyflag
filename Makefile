@@ -144,4 +144,4 @@ mysql:
 
 ## A target to initialise the repository
 bootstrap:
-	for i in $(EXECUTABLE_SCRIPTS); do chmod +x $$i; done
+	chmod +x $(EXECUTABLE_SCRIPTS)
