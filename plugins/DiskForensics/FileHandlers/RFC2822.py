@@ -28,8 +28,9 @@ import pyflag.Reports as Reports
 import pyflag.DB as DB
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import email
+import email, email.Utils,time
 from pyflag.FileSystem import File,CachedFile
+
 
 class RFC2822(Scanner.GenScanFactory):
     """ Scan RFC2822 Mail messages and insert record into email_ table"""
@@ -46,33 +47,7 @@ class RFC2822(Scanner.GenScanFactory):
                   'message/rfc822',
                   ]
  
-        def external_process(self,name):
-            def month_str_to_int(str): 
-	        if (str == "Jan"):
-	            return 1
-	        elif (str == "Feb"):
-		    return 2
-	        elif (str == "Mar"):
-		    return 3
-	        elif (str == "Apr"):
-		    return 4
-	        elif (str == "May"):
-		    return 5
-	        elif (str == "Jun"):
-		    return 6
-	        elif (str == "Jul"):
-		    return 7
-	        elif (str == "Aug"):
-		    return 8
-	        elif (str == "Sep"):
-		    return 9
-	        elif (str == "Oct"):
-		    return 10
-	        elif (str == "Nov"):
-		    return 11
-	        elif (str == "Dec"):
-		    return 12
-		    
+        def external_process(self,name):		    
 	    count = 0
             fd = open(name,'r')
 
@@ -80,17 +55,12 @@ class RFC2822(Scanner.GenScanFactory):
                 a=email.message_from_file(fd)
 		
 		#Mysql is really picky about the date formatting
-		strng = a.get('Date')
-		flds = strng.split()
-		datesql = flds[3] + "-" + str(month_str_to_int(flds[2])) + "-" + flds[1] + " " + flds[4] + " " + flds[5]
-		print datesql
-		self.dbh.execute("INSERT INTO `email_%s` SET `inode`=%r,`vfsinode`=%r,`date`=%r,`to`=%r,`from`=%r,`subject`=%r", (self.table, self.inode, name, datesql, a.get('To'), a.get('From'), a.get('Subject')))
+                date = email.Utils.parsedate(a.get('Date'))
+                if not date:
+                    raise Exception("No Date field in message - this is probably not an RFC2822 message at all.")
+                    
+		self.dbh.execute("INSERT INTO `email_%s` SET `inode`=%r,`vfsinode`=%r,`date`=from_unixtime(%r),`to`=%r,`from`=%r,`subject`=%r", (self.table, self.inode, name, time.mktime(date), a.get('To'), a.get('From'), a.get('Subject')))
 
-		#self.dbh.execute("INSERT INTO `email_%s` SET `inode`=%r,`vfsinode`='P%s',`date`=from_unixtime(%s),`to`=%r,`from`=%r,`subject`=%r", (self.table, self.inode, name, a.get('Date'), a.get('To'), a.get('From'), a.get('Subject')))
-
-                #print ("**************************************************") 
-                #print a.get("Date") + a.get("To") + a.get("From") + a.get("Subject") + a.get_payload()
-		#print ("**************************************************")
 		for part in a.walk():
                     if part.get_content_maintype() == 'multipart':
                         continue
