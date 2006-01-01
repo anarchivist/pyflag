@@ -368,7 +368,8 @@ class ViewFile(Reports.report):
             """ Dumps the file in a text window """
             max=config.MAX_DATA_DUMP_SIZE
             def textdumper(offset,data,result):
-                result.text(data,font='typewriter',color="red",wrap="full")
+                result.text(data,sanitise='full',font='typewriter',
+                            color="red",wrap="full")
 
             return display_data(query,result,max,textdumper)
         

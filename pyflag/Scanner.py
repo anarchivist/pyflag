@@ -169,7 +169,7 @@ class StoreAndScan(BaseScanner):
         self.name = None
         self.boring_status = True
 
-    def boring(self,metadata):
+    def boring(self,metadata, data=''):
         """ This function decides if this file is boring (i.e. we should ignore it).
 
         This must be implemented in derivative classes.
@@ -183,7 +183,7 @@ class StoreAndScan(BaseScanner):
             ## If this file is boring, we check to see if there is new
             ## information which makes it not boring:
             if self.boring_status:
-                self.boring_status = self.boring(metadata)
+                self.boring_status = self.boring(metadata, data=data)
                 
             ## We store all the files we create in a central place, so
             ## multiple instances of StoreAndScan can all share the
@@ -247,7 +247,7 @@ class StoreAndScanType(StoreAndScan):
     ## These are the mime types that will be used to decide if we should scan this file
     types = []
     
-    def boring(self,metadata):
+    def boring(self,metadata, data=''):
         try:
             mime_type = metadata['mime']
         except KeyError:

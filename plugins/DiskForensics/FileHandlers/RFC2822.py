@@ -46,6 +46,29 @@ class RFC2822(Scanner.GenScanFactory):
         types = [ 'text/x-mail.*',
                   'message/rfc822',
                   ]
+
+        def boring(self,metadata, data=''):
+            """ The magic determination of RFC2822 messages is too
+            loose, this does further tests to make sure it really is a
+            message.
+
+            In particular POP transcripts are identified as messages
+            since magic looks for the occurances of certain key words
+            near the start of the file, which happens to be after a
+            couple of pop exchanges.
+            """
+            if not Scanner.StoreAndScanType.boring(self,metadata,data=data):
+                ## Look at the first keyword before : at the first
+                ## line, must be one of the rfc keywords listed:
+                line = data.split('\r\n',1)[0].split(':',1)
+                try:
+                    if (line[0].lower() in
+                           ['received','from', 'message-id', 'to', 'subject']):
+                        return False
+                except:
+                    pass
+
+            return True
  
         def external_process(self,name):		    
 	    count = 0

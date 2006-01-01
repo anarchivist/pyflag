@@ -512,4 +512,4 @@ class OffsetFile(File):
 ## There is no point in caching the offset file since its basically
 ## not doing much underlying stuff
 ##class CachedOffsetFile(CachedFile, OffsetFile):
-##    target_class = OffsetFile
+##    target_class = OffsetFile    

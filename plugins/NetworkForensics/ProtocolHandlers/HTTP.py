@@ -2,8 +2,6 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 # Gavin Jackson <gavz@users.sourceforge.net>
 #
-# GJ: Added ts_sec field to request and response tables (and updated report)
-#
 # ******************************************************
 #  Version: FLAG $Version: 0.78 Date: Fri Aug 19 00:47:14 EST 2005$
 # ******************************************************
@@ -67,34 +65,47 @@ class HTTP:
                 pass
 
     def read_request(self, line):
-        """ Checks if line looks like a URL request. If it is, we continue reading the fd until we finish consuming the request (headers including post content if its there).
+        """ Checks if line looks like a URL request. If it is, we
+        continue reading the fd until we finish consuming the request
+        (headers including post content if its there).
 
         We should be positioned at the start of the response after this.
         """
         m=self.request_re.search(line)
         if not m: return False
 
-        self.request = { 'url': m.group(2), 'method':m.group(1) }
+        self.request = dict(url=m.group(2),
+                            method=m.group(1),
+                            packet_id = self.fd.get_packet_id(self.fd.tell())
+                            )
         self.read_headers(self.request)
 
         return True
         
     def read_response(self, line):
-        """ Checks if line looks like a HTTP Response. If it is, we continue reading the fd until we finish consuming the response.
+        """ Checks if line looks like a HTTP Response. If it is, we
+        continue reading the fd until we finish consuming the
+        response.
 
         We should be positioned at the start of the next request after this.
         """
         m=self.response_re.search(line)
         if not m: return False
 
-        self.response = { 'HTTP_code': m.group(1) }
+        self.response = dict(HTTP_code= m.group(1),
+                             packet_id = self.fd.get_packet_id(self.fd.tell())
+                             )
         self.read_headers(self.response)
         return True
 
     def skip_body(self, headers):
-        """ Reads the body of the HTTP object depending on the values in the headers. This function takes care of correctly parsing chunked and encoding.
+        """ Reads the body of the HTTP object depending on the values
+        in the headers. This function takes care of correctly parsing
+        chunked and encoding.
 
-        We assume that the fd is already positioned at the very start of the object. After this function we will be positioned at the end of this object.
+        We assume that the fd is already positioned at the very start
+        of the object. After this function we will be positioned at
+        the end of this object.
         """
         try:
             skip = int(headers['content-length'])
@@ -145,36 +156,25 @@ class HTTPScanner(NetworkScanFactory):
     
     def prepare(self):
         self.http_inodes = {}
-
         ## This is the information we store about each http request:
         ## inode - the inode which represents the response to this request
-        ## offset- The offset into the inode where the request begins
-        ## method- HTTP Method
-        ## host  - The Host this is directed to
-        ## request - The URI issued
+        ## request_packet - the packet id the request was sent in
+        ## method - method requested
+        ## url - the URL requested (This is the fully qualified url with host header included if present).
+        ## response_packet - the packet where the response was seen
+        ## content_type - The content type
         self.dbh.execute(
-            """CREATE TABLE if not exists `http_request_%s` (
+            """CREATE TABLE if not exists `http_%s` (
             `inode` VARCHAR( 255 ) NOT NULL ,
-            `packet` int not null,
-            `ts_sec` int(11),
+            `request_packet` int not null,
             `method` VARCHAR( 10 ) NOT NULL ,
-            `host` VARCHAR( 255 ) NOT NULL,
-            `request` VARCHAR( 255 ) NOT NULL 
+            `url` VARCHAR( 255 ) NOT NULL,
+            `response_packet` int not null,
+            `content_type` VARCHAR( 255 ) NOT NULL
             )""",(self.table,))
 
-        ## This is the stuff we store about responses:
-        self.dbh.execute(
-            """CREATE TABLE if not exists `http_response_%s` (
-            `response_id` int(11) unsigned NOT NULL auto_increment,
-            `inode` VARCHAR( 255 ) NOT NULL ,
-            `offset` INT NOT NULL ,
-            `packet` int not null,
-            `ts_sec` int(11),
-            `content_length` INT NOT NULL ,
-            `content_type` VARCHAR( 255 ) NOT NULL,
-            `content_encoding` VARCHAR( 255 ) NOT NULL,
-            key `response_id` (`response_id`)
-            )""",(self.table,))
+        self.dbh.check_index("http_%s" % self.table, "inode")
+        self.dbh.check_index("http_%s" % self.table, "url")
         
     def reset(self):
         self.dbh.execute("drop table if exists http_request_%s",(self.table,))
@@ -185,12 +185,12 @@ class HTTPScanner(NetworkScanFactory):
 
             ## Is this a HTTP request?
             if self.proto_tree.is_protocol_to_server("HTTP"):
-                self.outer.http_inodes[metadata['inode']]=1
+                self.outer.http_inodes[metadata['inode']]=self.proto_tree['ip.dest']
 
         def finish(self):
             if not NetworkScanner.finish(self): return
 
-            for key in self.outer.http_inodes.keys():
+            for key,value in self.outer.http_inodes.items():
                 forward_stream = key[1:]
                 reverse_stream = find_reverse_stream(
                     forward_stream,self.table,self.dbh)
@@ -224,126 +224,29 @@ class HTTPScanner(NetworkScanFactory):
                         pass
                            
                     self.ddfs.VFSCreate(None,new_inode,"%s/HTTP/%s" % (path, escape(p.request['url'])))
+
+                    ## Store information about this request in the
+                    ## http table:
+                    host = p.request.get("host",IP2str(value))
+                    url = p.request.get("url")
+                    if not url.startswith("http://") or not url.startswith("ftp://"):
+                        url = "http://%s%s" % (host, url)
+                    self.dbh.execute("insert into http_%s set inode=%r, request_packet=%r, method=%r, url=%r, response_packet=%r, content_type=%r",(self.outer.table, new_inode, p.request.get("packet_id"), p.request.get("method"), url, p.response.get("packet_id"), p.response.get("content-type","text/html")))
                     
                     ## Scan the new file using the scanner train. 
                     self.scan_as_file(new_inode)
 
-##            ## See if we can find a http request in this packet:
-##            try:
-##                method = self.proto_tree['http.request.method'].value()
-##                uri = self.proto_tree['http.request.uri'].value()
-##                host = self.proto_tree['http.host'].value()
-
-##                ## The offset is calculated as the offset from the
-##                ## start of this stream inode to the start of the
-##                ## request header:
-##                offset = metadata['stream_offset']
-
-##                ## Try to find the time stamp of this request:
-##                self.dbh.execute("select ts_sec from pcap_%s where id = %s "
-##                                 ,(self.table,self.packet_id))
-##                row = self.dbh.fetch()
-##                timestamp = row['ts_sec']
-                
-##                ## Store in the request table
-##                self.dbh.execute("insert into http_request_%s set inode=%r,offset=%r,packet=%r,ts_sec=%r,method=%r,host=%r,request=%r",(self.table, metadata['inode'],offset,self.packet_id,timestamp,method,host,uri))
-
-##                return
-##            except KeyError:
-##                pass
-
-##            ## See if there is a response in this packet:
-##            try:
-##                ## Is this a response?
-##                response = self.proto_tree['http.response']
-
-##                ## Default content_type:
-##                try:
-##                    content_type = self.proto_tree['http.content_type'].value()
-##                except:
-##                    content_type = "text/html"
-
-##                ## Default content_encoding
-##                try:
-##                    content_encoding = self.proto_tree['http.content_encoding'].value()
-##                except:
-##                    content_encoding = "plain"
-
-##                ## Default content_length
-##                try:
-##                    content_length = self.proto_tree['http.content_length'].value()
-##                except:
-##                    content_length = sys.maxint
-
-##                ## The offset is the position in the stream where the
-##                ## data starts. The data starts after the \r\n\r\n
-##                ## sequence. Sometimes this can be in the next packet,
-##                ## in which case we will miss it here.
-##                http = self.proto_tree['http']
-##                delimiter = "\r\n\r\n"
-##                end_of_headers = data[http.start():].find(delimiter)+len(delimiter)
-##                if end_of_headers<0: end_of_headers=http.length()
-##                offset = metadata['stream_offset'] + end_of_headers
-
-##                ## Try to find the time stamp of this request:
-##                self.dbh.execute("select ts_sec from pcap_%s where id = %s "
-##                                 ,(self.table,self.packet_id))
-##                row = self.dbh.fetch()
-##                timestamp = row['ts_sec']
-
-##                self.dbh.execute("insert into http_response_%s set inode=%r,offset=%r, packet=%r, ts_sec=%r, content_length=%r,content_type=%r,content_encoding=%r",(self.table,metadata['inode'],offset,self.packet_id,timestamp,content_length,content_type,content_encoding))
-##                response_id = self.dbh.autoincrement()
-##                path=self.ddfs.lookup(inode=metadata['inode'])
-##                path=os.path.dirname(path)
-##                new_inode = "%s|o%s:%s" % (metadata['inode'],offset,content_length)
-
-##                ## Handle chunked encodings
-##                try:
-##                    transfer_encoding = self.proto_tree['http.transfer_encoding'].value().lower()
-
-##                    if "chunked" in transfer_encoding:
-##                        new_inode=new_inode+"|c0"
-##                except:
-##                    pass
-                
-##                self.ddfs.VFSCreate(
-##                    None,
-##                    ## Inode:
-##                    new_inode,
-##                    ## Path to new file:
-##                    "%s/HTTP/Response %s" % (path,response_id)
-##                    )
-
-##                ## This code is needed because magic does not always
-##                ## identify the gzip nodes correctly.
-##                ## Handle gziped encoding:
-##                if content_encoding=='gzip':
-##                    self.ddfs.VFSCreate(
-##                        None,
-##                        ## Inode:
-##                        "%s|G1" % new_inode,
-##                        ## Path to new file:
-##                        "%s/HTTP/Response %s (uncompressed)" % (path,response_id)
-##                        )
-
-##                ## Now recursively scan the nodes:
-##                self.outer.http_inodes.append(new_inode)
-
-##            except KeyError,e:
-##                pass
-
-##        def finish(self):
-##            """ Rescan all the discovered inodes """
-##            if not NetworkScanner.finish(self): return
-            
-##            for inode in self.outer.http_inodes:
-##                try:
-##                    self.scan_as_file(inode)
-##                except Exception,e:
-##                    logging.log(logging.ERRORS,"CRITICAL: %s" % e)
-
 class BrowseHTTPRequests(Reports.report):
     """ This allows users to search the HTTP Requests that were loaded as part of the PCAP File system.
+
+    This is the information we store about each http request:
+    
+    inode - the inode which represents the response to this request
+    request_packet - the packet id the request was sent in
+    method - method requested
+    url - the URL requested (This is the fully qualified url with host header included if present).
+    response_packet - the packet where the response was seen
+    content_type - The content type of the response to this request.
     """
     parameters = { 'fsimage':'fsimage' }
 
@@ -357,21 +260,21 @@ class BrowseHTTPRequests(Reports.report):
             pass
 
     def display(self,query,result):
-        result.heading("Requested URIs in %s" % query['fsimage'])
+        result.heading("Requested URLs in %s" % query['fsimage'])
         result.table(
-            columns = ['from_unixtime(ts_sec)','inode','packet','method','host','request'],
-            names = [ 'Time Stamp', 'Inode', "Packet", "Method" ," Host","Request URI" ],
-            table="http_request_%s" % query['fsimage'],
+            columns = ['from_unixtime(ts_sec)','request_packet','inode','method','url', 'content_type'],
+            names = [ 'Time Stamp', "Request Packet", 'Inode', "Method" ,"URL", "Content Type" ],
+            table=" http_%s join pcap_%s on request_packet=id " % (query['fsimage'],query['fsimage']),
             links = [
             None,
+            FlagFramework.query_type((),
+                                     family=query['family'], report="View Packet",
+                                     fsimage=query['fsimage'],case=query['case'],
+                                     __target__='id'),
             FlagFramework.query_type((),
                                      family="Disk Forensics",case=query['case'],
                                      report="View File Contents",mode="Combined streams",
                                      fsimage=query['fsimage'],__target__="inode"),
-            FlagFramework.query_type((),
-                                     family=query['family'], report="View Packet",
-                                     fsimage=query['fsimage'],case=query['case'],
-                                     __target__='id')
             ], 
             case=query['case']
             )
