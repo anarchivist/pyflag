@@ -23,7 +23,7 @@ MISC_LIBS = /usr/lib/libgmp.so.3 /usr/lib/libmysqlclient_r.so.12 /usr/lib/libmag
 BASE_DIR = $(shell pwd)
 DOC_LIST = CONTRIBUTING README USAGE TODO
 PACKAGE_ARCH = i386
-EXECUTABLE_SCRIPTS = flash examine.py flag.sh launch.sh gendoc.sh gtk.sh libs/pypst2.py pyflag/nsrl_load.py pyflag/examine.py pyflag/FileFormats/libole2.py pyflag/FlagHTTPServer.py pyflag/FlagGTKServer.py utilities/nsrl_load.sh utilities/whois_load.py utilities/load_dictionary.sh utilities/whois_load.sh utilities/raid_guess.py utilities/update_version.sh utilities/load_regexps.sh utilities/load_regexps.py
+EXECUTABLE_SCRIPTS = flash examine.py flag.sh launch.sh gendoc.sh gtk.sh pyflag/nsrl_load.py pyflag/examine.py pyflag/FileFormats/libole2.py pyflag/FlagHTTPServer.py pyflag/FlagGTKServer.py utilities/nsrl_load.sh utilities/whois_load.py utilities/load_dictionary.sh utilities/whois_load.sh utilities/raid_guess.py utilities/update_version.sh utilities/load_regexps.sh utilities/load_regexps.py
 PACKAGE_SCRIPTS = DEBIAN/postinst DEBIAN/preinst DEBIAN/postrm DEBIAN/prerm etc/pyflag/debian-start etc/init.d/pyflag
 #If the package version is changed, the control file in pkg_files must also
 #be changed.

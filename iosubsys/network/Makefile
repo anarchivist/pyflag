@@ -15,7 +15,7 @@ deps: $(OBJS)
 ## This is the python binding:
 _dissect.so: dissect.o $(OBJS)
 	gcc -o $@ -shared  $(OBJS) dissect.o -ldl -lutil
-#	cp dissect.py $@ $(LIB_TARGET)
+	cp $@ $(LIB_TARGET)
 
 copy_pcap: pcaptool
 	cp pcaptool $(BIN_DIR)
