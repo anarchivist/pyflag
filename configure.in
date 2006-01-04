@@ -2,9 +2,12 @@ AC_INIT(flag.sh)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE(pyflag, 0.80)
 
-AM_MAINTAINER_MODE
+AC_PROG_LIBTOOL
+AC_PROG_CC
+
+AC_CHECK_HEADER(zlib.h,,AC_MSG_ERROR([You Must install zlib-dev to build pyflag]))
 
 AM_PATH_PYTHON(2.4)
 AC_PYTHON_MODULE(MySQLdb, REQUIRED)
 
-AC_OUTPUT([ Makefile ])
+AC_OUTPUT([ Makefile src/Makefile src/lib/Makefile src/sgzip/Makefile ])

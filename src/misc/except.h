@@ -98,7 +98,7 @@
    please add a string description of each exception to except.c */
 enum _exception {
   ZERO,E_ANY,E_GENERIC,E_OVERFLOW,
-  E_UNDERFLOW,E_IOERROR, E_NOMEMORY
+  E_UNDERFLOW,E_IOERROR, E_NOMEMORY, E_STOPITERATION
 };
 
 //Maximum size of exception string
@@ -131,8 +131,12 @@ extern enum _exception _except;
                  except_raise(_except,NULL,NULL);\
               } else if(_except && (((__EXCEPT__=_except) && (_except=0)) || 1))
 
+#ifdef __DEBUG__
 #define RAISE except_raise
+#else
+#define RAISE(x, ... ) except_raise(x,NULL)
+#endif
 
-extern void except_raise(enum _exception e,void *obj, char *reason, ...);
+extern void except_raise(enum _exception e, char *reason, ...);
 extern int except_cmp(int e,...) ;
 #endif
