@@ -6,8 +6,27 @@ AC_PROG_LIBTOOL
 AC_PROG_CC
 
 AC_CHECK_HEADER(zlib.h,,AC_MSG_ERROR([You Must install zlib-dev to build pyflag]))
+AC_CHECK_HEADER(pcap.h,,AC_MSG_ERROR([You Must install libpcap-dev to build pyflag]))
+AC_CHECK_FILE(src/filesystems/sleuthkit-2.03.tar.gz,,AC_MSG_ERROR([You Must download sleuthkit-2.03.tar.gz and place in src/filesystems ]))
+
+PKG_CHECK_MODULES(libclamav, libclamav)
 
 AM_PATH_PYTHON(2.4)
+AC_PYTHON_DEVEL
 AC_PYTHON_MODULE(MySQLdb, REQUIRED)
 
-AC_OUTPUT([ Makefile src/Makefile src/lib/Makefile src/sgzip/Makefile ])
+AC_PROG_SWIG(1.3)
+SWIG_PYTHON
+
+AC_OUTPUT([ 
+	Makefile 
+	src/Makefile 
+	src/lib/Makefile 
+	src/mailtools/Makefile 
+	src/mailtools/libpst-0.5/Makefile 
+	src/indextools/Makefile
+	src/network/Makefile
+	src/regtools/Makefile
+	src/virustools/Makefile
+	src/filesystems/Makefile
+	])

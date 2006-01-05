@@ -42,6 +42,7 @@ rebuild: clean all
 install: all
 	cp readpst /usr/local/bin
 	cp readpstlog /usr/local/bin/readpstlog
+
 uninstall:
 	rm -f /usr/local/bin/readpst
 	rm -f /usr/local/bin/readpstlog

@@ -1,2 +1,2 @@
-SUBDIRS = lib
-#SUBDIRS = lib filesystems imagingtools  indextools  mailtools  misc  network  regtools  virustools sources
+SUBDIRS = lib mailtools indextools network regtools virustools filesystems
+#SUBDIRS = imagingtools

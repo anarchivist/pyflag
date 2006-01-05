@@ -3,10 +3,16 @@ INCLUDES        	= -I$(top_srcdir)/src/include
 # main bin and lib targets
 noinst_PROGRAMS		= open
 bin_PROGRAMS		= sgzip evtool iowrapper remote_server
-lib_LTLIBRARIES		= libio_hooker.la libsgz.la libexcept.la libevf.la
+lib_LTLIBRARIES		= libexcept.la libsgz.la libevf.la libio_hooker.la liboo.la
 
 # convenience libs: just to reduce re-building
 noinst_LTLIBRARIES	= libmd5.la
+
+# python stuff
+BUILT_SOURCES		= $(srcdir)/io_wrap.c
+SWIG_SOURCES		= io.i
+pkgpython_PYTHON 	= iosubsys.py
+pkgpyexec_LTLIBRARIES 	= _iosubsys.la
 
 # specifics (libs)
 libexcept_la_SOURCES 	= except.c except.h
@@ -20,6 +26,8 @@ libevf_la_LIBADD	= libexcept.la -lz
 libio_hooker_la_SOURCES = hooker.c hooker.h
 libio_hooker_la_LIBADD	= libexcept.la -ldl
 
+liboo_la_SOURCES	= class.c stringio.c struct.c talloc.c packet.c misc.c
+
 libmd5_la_SOURCES	= md5c.c md5.h
 
 # specifics (bins)
@@ -32,3 +40,15 @@ iowrapper_SOURCES	= iowrapper.c iosubsys.c iosubsys.h remote_client.c remote.h
 iowrapper_LDADD		= libevf.la libsgz.la libmd5.la libio_hooker.la
 
 remote_server_LDADD	= libexcept.la
+
+# python module specifics
+_iosubsys_la_SOURCES 	= iosubsys.c iosubsys.h remote_client.c remote.h $(srcdir)/io_wrap.c $(SWIG_SOURCES)
+_iosubsys_la_CPPFLAGS 	= $(SWIG_PYTHON_CPPFLAGS)
+_iosubsys_la_LDFLAGS 	= -module
+_iosubsys_la_LIBADD	= libevf.la libsgz.la libmd5.la
+
+$(srcdir)/io_wrap.c: $(SWIG_SOURCES)
+	$(SWIG) $(SWIG_PYTHON_OPT) -o $@ $<
+
+clean-local:
+	-rm -rf iosubsys.py io_wrap.c
