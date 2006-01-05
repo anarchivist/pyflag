@@ -50,7 +50,7 @@ typedef void TALLOC_CTX;
 #endif
 
 /* useful macros for creating type checked pointers */
-/** These are changed to ensure that no naming is done, and memory is properly wiped before use
+/** These are changed to ensure that no naming is done, and memory is properly wiped before use (MC)
 #define talloc(ctx, type) (type *)talloc_named_const(ctx, sizeof(type), #type)
 
 #define talloc_size(ctx, size) talloc_named_const(ctx, size, __location__)

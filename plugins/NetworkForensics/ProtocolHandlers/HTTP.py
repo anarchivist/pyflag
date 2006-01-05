@@ -177,76 +177,65 @@ class HTTPScanner(NetworkScanFactory):
         self.dbh.check_index("http_%s" % self.table, "url")
         
     def reset(self):
-        self.dbh.execute("drop table if exists http_request_%s",(self.table,))
-        self.dbh.execute("drop table if exists http_response_%s",(self.table,))    
-    class Scan(NetworkScanner):
-        def process(self,data,metadata=None):
-            NetworkScanner.process(self,data,metadata)
+        self.dbh.execute("drop table if exists http_%s",(self.table,))
 
-            ## Is this a HTTP request?
-            if self.proto_tree.is_protocol_to_server("HTTP"):
-                self.outer.http_inodes[metadata['inode']]=self.proto_tree['ip.dest']
+    def process_stream(self, stream, factories):
+        forward_stream, reverse_stream = self.stream_to_server(stream, "HTTP")
+        if not reverse_stream or not forward_stream: return
 
-        def finish(self):
-            if not NetworkScanner.finish(self): return
+        combined_inode = "S%s/%s" % (forward_stream, reverse_stream)
+        logging.log(logging.DEBUG,"Openning %s for HTTP" % combined_inode)
 
-            for key,value in self.outer.http_inodes.items():
-                forward_stream = key[1:]
-                reverse_stream = find_reverse_stream(
-                    forward_stream,self.table,self.dbh)
-                
-                combined_inode = "S%s/%s" % (forward_stream,reverse_stream)
+        fd = self.fsfd.open(inode=combined_inode)
+        p=HTTP(fd,self.dbh,self.fsfd)
+        ## Iterate over all the messages in this connection
+        for f in p.parse():
+            if not f: continue
 
-                logging.log(logging.DEBUG,"Openning %s for HTTP" % combined_inode)
-                ## We open the file and scan it:
-                fd = self.ddfs.open(inode=combined_inode)
-                p=HTTP(fd,self.dbh,self.ddfs)
-                ## Iterate over all the messages in this connection
-                for f in p.parse():
-                    if not f: continue
+            ## Create the VFS node:
+            path=self.fsfd.lookup(inode="S%s" % forward_stream)
+            path=os.path.dirname(path)
+            new_inode="%s|o%s" % (combined_inode,f)
 
-                    ## Create the VFS node:
-                    path=self.ddfs.lookup(inode="S%s" % forward_stream)
-                    path=os.path.dirname(path)
-                    new_inode="%s|o%s" % (combined_inode,f)
- 
-                    try:
-                        if 'chunked' in p.response['transfer-encoding']:
-                            new_inode += "|c0"
-                    except KeyError:
-                        pass
+            try:
+                if 'chunked' in p.response['transfer-encoding']:
+                    new_inode += "|c0"
+            except KeyError:
+                pass
 
-                    try:
-                        if 'gzip' in p.response['content-encoding']:
-                            new_inode += "|G1"
+            try:
+                if 'gzip' in p.response['content-encoding']:
+                    new_inode += "|G1"
 
-                    except KeyError:
-                        pass
-                           
-                    self.ddfs.VFSCreate(None,new_inode,"%s/HTTP/%s" % (path, escape(p.request['url'])))
+            except KeyError:
+                pass
 
-                    ## Store information about this request in the
-                    ## http table:
-                    host = p.request.get("host",IP2str(value))
-                    url = p.request.get("url")
-                    if not url.startswith("http://") or not url.startswith("ftp://"):
-                        url = "http://%s%s" % (host, url)
-                    self.dbh.execute("insert into http_%s set inode=%r, request_packet=%r, method=%r, url=%r, response_packet=%r, content_type=%r",(self.outer.table, new_inode, p.request.get("packet_id"), p.request.get("method"), url, p.response.get("packet_id"), p.response.get("content-type","text/html")))
-                    
-                    ## Scan the new file using the scanner train. 
-                    self.scan_as_file(new_inode)
+            self.fsfd.VFSCreate(None,new_inode,"%s/HTTP/%s" % (path, escape(p.request['url'])))
 
+            ## Store information about this request in the
+            ## http table:
+            host = p.request.get("host",IP2str(stream.dest_ip))
+            url = p.request.get("url")
+            if not url.startswith("http://") or not url.startswith("ftp://"):
+                url = "http://%s%s" % (host, url)
+            self.dbh.execute("insert into http_%s set inode=%r, request_packet=%r, method=%r, url=%r, response_packet=%r, content_type=%r",(self.table, new_inode, p.request.get("packet_id"), p.request.get("method"), url, p.response.get("packet_id"), p.response.get("content-type","text/html")))
+
+            ## Scan the new file using the scanner train. 
+            self.scan_as_file(new_inode, factories)
+        
 class BrowseHTTPRequests(Reports.report):
     """ This allows users to search the HTTP Requests that were loaded as part of the PCAP File system.
 
     This is the information we store about each http request:
-    
-    inode - the inode which represents the response to this request
-    request_packet - the packet id the request was sent in
-    method - method requested
-    url - the URL requested (This is the fully qualified url with host header included if present).
-    response_packet - the packet where the response was seen
-    content_type - The content type of the response to this request.
+
+    <ul>
+    <li><b>inode</b> - the inode which represents the response to this request</li>
+    <li><b>request_packet</b> - the packet id the request was sent in</li>
+    <li><b>method</b> - method requested</li>
+    <li><b>url</b> - the URL requested (This is the fully qualified url with host header included if present).</li>
+    <li><b>response_packet</b> - the packet where the response was seen</li>
+    <li><b>content_type</b> - The content type of the response to this request.</li>
+    </ul>
     """
     parameters = { 'fsimage':'fsimage' }
 

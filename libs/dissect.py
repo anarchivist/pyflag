@@ -20,18 +20,9 @@ class dissector:
     def __getitem__(self, item):
         return _dissect.get_field(self.d, item)
 
-    def fix_ports(self, proto):
-        ports = getattr(config,proto+"_PORTS")
-        try:
-            ports[0]
-        except:
-            ports=[ports]
-
-        return ports
-
     def is_protocol_to_server(self,proto):
         """ Check if the dest port is one of the ones we are looking for """
-        ports = self.fix_ports(proto)
+        ports = fix_ports(proto)
         try:
             if self['tcp.dest_port'] in ports:
                 return True
@@ -42,7 +33,7 @@ class dissector:
         
     def is_protocol(self, proto):
         """ Check if either the dest port or src port is one of the ones we are looking for """
-        ports = self.fix_ports(proto)
+        ports = fix_ports(proto)
         try:
             if (self['tcp.src_port'] in ports
                 or self['tcp.dest_port'] in ports):
@@ -51,3 +42,13 @@ class dissector:
             pass
         
         return False
+    
+def fix_ports(proto):
+    """ Retrieve the ports from the config as a list """
+    ports = getattr(config,proto+"_PORTS")
+    try:
+        ports[0]
+    except:
+        ports=[ports]
+
+    return ports

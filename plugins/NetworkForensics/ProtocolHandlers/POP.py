@@ -118,7 +118,7 @@ class POP:
             try:
                 self.dispatcher[command](args)
             except KeyError:
-                raise POPException("Command %r not implemented." % (command))
+                raise POPException("POP: Command %r not implemented." % (command))
 
         return line
 
@@ -150,47 +150,37 @@ class POPScanner(NetworkScanFactory):
     def reset(self):
         self.dbh.execute("delete from passwords_%s where type='POP3'",(self.table,))
 
-    class Scan(NetworkScanner):
-        def process(self,data,metadata=None):
-            NetworkScanner.process(self,data,metadata)
+    def process_stream(self, stream, factories):
+        forward_stream, reverse_stream = self.stream_to_server(stream, "POP3")
+        if not reverse_stream or not forward_stream: return
 
-            ## Is this a POP request?
-            if self.proto_tree.is_protocol_to_server("POP3"):
-                self.outer.pop_connections[metadata['inode']]=1
+        combined_inode = "S%s/%s" % (forward_stream,reverse_stream)
+        logging.log(logging.DEBUG,"Openning %s for POP3" % combined_inode)
 
-        def finish(self):
-            if not NetworkScanner.finish(self): return
-            
-            for key in self.outer.pop_connections.keys():
-                forward_stream = key[1:]
-                reverse_stream = find_reverse_stream(
-                    forward_stream,self.table,self.dbh)
-                
-                combined_inode = "S%s/%s" % (forward_stream,reverse_stream)
+        ## We open the file and scan it for emails:
+        fd = self.fsfd.open(inode=combined_inode)
+        p=POP(fd)
+        while 1:
+            try:
+                if not p.parse():
+                    break
+            except POPException,e:
+                logging.log(logging.DEBUG,"%s" % e)
 
-                ## We open the file and scan it for emails:
-                fd = self.ddfs.open(inode=combined_inode)
-                p=POP(fd)
-                while 1:
-                    try:
-                        if not p.parse():
-                            break
-                    except POPException,e:
-                        logging.log(logging.DEBUG,"%s" % e)
+        for f in p.files:
+            ## Add a new VFS node
+            path=self.fsfd.lookup(inode="S%s" % forward_stream)
+            path=os.path.dirname(path)
+            new_inode="%s|o%s" % (combined_inode,f[1])
+            self.fsfd.VFSCreate(None,new_inode,"%s/POP/Message_%s" % (path,f[0]))
 
-                for f in p.files:
-                    ## Add a new VFS node
-                    path=self.ddfs.lookup(inode="S%s" % forward_stream)
-                    path=os.path.dirname(path)
-                    new_inode="%s|o%s" % (combined_inode,f[1])
-                    self.ddfs.VFSCreate(None,new_inode,"%s/POP/Message_%s" % (path,f[0]))
+            ## Scan the new file using the scanner train. If
+            ## the user chose the RFC2822 scanner, we will be
+            ## able to understand this:
+            self.scan_as_file(new_inode, factories)
 
-                    ## Scan the new file using the scanner train. If
-                    ## the user chose the RFC2822 scanner, we will be
-                    ## able to understand this:
-                    self.scan_as_file(new_inode)
+        ## If there is any authentication information in here,
+        ## we save it for Ron:
+        if p.username and p.password:
+            self.dbh.execute("insert into passwords_%s set inode='S%s',username=%r,password=%r,type='POP3'",(self.table,forward_stream,p.username,p.password))
 
-                ## If there is any authentication information in here,
-                ## we save it for Ron:
-                if p.username and p.password:
-                    self.dbh.execute("insert into passwords_%s set inode=%r,username=%r,password=%r,type='POP3'",(self.table,key,p.username,p.password))

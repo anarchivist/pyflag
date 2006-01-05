@@ -97,3 +97,7 @@ SMTP_Ports = 25
 POP3_Ports = 110
 IRC_Ports = 6667
 MSN_Ports = 1863
+
+## Maximum age (in packets) for a session before it will be considered
+## terminated.
+MAX_SESSION_AGE = 100

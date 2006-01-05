@@ -32,6 +32,38 @@ import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
 import struct,re
 
+class Stream:
+    """ This class represents a single stream """
+    con_id = 0
+    def __init__(self, isn, src_ip, src_port, dest_ip, dest_port, direction="forward"):
+        ## The list of packets which make up the stream.
+        self.packets = []
+        self.seq = []
+        self.length = []
+        self.packet_offset = []
+
+        ## Properties of the stream itself
+        self.isn = isn
+        self.src_ip = src_ip
+        self.src_port = src_port
+        self.dest_ip = dest_ip
+        self.dest_port = dest_port
+        self.max_id = 0
+        self.direction= direction
+        self.con_id+=1
+
+    def add_packet(self, packet_id, seq, length, packet_offset):
+        self.packets.append(packet_id)
+        self.seq.append(seq)
+        self.length.append(length)
+        self.packet_offset.append(packet_offset)
+        self.max_id = packet_id
+
+    def __str__(self):
+        return "Con id %s, from %s:%s to %s:%s has packets %s" % (
+            self.con_id, IP2str(self.src_ip), self.src_port,
+            IP2str(self.dest_ip), self.dest_port, self.packets)
+
 class StreamReassembler(NetworkScanFactory):
     """ This scanner reassembles the packets into the streams.
 
@@ -81,8 +113,58 @@ class StreamReassembler(NetworkScanFactory):
         self.dbh.execute("drop table connection_%s",(self.table,))
         self.dbh.execute("drop table connection_details_%s",(self.table,))
 
+    def process_stream(self, stream, factories):
+        """ This will be called to store the stream information in the
+        database. It gets called whenever we detect that a stream is
+        finished.
+        """
+        self.dbh.execute("insert into connection_details_%s set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r ",(
+            self.table, stream.src_ip,stream.src_port,
+            stream.dest_ip,stream.dest_port,
+            stream.isn))
+
+        stream.con_id=self.dbh.autoincrement()
+
+        if stream.direction == "forward":
+            self.fsfd.VFSCreate(None,"S%s" % (stream.con_id) ,
+                                "%s-%s/%s:%s/%s" % (IP2str(stream.dest_ip),
+                                                    IP2str(stream.src_ip),
+                                                    stream.dest_port,
+                                                    stream.src_port,
+                                                    stream.direction)
+                                )
+        else:
+            self.fsfd.VFSCreate(None,"S%s" % (stream.con_id) ,
+                                "%s-%s/%s:%s/%s" % (IP2str(stream.src_ip),
+                                                    IP2str(stream.dest_ip),
+                                                    stream.src_port,
+                                                    stream.dest_port,
+                                                    stream.direction)
+                                )            
+            
+        ## Now store the packets:
+        for packet_id, seq, length, packet_offset in zip(stream.packets,
+                                                         stream.seq,
+                                                         stream.length,
+                                                         stream.packet_offset):
+            self.dbh.execute("insert into connection_%s set con_id=%r,packet_id=%r,seq=%r,length=%r, packet_offset=%r",
+                             (self.table,
+                              stream.con_id,
+                              packet_id,
+                              seq,
+                              length,
+                              packet_offset))
+
     class Scan(NetworkScanner):
         """ Each packet will cause a new instantiation of this class. """
+        def process_stream(self, stream):
+            """ Calls all of the factory classes with the stream
+            object to allow them to process the completed stream.
+            """
+            for factory in self.factories:
+                if isinstance(factory, NetworkScanFactory):
+                    factory.process_stream(stream, self.factories)
+                
         def process(self,data, metadata=None):
             """ We get a complete packet in data.
 
@@ -107,65 +189,80 @@ class StreamReassembler(NetworkScanFactory):
             ## The following tests the cache for both forward or
             ## reverse connections, creating them if needed.
             try:
-                con_id,isn = self.outer.connection_cache[forward_key]
+                stream = self.outer.connection_cache[forward_key]
             except KeyError:
                 #We dont have the forward connection, maybe we have
                 #the reverse?
                 try:
                     reverse_key = struct.pack("IIII",ipdest,ipsrc,tcpdestport,tcpsrcport)
-                    con_id,isn = self.outer.connection_cache[reverse_key]
+                    stream = self.outer.connection_cache[reverse_key]
 
                     ## Create the current connection for this one:
                     isn = self.proto_tree['tcp.seq']+1
 
-                    self.dbh.execute("insert into connection_details_%s set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r ",(
-                        self.table, ipsrc,tcpsrcport,
-                        ipdest,tcpdestport,
-                        isn))
-                    
-                    ## Create a New VFS directory structure for this connection:
-                    con_id=self.dbh.autoincrement()
-                    self.ddfs.VFSCreate(None,"S%s" % (con_id) , "%s-%s/%s:%s/reverse" % (IP2str(ipdest),IP2str(ipsrc),tcpdestport, tcpsrcport))
+                    ## Create a stream class:
+                    stream = Stream(isn, ipsrc, tcpsrcport, ipdest, tcpdestport, direction = "reverse")
+                                        
                     ## Cache it:
-                    self.outer.connection_cache[forward_key]=(con_id,isn)
+                    self.outer.connection_cache[forward_key]=stream
                     
                 except KeyError:
                     ## Nope - we dont have that either, we need to
                     ## create a new node for the forward stream:
                     
                     isn = self.proto_tree['tcp.seq']+1
-                    self.dbh.execute("insert into connection_details_%s set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r",(
-                        self.table,
-                        ipsrc,tcpsrcport, ipdest, tcpdestport,
-                        isn))
 
-                    ## Create a New VFS directory structure for this connection:
-                    con_id=self.dbh.autoincrement()
-                    self.ddfs.VFSCreate(None,"S%s" % (con_id) , "%s-%s/%s:%s/forward" % (IP2str(ipsrc),IP2str(ipdest),tcpsrcport, tcpdestport))
-                    
+                    ## Create a stream:
+                    stream = Stream(isn, ipsrc, tcpsrcport, ipdest, tcpdestport, direction="forward")
+
                     ## Cache it:
-                    self.outer.connection_cache[forward_key]=(con_id,isn)
+                    self.outer.connection_cache[forward_key]=stream
 
                     ## END CREATE FORWARD STREAM
                     
-            ## Now insert into connection table:
             packet_id = self.fd.tell()-1
             seq = self.proto_tree['tcp.seq']
             length = self.proto_tree['tcp.data_len']
             
-            self.dbh.execute("insert into connection_%s set con_id=%r,packet_id=%r,seq=%r,length=%r, packet_offset=%r",(self.table,con_id,packet_id,seq,length, packet_offset))
+            ## Add this packet to the stream
+            stream.add_packet(packet_id, seq, length,packet_offset)
 
             ## Signal this inode to our clients
-            metadata['inode']= "S%s" % con_id
+            metadata['inode']= "S%s" % stream.con_id
 
             ## Note this connection's ISN to our clients
-            metadata['isn']=isn
+#            metadata['isn']=stream.isn
 
             ## Note the offset of this packet in the stream:
-            metadata['stream_offset'] = seq-isn
+#            metadata['stream_offset'] = seq-isn
+
+            ## Now check to see if the stream is ended:
+            flags = self.proto_tree['tcp.flags']
+
+            ## Expire sessions which are too old.
+            for key,s in self.outer.connection_cache.items():
+                if s.max_id + config.MAX_SESSION_AGE < packet_id:
+#                    print "Stream is older than %s packets past %s - teminating\n %s" % (config.MAX_SESSION_AGE, packet_id, s)
+                    self.process_stream(s)
+                    del self.outer.connection_cache[key]
+
+            ## If a session has fin/rst it has ended
+##            if flags & 5:
+##                print "Stream flags are %s - teminating\n" % (flags)
+
+##                self.process_stream(stream)
+##                del self.outer.connection_cache[forward_key]
 
         def finish(self):
             if not NetworkScanner.finish(self): return
+
+            ## Now go through and process all the left over streams
+            ## (close them all):
+            for stream in self.outer.connection_cache.values():
+#                print "Finalising stream %s" % stream
+                self.process_stream(stream)
+
+            self.outer.connection_cache = {}
             
             self.dbh.check_index("connection_%s" % self.table, 'con_id')
             ## Ensure that the connection_details table has indexes. We

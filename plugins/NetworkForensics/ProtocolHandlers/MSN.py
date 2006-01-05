@@ -331,30 +331,19 @@ class MSNScanner(NetworkScanFactory):
             
         self.msn_connections = {}
 
-    class Scan(NetworkScanner):
-        def process(self,data,metadata=None):
-            NetworkScanner.process(self,data,metadata)
-            
-            ## Is this an MSN packet bound to the server?
-            try:
-                if self.proto_tree.is_protocol("MSN"):
-                    self.outer.msn_connections[metadata['inode']]=1
-            except KeyError:
-                pass
+    def process_stream(self, stream, factories):
+        forward_stream, reverse_stream = self.stream_to_server(stream, "MSN")
+        if not forward_stream: return
 
-        def finish(self):
-            if not NetworkScanner.finish(self): return
-            
-            for key in self.outer.msn_connections.keys():
-                ## First parse the forward stream
-                fd = self.ddfs.open(inode=key)
-                m=message(self.dbh,self.table,fd,self.ddfs)
-                while 1:
-                    try:
-                        result=m.parse()
-                    except IOError:
-                        break
-                    
+        logging.log(logging.DEBUG,"Openning S%s for MSN" % forward_stream)
+
+        fd = self.fsfd.open(inode="S%s" % forward_stream)
+        m=message(self.dbh,self.table,fd,self.fsfd)
+        while 1:
+            try:
+                result=m.parse()
+            except IOError:
+                break                    
                 
 class MSNFile(CachedFile):
     """ VFS driver for reading the cached MSN files """

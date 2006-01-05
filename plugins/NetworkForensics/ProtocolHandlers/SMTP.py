@@ -138,42 +138,28 @@ class SMTPScanner(NetworkScanFactory):
         ## this via its config file.
         self.smtp_connections = {}
 
-    class Scan(NetworkScanner):
-        def process(self,data,metadata=None):
-            NetworkScanner.process(self,data,metadata)
+    def process_stream(self, stream, factories):
+        forward_stream, reverse_stream = self.stream_to_server(stream, "SMTP")
+        if not reverse_stream or not forward_stream: return
+
+        combined_inode = "S%s/%s" % (forward_stream, reverse_stream)
+        logging.log(logging.DEBUG,"Openning %s for SMTP" % combined_inode)
+
+        ## We open the file and scan it for emails:
+        fd = self.fsfd.open(inode=combined_inode)
+        p=SMTP(fd,self.dbh,self.fsfd)
+        
+        ## Iterate over all the messages in this connection
+        for f in p.parse():
+            if not f: continue
             
-            ## Is this an SMTP request?
-            if self.proto_tree.is_protocol_to_server("SMTP"):
-                self.outer.smtp_connections[metadata['inode']]=1
-
-        def finish(self):
-            if not NetworkScanner.finish(self): return
+            ## Create the VFS node:
+            path=self.fsfd.lookup(inode="S%s" % forward_stream)
+            path=os.path.dirname(path)
+            new_inode="%s|o%s" % (combined_inode,f[1])
+            self.fsfd.VFSCreate(None,new_inode,"%s/SMTP/Message_%s" % (path,f[0]))
             
-            for key in self.outer.smtp_connections.keys():
-                forward_stream = key[1:]
-                reverse_stream = find_reverse_stream(
-                    forward_stream,self.table,self.dbh)
-                
-                combined_inode = "S%s/%s" % (forward_stream,reverse_stream)
-
-                logging.log(logging.DEBUG,"Openning %s for SMTP" % combined_inode)
-                ## We open the file and scan it for emails:
-                fd = self.ddfs.open(inode=combined_inode)
-                p=SMTP(fd,self.dbh,self.ddfs)
-
-                ## Iterate over all the messages in this connection
-                for f in p.parse():
-                    if not f: continue
-
-                    ## Create the VFS node:
-                    path=self.ddfs.lookup(inode="S%s" % forward_stream)
-                    path=os.path.dirname(path)
-                    new_inode="%s|o%s" % (combined_inode,f[1])
-                    self.ddfs.VFSCreate(None,new_inode,"%s/SMTP/Message_%s" % (path,f[0]))
-                    
-                    ## Scan the new file using the scanner train. If
-                    ## the user chose the RFC2822 scanner, we will be
-                    ## able to understand this:
-                    self.scan_as_file(new_inode)
-
-
+            ## Scan the new file using the scanner train. If
+            ## the user chose the RFC2822 scanner, we will be
+            ## able to understand this:
+            self.scan_as_file(new_inode, factories)

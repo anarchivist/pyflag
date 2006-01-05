@@ -43,7 +43,33 @@
     t->super.Write((Packet)t, output);
 
 ****************************************/
-
+/******************************************************
+# Copyright 2004: Commonwealth of Australia.
+#
+# Developed by the Computer Network Vulnerability Team,
+# Information Security Group.
+# Department of Defence.
+#
+# Michael Cohen <scudette@users.sourceforge.net>
+#
+# ******************************************************
+#  Version: FLAG  $Version: 0.78 Date: Fri Aug 19 00:47:14 EST 2005$
+# ******************************************************
+#
+# * This program is free software; you can redistribute it and/or
+# * modify it under the terms of the GNU General Public License
+# * as published by the Free Software Foundation; either version 2
+# * of the License, or (at your option) any later version.
+# *
+# * This program is distributed in the hope that it will be useful,
+# * but WITHOUT ANY WARRANTY; without even the implied warranty of
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# * GNU General Public License for more details.
+# *
+# * You should have received a copy of the GNU General Public License
+# * along with this program; if not, write to the Free Software
+# * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# ******************************************************/
 #ifndef __PACKET_H
 #define __PACKET_H
 
@@ -158,7 +184,7 @@ END_CLASS
   list_add_tail(&(p->list), &((Packet)this)->properties.list);		\
   } while(0)
 
-/** This macro enables access to a struct member by name - size if
+/** This macro enables access to a struct member by name - size is
     filled automatically from the size of the member
 */
 #define NAME_ACCESS(struct_member_name, member, type)	\
@@ -166,7 +192,11 @@ END_CLASS
   p->size = sizeof(this->struct_member_name.member);			\
   __NAME_ACCESS_end(struct_member_name, member, type);		  
 
-/** Here we explicitly fill in the size pointer */
+/** Here we explicitly fill in the size pointer. The size_p is a
+    reference to the member (int) of the struct which contains the
+    size (relative to the begining of the struct). It will get
+    dereferenced once the struct is parsed properly.
+ */
 #define NAME_ACCESS_SIZE(struct_member_name, member, type, size_member)	\
   __NAME_ACCESS_start(struct_member_name, member, type);		\
   p->size_p = (int)(&((typeof(this->struct_member_name) *)0)->size_member); \
