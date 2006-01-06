@@ -53,6 +53,9 @@ struct packet_data_t {
 
 static struct packet_data_t buffer[MAX_BUFF_SIZE+1];
 static int buffer_count=0;
+long unsigned int packet_id = 0;
+pcap_t *pfh;
+char *tableName = NULL;
 
 void print_buffer(char *tableName) {
   int i;
@@ -75,20 +78,34 @@ void printUsage() {
   printf ("-c: create new tables before insertion\n\n");
 }
 
+
+void handler(u_char *data, const struct pcap_pkthdr *header, 
+	     const u_char *user_data) {
+  FILE *fp = pcap_file(pfh);
+  int data_offset = ftell(fp);
+  int pkt_encap = pcap_datalink(pfh);
+  
+  buffer[buffer_count].packet_id = packet_id;
+  buffer[buffer_count].data_offset=data_offset - (int) header->caplen;
+  buffer[buffer_count].caplen = (int) header->caplen;
+  buffer[buffer_count].sec = (long unsigned int)header->ts.tv_sec;
+  buffer[buffer_count].usec= (long unsigned int)header->ts.tv_usec;
+  buffer[buffer_count].encap= pkt_encap;
+  buffer_count++;
+  
+  if(buffer_count>=MAX_BUFF_SIZE) {
+    print_buffer(tableName);
+    buffer_count=0;
+  };
+  packet_id++;
+};
+
 int main(int argc, char **argv) {
-  pcap_t *pfh;
-  struct pcap_pkthdr *header;
-  u_char *data;
   char err_info[PCAP_ERRBUF_SIZE];
   char *fname=NULL;
-  FILE *fp;
-  long unsigned int data_offset;
-  long unsigned int packet_id = 0;
   int file_id = 0;
   int createNewTable = 0;
-  char *tableName = NULL;
   int index, c;
-  int pkt_encap;
 
   while ((c = getopt (argc, argv, "t:c")) != -1) {
     switch(c) {
@@ -131,33 +148,12 @@ int main(int argc, char **argv) {
     fname = argv[index];
     pfh = pcap_open_offline(fname, err_info);
     
-    if (pfh == NULL)
-      printf("Problem opening %s: %s\n", fname, err_info);
-    else {
-      fp = pcap_file(pfh);
-      pkt_encap = pcap_datalink(pfh);
-
-      while(1) {
-	data_offset = ftell(fp)+sizeof(*header);
-
-	if(pcap_next_ex(pfh, &header, (const u_char **)&data)<0) {
-	  break;
-	};
-
-	buffer[buffer_count].packet_id = packet_id;
-	buffer[buffer_count].data_offset=data_offset;
-	buffer[buffer_count].caplen = (int) header->caplen;
-	buffer[buffer_count].sec = (long unsigned int)header->ts.tv_sec;
-	buffer[buffer_count].usec= (long unsigned int)header->ts.tv_usec;
-	buffer[buffer_count].encap= pkt_encap;
-	buffer_count++;
-
-	if(buffer_count>=MAX_BUFF_SIZE) {
-	  print_buffer(tableName);
-	  buffer_count=0;
-	};
-        packet_id++;
-      }
+    if (pfh == NULL) {
+      fprintf(stderr,"Unable to open %s as a pcap file: %s. Quitting\n", 
+	      fname, err_info);
+      exit(-1);
+    } else {
+      pcap_dispatch(pfh, -1, handler, NULL);
 
       //Get the left over packets in the buffer
       if(buffer_count>0)
