@@ -9,7 +9,6 @@ http://www.hypothetic.org/docs/msn/notification/authentication.php
 # Michael Cohen <scudette@users.sourceforge.net>
 # Gavin Jackson <gavz@users.sourceforge.net>
 #
-# GJ: Added recipient column to table
 #
 # ******************************************************
 #  Version: FLAG $Version: 0.78 Date: Fri Aug 19 00:47:14 EST 2005$
@@ -332,18 +331,17 @@ class MSNScanner(NetworkScanFactory):
         self.msn_connections = {}
 
     def process_stream(self, stream, factories):
-        forward_stream, reverse_stream = self.stream_to_server(stream, "MSN")
-        if not forward_stream: return
+        ports = dissect.fix_ports("MSN")
+        if stream.src_port in ports or stream.dest_port in ports:
+            logging.log(logging.DEBUG,"Openning S%s for MSN" % stream.con_id)
 
-        logging.log(logging.DEBUG,"Openning S%s for MSN" % forward_stream)
-
-        fd = self.fsfd.open(inode="S%s" % forward_stream)
-        m=message(self.dbh,self.table,fd,self.fsfd)
-        while 1:
-            try:
-                result=m.parse()
-            except IOError:
-                break                    
+            fd = self.fsfd.open(inode="S%s" % stream.con_id)
+            m=message(self.dbh,self.table,fd,self.fsfd)
+            while 1:
+                try:
+                    result=m.parse()
+                except IOError:
+                    break                    
                 
 class MSNFile(CachedFile):
     """ VFS driver for reading the cached MSN files """

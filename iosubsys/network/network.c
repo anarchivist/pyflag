@@ -91,8 +91,11 @@ int Cooked_Read(Packet self, StringIO input) {
     break;
 
   default:
+#ifdef __VERBOSE_DEBUG__
     DEBUG("Unknown ethernet payload type 0x%x.\n", 
 	  this->packet.type);
+#endif
+    break;
   };
 
   return len;
@@ -130,8 +133,11 @@ int Eth2_Read(Packet self, StringIO input) {
     break;
 
   default:
+#ifdef __VERBOSE_DEBUG__
     DEBUG("Unknown ethernet payload type 0x%x.\n", 
 	  this->packet.type);
+#endif
+    break;
   };
 
   return len;
@@ -169,8 +175,10 @@ int IP_Read(Packet self, StringIO input) {
     break;
     
   default:
+#ifdef __VERBOSE_DEBUG__
     DEBUG("Unknown IP payload type 0x%x.\n", 
 	  this->packet.protocol);
+#endif
     return len;
   };
 

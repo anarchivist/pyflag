@@ -227,31 +227,16 @@ class StreamReassembler(NetworkScanFactory):
             ## Add this packet to the stream
             stream.add_packet(packet_id, seq, length,packet_offset)
 
-            ## Signal this inode to our clients
-            metadata['inode']= "S%s" % stream.con_id
-
-            ## Note this connection's ISN to our clients
-#            metadata['isn']=stream.isn
-
-            ## Note the offset of this packet in the stream:
-#            metadata['stream_offset'] = seq-isn
-
-            ## Now check to see if the stream is ended:
-            flags = self.proto_tree['tcp.flags']
-
             ## Expire sessions which are too old.
             for key,s in self.outer.connection_cache.items():
                 if s.max_id + config.MAX_SESSION_AGE < packet_id:
-#                    print "Stream is older than %s packets past %s - teminating\n %s" % (config.MAX_SESSION_AGE, packet_id, s)
                     self.process_stream(s)
                     del self.outer.connection_cache[key]
 
-            ## If a session has fin/rst it has ended
-##            if flags & 5:
-##                print "Stream flags are %s - teminating\n" % (flags)
-
-##                self.process_stream(stream)
-##                del self.outer.connection_cache[forward_key]
+            ## Note that we can not use fin/rst flags this since it is
+            ## legal to have packets exchanged even after fin/rst
+            ## which still belong to the present session (e.g. acks
+            ## etc).
 
         def finish(self):
             if not NetworkScanner.finish(self): return
@@ -259,12 +244,12 @@ class StreamReassembler(NetworkScanFactory):
             ## Now go through and process all the left over streams
             ## (close them all):
             for stream in self.outer.connection_cache.values():
-#                print "Finalising stream %s" % stream
                 self.process_stream(stream)
 
             self.outer.connection_cache = {}
             
             self.dbh.check_index("connection_%s" % self.table, 'con_id')
+            
             ## Ensure that the connection_details table has indexes. We
             ## need the indexes because we are about to do lots of selects
             ## on this table.
