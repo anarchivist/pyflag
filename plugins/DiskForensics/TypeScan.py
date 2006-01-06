@@ -109,16 +109,6 @@ class ViewFileTypes(Reports.report):
     def display(self,query,result):
         io = IO.open(query['case'],query['fsimage'])
         fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"], query["fsimage"], io)
-
-        def view_icon(inode):
-            tmp = result.__class__(result)
-            tmp.link( 'View File Details', target = 
-                      FlagFramework.query_type((), case=query['case'],
-                        fsimage=query['fsimage'], inode=inode,
-                        family = "Disk Forensics", report = "ViewFile"),
-                      tooltip=inode, icon="examine.png",
-                      )
-            return tmp
         
         def thumbnail_cb(inode):
             fd = fsfd.open(inode=inode)
@@ -128,17 +118,24 @@ class ViewFileTypes(Reports.report):
                 tmp.image(image,width=image.width,height=image.height)
             else:
                 tmp.image(image,width=image.width)
-                
-            return tmp
+
+            tmp2 = result.__class__(result)
+            tmp2.link( tmp, target = 
+                       FlagFramework.query_type((), case=query['case'],
+                       fsimage=query['fsimage'], inode=inode,
+                       family = "Disk Forensics", report = "ViewFile"),
+                       tooltip=inode, border=0
+                       )
+            
+            return tmp2
 
         try:
             result.table(
-                columns = ['a.inode','a.inode','concat(path,name)','type'],
-                names = [ 'Thumbnail','View', 'Filename', 'Type'],
-                table = 'file_%s as a, type_%s as b ' % (query['fsimage'],query['fsimage']),
-                where = ' a.inode=b.inode and mode like "r%" ',
+                columns = ['a.inode','concat(path,name)','type', 'from_unixtime(c.mtime)'],
+                names = [ 'Thumbnail', 'Filename', 'Type', 'Time stamp'],
+                table = 'file_%s as a, type_%s as b, inode_%s as c' % (query['fsimage'],query['fsimage'],query['fsimage']),
+                where = 'b.inode=c.inode and a.inode=b.inode and a.mode like "r%" ',
                 callbacks  = { 'Thumbnail': thumbnail_cb,
-                               'View': view_icon
                                },
                 case = query['case']
                 )

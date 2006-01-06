@@ -144,6 +144,7 @@ class PCAPFile(File):
         self.fd.seek(row['offset'])
 
         self.link_type = row['link_type']
+        self.ts_sec = row['ts_sec']
         self.readptr+=1
         
         if length<row['length']:

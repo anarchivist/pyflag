@@ -210,7 +210,10 @@ class HTTPScanner(NetworkScanFactory):
             except KeyError:
                 pass
 
-            self.fsfd.VFSCreate(None,new_inode,"%s/HTTP/%s" % (path, escape(p.request['url'])))
+            self.fsfd.VFSCreate(None,new_inode,
+                                "%s/HTTP/%s" % (path, escape(p.request['url'])),
+                                mtime=stream.ts_sec
+                                )
 
             ## Store information about this request in the
             ## http table:

@@ -157,7 +157,10 @@ class SMTPScanner(NetworkScanFactory):
             path=self.fsfd.lookup(inode="S%s" % forward_stream)
             path=os.path.dirname(path)
             new_inode="%s|o%s" % (combined_inode,f[1])
-            self.fsfd.VFSCreate(None,new_inode,"%s/SMTP/Message_%s" % (path,f[0]))
+            self.fsfd.VFSCreate(None,new_inode,
+                                "%s/SMTP/Message_%s" % (path,f[0]),
+                                mtime = stream.ts_sec
+                                )
             
             ## Scan the new file using the scanner train. If
             ## the user chose the RFC2822 scanner, we will be

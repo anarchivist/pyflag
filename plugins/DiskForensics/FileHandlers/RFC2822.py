@@ -102,7 +102,9 @@ class RFC2822(Scanner.GenScanFactory):
                     if not filename: filename="Attachment %s" % count
 
                     ## Create the VFS node:
-                    self.ddfs.VFSCreate(self.inode,"m%s" % count, filename)
+                    self.ddfs.VFSCreate(self.inode,"m%s" % count, filename,
+                                        mtime = time.mktime(date)
+                                        )
 
                     ## Now call the scanners on new file:
                     new_inode = "%s|m%s" % (self.inode,count)

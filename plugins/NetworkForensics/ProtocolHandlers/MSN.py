@@ -231,10 +231,15 @@ class message:
                     ## just make a filename off its printables.
                     filename = ''.join([ a for a in context if a in allowed_file_chars ])
                     size=0
+
+                try:
+                    mtime = self.fd.ts_sec
+                except:
+                    mtime = 0
                 
                 ## The filename and size is given in the context
                 self.ddfs.VFSCreate(None,new_inode, "%s/MSN/%s" %
-                                    (path,filename) ,
+                                    (path,filename) , mtime=mtime,
                                     size=size)
 
         ## We have a real channel id so this is an actual file:

@@ -131,7 +131,8 @@ class StreamReassembler(NetworkScanFactory):
                                                     IP2str(stream.src_ip),
                                                     stream.dest_port,
                                                     stream.src_port,
-                                                    stream.direction)
+                                                    stream.direction),
+                                mtime = stream.ts_sec
                                 )
         else:
             self.fsfd.VFSCreate(None,"S%s" % (stream.con_id) ,
@@ -139,7 +140,8 @@ class StreamReassembler(NetworkScanFactory):
                                                     IP2str(stream.dest_ip),
                                                     stream.src_port,
                                                     stream.dest_port,
-                                                    stream.direction)
+                                                    stream.direction),
+                                mtime = stream.ts_sec
                                 )            
             
         ## Now store the packets:
@@ -202,7 +204,8 @@ class StreamReassembler(NetworkScanFactory):
 
                     ## Create a stream class:
                     stream = Stream(isn, ipsrc, tcpsrcport, ipdest, tcpdestport, direction = "reverse")
-                                        
+                    stream.ts_sec = self.fd.ts_sec
+                    
                     ## Cache it:
                     self.outer.connection_cache[forward_key]=stream
                     
@@ -214,6 +217,7 @@ class StreamReassembler(NetworkScanFactory):
 
                     ## Create a stream:
                     stream = Stream(isn, ipsrc, tcpsrcport, ipdest, tcpdestport, direction="forward")
+                    stream.ts_sec = self.fd.ts_sec
 
                     ## Cache it:
                     self.outer.connection_cache[forward_key]=stream
