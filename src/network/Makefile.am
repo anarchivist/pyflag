@@ -1,3 +1,4 @@
+pkgpython_PYTHON 	= dissect.py
 pkgpyexec_LTLIBRARIES 	= _dissect.la
 
 _dissect_la_SOURCES 	= dissect.c network.c
