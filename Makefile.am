@@ -1,19 +1,27 @@
 SUBDIRS = src
 
-# main pyflag (python) application
-# not sure how to do this recursively
-# might just have to maintain this list
-pkgpython_PYTHON	= 	pyflag/*.py \
-				pyflag/FileFormats/*.py
-
-nobase_pkgpython_PYTHON = 	plugins/*.py \
-				plugins/Flash/*.py \
-				plugins/NetworkForensics/*.py \
-				plugins/NetworkForensics/ProtocolHandlers/*.py \
-				plugins/LogAnalysis/*.py \
-				plugins/DiskForensics/*.py \
-				plugins/DiskForensics/FileHandlers/*.py \
-				plugins/DiskForensics/FileSystems/*.py \
-				plugins/Themes/*.py
-
+bin_PROGRAMS		=	pyflag
+sysconf_DATA		=	pyflagrc
 nobase_pkgdata_DATA	=	images/*
+
+# perform subs in scripts and config files
+edit = sed \
+	-e 's,@datadir\@,$(pkgdatadir),g' \
+	-e 's,@sysconf\@,$(sysconfdir),g' \
+	-e 's,@pkgpyexec\@,$(pkgpyexecdir),g' \
+	-e 's,@prefix\@,$(prefix),g' \
+	-e 's,@bin\@,$(bindir),g' \
+	-e 's,@ploticus\@,@PLOTICUS@,g' \
+	-e 's,@mysql\@,@MYSQL@,g' \
+	-e 's,@python\@,$(PYTHON),g'
+
+pyflagrc: Makefile $(top_srcdir)/pyflagrc.in
+	rm -f pyflagrc pyflagrc.tmp
+	$(edit) $(top_srcdir)/pyflagrc.in >pyflagrc.tmp
+	mv pyflagrc.tmp pyflagrc
+
+pyflag: Makefile $(top_srcdir)/pyflag.in
+	rm -f pyflag pyflag.tmp
+	$(edit) $(top_srcdir)/pyflag.in >pyflag.tmp
+	chmod +x pyflag.tmp
+	mv pyflag.tmp pyflag

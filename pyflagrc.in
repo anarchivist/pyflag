@@ -1,0 +1,87 @@
+# This is the global site wide configuration file for pyflag. 
+
+# Database settings
+# These are left blank and will be prompted for and
+# saved into users ~/.pyflagrc
+PYFLAG_DBUSER=
+PYFLAG_DBPASSWD=
+PYFLAG_DBHOST=
+PYFLAG_DBPORT=
+PYFLAG_UNIXSOCKET= 
+
+#Default flag database
+PYFLAG_FLAGDB=pyflag
+
+# Paths
+
+# Flag can only read and write to these directories
+# over-riden by users
+PYFLAG_UPLOADDIR=
+PYFLAG_RESULTDIR=
+
+# icons etc go here
+PYFLAG_IMAGEDIR=@datadir@/images/
+
+# Path to read flag plugins from
+PYFLAG_PLUGINS=@pkgpyexec@/plugins
+
+# Paths to some required binaries
+PYFLAG_MYSQL_BIN=@mysql@
+PYFLAG_PLOTICUS=@ploticus@
+
+# Path for pyflag binaries
+PYFLAG_FLAG_BIN=@bin@
+
+#Location to the magic file for use
+PYFLAG_MAGICFILE=@datadir@/magic
+PYFLAG_MIMEMAGICFILE=@datadir@/magic.mime
+
+#Sleuthkit binary:
+sleuthkit=@bin@/dbtool
+
+#Wrapper hooker:
+iowrapper=@bin@/iowrapper
+
+# GUI stuff
+# Period we wait before refreshing the display when waiting for analysis to complete
+PYFLAG_REFRESH=3
+# This forces the HTTP GUI to use GET or POST
+PYFLAG_METHOD=POST
+
+PYFLAG_HILIGHT=pink
+PYFLAG_SELECTED=\#FFCC99
+PYFLAG_BGCOLOR=white
+PYFLAG_BGCOLOR1=\#e0e0e0
+PYFLAG_PAGESIZE=50
+PYFLAG_WRAP=80
+PYFLAG_MAXTREESIZE=13
+
+#This selects the output format, currently supported png,svg
+PYFLAG_GRAPHFORMAT=png
+
+#Maximum size of hex dump
+PYFLAG_MAX_DATA_DUMP_SIZE=2048
+
+# This can be BlueTheme or BasicTheme at the moment
+PYFLAG_THEME=Menu
+
+PYFLAG_LOG_LEVEL=10
+
+# If you require HTTP authentication add more tokens to this comma
+# seperated list of username:passwords - Or override in ~/.pyflagrc
+# authorise = mic:password, joe:letmein
+
+## This section configures the network scanners. Many of these setting
+## influence which streams will get dissected as a certain
+## protocol. If you have a capture which uses a common protocol on a
+## non-standard port, you may add this here.
+
+PYFLAG_HTTP_PORTS=80,8000,8080
+PYFLAG_SMTP_PORTS=25
+PYFLAG_POP3_PORTS=110
+PYFLAG_IRC_PORTS=6667
+PYFLAG_MSN_PORTS=1863
+
+## Maximum age (in packets) for a session before it will be considered
+## terminated.
+PYFLAG_MAX_SESSION_AGE=100

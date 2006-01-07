@@ -61,7 +61,7 @@ class ConfObject:
     def __init__(self):
         for k,v in os.environ.items():
             if k==k.upper():
-                ConfObject.__dict__[k.upper()]=v
+                ConfObject.__dict__[k.upper()[len('PYFLAG_'):]]=v
                 
 ##    def __init__(self):
 ##        """ Collect parameters from all sections into a single dict.

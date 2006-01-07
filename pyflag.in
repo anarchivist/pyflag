@@ -1,0 +1,7 @@
+#!/bin/bash
+
+. @sysconf@/pyflagrc
+
+declare -x `set | grep PYFLAG_`
+
+exec @python@ @pkgpyexec@/FlagHTTPServer.py

@@ -102,12 +102,12 @@ class DBPool:
         case=self.case
         try:
             #Try to connect over TCP
-            dbh = MySQLdb.Connect(user = config.USER, passwd = config.PASSWD,db = case, host=config.HOST, port=config.PORT)
+            dbh = MySQLdb.Connect(user = config.DBUSER, passwd = config.DBPASSWD,db = case, host=config.DBHOST, port=config.DBPORT)
             self.mysql_bin_string = "%s -f -u %r -p%r -h%s -P%s" % (config.MYSQL_BIN,config.USER,config.PASSWD,config.HOST,config.PORT)
         except Exception,e:
             #or maybe over the socket?
-            dbh = MySQLdb.Connect(user = config.USER, passwd = config.PASSWD,db = case, unix_socket = config.UNIX_SOCKET)
-            self.mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.USER,config.PASSWD,config.UNIX_SOCKET)
+            dbh = MySQLdb.Connect(user = config.DBUSER, passwd = config.DBPASSWD,db = case, unix_socket = config.DBUNIXSOCKET)
+            self.mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBUNIXSOCKET)
 
         return dbh
 

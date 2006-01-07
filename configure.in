@@ -1,27 +1,38 @@
+# basics
 AC_INIT(flag.sh)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE(pyflag, 0.80)
 
+# check standard stuff
 AC_PROG_LIBTOOL
 AC_PROG_CC
 
+# check headers
 AC_CHECK_HEADER(zlib.h,,AC_MSG_ERROR([You Must install zlib-dev to build pyflag]))
 AC_CHECK_HEADER(pcap.h,,AC_MSG_ERROR([You Must install libpcap-dev to build pyflag]))
 AC_CHECK_HEADER(magic.h,,AC_MSG_ERROR([You Must install libmagic-dev to build pyflag this may be part of file the package for some distros]))
 AC_CHECK_FILE(src/filesystems/sleuthkit-2.03.tar.gz,,AC_MSG_ERROR([You Must download sleuthkit-2.03.tar.gz and place in src/filesystems ]))
 
-PKG_CHECK_MODULES(libclamav, libclamav)
-
+# python checks 
+# (requires autoconf 1.5+ and the macros in acinclude.m4)
 AM_PATH_PYTHON(2.4)
 AC_PYTHON_DEVEL
 AC_PYTHON_MODULE(MySQLdb, REQUIRED)
 
+# check for swig, custom macro in acinclude.m4
 AC_PROG_SWIG(1.3)
 SWIG_PYTHON
 
+# check for stuff which uses pkg-config
+PKG_CHECK_MODULES(libclamav, libclamav)
+
+# check for binaries
+AC_PATH_PROG([MYSQL], mysql)
+AC_PATH_PROG([PLOTICUS], ploticus)
+if test -z $PLOTICUS; then AC_MSG_WARN([You should install ploticus to get graphs]); fi
+
+# defines and output
 AC_DEFINE([__DEBUG__])
-
-
 AC_OUTPUT([ 
 	Makefile 
 	src/Makefile 
