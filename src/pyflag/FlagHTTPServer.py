@@ -152,7 +152,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             ct="text/javascript"
             
         #Is this a request for an image?
-        if re.search("\.(png|jpg|gif)$",query.base):
+        if re.search("\.(png|jpg|gif|ico)$",query.base):
             ct="image/jpeg"
         
         if re.search("\.(css)$",query.base):

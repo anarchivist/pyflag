@@ -31,10 +31,11 @@ class Configure(Reports.report):
     def display(self,query,result):
         ## Do some checks to ensure the parameters seem right
         for k,v in dict(RESULTDIR=os.X_OK | os.R_OK | os.W_OK,
-                        UPLOADDIR=os.X_OK | os.R_OK).items():
+                        UPLOADDIR=os.X_OK | os.R_OK
+                        ).items():
             if not os.access(config.__class__.__dict__[k], v):
                 result.heading("Access denied to %s" % k)
-                result.para("We do not seem to have enough privileges to access %s, or the path does not exist" %k)
+                result.para("We do not seem to have enough privileges to access %s, or the path (%s) does not exist" %(k,config.__class__.__dict__[k]))
                 return
 
         fd=open(os.environ['HOME'] + '/.pyflagrc', 'a+')

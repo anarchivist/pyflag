@@ -2,7 +2,7 @@ SUBDIRS = src
 
 bin_PROGRAMS		=	pyflag
 sysconf_DATA		=	pyflagrc
-nobase_pkgdata_DATA	=	images/* db.setup
+nobase_pkgdata_DATA	=	images/* data/db.setup
 
 # perform subs in scripts and config files
 edit = sed \

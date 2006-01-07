@@ -225,6 +225,13 @@ class query_type:
 
         raise KeyError, ("Key '%s' not found in CGI query" % item)
 
+    def get(self,item,default=None):
+        for i in self.q:
+            if i[0]== item:
+                return i[1]
+
+        return default
+        
     def __iter__(self):
         self.iter_count = 0
         return self
@@ -488,35 +495,28 @@ class Flag:
 
         return result
 
-    checked=0
     def check_config(self,result,query):
         """ Checks the configuration for empty entries.
 
         Queries the user for those entries and creates a new configuration file in the users home directory
         @return: 1 if some of the configuration parameters are missing, 0 if all is well.
         """
-        ## Short circuit to ensure we do not need to do this over and over.
-        if self.checked: return 0
-
         report = None
 
-        try:
-            if query['family']=='Configuration':
+        ## First check for missing parameters:
+        for k,v in config.__class__.__dict__.items():
+            if v=='':
+                if query.has_key('PYFLAG_'+k):
+                    config.__class__.__dict__[k]=query['PYFLAG_' + k]
+                else:
+                    report = Registry.REPORTS.dispatch("Configuration",
+                                                       "Configure")
+
+        ## If we were going to the config page we keep going there:
+        if not report:
+            if query.get('family',None)=='Configuration':
                 report = Registry.REPORTS.dispatch(query['family'],
                                                    query['report'])
-        except:
-            pass
-        
-        if not report:
-            for k,v in config.__class__.__dict__.items():
-                if v=='':
-                    if query.has_key('PYFLAG_'+k):
-                        config.__class__.__dict__[k]=query['PYFLAG_' + k]
-                    else:
-                        print "Parameter %s does not exist" % k
-                        report = Registry.REPORTS.dispatch("Configuration",
-                                                           "Configure")
-                        break
 
         ## Now check that the DB is properly initialised:
         if not report:
@@ -539,8 +539,6 @@ class Flag:
             query['report']=report.name
 
             if report.check_parameters(query):
-                print "Parameters checked ok %s %s" % (report.name,
-                                                       canonicalise(query))
                 report.display(query,result)
             else:
                 result.start_form(query)
@@ -552,55 +550,6 @@ class Flag:
             return True
             
         return False
-        global config
-        ## Check to see if any of the configuration parameters are empty:
-        params=[]
-        import ConfigParser
-        save_params=ConfigParser.RawConfigParser()
-        result.heading("Missing configuration parameters")
-        result.start_form(query)
-        result.start_table()
-        for section in config.config.sections():
-            for opt in config.config.options(section):
-                if config.config.get(section,opt)=='':
-                    ## Check to see if there is an environment variable which overrides this:
-                    try:
-                        if os.environ["PYFLAG_%s" % opt.upper()]: continue
-                    except KeyError:
-                        pass
-                        
-                    ## Check to see if these parameters are outstanding:
-                    if query.has_key(opt):
-                        try:
-                            save_params.add_section(section)
-                        except:
-                            pass
-                        
-                        save_params.set(section,opt,query[opt])
-                    else:
-                        params.append(opt)
-                        result.textfield("%s: %s" %(section,opt),opt)
-
-        ## Now save the parameters that have been given:
-        if save_params.sections():
-            fd=open(os.path.expanduser('~/.pyflagrc'),'w')
-            save_params.write(fd)
-            fd.close()
-            ## Force a reload of configuration files:
-            ##pyflag.conf.ConfObject.config=None
-            ##config=pyflag.conf.ConfObject()
-            ##This does not work since everywhere else config was already loaded to be the old one. We really do need to exit and restart here.
-            print "You must restart the server for the changes to take effect"
-            sys.exit(0)
-
-        if params:
-            result.end_table()
-            result.end_form()
-            return 1
-            
-        ## Now check that we can create a database connection: FIXME
-        self.checked=1
-        return 0
                 
 class HexDump:
     """ Class manages displaying arbitrary data as hex dump.
