@@ -3,9 +3,10 @@ SUBDIRS = src
 # main pyflag (python) application
 # not sure how to do this recursively
 # might just have to maintain this list
-nobase_pkgpython_PYTHON = 	pyflag/*.py \
-				pyflag/FileFormats/*.py \
-				plugins/*.py \
+pkgpython_PYTHON	= 	pyflag/*.py \
+				pyflag/FileFormats/*.py
+
+nobase_pkgpython_PYTHON = 	plugins/*.py \
 				plugins/Flash/*.py \
 				plugins/NetworkForensics/*.py \
 				plugins/NetworkForensics/ProtocolHandlers/*.py \
@@ -14,3 +15,5 @@ nobase_pkgpython_PYTHON = 	pyflag/*.py \
 				plugins/DiskForensics/FileHandlers/*.py \
 				plugins/DiskForensics/FileSystems/*.py \
 				plugins/Themes/*.py
+
+nobase_pkgdata_DATA	=	images/*

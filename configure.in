@@ -19,6 +19,9 @@ AC_PYTHON_MODULE(MySQLdb, REQUIRED)
 AC_PROG_SWIG(1.3)
 SWIG_PYTHON
 
+AC_DEFINE([__DEBUG__])
+
+
 AC_OUTPUT([ 
 	Makefile 
 	src/Makefile 
