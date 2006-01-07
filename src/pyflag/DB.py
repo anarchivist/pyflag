@@ -308,7 +308,8 @@ class DBO:
         @arg client: A string of the command to shell out to.
         @arg dbh: The database handle to use.
         """
-        if not client.startswith(config.FLAG_BIN):
+        print "My client is %s" % client
+        if not client.startswith('/'):
             client = "%s/%s" % (config.FLAG_BIN, client)
             
         logging.log(logging.DEBUG, "Will shell out to run %s " % client)

@@ -60,8 +60,10 @@ class ConfObject:
 
     def __init__(self):
         for k,v in os.environ.items():
-            if k==k.upper():
-                ConfObject.__dict__[k.upper()[len('PYFLAG_'):]]=v
+            key = k.upper()[len('PYFLAG_'):]
+            if (k==k.upper() and k.startswith('PYFLAG') and
+                not self.__class__.__dict__.has_key(key)):
+                self.__class__.__dict__[key]=v
                 
 ##    def __init__(self):
 ##        """ Collect parameters from all sections into a single dict.

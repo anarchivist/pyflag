@@ -5,14 +5,15 @@
 # saved into users ~/.pyflagrc
 PYFLAG_DBUSER=
 PYFLAG_DBPASSWD=
-PYFLAG_DBHOST=
-PYFLAG_DBPORT=
-PYFLAG_UNIXSOCKET= 
+PYFLAG_DBHOST=127.0.0.1
+PYFLAG_DBPORT=3306
+PYFLAG_DBUNIXSOCKET=/var/run/mysqld/mysqld.sock  
 
 #Default flag database
 PYFLAG_FLAGDB=pyflag
 
 # Paths
+PYFLAG_PREFIX=@prefix@
 
 # Flag can only read and write to these directories
 # over-riden by users

@@ -315,12 +315,15 @@ class Flag:
                 
     def is_cached(self,query):
         """ Checks the database to see if the report has been cached """
-        dbh = DB.DBO(query['case'])
-        dbh.execute("select * from meta where property=%r and value=%r",("report_executed",canonicalise(query)))
-        if dbh.fetch():
-            return True
-        else:
-            return False
+        try:
+            dbh = DB.DBO(query['case'])
+            dbh.execute("select * from meta where property=%r and value=%r",("report_executed",canonicalise(query)))
+            if dbh.fetch():
+                return True
+        except:
+            pass
+        
+        return False
 
     def run_analysis(self,report,query):
         canonical_query = canonicalise(query)
@@ -494,6 +497,61 @@ class Flag:
         """
         ## Short circuit to ensure we do not need to do this over and over.
         if self.checked: return 0
+
+        report = None
+
+        try:
+            if query['family']=='Configuration':
+                report = Registry.REPORTS.dispatch(query['family'],
+                                                   query['report'])
+        except:
+            pass
+        
+        if not report:
+            for k,v in config.__class__.__dict__.items():
+                if v=='':
+                    if query.has_key('PYFLAG_'+k):
+                        config.__class__.__dict__[k]=query['PYFLAG_' + k]
+                    else:
+                        print "Parameter %s does not exist" % k
+                        report = Registry.REPORTS.dispatch("Configuration",
+                                                           "Configure")
+                        break
+
+        ## Now check that the DB is properly initialised:
+        if not report:
+            try:
+                dbh=DB.DBO(None)
+                dbh.execute("desc meta");
+            except Exception,e:
+                print "DB Error was %s" % e
+                if "Access denied" in str(e):
+                    report = Registry.REPORTS.dispatch("Configuration",
+                                                       "Configure")
+                else:
+                    report = Registry.REPORTS.dispatch("Configuration",
+                                                       "Initialise Database")
+
+        if report:
+            ## Instantiate report:
+            report = report(self, ui=self.ui)
+            query['family']=report.family
+            query['report']=report.name
+
+            if report.check_parameters(query):
+                print "Parameters checked ok %s %s" % (report.name,
+                                                       canonicalise(query))
+                report.display(query,result)
+            else:
+                result.start_form(query)
+                result.heading(report.name)
+                report.form(query,result)
+                result.end_table()
+                result.end_form('Submit')
+
+            return True
+            
+        return False
         global config
         ## Check to see if any of the configuration parameters are empty:
         params=[]

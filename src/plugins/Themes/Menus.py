@@ -60,7 +60,7 @@ class Menu(Theme.BasicTheme):
         Theme.order_families(module_list)
 
         for k in module_list:
-            result+='menu.addItem("%s","%s","%s",null,null);\n' % (k,k,k)
+            submenu_text = ''
             ## Add the reports in the family:
             report_list = Registry.REPORTS.family[k]
             for r in report_list:
@@ -68,13 +68,15 @@ class Menu(Theme.BasicTheme):
                 ## Only propegate if we stay within the same family:
                 try:
                     if query['family']==k:
-                        result+='menu.addSubItem("%s", "%s","%s","f?%s","");' % (k,r.name,r.name,Theme.propegate(query,FlagFramework.query_type((),family=k,report=r.name)))
+                        submenu_text+='menu.addSubItem("%s", "%s","%s","f?%s","");' % (k,r.name,r.name,Theme.propegate(query,FlagFramework.query_type((),family=k,report=r.name)))
                         continue
                 except KeyError:
                     pass
                 
-                result+='menu.addSubItem("%s", "%s","%s","f?%s","");' % (k,r.name,r.name,FlagFramework.query_type((),family=k,report=r.name))
-                
+                submenu_text+='menu.addSubItem("%s", "%s","%s","f?%s","");' % (k,r.name,r.name,FlagFramework.query_type((),family=k,report=r.name))
+
+            if len(submenu_text)>0:
+                result+='menu.addItem("%s","%s","%s",null,null);\n' % (k,k,k) + submenu_text
 
         return result+"menu.showMenu(); }</script>"
 
