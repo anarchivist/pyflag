@@ -29,7 +29,7 @@ import pyflag.Scanner as Scanner
 import pyflag.Reports as Reports
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import pyflag.FileFormats.IECache as IECache
+import FileFormats.IECache as IECache
 import pyflag.DB as DB
 
 ## raise Exception("This module not finished yet")

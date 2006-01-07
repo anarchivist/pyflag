@@ -9,6 +9,7 @@ edit = sed \
 	-e 's,@datadir\@,$(pkgdatadir),g' \
 	-e 's,@sysconf\@,$(sysconfdir),g' \
 	-e 's,@pkgpyexec\@,$(pkgpyexecdir),g' \
+	-e 's,@pythondir\@,$(pythondir),g' \
 	-e 's,@prefix\@,$(prefix),g' \
 	-e 's,@bin\@,$(bindir),g' \
 	-e 's,@ploticus\@,@PLOTICUS@,g' \

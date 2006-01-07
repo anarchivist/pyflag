@@ -4,4 +4,9 @@
 
 declare -x `set | grep PYFLAG_`
 
+## This is required in case the prefix is not /usr/ (otherwise python
+## can find it itself) 
+
+export PYTHONPATH=@pythondir@
+
 exec @python@ @pkgpyexec@/FlagHTTPServer.py
