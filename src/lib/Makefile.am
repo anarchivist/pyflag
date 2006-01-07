@@ -13,16 +13,16 @@ noinst_LTLIBRARIES	= libexcept.la libsgz.la libevf.la liboo.la libmd5.la libiosu
 # python stuff
 BUILT_SOURCES		= $(srcdir)/io_wrap.c
 SWIG_SOURCES		= io.i
-pkgpython_PYTHON 	= iosubsys.py
+nodist_pkgpython_PYTHON	= iosubsys.py
 pkgpyexec_LTLIBRARIES 	= _iosubsys.la
 
 # specifics (libs)
-libexcept_la_SOURCES 	= except.c except.h
+libexcept_la_SOURCES 	= except.c $(top_srcdir)/src/include/except.h
 
 libsgz_la_SOURCES       = sgzlib.c sgzlib.h
 libsgz_la_LDFLAGS	= -lz
 
-libevf_la_SOURCES       = libevf.c libevf.h
+libevf_la_SOURCES       = libevf.c libevf.h global.h
 libevf_la_LDFLAGS	= -lz
 
 libio_hooker_la_SOURCES = hooker.c hooker.h 
@@ -31,7 +31,7 @@ libio_hooker_la_LIBADD	= libiosubsys.la
 
 liboo_la_SOURCES	= class.c stringio.c struct.c talloc.c packet.c misc.c
 
-libmd5_la_SOURCES	= md5c.c md5.h
+libmd5_la_SOURCES	= md5c.c md5.h global.h
 
 # specifics (bins)
 sgzip_LDADD             = libsgz.la libexcept.la

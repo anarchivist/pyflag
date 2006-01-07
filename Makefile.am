@@ -1,8 +1,8 @@
 SUBDIRS = src
 
-bin_PROGRAMS		=	pyflag
+bin_SCRIPTS		=	pyflag
 sysconf_DATA		=	pyflagrc
-nobase_pkgdata_DATA	=	images/* data/db.setup
+nobase_pkgdata_DATA	=	images/*
 
 # perform subs in scripts and config files
 edit = sed \
@@ -26,3 +26,6 @@ pyflag: Makefile $(top_srcdir)/pyflag.in
 	$(edit) $(top_srcdir)/pyflag.in >pyflag.tmp
 	chmod +x pyflag.tmp
 	mv pyflag.tmp pyflag
+
+clean-local:
+	-rm -rf pyflag pyflagrc

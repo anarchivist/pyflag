@@ -1,5 +1,5 @@
 # basics
-AC_INIT(flag.sh)
+AC_INIT(pyflag.in)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE(pyflag, 0.80)
 
@@ -29,7 +29,10 @@ PKG_CHECK_MODULES(libclamav, libclamav)
 # check for binaries
 AC_PATH_PROG([MYSQL], mysql)
 AC_PATH_PROG([PLOTICUS], ploticus)
-if test -z $PLOTICUS; then AC_MSG_WARN([You should install ploticus to get graphs]); fi
+if test -z "$PLOTICUS"; then
+	AC_MSG_WARN([You should install ploticus to get graphs])
+	PLOTICUS=["\"echo You need to install ploticus to view graphs\""]
+fi
 
 # defines and output
 AC_DEFINE([__DEBUG__])

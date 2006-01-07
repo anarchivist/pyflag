@@ -1,7 +1,7 @@
 BUILT_SOURCES		= $(srcdir)/clamav_wrap.c
 SWIG_SOURCES		= clamav.i
 
-pkgpython_PYTHON 	= clamav.py
+nodist_pkgpython_PYTHON	= clamav.py
 pkgpyexec_LTLIBRARIES 	= _clamav.la
 
 _clamav_la_SOURCES 	= $(srcdir)/clamav_wrap.c $(SWIG_SOURCES)
