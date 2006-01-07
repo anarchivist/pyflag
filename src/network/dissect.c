@@ -81,18 +81,18 @@ static PyObject *get_field(PyObject *self, PyObject *args) {
   if(!root) 
     return PyErr_Format(PyExc_RuntimeError, "node is not valid");
 
-  len=strlen(element);
+  len=strcspn(e, ".");
+  if(len == strlen(e)) {
+    property=e;
+    element=NAMEOF(root);
+  } else {
+    property=e+len+1;
+    element=e;
+  };
 
-  for(property=e; property<e+len; property++) 
-    if(*property=='.') {
-      *property=0;
-      property++;
-      break;
-    };
+  e[len]=0;
 
-  if(property> e+len) property=e+len;
-
-  if(Find_Property(&root, &p, e, property)) {
+  if(Find_Property(&root, &p, element, property)) {
     void *item;
     int size=0;
 
@@ -121,6 +121,18 @@ static PyObject *get_field(PyObject *self, PyObject *args) {
 	returned 
     */    
     switch(p->field_type) {
+    case FIELD_TYPE_PACKET:
+      {
+	Packet node = *(Packet *)item;
+
+	result = PyCObject_FromVoidPtr(node, (void (*)(void *))node->destroy);
+	/** We are about to return another reference, we need to incref
+	    talloc to ensure it does not get destroyed unexpectadly 
+	*/
+	talloc_increase_ref_count(node);
+	break;
+      };
+
     case FIELD_TYPE_INT:
     case FIELD_TYPE_INT_X:
     case FIELD_TYPE_IP_ADDR:
@@ -137,7 +149,10 @@ static PyObject *get_field(PyObject *self, PyObject *args) {
     case FIELD_TYPE_STRING_X:
     case FIELD_TYPE_STRING:
       result = Py_BuildValue("s#",*(unsigned char **)item, size); break;
-      
+
+    case FIELD_TYPE_HEX:
+      result = Py_BuildValue("s#",(unsigned char *)item, size); break;
+
     default:
       return PyErr_Format(PyExc_RuntimeError,
 			  "Unable to process field of type %u\n", p->field_type);
@@ -154,11 +169,56 @@ static PyObject *get_field(PyObject *self, PyObject *args) {
 };
 
 
+/*********************************************************
+    Lists the fields in a Packet object
+**********************************************************/
+static PyObject *list_fields(PyObject *self, PyObject *args) {
+  PyObject *result;
+  Packet root;
+  struct struct_property_t *p;
+  PyObject *pylist;
+  
+  if(!PyArg_ParseTuple(args, "O",  &result)) 
+    return NULL;
+  
+  root = PyCObject_AsVoidPtr(result);
+  if(!root) 
+    return PyErr_Format(PyExc_RuntimeError, "node is not valid");
+
+  pylist = PyList_New(0);
+  list_for_each_entry(p, &(root->properties.list), list) {
+    if(p->name) {
+      PyList_Append(pylist, PyString_FromString(p->name));
+    } else break;
+  };
+
+  return pylist;
+};
+
+static PyObject *get_name(PyObject *self, PyObject *args) {
+  PyObject *result;
+  Packet root;
+  
+  if(!PyArg_ParseTuple(args, "O",  &result)) 
+    return NULL;
+  
+  root = PyCObject_AsVoidPtr(result);
+  if(!root) 
+    return PyErr_Format(PyExc_RuntimeError, "node is not valid");
+
+  return PyString_FromString(NAMEOF(root));
+};
+
+
 static PyMethodDef DissectMethods[] = {
   {"dissect",  dissect, METH_VARARGS,
    "Dissects a packet returning a dissection object"},
   {"get_field", get_field, METH_VARARGS,
    "Gets the field of a dissected node"},
+  {"list_fields", list_fields, METH_VARARGS,
+   "Lists the field names in the dissected object"},
+  {"get_name", get_name, METH_VARARGS,
+   "Returns the name of the current node"},
   {NULL, NULL, 0, NULL}
 };
 

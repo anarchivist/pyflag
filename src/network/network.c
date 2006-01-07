@@ -146,8 +146,8 @@ int Eth2_Read(Packet self, StringIO input) {
 VIRTUAL(ETH_II, Packet)
      INIT_STRUCT(packet, ethernet_2_Format);
 
-     NAME_ACCESS(packet, destination, FIELD_TYPE_STRING_X);
-     NAME_ACCESS(packet, source, FIELD_TYPE_STRING_X);
+     NAME_ACCESS(packet, destination, FIELD_TYPE_HEX);
+     NAME_ACCESS(packet, source, FIELD_TYPE_HEX);
      NAME_ACCESS(packet, type, FIELD_TYPE_SHORT_X);
      NAME_ACCESS(packet, payload, FIELD_TYPE_PACKET);
 

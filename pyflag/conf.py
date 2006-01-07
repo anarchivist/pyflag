@@ -21,7 +21,10 @@
 # ******************************************************
 """ Configuration modules for flag.
 
-This is just a python module so it will be included by the rest of flag when it runs. Make sure to add quotes around strings, and ensure there are no leading spaces at the start of every line """
+This module parses the pyflagrc file and is called by the rest of the code to work out configuration options etc.
+
+Note that its important for us to know where the system pyflagrc file resides. We use the environment variable PYFLAGRC to know that.
+"""
 
 import sys,ConfigParser,os
 
@@ -46,8 +49,14 @@ class ConfObject:
             "home": os.getenv("HOME"),
             "prefix":sys.prefix,
             "pyflagdir":"%s/../"%sys.modules['pyflag'].__path__[0]})
-        
-        ConfObject.config.read([sys.modules['pyflag'].__path__[0]+"/pyflagrc",os.path.expanduser('~/.pyflagrc')])
+
+        paths = [os.path.expanduser('~/.pyflagrc')]
+        try:
+            paths.insert(0,os.environ['PYFLAGRC'])
+        except KeyError:
+            pass
+
+        ConfObject.config.read(paths)
 
     def __init__(self):
         """ Collect parameters from all sections into a single dict.
