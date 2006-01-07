@@ -74,6 +74,7 @@ void load_library(void) {
   HOOK(dup2);
   HOOK(close);
   HOOK(fopen);
+  HOOK(fopen64);
   HOOK(fseek);
   HOOK(fdopen);
   HOOK(fclose);
@@ -82,6 +83,7 @@ void load_library(void) {
   HOOK(fgets);
   HOOK(__fxstat64);
   HOOK(ferror);
+  HOOK(feof);
 
   //Remove the LD_PRELOAD now that we are already hooked. This is needed if something else needs to fork later:
   unsetenv("LD_PRELOAD");
@@ -166,6 +168,9 @@ int open64(const char *pathname, int flags,int mode) {
 int open(const char *pathname, int flags, ...) {
   va_list ap;
   int mode=0;
+  
+  CHECK_INIT;
+
   va_start(ap,flags);
   mode = (int)*ap;
   va_end(ap);
@@ -225,6 +230,9 @@ off_t lseek64(int fildes,  off_t  offset, int whence) {
 
 int fseek(FILE *stream, long offset, int whence) {
   int fd=(int)stream;
+
+  CHECK_INIT;
+
   lseek(fd, offset,whence);
   return 0;
 };
@@ -262,6 +270,7 @@ ssize_t read(int fd, void *buf, size_t count) {
 char *fgets(char *s, int size, FILE *stream) {
   int fd=(int)stream;
 
+  CHECK_INIT;
   read(fd, s, size);
   return s;
 };
@@ -300,6 +309,8 @@ void exit(int status) {
 
 int dup2(int oldfd, int newfd)
 {
+  CHECK_INIT;
+
   //If the oldfd is an iosource, we make the new one an io source:
   if(iosources[oldfd]) {
     //Is the new one already assigned?
@@ -324,12 +335,20 @@ int close(int fd) {
   } else return 0;
 };
 
+FILE *fopen64(const char *path, const char *mode) {
+  FILE *fd;
+  CHECK_INIT;
+
+  fd=fopen(path,mode);
+  return fd;
+};
+
 FILE *fopen(const char *path, const char *mode) {
   char *file_prefix = getenv("IO_FILENAME");
 
   CHECK_INIT;
 
-  if( context == HOOKED && !memcmp(path,file_prefix,strlen(file_prefix))) {
+  if( context == HOOKED) {
     if(mode[0]=='r') {
       return ((FILE *)open(path,O_RDONLY));
     };
@@ -355,9 +374,11 @@ FILE *fdopen(int fd, const char *mode) {
 
 size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream) 
 {
+  CHECK_INIT;
+
   //Stream is actually a hooked io subsys
   if((unsigned int)stream<256) {
-    return read((int)stream,ptr,size*nmemb);
+    return read((int)stream,ptr,size*nmemb)/size;
   };
   return dispatch->fread(ptr,size,nmemb,stream);
 };
@@ -376,6 +397,8 @@ int getc(FILE *stream) {
 };
 
 int fgetc(FILE *stream) {
+  CHECK_INIT;
+
   return getc(stream);
 };
 
@@ -427,6 +450,8 @@ int fileno(FILE *stream) {
 };
 
 int fcntl(int fd, int cmd, void *lock) {
+  CHECK_INIT;
+
   return( 0);
 };
 
@@ -434,4 +459,17 @@ int ferror(FILE *stream) {
   CHECK_INIT;
 
   return 0;
+};       
+
+/** 
+    There currently is no way for us to tell if we are at the end of
+    the file, so we just return - no error.
+ */
+int feof(FILE *stream) {
+  return 0;
 };
+
+void check_init(struct dispatcher_t * dispatch) {
+  if(!dispatch) { init_hooker(); };
+}
+

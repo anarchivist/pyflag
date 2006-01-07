@@ -59,32 +59,37 @@ class ConfObject:
         ConfObject.config.read(paths)
 
     def __init__(self):
-        """ Collect parameters from all sections into a single dict.
+        for k,v in os.environ.items():
+            if k==k.upper():
+                ConfObject.__dict__[k.upper()]=v
+                
+##    def __init__(self):
+##        """ Collect parameters from all sections into a single dict.
 
-        Note that we add these as dynamic attributes to our own class...
-        """
-        if not ConfObject.config:
-            self.parse()
-            for section  in  self.config.sections():
-                for param in self.config.options(section):
-                    uparam=param.upper()
-                    ## We can not trash our own methods, because we use upper case here
-                    if not ConfObject.__dict__.has_key(uparam):
-                        parameter = self.config.get(section,param)
+##        Note that we add these as dynamic attributes to our own class...
+##        """
+##        if not ConfObject.config:
+##            self.parse()
+##            for section  in  self.config.sections():
+##                for param in self.config.options(section):
+##                    uparam=param.upper()
+##                    ## We can not trash our own methods, because we use upper case here
+##                    if not ConfObject.__dict__.has_key(uparam):
+##                        parameter = self.config.get(section,param)
                         
-                        ## Try storing values as integers first, then as string
-                        try:
-                           value=[int(x) for x in parameter.split(',')]
-                        except ValueError:
-                            value=parameter.split(',')
+##                        ## Try storing values as integers first, then as string
+##                        try:
+##                           value=[int(x) for x in parameter.split(',')]
+##                        except ValueError:
+##                            value=parameter.split(',')
 
-                        if len(value)==1: value=value[0]
+##                        if len(value)==1: value=value[0]
 
-                        ## If there is an environment variable - it overrrides this:
-                        try:
-                            value=os.environ["PYFLAG_%s" % uparam]
-                        except KeyError:
-                            pass
+##                        ## If there is an environment variable - it overrrides this:
+##                        try:
+##                            value=os.environ["PYFLAG_%s" % uparam]
+##                        except KeyError:
+##                            pass
 
-#                        print "Adding paramter %s->%s" % (uparam,value)
-                        ConfObject.__dict__[uparam]=value
+##                        print "Adding paramter %s->%s" % (uparam,value)
+##                        ConfObject.__dict__[uparam]=value

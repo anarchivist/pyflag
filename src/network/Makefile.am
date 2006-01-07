@@ -1,3 +1,9 @@
+bin_PROGRAMS		= pcaptool
+
+pcaptool_SOURCES	= pcaptool.c
+pcaptool_LDFLAGS	= /usr/lib/libpcap.a
+
+
 pkgpython_PYTHON 	= dissect.py
 pkgpyexec_LTLIBRARIES 	= _dissect.la
 

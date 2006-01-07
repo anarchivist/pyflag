@@ -50,7 +50,11 @@ void except_raise(enum _exception e,char *reason, ...) {
 };
 
 #else
-void except_raise(enum _exception e,char *reason, ...) {
+void except_raise(enum _exception e,char *reason, ...) {  
+  if(except_level==0) {
+    exit(-1);
+  };
+
   longjmp(env[except_level],e);
 };
 #endif

@@ -195,11 +195,11 @@ class DBFS(FileSystem):
         after they call the base class.
         """
         sdbh = DB.DBO(self.case)
-        sdbh.MySQLHarness("%s -t %s -d create blah" %(config.SLEUTHKIT,self.table))
+        sdbh.MySQLHarness("%s/dbtool -t %s -d create blah" %(config.FLAG_BIN,self.table))
 
     def delete(self):
         dbh = DB.DBO(self.case)
-        dbh.MySQLHarness("%s -t %s -d drop" %(config.SLEUTHKIT,self.table))
+        dbh.MySQLHarness("%s/dbtool -t %s -d drop" %(config.FLAG_BIN,self.table))
 
     def VFSCreate(self,root_inode,inode,new_filename,directory=False ,gid=0, uid=0, mode=100777, **properties):
         """ Extends the DB filesystem to include further virtual filesystem entries.

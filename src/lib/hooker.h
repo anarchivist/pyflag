@@ -53,6 +53,7 @@ struct dispatcher_t {
   int (*dup2)(int oldfd, int newfd);
   int (*close)(int fd);
   FILE * (*fopen)(const char *path, const char *mode);
+  FILE * (*fopen64)(const char *path, const char *mode);
   long (*ftell)(FILE *stream);
   int (*fgets)(char *s, int size, FILE *stream);
   FILE * (*fseek)(FILE *stream, long offset, int whence);
@@ -62,10 +63,13 @@ struct dispatcher_t {
   int (*__fxstat64)(int filedes, struct stat *buf);
   ssize_t (*write)(int fd, const void *buf, size_t count);
   int (*ferror)(FILE *stream);
+  int (*feof)(FILE *stream);
 } *dispatch=NULL;
 
+void check_init(struct dispatcher_t *dispatch);
+
 #define HOOK(x)   dispatch->x = dlsym(dispatch->handle,#x); check_errors();
-#define CHECK_INIT  if(!dispatch) { init_hooker(); };
+#define CHECK_INIT  check_init(dispatch)
 
 // This static variable is used to decide when we should hook calls
 // through the library. The library itself will be using the same
