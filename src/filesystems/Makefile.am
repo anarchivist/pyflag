@@ -1,7 +1,7 @@
 # this is bit hacking for the shiny new autoconf system, but what can you do?
 
 SKVER		= sleuthkit-2.03
-bin_EXTRA 	= $(SKVER)/src/fstools/dbtool
+bin_SCRIPTS 	= $(SKVER)/src/fstools/dbtool
 EXTRA_DIST	= dbtool.c Makefile.dbtool
 
 DBTOOL_SRC  	= dbtool.c
