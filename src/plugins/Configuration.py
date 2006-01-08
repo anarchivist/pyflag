@@ -70,7 +70,7 @@ class InitDB(Reports.report):
         dbh.execute("create database if not exists %s" % config.FLAGDB)
         
         dbh = DB.DBO(None)
-        dbh.MySQLHarness("/bin/cat /tmp/db.setup")
+        dbh.MySQLHarness("/bin/cat %s/db.setup" % config.DATADIR)
 
         try:
             dbh.execute("desc meta")

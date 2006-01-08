@@ -34,6 +34,11 @@ if test -z "$PLOTICUS"; then
 	PLOTICUS=["\"echo You need to install ploticus to view graphs\""]
 fi
 
+# try to find magic files
+AC_ARG_WITH(magic, AC_HELP_STRING([--with-magic], [specify a colon-separated list of system magic files, default autodetect]),,[magic=$(file -v | tail -1 | awk '{print $4}')])
+AC_SUBST(magic)
+            
+
 # defines and output
 AC_DEFINE([__DEBUG__])
 AC_OUTPUT([ 

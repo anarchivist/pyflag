@@ -14,6 +14,7 @@ PYFLAG_FLAGDB=pyflag
 
 # Paths
 PYFLAG_PREFIX=@prefix@
+PYFLAG_DATADIR=@datadir@
 
 # Flag can only read and write to these directories
 # over-riden by users
@@ -34,14 +35,13 @@ PYFLAG_PLOTICUS=@ploticus@
 PYFLAG_FLAG_BIN=@bin@
 
 #Location to the magic file for use
-PYFLAG_MAGICFILE=@datadir@/magic
-PYFLAG_MIMEMAGICFILE=@datadir@/magic.mime
+PYFLAG_MAGICFILE=@datadir@/magic:@magic@
 
 #Sleuthkit binary:
-sleuthkit=@bin@/dbtool
+PYFLAG_SLEUTHKIT=@bin@/dbtool
 
 #Wrapper hooker:
-iowrapper=@bin@/iowrapper
+PYFLAG_IOWRAPPER=@bin@/iowrapper
 
 # GUI stuff
 # Period we wait before refreshing the display when waiting for analysis to complete

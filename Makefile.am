@@ -2,7 +2,8 @@ SUBDIRS = src
 
 bin_SCRIPTS		=	pyflag
 sysconf_DATA		=	pyflagrc
-nobase_pkgdata_DATA	=	images/* data/db.setup
+pkgdata_DATA		=	data/magic data/magic.mime data/db.setup
+nobase_pkgdata_DATA	=	images/*
 EXTRA_DIST		=	pyflag.in pyflagrc.in
 
 # perform subs in scripts and config files
@@ -15,6 +16,7 @@ edit = sed \
 	-e 's,@bin\@,$(bindir),g' \
 	-e 's,@ploticus\@,@PLOTICUS@,g' \
 	-e 's,@mysql\@,@MYSQL@,g' \
+	-e 's,@magic\@,@magic@,g' \
 	-e 's,@python\@,$(PYTHON),g'
 
 pyflagrc: Makefile $(top_srcdir)/pyflagrc.in
