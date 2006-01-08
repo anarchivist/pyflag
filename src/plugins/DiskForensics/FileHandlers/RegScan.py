@@ -235,7 +235,7 @@ class InterestingRegKey(Reports.report):
         pdbh=self.DBO(None)
         tablename = dbh.MakeSQLSafe(query['fsimage'])
         try:
-			dbh.execute("create table `interestingregkeys_%s` select a.path, a.size, a.modified, a.remainder, a.type, a.reg_key, a.value, b.category, b.description from reg_%s as a, %s.registrykeys as b where a.path LIKE concat('%%',b.path,'%%') AND a.reg_key LIKE concat('%%',b.reg_key,'%%')",(tablename,tablename,config.FLAGDB))
+            dbh.execute("create table `interestingregkeys_%s` select a.path, a.size, a.modified, a.remainder, a.type, a.reg_key, a.value, b.category, b.description from reg_%s as a, %s.registrykeys as b where a.path LIKE concat('%%',b.path,'%%') AND a.reg_key LIKE concat('%%',b.reg_key,'%%')",(tablename,tablename,config.FLAGDB))
         except DB.DBError,e:
             raise Reports.ReportError("Unable to find the registry table for the current image. Did you run the Registry Scanner?.\n Error received was %s" % e)
     

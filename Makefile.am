@@ -2,7 +2,7 @@ SUBDIRS = src
 
 bin_SCRIPTS		=	pyflag
 sysconf_DATA		=	pyflagrc
-nobase_pkgdata_DATA	=	images/* db.setup
+nobase_pkgdata_DATA	=	images/* data/db.setup
 EXTRA_DIST		=	pyflag.in pyflagrc.in
 
 # perform subs in scripts and config files
