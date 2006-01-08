@@ -74,8 +74,9 @@ def parse_value(v):
         try:
             v[i] = int(v[i])
         except:
-            pass
-
+            if v[i][0]==v[i][-1] and v[i][0] in "'\"":
+                v[i]=v[i][1:-1]
+                
     if len(v)==1: v=v[0]
 
     return v

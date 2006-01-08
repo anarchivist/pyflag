@@ -134,30 +134,15 @@ class ResetCase(Reports.report):
 
     def display(self,query,result):
         result.heading("Reset case")
+
+        query['remove_case'] = query['reset_case']
+        query['create_case'] = query['reset_case']
+        tmp = result.__class__(result)
         
-        dbh = self.DBO(None)
-        dbh.execute("drop database if exists %s" ,query['reset_case'])
-        dbh.execute("Create database %s",(query['reset_case']))
-
-        #Get handle to the case db
-        case_dbh = self.DBO(query['reset_case'])
-        case_dbh.execute("Create table meta(`time` timestamp(14) NOT NULL,property varchar(50), value text, KEY property(property),KEY value(value(10)))",())
-        case_dbh.execute("create table bookmarks (id int(11) auto_increment, canon text, url text,  description text,  bookmark text ,  PRIMARY KEY  (id),  KEY id (id))",())
-
-        ## Delete all files from the cases temporary directory:
-        temporary_dir = "%s/case_%s" % (config.RESULTDIR,query['reset_case'])
-
-        ## Make sure its actually created:
-        try:
-            os.mkdir("%s/case_%s" % (config.RESULTDIR,query['reset_case']))
-        except OSError:
-            pass
-
-        for root, dirs, files in os.walk(temporary_dir,topdown=False):
-            for name in files:
-                os.remove(join(root, name))
-            for name in dirs:
-                os.rmdir(join(root, name))
+        report = DelCase(self.flag, self.ui)
+        report.display(query,tmp)
+        
+        report = NewCase(self.flag, self.ui)
+        report.display(query,tmp)
 
         result.para("Case %s has been reset" % query['reset_case'])
-        return result
