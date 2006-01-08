@@ -40,6 +40,7 @@ evtool_SOURCES		= evtool.c
 evtool_LDADD		= libevf.la libsgz.la libmd5.la libexcept.la
 
 iowrapper_SOURCES	= iowrapper.c 
+iowrapper_CFLAGS	= -DPYFLAG_LIBDIR=\"$(pkglibdir)\"
 iowrapper_LDADD		= libiosubsys.la libio_hooker.la
 
 remote_server_LDADD	= libexcept.la

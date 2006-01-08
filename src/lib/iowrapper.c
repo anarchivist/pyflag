@@ -49,6 +49,7 @@ int main(int argc, char **argv)
   int opts_size=10;
   char *opts=NULL;
   
+  setenv("LD_LIBRARY_PATH",PYFLAG_LIBDIR,0);
   setenv("LD_PRELOAD","libio_hooker.so",1);
   context = UNHOOKED;
   
