@@ -136,7 +136,7 @@ class ResetCase(Reports.report):
         result.heading("Reset case")
         
         dbh = self.DBO(None)
-        dbh.execute("drop database %s" ,query['reset_case'])
+        dbh.execute("drop database if exists %s" ,query['reset_case'])
         dbh.execute("Create database %s",(query['reset_case']))
 
         #Get handle to the case db
@@ -146,6 +146,13 @@ class ResetCase(Reports.report):
 
         ## Delete all files from the cases temporary directory:
         temporary_dir = "%s/case_%s" % (config.RESULTDIR,query['reset_case'])
+
+        ## Make sure its actually created:
+        try:
+            os.mkdir("%s/case_%s" % (config.RESULTDIR,query['reset_case']))
+        except OSError:
+            pass
+
         for root, dirs, files in os.walk(temporary_dir,topdown=False):
             for name in files:
                 os.remove(join(root, name))

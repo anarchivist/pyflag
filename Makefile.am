@@ -1,10 +1,10 @@
 SUBDIRS = src
 
-bin_SCRIPTS		=	pyflag
+bin_SCRIPTS		=	pyflag pyflash pyflag_launch
 sysconf_DATA		=	pyflagrc
 pkgdata_DATA		=	data/magic data/magic.mime data/db.setup
 nobase_pkgdata_DATA	=	images/*
-EXTRA_DIST		=	pyflag.in pyflagrc.in
+EXTRA_DIST		=	pyflag.in pyflagrc.in pyflash.in
 
 # perform subs in scripts and config files
 edit = sed \
@@ -19,16 +19,11 @@ edit = sed \
 	-e 's,@magic\@,@magic@,g' \
 	-e 's,@python\@,$(PYTHON),g'
 
-pyflagrc: Makefile $(top_srcdir)/pyflagrc.in
-	rm -f pyflagrc pyflagrc.tmp
-	$(edit) $(top_srcdir)/pyflagrc.in >pyflagrc.tmp
-	mv pyflagrc.tmp pyflagrc
-
-pyflag: Makefile $(top_srcdir)/pyflag.in
-	rm -f pyflag pyflag.tmp
-	$(edit) $(top_srcdir)/pyflag.in >pyflag.tmp
-	chmod +x pyflag.tmp
-	mv pyflag.tmp pyflag
+%: $(top_srcdir)/%.in Makefile
+	rm -f $@ $@.tmp
+	$(edit) $< > $@.tmp
+	chmod +x $@.tmp
+	mv $@.tmp $@
 
 clean-local:
-	-rm -rf pyflag pyflagrc
+	-rm -rf $(bin_SCRIPTS)

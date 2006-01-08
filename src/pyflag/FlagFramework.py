@@ -507,7 +507,8 @@ class Flag:
         for k,v in config.__class__.__dict__.items():
             if v=='':
                 if query.has_key('PYFLAG_'+k):
-                    config.__class__.__dict__[k]=query['PYFLAG_' + k]
+                    config.__class__.__dict__[k] = conf.parse_value(
+                        query['PYFLAG_' + k])
                 else:
                     report = Registry.REPORTS.dispatch("Configuration",
                                                        "Configure")

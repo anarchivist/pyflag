@@ -12,4 +12,4 @@ declare -x `set | grep PYFLAG_`
 
 export PYTHONPATH=@pythondir@
 
-exec @python@ @pkgpyexec@/FlagHTTPServer.py $@
+exec @python@ @pkgpyexec@/pyflagsh.py $@

@@ -63,35 +63,19 @@ class ConfObject:
             key = k.upper()[len('PYFLAG_'):]
             if (k==k.upper() and k.startswith('PYFLAG') and
                 not self.__class__.__dict__.has_key(key)):
-                self.__class__.__dict__[key]=v
-                
-##    def __init__(self):
-##        """ Collect parameters from all sections into a single dict.
+                self.__class__.__dict__[key]=parse_value(v)
 
-##        Note that we add these as dynamic attributes to our own class...
-##        """
-##        if not ConfObject.config:
-##            self.parse()
-##            for section  in  self.config.sections():
-##                for param in self.config.options(section):
-##                    uparam=param.upper()
-##                    ## We can not trash our own methods, because we use upper case here
-##                    if not ConfObject.__dict__.has_key(uparam):
-##                        parameter = self.config.get(section,param)
-                        
-##                        ## Try storing values as integers first, then as string
-##                        try:
-##                           value=[int(x) for x in parameter.split(',')]
-##                        except ValueError:
-##                            value=parameter.split(',')
 
-##                        if len(value)==1: value=value[0]
+def parse_value(v):
+    """ Returns a parsed value suitable to be put into the config variable """
+    v=v.split(",")
 
-##                        ## If there is an environment variable - it overrrides this:
-##                        try:
-##                            value=os.environ["PYFLAG_%s" % uparam]
-##                        except KeyError:
-##                            pass
+    for i in range(len(v)):
+        try:
+            v[i] = int(v[i])
+        except:
+            pass
 
-##                        print "Adding paramter %s->%s" % (uparam,value)
-##                        ConfObject.__dict__[uparam]=value
+    if len(v)==1: v=v[0]
+
+    return v
