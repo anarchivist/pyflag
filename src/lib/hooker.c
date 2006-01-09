@@ -20,15 +20,9 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 */
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/types.h>
-#include <dlfcn.h>
-#include "iosubsys.h"
-#include <stdarg.h>
-#include "except.h"
-#include <string.h>
 #include "hooker.h"
+#include "iosubsys.h"
+#include "except.h"
 //#include <fcntl.h>
 
 #define O_RDONLY 0
@@ -196,11 +190,12 @@ int llseek(unsigned int fildes,  unsigned  long  offset_high,  unsigned  long  o
     } else if(whence==SEEK_CUR) {
       iosources[fildes]->fpos += offset;
     };
+    printf("Someone called SEEK_END");
   };
   return offset;
 };
 
-off_t lseek(int fildes, unsigned long int offset, int whence) {
+off_t lseek(int fildes, off_t offset, int whence) {
   debug(1,"Called lseek with %lu\n",offset);
   CHECK_INIT;
 
@@ -216,7 +211,7 @@ off_t lseek(int fildes, unsigned long int offset, int whence) {
   };
 };
 
-off_t lseek64(int fildes,  off_t  offset, int whence) {
+off64_t lseek64(int fildes,  off64_t  offset, int whence) {
   debug(1,"Called lseek64 with %llu, %u\n",offset,whence);
   CHECK_INIT;
 
@@ -419,27 +414,27 @@ int stat(const char *file_name, struct stat *buf) {
   return(0);
 };
 
-int lstat64(const char *file_name, struct stat *buf) {
+int lstat64(const char *file_name, struct stat64 *buf) {
   CHECK_INIT;
   buf->st_size=-1;
   return(0);
 };
 
-int __xstat64 (int __ver, __const char *__filename, struct stat *buf) {
+int __xstat64 (int __ver, __const char *__filename, struct stat64 *buf) {
   CHECK_INIT;
   buf->st_size=-1;
   return(0);
 };
 
 
-int __fxstat64(int filedes, struct stat *buf) {
+int __fxstat64(int ver, int filedes, struct stat64 *buf) {
   CHECK_INIT;
 
   if(iosources[filedes]){
     buf->st_size=-1;
     return(0);
   } else {
-    dispatch->__fxstat64(filedes,buf);
+    dispatch->__fxstat64(ver, filedes,buf);
     return 0;
   };
 };

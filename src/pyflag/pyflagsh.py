@@ -296,7 +296,7 @@ if __name__ == "__main__":
         while(1):
             try:
                 input = raw_input("Flag Shell: %s>" % env.CWD)
-                process_line(readline.get_line_buffer())
+                process_line(input)
             except (EOFError):
                 print "\nBibi Then - Have a nice day."
                 sys.exit(0)

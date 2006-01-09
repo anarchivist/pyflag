@@ -41,6 +41,7 @@ AC_SUBST(magic)
 
 # defines and output
 AC_DEFINE([__DEBUG__])
+AC_DEFINE([_LARGEFILE64_SOURCE])
 AC_OUTPUT([ 
 	Makefile 
 	src/Makefile 

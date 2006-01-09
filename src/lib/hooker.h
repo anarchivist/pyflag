@@ -21,6 +21,12 @@
 # ******************************************************
 */
 #include <sys/stat.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <dlfcn.h>
+#include <stdarg.h>
+#include <string.h>
 
 //We call hard exit when hooking exit()
 extern void _exit(int);
@@ -47,7 +53,7 @@ struct dispatcher_t {
   int (*open)(const char *pathname, int flags,int mode);
   int (*open64)(const char *pathname, int flags,int mode);
   off_t (*lseek)(int fildes, off_t offset, int whence);
-  off_t (*lseek64)(int fildes, off_t offset, int whence);
+  off64_t (*lseek64)(int fildes, off64_t offset, int whence);
   ssize_t (*read)(int fd, void *buf, size_t count);
   void (*exit)(int status);
   int (*dup2)(int oldfd, int newfd);
@@ -60,7 +66,7 @@ struct dispatcher_t {
   FILE * (*fdopen)(int fd, const char *mode);
   size_t (*fread)(void *ptr, size_t size, size_t nmemb, FILE *stream);
   int (*fclose)(FILE *stream);
-  int (*__fxstat64)(int filedes, struct stat *buf);
+  int (*__fxstat64)(int ver,int filedes, struct stat64 *buf);
   ssize_t (*write)(int fd, const void *buf, size_t count);
   int (*ferror)(FILE *stream);
   int (*feof)(FILE *stream);

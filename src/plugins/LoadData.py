@@ -374,6 +374,7 @@ class LoadFS(Reports.report):
             fd=IO.open(query['case'],query['iosource'])
 
             fs_types = Registry.FILESYSTEMS.filesystems.keys()
+            fs_types.sort()
             
             ## Try to get a magic hint
             try:

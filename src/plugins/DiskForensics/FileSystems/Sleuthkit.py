@@ -15,6 +15,25 @@ import bisect
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 
+class AutoFS(DBFS):
+    """ This allows SK to determine automatically the filesystem type. """
+    sk_type = "auto"
+    name = "Auto"
+
+    def load(self):
+        DBFS.load(self)
+        sdbh = DB.DBO(self.case)
+
+        # run sleuthkit
+        string= "%s -i %r -o %r %r -t %r %r"%(config.IOWRAPPER,
+                                                     self.iosource.subsystem,
+                                                     self.iosource.make_parameter_list(),config.SLEUTHKIT,
+                                                     self.table,self.table)
+
+        sdbh.MySQLHarness(
+            string
+            )
+
 class Ext2(DBFS):
     """ A class implementing the Ext2 module from SK """
     sk_type = "linux-ext2"

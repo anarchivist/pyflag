@@ -11,7 +11,7 @@ pkglib_LTLIBRARIES	= libio_hooker.la
 noinst_LTLIBRARIES	= libexcept.la libsgz.la libevf.la liboo.la libmd5.la libiosubsys.la
 
 # Stuff that should be distributed:
-include_HEADERS		= *.h
+noinst_HEADERS		= *.h
 
 # python stuff
 BUILT_SOURCES		= $(srcdir)/io_wrap.c
