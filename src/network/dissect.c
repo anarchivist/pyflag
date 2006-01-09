@@ -33,7 +33,6 @@
 			       
 #include "packet.h"
 #include "network.h"
-#include "init.h"
 
 #undef _POSIX_C_SOURCE
 
@@ -222,6 +221,7 @@ static PyMethodDef DissectMethods[] = {
   {NULL, NULL, 0, NULL}
 };
 
+#include "init.h"
 PyMODINIT_FUNC init_dissect(void) {
   (void) Py_InitModule("_dissect", DissectMethods);
 #include "init.c"

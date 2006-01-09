@@ -4,8 +4,7 @@ SUBDIRS			= $(PSTVER)
 BUILT_SOURCES		= $(srcdir)/pypst_wrap.c
 SWIG_SOURCES		= pypst.i
 
-pkgpython_PYTHON 	= pypst2.py
-nodist_pkgpython_PYTHON	= pypst.py
+pkgpython_PYTHON 	= pypst2.py pypst.py
 pkgpyexec_LTLIBRARIES 	= _pypst.la
 
 _pypst_la_SOURCES 	= $(srcdir)/pypst_wrap.c $(SWIG_SOURCES)

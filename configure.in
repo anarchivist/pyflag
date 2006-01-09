@@ -52,4 +52,5 @@ AC_OUTPUT([
 	src/regtools/Makefile
 	src/virustools/Makefile
 	src/filesystems/Makefile
+	src/include/Makefile
 	])

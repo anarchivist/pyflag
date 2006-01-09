@@ -1,10 +1,10 @@
 BUILT_SOURCES		= $(srcdir)/index_wrap.c
 SWIG_SOURCES		= index.i
 
-nodist_pkgpython_PYTHON	= index.py
+pkgpython_PYTHON	= index.py
 pkgpyexec_LTLIBRARIES 	= _index.la
 
-_index_la_SOURCES 	= $(srcdir)/index_wrap.c $(SWIG_SOURCES) index.c index.h
+_index_la_SOURCES 	= $(srcdir)/index_wrap.c $(SWIG_SOURCES) index.c
 _index_la_CPPFLAGS 	= $(SWIG_PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
 _index_la_LDFLAGS 	= -module
 _index_la_LIBADD	= ../lib/libexcept.la

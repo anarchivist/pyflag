@@ -37,7 +37,6 @@
 #include <unistd.h>
 
 #define O_BINARY 0
-#define __DEBUG__
 
 /** This is used for debugging. */
 #ifndef __DEBUG__

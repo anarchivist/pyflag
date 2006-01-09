@@ -4,7 +4,8 @@ bin_SCRIPTS		=	pyflag pyflash pyflag_launch
 sysconf_DATA		=	pyflagrc
 pkgdata_DATA		=	data/magic data/magic.mime data/db.setup
 nobase_pkgdata_DATA	=	images/*
-EXTRA_DIST		=	pyflag.in pyflagrc.in pyflash.in
+EXTRA_DIST		=	pyflag.in pyflagrc.in pyflash.in \
+				pyflag_launch.in images/* data/*
 
 # perform subs in scripts and config files
 edit = sed \
