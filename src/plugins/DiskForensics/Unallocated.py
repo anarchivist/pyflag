@@ -50,7 +50,7 @@ class UnallocatedScan(GenScanFactory):
         name = "Filesystem Analysis"
         contains = ['UnallocatedScan','DeletedScan']
         default = True
-        special_fs_name = 'Ext2'
+        special_fs_name = 'AutoFS'
         
     def reset(self):
         GenScanFactory.reset(self)

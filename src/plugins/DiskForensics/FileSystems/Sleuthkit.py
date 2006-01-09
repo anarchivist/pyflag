@@ -34,7 +34,7 @@ class AutoFS(DBFS):
             string
             )
 
-class Ext2(DBFS):
+class Ext2(AutoFS):
     """ A class implementing the Ext2 module from SK """
     sk_type = "linux-ext2"
     name = "Linux ext2"

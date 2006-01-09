@@ -211,7 +211,7 @@ off_t lseek(int fildes, off_t offset, int whence) {
   };
 };
 
-off64_t lseek64(int fildes,  off64_t  offset, int whence) {
+off_t lseek64(int fildes,  off_t  offset, int whence) {
   debug(1,"Called lseek64 with %llu, %u\n",offset,whence);
   CHECK_INIT;
 
@@ -330,6 +330,7 @@ int close(int fd) {
   } else return 0;
 };
 
+/*
 FILE *fopen64(const char *path, const char *mode) {
   FILE *fd;
   CHECK_INIT;
@@ -337,6 +338,7 @@ FILE *fopen64(const char *path, const char *mode) {
   fd=fopen(path,mode);
   return fd;
 };
+*/
 
 FILE *fopen(const char *path, const char *mode) {
   char *file_prefix = getenv("IO_FILENAME");
@@ -414,20 +416,20 @@ int stat(const char *file_name, struct stat *buf) {
   return(0);
 };
 
-int lstat64(const char *file_name, struct stat64 *buf) {
+int lstat64(const char *file_name, struct stat *buf) {
   CHECK_INIT;
   buf->st_size=-1;
   return(0);
 };
 
-int __xstat64 (int __ver, __const char *__filename, struct stat64 *buf) {
+int __xstat64 (int __ver, __const char *__filename, struct stat *buf) {
   CHECK_INIT;
   buf->st_size=-1;
   return(0);
 };
 
 
-int __fxstat64(int ver, int filedes, struct stat64 *buf) {
+int __fxstat64(int ver, int filedes, struct stat *buf) {
   CHECK_INIT;
 
   if(iosources[filedes]){

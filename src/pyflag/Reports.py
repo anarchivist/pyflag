@@ -127,7 +127,7 @@ class report:
 
     def progress(self,query,result):
         """ This will be executed while the analysis is happening to give the user a progress bar """
-        result.heading("Im progressing along nicely")
+        result.heading("Processing - please wait")
         return result
 
     def reset(self,query):
