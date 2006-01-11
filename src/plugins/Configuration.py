@@ -38,7 +38,8 @@ class Configure(Reports.report):
                 result.para("We do not seem to have enough privileges to access %s, or the path (%s) does not exist" %(k,config.__class__.__dict__[k]))
                 return
 
-        fd=open(os.environ['HOME'] + '/.pyflagrc', 'a+')
+        fd=open(os.environ['HOME'] + '/.pyflagrc', 'a+', S_IRWXU)
+	## TODO Think append is wrong?
         result.para("Writing new $HOME/.pyflagrc")
 
         result.start_table(border=1)
@@ -50,7 +51,7 @@ class Configure(Reports.report):
         fd.close()
         result.end_table()
         
-        result.para("Done. You may edit your personalised configuration by overriding the system configuration at %s/pyflagrc" % config.PREFIX)
+        result.para("Done. You may edit your personalised configuration by overriding the system configuration at %s/pyflagrc" % config.SYSCONF)
         result.refresh(5,query.__class__())
 
 class InitDB(Reports.report):

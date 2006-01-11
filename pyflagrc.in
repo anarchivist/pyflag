@@ -14,6 +14,7 @@ PYFLAG_FLAGDB=pyflag
 
 # Paths
 PYFLAG_PREFIX=@prefix@
+PYFLAG_SYSCONF=@sysconfdir@
 PYFLAG_DATADIR=@datadir@
 
 # Flag can only read and write to these directories
