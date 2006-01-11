@@ -97,7 +97,7 @@ class Ploticus(GenericGraph):
     def __init__(self,**opts):
         import conf,os
 
-        os.environ['PLOTICUS_PREFABS'] = config.PLOTICUS_PREFABS
+#        os.environ['PLOTICUS_PREFABS'] = config.PLOTICUS_PREFABS
 
     def hist(self,x,y,**opts):
         """ Draw a Histogram.

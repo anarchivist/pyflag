@@ -105,12 +105,13 @@ class ListLogFile(Reports.report):
         callbacks = {}
         links = []
         where = []
-        table = [query['logtable']+'_log']
+        table_name = query['logtable']+'_log'
+        table = [ "%s as table_name" % table_name]
         for d in dbh.cursor.description:
             names.append(d[0])
             try:
                 type = log.types[log.fields.index(d[0])]
-                columns.append(LogFile.types[type].sql_out % d[0])
+                columns.append(LogFile.types[type].sql_out % ("table_name.`%s`" % (d[0])))
                 links.append(None)
                 if type == "IP Address" and query.has_key('whois'):
                     names.append("Whois %s" % d[0])
@@ -118,7 +119,7 @@ class ListLogFile(Reports.report):
                     columns.append("whois_%s.whois_id" % (d[0]))
                     callbacks["Whois %s" % d[0]] = render_whois_info
                     table.append('whois as whois_%s' % d[0])
-                    where.append("%s = whois_%s.IP" % (d[0],d[0]))
+                    where.append("table_name.`%s` = whois_%s.IP" % (d[0],d[0]))
                     links.append( FlagFramework.query_type((),case=query['case'],family='Log Analysis',report='LookupWhoisID',__target__='id', __opt__='popup'))
                     
             except ValueError,e:

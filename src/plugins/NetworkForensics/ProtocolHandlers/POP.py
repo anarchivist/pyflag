@@ -119,6 +119,8 @@ class POP:
                 self.dispatcher[command](args)
             except KeyError:
                 raise POPException("POP: Command %r not implemented." % (command))
+        except Exception,e:
+            raise POPException("POP: Unable to parse line: %s." % (line))
 
         return line
 

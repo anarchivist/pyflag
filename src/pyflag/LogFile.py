@@ -280,7 +280,7 @@ class Type:
     """
     type = None
     sql_in="%r"
-    sql_out = "`%s`"
+    sql_out = "%s"
     index = "%s"
     
 class VarType(Type):
@@ -299,8 +299,8 @@ class TextType(Type):
 class IPType(Type):
     """ IP addresses should be stored in the database as ints, but displayed in dot notation """
     type = "int unsigned"
-    sql_in= "INET_ATON(%r)"
-    sql_out= "INET_NTOA(`%s`)"
+    sql_in= "INET_ATON(%s)"
+    sql_out= "INET_NTOA(%s)"
     
 types = {
     'varchar(250)': VarType,
