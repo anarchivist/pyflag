@@ -18,6 +18,8 @@ AC_CHECK_FILE(src/filesystems/sleuthkit-2.03.tar.gz,,AC_MSG_ERROR([You Must down
 AM_PATH_PYTHON(2.4)
 AC_PYTHON_DEVEL
 AC_PYTHON_MODULE(MySQLdb, REQUIRED)
+AC_PYTHON_MODULE(pexpect, REQUIRED)
+AC_PYTHON_MODULE(PIL, REQUIRED)
 
 # check for swig, custom macro in acinclude.m4
 AC_PROG_SWIG(1.3)
