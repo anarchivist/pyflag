@@ -44,7 +44,7 @@ class RFC2822(Scanner.GenScanFactory):
 
     class Scan(Scanner.StoreAndScanType):
         types = [ 'text/x-mail.*',
-                  'message/rfc822',
+                  'message/rfc822.*',
                   ]
 
         def boring(self,metadata, data=''):
@@ -63,10 +63,13 @@ class RFC2822(Scanner.GenScanFactory):
                 line = data.split('\r\n',1)[0].split(':',1)
                 try:
                     if (line[0].lower() in
-                           ['received','from', 'message-id', 'to', 'subject']):
+                           ['received','from', 'message-id', 'to', 'subject',
+                            'return-path']):
                         return False
                 except:
                     pass
+
+                print "RFC2822 thought %s is boring despite the magic" % line
 
             return True
  

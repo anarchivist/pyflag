@@ -1064,7 +1064,11 @@ class HTMLUI(UI.GenericUI):
                 ## Check if the user specified a callback for this column
                 if callbacks.has_key(names[i]):
                     value=callbacks[names[i]](value)
-#                    value=callbacks[names[i]](value,result=self)
+                else:
+                ## Sanitise the value to make it HTML safe. Note that
+                ## callbacks are required to ensure they sanitise
+                ## their output if they need.
+                    value=cgi.escape(value)
 
                 ## Now add links if they are required
                 try:
