@@ -141,6 +141,11 @@ class PCAPFile(File):
         ## Find out the offset in the file of the packet:
         self.dbh.execute("select * from pcap_%s where id=%r",(self.table,self.readptr,))
         row=self.dbh.fetch()
+
+        if not row:
+            self.readptr+=1
+            return '\x00'
+        
         self.fd.seek(row['offset'])
 
         self.link_type = row['link_type']

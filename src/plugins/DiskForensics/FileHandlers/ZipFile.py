@@ -206,10 +206,22 @@ class GZ_file(CachedFile):
     def cache(self,fd):
         self.gz = gzip.GzipFile(fileobj=self.fd)
         count = 0
+        step = 1024
         
-        ## Copy ourself into the file
+        ## Copy ourself into the file - This is in case we have errors
+        ## in the file, we try to read as much as possible:
         while 1:
-            data=self.gz.read(1024*1024)
+            try:
+                data=self.gz.read(step)
+            except:
+                step /= 2
+                if step<10:
+                    logging.log(logging.DEBUG, "Error reading from %s, could only get %s bytes" % (self.fd.inode, count));
+                    break
+                
+                else:
+                    continue
+            
             count += len(data)
             if len(data)==0: break
             fd.write(data)

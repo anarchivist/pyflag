@@ -164,6 +164,14 @@ int IP_Read(Packet self, StringIO input) {
 
   len=this->__super__->Read(self, input);
 
+  /** Sometimes we get trailing trash at the end of a packet, since
+      the dissectors which follow us would not know how long the
+      packet actually is - it is up to us to set the size of it.
+   */
+  if(input->size > self->start + this->packet.total_length) {
+    CALL(input,truncate, self->start + this->packet.total_length);
+  };
+
   /** Now choose the dissector for the next layer */
   switch(this->packet.protocol) {
   case 0x6:

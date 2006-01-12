@@ -53,7 +53,9 @@ struct packet_data_t {
 
 static struct packet_data_t buffer[MAX_BUFF_SIZE+1];
 static int buffer_count=0;
-long unsigned int packet_id = 0;
+
+//We start counting packets from one so we are matched to ethereal.
+long unsigned int packet_id = 1;
 pcap_t *pfh;
 char *tableName = NULL;
 
