@@ -55,7 +55,7 @@ def display_test_log(dbh,log,result,query):
         names.append(d[0])
         try:
             type = log.types[log.fields.index(d[0])]
-            columns.append(LogFile.types[type].sql_out % d[0])
+            columns.append(LogFile.types[type].sql_out % "`%s`" % d[0])
         except ValueError:
             columns.append(d[0])
 
@@ -364,7 +364,7 @@ class RemoveLogPreset(Reports.report):
         ## Now lose the preset itself
         FlagFramework.reset_all(log_preset=preset,family=query['family'],report='Create Log Preset',case=None)
         
-        result.para("Deleted preset %s from the database" % query['log_preset'])
+        result.heading("Deleted preset %s from the database" % query['log_preset'])
         
 class ManageLogPresets(Reports.report):
     """ View and delete the available presets """
@@ -377,12 +377,12 @@ class ManageLogPresets(Reports.report):
         link = FlagFramework.query_type((),family=query['family'],report='CreateLogPreset')
                                                    
         result.toolbar(text="Add a new Preset",icon="new_preset.png",link=link,tooltip="Create a new Preset")
-        def DeleteIcon(value,result=None):
+        def DeleteIcon(value):
             tmp=result.__class__(result)
             tmp.icon("no.png",border=0,alt="Click here to delete %s preset" % value)
             return tmp
 
-        def Describe(value,result=None):
+        def Describe(value):
             try:
                 log = LogFile.get_loader(value,None)
                 return( "%s" % log.__class__)

@@ -38,6 +38,7 @@ import pyflag.DB as DB
 import StringIO
 import re
 from pyflag.FlagFramework import normpath
+import pyflag.FlagFramework as FlagFramework
 
 class PstScan(GenScanFactory):
     """ Recurse into Pst Files """
@@ -59,10 +60,10 @@ class PstScan(GenScanFactory):
         # create the "groupware" tables
         # these are global to the image, not the file, so other scanners may wish to use them
         # in that case this code may belong elseware
-        self.dbh.execute("CREATE TABLE IF NOT EXISTS `email_%s` (`inode` VARCHAR(250), `vfsinode` VARCHAR(250), `date` DATETIME, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));", self.table)
-        self.dbh.execute("CREATE TABLE IF NOT EXISTS `contact_%s` (`inode` VARCHAR(250), `vfsinode` VARCHAR(250), `name` VARCHAR(250), `email` VARCHAR(250), `address` VARCHAR(250), `phone` VARCHAR(250));", self.table)
-        self.dbh.execute("CREATE TABLE IF NOT EXISTS `appointment_%s` (`inode` VARCHAR(250), `vfsinode` VARCHAR(250), `startdate` DATETIME, `enddate` DATETIME, `location` VARCHAR(250), `comment` VARCHAR(250));", self.table)
-        self.dbh.execute("CREATE TABLE IF NOT EXISTS `journal_%s` (`inode` VARCHAR(250), `vfsinode` VARCHAR(250), `startdate` DATETIME, `enddate` DATETIME, `type` VARCHAR(250), `comment` VARCHAR(250));", self.table)
+        self.dbh.execute("CREATE TABLE IF NOT EXISTS `email_%s` (`inode` VARCHAR(250), `date` DATETIME, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));", self.table)
+        self.dbh.execute("CREATE TABLE IF NOT EXISTS `contact_%s` (`inode` VARCHAR(250), `name` VARCHAR(250), `email` VARCHAR(250), `address` VARCHAR(250), `phone` VARCHAR(250));", self.table)
+        self.dbh.execute("CREATE TABLE IF NOT EXISTS `appointment_%s` (`inode` VARCHAR(250), `startdate` DATETIME, `enddate` DATETIME, `location` VARCHAR(250), `comment` VARCHAR(250));", self.table)
+        self.dbh.execute("CREATE TABLE IF NOT EXISTS `journal_%s` (`inode` VARCHAR(250), `startdate` DATETIME, `enddate` DATETIME, `type` VARCHAR(250), `comment` VARCHAR(250));", self.table)
 
 
     def reset(self):
@@ -89,9 +90,6 @@ class PstScan(GenScanFactory):
             """ This is run on the extracted file """
             pst=pypst2.Pstfile(name)
 
-            ## filename is the filename in the filesystem for the pst file.
-            filename = self.ddfs.lookup(inode=self.inode)
-
             def scan_item(inode,item):
                 """ Scans the item with the scanner train.
 
@@ -101,12 +99,11 @@ class PstScan(GenScanFactory):
                 fd.inode=inode
                 Scanner.scanfile(self.ddfs,fd,self.factories)               
 
-            def add_email(id,name,item):
+            def add_email(new_inode,name,item):
                 """ adds the email itself into the VFS
 
                 @arg name: The name of the email to store
                 """
-
                 # add to email table
                 if item.header:
                     to = self.to_re.search(item.header)
@@ -124,8 +121,8 @@ class PstScan(GenScanFactory):
                     if item.outlook_sender:
                         from_addr += " (%s)" % item.outlook_sender
                     to_addr = "%s" % item.sentto_address
-                
-                self.dbh.execute("INSERT INTO `email_%s` SET `inode`=%r,`vfsinode`='P%s',`date`=from_unixtime(%s),`to`=%r,`from`=%r,`subject`=%r", (self.table, self.inode, id, item.arrival_date, to_addr, from_addr, item.subject.subj))
+
+                self.dbh.execute("INSERT INTO `email_%s` SET `inode`=%r,`date`=from_unixtime(%s),`to`=%r,`from`=%r,`subject`=%r", (self.table, new_inode, item.arrival_date, to_addr, from_addr, item.subject.subj))
                 
                 properties = {
                     'mtime':item.arrival_date,
@@ -134,10 +131,10 @@ class PstScan(GenScanFactory):
                     'size': item.size
                     }
  
-                self.ddfs.VFSCreate(self.inode,"P%s:0" % id, normpath("%s/body" % (name)),**properties)
+                self.ddfs.VFSCreate(None,"%s:0" % new_inode, normpath("%s/body" % (name)),**properties)
                 
                 #scan body
-                scan_item('%s|P%s:0' % (self.inode, id),item)
+                scan_item('%s:0' % (new_inode),item)
 
                 # now add each attachment                
                 count = 1
@@ -149,25 +146,25 @@ class PstScan(GenScanFactory):
                     else:
                         fname = "attach%i" % count
 
-                    self.ddfs.VFSCreate(self.inode,"P%s:%s" % (id,count), normpath("%s/%s" % (name,fname)),**properties)
+                    self.ddfs.VFSCreate(None,"%s:%s" % (new_inode,count), normpath("%s/%s" % (name,fname)),**properties)
 
                     #scan attachments
-                    scan_item('%s|P%s:%s' % (self.inode, id, count),a)
+                    scan_item('%s:%s' % (new_inode, count),a)
                     count += 1
 
-            def add_other(id,name,item):
+            def add_other(new_inode,name,item):
                 """ Adds other items than emails (does not process attachments) """
                 properties = {
                     'size': item.size
                     }
                                 
-                self.ddfs.VFSCreate(self.inode,"P%s" % id, normpath("%s" % (name)),**properties)
+                self.ddfs.VFSCreate(None,new_inode, normpath("%s" % (name)),**properties)
                 
                 #scan body
-                scan_item('%s|P%s' % (self.inode, id),item)
+                scan_item(new_inode,item)
 
-            def add_contact(id,name,item):
-                add_other(id,name,item)
+            def add_contact(new_inode,name,item):
+                add_other(new_inode,name,item)
                 name = ''
                 email = ''
                 address = ''
@@ -221,10 +218,10 @@ class PstScan(GenScanFactory):
                 elif item.business_phone2:
                     phone += ", %s(w)" % item.business_phone2
 
-                self.dbh.execute("INSERT INTO `contact_%s` SET `inode`=%r,`vfsinode`='P%s',`name`=%r, `email`=%r, `address`=%r, `phone`=%r", (self.table, self.inode, id, name, email, address, phone))
+                self.dbh.execute("INSERT INTO `contact_%s` SET `inode`=%r,`name`=%r, `email`=%r, `address`=%r, `phone`=%r", (self.table, new_inode, name, email, address, phone))
 
-            def add_appointment(id,name,item):
-                add_other(id,name,item)
+            def add_appointment(new_inode,name,item):
+                add_other(new_inode,name,item)
                 location = ''
                 comment = ''
                 if item.location:
@@ -232,10 +229,10 @@ class PstScan(GenScanFactory):
                 if item.comment:
                     comment = item.comment
                     
-                self.dbh.execute("INSERT INTO `appointment_%s` SET `inode`=%r,`vfsinode`='P%s', `startdate`=from_unixtime(%s), `enddate`=from_unixtime(%s), `location`=%r, `comment`=%r",(self.table, self.inode, id, item.start, item.end, location, comment))
+                self.dbh.execute("INSERT INTO `appointment_%s` SET `inode`=%r, `startdate`=from_unixtime(%s), `enddate`=from_unixtime(%s), `location`=%r, `comment`=%r",(self.table, new_inode, item.start, item.end, location, comment))
 
-            def add_journal(id,name,item):
-                add_other(id,name,item)
+            def add_journal(new_inode,name,item):
+                add_other(new_inode,name,item)
                 jtype = ''
                 comment = ''
                 if item.type:
@@ -243,22 +240,25 @@ class PstScan(GenScanFactory):
                 if item.comment:
                     comment = item.comment
                 
-                self.dbh.execute("INSERT INTO `journal_%s` SET `inode`=%r,`vfsinode`='P%s', `startdate`=from_unixtime(%s), `enddate`=from_unixtime(%s), `type`=%r, `comment`=%r",(self.table, self.inode, id, item.start, item.end, jtype, comment))
+                self.dbh.execute("INSERT INTO `journal_%s` SET `inode`=%r, `startdate`=from_unixtime(%s), `enddate`=from_unixtime(%s), `type`=%r, `comment`=%r",(self.table, new_inode, item.start, item.end, jtype, comment))
 
             ## Just walk over all the files
             for root, dirs, files in pst.walk():
                 ## We do not put empty directories (with no content) to prevent clutter
                 for name in files:
+                    new_inode = "%s|P%s" % (self.inode, name[0])
+                    root_directory = self.ddfs.lookup(inode=self.inode)
+                    
                     item = pst.getitem(name[0])
                         ## We make the filename of the VFS object root/name[1]
                     if isinstance(item, pypst2.Pstfile.Email):
-                        add_email(name[0],"%s/%s" % (root[1],name[1]),item)
+                        add_email(new_inode,"%s%s/%s" % (root_directory,root[1],name[1]),item)
                     elif isinstance(item, pypst2.Pstfile.Contact):
-                        add_contact(name[0],"%s/%s" % (root[1],name[1]),item)
+                        add_contact(new_inode,"%s%s/%s" % (root_directory,root[1],name[1]),item)
                     elif isinstance(item, pypst2.Pstfile.Appointment):
-                        add_appointment(name[0],"%s/%s" % (root[1],name[1]),item)
+                        add_appointment(new_inode,"%s%s/%s" % (root_directory,root[1],name[1]),item)
                     elif isinstance(item, pypst2.Pstfile.Journal):
-                        add_journal(name[0],"%s/%s" % (root[1],name[1]),item)
+                        add_journal(new_inode,"%s%s/%s" % (root_directory,root[1],name[1]),item)
 
 ## The correspoding VFS module:
 class Pst_file(File):
@@ -347,17 +347,18 @@ class PstExplorer(Reports.report):
         
         def email(query,output):
             output.table(
-                columns=('inode','vfsinode','date','`from`','`to`','subject'),
-                names=('Inode','VFSInode','Arrival Date','From','To','Subject'),
+                columns=('inode','date','`from`','`to`','subject'),
+                names=('Inode','Arrival Date','From','To','Subject'),
                 table=('email_%s' % (tablename)),
+                links = [ FlagFramework.query_type((), case=query['case'],family="Disk Forensics",report='ViewFile', fsimage=query['fsimage'],__target__='inode', inode="%s:0"),],
                 case=query['case']
                 )
             return output
         
         def contacts(query,output):
             output.table(
-                columns=('inode','vfsinode','name','email','address','phone'),
-                names=('Inode','VFSInode','Name','Email','Address','Phone'),
+                columns=('inode','name','email','address','phone'),
+                names=('Inode','Name','Email','Address','Phone'),
                 table=('contact_%s' % (tablename)),
                 case=query['case']
                 )
@@ -365,8 +366,8 @@ class PstExplorer(Reports.report):
         
         def appts(query,output):
             output.table(
-                columns=('inode','vfsinode','startdate','enddate','location','comment'),
-                names=('Inode','VFSInode','Start Date','End Date','Location','Comment'),
+                columns=('inode','startdate','enddate','location','comment'),
+                names=('Inode','Start Date','End Date','Location','Comment'),
                 table=('appointment_%s' % (tablename)),
                 case=query['case']
                 )
@@ -374,8 +375,8 @@ class PstExplorer(Reports.report):
         
         def journal(query,output):
             output.table(
-                columns=('inode','vfsinode','startdate','enddate','type','comment'),
-                names=('Inode','VFSInode','Start Date','End Date','Type','Comment'),
+                columns=('inode','startdate','enddate','type','comment'),
+                names=('Inode','Start Date','End Date','Type','Comment'),
                 table=('journal_%s' % (tablename)),
                 case=query['case']
                 )
@@ -389,30 +390,3 @@ class PstExplorer(Reports.report):
                 )
         except DB.DBError:
             result.para("No groupware tables found, either there were no recognised email folders found, or the correct scanners were not run")
-
-class ViewEmail(Reports.report):
-    """ Display a pst email message """
-    parameters = {'fsimage':'fsimage','inode':'sqlsafe'}
-    name = "Display email message"
-    family = "Disk Forensics"
-    description = "This report displays an email item from a pst vfs entry as a nicely formatted email message"
-    hidden = True
-
-    def form(self, query, result):
-        try:
-            result.case_selector()
-            result.meta_selector(message='FS Image',case=query['case'],property='fsimage')
-            result.textfield('Inode','inode')
-        except KeyError:
-            return result
-
-    def display(self, query, result):
-        result.heading("Email Message in %i" % query['inode'])
-
-        iofd = IO.open(query['case'],query['fsimage'])
-        fsfd = FileSystem.FS_Factory( query["case"], query["fsimage"], iofd)
-        #fd = fsfd.open(inode=query['inode'])
-
-        # grab a list of subitems for this email
-        # (headers, body, attachments)
-        # use pypst directly or dbfs???

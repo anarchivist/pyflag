@@ -35,6 +35,129 @@ import pyflag.logging as logging
 import cStringIO,re
 import plugins.NetworkForensics.PCAPFS as PCAPFS
 
+class IRC:
+    """ Class to manage the IRC state """
+    command_lookup = {
+        001: "Welcome Reply",
+        002: "Host Server",
+        003: "Server Creation Date",
+        004: "Server Modes",
+        005: "Server Info",
+        251: "LUSER Client Reply",
+        252: "LUSER OP Reply",
+        253: "LUSER Unknown Reply",
+        254: "LUSER Channel Reply",
+        255: "LUSER Clients-Servers",
+        256: "ADMIN Reply",
+        265: "Curent Local Users",
+        266: "Current Global Users",
+        301: "NICK away Reply",
+        303: "ISON Reply",
+        311: "WHOISUSER Reply",
+        312: "WHOISSERVER Reply",
+        313: "WHOISOPERATOR Reply",
+        317: "WHOIS IDLE Reply",
+        318: "WHOIS End",
+        319: "WHOIS Reply Channel OP",
+        322: "LIST Reply",
+        329: "Channel Creation Time",
+        324: "MODE Channel",
+        332: "TOPIC Reply",
+        333: "TOPIC Reply WHO TIME",
+        341: "INVITE Reply",
+        353: "NAME Reply",
+        366: "NAME End",
+        372: "MOTD Reply",
+        375: "MOTD Start",
+        376: "MOTD End",
+        377: "MOTD Reply",
+        378: "MOTD Reply",
+        381: "OPER Success Reply",
+        382: "REHASHING Reply",
+        465: "ERROR Banned",
+        482: "ERROR Not OP",
+        }
+    
+    def __init__(self,fd,dbh,ddfs):
+        self.fd=fd
+        self.dbh = dbh
+        self.ddfs = ddfs
+
+    def rewrite_reply(self,prefix,command,line):
+        return line, self.command_lookup[command]+"(%s)" % command
+
+    def PRIVMSG(self,prefix,command,line):
+        return line,command
+
+    def store_command(self,prefix,command,line):
+        """ Handle the PRIVMSG command """
+        packet_id = self.fd.get_packet_id(position=self.offset)
+        self.dbh.execute("select ts_sec from pcap_%s where id = %s "
+                         ,(self.table,packet_id))
+        row = self.dbh.fetch()
+        timestamp = row['ts_sec']
+
+        if not prefix: prefix = self.nick
+
+        m=re.search("^:?([^!@]+)",prefix)
+        if m:
+            short_name = m.group(1)
+        else:
+            short_name = prefix
+
+        try:
+            base_stream_inode = self.fd.inode[:self.fd.inode.index('/')]
+        except IndexError:
+            base_stream_inode = self.fd.inode
+        if (line != None):
+            recipient = line.split(':')[0]
+        else:
+            recipient = ""
+            self.dbh.execute(""" insert into irc_messages_%s set sender=%r,full_sender=%r,
+            inode=%r, packet_id=%r, data=%r, ts_sec=%r, command = %r, recipient = %r""",(
+                self.table,short_name,prefix,base_stream_inode, packet_id,
+                line, timestamp, command, recipient 
+                ))
+
+    password = ''
+    def PASS(self,prefix,command,line):
+        self.password = line
+        return line,command
+
+    nick = ''
+    def NICK(self,prefix,command,line):
+        """ When a user changes their nick we store it in the database """
+        self.nick = line
+        self.dbh.execute(
+            """ insert into  `irc_userdetails_%s`  set
+            inode=%r, nick=%r, username=%r, password=%r
+            """,( self.table, self.fd.inode, self.nick, self.username, self.password))
+        return line,command
+
+    username = ''
+    def USER(self,prefix,command,line):
+        self.username = line
+        return line,command
+
+    def dispatch(self,prefix,command,line):
+        """ A dispatcher to handle the command given. """
+        try:
+            line,command=getattr(self,command)(prefix,command,line)
+        except AttributeError,e:
+            ## Command is not in this class maybe its manually dispatched:
+            try:
+                line,command=self.dispatch_dict[command](self,prefix,command,line)
+            except KeyError:
+                ## If the command is an int, we try to remap it:
+                try:
+                    line,command=self.rewrite_reply(prefix,int(command),line)
+                except (ValueError,KeyError):
+                    pass
+
+        self.store_command(prefix,command,line)
+
+
+
 class IRCScanner(NetworkScanFactory):
     """ Collect information about IRC traffic """
     default = True
@@ -80,126 +203,6 @@ class IRCScanner(NetworkScanFactory):
         self.irc_connections = {}
 
     class Scan(NetworkScanner):
-        command_lookup = {
-            001: "Welcome Reply",
-            002: "Host Server",
-            003: "Server Creation Date",
-            004: "Server Modes",
-            005: "Server Info",
-            251: "LUSER Client Reply",
-            252: "LUSER OP Reply",
-            253: "LUSER Unknown Reply",
-            254: "LUSER Channel Reply",
-            255: "LUSER Clients-Servers",
-            256: "ADMIN Reply",
-            265: "Curent Local Users",
-            266: "Current Global Users",
-            301: "NICK away Reply",
-            303: "ISON Reply",
-            311: "WHOISUSER Reply",
-            312: "WHOISSERVER Reply",
-            313: "WHOISOPERATOR Reply",
-            317: "WHOIS IDLE Reply",
-            318: "WHOIS End",
-            319: "WHOIS Reply Channel OP",
-            322: "LIST Reply",
-            329: "Channel Creation Time",
-            324: "MODE Channel",
-            332: "TOPIC Reply",
-            333: "TOPIC Reply WHO TIME",
-            341: "INVITE Reply",
-            353: "NAME Reply",
-            366: "NAME End",
-            372: "MOTD Reply",
-            375: "MOTD Start",
-            376: "MOTD End",
-            377: "MOTD Reply",
-            378: "MOTD Reply",
-            381: "OPER Success Reply",
-            382: "REHASHING Reply",
-            465: "ERROR Banned",
-            482: "ERROR Not OP",
-            
-            
-            }
-
-        def rewrite_reply(self,prefix,command,line):
-            return line, self.command_lookup[command]+"(%s)" % command
-        
-        dispatch_dict = {
-            }
-
-        def PRIVMSG(self,prefix,command,line):
-            return line,command
-            
-        def store_command(self,prefix,command,line):
-            """ Handle the PRIVMSG command """
-            packet_id = self.fd.get_packet_id(position=self.offset)
-#            print "line %s is at offset %s in the stream %s packet %s" % (line,self.offset,self.fd.inode,packet_id)
-            self.dbh.execute("select ts_sec from pcap_%s where id = %s "
-                             ,(self.table,packet_id))
-            row = self.dbh.fetch()
-            timestamp = row['ts_sec']
-            
-            if not prefix: prefix = self.nick
-
-            m=re.search("^:?([^!@]+)",prefix)
-            if m:
-                short_name = m.group(1)
-            else:
-                short_name = prefix
-
-            try:
-                base_stream_inode = self.fd.inode[:self.fd.inode.index('/')]
-            except IndexError:
-                base_stream_inode = self.fd.inode
-	    if (line != None):
-	        recipient = line.split(':')[0]
-	    else:
-	        recipient = ""
-            self.dbh.execute(""" insert into irc_messages_%s set sender=%r,full_sender=%r,
-            inode=%r, packet_id=%r, data=%r, ts_sec=%r, command = %r, recipient = %r""",(
-                self.table,short_name,prefix,base_stream_inode, packet_id,
-                line, timestamp, command, recipient 
-                ))
-
-        password = ''
-        def PASS(self,prefix,command,line):
-            self.password = line
-            return line,command
-        
-        nick = ''
-        def NICK(self,prefix,command,line):
-            """ When a user changes their nick we store it in the database """
-            self.nick = line
-            self.dbh.execute(
-                """ insert into  `irc_userdetails_%s`  set
-                inode=%r, nick=%r, username=%r, password=%r
-                """,( self.table, self.fd.inode, self.nick, self.username, self.password))
-            return line,command
-
-        username = ''
-        def USER(self,prefix,command,line):
-            self.username = line
-            return line,command
-
-        def dispatch(self,prefix,command,line):
-            """ A dispatcher to handle the command given. """
-            try:
-                line,command=getattr(self,command)(prefix,command,line)
-            except AttributeError,e:
-                ## Command is not in this class maybe its manually dispatched:
-                try:
-                    line,command=self.dispatch_dict[command](self,prefix,command,line)
-                except KeyError:
-                    ## If the command is an int, we try to remap it:
-                    try:
-                        line,command=self.rewrite_reply(prefix,int(command),line)
-                    except (ValueError,KeyError):
-                        pass
-
-            self.store_command(prefix,command,line)
-
         def process(self,data,metadata=None):
             NetworkScanner.process(self,data,metadata)
 

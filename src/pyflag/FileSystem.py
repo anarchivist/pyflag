@@ -228,7 +228,7 @@ class DBFS(FileSystem):
             else:
                 path = normpath("%s/" % filename)
 
-            self.dbh.execute("select * from file_%s where path=%r and name=%r",(self.table, path, dirs[d]))
+            self.dbh.execute("select * from file_%s where path=%r and name=%r and mode='d/d'",(self.table, path, dirs[d]))
             if not self.dbh.fetch():
                 ## Directory does not exist, so we need to create it:
                 if root_inode != None:

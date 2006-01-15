@@ -530,6 +530,7 @@ class Flag:
                     report = Registry.REPORTS.dispatch("Configuration",
                                                        "Configure")
                 else:
+                    query['error'] = str(e)
                     report = Registry.REPORTS.dispatch("Configuration",
                                                        "Initialise Database")
 

@@ -320,8 +320,10 @@ class ScanFS(Reports.report):
                 try:
                     fd=fsfd.open(inode=stat['inode'])
                     Scanner.scanfile(fsfd,fd,scanners)
+                except IOError,e:
+                    logging.log(logging.WARNINGS,"Unable to open file %s/%s: %s" % (stat['path'],stat['name'],e))
                 except Exception,e:
-                    logging.log(logging.ERRORS,"Unable to open file %s: %s" % (stat['inode'],e))
+                    logging.log(logging.ERRORS,"Error scanning inode %s: %s" % (stat['inode'],e))
                     
             ## Now recursively scan all the directories in this directory:
             for directory in fsfd.ls(path=root,dirs=1):

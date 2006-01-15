@@ -183,7 +183,15 @@ class IndexScan(GenScanFactory):
             
             #Sort the results so the offsets are in order
             #element 0 is ID, element 1 is offset
-            offsets.sort(key=lambda x:  x[1])
+            def compfunc(x,y):
+                if x[1]>y[1]:
+                    return 1
+                elif x[1]<y[1]:
+                    return -1
+
+                return 0
+            
+            offsets.sort(compfunc)
             
             # Store indexing results in the dbase
             ## Store any hits in the database - NOTE: We use extended
@@ -550,7 +558,7 @@ class SearchIndex(Reports.report):
             inode,offset = value.split(',')
             tmp = result.__class__(result)
             #The highlighting is not very good.  Only highlights one occurrence and picks a fixed length to highlight (5 at the moment)
-            tmp.link( offset, target=FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',fsimage=query['fsimage'],mode='HexDump',inode=inode,hexlimit=offset,highlight=int(offset)+int(query['range'])/2, length=5) )
+            tmp.link( offset, target=FlagFramework.query_type((),case=query['case'],family="Disk Forensics", report='ViewFile',fsimage=query['fsimage'],mode='HexDump',inode=inode,hexlimit=offset,highlight=int(offset)+int(query['range'])/2, length=5) )
             return tmp
         
         result.table(
@@ -559,7 +567,7 @@ class SearchIndex(Reports.report):
             table='LogicalIndexCache_%s, LogicalIndex_%s ' % (cache_id,table),
             where = " low>>%s = block " % BLOCKBITS,
             callbacks = { 'Data' : SampleData, 'Offset' : offset_link_cb },
-            links = [ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',fsimage=query['fsimage'],mode='HexDump',__target__='inode') ],
+            links = [ FlagFramework.query_type((),case=query['case'],family="Disk Forensics",report='ViewFile',fsimage=query['fsimage'],__target__='inode') ],
             case=query['case'],
             )
         
