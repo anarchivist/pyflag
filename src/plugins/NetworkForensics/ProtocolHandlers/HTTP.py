@@ -118,7 +118,11 @@ class HTTP:
             if "chunked" in headers['transfer-encoding'].lower():
                 while True:
                     line = self.fd.readline()
-                    length = int(line,16)
+                    try:
+                        length = int(line,16)
+                    except:
+                        return
+                    
                     if length == 0:
                         return
 
@@ -285,12 +289,17 @@ class Chunked(File):
         self.fd.seek(0)
         self.data = self.fd.read()
         self.size=0
-        
+
         while 1:
             end = self.data.find(delimiter)+len(delimiter)
             if end<0: break
 
-            size = int(self.data[:end],16)
+            try:
+                size = int(self.data[:end],16)
+            except:
+                logging.log(logging.DEBUG, "Expecting chunked data length, found %s. Losing sync." % self.data[:end])
+                return
+            
             if size==0: break
             self.cached_fd.write(self.data[end:end+size])
             self.size+=size

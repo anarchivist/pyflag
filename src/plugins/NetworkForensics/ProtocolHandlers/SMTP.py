@@ -130,14 +130,6 @@ class SMTPScanner(NetworkScanFactory):
     default = True
     depends = ['StreamReassembler']
 
-    def prepare(self):
-        ## This table simply stores the fact that a certain Inode is
-        ## an SMTP String. We deduce this by checking if ethereal
-        ## decodes it as such. I guess if we want to parse SMTP
-        ## streams which are not on port 25, we need to tell ethereal
-        ## this via its config file.
-        self.smtp_connections = {}
-
     def process_stream(self, stream, factories):
         forward_stream, reverse_stream = self.stream_to_server(stream, "SMTP")
         if not reverse_stream or not forward_stream: return

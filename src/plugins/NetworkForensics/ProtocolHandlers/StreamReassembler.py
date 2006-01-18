@@ -234,7 +234,10 @@ class StreamReassembler(NetworkScanFactory):
             ## Expire sessions which are too old.
             for key,s in self.outer.connection_cache.items():
                 if s.max_id + config.MAX_SESSION_AGE < packet_id:
-                    self.process_stream(s)
+                    try:
+                        self.process_stream(s)
+                    except Exception,e:
+                        logging.log(logging.ERRORS,"Unable to scan stream: %s." % e)
                     del self.outer.connection_cache[key]
 
             ## Note that we can not use fin/rst flags this since it is
