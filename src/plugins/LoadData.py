@@ -354,6 +354,15 @@ class ScanFS(Reports.report):
            open_tree = query['path'])
                        )
 
+def get_default_fs_driver(query,sig):
+    """ Try to guess a good default filesystem driver based on the magic """
+    ## Only do this if one was not already supplied
+    if not query.has_key('fstype'):
+        if "tcpdump" in sig:
+            query['fstype'] = "PCAP Filesystem"
+        else:
+            query['fstype'] = "Auto FS"
+
 class LoadFS(Reports.report):
     """ Loads Filesystem Image into the database. """
     parameters = {"iosource":"iosource","fstype":"string"}
@@ -382,9 +391,12 @@ class LoadFS(Reports.report):
             try:
                 magic = FlagFramework.Magic()
                 result.ruler()
-                result.row("Magic identifies this file as: %s" % magic.buffer(fd.read(10240)),colspan=50,bgcolor=config.HILIGHT)
+                sig = magic.buffer(fd.read(10240))
+                result.row("Magic identifies this file as: %s" % sig,colspan=50,bgcolor=config.HILIGHT)
                 fd.close()
 
+                get_default_fs_driver(result.defaults,sig)
+                
                 result.const_selector("Enter Filesystem type",'fstype',fs_types,fs_types)
                 result.ruler()
             except FlagFramework.FlagException,e:

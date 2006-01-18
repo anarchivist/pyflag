@@ -18,7 +18,7 @@ config=pyflag.conf.ConfObject()
 class AutoFS(DBFS):
     """ This allows SK to determine automatically the filesystem type. """
     sk_type = "auto"
-    name = "Auto"
+    name = "Auto FS"
 
     def load(self):
         DBFS.load(self)

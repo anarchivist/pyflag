@@ -234,16 +234,21 @@ class ViewDissectedPacket(Reports.report):
             h=FlagFramework.HexDump(packet,result)
             
             try:
-                result.text("%s" % node.name)
+                result.text("%s" % node.name, font='bold')
                 start,length = node.get_range()
                 h.dump(highlight=start,length=length)
                 
             except AttributeError:
-                result.text("%s.%s = " % (previous_node.name,
+                result.text("%s.%s\n" % (previous_node.name,
                                           branch[-1]), color='black',
                             font='bold'
                                )
-                result.text("%r\n" % node, color='red')
+                try:
+                    node = node[:10000]
+                except:
+                    pass
+                
+                result.text("%s\n" % node, color='red', wrap='full', font='typewriter', sanitise='full')
                 result.text('',color='black', font='normal')
 
                 try:
