@@ -32,8 +32,6 @@ config=pyflag.conf.ConfObject()
 import FileFormats.IECache as IECache
 import pyflag.DB as DB
 
-## raise Exception("This module not finished yet")
-
 class IEIndex(Scanner.GenScanFactory):
     """ Load in IE History files """
     default = True
@@ -72,13 +70,15 @@ class IEIndex(Scanner.GenScanFactory):
             history = IECache.IEHistoryFile(fd)
             for event in history:
                 if event:                    
-                    r=["%s=%r" % (k,"%s"%v) for k,v in event.items() if k!='event' ]
-                    self.dbh.execute("INSERT INTO history_%s VALUES(%r,%r,%r,%r,%r,%r,%r,%r)",(self.table, self.ddfs.lookup(inode=self.inode),
-               event['type'],event['url'],event['modified_time'],
-               event['accessed_time'],
-               event['filename'],'',event['data']))
-
-                    # self.dbh.MySQLHarness("pasco -t %s -p %r %s " % (self.table,self.ddfs.lookup(inode=self.inode),name))
+                    self.dbh.execute("INSERT INTO history_%s VALUES(%r,%r,%r,%r,%r,%r,%r,%r)",(
+                        self.table, self.ddfs.lookup(inode=self.inode),
+                        event['type'],event['url'],
+                        event['modified_time'],
+                        event['accessed_time'],
+                        event['filename'],
+                        '',event['data']
+                        )
+                                     )
 
 class IEHistory(Reports.report):
     """ View IE browsing history with pasco"""

@@ -40,6 +40,9 @@ PYFLAG_MAGICFILE=@datadir@/magic:@magic@
 #Sleuthkit binary:
 PYFLAG_SLEUTHKIT=@bin@/dbtool
 
+#Clamav virus updates:
+PYFLAG_CLAMDIR=/var/lib/clamav/
+
 #Wrapper hooker:
 PYFLAG_IOWRAPPER=@bin@/iowrapper
 

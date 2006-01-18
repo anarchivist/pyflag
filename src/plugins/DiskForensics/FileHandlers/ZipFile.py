@@ -104,8 +104,8 @@ class GZScan(ZipScan):
                 ## 2) Failing this we check if the inodes filename ends with .gz
                 ## 3) Failing that, we call the new file "data"
                 a=FlagFramework.Magic()
-                a.buffer(data)
-                match = re.search(a.magic,'was "([^"]+)"')
+                magic = a.buffer(data)
+                match = re.search(magic,'was "([^"]+)"')
                 if match:
                     self.filename = match.groups(1)
                     return

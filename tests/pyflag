@@ -1,0 +1,24 @@
+#!/bin/bash
+## This is a version of the launcher script which run on the src directory - paths are hard coded atm. Configure below:
+
+SRC_DIR=~/pyflag/
+INSTALL_DIR=/var/tmp/build/pyflag/
+
+######### END CONFIGURATION ####################
+
+. $SRC_DIR/pyflagrc
+
+## Try to load personalised configurations
+if [ -e ~/.pyflagrc ] ; then source ~/.pyflagrc; fi
+
+declare -x `set | grep PYFLAG_ | cut -d= -f1`
+
+## This is required in case the prefix is not /usr/ (otherwise python
+## can find it itself) 
+
+export PYFLAG_PLUGINS=$SRC_DIR/src/plugins
+export PYTHONPATH=$INSTALL_DIR/lib/python2.4/site-packages/pyflag:$SRC_DIR/src/pyflag:$SRC_DIR/src/
+
+echo $PYTHONPATH
+
+exec /usr/bin/python2.4 $SRC_DIR/src/pyflag/FlagHTTPServer.py $@

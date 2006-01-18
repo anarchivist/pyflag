@@ -47,7 +47,7 @@ import pyflag.Registry as Registry
 import pyflag.IO as IO
 from pyflag.Scanner import *
 import pyflag.Scanner as Scanner
-import index,os,time
+import index,os,time,re
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
@@ -180,7 +180,7 @@ class IndexScan(GenScanFactory):
                     except KeyError:
                         #Must be a new id for the dictionary
                         self.stats_count[row[1]]=1
-            
+
             #Sort the results so the offsets are in order
             #element 0 is ID, element 1 is offset
             def compfunc(x,y):
@@ -474,7 +474,7 @@ class SearchIndex(Reports.report):
             if not old_temp_table:
                 offset_columns.append("offset_%s" % word_id)
                 try:
-                    dbh.execute("create table %s select offset-%s as low,offset+%s as high, offset as offset_%s from LogicalIndexOffsets_%s where id=%r",(temp_table,range,range,word_id,query['fsimage'],word_id))
+                    dbh.execute("create table %s select greatest(offset-%s , ((offset)>>20)<<20) as low,offset+%s as high, offset as offset_%s from LogicalIndexOffsets_%s where id=%r",(temp_table,range,range,word_id,query['fsimage'],word_id))
                 except DB.DBError,e:
                     raise Reports.ReportError("Unable to find a LogicalIndexOffsets table for current image. Did you run the LogicalIndex Scanner?.\n Error received was %s" % e)
                 
@@ -555,16 +555,30 @@ class SearchIndex(Reports.report):
         tmp = ['(block_number <<%s) + (%s & ((1<<%s)-1))' % (BLOCKBITS,a,BLOCKBITS) for a in offset_columns ]
 
         def offset_link_cb(value):
-            inode,offset = value.split(',')
+            inode,offset,word = value.split(',')
+            offset = int(offset)
             tmp = result.__class__(result)
             #The highlighting is not very good.  Only highlights one occurrence and picks a fixed length to highlight (5 at the moment)
-            tmp.link( offset, target=FlagFramework.query_type((),case=query['case'],family="Disk Forensics", report='ViewFile',fsimage=query['fsimage'],mode='HexDump',inode=inode,hexlimit=offset,highlight=int(offset)+int(query['range'])/2, length=5) )
+            tmp.link( offset, target=FlagFramework.query_type((),case=query['case'],family="Disk Forensics", report='ViewFile',fsimage=query['fsimage'],mode='HexDump',inode=inode,hexlimit=max(offset-int(query['range'])/2,0),highlight=offset, length=len(word)) )
             return tmp
         
         result.table(
-            columns = ['inode','concat(inode,",",(block_number <<%s) + (low & ((1<<%s)-1)))' % (BLOCKBITS,BLOCKBITS), 'concat(%s)' % ',",",'.join(['inode','low','high']+offset_columns)],
+            columns = ['inode',
+                       ## Data for Offset cb: inode,offset in
+                       ## inode,word highlighted. e.g:
+                       ## D1285|P2097316:0,10,word
+                       'concat(inode,",",(block_number <<%s) + (%s & ((1<<%s)-1)),",",%r)' % (BLOCKBITS,offset_columns[0],BLOCKBITS, words[0]),
+                       ## Data for data cb: inode,low offset, high
+                       ## offset, list of hit offsets. eg:
+                       ## D1285|P2097316:0,69206016,69206076,69206026
+                       'concat(%s)' % ',",",'.join(
+                             ['inode','low','high']+ offset_columns
+                             )
+                       ],
             names=['Inode','Offset','Data'],
             table='LogicalIndexCache_%s, LogicalIndex_%s ' % (cache_id,table),
+            
+            ## Note this assumes that high-low < BLOCKSIZE
             where = " low>>%s = block " % BLOCKBITS,
             callbacks = { 'Data' : SampleData, 'Offset' : offset_link_cb },
             links = [ FlagFramework.query_type((),case=query['case'],family="Disk Forensics",report='ViewFile',fsimage=query['fsimage'],__target__='inode') ],

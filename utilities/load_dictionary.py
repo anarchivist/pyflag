@@ -50,7 +50,7 @@ if not args:
 drop = False
 verbose = False
 wordclass = "English"
-type="String"
+type="literal"
 
 # parse options
 
@@ -65,7 +65,7 @@ for o, a in opts:
     if o in ("-d", "--drop"):
         drop = True
     if o in ("-r", "--regex"):
-        type="Regular Expression"
+        type="regex"
         
 print "wordclass is /%s/" % wordclass
 
@@ -81,7 +81,7 @@ dbh.execute(
     `word` VARCHAR( 50 ) NOT NULL ,
     `class` VARCHAR( 50 ) NOT NULL ,
     `encoding` SET( 'all', 'asci', 'ucs16' ) NOT NULL,
-    `type` set ( 'String','Regular Expression' ),
+    `type` set ( 'literal','regex' ),
     PRIMARY KEY  (`id`)
     )""")
 

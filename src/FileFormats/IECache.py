@@ -112,6 +112,13 @@ class HIST_STR_PTR(LONG):
         ## Return the null terminated string:
         return TERMINATED_STRING(data[offset:])
 
+    def __str__(self):
+        if not self.data:
+            self.initialise()
+
+        result="%s" % (self.data,)
+        return result.split('\0',1)[0]
+
 class Content(SimpleStruct):
     """ The Data contained within the record.
 

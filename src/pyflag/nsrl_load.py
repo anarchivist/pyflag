@@ -112,6 +112,10 @@ def ProductTable(dirname):
             print "SQL Error skipped %s" %e
 
 if __name__=="__main__":
-    MainNSRLHash(dirname)
+    try:
+        MainNSRLHash(dirname)
+    except IOError:
+        print "Unable to read main hash db, doing product table only"
+        
     ProductTable(dirname)    
     print "You may wish to run this program with the -i arg to create indexes now. Otherwise indexes will be created the first time they are needed."

@@ -137,6 +137,7 @@ class NetworkScanner(BaseScanner):
             ## pcapfs.
             link_type = self.fd.link_type
         except:
+#            print "Not processing non network fs"
             return
         
         ## We try to get previously set proto_tree. We store it in

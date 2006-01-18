@@ -10,3 +10,6 @@
 #
 # Internet Explorer History Files (index.dat)
 0        string          Client\ UrlCache        application/x-ie-index
+
+## Gzip files need their own mime types in Pyflag:
+0       string          \037\213        	 application/x-gzip; foobar
