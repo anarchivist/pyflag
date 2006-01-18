@@ -60,6 +60,50 @@ static PyObject *dissect(PyObject *self, PyObject *args) {
   return result;
 };
 
+
+/** Takes a node, and a field name and returns the offset within the
+    packet where the field is located 
+*/
+static PyObject *get_range(PyObject *self, PyObject *args) {
+  PyObject *result;
+  struct struct_property_t *p;
+  Packet root;
+  char *element;
+  
+  if(!PyArg_ParseTuple(args, "Os",  &result,&element)) 
+    return NULL;
+
+  root = PyCObject_AsVoidPtr(result);
+  if(!root) 
+    return PyErr_Format(PyExc_RuntimeError, "node is not valid");
+
+  // If element is not supplied, we assume this refers to ourselves
+  if(strlen(element)==0) {
+    PyObject *list = PyList_New(0);
+    PyList_Append(list, PyLong_FromUnsignedLong(root->start));
+    PyList_Append(list, PyLong_FromUnsignedLong(-1));
+    return list;
+  };
+
+  if(Find_Property(&root, &p, NAMEOF(root), element)) {
+    PyObject *list = PyList_New(0);
+    int size;
+     
+    if(!p->size) {
+      size = *(int *)((char *)(root->struct_p) + p->size_p);
+    } else 
+      size=p->size;
+
+    PyList_Append(list, PyLong_FromUnsignedLong(root->start + p->item));
+    PyList_Append(list, PyLong_FromUnsignedLong(size));
+    return list;
+  } else {
+
+    return PyErr_Format(PyExc_KeyError, 
+			"Can not find field %s", element);
+  };
+};
+
 /** Returns the object in field as a python object. field is a string
     of the format node_name.field_name 
 */
@@ -123,6 +167,12 @@ static PyObject *get_field(PyObject *self, PyObject *args) {
     case FIELD_TYPE_PACKET:
       {
 	Packet node = *(Packet *)item;
+
+	if(!node) {
+	  Py_INCREF(Py_None);
+	  result=Py_None;
+	  break;
+	};
 
 	result = PyCObject_FromVoidPtr(node, (void (*)(void *))node->destroy);
 	/** We are about to return another reference, we need to incref
@@ -218,6 +268,8 @@ static PyMethodDef DissectMethods[] = {
    "Lists the field names in the dissected object"},
   {"get_name", get_name, METH_VARARGS,
    "Returns the name of the current node"},
+  {"get_range", get_range, METH_VARARGS,
+   "Returns the start of an element in the node"},
   {NULL, NULL, 0, NULL}
 };
 

@@ -198,41 +198,63 @@ class ViewDissectedPacket(Reports.report):
 
         ## Now dissect it.
         proto_tree = dissect.dissector(packet,link_type)
+
+        def get_node(branch):
+            node = proto_tree
+            previous_node = node
+            for field in branch:
+                field=field.replace('/','')
+                try:
+                    tmp = node
+                    node = node[field]
+                    previous_node = tmp
+                except:
+                    break
+
+            return previous_node,node
         
         def tree_cb(branch):
+            previous_node, node = get_node(branch)
             try:
-                if branch:
-                    node = proto_tree[branch[-1]]
-                else:
-                    node = proto_tree
-            except KeyError:
-                node=proto_tree
-
-            child = node.get_child()
-            if not child: return
-            for peer in child:
-                if peer.get_child():
-                    yield  ( peer.name(), "%s" % peer,'branch')
-                else:
-                    yield  ( peer.name(),"%s" % (peer),'leaf')
+                for field in node.list_fields():
+                    if node.is_node(field):
+                        yield  ( field, node[field].name, 'branch')
+                    else:
+                        yield  ( field, field, 'leaf')
+            except AttributeError:
+                pass
+            
+            return
         
         def pane_cb(branch,result):
-            try:
-                if branch:
-                    node = proto_tree[branch[-1]]
-                else:
-                    node = proto_tree
-            except KeyError:
-                node=proto_tree
+            previous_node, node = get_node(branch)
 
-            result.heading("%s" % node)
-            start = node.start()
-            length = node.length()
-            ## Draw the hexdump
+            result.heading("Packet %s" % query['id'])
+
             h=FlagFramework.HexDump(packet,result)
-            h.dump(highlight=start,length=length)
+            
+            try:
+                result.text("%s" % node.name)
+                start,length = node.get_range()
+                h.dump(highlight=start,length=length)
+                
+            except AttributeError:
+                result.text("%s.%s = " % (previous_node.name,
+                                          branch[-1]), color='black',
+                            font='bold'
+                               )
+                result.text("%r\n" % node, color='red')
+                result.text('',color='black', font='normal')
 
-        result.tree(tree_cb=tree_cb, pane_cb=pane_cb, branch=['/'],layout="vertical")
+                try:
+                    start,length = previous_node.get_range(branch[-1])
+                    h.dump(highlight=start,length=length)
+                except KeyError:
+                    pass
+
+            return
+
+        result.tree(tree_cb=tree_cb, pane_cb=pane_cb, branch=[''])
 
         ## We add forward and back toolbar buttons to let people move
         ## to next or previous packet:

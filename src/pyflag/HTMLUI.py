@@ -674,11 +674,14 @@ class HTMLUI(UI.GenericUI):
                 left.text("&nbsp;%s\n" % str(sv),color='black')
 
         right=self.__class__(self)
+        
         try:
             ## Get the right part:
-            pane_cb(query['open_tree'].split('/'),right)
+            branch=query['open_tree'].split('/')
         except KeyError:
-            pane_cb(['/'],right)
+            branch=['/']
+
+        pane_cb(branch,right)
         
         ## Now draw the left part
         if layout=="vertical":            
