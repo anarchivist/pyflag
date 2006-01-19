@@ -15,5 +15,5 @@ _pypst_la_LIBADD	= $(PSTVER)/libpst.la
 $(srcdir)/pypst_wrap.c: $(SWIG_SOURCES)
 	$(SWIG) $(SWIG_PYTHON_OPT) -o $@ $<
 
-clean-local:
-	-rm -rf pypst.py pypst_wrap.c
+#clean-local:
+#	-rm -rf pypst.py pypst_wrap.c

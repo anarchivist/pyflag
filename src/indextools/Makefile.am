@@ -12,5 +12,5 @@ _index_la_LIBADD	= ../lib/libexcept.la
 $(srcdir)/index_wrap.c: $(SWIG_SOURCES)
 	$(SWIG) $(SWIG_PYTHON_OPT) -o $@ $<
 
-clean-local:
-	-rm -rf index.py index_wrap.c
+#clean-local:
+#	-rm -rf index.py index_wrap.c

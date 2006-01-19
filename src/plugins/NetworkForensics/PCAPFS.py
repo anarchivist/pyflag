@@ -235,6 +235,7 @@ class ViewDissectedPacket(Reports.report):
             
             try:
                 result.text("%s" % node.name, font='bold')
+                result.text('',color='black', font='normal')
                 start,length = node.get_range()
                 h.dump(highlight=start,length=length)
                 

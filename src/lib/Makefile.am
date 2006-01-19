@@ -60,5 +60,5 @@ _iosubsys_la_LIBADD	= libiosubsys.la
 $(srcdir)/io_wrap.c: $(SWIG_SOURCES)
 	$(SWIG) $(SWIG_PYTHON_OPT) -o $@ $<
 
-clean-local:
-	-rm -rf iosubsys.py io_wrap.c
+#clean-local:
+#	-rm -rf iosubsys.py

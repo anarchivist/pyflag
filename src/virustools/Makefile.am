@@ -12,5 +12,5 @@ _clamav_la_LDFLAGS 	= -module $(libclamav_LIBS)
 $(srcdir)/clamav_wrap.c: $(SWIG_SOURCES)
 	$(SWIG) $(SWIG_PYTHON_OPT) -o $@ $<
 
-clean-local:
-	-rm -rf clamav.py clamav_wrap.c
+#clean-local:
+#	-rm -rf clamav.py clamav_wrap.c
