@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. @sysconf@/pyflagrc
+. @sysconfdir@/pyflagrc
 
 ## Try to load personalised configurations
 if [ -e ~/.pyflagrc ] ; then source ~/.pyflagrc; fi

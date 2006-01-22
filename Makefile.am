@@ -10,7 +10,7 @@ EXTRA_DIST		=	pyflag.in pyflagrc.in pyflash.in \
 # perform subs in scripts and config files
 edit = sed \
 	-e 's,@datadir\@,$(pkgdatadir),g' \
-	-e 's,@sysconf\@,$(sysconfdir),g' \
+	-e 's,@sysconfdir\@,$(sysconfdir),g' \
 	-e 's,@pkgpyexec\@,$(pkgpyexecdir),g' \
 	-e 's,@pythondir\@,$(pythondir),g' \
 	-e 's,@prefix\@,$(prefix),g' \
