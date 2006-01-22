@@ -3,6 +3,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import os
 import DB
+import stat
 
 class Configure(Reports.report):
     """ Configures pyflag """
@@ -38,7 +39,8 @@ class Configure(Reports.report):
                 result.para("We do not seem to have enough privileges to access %s, or the path (%s) does not exist" %(k,config.__class__.__dict__[k]))
                 return
 
-        fd=open(os.environ['HOME'] + '/.pyflagrc', 'a+', S_IRWXU)
+        fd=open(os.environ['HOME'] + '/.pyflagrc', 'a+') #, os.S_IRWXU)
+	os.chmod(os.environ['HOME'] + '/.pyflagrc',  stat.S_IRWXU)
 	## TODO Think append is wrong?
         result.para("Writing new $HOME/.pyflagrc")
 
