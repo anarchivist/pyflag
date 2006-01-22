@@ -30,7 +30,7 @@
 
 @var flag_version: Current version of the flag program
 """ 
-flag_version = "$Version: 0.78 Date: Fri Aug 19 00:47:14 EST 2005$"
+flag_version ="$Version: 0.80 Date: Thu Jan 19 00:50:12 EST 2006$"
 flag_version=flag_version.replace('$','')
 import sys,os
 import pyflag.conf
