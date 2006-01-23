@@ -1,103 +1,35 @@
 PyFLAG Installation instructions.
 ========================
 
-PyFlag is shipped in 3 different ways. The choice of which release
-file to select depends on individual choices (e.g. if a development
-environment is needed). The simplest distribution to install and use
-is the Binary+MySQL release, while the most technically challenging
-setup to achieve is compiling the source tar ball.
+PyFlag is now shipped with an autoconf build system. For most systems
+you should be able to do:
 
-This file covers installation instructions for all distributions. If
-you are not comfortable with compiling from source and satisfying all
-dependencies, the Binary+MySQL release is your obvious choice.
+./configure
+make
+make install
 
-Binary+MySQL distribution:
---------------------------------------
-This distribution contains a stand alone version of the mysql server
-software. It is designed to be completely self contained and therefore
-has no external dependencies other than a fairly recent version of
-glibc. This distribution should run on most flavours of Linux and has
-been thoroughly tested on sarge. To install simply:
+The following package pre-requisites are required. This is what they
+are named on debian/Ubuntu - other distributions might name them
+differently:
 
-- Download the tarball.
-- Unpack the tarball in a directory of your choice.
-- cd into this directory and then execute ./flag.sh
-- point your browser to http://127.0.0.1:8000/
+Here are the packages needed for installing on debian:
 
-The first time that flag is run, you will be asked to fill in a number
-of parameters. This will create a ~/.pyflagrc file in your home
-directory.
-
-Binary distribution:
---------------------------
-This is a self contained distribution, which does not have an embedded
-mysql server. You will need to have a working mysql server
-somewhere. It may be on a different server than the server used to run
-pyflag, but you will need to have root level access to the database
-server. This is required in order to drop and create databases.
-
-Log into the mysql server by using the mysql utility (If you just
-installed mysql there is no root password set, so the -pxxxx can be
-omitted):
-bash$  mysql -u root -pxxxx
-mysql> create database pyflag;
-mysql> grant all on *.* to root@localhost identified by "Y0urP1ssw0rdH3r3";
-mysql> quit
-
-The grant command create a root level account on the database. You can
-replace localhost with the actual host you intend to log in
-from. Note that mysql does not have a root password by default, but
-PyFlag _requires_ that you have a root password set for the mysql
-server when running in this mode. This is best practice anyway, and
-you should never consider running a mysql server with a blank root
-password.
-
-Now from the shell, populate the initial database:
-cat db.setup | mysql -u root -pY0urP1ssw0rdH3r3 -h localhost pyflag
-
-Source Package:
------------------------
-If you wish to develop modules for PyFlag or contribute, we encourage
-you to download the source distribution. To install from source you
-will need to have the mysql database set up as described above, and
-have all library dependencies satisfied. Since the list of library
-dependencies changes very often, we will not provide an exhaustive
-list here.
-
-At the very least the following packages are required:
-
-  swig
-  python-dev are
-  python-mysqldb
-  clamav
-  libjpeg-progs
-  zlib1g-dev
-  libx11-dev,
-  libpng12-dev
-  g++
-  libglib1.2-dev
-
-On debian you can check to see if these are installed as follows:
-
-   dpkg -l | grep clamav
-
-and install new packags as
-
+   apt-get install python2.4
+   apt-get install python2.4-mysqldb
+   apt-get install python2.4-imaging
+   apt-get install python2.4-pexpect
    apt-get install clamav
+   apt-get install zlib1g-dev
+   apt-get install libpcap0.8-dev
+   apt-get install libmagic-dev
+   apt-get install python2.4-dev
+   apt-get install libclamav-dev
+   apt-get install mysql-server
+   apt-get install mysql-client
 
-Also ploticus, and ethereal sources are required (If you do not wish
-to use the TCPDump modules, the ethereal sources are not needed - flag
-should be ready to run by the time ethereal is compiled).
+Set the root password on mysql
 
-The following should be downloaded to the sources/ directory:
-
-  ethereal-0.10.2.tar.bz2
-  libpng-1.2.8-config.tar.gz
-  pl231src.tar.gz
-  msleuthkit-1.73.tar.gz
-
-Tarballs in the sources/ directory are built automatically when 
-you type "make" in the top level directory.
+  mysqladmin -u root password "password"
 
 Optional Features:
 ==============

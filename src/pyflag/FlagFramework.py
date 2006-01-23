@@ -30,13 +30,13 @@
 
 @var flag_version: Current version of the flag program
 """ 
-flag_version ="$Version: 0.80 Date: Thu Jan 19 00:50:12 EST 2006$"
-flag_version=flag_version.replace('$','')
 import sys,os
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.logging as logging
 import pyflag.Registry as Registry
+
+flag_version = config.VERSION
 
 class DontDraw(Exception):
     """ Exception raised by a UI to let the server know not to draw it.

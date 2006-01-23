@@ -1,4 +1,5 @@
 # This is the global site wide configuration file for pyflag. 
+PYFLAG_VERSION=@VERSION@
 
 # Database settings
 # These are left blank and will be prompted for and

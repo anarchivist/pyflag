@@ -15,6 +15,7 @@ edit = sed \
 	-e 's,@pythondir\@,$(pythondir),g' \
 	-e 's,@prefix\@,$(prefix),g' \
 	-e 's,@bin\@,$(bindir),g' \
+	-e 's,@VERSION\@,$(VERSION),g' \
 	-e 's,@ploticus\@,@PLOTICUS@,g' \
 	-e 's,@mysql\@,@MYSQL@,g' \
 	-e 's,@magic\@,@magic@,g' \
