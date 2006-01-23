@@ -92,6 +92,8 @@ CREATE TABLE `dictionary` (
 	PRIMARY KEY  (`id`)
 );
 
+INSERT INTO dictionary set word="secret", class="English";
+
 ## This has been commented out due to it being _Really_ slow. Reenable
 ## if you need it.
 

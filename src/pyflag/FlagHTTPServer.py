@@ -136,6 +136,13 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         self.do_GET()
+
+    def do_HEAD(self):
+        headers = {}
+        headers['Expires']='-1'
+        for k,v in headers.items():
+            self.send_header(k,v)
+
     
     def do_GET(self):
         headers = {}
