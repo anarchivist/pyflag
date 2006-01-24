@@ -1507,23 +1507,23 @@ class HTMLUI(UI.GenericUI):
             ## Add the form elements as hidden parameters:
             result.hidden(context,page)
             for k,v in result.form_parms:
-                result.result += "<input type=hidden name='%s' value='%s'>\n" % (k,v)
+                result.result += "<input type=hidden name='%s' id='%s' value='%s'>\n" % (k,k,v)
 
             result.end_table()
             if page>0:
-                result.result+="<input type=button value=Previous onclick=\"window.location=\'%s&%s=%s\'\"; />" % (new_query,context,page-1)
+                result.result+="<input type=button value=Previous onclick=\"window.location=\'%s&%s=%s\';\" />" % (new_query,context,page-1)
             ## Make the update button
             result.result += "<input type=submit value='Update'>"
 
             if page<len(names)-1:
-                result.result += "<input type=submit value='Next' name=submit>\n"
+                result.result += "<input type=button value='Next' onclick=\"document.getElementById(\'%s\').value=\'%s\'; document.pyflag_form.submit();\" >\n" % (context, page+1)
             elif page==len(names)-1:
                 result.result += "<input type=submit value='Finish' name=submit>\n"
 
             result.decoration='naked'
 
         cb = self.store_callback(wizard_cb)
-        self.result+="""<script language=javascript>var client; function open_wizard_window() {window.open('%s&%s=0&callback_stored=%s','client','toolbar=0,menubar=0,HEIGHT=600,WIDTH=800,scrollbars=yes')}; open_wizard_window(); </script><abbr title=\"It your browser blocks popups, click here to popup a wizard\"><a onclick=\"open_wizard_window()\">Click here to launch wizard</a></abbr>""" % (self.defaults,context,cb)
+        self.result+="""<script language=javascript>var client; function open_wizard_window() {window.open('%s&%s=0&callback_stored=%s','client','toolbar=0,menubar=0,HEIGHT=600,WIDTH=800,scrollbars=yes')}; open_wizard_window(); </script><abbr title=\"If your browser blocks popups, click here to popup a wizard\"><a onclick=\"open_wizard_window()\">Click here to launch wizard</a></abbr>""" % (self.defaults,context,cb)
         raise FlagFramework.DontDraw()
                 
     def notebook(self,names=[],context="notebook",callbacks=[],descriptions=[]):
