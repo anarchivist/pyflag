@@ -2,7 +2,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.75 Date: Sat Feb 12 14:00:04 EST 2005$
+#  Version: FLAG $Version: 0.80.1 Date: Tue Jan 24 13:51:25 NZDT 2006$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or

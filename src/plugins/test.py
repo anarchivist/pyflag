@@ -9,7 +9,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.4 (12-02-2004)$
+#  Version: FLAG $Version: 0.80.1 Date: Tue Jan 24 13:51:25 NZDT 2006$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
