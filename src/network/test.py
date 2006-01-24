@@ -1,4 +1,5 @@
-import dissect,_dissect
+import pyflag._dissect as _dissect
+import dissect
 
 filename = "/var/tmp/demo/stdcapture_0.2.pcap"
 start = 249272

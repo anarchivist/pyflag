@@ -10,6 +10,6 @@ declare -x `set | grep PYFLAG_ | cut -d= -f1`
 ## This is required in case the prefix is not /usr/ (otherwise python
 ## can find it itself) 
 
-export PYTHONPATH=@pythondir@
+export PYTHONPATH=@pythondir@:@pythondir@/pyflag/
 
 exec @python@ @pkgpyexec@/FlagHTTPServer.py $@
