@@ -4,7 +4,7 @@ set case=demo
 
 execute Load\ Data.Load\ IO\ Data\ Source iosource=test subsys=sgzip io_filename=/var/tmp/demo/pyflag_stdimage_0.1.sgz io_offset=0
 
-execute Load\ Data.Load\ Filesystem\ image iosource=test fstype=Auto
+execute Load\ Data.Load\ Filesystem\ image iosource=test fstype=Auto\ FS
 
 #execute Load\ Data.ScanFS fsimage=test path=/ scangroup_NetworkScanners=off scangroup_Windows\ Scanners=on scangroup_Compressed\ File=on scangroup_General\ Forensics=on final=ok
 

@@ -76,14 +76,18 @@ class DBPool:
 
         ## No suitable dbh is found - we lock ourself to protect
         ## access to the pool, and add a new element to the pool
-        self.self_lock.acquire()
-        self.locks.append(threading.RLock())
-        self.dbh.append(self.connect())
-        lock=self.locks[-1]
-        lock.acquire()
-        
-        dbh=self.dbh[-1]
-        self.self_lock.release()
+        try:
+            self.self_lock.acquire()
+            self.locks.append(threading.RLock())
+            self.dbh.append(self.connect())
+            lock=self.locks[-1]
+            lock.acquire()
+            
+            dbh=self.dbh[-1]
+            
+        finally:
+            self.self_lock.release()
+
         return dbh
 
     def release(self,dbh):
