@@ -8,7 +8,7 @@ pkgpython_PYTHON 	= pypst2.py pypst.py
 pkgpyexec_LTLIBRARIES 	= _pypst.la
 
 _pypst_la_SOURCES 	= $(srcdir)/pypst_wrap.c $(SWIG_SOURCES)
-_pypst_la_CPPFLAGS 	= $(SWIG_PYTHON_CPPFLAGS) -I$(PSTVER)
+_pypst_la_CPPFLAGS 	= $(SWIG_PYTHON_CPPFLAGS) -I$(srcdir)/$(PSTVER)
 _pypst_la_LDFLAGS 	= -module
 _pypst_la_LIBADD	= $(PSTVER)/libpst.la	
 

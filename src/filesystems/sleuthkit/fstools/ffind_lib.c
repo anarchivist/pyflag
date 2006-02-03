@@ -1,0 +1,102 @@
+/*
+** ffind  (file find)
+** The Sleuth Kit 
+**
+** $Date: 2005/09/02 23:34:02 $
+**
+** Find the file that uses the specified inode (including deleted files)
+** 
+** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved 
+**
+** TASK
+** Copyright (c) 2002 Brian Carrier, @stake Inc.  All rights reserved
+**
+** TCTUTILs
+** Copyright (c) 2001 Brian Carrier.  All rights reserved
+**
+**
+** This software is distributed under the Common Public License 1.0
+**
+*/
+#include "libfstools.h"
+
+/* NTFS has an optimized version of this function */
+extern void
+ ntfs_find_file(FS_INFO *, INUM_T, uint32_t,
+		uint16_t, int, FS_DENT_WALK_FN, void *ptr);
+
+
+static INUM_T inode = 0;
+static uint8_t localflags = 0;
+static uint8_t found = 0;
+
+static uint8_t
+find_file_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
+{
+    /* We found it! */
+    if (fs_dent->inode == inode) {
+	found = 1;
+	if (flags & FS_FLAG_NAME_UNALLOC)
+	    printf("* ");
+
+	printf("/%s%s\n", fs_dent->path, fs_dent->name);
+
+	if (!(localflags & FFIND_ALL)) {
+	    return WALK_STOP;
+	}
+    }
+    return WALK_CONT;
+}
+
+
+uint8_t
+fs_ffind(FS_INFO * fs, uint8_t lclflags, INUM_T inode_a, uint32_t type,
+	 uint16_t id, int flags)
+{
+
+    found = 0;
+    localflags = lclflags;
+    inode = inode_a;
+
+    /* Since we start the walk on the root inode, then this will not show
+     ** up in the above functions, so do it now
+     */
+    if (inode == fs->root_inum) {
+	if (flags & FS_FLAG_NAME_ALLOC) {
+	    printf("/\n");
+	    found = 1;
+
+	    if (!(lclflags & FFIND_ALL))
+		return 0;
+	}
+    }
+
+    if ((fs->ftype & FSMASK) == NTFS_TYPE) {
+	ntfs_find_file(fs, inode, type, id, flags, find_file_act, NULL);
+    }
+    else {
+	fs->dent_walk(fs, fs->root_inum, flags, find_file_act, NULL);
+    }
+
+    if (found == 0) {
+
+	/* With FAT, we can at least give the name of the file and call
+	 * it orphan 
+	 */
+	if ((fs->ftype & FSMASK) == FATFS_TYPE) {
+	    FS_INODE *fs_inode = fs->inode_lookup(fs, inode);
+	    if (fs_inode->name != NULL) {
+		if (fs_inode->flags & FS_FLAG_NAME_UNALLOC)
+		    printf("* ");
+		printf("%s/%s\n", ORPHAN_STR, fs_inode->name->name);
+	    }
+	    fs_inode_free(fs_inode);
+	}
+	else {
+	    printf("inode not currently used\n");
+	}
+    }
+
+    return 0;
+}

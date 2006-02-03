@@ -1,1 +1,1 @@
-include_HEADERS	= *.h
+include_HEADERS	= $(srcdir)/*.h

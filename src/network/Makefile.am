@@ -31,4 +31,4 @@ init.h: $(_dissect_la_LIBADD)
 
 
 clean-local:
-	-rm -rf init.c init.h
+	-rm -rf init.c init.h libinit.la

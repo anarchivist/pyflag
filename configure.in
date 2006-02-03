@@ -11,7 +11,7 @@ AC_PROG_CC
 AC_CHECK_HEADER(zlib.h,,AC_MSG_ERROR([You Must install zlib-dev to build pyflag]))
 AC_CHECK_HEADER(pcap.h,,AC_MSG_ERROR([You Must install libpcap-dev to build pyflag]))
 AC_CHECK_HEADER(magic.h,,AC_MSG_ERROR([You Must install libmagic-dev to build pyflag this may be part of file the package for some distros]))
-AC_CHECK_FILE(src/filesystems/sleuthkit-2.03.tar.gz,,AC_MSG_ERROR([You Must download sleuthkit-2.03.tar.gz and place in src/filesystems ]))
+#AC_CHECK_FILE($srcdir/src/filesystems/sleuthkit-2.03.tar.gz,,AC_MSG_ERROR([You Must download sleuthkit-2.03.tar.gz and place in src/filesystems ]))
 
 # python checks 
 # (requires autoconf 1.5+ and the macros in acinclude.m4)
@@ -57,5 +57,10 @@ AC_OUTPUT([
 	src/regtools/Makefile
 	src/virustools/Makefile
 	src/filesystems/Makefile
+	src/filesystems/sleuthkit/Makefile
+	src/filesystems/sleuthkit/auxtools/Makefile
+	src/filesystems/sleuthkit/imgtools/Makefile
+	src/filesystems/sleuthkit/fstools/Makefile
+	src/filesystems/magic/Makefile
 	src/include/Makefile
 	])
