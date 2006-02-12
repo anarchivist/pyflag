@@ -1,6 +1,13 @@
+pyflag (0.80.1) unstable; urgency=low
+
+  * Package updated to work with new build system.  Much nicer now :)
+
+ -- gmcastl <gmcastl@localhost.localdomain>  Thu,  9 Feb 2006 10:59:00 +1100
+
 pyflag (0.0.20050225-1) unstable; urgency=low
 
-  * Initial Release.
+  * Initial deb package release.
 
  -- pyflag <pyflag-support@lists.sourceforge.net>  Tue, 15 Feb 2005 16:39:33 +1100
+
 
