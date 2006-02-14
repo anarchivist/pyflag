@@ -1,4 +1,4 @@
-AM_CFLAGS		= -I$(srcdir)/../auxtools -I$(srcdir)/../imgtools -DLINUX2
+AM_CFLAGS		= -I$(srcdir)/../auxtools -I$(srcdir)/../imgtools -I$(top_srcdir)/src/include -DLINUX2
 
 bin_PROGRAMS		= dbtool
 noinst_LTLIBRARIES	= libfstools.la
