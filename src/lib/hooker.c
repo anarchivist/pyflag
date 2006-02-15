@@ -57,6 +57,9 @@ void load_library(void) {
     RAISE(E_GENERIC,NULL,dlerror());
   };
 
+  //This is used for debugging with gdb - attach during this sleep
+  //sleep(10);
+
   //Actually hook all our functions
   HOOK(open);
   HOOK(open64);
@@ -141,7 +144,9 @@ int open64(const char *pathname, int flags,int mode) {
 
     */
     do {
-      new_fd = dispatch->open64(pathname,flags,mode);
+      debug(1,"Calling the dispatcher for open64");
+      new_fd = dispatch->open(pathname,flags,mode);
+      debug(1,"Returned from dispatcher");
     } while(iosources[new_fd]);
 
     debug(1,"returned unhooked fd=%u",new_fd);
@@ -162,11 +167,13 @@ int open64(const char *pathname, int flags,int mode) {
 int open(const char *pathname, int flags, ...) {
   va_list ap;
   int mode=0;
+
+  debug(1,"called open");
   
   CHECK_INIT;
 
   va_start(ap,flags);
-  mode = (int)*ap;
+  mode = va_arg(ap, int);
   va_end(ap);
 
   return open64(pathname,flags,mode);
