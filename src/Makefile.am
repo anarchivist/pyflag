@@ -76,4 +76,12 @@ nobase_pkgpython_PYTHON = 	plugins/test.py \
 				plugins/Farm.py \
 				plugins/Themes/Standard.py \
 				plugins/Themes/Menus.py \
-				plugins/Configuration.py
+				plugins/Configuration.py \
+				FileFormats/EVTLog.py \
+				FileFormats/format.py \
+				FileFormats/IECache.py \
+				FileFormats/__init__.py \
+				FileFormats/libole2.py \
+				FileFormats/OLE2.py \
+				FileFormats/PElib.py \
+				FileFormats/RegFile.py
