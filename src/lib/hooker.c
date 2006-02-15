@@ -270,7 +270,9 @@ ssize_t read(int fd, void *buf, size_t count) {
 };
 
 char *fgets(char *s, int size, FILE *stream) {
-  int fd=(int)stream;
+  int fd;
+  
+  fd=(long int)stream;
 
   CHECK_INIT;
   read(fd, s, size);
@@ -382,7 +384,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 
   //Stream is actually a hooked io subsys
   if((unsigned int)stream<256) {
-    return read((int)stream,ptr,size*nmemb)/size;
+    return read((long int)stream,ptr,size*nmemb)/size;
   };
   return dispatch->fread(ptr,size,nmemb,stream);
 };
@@ -395,7 +397,7 @@ int getc(FILE *stream) {
 
   len=fread(&temp,1,1,stream);
   if(len>0)
-    return((int)temp);
+    return((long int)temp);
   else
     return(EOF);
 };
@@ -450,7 +452,7 @@ int __fxstat64(int ver, int filedes, struct stat *buf) {
 
 int fileno(FILE *stream) {
   CHECK_INIT;
-	return((int)stream);
+	return((long int)stream);
 };
 
 int fcntl(int fd, int cmd, void *lock) {

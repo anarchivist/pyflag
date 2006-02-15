@@ -20,6 +20,8 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 */
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <getopt.h>
 #include <unistd.h>
@@ -44,9 +46,7 @@ void usage(char *prog) {
 
 int main(int argc, char **argv) 
 {
-  char ch;
   int i;
-  int opts_size=10;
   char *opts=NULL;
   
   setenv("LD_LIBRARY_PATH",PYFLAG_LIBDIR,0);
@@ -132,5 +132,6 @@ int main(int argc, char **argv)
 
   //If we are here something went horribly wrong:
   RAISE(E_GENERIC,NULL,"No file to execute ... maybe you need a -- somewhere?");
+  return -1;
 };
   
