@@ -158,7 +158,7 @@ class HTMLUI(UI.GenericUI):
         
         if self.decoration=='naked':
             return theme.naked_render(data=self.__str__(), ui=self,title=self.title)
-        elif self.decoration=='raw':
+        elif self.decoration=='raw' or self.decoration=='js':
             return self.__str__()
         else:
             return theme.render(q,meta=self.meta,data=self.__str__(),next=self.next , previous=self.previous , pageno=self.pageno, ui=self)
@@ -370,7 +370,8 @@ class HTMLUI(UI.GenericUI):
             if 'parent' in tmp:
                 action = "javascript: document.PseudoForm.target=self.opener.window.name; document.getElementById(\'pseudo_post_query\').value=\'%s\';  document.PseudoForm.submit(); self.close();" % (q,)
             else:
-                action = "javascript: if(isMiddleClick(event) || isLeftClick(event)) { if(isMiddleClick(event)){ document.PseudoForm.target='new_page';} else {document.PseudoForm.target=window.name;};  document.getElementById(\'pseudo_post_query\').value=\'%s\';document.PseudoForm.method=\'POST\';  PseudoForm.submit();};" % (q,)
+                window=q.window+".name"
+                action = "javascript: if(isMiddleClick(event) || isLeftClick(event)) { if(isMiddleClick(event)){ document.PseudoForm.target='new_page';} else {document.PseudoForm.target=%s;};  document.getElementById(\'pseudo_post_query\').value=\'%s\';document.PseudoForm.method=\'POST\';  PseudoForm.submit();};" % (window,q)
             base = '<a %s href="%s" onmousedown="%s" >%s</a>' % (self.opt_to_str(options),action,action,string)
         else:
             if 'parent' in tmp:
@@ -534,7 +535,85 @@ class HTMLUI(UI.GenericUI):
 
         return q
 
-    def tree(self,tree_cb = None, pane_cb=None, branch = ('/'), layout="horizontal"):
+    def tree(self, tree_cb = None, pane_cb=None, branch = None, layout=None):
+        """ A tree widget.
+
+        This implementation uses javascript/iframes extensively.
+        """
+        print "branch is %s" % (branch,)
+        
+        def draw_branch(depth,query, result):
+            try:
+            ## Get the right part:
+                branch=query['open_tree'].split('/')
+            except KeyError:
+                branch=['/']
+
+            print "Branch is %s" % (branch,)
+            
+            for name,value,state in tree_cb(branch[:depth]):
+                ## Must have a name and value
+                if not name or not value: continue
+                result.icon("spacer.png", width=20*depth, height=20)
+                link = query.clone()
+                del link['open_tree']
+                del link['yoffset']
+                cb = link['callback_stored']
+                del link['callback_stored']
+                
+                link['open_tree'] = FlagFramework.normpath("/".join(branch[:depth] + [name]))
+                open_tree = FlagFramework.urlencode(link['open_tree'])
+                sv=value.__str__().replace(' ','&nbsp;')
+                
+                if state=="branch":
+                    result.result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img border=0 src=\"/folder.png\"></a>" % (cb,query['right_pane_cb'],link)
+                else:
+                    result.result+="<a href=\"javascript:tree_pane_open('%s','%s','f?%s')\"><img border=0 src=\"/corner.png\"></a>" % (cb,query['right_pane_cb'],link)
+                    
+                result.result+="&nbsp;%s<br>\n" % str(sv)
+                result.result+="\n"
+
+                try:
+                ## Draw any opened branches
+                    if name == branch[depth]:
+                        draw_branch(depth+1,query, result)
+                except IndexError:
+                    pass
+
+        def left(query,result):
+            result.decoration = "js"
+            result.content_type = "text/html"
+
+            #The first item in the tree is the first one provided in branch
+            link = query.clone()
+            del link['callback_stored']
+            result.result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img border=0 src=\"/folder.png\"></a>" % (query['callback_stored'],query['right_pane_cb'],link)
+            result.result+="&nbsp;/<br>\n"
+            
+            draw_branch(1,query, result)
+            try:
+                result.result+="<script>document.body.scrollTop = %s;</script>\n" % query['yoffset']
+            except:
+                pass
+
+        def right(query,result):
+            result.decoration = "js"
+            result.content_type = "text/html"
+#            result.result += "<script>window.onunload = function() { if(document != top) top.location = window.document.location; }; </script>\n"
+            try:
+            ## Get the right part:
+                branch=query['open_tree'].split('/')
+            except KeyError:
+                branch=['/']
+
+            pane_cb(branch,result)
+
+        l = self.store_callback(left)
+        r = self.store_callback(right)
+
+        self.result+='<table width="100%%"  height="100%%"><tr height="400+"><td width="40%%" height="80%%"><iframe id="left" name="left" height="100%%" width=300 src="%s&callback_stored=%s&right_pane_cb=%s"></iframe></td><td width="40%%" height="80%%"><iframe name="right" id="right" height="100%%" width=1000 src="%s&callback_stored=%s" > </iframe></td></tr></table>' % (self.defaults,l,r,self.defaults,r)
+
+    def xtree(self,tree_cb = None, pane_cb=None, branch = ('/'), layout="horizontal"):
         """ A tree widget.
 
         This widget works by repeatadly calling the call back function for information about entries in the current tree. The format of the callback is:
@@ -739,6 +818,11 @@ class HTMLUI(UI.GenericUI):
         #in case the user forgot and gave us a tuple, we forgive them:
         names=list(names)
         columns = list(columns)
+        for l in links:
+            try:
+                l.window="top.window"
+            except:
+                pass
         
         #First work out what is the query string:
         query_str = sql;
@@ -1544,7 +1628,7 @@ class HTMLUI(UI.GenericUI):
             cbfunc=callbacks[0]
             context_str=names[0]
 
-        out='\n<table border=0 cellspacing=0 cellpadding=0 width=100%><tr><td colspan=50><img height=20 width=1 alt=""></td></tr><tr>'
+        out='\n<table border=0 cellspacing=0 cellpadding=0 width="100%"><tr><td colspan=50><img height=20 width=1 alt=""></td></tr><tr>'
         
         for i in names:
             q=query.clone()
@@ -1563,5 +1647,5 @@ class HTMLUI(UI.GenericUI):
         #Now draw the results of the callback:
         result=self.__class__(self)
         cbfunc(query,result)
-        out+="<tr><td colspan=50><table border=1 width=100%%><tr><td>%s</td></tr></table></td></tr></table>" % result
+        out+="<tr><td colspan=50><table border=1 width=\"100%%\"><tr><td>%s</td></tr></table></td></tr></table>" % result
         self.result+=out

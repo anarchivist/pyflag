@@ -55,30 +55,8 @@ class TemplateReport(Reports.report):
         result.heading("I am calling the display method")
         branch = ['/']
 
-#        sys.exit(0)
-        #We are testing the graphing widget:
-#        import pyflag.Graph as Graph
-
-        ## First make one graph
-#        graph = Graph.Graph()
-#        graph.pie((1,2,3,'a','test point','hello'),(2,4,3,6,4,2),explode="0.1", legend='no')
-
-##        ## Testing the image object:
-##        fd=open("%s/images/defence.png" % config.FLAG_BIN,'r')
-##        image = Graph.Image(fd.read())
-##        fd.close()
-        
-#        tmp = self.ui(result)      
-#        tmp.image(graph)
-##        tmp.heading("Image test")
-##        tmp.image(image)
-        
-        new_query = query.clone()
-        del new_query['lookat']
-        del new_query['open_tree']
-        target = new_query
-        
-        #We are testing the tree widget. Note this could have been written as a generator for faster performance...
+        #We are testing the tree widget. Note this could have been
+        #written as a generator for faster performance...
         def tree_cb(branch):
             path ='/'+'/'.join(branch)  + '/'
             print path,branch
@@ -87,19 +65,15 @@ class TemplateReport(Reports.report):
                 files = []
                 dirs = []
                 for d in os.listdir(path):
-                    link = self.ui(result)
-                    link.link(d,target,open_tree="%s%s" %(path,d),__mark__="%s%s" %(path,d))
                     if os.path.isdir(os.path.join(path,d)):
-                        dirs.append((d,link,'branch'))
+                        dirs.append((d,d,'branch'))
                     else:
-                        files.append((d,link,'leaf'))
+                        files.append((d,d,'leaf'))
 
                 files.sort()
                 dirs.sort()
                 return dirs + files 
             except OSError: return [(None,None,None)]
-
-        tmp2 = self.ui(result)
 
         def pane_cb(branch,result):
             """ A callback for rendering the right pane.
@@ -110,19 +84,7 @@ class TemplateReport(Reports.report):
             result.text("You clicked on %s" % str(branch))
             print "Called back for %s" % (branch,)
 
-        tmp2.tree(tree_cb = tree_cb,pane_cb = pane_cb ,branch = branch )
-        ## Now place them side by side
-        result.row(tmp2,width=500,height=300)
-        result.end_table()
-
-        result.para("I have two variables here, a=%s and b=%s" % (query['a'],query['b']))
-        return result
-
-    def analyse(self,query):
-        #Note that analyse does not need to return anything, if it does it is ignored.
-        import time
-        
-        time.sleep(10)
+        result.xtree(tree_cb = tree_cb,pane_cb = pane_cb ,branch = branch )
     
     def form(self,query,result):
         result.defaults = query
@@ -131,15 +93,9 @@ class TemplateReport(Reports.report):
         result.const_selector("This is a selector","select",('1st','2nd','3rd'),('1st','2nd','3rd'))
         result.textfield('a parameter','a',size='5')
         result.textfield('b parameter','b',size='10')
-#        tmp=self.ui(result)
-#        tmp.table()
-#        result.row(tmp)
-#        result.table()
-        return result
 
     def progress(self,query,result):
         result.heading("Im progressing along nicely")
-        return result
 
 class SomeClass:
     """ A private class that lives within the plugin.

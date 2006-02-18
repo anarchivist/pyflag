@@ -113,6 +113,10 @@ class query_type:
         self.user = user
         self.passwd = passwd
         self.base= base
+    
+        ## The window we came from (This is used by HTML to work our
+        ## where we need to be drawn to.
+        self.window = "window"
         
         self.q=[]
         if isinstance(query_list,list):
@@ -179,6 +183,7 @@ class query_type:
         """ Clones the current object into a new object. Faster than copy.deepcopy """
         tmp = self.__class__(())
         tmp.q = self.q[:]
+        tmp.window = self.window
         return tmp
 
     def getarray(self,key):

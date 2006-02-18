@@ -125,7 +125,10 @@ class Log:
         cols = []
         insert_sql = []
         field_indexes = []
+        row_cache = []
+        cached_count = 0
         count=0
+        
         for i in range(len(self.fields)):
             if self.fields[i]!='' and self.fields[i] != 'ignore':
                 field_indexes.append(i)
@@ -135,18 +138,28 @@ class Log:
 
         dbh.execute("CREATE TABLE IF NOT EXISTS %s (id int auto_increment,%s,key(id))" % (tablename,",".join(cols)))
         ## prepare the insert string
-        insert_str = "INSERT INTO "+tablename+" values(Null,"+','.join(insert_sql)+")"
+        insert_str = "(Null,"+','.join(insert_sql)+")"
 
         for fields in self.get_fields():
             count += 1
             fields = [ fields[i] for i in range(len(fields)) if i in field_indexes ]
             try:
+                print insert_str, fields
+                row_cache.append(insert_str % fields)
+                cached_count += 1
+                if cached_count > 5:
                 ## We insert into the table those fields that are not ignored:
-                dbh.execute(insert_str, fields )
+##                    dbh.execute("INSERT INTO "+tablename+" values "+insert_str * cached_count, row_cache
+                    try:
+                        print ("INSERT INTO "+tablename+" values "+','.join(row_cache))
+                    finally:
+                        cached_count =0
+                        row_cache = []
+                    
             except DB.DBError,e:
                 logging.log(logging.WARNINGS,"Warning: %s" % e)
             except TypeError:
-                logging.log(logging.WARNINGS,"Unable to load line into table SQL: %s Data: %s" % (insert_str,fields))
+                logging.log(logging.WARNINGS,"Unable to load line into table SQL: %s Data: %s" % (insert_str,row_cache))
                 continue
 
             yield "Uploaded %s rows" % count

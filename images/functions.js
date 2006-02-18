@@ -156,3 +156,16 @@ function isLeftClick(e)
 
   return click;
 };
+
+function tree_pane_open(left_cb,right_cb, url) {
+  parent.frames['right'].location.href =url +  "&callback_stored="+ right_cb;
+}
+
+function tree_open(left_cb, right_cb,url) {
+  var yoffset;
+
+  yoffset = document.body.scrollTop;
+  document.location = url + "&callback_stored="+left_cb+ "&yoffset="+yoffset;
+
+  tree_pane_open(left_cb, right_cb, url);
+};
