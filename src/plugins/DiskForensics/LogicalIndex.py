@@ -117,6 +117,12 @@ class IndexScan(GenScanFactory):
         for row in pydbh:
             self.index.add_word(row['word'],row['id'])
 
+        # load words in a number of alternate ways
+        pydbh.execute("select word,id from dictionary where type='word'")
+        for row in pydbh:
+            self.index.add_word(row['word'],row['id'])
+            self.index.add_word(row['word'].decode("UTF-8").encode("UTF-16LE"),row['id'])
+
         logging.log(logging.DEBUG,"Index Scanner: Done in %s seconds..." % (time.time()-start_time))
 
         #Do regex prep
@@ -309,7 +315,7 @@ class BuildDictionary(Reports.report):
             `word` VARCHAR( 50 ) binary NOT NULL ,
             `class` VARCHAR( 50 ) NOT NULL ,
             `encoding` SET( 'all', 'asci', 'ucs16' ) DEFAULT 'all' NOT NULL,
-            `type` set ( 'literal','regex' ) DEFAULT 'literal' NOT NULL,
+            `type` set ( 'word','literal','regex' ) DEFAULT 'literal' NOT NULL,
             PRIMARY KEY  (`id`))""")
             
             result.para("Just created a new empty dictionary")

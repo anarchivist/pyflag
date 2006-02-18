@@ -34,6 +34,9 @@ import pyflag.logging as logging
 import time,types
 import threading
 
+def escape(string):
+    return MySQLdb.escape_string(string)
+
 class DBError(Exception):
     """ Generic Database Exception """
     pass

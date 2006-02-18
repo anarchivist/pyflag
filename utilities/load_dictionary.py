@@ -35,7 +35,7 @@ Options:
 #
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "rhdvc:", ["regex","help", "drop","verbose","class"])
+    opts, args = getopt.getopt(sys.argv[1:], "lrhdvc:", ["literal","regex","help", "drop","verbose","class"])
 except getopt.GetoptError:
     # print help information and exit:
     usage()
@@ -50,7 +50,7 @@ if not args:
 drop = False
 verbose = False
 wordclass = "English"
-type="literal"
+type="word"
 
 # parse options
 
@@ -64,6 +64,8 @@ for o, a in opts:
         sys.exit()
     if o in ("-d", "--drop"):
         drop = True
+    if o in ("-l", "--literal"):
+        type="literal"
     if o in ("-r", "--regex"):
         type="regex"
         
@@ -78,10 +80,10 @@ if drop:
 dbh.execute(
     """ CREATE TABLE if not exists `dictionary` (
     `id` int auto_increment,
-    `word` VARCHAR( 50 ) NOT NULL ,
+    `word` VARCHAR( 50 ) binary NOT NULL ,
     `class` VARCHAR( 50 ) NOT NULL ,
-    `encoding` SET( 'all', 'asci', 'ucs16' ) NOT NULL,
-    `type` set ( 'literal','regex' ),
+    `encoding` SET( 'all', 'asci', 'ucs16' ) DEFAULT 'all' NOT NULL,
+    `type` set ( 'word','literal','regex' ) DEFAULT 'literal' NOT NULL,
     PRIMARY KEY  (`id`)
     )""")
 
@@ -90,9 +92,10 @@ for file in args[0:]:
     fd=open(file)
     print "Reading File %s" % file
     for line in fd:
-        if len(line)>3 and not "'" in line:
+        if len(line)>3:
             try:
-                dbh.execute("insert into dictionary set word=%r,class=\"%s\",type=%r" % (line[:-1],wordclass,type))
+                dbh.execute("insert into dictionary set word=\"%s\",class=\"%s\",type=%r" %
+                            (DB.escape(line.strip()),wordclass,type))
                 count+=1
             except DB.DBError:
                 pass
