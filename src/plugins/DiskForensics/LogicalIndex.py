@@ -117,7 +117,10 @@ class IndexScan(GenScanFactory):
         for row in pydbh:
             self.index.add_word(row['word'],row['id'])
 
-        # load words in a number of alternate ways
+        # load words in a number of alternate character sets. The ones
+        # we care about atm are utf-8 and utf-16/UCS-2 which is used
+        # extensively in windows (e.g word documents). We can easily
+        # add more encodings here as necessary.
         pydbh.execute("select word,id from dictionary where type='word'")
         for row in pydbh:
             self.index.add_word(row['word'],row['id'])
@@ -296,7 +299,7 @@ class BuildDictionary(Reports.report):
         form.textfield('Word:','word')        
         form.selector('Classification:','class','select class,class from dictionary group by class order by class',())
         form.textfield('(Or create a new class:)','class_override')
-        form.const_selector('Type:','type',('literal','regex'),('Literal','RegEx'))
+        form.const_selector('Type:','type',('word','literal','regex'),('word','Literal','RegEx'))
         form.end_table()
         form.end_form('Go')
 
@@ -618,6 +621,14 @@ class BrowseIndexKeywords(Reports.report):
             names=['Index Term','Dictionary Class','Number of Hits'],
             table='LogicalIndexStats_%s' % tablename,
             case=query['case'],
+            links=[ FlagFramework.query_type((),
+                                             case=query['case'],
+                                             family="Keyword Indexing",
+                                             report='SearchIndex',
+                                             fsimage=query['fsimage'],
+                                             range=100,
+                                             final=1,
+                                             __target__='keyword')]
             )
         except DB.DBError,e:
             result.para("Unable to display index search results.  Did you run the index scanner?")
