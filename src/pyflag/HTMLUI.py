@@ -139,7 +139,7 @@ class HTMLUI(UI.GenericUI):
     def display(self):
         ## If the method is post, we need to emit the pseudo post form:
         if self.decoration!='raw':
-            self.result="<form name=PseudoForm method=POST action='/post'><input type=hidden id=pseudo_post_query name=pseudo_post_query value='' /></form><script>if(!window.name) window.name='ID%s'; </script>" % self.id + self.result
+            self.result="<form name=PseudoForm method=POST action='/post'><input type=hidden id=pseudo_post_query name=pseudo_post_query value='' /></form><script>if(!window.name) window.name='ID%s'; </script>\n<script src='/images/functions.js'></script>\n" % self.id + self.result
 
         #Make a toolbar
         if not self.nav_query:
