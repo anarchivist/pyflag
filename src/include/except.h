@@ -164,6 +164,6 @@ extern enum _exception _except;
 #define RAISE(x, ... ) except_raise(x,NULL)
 #endif
 
-extern void except_raise(enum _exception e, char *reason, ...);
+extern void except_raise(enum _exception e, void *obj, char *reason, ...);
 extern int except_cmp(int e,...) ;
 #endif

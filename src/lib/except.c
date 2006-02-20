@@ -33,7 +33,7 @@ enum _exception _except;
 
 /* Raises an exception throught the stack */
 #ifdef __DEBUG__
-void except_raise(enum _exception e,char *reason, ...) {
+void except_raise(enum _exception e, void *obj, char *reason, ...) {
   if(reason) {
     va_list ap;
     va_start(ap, reason);
