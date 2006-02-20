@@ -78,7 +78,6 @@ def make_inode_link(query,result, variable='inode'):
 
 class BrowseFS(Reports.report):
     """ Report to browse the filesystem"""
-    parameters = {'fsimage':'fsimage'}
     hidden = False
     order=5
     name = "Browse Filesystem"
@@ -86,13 +85,11 @@ class BrowseFS(Reports.report):
     description = "Display filesystem in a browsable format"
     
     def display(self,query,result):
-        result.heading("Browsing Filesystem in image %s" % query['fsimage'])
+        result.heading("Browsing Filesystem")
         dbh = self.DBO(query['case'])
         main_result=result
         
-        # lookup the iosource for this fsimage
-        iofd = IO.open(query['case'], query['fsimage'])
-        fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"], query["fsimage"], iofd)
+        fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])
         
         branch = ['']
         new_query = result.make_link(query, '')
@@ -105,9 +102,9 @@ class BrowseFS(Reports.report):
                 table='file as f, inode as i',
                 where="f.inode=i.inode",
                 case=query['case'],
-                links=[ FlagFramework.query_type((), case=query['case'],family=query['family'],report='ViewFile', fsimage=query['fsimage'],__target__='inode', inode="%s"),
+                links=[ FlagFramework.query_type((), case=query['case'],family=query['family'],report='ViewFile', __target__='inode', inode="%s"),
                         None,
-                        FlagFramework.query_type((),case=query['case'],family=query['family'],report='Browse Filesystem', fsimage=query['fsimage'],__target__='open_tree',open_tree="%s") ]
+                        FlagFramework.query_type((),case=query['case'],family=query['family'],report='Browse Filesystem', __target__='open_tree',open_tree="%s") ]
                 )
 
         def tree_view(query,result):
@@ -121,7 +118,7 @@ class BrowseFS(Reports.report):
                 path =FlagFramework.normpath('/'.join(branch)+'/')
                 ## We need a local copy of the filesystem factory so
                 ## as not to affect other instances!!!
-                fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"], query["fsimage"], iofd)
+                fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])
 
                 for i in fsfd.dent_walk(path): 
                     if i['mode']=="d/d" and i['status']=='alloc':
@@ -137,7 +134,7 @@ class BrowseFS(Reports.report):
                     table='file as f, inode as i',
                     where="f.inode=i.inode and path=%r and f.mode!='d/d'" % (br),
                     case=query['case'],
-                    links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='View File Contents', fsimage=query['fsimage'],__target__='inode', inode="%s")]
+                    links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='View File Contents', __target__='inode', inode="%s")]
                     )
         
             result.tree(tree_cb = tree_cb,pane_cb = pane_cb, branch = branch )
@@ -145,7 +142,7 @@ class BrowseFS(Reports.report):
                     link=FlagFramework.query_type((),
                       family="Load Data", report="ScanFS",
                       path=query['open_tree'],
-                      fsimage=query['fsimage'],case=query['case'],
+                      case=query['case'],
                     ))
 
         
@@ -155,12 +152,7 @@ class BrowseFS(Reports.report):
             )
 
     def form(self,query,result):
-        try:
-            result.case_selector()
-            if query['case']!=config.FLAGDB:
-               result.meta_selector(case=query['case'],property='fsimage')
-        except KeyError:
-            return result
+        result.case_selector()
 
 def goto_page_cb(query,result,variable):
     try:
@@ -197,7 +189,7 @@ def goto_page_cb(query,result,variable):
 
 class ViewFile(Reports.report):
     """ Report to browse the filesystem """
-    parameters = {'fsimage':'fsimage','inode':'string'}
+    parameters = {'inode':'string'}
     hidden = True
     family = "Disk Forensics"
     name = "View File Contents"
@@ -208,9 +200,7 @@ class ViewFile(Reports.report):
         if not query.has_key('limit'): query['limit']= 0
         dbh = self.DBO(query['case'])
 
-        # retrieve the iosource for this fsimage
-        iofd = IO.open(query['case'],query['fsimage'])
-        fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"], query["fsimage"], iofd)
+        fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])
         ## If this is a directory, only show the stats
         path = fsfd.lookup(inode=query['inode'])
         fd = None
@@ -380,7 +370,7 @@ class ViewFile(Reports.report):
             link = result.__class__(result)
             link.link(path,
                       FlagFramework.query_type((),family="Disk Forensics",
-                          report='BrowseFS',fsimage=query['fsimage'],
+                          report='BrowseFS',
                           open_tree=base_path, case=query['case'])
                       )
             left.row("Filename:",'',link)
@@ -438,35 +428,27 @@ class ViewFile(Reports.report):
                    link=FlagFramework.query_type((),
                       family="Load Data", report="ScanFS",
                       path=fsfd.lookup(inode=query['inode']),
-                      fsimage=query['fsimage'],case=query['case'],
+                      case=query['case'],
                        )
                    )
             
     def form(self,query,result):
         result.defaults = query
         result.case_selector()
-        result.meta_selector(message='FS Image',case=query['case'],property='fsimage')
         result.textfield('Inode','inode')
         return result
 
 class Timeline(Reports.report):
     """ View file MAC times in a searchable table """
-    parameters = {'fsimage':'fsimage'}
     name = "View File Timeline"
     family = "Disk Forensics"
     description = "Browse file creation, modification, and access times"
 
     def form(self, query, result):
-        try:
-            result.case_selector()
-            if query['case']!=config.FLAGDB:
-                result.meta_selector(message='FS Image',case=query['case'],property='fsimage')
-        except KeyError:
-            return result
+        result.case_selector()
 
     def analyse(self, query):
         dbh = self.DBO(query['case'])
-        tablename = dbh.MakeSQLSafe(query['fsimage'])
         temp_table = dbh.get_temp()
         dbh.check_index("inode","inode")
         dbh.execute("create temporary table %s select i.inode,f.status,mtime as `time`,1 as `m`,0 as `a`,0 as `c`,0 as `d`,concat(path,name) as `name` from inode as i left join file as f on i.inode=f.inode" %
@@ -483,8 +465,7 @@ class Timeline(Reports.report):
     
     def display(self, query, result):
         dbh = self.DBO(query['case'])
-        tablename = dbh.MakeSQLSafe(query['fsimage'])
-        result.heading("File Timeline for Filesystem %s" % tablename)
+        result.heading("File Timeline for Filesystem")
         result.table(
             columns=('from_unixtime(time)','inode','status',
                      "if(m,'m',' ')","if(a,'a',' ')","if(c,'c',' ')","if(d,'d',' ')",'name'),
@@ -493,12 +474,10 @@ class Timeline(Reports.report):
             table=('mac'),
             case=query['case'],
 #            links=[ None, None, None, None, None, None, None, FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='filename')]
-            links=[ None, FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='inode')]
+            links=[ None, FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',__target__='inode')]
             )
 
     def reset(self, query):
-        dbh = self.DBO(query['case'])
-        tablename = dbh.MakeSQLSafe(query['fsimage'])
         dbh = self.DBO(query['case'])
         dbh.execute("drop table mac")
                 

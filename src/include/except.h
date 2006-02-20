@@ -161,7 +161,7 @@ extern enum _exception _except;
 #ifdef __DEBUG__
 #define RAISE except_raise
 #else
-#define RAISE(x, ... ) except_raise(x,NULL)
+#define RAISE(x, ... ) except_raise(x, NULL, NULL)
 #endif
 
 extern void except_raise(enum _exception e, void *obj, char *reason, ...);

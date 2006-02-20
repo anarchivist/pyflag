@@ -92,7 +92,6 @@ class ViewFileTypes(Reports.report):
 
     A thumbnail of the file is also shown for rapid previewing of images etc.
     """
-    parameters = {'case': 'flag_case'}
     name = "Browse Types"
     family = "Disk Forensics"
     

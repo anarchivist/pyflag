@@ -50,7 +50,7 @@ void except_raise(enum _exception e, void *obj, char *reason, ...) {
 };
 
 #else
-void except_raise(enum _exception e,char *reason, ...) {  
+void except_raise(enum _exception e, void *obj, char *reason, ...) {  
   if(except_level==0) {
     exit(-1);
   };
