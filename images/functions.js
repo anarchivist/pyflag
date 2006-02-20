@@ -162,10 +162,26 @@ function tree_pane_open(left_cb,right_cb, url) {
 }
 
 function tree_open(left_cb, right_cb,url) {
-  var yoffset;
+  var x,y;
 
-  yoffset = document.body.scrollTop;
-  document.location = url + "&callback_stored="+left_cb+ "&yoffset="+yoffset;
+  if (self.pageYOffset) // all except Explorer
+    {
+      x = self.pageXOffset;
+      y = self.pageYOffset;
+    }
+  else if (document.documentElement && document.documentElement.scrollTop)
+    // Explorer 6 Strict
+    {
+      x = document.documentElement.scrollLeft;
+      y = document.documentElement.scrollTop;
+    }
+  else if (document.body) // all other Explorers
+    {
+      x = document.body.scrollLeft;
+      y = document.body.scrollTop;
+    }
+
+  document.location = url + "&callback_stored="+left_cb+ "&yoffset="+y+ "&xoffset="+x;;
 
   tree_pane_open(left_cb, right_cb, url);
 };

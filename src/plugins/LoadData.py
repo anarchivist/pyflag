@@ -218,7 +218,7 @@ class ScanFS(Reports.report):
     - If an enabled scanner depends on another scanner to execute, that scanner will be enabled in order to satisfy the dependancy.
 
     """
-    parameters = {'fsimage':'fsimage', 'path':'any', 'final':'string'}
+    parameters = {'path':'any', 'final':'string'}
     name = "Scan Filesystem"
     description = "Scan filesystem using spceified scanners"
     family = "Load Data"
@@ -246,7 +246,6 @@ class ScanFS(Reports.report):
         try:
             result.case_selector()
             if query['case']!=config.FLAGDB:
-               result.meta_selector(case=query['case'],property='fsimage')
                result.textfield('Scan under directory','path',size=50)
 
                ## Draw the form for each scan group:
@@ -256,6 +255,7 @@ class ScanFS(Reports.report):
                result.checkbox('Click here when finished','final','ok')
 
         except KeyError:
+            raise
             return result
 
     def calculate_scanners(self,query):
@@ -283,8 +283,7 @@ class ScanFS(Reports.report):
 
     def analyse(self,query):
         dbh=DB.DBO(query['case'])
-        iofd=IO.open(query['case'],query['fsimage'])
-        fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'],query['fsimage'],iofd)
+        fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'])
 
         scanner_names = self.calculate_scanners(query)
         
@@ -292,7 +291,7 @@ class ScanFS(Reports.report):
         for i in scanner_names:
             try:
                 tmp  = Registry.SCANNERS.dispatch(i)
-                scanners.append(tmp(dbh,query['fsimage'],fsfd))
+                scanners.append(tmp(fsfd))
             except Exception,e:
                 logging.log(logging.ERRORS,"Unable to initialise scanner %s (%s)" % (i,e))
 
@@ -337,7 +336,7 @@ class ScanFS(Reports.report):
             s.destroy()
 
     def progress(self,query,result):
-        result.heading("Scanning filesystem %s in path %s" % (query['fsimage'],query['path']))
+        result.heading("Scanning path %s" % (query['path']))
         scanners = self.calculate_scanners(query)
         
         result.para("The following scanners are used: %s" % scanners)
@@ -350,7 +349,7 @@ class ScanFS(Reports.report):
     def display(self,query,result):
         ## Browse the filesystem instantly
         result.refresh(0, FlagFramework.query_type((),case=query['case'],
-           family='Disk Forensics', report='BrowseFS', fsimage=query['fsimage'],
+           family='Disk Forensics', report='BrowseFS',
            open_tree = query['path'])
                        )
 
@@ -364,8 +363,13 @@ def get_default_fs_driver(query,sig):
             query['fstype'] = "Auto FS"
 
 class LoadFS(Reports.report):
-    """ Loads Filesystem Image into the database. """
-    parameters = {"iosource":"iosource","fstype":"string"}
+    """ Loads Filesystem Image into the database.
+
+    PyFlag Uses a Virtual File System (VFS) to present information about all filesystems within a case. When a filesystem is loaded, it is usually loaded inot a specified mount point. This is a path (directory) which will contain all the files in this filesystem within it.
+
+    The mount point can be any valid path, but its probably most sensible to make it the same as the mount point of the original filesystem within the system drive. For example /freds_box/c/ or /fred/usr/.
+    """
+    parameters = {"iosource":"iosource","fstype":"string", "mount_point":"string"}
     name = "Load Filesystem image"
     family="Load Data"
     description = "Load a filesystem image into the case Database"
@@ -398,6 +402,7 @@ class LoadFS(Reports.report):
                 get_default_fs_driver(result.defaults,sig)
                 
                 result.const_selector("Enter Filesystem type",'fstype',fs_types,fs_types)
+                result.textfield("VFS Mount Point:","mount_point")
                 result.ruler()
             except FlagFramework.FlagException,e:
                 result.hidden('fstype','Mounted')
@@ -412,33 +417,29 @@ class LoadFS(Reports.report):
         dbh = self.DBO(query['case'])
         self.progress_str=None
         
-        #Check to see if we have done this part previously
-        if dbh.get_meta('fsimage')!=query['iosource']:
-            tablename=dbh.MakeSQLSafe(query['iosource'])
-            io = IO.open(query['case'],query['iosource'])
-            # call on FileSystem to load data
-            fsobj=Registry.FILESYSTEMS.filesystems[query['fstype']](query['case'],tablename,io)
-            fsobj.load()
+        # call on FileSystem to load data
+        fsobj=Registry.FILESYSTEMS.filesystems[query['fstype']](query['case'])
+        mount_point = FlagFramework.normpath("/"+query['mount_point'])[:-1]
+        fsobj.load(mount_point, query['iosource'])
 
-            self.progress_str="Creating file and inode indexes"        
-            #Add indexes:
-            index = (
-                ('file','inode',None),
-                ('file','path',100),
-                ('file','name',100),
-                ('inode','inode',None),
-                ('block','inode',None)
-                )
-            for x,y,z in index:
-                dbh.check_index("%s_%s" % (x,tablename),y,z)
-
-            dbh.set_meta('fsimage',query['iosource'])
-            dbh.set_meta('fstype_%s' % query['iosource'],query['fstype'])
+        self.progress_str="Creating file and inode indexes"        
+        #Add indexes:
+        index = (
+            ('file','inode',None),
+            ('file','path',100),
+            ('file','name',100),
+            ('inode','inode',None),
+            ('block','inode',None)
+            )
+        for x,y,z in index:
+            dbh.check_index(x,y,z)
+            
+        dbh.set_meta('fstype' , query['fstype'])
         
     def display(self,query,result):
         result.heading("Uploaded FS Image from IO Source %s to case %s" % (query['iosource'],query['case']))
-        result.link("Analyse this data", FlagFramework.query_type((), case=query['case'], family="Disk Forensics", fsimage=query['iosource'],report='BrowseFS'))
-        result.refresh(0,FlagFramework.query_type((), case=query['case'], family="Disk Forensics", fsimage=query['iosource'],report='BrowseFS'))
+        result.link("Analyse this data", FlagFramework.query_type((), case=query['case'], family="Disk Forensics",report='BrowseFS'))
+        result.refresh(0,FlagFramework.query_type((), case=query['case'], family="Disk Forensics", report='BrowseFS'))
                        
     def progress(self,query,result):
         result.heading("Uploading filesystem image to case %s" % query['case'])
@@ -450,7 +451,7 @@ class LoadFS(Reports.report):
             
         try:
             result.start_table()
-            dbh.execute("select count(*) as Count from file_%s" % tablename)
+            dbh.execute("select count(*) as Count from file")
             row=dbh.fetch()
             if row:
                 result.row("Uploaded File Entries: %s"%row['Count'])

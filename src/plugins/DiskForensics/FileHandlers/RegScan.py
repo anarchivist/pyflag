@@ -36,21 +36,20 @@ class RegistryScan(GenScanFactory):
     default = True
     depends = ['TypeScan']
     
-    def __init__(self,dbh, table,fsfd):
-        self.dbh=dbh
-        self.table=table
-        dbh.MySQLHarness("regtool -t reg_%s -d create" % table)
+    def __init__(self,fsfd):
+        GenScanFactory.__init__(self, fsfd)
+        self.dbh.MySQLHarness("regtool -t reg -d create")
 
     def reset(self):
         GenScanFactory.reset(self)
-        self.dbh.MySQLHarness("regtool -t reg_%s -d drop" % self.table)
-        self.dbh.execute('drop table if exists regi_%s',self.table)
+        self.dbh.MySQLHarness("regtool -t reg -d drop")
+        self.dbh.execute('drop table if exists regi')
         
     def destroy(self):
         ## Create the directory indexes to speed up tree navigation:
-        self.dbh.execute("create table if not exists regi_%s (`dirname` TEXT NOT NULL ,`basename` TEXT NOT NULL,KEY `dirname` (`dirname`(100)))",self.table)
+        self.dbh.execute("create table if not exists regi (`dirname` TEXT NOT NULL ,`basename` TEXT NOT NULL,KEY `dirname` (`dirname`(100)))")
         dirtable = {}
-        self.dbh.execute("select path from reg_%s",self.table)
+        self.dbh.execute("select path from reg")
         for row in self.dbh:
             array=row['path'].split("/")
             while len(array)>1:
@@ -66,10 +65,10 @@ class RegistryScan(GenScanFactory):
 
         for k,v in dirtable.items():
             for name in v:
-                self.dbh.execute("insert into regi_%s set dirname=%r,basename=%r",(self.table,k,name))
+                self.dbh.execute("insert into regi set dirname=%r,basename=%r",(k,name))
 
         ## Add indexes:
-        self.dbh.check_index("reg_%s" % self.table,"path")
+        self.dbh.check_index("reg" ,"path")
 
     class Scan(StoreAndScanType):
         types =  (
@@ -78,7 +77,7 @@ class RegistryScan(GenScanFactory):
             )
         
         def external_process(self,filename):
-            self.dbh.MySQLHarness("regtool -f %s -t reg_%s -p %r " % (filename,self.ddfs.table,self.ddfs.lookup(inode=self.inode)))
+            self.dbh.MySQLHarness("regtool -f %s -t reg -p %r " % (filename,self.ddfs.lookup(inode=self.inode)))
 
 ## Report to browse Loaded Registry Files:
 class BrowseRegistry(DiskForensics.BrowseFS):
@@ -87,9 +86,8 @@ class BrowseRegistry(DiskForensics.BrowseFS):
     name = "Browse Registry Hive"
 
     def display(self,query,result):
-        result.heading("Registry Hive in image %r" % query['fsimage'])
+        result.heading("Registry Hive")
         dbh = self.DBO(query['case'])
-        tablename = dbh.MakeSQLSafe(query['fsimage'])
         new_q=query.clone()
             
         #Make a tree call back:
@@ -100,7 +98,7 @@ class BrowseRegistry(DiskForensics.BrowseFS):
             dbh = self.DBO(query['case'])
 
             ##Show the directory entries:
-            dbh.execute("select basename from regi_%s where dirname=%r and length(basename)>1 group by basename",(tablename,path))
+            dbh.execute("select basename from regi where dirname=%r and length(basename)>1 group by basename",(path))
             for row in dbh:
                 yield(([row['basename'],row['basename'],'branch']))
                 
@@ -113,7 +111,7 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                     columns=['path','type','reg_key','from_unixtime(modified)','size','value'],
                     names=['Path','Type','Key','Modified','Size','Value'],
                     links=[ result.make_link(new_q,'open_tree',mark='target',mode='Tree View') ],
-                    table='reg_%s'%tablename,
+                    table='reg',
                     case=query['case'],
                     )
 
@@ -122,7 +120,7 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                 def pane_cb(branch,table):
                     path = FlagFramework.normpath('/'.join(branch))
                     tmp=result.__class__(result)
-                    dbh.execute("select from_unixtime(modified) as time from reg_%s where path=%r",(tablename,path))
+                    dbh.execute("select from_unixtime(modified) as time from reg where path=%r",(path))
                     row=dbh.fetch()
 
                     try:
@@ -137,10 +135,10 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                     table.table(
                         columns=['reg_key','type','size',"if(length(value)<50,value,concat(left(value,50),' .... '))"],
                         names=('Key','Type','Size','Value'),
-                        table='reg_%s' % tablename,
+                        table='reg',
                         where="path=%r" % path,
                         case=query['case'],
-                        links=[ FlagFramework.query_type(family=query['family'],report='BrowseRegistryKey',fsimage=query['fsimage'],path=path,__target__='key',case=query['case'])],
+                        links=[ FlagFramework.query_type(family=query['family'],report='BrowseRegistryKey',path=path,__target__='key',case=query['case'])],
                         )
 
                 # display paths in tree
@@ -160,14 +158,13 @@ class BrowseRegistry(DiskForensics.BrowseFS):
             
     def reset(self,query):
         dbh = self.DBO(query['case'])
-        tablename = dbh.MakeSQLSafe(query['fsimage'])
-        
-        dbh.execute('drop table if exists reg_%s',tablename)
-        dbh.execute('drop table if exists regi_%s',tablename)
+
+        dbh.execute('drop table if exists reg')
+        dbh.execute('drop table if exists regi')
 
 class BrowseRegistryKey(BrowseRegistry):
     """ Display the content of a registry key """
-    parameters= {'fsimage':'fsimage','key':'string','path':'string'}
+    parameters= {'key':'string','path':'string'}
     hidden=True
     name="BrowseRegistryKey"
     family="Disk Forensics"
@@ -176,14 +173,13 @@ class BrowseRegistryKey(BrowseRegistry):
     def display(self,query,result):
         path=query['path']
         key=query['key']
-        result.heading("Registry Key Contents from Filesystem %s" % query['fsimage'])
+        result.heading("Registry Key Contents")
         result.text("Key %s/%s:" % (path,key),color='red',font='typewriter')
         dbh=DB.DBO(query['case'])
-        tablename=query['fsimage']
 
         def hexdump(query,out):
             """ Show the hexdump for the key """
-            dbh.execute("select value from reg_%s where path=%r and reg_key=%r",(tablename,path,key))
+            dbh.execute("select value from reg where path=%r and reg_key=%r",(path,key))
             row=dbh.fetch()
             if row:
                 FlagFramework.HexDump(row['value'],out).dump()
@@ -208,47 +204,39 @@ class BrowseRegistryKey(BrowseRegistry):
 
 class InterestingRegKey(Reports.report):
     """ Displays values of interesting registry keys, grouped into categories """
-    parameters = {'fsimage':'fsimage'}
+    parameters = {'case': 'flag_case'}
     name = "Interesting Reg Keys"
     family = "Disk Forensics"
     description="This report shows the values of interesting registry keys on the disk"
     progress_dict = {}
 
     def form(self,query,result):
-        try:
-            result.case_selector()
-            if query['case']!=config.FLAGDB:
-               result.meta_selector(case=query['case'],property='fsimage')
-        except KeyError:
-            return result
-
+        result.case_selector()
+        
     def progress(self,query,result):
         result.heading("Looking for registry key values");
 
     def reset(self,query):
         dbh = self.DBO(query['case'])
-        tablename = dbh.MakeSQLSafe(query['fsimage'])
-        dbh.execute('drop table interestingregkeys_%s',tablename);
+        dbh.execute('drop table interestingregkeys');
 
     def analyse(self,query):
         dbh = self.DBO(query['case'])
         pdbh=self.DBO(None)
-        tablename = dbh.MakeSQLSafe(query['fsimage'])
         try:
-            dbh.execute("create table `interestingregkeys_%s` select a.path, a.size, a.modified, a.remainder, a.type, a.reg_key, a.value, b.category, b.description from reg_%s as a, %s.registrykeys as b where a.path LIKE concat('%%',b.path,'%%') AND a.reg_key LIKE concat('%%',b.reg_key,'%%')",(tablename,tablename,config.FLAGDB))
+            dbh.execute("create table `interestingregkeys` select a.path, a.size, a.modified, a.remainder, a.type, a.reg_key, a.value, b.category, b.description from reg as a, %s.registrykeys as b where a.path LIKE concat('%%',b.path,'%%') AND a.reg_key LIKE concat('%%',b.reg_key,'%%')",(config.FLAGDB))
         except DB.DBError,e:
             raise Reports.ReportError("Unable to find the registry table for the current image. Did you run the Registry Scanner?.\n Error received was %s" % e)
     
     def display(self,query,result):
-        result.heading("Interesting Registry Keys for %s" % query['fsimage'])
+        result.heading("Interesting Registry Keys")
         dbh=self.DBO(query['case'])
-        tablename = dbh.MakeSQLSafe(query['fsimage'])
 
         try:
             result.table(
                 columns=('Path','reg_key','Value','from_unixtime(modified)','category','Description'),
                 names=('Path','Key','Value','Last Modified','Category','Description'),
-                table='interestingregkeys_%s ' % (tablename),
+                table='interestingregkeys ',
                 case=query['case'],
                 #TODO make a link to view the rest of the reg info
                 #links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='BrowseRegistryKey')]

@@ -1,3 +1,7 @@
+# FIXME: Unallocated scanner needs to be added to the fs loading code
+# as it must be done per filesystem loaded - its not really a scanner
+# at all.
+
 # Michael Cohen <scudette@users.sourceforge.net>
 # David Collett <daveco@users.sourceforge.net>
 #
@@ -35,6 +39,8 @@ import pyflag.DB as DB
 import pyflag.Exgrep as Exgrep
 import pyflag.Scanner as Scanner
 
+active=False
+
 #hidden = True
 
 class UnallocatedScan(GenScanFactory):
@@ -45,7 +51,7 @@ class UnallocatedScan(GenScanFactory):
     order=100
     default = False
 
-    class Drawer(Scanner.FSSpecialisedDrawer):
+    class Drawer(Scanner.Drawer):
         description = "Filesystem Specific Analysis"
         name = "Filesystem Analysis"
         contains = ['UnallocatedScan','DeletedScan']
@@ -54,7 +60,7 @@ class UnallocatedScan(GenScanFactory):
         
     def reset(self):
         GenScanFactory.reset(self)
-        self.dbh.execute("drop table if exists unallocated_%s" ,self.table)
+        self.dbh.execute("drop table if exists unallocated" )
 
     def prepare(self):
         """ Creates the unallocated VFS nodes at scanner initialisation.
@@ -62,8 +68,8 @@ class UnallocatedScan(GenScanFactory):
         This works because scanners are invoked after all the physical Inodes are created in the blocks table - so we have visibility of allocated nodes. Note that VFS objects do not count since they typically do not have block allocations.
         """
         ## We remove older tables to ensure we always have the latest up to date table.
-        self.dbh.execute("drop table if exists unallocated_%s" ,self.table)
-        self.dbh.execute("CREATE TABLE unallocated_%s (`inode` VARCHAR(50) NOT NULL,`offset` BIGINT NOT NULL,`size` BIGINT NOT NULL)",self.table)
+        self.dbh.execute("drop table if exists unallocated")
+        self.dbh.execute("CREATE TABLE unallocated (`inode` VARCHAR(50) NOT NULL,`offset` BIGINT NOT NULL,`size` BIGINT NOT NULL)")
         unalloc_blocks = []
 
         ## We ask the filesystem whats the blocksize - if we dont know, we use 1
@@ -75,7 +81,7 @@ class UnallocatedScan(GenScanFactory):
         count=0
         ## Now we work out the unallocated blocks by looking at the blocks table:
         last = (0,0)
-        self.dbh.execute("select * from block_%s order by block asc", self.table)
+        self.dbh.execute("select * from block order by block asc")
         dbh2 = self.dbh.clone()
         for row in self.dbh:
             ## We make a list of all blocks which are unallocated:
@@ -85,8 +91,8 @@ class UnallocatedScan(GenScanFactory):
                 ## Add the offset into the db table:
                 offset = new_block[0] * blocksize
                 size = new_block[1] * blocksize
-                dbh2.execute("insert into unallocated_%s set inode='U%s',offset=%r,size=%r",(
-                    self.table, count, offset, size))
+                dbh2.execute("insert into unallocated set inode='U%s',offset=%r,size=%r",(
+                    count, offset, size))
 
                 ## Add a new VFS node:
                 self.fsfd.VFSCreate(None,'U%s' % count, "/_unallocated_/%s" % offset, size=size)
@@ -99,7 +105,7 @@ class UnallocatedScan(GenScanFactory):
         ## the last allocated block, and finished at the end of the IO
         ## source. The size of -1 makes the VFS driver keep reading till the end.
         offset = last[0] * blocksize
-        dbh2.execute("insert into unallocated_%s set inode='U%s',offset=%r,size=%r", (self.table,count,offset, -1))
+        dbh2.execute("insert into unallocated set inode='U%s',offset=%r,size=%r", (count,offset, -1))
 
         ## Add a new VFS node:
         self.fsfd.VFSCreate(None,'U%s' % count, "/_unallocated_/%s" % offset)
@@ -113,7 +119,7 @@ class UnallocatedScan(GenScanFactory):
                     ## Create a VFS node:
                     offset = cut['offset']+self.fd.tell()
                     self.outer.fsfd.VFSCreate(self.inode,'U%s' % offset,"%s.%s" % (offset,cut['type']),size=cut['length'])
-                    self.outer.dbh.execute("insert into unallocated_%s set inode='%s|U%s',offset=%r,size=%r" , (self.outer.table,self.inode,offset,offset,cut['length']))
+                    self.outer.dbh.execute("insert into unallocated set inode='%s|U%s',offset=%r,size=%r" , (self.inode,offset,offset,cut['length']))
 
                     ## Now scan the newfound file:
                     fd = self.ddfs.open(inode='%s|U%s' % (self.inode,offset))
@@ -139,19 +145,19 @@ class DeletedScan(GenScanFactory):
         This scanner just inserts more entries into the file table. This means it needs intimate knowledge of the file/inode schema (rather than using the VFSCreate API). Since this scanner needs to have intimate knowledge of the schema to work out which inodes are deleted, this is probably ok. By inserting extra file entries, we dont need to have a VFS driver too. 
         """
         ## We may only execute this scanner once per filesystem:
-        if not self.dbh.get_meta("deleted_scan_%s" % self.table):
+        if not self.dbh.get_meta("deleted_scan"):
             ## Create a deleted directory entry:
             dbh2=self.dbh.clone()
-            self.dbh.execute("insert into file_%s set  inode='D0',mode='d/d',status='alloc',path='/',name='_deleted_'",self.table)
-            self.dbh.execute("insert into inode_%s set  inode='D0', links=3,mode=40755 ,gid=0,uid=0",self.table)
+            self.dbh.execute("insert into file set  inode='D0',mode='d/d',status='alloc',path='/',name='_deleted_'")
+            self.dbh.execute("insert into inode set  inode='D0', links=3,mode=40755 ,gid=0,uid=0")
             ## This will give us all the inodes which appear in the blocks
             ## table (i.e. they are allocated), but do not appear in the
             ## file table (i.e. do not have a filename).
-            self.dbh.execute("select a.inode as inode from block_%s as a left join file_%s as b on a.inode=b.inode where isnull(b.inode) group by a.inode",(self.table,self.table))
+            self.dbh.execute("select a.inode as inode from block as a left join file as b on a.inode=b.inode where isnull(b.inode) group by a.inode")
             for row in self.dbh:
-                dbh2.execute("insert into file_%s set inode=%r,mode='r/r',status='alloc',path='/_deleted_/',name=%r",(self.table,row['inode'],row['inode']))
+                dbh2.execute("insert into file set inode=%r,mode='r/r',status='alloc',path='/_deleted_/',name=%r",(row['inode'],row['inode']))
 
-            self.dbh.set_meta("deleted_scan_%s" % self.table,"Scanned")
+            self.dbh.set_meta("deleted_scan" ,"Scanned")
 
 ## Unallocated space VFS Driver:
 class Unallocated_File(FileSystem.File):
@@ -165,7 +171,7 @@ class Unallocated_File(FileSystem.File):
         File.__init__(self, case, table, fd, inode)
         self.fd=fd
         self.dbh = DB.DBO(case)
-        self.dbh.execute("select * from unallocated_%s where inode=%r",(table,inode))
+        self.dbh.execute("select * from unallocated where inode=%r",(inode))
         row=self.dbh.fetch()
         try:
             self.size=row['size']

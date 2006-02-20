@@ -37,10 +37,9 @@ class RFC2822(Scanner.GenScanFactory):
     default = True
     depends = ['TypeScan','PstScan']
     
-    def __init__(self,dbh, table,fsfd):
-        self.dbh=dbh
-        self.table=table
-        self.dbh.execute("CREATE TABLE IF NOT EXISTS `email_%s` (`inode` VARCHAR(250), `vfsinode` VARCHAR(250), `date` DATETIME, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));", self.table)
+    def __init__(self,fsfd):
+        Scanner.GenScanFactory.__init__(self,fsfd)
+        self.dbh.execute("CREATE TABLE IF NOT EXISTS `email` (`inode` VARCHAR(250), `vfsinode` VARCHAR(250), `date` DATETIME, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));")
 
     class Scan(Scanner.StoreAndScanType):
         types = [ 'text/x-mail.*',
@@ -85,7 +84,7 @@ class RFC2822(Scanner.GenScanFactory):
                 if not date:
                     raise Exception("No Date field in message - this is probably not an RFC2822 message at all.")
                     
-		self.dbh.execute("INSERT INTO `email_%s` SET `inode`=%r,`vfsinode`=%r,`date`=from_unixtime(%r),`to`=%r,`from`=%r,`subject`=%r", (self.table, self.inode, name, time.mktime(date), a.get('To'), a.get('From'), a.get('Subject')))
+		self.dbh.execute("INSERT INTO `email` SET `inode`=%r,`vfsinode`=%r,`date`=from_unixtime(%r),`to`=%r,`from`=%r,`subject`=%r", (self.inode, name, time.mktime(date), a.get('To'), a.get('From'), a.get('Subject')))
 
 		for part in a.walk():
                     if part.get_content_maintype() == 'multipart':
@@ -123,8 +122,8 @@ class RFC2822(Scanner.GenScanFactory):
 class RFC2822_File(File):
     """ A VFS Driver for reading mail attachments """
 
-    def __init__(self, case, table, fd, inode):
-        File.__init__(self, case, table, fd, inode)
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
 
         a=email.message_from_file(fd)
         my_part = inode.split('|')[-1]

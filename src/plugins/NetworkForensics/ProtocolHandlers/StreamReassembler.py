@@ -75,7 +75,7 @@ class StreamReassembler(NetworkScanFactory):
     default = True
     order=5
 
-    class Drawer(Scanner.FSSpecialisedDrawer):
+    class Drawer(Scanner.Drawer):
         description = "Network Scanners"
         name = "NetworkScanners"
         contains = [ "IRCScanner", "MSNScanner", "HTTPScanner", "POPScanner","SMTPScanner","RFC2822" ]
@@ -360,8 +360,8 @@ class StreamFile(File):
     stat_cbs = [ show_packets, combine_streams ]
     stat_names = [ "Show Packets", "Combined streams"]
     
-    def __init__(self, case, table, fd, inode):
-        File.__init__(self, case, table, fd, inode)
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
 
         ## We allow the user to ask for a number of streams which will
         ## be combined at the same time. This allows us to create a
@@ -377,7 +377,7 @@ class StreamFile(File):
         try:
             self.con_id = int(inode[1:])
         except ValueError: ## We have / in the inode name
-            self.dbh.execute("select con_id from connection_details_%s where inode=%r",(self.table,inode))
+            self.dbh.execute("select con_id from connection_details where inode=%r",(inode))
             row=self.dbh.fetch()
             if row:
                 self.con_id=row['con_id']
@@ -553,8 +553,8 @@ class OffsetFile(File):
     The format is offset:length
     """
     specifier = 'o'
-    def __init__(self, case, table, fd, inode):
-        File.__init__(self, case, table, fd, inode)
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
 
         ## We parse out the offset and length from the inode string
         tmp = inode.split('|')[-1]

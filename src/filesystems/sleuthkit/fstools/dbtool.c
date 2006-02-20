@@ -35,8 +35,9 @@
 /* Time skew of the system in seconds */
 static int32_t sec_skew = 0;
 
-char *tbl_name;
-char *fstype;
+char *tbl_name=NULL;
+char *fstype=NULL;
+char *mount_point=NULL;
 int file_count = 0;
 int inode_count = 0;
 int inode_total = 0;
@@ -323,25 +324,25 @@ print_dent2(FILE *hFile, FS_DENT *fs_dent, int flags, FS_INFO *fs,
 			    (strcmp(fs_data->name, "$Data") != 0)) ||
 			   ((fs_data->type == NTFS_ATYPE_IDXROOT) && 
 			    (strcmp(fs_data->name, "$I30") != 0))) ) {
-            fprintf(hFile, "INSERT INTO file_%s VALUES('D%llu-%i-%i','%s','%s','/%s','%s:%s');\n", 
+            fprintf(hFile, "INSERT INTO file VALUES('I%s|D%llu-%i-%i','%s','%s','%s/%s','%s:%s');\n", 
 		    tbl_name,
 		    fs_dent->inode, fs_data->type, fs_data->id,
-		    t1,t2,t3,t4,t5);
+		    t1,t2,mount_point,t3,t4,t5);
 
 	  } else {
-	    fprintf(hFile, "INSERT INTO file_%s VALUES('D%llu-%i-%i','%s','%s','/%s','%s');\n", 
+	    fprintf(hFile, "INSERT INTO file VALUES('I%s|D%llu-%i-%i','%s','%s','%s/%s','%s');\n", 
 		    tbl_name,
 		    fs_dent->inode, fs_data->type, fs_data->id, 
-		    t1,t2,t3,t4);
+		    t1,t2,mount_point,t3,t4);
 	  } 
 	  free(t5);
 
 	  //No Data stream
 	} else {	    
-	  fprintf(hFile, "INSERT INTO file_%s VALUES('D%llu','%s','%s','/%s','%s');\n", 
+	  fprintf(hFile, "INSERT INTO file VALUES('I%s|D%llu','%s','%s','%s/%s','%s');\n", 
 		  tbl_name,
 		  fs_dent->inode,
-		  t1,t2,t3,t4); 
+		  t1,t2,mount_point,t3,t4); 
 	};
 
 	free(t1); 
@@ -416,7 +417,7 @@ print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
 					run.next = NULL;
 					ptr = &run;
 					
-					printf("INSERT INTO inode_%s VALUES('D%lu-%d-%d','%c','%d','%d','%lu'," \
+					printf("INSERT INTO inode VALUES('I%s|D%lu-%d-%d','%c','%d','%d','%lu'," \
 					       "'%lu','%lu',%lu,'%lo','%d','%s','%lu');\n",
 					       tbl_name,
 					       (ULONG) fs_inode->addr, fs_data->type, fs_data->id,
@@ -439,7 +440,7 @@ print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
 	}
 	else {
 
-	  printf("INSERT INTO inode_%s VALUES('D%lu','%c','%d','%d','%lu'," \
+	  printf("INSERT INTO inode VALUES('I%s|D%lu','%c','%d','%d','%lu'," \
 		 "'%lu','%lu',%lu,'%lo','%d','%s','%lu');\n",
 		 tbl_name,
 		 (ULONG) fs_inode->addr, (flags & FS_FLAG_META_ALLOC) ? 'a' : 'f',
@@ -488,8 +489,10 @@ print_addr (FS_INFO *fs, DADDR_T addr, char *buf,
   if(size > 0) {
     if(((fs->ftype & FSMASK) == NTFS_TYPE) && (buf != '\0')) {
       // we have resident ntfs data
-      printf("INSERT INTO resident_%s values('D%lu-%d-%d','", 
-	     tbl_name, (ULONG)(*run)->inum, (*run)->type, (*run)->id);
+      printf("INSERT INTO resident values('I%s|D%lu-%d-%d','", 
+	     tbl_name,
+	     (ULONG)(*run)->inum, (*run)->type, (*run)->id);
+      
       print_sql_string(stdout, buf, size);
       printf("');\n");
     }
@@ -528,18 +531,26 @@ void print_blocks (INUM_T inum, int type, int id, RUN *run) {
 	  else {
 	    if(start_block != 0) {
 	      if(type == 0) {
-	        printf("INSERT INTO block_%s VALUES('D%lu','%lu','%lu','%lu');\n", tbl_name, (ULONG)inum, index, start_block, count);
+	        printf("INSERT INTO block VALUES('I%s|D%lu','%lu','%lu','%lu');\n", 
+		       tbl_name, 
+		       (ULONG)inum, index, start_block, count);
 	      }
 	      else {
-	        printf("INSERT INTO block_%s VALUES('D%lu-%i-%i','%lu','%lu','%lu');\n", tbl_name, (ULONG)inum, type, id, index, start_block, count);
+	        printf("INSERT INTO block VALUES('I%s|D%lu-%i-%i','%lu','%lu','%lu');\n", 
+		       tbl_name, 
+		       (ULONG)inum, type, id, index, start_block, count);
 	      }
 	    }
 	    else {
 	      if(type == 0) {
-	        printf("INSERT INTO block_%s VALUES('D%lu','%lu','%lu','%lu');\n", tbl_name, (ULONG)inum, index, ptr->addr, count);
+	        printf("INSERT INTO block VALUES('I%s|D%lu','%lu','%lu','%lu');\n", 
+		       tbl_name, 
+		       (ULONG)inum, index, ptr->addr, count);
 	      }
 	      else {
-	        printf("INSERT INTO block_%s VALUES('D%lu-%i-%i','%lu','%lu','%lu');\n", tbl_name, (ULONG)inum, type, id, index, ptr->addr, count);
+	        printf("INSERT INTO block VALUES('I%s|D%lu-%i-%i','%lu','%lu','%lu');\n", 
+		       tbl_name, 
+		       (ULONG)inum, type, id, index, ptr->addr, count);
 	      }
 	    }
 	    start_block = 0;
@@ -561,12 +572,12 @@ void print_blocks (INUM_T inum, int type, int id, RUN *run) {
 void print_fsinfo(FS_INFO *fs) {
   
   // fill in the metadata about the filesystem
-  printf("INSERT INTO meta_%s VALUES\n" \
-	 "('fstype', '%s'),\n('first_inode','%lu'),\n" \
-	 "('last_inode','%lu'),\n('root_inode','%lu'),\n" \
-	 "('first_block','%lu'),\n('last_block','%lu'),\n" \
-	 "('block_size','%lu');\n\n",
-	 tbl_name, fstype, 
+  printf("INSERT INTO meta VALUES\n" \
+	 "(NULL,'fstype', '%s'),\n(NULL,'first_inode','%lu'),\n" \
+	 "(NULL,'last_inode','%lu'),\n(NULL,'root_inode','%lu'),\n" \
+	 "(NULL,'first_block','%lu'),\n(NULL,'last_block','%lu'),\n" \
+	 "(NULL,'block_size','%lu');\n\n",
+	 fstype, 
 	 (ULONG)fs->first_inum, (ULONG)fs->last_inum, 
 	 (ULONG)fs->root_inum, (ULONG)fs->first_block, 
 	 (ULONG)fs->last_block, (ULONG)fs->block_size);
@@ -592,7 +603,7 @@ main(int argc, char **argv)
 
 	i_flags |= ~0;
 
-	while ((ch = getopt(argc, argv, "i:t:f:d:s:vVz:")) > 0) {
+	while ((ch = getopt(argc, argv, "i:m:t:f:d:s:vVz:")) > 0) {
 	  switch (ch) {
 	  case '?':
 	  default: 
@@ -605,6 +616,13 @@ main(int argc, char **argv)
 	    break;
 	  case 'd':  
 	    dbaction=optarg;
+	    break;
+	  case 'm':
+	    {
+	      int len=0;
+	      escape_sql_string(&mount_point,&len,optarg,strlen(optarg)); 
+	      mount_point[len]=0;
+	    };
 	    break;
 	  case 's':
 	    sec_skew = atoi(optarg);
@@ -633,7 +651,11 @@ main(int argc, char **argv)
 	  }
 	}
 
-	if(!tbl_name) RAISE(E_GENERIC,NULL,"Table name not specified!!");
+	if(!tbl_name) 
+	  RAISE(E_GENERIC,NULL,"IO Source name not specified!!");
+
+	if(!mount_point)
+	  RAISE(E_GENERIC,NULL,"mount point not specified!!");
 
 	/* create/drop tables */
 	if(dbaction) {
@@ -691,9 +713,7 @@ main(int argc, char **argv)
 
 void create_tables(char *name) {
 	/* create tables */
-	printf("CREATE TABLE IF NOT EXISTS meta_%s (`name` VARCHAR(25) NOT NULL, `value` VARCHAR(25) NOT NULL);\n\n", name);
-
-	printf("CREATE TABLE IF NOT EXISTS inode_%s (\n" \
+	printf("CREATE TABLE IF NOT EXISTS inode (\n" \
 	"	`inode` VARCHAR(250) NOT NULL,\n" \
 	"	`status` INT,\n" \
 	"	`uid` INT,\n" \
@@ -705,27 +725,27 @@ void create_tables(char *name) {
 	"	`mode` INT,\n" \
 	"	`links` INT,\n" \
 	"	`link` TEXT,\n" \
-	"	`size` BIGINT NOT NULL);\n\n", name);;
+	"	`size` BIGINT NOT NULL);\n\n");;
 
-	printf("CREATE TABLE IF NOT EXISTS file_%s (\n" \
+	printf("CREATE TABLE IF NOT EXISTS file (\n" \
 	"	`inode` VARCHAR(250) NOT NULL,\n" \
 	"	`mode` VARCHAR(3) NOT NULL,\n" \
 	"	`status` VARCHAR(8) NOT NULL,\n" \
 	"	`path` TEXT,\n" \
-	"	`name` TEXT);\n\n", name);
+	"	`name` TEXT);\n\n");
 
-	printf("CREATE TABLE IF NOT EXISTS block_%s (\n" \
+	printf("CREATE TABLE IF NOT EXISTS block (\n" \
 	"	`inode` VARCHAR(250) NOT NULL,\n" \
 	"	`index` INT NOT NULL,\n" \
 	"	`block` BIGINT NOT NULL,\n" \
-	"	`count` INT NOT NULL);\n\n", name);
+	"	`count` INT NOT NULL);\n\n");
 
-	printf("CREATE TABLE IF NOT EXISTS resident_%s (\n" \
+	printf("CREATE TABLE IF NOT EXISTS resident (\n" \
 	"	`inode` VARCHAR(250) NOT NULL,\n" \
-	"	`data` TEXT);\n\n", name);
+	"	`data` TEXT);\n\n");
 }
 
 void drop_tables(char *name) {
 	/* drop tables */
-	printf("DROP TABLE IF EXISTS meta_%s, inode_%s, file_%s, block_%s, resident_%s;\n", name, name, name, name, name);
+	printf("DROP TABLE IF EXISTS  inode, file, block, resident;\n");
 }

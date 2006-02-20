@@ -20,15 +20,20 @@ class AutoFS(DBFS):
     sk_type = "auto"
     name = "Auto FS"
 
-    def load(self):
-        DBFS.load(self)
+    def load(self, mount_point, iosource_name):
+        DBFS.load(self, mount_point, iosource_name)
+        ## Ensure the VFS contain the mount point:
+        self.VFSCreate(None, None, mount_point, directory=True)
+
         sdbh = DB.DBO(self.case)
+        self.iosource = IO.open(self.case, iosource_name)
 
         # run sleuthkit
-        string= "%s -i %r -o %r %r -t %r %r"%(config.IOWRAPPER,
-                                                     self.iosource.subsystem,
-                                                     self.iosource.make_parameter_list(),config.SLEUTHKIT,
-                                                     self.table,self.table)
+        string= "%s -i %r -o %r %r -t %r -m %r %r"%(config.IOWRAPPER,
+                                                    self.iosource.subsystem,
+                                                    self.iosource.make_parameter_list(), config.SLEUTHKIT,
+                                                    iosource_name, mount_point,
+                                                    "foo")
 
         sdbh.MySQLHarness(
             string
@@ -39,16 +44,21 @@ class Ext2(AutoFS):
     sk_type = "linux-ext2"
     name = "Linux ext2"
 
-    def load(self):
-        DBFS.load(self)
+    def load(self, mount_point, iosource_name):
+        DBFS.load(self, mount_point, iosource_name)
         sdbh = DB.DBO(self.case)
 
-        # run sleuthkit
-        string= "%s -i %r -o %r %r -t %r -f %r %r"%(config.IOWRAPPER,
-                                                     self.iosource.subsystem,
-                                                     self.iosource.make_parameter_list(),config.SLEUTHKIT,
-                                                     self.table,self.sk_type,self.table)
+        self.iosource = IO.open(self.case, iosource_name)
 
+        # run sleuthkit
+        string= "%s -i %r -o %r %r -t %r -f %r -m %r %r"% (
+            config.IOWRAPPER,
+            self.iosource.subsystem,
+            self.iosource.make_parameter_list(),config.SLEUTHKIT,
+            iosource_name, self.sk_type, mount_point,
+            "foo"
+            )
+        
         sdbh.MySQLHarness(
             string
             )
@@ -104,7 +114,7 @@ class Raw(Ext2):
 class Mounted(DBFS):
     """ A class implementing the mounted filesystem option """
     name = 'Mounted'
-    def load(self):
+    def load(self, mount_point, iosource):
         logging.log(logging.DEBUG,"Loading files from directory %s" % self.iosource.mount_point)
         dbh = DB.DBO(self.case)
         ## Create the tables for the filesystem

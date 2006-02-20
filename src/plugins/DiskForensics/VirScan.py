@@ -60,18 +60,18 @@ class VScan:
 class VirScan(GenScanFactory):
     """ Scan file for viruses """
     def __init__(self,dbh, table,fsfd):
-        dbh.execute(""" CREATE TABLE IF NOT EXISTS `virus_%s` (
+        dbh.execute(""" CREATE TABLE IF NOT EXISTS `virus` (
         `inode` varchar( 20 ) NOT NULL,
-        `virus` tinytext NOT NULL )""", table)
+        `virus` tinytext NOT NULL )""")
         self.dbh=dbh
         self.table=table
 
     def destroy(self):
-        self.dbh.execute('ALTER TABLE virus_%s ADD INDEX(inode)', self.table)
+        self.dbh.execute('ALTER TABLE virus ADD INDEX(inode)')
 
     def reset(self):
         GenScanFactory.reset(self)
-        self.dbh.execute('drop table virus_%s',self.table)
+        self.dbh.execute('drop table virus')
 
     class Scan(MemoryScan):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
@@ -85,7 +85,7 @@ class VirScan(GenScanFactory):
 
         def finish(self):
             if self.virus:
-                self.dbh.execute("INSERT INTO virus_%s VALUES(%r,%r)", (self.table, self.inode, self.virus))
+                self.dbh.execute("INSERT INTO virus VALUES(%r,%r)", (self.inode, self.virus))
 
 class VirusScan(Reports.report):
     """ Scan Filesystem for Viruses using clamav"""
@@ -110,7 +110,7 @@ class VirusScan(Reports.report):
             result.table(
                 columns=('a.inode','concat(path,name)', 'virus'),
                 names=('Inode','Filename','Virus Detected'),
-                table='virus_%s as a join file_%s as b on a.inode=b.inode ' % (tablename,tablename),
+                table='virus as a join file as b on a.inode=b.inode ',
                 case=query['case'],
                 links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='inode')]
                 )

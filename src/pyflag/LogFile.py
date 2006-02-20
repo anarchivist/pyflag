@@ -178,8 +178,13 @@ class Log:
                 
         ## Add the IP addresses to the whois table if required:
         dbh.execute("create table if not exists `whois` (`IP` INT UNSIGNED NOT NULL ,`country` VARCHAR( 4 ) NOT NULL ,`NetName` VARCHAR( 50 ) NOT NULL ,`whois_id` INT NOT NULL ,PRIMARY KEY ( `IP` )) COMMENT = 'A local case specific collection of whois information'")
+
         for field_number in range(len(self.fields)):
             if self.types[field_number] == 'IP Address':
+                ## FIXME: Resolving whois lookups is too
+                ## expensive. This needs to be moved to a different
+                ## report!!!. For now it disabled
+                continue
                 dbh2=dbh.clone()
                 #Handle for the pyflag db
                 dbh_pyflag = DB.DBO(None)

@@ -175,8 +175,8 @@ class Zip_file(File):
     """ A file like object to read files from within zip files. Note that the zip file is specified as an inode in the DBFS """
     specifier = 'Z'
     
-    def __init__(self, case, table, fd, inode):
-        File.__init__(self, case, table, fd, inode)
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
         # strategy:
         # inode is the index into the namelist of the zip file (i hope this is consistant!!)
         # just read that file!
@@ -232,8 +232,8 @@ class Tar_file(File):
     """ A file like object to read files from within tar files. Note that the tar file is specified as an inode in the DBFS """
     specifier = 'T'
     
-    def __init__(self, case, table, fd, inode):
-        File.__init__(self, case, table, fd, inode)
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
         # strategy:
         # inode is the index into the namelist of the tar file (i hope this is consistant!!)
         # just read that file!

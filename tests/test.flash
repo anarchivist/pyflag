@@ -4,8 +4,8 @@ set case=demo
 
 execute Load\ Data.Load\ IO\ Data\ Source iosource=test subsys=sgzip io_filename=/var/tmp/demo/pyflag_stdimage_0.1.sgz io_offset=0
 
-execute Load\ Data.Load\ Filesystem\ image iosource=test fstype=Auto\ FS
+execute Load\ Data.Load\ Filesystem\ image iosource=test fstype=Auto\ FS mount_point=/mnt/point/
 
-#execute Load\ Data.ScanFS fsimage=test path=/ scangroup_NetworkScanners=off scangroup_Windows\ Scanners=on scangroup_Compressed\ File=on scangroup_General\ Forensics=on final=ok
+execute Load\ Data.ScanFS fsimage=test path=/ scangroup_NetworkScanners=on scangroup_File\ Scanners=on scangroup_Compressed\ File=on scangroup_Filesystem\ Analysis=on scangroup_General\ Forensics=on final=ok scan_IRCScanner=off scan_MSNScanner=off scan_HTTPScanner=off scan_POPScanner=off scan_SMTPScanner=off scan_RFC2822=on scan_PstScan=on scan_IEIndex=on scan_RegistryScan=on scan_TypeScan=on scan_GZScan=on scan_TarScan=on scan_ZipScan=on scan_UnallocatedScan=on scan_DeletedScan=on scan_IndexScan=on scan_MD5Scan=on scan_VirScan=off
 
-execute Load\ Data.ScanFS fsimage=test path=/ scangroup_File\ Scanners=on scangroup_Compressed\ File=off scangroup_Filesystem\ Analysis=on scangroup_General\ Forensics=on scangroup_NetworkScanners=off scan_IRCScanner=off scan_MSNScanner=off scan_HTTPScanner=off scan_POPScanner=off scan_SMTPScanner=off scan_RFC2822=off scan_PstScan=on scan_IEIndex=on scan_RegistryScan=on scan_TypeScan=on scan_GZScan=on scan_TarScan=on scan_ZipScan=on scan_UnallocatedScan=off scan_DeletedScan=on scan_IndexScan=on scan_MD5Scan=off scan_VirScan=off
+#execute Load\ Data.ScanFS fsimage=test path=/ scangroup_File\ Scanners=on scangroup_Compressed\ File=off scangroup_Filesystem\ Analysis=on scangroup_General\ Forensics=on scangroup_NetworkScanners=off scan_IRCScanner=off scan_MSNScanner=off scan_HTTPScanner=off scan_POPScanner=off scan_SMTPScanner=off scan_RFC2822=off scan_PstScan=on scan_IEIndex=on scan_RegistryScan=on scan_TypeScan=on scan_GZScan=on scan_TarScan=on scan_ZipScan=on scan_UnallocatedScan=off scan_DeletedScan=on scan_IndexScan=on scan_MD5Scan=off scan_VirScan=off

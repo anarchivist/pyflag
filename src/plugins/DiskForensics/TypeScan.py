@@ -40,24 +40,22 @@ class TypeScan(Scanner.GenScanFactory):
     an action based on the mime type of the file"""
     order=5
     default=True
-    def __init__(self,dbh, table,fsfd):
-        dbh.execute(""" CREATE TABLE IF NOT EXISTS `type_%s` (
+    def __init__(self,fsfd):
+        Scanner.GenScanFactory.__init__(self, fsfd)
+        self.dbh.execute(""" CREATE TABLE IF NOT EXISTS `type` (
         `inode` varchar( 20 ) NOT NULL,
         `mime` varchar( 50 ) NOT NULL,
-        `type` tinytext NOT NULL )""" , table)
-        self.dbh=dbh
-        self.table=table
+        `type` tinytext NOT NULL )""")
 
         ## Create indexes on this table immediately because we need to select
-        self.dbh.check_index('type_%s' % table,'inode')
+        self.dbh.check_index('type','inode')
 
     def reset(self):
         Scanner.GenScanFactory.reset(self)
-        self.dbh.execute("drop table if exists `type_%s`",self.table)
+        self.dbh.execute("drop table if exists `type`")
 
     def destroy(self):
         pass
-#        self.dbh.execute('ALTER TABLE type_%s ADD INDEX(inode)', self.table)
 
     class Scan(Scanner.BaseScanner):
         size=0
@@ -81,7 +79,7 @@ class TypeScan(Scanner.GenScanFactory):
 
         def finish(self):
             # insert type into DB
-            self.dbh.execute('INSERT INTO type_%s VALUES(%r, %r, %r)', (self.table, self.inode, self.type_mime, self.type_str))
+            self.dbh.execute('INSERT INTO type VALUES(%r, %r, %r)', (self.inode, self.type_mime, self.type_str))
             # if we have a mime handler for this data, call it
 #            logging.log(logging.DEBUG, "Handling inode %s = %s, mime type: %s, magic: %s" % (self.inode,self.filename,self.type_mime, self.type_str))
 
@@ -94,21 +92,15 @@ class ViewFileTypes(Reports.report):
 
     A thumbnail of the file is also shown for rapid previewing of images etc.
     """
-    parameters = {'fsimage':'fsimage'}
+    parameters = {'case': 'flag_case'}
     name = "Browse Types"
     family = "Disk Forensics"
     
     def form(self,query,result):
-        try:
-            result.case_selector()
-            if query['case']!=config.FLAGDB:
-               result.meta_selector(case=query['case'],property='fsimage')
-        except KeyError:
-            return
-
+        result.case_selector()
+        
     def display(self,query,result):
-        io = IO.open(query['case'],query['fsimage'])
-        fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"], query["fsimage"], io)
+        fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])
         
         def thumbnail_cb(inode):
             fd = fsfd.open(inode=inode)
@@ -122,7 +114,7 @@ class ViewFileTypes(Reports.report):
             tmp2 = result.__class__(result)
             tmp2.link( tmp, target = 
                        FlagFramework.query_type((), case=query['case'],
-                       fsimage=query['fsimage'], inode=inode,
+                       inode=inode,
                        family = "Disk Forensics", report = "ViewFile"),
                        tooltip=inode, border=0
                        )
@@ -133,7 +125,7 @@ class ViewFileTypes(Reports.report):
             result.table(
                 columns = ['a.inode','concat(path,name)','type', 'from_unixtime(c.mtime)'],
                 names = [ 'Thumbnail', 'Filename', 'Type', 'Time stamp'],
-                table = 'file_%s as a, type_%s as b, inode_%s as c' % (query['fsimage'],query['fsimage'],query['fsimage']),
+                table = 'file as a, type as b, inode as c',
                 where = 'b.inode=c.inode and a.inode=b.inode and a.mode like "r%" ',
                 callbacks  = { 'Thumbnail': thumbnail_cb,
                                },

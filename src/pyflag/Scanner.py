@@ -59,7 +59,6 @@ class BaseScanner:
         self.ddfs = ddfs
         self.ddfs.dbh.set_meta("scan_%s" % outer.__class__, inode)
         self.dbh=outer.dbh
-        self.table=outer.table
         self.outer=outer
         self.factories=factories
 
@@ -98,16 +97,13 @@ class GenScanFactory:
     ## enabled.
     depends = []
     
-    def __init__(self,dbh,table,fsfd):
+    def __init__(self,fsfd):
         """ Factory constructor.
 
-        @arg dbh: A valid database handle
-        @arg table: The name of the filesystem we are currently operating on
         @arg fsfd: A filesystem object for the filesystem we are about to scan.
         """
-        self.dbh=dbh
-        self.table=table
         self.fsfd = fsfd
+        self.dbh = fsfd.dbh
 
     def prepare(self):
         """ This is called before the scanner is used.
@@ -212,7 +208,7 @@ class StoreAndScan(BaseScanner):
         Where $inode is the filename in the filesystem.
         """
         return make_temp_filename(
-            self.dbh.case, self.table,
+            self.dbh.case, 
             self.dbh.MakeSQLSafe(self.inode)
             )
 
@@ -233,10 +229,10 @@ class StoreAndScan(BaseScanner):
         @arg name: The name of the file in the filesystem to operate on - The Scanner should have saved this file previously.
         """
 
-def make_temp_filename(case, fsimage, inode):
-        return("%s/case_%s/%s_%s" % (
+def make_temp_filename(case, inode):
+        return("%s/case_%s/%s" % (
             config.RESULTDIR,
-            case,fsimage,
+            case,
             inode))
 
 class StoreAndScanType(StoreAndScan):
@@ -251,7 +247,7 @@ class StoreAndScanType(StoreAndScan):
         try:
             mime_type = metadata['mime']
         except KeyError:
-            self.dbh.execute("select mime from type_%s where inode=%r",(self.table,self.inode))
+            self.dbh.execute("select mime from type where inode=%r",(self.inode))
             row=self.dbh.fetch()
             if row:
                 mime_type = row['mime']
@@ -460,22 +456,27 @@ class Drawer:
         result.const_selector(left,
                            scan_group_name,
                            ['on','off'],['Enabled','Disabled'])
+        
+## This is a down side for the unified VFS model - we may well
+## encounter any filesystem in our scan run, so we must show them
+## all. This means that we allow users to select Network filesystems
+## when they only have a disk image loaded etc.
 
-class FSSpecialisedDrawer(Drawer):
-    """ A drawer which only draws the form if the current filesystem is derived from a given filesystem name """
-    special_fs_name = ''
+##class FSSpecialisedDrawer(Drawer):
+##    """ A drawer which only draws the form if the current filesystem is derived from a given filesystem name """
+##    special_fs_name = ''
 
-    def form(self,query,result):
-        """ It only makes sense to run these scanners when the
-        base filesystem is derived from the PCAPFS. Otherwise
-        we just hide these options.
-        """
-        dbh = DB.DBO(query['case'])
-        fstype = dbh.get_meta('fstype_%s' % query['fsimage'])
-        fs_class = Registry.FILESYSTEMS.filesystems[fstype]
-        if issubclass(fs_class,Registry.FILESYSTEMS.fs[self.special_fs_name]):
-            Drawer.form(self,query,result)
-        else:
-            result.hidden(self.get_group_name(),'off')
-            for i in self.contains:
-                result.hidden("scan_%s" % i,'off')
+##    def form(self,query,result):
+##        """ It only makes sense to run these scanners when the
+##        base filesystem is derived from the PCAPFS. Otherwise
+##        we just hide these options.
+##        """
+##        dbh = DB.DBO(query['case'])
+##        fstype = dbh.get_meta('fstype')
+##        fs_class = Registry.FILESYSTEMS.filesystems[fstype]
+##        if issubclass(fs_class,Registry.FILESYSTEMS.fs[self.special_fs_name]):
+##            Drawer.form(self,query,result)
+##        else:
+##            result.hidden(self.get_group_name(),'off')
+##            for i in self.contains:
+##                result.hidden("scan_%s" % i,'off')

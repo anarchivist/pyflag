@@ -175,13 +175,13 @@ class HTTPScanner(NetworkScanFactory):
             `url` VARCHAR( 255 ) NOT NULL,
             `response_packet` int not null,
             `content_type` VARCHAR( 255 ) NOT NULL
-            )""",(self.table,))
+            )""")
 
-        self.dbh.check_index("http_%s" % self.table, "inode")
-        self.dbh.check_index("http_%s" % self.table, "url")
+        self.dbh.check_index("http", "inode")
+        self.dbh.check_index("http", "url")
         
     def reset(self):
-        self.dbh.execute("drop table if exists http_%s",(self.table,))
+        self.dbh.execute("drop table if exists http")
 
     def process_stream(self, stream, factories):
         forward_stream, reverse_stream = self.stream_to_server(stream, "HTTP")
@@ -225,7 +225,7 @@ class HTTPScanner(NetworkScanFactory):
             url = p.request.get("url")
             if not url.startswith("http://") or not url.startswith("ftp://"):
                 url = "http://%s%s" % (host, url)
-            self.dbh.execute("insert into http_%s set inode=%r, request_packet=%r, method=%r, url=%r, response_packet=%r, content_type=%r",(self.table, new_inode, p.request.get("packet_id"), p.request.get("method"), url, p.response.get("packet_id"), p.response.get("content-type","text/html")))
+            self.dbh.execute("insert into http set inode=%r, request_packet=%r, method=%r, url=%r, response_packet=%r, content_type=%r",(new_inode, p.request.get("packet_id"), p.request.get("method"), url, p.response.get("packet_id"), p.response.get("content-type","text/html")))
 
             ## Scan the new file using the scanner train. 
             self.scan_as_file(new_inode, factories)
@@ -307,8 +307,8 @@ class Chunked(File):
 
         self.cached_fd.close()
         
-    def __init__(self, case, table, fd, inode):
-        File.__init__(self, case, table, fd, inode)
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
 
         self.filename = FlagFramework.get_temp_path(self.case,self.inode)
 

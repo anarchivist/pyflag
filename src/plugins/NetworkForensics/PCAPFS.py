@@ -70,7 +70,7 @@ def draw_only_PCAPFS(query,result):
     ## Get a list of filesystems which are of type PCAPFS:
     dbh.execute("select * from meta where property='fsimage'")
     for row in dbh:
-        t=dbh2.get_meta("fstype_%s" % row['value'])
+        t=dbh2.get_meta("fstype")
         if t.startswith("PCAP"):
             images.append(row['value'])
 
@@ -88,12 +88,12 @@ class PCAPFS(DBFS):
         DBFS.load(self)
         sdbh = DB.DBO(self.case)
         ## This sets up the schema for pcap
-        sdbh.MySQLHarness("%s/pcaptool -c -t pcap_%s" %(config.FLAG_BIN,self.table))
+        sdbh.MySQLHarness("%s/pcaptool -c -t pcap" %(config.FLAG_BIN))
         ## This populates it 
-        sql =  "%s/iowrapper  -i %s -o %s -f foo -- %s/pcaptool -t pcap_%s foo"%(config.FLAG_BIN,
-                                                     self.iosource.subsystem,
-                                                     self.iosource.make_parameter_list(),config.FLAG_BIN,
-                                                     self.table)
+        sql =  "%s/iowrapper  -i %s -o %s -f foo -- %s/pcaptool -t pcap foo" % (
+            config.FLAG_BIN,
+            self.iosource.subsystem,
+            self.iosource.make_parameter_list(),config.FLAG_BIN)
 
         sdbh.MySQLHarness(sql)
 
@@ -101,12 +101,13 @@ class PCAPFS(DBFS):
         self.VFSCreate(None,"p0",'rawdata');
 
         ## Creates indexes on id:
-        sdbh.check_index("pcap_%s" % self.table,'id')
+        sdbh.check_index("pcap",'id')
 
     def delete(self):
         DBFS.delete(self)
         sdbh = DB.DBO(self.case)
-        sdbh.MySQLHarness("%s/pcaptool -d -t pcap_%s" % (config.FLAG_BIN,self.table))
+        sdbh.MySQLHarness("%s/pcaptool -d -t pcap" % (
+            config.FLAG_BIN))
 
 class PCAPFile(File):
     """ A file like object to read packets from a pcap file.
@@ -116,19 +117,19 @@ class PCAPFile(File):
     """
     specifier = 'p'
 
-    def __init__(self, case, table, fd, inode):
+    def __init__(self, case, fd, inode):
         """ This is a top level File driver for opening pcap files.
 
         Note that pcap files are stored in their own filesystem. We expect the following initialisation:
         @arg fd: is an io source for the pcap file
         @arg inode: The inode of the pcap file in the pcap filesystem, currently ignored.
         """
-        File.__init__(self, case, table, fd, inode)
+        File.__init__(self, case, fd, inode)
         ## Calculates the size of this file:
         dbh = DB.DBO(self.case)
         self.dbh=dbh
         
-        dbh.execute("select max(id) as max from pcap_%s" % table)
+        dbh.execute("select max(id) as max from pcap")
         row=dbh.fetch()
         self.size = row['max']
 
@@ -139,7 +140,7 @@ class PCAPFile(File):
         if self.readptr>=self.size: return ''
 
         ## Find out the offset in the file of the packet:
-        self.dbh.execute("select * from pcap_%s where id=%r",(self.table,self.readptr,))
+        self.dbh.execute("select * from pcap where id=%r",(self.readptr,))
         row=self.dbh.fetch()
 
         if not row:

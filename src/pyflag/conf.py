@@ -41,30 +41,12 @@ class ConfObject:
     @note: If the user does not have a configuration file in their home directory, we create it.
     """
     config=None
-    def parse(self):
-        """ This utility function loads the configuration file from the users home directory.
-      
-        """
-        ConfObject.config = ConfigParser.SafeConfigParser({
-            "home": os.getenv("HOME"),
-            "prefix":sys.prefix,
-            "pyflagdir":"%s/../"%sys.modules['pyflag'].__path__[0]})
-
-        paths = [os.path.expanduser('~/.pyflagrc')]
-        try:
-            paths.insert(0,os.environ['PYFLAGRC'])
-        except KeyError:
-            pass
-
-        ConfObject.config.read(paths)
-
     def __init__(self):
         for k,v in os.environ.items():
             key = k.upper()[len('PYFLAG_'):]
             if (k==k.upper() and k.startswith('PYFLAG') and
                 not self.__class__.__dict__.has_key(key)):
                 self.__class__.__dict__[key]=parse_value(v)
-
 
 def parse_value(v):
     """ Returns a parsed value suitable to be put into the config variable """

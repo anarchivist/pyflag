@@ -52,18 +52,17 @@ class PstScan(GenScanFactory):
         contains = [ 'PstScan','IEIndex', 'RegistryScan', 'TypeScan']
         default = True
         
-    def __init__(self,dbh, table,fsfd):
-        self.dbh=dbh
-        self.table=table
+    def __init__(self,fsfd):
+        GenScanFactory.__init__(self, fsfd)
         self.to_re = re.compile('^to:\s+(.*?)\n(?:\w|\n)', re.IGNORECASE|re.MULTILINE|re.DOTALL)
         self.from_re = re.compile('^from:\s+(.*?)\n(?:\w|\n)', re.IGNORECASE|re.MULTILINE|re.DOTALL)
         # create the "groupware" tables
         # these are global to the image, not the file, so other scanners may wish to use them
         # in that case this code may belong elseware
-        self.dbh.execute("CREATE TABLE IF NOT EXISTS `email_%s` (`inode` VARCHAR(250), `date` DATETIME, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));", self.table)
-        self.dbh.execute("CREATE TABLE IF NOT EXISTS `contact_%s` (`inode` VARCHAR(250), `name` VARCHAR(250), `email` VARCHAR(250), `address` VARCHAR(250), `phone` VARCHAR(250));", self.table)
-        self.dbh.execute("CREATE TABLE IF NOT EXISTS `appointment_%s` (`inode` VARCHAR(250), `startdate` DATETIME, `enddate` DATETIME, `location` VARCHAR(250), `comment` VARCHAR(250));", self.table)
-        self.dbh.execute("CREATE TABLE IF NOT EXISTS `journal_%s` (`inode` VARCHAR(250), `startdate` DATETIME, `enddate` DATETIME, `type` VARCHAR(250), `comment` VARCHAR(250));", self.table)
+        self.dbh.execute("CREATE TABLE IF NOT EXISTS `email` (`inode` VARCHAR(250), `date` DATETIME, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));")
+        self.dbh.execute("CREATE TABLE IF NOT EXISTS `contact` (`inode` VARCHAR(250), `name` VARCHAR(250), `email` VARCHAR(250), `address` VARCHAR(250), `phone` VARCHAR(250));")
+        self.dbh.execute("CREATE TABLE IF NOT EXISTS `appointment` (`inode` VARCHAR(250), `startdate` DATETIME, `enddate` DATETIME, `location` VARCHAR(250), `comment` VARCHAR(250));")
+        self.dbh.execute("CREATE TABLE IF NOT EXISTS `journal` (`inode` VARCHAR(250), `startdate` DATETIME, `enddate` DATETIME, `type` VARCHAR(250), `comment` VARCHAR(250));")
 
 
     def reset(self):
@@ -71,7 +70,7 @@ class PstScan(GenScanFactory):
         # reset the groupware tables, this should not be done here
         # if ever another scanner wants to use them also
         for name in ('email','contact','appointment','journal'):
-            self.dbh.execute("DROP TABLE `%s_%s`;", (name, self.table))
+            self.dbh.execute("DROP TABLE `%s`;", (name))
         
     def destroy(self):
         pass
@@ -122,7 +121,7 @@ class PstScan(GenScanFactory):
                         from_addr += " (%s)" % item.outlook_sender
                     to_addr = "%s" % item.sentto_address
 
-                self.dbh.execute("INSERT INTO `email_%s` SET `inode`=%r,`date`=from_unixtime(%s),`to`=%r,`from`=%r,`subject`=%r", (self.table, new_inode, item.arrival_date, to_addr, from_addr, item.subject.subj))
+                self.dbh.execute("INSERT INTO `email` SET `inode`=%r,`date`=from_unixtime(%s),`to`=%r,`from`=%r,`subject`=%r", (new_inode, item.arrival_date, to_addr, from_addr, item.subject.subj))
                 
                 properties = {
                     'mtime':item.arrival_date,
@@ -218,7 +217,7 @@ class PstScan(GenScanFactory):
                 elif item.business_phone2:
                     phone += ", %s(w)" % item.business_phone2
 
-                self.dbh.execute("INSERT INTO `contact_%s` SET `inode`=%r,`name`=%r, `email`=%r, `address`=%r, `phone`=%r", (self.table, new_inode, name, email, address, phone))
+                self.dbh.execute("INSERT INTO `contact` SET `inode`=%r,`name`=%r, `email`=%r, `address`=%r, `phone`=%r", (new_inode, name, email, address, phone))
 
             def add_appointment(new_inode,name,item):
                 add_other(new_inode,name,item)
@@ -229,7 +228,7 @@ class PstScan(GenScanFactory):
                 if item.comment:
                     comment = item.comment
                     
-                self.dbh.execute("INSERT INTO `appointment_%s` SET `inode`=%r, `startdate`=from_unixtime(%s), `enddate`=from_unixtime(%s), `location`=%r, `comment`=%r",(self.table, new_inode, item.start, item.end, location, comment))
+                self.dbh.execute("INSERT INTO `appointment` SET `inode`=%r, `startdate`=from_unixtime(%s), `enddate`=from_unixtime(%s), `location`=%r, `comment`=%r",(new_inode, item.start, item.end, location, comment))
 
             def add_journal(new_inode,name,item):
                 add_other(new_inode,name,item)
@@ -240,7 +239,7 @@ class PstScan(GenScanFactory):
                 if item.comment:
                     comment = item.comment
                 
-                self.dbh.execute("INSERT INTO `journal_%s` SET `inode`=%r, `startdate`=from_unixtime(%s), `enddate`=from_unixtime(%s), `type`=%r, `comment`=%r",(self.table, new_inode, item.start, item.end, jtype, comment))
+                self.dbh.execute("INSERT INTO `journal` SET `inode`=%r, `startdate`=from_unixtime(%s), `enddate`=from_unixtime(%s), `type`=%r, `comment`=%r",(new_inode, item.start, item.end, jtype, comment))
 
             ## Just walk over all the files
             for root, dirs, files in pst.walk():
@@ -266,15 +265,15 @@ class Pst_file(File):
     specifier = 'P'
     blocks=()
     size=None
-    def __init__(self, case, table, fd, inode):
-        File.__init__(self, case, table, fd, inode)
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
         parts = inode.split('|')
         pstinode = '|'.join(parts[:-1])
         thispart = parts[-1]
 
         # open the pst file from disk cache
         # or from fd if cached file does not exist
-        fname = Scanner.make_temp_filename(case, table, pstinode)
+        fname = Scanner.make_temp_filename(case, pstinode)
         if not os.path.isfile(fname):
             outfd = open(fname, 'w')
             outfd.write(fd.read())
@@ -311,7 +310,7 @@ class Pst_file(File):
 # a bunch of reports for browsing the outlook data
 class PstExplorer(Reports.report):
     """ Browse Groupware Information"""
-    parameters = {'fsimage':'fsimage','inode':'any'}
+    parameters = {'inode':'any'}
     name = "Groupware (Email, Contacts, Appointments etc)"
     family = "Disk Forensics"
     description="This report will display all email, contact and calendaring data found in recognised email folders and files (eg. pst)"
@@ -319,12 +318,11 @@ class PstExplorer(Reports.report):
     def form(self,query,result):
         try:
             result.case_selector()
-            result.meta_selector(message='FS Image',case=query['case'],property='fsimage')
+
             # show a list of files where email was found
             dbh = self.DBO(query['case'])
-            tablename = dbh.MakeSQLSafe(query['fsimage'])
             try:
-                dbh.execute('select distinct email.inode, concat(file.path,file.name) as path from email_%s as email, file_%s as file where file.inode = email.inode', (tablename, tablename))
+                dbh.execute('select distinct email.inode, concat(file.path,file.name) as path from email as email, file as file where file.inode = email.inode')
                 result.row('Email was found in the following files, select the file to browse:',colspan=2)
                 for row in dbh:
                     tmp=self.ui(result)
@@ -340,17 +338,16 @@ class PstExplorer(Reports.report):
             return result
 
     def display(self,query,result):
-        result.heading("Email and Contacts in FS Image %s" % query['fsimage'])
+        result.heading("Email and Contacts in VFS")
         
         dbh=self.DBO(query['case'])
-        tablename = dbh.MakeSQLSafe(query['fsimage'])
         
         def email(query,output):
             output.table(
                 columns=('inode','date','`from`','`to`','subject'),
                 names=('Inode','Arrival Date','From','To','Subject'),
-                table=('email_%s' % (tablename)),
-                links = [ FlagFramework.query_type((), case=query['case'],family="Disk Forensics",report='ViewFile', fsimage=query['fsimage'],__target__='inode', inode="%s:0"),],
+                table=('email'),
+                links = [ FlagFramework.query_type((), case=query['case'],family="Disk Forensics",report='ViewFile',__target__='inode', inode="%s:0"),],
                 case=query['case']
                 )
             return output
@@ -359,7 +356,7 @@ class PstExplorer(Reports.report):
             output.table(
                 columns=('inode','name','email','address','phone'),
                 names=('Inode','Name','Email','Address','Phone'),
-                table=('contact_%s' % (tablename)),
+                table=('contact'),
                 case=query['case']
                 )
             return output
@@ -368,7 +365,7 @@ class PstExplorer(Reports.report):
             output.table(
                 columns=('inode','startdate','enddate','location','comment'),
                 names=('Inode','Start Date','End Date','Location','Comment'),
-                table=('appointment_%s' % (tablename)),
+                table=('appointment'),
                 case=query['case']
                 )
             return output
@@ -377,7 +374,7 @@ class PstExplorer(Reports.report):
             output.table(
                 columns=('inode','startdate','enddate','type','comment'),
                 names=('Inode','Start Date','End Date','Type','Comment'),
-                table=('journal_%s' % (tablename)),
+                table=('journal'),
                 case=query['case']
                 )
             return output

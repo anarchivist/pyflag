@@ -36,13 +36,9 @@ class IEIndex(Scanner.GenScanFactory):
     """ Load in IE History files """
     default = True
     depends = ['TypeScan']
-    
-    def __init__(self,dbh, table,fsfd):
-        self.dbh=dbh
-        self.table=table
 
     def prepare(self):
-        self.dbh.execute("""CREATE TABLE IF NOT EXISTS history_%s (
+        self.dbh.execute("""CREATE TABLE IF NOT EXISTS history (
         `path` TEXT NOT NULL,
         `type` VARCHAR(20) NOT NULL,
         `url` TEXT NOT NULL,
@@ -50,16 +46,16 @@ class IEIndex(Scanner.GenScanFactory):
         `accessed` DATETIME NOT NULL,
         `filename` VARCHAR(250),
         `filepath` VARCHAR(250),
-        `headers` TEXT)""" % self.table)        
+        `headers` TEXT)""")        
 #        self.dbh.MySQLHarness("pasco -t %s -g create " % (self.table))
 
     def reset(self):
         Scanner.GenScanFactory.reset(self)
-        self.dbh.execute("DROP TABLE IF EXISTS history_%s" % self.table)
+        self.dbh.execute("DROP TABLE IF EXISTS history")
 #        self.dbh.MySQLHarness("pasco -t %s -g drop " % (self.table))
         
     def destroy(self):
-        self.dbh.check_index("history_%s" % self.table,"url",10)
+        self.dbh.check_index("history" ,"url",10)
 #        self.dbh.execute('ALTER TABLE history_%s ADD INDEX(url(10))', self.table)
 
     class Scan(Scanner.StoreAndScanType):
@@ -70,8 +66,8 @@ class IEIndex(Scanner.GenScanFactory):
             history = IECache.IEHistoryFile(fd)
             for event in history:
                 if event:                    
-                    self.dbh.execute("INSERT INTO history_%s VALUES(%r,%r,%r,%r,%r,%r,%r,%r)",(
-                        self.table, self.ddfs.lookup(inode=self.inode),
+                    self.dbh.execute("INSERT INTO history VALUES(%r,%r,%r,%r,%r,%r,%r,%r)",(
+                        self.ddfs.lookup(inode=self.inode),
                         event['type'],event['url'],
                         event['modified_time'],
                         event['accessed_time'],
@@ -82,28 +78,22 @@ class IEIndex(Scanner.GenScanFactory):
 
 class IEHistory(Reports.report):
     """ View IE browsing history with pasco"""
-    parameters = {'fsimage':'fsimage'}
+    parameters = {'case': 'flag_case'}
     name = "IE Browser History (pasco)"
     family = "Disk Forensics"
     description="This report will display all IE browsing history data found in index.dat files"
     def form(self,query,result):
-        try:
-            result.case_selector()
-            if query['case']!=config.FLAGDB:
-               result.meta_selector(case=query['case'],property='fsimage')
-        except KeyError:
-            return result
-
+        result.case_selector()
+        
     def display(self,query,result):
-        result.heading("IE History for %s" % query['fsimage'])
+        result.heading("IE History")
         dbh=self.DBO(query['case'])
-        tablename = dbh.MakeSQLSafe(query['fsimage'])
 
         try:
             result.table(
                 columns=('path','type','url','modified','accessed','concat(filepath,filename)','headers'),
                 names=('Path','Type','URL','Modified','Accessed','Filename','Headers'),
-                table=('history_%s' % (tablename)),
+                table=('history'),
                 case=query['case']
                 )
         except DB.DBError,e:

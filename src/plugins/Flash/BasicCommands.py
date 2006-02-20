@@ -482,6 +482,6 @@ class file(ls):
         
         for path in self.args[1:]:
             inode = self.environment._FS.lookup(path=path)
-            dbh.execute("select mime,type from type_%s where inode =%r",(self.environment._IOSOURCE,inode))
+            dbh.execute("select mime,type from type where inode =%r",(inode))
             yield dbh.fetch()
 

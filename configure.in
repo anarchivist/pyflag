@@ -53,6 +53,7 @@ AC_OUTPUT([
 	src/mailtools/Makefile 
 	src/mailtools/libpst-0.5/Makefile 
 	src/indextools/Makefile
+	src/logtools/Makefile
 	src/network/Makefile
 	src/regtools/Makefile
 	src/virustools/Makefile

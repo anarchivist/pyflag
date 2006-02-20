@@ -102,7 +102,7 @@ class BrowseFS(Reports.report):
                 columns=['f.inode','f.mode','concat(path,name)','f.status','size','from_unixtime(mtime)','from_unixtime(atime)','from_unixtime(ctime)'],
                 names=('Inode','Mode','Filename','Del','File Size','Last Modified','Last Accessed','Created'),
                 callbacks={'Del':FlagFramework.Curry(DeletedIcon,result=result)},
-                table='file_%s as f, inode_%s as i' % (fsfd.table,fsfd.table),
+                table='file as f, inode as i',
                 where="f.inode=i.inode",
                 case=query['case'],
                 links=[ FlagFramework.query_type((), case=query['case'],family=query['family'],report='ViewFile', fsimage=query['fsimage'],__target__='inode', inode="%s"),
@@ -134,7 +134,7 @@ class BrowseFS(Reports.report):
                 tmp.table(
                     columns=['f.inode','name','f.status','size', 'from_unixtime(mtime)','f.mode'],
                     names=('Inode','Filename','Del','File Size','Last Modified','Mode'),
-                    table='file_%s as f, inode_%s as i' % (fsfd.table,fsfd.table),
+                    table='file as f, inode as i',
                     where="f.inode=i.inode and path=%r and f.mode!='d/d'" % (br),
                     case=query['case'],
                     links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='View File Contents', fsimage=query['fsimage'],__target__='inode', inode="%s")]
@@ -468,15 +468,15 @@ class Timeline(Reports.report):
         dbh = self.DBO(query['case'])
         tablename = dbh.MakeSQLSafe(query['fsimage'])
         temp_table = dbh.get_temp()
-        dbh.check_index("inode_%s" % tablename,"inode")
-        dbh.execute("create temporary table %s select i.inode,f.status,mtime as `time`,1 as `m`,0 as `a`,0 as `c`,0 as `d`,concat(path,name) as `name` from inode_%s as i left join file_%s as f on i.inode=f.inode" %
-                    (temp_table, tablename, tablename));
-        dbh.execute("insert into %s select i.inode,f.status,atime,0,1,0,0,concat(path,name) from inode_%s as i left join file_%s as f on i.inode=f.inode" % (temp_table, tablename, tablename))
-        dbh.execute("insert into %s select i.inode,f.status,ctime,0,0,1,0,concat(path,name) from inode_%s as i left join file_%s as f on i.inode=f.inode" % (temp_table, tablename, tablename))
-        dbh.execute("insert into %s select i.inode,f.status,dtime,0,0,0,1,concat(path,name) from inode_%s as i left join file_%s as f on i.inode=f.inode" % (temp_table, tablename, tablename))
-        dbh.execute("create table if not exists mac_%s select inode,status,time,sum(m) as `m`,sum(a) as `a`,sum(c) as `c`,sum(d) as `d`,name from %s where time>0 group by time,name order by time,name" %
-                    (tablename, temp_table))
-        dbh.check_index("mac_%s" % tablename,"inode")
+        dbh.check_index("inode","inode")
+        dbh.execute("create temporary table %s select i.inode,f.status,mtime as `time`,1 as `m`,0 as `a`,0 as `c`,0 as `d`,concat(path,name) as `name` from inode as i left join file as f on i.inode=f.inode" %
+                    (temp_table, ));
+        dbh.execute("insert into %s select i.inode,f.status,atime,0,1,0,0,concat(path,name) from inode as i left join file as f on i.inode=f.inode" % (temp_table,))
+        dbh.execute("insert into %s select i.inode,f.status,ctime,0,0,1,0,concat(path,name) from inode as i left join file as f on i.inode=f.inode" % (temp_table, ))
+        dbh.execute("insert into %s select i.inode,f.status,dtime,0,0,0,1,concat(path,name) from inode as i left join file as f on i.inode=f.inode" % (temp_table, ))
+        dbh.execute("create table if not exists mac select inode,status,time,sum(m) as `m`,sum(a) as `a`,sum(c) as `c`,sum(d) as `d`,name from %s where time>0 group by time,name order by time,name" %
+                    temp_table)
+        dbh.check_index("mac","inode")
         
     def progress(self, query, result):
         result.heading("Building Timeline")
@@ -490,7 +490,7 @@ class Timeline(Reports.report):
                      "if(m,'m',' ')","if(a,'a',' ')","if(c,'c',' ')","if(d,'d',' ')",'name'),
             names=('Timestamp', 'Inode','Del','m','a','c','d','Filename'),
             callbacks={'Del':FlagFramework.Curry(DeletedIcon,result=result)},
-            table=('mac_%s' % tablename),
+            table=('mac'),
             case=query['case'],
 #            links=[ None, None, None, None, None, None, None, FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='filename')]
             links=[ None, FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='inode')]
@@ -500,32 +500,32 @@ class Timeline(Reports.report):
         dbh = self.DBO(query['case'])
         tablename = dbh.MakeSQLSafe(query['fsimage'])
         dbh = self.DBO(query['case'])
-        dbh.execute("drop table mac_%s" % tablename)
+        dbh.execute("drop table mac")
                 
 ## Standard file objects:
 class DBFS_file(FileSystem.File):
     """ Class for reading files within a loaded dd image, supports typical file-like operations, seek, tell, read """
     specifier = 'D'
-    def __init__(self, case, table, fd, inode):
-        FileSystem.File.__init__(self, case, table, fd, inode)
+    def __init__(self, case, fd, inode):
+        FileSystem.File.__init__(self, case, fd, inode)
 
         self.dbh = DB.DBO(case)
         self.readptr = 0
         try:
-            self.dbh.execute("select value from meta_%s where name='block_size'",self.table);
+            self.dbh.execute("select value from meta where property='block_size'");
             self.block_size = int(self.dbh.fetch()["value"])
         except TypeError:
             pass
         # fetch inode data
-        self.dbh.check_index("inode_%s" % self.table,"inode")
-        self.dbh.execute("select * from inode_%s where inode=%r and status='alloc'", (self.table, inode))
+        self.dbh.check_index("inode" ,"inode")
+        self.dbh.execute("select * from inode where inode=%r and status='alloc'", (inode))
         self.data = self.dbh.fetch()
         if not self.data:
             raise IOError("Could not locate inode %s"% inode)
 
         self.size = self.data['size']
-        self.dbh.check_index("block_%s" % self.table,"inode")
-        self.dbh.execute("select block,count,`index` from block_%s where inode=%r order by `index`", (self.table, inode))
+        self.dbh.check_index("block" ,"inode")
+        self.dbh.execute("select block,count,`index` from block where inode=%r order by `index`", (inode))
         try:
             self.blocks = [ (row['block'],row['count'],row['index']) for row in self.dbh ]
         except KeyError:
@@ -547,8 +547,8 @@ class DBFS_file(FileSystem.File):
 
         if not self.blocks:
             # now try to find blocks in the resident table
-            self.dbh.check_index("resident_%s" % self.table,"inode")
-            self.dbh.execute("select data from resident_%s where inode=%r" % (self.table, self.data['inode']));
+            self.dbh.check_index("resident","inode")
+            self.dbh.execute("select data from resident where inode=%r" % (self.data['inode']));
             row = self.dbh.fetch()
             if not row:
                 raise IOError("Cant find any file data")
@@ -609,8 +609,8 @@ class DBFS_file(FileSystem.File):
 class MountedFS_file(FileSystem.File):
     """ access to real file in filesystem """
     specifier = 'M'
-    def __init__(self, case, table, fd, inode):
-        FileSystem.File.__init__(self, case, table, fd, inode)
+    def __init__(self, case, fd, inode):
+        FileSystem.File.__init__(self, case, fd, inode)
         #strategy:
         #must determine path from inode
         #we can assume this vfs will never be inside another vfs...
@@ -618,8 +618,8 @@ class MountedFS_file(FileSystem.File):
 
         dbh = DB.DBO(case)
         self.dbh=dbh
-        self.dbh.check_index("file_%s" % self.table,"inode")
-        dbh.execute("select path,name from file_%s where inode=%r",(self.table, inode))
+        self.dbh.check_index("file" ,"inode")
+        dbh.execute("select path,name from file where inode=%r",(inode))
         row=self.dbh.fetch()
         path=row['path']+"/"+row['name']
         self.fd=open(fd.mount_point+'/'+path,'r')

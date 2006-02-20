@@ -540,24 +540,22 @@ class HTMLUI(UI.GenericUI):
 
         This implementation uses javascript/iframes extensively.
         """
-        print "branch is %s" % (branch,)
-        
         def draw_branch(depth,query, result):
             try:
             ## Get the right part:
                 branch=query['open_tree'].split('/')
             except KeyError:
                 branch=['/']
-
-            print "Branch is %s" % (branch,)
             
             for name,value,state in tree_cb(branch[:depth]):
                 ## Must have a name and value
                 if not name or not value: continue
+                result.result+="<tr><td>"
                 result.icon("spacer.png", width=20*depth, height=20)
                 link = query.clone()
                 del link['open_tree']
                 del link['yoffset']
+                del link['xoffset']
                 cb = link['callback_stored']
                 del link['callback_stored']
                 
@@ -570,7 +568,7 @@ class HTMLUI(UI.GenericUI):
                 else:
                     result.result+="<a href=\"javascript:tree_pane_open('%s','%s','f?%s')\"><img border=0 src=\"/corner.png\"></a>" % (cb,query['right_pane_cb'],link)
                     
-                result.result+="&nbsp;%s<br>\n" % str(sv)
+                result.result+="&nbsp;%s</td></tr>\n" % str(sv)
                 result.result+="\n"
 
                 try:
@@ -589,13 +587,16 @@ class HTMLUI(UI.GenericUI):
             del link['callback_stored']
             result.result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img border=0 src=\"/folder.png\"></a>" % (query['callback_stored'],query['right_pane_cb'],link)
             result.result+="&nbsp;/<br>\n"
-            
+
+            result.result+="<table width=100%>"
             draw_branch(1,query, result)
             try:
-                result.result+="<script>document.body.scrollTop = %s;</script>\n" % query['yoffset']
+                result.result+="<script>document.body.scrollTop = %s; document.body.scrollLeft = %s;</script>\n" % (query['yoffset'], query['xoffset'])
             except:
                 pass
 
+            result.result+="</table>"
+            
         def right(query,result):
             result.decoration = "js"
             result.content_type = "text/html"
