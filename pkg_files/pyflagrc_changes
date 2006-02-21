@@ -1,9 +1,0 @@
-s/^User.*$/User=bogus_user/
-s/^Passwd.*$/Passwd=password/
-s/^Host.*$/Host=127\.0\.0\.1/
-s/^Port.*$/Port=0/
-s/^UNIX_SOCKET.*$/UNIX_SOCKET\ =\ \/var\/run\/pyflagd\/pyflag.sock/
-s/^DATADIR.*$/DATADIR=\/var\/lib\/pyflag/
-s/^ploticus=.*$/ploticus=\/usr\/bin\/ploticus/
-s/^ploticus_prefabs.*$/ploticus_prefabs=\/usr\/share\/ploticus/
-s/^LOG_LEVEL.*$/LOG_LEVEL\ =\ 10/

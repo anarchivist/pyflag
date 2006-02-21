@@ -1,4 +1,4 @@
-SUBDIRS = src
+SUBDIRS = src examples debian
 
 my_images	 	=	\
 				images/arrow_left_grey.gif images/arrow_right_grey.gif images/back.png images/broken.png \
@@ -20,9 +20,10 @@ bin_SCRIPTS		=	pyflag pyflash pyflag_launch
 sysconf_DATA		=	pyflagrc
 pkgdata_DATA		=	$(my_data)
 nobase_pkgdata_DATA	=	$(my_images)
-man_MAN1		=	pyflag.1
+#This breaks the make, but all the doco says this is how to do it.  No man page for now.
+man_MANS		=	pyflag.1
 EXTRA_DIST		=	pyflag.in pyflagrc.in pyflash.in \
-				pyflag_launch.in $(my_images) $(my_data)
+				pyflag_launch.in $(my_images) $(my_data) $(man_MANS)
 
 # perform subs in scripts and config files
 edit = sed \
@@ -46,22 +47,7 @@ edit = sed \
 
 clean-local:
 	-rm -rf $(bin_SCRIPTS) $(sysconf_DATA)
-	-rm -rf $(top_srcdir)/pkg_tmpdir
 
 deb-pkg:	
-	mkdir -p $(top_srcdir)/pkg_tmpdir/debian/DEBIAN
-	echo $(DESTDIR)
-	sh $(top_srcdir)/autogen.sh
-	$(top_srcdir)/configure --prefix=/usr --sysconfdir=/etc --includedir=/usr/include/pyflag
-	make install DESTDIR=/home/gavinj/pyflag_source/pyflag/pkg_tmpdir/debian
-	mkdir -p $(top_srcdir)/pkg_tmpdir/debian/usr/share/doc/pyflag
-	mkdir -p $(top_srcdir)/pkg_tmpdir/debian/usr/share/man/man1
-	gzip -9c $(top_srcdir)/pkg_files/changelog > $(top_srcdir)/pkg_files/changelog.gz
-	cp $(top_srcdir)/pkg_files/copyright $(top_srcdir)/pkg_files/changelog.gz $(top_srcdir)/pkg_tmpdir/debian/usr/share/doc/pyflag
-	rm pkg_files/changelog.gz
-	gzip -9c pkg_files/pyflag.1 > pkg_files/pyflag.1.gz
-	mv pkg_files/pyflag.1.gz $(top_srcdir)/pkg_tmpdir/debian/usr/share/man/man1
-	cp pkg_files/control $(top_srcdir)/pkg_tmpdir/debian/DEBIAN
-	echo '/etc/$(sysconf_DATA)' > $(top_srcdir)/pkg_tmpdir/debian/DEBIAN/conffiles
-	fakeroot dpkg-deb --build $(top_srcdir)/pkg_tmpdir/debian $(top_srcdir)/pyflag_$(VERSION)_i386.deb
+	dpkg-buildpackage -rfakeroot
 

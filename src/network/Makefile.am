@@ -20,7 +20,7 @@ include_HEADERS		= network.h
 dissect.c: init.h
 
 define build-init-deps
-	$(LIBTOOL) --mode=link gcc -o libinit.la $^
+	$(LIBTOOL) --mode=link --tag=CC gcc -o libinit.la $^
 	nm --defined-only .libs/libinit.a | grep __MODULE_INIT | awk '{ print "extern void "$$3"();" }' > init.h	
 	nm --defined-only .libs/libinit.a | grep __MODULE_INIT | awk '{ print $$3"();" }' > init.c
 

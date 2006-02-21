@@ -1,11 +1,15 @@
-Package: pyflag
-Version: 0.80.1
+Source: pyflag
 Section: utils
 Priority: optional
 Maintainer: Michael Cohen and David Collett <pyflag-support@lists.sourceforge.net>
-Architecture: i386
+Build-Depends: autoconf, automake1.9, autotools-dev, debhelper (>= 4.0.0), libtool, g++, zlib1g-dev, libpcap-dev, libmagic-dev, python-dev (>= 2.4), libclamav-dev, make, swig
+Build-Conflicts: autoconf2.13, automake1.4
+Standards-Version: 3.6.1
+
+Package: pyflag
+Architecture: any
 Depends: python (>= 2.4), libmagic1, libclamav1, python2.4-mysqldb, mysql-server (>= 4.0.23), python2.4-imaging, libpcre3
-Recommends: ploticus (>= 2.20), sleuthkit
+Recommends: ploticus (>= 2.20), disktype
 Description: python-based forensic tool
  The python Forensic Log Analysis GUI was designed to simplify the process of
  log file analysis and forensic investigations.  Often when investigating a 
@@ -14,3 +18,8 @@ Description: python-based forensic tool
  This allows flag to remain responsive and expedite data manipulation
  operations.  Flag started off as a project in the Australian Department of 
  Defence.  It is now hosted on sourceforge.
+
+Package: pyflag-doc
+Architecture: all
+Description: Documentation for pyflag
+ This documentation includes blah
