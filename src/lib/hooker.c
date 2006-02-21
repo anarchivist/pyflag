@@ -145,7 +145,15 @@ int open64(const char *pathname, int flags,int mode) {
     */
     do {
       debug(1,"Calling the dispatcher for open64");
+
+      /** This routes open to open64 on 32 bit patforms, and to open
+	  of 64 bit platforms. 
+      */
+#if _FILE_OFFSET_BITS==64
+      new_fd = dispatch->open64(pathname,flags,mode);
+#else
       new_fd = dispatch->open(pathname,flags,mode);
+#endif
       debug(1,"Returned from dispatcher");
     } while(iosources[new_fd]);
 

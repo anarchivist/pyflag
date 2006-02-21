@@ -92,12 +92,12 @@ class NetworkScanFactory(GenScanFactory):
         if stream.dest_port in dissect.fix_ports(protocol):
             forward_stream = stream.con_id
             reverse_stream = find_reverse_stream(
-                forward_stream, self.table, self.dbh)
+                forward_stream,  self.dbh)
             
         elif stream.src_port in dissect.fix_ports(protocol):
             reverse_stream = stream.con_id
             forward_stream = find_reverse_stream(
-                reverse_stream, self.table, self.dbh)
+                reverse_stream,  self.dbh)
         else:
             return None, None
 
@@ -155,17 +155,18 @@ class NetworkScanner(BaseScanner):
             ## Store it for the future
             metadata['proto_tree']={ self.packet_id: self.proto_tree }
 
-def find_reverse_stream(forward_stream,table,dbh):
+def find_reverse_stream(forward_stream,dbh):
     """ Given a connection ID and a table name, finds the reverse connection.
 
     return None if there is not reverse stream
     """
-    dbh.execute("select * from connection_details_%s where con_id=%r",
-                (table,forward_stream))
+    dbh.execute("select * from connection_details where con_id=%r",
+                (forward_stream))
     
     row=dbh.fetch()
     
-    dbh.execute("select con_id from connection_details_%s where src_ip=%r and src_port=%r and dest_ip=%r and dest_port=%r",(table,row['dest_ip'],row['dest_port'],row['src_ip'],row['src_port']))
+    dbh.execute("select con_id from connection_details where src_ip=%r and src_port=%r and dest_ip=%r and dest_port=%r",(
+        row['dest_ip'],row['dest_port'],row['src_ip'],row['src_port']))
     row=dbh.fetch()
 
     try:

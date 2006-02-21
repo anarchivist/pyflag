@@ -324,8 +324,8 @@ class IRC:
 
     def store_command(self,prefix,command,line):
         packet_id = self.fd.get_packet_id(position=self.fd.tell())
-        self.dbh.execute("select ts_sec from pcap_%s where id = %s "
-                         ,(self.table,packet_id))
+        self.dbh.execute("select ts_sec from pcap where id = %s "
+                         ,(packet_id))
         row = self.dbh.fetch()
         timestamp = row['ts_sec']
 
@@ -347,9 +347,9 @@ class IRC:
         else:
             recipient = ""
             
-        self.dbh.execute(""" insert into irc_messages_%s set sender=%r,full_sender=%r,
+        self.dbh.execute(""" insert into irc_messages set sender=%r,full_sender=%r,
         inode=%r, packet_id=%r, data=%r, ts_sec=%r, command = %r, recipient = %r""",(
-            self.table,short_name,prefix,base_stream_inode, packet_id,
+            short_name,prefix,base_stream_inode, packet_id,
             line, timestamp, command, recipient 
             ))
 
@@ -363,9 +363,9 @@ class IRC:
         """ When a user changes their nick we store it in the database """
         self.nick = line
         self.dbh.execute(
-            """ insert into  `irc_userdetails_%s`  set
+            """ insert into  `irc_userdetails`  set
             inode=%r, nick=%r, username=%r, password=%r
-            """,( self.table, self.fd.inode, self.nick, self.username, self.password))
+            """,( self.fd.inode, self.nick, self.username, self.password))
         return line,command
 
     username = ''
@@ -412,7 +412,7 @@ class IRCScanner(NetworkScanFactory):
     
     def prepare(self):
         self.dbh.execute(
-            """CREATE TABLE if not exists `irc_messages_%s` (
+            """CREATE TABLE if not exists `irc_messages` (
             `id` int auto_increment,
             `sender` VARCHAR( 250 ) NOT NULL ,
             `full_sender` VARCHAR( 255 ) NOT NULL ,
@@ -424,34 +424,34 @@ class IRCScanner(NetworkScanFactory):
             `ts_sec` int(11),
             `data` TEXT NOT NULL,
             key(id)
-            )""",(self.table,))
+            )""")
         self.dbh.execute(
-            """ CREATE TABLE if not exists `irc_session_%s` (
+            """ CREATE TABLE if not exists `irc_session` (
             `id` VARCHAR(250),
             `user` VARCHAR( 250 ) NOT NULL
-            )""",(self.table,))
+            )""")
         self.dbh.execute(
-            """ CREATE TABLE if not exists `irc_userdetails_%s` (
+            """ CREATE TABLE if not exists `irc_userdetails` (
             `inode` VARCHAR(250),
             `nick` VARCHAR(250),
             `username` VARCHAR(250),
             `password` VARCHAR(250)
-            )""",(self.table,))
+            )""")
         self.dbh.execute(
-            """ CREATE TABLE if not exists `irc_p2p_%s` (
+            """ CREATE TABLE if not exists `irc_p2p` (
             `inode` VARCHAR(250),
             `session_id` INT,
             `channel_id` INT,
             `to_user` VARCHAR(250),
             `from_user` VARCHAR(250),
             `context` VARCHAR(250)
-            )""",(self.table,))
+            )""")
 
     def process_stream(self, stream, factories):
         forward_stream, reverse_stream = self.stream_to_server(stream, "IRC")
         if not reverse_stream or not forward_stream: return
 
-        combined_inode = "S%s/%s" % (forward_stream, reverse_stream)
+        combined_inode = "I%s|S%s/%s" % (stream.iosource.name, forward_stream, reverse_stream)
         logging.log(logging.DEBUG,"Openning %s for IRC" % combined_inode)
 
         ## We open the file and scan it for IRC:
@@ -496,7 +496,7 @@ class BrowseIRCChat(Reports.report):
         result.table(
             columns = ['id', 'from_unixtime(ts_sec)','inode','packet_id','command','sender','recipient', 'data'],
             names = ['ID','Time Stamp','Stream','Packet','Command','Sender Nick','Recipient','Text'],
-            table = "irc_messages_%s" % query['fsimage'],
+            table = "irc_messages" ,
 #            callbacks = { 'Text': Curry(text_cb, wrap='full',wrap_size=80, font='typewriter'),
 #                          'Recipient': Curry(text_cb, wrap_size=20, wrap='full', font='typewriter')
 #                          },

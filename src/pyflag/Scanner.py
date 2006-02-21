@@ -332,6 +332,7 @@ def scanfile(ddfs,fd,factories):
                 o.process(data,metadata=metadata)
             except Exception,e:
                 logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
+                raise
 
     # call finish method of each object
     for o in objs:

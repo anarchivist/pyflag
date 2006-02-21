@@ -168,7 +168,7 @@ class HTTPScanner(NetworkScanFactory):
         ## response_packet - the packet where the response was seen
         ## content_type - The content type
         self.dbh.execute(
-            """CREATE TABLE if not exists `http_%s` (
+            """CREATE TABLE if not exists `http` (
             `inode` VARCHAR( 255 ) NOT NULL ,
             `request_packet` int not null,
             `method` VARCHAR( 10 ) NOT NULL ,
@@ -187,7 +187,7 @@ class HTTPScanner(NetworkScanFactory):
         forward_stream, reverse_stream = self.stream_to_server(stream, "HTTP")
         if not reverse_stream or not forward_stream: return
 
-        combined_inode = "S%s/%s" % (forward_stream, reverse_stream)
+        combined_inode = "I%s|S%s/%s" % (stream.iosource.name, forward_stream, reverse_stream)
         logging.log(logging.DEBUG,"Openning %s for HTTP" % combined_inode)
 
         fd = self.fsfd.open(inode=combined_inode)
@@ -197,7 +197,7 @@ class HTTPScanner(NetworkScanFactory):
             if not f: continue
 
             ## Create the VFS node:
-            path=self.fsfd.lookup(inode="S%s" % forward_stream)
+            path=self.fsfd.lookup(inode="I%s|S%s" % (stream.iosource.name, forward_stream))
             path=os.path.dirname(path)
             new_inode="%s|o%s" % (combined_inode,f)
 
@@ -260,7 +260,7 @@ class BrowseHTTPRequests(Reports.report):
         result.table(
             columns = ['from_unixtime(ts_sec)','request_packet','inode','method','url', 'content_type'],
             names = [ 'Time Stamp', "Request Packet", 'Inode', "Method" ,"URL", "Content Type" ],
-            table=" http_%s join pcap_%s on request_packet=id " % (query['fsimage'],query['fsimage']),
+            table=" http join pcap on request_packet=id ",
             links = [
             None,
             FlagFramework.query_type((),

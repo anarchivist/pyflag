@@ -142,21 +142,21 @@ class POPScanner(NetworkScanFactory):
 
         ## This table stores common usernames/passwords:
         self.dbh.execute(
-            """ CREATE TABLE if not exists `passwords_%s` (
+            """ CREATE TABLE if not exists `passwords` (
             `inode` VARCHAR(255) NOT NULL,
             `username` VARCHAR(255) NOT NULL,
             `password` VARCHAR(255) NOT NULL,
             `type` VARCHAR(255) NOT NULL
-            ) """,(self.table,))
+            ) """)
             
     def reset(self):
-        self.dbh.execute("delete from passwords_%s where type='POP3'",(self.table,))
+        self.dbh.execute("delete from passwords where type='POP3'")
 
     def process_stream(self, stream, factories):
         forward_stream, reverse_stream = self.stream_to_server(stream, "POP3")
         if not reverse_stream or not forward_stream: return
 
-        combined_inode = "S%s/%s" % (forward_stream,reverse_stream)
+        combined_inode = "I%s|S%s/%s" % (stream.iosource.name, forward_stream,reverse_stream)
         logging.log(logging.DEBUG,"Openning %s for POP3" % combined_inode)
 
         ## We open the file and scan it for emails:
@@ -171,7 +171,7 @@ class POPScanner(NetworkScanFactory):
 
         for f in p.files:
             ## Add a new VFS node
-            path=self.fsfd.lookup(inode="S%s" % forward_stream)
+            path=self.fsfd.lookup(inode="I%s|S%s" % (stream.iosource.name, forward_stream))
             path=os.path.dirname(path)
             new_inode="%s|o%s" % (combined_inode,f[1])
             self.fsfd.VFSCreate(None,new_inode,
@@ -187,5 +187,6 @@ class POPScanner(NetworkScanFactory):
         ## If there is any authentication information in here,
         ## we save it for Ron:
         if p.username and p.password:
-            self.dbh.execute("insert into passwords_%s set inode='S%s',username=%r,password=%r,type='POP3'",(self.table,forward_stream,p.username,p.password))
+            self.dbh.execute("insert into passwords set inode='S%s',username=%r,password=%r,type='POP3'",(
+                forward_stream,p.username,p.password))
 

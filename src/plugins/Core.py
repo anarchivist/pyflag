@@ -45,8 +45,8 @@ class IO_File(FileSystem.File):
 
         ## The format of the inode is Iname .Where name is the name of
         ## the IO source.
-        name = inode[1:]
-        self.io = IO.open(case, name)
+        self.name = inode[1:]
+        self.io = IO.open(case, self.name)
 
     def read(self, length=None):
         return self.io.read(length)

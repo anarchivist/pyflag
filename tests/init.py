@@ -10,4 +10,4 @@ case = "demo"
 fsimage = "test"
 
 io=IO.open(case,fsimage)
-fsfd = Registry.FILESYSTEMS.fs['DBFS'](case,fsimage,io)
+fsfd = Registry.FILESYSTEMS.fs['DBFS'](case)

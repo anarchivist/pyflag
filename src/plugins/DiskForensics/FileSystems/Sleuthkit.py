@@ -22,11 +22,6 @@ class AutoFS(DBFS):
 
     def load(self, mount_point, iosource_name):
         DBFS.load(self, mount_point, iosource_name)
-        ## Ensure the VFS contain the mount point:
-        self.VFSCreate(None, None, mount_point, directory=True)
-
-        sdbh = DB.DBO(self.case)
-        self.iosource = IO.open(self.case, iosource_name)
 
         # run sleuthkit
         string= "%s -i %r -o %r %r -t %r -m %r %r"%(config.IOWRAPPER,
@@ -35,7 +30,7 @@ class AutoFS(DBFS):
                                                     iosource_name, mount_point,
                                                     "foo")
 
-        sdbh.MySQLHarness(
+        self.dbh.MySQLHarness(
             string
             )
 
@@ -46,9 +41,6 @@ class Ext2(AutoFS):
 
     def load(self, mount_point, iosource_name):
         DBFS.load(self, mount_point, iosource_name)
-        sdbh = DB.DBO(self.case)
-
-        self.iosource = IO.open(self.case, iosource_name)
 
         # run sleuthkit
         string= "%s -i %r -o %r %r -t %r -f %r -m %r %r"% (
@@ -59,7 +51,7 @@ class Ext2(AutoFS):
             "foo"
             )
         
-        sdbh.MySQLHarness(
+        self.dbh.MySQLHarness(
             string
             )
 
@@ -114,11 +106,11 @@ class Raw(Ext2):
 class Mounted(DBFS):
     """ A class implementing the mounted filesystem option """
     name = 'Mounted'
-    def load(self, mount_point, iosource):
+    def load(self, mount_point, iosource_name):
         logging.log(logging.DEBUG,"Loading files from directory %s" % self.iosource.mount_point)
-        dbh = DB.DBO(self.case)
+        
         ## Create the tables for the filesystem
-        dbh.MySQLHarness("%s -t %s -d create blah" %(config.SLEUTHKIT,self.table))
+        self.dbh.MySQLHarness("%s -t %s -d create blah" %(config.SLEUTHKIT,iosource_name))
 
         ## This deals with a mounted filesystem -
         ## we dont get the full forensic joy, but we can handle more filesystems than sleuthkit can.

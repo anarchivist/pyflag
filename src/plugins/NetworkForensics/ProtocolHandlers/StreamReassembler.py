@@ -35,7 +35,7 @@ import struct,re
 class Stream:
     """ This class represents a single stream """
     con_id = 0
-    def __init__(self, isn, src_ip, src_port, dest_ip, dest_port, direction="forward"):
+    def __init__(self, isn, src_ip, src_port, dest_ip, dest_port, iosource, direction="forward"):
         ## The list of packets which make up the stream.
         self.packets = []
         self.seq = []
@@ -51,6 +51,8 @@ class Stream:
         self.max_id = 0
         self.direction= direction
         self.con_id+=1
+        ## Ths iosource containing this stream
+        self.iosource = iosource
 
     def add_packet(self, packet_id, seq, length, packet_offset):
         self.packets.append(packet_id)
@@ -89,7 +91,7 @@ class StreamReassembler(NetworkScanFactory):
         ## connection table store all the packets belonging to each
         ## connection.
         self.dbh.execute(
-            """CREATE TABLE if not exists `connection_details_%s` (
+            """CREATE TABLE if not exists `connection_details` (
             `inode` varchar(250),
             `con_id` int(11) unsigned NOT NULL auto_increment,
             `src_ip` int(11) unsigned NOT NULL default '0',
@@ -98,64 +100,67 @@ class StreamReassembler(NetworkScanFactory):
             `dest_port` int(11) unsigned NOT NULL default '0',
             `isn` int(100) unsigned NOT NULL default 0,
             KEY `con_id` (`con_id`)
-            )""",(self.table,))
+            )""")
         self.dbh.execute(
-            """CREATE TABLE if not exists `connection_%s` (
+            """CREATE TABLE if not exists `connection` (
             `con_id` int(11) unsigned NOT NULL default '0',
             `packet_id` int(11) unsigned NOT NULL default '0',
             `seq` int(11) unsigned NOT NULL default '0',
             `length` mediumint(9) unsigned NOT NULL default '0',
             `packet_offset`  mediumint(9) unsigned NOT NULL default '0'
-            ) """,(self.table,))
+            ) """)
         self.connection_cache={}
 
     def reset(self):
-        self.dbh.execute("drop table connection_%s",(self.table,))
-        self.dbh.execute("drop table connection_details_%s",(self.table,))
+        self.dbh.execute("drop table connection")
+        self.dbh.execute("drop table connection_details")
 
     def process_stream(self, stream, factories):
         """ This will be called to store the stream information in the
         database. It gets called whenever we detect that a stream is
         finished.
         """
-        self.dbh.execute("insert into connection_details_%s set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r ",(
-            self.table, stream.src_ip,stream.src_port,
+        self.dbh.execute("insert into connection_details set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r ",(
+            stream.src_ip,stream.src_port,
             stream.dest_ip,stream.dest_port,
             stream.isn))
 
         stream.con_id=self.dbh.autoincrement()
 
         if stream.direction == "forward":
-            self.fsfd.VFSCreate(None,"S%s" % (stream.con_id) ,
-                                "%s-%s/%s:%s/%s" % (IP2str(stream.dest_ip),
-                                                    IP2str(stream.src_ip),
-                                                    stream.dest_port,
-                                                    stream.src_port,
-                                                    stream.direction),
-                                mtime = stream.ts_sec
-                                )
+            self.fsfd.VFSCreate(
+                "I%s" % stream.iosource.name,
+                "S%s" % (stream.con_id) ,
+                "%s-%s/%s:%s/%s" % (IP2str(stream.dest_ip),
+                                    IP2str(stream.src_ip),
+                                    stream.dest_port,
+                                    stream.src_port,
+                                    stream.direction),
+                mtime = stream.ts_sec
+                )
         else:
-            self.fsfd.VFSCreate(None,"S%s" % (stream.con_id) ,
-                                "%s-%s/%s:%s/%s" % (IP2str(stream.src_ip),
-                                                    IP2str(stream.dest_ip),
-                                                    stream.src_port,
-                                                    stream.dest_port,
-                                                    stream.direction),
-                                mtime = stream.ts_sec
-                                )            
+            self.fsfd.VFSCreate(
+                "I%s" % stream.iosource.name,
+                "S%s" % (stream.con_id) ,
+                "%s-%s/%s:%s/%s" % (IP2str(stream.src_ip),
+                                    IP2str(stream.dest_ip),
+                                    stream.src_port,
+                                    stream.dest_port,
+                                    stream.direction),
+                mtime = stream.ts_sec
+                )            
             
         ## Now store the packets:
         for packet_id, seq, length, packet_offset in zip(stream.packets,
                                                          stream.seq,
                                                          stream.length,
                                                          stream.packet_offset):
-            self.dbh.execute("insert into connection_%s set con_id=%r,packet_id=%r,seq=%r,length=%r, packet_offset=%r",
-                             (self.table,
-                              stream.con_id,
-                              packet_id,
-                              seq,
-                              length,
-                              packet_offset))
+            self.dbh.execute("insert into connection set con_id=%r,packet_id=%r,seq=%r,length=%r, packet_offset=%r",
+                             ( stream.con_id,
+                               packet_id,
+                               seq,
+                               length,
+                               packet_offset))
 
     class Scan(NetworkScanner):
         """ Each packet will cause a new instantiation of this class. """
@@ -203,7 +208,7 @@ class StreamReassembler(NetworkScanFactory):
                     isn = self.proto_tree['tcp.seq']+1
 
                     ## Create a stream class:
-                    stream = Stream(isn, ipsrc, tcpsrcport, ipdest, tcpdestport, direction = "reverse")
+                    stream = Stream(isn, ipsrc, tcpsrcport, ipdest, tcpdestport, self.fd.iosource, direction = "reverse")
                     stream.ts_sec = self.fd.ts_sec
                     
                     ## Cache it:
@@ -216,7 +221,7 @@ class StreamReassembler(NetworkScanFactory):
                     isn = self.proto_tree['tcp.seq']+1
 
                     ## Create a stream:
-                    stream = Stream(isn, ipsrc, tcpsrcport, ipdest, tcpdestport, direction="forward")
+                    stream = Stream(isn, ipsrc, tcpsrcport, ipdest, tcpdestport, self.fd.iosource, direction="forward")
                     stream.ts_sec = self.fd.ts_sec
 
                     ## Cache it:
@@ -255,15 +260,15 @@ class StreamReassembler(NetworkScanFactory):
 
             self.outer.connection_cache = {}
             
-            self.dbh.check_index("connection_%s" % self.table, 'con_id')
+            self.dbh.check_index("connection", 'con_id')
             
             ## Ensure that the connection_details table has indexes. We
             ## need the indexes because we are about to do lots of selects
             ## on this table.
-            self.dbh.check_index("connection_details_%s" % self.table,'src_ip')
-            self.dbh.check_index("connection_details_%s" % self.table,'src_port')
-            self.dbh.check_index("connection_details_%s" % self.table,'dest_ip')
-            self.dbh.check_index("connection_details_%s" % self.table,'dest_port')
+            self.dbh.check_index("connection_details",'src_ip')
+            self.dbh.check_index("connection_details",'src_port')
+            self.dbh.check_index("connection_details",'dest_ip')
+            self.dbh.check_index("connection_details",'dest_port')
 
 def combine_streams(query,result):
     """ Show both ends of the stream combined.
@@ -283,17 +288,18 @@ def combine_streams(query,result):
     forward_cid = int(forward_inode)
 
     dbh = DB.DBO(query['case'])
-    dbh.execute("select * from connection_details_%s where con_id=%r",(table,forward_cid))
+    dbh.execute("select * from connection_details where con_id=%r",(forward_cid))
     row=dbh.fetch()
     
-    dbh.execute("select con_id from connection_details_%s where src_ip=%r and src_port=%r and dest_ip=%r and dest_port=%r",(table,row['dest_ip'],row['dest_port'],row['src_ip'],row['src_port']))
+    dbh.execute("select con_id from connection_details where src_ip=%r and src_port=%r and dest_ip=%r and dest_port=%r",(
+        row['dest_ip'],row['dest_port'],row['src_ip'],row['src_port']))
     row = dbh.fetch()
     if row:
         reverse_cid = row['con_id']
     else:
         reverse_cid = 0
 
-    dbh.execute("select con_id,offset,packet_offset,connection_%s.length as length from connection_%s join pcap_%s on packet_id=id where con_id=%r or con_id=%r order by packet_id",(table,table,table,forward_cid,reverse_cid))
+    dbh.execute("select con_id,offset,packet_offset,connection.length as length from connection join pcap on packet_id=id where con_id=%r or con_id=%r order by packet_id",(forward_cid,reverse_cid))
     for row in dbh:
         ## Get the data:
         fd.seek(row['offset']+row['packet_offset'])
@@ -313,14 +319,14 @@ def show_packets(query,result):
     try:
         con_id = int(inode[1:])
     except ValueError:
-        dbh.execute("select con_id from connection_details_%s where inode=%r",(table,inode))
+        dbh.execute("select con_id from connection_details where inode=%r",(inode))
         row=dbh.fetch()
         con_id=row['con_id']
             
     def show_data(value):
         length,packet_offset,packet_id = value.split(",")
         length=int(length)
-        dbh.execute("select offset from pcap_%s where id=%s",(table,packet_id))
+        dbh.execute("select offset from pcap where id=%s",(packet_id))
         row = dbh.fetch()
         fd.seek(row['offset'] + int(packet_offset))
         ## We read at most this many chars from the packet:
@@ -339,7 +345,7 @@ def show_packets(query,result):
         columns = ('packet_id','from_unixtime(ts_sec)','ts_usec','seq','con.length','concat(con.length,",",packet_offset,",",packet_id)'),
         names = ('Packet ID','Timestamp','uSec','Sequence Number','Length',"Data"),
         links = [ FlagFramework.query_type((),family="Network Forensics",report='View Packet',case=query['case'],fsimage=query['fsimage'],__target__='id')],
-        table= 'connection_%s as con , pcap_%s' % (query['fsimage'],query['fsimage']),
+        table= 'connection as con , pcap',
         where = 'con_id="%s" and packet_id=id ' % con_id,
         callbacks = { 'Data': show_data },
         case=query['case']
@@ -362,6 +368,8 @@ class StreamFile(File):
     
     def __init__(self, case, fd, inode):
         File.__init__(self, case, fd, inode)
+
+        inode = inode.split("|")[-1]
 
         ## We allow the user to ask for a number of streams which will
         ## be combined at the same time. This allows us to create a
@@ -391,17 +399,16 @@ class StreamFile(File):
         ## the hits onto the buffer at the correct spot. This allows
         ## us to have missing packets, as we will simply return 0 for
         ## the byte sequences we are missing.
-        
-        self.fd = IO.open(case,table)
+        print "inode = %r, fd = %r" % (inode,fd)
         
         self.dbh = DB.DBO(self.case)
-        self.dbh.execute("select isn from connection_details_%s where con_id=%r",(self.table,self.con_id))
+        self.dbh.execute("select isn from connection_details where con_id=%r",(self.con_id))
         row=self.dbh.fetch()
         if not row:
             raise IOError("No stream with connection ID %s" % self.con_id)
 
         self.isn = row['isn']
-        self.dbh.execute("select max(seq+length) as size from connection_%s where con_id=%r",(self.table,self.con_id))
+        self.dbh.execute("select max(seq+length) as size from connection where con_id=%r",(self.con_id))
         row=self.dbh.fetch()
         self.size=row['size']-self.isn
 
@@ -411,16 +418,16 @@ class StreamFile(File):
         @return the new stream id.
         """
         ## Store the new stream in the cache:
-        self.dbh.execute("insert into connection_details_%s set inode=%r",(self.table,self.inode))
+        self.dbh.execute("insert into connection_details set inode=%r",(self.inode))
         con_id = self.dbh.autoincrement()
         self.dbh2 = self.dbh.clone()
         sum=0
-        self.dbh.execute("select * from connection_%s where %s order by packet_id",(
-            self.table," or ".join(["con_id=%r" % a for a in stream_ids])
+        self.dbh.execute("select * from connection where %s order by packet_id",(
+            " or ".join(["con_id=%r" % a for a in stream_ids])
             ))
         for row in self.dbh:
-            self.dbh2.execute("insert into connection_%s set con_id=%r,packet_id=%r,seq=%r,length=%r,packet_offset=%r",(
-                self.table,con_id,row['packet_id'],sum,
+            self.dbh2.execute("insert into connection set con_id=%r,packet_id=%r,seq=%r,length=%r,packet_offset=%r",(
+                con_id,row['packet_id'],sum,
                 row['length'],row['packet_offset']
                 ))
             sum+=row['length']
@@ -440,7 +447,7 @@ class StreamFile(File):
         @arg result_offset: The position in the cStringIO to paste to
         """
         dbh = DB.DBO(self.case)
-        dbh.execute("select * from pcap_%s where id=%r",(self.table,pkt_id))
+        dbh.execute("select * from pcap where id=%r",(pkt_id))
         row = dbh.fetch()
 
         self.fd.seek(row['offset']+packet_offset+start)
@@ -459,8 +466,7 @@ class StreamFile(File):
         result = cStringIO.StringIO()
 
         ## Find out which packets fall within the range of interest
-        self.dbh.execute("select * from connection_%s where con_id=%r and seq+length>=%r and seq<=%r order by seq",(
-            self.table,
+        self.dbh.execute("select * from connection where con_id=%r and seq+length>=%r and seq<=%r order by seq",(
             self.con_id,
             self.isn+self.readptr, ## Start of range
             self.isn+self.readptr+length, ## End of range
@@ -525,16 +531,16 @@ class StreamFile(File):
         if not position:
             position = self.tell()
             
-        self.dbh.execute("select con_id,isn from connection_details_%s where inode=%r",(self.table,self.inode))
+        self.dbh.execute("select con_id,isn from connection_details where inode=%r",(self.inode))
         row=self.dbh.fetch()
         if not row:
-            self.dbh.execute("select con_id,isn from connection_details_%s where con_id=%r",(self.table,self.inode[1:]))
+            self.dbh.execute("select con_id,isn from connection_details where con_id=%r",(self.con_id))
             row=self.dbh.fetch()
             
         con_id,isn = row['con_id'],row['isn']
-        self.dbh.execute("""select packet_id from connection_%s where
+        self.dbh.execute("""select packet_id from connection where
                          con_id = %r and seq <= (%r+%r) order by seq desc, length desc limit 1""",
-                         (self.table, con_id, isn, position))
+                         (con_id, isn, position))
         row=self.dbh.fetch()
         return row['packet_id']
 

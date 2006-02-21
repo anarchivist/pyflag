@@ -66,9 +66,8 @@ def get_temp_path(case,inode):
 
 class message:
     """ A class representing the message """
-    def __init__(self,dbh,table,fd,ddfs):
+    def __init__(self,dbh,fd,ddfs):
         self.dbh=dbh
-        self.table=table
         self.fd=fd
         self.ddfs = ddfs
         self.client_id=''
@@ -149,8 +148,8 @@ class message:
 	
 	try:
             self.session_id = int(words[-1])
-            self.dbh.execute("insert into msn_session_%s set id=%r, user=%r",
-                             (self.table,self.session_id, words[2]))
+            self.dbh.execute("insert into msn_session set id=%r, user=%r",
+                             (self.session_id, words[2]))
             ## This stores the current clients username
             self.client_id = words[2]
         except: pass
@@ -158,29 +157,29 @@ class message:
 	
     def IRO(self):
         words = self.cmdline.split()
-        self.dbh.execute("insert into msn_session_%s set id=%r, user=%r",
-                         (self.table,self.session_id, words[4]))
+        self.dbh.execute("insert into msn_session set id=%r, user=%r",
+                         (self.session_id, words[4]))
 	self.state = "IRO"
 
     def JOI(self):
         words = self.cmdline.split()
-        self.dbh.execute("insert into msn_session_%s set id=%r, user=%r",
-                         (self.table,self.session_id, words[1]))
+        self.dbh.execute("insert into msn_session set id=%r, user=%r",
+                         (self.session_id, words[1]))
 	self.state = "JOI"
                          
     def plain_handler(self,content_type,sender,friendly_sender):
         """ A handler for content type text/plain """
         ## Try to find the time stamp of this request:
         packet_id = self.fd.get_packet_id(position=self.offset)
-        self.dbh.execute("select ts_sec from pcap_%s where id = %s "
-                         ,(self.table,packet_id))
+        self.dbh.execute("select ts_sec from pcap where id = %s "
+                         ,(packet_id))
         row = self.dbh.fetch()
         timestamp = row['ts_sec']
 
-        self.dbh.execute(""" insert into msn_messages_%s set sender=%r,friendly_name=%r,
+        self.dbh.execute(""" insert into msn_messages set sender=%r,friendly_name=%r,
         recipient=%r, inode=%r, packet_id=%r, data=%r, ts_sec=%r, session=%r
         """,(
-            self.table,sender,friendly_sender, self.recipient, self.fd.inode, packet_id,
+            sender,friendly_sender, self.recipient, self.fd.inode, packet_id,
             self.get_data(), timestamp, self.session_id
             ))
 
@@ -211,8 +210,8 @@ class message:
 
                 context = safe_base64_decode(headers['context'])
 
-                self.dbh.execute("insert into msn_p2p_%s set session_id = %r, channel_id = %r, to_user= %r, from_user= %r, context=%r",
-                                 (self.table,self.session_id,headers['sessionid'],
+                self.dbh.execute("insert into msn_p2p set session_id = %r, channel_id = %r, to_user= %r, from_user= %r, context=%r",
+                                 (self.session_id,headers['sessionid'],
                                   headers['to'],headers['from'],context))
 
                 ## Add a VFS entry for this file:
@@ -308,7 +307,7 @@ class MSNScanner(NetworkScanFactory):
 
     def prepare(self):
         self.dbh.execute(
-            """CREATE TABLE if not exists `msn_messages_%s` (
+            """CREATE TABLE if not exists `msn_messages` (
             `sender` VARCHAR( 250 ) NOT NULL ,
             `friendly_name` VARCHAR( 255 ) NOT NULL ,
 	    `recipient` VARCHAR( 255 ),
@@ -317,21 +316,21 @@ class MSNScanner(NetworkScanFactory):
             `session` INT,
             `ts_sec` int(11),
             `data` TEXT NOT NULL
-            )""",(self.table,))
+            )""")
         self.dbh.execute(
-            """ CREATE TABLE if not exists `msn_session_%s` (
+            """ CREATE TABLE if not exists `msn_session` (
             `id` INT,
             `user` VARCHAR( 250 ) NOT NULL
-            )""",(self.table,))
+            )""")
         self.dbh.execute(
-            """ CREATE TABLE if not exists `msn_p2p_%s` (
+            """ CREATE TABLE if not exists `msn_p2p` (
             `inode` VARCHAR(250),
             `session_id` INT,
             `channel_id` INT,
             `to_user` VARCHAR(250),
             `from_user` VARCHAR(250),
             `context` VARCHAR(250)
-            )""",(self.table,))
+            )""")
             
         self.msn_connections = {}
 
@@ -340,8 +339,8 @@ class MSNScanner(NetworkScanFactory):
         if stream.src_port in ports or stream.dest_port in ports:
             logging.log(logging.DEBUG,"Openning S%s for MSN" % stream.con_id)
 
-            fd = self.fsfd.open(inode="S%s" % stream.con_id)
-            m=message(self.dbh,self.table,fd,self.fsfd)
+            fd = self.fsfd.open(inode="I%s|S%s" % (stream.iosource.name, stream.con_id))
+            m=message(self.dbh,fd,self.fsfd)
             while 1:
                 try:
                     result=m.parse()
@@ -352,8 +351,8 @@ class MSNFile(CachedFile):
     """ VFS driver for reading the cached MSN files """
     specifier = 'C'
     
-    def __init__(self,case, table, fd, inode):
-        File.__init__(self, case, table, fd, inode)
+    def __init__(self,case, fd, inode):
+        File.__init__(self, case,fd, inode)
         ## Figure out the filename
         cached_filename = get_temp_path(case,inode[1:])
 
@@ -411,7 +410,7 @@ class BrowseMSNChat(Reports.report):
         result.table(
             columns = ['ts_sec', 'from_unixtime(ts_sec)', 'inode', 'packet_id', 'session', 'sender', 'recipient','data'],
             names = ['Prox','Time Stamp','Stream', 'Packet', 'Session', 'Sender Nick', 'Recipient Nick','Text'],
-            table = "msn_messages_%s" % query['fsimage'],
+            table = "msn_messages",
             callbacks = {'Prox':draw_prox_cb},
             links = [
 	    	     None,None,
@@ -442,7 +441,7 @@ class BrowseMSNSessions(BrowseMSNChat):
         result.table(
             columns = [ 'id','user'],
             names = ['Session ID','Users'],
-            table = "msn_session_%s" % query['fsimage'],
+            table = "msn_session",
             case = query['case']
             )
 

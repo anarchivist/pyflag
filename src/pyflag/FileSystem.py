@@ -75,7 +75,7 @@ class FileSystem:
     
     name = None
     
-    def load(self, mount_point):
+    def load(self, mount_point, iosource_name):
         """ This method loads the filesystem into the database.
 
         Currently the database schema is standardised by the DBFS class, and all other filesystems just extend the load method to implement different drivers for loading the filesystem into the database. For reading and manipulating the filesystem, the DBFS methods are used.
@@ -185,18 +185,59 @@ class DBFS(FileSystem):
         except:
             self.blocksize = 1024
 
-    def load(self, mount_point, iosource):
+    def load(self, mount_point, iosource_name):
         """ Sets up the schema for loading the filesystem.
 
         Note that derived classes need to actually do the loading
         after they call the base class.
         """
-        sdbh = DB.DBO(self.case)
-        sdbh.MySQLHarness("%s/dbtool -t %r -m %r -d create blah" %(config.FLAG_BIN, iosource, mount_point))
+        self.dbh = DB.DBO(self.case)
+        self.dbh.MySQLHarness("%s/dbtool -t %r -m %r -d create blah" %(config.FLAG_BIN, iosource_name, mount_point))
+
+        ## Ensure the VFS contains the mount point:
+        self.VFSCreate(None, "I%s" % iosource_name, mount_point, directory=True)
+
+        ## Ensure that we have the IOSource available
+        self.iosource = IO.open(self.case, iosource_name)
 
     def delete(self):
         dbh = DB.DBO(self.case)
         dbh.MySQLHarness("%s/dbtool -t %s -m %r -d drop" %(config.FLAG_BIN,iosource, mount_point))
+
+    def VFSCreatex(self,root_inode,inode,new_filename,directory=False ,gid=0, uid=0, mode=100777, **properties):
+        ## Basically this is how this function works - if root_inode
+        ## is provided we make the new inode inherit the root inodes
+        ## path and inode string.
+        if root_inode:
+            new_filename = filesystem + "/"+ self.lookup(inode=root_inode)
+            inode = "%s|%s" % (root_inode,inode)
+
+        if directory:
+            directory_string = "d/d"
+        else:
+            directory_string = "r/r"
+
+        ## Normalise the path:
+        new_filename=os.path.normpath(new_filename)
+        
+        ## Make sure that all intermediate dirs exist:
+        dirs = ['']+os.path.dirname(new_filename).split("/")
+
+        for d in range(len(dirs)-1):
+            path = "/".join(dirs[:d])
+            self.dbh.execute("select * from file where path=%r and name=%r and mode='d/d'",(path, dirs[d]))
+            if not self.dbh.fetch():
+                self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode='d/d'",(path,dirs[d]))
+
+        ## Now add to the file and inode tables:
+        self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode=%r,inode=%r",  (
+            os.path.dirname(new_filename),
+            os.path.basename(new_filename),
+            directory_string,
+            inode))
+        
+        self.dbh.execute("insert into inode  set mode=%r, links=%r , inode=%r,gid=0,uid=0,size=1",(
+            40755, 4,inode))
 
     def VFSCreate(self,root_inode,inode,new_filename,directory=False ,gid=0, uid=0, mode=100777, **properties):
         """ Extends the DB filesystem to include further virtual filesystem entries.
@@ -207,6 +248,7 @@ class DBFS(FileSystem):
         @arg new_filename: The prposed new filename for the VFS file. This may contain directories in which case sub directories will also be created.
         @arg directory: If true we create a directory node.
         """
+        print "Will create %s , %s, %s " % (root_inode, inode, new_filename)
         ## filename is the filename in the filesystem for the parent directory.
         if root_inode:
             filename = self.lookup(inode=root_inode)
@@ -232,13 +274,15 @@ class DBFS(FileSystem):
             self.dbh.execute("select * from file where path=%r and name=%r and mode='d/d'",(path, dirs[d]))
             if not self.dbh.fetch():
                 ## Directory does not exist, so we need to create it:
-                if root_inode != None:
-                    self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode='d/d',inode='%s|%s-'",(path,dirs[d],root_inode,inode))
-#                    self.dbh.execute("update inode  set mode=%r, links=%r where inode=%r",(40755, 3,inode))
-                    self.dbh.execute("insert into inode  set mode=%r, links=%r , inode='%s|%s-',gid=0,uid=0,size=1",(40755, 4,root_inode,inode))
+                if d < len(dirs):
+                        self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode='d/d'",(path,dirs[d]))
                 else:
-                    self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode='d/d',inode='%s-'",(path,dirs[d],inode))
-                    self.dbh.execute("insert into inode  set mode=%r, links=%r , inode='%s-',gid=0,uid=0,size=1",(40755, 4,inode))
+                    if root_inode != None:
+                        self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode='d/d',inode='%s|%s'",(path,dirs[d],root_inode,inode))
+                        self.dbh.execute("insert into inode  set mode=%r, links=%r , inode='%s|%s',gid=0,uid=0,size=1",(40755, 4,root_inode,inode))
+                    else:
+                        self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode='d/d',inode='%s'",(path,dirs[d],inode))
+                        self.dbh.execute("insert into inode  set mode=%r, links=%r , inode='%s',gid=0,uid=0,size=1",(40755, 4,inode))
                     
         path = normpath("%s/%s/" % (filename,os.path.dirname(new_filename)))
         ## Add the file itself to the file table (only if name was specified)

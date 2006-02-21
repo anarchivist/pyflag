@@ -363,6 +363,7 @@ def open(case, iosource):
     # unmarshal the option tuple from the database
     # opts[0] is always the subsystem name
     opts = marshal.loads(optstr)
-    io=subsystems[opts[0][0]]
-    return io(options=opts)
+    io=subsystems[opts[0][0]](options=opts)
+    io.name = iosource
+    return io
  

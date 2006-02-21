@@ -84,29 +84,29 @@ class PCAPFS(DBFS):
     """
     name = 'PCAP Filesystem'
 
-    def load(self):
-        DBFS.load(self)
-        sdbh = DB.DBO(self.case)
+    def load(self, mount_point, iosource_name):
+        DBFS.load(self, mount_point, iosource_name)
+        
         ## This sets up the schema for pcap
-        sdbh.MySQLHarness("%s/pcaptool -c -t pcap" %(config.FLAG_BIN))
+        self.dbh.MySQLHarness("%s/pcaptool -c -t pcap" %(config.FLAG_BIN))
         ## This populates it 
         sql =  "%s/iowrapper  -i %s -o %s -f foo -- %s/pcaptool -t pcap foo" % (
             config.FLAG_BIN,
             self.iosource.subsystem,
-            self.iosource.make_parameter_list(),config.FLAG_BIN)
+            self.iosource.make_parameter_list(),
+            config.FLAG_BIN)
 
-        sdbh.MySQLHarness(sql)
+        self.dbh.MySQLHarness(sql)
 
         ## Add our VFS node
-        self.VFSCreate(None,"p0",'rawdata');
+        self.VFSCreate(None,"I%s|p0" % iosource_name,'%s/rawdata' % mount_point);
 
         ## Creates indexes on id:
-        sdbh.check_index("pcap",'id')
+        self.dbh.check_index("pcap",'id')
 
     def delete(self):
         DBFS.delete(self)
-        sdbh = DB.DBO(self.case)
-        sdbh.MySQLHarness("%s/pcaptool -d -t pcap" % (
+        self.dbh.MySQLHarness("%s/pcaptool -d -t pcap" % (
             config.FLAG_BIN))
 
 class PCAPFile(File):
@@ -132,6 +132,8 @@ class PCAPFile(File):
         dbh.execute("select max(id) as max from pcap")
         row=dbh.fetch()
         self.size = row['max']
+
+        self.iosource = fd
 
     def read(self,length=None):
         ## If we dont specify the length we get the full packet. Must
