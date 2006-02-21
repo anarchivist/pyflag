@@ -399,7 +399,6 @@ class StreamFile(File):
         ## the hits onto the buffer at the correct spot. This allows
         ## us to have missing packets, as we will simply return 0 for
         ## the byte sequences we are missing.
-        print "inode = %r, fd = %r" % (inode,fd)
         
         self.dbh = DB.DBO(self.case)
         self.dbh.execute("select isn from connection_details where con_id=%r",(self.con_id))

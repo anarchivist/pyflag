@@ -204,12 +204,12 @@ class DBFS(FileSystem):
         dbh = DB.DBO(self.case)
         dbh.MySQLHarness("%s/dbtool -t %s -m %r -d drop" %(config.FLAG_BIN,iosource, mount_point))
 
-    def VFSCreatex(self,root_inode,inode,new_filename,directory=False ,gid=0, uid=0, mode=100777, **properties):
+    def VFSCreate(self,root_inode,inode,new_filename,directory=False ,gid=0, uid=0, mode=100777, **properties):
         ## Basically this is how this function works - if root_inode
         ## is provided we make the new inode inherit the root inodes
         ## path and inode string.
         if root_inode:
-            new_filename = filesystem + "/"+ self.lookup(inode=root_inode)
+            new_filename = self.lookup(inode=root_inode) + "/" + new_filename
             inode = "%s|%s" % (root_inode,inode)
 
         if directory:
@@ -221,17 +221,17 @@ class DBFS(FileSystem):
         new_filename=os.path.normpath(new_filename)
         
         ## Make sure that all intermediate dirs exist:
-        dirs = ['']+os.path.dirname(new_filename).split("/")
+        dirs = os.path.dirname(new_filename).split("/")
 
-        for d in range(len(dirs)-1):
-            path = "/".join(dirs[:d])
+        for d in range(1,len(dirs)):
+            path = "/".join(dirs[:d])+"/"
             self.dbh.execute("select * from file where path=%r and name=%r and mode='d/d'",(path, dirs[d]))
             if not self.dbh.fetch():
                 self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode='d/d'",(path,dirs[d]))
 
         ## Now add to the file and inode tables:
         self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode=%r,inode=%r",  (
-            os.path.dirname(new_filename),
+            os.path.dirname(new_filename)+"/",
             os.path.basename(new_filename),
             directory_string,
             inode))
@@ -239,78 +239,78 @@ class DBFS(FileSystem):
         self.dbh.execute("insert into inode  set mode=%r, links=%r , inode=%r,gid=0,uid=0,size=1",(
             40755, 4,inode))
 
-    def VFSCreate(self,root_inode,inode,new_filename,directory=False ,gid=0, uid=0, mode=100777, **properties):
-        """ Extends the DB filesystem to include further virtual filesystem entries.
+##    def VFSCreatex(self,root_inode,inode,new_filename,directory=False ,gid=0, uid=0, mode=100777, **properties):
+##        """ Extends the DB filesystem to include further virtual filesystem entries.
 
-        Note that there must be an appropriate VFS driver for the added inodes, or else they may not be viewable.
-        @arg root_inode: The inode that will serve as the root for the new inode. If None, we create a root Inode.
-        @arg inode: The proposed inode name for the new inode (without the | to the root_inode). This needs to be understood by the VFS driver.
-        @arg new_filename: The prposed new filename for the VFS file. This may contain directories in which case sub directories will also be created.
-        @arg directory: If true we create a directory node.
-        """
-        print "Will create %s , %s, %s " % (root_inode, inode, new_filename)
-        ## filename is the filename in the filesystem for the parent directory.
-        if root_inode:
-            filename = self.lookup(inode=root_inode)
-        else:
-            filename = '/'
+##        Note that there must be an appropriate VFS driver for the added inodes, or else they may not be viewable.
+##        @arg root_inode: The inode that will serve as the root for the new inode. If None, we create a root Inode.
+##        @arg inode: The proposed inode name for the new inode (without the | to the root_inode). This needs to be understood by the VFS driver.
+##        @arg new_filename: The prposed new filename for the VFS file. This may contain directories in which case sub directories will also be created.
+##        @arg directory: If true we create a directory node.
+##        """
+##        print "Will create %s , %s, %s " % (root_inode, inode, new_filename)
+##        ## filename is the filename in the filesystem for the parent directory.
+##        if root_inode:
+##            filename = self.lookup(inode=root_inode)
+##        else:
+##            filename = '/'
 
-        ## Check if the directories all exist properly:
-        if not directory:
-            dirs = os.path.dirname(new_filename).split('/')
-        else:
-            dirs = new_filename.split('/')
+##        ## Check if the directories all exist properly:
+##        if not directory:
+##            dirs = os.path.dirname(new_filename).split('/')
+##        else:
+##            dirs = new_filename.split('/')
             
-        name = os.path.basename(new_filename)
+##        name = os.path.basename(new_filename)
 
-        ## This creates subdirectories for node if they are missing.
-        for d in range(len(dirs)):
-            if not dirs[d]: continue
-            if d>0:
-                path = normpath("%s/%s/" % (filename,"/".join(dirs[:d])))
-            else:
-                path = normpath("%s/" % filename)
+##        ## This creates subdirectories for node if they are missing.
+##        for d in range(len(dirs)):
+##            if not dirs[d]: continue
+##            if d>0:
+##                path = normpath("%s/%s/" % (filename,"/".join(dirs[:d])))
+##            else:
+##                path = normpath("%s/" % filename)
 
-            self.dbh.execute("select * from file where path=%r and name=%r and mode='d/d'",(path, dirs[d]))
-            if not self.dbh.fetch():
-                ## Directory does not exist, so we need to create it:
-                if d < len(dirs):
-                        self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode='d/d'",(path,dirs[d]))
-                else:
-                    if root_inode != None:
-                        self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode='d/d',inode='%s|%s'",(path,dirs[d],root_inode,inode))
-                        self.dbh.execute("insert into inode  set mode=%r, links=%r , inode='%s|%s',gid=0,uid=0,size=1",(40755, 4,root_inode,inode))
-                    else:
-                        self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode='d/d',inode='%s'",(path,dirs[d],inode))
-                        self.dbh.execute("insert into inode  set mode=%r, links=%r , inode='%s',gid=0,uid=0,size=1",(40755, 4,inode))
+##            self.dbh.execute("select * from file where path=%r and name=%r and mode='d/d'",(path, dirs[d]))
+##            if not self.dbh.fetch():
+##                ## Directory does not exist, so we need to create it:
+##                if d < len(dirs):
+##                        self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode='d/d'",(path,dirs[d]))
+##                else:
+##                    if root_inode != None:
+##                        self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode='d/d',inode='%s|%s'",(path,dirs[d],root_inode,inode))
+##                        self.dbh.execute("insert into inode  set mode=%r, links=%r , inode='%s|%s',gid=0,uid=0,size=1",(40755, 4,root_inode,inode))
+##                    else:
+##                        self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode='d/d',inode='%s'",(path,dirs[d],inode))
+##                        self.dbh.execute("insert into inode  set mode=%r, links=%r , inode='%s',gid=0,uid=0,size=1",(40755, 4,inode))
                     
-        path = normpath("%s/%s/" % (filename,os.path.dirname(new_filename)))
-        ## Add the file itself to the file table (only if name was specified)
-        if not name or directory: return
+##        path = normpath("%s/%s/" % (filename,os.path.dirname(new_filename)))
+##        ## Add the file itself to the file table (only if name was specified)
+##        if not name or directory: return
         
-        if root_inode:
-            self.dbh.execute("insert into file set status='alloc',mode='r/r',inode='%s|%s',path=%r, name=%r",(root_inode,inode,normpath(path+'/'),name))
-        else:
-            self.dbh.execute("insert into file set status='alloc',mode='r/r',inode='%s',path=%r, name=%r",(inode,normpath(path+'/'),name))
+##        if root_inode:
+##            self.dbh.execute("insert into file set status='alloc',mode='r/r',inode='%s|%s',path=%r, name=%r",(root_inode,inode,normpath(path+'/'),name))
+##        else:
+##            self.dbh.execute("insert into file set status='alloc',mode='r/r',inode='%s',path=%r, name=%r",(inode,normpath(path+'/'),name))
 
-        ## Add the file to the inode table:
-        extra = ','.join(["%s=%%r" % p for p in properties.keys()])
-        if extra:
-            extra=','+extra
+##        ## Add the file to the inode table:
+##        extra = ','.join(["%s=%%r" % p for p in properties.keys()])
+##        if extra:
+##            extra=','+extra
 
-        if root_inode!=None:
-            self.dbh.execute("insert into inode set inode='%s|%s',mode=%s,links=4,gid=%s,uid=%s" + extra ,[root_inode,inode,mode,gid,uid] + properties.values())
-        else:
-            self.dbh.execute("insert into inode set inode='%s',mode=%s,links=4,gid=%s,uid=%s" + extra ,[ inode,mode,gid,uid] + properties.values())
+##        if root_inode!=None:
+##            self.dbh.execute("insert into inode set inode='%s|%s',mode=%s,links=4,gid=%s,uid=%s" + extra ,[root_inode,inode,mode,gid,uid] + properties.values())
+##        else:
+##            self.dbh.execute("insert into inode set inode='%s',mode=%s,links=4,gid=%s,uid=%s" + extra ,[ inode,mode,gid,uid] + properties.values())
         
-        ## Set the root file to be a d/d entry so it looks like its a virtual directory:
-        self.dbh.execute("select * from file where mode='d/d' and inode=%r and status='alloc'",(root_inode,))
-        if not self.dbh.fetch():
-            self.dbh.execute("select * from file where mode='r/r' and inode=%r and status='alloc'",(root_inode,))
-            row = self.dbh.fetch()
-            if row:
-                self.dbh.execute("insert into file set mode='d/d',inode=%r,status='alloc',path=%r,name=%r",(root_inode,row['path'],row['name']))
-                self.dbh.execute("update inode  set mode=%r, links=%r where inode=%r",(40755, 3,root_inode))
+##        ## Set the root file to be a d/d entry so it looks like its a virtual directory:
+##        self.dbh.execute("select * from file where mode='d/d' and inode=%r and status='alloc'",(root_inode,))
+##        if not self.dbh.fetch():
+##            self.dbh.execute("select * from file where mode='r/r' and inode=%r and status='alloc'",(root_inode,))
+##            row = self.dbh.fetch()
+##            if row:
+##                self.dbh.execute("insert into file set mode='d/d',inode=%r,status='alloc',path=%r,name=%r",(root_inode,row['path'],row['name']))
+##                self.dbh.execute("update inode  set mode=%r, links=%r where inode=%r",(40755, 3,root_inode))
 
     def longls(self,path='/', dirs = None):
         if self.isdir(path):
