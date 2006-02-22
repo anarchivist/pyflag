@@ -49,5 +49,6 @@ clean-local:
 	-rm -rf $(bin_SCRIPTS) $(sysconf_DATA)
 
 deb-pkg:	
+	chmod 744 debian/rules
 	dpkg-buildpackage -rfakeroot
 
