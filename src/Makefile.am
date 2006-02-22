@@ -1,4 +1,4 @@
-SUBDIRS = lib mailtools indextools network regtools virustools filesystems include logtools
+SUBDIRS = lib mailtools indextools network regtools virustools filesystems include
 
 # main pyflag (python) application
 # not sure how to do this recursively
