@@ -85,7 +85,7 @@ CREATE TABLE meta (
 
 CREATE TABLE `dictionary` (
 	`id` int auto_increment,
-	`word` VARCHAR( 50 ) binary NOT NULL ,
+	`word` VARCHAR( 250 ) binary NOT NULL ,
 	`class` VARCHAR( 50 ) NOT NULL ,
 	`encoding` SET( 'all', 'asci', 'ucs16' ) DEFAULT 'all' NOT NULL,
 	`type` set ( 'word','literal','regex' ) DEFAULT 'literal' NOT NULL,

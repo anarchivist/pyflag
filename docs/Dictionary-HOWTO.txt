@@ -1,0 +1,38 @@
+This is a brief description of how to search for plain strings or regular
+expressions in disk images using PyFLAG.
+
+1. Create your dictionary file
+
+   Each line should contain a keyword (beginning of line, no whitespace)
+   describing the type or class of the thing being matched followed by
+   whitespace followed by the regular expression or string describing the thing
+   to be matched. For example (see data/regexps.txt)
+ 
+	Email [\w\.]+@[\w\.]+
+	URL	(http:|https:|ftp:|mail:)\S+
+	IPv4 \d+\.\d+\.\d+\.\d+
+	IPv4x.x.x.21 \d+\.\d+\.\d+\.21
+	continent    Antarctica
+
+2. Load the dictionary file
+
+   Load the dictionary into the database.  Use --regex or --literal depending on whether your dictionary is string literals or regex's.  For example, regex:
+
+      pyflag_launch utilities/load_dictionary.py -v --regex regexps.txt
+      wordclass is /English/
+      Reading File data/regexps.txt
+
+3. Select IndexScanner as one of the scan methods when loading data
+
+4. Display the results
+
+Notes:
+  - Matches are case insensitive
+
+Caveats:
+  - Matches do not cross block boundaries
+  - The scanner searches *all* data.   It may be very slow to load.
+  - Results may be large.  Be careful what regular expressions you
+    search for. 
+ 
+---gregsfdev 2005_02_24

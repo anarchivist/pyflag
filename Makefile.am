@@ -14,16 +14,21 @@ my_images	 	=	\
 				images/spanner.png images/stock_down-with-subpoints.png images/stock_left_gray.png images/stock_left.png \
 				images/stock_next-page.png images/stock_previous-page.png images/stock_right_gray.png images/stock_right.png \
 				images/stop.png images/topfill.jpg images/unknown.png images/up.png images/whois.png images/yes.png
-my_data			=	data/db.setup data/magic data/magic.mime data/regkeys.txt
+
+my_data			=	data/db.setup data/magic data/magic.mime data/regkeys.txt data/regexps.txt
+
+my_utilities		=	utilities/regkeys_load.sh utilities/compare.py utilities/fuse_loopback_subsystem.py \
+				utilities/update_version.sh utilities/indexer.py utilities/pyflag_fuse.py utilities/whois_load.py \
+				utilities/load_dictionary.py utilities/raid_guess.py utilities/whois_load.sh utilities/load_dictionary.sh \
+				utilities/nsrl_load.sh
 
 bin_SCRIPTS		=	pyflag pyflash pyflag_launch
 sysconf_DATA		=	pyflagrc
 pkgdata_DATA		=	$(my_data)
-nobase_pkgdata_DATA	=	$(my_images)
-#This breaks the make, but all the doco says this is how to do it.  No man page for now.
+nobase_pkgdata_DATA	=	$(my_images) $(my_utilities)
 man_MANS		=	pyflag.1
 EXTRA_DIST		=	pyflag.in pyflagrc.in pyflash.in \
-				pyflag_launch.in $(my_images) $(my_data) $(man_MANS)
+				pyflag_launch.in $(nobase_pkgdata_DATA) $(pkgdata_DATA) $(man_MANS)
 
 # perform subs in scripts and config files
 edit = sed \

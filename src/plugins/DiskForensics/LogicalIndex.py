@@ -89,7 +89,7 @@ class IndexScan(GenScanFactory):
         #Create a table that will hold our stats: number of occurrences of each word id we are searching for.
         self.dbh.execute("""CREATE TABLE if not exists `LogicalIndexStats` (
         `id` int NOT NULL,
-        `word` VARCHAR( 50 ) binary NOT NULL,
+        `word` VARCHAR( 250 ) binary NOT NULL,
         `class` VARCHAR( 50 ) NOT NULL,
         `hits` INT NOT NULL,
         PRIMARY KEY  (`id`)
@@ -312,7 +312,7 @@ class BuildDictionary(Reports.report):
         except DB.DBError:
             dbh.execute("""CREATE TABLE `dictionary` (
             `id` int auto_increment,
-            `word` VARCHAR( 50 ) binary NOT NULL ,
+            `word` VARCHAR( 250 ) binary NOT NULL ,
             `class` VARCHAR( 50 ) NOT NULL ,
             `encoding` SET( 'all', 'asci', 'ucs16' ) DEFAULT 'all' NOT NULL,
             `type` set ( 'word','literal','regex' ) DEFAULT 'literal' NOT NULL,

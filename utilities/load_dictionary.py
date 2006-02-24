@@ -25,6 +25,7 @@ Options:
   -c|--class	Specify a class for the words.  The default class is 'English'.
   -d|--drop	Drop old table before loading
   -r|--regex    Add entries as regular expressions rather than strings.
+  -l|--literal  Add entries as string literals.
   -h|--help	Print help (this message)
   -v|--verbose	Be verbose
   """ % os.path.basename(sys.argv[0])
@@ -80,7 +81,7 @@ if drop:
 dbh.execute(
     """ CREATE TABLE if not exists `dictionary` (
     `id` int auto_increment,
-    `word` VARCHAR( 50 ) binary NOT NULL ,
+    `word` VARCHAR( 250 ) binary NOT NULL ,
     `class` VARCHAR( 50 ) NOT NULL ,
     `encoding` SET( 'all', 'asci', 'ucs16' ) DEFAULT 'all' NOT NULL,
     `type` set ( 'word','literal','regex' ) DEFAULT 'literal' NOT NULL,
