@@ -39,7 +39,7 @@ import pexpect
 import pyflag.FlagFramework as FlagFramework
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import marshal
+import cPickle
 import os,re
 import pyflag.logging as logging
 
@@ -124,7 +124,7 @@ class IO:
     readptr=0
     cache={}
     parameters=()
-    options = ()
+    options = []
 
     def make_parameter_list(self):
         """ Returns a parameter list formatted as parameter=value,parameter=value """
@@ -140,7 +140,7 @@ class IO:
 
     def get_options(self):
         """ returns a marshalled representation of options to cache in the database """
-        return marshal.dumps(self.options)
+        return cPickle.dumps(self.options)
         
     def form(self,query,result):
         """ Draw a form in result (ui object) to obtain all the needed parameters from query """
@@ -362,7 +362,7 @@ def open(case, iosource):
         raise IOError, "Not a valid IO Data Source: %s" % iosource
     # unmarshal the option tuple from the database
     # opts[0] is always the subsystem name
-    opts = marshal.loads(optstr)
+    opts = cPickle.loads(optstr)    
     io=subsystems[opts[0][0]](options=opts)
     io.name = iosource
     return io

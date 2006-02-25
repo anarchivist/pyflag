@@ -25,42 +25,24 @@ family."""
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 
-import os.path
-import pyflag.FlagFramework as FlagFramework
-import pyflag.logging as logging
-from pyflag.Scanner import *
-import pyflag.Scanner as Scanner
-#import pypst2
-import pyflag.IO as IO
-#import pyflag.FileSystem as FileSystem
-#from pyflag.FileSystem import File
 import pyflag.Reports as Reports
-import pyflag.DB as DB
-import StringIO
-import re
-from pyflag.FlagFramework import normpath
 
 class BrowseEmail(Reports.report):
     """ Slightly modified report for displaying emails in the network forensics family """
-    parameters = { 'fsimage':'fsimage' }
     name = "Browse Email"
     family = "Network Forensics"
     description = "This report displays an email item from an email vfs entry as a nicely formatted email message"
     hidden = False
 
     def form(self, query, result):
-	try:
-            result.case_selector()
-            result.meta_selector(message='FS Image',case=query['case'],property='fsimage')
-        except KeyError:
-            return result
-
+        result.case_selector()
+       
     def display(self, query, result):
-	result.heading("Email sessions in %s " % query['fsimage'])
+	result.heading("Email sessions")
         result.table(
             columns=('inode','date','`from`','`to`','subject'),
             names=('Inode','Date','From','To','Subject'),
-            table=('email_%s' % (query['fsimage'])),
+            table=('email'),
             case=query['case'],
 	    links = [FlagFramework.query_type((),
                         family='Disk Forensics', case=query['case'],

@@ -28,7 +28,7 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 
-import pygtk
+import pygtk, gobject
 pygtk.require('2.0')
 import gtk,gtk.gdk
 
@@ -377,7 +377,7 @@ class GTKServer(gtk.Window):
                             print "drawing progress"
                             self.run_progress(query)
                             ## Ensure we get invoked again to monitor the progress
-                            gtk.timeout_add(1000*config.REFRESH,progress_thread,t,query)
+                            gobject.timeout_add(1000*config.REFRESH,progress_thread,t,query)
                         else:
                             print "finished progressing"
                             self.process_query(query)
@@ -385,7 +385,7 @@ class GTKServer(gtk.Window):
                     ## The first check the progress of the analysis is
                     ## only quite short- this allows trivial analyses
                     ## methods to complete quickly
-                    gtk.timeout_add(100,progress_thread,t,query)
+                    gobject.timeout_add(100,progress_thread,t,query)
                     return
 
             ## We do not have all the parameters we need:

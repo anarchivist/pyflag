@@ -13,3 +13,7 @@
 
 ## Gzip files need their own mime types in Pyflag:
 0       string          \037\213        	 application/x-gzip; foobar
+
+# A better RFC2822 detector
+0     search/1024     MIME-Version:	      message/rfc822
+20    regex/c	      ^From:.+<.+@.+>	      message/rfc822

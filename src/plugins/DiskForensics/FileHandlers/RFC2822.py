@@ -78,13 +78,15 @@ class RFC2822(Scanner.GenScanFactory):
 
             try:
                 a=email.message_from_file(fd)
+
+                logging.log(logging.DEBUG,"Found an email message in %s" % self.inode)
 		
 		#Mysql is really picky about the date formatting
                 date = email.Utils.parsedate(a.get('Date'))
                 if not date:
                     raise Exception("No Date field in message - this is probably not an RFC2822 message at all.")
                     
-		self.dbh.execute("INSERT INTO `email` SET `inode`=%r,`vfsinode`=%r,`date`=from_unixtime(%r),`to`=%r,`from`=%r,`subject`=%r", (self.inode, name, time.mktime(date), a.get('To'), a.get('From'), a.get('Subject')))
+		self.dbh.execute("INSERT INTO `email` SET `inode`=%r,`date`=from_unixtime(%r),`to`=%r,`from`=%r,`subject`=%r", (self.inode, time.mktime(date), a.get('To'), a.get('From'), a.get('Subject')))
 
 		for part in a.walk():
                     if part.get_content_maintype() == 'multipart':

@@ -1,13 +1,8 @@
-import pyflag.Registry as Registry
-import pyflag.FlagFramework as FlagFramework
-import pyflag.conf
-config=pyflag.conf.ConfObject()
-
 import pyflag.IO as IO
+import pyflag.Registry as Registry
 Registry.Init()
 
 case = "demo"
-fsimage = "test"
 
-io=IO.open(case,fsimage)
+## This gives us a handle to the VFS
 fsfd = Registry.FILESYSTEMS.fs['DBFS'](case)

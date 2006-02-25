@@ -1,3 +1,7 @@
 # IE History file
 0     string          Client\ UrlCache\ MMF\ Ver\ 5.2 IE History File
 0     lelong          0x4E444221              MS Outlook PST File
+
+# A better RFC2822 detector
+0     search/1024     MIME-Version:	      RFC 822 Message
+20    regex/c	      ^From:.+<.+@.+>	      RFC 822 Message
