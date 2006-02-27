@@ -495,6 +495,7 @@ class DBFS_file(FileSystem.File):
             self.block_size = int(self.dbh.fetch()["value"])
         except TypeError:
             pass
+
         # fetch inode data
         self.dbh.check_index("inode" ,"inode")
         self.dbh.execute("select * from inode where inode=%r and status='alloc'", (inode))

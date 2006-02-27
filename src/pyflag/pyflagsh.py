@@ -289,9 +289,9 @@ if __name__ == "__main__":
       # Ask the user to fill in variables in the file
       file=file % asker
       for f in file.split('\n'):
-      	print "# %s" % f
-    	process_line(f)
-            
+          print "# %s" % f
+          process_line(f)
+                      
     else:
         while(1):
             try:

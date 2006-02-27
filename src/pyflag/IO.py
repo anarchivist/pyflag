@@ -199,8 +199,8 @@ class IO:
         """ read length bytes from subsystem starting at readptr """            
         if length==None:
             return ""
-        (len, buf) =  iosubsys.read_random(self.io,length,self.readptr)
-        self.readptr += len
+        buf = iosubsys.read_random(self.io,length,self.readptr)
+        self.readptr += len(buf)
         return buf
 
     def close(self):

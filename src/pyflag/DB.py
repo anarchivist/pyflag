@@ -69,6 +69,7 @@ class DBPool:
         self.locks = []
         self.dbh = []
         self.self_lock = threading.RLock()
+        self.indexes = {}
 
     def get(self):
         """ Get a new dbh from our array. """
@@ -235,20 +236,27 @@ class DBO:
         """ This checks the database to ensure that the said table has an index on said key.
 
         If an index is missing, we create it here, so we always ensure an index exists once we return. """
-        self.execute("show index from `%s`",table)
-        for row in self:
-            if row['Key_name'] == key:
-                ## We found an index we are looking for
-                return
+        ## We implement a local cache to ensure that we dont hit the DB all the time:
+        try:
+            return self.DBH[self.case].indexes["%s.%s" % (table,key)]
+        except KeyError:        
+            self.execute("show index from `%s`",table)
+            for row in self:
+                if row['Key_name'] == key:
+                    ## We found an index we are looking for
+                    return
 
-        if length:
-            sql="(`%s`(%s))" % (key,length)
-        else:
-            sql="(`%s`)" % (key) 
-        
-        logging.log(logging.DEBUG,"Oops... No index found in table %s on field %s - Generating index, this may take a while" %(table,key))
-        ## Index not found, we make it here:
-        self.execute("Alter table `%s` add index%s",(table,sql))
+            if length:
+                sql="(`%s`(%s))" % (key,length)
+            else:
+                sql="(`%s`)" % (key) 
+
+            logging.log(logging.DEBUG,"Oops... No index found in table %s on field %s - Generating index, this may take a while" %(table,key))
+            ## Index not found, we make it here:
+            self.execute("Alter table `%s` add index%s",(table,sql))
+
+            ## Add to cache:
+            self.DBH[self.case].indexes["%s.%s" % (table,key)] = True
         
     def get_meta(self, property):
         """ Returns the value for the given property in meta table selected database

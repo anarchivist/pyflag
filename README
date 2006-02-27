@@ -3,15 +3,9 @@
 
 This application is designed to assist IT security professionals with
 analysing log files, tcpdump files and hard disk images for forensic
-evidence. Flag utilises Ethereal (http://www.ethereal.com) for network
-packet disection and sleuthkit (http://www.sleuthkit.org) for hard
-disk filesystem analysis.
+evidence. 
 
-This the official python successor of the original flag written in
-perl. It has been re-written from the ground up to be cleaner, simpler
-and more managable.
-
-pyflag is designed to run on Linux and has been tested on recent
+PyFlag is designed to run on Linux and has been tested on recent
 versions of Redhat/Fedora and Debian (Stable/Testing). It performs
 data analyis using a mysql database. It is written in python and
 should be portable to other unix-like systems.
