@@ -50,6 +50,9 @@ class NewCase(Reports.report):
         result.defaults = query
         result.textfield("Please enter a new case name:","create_case")
         return result
+
+    def analyse(self,query):
+        print "analysising"
         
     def display(self,query,result):
         #Get handle to flag db

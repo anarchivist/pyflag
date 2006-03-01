@@ -58,19 +58,20 @@ static int buffer_count=0;
 long unsigned int packet_id = 1;
 pcap_t *pfh;
 char *tableName = NULL;
+char *iosource_name=NULL;
 
 void print_buffer(char *tableName) {
   int i;
   struct packet_data_t *p=buffer;
 
-  printf("INSERT INTO `%s` VALUES (%lu,%lu,%u,%lu,%lu,%u)",tableName,
-	 p->packet_id, p->data_offset, p->caplen,p->sec,p->usec,p->encap);
+  printf("INSERT INTO `%s` VALUES (Null,'%s',%lu,%u,%lu,%lu,%u)",tableName,iosource_name,
+	 p->data_offset, p->caplen,p->sec,p->usec,p->encap);
 
   for(i=1;i<buffer_count;i++) {
     p=&buffer[i];
 
-    printf(",(%lu,%lu,%u,%lu,%lu,%u)", 
-	   p->packet_id, p->data_offset, p->caplen,p->sec,p->usec,p->encap);
+    printf(",(Null,'%s',%lu,%u,%lu,%lu,%u)", 
+	   iosource_name, p->data_offset, p->caplen,p->sec,p->usec,p->encap);
   };
   printf(";\n");
 };
@@ -109,7 +110,7 @@ int main(int argc, char **argv) {
   int createNewTable = 0;
   int index, c;
 
-  while ((c = getopt (argc, argv, "t:c")) != -1) {
+  while ((c = getopt (argc, argv, "t:ci:")) != -1) {
     switch(c) {
     case 'c':
       createNewTable = TRUE;
@@ -117,20 +118,18 @@ int main(int argc, char **argv) {
     case 't':
       tableName = optarg;
       break;
+    case 'i':
+      iosource_name = optarg;
+      break;
     default:
       printUsage();
       exit(0);
     };
   };
 
-  if ((argc < 2) || (tableName == NULL)) {
-    printUsage();
-    exit(0);
-  }
-
   if (createNewTable == TRUE) {
     /* will prob need to do some validation of tableName */
-    printf ("CREATE TABLE if not exists `%s` ( \n", tableName);
+    printf ("CREATE TABLE `%s` ( \n", tableName);
     printf ("  `id` INT NOT NULL , \n");
     printf ("  `offset` INT NOT NULL , \n");
     printf ("  `length` INT NOT NULL , \n");
@@ -139,6 +138,11 @@ int main(int argc, char **argv) {
     printf ("  `link_type`  TINYINT not null\n");
     printf ("); \n\n");
 
+    exit(0);
+  }
+
+  if (!tableName || !iosource_name ) {
+    printUsage();
     exit(0);
   }
   
