@@ -18,8 +18,11 @@ execute Load\ Data.Load\ IO\ Data\ Source iosource=%(iosource)s subsys=standard 
 #Set this as the default io source
 set iosource=%(iosource)s
 
+#Set the vfs mount point.  This is how the pcap will appear in flag.  e.g. /2005/12/25
+set mount_point=%(mountpoint)s
+
 #Tell it to use the PCAP filesystem
-execute Load\ Data.LoadFS fstype='PCAP Filesystem'
+execute Load\ Data.Load\ Filesystem\ image fstype='PCAP Filesystem'
 
 #Run the scanners
 execute Load\ Data.ScanFS scan_IRCScanner=on scan_MSNScanner=on scan_HTTPScanner=on scan_POPScanner=on scan_SMTPScanner=on scan_RFC2822=on scan_GZScan=on scan_TarScan=on scan_ZipScan=on scan_PstScan=on scan_IEIndex=on scan_RegistryScan=on scan_TypeScan=on scangroup_Filesystem\ Analysis=off scan_UnallocatedScan=off scan_DeletedScan=off scan_IndexScan=on scan_MD5Scan=off fsimage=%(iosource)s path='/' scangroup_NetworkScanners=on scangroup_Compressed\ File=off scangroup_File\ Scanners=on scangroup_General\ Forensics=on final=ok

@@ -419,7 +419,7 @@ class LoadFS(Reports.report):
         
         # call on FileSystem to load data
         fsobj=Registry.FILESYSTEMS.filesystems[query['fstype']](query['case'])
-        mount_point = FlagFramework.normpath("/"+query['mount_point'])[:-1]
+        mount_point = FlagFramework.normpath("/"+query['mount_point'])
         fsobj.load(mount_point, query['iosource'])
 
         self.progress_str="Creating file and inode indexes"        

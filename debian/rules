@@ -125,7 +125,7 @@ binary-common:
 	dh_compress 
 	dh_fixperms
 #	dh_perl
-#	dh_python
+	dh_python
 	dh_makeshlibs
 	dh_installdeb
 	dh_shlibdeps

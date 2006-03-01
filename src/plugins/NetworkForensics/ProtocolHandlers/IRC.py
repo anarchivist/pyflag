@@ -314,10 +314,9 @@ class IRC:
         999: "Error: NUMERIC_ERR",
         }
 
-    def __init__(self,fd,dbh, table):
+    def __init__(self,fd,dbh):
         self.fd=fd
         self.dbh = dbh
-        self.table = table
 
     def rewrite_reply(self,prefix,command,line):
         return line, self.command_lookup[command]+"(%s)" % command
@@ -456,7 +455,7 @@ class IRCScanner(NetworkScanFactory):
 
         ## We open the file and scan it for IRC:
         fd = self.fsfd.open(inode=combined_inode)
-        irc=IRC(fd,self.dbh, self.table)
+        irc=IRC(fd,self.dbh)
         irc.parse()
                     
 class BrowseIRCChat(Reports.report):

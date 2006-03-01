@@ -2,7 +2,7 @@ Source: pyflag
 Section: utils
 Priority: optional
 Maintainer: Michael Cohen and David Collett <pyflag-support@lists.sourceforge.net>
-Build-Depends: autoconf, automake1.9, autotools-dev, debhelper (>= 4.0.0), libtool, g++, zlib1g-dev, libpcap-dev, libmagic-dev, python-dev (>= 2.4), libclamav-dev, make, swig
+Build-Depends: autoconf, automake1.9, autotools-dev, debhelper (>= 4.0.0), libtool, g++, zlib1g-dev, libpcap-dev, libmagic-dev, python-dev (>= 2.4), libclamav-dev, make, swig, ${python:Depends}
 Build-Conflicts: autoconf2.13, automake1.4
 Standards-Version: 3.6.1
 
