@@ -75,8 +75,11 @@ class ListLogFile(Reports.report):
     description="This report simply lists the log entries in a searchable/groupable table"
 
     def form(self,query,result):
-        result.case_selector()
-        result.meta_selector(query['case'],'Select Log Table','logtable')
+        try:
+            result.case_selector()
+            result.meta_selector(query['case'],'Select Log Table','logtable')
+        except KeyError:
+            pass
 
     def display(self,query,result):
         result.heading("Log File in Table %s" % query['logtable'])            

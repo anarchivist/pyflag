@@ -26,6 +26,7 @@ family."""
 # ******************************************************
 
 import pyflag.Reports as Reports
+import pyflag.FlagFramework as FlagFramework
 
 class BrowseEmail(Reports.report):
     """ Slightly modified report for displaying emails in the network forensics family """
@@ -46,7 +47,7 @@ class BrowseEmail(Reports.report):
             case=query['case'],
 	    links = [FlagFramework.query_type((),
                         family='Disk Forensics', case=query['case'],
-                        fsimage=query['fsimage'], __target__='inode',
+                        __target__='inode',
                         report='View File Contents', mode="Text"
                         ),
                      ],

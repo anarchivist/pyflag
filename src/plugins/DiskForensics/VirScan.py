@@ -89,30 +89,20 @@ class VirScan(GenScanFactory):
 
 class VirusScan(Reports.report):
     """ Scan Filesystem for Viruses using clamav"""
-    parameters = {'fsimage':'fsimage'}
     name = "Virus Scan (clamav)"
     family = "Disk Forensics"
     description="This report will scan for viruses and display a table of viruses found"
-    def form(self,query,result):
-        try:
-            result.case_selector()
-            if query['case']!=config.FLAGDB:
-               result.meta_selector(case=query['case'],property='fsimage')
-        except KeyError:
-            return result
 
     def display(self,query,result):
-        result.heading("Virus Scan for %s" % query['fsimage'])
+        result.heading("Virus Scan Results")
         dbh=self.DBO(query['case'])
-        tablename = dbh.MakeSQLSafe(query['fsimage'])
-
         try:
             result.table(
                 columns=('a.inode','concat(path,name)', 'virus'),
                 names=('Inode','Filename','Virus Detected'),
                 table='virus as a join file as b on a.inode=b.inode ',
                 case=query['case'],
-                links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='inode')]
+                links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',__target__='inode')]
                 )
         except DB.DBError,e:
             result.para("Unable to display Virus table, maybe you did not run the virus scanner over the filesystem?")

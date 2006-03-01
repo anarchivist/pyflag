@@ -460,7 +460,6 @@ class IRCScanner(NetworkScanFactory):
                     
 class BrowseIRCChat(Reports.report):
     """ This allows chat messages to be browsed. """
-    parameters = { 'fsimage':'fsimage' }
     name = "Browse IRC Chat"
     family = "Network Forensics"
     def form(self,query,result):
@@ -471,7 +470,7 @@ class BrowseIRCChat(Reports.report):
             pass
 
     def display(self,query,result):
-        result.heading("Chat sessions in %s " % query['fsimage'])
+        result.heading("Chat sessions")
 
         def Stream_cb(value):
             tmp = result.__class__(result)
@@ -482,7 +481,7 @@ class BrowseIRCChat(Reports.report):
                 
             tmp.link(value,target = FlagFramework.query_type((),
                     family='Disk Forensics', case=query['case'],
-                    fsimage=query['fsimage'], inode=base_stream_inode,
+                    inode=base_stream_inode,
                     report='View File Contents', mode="Combined streams"
                                                              ))
             return tmp
@@ -502,12 +501,12 @@ class BrowseIRCChat(Reports.report):
             links = [None, None,
                      FlagFramework.query_type((),
                         family='Disk Forensics', case=query['case'],
-                        fsimage=query['fsimage'], __target__='inode',
+                        __target__='inode',
                         report='View File Contents', mode="Combined streams"
                         ),
                      FlagFramework.query_type((),
                         family="Network Forensics", case=query['case'],
-                        report='View Packet', fsimage=query['fsimage'],
+                        report='View Packet', 
                         __target__='id'),
                      ],
             case = query['case']

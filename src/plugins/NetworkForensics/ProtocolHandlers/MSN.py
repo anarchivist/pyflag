@@ -377,7 +377,6 @@ class BrowseMSNChat(Reports.report):
     searching for it, but want to see what messages were sent around
     the same time to get some context.
     """
-    parameters = { 'fsimage':'fsimage' }
     name = "Browse MSN Chat"
     family = "Network Forensics"
     def form(self,query,result):
@@ -392,14 +391,14 @@ class BrowseMSNChat(Reports.report):
         full msn messages for all sessions from 60 seconds prior to
         this message."""
         
-        result.heading("MSN Chat sessions in %s " % query['fsimage'])
+        result.heading("MSN Chat sessions")
 
         def draw_prox_cb(value):
             tmp = result.__class__(result)
             tmp.link('Go To Approximate Time',
               target=FlagFramework.query_type((),
                 family=query['family'], report=query['report'],
-                fsimage=query['fsimage'], where_Prox = ">%s" % (int(value)-60),
+                where_Prox = ">%s" % (int(value)-60),
                 case = query['case'],
               ),
               icon = "stock_down-with-subpoints.png",
@@ -416,15 +415,15 @@ class BrowseMSNChat(Reports.report):
 	    	     None,None,
 		     FlagFramework.query_type((),
                                               family="Disk Forensics", case=query['case'],
-                                              report='View File Contents', fsimage=query['fsimage'],
+                                              report='View File Contents', 
                                               __target__='inode', mode="Combined streams"),
                      FlagFramework.query_type((),
                                               family="Network Forensics", case=query['case'],
-                                              report='View Packet', fsimage=query['fsimage'],
+                                              report='View Packet', 
                                               __target__='id'),
                      FlagFramework.query_type((),
                                               family="Network Forensics", case=query['case'],
-                                              report='BrowseMSNSessions', fsimage=query['fsimage'],
+                                              report='BrowseMSNSessions', 
                                               __target__='where_Session ID'),
                      ],
             case = query['case']
@@ -432,12 +431,11 @@ class BrowseMSNChat(Reports.report):
 
 class BrowseMSNSessions(BrowseMSNChat):
     """ This shows MSN Session users. """
-    parameters = { 'fsimage':'fsimage' }
     name = "Browse MSN Sessions"
     family = "Network Forensics"
     hidden = True
     def display(self,query,result):
-        result.heading("MSN Chat sessions in %s " % query['fsimage'])
+        result.heading("MSN Chat sessions")
         result.table(
             columns = [ 'id','user'],
             names = ['Session ID','Users'],

@@ -244,19 +244,10 @@ class BrowseHTTPRequests(Reports.report):
     <li><b>content_type</b> - The content type of the response to this request.</li>
     </ul>
     """
-    parameters = { 'fsimage':'fsimage' }
-
     name = "Browse HTTP Requests"
     family = "Network Forensics"
-    def form(self,query,result):
-        try:
-            result.case_selector()
-            PCAPFS.draw_only_PCAPFS(query,result)
-        except KeyError:
-            pass
-
     def display(self,query,result):
-        result.heading("Requested URLs in %s" % query['fsimage'])
+        result.heading("Requested URLs")
         result.table(
             columns = ['from_unixtime(ts_sec)','request_packet','inode','method','url', 'content_type'],
             names = [ 'Time Stamp', "Request Packet", 'Inode', "Method" ,"URL", "Content Type" ],
@@ -265,12 +256,11 @@ class BrowseHTTPRequests(Reports.report):
             None,
             FlagFramework.query_type((),
                                      family=query['family'], report="View Packet",
-                                     fsimage=query['fsimage'],case=query['case'],
-                                     __target__='id'),
+                                     case=query['case'], __target__='id'),
             FlagFramework.query_type((),
                                      family="Disk Forensics",case=query['case'],
                                      report="View File Contents",mode="Combined streams",
-                                     fsimage=query['fsimage'],__target__="inode"),
+                                     __target__="inode"),
             ], 
             case=query['case']
             )

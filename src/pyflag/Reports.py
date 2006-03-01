@@ -62,7 +62,7 @@ class report:
     """
     name = "Base class"
     description = "Generic base report class"
-    parameters = {}
+    parameters = {'case':'flag_db'}
     ui = None
     TypeChecker = None
     DBO = DB.DBO
@@ -117,8 +117,7 @@ class report:
     
     def form(self,query,result):
         """ This will be executed to produce the form. You do not need to put the <form> tags or the submit button here. You need to offer as many input elements here as are required by the parameters section above. """
-        result.heading("I am calling the form method")
-        return result
+        result.case_selector()
 
     def display(self,query,result):
         """ This routine will be called in the second phase to display the results """

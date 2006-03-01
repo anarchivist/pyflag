@@ -132,10 +132,10 @@ class query_type:
                 self.__setitem__(k,v)
 
         #All query strings should have a case to operate on:
-        try:
-            self.__getitem__('case')
-        except KeyError:
-            self.__setitem__('case',config.FLAGDB)
+#        try:
+#            self.__getitem__('case')
+#        except KeyError:
+#            self.__setitem__('case',config.FLAGDB)
 
     def __str__(self):
         """ Prints the query object as a url string """
@@ -422,10 +422,10 @@ class Flag:
             result.decoration='naked'
 
         #Since flag must always operate on a case, if there is no case, we use the default flagdb as a case
-        try:
-            query['case']
-        except KeyError:
-            query['case'] = config.FLAGDB
+#        try:
+#            query['case']
+#        except KeyError:
+#            query['case'] = config.FLAGDB
 
         import pyflag.TypeCheck as TypeCheck
 

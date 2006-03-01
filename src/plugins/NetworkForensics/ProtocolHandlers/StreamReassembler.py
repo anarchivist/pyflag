@@ -420,11 +420,20 @@ class StreamFile(File):
         self.dbh.execute("insert into connection_details set inode=%r",(self.inode))
         con_id = self.dbh.autoincrement()
         self.dbh2 = self.dbh.clone()
+
+        ## This caches the current sequence number of each stream -
+        ## this is needed in order to avoid including multiple copies
+        ## of each packet when retransmission etc occur.
+        seq_numbers = dict(zip(stream_ids, [ 0 ] * len(stream_ids)))
+        
         sum=0
         self.dbh.execute("select * from connection where %s order by packet_id",(
             " or ".join(["con_id=%r" % a for a in stream_ids])
             ))
         for row in self.dbh:
+#            if row['seq'] > seq_numbers[row['con_id']]:
+#                seq_numbers[row['con_id']] = row['seq']
+            
             self.dbh2.execute("insert into connection set con_id=%r,packet_id=%r,seq=%r,length=%r,packet_offset=%r",(
                 con_id,row['packet_id'],sum,
                 row['length'],row['packet_offset']

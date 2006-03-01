@@ -204,7 +204,6 @@ class BrowseRegistryKey(BrowseRegistry):
 
 class InterestingRegKey(Reports.report):
     """ Displays values of interesting registry keys, grouped into categories """
-    parameters = {'case': 'flag_case'}
     name = "Interesting Reg Keys"
     family = "Disk Forensics"
     description="This report shows the values of interesting registry keys on the disk"

@@ -78,7 +78,6 @@ class IEIndex(Scanner.GenScanFactory):
 
 class IEHistory(Reports.report):
     """ View IE browsing history with pasco"""
-    parameters = {'case': 'flag_case'}
     name = "IE Browser History (pasco)"
     family = "Disk Forensics"
     description="This report will display all IE browsing history data found in index.dat files"
