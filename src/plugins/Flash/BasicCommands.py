@@ -43,43 +43,29 @@ class load(pyflagsh.command):
         args=self.args
         text=''
         try:
-            text=args[1]
-            try:
-                case=text[:text.index(".")]
-                dbh = self.environment._DBO(case)
-                sourcename=text[text.index(".")+1:]
-            except ValueError:
-                raise ParserException("Load has the following format: case.tag")
-            iofd=IO.open(case,sourcename)
-            self.environment.__class__._FS=Registry.FILESYSTEMS.fs['DBFS'](case,sourcename,iofd)
-            self.environment.__class__._IOSOURCE = sourcename
+            case=args[1]
+            dbh = self.environment._DBO(case)
+##            try:
+##                case=text[:text.index(".")]
+##                dbh = self.environment._DBO(case)
+##            except ValueError:
+##                raise ParserException("Load has the following format: case.tag")
+
+            self.environment.__class__._FS=Registry.FILESYSTEMS.fs['DBFS'](case)
             self.environment.__class__._CASE = case
-            yield "Loaded Filesystem tag %r in case %r" %(sourcename,case)
+            yield "Loaded case %r" %(case)
         except Exception,e:
             raise ParserException("Unable to open filesystem %s (%s)" %(text,e))
 
     def complete(self,text,state):
         """ Completes the command for the different filesystems """
-        #If the text does not have . in it, list the cases, other wise assume the thing before the first . is the case name and list the filesystems in it
         args=self.args
-        try:
-            case=text[:text.index(".")]
-            iosource=text[text.index(".")+1:]
-            dbh=self.environment._DBO(case)
-            dbh.execute("select value from meta where property =%r","iosource")
-            iosources=[ row['value'] for row in dbh ]
-            for i in range(state,len(iosources)):
-                if iosources[i].startswith(iosource):
-                    return case+"."+iosources[i]
-            
-        except ValueError:
-            # No case was given yet
-            dbh=self.environment._DBO(None)
-            dbh.execute("select value from meta where property=%r","flag_db")
-            cases=[ row['value'] for row in dbh ]
-            for i in range(state,len(cases)):
-                if cases[i].startswith(text):
-                    return cases[i]
+        dbh=self.environment._DBO(None)
+        dbh.execute("select value from meta where property=%r","flag_db")
+        cases=[ row['value'] for row in dbh ]
+        for i in range(state,len(cases)):
+            if cases[i].startswith(text):
+                return cases[i]
 
 class ls(pyflagsh.command):
     """ Implement the ls command. """

@@ -39,6 +39,7 @@ pkgpython_PYTHON	= 	pyflag/conf.py \
 
 nobase_pkgpython_PYTHON = 	plugins/test.py \
 				plugins/__init__.py \
+				plugins/Core.py \
 				plugins/Flash/BasicCommands.py \
 				plugins/NetworkForensics/PCAPFS.py plugins/NetworkForensics/ProtocolHandlers/HTTP.py \
 				plugins/NetworkForensics/ProtocolHandlers/SMTP.py \

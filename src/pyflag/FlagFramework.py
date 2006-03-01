@@ -637,40 +637,36 @@ class HexDump:
 #            ui.text(finish=1)
             offset+=1
 
-try:
-    import magic
+import magic
 
-    class Magic:
-        """ Singleton class to manage magic library access """
-        ## May need to do locking in future, if libmagic is not reentrant.
-        magic = None
-        mimemagic = None
+class Magic:
+    """ Singleton class to manage magic library access """
+    ## May need to do locking in future, if libmagic is not reentrant.
+    magic = None
+    mimemagic = None
 
-        def __init__(self,mode=None):
-            if not Magic.magic:
-                Magic.magic=magic.open(magic.MAGIC_CONTINUE)
-                if Magic.magic.load(config.MAGICFILE) < 0:
-                    raise IOError("Could not open magic file %s" % config.MAGICFILE)
+    def __init__(self,mode=None):
+        if not Magic.magic:
+            Magic.magic=magic.open(magic.MAGIC_CONTINUE)
+            if Magic.magic.load(config.MAGICFILE) < 0:
+                raise IOError("Could not open magic file %s" % config.MAGICFILE)
 
-            if not Magic.mimemagic:
-                Magic.mimemagic=magic.open(magic.MAGIC_MIME | magic.MAGIC_CONTINUE)
-                if Magic.mimemagic.load(config.MAGICFILE) < 0:
-                    raise IOError("Could not open magic file %s" % config.MAGICFILE)
-            self.mode=mode
+        if not Magic.mimemagic:
+            Magic.mimemagic=magic.open(magic.MAGIC_MIME | magic.MAGIC_CONTINUE)
+            if Magic.mimemagic.load(config.MAGICFILE) < 0:
+                raise IOError("Could not open magic file %s" % config.MAGICFILE)
+        self.mode=mode
 
-        def buffer(self,buf):
-            """ Return the string representation of the buffer """
-            if self.mode:
-                result=Magic.mimemagic.buffer(buf)
-            else:
-                result=Magic.magic.buffer(buf)
+    def buffer(self,buf):
+        """ Return the string representation of the buffer """
+        if self.mode:
+            result=Magic.mimemagic.buffer(buf)
+        else:
+            result=Magic.magic.buffer(buf)
 
-            if not result:
-                return "text/plain"
-            else: return result
-
-except ImportError:
-    pass
+        if not result:
+            return "text/plain"
+        else: return result
 
 class Curry:
     """ This class makes a curried object available for simple inlined functions.
