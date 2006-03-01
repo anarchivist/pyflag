@@ -1,7 +1,7 @@
 # basics
 AC_INIT(pyflag.in)
 AC_CONFIG_AUX_DIR(config)
-AM_INIT_AUTOMAKE(pyflag, 0.80.1)
+AM_INIT_AUTOMAKE(pyflag, 0.80.2)
 
 # check standard stuff
 AC_PROG_LIBTOOL

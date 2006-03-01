@@ -1,27 +1,8 @@
 SUBDIRS = src examples debian
 
-my_images	 	=	\
-				images/arrow_left_grey.gif images/arrow_right_grey.gif images/back.png images/broken.png \
-				images/button_delete.xpm images/cornerplus.png images/corner.png images/defence.png \
-				images/down.png images/examine.png images/favicon.ico images/flag.png images/floppy.png \
-				images/folder.png images/forward.png images/functions.js images/g_back.png images/g_forward.png \
-				images/glasses.png images/greenbarfill.gif images/greenbarleft.gif images/greenbarrgt.gif \
-				images/help.png images/home_grey.png images/home.png images/logo.png images/menu.js \
-				images/metbarend.gif images/metbarfill.gif images/metbarleft.gif images/msoffice.png \
-				images/new_preset.png images/next_line.png images/no.png images/page.png images/pdf.png \
-				images/pie.png images/pyflag_logo.png images/pyflag.png images/question.png images/red-plus.png \
-				images/reset_grey.png images/reset.png images/sidebarleft.gif images/sidebarrgt.gif images/spacer.png \
-				images/spanner.png images/stock_down-with-subpoints.png images/stock_left_gray.png images/stock_left.png \
-				images/stock_next-page.png images/stock_previous-page.png images/stock_right_gray.png images/stock_right.png \
-				images/stop.png images/topfill.jpg images/unknown.png images/up.png images/whois.png images/yes.png
-
-my_data			=	data/db.setup data/magic data/magic.mime data/regkeys.txt data/regexps.txt
-
-my_utilities		=	utilities/regkeys_load.sh utilities/compare.py utilities/fuse_loopback_subsystem.py \
-				utilities/update_version.sh utilities/indexer.py utilities/pyflag_fuse.py utilities/whois_load.py \
-				utilities/load_dictionary.py utilities/raid_guess.py utilities/whois_load.sh utilities/load_dictionary.sh \
-				utilities/nsrl_load.sh
-
+my_images	 	=	$(shell find images -not -name .\*)
+my_data			=	$(shell find data -not -name .\*)
+my_utilities		=	$(shell find utilities -not -name .\*)
 bin_SCRIPTS		=	pyflag pyflash pyflag_launch
 sysconf_DATA		=	pyflagrc
 pkgdata_DATA		=	$(my_data)
