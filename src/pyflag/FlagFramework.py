@@ -363,7 +363,11 @@ class Flag:
             return
 
         #Lets remember the fact that we analysed this report - in the database
-        dbh = DB.DBO(query['case'])
+        try:
+            dbh = DB.DBO(query['case'])
+        except KeyError:
+            dbh = DB.DBO(None)
+            
         dbh.execute("insert into meta set property=%r,value=%r",('report_executed',canonical_query))
         
         #Remove the lock

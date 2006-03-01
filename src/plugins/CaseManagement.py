@@ -52,7 +52,7 @@ class NewCase(Reports.report):
         return result
         
     def display(self,query,result):
-                #Get handle to flag db
+        #Get handle to flag db
         dbh = self.DBO(None)
         dbh.execute("Create database if not exists %s",(query['create_case']))
         dbh.execute("select * from meta where property='flag_db' and value=%r",query['create_case'])

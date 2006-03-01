@@ -225,13 +225,14 @@ class DBFS(FileSystem):
 
         for d in range(1,len(dirs)):
             path = "/".join(dirs[:d])+"/"
+            path = FlagFramework.normpath(path)
             self.dbh.execute("select * from file where path=%r and name=%r and mode='d/d'",(path, dirs[d]))
             if not self.dbh.fetch():
                 self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode='d/d'",(path,dirs[d]))
 
         ## Now add to the file and inode tables:
         self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode=%r,inode=%r",  (
-            os.path.dirname(new_filename)+"/",
+            FlagFramework.normpath(os.path.dirname(new_filename)+"/"),
             os.path.basename(new_filename),
             directory_string,
             inode))

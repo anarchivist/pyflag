@@ -92,7 +92,6 @@ static PyObject *py_read_random(PyObject *dummy, PyObject *args) {
   char *buf;
   PyObject *string;
   int result;
-  PyGILState_STATE gstate;
 
   // retrieve args
   if(!PyArg_ParseTuple(args, "OIK", &pyself, &length, &offs)) {
@@ -104,31 +103,25 @@ static PyObject *py_read_random(PyObject *dummy, PyObject *args) {
   TRY {
     /** Create a new string to return to the caller */
     string =  PyString_FromStringAndSize(NULL, length);
-    if(!string) {
-      PyGILState_Release(gstate);
-      return PyErr_Format(PyExc_MemoryError, "Unable to allocate a string of length %u\n", length);
-    }
+    if(string) {
+      buf = PyString_AsString(string);
 
-    buf = PyString_AsString(string);
-
-    /** Release the GIL to allow other threads to work while we wait on IO */
-    Py_BEGIN_ALLOW_THREADS
-    result=self->read_random(self,buf, length, offs,"Python calling");
-    Py_END_ALLOW_THREADS
-
-    /** If this was a short read we truncate the string (This is
-	allowed because we just created it) 
-    */
-    if(result < length)
-      if(_PyString_Resize(&string, result) <0 ) return NULL;
-
+      result=self->read_random(self,buf, length, offs,"Python calling");
+      
+      /** If this was a short read we truncate the string (This is
+	  allowed because we just created it) 
+      */
+      if(result < length)
+	if(_PyString_Resize(&string, result) <0 ) return NULL;
+    };
   } EXCEPT(E_ANY) {
-
-    PyGILState_Release(gstate);
     return PyErr_Format(map_exceptions_for_python(__EXCEPT__), "%s", except_str);
   };
 
   /** Return the string to our caller */
+  if(!string)
+    return PyErr_Format(PyExc_MemoryError, "Unable to allocate a string of length %u\n", length);
+
   return string;
 };
 
