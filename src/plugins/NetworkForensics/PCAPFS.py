@@ -276,3 +276,69 @@ class ViewDissectedPacket(Reports.report):
             del new_query['id']
             new_query['id']=id+1
             result.toolbar(text="Next Packet",icon="stock_right.png",link=new_query)
+
+
+class NetworkingSummary(Reports.report):
+    """ This report provides users with a summary of the information extracted from all the network captures for this case.
+
+    This is a start but I actually want more powerful/useful stats like below.  I am thinking about how to do this.
+
+    <ul>
+    <li><b>HTTP</b> - Number of unique GET requests,unique content types, all urls ordered by frequency (index-scanner like)</li>
+    <li><b>IRC</b> - List of (unique) participants (senders,receivers), list of (unique) IRC commands used</li>
+    <li><b>MSN</b> - List of participants (senders,receivers)</li>
+    <li><b>Email</b> - No of unique subjects, list of unique senders, list of unique recipients</li>
+    </ul>
+    """
+    name = "Networking Summary"
+    family = "Network Forensics"
+    
+    def display(self,query,result):
+    
+        result.heading("Summary of Networking Information for %s" % query['case'])
+
+        def http(query,output):
+            #select distinct url from http group by url
+            #select distinct count(inode) from http group by url
+            output.table(
+                columns=['count(inode)'],
+                names=['Number of HTTP Get Requests'],
+                table='http',
+                case=query['case']
+                )
+            return output
+
+        def irc(query,output):
+            output.table(
+                columns=['count(inode)'],
+                names=['Number of IRC Messages'],
+                table='irc_messages',
+                case=query['case']
+                )
+            return output
+
+        def msn(query,output):
+            output.table(
+                columns=['count(inode)'],
+                names=['Number of MSN Messages'],
+                table='msn_messages',
+                case=query['case']
+                )
+            return output
+
+        def email(query,output):
+            output.table(
+                columns=['count(inode)'],
+                names=['Number of Emails'],
+                table='email',
+                case=query['case']
+                )
+            return output
+        
+        try:
+            result.notebook(
+                names=["HTTP","IRC","MSN","Email"],
+                callbacks=[http,irc,msn,email],
+                )
+        except DB.DBError,args:
+            result.para("No networking tables found, you probably haven't run the correct scanners: %s" % args)
