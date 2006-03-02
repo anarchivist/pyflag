@@ -275,86 +275,96 @@ def combine_streams(query,result):
 
     In each screenfull we show a maximum of MAXSIZE characters per connection. We stop as soon as either direction reaches this many characters.
     """
-    ## FIXME: Implement sensible paging here.
-    
-    ## First we find the reverse connection:
-    table = query['fsimage']
-    fd = IO.open(query['case'],table)
-
-    #extract stream id from inode
-    m=re.match("S(\d+)",query['inode'])
-    
-    forward_inode = m.group(1)
-    forward_cid = int(forward_inode)
-
+    inode = query['inode']
     dbh = DB.DBO(query['case'])
-    dbh.execute("select * from connection_details where con_id=%r",(forward_cid))
-    row=dbh.fetch()
-    
-    dbh.execute("select con_id from connection_details where src_ip=%r and src_port=%r and dest_ip=%r and dest_port=%r",(
-        row['dest_ip'],row['dest_port'],row['src_ip'],row['src_port']))
-    row = dbh.fetch()
-    if row:
-        reverse_cid = row['con_id']
-    else:
-        reverse_cid = 0
+    try:
+        iosource = inode[:inode.index("|")]
+        stream_inode = inode[inode.rindex("|"):]
+        forward_cid = int(stream_inode[2:])
+    except ValueError:
+        raise ValueError("Inode format is not correct. %s is not a valid inode." % inode)
 
-    dbh.execute("select con_id,offset,packet_offset,connection.length as length from connection join pcap on packet_id=id where con_id=%r or con_id=%r order by packet_id",(forward_cid,reverse_cid))
+    try:
+        limit = int(query['stream_limit'])
+    except:
+        limit = 0
+    
+    reverse_cid  = find_reverse_stream(forward_cid, dbh)
+
+    ## This gives us a handle to the VFS
+    fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'])
+
+    number_of_rows = 0
+    dbh.execute("select con_id, concat(\"%s|p0|O\",cast(packet_id as char),\"|o\",cast(packet_offset as char),\":\",cast(connection.length as char)) as inode from connection join pcap on packet_id=pcap.id where con_id=%r or con_id=%r order by packet_id limit %s,%s",(iosource,forward_cid,reverse_cid, limit, config.PAGESIZE))
     for row in dbh:
+        number_of_rows += 1
+        fd = fsfd.open(inode = row['inode'])
         ## Get the data:
-        fd.seek(row['offset']+row['packet_offset'])
-        data=fd.read(row['length'])
+        data=fd.read()
         if row['con_id']==forward_cid:
             result.text(data,color="blue",font='typewriter',sanitise='full',wrap='full')
         else:
             result.text(data,color="red",font='typewriter',sanitise='full',wrap='full')    
-    
+
+    ## Make the paging buttons
+    if limit > 0:
+        del query['stream_limit']
+        temp = limit-config.PAGESIZE
+        if temp < 0:
+            temp = 0
+            
+        query['stream_limit'] = temp
+        result.toolbar(text="Previous page", icon="stock_left.png",
+                       link = query )
+    else:
+        result.toolbar(text="Previous page", icon="stock_left_gray.png")
+
+    if number_of_rows >= config.PAGESIZE:
+        del query['stream_limit']
+        query['stream_limit'] = limit+config.PAGESIZE
+        result.toolbar(text="Next page", icon="stock_right.png",
+                       link = query )
+    else:
+        result.toolbar(text="Next page", icon="stock_right_gray.png")
+        
 def show_packets(query,result):
     """ Shows the packets which belong in this stream """
     inode = query['inode']
     dbh = DB.DBO(query['case'])
     try:
         iosource = inode[:inode.index("|")]
+        stream_inode = inode[inode.rindex("|"):]
+        con_id = int(stream_inode[2:])
     except ValueError:
         raise ValueError("Inode format is not correct. %s is not a valid inode." % inode)
 
-
     ## This gives us a handle to the VFS
-    fsfd = Registry.FILESYSTEMS.fs['DBFS'](case)
-    fd=IO.open(query['case'],)
-
-    try:
-        con_id = int(inode[1:])
-    except ValueError:
-        dbh.execute("select con_id from connection_details where inode=%r",(inode))
-        row=dbh.fetch()
-        con_id=row['con_id']
+    fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'])
             
     def show_data(value):
-        length,packet_offset,packet_id = value.split(",")
-        length=int(length)
-        dbh.execute("select offset from pcap where id=%s",(packet_id))
-        row = dbh.fetch()
-        fd.seek(row['offset'] + int(packet_offset))
+        fd = fsfd.open(inode=value)
+        ui=result.__class__(result)
         ## We read at most this many chars from the packet:
-        elipses=''
-        
-        if length>50:
-            length=50
-            elipses=' ... '
-            
-        data=fd.read(length)
+        data=fd.read(50)
 
-        ## Sanitise data
-        return data+elipses
+        if(len(data) ==50):
+            data += "  ...."
+
+        ui.text(data, sanitise='full', font='typewriter')
+        return ui
     
     result.table(
-        columns = ('packet_id','from_unixtime(ts_sec)','ts_usec','seq','con.length','concat(con.length,",",packet_offset,",",packet_id)'),
-        names = ('Packet ID','Timestamp','uSec','Sequence Number','Length',"Data"),
-#        links = [ FlagFramework.query_type((),family="Network Forensics",report='View Packet',case=query['case'],fsimage=query['fsimage'],__target__='id')],
+        columns = ('concat("%s|p0|o",cast(packet_id as char))' % iosource, 'from_unixtime(pcap.ts_sec,"%Y-%m-%d")','concat(from_unixtime(pcap.ts_sec,"%H:%i:%s"),".",pcap.ts_usec)','seq','con.length','concat("%s|p0|O",cast(packet_id as char),"|o",cast(packet_offset as char),":",cast(con.length as char))' % iosource),
+        names = ('Packet ID','Date','Time','Sequence Number','Length',"Data"),
+        links = [ FlagFramework.query_type((),
+                                           family="Network Forensics",
+                                           report='View Packet',
+                                           case=query['case'],
+                                           __target__='inode'),
+                  ],
         table= 'connection as con , pcap',
         where = 'con_id="%s" and packet_id=id ' % con_id,
-#        callbacks = { 'Data': show_data },
+        callbacks = { 'Data': show_data },
         case=query['case']
         )
             
@@ -621,5 +631,26 @@ class OffsetFile(File):
 
 ## There is no point in caching the offset file since its basically
 ## not doing much underlying stuff
-##class CachedOffsetFile(CachedFile, OffsetFile):
-##    target_class = OffsetFile    
+#class CachedOffsetFile(CachedFile, OffsetFile):
+#    target_class = OffsetFile    
+#    specifier = 'O'
+
+import StringIO
+
+## This is a memory cached version of the offset file driver - very useful for packets:
+class MemroyCachedOffset(StringIO.StringIO,File):
+    specifier = 'O'
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
+
+        ## We parse out the offset and length from the inode string
+        tmp = inode.split('|')[-1]
+        tmp = tmp[1:].split(":")
+        fd.seek(int(tmp[0]))
+
+        try:
+            self.size=int(tmp[1])
+        except IndexError:
+            self.size=sys.maxint
+            
+        StringIO.StringIO.__init__(self, fd.read(self.size))

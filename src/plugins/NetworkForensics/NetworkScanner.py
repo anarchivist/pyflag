@@ -156,7 +156,7 @@ class NetworkScanner(BaseScanner):
             metadata['proto_tree']={ self.packet_id: self.proto_tree }
 
 def find_reverse_stream(forward_stream,dbh):
-    """ Given a connection ID and a table name, finds the reverse connection.
+    """ Given a connection ID, finds the reverse connection.
 
     return None if there is not reverse stream
     """
