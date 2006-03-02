@@ -1125,8 +1125,9 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 	 * directory then skip it.  NOTE: This will miss unallocated
 	 * entries in slack space of the file...
 	 */
-	if ((clustalloc == 1) && (isset(sect_alloc, sect) == 0))
-	    continue;
+	// davec: commented out for pyflag as we miss a lot of inodes otherwise!
+	//if ((clustalloc == 1) && (isset(sect_alloc, sect) == 0))
+	//    continue;
 
 	/* The final cluster may not be full */
 	if (lsect - sect + 1 < fatfs->csize)

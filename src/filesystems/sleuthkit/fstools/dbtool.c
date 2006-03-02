@@ -590,7 +590,7 @@ int
 main(int argc, char **argv) 
 {
 	int f_flags = FS_FLAG_NAME_ALLOC | FS_FLAG_NAME_UNALLOC | FS_FLAG_NAME_RECURSE;
-	int i_flags = 0;
+	int i_flags = 0; i_flags |= ~0;
 	char ch;
 	FS_INFO 	*fs;
 	IMG_INFO *img;
