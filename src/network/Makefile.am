@@ -15,7 +15,7 @@ _dissect_la_CPPFLAGS 	= $(SWIG_PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
 _dissect_la_LDFLAGS 	= -module
 _dissect_la_LIBADD	= ../lib/liboo.la libnetwork.la
 
-include_HEADERS		= network.h
+noinst_HEADERS		= network.h
 
 dissect.c: init.h
 

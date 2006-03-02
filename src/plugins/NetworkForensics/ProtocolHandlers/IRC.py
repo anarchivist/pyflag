@@ -487,7 +487,7 @@ class BrowseIRCChat(Reports.report):
             return tmp
         
         result.table(
-            columns = ['irc_messages.id', 'from_unixtime(ts_sec,"%Y-%m-%d")','concat(from_unixtime(ts_sec,"%H:%i:%s"),".",ts_usec)','inode','packet_id','command','sender','recipient', 'data'],
+            columns = ['pcap.id', 'from_unixtime(pcap.ts_sec,"%Y-%m-%d")','concat(from_unixtime(pcap.ts_sec,"%H:%i:%s"),".",pcap.ts_usec)','inode','concat(left(inode,instr(inode,"|")),"p0|o",cast(packet_id as char))','command','sender','recipient', 'data'],
             names = ['ID','Date','Time','Stream','Packet','Command','Sender Nick','Recipient','Text'],
             table = "irc_messages join pcap on packet_id=pcap.id" ,
 #            callbacks = { 'Text': Curry(text_cb, wrap='full',wrap_size=80, font='typewriter'),
@@ -502,7 +502,7 @@ class BrowseIRCChat(Reports.report):
                      FlagFramework.query_type((),
                         family="Network Forensics", case=query['case'],
                         report='View Packet', 
-                        __target__='id'),
+                        __target__='inode'),
                      ],
             case = query['case']
             )

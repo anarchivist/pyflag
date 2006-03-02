@@ -255,7 +255,6 @@ class ScanFS(Reports.report):
                result.checkbox('Click here when finished','final','ok')
 
         except KeyError:
-            raise
             return result
 
     def calculate_scanners(self,query):

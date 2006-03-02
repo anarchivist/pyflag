@@ -402,7 +402,7 @@ class BrowseMSNChat(Reports.report):
             return tmp	
 
         result.table(
-            columns = ['ts_sec', 'from_unixtime(ts_sec,"%Y-%m-%d")','concat(from_unixtime(ts_sec,"%H:%i:%s"),".",ts_usec)', 'inode', 'packet_id', 'session', 'sender', 'recipient','data'],
+            columns = ['pcap.ts_sec', 'from_unixtime(pcap.ts_sec,"%Y-%m-%d")','concat(from_unixtime(pcap.ts_sec,"%H:%i:%s"),".",pcap.ts_usec)', 'inode', 'concat(left(inode,instr(inode,"|")),"p0|o",cast(packet_id as char))', 'session', 'sender', 'recipient','data'],
             names = ['Prox','Date','Time','Stream', 'Packet', 'Session', 'Sender Nick', 'Recipient Nick','Text'],
             table = "msn_messages join pcap on packet_id=id",
             callbacks = {'Prox':draw_prox_cb},
@@ -415,7 +415,7 @@ class BrowseMSNChat(Reports.report):
                      FlagFramework.query_type((),
                                               family="Network Forensics", case=query['case'],
                                               report='View Packet', 
-                                              __target__='id'),
+                                              __target__='inode'),
                      FlagFramework.query_type((),
                                               family="Network Forensics", case=query['case'],
                                               report='BrowseMSNSessions', 

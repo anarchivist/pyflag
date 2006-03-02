@@ -251,15 +251,15 @@ class BrowseHTTPRequests(Reports.report):
     
         result.heading("Requested URLs")
         result.table(
-            columns = ['from_unixtime(ts_sec,"%Y-%m-%d")','concat(from_unixtime(ts_sec,"%H:%i:%s"),".",ts_usec)','request_packet','inode','method','url', 'content_type'],
-            names = [ "Date","Time", "Request Packet", 'Inode', "Method" ,"URL", "Content Type" ],
+            columns = ['from_unixtime(ts_sec,"%Y-%m-%d")','concat(from_unixtime(ts_sec,"%H:%i:%s"),".",ts_usec)','concat(left(inode,instr(inode,"|")),"p0|o",cast(request_packet as char))','inode','method','url', 'content_type'],
+            names = [ "Date","Time",  "Request Packet", 'Inode', "Method" ,"URL", "Content Type" ],
             table=" http join pcap on request_packet=id ",
             links = [
             None,
             None,
             FlagFramework.query_type((),
                                      family=query['family'], report="View Packet",
-                                     case=query['case'], __target__='id'),
+                                     case=query['case'], __target__='inode'),
             FlagFramework.query_type((),
                                      family="Disk Forensics",case=query['case'],
                                      report="View File Contents",mode="Combined streams",

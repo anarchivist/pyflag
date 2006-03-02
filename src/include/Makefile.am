@@ -1,1 +1,1 @@
-include_HEADERS	= $(srcdir)/*.h
+noinst_HEADERS	= $(srcdir)/*.h
