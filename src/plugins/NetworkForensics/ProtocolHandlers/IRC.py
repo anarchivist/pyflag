@@ -323,10 +323,6 @@ class IRC:
 
     def store_command(self,prefix,command,line):
         packet_id = self.fd.get_packet_id(position=self.fd.tell())
-        self.dbh.execute("select ts_sec from pcap where id = %s "
-                         ,(packet_id))
-        row = self.dbh.fetch()
-        timestamp = row['ts_sec']
 
         if not prefix: prefix = self.nick
 
@@ -347,9 +343,9 @@ class IRC:
             recipient = ""
             
         self.dbh.execute(""" insert into irc_messages set sender=%r,full_sender=%r,
-        inode=%r, packet_id=%r, data=%r, ts_sec=%r, command = %r, recipient = %r""",(
+        inode=%r, packet_id=%r, data=%r, command = %r, recipient = %r""",(
             short_name,prefix,base_stream_inode, packet_id,
-            line, timestamp, command, recipient 
+            line, command, recipient 
             ))
 
     password = ''
@@ -420,7 +416,6 @@ class IRCScanner(NetworkScanFactory):
             `inode` VARCHAR(50) NOT NULL,
             `packet_id` INT,
             `session` VARCHAR(250),
-            `ts_sec` int(11),
             `data` TEXT NOT NULL,
             key(id)
             )""")
@@ -492,13 +487,13 @@ class BrowseIRCChat(Reports.report):
             return tmp
         
         result.table(
-            columns = ['id', 'from_unixtime(ts_sec)','inode','packet_id','command','sender','recipient', 'data'],
-            names = ['ID','Time Stamp','Stream','Packet','Command','Sender Nick','Recipient','Text'],
-            table = "irc_messages" ,
+            columns = ['irc_messages.id', 'from_unixtime(ts_sec,"%Y-%m-%d")','concat(from_unixtime(ts_sec,"%H:%i:%s"),".",ts_usec)','inode','packet_id','command','sender','recipient', 'data'],
+            names = ['ID','Date','Time','Stream','Packet','Command','Sender Nick','Recipient','Text'],
+            table = "irc_messages join pcap on packet_id=pcap.id" ,
 #            callbacks = { 'Text': Curry(text_cb, wrap='full',wrap_size=80, font='typewriter'),
 #                          'Recipient': Curry(text_cb, wrap_size=20, wrap='full', font='typewriter')
 #                          },
-            links = [None, None,
+            links = [None, None,None,
                      FlagFramework.query_type((),
                         family='Disk Forensics', case=query['case'],
                         __target__='inode',

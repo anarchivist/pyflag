@@ -171,16 +171,12 @@ class message:
         """ A handler for content type text/plain """
         ## Try to find the time stamp of this request:
         packet_id = self.fd.get_packet_id(position=self.offset)
-        self.dbh.execute("select ts_sec from pcap where id = %s "
-                         ,(packet_id))
-        row = self.dbh.fetch()
-        timestamp = row['ts_sec']
 
         self.dbh.execute(""" insert into msn_messages set sender=%r,friendly_name=%r,
-        recipient=%r, inode=%r, packet_id=%r, data=%r, ts_sec=%r, session=%r
+        recipient=%r, inode=%r, packet_id=%r, data=%r, session=%r
         """,(
             sender,friendly_sender, self.recipient, self.fd.inode, packet_id,
-            self.get_data(), timestamp, self.session_id
+            self.get_data(), self.session_id
             ))
 
     def p2p_handler(self,content_type,sender,friendly_sender):
@@ -314,7 +310,6 @@ class MSNScanner(NetworkScanFactory):
             `inode` VARCHAR(50) NOT NULL,
             `packet_id` INT,
             `session` INT,
-            `ts_sec` int(11),
             `data` TEXT NOT NULL
             )""")
         self.dbh.execute(
@@ -407,12 +402,12 @@ class BrowseMSNChat(Reports.report):
             return tmp	
 
         result.table(
-            columns = ['ts_sec', 'from_unixtime(ts_sec)', 'inode', 'packet_id', 'session', 'sender', 'recipient','data'],
-            names = ['Prox','Time Stamp','Stream', 'Packet', 'Session', 'Sender Nick', 'Recipient Nick','Text'],
-            table = "msn_messages",
+            columns = ['ts_sec', 'from_unixtime(ts_sec,"%Y-%m-%d")','concat(from_unixtime(ts_sec,"%H:%i:%s"),".",ts_usec)', 'inode', 'packet_id', 'session', 'sender', 'recipient','data'],
+            names = ['Prox','Date','Time','Stream', 'Packet', 'Session', 'Sender Nick', 'Recipient Nick','Text'],
+            table = "msn_messages join pcap on packet_id=id",
             callbacks = {'Prox':draw_prox_cb},
             links = [
-	    	     None,None,
+	    	     None,None,None,
 		     FlagFramework.query_type((),
                                               family="Disk Forensics", case=query['case'],
                                               report='View File Contents', 

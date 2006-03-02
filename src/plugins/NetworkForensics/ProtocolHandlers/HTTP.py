@@ -246,13 +246,16 @@ class BrowseHTTPRequests(Reports.report):
     """
     name = "Browse HTTP Requests"
     family = "Network Forensics"
+    
     def display(self,query,result):
+    
         result.heading("Requested URLs")
         result.table(
-            columns = ['from_unixtime(ts_sec)','request_packet','inode','method','url', 'content_type'],
-            names = [ 'Time Stamp', "Request Packet", 'Inode', "Method" ,"URL", "Content Type" ],
+            columns = ['from_unixtime(ts_sec,"%Y-%m-%d")','concat(from_unixtime(ts_sec,"%H:%i:%s"),".",ts_usec)','request_packet','inode','method','url', 'content_type'],
+            names = [ "Date","Time", "Request Packet", 'Inode', "Method" ,"URL", "Content Type" ],
             table=" http join pcap on request_packet=id ",
             links = [
+            None,
             None,
             FlagFramework.query_type((),
                                      family=query['family'], report="View Packet",
