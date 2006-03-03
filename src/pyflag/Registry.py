@@ -137,7 +137,8 @@ class Registry:
                                             logging.log(logging.WARNINGS, err)
                                             continue
 
-                                        self.classes.append(Class)
+                                        if Class not in self.classes:
+                                            self.classes.append(Class)
                                         logging.log(logging.DEBUG, "Added %s '%s:%s'"
                                                     % (ParentClass,module_desc,cls))
 

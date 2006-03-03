@@ -57,7 +57,7 @@ class BaseScanner:
         self.fd=fd
         self.size = 0
         self.ddfs = ddfs
-        self.ddfs.dbh.set_meta("scan_%s" % outer.__class__, inode)
+        self.ddfs.dbh.execute("update inode set scanner_cache = concat_ws(',',scanner_cache, %r) where inode=%r", (outer.__class__.__name__, inode))
         self.dbh=outer.dbh
         self.outer=outer
         self.factories=factories
@@ -296,7 +296,7 @@ def scanfile(ddfs,fd,factories):
     #the scanners on new files it discovers.
     objs = []
     for c in factories:
-        ddfs.dbh.execute("select * from meta where property=%r and value=%r",("scan_%s" % c.__class__,fd.inode))
+        ddfs.dbh.execute("select inode from inode where inode=%r and FIND_IN_SET(%r,scanner_cache)",(fd.inode,"%s" % c.__class__.__name__))
         if not ddfs.dbh.fetch():
             objs.append(c.Scan(fd.inode,ddfs,c,factories=factories,fd=fd))
 

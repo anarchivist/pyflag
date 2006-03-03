@@ -129,14 +129,16 @@ int main(int argc, char **argv) {
 
   if (createNewTable == TRUE) {
     /* will prob need to do some validation of tableName */
-    printf ("CREATE TABLE `%s` ( \n", tableName);
-    printf ("  `id` INT NOT NULL , \n");
-    printf ("  `offset` INT NOT NULL , \n");
-    printf ("  `length` INT NOT NULL , \n");
-    printf ("  `ts_sec` INT NOT NULL , \n");
-    printf ("  `ts_usec` INT NOT NULL, \n");
-    printf ("  `link_type`  TINYINT not null\n");
-    printf ("); \n\n");
+    printf ("CREATE TABLE `%s` ("
+	    "  `id` INT NOT NULL auto_increment,"
+	    "  `iosource` varchar(50), "
+	    "  `offset` INT NOT NULL ,"
+	    "  `length` INT NOT NULL ,"
+	    "  `ts_sec` INT NOT NULL ,"
+	    "  `ts_usec` INT NOT NULL,"
+	    "  `link_type`  TINYINT not null,"
+	    " KEY `id` (`id`)"
+	    ");", tableName);
 
     exit(0);
   }

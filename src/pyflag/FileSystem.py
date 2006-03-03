@@ -191,9 +191,42 @@ class DBFS(FileSystem):
         Note that derived classes need to actually do the loading
         after they call the base class.
         """
+        scanners = [ "%r" % s.__name__ for s in Registry.SCANNERS.classes ]
+        
         self.dbh = DB.DBO(self.case)
-        self.dbh.MySQLHarness("%s/dbtool -t %r -m %r -d create blah" %(config.FLAG_BIN, iosource_name, mount_point))
+        self.dbh.execute("""CREATE TABLE IF NOT EXISTS inode (
+        `inode` VARCHAR(250) NOT NULL,
+        `status` INT,
+        `uid` INT,
+        `gid` INT,
+        `mtime` INT NOT NULL,
+        `atime` INT NOT NULL,
+        `ctime` INT NOT NULL,
+        `dtime` INT,
+        `mode` INT,
+        `links` INT,
+        `link` TEXT,
+        `size` BIGINT NOT NULL,
+        `scanner_cache` set(%s)
+        )""",",".join(scanners))
 
+        self.dbh.execute("""CREATE TABLE IF NOT EXISTS file (
+        `inode` VARCHAR(250) NOT NULL,
+        `mode` VARCHAR(3) NOT NULL,
+        `status` VARCHAR(8) NOT NULL,
+        `path` TEXT,
+        `name` TEXT)""")
+
+        self.dbh.execute("""CREATE TABLE IF NOT EXISTS block (
+        `inode` VARCHAR(250) NOT NULL,
+        `index` INT NOT NULL,
+        `block` BIGINT NOT NULL,
+        `count` INT NOT NULL)""")
+
+        self.dbh.execute("""CREATE TABLE IF NOT EXISTS resident (
+        `inode` VARCHAR(250) NOT NULL,
+        `data` TEXT)""")
+    
         ## Ensure the VFS contains the mount point:
         self.VFSCreate(None, "I%s" % iosource_name, mount_point, directory=True)
 
