@@ -130,7 +130,7 @@ int main(int argc, char **argv) {
 
   if (createNewTable == TRUE) {
     /* will prob need to do some validation of tableName */
-    printf ("CREATE TABLE `%s` ( \n", tableName);
+    printf ("CREATE TABLE if not exists `%s` ( \n", tableName);
     printf ("  `id` INT NOT NULL , \n");
     printf ("  `offset` INT NOT NULL , \n");
     printf ("  `length` INT NOT NULL , \n");
