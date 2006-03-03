@@ -14,6 +14,7 @@ import math
 import bisect
 import pyflag.conf
 config=pyflag.conf.ConfObject()
+import os.path
 
 class AutoFS(DBFS):
     """ This allows SK to determine automatically the filesystem type. """
@@ -21,6 +22,9 @@ class AutoFS(DBFS):
     name = "Auto FS"
 
     def load(self, mount_point, iosource_name):
+        ## Ensure that mount point is normalised:
+        mount_point = os.path.normpath(mount_point)
+        
         DBFS.load(self, mount_point, iosource_name)
 
         # run sleuthkit
@@ -40,6 +44,9 @@ class Ext2(AutoFS):
     name = "Linux ext2"
 
     def load(self, mount_point, iosource_name):
+        ## Ensure that mount point is normalised:
+        mount_point = os.path.normpath(mount_point)
+
         DBFS.load(self, mount_point, iosource_name)
 
         # run sleuthkit

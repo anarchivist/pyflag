@@ -6,7 +6,7 @@ We extract all the files with type like image into the /tmp/ directory"""
 import pyflag.pyflagsh as pyflagsh
 
 ## First we load the filesystem in:
-pyflagsh.shell_execv('load','demo.test')
+pyflagsh.shell_execv('load','demo')
 
 #Do a big find over the filesystem to recover all the files
 for file in pyflagsh.shell_execv_iter('find_dict','/'):

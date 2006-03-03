@@ -119,9 +119,11 @@ class IndexScan(GenScanFactory):
         # extensively in windows (e.g word documents). We can easily
         # add more encodings here as necessary.
         pydbh.execute("select word,id from dictionary where type='word'")
+        encodings = pyflag.conf.parse_value("INDEX_ENCONDINGS")
+        word = row['word'].decode("UTF-8")
         for row in pydbh:
-            self.index.add_word(row['word'],row['id'])
-            self.index.add_word(row['word'].decode("UTF-8").encode("UTF-16LE"),row['id'])
+            for e in encodings:
+                self.index.add_word(word.encode(e),row['id'])
 
         logging.log(logging.DEBUG,"Index Scanner: Done in %s seconds..." % (time.time()-start_time))
 
@@ -430,7 +432,7 @@ class SearchIndex(Reports.report):
             pass
 
     def progress(self,query,result):
-        result.heading("Searching for '%s' in image %s" % ('\',\''.join(query.getarray('keyword')),query['fsimage']))
+        result.heading("Searching for '%s'" % ('\',\''.join(query.getarray('keyword'))))
         
     def analyse(self,query):
         dbh = DB.DBO(query['case'])

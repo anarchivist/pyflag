@@ -319,7 +319,7 @@ class ScanFS(Reports.report):
                     fd=fsfd.open(inode=stat['inode'])
                     Scanner.scanfile(fsfd,fd,scanners)
                 except IOError,e:
-                    logging.log(logging.WARNINGS,"Unable to open file %s/%s: %s" % (stat['path'],stat['name'],e))
+                    logging.log(logging.WARNINGS,"Unable to open file %s%s: %s" % (stat['path'],stat['name'],e))
                 except Exception,e:
                     logging.log(logging.ERRORS,"Error scanning inode %s: %s" % (stat['inode'],e))
                     
