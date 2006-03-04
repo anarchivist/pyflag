@@ -418,7 +418,7 @@ print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
 					ptr = &run;
 					
 					printf("INSERT INTO inode VALUES('I%s|D%lu-%d-%d','%c','%d','%d','%lu'," \
-					       "'%lu','%lu',%lu,'%lo','%d','%s','%lu');\n",
+					       "'%lu','%lu',%lu,'%lo','%d','%s','%lu','');\n",
 					       tbl_name,
 					       (ULONG) fs_inode->addr, fs_data->type, fs_data->id,
 					       (flags & FS_FLAG_META_ALLOC) ? 'a' : 'f',
@@ -441,7 +441,7 @@ print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
 	else {
 
 	  printf("INSERT INTO inode VALUES('I%s|D%lu','%c','%d','%d','%lu'," \
-		 "'%lu','%lu',%lu,'%lo','%d','%s','%lu');\n",
+		 "'%lu','%lu',%lu,'%lo','%d','%s','%lu','');\n",
 		 tbl_name,
 		 (ULONG) fs_inode->addr, (flags & FS_FLAG_META_ALLOC) ? 'a' : 'f',
 		 (int) fs_inode->uid, (int) fs_inode->gid,

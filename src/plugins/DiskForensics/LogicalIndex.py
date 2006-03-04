@@ -120,8 +120,8 @@ class IndexScan(GenScanFactory):
         # add more encodings here as necessary.
         pydbh.execute("select word,id from dictionary where type='word'")
         encodings = pyflag.conf.parse_value("INDEX_ENCONDINGS")
-        word = row['word'].decode("UTF-8")
         for row in pydbh:
+            word = row['word'].decode("UTF-8")
             for e in encodings:
                 self.index.add_word(word.encode(e),row['id'])
 
