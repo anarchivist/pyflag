@@ -41,6 +41,7 @@ import os,imp
 import re
 import pyflag.Registry as Registry
 import pyflag.DB as DB
+import pyflag.FlagFramework as FlagFramework
 
 class BaseScanner:
     """ This is the actual scanner class that will be instanitated once for each file in the filesystem.
@@ -57,7 +58,7 @@ class BaseScanner:
         self.fd=fd
         self.size = 0
         self.ddfs = ddfs
-        self.ddfs.dbh.execute("update inode set scanner_cache = concat_ws(',',scanner_cache, %r) where inode=%r", (outer.__class__.__name__, inode))
+#        self.ddfs.dbh.execute("update inode set scanner_cache = concat_ws(',',scanner_cache, %r) where inode=%r", (outer.__class__.__name__, inode))
         self.dbh=outer.dbh
         self.outer=outer
         self.factories=factories
@@ -207,10 +208,7 @@ class StoreAndScan(BaseScanner):
 
         Where $inode is the filename in the filesystem.
         """
-        return make_temp_filename(
-            self.dbh.case, 
-            self.dbh.MakeSQLSafe(self.inode)
-            )
+        return FlagFramework.get_temp_path(self.dbh.case, self.inode)
 
     def finish(self):
         if self.file:
@@ -228,13 +226,7 @@ class StoreAndScan(BaseScanner):
 
         @arg name: The name of the file in the filesystem to operate on - The Scanner should have saved this file previously.
         """
-
-def make_temp_filename(case, inode):
-        return("%s/case_%s/%s" % (
-            config.RESULTDIR,
-            case,
-            inode))
-
+        
 class StoreAndScanType(StoreAndScan):
     """ This class scans a file only if a file is of a certain type.
 
@@ -291,14 +283,23 @@ def scanfile(ddfs,fd,factories):
     # instantiate a scanner object from each of the factory. We only
     #instantiate scanners from factories which have not been run on
     #this inode previously. We find which factories were already run
-    #by checking the meta table.  Note that we still pass the full
+    #by checking the inode table.  Note that we still pass the full
     #list of factories to the Scan class so that it may invoke all of
     #the scanners on new files it discovers.
-    objs = []
-    for c in factories:
-        ddfs.dbh.execute("select inode from inode where inode=%r and FIND_IN_SET(%r,scanner_cache)",(fd.inode,"%s" % c.__class__.__name__))
-        if not ddfs.dbh.fetch():
-            objs.append(c.Scan(fd.inode,ddfs,c,factories=factories,fd=fd))
+    ddfs.dbh.execute("select scanner_cache from inode where inode=%r", fd.inode);
+    row=ddfs.dbh.fetch()
+    if not row: return
+    scanners_run =row['scanner_cache'].split(',')
+    
+    objs = [ c.Scan(fd.inode,ddfs,c,factories=factories,fd=fd)
+                 for c in factories
+                    if c.__class__.__name__ not in scanners_run ]
+
+    if not objs: return
+##    for c in factories:
+##        ddfs.dbh.execute("select inode from inode where inode=%r and FIND_IN_SET(%r,scanner_cache)",(fd.inode,"%s" % c.__class__.__name__))
+##        if not ddfs.dbh.fetch():
+##            objs.append(c.Scan(fd.inode,ddfs,c,factories=factories,fd=fd))
 
     # read data (in chunks)
     while 1:
@@ -341,6 +342,9 @@ def scanfile(ddfs,fd,factories):
         except Exception,e:
             logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
 
+    # Store the fact that we finished in the inode table:
+    scanner_names = ','.join([ c.outer.__class__.__name__ for c in objs ])
+    ddfs.dbh.execute("update inode set scanner_cache = concat_ws(',',scanner_cache, %r) where inode=%r", (scanner_names, fd.inode))
 
 class Drawer:
     """ This class is responsible for rendering scanners of similar classes.

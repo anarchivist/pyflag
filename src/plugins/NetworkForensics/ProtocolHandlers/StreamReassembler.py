@@ -26,7 +26,7 @@ import pyflag.Registry as Registry
 from pyflag.Scanner import *
 import struct,sys,cStringIO
 import pyflag.DB as DB
-from pyflag.FileSystem import File,CachedFile
+from pyflag.FileSystem import File
 import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
@@ -382,10 +382,13 @@ class StreamFile(File):
     """
     stat_cbs = [ show_packets, combine_streams ]
     stat_names = [ "Show Packets", "Combined streams"]
+    specifier = 'S'
     
     def __init__(self, case, fd, inode):
         File.__init__(self, case, fd, inode)
 
+        if self.cached_fd: return
+        
         inode = inode.split("|")[-1]
 
         ## We allow the user to ask for a number of streams which will
@@ -427,6 +430,8 @@ class StreamFile(File):
         self.dbh.execute("select max(seq+length) as size from connection where con_id=%r",(self.con_id))
         row=self.dbh.fetch()
         self.size=row['size']-self.isn
+
+        self.cache()
 
     def create_new_stream(self,stream_ids):
         """ Creates a new stream by combining the streams given by the list stream_ids.
@@ -482,6 +487,13 @@ class StreamFile(File):
         result.write(data)
 
     def read(self,length = None):
+        try:
+            data=File.read(self,length)
+            #print "Read %s from cache" % len(data)
+            return data
+        except IOError:
+            pass
+
         if length==None:
             length=sys.maxint
 
@@ -547,10 +559,6 @@ class StreamFile(File):
         self.readptr+=len(data)
         return data
 
-    def seek(self,offset,rel=None):
-        result= File.seek(self,offset,rel)
-        return result
-
     def get_packet_id(self, position=None):
         """ Gets the current packet id (where the readptr is currently at) """
         if not position:
@@ -568,14 +576,6 @@ class StreamFile(File):
                          (con_id, isn, position))
         row=self.dbh.fetch()
         return row['packet_id']
-
-class CachedStreamFile(CachedFile,StreamFile):
-    """ A StreamFile VFS node with file based cache.
-
-    Due to complex operations required to reassemble the streams on the fly we find that its quicker to cache these streams on disk.
-    """
-    specifier = 'S'
-    target_class = StreamFile
 
 class OffsetFile(File):
     """ A simple offset:length file driver.

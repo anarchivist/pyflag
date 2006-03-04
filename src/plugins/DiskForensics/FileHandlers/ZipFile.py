@@ -29,7 +29,7 @@ import os.path
 import pyflag.logging as logging
 from pyflag.Scanner import *
 import zipfile,gzip,tarfile
-from pyflag.FileSystem import File , CachedFile
+from pyflag.FileSystem import File
 import pyflag.FlagFramework as FlagFramework
 import time,re,os
 import StringIO
@@ -177,6 +177,12 @@ class Zip_file(File):
     
     def __init__(self, case, fd, inode):
         File.__init__(self, case, fd, inode)
+
+        ## Zip file handling requires repeated access into the zip
+        ## file. Caching our input fd really helps to speed things
+        ## up...
+        fd.cache()
+
         # strategy:
         # inode is the index into the namelist of the zip file (i hope this is consistant!!)
         # just read that file!
@@ -191,6 +197,12 @@ class Zip_file(File):
         self.size=len(self.data)
         
     def read(self,len=None):
+        ## Call our baseclass to see if we have cached data:
+        try:
+            return File.read(self,len)
+        except IOError:
+            pass
+        
         if len:
             temp=self.data[self.readptr:self.readptr+len]
             self.readptr+=len
@@ -200,10 +212,19 @@ class Zip_file(File):
     def close(self):
         pass
 
-class GZ_file(CachedFile):
+class GZ_file(File):
     """ A file like object to read gzipped files. """
     specifier = 'G'
-    def cache(self,fd):
+    
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
+
+        self.cache()
+        
+    def force_cache(self):
+        cached_filename = self.get_temp_path()
+        fd = open(cached_filename, 'w')
+        
         self.gz = gzip.GzipFile(fileobj=self.fd)
         count = 0
         step = 1024
@@ -234,6 +255,12 @@ class Tar_file(File):
     
     def __init__(self, case, fd, inode):
         File.__init__(self, case, fd, inode)
+
+        ## Tar file handling requires repeated access into the zip
+        ## file. Caching our input fd really helps to speed things
+        ## up...
+        fd.cache()
+        
         # strategy:
         # inode is the index into the namelist of the tar file (i hope this is consistant!!)
         # just read that file!
@@ -249,6 +276,12 @@ class Tar_file(File):
         self.size=t.getmember(name).size
                 
     def read(self,len=None):
+        ## Call our baseclass to see if we have cached data:
+        try:
+            return File.read(self,len)
+        except IOError:
+            pass
+
         if len:
             temp=self.data[self.readptr:self.readptr+len]
             self.readptr+=len

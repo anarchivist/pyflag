@@ -271,21 +271,23 @@ class Pst_file(File):
         pstinode = '|'.join(parts[:-1])
         thispart = parts[-1]
 
-        # open the pst file from disk cache
-        # or from fd if cached file does not exist
-        fname = Scanner.make_temp_filename(case, pstinode)
-        if not os.path.isfile(fname):
-            outfd = open(fname, 'w')
-            outfd.write(fd.read())
-            outfd.close()
+        ## Force our predecessor to be cached
+        self.fd.cache()
 
-        pst = pypst2.Pstfile(fname)
+        ## Reopen the cache file from our predecessor on disk:
+        pst = pypst2.Pstfile(self.fd.cached_fd.name)
         item = pst.open(thispart[1:])
         self.data = item.read()
         self.pos = 0
         self.size=len(self.data)
 
     def read(self,len=None):
+        ## Call our baseclass to see if we have cached data:
+        try:
+            return File.read(self,len)
+        except IOError:
+            pass
+        
         if len:
             temp=self.data[self.pos:self.pos+len]
             self.pos+=len

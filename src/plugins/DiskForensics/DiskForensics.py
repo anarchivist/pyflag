@@ -488,29 +488,9 @@ class DBFS_file(FileSystem.File):
     def __init__(self, case, fd, inode):
         FileSystem.File.__init__(self, case, fd, inode)
 
-        self.dbh = DB.DBO(case)
-        self.readptr = 0
-        try:
-            self.dbh.execute("select value from meta where property='block_size'");
-            self.block_size = int(self.dbh.fetch()["value"])
-        except TypeError:
-            pass
-
-        # fetch inode data
-        self.dbh.check_index("inode" ,"inode")
-        self.dbh.execute("select * from inode where inode=%r and status='alloc'", (inode))
-        self.data = self.dbh.fetch()
-        if not self.data:
-            raise IOError("Could not locate inode %s"% inode)
-
-        self.size = self.data['size']
-        self.dbh.check_index("block" ,"inode")
-        self.dbh.execute("select block,count,`index` from block where inode=%r order by `index`", (inode))
-        try:
-            self.blocks = [ (row['block'],row['count'],row['index']) for row in self.dbh ]
-        except KeyError:
-            self.blocks = None
-        self.index = [ d[2] for d in self.blocks ]
+        ## This is kind of a late initialization. We get the blocksize
+        ## on demand later.
+        self.block_size=0
         
     def getval(property):
         try:
@@ -519,6 +499,36 @@ class DBFS_file(FileSystem.File):
             return None
 
     def read(self, length=None):
+        ## Call our baseclass to see if we have cached data:
+        try:
+            return FileSystem.File.read(self,length)
+        except IOError:
+            pass
+        
+        ## We need to fetch the blocksize if we dont already know it:
+        if not self.block_size:
+            try:
+                self.dbh.execute("select value from meta where property='block_size'");
+                self.block_size = int(self.dbh.fetch()["value"])
+            except TypeError:
+                pass
+
+            # fetch inode data
+            self.dbh.check_index("inode" ,"inode")
+            self.dbh.execute("select * from inode where inode=%r and status='alloc'", (self.inode))
+            self.data = self.dbh.fetch()
+            if not self.data:
+                raise IOError("Could not locate inode %s"% self.inode)
+
+            self.size = self.data['size']
+            self.dbh.check_index("block" ,"inode")
+            self.dbh.execute("select block,count,`index` from block where inode=%r order by `index`", (self.inode))
+            try:
+                self.blocks = [ (row['block'],row['count'],row['index']) for row in self.dbh ]
+            except KeyError:
+                self.blocks = None
+            self.index = [ d[2] for d in self.blocks ]
+
         if (length == None) or ((length + self.readptr) > self.size):
             length = self.size - self.readptr
 

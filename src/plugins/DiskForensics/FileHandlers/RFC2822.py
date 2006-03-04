@@ -29,7 +29,7 @@ import pyflag.DB as DB
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import email, email.Utils,time
-from pyflag.FileSystem import File,CachedFile
+from pyflag.FileSystem import File
 
 
 class RFC2822(Scanner.GenScanFactory):
@@ -123,11 +123,19 @@ class RFC2822(Scanner.GenScanFactory):
 
 class RFC2822_File(File):
     """ A VFS Driver for reading mail attachments """
+    specifier = 'm'
 
     def __init__(self, case, fd, inode):
         File.__init__(self, case, fd, inode)
+        self.cache()
 
-        a=email.message_from_file(fd)
+    def read(self, length=None):
+        try:
+            return File.read(self,length)
+        except IOError:
+            pass
+        
+        a=email.message_from_file(self.fd)
         my_part = inode.split('|')[-1]
         attachment_number = int(my_part[1:])
         count = 0
@@ -142,9 +150,6 @@ class RFC2822_File(File):
 
             count+=1
 
-        raise IOError("Unable to find attachment %s in MIME message" % count)
-
-    def read(self,length=None):
         if length==None:
             result=self.message[self.readptr:]
         else:
@@ -153,6 +158,5 @@ class RFC2822_File(File):
         self.readptr+=len(result)
         return result
 
-class RFC2822CachedFile(CachedFile, RFC2822_File):
-    specifier = 'm'
-    target_class = RFC2822_File
+##class RFC2822CachedFile(CachedFile, RFC2822_File):
+##    target_class = RFC2822_File

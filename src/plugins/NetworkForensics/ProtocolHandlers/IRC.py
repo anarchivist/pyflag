@@ -27,7 +27,6 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 from pyflag.Scanner import *
 import pyflag.DB as DB
-from pyflag.FileSystem import CachedFile
 import pyflag.FlagFramework as FlagFramework
 from pyflag.FlagFramework import Curry
 from NetworkScanner import *

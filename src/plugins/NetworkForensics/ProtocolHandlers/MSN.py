@@ -34,7 +34,7 @@ config=pyflag.conf.ConfObject()
 from pyflag.Scanner import *
 import struct,sys,cStringIO
 import pyflag.DB as DB
-from pyflag.FileSystem import CachedFile
+from pyflag.FileSystem import File
 import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
@@ -342,12 +342,13 @@ class MSNScanner(NetworkScanFactory):
                 except IOError:
                     break                    
                 
-class MSNFile(CachedFile):
+class MSNFile(File):
     """ VFS driver for reading the cached MSN files """
     specifier = 'C'
     
     def __init__(self,case, fd, inode):
         File.__init__(self, case,fd, inode)
+        
         ## Figure out the filename
         cached_filename = get_temp_path(case,inode[1:])
 
@@ -359,7 +360,6 @@ class MSNFile(CachedFile):
         self.size=self.cached_fd.tell()
         self.cached_fd.seek(0)
         self.readptr=0
-
 
 class BrowseMSNChat(Reports.report):
     """ This allows MSN chat messages to be browsed.

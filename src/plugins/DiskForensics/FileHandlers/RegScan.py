@@ -77,7 +77,7 @@ class RegistryScan(GenScanFactory):
             )
         
         def external_process(self,filename):
-            self.dbh.MySQLHarness("regtool -f %s -t reg -p %r " % (filename,self.ddfs.lookup(inode=self.inode)))
+            self.dbh.MySQLHarness("regtool -f %r -t reg -p %r " % (filename,self.ddfs.lookup(inode=self.inode)))
 
 ## Report to browse Loaded Registry Files:
 class BrowseRegistry(DiskForensics.BrowseFS):

@@ -273,79 +273,6 @@ class DBFS(FileSystem):
         self.dbh.execute("insert into inode  set mode=%r, links=%r , inode=%r,gid=0,uid=0,size=1",(
             40755, 4,inode))
 
-##    def VFSCreatex(self,root_inode,inode,new_filename,directory=False ,gid=0, uid=0, mode=100777, **properties):
-##        """ Extends the DB filesystem to include further virtual filesystem entries.
-
-##        Note that there must be an appropriate VFS driver for the added inodes, or else they may not be viewable.
-##        @arg root_inode: The inode that will serve as the root for the new inode. If None, we create a root Inode.
-##        @arg inode: The proposed inode name for the new inode (without the | to the root_inode). This needs to be understood by the VFS driver.
-##        @arg new_filename: The prposed new filename for the VFS file. This may contain directories in which case sub directories will also be created.
-##        @arg directory: If true we create a directory node.
-##        """
-##        print "Will create %s , %s, %s " % (root_inode, inode, new_filename)
-##        ## filename is the filename in the filesystem for the parent directory.
-##        if root_inode:
-##            filename = self.lookup(inode=root_inode)
-##        else:
-##            filename = '/'
-
-##        ## Check if the directories all exist properly:
-##        if not directory:
-##            dirs = os.path.dirname(new_filename).split('/')
-##        else:
-##            dirs = new_filename.split('/')
-            
-##        name = os.path.basename(new_filename)
-
-##        ## This creates subdirectories for node if they are missing.
-##        for d in range(len(dirs)):
-##            if not dirs[d]: continue
-##            if d>0:
-##                path = normpath("%s/%s/" % (filename,"/".join(dirs[:d])))
-##            else:
-##                path = normpath("%s/" % filename)
-
-##            self.dbh.execute("select * from file where path=%r and name=%r and mode='d/d'",(path, dirs[d]))
-##            if not self.dbh.fetch():
-##                ## Directory does not exist, so we need to create it:
-##                if d < len(dirs):
-##                        self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode='d/d'",(path,dirs[d]))
-##                else:
-##                    if root_inode != None:
-##                        self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode='d/d',inode='%s|%s'",(path,dirs[d],root_inode,inode))
-##                        self.dbh.execute("insert into inode  set mode=%r, links=%r , inode='%s|%s',gid=0,uid=0,size=1",(40755, 4,root_inode,inode))
-##                    else:
-##                        self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode='d/d',inode='%s'",(path,dirs[d],inode))
-##                        self.dbh.execute("insert into inode  set mode=%r, links=%r , inode='%s',gid=0,uid=0,size=1",(40755, 4,inode))
-                    
-##        path = normpath("%s/%s/" % (filename,os.path.dirname(new_filename)))
-##        ## Add the file itself to the file table (only if name was specified)
-##        if not name or directory: return
-        
-##        if root_inode:
-##            self.dbh.execute("insert into file set status='alloc',mode='r/r',inode='%s|%s',path=%r, name=%r",(root_inode,inode,normpath(path+'/'),name))
-##        else:
-##            self.dbh.execute("insert into file set status='alloc',mode='r/r',inode='%s',path=%r, name=%r",(inode,normpath(path+'/'),name))
-
-##        ## Add the file to the inode table:
-##        extra = ','.join(["%s=%%r" % p for p in properties.keys()])
-##        if extra:
-##            extra=','+extra
-
-##        if root_inode!=None:
-##            self.dbh.execute("insert into inode set inode='%s|%s',mode=%s,links=4,gid=%s,uid=%s" + extra ,[root_inode,inode,mode,gid,uid] + properties.values())
-##        else:
-##            self.dbh.execute("insert into inode set inode='%s',mode=%s,links=4,gid=%s,uid=%s" + extra ,[ inode,mode,gid,uid] + properties.values())
-        
-##        ## Set the root file to be a d/d entry so it looks like its a virtual directory:
-##        self.dbh.execute("select * from file where mode='d/d' and inode=%r and status='alloc'",(root_inode,))
-##        if not self.dbh.fetch():
-##            self.dbh.execute("select * from file where mode='r/r' and inode=%r and status='alloc'",(root_inode,))
-##            row = self.dbh.fetch()
-##            if row:
-##                self.dbh.execute("insert into file set mode='d/d',inode=%r,status='alloc',path=%r,name=%r",(root_inode,row['path'],row['name']))
-##                self.dbh.execute("update inode  set mode=%r, links=%r where inode=%r",(40755, 3,root_inode))
-
     def longls(self,path='/', dirs = None):
         if self.isdir(path):
             ## If we are listing a directory, we list the files inside the directory            
@@ -466,6 +393,7 @@ class File:
     @cvar stat_names: A list of names for the above callbacks.
     """
     specifier = None
+    ## cached_fd = None
     ## These can be overridden by the caller if they want to add stats to the ViewFile report
     #stat_cbs = None
     #stat_names = None
@@ -481,16 +409,78 @@ class File:
         self.case = case
         self.fd = fd
         self.inode = inode
-        self.readptr =0
-        self.size=0
         self.dbh=DB.DBO(case)
+
+        ## Now we check to see if there is a cached copy of the file for us:
+        cached_filename = self.get_temp_path()
+        try:
+            ## open the previously cached copy
+            self.cached_fd = open(cached_filename,'r')
+
+            ## Find our size (This may not be important but we leave it for now):
+            self.cached_fd.seek(0,2)
+            self.size=self.cached_fd.tell()
+            self.cached_fd.seek(0)
+#            print "Using cached file %s" % cached_filename
+            
+        except IOError,e:
+            self.cached_fd = None
+            self.size=0
+            self.readptr=0
+
+    def get_temp_path(self):
+        """ Returns the full path to a temporary file based on filename.
+        """
+        filename = self.inode.replace('/','-')
+        result= "%s/case_%s/%s" % (config.RESULTDIR,self.case,filename)
+        return result
+
+    def cache(self):
+        """ Creates a cache file if it does not exist """
+        if not self.cached_fd:
+#            print "Building cache for %s" % self.inode
+            self.force_cache()
+
+    def force_cache(self):
+        """ Recreates the cache file. """
+        readptr = self.tell()
+
+        ## This forces the File class to regenerate the data instead
+        ## of getting it from the cache
+        self.cached_fd = None
+        size=0
+
+        ## Recreate the cache file (May need to use kernel locking for
+        ## multithreaded support)
+        cached_filename = self.get_temp_path()
+        fd = open(cached_filename, 'w')
+
+        self.seek(0)
+        
+        ## Copy ourself into the file
+        while 1:
+            data=self.read(1024*1024)
+            if len(data)==0: break
+            fd.write(data)
+            size+=len(data)
+
+        ## Now set the cached fd so a subsequent read will get it from the cache:
+        self.cached_fd =  open(cached_filename, 'r')
+        self.seek(readptr)
+        
+        return size
 
     def close(self):
         """ Fake close method. """
-        pass
+        try:
+            self.cached_fd.close()
+            self.cached_fd = None
+        except AttributeError:
+            pass
     
     def seek(self, offset, rel=None):
         """ Seeks to a specified position inside the file """
+        ## If the file is cached we seek the backing file:
         if rel==1:
             self.readptr += offset
 
@@ -499,21 +489,35 @@ class File:
             self.readptr = self.size + offset
         else:
             self.readptr = offset
-            
+
         if(self.size>0 and self.readptr > self.size):
             self.readptr = self.size
 
         if self.readptr<0: self.readptr=0
-        
+
+        try:
+            self.cached_fd.seek(self.readptr)
+        except AttributeError:
+            pass
+
         return self.readptr
          
     def tell(self):
         """ returns the current read pointer"""
-        return self.readptr
+        try:
+            return self.cached_fd.tell()
+        except AttributeError:
+            return self.readptr
 
     def read(self, length=None):
         """ Reads length bytes from file, or less if there are less bytes in file. If length is None, returns the whole file """
-        pass
+        try:
+            if length!=None:
+                return self.cached_fd.read(length)
+            else:
+                return self.cached_fd.read()
+        except AttributeError:
+            raise IOError("No cached file")
 
     def stats(self):
         """ Returns a dict of statistics about the content of the file. """
@@ -544,114 +548,61 @@ class File:
                 if len(data)==0: return buffer
                 buffer += data
 
-class CachedFile(File):
-    """ This class is used to give a VFS driver automatic file caching capability. This should speed it up if re-creating the file on the fly is too expensive.
+##class CachedFile(File):
+##    """ This class is used to give a VFS driver automatic file caching capability. This should speed it up if re-creating the file on the fly is too expensive.
 
-    To use, inherit from this class as well as the class you wish to cache and set target_class to the VFS driver. E.g:
-    class CachedStreamFile(CachedFile,StreamFile):
-        specifier = 'S'
-        target_class = StreamFile
+##    To use, inherit from this class as well as the class you wish to cache and set target_class to the VFS driver. E.g:
+##    class CachedStreamFile(CachedFile,StreamFile):
+##        specifier = 'S'
+##        target_class = StreamFile
 
-    """
-    cached_fd = None
-    target_class = None
-    
-    def get_temp_path(self):
-        """ Returns the full path to a temporary file based on filename.
-        """
-        filename = self.inode.replace('/','-')
-        result= "%s/case_%s/%s" % (config.RESULTDIR,self.case,filename)
-        return result
+##    """
+##    target_class = None
 
-    def __init__(self, case, fd, inode):
-        File.__init__(self, case, fd, inode)
-
-        cached_filename = self.get_temp_path()
-        try:
-            ## open the previously cached copy
-            self.cached_fd = open(cached_filename,'r')
-
-            ## Find our size:
-            self.cached_fd.seek(0,2)
-            self.size=self.cached_fd.tell()
-            
-        except IOError,e:
-            ## It does not exist: Create a new cached copy:
-            fd = open(cached_filename,'w')
-
-            try:
-                self.size=self.cache(fd)
-                ## If we can not open the original file, we bail
-            except:
-                os.unlink(cached_filename)
-                raise
-                
-            ## Reopen file for reading
-            self.cached_fd = open(cached_filename,'r')
-
-        self.cached_fd.seek(0)
-        self.readptr=0
-
-    def cache(self,fd):
-        """ Creates the cache file given by fd.
-
-        Note the fd is already open for writing, we just need to write into it.
-        @return: the total size of the written file.
-        """
-        ## Init ourself:
-        self.target_class.__init__(self,self.case,self.fd,self.inode)
+##    def __init__(self, case, fd, inode):
+##        File.__init__(self, case, fd, inode)
         
-        size=0
-        ## Copy ourself into the file
-        while 1:
-            data=self.target_class.read(self,1024*1024)
-            if len(data)==0: break
-            fd.write(data)
-            size+=len(data)
-            
-        return size
-        
-    def read(self,length=None):
-        if not self.cached_fd:
-            self.cache()
+##    def read(self,length=None):
+##        if not self.cached_fd:
+##            self.cache()
 
-        if length!=None:
-            ## The amount of data available to read:
-            available = self.size-self.readptr
+##        if length!=None:
+##            ## The amount of data available to read:
+##            available = self.size-self.readptr
             
-            if length>available:
-                length=available
+##            if length>available:
+##                length=available
                 
-            result=self.cached_fd.read(length)
-        else:
-            result=self.cached_fd.read(self.size-self.readptr)
+##            result=self.cached_fd.read(length)
+##        else:
+##            result=self.cached_fd.read(self.size-self.readptr)
 
-        self.readptr+=len(result)
-        return result
+##        self.readptr+=len(result)
+##        return result
 
-    def readline(self):
-        if not self.cached_fd:
-            self.cache()
+##    def readline(self):
+##        if not self.cached_fd:
+##            self.cache()
             
-        result=self.cached_fd.readline()
-        self.readptr+=len(result)
-        return result
+##        result=self.cached_fd.readline()
+##        self.readptr+=len(result)
+##        return result
 
-    def tell(self):
-        if not self.cached_fd:
-            self.cache()
+##    def tell(self):
+##        if not self.cached_fd:
+##            self.cache()
 
-        return self.readptr
+##        return self.readptr
 
-    def seek(self,offset,whence=0):
-        if not self.cached_fd:
-            self.cache()
+##    def seek(self,offset,whence=0):
+##        if not self.cached_fd:
+##            self.cache()
 
-        if whence==0:
-            self.readptr=offset
-        elif whence==1:
-            self.readptr+=offset
-        elif whence==2:
-            self.readptr=self.size+offset
+##        if whence==0:
+##            self.readptr=offset
+##        elif whence==1:
+##            self.readptr+=offset
+##        elif whence==2:
+##            self.readptr=self.size+offset
     
-        self.cached_fd.seek(self.readptr)
+##        self.cached_fd.seek(self.readptr)
