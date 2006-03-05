@@ -288,8 +288,10 @@ def scanfile(ddfs,fd,factories):
     #the scanners on new files it discovers.
     ddfs.dbh.execute("select scanner_cache from inode where inode=%r", fd.inode);
     row=ddfs.dbh.fetch()
-    if not row: return
-    scanners_run =row['scanner_cache'].split(',')
+    try:
+        scanners_run =row['scanner_cache'].split(',')
+    except:
+        scanners_run = []
     
     objs = [ c.Scan(fd.inode,ddfs,c,factories=factories,fd=fd)
                  for c in factories
