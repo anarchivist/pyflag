@@ -24,43 +24,72 @@ class AutoFS(DBFS):
     def load(self, mount_point, iosource_name):
         ## Ensure that mount point is normalised:
         mount_point = os.path.normpath(mount_point)
-        
         DBFS.load(self, mount_point, iosource_name)
 
         # run sleuthkit
-        string= "%s -i %r -o %r %r -t %r -m %r %r"%(config.IOWRAPPER,
-                                                    self.iosource.subsystem,
-                                                    self.iosource.make_parameter_list(), config.SLEUTHKIT,
-                                                    iosource_name, mount_point,
-                                                    "foo")
-
-        self.dbh.MySQLHarness(
-            string
-            )
-
-class Ext2(AutoFS):
-    """ A class implementing the Ext2 module from SK """
-    sk_type = "linux-ext2"
-    name = "Linux ext2"
-
-    def load(self, mount_point, iosource_name):
-        ## Ensure that mount point is normalised:
-        mount_point = os.path.normpath(mount_point)
-
-        DBFS.load(self, mount_point, iosource_name)
-
-        # run sleuthkit
-        string= "%s -i %r -o %r %r -t %r -f %r -m %r %r"% (
+        string= "%s -i %r -o %r %r -t %r -f %r -m %r %r" % (
             config.IOWRAPPER,
             self.iosource.subsystem,
             self.iosource.make_parameter_list(),config.SLEUTHKIT,
             iosource_name, self.sk_type, mount_point,
             "foo"
             )
-        
+                
         self.dbh.MySQLHarness(
             string
             )
+        
+        # now find all the 'unallocated' files
+        self.dbh.execute("drop table if exists unallocated")
+        self.dbh.execute("CREATE TABLE unallocated (`inode` VARCHAR(250) NOT NULL,`offset` BIGINT NOT NULL,`size` BIGINT NOT NULL)")
+        unalloc_blocks = []
+        
+        ## We ask the filesystem whats the blocksize - if we dont know, we use 1
+        try:
+            self.dbh.execute("select value from meta where property='block_size'");
+            blocksize = int(self.dbh.fetch()["value"])
+        except:
+            blocksize = 1
+
+        count=0
+        ## Now we work out the unallocated blocks by looking at the blocks table:
+        last = (0,0)
+        self.dbh.execute("select * from block order by block asc")
+        dbh2 = self.dbh.clone()
+        for row in self.dbh:
+            ## We make a list of all blocks which are unallocated:
+            ## This is the end of the unallocated block just before this one:
+            new_block = ( last[0],row['block']-last[0])
+            if new_block[1]>0:
+                ## Add the offset into the db table:
+                offset = new_block[0] * blocksize
+                size = new_block[1] * blocksize
+                dbh2.execute("insert into unallocated set inode='I%s|U%s',offset=%r,size=%r",(
+                    iosource_name, count, offset, size))
+                
+                ## Add a new VFS node:
+                self.VFSCreate("I%s" % iosource_name,'U%s' % count,
+                               "/_unallocated_/%s" % offset, size=size)
+                count+=1
+                unalloc_blocks.append(new_block)
+                
+            last=(row['block']+row['count'],0,row['inode'])
+
+        ## Now we need to add the last unalloced block. This starts at
+        ## the last allocated block, and finished at the end of the IO
+        ## source. The size of -1 makes the VFS driver keep reading till the end.
+        offset = last[0] * blocksize
+        dbh2.execute("insert into unallocated set inode='I%s|U%s',offset=%r,size=%r",
+                     (iosource_name, count,offset, -1))
+
+        ## Add a new VFS node:
+        self.VFSCreate("I%s" % iosource_name, 'U%s' % count,
+                       "/_unallocated_/%s" % offset)
+
+class Ext2(AutoFS):
+    """ A class implementing the Ext2 module from SK """
+    sk_type = "linux-ext2"
+    name = "Linux ext2"
 
 class Ext3(Ext2):
     sk_type = "linux-ext3"

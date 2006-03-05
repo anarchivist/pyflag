@@ -631,3 +631,39 @@ class MountedFS_file(FileSystem.File):
 
     def tell(self):
         return self.fd.tell()
+
+## Unallocated space VFS Driver:
+class Unallocated_File(FileSystem.File):
+    """ A VFS driver for reading unallocated space off the disk.
+
+    This driver reads the offset from the unallocated table which was previously prepared by the unallocated scanner.
+    """
+    specifier = 'U'
+    
+    def __init__(self, case, fd, inode):
+        FileSystem.File.__init__(self, case, fd, inode)
+        self.fd=fd
+        self.dbh = DB.DBO(case)
+        self.dbh.execute("select * from unallocated where inode=%r",(inode))
+        row=self.dbh.fetch()
+        try:
+            self.size=row['size']
+            self.offset=row['offset']
+        except KeyError:
+            raise IOError
+
+    def read(self,length=None):
+        if self.size>0:
+            if (length == None) or ((length + self.readptr) > self.size):
+                length = self.size - self.readptr
+
+            if length == 0:
+                return ''
+        else:
+            if length==None:
+                raise IOError("Unable to read entire IO source into memory")
+
+        self.fd.seek(self.readptr+self.offset)
+        result =self.fd.read(length)
+        self.readptr+=len(result)
+        return result

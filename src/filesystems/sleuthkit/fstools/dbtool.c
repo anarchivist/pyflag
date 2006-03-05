@@ -609,7 +609,8 @@ main(int argc, char **argv)
 	  default: 
 	    usage(argv[0]);
 	  case 'f':
-	    fstype = optarg;
+	    if(strstr(optarg, "auto")==NULL)
+	      fstype = optarg;
 	    break;
 	  case 't':
 	    tbl_name = optarg;

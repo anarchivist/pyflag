@@ -269,9 +269,14 @@ class DBFS(FileSystem):
             os.path.basename(new_filename),
             directory_string,
             inode))
-        
-        self.dbh.execute("insert into inode  set mode=%r, links=%r , inode=%r,gid=0,uid=0,size=1",(
-            40755, 4,inode))
+
+        try:
+            size = properties['size']
+        except KeyError:
+            size = 1
+            
+        self.dbh.execute("insert into inode  set mode=%r, links=%r , inode=%r,gid=0,uid=0,size=%r",(
+            40755, 4,inode, size))
 
     def longls(self,path='/', dirs = None):
         if self.isdir(path):
