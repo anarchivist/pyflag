@@ -119,7 +119,6 @@ class IndexScan(GenScanFactory):
         # extensively in windows (e.g word documents). We can easily
         # add more encodings here as necessary.
         pydbh.execute("select word,id from dictionary where type='word'")
-        encodings = pyflag.conf.parse_value("INDEX_ENCONDINGS")
         for row in pydbh:
             word = row['word'].decode("UTF-8")
             for e in config.INDEX_ENCODINGS:
