@@ -79,7 +79,7 @@ class IndexScan(GenScanFactory):
         ## When running in a distributed environment this is not
         ## accessible - maybe we need to pass this in the metadata?
         self.rel_offset = 0
-        self.dbh.execute("create table if not exists `LogicalIndex` (`inode` VARCHAR( 20 ) NOT NULL ,`block` INT NOT NULL auto_increment, `block_number` int not null, primary key(block))")
+        self.dbh.execute("create table if not exists `LogicalIndex` (`inode` VARCHAR( 250 ) NOT NULL ,`block` INT NOT NULL auto_increment, `block_number` int not null, primary key(block))")
         
         self.dbh.execute("""create table if not exists `LogicalIndexOffsets` (
         `id` INT NOT NULL ,
