@@ -1135,13 +1135,13 @@ class HTMLUI(UI.GenericUI):
         
         #output the rest of the lines in a table:
         while 1:
-            row = dbh.cursor.fetchone()
+            row = dbh.fetch()
             if not row: break
 
             #Form a row of strings
             row_str=[]
             for i in range(len(row)):
-                row_str.append("%s" % row[i])
+                row_str.append("%s" % row[names[i]])
                 if width[i] < len(row_str[i]):
                     width[i] = len(row_str[i])
 
@@ -1181,8 +1181,8 @@ class HTMLUI(UI.GenericUI):
                 continue
                             
             #Work out the background color
-            if common[1] != row[ordered_col]:
-                common[1] = row[ordered_col]
+            if common[1] != row[names[ordered_col]]:
+                common[1] = row[names[ordered_col]]
                 common[0] = not common[0]
 
             options = {}

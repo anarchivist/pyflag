@@ -541,7 +541,10 @@ class SearchIndex(Reports.report):
 #            offsets =[ int(a) for a in [low]+row[3:]+[high] ]
             fd = fsfd.open(inode=inode)
             fd.seek(low)
-            data=fd.read(high-low)
+            try:
+                data=fd.read(high-low)
+            except IOError:
+                data="Error reading %d bytes from file" % (high-low)
 
             out=result.__class__(result)
             word=''
