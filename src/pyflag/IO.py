@@ -119,10 +119,9 @@ class IO:
 
     Callers of this object should be prepared to catch IOError exceptions in case this object fails to instantiate. If callers suppy a ui object for result, a form will be drawn on the ui object to assist the user with selecting appropriate parameters for this IO subsystem.
 
-    @Note: The actual subsystem that will be instatiated is query[susbsys].
+    @Note: The actual subsystem that will be instatiated is query[subsys].
     """
     readptr=0
-    cache={}
     parameters=()
     options = []
 
@@ -136,7 +135,7 @@ class IO:
         return ','.join(opts)
 
     def set_options(self,key,value):
-        """ Sets key and value to the susbsystem """
+        """ Sets key and value to the subsystem """
 
     def get_options(self):
         """ returns a marshalled representation of options to cache in the database """
@@ -145,8 +144,18 @@ class IO:
     def form(self,query,result):
         """ Draw a form in result (ui object) to obtain all the needed parameters from query """
 
-    def __init__(self, query=None,result=None,subsys='subsys',options=None):
-        """ initialise the object before use. """
+    def __init__(self, query=None,result=None,subsys='subsys',options=None, clone=None):
+        """ initialise the object before use.
+
+        if clone is specified we clone the object specified which is also an IO object.
+        """
+        if clone:
+            self.options = clone.options
+            self.subsystem = clone.subsystem
+            self.io = clone.io
+            
+            return
+        
         try:
             if not options:
                 options=tuple([query.getarray(i) for i in self.parameters])
@@ -159,24 +168,20 @@ class IO:
             except TypeError:
                 self.subsystem=self.options[0][0]
 
+            #Try and make the subsystem based on the args
+            self.io=iosubsys.Open(self.subsystem)
             try:
-                self.io=IO.cache[self.options]
-            except KeyError:
-                #Try and make the subsystem based on the args
-                self.io=iosubsys.Open(self.subsystem)
-                try:
-                    for k in range(len(self.options) - 1):
-                        for j in range(len(self.options[k+1])):
-                            self.set_options(self.parameters[k+1],self.options[k+1][j])
-                            
-                    # try reading to see if we get an IOError
-                    self.read(10)
+                for k in range(len(self.options) - 1):
+                    for j in range(len(self.options[k+1])):
+                        self.set_options(self.parameters[k+1],self.options[k+1][j])
 
-                    ## If we are here it should be ok to cache the object.
-                    IO.cache[self.options]=self.io
-                except (KeyError,IOError):
-                    #iosubsys.io_close(self.io)
-                    raise
+                # try reading to see if we get an IOError
+                self.read(10)
+
+            except (KeyError,IOError):
+                #iosubsys.io_close(self.io)
+                raise
+
             self.readptr = 0
             
         except (KeyError, IOError):
@@ -353,17 +358,32 @@ subsystems=FlagFramework.query_type([
 
 del subsystems['case']
 
+## This caches the io subsys
+IO_Cache = {}
+
 def open(case, iosource):
-    """ lookup iosource in database and return an IO object """
-    dbh = DB.DBO(case)
+    """ lookup iosource in database and return an IO object.
+
+    This uses function memoization to speed it up.
+    """
     try:
-        optstr = dbh.get_meta(iosource)
-    except TypeError:
-        raise IOError, "Not a valid IO Data Source: %s" % iosource
-    # unmarshal the option tuple from the database
-    # opts[0] is always the subsystem name
-    opts = cPickle.loads(optstr)    
-    io=subsystems[opts[0][0]](options=opts)
-    io.name = iosource
-    return io
+        type, io_obj = IO_Cache[(case,iosource)]
+        io=subsystems[type](clone=io_obj)
+        io.name = iosource
+        return io
+    except KeyError:
+        dbh = DB.DBO(case)
+        try:
+            optstr = dbh.get_meta(iosource)
+        except TypeError:
+            raise IOError, "Not a valid IO Data Source: %s" % iosource
+
+        # unmarshal the option tuple from the database
+        opts = cPickle.loads(optstr)    
+        io=subsystems[opts[0][0]](options=opts)
+        io.name = iosource
+
+        ## Cache the option string:
+        IO_Cache[(case,iosource)] = (opts[0][0], io)
+        return io
  

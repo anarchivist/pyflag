@@ -32,6 +32,9 @@ import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
 import struct,re
 
+## A hash table for caching streams in memory. key=stream_id, value=Stream class
+stream_cache = {}
+
 class Stream:
     """ This class represents a single stream """
     con_id = 0
@@ -40,7 +43,7 @@ class Stream:
         self.packets = []
         self.seq = []
         self.length = []
-        self.packet_offset = []
+        self.data_offset = []
 
         ## Properties of the stream itself
         self.isn = isn
@@ -54,11 +57,11 @@ class Stream:
         ## Ths iosource containing this stream
         self.iosource = iosource
 
-    def add_packet(self, packet_id, seq, length, packet_offset):
+    def add_packet(self, packet_id, seq, length, data_offset):
         self.packets.append(packet_id)
         self.seq.append(seq)
         self.length.append(length)
-        self.packet_offset.append(packet_offset)
+        self.data_offset.append(data_offset)
         self.max_id = packet_id
 
     def __str__(self):
@@ -101,14 +104,28 @@ class StreamReassembler(NetworkScanFactory):
             `isn` int(100) unsigned NOT NULL default 0,
             KEY `con_id` (`con_id`)
             )""")
+        
+        ### data offset is the offset within the iosource where we can
+        ### find the data section of this packet.
         self.dbh.execute(
             """CREATE TABLE if not exists `connection` (
             `con_id` int(11) unsigned NOT NULL default '0',
             `packet_id` int(11) unsigned NOT NULL default '0',
             `seq` int(11) unsigned NOT NULL default '0',
             `length` mediumint(9) unsigned NOT NULL default '0',
-            `packet_offset`  mediumint(9) unsigned NOT NULL default '0'
+            `data_offset`  mediumint(9) unsigned NOT NULL default '0'
             ) """)
+
+        self.dbh.check_index("connection", 'con_id')
+        
+        ## Ensure that the connection_details table has indexes. We
+        ## need the indexes because we are about to do lots of selects
+        ## on this table.
+        self.dbh.check_index("connection_details",'src_ip')
+        self.dbh.check_index("connection_details",'src_port')
+        self.dbh.check_index("connection_details",'dest_ip')
+        self.dbh.check_index("connection_details",'dest_port')
+        
         self.connection_cache={}
 
     def reset(self):
@@ -151,16 +168,25 @@ class StreamReassembler(NetworkScanFactory):
                 )            
             
         ## Now store the packets:
-        for packet_id, seq, length, packet_offset in zip(stream.packets,
+        self.dbh.mass_insert_start("connection")
+        
+        for packet_id, seq, length, data_offset in zip(stream.packets,
                                                          stream.seq,
                                                          stream.length,
-                                                         stream.packet_offset):
-            self.dbh.execute("insert into connection set con_id=%r,packet_id=%r,seq=%r,length=%r, packet_offset=%r",
-                             ( stream.con_id,
-                               packet_id,
-                               seq,
-                               length,
-                               packet_offset))
+                                                         stream.data_offset):
+            self.dbh.mass_insert(con_id=stream.con_id,packet_id=packet_id,
+                                  seq=seq,length=length,data_offset=data_offset)
+
+        self.dbh.mass_insert_commit()
+##            self.dbh.execute("insert into connection set con_id=%r,packet_id=%r,seq=%r,length=%r, data_offset=%r",
+##                             ( stream.con_id,
+##                               packet_id,
+##                               seq,
+##                               length,
+##                               data_offset))
+
+        ## Add to local memory cache:
+        stream_cache[stream.con_id] = stream
 
     class Scan(NetworkScanner):
         """ Each packet will cause a new instantiation of this class. """
@@ -185,7 +211,7 @@ class StreamReassembler(NetworkScanFactory):
                 tcpdestport=self.proto_tree['tcp.dest_port']
                 ipsrc=self.proto_tree['ip.src']
                 ipdest=self.proto_tree['ip.dest']
-                packet_offset = self.proto_tree['tcp.data_offset']
+                data_offset = self.proto_tree['tcp.data_offset'] + self.packet_offset
             except KeyError,e:
                 return
 
@@ -234,7 +260,7 @@ class StreamReassembler(NetworkScanFactory):
             length = self.proto_tree['tcp.data_len']
             
             ## Add this packet to the stream
-            stream.add_packet(packet_id, seq, length,packet_offset)
+            stream.add_packet(packet_id, seq, length,data_offset)
 
             ## Expire sessions which are too old.
             for key,s in self.outer.connection_cache.items():
@@ -260,16 +286,6 @@ class StreamReassembler(NetworkScanFactory):
 
             self.outer.connection_cache = {}
             
-            self.dbh.check_index("connection", 'con_id')
-            
-            ## Ensure that the connection_details table has indexes. We
-            ## need the indexes because we are about to do lots of selects
-            ## on this table.
-            self.dbh.check_index("connection_details",'src_ip')
-            self.dbh.check_index("connection_details",'src_port')
-            self.dbh.check_index("connection_details",'dest_ip')
-            self.dbh.check_index("connection_details",'dest_port')
-
 def combine_streams(query,result):
     """ Show both ends of the stream combined.
 
@@ -295,7 +311,7 @@ def combine_streams(query,result):
     fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'])
 
     number_of_rows = 0
-    dbh.execute("select con_id, concat(\"%s|p0|O\",cast(packet_id as char),\"|o\",cast(packet_offset as char),\":\",cast(connection.length as char)) as inode from connection join pcap on packet_id=pcap.id where con_id=%r or con_id=%r order by packet_id limit %s,%s",(iosource,forward_cid,reverse_cid, limit, config.PAGESIZE))
+    dbh.execute("select con_id, concat(\"%s|p0|O\",cast(packet_id as char),\"|o\",cast(data_offset as char),\":\",cast(connection.length as char)) as inode from connection join pcap on packet_id=pcap.id where con_id=%r or con_id=%r order by packet_id limit %s,%s",(iosource,forward_cid,reverse_cid, limit, config.PAGESIZE))
     for row in dbh:
         number_of_rows += 1
         fd = fsfd.open(inode = row['inode'])
@@ -354,7 +370,7 @@ def show_packets(query,result):
         return ui
     
     result.table(
-        columns = ('concat("%s|p0|o",cast(packet_id as char))' % iosource, 'from_unixtime(pcap.ts_sec,"%Y-%m-%d")','concat(from_unixtime(pcap.ts_sec,"%H:%i:%s"),".",pcap.ts_usec)','seq','con.length','concat("%s|p0|O",cast(packet_id as char),"|o",cast(packet_offset as char),":",cast(con.length as char))' % iosource),
+        columns = ('concat("%s|p0|o",cast(packet_id as char))' % iosource, 'from_unixtime(pcap.ts_sec,"%Y-%m-%d")','concat(from_unixtime(pcap.ts_sec,"%H:%i:%s"),".",pcap.ts_usec)','seq','con.length','concat("%s|p0|O",cast(packet_id as char),"|o",cast(data_offset as char),":",cast(con.length as char))' % iosource),
         names = ('Packet ID','Date','Time','Sequence Number','Length',"Data"),
         links = [ FlagFramework.query_type((),
                                            family="Network Forensics",
@@ -411,26 +427,34 @@ class StreamFile(File):
                 self.con_id=row['con_id']
             else:
                 self.con_id=self.create_new_stream(inode[1:].split("/"))
-            
-        ## Strategy: We determine the ISN of this stream at
-        ## startup. When requested to read a range we select all those
-        ## packets whose seq number fall within the range, we then
-        ## initialise the output buffer and copy the data from each of
-        ## the hits onto the buffer at the correct spot. This allows
-        ## us to have missing packets, as we will simply return 0 for
-        ## the byte sequences we are missing.
-        
-        self.dbh = DB.DBO(self.case)
-        self.dbh.execute("select isn from connection_details where con_id=%r",(self.con_id))
-        row=self.dbh.fetch()
-        if not row:
-            raise IOError("No stream with connection ID %s" % self.con_id)
 
-        self.isn = row['isn']
+        ## Optimization: Try to find this from the stream cache
+        try:
+            stream = stream_cache[self.con_id]
+            self.isn = stream.isn
+            self.stream = stream
+        except KeyError:
+            ## Strategy: We determine the ISN of this stream at
+            ## startup. When requested to read a range we select all those
+            ## packets whose seq number fall within the range, we then
+            ## initialise the output buffer and copy the data from each of
+            ## the hits onto the buffer at the correct spot. This allows
+            ## us to have missing packets, as we will simply return 0 for
+            ## the byte sequences we are missing.
+
+            self.dbh = DB.DBO(self.case)
+            self.dbh.execute("select isn from connection_details where con_id=%r",(self.con_id))
+            row=self.dbh.fetch()
+            if not row:
+                raise IOError("No stream with connection ID %s" % self.con_id)
+
+            self.isn = row['isn']
+
         self.dbh.execute("select max(seq+length) as size from connection where con_id=%r",(self.con_id))
         row=self.dbh.fetch()
         self.size=row['size']-self.isn
 
+        ## This VFS driver is disk backed
         self.cache()
 
     def create_new_stream(self,stream_ids):
@@ -446,41 +470,54 @@ class StreamFile(File):
         ## This caches the current sequence number of each stream -
         ## this is needed in order to avoid including multiple copies
         ## of each packet when retransmission etc occur.
-        seq_numbers = dict(zip(stream_ids, [ 0 ] * len(stream_ids)))
+#        seq_numbers = dict(zip(stream_ids, [ 0 ] * len(stream_ids)))
         
         sum=0
-        self.dbh.execute("select * from connection where %s order by packet_id",(
+        stream = Stream(0,0,0,0,0, self.fd)
+        self.dbh.execute("select packet_id, length, data_offset from connection where %s order by packet_id",(
             " or ".join(["con_id=%r" % a for a in stream_ids])
             ))
+
+        self.dbh2.mass_insert_start("connection")
         for row in self.dbh:
-#            if row['seq'] > seq_numbers[row['con_id']]:
-#                seq_numbers[row['con_id']] = row['seq']
-            
-            self.dbh2.execute("insert into connection set con_id=%r,packet_id=%r,seq=%r,length=%r,packet_offset=%r",(
-                con_id,row['packet_id'],sum,
-                row['length'],row['packet_offset']
-                ))
+            self.dbh2.mass_insert(con_id=con_id,packet_id=row['packet_id'],
+                                  seq=sum,length=row['length'],data_offset=row['data_offset'])
+            stream.add_packet(row['packet_id'], sum,row['length'] ,row['data_offset'])
             sum+=row['length']
 
+        self.dbh2.mass_insert_commit()
+        
+##        for row in self.dbh:
+###            if row['seq'] > seq_numbers[row['con_id']]:
+###                seq_numbers[row['con_id']] = row['seq']
+            
+##            self.dbh2.execute("insert into connection set con_id=%r,packet_id=%r,seq=%r,length=%r,data_offset=%r",(
+##                con_id,row['packet_id'],sum,
+##                row['length'],row['data_offset']
+##                ))
+##            stream.add_packet(row['packet_id'], sum,row['length'] ,row['data_offset'])
+##            sum+=row['length']
+
+        stream_cache[con_id] = stream
         return con_id
 
-    def readpkt(self,pkt_id,packet_offset,start,end,result,result_offset):
+    def readpkt(self,pkt_id,data_offset,start,end,result,result_offset):
         """ This function gets the data from pkt_id and pastes it into
         the file like object in result at offset result_offset.
 
         We basically do this: pkt_id.data[start:end] -> result[result_offset]
         @arg pkt_id: The packet ID
-        @arg packet_offset: The offset within the packet where the data starts
+        @arg data_offset: The offset within the packet where the data starts
         @arg start: The start within the data segment where we want to copy from
         @arg end: The end point to copy till
         @arg result: A cStringIO object to copy the data to
         @arg result_offset: The position in the cStringIO to paste to
         """
-        dbh = DB.DBO(self.case)
-        dbh.execute("select * from pcap where id=%r",(pkt_id))
-        row = dbh.fetch()
+##        dbh = DB.DBO(self.case)
+##        dbh.execute("select offset from pcap where id=%r",(pkt_id))
+##        row = dbh.fetch()
 
-        self.fd.seek(row['offset']+packet_offset+start)
+        self.fd.seek(data_offset+start)
         
         data = self.fd.read(end-start)
         result.seek(result_offset)
@@ -503,7 +540,7 @@ class StreamFile(File):
         result = cStringIO.StringIO()
 
         ## Find out which packets fall within the range of interest
-        self.dbh.execute("select * from connection where con_id=%r and seq+length>=%r and seq<=%r order by seq",(
+        self.dbh.execute("select packet_id, length, data_offset,seq from connection where con_id=%r and seq+length>=%r and seq<=%r order by seq",(
             self.con_id,
             self.isn+self.readptr, ## Start of range
             self.isn+self.readptr+length, ## End of range
@@ -547,7 +584,7 @@ class StreamFile(File):
          
             self.readpkt(
                 row['packet_id'],
-                row['packet_offset'],
+                row['data_offset'],
                 start,
                 end,
                 result,

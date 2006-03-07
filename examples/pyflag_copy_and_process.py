@@ -151,8 +151,12 @@ class Local:
         errors=0
         for filename in self.list:
             try:
-                print "Moving %s to %s" % (filename,dest.path)
-                shutil.move(filename, dest.path)
+                if (options.removedata):
+                    print "Moving %s to %s" % (filename,dest.path)
+                    shutil.move(filename, dest.path)
+                else:
+                    print "Copying %s to %s" % (filename,dest.path)
+                    shutil.copy(filename, dest.path)
                 files_copied_successfully +=1
             except KeyboardInterrupt:
                 log.write("notice: user has terminated execution, exiting")

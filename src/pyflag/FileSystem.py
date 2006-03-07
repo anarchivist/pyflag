@@ -464,7 +464,7 @@ class File:
         
         ## Copy ourself into the file
         while 1:
-            data=self.read(1024*1024)
+            data=self.read(10000000)
             if len(data)==0: break
             fd.write(data)
             size+=len(data)

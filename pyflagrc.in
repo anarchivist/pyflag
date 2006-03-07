@@ -90,7 +90,7 @@ PYFLAG_MSN_PORTS=1863
 
 ## Maximum age (in packets) for a session before it will be considered
 ## terminated.
-PYFLAG_MAX_SESSION_AGE=100
+PYFLAG_MAX_SESSION_AGE=100000
 
 ## The encodings that will be searched on in the index scanner
 PYFLAG_INDEX_ENCODINGS=UTF-8,UTF-16LE

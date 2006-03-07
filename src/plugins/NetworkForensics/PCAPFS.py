@@ -68,7 +68,7 @@ def draw_only_PCAPFS(query,result):
     dbh2 = DB.DBO(query['case'])
     images = []
     ## Get a list of filesystems which are of type PCAPFS:
-    dbh.execute("select * from meta where property='fsimage'")
+    dbh.execute("select value from meta where property='fsimage'")
     for row in dbh:
         t=dbh2.get_meta("fstype")
         if t.startswith("PCAP"):
@@ -132,7 +132,7 @@ class PCAPFile(File):
         dbh.execute("select max(id) as max from pcap")
         row=dbh.fetch()
         self.size = row['max']
-
+        self.dbh.execute("select id,offset,link_type,ts_sec,length from pcap")
         self.iosource = fd
 
     def read(self,length=None):
@@ -142,13 +142,18 @@ class PCAPFile(File):
         if self.readptr>=self.size: return ''
 
         ## Find out the offset in the file of the packet:
-        self.dbh.execute("select * from pcap where id=%r",(self.readptr,))
         row=self.dbh.fetch()
+
+        ## If this the row we were expecting?
+        if row['id'] != self.readptr:
+            self.dbh.execute("select id,offset,link_type,ts_sec,length from pcap where id>=%r", self.readptr)
+            row=self.dbh.fetch()
 
         if not row:
             self.readptr+=1
             return '\x00'
-        
+
+        self.packet_offset = row['offset']
         self.fd.seek(row['offset'])
 
         self.link_type = row['link_type']

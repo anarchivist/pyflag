@@ -191,6 +191,43 @@ class DBO:
     def __iter__(self):
         return self
 
+    def mass_insert_start(self, table):
+        self.mass_insert_cache = {}
+        self.mass_insert_table = table
+    
+    def mass_insert(self, **columns):
+        """ Starts a mass insert operation. When done adding rows, call commit_mass_insert to finalise the insert.
+        """
+        for k,v in columns.items():
+            try:
+                self.mass_insert_cache[k].append(v)
+            except:
+                self.mass_insert_cache[k] = [ v, ]
+
+        ## If the transaction is too large, we need to commit it and restart:
+        if len(self.mass_insert_cache[k]) > 100:
+            self.mass_insert_commit()
+            self.mass_insert_start(self.mass_insert_table)
+
+    def mass_insert_commit(self):
+        keys = self.mass_insert_cache.keys()
+        if len(keys)==0: return
+        
+        args = []
+        values = []
+        for i in range(len(self.mass_insert_cache[keys[0]])):
+            for k in keys:
+                args.append( self.mass_insert_cache[k][i])
+
+            values.append(",".join(["%r"] * len(keys)))
+
+        sql = "insert into %s (%s) values (%s)" % (self.mass_insert_table,
+                                                   ','.join(["`%s`" % c for c in keys]),
+                                                   "),(".join(values))
+#        print sql,args
+        self.execute(sql,args)
+
+
     def autoincrement(self):
         """ Returns the value of the last autoincremented key """
         self.execute("select LAST_INSERT_ID() as result")

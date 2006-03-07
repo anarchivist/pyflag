@@ -145,6 +145,8 @@ class NetworkScanner(BaseScanner):
         ## can reuse it. This ensure we do not un-necessarily
         ## dissect each packet.
         self.packet_id = self.fd.tell()-1
+        self.packet_offset = self.fd.packet_offset
+        metadata['mime'] = None
           
         try:
             self.proto_tree = metadata['proto_tree'][self.packet_id]
@@ -160,7 +162,7 @@ def find_reverse_stream(forward_stream,dbh):
 
     return None if there is not reverse stream
     """
-    dbh.execute("select * from connection_details where con_id=%r",
+    dbh.execute("select dest_ip,dest_port,src_ip,src_port from connection_details where con_id=%r",
                 (forward_stream))
     
     row=dbh.fetch()

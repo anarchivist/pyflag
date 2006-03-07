@@ -243,12 +243,15 @@ class StoreAndScanType(StoreAndScan):
             row=self.dbh.fetch()
             if row:
                 mime_type = row['mime']
-            else: mime_type = ""
+            else:
+                metadata['mime'] = None
+                return True
 
-        for t in self.types:
-            if re.search(t,mime_type):
-                ## Not boring:
-                return False
+        if mime_type:
+            for t in self.types:
+                if re.search(t,mime_type):
+                    ## Not boring:
+                    return False
 
         return True
 
