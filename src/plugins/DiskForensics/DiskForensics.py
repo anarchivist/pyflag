@@ -89,7 +89,7 @@ class BrowseFS(Reports.report):
         dbh = self.DBO(query['case'])
         main_result=result
         
-        fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])
+        fsfd = FileSystem.DBFS( query["case"])
         
         branch = ['']
         new_query = result.make_link(query, '')
@@ -200,17 +200,16 @@ class ViewFile(Reports.report):
         if not query.has_key('limit'): query['limit']= 0
         dbh = self.DBO(query['case'])
 
-        fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])
+        fsfd = FileSystem.DBFS( query["case"])
         ## If this is a directory, only show the stats
         path = fsfd.lookup(inode=query['inode'])
-        fd = None
-        image = None
 
         try:
             fd = fsfd.open(inode=query['inode'])
             image = Graph.Thumbnailer(fd,300)
         except IOError:
-            pass
+            fd = None
+            image = None
             
         #How big is this file?
         i=fsfd.istat(inode=query['inode'])

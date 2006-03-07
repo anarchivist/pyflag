@@ -297,17 +297,6 @@ class Pst_file(File):
     def close(self):
         pass
 
-    def tell(self):
-        return self.pos
-
-    def seek(self,pos,rel=0):
-        if rel==1:
-            self.pos+=pos
-        elif rel==2:
-            self.pos=len(self.data)+pos
-        else:
-            self.pos=pos
-
 
 # a bunch of reports for browsing the outlook data
 class PstExplorer(Reports.report):
