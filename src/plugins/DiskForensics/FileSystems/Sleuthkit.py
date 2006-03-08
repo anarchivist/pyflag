@@ -135,9 +135,17 @@ class Solaris(Ext2):
     sk_type='solaris'
     name="Solaris FFS"
 
-class Raw(Ext2):
-    sk_type='raw'
+class Raw(DBFS):
+    """ A psuedo file system to load raw images """
     name="Raw"
+
+    def load(self, mount_point, iosource_name):
+        ## Ensure that mount point is normalised:
+        mount_point = os.path.normpath(mount_point)
+        DBFS.load(self, mount_point, iosource_name)
+
+        ## Just add a single inode:
+        self.VFSCreate("I%s" % iosource_name,'o0', "%s/raw_filesystem" % mount_point)
 
 class Mounted(DBFS):
     """ A class implementing the mounted filesystem option """

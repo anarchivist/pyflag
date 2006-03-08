@@ -242,7 +242,10 @@ class DBFS(FileSystem):
         ## is provided we make the new inode inherit the root inodes
         ## path and inode string.
         if root_inode:
-            new_filename = self.lookup(inode=root_inode) + "/" + new_filename
+            try:
+                new_filename = self.lookup(inode=root_inode) + "/" + new_filename
+            except:
+                new_filename = "/"+new_filename
             inode = "%s|%s" % (root_inode,inode)
 
         if directory:
@@ -275,7 +278,7 @@ class DBFS(FileSystem):
         except KeyError:
             size = 1
             
-        self.dbh.execute("insert into inode  set mode=%r, links=%r , inode=%r,gid=0,uid=0,size=%r",(
+        self.dbh.execute("insert into inode  set status='alloc', mode=%r, links=%r , inode=%r,gid=0,uid=0,size=%r",(
             40755, 4,inode, size))
 
     def longls(self,path='/', dirs = None):
