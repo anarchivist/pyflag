@@ -332,7 +332,13 @@ def resolve_offset(dbh, encoded_offset):
     dbh.execute("select (block_number <<%s) + (%r & ((1<<%s)-1)) as `Offset` from LogicalIndex where ( %r >>%s = block )",(BLOCKBITS,encoded_offset,BLOCKBITS,encoded_offset, BLOCKBITS))
     row=dbh.fetch()
     return row['Offset']
-    
+
+def resolve_inode(dbh, encoded_offset):
+    """ Converts the encoded_offset to an Inode """
+    dbh.execute("select inode from LogicalIndex where block=%r>>%s",(encoded_offset, BLOCKBITS))
+    row=dbh.fetch()
+    return row['inode']
+
 class SearchIndex(Reports.report):
     """ Search for indexed keywords """
     description = "Search for words that were indexed during filesystem load. Words must be in dictionary to be indexed. "
