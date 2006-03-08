@@ -13,7 +13,7 @@ execute Case\ Management.Create\ new\ case create_case=%(case)s
 set case=%(case)s
 
 #Select the filesystem image (PCAP file) to load
-execute Load\ Data.Load\ IO\ Data\ Source iosource=%(iosource)s subsys=standard io_filename=%(iofilename)s 
+execute Load\ Data.Load\ IO\ Data\ Source iosource=%(iosource)s subsys=standard io_filename=%(iofilename)s io_offset=0
 
 #Set this as the default io source
 set iosource=%(iosource)s
@@ -22,7 +22,7 @@ set iosource=%(iosource)s
 set mount_point=%(mountpoint)s
 
 #Tell it to use the PCAP filesystem
-execute Load\ Data.Load\ Filesystem\ image fstype='PCAP Filesystem'
+execute Load\ Data.Load\ Filesystem\ image fstype=PCAP\ Filesystem
 
 #Run the scanners
-execute Load\ Data.ScanFS scan_IRCScanner=on scan_MSNScanner=on scan_HTTPScanner=on scan_POPScanner=on scan_SMTPScanner=on scan_RFC2822=on scan_GZScan=on scan_TarScan=on scan_ZipScan=on scan_PstScan=on scan_IEIndex=on scan_RegistryScan=on scan_TypeScan=on scangroup_Filesystem\ Analysis=off scan_UnallocatedScan=off scan_DeletedScan=off scan_IndexScan=on scan_MD5Scan=off path='/' scangroup_NetworkScanners=on scangroup_Compressed\ File=off scangroup_File\ Scanners=on scangroup_General\ Forensics=on final=ok
+execute Load\ Data.ScanFS scan_IRCScanner=on scan_MSNScanner=on scan_HTTPScanner=on scan_POPScanner=on scan_SMTPScanner=on scan_RFC2822=on scan_GZScan=on scan_TarScan=on scan_ZipScan=on scan_PstScan=on scan_IEIndex=on scan_RegistryScan=on scan_TypeScan=on scangroup_Filesystem\ Analysis=off scan_UnallocatedScan=off scan_DeletedScan=off scan_IndexScan=on scan_MD5Scan=off path='/' scangroup_NetworkScanners=on scangroup_Compressed\ File=off scangroup_File\ Scanners=on scangroup_General\ Forensics=on

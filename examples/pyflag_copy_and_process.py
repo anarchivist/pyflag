@@ -222,7 +222,7 @@ class FlagFeeder:
     def pcap(self,source,pyflashconf,casename,error_log_dir,handler):
         errors=0
         #For each pcap in the directory given, run it through flag
-        for files in glob.glob(os.path.join(source.path,"*.pcap")):
+        for files in source.list:
             local_file_for_processing = os.path.basename(files).replace(".pcap","")
             pyflash_log_file=os.path.join(os.path.dirname(log.path), casename + "_" + date.current + "_" + local_file_for_processing + ".pyflag_log")
             log.write("Pyflash logfile: " + pyflash_log_file)
@@ -281,16 +281,16 @@ class LockFile:
 
 parser = OptionParser(version="%prog 1.0")
 
-parser.add_option("-s", "--src",type="string", dest="src", help="The source of the file(s) to be processed.  This can be local or in scp syntax including wildcards, e.g. /file/path/*.dd user@host:/path/to/file.*  Source file names must be unique, or they may overwrite each other."),
+parser.add_option("-s", "--src",type="string", dest="src", help="The source of the file(s) to be processed.  This can be local or in scp syntax including wildcards, e.g. /file/path/*.dd user@host:/path/to/file.*  Source file names must be unique, or they may overwrite each other.  Use double quotes if you path includes wildcards."),
 parser.add_option("-c", "--pyflash-file",type="string", dest="pyflashconf", help="The pyflash config file to use (must be local file)"),
 parser.add_option("-l", "--logdir",type="string", dest="logdir", help="The directory to put the pyflash log files in.  This can be local or in scp syntax, e.g. /my/logdir user@host:/path/to/dir"),
 parser.add_option("-e", "--errorlogdir",type="string", dest="errorlogdir", help="The directory to put the pyflash log files in if the copying or pyflash script doesn't complete successfully.  This can be local or in scp syntax, e.g. /my/error/logdir user@host:/path/to/dir"),
 parser.add_option("-t", "--tempdir",type="string", dest="tempdir", help="Temporary directory to store log files as they are being written (must be local)"),
-parser.add_option("-d", "--holdingdir",type="string", dest="holdingdir", help="Temporary directory to store the data for processing (must be local, will be moved from --src)"),
+parser.add_option("-d", "--holdingdir",type="string", dest="holdingdir", help="Temporary directory to store the data for processing (must be local, will be moved from --src).  If no directory specified, the data will be processed in placed (assuming it is local)."),
 parser.add_option("-n", "--casename",type="string", dest="casename", help="The casename to use in pyFLAG for these files"),
 parser.add_option("-f", "--lockfile",type="string", dest="lockfilepath", help="The lockfile for the program (must be local)"),
 parser.add_option("-r", "--removepostprocess",action="store_true",dest="removedata",help="If this flag is set, data will be removed from source after it has been successfully copied  holdingdir.  Only necessary if source is remote - if src is local, the data is moved (not copied) to holdingdir regardless of this flag."),
-parser.add_option("-b", "--backupdir",type="string", dest="backupdir", help="The local directory to backup all data (excepts logs) to after processing is finished (this is the only copy of the data that will remain)")
+parser.add_option("-b", "--backupdir",type="string", dest="backupdir", help="The local directory to backup all data (excepts logs) to after processing is finished (this is the only copy of the data that will remain).  Only makes sense if --removepostprocess and holdingdir are specified.")
 
 (options, args) = parser.parse_args()
 
@@ -306,32 +306,38 @@ log.write("logfile created at " + log.path)
 
 try:
     #Make sure we don't trash a previous cron that is still processing.
-    lock=LockFile(options.lockfilepath)
+    lock=LockFile(options.lockfilepath+date.current)
     log.write("lock file created at: %s" % lock.path)
     
     data_source=handler.create(options.src)
 
-    local_data_store=CaseDateDir(options.holdingdir)
-    
-    #Get data here so we can process it.
-    (num_files,errors)=data_source.moveandcheck(local_data_store)
-
+    if (options.holdingdir):
+        #If we specified a holding dir, use it for data
+        local_data_store=CaseDateDir(options.holdingdir)
+        
+        #Get data here so we can process it.
+        (num_files,errors)=data_source.moveandcheck(local_data_store)
+    else:
+        #Otherwise just process the files in place (assume src is local)
+        local_data_store=Local(data_source.path)
+        num_files=len(local_data_store.list)
 
     if (num_files > 0):
         #we copied at least one file, so let's work on it
-        log.write("Successfully copied: %s files" % num_files)
+        log.write("Will work on: %s files" % num_files)
 
         #FLAG Processing
-        log.write("########### File copying finished, starting pyflag processing #########")
+        log.write("########### Starting pyflag processing #########")
         flag_feeder=FlagFeeder()
         flag_err=flag_feeder.pcap(local_data_store,options.pyflashconf,options.casename,options.errorlogdir,handler)
         log.write("Flag processing completed with errors in %s files" % flag_err)
 
-        #Backing up data
-        log.write("Backing up data to " + options.backupdir)
-        backup_dir=Local(options.backupdir)
-        local_data_store.movedir(backup_dir)
-        log.write("Directory " + local_data_store.path + " moved to backup location: " + backup_dir.path)
+        if ((options.backupdir) and (options.removedata)):
+            #Backing up data
+            backup_dir=Local(options.backupdir)
+            local_data_store.movedir(backup_dir)
+            log.write("Backing up data to " + options.backupdir)
+            log.write("Directory " + local_data_store.path + " moved to backup location: " + backup_dir.path)
 
         if ((errors > 0) or (flag_err > 0)):
             log.write("%s error(s) were encountered during copying.  %s error(s) were encountered during flag processing. See logs in %s" % (errors,flag_err,options.errorlogdir))
