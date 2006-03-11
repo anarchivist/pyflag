@@ -184,9 +184,16 @@ static PyObject *get_field(PyObject *self, PyObject *args) {
 
     case FIELD_TYPE_INT:
     case FIELD_TYPE_INT_X:
-    case FIELD_TYPE_IP_ADDR:
       result = PyLong_FromUnsignedLong(*(unsigned int *)item); break;
 
+    case FIELD_TYPE_IP_ADDR:
+      {
+	struct in_addr temp;
+
+	temp.s_addr= htonl(*(uint32_t *)item);
+	result = Py_BuildValue("s",inet_ntoa(temp)); 
+	break;
+      };
     case FIELD_TYPE_CHAR_X:
     case FIELD_TYPE_CHAR:
       result = Py_BuildValue("b", *(unsigned char *)item); break;
