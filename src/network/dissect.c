@@ -209,6 +209,24 @@ static PyObject *get_field(PyObject *self, PyObject *args) {
     case FIELD_TYPE_HEX:
       result = Py_BuildValue("s#",(unsigned char *)item, size); break;
 
+    case FIELD_TYPE_ETH_ADD:
+      {
+	char *x= (unsigned char *)item;
+	char temp[1024];
+
+	snprintf(temp,1024,"%02X:%02X:%02X:%02X:%02X:%02X",
+		 (unsigned char)x[0],
+		 (unsigned char)x[1],
+		 (unsigned char)x[2],
+		 (unsigned char)x[3],
+		 (unsigned char)x[4],
+		 (unsigned char)x[5]
+		 );
+
+	result = Py_BuildValue("s", temp);
+	break;
+      };
+
     default:
       return PyErr_Format(PyExc_RuntimeError,
 			  "Unable to process field of type %u\n", p->field_type);

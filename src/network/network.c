@@ -146,8 +146,8 @@ int Eth2_Read(Packet self, StringIO input) {
 VIRTUAL(ETH_II, Packet)
      INIT_STRUCT(packet, ethernet_2_Format);
 
-     NAME_ACCESS(packet, destination, FIELD_TYPE_HEX);
-     NAME_ACCESS(packet, source, FIELD_TYPE_HEX);
+     NAME_ACCESS(packet, destination, FIELD_TYPE_ETH_ADD);
+     NAME_ACCESS(packet, source, FIELD_TYPE_ETH_ADD);
      NAME_ACCESS(packet, type, FIELD_TYPE_SHORT_X);
      NAME_ACCESS(packet, payload, FIELD_TYPE_PACKET);
 
@@ -206,10 +206,10 @@ int IP_Read(Packet self, StringIO input) {
 VIRTUAL(IP, Packet)
      INIT_STRUCT(packet, ip_Format);
 
-     NAME_ACCESS(packet, ttl, FIELD_TYPE_CHAR);
-     NAME_ACCESS(packet, protocol, FIELD_TYPE_CHAR);
      NAME_ACCESS(packet, src, FIELD_TYPE_IP_ADDR);
      NAME_ACCESS(packet, dest, FIELD_TYPE_IP_ADDR);
+     NAME_ACCESS(packet, ttl, FIELD_TYPE_CHAR);
+     NAME_ACCESS(packet, protocol, FIELD_TYPE_CHAR);
      NAME_ACCESS(packet, payload, FIELD_TYPE_PACKET);
 
      VMETHOD(super.Read)=IP_Read;
