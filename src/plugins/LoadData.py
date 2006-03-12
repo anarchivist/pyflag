@@ -420,6 +420,7 @@ class LoadFS(Reports.report):
         fsobj=Registry.FILESYSTEMS.filesystems[query['fstype']](query['case'])
         mount_point = FlagFramework.normpath("/"+query['mount_point'])
         fsobj.load(mount_point, query['iosource'])
+        dbh.set_meta("mount_point_%s" % query['iosource'] , mount_point)
 
         self.progress_str="Creating file and inode indexes"        
         #Add indexes:

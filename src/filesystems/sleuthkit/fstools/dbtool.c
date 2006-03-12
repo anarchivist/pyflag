@@ -595,7 +595,7 @@ main(int argc, char **argv)
 	FS_INFO 	*fs;
 	IMG_INFO *img;
 	char *dbaction = NULL;
-	extern int optind;
+	extern int optind;	
 
 	progname = argv[0];
 	//fstype = DEF_FSTYPE;

@@ -209,8 +209,10 @@ class StreamReassembler(NetworkScanFactory):
             try:
                 tcpsrcport=self.proto_tree['tcp.src_port']
                 tcpdestport=self.proto_tree['tcp.dest_port']
-                ipsrc=self.proto_tree['ip.src']
-                ipdest=self.proto_tree['ip.dest']
+                
+                ## We want the int versions of these
+                ipsrc=self.proto_tree['ip._src']
+                ipdest=self.proto_tree['ip._dest']
                 data_offset = self.proto_tree['tcp.data_offset'] + self.packet_offset
             except KeyError,e:
                 return

@@ -215,6 +215,15 @@ class IO:
     def set_options(self,key,value):
         iosubsys.parse_options(self.io,"%s=%s" % (key[3:],value))
 
+    def explain(self,result):
+        """ Give some information about our IO Source """
+        result.row("IOSubsys Driver", self.__class__.__name__)
+        for i in range(len(self.parameters)-1):
+            for j in range(len(self.options[i+1])):
+                tmp = result.__class__(result)
+                tmp.text(self.options[i+1][j], color="red", font="bold")
+                result.row(self.parameters[i+1][3:], tmp, valign="top")
+
 class sgzip(IO):
     parameters=('subsys','io_filename','io_offset')
 

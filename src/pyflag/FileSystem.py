@@ -401,7 +401,7 @@ class File:
     @cvar stat_names: A list of names for the above callbacks.
     """
     specifier = None
-    ## cached_fd = None
+
     ## These can be overridden by the caller if they want to add stats to the ViewFile report
     #stat_cbs = None
     #stat_names = None
@@ -556,61 +556,9 @@ class File:
                 if len(data)==0: return buffer
                 buffer += data
 
-##class CachedFile(File):
-##    """ This class is used to give a VFS driver automatic file caching capability. This should speed it up if re-creating the file on the fly is too expensive.
 
-##    To use, inherit from this class as well as the class you wish to cache and set target_class to the VFS driver. E.g:
-##    class CachedStreamFile(CachedFile,StreamFile):
-##        specifier = 'S'
-##        target_class = StreamFile
-
-##    """
-##    target_class = None
-
-##    def __init__(self, case, fd, inode):
-##        File.__init__(self, case, fd, inode)
-        
-##    def read(self,length=None):
-##        if not self.cached_fd:
-##            self.cache()
-
-##        if length!=None:
-##            ## The amount of data available to read:
-##            available = self.size-self.readptr
-            
-##            if length>available:
-##                length=available
-                
-##            result=self.cached_fd.read(length)
-##        else:
-##            result=self.cached_fd.read(self.size-self.readptr)
-
-##        self.readptr+=len(result)
-##        return result
-
-##    def readline(self):
-##        if not self.cached_fd:
-##            self.cache()
-            
-##        result=self.cached_fd.readline()
-##        self.readptr+=len(result)
-##        return result
-
-##    def tell(self):
-##        if not self.cached_fd:
-##            self.cache()
-
-##        return self.readptr
-
-##    def seek(self,offset,whence=0):
-##        if not self.cached_fd:
-##            self.cache()
-
-##        if whence==0:
-##            self.readptr=offset
-##        elif whence==1:
-##            self.readptr+=offset
-##        elif whence==2:
-##            self.readptr=self.size+offset
-    
-##        self.cached_fd.seek(self.readptr)
+    def explain(self, result):
+        """ This method is called to explain how we arrive at this
+        data"""
+        print "%s" % self.__class__.__name__
+        result.row(self.__class__.__name__, self.__doc__)

@@ -53,6 +53,8 @@ class ZipScan(GenScanFactory):
         def external_process(self,name):
             """ This is run on the extracted file """
             zip=zipfile.ZipFile(name)
+
+            pathname = self.ddfs.lookup(inode = self.inode)
             
             ## List all the files in the zip file:
             dircount = 0
@@ -68,7 +70,7 @@ class ZipScan(GenScanFactory):
                 ## If the entry corresponds to just a directory we ignore it.
                 if not os.path.basename(namelist[i]): continue
 
-                self.ddfs.VFSCreate(self.inode,"Z%s" % i,namelist[i],size=zip.infolist()[i].file_size,mtime=t)
+                self.ddfs.VFSCreate(None, "%s|Z%s" % (self.inode,i),pathname+"/"+namelist[i],size=zip.infolist()[i].file_size,mtime=t)
 
                 ## Now call the scanners on this new file (FIXME limit the recursion level here)
                 fd = StringIO.StringIO(zip.read(namelist[i]))

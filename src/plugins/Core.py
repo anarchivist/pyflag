@@ -40,6 +40,7 @@ class IO_File(FileSystem.File):
     Basically we proxy the IO source driver in here.
     """
     specifier = "I"
+
     def __init__(self, case, fd, inode):
         FileSystem.File.__init__(self, case, fd, inode)
 
@@ -60,3 +61,8 @@ class IO_File(FileSystem.File):
     def tell(self):
         return self.io.tell()
         
+    def explain(self, result):
+        tmp = result.__class__(result)
+        self.io.explain(tmp)
+        result.row("IO Subsys %s:" % self.name, tmp, valign="top")
+        result.row("Mount point",self.dbh.get_meta("mount_point_%s" % self.name))

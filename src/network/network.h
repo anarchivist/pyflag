@@ -125,6 +125,11 @@ struct ip_struct {
   uint32_t src;
   uint32_t dest;
 
+  /******* Everything after here will be manually filled in ****/
+
+  uint32_t _src;
+  uint32_t _dest;  
+
   Packet payload;
 };
 

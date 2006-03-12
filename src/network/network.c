@@ -164,6 +164,10 @@ int IP_Read(Packet self, StringIO input) {
 
   len=this->__super__->Read(self, input);
 
+  /** The _ types are filled in to provide multiple access methods */
+  this->packet._src = this->packet.src;
+  this->packet._dest = this->packet.dest;
+
   /** Sometimes we get trailing trash at the end of a packet, since
       the dissectors which follow us would not know how long the
       packet actually is - it is up to us to set the size of it.
@@ -208,6 +212,8 @@ VIRTUAL(IP, Packet)
 
      NAME_ACCESS(packet, src, FIELD_TYPE_IP_ADDR);
      NAME_ACCESS(packet, dest, FIELD_TYPE_IP_ADDR);
+     NAME_ACCESS(packet, _src, FIELD_TYPE_INT);
+     NAME_ACCESS(packet, _dest, FIELD_TYPE_INT);
      NAME_ACCESS(packet, ttl, FIELD_TYPE_CHAR);
      NAME_ACCESS(packet, protocol, FIELD_TYPE_CHAR);
      NAME_ACCESS(packet, payload, FIELD_TYPE_PACKET);

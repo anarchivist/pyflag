@@ -376,6 +376,7 @@ iso9660_get_dentrys(FS_INFO * fs, OFF_T offs, int count, int type,
 			tmp->inode.rr = in->inode.rr;
 			in->inode.rr = NULL;
 		    }
+
 		    if (in->inode.rr)
 			free(in->inode.rr);
 

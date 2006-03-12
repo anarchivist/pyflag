@@ -224,6 +224,8 @@ class ViewDissectedPacket(Reports.report):
             previous_node, node = get_node(branch)
             try:
                 for field in node.list_fields():
+                    if field.startswith("_"): continue
+                    
                     if node.is_node(field):
                         yield  ( field, node[field].name, 'branch')
                     else:

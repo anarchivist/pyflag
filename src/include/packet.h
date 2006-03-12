@@ -95,7 +95,8 @@ enum field_types {
   FIELD_TYPE_STRING_X,
   FIELD_TYPE_IP_ADDR,
   FIELD_TYPE_HEX,
-  FIELD_TYPE_PACKET
+  FIELD_TYPE_PACKET,
+  FIELD_TYPE_ETH_ADD
 };
 
 struct struct_property_t {

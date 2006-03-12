@@ -92,7 +92,7 @@
 #define ISO9660_RESERVE_CEIL		254
 #define ISO9660_VOL_DESC_SET_TERM	255	/* volume descriptor set terminator */
 
-#define ISO9660_MAXNAMLEN	103	/* joliet max name length */
+#define ISO9660_MAXNAMLEN	1024	/* joliet max name length */
 
 /* Bits in permissions used in extended attribute records.  */
 #define ISO9660_BIT_UR	0x0010

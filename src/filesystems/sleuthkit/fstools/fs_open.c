@@ -81,7 +81,6 @@ fs_open(IMG_INFO * img_info, const char *type)
 	    }
 	}
 
-	/*
 	if ((fs_info = hfs_open(img_info, HFS, 1)) != NULL) {
 	    if (set == NULL) {
 		set = "HFS";
@@ -101,7 +100,6 @@ fs_open(IMG_INFO * img_info, const char *type)
 	   }
 	   fs_set = fs_info;
 	}
-	*/
 
 	if (fs_set != NULL) {
 	    return fs_set;
@@ -124,12 +122,10 @@ fs_open(IMG_INFO * img_info, const char *type)
 	    return fatfs_open(img_info, ftype, 0);
 	case NTFS_TYPE:
 	    return ntfs_open(img_info, ftype, 0);
-/*
 	case ISO9660_TYPE:
 	    return iso9660_open(img_info, ftype, 0);
 	case HFS_TYPE:
 	    return hfs_open(img_info, ftype, 0);
-*/
 	case RAWFS_TYPE:
 	    return rawfs_open(img_info, ftype);
 	case SWAPFS_TYPE:

@@ -29,6 +29,8 @@
 """ Creates a new case database for flag """
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
+import pyflag.FileSystem as FileSystem
+import pyflag.DB as DB
 import os
 import pyflag.conf
 config=pyflag.conf.ConfObject()

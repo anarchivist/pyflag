@@ -1,0 +1,66 @@
+/*****************************************
+   This file implements a trie.
+
+  A Trie is a special data structure with multiple elements under each
+  node.
+***********************************/
+#ifndef __TRIE_H
+#define __TRIE_H
+
+#include "class.h"
+#include "list.h"
+#include <stdint.h>
+
+/** These are the possible types that words may be supplied as **/
+enum word_types {
+  // This is a literal
+  WORD_LITERAL,
+
+  // This is an extended format (regex like) 
+  WORD_EXTENDED,
+
+  // This is an english word (case insensitive matching)
+  WORD_ENGLISH
+};
+
+/** This is an abstract class with no constructors, it must be
+    extended.
+*/
+CLASS(TrieNode, Object)
+     struct list_head peers;
+     struct list_head children;
+
+     /** Checks if there is a match at the current position in buffer. 
+	 May alter result with the value stored in the node.
+     */
+     int METHOD(TrieNode, Match, char *buffer, int len, uint64_t *result);
+
+     /** Adds the word into the trie with the value in data */
+     void METHOD(TrieNode, AddWord, char *word, int len, uint64_t data,
+		 enum word_types type);
+
+     int METHOD(TrieNode, __eq__, TrieNode tested);
+
+     /** This is called to
+     TrieNode METHOD(TrieNode, Con, TrieNode parent);
+     */
+END_CLASS
+
+CLASS(DataNode, TrieNode)
+     uint64_t data;
+
+     int METHOD(DataNode, Con, uint64_t data);
+END_CLASS
+
+CLASS(LiteralNode, TrieNode)
+     char value;
+
+     LiteralNode METHOD(LiteralNode, Con, char value);
+END_CLASS
+
+CLASS(RootNode, TrieNode)
+  
+     RootNode METHOD(RootNode, Con);
+END_CLASS
+
+#endif
