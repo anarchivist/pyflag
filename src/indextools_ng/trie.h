@@ -28,7 +28,11 @@ enum word_types {
 */
 CLASS(TrieNode, Object)
      struct list_head peers;
-     struct list_head children;
+
+     /** This points to a dummy TrieNode object which serves as a
+	 list_head for the peers list of all this nodes children 
+     */
+     TrieNode child;
 
      /** Checks if there is a match at the current position in buffer. 
 	 May alter result with the value stored in the node.
@@ -41,15 +45,15 @@ CLASS(TrieNode, Object)
 
      int METHOD(TrieNode, __eq__, TrieNode tested);
 
-     /** This is called to
-     TrieNode METHOD(TrieNode, Con, TrieNode parent);
-     */
+/** This is a simple constructor. It is mostly used for creating list
+    heads for children */
+     TrieNode METHOD(TrieNode, Con);
 END_CLASS
 
 CLASS(DataNode, TrieNode)
      uint64_t data;
 
-     int METHOD(DataNode, Con, uint64_t data);
+     DataNode METHOD(DataNode, Con, uint64_t data);
 END_CLASS
 
 CLASS(LiteralNode, TrieNode)

@@ -753,6 +753,8 @@ void talloc_report_depth(const void *ptr, FILE *f, int depth)
 			fprintf(f, "%*sreference to: %s\n", depth*4, "", name2);
 		} else {
 			const char *name = talloc_get_name(c+1);
+
+			if(!strcmp(name,".name")) continue;
 			fprintf(f, "%*s%-30s contains %6lu bytes in %3lu blocks (ref %d)\n", 
 				depth*4, "",
 				name,
