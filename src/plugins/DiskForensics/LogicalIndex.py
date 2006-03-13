@@ -105,14 +105,14 @@ class IndexScan(GenScanFactory):
     def prepare(self):
         ## Create new index trie - This takes a serious amount of time
         ## for large dictionaries (about 2 sec for 70000 words):
-        self.index = index.index()
+        self.index = index.indexer()
         pydbh = DB.DBO(None)
         #Do word index (literal) prep
         logging.log(logging.DEBUG,"Index Scanner: Building index trie")
         start_time=time.time()
         pydbh.execute("select word,id from dictionary where type='literal'")
         for row in pydbh:
-            self.index.add_word(row['word'],row['id'])
+            index.add_word(self.index,row['word'],row['id'], 0)
 
         # load words in a number of alternate character sets. The ones
         # we care about atm are utf-8 and utf-16/UCS-2 which is used
@@ -122,7 +122,7 @@ class IndexScan(GenScanFactory):
         for row in pydbh:
             word = row['word'].decode("UTF-8")
             for e in config.INDEX_ENCODINGS:
-                self.index.add_word(word.encode(e),row['id'])
+                index.add_word(self.index, word.encode(e),row['id'], 0)
 
         logging.log(logging.DEBUG,"Index Scanner: Done in %s seconds..." % (time.time()-start_time))
 
@@ -167,48 +167,53 @@ class IndexScan(GenScanFactory):
             self.stats_count={}
 
         def process(self,data,metadata=None):
-            self.index.index_buffer(data)
-            offsets=[]
-            #Store the offsets we got from the index C code
-            for i in self.index.get_offsets():
-                offsets.append((i.id, i.offset))
-                try:
-                    self.stats_count[i.id]+=1
-                except KeyError:
-                    #Must be a new id for the dictionary
-                    self.stats_count[i.id]=1
+            offsets=index.index_buffer(self.index, data)
+##            #Store the offsets we got from the index C code
+##            for i in self.index.get_offsets():
+##                offsets.append((i.id, i.offset))
+##                try:
+##                    self.stats_count[i.id]+=1
+##                except KeyError:
+##                    #Must be a new id for the dictionary
+##                    self.stats_count[i.id]=1
                 
-            #Now search for all the regex's in the dictionary and store the results
-            for row in self.RegexpRows:
-                for match in row[0].finditer(data):
-                    offsets.append((row[1],match.start()))
-                    try:
-                        self.stats_count[row[1]]+=1
-                    except KeyError:
-                        #Must be a new id for the dictionary
-                        self.stats_count[row[1]]=1
+##            #Now search for all the regex's in the dictionary and store the results
+##            for row in self.RegexpRows:
+##                for match in row[0].finditer(data):
+##                    offsets.append((row[1],match.start()))
+##                    try:
+##                        self.stats_count[row[1]]+=1
+##                    except KeyError:
+##                        #Must be a new id for the dictionary
+##                        self.stats_count[row[1]]=1
 
-            #Sort the results so the offsets are in order
-            #element 0 is ID, element 1 is offset
-            def compfunc(x,y):
-                if x[1]>y[1]:
-                    return 1
-                elif x[1]<y[1]:
-                    return -1
+##            #Sort the results so the offsets are in order
+##            #element 0 is ID, element 1 is offset
+##            def compfunc(x,y):
+##                if x[1]>y[1]:
+##                    return 1
+##                elif x[1]<y[1]:
+##                    return -1
 
-                return 0
+##                return 0
             
-            offsets.sort(compfunc)
+##            offsets.sort(compfunc)
             
             # Store indexing results in the dbase
             ## Store any hits in the database - NOTE: We use extended
             ## insert syntax here for speed (This may not be portable
             ## to other databases):
             results = []
-            for i in offsets:
+            for id, offset in offsets:
+                try:
+                    self.stats_count[id]+=1
+                except KeyError:
+                    #Must be a new id for the dictionary
+                    self.stats_count[id]=1
+
                 ## If the file is longer than a block, we create a new
                 ## block, and adjust the relative offset
-                if self.rel_offset+i[1] > BLOCKSIZE:
+                if self.rel_offset+offset > BLOCKSIZE:
                     self.block_number+=1
                     self.rel_offset -= BLOCKSIZE
                     self.dbh.execute("insert into LogicalIndex set inode=%r,block_number=%r",(self.inode,self.block_number))
@@ -216,7 +221,7 @@ class IndexScan(GenScanFactory):
                     self.block = self.dbh.autoincrement()
 
                 #Final result ie. absolute offset is (current block number * blocksize) + (offset from start of data chunk where we found the term + offset of the data block)
-                results.append("(%s,(%s<<%s)+%s+%s)" % (i[0],self.block,BLOCKBITS,i[1],self.rel_offset))
+                results.append("(%s,(%s<<%s)+%s+%s)" % (id,self.block,BLOCKBITS,offset,self.rel_offset))
 
             if results:
                 self.dbh.execute("insert into LogicalIndexOffsets values %s",(",".join(results)))

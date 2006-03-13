@@ -37,10 +37,10 @@ CLASS(TrieNode, Object)
      /** Checks if there is a match at the current position in buffer. 
 	 May alter result with the value stored in the node.
      */
-     int METHOD(TrieNode, Match, char *buffer, int len, uint64_t *result);
+     int METHOD(TrieNode, Match, char *buffer, int len, int *result);
 
      /** Adds the word into the trie with the value in data */
-     void METHOD(TrieNode, AddWord, char *word, int len, uint64_t data,
+     void METHOD(TrieNode, AddWord, char *word, int len, int data,
 		 enum word_types type);
 
      int METHOD(TrieNode, __eq__, TrieNode tested);
@@ -51,9 +51,9 @@ CLASS(TrieNode, Object)
 END_CLASS
 
 CLASS(DataNode, TrieNode)
-     uint64_t data;
+     int data;
 
-     DataNode METHOD(DataNode, Con, uint64_t data);
+     DataNode METHOD(DataNode, Con, int data);
 END_CLASS
 
 CLASS(LiteralNode, TrieNode)

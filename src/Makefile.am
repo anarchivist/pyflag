@@ -1,5 +1,5 @@
-#SUBDIRS = lib mailtools indextools_ng indextools network regtools virustools filesystems include
-SUBDIRS = lib mailtools indextools network regtools virustools filesystems include
+SUBDIRS = lib mailtools indextools_ng indextools network regtools virustools filesystems include
+#SUBDIRS = lib mailtools indextools network regtools virustools filesystems include
 
 # main pyflag (python) application
 ## The pyflag directory goes in the system site-packages
