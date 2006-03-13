@@ -59,12 +59,12 @@ class VScan:
 
 class VirScan(GenScanFactory):
     """ Scan file for viruses """
-    def __init__(self,dbh, table,fsfd):
-        dbh.execute(""" CREATE TABLE IF NOT EXISTS `virus` (
+    def __init__(self,fsfd):
+        GenScanFactory.__init__(self, fsfd)        
+
+        self.dbh.execute(""" CREATE TABLE IF NOT EXISTS `virus` (
         `inode` varchar( 20 ) NOT NULL,
         `virus` tinytext NOT NULL )""")
-        self.dbh=dbh
-        self.table=table
 
     def destroy(self):
         self.dbh.execute('ALTER TABLE virus ADD INDEX(inode)')
