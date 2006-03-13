@@ -21,6 +21,7 @@
 # ******************************************************
 */
 #include <stdlib.h>
+#include <stdint.h>
 
 /***********************************************************
  * Linked list for IO subsystem options
@@ -54,7 +55,7 @@ struct IO_INFO {
   /* The function used to parse out options and initialise the subsystem */
   int (*initialise)(struct IO_INFO *self,IO_OPT *arg);
   /* The random read function */
-  int (*read_random)(struct IO_INFO *self, char *buf, int len, off_t offs,
+  int (*read_random)(struct IO_INFO *self, char *buf, uint32_t len, uint64_t offs,
 		               const char *comment);
   /* A function used to open the file (may not be needed?) */
   int (*open)(struct IO_INFO *self);
@@ -83,4 +84,4 @@ void io_help(char *name) ;
   M - Means 1024*1024 bytes
   S - Menas 512 bytes (sector size)
 */
-long long unsigned int parse_offsets(char *string);
+uint64_t parse_offsets(char *string);

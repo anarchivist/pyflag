@@ -37,48 +37,49 @@ THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED WAR
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdarg.h>
+#include <stdint.h>
 
 extern void evf_warn(const char *message, ...);
 
 struct evf_file_header {
   char magic[8];
   char one;
-  unsigned short int segment;
-  unsigned short int zero;
+  uint16_t segment;
+  uint16_t zero;
 } __attribute__((packed));
 
 struct evf_section_header {
   char type[16];
-  unsigned long long next;
-  unsigned long long size;
+  uint64_t next;
+  uint64_t size;
   char padding[40];
-  unsigned int crc;
+  uint32_t crc;
 } __attribute__((packed));
 
 struct evf_volume_header {
-  unsigned int reserved;
-  unsigned int chunk_count;
-  unsigned int sectors_per_chunk;
-  unsigned int bytes_per_sector;
-  unsigned int sector_count;
+  uint32_t reserved;
+  uint32_t chunk_count;
+  uint32_t sectors_per_chunk;
+  uint32_t bytes_per_sector;
+  uint32_t sector_count;
   char reserved2[20];
   char padding[1003];
   char signature[5];
-  unsigned int crc;
+  uint32_t crc;
 }  __attribute__((packed));
 
 struct evf_table_header {
-  unsigned int count;
+  uint32_t count;
   char padding[16];
-  unsigned int crc;
+  uint32_t crc;
 }  __attribute__((packed));
 
 struct evf_hash {
   char md5[16];
-  unsigned int zero;
-  unsigned int unknown;
-  unsigned int zero2;
-  unsigned int unknown2;
+  uint32_t zero;
+  uint32_t unknown;
+  uint32_t zero2;
+  uint32_t unknown2;
 }  __attribute__((packed));
 
 /* This is a linked list keeping track of all sections, their start
@@ -86,8 +87,8 @@ struct evf_hash {
    of the last chunk in each section table */
 struct section {
   int fd;
-  unsigned long int start_offset;
-  unsigned long int end_offset;
+  uint32_t start_offset;
+  uint32_t end_offset;
   struct section *next;
 };
 
@@ -98,16 +99,16 @@ struct offset_table {
   struct section *section_list;
   int max_chunk;
   /* Stores the maximum number of segments */
-  unsigned short int max_segment;
+  uint16_t max_segment;
   /*An array that keeps track of open fds in their segment order */
   int *files;
   /* An array (same size as offset) of file descriptor into the
      correct file, must already be opened by initialiser */
   int *fd;
   /* array of offsets within the file pointed to by fd */
-  unsigned int *offset;
+  uint32_t *offset;
   /* Array of chunk sizes */
-  unsigned short int *size;
+  uint16_t *size;
   char md5[16];
 };
 

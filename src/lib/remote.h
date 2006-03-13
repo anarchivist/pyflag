@@ -66,5 +66,5 @@ void remote_read_response(struct remote_handle *hndle,char **buf,int *length);
    data - A variable to hold the malloced buffer. Note that callers are expected to free it.
    length - The length of data to read. The variable is adjusted for the length actually read.
 */
-void remote_read_data(struct remote_handle *hndle, long long unsigned int offset, char **data, unsigned int *length);
+void remote_read_data(struct remote_handle *hndle, uint64_t offset, char **data, uint32_t *length);
 

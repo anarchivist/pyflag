@@ -74,7 +74,7 @@ IO_INFO *io_constructor(IO_INFO *class) {
 };
 
 /* fs_read_random - random-access read */
-int    std_read_random(IO_INFO *self, char *buf, int len, off_t offs,
+int    std_read_random(IO_INFO *self, char *buf, uint32_t len, uint64_t offs,
 		               const char *comment)
 {
     char   *myname = "fs_read_random";
@@ -146,8 +146,8 @@ struct adv_split_file {
   const char *name;
   int fd;
   // These correspond to the offsets for this file
-  long long int start_offset;
-  long long int end_offset;
+  uint64_t start_offset;
+  uint64_t end_offset;
   struct adv_split_file *next;
 };
 
@@ -155,17 +155,17 @@ struct IO_INFO_ADV {
   IO_INFO io;
   //Stores the files belonging to this dd image set
   struct adv_split_file *file_list;
-  unsigned long long offset;
+  uint64_t offset;
 };
 
 typedef struct IO_INFO_ADV IO_INFO_ADV;
 
 /* fs_read_random - random-access read */
-int    adv_read_random(IO_INFO *self, char *buf, int len, off_t offs,
+int    adv_read_random(IO_INFO *self, char *buf, uint32_t len, uint64_t offs,
 		               const char *comment)
 {
     IO_INFO_ADV *io=(IO_INFO_ADV *)self;
-    unsigned long long int count=0,available;
+    uint64_t count=0,available;
     struct adv_split_file *file;
 
     if(!self->ready)
@@ -222,8 +222,8 @@ void adv_help(void) {
 int adv_add_file_to_split_list(IO_INFO_ADV *io,const char *name) {
   /* Add file to our split files list: */
   struct adv_split_file *file,*tmp;
-  long long int max_offset=0;
-  long long int file_size=0;
+  uint64_t max_offset=0;
+  uint64_t file_size=0;
   
   file=NEW(struct adv_split_file);
   if(!file) RAISE(E_NOMEMORY,NULL,"Cant Malloc");
@@ -318,13 +318,13 @@ struct IO_INFO_SGZ {
   struct sgzip_obj *sgzip;
   int fd;
   char *name;
-  unsigned long long int *index;
-  unsigned long long int offset;
+  uint64_t *index;
+  uint64_t offset;
 };
 
 typedef struct IO_INFO_SGZ IO_INFO_SGZ;
 
-int sgz_read_random(IO_INFO *self, char *buf, int len, off_t offs,
+int sgz_read_random(IO_INFO *self, char *buf, uint32_t len, uint64_t offs,
 		               const char *comment)
 {
   IO_INFO_SGZ *io=(IO_INFO_SGZ *)self;
@@ -427,7 +427,7 @@ struct IO_INFO_EWF {
   struct offset_table offsets;
   //This is the offset into the image. Its usually zero unless the
   //entire HDD was acquired.
-  unsigned long long int offs;
+  uint64_t offs;
   //Should we ignore errors?
   int force;
 };
@@ -441,7 +441,7 @@ void ewf_help(void) {
   printf("\tA single word without an = sign represents a filename to use\n");
 };
 
-int ewf_read_random(IO_INFO *self, char *buf,int len, off_t offs,
+int ewf_read_random(IO_INFO *self, char *buf,uint32_t len, uint64_t offs,
 		    const char *comment) {
   IO_INFO_EWF *io=(IO_INFO_EWF *)self;
   
@@ -501,7 +501,7 @@ int ewf_initialiser(IO_INFO *self,IO_OPT *args) {
     io->offsets.max_chunk=0;
     io->offsets.max_segment=0;
     //Allocate one array entry and realloc the rest when we need it
-    io->offsets.files=(unsigned int *)malloc(sizeof(io->offsets.files)*2);
+    io->offsets.files=(int *)malloc(sizeof(io->offsets.files)*2);
     io->offsets.fd=NULL;
     io->offsets.offset=NULL;
     io->offsets.section_list=NULL;
@@ -678,7 +678,7 @@ struct IO_INFO_RAID {
   int logical_blocks_per_period;
   int block_size;
   int header_size;
-  unsigned long long int offset;
+  uint64_t offset;
   //An array of map information
   char *map_string;
   struct coordinate *map;
@@ -896,11 +896,11 @@ int raid_slack_read(IO_INFO_RAID *io, char *buf, int len, off_t offs) {
   //Correct offs to the array defaults:
   offs+=io->offset;
 
-  logical_block = (unsigned long long int)(offs/io->block_size);
+  logical_block = (uint64_t)(offs/io->block_size);
   relative_offs = (offs - logical_block*io->block_size);
-  period_number = (unsigned long long int)(logical_block/io->logical_blocks_per_period);
+  period_number = (uint64_t)(logical_block/io->logical_blocks_per_period);
   //The relative logical block within the period:
-  relative_logical_block=(unsigned long long int)(logical_block-period_number*io->logical_blocks_per_period);
+  relative_logical_block=(uint64_t)(logical_block-period_number*io->logical_blocks_per_period);
   
   //The correct slot to find the block in (looked up from the map).
   slot=io->map[relative_logical_block].slot;
@@ -947,7 +947,7 @@ int raid_slack_read(IO_INFO_RAID *io, char *buf, int len, off_t offs) {
   return(len_to_read);
 };
 
-int raid_read_random(IO_INFO *self, char *buf, int len, off_t offs,
+int raid_read_random(IO_INFO *self, char *buf, uint32_t len, uint64_t offs,
 		     const char *comment)
 {
     IO_INFO_RAID *io=(IO_INFO_RAID *)self;
@@ -984,7 +984,7 @@ int raid_read_random(IO_INFO *self, char *buf, int len, off_t offs,
 *****************************************/
 struct IO_INFO_REMOTE {
   IO_INFO io;
-  long long unsigned int offset;
+  uint64_t offset;
   char *remote_server_path;
   char *remote_raw_device;
   char *username;
@@ -1003,7 +1003,7 @@ void remote_help(void) {
   printf("\tdevice=path\t\tRaw device to make available on the remote system.\n");
 };
 
-int remote_read_random(IO_INFO *self, char *buf,int len, off_t offs,
+int remote_read_random(IO_INFO *self, char *buf,uint32_t len, uint64_t offs,
 		    const char *comment) {
   IO_INFO_REMOTE *io=(IO_INFO_REMOTE *)self;
   char *data=NULL;
@@ -1217,9 +1217,9 @@ IO_INFO *io_open(char *name) {
   M - Means 1024*1024 bytes
   S - Menas 512 bytes (sector size)
 */
-long long unsigned int parse_offsets(char *string) 
+uint64_t parse_offsets(char *string) 
 {
-  long long unsigned int result=0;
+  uint64_t result=0;
   int multiplier=1;
   int offs=0;
   

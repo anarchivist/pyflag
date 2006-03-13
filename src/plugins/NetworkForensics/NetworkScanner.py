@@ -40,7 +40,7 @@ import pyflag.FlagFramework as FlagFramework
 
 def IP2str(ip):
     """ Returns a string representation of the 32 bit network order ip """
-    tmp = list(struct.unpack('BBBB',struct.pack('L',ip)))
+    tmp = list(struct.unpack('=BBBB',struct.pack('=L',ip)))
     tmp.reverse()
     return ".".join(["%s" % i for i in tmp])
 

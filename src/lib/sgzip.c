@@ -63,7 +63,7 @@ same for both the uncompressed file and the compressed file.
 @arg filename: The filename of an uncompressed image size
 @arg cfd:   A file descriptor for a compressed file
 */
-void test_harness(char *filename,int cfd,unsigned long long int *index,const struct sgzip_obj *sgzip) {
+void test_harness(char *filename,int cfd,uint64_t *index,const struct sgzip_obj *sgzip) {
   int fd1;
   int offset,count=0;
   int read_size;
@@ -226,7 +226,7 @@ void handle_file(char *filename,char mode) {
 };
 
 int main(int argc, char **argv) {
-  unsigned long long int *index;
+  uint64_t *index;
   char c;
   // 'c' for compress, 'd' for decompress
   char mode='c';
@@ -319,7 +319,7 @@ int main(int argc, char **argv) {
 	char temp[5];
 	int fdin,count;
 	int flag=0;
-	unsigned long long int *index,*derived_index;
+	uint64_t *index,*derived_index;
 
 	fdin=open(filename,O_RDONLY|O_BINARY);
 	if(fdin<0) die(Open,filename);
@@ -363,7 +363,7 @@ int main(int argc, char **argv) {
     case 'R': //Rebuild index
       {
 	char *filename=optarg;
-	unsigned long long int *index;
+	uint64_t *index;
 	int fdin;
 
 	fdin=open(filename,O_RDWR|O_BINARY);

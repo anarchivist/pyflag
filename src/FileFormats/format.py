@@ -196,7 +196,7 @@ class BasicType(DataType):
 
 class WORD(BasicType):
     """ Reads a word (short int) from the data in big endian """
-    fmt = 'H'
+    fmt = '=H'
     def __str__(self):
         if not self.data:
             self.initialise()
@@ -204,10 +204,10 @@ class WORD(BasicType):
         return "0x%X" % (self.data,)
 
 class LONG(BasicType):
-    fmt='l'
+    fmt='=l'
 
 class ULONG(BasicType):
-    fmt='L'
+    fmt='=L'
     
     def __str__(self):
         if not self.data:
@@ -216,16 +216,16 @@ class ULONG(BasicType):
         return "%s (0x%X)" % (self.data,self.data)
 
 class LONGLONG(BasicType):
-    fmt='q'
+    fmt='=q'
     
 class DWORD(LONG):
     pass
 
 class CHAR(BasicType):
-    fmt='c'
+    fmt='=c'
 
 class BYTE(BasicType):
-    fmt='b'
+    fmt='=b'
     
     def __str__(self):
         if not self.data:
@@ -563,10 +563,10 @@ class BYTE_ENUM(BYTE):
         return self.types[self.data]
     
 class LONG_ENUM(BYTE_ENUM):
-    fmt='l'    
+    fmt='=l'    
 
 class WORD_ENUM(BYTE_ENUM):
-    fmt='H'    
+    fmt='=H'    
 
 class BitField(BYTE):
     ## This stores the masks

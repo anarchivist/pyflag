@@ -347,7 +347,7 @@ int close(int fd) {
   } else return 0;
 };
 
-/*
+
 FILE *fopen64(const char *path, const char *mode) {
   FILE *fd;
   CHECK_INIT;
@@ -355,7 +355,6 @@ FILE *fopen64(const char *path, const char *mode) {
   fd=fopen(path,mode);
   return fd;
 };
-*/
 
 FILE *fopen(const char *path, const char *mode) {
   char *file_prefix = getenv("IO_FILENAME");
@@ -420,8 +419,8 @@ int fclose(FILE *stream) {
   CHECK_INIT;
 
   //Thats an iosource:
-  if((unsigned int)stream<256) {
-    iosources[(unsigned int)stream]=NULL;
+  if((uint32_t)stream<256) {
+    iosources[(uint32_t)stream]=NULL;
     return 0;
   };
   return dispatch->fclose(stream);

@@ -218,7 +218,7 @@ struct sgzip_index_list *add_item(struct sgzip_index_list *index,int block_lengt
    If data is NULL, or length =0, we flush the buffer.
  */
 static int stream_write(int outfd,void *data,int length, 
-			char *buffer,unsigned long int *fill, int size, char *comment) {
+			char *buffer,uint32_t *fill, int size, char *comment) {
   //Can we fit the new data in the buffer? Or do we need to flush the
   //data?
   if(!data || length==0 || *fill+length>size) { //No: write the buffer out
@@ -240,10 +240,10 @@ static int stream_write(int outfd,void *data,int length,
   return(length);
 };
 
-void sgzip_write_index(int outfd,unsigned long long int *index) {
+void sgzip_write_index(int outfd,uint64_t *index) {
   int j,count=0;
   char *buffer;
-  unsigned long int fill=0;
+  uint32_t fill=0;
 
   buffer=(char *)malloc(BUFFER_SIZE);
   if(!buffer) RAISE(E_NOMEMORY,NULL,Malloc);
@@ -267,21 +267,21 @@ void sgzip_write_index(int outfd,unsigned long long int *index) {
 
 /* Copy stream in to stream out */
 void sgzip_compress_fds(int infd,int outfd,const struct sgzip_obj *sgzip) {
-  char *datain;
-  unsigned long int lengthin;
-  char *dataout;
+  unsigned char *datain;
+  uint32_t lengthin;
+  unsigned char *dataout;
   char *buffer;
-  unsigned long int lengthout;
-  unsigned long int fill=0;
+  unsigned long lengthout;
+  uint32_t fill=0;
   int result;
   struct sgzip_index_list *index_list=NULL;
   struct sgzip_index_list *i;
-  unsigned long long int count=0;
-  unsigned long long int *index;
+  uint64_t count=0;
+  uint64_t *index;
 
-  datain=(char *) malloc(sgzip->header->blocksize);
-  dataout=(char*)malloc(sgzip->header->blocksize+1024);
-  buffer = (char *)malloc(BUFFER_SIZE);
+  datain=(unsigned char *) malloc(sgzip->header->blocksize);
+  dataout=(unsigned char*)malloc(sgzip->header->blocksize+1024);
+  buffer = (unsigned char *)malloc(BUFFER_SIZE);
   if(!datain || !dataout || !buffer)
     RAISE(E_NOMEMORY,NULL,Malloc);
 
@@ -299,15 +299,20 @@ void sgzip_compress_fds(int infd,int outfd,const struct sgzip_obj *sgzip) {
       if(lengthin>lengthout) RAISE(E_GENERIC,NULL,"Unable to copy %u bytes into %u bytes\n",lengthin,lengthout);
       memcpy(dataout,datain,lengthin);
     } else {
-      result = compress2(dataout,(long int *)&lengthout,datain,(long int)lengthin,sgzip->level);
+      result = compress2(dataout,(unsigned long *)&lengthout,datain,(unsigned long)lengthin,sgzip->level);
       if(result!=Z_OK) {
 	warn("Cant compress block of size %lu into size %lu...\n" , lengthin, lengthout);
       };
     };
     //Now we write the size of the compressed buffer as a pointer to
-    //the next buffer.
-    stream_write(outfd,&lengthout,sizeof(lengthout),
-		 buffer,&fill,BUFFER_SIZE,"Compressed Pointer");
+    //the next buffer. This is done to force only 32bits to be written
+    //into the file.
+    {
+      uint32_t temp = (uint32_t)lengthout;
+
+      stream_write(outfd,&temp,sizeof(temp),
+		   buffer,&fill,BUFFER_SIZE,"Compressed Pointer");
+    };
 
     if(!(count % 100)) {
       sgzip_debug(1,"Wrote %llu blocks of %lu bytes = %llu Mb total\r",count,sgzip->header->blocksize,(count*sgzip->header->blocksize/1024/1024));
@@ -333,7 +338,7 @@ void sgzip_compress_fds(int infd,int outfd,const struct sgzip_obj *sgzip) {
   stream_write(outfd,NULL,0,buffer,&fill,BUFFER_SIZE,"Flush");
 
   //Now write the index to the file:
-  index=(unsigned long long int *)calloc(sizeof(*index),count+1);
+  index=(uint64_t *)calloc(sizeof(*index),count+1);
   if(!index) RAISE(E_NOMEMORY,NULL,Malloc);
   
   for(count=0,i=index_list;i;i=i->next,count++) {
@@ -357,16 +362,16 @@ void sgzip_compress_fds(int infd,int outfd,const struct sgzip_obj *sgzip) {
    data is a malloced block which gets read every time. We never free
    data since it must remain valid between calls.
 */
-static char *data=NULL;
-static char *cdata=NULL;
-static long long int cached_block_offs=-1;
+static unsigned char *data=NULL;
+static unsigned char *cdata=NULL;
+uint64_t cached_block_offs=-1;
 static int cached_length=-1;
 
 /* read a random buffer from the sgziped file */
-int sgzip_read_random(char *buf, int len, unsigned long long int offs,
-		      int fd, unsigned long long int *index,const struct sgzip_obj *sgzip) {
-  long int length;
-  long long int block_offs,clength,copied=0,buffer_offset,available;
+int sgzip_read_random(char *buf, int len, uint64_t offs,
+		      int fd, uint64_t *index,const struct sgzip_obj *sgzip) {
+  unsigned long int length,clength;
+  uint64_t block_offs,copied=0,buffer_offset,available;
   int result;
 
   //Only malloc data the first time we run.
@@ -409,7 +414,7 @@ int sgzip_read_random(char *buf, int len, unsigned long long int offs,
       };
   
       length=sgzip->header->blocksize;
-      result=uncompress(data,(long int *)&length,cdata,clength);
+      result=uncompress(data,(unsigned long *)&length,cdata,clength);
     
       //Inability to decompress the data is non-recoverable:
       if(!result==Z_OK) {
@@ -450,18 +455,18 @@ int sgzip_read_random(char *buf, int len, unsigned long long int offs,
 
    If the index is not there we flag an error by returning null.
 */
-unsigned long long int *sgzip_read_index(int fd, struct sgzip_obj *sgzip) {
+uint64_t *sgzip_read_index(int fd, struct sgzip_obj *sgzip) {
   char magic[6];
   unsigned int count;
-  unsigned long long int *index;
-  unsigned long long int end;
+  uint64_t *index;
+  uint64_t end;
 
   //Find the end of file:
   end=lseek(fd,0,SEEK_END);
   if(end<0) return(NULL);
 
   //First we detect if there is an index at the end by reading the magic
-  if(lseek(fd,(unsigned long long int)(end-6-sizeof(count)),SEEK_SET)<0) {
+  if(lseek(fd,(uint64_t)(end-6-sizeof(count)),SEEK_SET)<0) {
     /* This file may not be seekable, in this case we cant read its
        index.  We can rebuild the index from the file itself, but a
        non-seekable file cannot be used for read_random, and simply
@@ -484,7 +489,7 @@ unsigned long long int *sgzip_read_index(int fd, struct sgzip_obj *sgzip) {
   sgzip->header->x.max_chunks = count;
 
   //Allocate enough memory for the array:
-  index=(unsigned long long int *)calloc(count+1,sizeof(*index));
+  index=(uint64_t *)calloc(count+1,sizeof(*index));
   if(!index) 
     RAISE(E_NOMEMORY,NULL,Malloc);
 
@@ -510,9 +515,9 @@ unsigned long long int *sgzip_read_index(int fd, struct sgzip_obj *sgzip) {
 
    This is done by following all the blocks throughout the file and
    rebuilding the index. None of the blocks are decoded so this should
-   be quick.  We return an index array of unsigned long long ints.
+   be quick.  We return an index array of uint64_t.
  */
-unsigned long long int *sgzip_calculate_index_from_stream(int fd,
+uint64_t *sgzip_calculate_index_from_stream(int fd,
 			      const struct sgzip_obj *sgzip) {
   int length=0;
   int zoffset=0;
@@ -520,7 +525,7 @@ unsigned long long int *sgzip_calculate_index_from_stream(int fd,
   char *datain;
   int datalength=sgzip->header->blocksize+1024;
   struct sgzip_index_list *result=NULL,*i;
-  unsigned long long int *index=NULL;
+  uint64_t *index=NULL;
 
   /* We use read, rather than seek so this will work on non-seekable
      streams. */
@@ -554,7 +559,7 @@ unsigned long long int *sgzip_calculate_index_from_stream(int fd,
        which is a sign for us to write the index on the file */
   };
   //Create an index table:
-  index=(unsigned long long int *)malloc(count*sizeof(*index));
+  index=(uint64_t *)malloc(count*sizeof(*index));
   if(!index) RAISE(E_NOMEMORY,NULL,Malloc);
 
   count=1;
@@ -572,20 +577,21 @@ unsigned long long int *sgzip_calculate_index_from_stream(int fd,
  */
 void sgzip_decompress_fds(int fd,int outfd,struct sgzip_obj *sgzip) {
   int length=0;
-  long int lengthout=0;
+  unsigned long lengthout=0;
   int read_len;
   int result;
   int zoffset=0;
-  char *datain,*dataout,*buffer;
+  unsigned char *datain,*dataout;
+  char *buffer;
   int datalength=sgzip->header->blocksize+1024;
-  long int count=0;
-  unsigned long int fill=0;
+  uint32_t count=0;
+  uint32_t fill=0;
 
   /* We use read, rather than seek so this will work on non-seekable
      streams. */
-  datain=(char *) malloc(datalength);
-  dataout=(char *) malloc(datalength);
-  buffer = (char *)malloc(BUFFER_SIZE);
+  datain=(unsigned char *) malloc(datalength);
+  dataout=(unsigned char *) malloc(datalength);
+  buffer = (unsigned char *)malloc(BUFFER_SIZE);
   if(!datain || !dataout || !buffer) 
     RAISE(E_NOMEMORY,NULL,Malloc);
   
@@ -612,9 +618,9 @@ void sgzip_decompress_fds(int fd,int outfd,struct sgzip_obj *sgzip) {
     //Now uncompress this block:
     lengthout=datalength;
 
-    result=uncompress(dataout,(long int *)&lengthout,datain,length);
+    result=uncompress(dataout,(unsigned long *)&lengthout,datain,length);
     if(result!=Z_OK) {
-      warn("Cant compress block of size %lu into size %lu..., filling with zeros\n" , length, datalength);
+      warn("Cant uncompress block of size %lu into size %lu..., filling with zeros\n" , length, datalength);
       memset(dataout,0,datalength);
     };
     
