@@ -7,6 +7,7 @@
 #ifndef __TRIE_H
 #define __TRIE_H
 
+#include <Python.h>
 #include "class.h"
 #include "list.h"
 #include <stdint.h>
@@ -37,10 +38,10 @@ CLASS(TrieNode, Object)
      /** Checks if there is a match at the current position in buffer. 
 	 May alter result with the value stored in the node.
      */
-     int METHOD(TrieNode, Match, char *buffer, int len, int *result);
+     int METHOD(TrieNode, Match, char **buffer, int *len, PyObject *result);
 
      /** Adds the word into the trie with the value in data */
-     void METHOD(TrieNode, AddWord, char *word, int len, int data,
+     void METHOD(TrieNode, AddWord, char **word, int *len, long int data,
 		 enum word_types type);
 
      int METHOD(TrieNode, __eq__, TrieNode tested);
@@ -59,12 +60,17 @@ END_CLASS
 CLASS(LiteralNode, TrieNode)
      char value;
 
-     LiteralNode METHOD(LiteralNode, Con, char value);
+     LiteralNode METHOD(LiteralNode, Con, char **value, int *len);
 END_CLASS
 
 CLASS(RootNode, TrieNode)
   
      RootNode METHOD(RootNode, Con);
+END_CLASS
+
+CLASS(CharacterClassNode, TrieNode)
+     char *map;
+     CharacterClassNode METHOD(CharacterClassNode, Con, char **word, int *len);
 END_CLASS
 
 #endif

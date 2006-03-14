@@ -347,7 +347,7 @@ int close(int fd) {
   } else return 0;
 };
 
-
+#ifndef _FILE_OFFSET_BITS
 FILE *fopen64(const char *path, const char *mode) {
   FILE *fd;
   CHECK_INIT;
@@ -355,6 +355,7 @@ FILE *fopen64(const char *path, const char *mode) {
   fd=fopen(path,mode);
   return fd;
 };
+#endif
 
 FILE *fopen(const char *path, const char *mode) {
   char *file_prefix = getenv("IO_FILENAME");
