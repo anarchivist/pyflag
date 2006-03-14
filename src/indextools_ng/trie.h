@@ -12,6 +12,11 @@
 #include "list.h"
 #include <stdint.h>
 
+/** This is the maximum match that will be made with wildcards (must
+    be less than unsigned char
+*/
+#define MAX_MATCH_LENGTH 100
+
 /** These are the possible types that words may be supplied as **/
 enum word_types {
   // This is a literal
@@ -29,6 +34,9 @@ enum word_types {
 */
 CLASS(TrieNode, Object)
      struct list_head peers;
+
+     unsigned char lower_limit;
+     unsigned char upper_limit;
 
      /** This points to a dummy TrieNode object which serves as a
 	 list_head for the peers list of all this nodes children 

@@ -1,6 +1,54 @@
 #include "trie.h"
 #include "misc.h"
 
+/** This function reads the wildcards and ranges:
+
+* Means zero or more occurances,
++ Means one or more occurances,
+{lower,upper} sets a range.
+
+The values are set in the lower,upper if they were found. buffer and
+len are suitably adjusted.
+*/
+void check_for_wildcards(unsigned char *lower, unsigned char *upper, 
+			 char **buffer, int *len) {
+  switch(**buffer) {
+  case '*':
+    *lower=0;
+    goto wildcards_return;
+  case '+':
+    *lower=1;
+    goto wildcards_return;
+  case '{':
+    {
+      int l,u;
+      if(sscanf(*buffer, "{%u,%u}", &l, &u) < 2) {
+	printf("Unable to understand range specification %s\n", *buffer);
+	return;
+      } else {
+	while(**buffer!='}') {
+	  *(buffer)++;
+	  *(len)--;
+	};
+
+	*lower=(unsigned char)l;
+	*upper=(unsigned char)u;
+	return;
+      };
+    };
+  default:
+    /** Do nothing if there are not ranges */
+    return;
+  };
+
+ wildcards_return:
+  *upper=MAX_MATCH_LENGTH;
+  *buffer = *buffer+1;
+  *len = *len -1;
+  return;
+};
+
+
 TrieNode TrieNode_Con(TrieNode self) {
 
   INIT_LIST_HEAD(&(self->peers));
@@ -25,6 +73,7 @@ void TrieNode_AddWord(TrieNode self, char **word, int *len, long int data,
   if(**word == '\\') {
     *word=*word+1;
     *len=*len-1;
+    /** Two \\ in a row will be replaced by one \ */
     if(**word != '\\') {
       n=(TrieNode)CONSTRUCT(CharacterClassNode, CharacterClassNode, 
 			    Con, self, word, len);
@@ -55,11 +104,16 @@ void TrieNode_AddWord(TrieNode self, char **word, int *len, long int data,
     n->child = CONSTRUCT(TrieNode, TrieNode, Con, self);
   };
   
-  /** Now ask n to add the rest of the word */
   (*len)--;
   (*word)++;
+
+  /** Now check for wildcards and ranges */
+  check_for_wildcards(&(self->lower_limit), &(self->upper_limit), word, len);
+
+  /** Now ask n to add the rest of the word */  
   CALL(n->child, AddWord, word, len, data, type);
 
+  printf("%u %u\n", self->lower_limit, self->upper_limit);
   return;
 };
 
@@ -82,6 +136,9 @@ int TrieNode_Match(TrieNode self, char **buffer, int *len, PyObject *result) {
 };
 
 VIRTUAL(TrieNode, Object)
+     VATTR(lower_limit)=1;
+     VATTR(upper_limit)=1;
+
      VMETHOD(Con) = TrieNode_Con;
      VMETHOD(AddWord) = TrieNode_AddWord;
      VMETHOD(Match) = TrieNode_Match;
@@ -112,21 +169,36 @@ int LiteralNode_eq(TrieNode self, TrieNode tested) {
 
 int LiteralNode_Match(TrieNode self, char **buffer, int *len, PyObject *result) {
   LiteralNode this=(LiteralNode) self;
+  int i;
 
-  /** Here we try to check if *buffer matches us. If it does, we can
-      search further otherwise we return False immediately
+  /** First check for the lower limit of char counts */
+  for(i=0;i<self->lower_limit;i++) {
+    if(**buffer!=this->value)
+      return False;
+  };
+
+  /** Now check for the range - this makes us greedy since it will
+      consume as many chars as possible between the lower_limit and
+      the upper_limit
   */
-  if(**buffer == this->value) {
-    //Consume one char and keep testing:
-    char *new_buffer=*buffer+1;
-    int new_length = *len-1;
+  for(i=self->lower_limit; i<self->upper_limit; i++) {
+    if(*(*buffer + i) != this->value) {
+      break;
+    };
+  };
+
+  {
+    //Consume all the chars and keep testing:
+    char *new_buffer=*buffer+i;
+    int new_length = *len-i;
     return this->__super__->Match(self->child, &new_buffer, &new_length, result);
-  } else {
-    return False;
   };
 };
 
 VIRTUAL(LiteralNode, TrieNode)
+     VATTR(super.lower_limit)=1;
+     VATTR(super.upper_limit)=1;
+
      VMETHOD(Con) = LiteralNode_Con;
      VMETHOD(super.__eq__) = LiteralNode_eq;
      VMETHOD(super.Match) = LiteralNode_Match;
