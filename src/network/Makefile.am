@@ -6,14 +6,17 @@ pcaptool_LDFLAGS	= /usr/lib/libpcap.a
 pkgpython_PYTHON 	= dissect.py
 pkgpyexec_LTLIBRARIES 	= _dissect.la
 
-noinst_LTLIBRARIES	= libnetwork.la
+noinst_LTLIBRARIES	= libnetwork.la libhashtable.la
 libnetwork_la_SOURCES	= network.c
 libnetwork_la_CFLAGS 	= -I$(top_srcdir)/src/include
+
+libhashtable_la_SOURCES	= hashtable.c
+libhashtable_la_CFLAGS	= -I$(top_srcdir)/src/include
 
 _dissect_la_SOURCES 	= dissect.c
 _dissect_la_CPPFLAGS 	= $(SWIG_PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
 _dissect_la_LDFLAGS 	= -module
-_dissect_la_LIBADD	= ../lib/liboo.la libnetwork.la
+_dissect_la_LIBADD	= ../lib/liboo.la libnetwork.la libhashtable.la
 
 noinst_HEADERS		= network.h
 

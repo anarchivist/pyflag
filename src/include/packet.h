@@ -84,24 +84,25 @@
 
 #define MAXIMUM_PACKET_SIZE 32*1024
 
-enum field_types {
-  FIELD_TYPE_INT,
-  FIELD_TYPE_INT_X,
-  FIELD_TYPE_CHAR,
-  FIELD_TYPE_CHAR_X,
-  FIELD_TYPE_SHORT,
-  FIELD_TYPE_SHORT_X,
-  FIELD_TYPE_STRING,
-  FIELD_TYPE_STRING_X,
-  FIELD_TYPE_IP_ADDR,
-  FIELD_TYPE_HEX,
-  FIELD_TYPE_PACKET,
-  FIELD_TYPE_ETH_ADD
-};
+#define ENUM_FIELD_TYPE(_)			\
+  _(FIELD_TYPE_INT)				\
+       _(FIELD_TYPE_INT_X)			\
+       _(FIELD_TYPE_CHAR)			\
+       _(FIELD_TYPE_CHAR_X)			\
+       _(FIELD_TYPE_SHORT)			\
+       _(FIELD_TYPE_SHORT_X)			\
+       _(FIELD_TYPE_STRING)			\
+       _(FIELD_TYPE_STRING_X)			\
+       _(FIELD_TYPE_IP_ADDR)			\
+       _(FIELD_TYPE_HEX)			\
+       _(FIELD_TYPE_PACKET)			\
+       _(FIELD_TYPE_ETH_ADD)		       
+
+DEFINE_ENUM(field_type_t, ENUM_FIELD_TYPE);
 
 struct struct_property_t {
   char *name;
-  int field_type;
+  enum field_type_t field_type;
   
   /** This represents the number of bytes from the begining of the
       struct where this item may be found 

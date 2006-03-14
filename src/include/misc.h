@@ -35,6 +35,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include "enum.h"
 
 #define O_BINARY 0
 
