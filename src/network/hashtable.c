@@ -76,7 +76,8 @@ VIRTUAL(HashTable, Object)
      VMETHOD(hash_function) = HashTable_hash_function;
 END_VIRTUAL
 
-/** Test this module */
+/** Test this module
 MODULE_INIT(hashtables) {
   HashTable h=CONSTRUCT(HashTable, HashTable, Con, 8, NULL);
 };
+*/

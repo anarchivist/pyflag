@@ -323,7 +323,21 @@ class ThemeRegistry(Registry):
         Registry.__init__(self,ParentClass)
         for cls in self.classes:
             self.themes[("%s" % cls).split('.')[-1]]=cls
-    
+
+class FileFormatRegistry(Registry):
+    """ A class for registering all file formats """
+    formats = {}
+
+    def __getitem__(self,format_name):
+        """ Return the command objects by name """
+        return self.formats[format_name]
+
+    def __init__(self,ParentClass):
+        Registry.__init__(self,ParentClass)   
+        for cls in self.classes:
+            ## The name of the class is the command name
+            self.formats[("%s" % cls).split('.')[-1]] = cls
+
 LOCK = 0
 REPORTS = None
 SCANNERS = None
@@ -332,6 +346,7 @@ LOG_DRIVERS = None
 SHELL_COMMANDS = None
 FILESYSTEMS = None
 THEMES = None
+FILEFORMATS = None
 
 ## This is required for late initialisation to avoid dependency nightmare.
 def Init():
@@ -376,6 +391,10 @@ def Init():
     global FILESYSTEMS
     FILESYSTEMS = FileSystemRegistry(FileSystem.FileSystem)
 
+    ## Register FileFormat drivers
+    import pyflag.format as format
+    global FILEFORMATS
+    FILEFORMATS = FileFormatRegistry(format.DataType)
 
 def import_module(name,load_as=None):
     Init()
