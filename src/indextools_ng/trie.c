@@ -22,22 +22,23 @@ void check_for_wildcards(unsigned char *lower, unsigned char *upper,
   case '{':
     {
       int l,u;
+
       if(sscanf(*buffer, "{%u,%u}", &l, &u) < 2) {
 	printf("Unable to understand range specification %s\n", *buffer);
 	return;
       } else {
-	while(**buffer!='}') {
-	  *(buffer)++;
-	  *(len)--;
+	while(*(*buffer-1)!='}') {
+	  (*buffer)++;
+	  (*len)--;
 	};
-
+	
 	*lower=(unsigned char)l;
 	*upper=(unsigned char)u;
 	return;
       };
     };
   default:
-    /** Do nothing if there are not ranges */
+    /** Do nothing if there are no ranges */
     return;
   };
 
@@ -54,6 +55,10 @@ TrieNode TrieNode_Con(TrieNode self) {
   INIT_LIST_HEAD(&(self->peers));
 
   return self;
+};
+
+int TrieNode_compare(TrieNode self, char *buffer, int len) {
+  return True;
 };
 
 /** This adds the chain representing word into self as a parent */
@@ -108,31 +113,53 @@ void TrieNode_AddWord(TrieNode self, char **word, int *len, long int data,
   (*word)++;
 
   /** Now check for wildcards and ranges */
-  check_for_wildcards(&(self->lower_limit), &(self->upper_limit), word, len);
+  check_for_wildcards(&(n->lower_limit), &(n->upper_limit), word, len);
 
   /** Now ask n to add the rest of the word */  
   CALL(n->child, AddWord, word, len, data, type);
 
-  printf("%u %u\n", self->lower_limit, self->upper_limit);
   return;
 };
 
 int TrieNode_Match(TrieNode self, char **buffer, int *len, PyObject *result) {
-  TrieNode i;
-  int found=False;
-    
-  /** The indexed buffer has run out */
-  if(*len<=0) return False;
+  int i;
 
-  /** If one of our children is a DataNode we adjust result. This loop
-      goes over all our children in case one of them is a DataNode
-  */
-  list_for_each_entry(i, &(self->peers), peers) {
-    if(i->Match(i, buffer, len, result))
-      found=True;
+  /** First check for the lower limit of char counts */
+  for(i=0;i<self->lower_limit;i++) {
+    if(!self->compare(self,*buffer+i, *len-1))
+      return False;
   };
-  
-  return found;
+
+  /** Now check for the range - this makes us greedy since it will
+      consume as many chars as possible between the lower_limit and
+      the upper_limit
+  */
+  for(i=self->lower_limit; i<self->upper_limit; i++) {
+    if(!self->compare(self,*buffer+i, *len-1))
+      break;
+    };
+
+  {
+    //Consume all the chars and keep testing:
+    char *new_buffer=*buffer+i;
+    int new_length = *len-i;
+    int found=False;
+    TrieNode i;
+
+    /** The indexed buffer has run out */
+    if(new_length<=0) return False;
+    
+    /** Get all the matches from our children Note that we need to get
+	_all_ the matches but return true if _any_ of our peers match.
+    */
+    list_for_each_entry(i, &(self->child->peers), peers) {
+      if(i->Match(i, &new_buffer, &new_length, result))
+	found=True;
+    };
+    
+    return found;
+  //    return self->Match(self->child, &new_buffer, &new_length, result);
+  };
 };
 
 VIRTUAL(TrieNode, Object)
@@ -142,6 +169,7 @@ VIRTUAL(TrieNode, Object)
      VMETHOD(Con) = TrieNode_Con;
      VMETHOD(AddWord) = TrieNode_AddWord;
      VMETHOD(Match) = TrieNode_Match;
+     VMETHOD(compare) = TrieNode_compare;
 END_VIRTUAL
 
 LiteralNode LiteralNode_Con(LiteralNode self, char **value, int *len) {
@@ -167,32 +195,10 @@ int LiteralNode_eq(TrieNode self, TrieNode tested) {
   return 0;
 };
 
-int LiteralNode_Match(TrieNode self, char **buffer, int *len, PyObject *result) {
-  LiteralNode this=(LiteralNode) self;
-  int i;
+int LiteralNode_compare(TrieNode self, char *buffer, int len) {
+  LiteralNode this = (LiteralNode)self;
 
-  /** First check for the lower limit of char counts */
-  for(i=0;i<self->lower_limit;i++) {
-    if(**buffer!=this->value)
-      return False;
-  };
-
-  /** Now check for the range - this makes us greedy since it will
-      consume as many chars as possible between the lower_limit and
-      the upper_limit
-  */
-  for(i=self->lower_limit; i<self->upper_limit; i++) {
-    if(*(*buffer + i) != this->value) {
-      break;
-    };
-  };
-
-  {
-    //Consume all the chars and keep testing:
-    char *new_buffer=*buffer+i;
-    int new_length = *len-i;
-    return this->__super__->Match(self->child, &new_buffer, &new_length, result);
-  };
+  return *buffer == this->value;
 };
 
 VIRTUAL(LiteralNode, TrieNode)
@@ -201,8 +207,26 @@ VIRTUAL(LiteralNode, TrieNode)
 
      VMETHOD(Con) = LiteralNode_Con;
      VMETHOD(super.__eq__) = LiteralNode_eq;
-     VMETHOD(super.Match) = LiteralNode_Match;
+     VMETHOD(super.compare) = LiteralNode_compare;
 END_VIRTUAL
+
+int RootNode_Match(TrieNode self, char **buffer, int *len, PyObject *result) {
+  TrieNode i;
+  int found=False;
+    
+  /** The indexed buffer has run out */
+  if(*len<=0) return False;
+
+  /** Get all the matches from our peers Note that we need to get
+      _all_ the matches but return true if _any_ of our peers match.
+  */
+  list_for_each_entry(i, &(self->peers), peers) {
+    if(i->Match(i, buffer, len, result))
+      found=True;
+  };
+  
+  return found;
+};
 
 RootNode RootNode_Con(RootNode this) {
   
@@ -213,6 +237,7 @@ RootNode RootNode_Con(RootNode this) {
 
 VIRTUAL(RootNode, TrieNode)
      VMETHOD(Con) = RootNode_Con;
+     VMETHOD(super.Match) = RootNode_Match;
 END_VIRTUAL
 
 DataNode DataNode_Con(DataNode self, int data) {
@@ -269,21 +294,14 @@ CharacterClassNode CharacterClassNode_Con(CharacterClassNode self,
   return self;
 };
 
-int CharacterClassNode_Match(TrieNode self, char **buffer, int *len, PyObject *result) {
+int CharacterClassNode_compare(TrieNode self, char *buffer, int len) {
   CharacterClassNode this=(CharacterClassNode) self;
-  int index = *(unsigned char *)*buffer;
+  int index = *(unsigned char *)buffer;
 
-  if(this->map[index]) {
-    //Consume one char and keep testing:
-    *buffer=*buffer+1;
-    *len=*len-1;
-    return this->__super__->Match(self->child, buffer, len, result);
-  } else {
-    return False;
-  };
+  return(this->map[index]);
 };
 
 VIRTUAL(CharacterClassNode, TrieNode)
      VMETHOD(Con) = CharacterClassNode_Con;
-     VMETHOD(super.Match) = CharacterClassNode_Match;
+     VMETHOD(super.compare) = CharacterClassNode_compare;
 END_VIRTUAL

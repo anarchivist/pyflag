@@ -48,6 +48,9 @@ CLASS(TrieNode, Object)
      */
      int METHOD(TrieNode, Match, char **buffer, int *len, PyObject *result);
 
+     /** This method must return True or False when comparing at buffer */
+     int METHOD(TrieNode, compare, char *buffer, int len);
+
      /** Adds the word into the trie with the value in data */
      void METHOD(TrieNode, AddWord, char **word, int *len, long int data,
 		 enum word_types type);
