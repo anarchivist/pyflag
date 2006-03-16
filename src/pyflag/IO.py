@@ -277,7 +277,7 @@ class advanced(IO):
         result.row("Select image(s):", tmp)
         tmp = result.__class__(result)
         tmp2 = result.__class__(result)
-        option_str="filename=%s" % query['io_filename']
+        option_str=','.join(["filename=%s" % x for x in query.getarray('io_filename')])
         tmp2.popup(
             FlagFramework.Curry(mmls_popup,option_str=option_str,subsys="advanced",offset="io_offset"),
             "Survey the partition table",
@@ -311,7 +311,7 @@ class ewf(IO):
         result.row("Select EWF image(s):",tmp)
         tmp = result.__class__(result)
         tmp2 = result.__class__(result)
-        option_str="filename=%s" % query['io_filename']
+        option_str=','.join(["filename=%s" % x for x in query.getarray('io_filename')])
         tmp2.popup(
             FlagFramework.Curry(mmls_popup,option_str=option_str,subsys="ewf",offset="io_offset"),
             "Survey the partition table",
