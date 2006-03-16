@@ -44,12 +44,14 @@ static PyObject *index_buffer(PyObject *self, PyObject *args) {
     char *new_buffer = buffer+i;
     int new_length = length-i;
 
-    if(root->super.Match((TrieNode)root, &new_buffer, &new_length, match_list)) {
-      PyObject *temp = Py_BuildValue("iN", i, match_list);
-      if(!temp) return NULL;
+    if(root->super.Match((TrieNode)root, new_buffer, 
+			 &new_buffer, &new_length, match_list)) {
+
+      if(PyList_Insert(match_list, 0, PyInt_FromLong(i))<0) 
+	return NULL;
 
       /** Append temp to the result */
-      if(PyList_Append(result, temp)<0) return NULL;
+      if(PyList_Append(result, match_list)<0) return NULL;
       match_list=PyList_New(0);
     };
   };

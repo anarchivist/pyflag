@@ -45,8 +45,12 @@ CLASS(TrieNode, Object)
 
      /** Checks if there is a match at the current position in buffer. 
 	 May alter result with the value stored in the node.
+
+	 start is a pointer to the start of the match (such that
+	 *buffer-start = length of match).
      */
-     int METHOD(TrieNode, Match, char **buffer, int *len, PyObject *result);
+     int METHOD(TrieNode, Match, char *start, char **buffer, int *len, 
+		PyObject *result);
 
      /** This method must return True or False when comparing at buffer */
      int METHOD(TrieNode, compare, char *buffer, int len);
@@ -82,6 +86,8 @@ END_CLASS
 CLASS(CharacterClassNode, TrieNode)
      char *map;
      CharacterClassNode METHOD(CharacterClassNode, Con, char **word, int *len);
+     CharacterClassNode METHOD(CharacterClassNode, Con_with_map, 
+			       char **word, int *len, char *map);
 END_CLASS
 
 #endif

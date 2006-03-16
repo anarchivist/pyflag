@@ -49,6 +49,54 @@ void check_for_wildcards(unsigned char *lower, unsigned char *upper,
   return;
 };
 
+/** This function builds a character map from a character class
+    specification. (e.g. [^1-9abc]). buffer,len are the buffer to read
+    the specification from, we advance those past the
+    specification. We return a map (i.e. char x[256] where x[char] =
+    True for char in character class.
+*/
+char *build_character_class(char **buffer, int *len) {
+  int inverted = False;
+  char *map;
+
+  if(**buffer == '[') {
+    (*buffer)++; (*len)--;
+  } else return NULL;
+
+  map = talloc_size(NULL, 256);
+  memset(map, 0, 256);
+  
+  if(**buffer == '^') {
+    inverted = True;
+    (*buffer)++; (*len)--;
+  };
+
+  while(**buffer != ']') {
+    //Range specified:
+    if(**buffer=='-') {
+      int i;
+
+      for(i= *(*buffer-1); i<= *(*buffer+1); i++) {
+	map[i] = True;
+      };
+
+      (*buffer)++; (*len)--;
+    } else     
+      map[(int)*(unsigned char *)*buffer] = True;
+
+    (*buffer)++; (*len)--;
+  };
+
+  if(inverted) {
+    int i;
+
+    for(i=0;i<256; i++) map[i] = ~map[i];
+  };
+
+  (*buffer)++; (*len)--; 
+  return map;
+};
+
 
 TrieNode TrieNode_Con(TrieNode self) {
 
@@ -75,21 +123,33 @@ void TrieNode_AddWord(TrieNode self, char **word, int *len, long int data,
     return;
   };
 
-  if(**word == '\\') {
-    *word=*word+1;
-    *len=*len-1;
-    /** Two \\ in a row will be replaced by one \ */
-    if(**word != '\\') {
-      n=(TrieNode)CONSTRUCT(CharacterClassNode, CharacterClassNode, 
-			    Con, self, word, len);
+  if(*len>0) {
+    if(**word == '\\') {
+      *word=*word+1;
+      *len=*len-1;
+      /** Two \\ in a row will be replaced by one \ */
+      if(**word != '\\') {
+	n=(TrieNode)CONSTRUCT(CharacterClassNode, CharacterClassNode, 
+			      Con, self, word, len);
+      };
+    } else if (**word == '[') {
+      char *map = build_character_class(word, len);
+      
+      if(map) {
+	n=(TrieNode)CONSTRUCT(CharacterClassNode, CharacterClassNode,
+			      Con_with_map, self, word,len, map);
+	
+	/** Steal this map: */
+	talloc_steal(n, map);
+      };
     };
   };
-
+  
   if(!n) {
     /** Node is literal */
     n=(TrieNode)CONSTRUCT(LiteralNode, LiteralNode, Con, self, word, len);
   };
-
+  
   /** Check to see if the new item is in our peers list: */
   list_for_each_entry(i, &(self->peers), peers) {
     if(n->__eq__(n, i)) {
@@ -103,25 +163,24 @@ void TrieNode_AddWord(TrieNode self, char **word, int *len, long int data,
   if(n!=i) {
     list_add(&(n->peers), &(self->peers));
   };
-
+  
   if(!n->child) {
     /** Child is a list head for the children list: */
     n->child = CONSTRUCT(TrieNode, TrieNode, Con, self);
   };
-  
-  (*len)--;
-  (*word)++;
-
-  /** Now check for wildcards and ranges */
-  check_for_wildcards(&(n->lower_limit), &(n->upper_limit), word, len);
-
+    
+  if(*len > 0) {
+    /** Now check for wildcards and ranges */
+    check_for_wildcards(&(n->lower_limit), &(n->upper_limit), word, len);
+  };
+   
   /** Now ask n to add the rest of the word */  
   CALL(n->child, AddWord, word, len, data, type);
 
   return;
 };
 
-int TrieNode_Match(TrieNode self, char **buffer, int *len, PyObject *result) {
+int TrieNode_Match(TrieNode self, char *start, char **buffer, int *len, PyObject *result) {
   int i;
 
   /** First check for the lower limit of char counts */
@@ -153,7 +212,7 @@ int TrieNode_Match(TrieNode self, char **buffer, int *len, PyObject *result) {
 	_all_ the matches but return true if _any_ of our peers match.
     */
     list_for_each_entry(i, &(self->child->peers), peers) {
-      if(i->Match(i, &new_buffer, &new_length, result))
+      if(i->Match(i,start, &new_buffer, &new_length, result))
 	found=True;
     };
     
@@ -174,7 +233,10 @@ END_VIRTUAL
 
 LiteralNode LiteralNode_Con(LiteralNode self, char **value, int *len) {
   self->value = **value;
-  
+
+  (*value)++;
+  (*len)--;
+
   INIT_LIST_HEAD(&(self->super.peers));
 
   talloc_set_name(self, "%s: %c", NAMEOF(self),**value);
@@ -210,7 +272,7 @@ VIRTUAL(LiteralNode, TrieNode)
      VMETHOD(super.compare) = LiteralNode_compare;
 END_VIRTUAL
 
-int RootNode_Match(TrieNode self, char **buffer, int *len, PyObject *result) {
+int RootNode_Match(TrieNode self, char *start, char **buffer, int *len, PyObject *result) {
   TrieNode i;
   int found=False;
     
@@ -221,7 +283,7 @@ int RootNode_Match(TrieNode self, char **buffer, int *len, PyObject *result) {
       _all_ the matches but return true if _any_ of our peers match.
   */
   list_for_each_entry(i, &(self->peers), peers) {
-    if(i->Match(i, buffer, len, result))
+    if(i->Match(i, start, buffer, len, result))
       found=True;
   };
   
@@ -253,11 +315,12 @@ DataNode DataNode_Con(DataNode self, int data) {
 /** Data nodes automatically match - if we get to them, we have a
     match. We also can set the result 
 */
-int DataNode_Match(TrieNode self, char **buffer, int *len, PyObject *result) {
+int DataNode_Match(TrieNode self, char *start, char **buffer, int *len, PyObject *result) {
   DataNode this = (DataNode) self;
   
   /** Append the hit to the list */
-  PyList_Append(result,PyInt_FromLong(this->data));
+  PyList_Append(result, PyInt_FromLong(*buffer-start));
+  PyList_Append(result, PyInt_FromLong(this->data));
   
   return True;
 };
@@ -271,6 +334,17 @@ END_VIRTUAL
     edited for UTF8?? */
 static char char_map_digits[256] = { ['0' ... '9'] = 1 };
 static char char_map_word[256]   = { ['a' ... 'z'] = 1, ['A' ... 'Z'] = 1};
+
+CharacterClassNode CharacterClassNode_Con_with_map(CharacterClassNode self,
+						   char **word, int *len, 
+						   char *map) {
+  CharacterClassNode this = (CharacterClassNode) self;
+
+  this->map = map;
+
+  return self;
+};
+
 
 CharacterClassNode CharacterClassNode_Con(CharacterClassNode self,
 					  char **word, int *len) {
@@ -290,6 +364,9 @@ CharacterClassNode CharacterClassNode_Con(CharacterClassNode self,
     return (CharacterClassNode)CONSTRUCT(LiteralNode, LiteralNode, Con,
 					 self, word, len);
   }
+  
+  (*len)--;
+  (*word)++;
 
   return self;
 };
@@ -302,6 +379,7 @@ int CharacterClassNode_compare(TrieNode self, char *buffer, int len) {
 };
 
 VIRTUAL(CharacterClassNode, TrieNode)
-     VMETHOD(Con) = CharacterClassNode_Con;
+     VMETHOD(Con) = CharacterClassNode_Con; 
+     VMETHOD(Con_with_map) = CharacterClassNode_Con_with_map;
      VMETHOD(super.compare) = CharacterClassNode_compare;
 END_VIRTUAL
