@@ -83,7 +83,8 @@ class IndexScan(GenScanFactory):
         
         self.dbh.execute("""create table if not exists `LogicalIndexOffsets` (
         `id` INT NOT NULL ,
-        `offset` BIGINT NOT NULL
+        `offset` BIGINT NOT NULL,
+        `length` smallint not null
         )""")
 
         #Create a table that will hold our stats: number of occurrences of each word id we are searching for.
@@ -120,9 +121,12 @@ class IndexScan(GenScanFactory):
         # add more encodings here as necessary.
         pydbh.execute("select word,id from dictionary where type='word'")
         for row in pydbh:
-            word = row['word'].decode("UTF-8")
-            for e in config.INDEX_ENCODINGS:
-                index.add_word(self.index, word.encode(e),row['id'], 0)
+            try:
+                word = row['word'].decode("UTF-8")
+                for e in config.INDEX_ENCODINGS:
+                    index.add_word(self.index, word.encode(e),row['id'], 0)
+            except UnicodeDecodeError:
+                pass
 
         logging.log(logging.DEBUG,"Index Scanner: Done in %s seconds..." % (time.time()-start_time))
 
@@ -167,7 +171,6 @@ class IndexScan(GenScanFactory):
             self.stats_count={}
 
         def process(self,data,metadata=None):
-            offsets=index.index_buffer(self.index, data)
 ##            #Store the offsets we got from the index C code
 ##            for i in self.index.get_offsets():
 ##                offsets.append((i.id, i.offset))
@@ -204,24 +207,25 @@ class IndexScan(GenScanFactory):
             ## insert syntax here for speed (This may not be portable
             ## to other databases):
             results = []
-            for id, offset in offsets:
-                try:
-                    self.stats_count[id]+=1
-                except KeyError:
-                    #Must be a new id for the dictionary
-                    self.stats_count[id]=1
+            for offset, matches in index.index_buffer(self.index, data):
+                for id, length in matches:
+                    try:
+                        self.stats_count[id]+=1
+                    except KeyError:
+                        #Must be a new id for the dictionary
+                        self.stats_count[id]=1
 
-                ## If the file is longer than a block, we create a new
-                ## block, and adjust the relative offset
-                if self.rel_offset+offset > BLOCKSIZE:
-                    self.block_number+=1
-                    self.rel_offset -= BLOCKSIZE
-                    self.dbh.execute("insert into LogicalIndex set inode=%r,block_number=%r",(self.inode,self.block_number))
-                    #block is the current block number we are looking at
-                    self.block = self.dbh.autoincrement()
+                    ## If the file is longer than a block, we create a new
+                    ## block, and adjust the relative offset
+                    if self.rel_offset+offset > BLOCKSIZE:
+                        self.block_number+=1
+                        self.rel_offset -= BLOCKSIZE
+                        self.dbh.execute("insert into LogicalIndex set inode=%r,block_number=%r",(self.inode,self.block_number))
+                        #block is the current block number we are looking at
+                        self.block = self.dbh.autoincrement()
 
                 #Final result ie. absolute offset is (current block number * blocksize) + (offset from start of data chunk where we found the term + offset of the data block)
-                results.append("(%s,(%s<<%s)+%s+%s)" % (id,self.block,BLOCKBITS,offset,self.rel_offset))
+                results.append("(%s,(%s<<%s)+%s+%s, %s)" % (id,self.block,BLOCKBITS,offset,self.rel_offset,length))
 
             if results:
                 self.dbh.execute("insert into LogicalIndexOffsets values %s",(",".join(results)))
@@ -491,12 +495,12 @@ class SearchIndex(Reports.report):
             if not old_temp_table:
                 offset_columns.append("offset_%s" % word_id)
                 try:
-                    dbh.execute("create table %s select greatest(offset-%s , ((offset)>>20)<<20) as low,offset+%s as high, offset as offset_%s from LogicalIndexOffsets where id=%r",(temp_table,range,range,word_id,word_id))
+                    dbh.execute("create table %s select greatest(offset-%s , ((offset)>>20)<<20) as low,offset+%s as high, offset as offset_%s, length from LogicalIndexOffsets where id=%r",(temp_table,range,range,word_id,word_id))
                 except DB.DBError,e:
                     raise Reports.ReportError("Unable to find a LogicalIndexOffsets table for current image. Did you run the LogicalIndex Scanner?.\n Error received was %s" % e)
                 
             else:
-                dbh.execute("create table %s select least(offset-%s,low) as low, greatest(offset+%s,high) as high, %s, offset as offset_%s from %s, LogicalIndexOffsets where id=%r and offset<high and offset>low",
+                dbh.execute("create table %s select least(offset-%s,low) as low, greatest(offset+%s,high) as high, %s, offset as offset_%s from %s, LogicalIndexOffsets, length where id=%r and offset<high and offset>low",
                             (temp_table,range,range,
                              ','.join(offset_columns),word_id,
                              old_temp_table,
@@ -546,7 +550,8 @@ class SearchIndex(Reports.report):
             inode = row[0]
             low=resolve_offset(dbh,row[1])
             high=resolve_offset(dbh,row[2])
-            offsets = [ resolve_offset(dbh,a) for a in row[3:] ]
+            length= int(row[3])
+            offsets = [ resolve_offset(dbh,a) for a in row[4:] ]
             sorted_offsets = [low] + offsets[:] + [high]
             sorted_offsets.sort()
 #            offsets =[ int(a) for a in [low]+row[3:]+[high] ]
@@ -560,24 +565,24 @@ class SearchIndex(Reports.report):
             out=result.__class__(result)
             word=''
             for i in range(1,len(sorted_offsets)):
-                out.text(data[sorted_offsets[i-1]-low+len(word):sorted_offsets[i]-low],color='black',sanitise='full')
+                out.text(data[sorted_offsets[i-1]-low+length:sorted_offsets[i]-low],color='black',sanitise='full')
                 try:
                     word = words[offsets.index(sorted_offsets[i])]
                 except:
                     word = ''
 
-                out.text(data[sorted_offsets[i]-low:sorted_offsets[i]-low+len(word)],color='red',sanitise='full')
+                out.text(data[sorted_offsets[i]-low:sorted_offsets[i]-low+length],color='red',sanitise='full')
             
             return out
 
         tmp = ['(block_number <<%s) + (%s & ((1<<%s)-1))' % (BLOCKBITS,a,BLOCKBITS) for a in offset_columns ]
 
         def offset_link_cb(value):
-            inode,offset,word = value.split(',')
+            inode,offset,length,word = value.split(',',3)
             offset = int(offset)
             tmp = result.__class__(result)
-            #The highlighting is not very good.  Only highlights one occurrence and picks a fixed length to highlight (5 at the moment)
-            tmp.link( offset, target=FlagFramework.query_type((),case=query['case'],family="Disk Forensics", report='ViewFile',mode='HexDump',inode=inode,hexlimit=max(offset-int(query['range'])/2,0),highlight=offset, length=len(word)) )
+
+            tmp.link( offset, target=FlagFramework.query_type((),case=query['case'],family="Disk Forensics", report='ViewFile',mode='HexDump',inode=inode,hexlimit=max(offset-int(query['range'])/2,0),highlight=offset, length=length) )
             return tmp
         
         result.table(
@@ -585,12 +590,12 @@ class SearchIndex(Reports.report):
                        ## Data for Offset cb: inode,offset in
                        ## inode,word highlighted. e.g:
                        ## D1285|P2097316:0,10,word
-                       'concat(inode,",",(block_number <<%s) + (%s & ((1<<%s)-1)),",",%r)' % (BLOCKBITS,offset_columns[0],BLOCKBITS, words[0]),
+                       'concat(inode,",",(block_number <<%s) + (%s & ((1<<%s)-1)),",", `length`,",",%r)' % (BLOCKBITS,offset_columns[0],BLOCKBITS, words[0]),
                        ## Data for data cb: inode,low offset, high
                        ## offset, list of hit offsets. eg:
                        ## D1285|P2097316:0,69206016,69206076,69206026
                        'concat(%s)' % ',",",'.join(
-                             ['inode','low','high']+ offset_columns
+                             ['inode','low','high', 'length']+ offset_columns
                              )
                        ],
             names=['Inode','Offset','Data'],

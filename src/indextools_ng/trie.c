@@ -152,7 +152,7 @@ void TrieNode_AddWord(TrieNode self, char **word, int *len, long int data,
   
   /** Check to see if the new item is in our peers list: */
   list_for_each_entry(i, &(self->peers), peers) {
-    if(n->__eq__(n, i)) {
+    if(n->__eq__ && n->__eq__(n, i)) {
       talloc_free(n);
       n=i;
       break;
@@ -319,8 +319,7 @@ int DataNode_Match(TrieNode self, char *start, char **buffer, int *len, PyObject
   DataNode this = (DataNode) self;
   
   /** Append the hit to the list */
-  PyList_Append(result, PyInt_FromLong(*buffer-start));
-  PyList_Append(result, PyInt_FromLong(this->data));
+  PyList_Append(result, Py_BuildValue("ii",this->data, *buffer-start));
   
   return True;
 };
