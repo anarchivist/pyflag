@@ -9,6 +9,7 @@ class DynamicStruct(SimpleStruct):
         self.fields=[]
 
 class AlignedOffset(format.DataType):
+    visible = True
     def __init__(self, buffer, parameters, *args, **kwargs):
         self.buffer = buffer
         self.parameters = parameters
@@ -20,10 +21,20 @@ class AlignedOffset(format.DataType):
 
     def size(self):
         """ This consumes as many bytes until the next alignment boundary """
-        print "My size is 0"
-        return int(self.parameters['alignment']) -(
-            self.buffer.offset % int(self.parameters['alignment'])
-            )
+	align = self.parameters['alignment']
+
+	### Allow alignment to be entered in dec or hex (0x)
+	if align.find('0x') == 0:
+	    align = int(align[2:],16)
+	else:
+	    align = int(align)
+
+	if self.buffer.offset % align == 0:
+	    size = 0
+	else:
+	    size = align - (self.buffer.offset % align)
+
+        return size 
 
     def __str__(self):
         return "Aligned to %s\nat 0x%08X" % (self.parameters['alignment'],
@@ -51,6 +62,8 @@ class RevEng_GUI(Reports.report):
     def form(self, query, result):
         result.heading("Data Analysis Facilitation Tool")
         result.start_form(query)
+
+	result.textfield("Starting Offset","StartOffset",size=20)
 
         def popup_cb(query, ui, column_number = None):
             print "I am here"
@@ -88,7 +101,17 @@ class RevEng_GUI(Reports.report):
 
         fd=open("/var/tmp/SEReveng/SE_T630_351295000248246_23Apr05.bin")
         ## Build a struct to work from:
-        buf = format.Buffer(fd=fd)[8*1024*1024:]
+	try:
+	    startoffset = query['StartOffset']
+	    if startoffset.find('0x') == 0:
+	        startoffset = int(startoffset[2:],16)
+	    else:
+	        startoffset = int(startoffset)
+	    
+	except KeyError:
+	    startoffset = 0
+        buf = format.Buffer(fd=fd)[startoffset:]
+
 
         while 1:
             try:
