@@ -108,12 +108,14 @@ class HTMLUI(UI.GenericUI):
             self.defaults = default.defaults
             self.toolbar_ui=default.toolbar_ui
             self.generator=default.generator
+            self.depth = default.depth+1
         else:
             import pyflag.FlagFramework as FlagFramework
             self.form_parms =FlagFramework.query_type(())
             self.defaults = FlagFramework.query_type(())
             self.toolbar_ui=None
             self.generator=HTTPObject()
+            self.depth=1
 
         if query:
             self.defaults=query
@@ -432,14 +434,14 @@ class HTMLUI(UI.GenericUI):
            var query='';
            client_page = window.open('','child_window_%s','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=900,scrollbars=yes,dependent');
            //Here we read the forms contents, so we can let the popup window know the values of currently filled in fields (Before submitting).
-           for(var i=0; i<document.pyflag_form.elements.length; i++) {
+           for(var i=0; i<document.pyflag_form_1.elements.length; i++) {
               //Checkboxes should only be added if they are checked
-              if(document.pyflag_form.elements[i].type=='checkbox' && !document.pyflag_form.elements[i].checked) {
+              if(document.pyflag_form_1.elements[i].type=='checkbox' && !document.pyflag_form_1.elements[i].checked) {
                 continue;
               };
               //We must leave the submit button off, so that when the popup window refreshes to its parent we know it wasnt actually submitted.
-              if(document.pyflag_form.elements[i].type!='submit' && document.pyflag_form.elements[i].name.length>0 ) {
-                 query+=document.pyflag_form.elements[i].name+'='+encodeURIComponent(document.pyflag_form.elements[i].value)+'&';
+              if(document.pyflag_form_1.elements[i].type!='submit' && document.pyflag_form_1.elements[i].name.length>0 ) {
+                 query+=document.pyflag_form_1.elements[i].name+'='+encodeURIComponent(document.pyflag_form_1.elements[i].value)+'&';
               };
            };
            query+= "&parent_window="+self.name;
@@ -1428,8 +1430,7 @@ class HTMLUI(UI.GenericUI):
         for k,v in hiddens.items():
             self.form_parms[k]=v
 
-#        self.result += "<form name=pyflag_form method=%s action='/f'>\n" % config.METHOD
-        self.result += '<form name=pyflag_form method=%s action="/f" enctype="multipart/form-data">\n' % config.METHOD
+        self.result += '<form name=pyflag_form_%s method=%s action="/f" enctype="multipart/form-data">\n' % (self.depth, config.METHOD)
 
     def end_form(self,value='Submit',name='submit',**opts):
         for k,v in self.form_parms:
@@ -1601,7 +1602,7 @@ class HTMLUI(UI.GenericUI):
             result.result += "<input type=submit value='Update'>"
 
             if page<len(names)-1:
-                result.result += "<input type=button value='Next' onclick=\"document.getElementById(\'%s\').value=\'%s\'; document.pyflag_form.submit();\" >\n" % (context, page+1)
+                result.result += "<input type=button value='Next' onclick=\"document.getElementById(\'%s\').value=\'%s\'; document.pyflag_form_1.submit();\" >\n" % (context, page+1)
             elif page==len(names)-1:
                 result.result += "<input type=submit value='Finish' name=submit>\n"
 

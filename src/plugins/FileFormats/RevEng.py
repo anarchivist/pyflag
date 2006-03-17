@@ -3,6 +3,7 @@ import pyflag.Registry as Registry
 import pyflag.FlagFramework as FlagFramework
 import pyflag.format as format
 import pyflag.DB as DB
+import pyflag.HTMLUI as HTMLUI
 from plugins.FileFormats.BasicFormats import *
 
 class DynamicStruct(SimpleStruct):
@@ -45,30 +46,38 @@ class AlignedOffset(format.DataType):
         result.textfield("Alignment boundary",prefix+"alignment")
 
 class HexDump(STRING):
+    sql_type = "text"
+    
     def display(self, result):
         h=FlagFramework.HexDump(self.__str__(),result)
         h.dump()
-        
+
+    def get_value(self):
+        tmp = HTMLUI.HTMLUI(None)
+        self.display(tmp)
+        return tmp
 
 class RevEng_GUI(Reports.report):
     """ Allows us to manipulate data structures in reverse engineering efforts """
     name = "DAFT"
     family = "Misc"
     description = "Data Analysis Facilitation Tool (Reverse Engineering)"
-    parameters = { "foo": "any"}
+##    parameters = { "foo": "any"}
 
-    def analyse(self, query,result):
-        fd=open("/var/tmp/SEReveng/SE_T630_351295000248246_23Apr05.bin")
-        fd.seek(8*1024*1024)
+#    def analyse(self, query,result):
+#        fd=open("/var/tmp/SEReveng/SE_T630_351295000248246_23Apr05.bin")
+#        fd.seek(8*1024*1024)
 
-    def form(self, query, result):
+    def display(self, query, result):
+        result.start_form(query)
         try:
             result.heading("Data Analysis Facilitation Tool")
             dbh=DB.DBO(query['case'])
             result.start_form(query)
 
             result.textfield("Starting Offset","StartOffset",size=20)
-
+            result.end_table()
+          
             def popup_cb(query, ui, column_number = None):
                 print "I am here"
                 ui.decoration = "naked"
@@ -103,7 +112,7 @@ class RevEng_GUI(Reports.report):
                 ui.end_form()
                 return ui
 
-            fd=open("/home/michael/dev/SERevEng/T630/SE_T630_351295000248246_23Apr05.bin")
+            fd=open("/var/tmp/SEReveng/SE_T630_351295000248246_23Apr05.bin")
             ## Build a struct to work from:
             try:
                 startoffset = query['StartOffset']
@@ -143,12 +152,19 @@ class RevEng_GUI(Reports.report):
 
                     popup_row = []
                     headings = []
-                    row_data = []
+                    data = []
+                    row_data = {}
+                    row_data_names = []
+                    row_data_types = []
+                    row_view = []
+                    row_htmls = []
                     for i in range(count+1):
                         tmp = result.__class__(result)
                         tmp.popup(FlagFramework.Curry(popup_cb, column_number = i)
                                   ,"Edit", icon="red-plus.png")
                         popup_row.append(tmp)
+
+                    
 
                     struct.read(buf)
 
@@ -161,21 +177,79 @@ class RevEng_GUI(Reports.report):
 
                         tmp = result.__class__(result)
                         struct.data[query['name_%s' % i]].display(tmp)
-                        row_data.append( tmp)
+                        row_view.append( tmp)
+
+                        try:
+                            name = query['name_%s' % i]
+                            value = struct.data[name].get_value()
+                            row_data_types.append(struct.data[name].sql_type)
+
+                            if(isinstance(value, result.__class__)):
+                                row_htmls.append(name)
+                            
+                            row_data[name]=value
+                            row_data_names.append(name)
+                            
+                        except AttributeError:
+                            pass
 
                     result.row(*popup_row)
                     result.row(*headings)
-                    result.row(*row_data)
+                    result.row(*row_view)
                 except IOError:
                     buf = buf[1:]
+
+                dbh.execute("drop table if exists reveng")
+                dbh.execute("""create table reveng  ("""+
+                            ",".join(
+                    ["`%s` %s" % (row_data_names[i],row_data_types[i])
+                     for i in range(len(row_data_names))]
+                    )+
+                            ")")
+                
+                dbh.set_meta("reveng_HTML", ",".join(row_htmls))
+                dbh.mass_insert_start("reveng")
+                dbh.mass_insert(**row_data)
+                dbh.mass_insert_commit()
+
+                ###########################################
+
+                def render_HTMLUI(data):
+                    tmp = result.__class__(result)
+                    tmp.result = data
+                    return tmp
+
+                row_htmls = dbh.get_meta("reveng_HTML").split(",")
+                cb={}
+                count=0
+                names=[]
+                try:
+                    while 1:
+                        name = query['name_%s' % count]
+                        names.append(name)
+                        if name in row_htmls:
+                            cb[name] = render_HTMLUI
+
+                        count+=1
+                except KeyError:
+                    pass
+                
+                result.table(
+                    names= names,
+                    columns = names,
+                    callbacks = cb,
+                    table = "reveng",
+                    case = query['case']
+                    )
 
                 if len(buf)==0:
                     break
                 
                 break
 
-        except KeyError:
+        except KeyError,e:
             result.case_selector()
+            print "%r%s%s" %(e,e,FlagFramework.get_bt_string(e))
 
 
     def reset(self, query):

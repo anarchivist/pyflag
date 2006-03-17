@@ -2,6 +2,8 @@ from pyflag.format import *
     
 class BasicType(DataType):
     """ Base class for basic types that unpack understands """
+    sql_type = "int"
+    
     def size(self):
         ## We consume 2 bytes here
         return struct.calcsize(self.fmt)
@@ -39,7 +41,8 @@ class WORD(BasicType):
     """ Reads a word (short int) from the data in big endian """
     fmt = '=H'
     visible = True
-    
+    sql_type = "int"
+        
     def __str__(self):
         if not self.data:
             self.initialise()
@@ -329,6 +332,7 @@ class ULONG_ARRAY(ARRAY):
 
 class STRING(BYTE):
     visible = True
+    sql_type="text"
     
     def __init__(self,buffer,parameters,*args,**kwargs):
         try:
@@ -501,6 +505,7 @@ class WIN_FILETIME(SimpleStruct):
     This represent the number of 100ns periods since 1601 - how did they come up with that???
     """
     visible = True
+    sql_type = "int"
     
     def init(self):
         self.fields = [

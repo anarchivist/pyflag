@@ -114,6 +114,10 @@ class DataType:
     """ Base class that reads a data type from the file."""
     ## Controls if this is visible in the GUI
     visible = False
+
+    ## This is the SQL type which is most appropriate for storing the
+    ## results of value()
+    sql_type = "text"
     
     def __init__(self,buffer,*args,**kwargs):
         """ This will force this class to read the data type from data at the specified offset """
@@ -155,6 +159,9 @@ class DataType:
 
     def display(self, result):
         result.text(self.__str__(), wrap='full', sanitise='full', font='typewriter')
+
+    def value(self):
+        return self.__str__()
         
 
 class RAW(DataType):
