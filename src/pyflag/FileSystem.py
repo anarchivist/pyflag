@@ -319,7 +319,7 @@ class DBFS(FileSystem):
             if dir == '/':
                 dir = ''
 
-            self.dbh.execute("select inode from file where path=%r and (name=%r or name=concat(%r,'/'))", (dir+'/',name,name))
+            self.dbh.execute("select inode from file where path=%r and (name=%r or name=concat(%r,'/')) and inode!=''", (dir+'/',name,name))
             res = self.dbh.fetch()
             if not res:
                 return None

@@ -4,9 +4,20 @@ import pyflag.FlagFramework as FlagFramework
 import pyflag.format as format
 import pyflag.DB as DB
 import pyflag.HTMLUI as HTMLUI
-from plugins.FileFormats.BasicFormats import *
+import plugins.FileFormats.BasicFormats as BasicFormats
 
-class DynamicStruct(SimpleStruct):
+def numeric(num_str):
+    try:
+        if num_str.find('0x') == 0:
+            result = int(num_str[2:],16)
+        else:
+            result = int(num_str)
+    except TypeError:
+        result = 0
+
+    return result
+
+class DynamicStruct(BasicFormats.SimpleStruct):
     def init(self):
         self.fields=[]
 
@@ -23,13 +34,7 @@ class AlignedOffset(format.DataType):
 
     def size(self):
         """ This consumes as many bytes until the next alignment boundary """
-	align = self.parameters['alignment']
-
-	### Allow alignment to be entered in dec or hex (0x)
-	if align.find('0x') == 0:
-	    align = int(align[2:],16)
-	else:
-	    align = int(align)
+	align = numeric(self.parameters['alignment'])
 
 	if self.buffer.offset % align == 0:
 	    size = 0
@@ -45,7 +50,7 @@ class AlignedOffset(format.DataType):
     def form(self,prefix, query,result):
         result.textfield("Alignment boundary",prefix+"alignment")
 
-class HexDump(STRING):
+class HexDump(BasicFormats.STRING):
     sql_type = "text"
     
     def display(self, result):
@@ -62,14 +67,21 @@ class RevEng_GUI(Reports.report):
     name = "DAFT"
     family = "Misc"
     description = "Data Analysis Facilitation Tool (Reverse Engineering)"
-##    parameters = { "foo": "any"}
+#    parameters = { "foo": "any"}
+
+
+    def analyse(self, query):
+        pass
+##        fd=open("/home/michael/dev/SERevEng/T630/SE_T630_351295000248246_23Apr05.bin")
+##        fd.seek(8*1024*1024)
 
 #    def analyse(self, query,result):
 #        fd=open("/var/tmp/SEReveng/SE_T630_351295000248246_23Apr05.bin")
 #        fd.seek(8*1024*1024)
 
+
     def display(self, query, result):
-        result.start_form(query)
+        ##result.start_form(query)
         try:
             result.heading("Data Analysis Facilitation Tool")
             dbh=DB.DBO(query['case'])
@@ -112,19 +124,20 @@ class RevEng_GUI(Reports.report):
                 ui.end_form()
                 return ui
 
-            fd=open("/var/tmp/SEReveng/SE_T630_351295000248246_23Apr05.bin")
+            def render_HTMLUI(data):
+                tmp = result.__class__(result)
+                tmp.result = data
+                return tmp
+
+            fd=open("/home/michael/dev/SERevEng/T630/SE_T630_351295000248246_23Apr05.bin")
+
             ## Build a struct to work from:
             try:
-                startoffset = query['StartOffset']
-                if startoffset.find('0x') == 0:
-                    startoffset = int(startoffset[2:],16)
-                else:
-                    startoffset = int(startoffset)
-                
+                startoffset = numeric(query['StartOffset'])
             except KeyError:
                 startoffset = 0
+                
             buf = format.Buffer(fd=fd)[startoffset:]
-
 
             while 1:
                 try:
@@ -165,7 +178,6 @@ class RevEng_GUI(Reports.report):
                         popup_row.append(tmp)
 
                     
-
                     struct.read(buf)
 
                     print struct.fields
@@ -199,25 +211,25 @@ class RevEng_GUI(Reports.report):
                 except IOError:
                     buf = buf[1:]
 
-                dbh.execute("drop table if exists reveng")
-                dbh.execute("""create table reveng  ("""+
-                            ",".join(
-                    ["`%s` %s" % (row_data_names[i],row_data_types[i])
-                     for i in range(len(row_data_names))]
-                    )+
-                            ")")
-                
+                #### DBH can't create a table when there are no fields
+                if len(row_data_names)>0:
+                    dbh.execute("drop table if exists reveng")
+                    dbh.execute("""create table reveng  ("""+
+                                ",".join(
+                        ["`%s` %s" % (row_data_names[i],row_data_types[i])
+                         for i in range(len(row_data_names))]
+                        )+
+                                ")")
+
+                    dbh.mass_insert_start("reveng")
+                    dbh.mass_insert(**row_data)
+                    dbh.mass_insert_commit()
+
                 dbh.set_meta("reveng_HTML", ",".join(row_htmls))
-                dbh.mass_insert_start("reveng")
-                dbh.mass_insert(**row_data)
-                dbh.mass_insert_commit()
+
 
                 ###########################################
 
-                def render_HTMLUI(data):
-                    tmp = result.__class__(result)
-                    tmp.result = data
-                    return tmp
 
                 row_htmls = dbh.get_meta("reveng_HTML").split(",")
                 cb={}
@@ -234,13 +246,16 @@ class RevEng_GUI(Reports.report):
                 except KeyError:
                     pass
                 
-                result.table(
-                    names= names,
-                    columns = names,
-                    callbacks = cb,
-                    table = "reveng",
-                    case = query['case']
-                    )
+                try:
+                    result.table(
+                        names= names,
+                        columns = names,
+                        callbacks = cb,
+                        table = "reveng",
+                        case = query['case']
+                        )
+                except IndexError:
+                    pass
 
                 if len(buf)==0:
                     break
@@ -250,6 +265,8 @@ class RevEng_GUI(Reports.report):
         except KeyError,e:
             result.case_selector()
             print "%r%s%s" %(e,e,FlagFramework.get_bt_string(e))
+
+        result.end_form()
 
 
     def reset(self, query):
