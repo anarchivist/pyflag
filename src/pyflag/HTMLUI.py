@@ -874,7 +874,7 @@ class HTMLUI(UI.GenericUI):
 
         #Form the columns in the sql
         if not select_clause:
-            select_clause= [ k+" as `"+v+"`" for (k,v) in zip(columns,names) ]
+            select_clause= [ "`"+k+"` as `"+v+"`" for (k,v) in zip(columns,names) ]
             
         query_str+=",".join(select_clause) 
 
