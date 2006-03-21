@@ -181,7 +181,9 @@ super.add as well.
   void class ## _Alloc(class this);			\
   extern int __ ## class ## _initialised;		\
   extern struct class __ ## class;			\
-  struct class { struct super_class super;		
+  struct class { struct super_class super;		 \
+    class __class__;					 \
+    super_class __super__;
 
 #define METHOD(class,name, ... )		\
   (* name)(class this, ## __VA_ARGS__ )
@@ -225,7 +227,9 @@ super.add as well.
     superclass ## _init();						\
     superclass ##_Alloc((superclass)this);				\
     ((Object)this)->__class__ = (Object)&__ ## class;			\
+    this->__class__ = &__ ## class;					\
     ((Object)this)->__super__ = (Object)&__ ## superclass;		\
+    this->__super__ = &__ ## superclass;				\
     ((Object)this)->__size = sizeof(struct class);			\
     ((Object)this)->__name__ = #class;
 
