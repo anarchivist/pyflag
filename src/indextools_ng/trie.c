@@ -44,8 +44,7 @@ void check_for_wildcards(unsigned char *lower, unsigned char *upper,
 
  wildcards_return:
   *upper=MAX_MATCH_LENGTH;
-  *buffer = *buffer+1;
-  *len = *len -1;
+  (*buffer)++; (*len)--;
   return;
 };
 
@@ -90,13 +89,45 @@ char *build_character_class(char **buffer, int *len) {
   if(inverted) {
     int i;
 
-    for(i=0;i<256; i++) map[i] = ~map[i];
+    for(i=0;i<256; i++) map[i] = !map[i];
   };
 
   (*buffer)++; (*len)--; 
   return map;
 };
 
+/** 
+    Adds a node to a peer list only if it doesnt already exist in
+   there.  Frees the node if its already there.
+*/
+static TrieNode add_unique_to_peer_list(struct list_head *l, TrieNode n, 
+					int (*cb)(TrieNode a,TrieNode b)) {
+    int found=False;
+    TrieNode i;
+
+    list_for_each_entry(i, l, peers) {
+      if(cb(i,n)) {
+	found = True;
+	break;
+      };
+    };
+
+    if(!found) {
+      list_add(&(n->peers), l);
+    } else {
+      talloc_free(n);
+      n=i;
+    }
+
+    return n;
+};
+
+int Compare_literal_nodes(TrieNode a, TrieNode b) {
+  if(!ISSUBCLASS(a,LiteralNode) || !ISSUBCLASS(b,LiteralNode)) 
+    return False;
+
+  return (((LiteralNode)a)->value == ((LiteralNode)b)->value);
+};
 
 TrieNode TrieNode_Con(TrieNode self) {
 
@@ -105,87 +136,109 @@ TrieNode TrieNode_Con(TrieNode self) {
   return self;
 };
 
-int TrieNode_compare(TrieNode self, char *buffer, int len) {
+int TrieNode_compare(TrieNode self, char **buffer, int *len) {
   return True;
+};
+
+/** Works out which node comes next by looking at the special
+    characters in word. This function is responsible for parsing
+    character classes, multiples etc.
+
+    We return NULL to indicate that no nodes are available (e.g. end
+    of word etc).
+ */
+static TrieNode MakeNextNode(TrieNode self, char **word, int *len, 
+			     long int data, enum word_types type) {
+  TrieNode n=NULL;
+  
+  /** This is the final node in the chain. We need to add a DataNode */
+  if(*len==0) {
+    n=(TrieNode)CONSTRUCT(DataNode, DataNode, Con, self, data);
+    
+    return n;
+  };
+
+  /** Look for \ escapes */
+  if(**word == '\\') {
+    *word=*word+1;
+    *len=*len-1;
+    
+    /** Two \\ in a row will be replaced by one \ */
+    if(**word != '\\') {
+      /** CharacterClassNode accounds for things like \d \w etc */
+      n=(TrieNode)CONSTRUCT(CharacterClassNode, CharacterClassNode, 
+			    Con, self, word, len);
+    };
+
+    /** Look for explicit character classes [0-2] etc */
+  } else if (**word == '[') {
+    char *map = build_character_class(word, len);
+    
+    if(map) {
+      n=(TrieNode)CONSTRUCT(CharacterClassNode, CharacterClassNode,
+			    Con_with_map, self, word,len, map);
+      
+      /** Steal this map: */
+      talloc_steal(n, map);
+    };
+  };
+
+  /** Otherwise we just add a literal node */
+  if(!n) {
+    /** Node is literal */
+    n=(TrieNode)CONSTRUCT(LiteralNode, LiteralNode, Con, self, word, len);    
+  };
+
+  /** Now check for wildcards and ranges e.g. {1,4} */
+  if(*len > 0) {
+    check_for_wildcards(&(n->lower_limit), &(n->upper_limit), word, len);
+  };
+
+  return n;
 };
 
 /** This adds the chain representing word into self as a parent */
 void TrieNode_AddWord(TrieNode self, char **word, int *len, long int data, 
 		      enum word_types type) {
-  TrieNode n=NULL;
-  TrieNode i;
+  int i = 0x0F & **word;
+  TrieNode n=MakeNextNode(self, word, len, data, type);
+  
+  if(!n) return;
 
-  /** This is the final node in the chain. We need to add a DataNode */
-  if(*len==0) {
-    n=(TrieNode)CONSTRUCT(DataNode, DataNode, Con, self, data);
+  /** If the node is a literal node, we can store it in our hash
+      table: 
+  */
+  if(ISINSTANCE(n, LiteralNode)) {
+    if(!self->hash_table[i]) {
+      self->hash_table[i] = CONSTRUCT(TrieNode, TrieNode, Con, self);
+    };
     
-    list_add(&(n->peers), &(self->peers));
-    return;
-  };
+    n=add_unique_to_peer_list(&(self->hash_table[i]->peers), n, 
+			      &Compare_literal_nodes);
+  } else {
+    /** Otherwise Add the node to our children list */
+    if(!self->child) 
+      self->child = CONSTRUCT(TrieNode, TrieNode, Con, self);
 
-  if(*len>0) {
-    if(**word == '\\') {
-      *word=*word+1;
-      *len=*len-1;
-      /** Two \\ in a row will be replaced by one \ */
-      if(**word != '\\') {
-	n=(TrieNode)CONSTRUCT(CharacterClassNode, CharacterClassNode, 
-			      Con, self, word, len);
-      };
-    } else if (**word == '[') {
-      char *map = build_character_class(word, len);
-      
-      if(map) {
-	n=(TrieNode)CONSTRUCT(CharacterClassNode, CharacterClassNode,
-			      Con_with_map, self, word,len, map);
-	
-	/** Steal this map: */
-	talloc_steal(n, map);
-      };
-    };
-  };
-  
-  if(!n) {
-    /** Node is literal */
-    n=(TrieNode)CONSTRUCT(LiteralNode, LiteralNode, Con, self, word, len);
-  };
-  
-  /** Check to see if the new item is in our peers list: */
-  list_for_each_entry(i, &(self->peers), peers) {
-    if(n->__eq__ && n->__eq__(n, i)) {
-      talloc_free(n);
-      n=i;
-      break;
-    };
-  };
-  
-  /** Couldnt find the node in the peers list: add to peers list */
-  if(n!=i) {
-    list_add(&(n->peers), &(self->peers));
-  };
-  
-  if(!n->child) {
-    /** Child is a list head for the children list: */
-    n->child = CONSTRUCT(TrieNode, TrieNode, Con, self);
-  };
-    
-  if(*len > 0) {
-    /** Now check for wildcards and ranges */
-    check_for_wildcards(&(n->lower_limit), &(n->upper_limit), word, len);
-  };
-   
+    n=add_unique_to_peer_list(&(self->child->peers),n,
+			      &Compare_literal_nodes);
+  }
+
   /** Now ask n to add the rest of the word */  
-  CALL(n->child, AddWord, word, len, data, type);
+  CALL(n, AddWord, word, len, data, type);
 
   return;
 };
 
 int TrieNode_Match(TrieNode self, char *start, char **buffer, int *len, PyObject *result) {
   int i;
+  int found=False;
+  uint16_t h;
+  TrieNode j;
 
   /** First check for the lower limit of char counts */
   for(i=0;i<self->lower_limit;i++) {
-    if(!self->compare(self,*buffer+i, *len-1))
+    if(!self->compare(self,buffer,len))
       return False;
   };
 
@@ -194,31 +247,36 @@ int TrieNode_Match(TrieNode self, char *start, char **buffer, int *len, PyObject
       the upper_limit
   */
   for(i=self->lower_limit; i<self->upper_limit; i++) {
-    if(!self->compare(self,*buffer+i, *len-1))
+    if(!self->compare(self,buffer, len))
       break;
-    };
-
-  {
-    //Consume all the chars and keep testing:
-    char *new_buffer=*buffer+i;
-    int new_length = *len-i;
-    int found=False;
-    TrieNode i;
-
-    /** The indexed buffer has run out */
-    if(new_length<=0) return False;
-    
-    /** Get all the matches from our children Note that we need to get
-	_all_ the matches but return true if _any_ of our peers match.
-    */
-    list_for_each_entry(i, &(self->child->peers), peers) {
-      if(i->Match(i,start, &new_buffer, &new_length, result))
-	found=True;
-    };
-    
-    return found;
-  //    return self->Match(self->child, &new_buffer, &new_length, result);
   };
+
+  /** Check to see if there is a literal node matching in our hash
+      table 
+  */
+  h=0x0F & **buffer;
+  if(self->hash_table[h]) {
+    list_for_each_entry(j, &(self->hash_table[h]->peers), peers) {
+      char *buf = *buffer;
+      int length = *len;
+      
+      if(j->Match(j, start, &buf, &length, result))
+	found = True;
+    };
+  };
+  
+  /** Now search our children for a match: */
+  if(self->child) {
+    list_for_each_entry(j, &(self->child->peers), peers) {
+      char *buf = *buffer;
+	int length = *len;
+	
+	if(j->Match(j, start, &buf, &length, result))
+	  found = True;
+    };
+  };
+  
+  return found;
 };
 
 VIRTUAL(TrieNode, Object)
@@ -234,33 +292,26 @@ END_VIRTUAL
 LiteralNode LiteralNode_Con(LiteralNode self, char **value, int *len) {
   self->value = **value;
 
+#ifdef __DEBUG_V_
+  talloc_set_name(self, "%s: %c", NAMEOF(self),**value);
+#endif
+
   (*value)++;
   (*len)--;
 
   INIT_LIST_HEAD(&(self->super.peers));
 
-  talloc_set_name(self, "%s: %c", NAMEOF(self),**value);
-
   return self;
 };
 
-int LiteralNode_eq(TrieNode self, TrieNode tested) {
-  LiteralNode this=(LiteralNode)self;
-  LiteralNode this_tested = (LiteralNode)tested;
-
-  /** If we dont belong to the same class, we cant be equal */
-  if(CLASSOF(tested)!=CLASSOF(self)) return 0;
-
-  /** If our literal values are the same, we are equal */
-  if(this->value == this_tested->value) return 1;
-
-  return 0;
-};
-
-int LiteralNode_compare(TrieNode self, char *buffer, int len) {
+int LiteralNode_compare(TrieNode self, char **buffer, int *len) {
   LiteralNode this = (LiteralNode)self;
+  int result = (**buffer == this->value);
 
-  return *buffer == this->value;
+  if(result)
+    (*buffer)++; (*len)--;
+
+  return result;
 };
 
 VIRTUAL(LiteralNode, TrieNode)
@@ -268,27 +319,8 @@ VIRTUAL(LiteralNode, TrieNode)
      VATTR(super.upper_limit)=1;
 
      VMETHOD(Con) = LiteralNode_Con;
-     VMETHOD(super.__eq__) = LiteralNode_eq;
      VMETHOD(super.compare) = LiteralNode_compare;
 END_VIRTUAL
-
-int RootNode_Match(TrieNode self, char *start, char **buffer, int *len, PyObject *result) {
-  TrieNode i;
-  int found=False;
-    
-  /** The indexed buffer has run out */
-  if(*len<=0) return False;
-
-  /** Get all the matches from our peers Note that we need to get
-      _all_ the matches but return true if _any_ of our peers match.
-  */
-  list_for_each_entry(i, &(self->peers), peers) {
-    if(i->Match(i, start, buffer, len, result))
-      found=True;
-  };
-  
-  return found;
-};
 
 RootNode RootNode_Con(RootNode this) {
   
@@ -299,7 +331,6 @@ RootNode RootNode_Con(RootNode this) {
 
 VIRTUAL(RootNode, TrieNode)
      VMETHOD(Con) = RootNode_Con;
-     VMETHOD(super.Match) = RootNode_Match;
 END_VIRTUAL
 
 DataNode DataNode_Con(DataNode self, int data) {
@@ -307,7 +338,9 @@ DataNode DataNode_Con(DataNode self, int data) {
   
   INIT_LIST_HEAD(&(self->super.peers));
 
+#ifdef __DEBUG_V_
   talloc_set_name(self, "DataNode: %u", data);
+#endif
 
   return self;
 };
@@ -322,6 +355,11 @@ int DataNode_Match(TrieNode self, char *start, char **buffer, int *len, PyObject
   PyList_Append(result, Py_BuildValue("ii",this->data, *buffer-start));
   
   return True;
+};
+
+void DataNode_AddWord(TrieNode self, char **word, int *len, long int data, 
+		      enum word_types type) {
+  return;
 };
 
 VIRTUAL(DataNode, TrieNode)

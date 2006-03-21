@@ -78,7 +78,9 @@ static PyMethodDef IndexMethods[] = {
 };
 
 PyMODINIT_FUNC initindex(void) {
+#ifdef __DEBUG_V_
   talloc_enable_leak_report_full();
+#endif
 
   (void) Py_InitModule("index", IndexMethods);
 }

@@ -181,9 +181,7 @@ super.add as well.
   void class ## _Alloc(class this);			\
   extern int __ ## class ## _initialised;		\
   extern struct class __ ## class;			\
-  struct class { struct super_class super;		\
-    class __class__;					\
-    super_class __super__;				
+  struct class { struct super_class super;		
 
 #define METHOD(class,name, ... )		\
   (* name)(class this, ## __VA_ARGS__ )
@@ -215,6 +213,7 @@ super.add as well.
 
 #define VIRTUAL(class,superclass)				\
   struct class __ ## class;					\
+  inline void class ## _Alloc(class this);				\
   inline void class ## _init(void) {					\
     if(!__ ## class ## _initialised) {					\
       class ## _Alloc(&__ ## class);					\
@@ -222,13 +221,11 @@ super.add as well.
     };									\
   };									\
   int __ ## class ## _initialised=0;					\
-  void class ## _Alloc(class this) {					\
+  inline void class ## _Alloc(class this) {					\
     superclass ## _init();						\
     superclass ##_Alloc((superclass)this);				\
     ((Object)this)->__class__ = (Object)&__ ## class;			\
-    this->__class__ = &__ ## class;					\
     ((Object)this)->__super__ = (Object)&__ ## superclass;		\
-    this->__super__ = &__ ## superclass;				\
     ((Object)this)->__size = sizeof(struct class);			\
     ((Object)this)->__name__ = #class;
 
@@ -239,6 +236,7 @@ super.add as well.
 
 #define VIRTUAL(class,superclass)				\
   struct class __ ## class;					\
+  inline void class ## _Alloc(class this);				\
   inline void class ## _init(void) {					\
     if(!__ ## class ## _initialised) {					\
       class ## _Alloc(&__ ## class);					\
@@ -246,17 +244,14 @@ super.add as well.
     };									\
   };									\
   int __ ## class ## _initialised=0;					\
-  void class ## _Alloc(class this) {					\
+  inline void class ## _Alloc(class this) {					\
     superclass ## _init();						\
     superclass ##_Alloc((superclass)this);				\
     ((Object)this)->__class__ = (Object)&__ ## class;			\
-    this->__class__ = &__ ## class;					\
     ((Object)this)->__super__ = (Object)&__ ## superclass;		\
-    this->__super__ = &__ ## superclass;				\
     ((Object)this)->__size = sizeof(struct class);
 
-#define SET_DOCSTRING(string)			\
-  ((Object)this)->__doc__ = NULL
+#define SET_DOCSTRING(string) ;
 
 #endif
 
@@ -324,6 +319,7 @@ super.add as well.
 
 typedef struct Object *Object;
 
+#ifdef __DEBUG__
 struct Object {
   //A reference to a class instance - this is useful to be able to
   //tell which class an object really belongs to:
@@ -341,9 +337,24 @@ struct Object {
   int __size;
 };
 
+#else
+
+struct Object {
+  //A reference to a class instance - this is useful to be able to
+  //tell which class an object really belongs to:
+  Object __class__;
+
+  //And its super class:
+  Object __super__;
+
+  //How large the class is:
+  int __size;
+};
+#endif
+
 // Returns true if the obj belongs to the class
 #define ISINSTANCE(obj,class)			\
-  ((Object)obj->__class__ == (Object)&__ ## class)
+  (((Object)obj)->__class__ == (Object)&__ ## class)
 
 #define ISSUBCLASS(obj,class)			\
   issubclass((Object)obj, (Object)&__ ## class)
