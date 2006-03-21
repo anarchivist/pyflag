@@ -365,6 +365,7 @@ void DataNode_AddWord(TrieNode self, char **word, int *len, long int data,
 VIRTUAL(DataNode, TrieNode)
      VMETHOD(Con) = DataNode_Con;
      VMETHOD(super.Match) = DataNode_Match;
+     VMETHOD(super.AddWord) = DataNode_AddWord;
 END_VIRTUAL
 
 /** These are some standard character maps - they may need to be
@@ -387,7 +388,9 @@ CharacterClassNode CharacterClassNode_Con(CharacterClassNode self,
 					  char **word, int *len) {
   CharacterClassNode this = (CharacterClassNode) self;
 
+#ifdef __DEBUG_V_
   talloc_set_name(self, "%s: %c", NAMEOF(self),**word);
+#endif
 
   switch(**word) {
   case 'd':
@@ -408,11 +411,16 @@ CharacterClassNode CharacterClassNode_Con(CharacterClassNode self,
   return self;
 };
 
-int CharacterClassNode_compare(TrieNode self, char *buffer, int len) {
+int CharacterClassNode_compare(TrieNode self, char **buffer, int *len) {
   CharacterClassNode this=(CharacterClassNode) self;
-  int index = *(unsigned char *)buffer;
+  int index = *(unsigned char *)*buffer;
 
-  return(this->map[index]);
+  if(this->map[index]) {
+    (*buffer)++; (*len)--;
+    return True;
+  };
+
+  return False;
 };
 
 VIRTUAL(CharacterClassNode, TrieNode)

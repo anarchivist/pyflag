@@ -35,6 +35,9 @@ enum word_types {
 CLASS(TrieNode, Object)
      struct list_head peers;
 
+     /** This is a hashtable of our children */
+     TrieNode hash_table[16];
+
      unsigned char lower_limit;
      unsigned char upper_limit;
 
@@ -52,14 +55,14 @@ CLASS(TrieNode, Object)
      int METHOD(TrieNode, Match, char *start, char **buffer, int *len, 
 		PyObject *result);
 
-     /** This method must return True or False when comparing at buffer */
-     int METHOD(TrieNode, compare, char *buffer, int len);
+     /** This method must return True or False when comparing at
+	 buffer. It must consume the number of chars that are equal
+     */
+     int METHOD(TrieNode, compare, char **buffer, int *len);
 
      /** Adds the word into the trie with the value in data */
      void METHOD(TrieNode, AddWord, char **word, int *len, long int data,
 		 enum word_types type);
-
-     int METHOD(TrieNode, __eq__, TrieNode tested);
 
 /** This is a simple constructor. It is mostly used for creating list
     heads for children */
