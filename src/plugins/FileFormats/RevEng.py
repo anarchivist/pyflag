@@ -21,6 +21,25 @@ class DynamicStruct(BasicFormats.SimpleStruct):
     def init(self):
         self.fields=[]
 
+    def create_fields(self, query, key_prefix):
+        self.count = 0
+        parameters={}
+        while 1:
+            try:
+                parameters[self.count]={}
+                for k in query.keys():
+                    key = '%s%s_' % (key_prefix, self.count)
+                    if k.startswith(key):
+                        parameters[self.count][k[len(key):]] = query[k]
+
+                self.fields.append((Registry.FILEFORMATS[query['data_type_%s' % self.count]],
+                                      parameters[self.count],
+                                      query['name_%s' % self.count]
+                                      ))
+                self.count+=1
+            except KeyError:
+                break
+        
 class AlignedOffset(format.DataType):
     visible = True
     def __init__(self, buffer, parameters, *args, **kwargs):
@@ -168,67 +187,34 @@ class RevEng_GUI(Reports.report):
             buf = format.Buffer(fd=fd)[startoffset:]
 
             struct = DynamicStruct(buf)
-
-            count = 0
-            parameters={}
-            while 1:
-                try:
-                    parameters[count]={}
-                    for k in query.keys():
-                        key = 'parameter_%s_' % count
-                        if k.startswith(key):
-                            parameters[count][k[len(key):]] = query[k]
-
-##                    print parameters
-                    struct.fields.append((Registry.FILEFORMATS[query['data_type_%s' % count]],
-                                          parameters[count],
-                                          query['name_%s' % count]
-                                          ))
-                    count+=1
-                    
-                except KeyError:
-                    break
-
+            struct.create_fields(query, 'parameter_')
+            
             popup_row = ['']
-            headings = ['']
-            data = []
-            row_data = {}
-            row_data_names = []
-            row_data_types = []
-            row_view = []
-            row_htmls = []
-            for i in range(count+1):
+            for i in range(struct.count+1):
                 tmp = result.__class__(result)
                 tmp.popup(FlagFramework.Curry(popup_cb, column_number = i)
                           ,"Edit", icon="red-plus.png")
                 popup_row.append(tmp)
-
             result.row(*popup_row)
 
-
+            headings = ['']
             struct.read(buf)
-
-            print struct.fields
-
-            for i in range(count):
+            for i in range(struct.count):
                 tmp = result.__class__(result)
                 tmp.text(query['name_%s' % i], color="red", font="bold")
                 headings.append(tmp)
-
             result.row(*headings)
 
-            for i in range(count):
-                tmp = result.__class__(result)
-                struct.data[query['name_%s' % i]].display(tmp)
-                row_view.append( tmp)
+            ######## Creating table rows here
+            data = []
+            row_data = {}
+            row_data_names = []
+            row_data_types = []
+            row_htmls = []
 
-##            result.row(*row_view)
-
-            ######## Attempting multiple table rows here
             rc = 0
-            offset = 0
             while 1:
-                for i in range(count):
+                for i in range(struct.count):
                     try:
                         name = query['name_%s' % i]
                         value = struct.data[name].get_value()
@@ -263,21 +249,17 @@ class RevEng_GUI(Reports.report):
                 dbh.mass_insert( **row_data)
                 dbh.mass_insert_commit()
 
-                print struct.size()
-                offset += struct.size()
-                buf = buf[offset:]
+                if rc > maxrows - 1:
+                    break
+
+                buf = buf[struct.size():]
                 struct.read(buf)
                 rc += 1
 
-                if rc > maxrows:
-                    break
 
             dbh.set_meta("reveng_HTML", ",".join(row_htmls))
-
-
             ###########################################
-
-
+            # Display table
             row_htmls = dbh.get_meta("reveng_HTML").split(",")
             cb={}
             count=0
@@ -303,7 +285,6 @@ class RevEng_GUI(Reports.report):
                     )
             except IndexError:
                 pass
-
                             
             result.end_form()
 
