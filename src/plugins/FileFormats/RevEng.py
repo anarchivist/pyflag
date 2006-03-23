@@ -58,29 +58,60 @@ class AlignedOffset(format.DataType):
         return size 
 
     def __str__(self):
-        return "Offset %X Aligned to %s\nat 0x%08X (%X consumed)" % (self.buffer.offset, self.parameters['alignment'],
-                                        self.buffer.offset + self.size(), self.size())
+        return "Aligned to %s\nat 0x%08X" % (self.parameters['alignment'],
+                                        self.buffer.offset + self.size())
 
     def form(self,prefix, query,result):
         result.textfield("Alignment boundary",prefix+"alignment")
 
-class SearchFor(format.DataType):
+class Offset(format.DataType):
     visible = True
     def __init__(self, buffer, parameters, *args, **kwargs):
         self.buffer = buffer
-        self.parameters = parameters
 
     def size(self):
-        """This consumes as many bytes until the search string is found """
-        strbuffer = buffer.read(0, int(self.parameters['within']))
-        size = strbuffer.find(self.parameters['search'])
-        if size == -1:
-            raise NotFound
-            
-        return size
+        return 0
 
     def __str__(self):
-        return "Search for %s" % self.parameters['search']
+        return "(0x%08X)" % self.buffer.offset
+
+class SearchFor(format.DataType):
+
+    visible = True
+    max_blocksize=1024*1024
+    initial_blocksize=1024
+
+    def __init__(self, buffer, parameters, *args, **kwargs):
+        self.buffer = buffer
+        self.parameters = parameters
+        self.data = None
+
+    def read(self,data):
+        try:
+            blocksize=numeric(self.parameters['within'])
+        except KeyError:
+            blocksize=1024
+            
+        tmp=''
+        tmp=data[0:blocksize].__str__()
+        search = eval("'"+self.parameters['search']+"'")
+        offset=tmp.find(search)
+
+        if offset == -1:
+            self.raw_size = blocksize
+        else:
+            self.raw_size = offset
+
+        return data[0:self.raw_size]
+
+    def size(self):
+        if not self.data:
+            self.initialise()
+            
+        return self.raw_size
+
+    def __str__(self):
+        return "Search for %s (0x%X bytes consumed)" % (self.parameters['search'], self.size())
 
     def form(self, prefix, query, result):
         result.textfield("Search string",prefix+"search")
@@ -189,21 +220,18 @@ class RevEng_GUI(Reports.report):
             struct = DynamicStruct(buf)
             struct.create_fields(query, 'parameter_')
             
-            popup_row = ['']
-            for i in range(struct.count+1):
-                tmp = result.__class__(result)
-                tmp.popup(FlagFramework.Curry(popup_cb, column_number = i)
-                          ,"Edit", icon="red-plus.png")
-                popup_row.append(tmp)
-            result.row(*popup_row)
+#            result.row(*popup_row)
 
-            headings = ['']
             struct.read(buf)
+            popup_row = {}
             for i in range(struct.count):
                 tmp = result.__class__(result)
-                tmp.text(query['name_%s' % i], color="red", font="bold")
-                headings.append(tmp)
-            result.row(*headings)
+                tmp.popup(FlagFramework.Curry(popup_cb, column_number = i)
+                          ,"Edit column", icon="red-plus.png")
+                popup_row[query['name_%s' % i]]=tmp
+
+            result.popup(FlagFramework.Curry(popup_cb, column_number = struct.count)
+                          ,"Add new column", icon="red-plus.png")
 
             ######## Creating table rows here
             data = []
@@ -229,6 +257,8 @@ class RevEng_GUI(Reports.report):
 
                     except AttributeError:
                         pass
+                    except IOError:
+                        break
 
 
                 #### DBH can't create a table when there are no fields
@@ -257,6 +287,7 @@ class RevEng_GUI(Reports.report):
                 rc += 1
 
 
+            print row_htmls
             dbh.set_meta("reveng_HTML", ",".join(row_htmls))
             ###########################################
             # Display table
@@ -281,9 +312,13 @@ class RevEng_GUI(Reports.report):
                     columns = names,
                     callbacks = cb,
                     table = "reveng",
-                    case = query['case']
+                    headers=popup_row,
+                    case = query['case'],
+                    valign="top"
                     )
             except IndexError:
+                pass
+            except DB.DBError:
                 pass
                             
             result.end_form()

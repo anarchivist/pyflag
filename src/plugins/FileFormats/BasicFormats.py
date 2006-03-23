@@ -9,7 +9,10 @@ class BasicType(DataType):
         return struct.calcsize(self.fmt)
 
     def read(self,data):
-        return struct.unpack(self.fmt,data[:self.size()].__str__())[0]
+        try:
+            return struct.unpack(self.fmt,data[:self.size()].__str__())[0]
+        except struct.error,e:
+            raise IOError("%s"% e)
 
     def __int__(self):
         if not self.data:
