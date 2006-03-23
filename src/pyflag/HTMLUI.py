@@ -1128,6 +1128,20 @@ class HTMLUI(UI.GenericUI):
         width = [ len(names[d]) for d in range(len(names))]
 
         #output the table header
+        if opts.has_key('headers'):
+            try:
+                h = []
+                for i in range(len(names)):
+                    if i not in hidden_columns:
+                        try:
+                            h.append(opts['headers'][names[i]])
+                        except KeyError:
+                            h.append('')
+            except KeyError:
+                pass
+
+            self.row(*h)
+
         self.row(*tmp_links)
 
         #This is used to keep track of the lines with a common sorting
@@ -1196,6 +1210,11 @@ class HTMLUI(UI.GenericUI):
                 bgcolor=config.BGCOLOR
                 
             options['bgcolor'] = bgcolor
+            try:
+                options['valign'] = opts['valign']
+            except KeyError:
+                pass
+            
             options['onmouseover']="setPointer(this,%u,'over',%r,%r,%r);" % (count,bgcolor,config.HILIGHT,config.SELECTED)
             options['onmouseout']="setPointer(this,%u,'out',%r,%r,%r);" % (count,bgcolor,config.HILIGHT,config.SELECTED)
             options['onmousedown']="setPointer(this,%u,'click',%r,%r,%r);" % (count,bgcolor,config.HILIGHT,config.SELECTED)
@@ -1248,6 +1267,7 @@ class HTMLUI(UI.GenericUI):
             tmp_links.append(tmp)
 
         self.row(*tmp_links)
+        
         self.row(*[ names[i] for i in range(len(names)) if i not in hidden_columns ])
 
         #If our row count is smaller than the page size, then we dont
