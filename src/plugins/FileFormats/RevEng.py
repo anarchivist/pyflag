@@ -139,13 +139,6 @@ class RevEng_GUI(Reports.report):
 
     def analyse(self, query):
         pass
-##        fd=open("/home/michael/dev/SERevEng/T630/SE_T630_351295000248246_23Apr05.bin")
-##        fd.seek(8*1024*1024)
-
-#    def analyse(self, query,result):
-#        fd=open("/var/tmp/SEReveng/SE_T630_351295000248246_23Apr05.bin")
-#        fd.seek(8*1024*1024)
-
 
     def display(self, query, result):
         
@@ -240,7 +233,7 @@ class RevEng_GUI(Reports.report):
             row_data_types = []
             row_htmls = []
 
-            rc = 0
+            rowcount = 0
             while 1:
                 for i in range(struct.count):
                     try:
@@ -248,7 +241,7 @@ class RevEng_GUI(Reports.report):
                         value = struct.data[name].get_value()
                         row_data_types.append(struct.data[name].sql_type)
 
-                        if rc == 0:
+                        if rowcount == 0:
                             if(isinstance(value, result.__class__)):
                                 row_htmls.append(name)
 
@@ -265,26 +258,24 @@ class RevEng_GUI(Reports.report):
                 if len(row_data_names) == 0:
                     break;
 
-                if rc == 0:
+                if rowcount == 0:
                     dbh.execute("drop table if exists reveng")
                     dbh.execute("""create table reveng  (`Row` int,"""+
                                 ",".join(
                         ["`%s` %s" % (row_data_names[i],row_data_types[i])
-                         for i in range(len(row_data_names))]
-                        )+
-                                ")")
+                         for i in range(len(row_data_names))])+")")
 
                 dbh.mass_insert_start("reveng")
-                row_data['Row'] = rc
+                row_data['Row'] = rowcount
                 dbh.mass_insert( **row_data)
                 dbh.mass_insert_commit()
 
-                if rc > maxrows - 1:
+                if rowcount > maxrows - 1:
                     break
 
                 buf = buf[struct.size():]
                 struct.read(buf)
-                rc += 1
+                rowcount += 1
 
 
             print row_htmls
@@ -331,4 +322,4 @@ class RevEng_GUI(Reports.report):
 
     def reset(self, query):
         dbh = self.DBO(query['case'])
-        dbh.execute("drop table daft")
+        dbh.execute("drop table reveng")

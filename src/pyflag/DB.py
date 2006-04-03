@@ -297,14 +297,15 @@ class DBO:
         self.execute("select value from `%s` where property=%r",
                      (table,property))
         row = self.fetch()
-        if row:
+        print "row %s: %s" % (property, row)
+        if row != None:
             return row['value']
         return None
 
     def set_meta(self, property,value, table='meta', **args):
         """ Sets the value in meta table
         """
-        row = self.get_meta(property, table, **args)
+        row = self.get_meta(property)
         if row:
             self.execute("update `%s` set property=%r,value=%r,%s where property=%r",
                          (table, property,value, property))
