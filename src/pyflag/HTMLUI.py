@@ -874,7 +874,7 @@ class HTMLUI(UI.GenericUI):
 
         #Form the columns in the sql
         if not select_clause:
-            select_clause= [ "`"+k+"` as `"+v+"`" for (k,v) in zip(columns,names) ]
+            select_clause= [ " %s as `%s` " % (k,v) for (k,v) in zip(columns,names) ]
             
         query_str+=",".join(select_clause) 
 
@@ -1506,7 +1506,6 @@ class HTMLUI(UI.GenericUI):
                             stored_query = FlagFramework.query_type(cgi.parse_qsl(stored_query))
                             del query['stored_query_%s' % callback_stored]
                             target_window =  "%r"%stored_query['parent_window']
-                            print "set target to %s" % target_window
                         except KeyError:
                             target_window = "self.opener.window.name"
                         

@@ -352,6 +352,55 @@ class ScanFS(Reports.report):
            open_tree = query['path'])
                        )
 
+class ResetScanners(ScanFS):
+    """ This report will reset the specified scanners.
+
+    Normally when files are scanned by the PyFlag scanners, the fact they have been scanned is cached in the database. This will ensure that the same file will never be rescanned by the same scanner again.
+
+    Sometimes it is desired to rescan files again. For example when adding new words to the dictionary. This report will reset the scanners ensuring it is safe to rescan the files again.
+    """
+    name = "Reset Scanners"
+    description = "Reset Scanners ran on the VFS"
+    order = 40
+
+    def analyse(self,query):
+        dbh=DB.DBO(query['case'])
+        fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'])
+
+        scanner_names = self.calculate_scanners(query)
+        
+        scanners = [ ]
+        for i in scanner_names:
+            try:
+                tmp  = Registry.SCANNERS.dispatch(i)
+                scanners.append(tmp(fsfd))
+            except Exception,e:
+                logging.log(logging.ERRORS,"Unable to initialise scanner %s (%s)" % (i,e))
+
+        logging.log(logging.DEBUG,"Will reset the following scanners: %s" % scanners)
+        ## Prepare the scanner factories for scanning:
+
+        def process_directory(root):
+            """ Recursive function for scanning directories """
+            ## First scan all the files in the directory
+            for stat in fsfd.longls(path=root,dirs=0):
+                logging.log(logging.DEBUG,"Resetting file %s%s (inode %s)" % (stat['path'],stat['name'],stat['inode']))
+                for s in scanners:
+                    s.reset(stat['inode'])
+                    ## Remove the fact that this inode is scanned by noting that in the inode table:
+                    dbh.execute("update inode set scanner_cache = REPLACE(scanner_cache,%r,'') where inode=%r",
+                                (s.__class__.__name__, stat['inode']))
+
+            ## Now recursively scan all the directories in this directory:
+            for directory in fsfd.ls(path=root,dirs=1):
+                new_path = "%s%s/" % (root,directory)
+                process_directory(new_path)
+                    
+        process_directory(query['path'])
+
+        ## Reset the ScanFS reports from the database
+        FlagFramework.reset_all(family = query['family'], report="ScanFS", case=query['case'])
+
 def get_default_fs_driver(query,sig):
     """ Try to guess a good default filesystem driver based on the magic """
     ## Only do this if one was not already supplied

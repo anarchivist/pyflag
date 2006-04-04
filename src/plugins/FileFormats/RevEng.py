@@ -284,7 +284,7 @@ class RevEng_GUI(Reports.report):
             names=['Row']
             try:
                 while 1:
-                    name = query['name_%s' % count]
+                    name = "`%s`" % query['name_%s' % count]
                     names.append(name)
                     if name in row_htmls:
                         cb[name] = render_HTMLUI

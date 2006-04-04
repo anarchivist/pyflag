@@ -137,18 +137,22 @@ class IndexScan(GenScanFactory):
         self.RegexpRows = [ (re.compile(row['word'],re.IGNORECASE),row['id']) for row in pydbh ]
         logging.log(logging.DEBUG,"Index Scanner: Done in %s seconds..." % (time.time()-start_time))
                 
-    def reset(self):
-        """ This deletes the index file and drops the LogicalIndex table """
-        GenScanFactory.reset(self)
-        del self.index
-        del self.RegexpRows
+    def reset(self, inode):
+        """ This deletes the index file and drops the LogicalIndex table.
 
+        Note: At present reseting the index scanner on _ANY_ inode
+        will cause it to be reset on all inodes. This is because it
+        would be too confusing if users scanned parts of the VFS using
+        different dictionaries.
+        """
+        GenScanFactory.reset(self, inode)
         self.dbh.execute("drop table if exists `LogicalIndex`")
         self.dbh.execute("drop table if exists `LogicalIndexOffsets`")
         ## Here we reset all reports that searched this disk
-        FlagFramework.reset_all(case=self.dbh.case,report='SearchIndex', family='Disk Forensics')
-        self.dbh.execute("drop table if exists `LogicalKeyword`")
+        FlagFramework.reset_all(case=self.dbh.case,report='SearchIndex', family='Keyword Indexing')
         self.dbh.execute("drop table if exists `LogicalIndexStats`")
+        #self.dbh.execute("update inode set scanner_cache = REPLACE(scanner_cache,%r,'') ",
+        #            (self.__class__.__name__))
 
     def destroy(self):
         ## Destroy our index handle which will close the file and free memory

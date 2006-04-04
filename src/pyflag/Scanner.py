@@ -119,10 +119,8 @@ class GenScanFactory:
         """
         pass
 
-    def reset(self):
+    def reset(self, inode):
         """ This method drops the relevant tables in the database, restoring the db to the correct state for rescanning to take place. """
-        ## Delete all scanner activities from the meta table:
-        self.dbh.execute("delete from meta where property = %r", "scan_%s" % self.__class__)
 
     ## Relative order of scanners - Higher numbers come later in the order
     order=10
