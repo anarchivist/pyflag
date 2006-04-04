@@ -487,7 +487,7 @@ print_addr (FS_INFO *fs, DADDR_T addr, char *buf,
 
   // skip if no data
   if(size > 0) {
-    if(((fs->ftype & FSMASK) == NTFS_TYPE) && (buf != '\0')) {
+    if(flags & FS_FLAG_DATA_RESIDENT) {
       // we have resident ntfs data
       printf("INSERT INTO resident values('I%s|D%lu-%d-%d','", 
 	     tbl_name,
@@ -622,6 +622,7 @@ main(int argc, char **argv)
 	    {
 	      int len=0;
 	      escape_sql_string(&mount_point,&len,optarg,strlen(optarg)); 
+	      if(mount_point[len-1]=='/') len--;
 	      mount_point[len]=0;
 	    };
 	    break;

@@ -600,12 +600,30 @@ ntfs_data_walk(NTFS_INFO * ntfs, INUM_T inum, FS_DATA * fs_data,
     if (fs_data->flags & FS_DATA_RES) {
 	char *buf = NULL;
 
-	if ((flags & FS_FLAG_FILE_AONLY) == 0) {
+	/** 
+	This is an oddity in sleuthkit... When we have resident files
+	and we ask for FS_FLAG_FILE_AONLY (i.e. we want to only copy
+	the address, not the contents of the buffer), we get a bogus
+	address. This is pretty useless because:
+
+	a) Our callback has no way of knowing that the file is
+	resident.  
+
+	b) The callback gets an address which is completely bogus,
+	i.e. the content of the file is not in that address anyway. 
+	
+	This is not very useful. We modify this to include a flag
+	FS_FLAG_DATA_RESIDENT to ensure that the callback knows that
+	we are resident. We also ignore the FS_FLAG_FILE_AONLY flag by
+	including the content of the data.
+	
+	*/
+	if (1 || (flags & FS_FLAG_FILE_AONLY) == 0) {
 	    buf = mymalloc(fs_data->size);
 	    memcpy(buf, fs_data->buf, fs_data->size);
 	}
 
-	myflags = FS_FLAG_DATA_CONT | FS_FLAG_DATA_ALLOC;
+	myflags = FS_FLAG_DATA_CONT | FS_FLAG_DATA_ALLOC | FS_FLAG_DATA_RESIDENT;
 	action(fs, ntfs->root_mft_addr, buf, fs_data->size, myflags, ptr);
 
 	if (buf)

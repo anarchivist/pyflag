@@ -182,7 +182,7 @@ extern "C" {
 #define FS_FLAG_DATA_META	(1<<3)	/* allocated for meta data */
 #define FS_FLAG_DATA_BAD	(1<<4)	/* marked as bad by the FS */
 #define FS_FLAG_DATA_ALIGN	(1<<5)	/* block align (i.e. send a whole block) */
-
+#define FS_FLAG_DATA_RESIDENT      (1<<6)  /* Marks file as resident */
 
 
 /* Flags used when calling file_walk, action of file_walk uses
@@ -246,7 +246,7 @@ extern "C" {
 #define FS_DATA_INUSE	0x1	// structre in use
 #define FS_DATA_NONRES	0x2	// non-resident
 #define FS_DATA_RES		0x4	// resident
-#define	FS_DATA_ENC		0x10	// encrypted
+#define FS_DATA_ENC		0x10	// encrypted
 #define FS_DATA_COMP	0x20	// compressed
 #define FS_DATA_SPAR	0x40	// sparse
 
