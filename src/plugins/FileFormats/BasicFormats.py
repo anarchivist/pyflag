@@ -87,7 +87,19 @@ class BYTE(BasicType):
 
         ## This is done to remove deprecation warnings:
         return "%02x" % (self.data,)
-    
+
+class UBYTE(BasicType):
+    fmt='=B'
+    visible = True
+        
+    def __str__(self):
+        if not self.data:
+            self.initialise()
+
+        ## This is done to remove deprecation warnings:
+        return "%02x" % (self.data,)
+
+
 class SimpleStruct(DataType):
     """ A class representing a simple struct to read off disk """
     field_names = ["Type","Parameters","Name","Description","Function" ]

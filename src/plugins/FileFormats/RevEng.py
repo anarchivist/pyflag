@@ -39,6 +39,7 @@ class DynamicStruct(BasicFormats.SimpleStruct):
                 self.count+=1
             except KeyError:
                 break
+        print self.fields
         
 class AlignedOffset(format.DataType):
     visible = True
@@ -142,7 +143,7 @@ class RevEng_GUI(Reports.report):
 
     def display(self, query, result):
         
-        def popup_cb(query, ui, column_number = None):
+        def popup_cb(query, ui, column_number = None, mode = None):
             """Popup for defining column attributes"""
             print "I am here"
             ui.decoration = "naked"
@@ -177,6 +178,22 @@ class RevEng_GUI(Reports.report):
             ui.end_form()
             return ui
 
+        def delete_col_cb(query, ui, column_number = None):
+            """Popup to confirm deletion of column"""
+            ui.decoration = "naked"
+            ui.heading("Delete column number %s?" % column_number)
+            try:
+                if query['submit']:
+                    del query['submit']
+                    ui.refresh(0,query,parent=1)
+            except KeyError:
+                pass
+
+            ui.start_form(query)
+            ui.checkbox("Click here to delete", "delete_%s" % column_number, "yes")
+            ui.end_form()
+            return ui
+
         def render_HTMLUI(data):
             """Callback to render mysql stored data in HTML"""
             tmp = result.__class__(result)
@@ -188,6 +205,58 @@ class RevEng_GUI(Reports.report):
         try:
             result.heading("Data Analysis Facilitation Tool")
             dbh=DB.DBO(query['case'])
+
+            delcol = -1
+            inscol = -1
+            
+            for k in query.keys():
+                if k.startswith('delete_'):
+                    delcol = int(k[7:])
+                    del query[k]
+                    break
+                if k.startswith('insert_'):
+                    inscol = int(k[7:])
+                    del query[k]
+                    break
+                    ### other stuff for ins col parameters
+            
+            if delcol >= 0:
+                count = delcol
+                names = []
+                types = []
+                while 1:
+                    try:
+                        name = query['name_%s' % count]
+                        names.append(name[:5])
+                        count += 1
+                    except KeyError:
+                        break
+                for i in range(delcol+1, count):
+                    del query['name_%s' % (i-1)]
+                    del query['data_type_%s' % (i-1)]
+                    del query['visible_%s' % (i-1)]
+                    params = [k for k in query.keys() if
+                              k.startswith('parameters_%s_' % (i-1))]
+                    for parameter in params:
+                        del query[parameter]
+
+                    query['name_%s' % (i-1)] = query['name_%s' % i]
+                    query['data_type_%s' % (i-1)] = query['data_type_%s' % i]
+                    query['visible_%s' % (i-1)] = query['visible_%s' % i]
+                    key = 'parameter_'
+                    params = [k[:-(len('%s'%i)+12)] for k in query.keys() if
+                              k.startswith('%s%s_' % (key,i))]
+                    for parameter in params:
+                        query['%s%s_%s'%(key, (i-1), parameter)] = query['%s%s_%s'%(key, i, parameter)]
+                    
+                del query['name_%s' % (count-1)]
+                del query['data_type_%s' % (count-1)]
+                del query['visible_%s' % (count-1)]
+                params = [k for k in query.keys() if
+                          k.startswith('parameter_%s_' % (count-1))]
+                for parameter in params:
+                    del query[params]
+
             result.start_form(query)
 
             result.textfield("Starting Offset","StartOffset",size=20)
@@ -219,13 +288,18 @@ class RevEng_GUI(Reports.report):
             popup_row = {}
             for i in range(struct.count):
                 tmp = result.__class__(result)
+                tmp.popup(FlagFramework.Curry(popup_cb, column_number = i,
+                          mode='insert'), "Insert column", icon="insert.png")
                 tmp.popup(FlagFramework.Curry(popup_cb, column_number = i)
-                          ,"Edit column", icon="red-plus.png")
+                          ,"Edit column", icon="edit.png")
+                tmp.popup(FlagFramework.Curry(delete_col_cb, column_number = i)
+                          ,"Delete column", icon="delete.png")
                 popup_row[query['name_%s' % i]]=tmp
 
             result.popup(FlagFramework.Curry(popup_cb, column_number = struct.count)
                           ,"Add new column", icon="red-plus.png")
 
+                    
             ######## Creating table rows here
             data = []
             row_data = {}
@@ -270,10 +344,14 @@ class RevEng_GUI(Reports.report):
                 dbh.mass_insert( **row_data)
                 dbh.mass_insert_commit()
 
-                if rowcount > maxrows - 1:
+                if rowcount >= maxrows - 1:
                     break
 
                 buf = buf[struct.size():]
+##                print "buffer length: %d, struct size: %d" % (len(buf), struct.size())
+##                if len(buf) == 0:
+##                    print "eof"
+##                    break
                 struct.read(buf)
                 rowcount += 1
 
@@ -288,7 +366,7 @@ class RevEng_GUI(Reports.report):
             names=['Row']
             try:
                 while 1:
-                    name = "`%s`" % query['name_%s' % count]
+                    name = "%s" % query['name_%s' % count]
                     names.append(name)
                     if name in row_htmls:
                         cb[name] = render_HTMLUI
@@ -307,10 +385,10 @@ class RevEng_GUI(Reports.report):
                     case = query['case'],
                     valign="top"
                     )
-            except IndexError:
-                pass
-            except DB.DBError:
-                pass
+            except IndexError, e:
+                print "Index Error: %s" % e
+            except DB.DBError, e:
+                print "DB Error: %s" % e
                             
             result.end_form()
 
