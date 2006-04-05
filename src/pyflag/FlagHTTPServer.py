@@ -103,7 +103,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             try:
                 value = form[key].value
                 ## We only accept non-empty args
-                if len(value)>0:
+                if len(value)>0 and value!='None':
                     query[key]= value
             except AttributeError:
                 for value in form[key]:
@@ -124,6 +124,10 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         except KeyError:
             if self.command=='POST':
                 print "posted query is %s" % query
+
+        for k,v in query.q:
+            if v=='None':
+                del query[k]
 
         self.query=query
         return query

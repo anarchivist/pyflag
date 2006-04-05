@@ -21,6 +21,8 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 import pyflag.LogFile as LogFile
+import pyflag.DB as DB
+import pyflag.FlagFramework as FlagFramework
 import re
 
 delimiters = {'Space':' ', 'Comma':',', 'Colon':':', 'Semi-Colon':';', 'Hyphen':'-'}
@@ -34,6 +36,9 @@ def pre_selector(result):
         y.append(f[i][1])
         
     result.const_selector("pre-filter(s) to use on the data:",'prefilter',x,y,size=4,multiple="multiple")
+
+def type_selector(result, name):
+    result.const_selector('',name, LogFile.types.keys(), LogFile.types.keys())
 
 class prefilter:
     """ This class defines all the prefilters that are appropriate for importing log files.
@@ -143,16 +148,38 @@ class prefilter:
 class SimpleLog(LogFile.Log):
     """ A log processor to perform simple delimiter dissection
     """
-    name = "Simple"
-    def __init__(self,variable,query):
-        LogFile.Log.__init__(self,variable,query)
-        self.prefilters = query.getarray('prefilter')
-        try:
-            self.delimiter=query['delimiter']
-        except KeyError:
-            self.delimiter=delimiters.values()[0]
-            query['delimiter']=self.delimiter
-    
+    name = "Simple"    
+
+    def set_fields(self, query):
+        """ set the field names from the query, order is important """
+        self.fields=[]
+        for i in range(0,self.num_fields):
+            try:
+                assert(len(query['field%u'%i])>0)
+                self.fields.append(query['field%u'%i])
+            except (KeyError,AssertionError):
+                query['field%u' % i ] = 'ignore'
+                self.fields.append('ignore')
+
+    def set_types(self,query):
+        """ set the field types from the query, order is important """
+        self.types=[]
+        for i in range(0,self.num_fields):
+            try:
+                self.types.append(query['type%u'%i])
+            except KeyError:
+                query['type%u' % i ] = 'varchar(250)'
+                self.types.append('varchar(250)')
+
+    def set_indexes(self,query):
+        """ which fields require indexes """
+        self.indexes=[]
+        for i in range(0,self.num_fields):
+            if query.has_key('index%u'%i):
+                self.indexes.append(True)
+            else:
+                self.indexes.append(False)
+
     def prefilter_record(self,string):
         """ Prefilters the record (string) and returns a new string which is the filtered record.
         """
@@ -160,6 +187,7 @@ class SimpleLog(LogFile.Log):
         for i in self.prefilters:
             #Call the relevant methods on the prefilter object:
             string = p.filters[i][0](p,string)
+            
         return string
 
     def get_fields(self):
@@ -171,44 +199,187 @@ class SimpleLog(LogFile.Log):
             row = self.prefilter_record(row)
             yield row.split(self.delimiter)
 
+    def parse(self, query, datafile='datafile'):
+        LogFile.Log.parse(self,query, datafile)
+        
+        self.datafile = query.getarray(datafile)
+        self.prefilters = query.getarray('prefilter')
+
+        self.num_fields = 0
+        ## If this object was called with an unknown number of fields
+        ## we work it out. Note that we may not have all the
+        ## consecutive fields defined:
+        for k in query.keys():
+            if k.startswith('field'):
+                number=int(k[len('field'):])
+                if number>self.num_fields:
+                    self.num_fields=number
+                    
+        self.num_fields+=1
+
+        self.set_fields(query)
+        self.set_types(query)
+        self.set_indexes(query)
+  
+        try:
+            self.delimiter=query['delimiter']
+        except KeyError:
+            self.delimiter=delimiters.values()[0]
+            query['delimiter']=self.delimiter
+
+        if not query.has_key('delimiter'):
+            query['delimiter'] = delimiters.values()[0]
+
+
     def form(self,query,result):
         """ This draws the form required to fulfill all the parameters for this report
         """
-        result.start_table(hstretch=False)
-        if not query.has_key('delimiter'):
-            query['delimiter'] = delimiters.values()[0]
-            
-        result.const_selector("Simple Field Separator:",'delimiter',delimiters.values(), delimiters.keys())
+        def configure(query, result):            
+            self.parse(query)
+            result.start_table(hstretch=False)
+            result.const_selector("Simple Field Separator:",'delimiter',delimiters.values(), delimiters.keys())
 
+            result.end_table()
+            result.start_table()
+            result.row("Unprocessed text from file")
+            sample = []
+            count =0
+            for line in self.read_record():
+                sample.append(line)
+                count +=1
+                if count>3:
+                    break
 
-        result.end_table()
-        result.start_table()
-        result.row("Unprocessed text from file")
-        sample = []
-        count =0
-        for line in self.read_record():
-            sample.append(line)
-            count +=1
-            if count>3:
-                break
-            
-        [result.row(s,bgcolor='lightgray') for s in sample]
-        result.end_table()
+            [result.row(s,bgcolor='lightgray') for s in sample]
+            result.end_table()
 
+            result.start_table()
+            result.ruler()
+            tmp = result.__class__(result)
+            tmp.heading("Step:")
+            result.row(tmp,  " Select pre-filter(s) to use on the data")
+            result.ruler()
+
+            pre_selector(result)
+            result.end_table()
+            result.start_table()
+            ## Show the filtered sample:
+            result.row("Prefiltered data:",align="left")
+            sample=[ self.prefilter_record(record) for record in sample ]
+            [result.row(s,bgcolor='lightgray') for s in sample]
+            result.end_table()
+
+            self.draw_type_selector(result)
+
+        def test(query,result):
+            self.parse(query)
+            result.text("The following is the result of importing the first few lines from the log file into the database.\nPlease check that the importation was successfull before continuing.",wrap='full')
+            self.display_test_log(result,query)
+            return True
+
+        result.wizard(
+            names = (
+            "Step 1: Select Log File",
+            "Step 2: Configure Log processor",
+            "Step 3: View test result",
+            "Step 4: Save Preset"),
+            callbacks = (LogFile.get_file, configure, test, FlagFramework.Curry(LogFile.save_preset, log=self))
+            )
+    
+    def draw_type_selector(self,result):
+        """ Draws an interactive GUI allowing users to specify field names, types and choice of indexes """
         result.start_table()
         result.ruler()
         tmp = result.__class__(result)
         tmp.heading("Step:")
-        result.row(tmp,  " Select pre-filter(s) to use on the data")
+        result.row(tmp,"Assign field names and Types to each field")
         result.ruler()
-        
-        pre_selector(result)
         result.end_table()
-        result.start_table()
-        ## Show the filtered sample:
-        result.row("Prefiltered data:",align="left")
-        sample=[ self.prefilter_record(record) for record in sample ]
-        [result.row(s,bgcolor='lightgray') for s in sample]
-        result.end_table()
-        
-        self.draw_type_selector(result)
+
+        ## This part creates a GUI allowing users to assign names,
+        ## types and indexes to columns
+        result.start_table(border=1,bgcolor='lightgray')
+        count = 0
+
+        for fields in self.get_fields():
+            count +=1                
+            result.row(*fields)
+            ## Find the largest number of columns in the data
+            if len(fields)>self.num_fields:
+                self.num_fields=len(fields)
+            if count>3: break
+
+        ## If we have more columns we set their names,types and
+        ## indexes from the users data.
+        print fields
+
+        field = []
+        type = []
+        index = []
+        ## Now we create the input elements:
+        for i in range(len(fields)):
+            field_ui = result.__class__(result)
+            type_ui = result.__class__(result)
+            index_ui =  result.__class__(result)
+            
+            field_ui.textfield('','field%u' % i)
+            type_selector(type_ui,"type%u" % i)
+            index_ui.checkbox('Add Index?','index%u'%i,'yes')
+            field.append(field_ui)
+            type.append(type_ui)
+            index.append(index_ui)
+
+        result.row(*field)
+        result.row(*type)
+        result.row(*index)
+
+    def display(self,query,result):
+        if 'IP Address' in self.types and not query.has_key('group_by'):
+            new_query=query.clone()
+            if query.has_key('whois'):
+                del new_query['whois']
+                result.toolbar(link=new_query, text='Hide Whois Data',icon='whois.png')
+            else:
+                new_query['whois']='yes'
+                result.toolbar(link=new_query, text='Show Whois Data',icon='whois.png')
+
+        #Find the names of all the columns in table:
+        self.dbh.execute("select * from %s_log limit 1",query['logtable'])
+
+        columns =[]
+        names = []
+        callbacks = {}
+        links = []
+        where = []
+        table_name = query['logtable']+'_log'
+        table = [ "%s as table_name" % table_name]
+        for d in self.dbh.cursor.description:
+            names.append(d[0])
+            try:
+                type = self.types[self.fields.index(d[0])]
+                columns.append(LogFile.types[type].sql_out % ("table_name.`%s`" % (d[0])))
+                links.append(None)
+                if type == "IP Address" and query.has_key('whois'):
+                    names.append("Whois %s" % d[0])
+                    columns.append("whois_%s.whois_id" % (d[0]))
+                    callbacks["Whois %s" % d[0]] = LogFile.render_whois_info
+                    table.append('whois as whois_%s' % d[0])
+                    where.append("table_name.`%s` = whois_%s.IP" % (d[0],d[0]))
+                    links.append( FlagFramework.query_type(
+                        (),case=query['case'],
+                        family='Log Analysis',report='LookupWhoisID',
+                        __target__='id', __opt__='popup'))
+                    
+            except ValueError,e:
+                columns.append(d[0])
+                links.append(None)
+
+        result.table(
+            columns=columns,
+            names=names,
+            links= links,
+            table= ','.join(table),
+            callbacks = callbacks,
+            where=" and ".join(where),
+            case=query['case']
+            )

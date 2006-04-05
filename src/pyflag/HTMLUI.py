@@ -1047,7 +1047,7 @@ class HTMLUI(UI.GenericUI):
                     
             names_list = [ i for i in names if i not in hidden_columns ]
             csv_writer = csv.DictWriter(data,names_list,dialect='excel')
-            dbh.execute(query_str_basic + " order by %s" % order,())
+            dbh.execute(query_str_basic + " order by %s" %order)
             for row in dbh:
                 ## If there are any callbacks we respect those now.
                 new_row={}

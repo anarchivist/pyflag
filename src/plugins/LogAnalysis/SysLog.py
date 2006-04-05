@@ -22,6 +22,7 @@
 # ******************************************************
 import time
 import plugins.LogAnalysis.Simple as Simple
+import pyflag.DB as DB
 
 class Syslog(Simple.SimpleLog):
     """ Log parser designed to handle simple syslog files
@@ -29,9 +30,14 @@ class Syslog(Simple.SimpleLog):
     name = "Syslog"
     
     def get_fields(self):
+        #dbh=DB.DBO(None)
         for row in self.read_record():
             tmp=row.split(" ",4)
             ts = ' '.join(tmp[:3])
+            #print time.strftime("1970%m%d%H%M%S",time.strptime(ts, "%b %d %H:%M:%S"))
+            #print tmp[3]
+            #print dbh.MakeSQLSafe(tmp[4])
+            
             yield ( time.strftime("1970%m%d%H%M%S",
                                   time.strptime(ts, "%b %d %H:%M:%S"))
                     , tmp[3], tmp[4])

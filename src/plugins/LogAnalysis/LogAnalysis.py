@@ -41,32 +41,6 @@ import pyflag.Registry as Registry
 description = "Log Analysis"
 order = 35
 
-def display_test_log(dbh,log,result,query):
-    # try to load and display as a final test
-    temp_table = dbh.get_temp()
-    
-    for a in log.load(dbh,temp_table,rows= 3):
-        pass
-
-    dbh.execute("select * from %s limit 1",temp_table)
-    columns =[]
-    names = []
-    for d in dbh.cursor.description:
-        names.append(d[0])
-        try:
-            type = log.types[log.fields.index(d[0])]
-            columns.append(LogFile.types[type].sql_out % "`%s`" % d[0])
-        except ValueError:
-            columns.append(d[0])
-
-    result.ruler()
-    tmp_final = result.__class__(result)
-    tmp_final.table(columns=columns,names=names,links=[], table=temp_table, case=query['case'], simple=True)
-    result.row(tmp_final,bgcolor='lightgray',colspan=5)
-
-def render_whois_info(string,result=None):
-    return Whois.identify_network(string)
-
 class ListLogFile(Reports.report):
     """ Lists the content of the log file using the table UI object """
     parameters = {"logtable":"casetable"}
@@ -87,62 +61,15 @@ class ListLogFile(Reports.report):
         dbh.execute("select value from meta where property = 'log_preset_%s'",(query['logtable']))
         row=dbh.fetch()
         try:
-            log = LogFile.get_loader(row['value'],None)
+            log = LogFile.get_loader(dbh,row['value'],None)
         except KeyError:
             raise Reports.ReportError("Unable to load the preset %s for table %s " % (row['value'],query['logtable']))
 
-        if 'IP Address' in log.types and not query.has_key('group_by'):
-            new_query=query.clone()
-            if query.has_key('whois'):
-                del new_query['whois']
-                result.toolbar(link=new_query, text='Hide Whois Data',icon='whois.png')
-            else:
-                new_query['whois']='yes'
-                result.toolbar(link=new_query, text='Show Whois Data',icon='whois.png')
-
-        #Find the names of all the columns in table:
-        dbh.execute("select * from %s_log limit 1",query['logtable'])
-            
-        columns =[]
-        names = []
-        callbacks = {}
-        links = []
-        where = []
-        table_name = query['logtable']+'_log'
-        table = [ "%s as table_name" % table_name]
-        for d in dbh.cursor.description:
-            names.append(d[0])
-            try:
-                type = log.types[log.fields.index(d[0])]
-                columns.append(LogFile.types[type].sql_out % ("table_name.`%s`" % (d[0])))
-                links.append(None)
-                if type == "IP Address" and query.has_key('whois'):
-                    names.append("Whois %s" % d[0])
-##                    columns.append("concat(whois_%s.country,'/',whois_%s.NetName)" % (d[0],d[0]))
-                    columns.append("whois_%s.whois_id" % (d[0]))
-                    callbacks["Whois %s" % d[0]] = render_whois_info
-                    table.append('whois as whois_%s' % d[0])
-                    where.append("table_name.`%s` = whois_%s.IP" % (d[0],d[0]))
-                    links.append( FlagFramework.query_type((),case=query['case'],family='Log Analysis',report='LookupWhoisID',__target__='id', __opt__='popup'))
-                    
-            except ValueError,e:
-                columns.append(d[0])
-                links.append(None)
-
-        result.table(
-            columns=columns,
-            names=names,
-            links= links,
-            table= ','.join(table),
-            callbacks = callbacks,
-            where=" and ".join(where),
-            case=query['case']
-            )
+        log.display(query,result);
 
 class CreateLogPreset(Reports.report):
     """ Creates a new type of log file in the database, so that they can be loaded using the Load Log File report """
-    parameters = {"log_preset":"sqlsafe", "datafile":"filename",
-                   }
+    parameters = {"log_preset":"sqlsafe", "finished":"any"}
     name="Create Log Preset"
     family = "Log Analysis"
     description="Create new preset log type"
@@ -155,72 +82,20 @@ class CreateLogPreset(Reports.report):
 
     def display(self,query,result):
         result.heading("New log file preset %s created" % query['log_preset'])
-        result.link("Load a log file", FlagFramework.query_type((),case=query['case'],family='Load Data',report='LoadPresetLog',log_preset=query['log_preset']))
+        result.link("Load a log file", FlagFramework.query_type((),case=None,family='Load Data',report='LoadPresetLog',log_preset=query['log_preset']))
         return result
 
     def form(self,query,result):
-        def step1(query,result):
-            result.row("Select a sample log file for the previewer",stretch=False)
-            tmp = result.__class__(result)
-            tmp.filebox(target='datafile')
-            result.row("Enter name of log file:",tmp)
-            if query.has_key('datafile'):
-                return True
-            else:
-                result.text("Please input a log file name\n",color='red')
-                return False
-        
-        def step2(query,result):
-            result.const_selector("Select Log Processor", 'delmethod',
+        try:
+            result.const_selector("Select Log Processor", 'driver',
                                   Registry.LOG_DRIVERS.drivers.keys() , Registry.LOG_DRIVERS.drivers.keys()
                                   )
-            if query.has_key('delmethod'):
-                return True
-            else:
-                result.text("Please select a processor",color='red')
-                return False
-
-        def step3(query,result):
-            # Now we ask the log object to draw its form for us:
-            log = Registry.LOG_DRIVERS.drivers[query['delmethod']]('datafile',query)
-
-            #Ask the Log object to draw the form it requires
+            log=Registry.LOG_DRIVERS.drivers[query['driver']]()
             log.form(query,result)
-            
-            return True
-
-        def step4(query,result):
-            dbh = self.DBO(query['case'])
-            result.text("The following is the result of importing the first few lines from the log file into the database.\nPlease check that the importation was successfull before continuing.",wrap='full')
-            log = Registry.LOG_DRIVERS.drivers[query['delmethod']]('datafile',query)
-            display_test_log(dbh,log,result,query)
-            return True
-
-        def step5(query,result):
-            result.textfield("name for preset:",'log_preset')
-            if query.has_key('log_preset'):
-                return True
-            else:
-                result.text("Please type a name for the preset.\n",color='red')
-                return False
-
-        result.wizard(
-            names = ( "Step 1: Select a log file",
-                      "Step 2: Select a Log processor",
-                      "Step 3: Configure Log processor",
-                      "Step 4: View test result",
-                      "Step 5: Save Preset"),
-            callbacks = (step1,step2,step3,step4,step5)
-            )
-
-        return
-
-    def analyse(self, query):
-        """ store this log type in the database """
-        log = Registry.LOG_DRIVERS.drivers[query['delmethod']]('datafile',query)
-        # pickle it to the database
-        LogFile.store_loader(log, query['log_preset'])
-
+        except KeyError,e:
+            print e
+            pass
+        
 class BandWidth(Reports.report):
     """ Calculates the approximate bandwidth requirements by adding the size of each log entry within time period """
     parameters = {"logtable":"casetable","timestamp":"sqlsafe","size":"sqlsafe"}
@@ -364,8 +239,10 @@ class RemoveLogPreset(Reports.report):
         for row in dbh:
             FlagFramework.reset_all(family='Load Data',report='LoadPresetLog',log_preset=preset,case=row['value'])
 
-        ## Now lose the preset itself
-        FlagFramework.reset_all(log_preset=preset,family=query['family'],report='Create Log Preset',case=None)
+            ## Now lose the preset itself
+            FlagFramework.reset_all(log_preset=preset,family=query['family'],report='Create Log Preset',case=None)
+        dbh.execute("delete from meta where property='log_preset' and value=%r",query['log_preset'])
+        dbh.execute("delete from meta where property='log_preset_%s'",query['log_preset'])
         
         result.heading("Deleted preset %s from the database" % query['log_preset'])
         
@@ -374,8 +251,10 @@ class ManageLogPresets(Reports.report):
     name = "Manage Log Presets"
     family = "Log Analysis"
     description =     """ Log presets are templates which are used to parse different types of logs. Since each type of log file is subtablly different, a suitable preset should be created for the specific type of log file. This report allows you to create a new preset, view existing presets and delete unused presets. """
+    parameters = {}
     
     def display(self,query,result):
+        dbh=DB.DBO(None)
         result.heading("These are the currently available presets")
         link = FlagFramework.query_type((),family=query['family'],report='CreateLogPreset')
                                                    
@@ -387,7 +266,7 @@ class ManageLogPresets(Reports.report):
 
         def Describe(value):
             try:
-                log = LogFile.get_loader(value,None)
+                log = LogFile.get_loader(dbh, value,None)
                 return( "%s" % log.__class__)
             except KeyError:
                 return "Unknown"

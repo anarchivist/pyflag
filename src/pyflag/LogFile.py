@@ -36,6 +36,28 @@ import pyflag.logging as logging
 import pickle
 import plugins.LogAnalysis.Whois as Whois
 
+def get_file(query,result):
+    result.row("Select a sample log file for the previewer",stretch=False)
+    tmp = result.__class__(result)
+    tmp.filebox(target='datafile')
+    result.row("Enter name of log file:",tmp)
+    if query.has_key('datafile'):
+        return True
+    else:
+        result.text("Please input a log file name\n",color='red')
+        return False
+
+def save_preset(query,result, log=None):
+    result.textfield("name for preset:",'log_preset')
+    if query.has_key('log_preset'):
+        log.parse(query)
+        log.store(query['log_preset'])
+        query['finished']='yes'
+        return True
+    else:
+        result.text("Please type a name for the preset.\n",color='red')
+        return False
+
 class Log:
     """ This base class abstracts Loading of log files.
 
@@ -43,32 +65,45 @@ class Log:
     drivers extend this class, possibly providing new methods for form
     and field, and potentially even read_record.
     """
-    datafile = ()
-    num_fields = 0
-    def __init__(self,variable,query):
-        """ Load the log file.
+    def parse(self, query, datafile="datafile"):
+        """ Parse all options from query and update ourselves.
 
-        @arg variable: Name of query variable that carries the name of the file. Note that this may be an array for users to specify a number of files.
-        @arg query: The query object.
+        This may be done several times during the life of an
+        object. We need to ensure that we completely refresh all data
+        which is unique to our instance.
         """
-        self.datafile = query.getarray(variable)
-        if self.datafile==():
-            raise KeyError("No variable %s" % variable)
-        self.query = query
+        
+    def __init__(self, case=None):
+        self.dbh = DB.DBO(case)
+        
+    def form(self,query,result):
+        """ This method will be called when the user wants to configure a new instance of us. IE a new preset """
 
-        self.num_fields = 0
-        ## If this object was called with an unknown number of fields we work it out. Note that we may not have all the consecutive fields defined:
-        for k in query.keys():
-            if k.startswith('field'):
-                number=int(k[len('field'):])
-                if number>self.num_fields:
-                    self.num_fields=number
-                    
-        self.num_fields+=1
+    def reset(self, query):
+        """ This is called to reset the log tables this log driver has created """
 
-        self.set_fields()
-        self.set_types()
-        self.set_indexes()
+    def display_test_log(self,result,query):
+        # try to load and display as a final test
+        temp_table = self.dbh.get_temp()
+
+        for a in self.load(temp_table,rows= 3):
+            pass
+
+        self.dbh.execute("select * from %s limit 1",temp_table)
+        columns =[]
+        names = []
+        for d in self.dbh.cursor.description:
+            names.append(d[0])
+            try:
+                type = self.types[self.fields.index(d[0])]
+                columns.append(types[type].sql_out % "`%s`" % d[0])
+            except ValueError:
+                columns.append(d[0])
+
+        result.ruler()
+        tmp_final = result.__class__(result)
+        tmp_final.table(columns=columns,names=names,links=[], table=temp_table, case=self.dbh.case, simple=True)
+        result.row(tmp_final,bgcolor='lightgray',colspan=5)
     
     def read_record(self, ignore_comment = True):
         """ Generates records.
@@ -83,40 +118,9 @@ class Log:
                 else:
                     yield line
 
-    def set_fields(self):
-        """ set the field names from the query, order is important """
-        self.fields=[]
-        for i in range(0,self.num_fields):
-            try:
-                assert(len(self.query['field%u'%i])>0)
-                self.fields.append(self.query['field%u'%i])
-            except (KeyError,AssertionError):
-                self.query['field%u' % i ] = 'ignore'
-                self.fields.append('ignore')
-
-    def set_types(self):
-        """ set the field types from the query, order is important """
-        self.types=[]
-        for i in range(0,self.num_fields):
-            try:
-                self.types.append(self.query['type%u'%i])
-            except KeyError:
-                self.query['type%u' % i ] = 'varchar(250)'
-                self.types.append('varchar(250)')
-
-    def set_indexes(self):
-        """ which fields require indexes """
-        self.indexes=[]
-        for i in range(0,self.num_fields):
-            if self.query.has_key('index%u'%i):
-                self.indexes.append(True)
-            else:
-                self.indexes.append(False)
-
-    def load(self,dbh,tablename, rows = None):
+    def load(self,tablename, rows = None):
         """ Loads the specified number of rows into the database.
 
-        @arg dbh: A database handle to use
         @arg table_name: A table name to use
         @arg rows: number of rows to upload - if None , we upload them all
         @return: A generator that represents the current progress indication.
@@ -136,30 +140,21 @@ class Log:
                 cols.append("`%s` %s" % (self.fields[i], type.type ))
                 insert_sql.append(type.sql_in)
 
-        dbh.execute("CREATE TABLE IF NOT EXISTS %s (id int auto_increment,%s,key(id))" % (tablename,",".join(cols)))
+        self.dbh.execute("CREATE TABLE IF NOT EXISTS %s (id int auto_increment,%s,key(id))" % (tablename,",".join(cols)))
+        
         ## prepare the insert string
         insert_str = "(Null,"+','.join(insert_sql)+")"
-
+        #insert_str = ','.join(insert_sql)+")"
+        
         for fields in self.get_fields():
             count += 1
             fields = [ fields[i] for i in range(len(fields)) if i in field_indexes ]
             try:
-                print insert_str, fields
-                row_cache.append(insert_str % fields)
-                cached_count += 1
-                if cached_count > 5:
-                ## We insert into the table those fields that are not ignored:
-##                    dbh.execute("INSERT INTO "+tablename+" values "+insert_str * cached_count, row_cache
-                    try:
-                        print ("INSERT INTO "+tablename+" values "+','.join(row_cache))
-                    finally:
-                        cached_count =0
-                        row_cache = []
-                    
+                self.dbh.execute("INSERT INTO "+tablename+" values " + insert_str, fields)
             except DB.DBError,e:
-                logging.log(logging.WARNINGS,"Warning: %s" % e)
-            except TypeError:
-                logging.log(logging.WARNINGS,"Unable to load line into table SQL: %s Data: %s" % (insert_str,row_cache))
+                logging.log(logging.WARNINGS,"DB Error: %s" % e)
+            except TypeError,e:
+                logging.log(logging.WARNINGS,"Unable to load line into table SQL: %s Data: %s Error: %s" % (insert_str,fields,e))
                 continue
 
             yield "Uploaded %s rows" % count
@@ -173,11 +168,11 @@ class Log:
             if self.indexes[field_number] and index:
                 ## interpolate the column name into the index declaration
                 index = index % self.fields[field_number]
-                dbh.execute("Alter table %s add index(`%s`)" % (tablename,index))
+                self.dbh.execute("Alter table %s add index(`%s`)" % (tablename,index))
                 yield "Created index on %s " % index
                 
         ## Add the IP addresses to the whois table if required:
-        dbh.execute("create table if not exists `whois` (`IP` INT UNSIGNED NOT NULL ,`country` VARCHAR( 4 ) NOT NULL ,`NetName` VARCHAR( 50 ) NOT NULL ,`whois_id` INT NOT NULL ,PRIMARY KEY ( `IP` )) COMMENT = 'A local case specific collection of whois information'")
+        self.dbh.execute("create table if not exists `whois` (`IP` INT UNSIGNED NOT NULL ,`country` VARCHAR( 4 ) NOT NULL ,`NetName` VARCHAR( 50 ) NOT NULL ,`whois_id` INT NOT NULL ,PRIMARY KEY ( `IP` )) COMMENT = 'A local case specific collection of whois information'")
 
         for field_number in range(len(self.fields)):
             if self.types[field_number] == 'IP Address':
@@ -185,16 +180,16 @@ class Log:
                 ## expensive. This needs to be moved to a different
                 ## report!!!. For now it disabled
                 continue
-                dbh2=dbh.clone()
+                dbh2=self.dbh.clone()
                 #Handle for the pyflag db
                 dbh_pyflag = DB.DBO(None)
                 yield "Doing Whois lookup of column %s" % self.fields[field_number]
                 
-                dbh.execute("select `%s` as IP from %s group by `%s`", (
+                self.dbh.execute("select `%s` as IP from %s group by `%s`", (
                     self.fields[field_number],
                     tablename,
                     self.fields[field_number]))
-                for row in dbh:
+                for row in self.dbh:
                     whois_id = Whois.lookup_whois(row['IP'])
                     dbh_pyflag.execute("select * from whois where id=%r",(whois_id))
                     row2=dbh_pyflag.fetch()
@@ -206,10 +201,9 @@ class Log:
                             whois_id))
                     except DB.DBError:
                         pass
-                                
-                    
-    def pickle(self):
-        """ Pickles this object
+
+    def store(self, name):
+        """ Stores the configured driver in the db.
 
         Note that Log objects are asked to pickle themselves. However
         the base class uses a generic pickler. If you need to do
@@ -218,78 +212,29 @@ class Log:
         """
         ## Clear stuff that is not relevant
         self.datafile = None
-        self.query = None
-        return pickle.dumps(self)
+        tmp=self.dbh
+        self.dbh=None
+        data=pickle.dumps(self)
+        self.dbh=tmp
+        self.dbh.set_meta("log_preset", name)
+        self.dbh.set_meta("log_preset_%s" % name, data)
 
-    def draw_type_selector(self,result):
-        """ Draws an interactive GUI allowing users to specify field names, types and choice of indexes """
-        result.start_table()
-        result.ruler()
-        tmp = result.__class__(result)
-        tmp.heading("Step:")
-        result.row(tmp,"Assign field names and Types to each field")
-        result.ruler()
-        result.end_table()
+    def display(self,query,result):
+        """ This method is called to display the contents of the log
+        file after it has been loaded
+        """
 
-        ## This part creates a GUI allowing users to assign names,
-        ## types and indexes to columns
-        result.start_table(border=1,bgcolor='lightgray')
-        count = 0
-        self.num_fields=0
-        for fields in self.get_fields():
-            count +=1                
-            result.row(*fields)
-            ## Find the largest number of columns in the data
-            if len(fields)>self.num_fields:
-                self.num_fields=len(fields)
-            if count>3: break
-
-        ## If we have more columns we set their names,types and
-        ## indexes from the users data.
-        self.num_fields=len(fields)
-        self.set_fields()
-        self.set_types()
-        self.set_indexes()
-
-        field = []
-        type = []
-        index = []
-        ## Now we create the input elements:
-        for i in range(len(self.fields)):
-            field_ui = result.__class__(result)
-            type_ui = result.__class__(result)
-            index_ui =  result.__class__(result)
-            
-            field_ui.textfield('','field%u' % i)
-            type_selector(type_ui,"type%u" % i)
-            index_ui.checkbox('Add Index?','index%u'%i,'yes')
-            field.append(field_ui)
-            type.append(type_ui)
-            index.append(index_ui)
-
-        result.row(*field)
-        result.row(*type)
-        result.row(*index)
-                
-#plugins = {"Simple": SimpleLog,"CSV": CSVLog, "IIS Log":IISLog}
-
-def get_loader(name,datafile):
+def get_loader(dbh,name,datafile):
     """ lookup and unpickle log object from the database, return loader object
 
     We also initialise the object to the datafile list of filenames to use.
     """
-    dbh = DB.DBO(config.FLAGDB)
-    log=pickle.loads(dbh.get_meta('log_preset_%s' % name))
+    pydbh = DB.DBO(None)
+    log=pickle.loads(pydbh.get_meta('log_preset_%s' % name))
     log.datafile = datafile
+    log.dbh = dbh
     return log
     
-def store_loader(log, name):
-    """ pickle and save given loader into the database """
-    dbh = DB.DBO(config.FLAGDB)
-    dbh.execute('INSERT INTO meta set property="log_preset", value=%r' % name)
-    print "%s" % log.fields
-    dbh.execute('INSERT INTO meta set property="log_preset_%s", value=%r' % (name,log.pickle()))
-
 class Type:
     """ This class represents translations between the way a column is stored in the database and the way it is displayed.
 
@@ -328,5 +273,5 @@ types = {
     'IP Address': IPType
     }
 
-def type_selector(result, name):
-    result.const_selector('',name, types.keys(), types.keys())
+def render_whois_info(string,result=None):
+    return Whois.identify_network(string)
