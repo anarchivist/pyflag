@@ -143,13 +143,17 @@ class RevEng_GUI(Reports.report):
 
     def display(self, query, result):
         
-        def popup_cb(query, ui, column_number = None, mode = None):
+        def popup_cb(query, ui, column_number = None, mode = ''):
             """Popup for defining column attributes"""
             print "I am here"
             ui.decoration = "naked"
 
+            if mode == 'insert':
+                pre = 'insert_'
+            else:
+                pre = ''
             try:
-                if query['finish'] and query['name_%s' % column_number]:
+                if query['finish'] and query['%sname_%s' % (pre, column_number)]:
                     del query['finish']
                     del query['submit']
 
@@ -159,20 +163,26 @@ class RevEng_GUI(Reports.report):
 
             ui.start_form(query)
             ui.start_table()
-            ui.heading("Column number %s" % column_number)
+            if mode == 'insert':
+                ui.heading("Inserting Column number %s" % column_number)
+            else:
+                ui.heading("Column number %s" % column_number)
             names = [ x.__name__ for x in Registry.FILEFORMATS.classes if x.visible ]
 
-            ui.textfield("Name for this field", "name_%s" % column_number)
-            ui.const_selector("Data Type", 'data_type_%s' % column_number, names, names)
+            ui.textfield("Name for this field", "%sname_%s" % (pre, column_number))
+            ui.const_selector("Data Type", '%sdata_type_%s' % (pre, column_number),
+                              names, names)
             try:
-                temp = Registry.FILEFORMATS[query['data_type_%s' % column_number]]("",None)
+                temp = Registry.FILEFORMATS[query['%sdata_type_%s' % (pre,
+                              column_number)]]("",None)
                 ui.row("Description", temp.__doc__)
 
-                temp.form("parameter_%s_" % column_number, query,ui)
+                temp.form("%sparameter_%s_" % (pre, column_number), query,ui)
             except KeyError,e:
                 pass
 
-            ui.checkbox("Visible","visible_%s" % column_number, "yes", checked=True)
+            ui.checkbox("Visible","%svisible_%s" % (pre, column_number), "yes",
+                        checked=True)
             ui.checkbox("Click here to finish", "finish","yes");
             ui.end_table()
             ui.end_form()
@@ -194,36 +204,26 @@ class RevEng_GUI(Reports.report):
             ui.end_form()
             return ui
 
-        def render_HTMLUI(data):
-            """Callback to render mysql stored data in HTML"""
-            tmp = result.__class__(result)
-            tmp.result = data
-            return tmp
-
-        ##### Display starts here
-        
-        try:
-            result.heading("Data Analysis Facilitation Tool")
-            dbh=DB.DBO(query['case'])
-
+        def processquery(query):
             delcol = -1
-            inscol = -1
+            insvalues={}
             
             for k in query.keys():
                 if k.startswith('delete_'):
                     delcol = int(k[7:])
                     del query[k]
                     break
-                if k.startswith('insert_'):
-                    inscol = int(k[7:])
+                elif k.startswith('insert_'):
+                    insvalues[k[7:]] = query[k]
+                    if k.startswith('insert_name_'):
+                        inscol = int(k[12:])
                     del query[k]
-                    break
+                    continue
                     ### other stuff for ins col parameters
             
+            names =[]
             if delcol >= 0:
                 count = delcol
-                names = []
-                types = []
                 while 1:
                     try:
                         name = query['name_%s' % count]
@@ -256,7 +256,47 @@ class RevEng_GUI(Reports.report):
                           k.startswith('parameter_%s_' % (count-1))]
                 for parameter in params:
                     del query[params]
+            elif len(insvalues) > 0:
+                count = inscol
+                while 1:
+                    try:
+                        name = query['name_%s' % count]
+                        names.append(name[:5])
+                        count +=1
+                    except KeyError:
+                        break
+                for i in range(count, inscol, -1):
+                    query['name_%s' % i] = query['name_%s' % (i-1)]
+                    query['data_type_%s' % i] = query['data_type_%s' % (i-1)]
+                    key = 'parameter_'
+                    params = [k[:-(len('%s'%i)+12)] for k in query.keys() if
+                              k.startswith('%s%s_' % (key,i))]
+                    for parameter in params:
+                        query['%s%s_%s'%(key, i, parameter)] = query['%s%s_%s'%(key, (i-1), parameter)]
+                    del query['name_%s' % (i-1)]
+                    del query['data_type_%s' % (i-1)]
+                    del query['visible_%s' % (i-1)]
+                    params = [k for k in query.keys() if
+                              k.startswith('parameters_%s_' % (i-1))]
+                    for parameter in params:
+                        del query[parameter]
+                for k in insvalues.keys():
+                    query[k] = insvalues[k]
 
+            
+        def render_HTMLUI(data):
+            """Callback to render mysql stored data in HTML"""
+            tmp = result.__class__(result)
+            tmp.result = data
+            return tmp
+
+        ##### Display starts here
+        
+        try:
+            result.heading("Data Analysis Facilitation Tool")
+            dbh=DB.DBO(query['case'])
+
+            processquery(query)
             result.start_form(query)
 
             result.textfield("Starting Offset","StartOffset",size=20)
