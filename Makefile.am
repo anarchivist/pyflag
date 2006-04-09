@@ -5,11 +5,13 @@ my_data			=	$(shell find data -not -name .\*)
 my_utilities		=	$(shell find utilities -not -name .\*)
 bin_SCRIPTS		=	pyflag pyflash pyflag_launch
 sysconf_DATA		=	pyflagrc
-pkgdata_DATA		=	$(my_data)
+pkgdata_DATA		=	$(my_data) \
+				data/magic.mgc data/magic.mime.mgc
 nobase_pkgdata_DATA	=	$(my_images) $(my_utilities)
 man_MANS		=	pyflag.1
 EXTRA_DIST		=	pyflag.in pyflagrc.in pyflash.in \
 				pyflag_launch.in $(nobase_pkgdata_DATA) $(pkgdata_DATA) $(man_MANS)
+
 
 # perform subs in scripts and config files
 edit = sed \
@@ -38,3 +40,8 @@ deb-pkg:
 	chmod 744 debian/rules
 	dpkg-buildpackage -rfakeroot
 
+data/magic.mgc: data/magic
+	cd data && file -C -m magic
+
+data/magic.mime.mgc: data/magic.mime
+	cd data && file -C -m magic.mime

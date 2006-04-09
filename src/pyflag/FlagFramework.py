@@ -652,21 +652,21 @@ class Magic:
     def __init__(self,mode=None):
         if not Magic.magic:
             Magic.magic=magic.open(magic.MAGIC_CONTINUE)
-            if Magic.magic.load(config.MAGICFILE) < 0:
+            if magic.load(Magic.magic, config.MAGICFILE) < 0:
                 raise IOError("Could not open magic file %s" % config.MAGICFILE)
 
         if not Magic.mimemagic:
             Magic.mimemagic=magic.open(magic.MAGIC_MIME | magic.MAGIC_CONTINUE)
-            if Magic.mimemagic.load(config.MAGICFILE) < 0:
+            if magic.load(Magic.mimemagic,config.MAGICFILE) < 0:
                 raise IOError("Could not open magic file %s" % config.MAGICFILE)
         self.mode=mode
 
     def buffer(self,buf):
         """ Return the string representation of the buffer """
         if self.mode:
-            result=Magic.mimemagic.buffer(buf)
+            result=magic.buffer(Magic.mimemagic,buf)
         else:
-            result=Magic.magic.buffer(buf)
+            result=magic.buffer(Magic.magic, buf)
 
         if not result:
             return "text/plain"

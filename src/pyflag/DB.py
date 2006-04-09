@@ -295,25 +295,26 @@ class DBO:
             ## Add to cache:
             self.DBH[self.case].indexes["%s.%s" % (table,key)] = True
         
-    def get_meta(self, property):
+    def get_meta(self, property, table='meta',**args):
         """ Returns the value for the given property in meta table selected database
 
         Only returns first value """
-        self.execute("select value from meta where property=%r", property)
+        self.execute("select value from `%s` where property=%r",
+                     (table,property))
         row = self.fetch()
         if row:
             return row['value']
         return None
 
-    def set_meta(self, property,value):
+    def set_meta(self, property,value, table='meta', **args):
         """ Sets the value in meta table
         """
-        row = self.get_meta(property)
+        row = self.get_meta(property, table, **args)
         if row:
-            self.execute("update meta set property=%r,value=%r where property=%r",
-                         (property,value, property))
+            self.execute("update `%s` set property=%r,value=%r,%s where property=%r",
+                         (table, property,value, property))
         else:
-            self.execute("insert into meta set property=%r,value=%r", (property,value))
+            self.execute("insert into `%s` set property=%r,value=%r", (table, property,value))
 
     def MakeSQLSafe(self,string):
         """ Returns a version of string, which is SQL safe.

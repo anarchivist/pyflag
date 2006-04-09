@@ -464,6 +464,15 @@ class LoadFS(Reports.report):
         """ load the filesystem image data into the database """
         dbh = self.DBO(query['case'])
         self.progress_str=None
+
+        dbh.execute("""CREATE TABLE `filesystems` (
+        `name` VARCHAR( 50 ) NOT NULL ,
+        `property` VARCHAR( 50 ) NOT NULL ,
+        `value` MEDIUMTEXT NOT NULL ,
+        PRIMARY KEY ( `name` )
+        ) TYPE = MYISAM""")
+
+        dbh.set_meta('fstype', query['fstype'], table='filesystems', name=query['iosource'])
         
         # call on FileSystem to load data
         fsobj=Registry.FILESYSTEMS.filesystems[query['fstype']](query['case'])
@@ -482,9 +491,7 @@ class LoadFS(Reports.report):
             )
         for x,y,z in index:
             dbh.check_index(x,y,z)
-            
-        dbh.set_meta('fstype' , query['fstype'])
-        
+
     def display(self,query,result):
         result.heading("Uploaded FS Image from IO Source %s to case %s" % (query['iosource'],query['case']))
         result.link("Analyse this data", FlagFramework.query_type((), case=query['case'], family="Disk Forensics",report='BrowseFS'))
