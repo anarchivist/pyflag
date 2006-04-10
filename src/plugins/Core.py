@@ -41,8 +41,8 @@ class IO_File(FileSystem.File):
     """
     specifier = "I"
 
-    def __init__(self, case, fd, inode):
-        FileSystem.File.__init__(self, case, fd, inode)
+    def __init__(self, case, fd, inode, dbh=None):
+        FileSystem.File.__init__(self, case, fd, inode, dbh)
 
         ## The format of the inode is Iname .Where name is the name of
         ## the IO source.

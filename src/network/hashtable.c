@@ -79,5 +79,7 @@ END_VIRTUAL
 /** Test this module
 MODULE_INIT(hashtables) {
   HashTable h=CONSTRUCT(HashTable, HashTable, Con, 8, NULL);
+  
+  h->
 };
 */

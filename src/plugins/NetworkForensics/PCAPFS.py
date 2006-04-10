@@ -117,20 +117,18 @@ class PCAPFile(File):
     """
     specifier = 'p'
 
-    def __init__(self, case, fd, inode):
+    def __init__(self, case, fd, inode, dbh=None):
         """ This is a top level File driver for opening pcap files.
 
         Note that pcap files are stored in their own filesystem. We expect the following initialisation:
         @arg fd: is an io source for the pcap file
         @arg inode: The inode of the pcap file in the pcap filesystem, currently ignored.
         """
-        File.__init__(self, case, fd, inode)
+        File.__init__(self, case, fd, inode, dbh)
         ## Calculates the size of this file:
-        dbh = DB.DBO(self.case)
-        self.dbh=dbh
-        
-        dbh.execute("select max(id) as max from pcap")
-        row=dbh.fetch()
+        self.dbh = dbh.clone()
+        self.dbh.execute("select max(id) as max from pcap")
+        row=self.dbh.fetch()
         self.size = row['max']
         self.dbh.execute("select id,offset,link_type,ts_sec,length from pcap")
         self.iosource = fd

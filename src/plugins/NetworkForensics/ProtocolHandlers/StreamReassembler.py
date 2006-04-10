@@ -294,7 +294,7 @@ def combine_streams(query,result):
     In each screenfull we show a maximum of MAXSIZE characters per connection. We stop as soon as either direction reaches this many characters.
     """
     inode = query['inode']
-    dbh = DB.DBO(query['case'])
+    dbh = result.dbh
     try:
         iosource = inode[:inode.index("|")]
         stream_inode = inode[inode.rindex("|"):]
@@ -402,8 +402,8 @@ class StreamFile(File):
     stat_names = [ "Show Packets", "Combined streams"]
     specifier = 'S'
     
-    def __init__(self, case, fd, inode):
-        File.__init__(self, case, fd, inode)
+    def __init__(self, case, fd, inode, dbh=None):
+        File.__init__(self, case, fd, inode, dbh)
 
         if self.cached_fd: return
         
@@ -444,7 +444,7 @@ class StreamFile(File):
             ## us to have missing packets, as we will simply return 0 for
             ## the byte sequences we are missing.
 
-            self.dbh = DB.DBO(self.case)
+#            self.dbh = DB.DBO(self.case)
             self.dbh.execute("select isn from connection_details where con_id=%r",(self.con_id))
             row=self.dbh.fetch()
             if not row:
@@ -623,8 +623,8 @@ class OffsetFile(File):
     The format is offset:length
     """
     specifier = 'o'
-    def __init__(self, case, fd, inode):
-        File.__init__(self, case, fd, inode)
+    def __init__(self, case, fd, inode, dbh=None):
+        File.__init__(self, case, fd, inode, dbh)
 
         ## We parse out the offset and length from the inode string
         tmp = inode.split('|')[-1]
@@ -679,8 +679,8 @@ import StringIO
 ## This is a memory cached version of the offset file driver - very useful for packets:
 class MemroyCachedOffset(StringIO.StringIO,File):
     specifier = 'O'
-    def __init__(self, case, fd, inode):
-        File.__init__(self, case, fd, inode)
+    def __init__(self, case, fd, inode, dbh=None):
+        File.__init__(self, case, fd, inode, dbh)
 
         ## We parse out the offset and length from the inode string
         tmp = inode.split('|')[-1]

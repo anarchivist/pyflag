@@ -265,8 +265,8 @@ class Pst_file(File):
     specifier = 'P'
     blocks=()
     size=None
-    def __init__(self, case, fd, inode):
-        File.__init__(self, case, fd, inode)
+    def __init__(self, case, fd, inode, dbh=None):
+        File.__init__(self, case, fd, inode, dbh)
         parts = inode.split('|')
         pstinode = '|'.join(parts[:-1])
         thispart = parts[-1]

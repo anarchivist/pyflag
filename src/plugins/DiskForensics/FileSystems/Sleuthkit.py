@@ -35,9 +35,7 @@ class AutoFS(DBFS):
             "foo"
             )
                 
-        self.dbh.MySQLHarness(
-            string
-            )
+        self.dbh.MySQLHarness(string)
         
         # now find all the 'unallocated' files
         self.dbh.execute("drop table if exists unallocated")

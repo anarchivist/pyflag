@@ -765,10 +765,10 @@ def make_sql_from_filter(filter_str,having,column,name):
         #If the user already supplied the %, we dont add our own:
         having.append("%s like %r " % (column,filter_str))
         condition_text="%s like %s" % (name,filter_str)
-    elif filter_str[0] == '!':
-        #If the user already supplied the %, we dont add our own:
-        having.append("%s not like %r " % (column,"%%%%%s%%%%"% filter_str[1:]))
-        condition_text="%s not like %s" % (name,"%%%s%%" % filter_str[1:])
+    elif filter_str.startswith('!'):
+        ## If the input starts with !, we do an exact match
+        having.append("%s not like %r " % (column,filter_str[1:]))
+        condition_text="%s not like %s" % (name,filter_str[1:])
     else:
         ## Otherwise we do a fuzzy match. 
         having.append("%s like %r " % (column,"%%%s%%"% filter_str))

@@ -177,8 +177,8 @@ class Zip_file(File):
     """ A file like object to read files from within zip files. Note that the zip file is specified as an inode in the DBFS """
     specifier = 'Z'
     
-    def __init__(self, case, fd, inode):
-        File.__init__(self, case, fd, inode)
+    def __init__(self, case, fd, inode, dbh=None):
+        File.__init__(self, case, fd, inode, dbh)
 
         ## Zip file handling requires repeated access into the zip
         ## file. Caching our input fd really helps to speed things
@@ -218,8 +218,8 @@ class GZ_file(File):
     """ A file like object to read gzipped files. """
     specifier = 'G'
     
-    def __init__(self, case, fd, inode):
-        File.__init__(self, case, fd, inode)
+    def __init__(self, case, fd, inode, dbh=None):
+        File.__init__(self, case, fd, inode, dbh)
 
         self.cache()
         
@@ -255,8 +255,8 @@ class Tar_file(File):
     """ A file like object to read files from within tar files. Note that the tar file is specified as an inode in the DBFS """
     specifier = 'T'
     
-    def __init__(self, case, fd, inode):
-        File.__init__(self, case, fd, inode)
+    def __init__(self, case, fd, inode, dbh=None):
+        File.__init__(self, case, fd, inode, dbh)
 
         ## Tar file handling requires repeated access into the zip
         ## file. Caching our input fd really helps to speed things

@@ -484,8 +484,8 @@ class Timeline(Reports.report):
 class DBFS_file(FileSystem.File):
     """ Class for reading files within a loaded dd image, supports typical file-like operations, seek, tell, read """
     specifier = 'D'
-    def __init__(self, case, fd, inode):
-        FileSystem.File.__init__(self, case, fd, inode)
+    def __init__(self, case, fd, inode, dbh=None):
+        FileSystem.File.__init__(self, case, fd, inode, dbh)
 
         ## This is kind of a late initialization. We get the blocksize
         ## on demand later.
@@ -598,8 +598,8 @@ class DBFS_file(FileSystem.File):
 class MountedFS_file(FileSystem.File):
     """ access to real file in filesystem """
     specifier = 'M'
-    def __init__(self, case, fd, inode):
-        FileSystem.File.__init__(self, case, fd, inode)
+    def __init__(self, case, fd, inode, dbh=None):
+        FileSystem.File.__init__(self, case, fd, inode, dbh)
         #strategy:
         #must determine path from inode
         #we can assume this vfs will never be inside another vfs...
@@ -639,8 +639,8 @@ class Unallocated_File(FileSystem.File):
     """
     specifier = 'U'
     
-    def __init__(self, case, fd, inode):
-        FileSystem.File.__init__(self, case, fd, inode)
+    def __init__(self, case, fd, inode, dbh=None):
+        FileSystem.File.__init__(self, case, fd, inode, dbh)
         self.fd=fd
         self.dbh = DB.DBO(case)
         self.dbh.execute("select * from unallocated where inode=%r",(inode))

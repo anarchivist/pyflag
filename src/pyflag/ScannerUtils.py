@@ -36,24 +36,6 @@ def scan_groups_gen():
 
         yield cls
 
-def ResetScanners(query):
-    ## FIXME : This is not currently working
-    """ Reset all the scanners specified in query """
-    iofd=IO.open(query['case'],query['iosource'])
-    fsfd=FileSystem.FS_Factory( query["case"], query["iosource"], iofd)
-
-    ## Instantiate all scanners for reset
-    scanners = [ i(dbh,query['iosource'],fsfd) for i in Registry.SCANNERS.classes ]
-
-    fsfd.resetscanfs(scanners)
-    dbh.execute("delete from meta where property=%r and value=%r",('fsimage',query['iosource']))
-    dbh.execute("delete from meta where property like 'scanfs_%s'",query['iosource'])
-
-    ## Here we remove from the meta table any reference to this report regardless of the scanners used:
-    del query['scan']
-    canonical_query = FlagFramework.canonicalise(query)
-    dbh.execute("delete from meta where property='report_executed' and value like '%s%%'",(canonical_query))
-
 def fill_in_dependancies(scanners):
     """ Will add scanner names to scanners to satisfy all dependancies """
     while 1:

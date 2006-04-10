@@ -137,7 +137,7 @@ class FileSystem:
         for part in parts:
             sofar.append(part)
             try:
-                retfd = Registry.VFS_FILES.vfslist[part[0]](self.case, retfd, '|'.join(sofar))
+                retfd = Registry.VFS_FILES.vfslist[part[0]](self.case, retfd, '|'.join(sofar), dbh=self.dbh)
             except IndexError:
                 raise IOError, "Unable to open inode: %s, no VFS" % part
 
@@ -192,8 +192,7 @@ class DBFS(FileSystem):
         after they call the base class.
         """
         scanners = [ "%r" % s.__name__ for s in Registry.SCANNERS.classes ]
-        
-        self.dbh = DB.DBO(self.case)
+    
         self.dbh.execute("""CREATE TABLE IF NOT EXISTS inode (
         `inode` VARCHAR(250) NOT NULL,
         `status` INT,
@@ -234,8 +233,7 @@ class DBFS(FileSystem):
         self.iosource = IO.open(self.case, iosource_name)
 
     def delete(self):
-        dbh = DB.DBO(self.case)
-        dbh.MySQLHarness("%s/dbtool -t %s -m %r -d drop" %(config.FLAG_BIN,iosource, mount_point))
+        self.dbh.MySQLHarness("%s/dbtool -t %s -m %r -d drop" %(config.FLAG_BIN,iosource, mount_point))
 
     def VFSCreate(self,root_inode,inode,new_filename,directory=False ,gid=0, uid=0, mode=100777, **properties):
         ## Basically this is how this function works - if root_inode
@@ -406,7 +404,7 @@ class File:
     #stat_cbs = None
     #stat_names = None
     
-    def __init__(self, case, fd, inode):
+    def __init__(self, case, fd, inode, dbh=None):
         """ The constructor for this object.
         @arg case: Case to use
         @arg fd: An already open data source, may be iosource, or another 'File'
@@ -417,7 +415,10 @@ class File:
         self.case = case
         self.fd = fd
         self.inode = inode
-        self.dbh=DB.DBO(case)
+        if dbh:
+            self.dbh = dbh
+        else:
+            self.dbh=DB.DBO(case)
 
         ## Now we check to see if there is a cached copy of the file for us:
         cached_filename = self.get_temp_path()

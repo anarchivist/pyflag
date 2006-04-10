@@ -300,8 +300,8 @@ class Chunked(File):
 
         self.cached_fd.close()
         
-    def __init__(self, case, fd, inode):
-        File.__init__(self, case, fd, inode)
+    def __init__(self, case, fd, inode, dbh=None):
+        File.__init__(self, case, fd, inode, dbh)
 
         self.filename = FlagFramework.get_temp_path(self.case,self.inode)
 

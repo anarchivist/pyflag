@@ -346,8 +346,8 @@ class MSNFile(File):
     """ VFS driver for reading the cached MSN files """
     specifier = 'C'
     
-    def __init__(self,case, fd, inode):
-        File.__init__(self, case,fd, inode)
+    def __init__(self,case, fd, inode, dbh=None):
+        File.__init__(self, case,fd, inode, dbh)
         
         ## Figure out the filename
         cached_filename = get_temp_path(case,inode[1:])

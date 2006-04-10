@@ -106,6 +106,7 @@ class RFC2822(Scanner.GenScanFactory):
                     if not filename: filename="Attachment %s" % count
 
                     ## Create the VFS node:
+                    print "Creating node %s|m%s" %(self.inode, count)
                     self.ddfs.VFSCreate(self.inode,"m%s" % count, filename,
                                         mtime = time.mktime(date)
                                         )
@@ -120,13 +121,13 @@ class RFC2822(Scanner.GenScanFactory):
                     
             except Exception,e:
                 logging.log(logging.DEBUG,"RFC2822 Scan: Unable to parse inode %s as an RFC2822 message (%s)" % (self.inode,e))
-
+                
 class RFC2822_File(File):
     """ A VFS Driver for reading mail attachments """
     specifier = 'm'
 
-    def __init__(self, case, fd, inode):
-        File.__init__(self, case, fd, inode)
+    def __init__(self, case, fd, inode, dbh=None):
+        File.__init__(self, case, fd, inode, dbh)
         self.cache()
 
     def read(self, length=None):
@@ -134,9 +135,13 @@ class RFC2822_File(File):
             return File.read(self,length)
         except IOError:
             pass
+
+        if self.readptr > 0:
+            return ''
         
+        self.fd.seek(0)
         a=email.message_from_file(self.fd)
-        my_part = inode.split('|')[-1]
+        my_part = self.inode.split('|')[-1]
         attachment_number = int(my_part[1:])
         count = 0
 
@@ -146,17 +151,11 @@ class RFC2822_File(File):
 
             if count==attachment_number:
                 self.message = part.get_payload(decode=1)
-                return
+                self.readptr += len(self.message)
+                return self.message
 
             count+=1
 
-        if length==None:
-            result=self.message[self.readptr:]
-        else:
-            result= self.message[self.readptr:self.readptr+length]
-
-        self.readptr+=len(result)
-        return result
-
+        return ''
 ##class RFC2822CachedFile(CachedFile, RFC2822_File):
 ##    target_class = RFC2822_File

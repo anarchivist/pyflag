@@ -33,6 +33,9 @@ config=pyflag.conf.ConfObject()
 import pyflag.logging as logging
 import time,types
 import threading
+from Queue import Queue, Full, Empty
+
+db_connections=0
 
 def escape(string):
     return MySQLdb.escape_string(string)
@@ -61,62 +64,55 @@ class DBExpander:
     def __repr__(self):
         return "'%s'"% MySQLdb.escape_string(self.string)
 
-class DBPool:
-    """ This class implements a pool of connection handles which many threads may share at the same time.
-    """
-    def __init__(self,case):
-        self.case = case
-        self.locks = []
-        self.dbh = []
-        self.self_lock = threading.RLock()
-        self.indexes = {}
-
-    def get(self):
-        """ Get a new dbh from our array. """
-        for lock,dbh in zip(self.locks,self.dbh):
-            ## If we are able to lock the handle, we return it
-            if lock.acquire(blocking=0):
-                return dbh
-            
-        ## No suitable dbh is found - we lock ourself to protect
-        ## access to the pool, and add a new element to the pool
-        self.self_lock.acquire()
-        try:
-            self.locks.append(threading.RLock())
-            self.dbh.append(self.connect())
-            lock=self.locks[-1]
-            lock.acquire()
-        
-            dbh=self.dbh[-1]
-        finally:
-            self.self_lock.release()
-
-        return dbh
-
-    def release(self,dbh):
-        """ Release the current handle.
-
-        Note: dbh must be a handle returned via self.get
-        """
-        try:
-            i = self.dbh.index(dbh)
-            self.locks[i].release()
-        except ValueError:
-            raise DBError("Unable to find handle %s in pool for case %s" %(dbh,self.case))
+class Pool(Queue):
+    """ Pyflag needs to maintain multiple simulataneous connections to
+    the database sometimes.  To avoid having to reconnect on each
+    occasion, we keep a pool of connection objects. This allows
+    connections to be placed back in the pool after DBO destruction
+    for reuse by other DBOs.
     
+    Note that since we use the Queue class we are thread safe
+    here. I.e. we guarantee that the same connection will never be
+    shared by two different threads.
+
+    Note that connections are not placed back on the queue until all
+    references to them are GCed. This means that we still need to be
+    relatively concervative in creating new DBOs and prefer to reuse
+    existing ones whenever possible (of course we need to create new
+    ones if the connection state is important (e.g. iterating through
+    a resultset while doing some different db activity).
+    """
+    def __init__(self, case, poolsize=0):
+        self.case=case
+        Queue.__init__(self, poolsize)
+
+    def get(self, block=1):
+        """Get an object from the pool or a new one if empty."""
+        try:
+            return self.empty() and self.connect() or Queue.get(self, block)
+        except Empty:
+            return self.connect()
+
     def connect(self):
         """ Connect specified case and return a new connection handle """
+        global db_connections
+        db_connections +=1
+        logging.log(logging.VERBOSE_DEBUG, "New Connection to DB. We now have %s in total" % (db_connections, ))
+        
         case=self.case
         try:
             #Try to connect over TCP
             dbh = MySQLdb.Connect(user = config.DBUSER, passwd = config.DBPASSWD,db = case, host=config.DBHOST, port=config.DBPORT)
-            self.mysql_bin_string = "%s -f -u %r -p%r -h%s -P%s" % (config.MYSQL_BIN,config.USER,config.PASSWD,config.HOST,config.PORT)
+            mysql_bin_string = "%s -f -u %r -p%r -h%s -P%s" % (config.MYSQL_BIN,config.USER,config.PASSWD,config.HOST,config.PORT)
         except Exception,e:
             #or maybe over the socket?
             dbh = MySQLdb.Connect(user = config.DBUSER, passwd = config.DBPASSWD,db = case, unix_socket = config.DBUNIXSOCKET)
-            self.mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBUNIXSOCKET)
+            mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBUNIXSOCKET)
 
-        return dbh
+        return (dbh,mysql_bin_string)
+
+global DBH
+DBH={}
 
 class DBO:
     """ Class controlling access to DB handles
@@ -127,7 +123,6 @@ class DBO:
     @cvar lock: an array of unique locks that each thread must hold before executing new SQL
     @ivar temp_tables: A variable that keeps track of temporary tables so they may be dropped when this object gets gc'ed
     """
-    DBH={}
     temp_tables = []
     
     def __init__(self,case=None):
@@ -139,15 +134,15 @@ class DBO:
             case = config.FLAGDB
 
         try:
-            self.dbh=self.DBH[case].get()
+            self.dbh,self.mysql_bin_string=DBH[case].get()
         except KeyError:
-            self.DBH[case] = DBPool(case)
-            self.dbh=self.DBH[case].get()
+            DBH[case] = Pool(case)
+            self.dbh,self.mysql_bin_string=DBH[case].get()
             
-        self.cursor = self.dbh.cursor()
         self.temp_tables = []
-        self.case=case
-
+        self.case = case
+        self.cursor = self.dbh.cursor()
+                
     def clone(self):
         """ Returns a new database object for the same case database """
         return self.__class__(self.case)
@@ -224,7 +219,6 @@ class DBO:
         sql = "insert into %s (%s) values (%s)" % (self.mass_insert_table,
                                                    ','.join(["`%s`" % c for c in keys]),
                                                    "),(".join(values))
-#        print sql,args
         self.execute(sql,args)
 
 
@@ -274,9 +268,10 @@ class DBO:
 
         If an index is missing, we create it here, so we always ensure an index exists once we return. """
         ## We implement a local cache to ensure that we dont hit the DB all the time:
-        try:
-            return self.DBH[self.case].indexes["%s.%s" % (table,key)]
-        except KeyError:        
+##        try:
+##            return self.DBH[self.case].indexes["%s.%s" % (table,key)]
+##        except KeyError:        
+        if 1:
             self.execute("show index from `%s`",table)
             for row in self:
                 if row['Key_name'] == key:
@@ -293,7 +288,7 @@ class DBO:
             self.execute("Alter table `%s` add index%s",(table,sql))
 
             ## Add to cache:
-            self.DBH[self.case].indexes["%s.%s" % (table,key)] = True
+##            self.DBH[self.case].indexes["%s.%s" % (table,key)] = True
         
     def get_meta(self, property, table='meta',**args):
         """ Returns the value for the given property in meta table selected database
@@ -341,7 +336,7 @@ class DBO:
             test_name = "temp%s_%u" % (thread_name,count)
             ## Check if the table already exists:
             self.execute('show table status like %r',test_name)
-            rs = self.cursor.fetchone()
+            rs = self.dbh.cursor.fetchone()
             if not rs:
                 self.temp_tables.append(test_name)
                 return test_name
@@ -353,8 +348,8 @@ class DBO:
         try:
             for i in self.temp_tables:
                 self.execute('drop table if exists %s' % i)
-#            print "%s %s" % ( self.DBH[self.case].dbh, self.case)
-            self.DBH[self.case].release(self.dbh)
+
+            DBH[self.case].put((self.dbh, self.mysql_bin_string))
         except (TypeError,AssertionError):
             pass
 
@@ -370,7 +365,7 @@ class DBO:
         logging.log(logging.DEBUG, "Will shell out to run %s " % client)
 
         import os
-        p_mysql=os.popen("%s -D%s" % (self.DBH[self.case].mysql_bin_string,self.case),'w')
+        p_mysql=os.popen("%s -D%s" % (self.mysql_bin_string,self.case),'w')
         p_client=os.popen(client,'r')
         while 1:
             data= p_client.read(1000)

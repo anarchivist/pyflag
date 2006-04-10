@@ -176,7 +176,7 @@ void cleanup_deleted(char *name) {
  * print usage message
  */
 void usage(char *myProg) {
-	printf("usage: %s [-vV] [-t table_name] [-f fstype] [-z ZONE] [-s seconds] [-d (create|drop)] image\n", 
+	printf("usage: %s [-vV] [-t table_name] [-f fstype] [-z ZONE] [-s seconds] [-m mntpoint] [-d (create|drop)] image\n", 
 	  myProg);
 	printf("\tIf [inode] is not given, the root directory is used\n");
 	printf("\t-v: verbose output to stderr\n");
@@ -185,6 +185,7 @@ void usage(char *myProg) {
 	printf("\t-z: Time zone of original machine (i.e. EST5EDT or GMT) (only useful with -l)\n");
 	printf("\t-s seconds: Time skew of original machine (in seconds) (only useful with -l & -m)\n");
     	printf("\t-f fstype: Image file system type\n");
+	printf("\t-m mount point: Mount point \n");
     	printf("\t-d (create|drop): Print create of drop table strings\n");
 	printf("Supported file system types:\n");
 	fs_print_types(stderr);
