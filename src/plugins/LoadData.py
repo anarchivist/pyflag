@@ -467,15 +467,6 @@ class LoadFS(Reports.report):
         dbh = self.DBO(query['case'])
         self.progress_str=None
 
-        dbh.execute("""CREATE TABLE `filesystems` (
-        `name` VARCHAR( 50 ) NOT NULL ,
-        `property` VARCHAR( 50 ) NOT NULL ,
-        `value` MEDIUMTEXT NOT NULL ,
-        PRIMARY KEY ( `name` )
-        ) TYPE = MYISAM""")
-
-        dbh.set_meta('fstype', query['fstype'], table='filesystems', name=query['iosource'])
-        
         # call on FileSystem to load data
         fsobj=Registry.FILESYSTEMS.filesystems[query['fstype']](query['case'])
         mount_point = FlagFramework.normpath("/"+query['mount_point'])

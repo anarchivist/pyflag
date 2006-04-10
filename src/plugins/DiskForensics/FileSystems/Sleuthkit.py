@@ -27,7 +27,7 @@ class AutoFS(DBFS):
         DBFS.load(self, mount_point, iosource_name)
 
         # run sleuthkit
-        string= "%s -i %r -o %r %r -t %r -f %r -m %r %r" % (
+        string= "%s -i %r -o %r %r -n %r -f %r -m %r %r" % (
             config.IOWRAPPER,
             self.iosource.subsystem,
             self.iosource.make_parameter_list(),config.SLEUTHKIT,
@@ -152,12 +152,13 @@ class Mounted(DBFS):
         logging.log(logging.DEBUG,"Loading files from directory %s" % self.iosource.mount_point)
         
         ## Create the tables for the filesystem
-        self.dbh.MySQLHarness("%s -t %s -d create blah" %(config.SLEUTHKIT,iosource_name))
+        self.dbh.MySQLHarness("%s -n %s -d create -m / blah" %(config.SLEUTHKIT,iosource_name))
 
-        ## This deals with a mounted filesystem -
-        ## we dont get the full forensic joy, but we can handle more filesystems than sleuthkit can.
-        ## The downside is that the user has to mount the filesystem first,
-        ## we also need to be running as root or we may not be able to stat all the files :-(
+        ## This deals with a mounted filesystem - we dont get the full
+        ## forensic joy, but we can handle more filesystems than
+        ## sleuthkit can.  The downside is that the user has to mount
+        ## the filesystem first, we also need to be running as root or
+        ## we may not be able to stat all the files :-(
         def insert_into_table(mode,root,name):
             rel_root="/"+root[len(self.iosource.mount_point):]+"/"
             if rel_root=="//": rel_root="/"

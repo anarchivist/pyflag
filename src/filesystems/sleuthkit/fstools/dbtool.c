@@ -35,9 +35,10 @@
 /* Time skew of the system in seconds */
 static int32_t sec_skew = 0;
 
-char *tbl_name=NULL;
 char *fstype=NULL;
+char *fs_type=NULL;
 char *mount_point=NULL;
+char *iosource = NULL;
 int file_count = 0;
 int inode_count = 0;
 int inode_total = 0;
@@ -66,8 +67,8 @@ print_addr(FS_INFO *fs, DADDR_T addr, char *buf,
 
 void print_blocks(INUM_T inum, int type, int id, RUN *run);
 void cleanup_deleted(char *name);
-void create_tables(char *name);
-void drop_tables(char *name);
+void create_tables();
+void drop_tables();
 
 //Function prints the string given in ptr as an SQL escaped string sequence. 
 void print_sql_string(FILE *fh, const char *ptr, int length) {
@@ -176,17 +177,17 @@ void cleanup_deleted(char *name) {
  * print usage message
  */
 void usage(char *myProg) {
-	printf("usage: %s [-vV] [-t table_name] [-f fstype] [-z ZONE] [-s seconds] [-m mntpoint] [-d (create|drop)] image\n", 
+	printf("usage: %s [-vV] [-f fstype] [-z ZONE] [-s seconds] [-m mntpoint] [-d (create|drop)] [-n iosource] image\n", 
 	  myProg);
 	printf("\tIf [inode] is not given, the root directory is used\n");
 	printf("\t-v: verbose output to stderr\n");
-	printf("\t-t: output table name\n");
 	printf("\t-V: Print version\n");
 	printf("\t-z: Time zone of original machine (i.e. EST5EDT or GMT) (only useful with -l)\n");
 	printf("\t-s seconds: Time skew of original machine (in seconds) (only useful with -l & -m)\n");
     	printf("\t-f fstype: Image file system type\n");
 	printf("\t-m mount point: Mount point \n");
     	printf("\t-d (create|drop): Print create of drop table strings\n");
+	printf("\t-n iosource: name of iosource");
 	printf("Supported file system types:\n");
 	fs_print_types(stderr);
 
@@ -326,13 +327,13 @@ print_dent2(FILE *hFile, FS_DENT *fs_dent, int flags, FS_INFO *fs,
 			   ((fs_data->type == NTFS_ATYPE_IDXROOT) && 
 			    (strcmp(fs_data->name, "$I30") != 0))) ) {
             fprintf(hFile, "INSERT INTO file VALUES('I%s|D%llu-%i-%i','%s','%s','%s/%s','%s:%s');\n", 
-		    tbl_name,
+		    iosource,
 		    fs_dent->inode, fs_data->type, fs_data->id,
 		    t1,t2,mount_point,t3,t4,t5);
 
 	  } else {
 	    fprintf(hFile, "INSERT INTO file VALUES('I%s|D%llu-%i-%i','%s','%s','%s/%s','%s');\n", 
-		    tbl_name,
+		    iosource,
 		    fs_dent->inode, fs_data->type, fs_data->id, 
 		    t1,t2,mount_point,t3,t4);
 	  } 
@@ -341,7 +342,7 @@ print_dent2(FILE *hFile, FS_DENT *fs_dent, int flags, FS_INFO *fs,
 	  //No Data stream
 	} else {	    
 	  fprintf(hFile, "INSERT INTO file VALUES('I%s|D%llu','%s','%s','%s/%s','%s');\n", 
-		  tbl_name,
+		  iosource,
 		  fs_dent->inode,
 		  t1,t2,mount_point,t3,t4); 
 	};
@@ -420,7 +421,7 @@ print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
 					
 					printf("INSERT INTO inode VALUES('I%s|D%lu-%d-%d','%c','%d','%d','%lu'," \
 					       "'%lu','%lu',%lu,'%lo','%d','%s','%lu','');\n",
-					       tbl_name,
+					       iosource,
 					       (ULONG) fs_inode->addr, fs_data->type, fs_data->id,
 					       (flags & FS_FLAG_META_ALLOC) ? 'a' : 'f',
 					       (int) fs_inode->uid, (int) fs_inode->gid,
@@ -443,7 +444,7 @@ print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
 
 	  printf("INSERT INTO inode VALUES('I%s|D%lu','%c','%d','%d','%lu'," \
 		 "'%lu','%lu',%lu,'%lo','%d','%s','%lu','');\n",
-		 tbl_name,
+		 iosource,
 		 (ULONG) fs_inode->addr, (flags & FS_FLAG_META_ALLOC) ? 'a' : 'f',
 		 (int) fs_inode->uid, (int) fs_inode->gid,
 		 (ULONG) fs_inode->mtime, (ULONG) fs_inode->atime,
@@ -491,7 +492,7 @@ print_addr (FS_INFO *fs, DADDR_T addr, char *buf,
     if(flags & FS_FLAG_DATA_RESIDENT) {
       // we have resident ntfs data
       printf("INSERT INTO resident values('I%s|D%lu-%d-%d','", 
-	     tbl_name,
+	     iosource,
 	     (ULONG)(*run)->inum, (*run)->type, (*run)->id);
       
       print_sql_string(stdout, buf, size);
@@ -533,24 +534,24 @@ void print_blocks (INUM_T inum, int type, int id, RUN *run) {
 	    if(start_block != 0) {
 	      if(type == 0) {
 	        printf("INSERT INTO block VALUES('I%s|D%lu','%lu','%lu','%lu');\n", 
-		       tbl_name, 
+		       iosource, 
 		       (ULONG)inum, index, start_block, count);
 	      }
 	      else {
 	        printf("INSERT INTO block VALUES('I%s|D%lu-%i-%i','%lu','%lu','%lu');\n", 
-		       tbl_name, 
+		       iosource, 
 		       (ULONG)inum, type, id, index, start_block, count);
 	      }
 	    }
 	    else {
 	      if(type == 0) {
 	        printf("INSERT INTO block VALUES('I%s|D%lu','%lu','%lu','%lu');\n", 
-		       tbl_name, 
+		       iosource, 
 		       (ULONG)inum, index, ptr->addr, count);
 	      }
 	      else {
 	        printf("INSERT INTO block VALUES('I%s|D%lu-%i-%i','%lu','%lu','%lu');\n", 
-		       tbl_name, 
+		       iosource, 
 		       (ULONG)inum, type, id, index, ptr->addr, count);
 	      }
 	    }
@@ -573,15 +574,21 @@ void print_blocks (INUM_T inum, int type, int id, RUN *run) {
 void print_fsinfo(FS_INFO *fs) {
   
   // fill in the metadata about the filesystem
-  printf("INSERT INTO meta VALUES\n" \
-	 "(NULL,'fstype', '%s'),\n(NULL,'first_inode','%lu'),\n" \
-	 "(NULL,'last_inode','%lu'),\n(NULL,'root_inode','%lu'),\n" \
-	 "(NULL,'first_block','%lu'),\n(NULL,'last_block','%lu'),\n" \
-	 "(NULL,'block_size','%lu');\n\n",
-	 fstype, 
-	 (ULONG)fs->first_inum, (ULONG)fs->last_inum, 
-	 (ULONG)fs->root_inum, (ULONG)fs->first_block, 
-	 (ULONG)fs->last_block, (ULONG)fs->block_size);
+  printf("INSERT INTO filesystems VALUES\n"
+	 "('%s','fstype', '%s'),"
+	 "('%s','first_inode','%lu')," 
+	 "('%s','last_inode','%lu'),"
+	 "('%s','root_inode','%lu')," 
+	 "('%s','first_block','%lu'),"
+	 "('%s','last_block','%lu'),"
+	 "('%s','block_size','%lu');",
+	 iosource, fs_type,  
+	 iosource, (ULONG)fs->first_inum, 
+	 iosource, (ULONG)fs->last_inum, 
+	 iosource, (ULONG)fs->root_inum, 
+	 iosource, (ULONG)fs->first_block, 
+	 iosource, (ULONG)fs->last_block, 
+	 iosource, (ULONG)fs->block_size);
 }
 
 /* 
@@ -604,17 +611,15 @@ main(int argc, char **argv)
 
 	i_flags |= ~0;
 
-	while ((ch = getopt(argc, argv, "i:m:t:f:d:s:vVz:")) > 0) {
+	while ((ch = getopt(argc, argv, "i:m:n:f:d:s:vVz:")) > 0) {
 	  switch (ch) {
 	  case '?':
 	  default: 
 	    usage(argv[0]);
 	  case 'f':
+	    fs_type = optarg;
 	    if(strstr(optarg, "auto")==NULL)
 	      fstype = optarg;
-	    break;
-	  case 't':
-	    tbl_name = optarg;
 	    break;
 	  case 'd':  
 	    dbaction=optarg;
@@ -626,6 +631,9 @@ main(int argc, char **argv)
 	      if(mount_point[len-1]=='/') len--;
 	      mount_point[len]=0;
 	    };
+	    break;
+	  case 'n':
+	    iosource = optarg;
 	    break;
 	  case 's':
 	    sec_skew = atoi(optarg);
@@ -654,7 +662,7 @@ main(int argc, char **argv)
 	  }
 	}
 
-	if(!tbl_name) 
+	if(!iosource) 
 	  RAISE(E_GENERIC,NULL,"IO Source name not specified!!");
 
 	if(!mount_point)
@@ -663,10 +671,10 @@ main(int argc, char **argv)
 	/* create/drop tables */
 	if(dbaction) {
 	  if(!strcmp(dbaction, "create")) {
-	    create_tables(tbl_name);
+	    create_tables();
 	    exit(0);
 	  } else if(dbaction && !strcmp(dbaction, "drop")) {
-	    drop_tables(tbl_name);
+	    drop_tables();
 	    exit(0);
 	  } else {
 	    RAISE(E_GENERIC,NULL,"Only valid parameters to -d are create or drop");
@@ -714,7 +722,7 @@ main(int argc, char **argv)
 	exit (0);
 }
 
-void create_tables(char *name) {
+void create_tables() {
 	/* create tables */
 	printf("CREATE TABLE IF NOT EXISTS inode (\n" \
 	"	`inode` VARCHAR(250) NOT NULL,\n" \
@@ -746,9 +754,16 @@ void create_tables(char *name) {
 	printf("CREATE TABLE IF NOT EXISTS resident (\n" \
 	"	`inode` VARCHAR(250) NOT NULL,\n" \
 	"	`data` TEXT);\n\n");
+
+	printf("CREATE TABLE IF NOT EXISTS `filesystems` ("
+	       "`iosource` VARCHAR( 50 ) NOT NULL ,"
+	       "`property` VARCHAR( 50 ) NOT NULL ,"
+	       "`value` MEDIUMTEXT NOT NULL ,"
+	       "PRIMARY KEY ( `iosource` )"
+	       ");\n\n");
 }
 
-void drop_tables(char *name) {
+void drop_tables() {
 	/* drop tables */
-	printf("DROP TABLE IF EXISTS  inode, file, block, resident;\n");
+	printf("DROP TABLE IF EXISTS  inode, file, block, resident, filesystems;\n");
 }

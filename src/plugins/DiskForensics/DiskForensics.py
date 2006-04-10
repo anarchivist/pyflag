@@ -489,7 +489,7 @@ class DBFS_file(FileSystem.File):
 
         ## This is kind of a late initialization. We get the blocksize
         ## on demand later.
-        self.block_size=0
+        self.index=None
         
     def getval(property):
         try:
@@ -505,13 +505,7 @@ class DBFS_file(FileSystem.File):
             pass
         
         ## We need to fetch the blocksize if we dont already know it:
-        if not self.block_size:
-            try:
-                self.dbh.execute("select value from meta where property='block_size'");
-                self.block_size = int(self.dbh.fetch()["value"])
-            except TypeError:
-                pass
-
+        if not self.index:
             # fetch inode data
             self.dbh.check_index("inode" ,"inode")
             self.dbh.execute("select * from inode where inode=%r and status='alloc'", (self.inode))
@@ -526,6 +520,7 @@ class DBFS_file(FileSystem.File):
                 self.blocks = [ (row['block'],row['count'],row['index']) for row in self.dbh ]
             except KeyError:
                 self.blocks = None
+                
             self.index = [ d[2] for d in self.blocks ]
 
         if (length == None) or ((length + self.readptr) > self.size):
@@ -565,7 +560,7 @@ class DBFS_file(FileSystem.File):
     def offset(self,offset):
         """ returns the offset into the current block group where the given offset is found"""
         ## The block in the file where the offset is found
-        block = int(offset/self.block_size)
+        block = int(offset/self.fd.block_size)
 
         ##Obtain the index of blocks array where the chunk is. This is the index at which self.index is 
         blocks_index=0
@@ -585,13 +580,13 @@ class DBFS_file(FileSystem.File):
         ddblock,count,index=self.blocks[blocks_index]
 
         ## The offset into the chunk in bytes
-        chunk_offset = offset-index*self.block_size
+        chunk_offset = offset-index*self.fd.block_size
 
         ## The dd offset in bytes
-        ddoffset=ddblock*self.block_size+chunk_offset
+        ddoffset=ddblock*self.fd.block_size+chunk_offset
 
         ## The number of bytes remaining in this chunk
-        bytes_left = count*self.block_size-chunk_offset
+        bytes_left = count*self.fd.block_size-chunk_offset
         
         return ddoffset,bytes_left
 

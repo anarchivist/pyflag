@@ -225,7 +225,14 @@ class DBFS(FileSystem):
         self.dbh.execute("""CREATE TABLE IF NOT EXISTS resident (
         `inode` VARCHAR(250) NOT NULL,
         `data` TEXT)""")
-    
+
+        self.dbh.execute("""CREATE TABLE IF NOT EXISTS `filesystems` (
+        `iosource` VARCHAR( 50 ) NOT NULL ,
+        `property` VARCHAR( 50 ) NOT NULL ,
+        `value` MEDIUMTEXT NOT NULL ,
+        KEY ( `iosource` )
+        )""")
+        
         ## Ensure the VFS contains the mount point:
         self.VFSCreate(None, "I%s" % iosource_name, mount_point, directory=True)
 

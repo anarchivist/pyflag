@@ -49,6 +49,14 @@ class IO_File(FileSystem.File):
         self.name = inode[1:]
         self.io = IO.open(case, self.name)
 
+        ## IO Sources may have block_size specified:
+        try:
+            self.dbh.execute("select value from filesystems where iosource=%r and property='block_size'", self.name);
+            self.block_size = int(self.dbh.fetch()["value"])
+        except TypeError:
+            pass
+
+
     def read(self, length=None):
         return self.io.read(length)
 

@@ -4,9 +4,7 @@
 #include "except.h"
 #include <stdio.h>
 
-#ifdef __DEBUG__
 static char *_exception_descriptions[] = {"No Error","Exception","Generic Error","Overflow Error","Underflow Error","IO Error","Out of Memory Error", "Stop Iteration"};
-#endif
 
 int except_cmp(int e,...) 
 {
@@ -32,7 +30,7 @@ enum _exception __EXCEPT__;
 enum _exception _except;
 
 /* Raises an exception throught the stack */
-#ifdef __DEBUG__
+
 void except_raise(enum _exception e, void *obj, char *reason, ...) {
   if(reason) {
     va_list ap;
@@ -48,13 +46,3 @@ void except_raise(enum _exception e, void *obj, char *reason, ...) {
   };
   longjmp(env[except_level],e);
 };
-
-#else
-void except_raise(enum _exception e, void *obj, char *reason, ...) {  
-  if(except_level==0) {
-    exit(-1);
-  };
-
-  longjmp(env[except_level],e);
-};
-#endif
