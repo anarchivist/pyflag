@@ -305,9 +305,9 @@ class DBO:
     def set_meta(self, property,value, table='meta', **args):
         """ Sets the value in meta table
         """
-        row = self.get_meta(property)
-        if row:
-            self.execute("update `%s` set property=%r,value=%r,%s where property=%r",
+        prevvalue = self.get_meta(property, table, **args)
+        if prevvalue != None:
+            self.execute("update `%s` set property=%r,value=%r where property=%r",
                          (table, property,value, property))
         else:
             self.execute("insert into `%s` set property=%r,value=%r", (table, property,value))

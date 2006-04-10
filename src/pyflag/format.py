@@ -103,11 +103,12 @@ class Buffer:
         return self.__class__(fd=self.fd,offset=self.offset+a,size=b-a)
 
     def __str__(self):
-        try:
-            self.fd.seek(self.offset)
-            return self.fd.read(self.size)
-        except Exception,e:
-            raise IOError("Unable to read %s bytes from %s - %r" %(self.offset,self.size,e))
+        self.fd.seek(self.offset)
+        data=self.fd.read(self.size)
+        if len(data) < self.size:
+            raise IOError("Unable to read %s bytes from %s" %(self.size,self.offset))
+
+        return data
 
 #### Start of data definitions:
 class DataType:

@@ -95,6 +95,14 @@ class RevEng_GUI(Reports.report):
                         inscol = int(k[12:])
                     del query[k]
                     continue
+                elif k.startswith('savenow'):
+                    savelayout(query)
+                    del query[k]
+                    break
+                elif k.startswith('open'):
+                    openlayout(query)
+                    del query[k]
+                    
                     ### other stuff for ins col parameters
             
             if delcol >= 0:
@@ -157,7 +165,79 @@ class RevEng_GUI(Reports.report):
                 for k in insvalues.keys():
                     query[k] = insvalues[k]
 
+        def open_cb(query, ui):
+            """Popup for loading a layout"""
+            ui.decoration = "naked"
+            dbh = self.DBO(query['case'])
             
+            try:
+                if query['finish'] and query['loadlayout']:
+                    del query['finish']
+                    del query['submit']
+                    ui.refresh(0,query,parent=1)
+            except KeyError:
+                pass
+
+            ui.start_form(query)
+            ui.start_table()
+            ui.heading("Load a saved layout")
+
+            dbh.execute('select name from DAFTLayouts')
+            for row in dbh:
+                row['name']
+                    
+
+            ### Create a list of saved layouts
+
+        def openlayout(query):
+            values = ['StartOffset','MaxRows']
+            prefixes = ['name_','data_type_','parameter_','visible_','filelist_']
+
+
+            for k in values:
+                try:
+                    del query[k]
+                except KeyError:
+                    pass
+                
+            for p in prefixes:
+                keys = [x for x in query.keys() if x.startswith(p) != -1]
+                for k in keys:
+                    del query[k]
+
+            ### Add dbh command to get values from table
+        
+        def save_cb(query, ui):
+            """Popup for saving layout"""
+            ui.decoration = "naked"
+
+            try:
+                if query['finish'] and query['savelayout']:
+                    query['savenow'] = 'yes'
+                    del query['finish']
+                    del query['submit']
+
+                    ui.refresh(0,query,parent=1)
+            except KeyError:
+                pass
+
+            ui.start_form(query)
+            ui.start_table()
+            ui.heading("Save current layout")
+
+            ui.textfield("Layout name", "savelayout")
+            
+            ui.checkbox("Click here to finish", "finish","yes");
+            ui.end_table()
+            ui.end_form()
+            return ui
+
+        def savelayout(query):
+            pass
+        
+        def filelist_cb(query, ui):
+            pass
+        
         def render_HTMLUI(data):
             """Callback to render mysql stored data in HTML"""
             tmp = result.__class__(result)
@@ -212,7 +292,9 @@ class RevEng_GUI(Reports.report):
 
             result.popup(FlagFramework.Curry(popup_cb, column_number = struct.count)
                           ,"Add new column", icon="red-plus.png")
-
+            result.popup(filelist_cb, "Select files to use", icon="find.png")
+            result.popup(open_cb, "Open a saved layout", icon="fileopen.png")
+            result.popup(save_cb, "Save the current layout", icon="filesave.png")
                     
             ######## Creating table rows here
             data = []
@@ -222,6 +304,7 @@ class RevEng_GUI(Reports.report):
             row_htmls = []
 
             rowcount = 0
+            done = False
             while 1:
                 for i in range(struct.count):
                     try:
@@ -236,15 +319,19 @@ class RevEng_GUI(Reports.report):
                         row_data[name]=value
                         row_data_names.append(name)
 
-                    except AttributeError:
+                    except AttributeError,e:
                         pass
-                    except IOError:
+                    except IOError,e:
+                        print e
+                        done = True
                         break
 
+                if done: break
+                
 
                 #### DBH can't create a table when there are no fields
                 if len(row_data_names) == 0:
-                    break;
+                    break
 
                 if rowcount == 0:
                     dbh.execute("drop table if exists reveng")
@@ -262,10 +349,10 @@ class RevEng_GUI(Reports.report):
                     break
 
                 buf = buf[struct.size():]
-##                print "buffer length: %d, struct size: %d" % (len(buf), struct.size())
-##                if len(buf) == 0:
-##                    print "eof"
-##                    break
+                print "buffer length: %d, struct size: %d" % (len(buf), struct.size())
+                if len(buf) == 0:
+                    print "eof"
+                    break
                 struct.read(buf)
                 rowcount += 1
 
