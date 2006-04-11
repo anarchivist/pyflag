@@ -21,7 +21,7 @@ class RevEng_GUI(Reports.report):
         
         def popup_cb(query, ui, column_number = None, mode = ''):
             """Popup for defining column attributes"""
-            print "I am here"
+##            print "I am here"
             ui.decoration = "naked"
 
             if mode == 'insert':
@@ -227,7 +227,7 @@ class RevEng_GUI(Reports.report):
 
             ui.textfield("Layout name", "savelayout")
             
-            ui.checkbox("Click here to finish", "finish","yes");
+            ui.checkbox("Click here to finish", "finish","yes")
             ui.end_table()
             ui.end_form()
             return ui
@@ -236,7 +236,33 @@ class RevEng_GUI(Reports.report):
             pass
         
         def filelist_cb(query, ui):
-            pass
+            """Popup to select files to analyse"""
+            ui.decoration = "naked"
+
+            try:
+                if query['finish'] and query['fileselect']:
+                    del query['finish']
+                    del query['submit']
+
+                    ui.refresh(0, query, parent=1)
+            except KeyError:
+                pass
+
+            ui.start_form(query)
+            ui.start_table()
+            ui.heading("Select files")
+
+            values = []
+            keys = []
+            dbh.execute("select name, path, inode from file where inode != ''")
+            for row in dbh:
+                values.append('%s%s' % (row['path'], row['name']))
+                keys.append(row['inode'])
+            ui.const_selector("File", "fileselect", keys, values)
+
+            ui.checkbox("Click here to finish", "finish", "yes")
+            ui.end_table()
+            ui.end_form()
         
         def render_HTMLUI(data):
             """Callback to render mysql stored data in HTML"""
@@ -257,9 +283,6 @@ class RevEng_GUI(Reports.report):
             result.textfield("Maximum Rows","MaxRows")
             result.end_table()
           
-
-            fd=open("/home/michael/dev/SERevEng/T630/SE_T630_351295000248246_23Apr05.bin")
-
             ## Build a struct to work from:
             try:
                 startoffset = DAFTFormats.numeric(query['StartOffset'])
@@ -270,9 +293,30 @@ class RevEng_GUI(Reports.report):
                 maxrows = DAFTFormats.numeric(query['MaxRows'])
             except KeyError:
                 maxrows = 10
-                
-            buf = format.Buffer(fd=fd)[startoffset:]
 
+            fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])
+            try:
+                fd = fsfd.open(inode=query['fileselect'])
+                fdsize = fsfd.istat(inode=query['fileselect'])
+                fd.block_size = dbh.get_meta('block_size')
+                buf = format.Buffer(fd=fd)[startoffset:]
+            except IOError, e:
+                print 'IOError: %s' % e
+                fd = None
+                fdsize = 0
+                s = '\x00'*1024
+                buf = format.Buffer(string=s)
+            except KeyError, e:
+                print 'KeyError: %s' %e
+                s = '\x00'*1024
+                buf = format.Buffer(string=s)
+                fd = None
+                fdsize = 0
+
+##            print 'File Size %s' % fdsize
+
+##            fd=open("/home/michael/dev/SERevEng/T630/SE_T630_351295000248246_23Apr05.bin")
+                
             struct = DAFTFormats.DynamicStruct(buf)
             struct.create_fields(query, 'parameter_')
             
@@ -349,15 +393,11 @@ class RevEng_GUI(Reports.report):
                     break
 
                 buf = buf[struct.size():]
-                print "buffer length: %d, struct size: %d" % (len(buf), struct.size())
-                if len(buf) == 0:
-                    print "eof"
-                    break
                 struct.read(buf)
                 rowcount += 1
 
 
-            print row_htmls
+##            print row_htmls
             dbh.set_meta("reveng_HTML", ",".join(row_htmls))
             ###########################################
             # Display table

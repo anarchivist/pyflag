@@ -37,7 +37,7 @@ class DynamicStruct(BasicFormats.SimpleStruct):
                 self.count+=1
             except KeyError:
                 break
-        print self.fields
+##        print self.fields
         
 class AlignedOffset(format.DataType):
     visible = True

@@ -444,6 +444,11 @@ class File:
             self.size=0
             self.readptr=0
 
+        try:
+            self.block_size = self.fd.block_size
+        except:
+            pass
+        
     def get_temp_path(self):
         """ Returns the full path to a temporary file based on filename.
         """
