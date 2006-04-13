@@ -1033,50 +1033,73 @@ class HTMLUI(UI.GenericUI):
 
         ## Draw a popup to allow the user to save the entire table in CSV format:
         def save_table(query,result):
-            result.decoration='raw'
-            result.type = "text/plain"
-            data = cStringIO.StringIO()
-            hidden_columns = list(query.getarray('hide_column'))
+            dbh = DB.DBO(case)
+
+            def generate_output():
+                query_row_limit = 1024
+                data = cStringIO.StringIO()
+                hidden_columns = list(query.getarray('hide_column'))
 
             ## FIXME - We dont usually want to save called back
             ## columns becuase they rarely make sense (but sometimes
             ## they do?? which should we do here???)
-            for i in callbacks.keys():
-                if i not in hidden_columns:
-                    hidden_columns.append(i)
+                for i in callbacks.keys():
+                    if i not in hidden_columns:
+                        hidden_columns.append(i)
                     
-            names_list = [ i for i in names if i not in hidden_columns ]
-            csv_writer = csv.DictWriter(data,names_list,dialect='excel')
-            dbh.execute(query_str_basic + " order by %s" %order)
-            for row in dbh:
-                ## If there are any callbacks we respect those now.
-                new_row={}
-                for k,v in row.items():
-                    if k in hidden_columns: continue
-                    try:
-                        row[k]=callbacks[k](v)
-                    except (KeyError,Exception):
-                        pass
-
-                    ## Escape certain characters from the rows - some
-                    ## spreadsheets dont like these even though they
-                    ## are probably ok:
-                    tmp=str(row[k])
-                    tmp=tmp.replace("\r","\\r")
-                    tmp=tmp.replace("\n","\\n")
-                    
-                    new_row[k]=tmp
-
-                csv_writer.writerow(new_row)
-
-            data.seek(0)
-            del query['callback_stored']
-            result.result = "#Pyflag Table widget output\n#Query was %s.\n#Fields: %s\n""" %(query," ".join(names_list))
-            if condition_text_array:
-                result.result += "#The following conditions are in force\n"
+                names_list = [ i for i in names if i not in hidden_columns ]
+                inittext= "#Pyflag Table widget output\n#Query was %s.\n#Fields: %s\n""" %(query," ".join(names_list))
+                if condition_text_array:
+                    inittext+= "#The following conditions are in force\n"
                 for i in condition_text_array:
-                    result.result += "# %s\n" % i
-            result.result += data.read()
+                    inittext += "# %s\n" % i
+                yield inittext
+                
+                csv_writer = csv.DictWriter(data,names_list,dialect='excel')
+                limit = 0
+                while 1:
+                    dbh.execute(query_str_basic + " order by %s limit %s,%s" %
+                                (order,limit,limit+query_row_limit))
+
+                    count = 0
+                    for row in dbh:
+                        count+=1
+                    ## If there are any callbacks we respect those now.
+                        new_row={}
+                        for k,v in row.items():
+                            if k in hidden_columns: continue
+                            try:
+                                row[k]=callbacks[k](v)
+                            except (KeyError,Exception):
+                                pass
+
+                        ## Escape certain characters from the rows - some
+                        ## spreadsheets dont like these even though they
+                        ## are probably ok:
+                            tmp=str(row[k])
+                            tmp=tmp.replace("\r","\\r")
+                            tmp=tmp.replace("\n","\\n")
+
+                            new_row[k]=tmp
+
+                        csv_writer.writerow(new_row)
+                        data.seek(0)
+                        tmp=data.read()
+                        yield tmp
+                        data.truncate(0)
+
+                    if count==0: break
+                    limit+=query_row_limit
+
+            result.generator.generator = generate_output()
+            result.generator.content_type = "text/csv"
+            result.generator.headers = [("Content-Disposition","attachment; filename=%s_%s.csv" %(case,table) ),]
+
+            del query['callback_stored']
+            
+            return
+            
+            
             
         self.toolbar(save_table,'Save Table',icon="floppy.png")
 

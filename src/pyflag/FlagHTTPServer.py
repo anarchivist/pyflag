@@ -273,7 +273,8 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             
             for i in result.generator.headers:
                 self.send_header(i[0],i[1])
-                self.end_headers()
+
+            self.end_headers()
 
             ## Print the data
             for data in result.generator.generator:

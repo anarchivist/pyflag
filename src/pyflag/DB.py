@@ -338,7 +338,7 @@ class DBO:
             test_name = "temp%s_%u" % (thread_name,count)
             ## Check if the table already exists:
             self.execute('show table status like %r',test_name)
-            rs = self.dbh.cursor.fetchone()
+            rs = self.cursor.fetchone()
             if not rs:
                 self.temp_tables.append(test_name)
                 return test_name

@@ -110,7 +110,7 @@ class TypeChecker:
         """ Tests to see if the string is a valid filename within the upload dir """
         string =os.path.normpath( query[field])
 
-        dir = config.UPLOADDIR
+        dir = os.path.normpath(config.UPLOADDIR)
         if string.startswith(dir) and os.access(string,os.R_OK):
             return
         else:
