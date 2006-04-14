@@ -1,22 +1,29 @@
+SUBDIRS = libnids
+
 bin_PROGRAMS		= pcaptool
 
 pcaptool_SOURCES	= pcaptool.c
 pcaptool_LDFLAGS	= /usr/lib/libpcap.a
 
 pkgpython_PYTHON 	= dissect.py
-pkgpyexec_LTLIBRARIES 	= _dissect.la
+pkgpyexec_LTLIBRARIES 	= _dissect.la libnids.la
 
 noinst_LTLIBRARIES	= libnetwork.la libhashtable.la
 libnetwork_la_SOURCES	= network.c
-libnetwork_la_CFLAGS 	= -I$(top_srcdir)/src/include
+libnetwork_la_CFLAGS 	= -I$(top_srcdir)/src/include -D__DEBUG__
 
 libhashtable_la_SOURCES	= hashtable.c
 libhashtable_la_CFLAGS	= -I$(top_srcdir)/src/include
 
 _dissect_la_SOURCES 	= dissect.c
-_dissect_la_CPPFLAGS 	= $(SWIG_PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
+_dissect_la_CPPFLAGS 	= $(SWIG_PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include -D__DEBUG__
 _dissect_la_LDFLAGS 	= -module
-_dissect_la_LIBADD	= ../lib/liboo.la libnetwork.la libhashtable.la
+_dissect_la_LIBADD		= ../lib/liboo.la libnetwork.la libhashtable.la
+
+libnids_la_SOURCES 	= libnids.c
+libnids_la_CPPFLAGS 	= $(SWIG_PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
+libnids_la_LDFLAGS 	= -module
+libnids_la_LIBADD		= ../lib/liboo.la libnids/libnids.la 
 
 noinst_HEADERS		= network.h
 

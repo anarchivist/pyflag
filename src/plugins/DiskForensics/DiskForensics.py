@@ -487,7 +487,7 @@ class DBFS_file(FileSystem.File):
     def __init__(self, case, fd, inode, dbh=None):
         FileSystem.File.__init__(self, case, fd, inode, dbh)
 
-        ## This is kind of a late initialization. We get the blocksize
+        ## This is kind of a late initialization. We get the indexes
         ## on demand later.
         self.index=None
         

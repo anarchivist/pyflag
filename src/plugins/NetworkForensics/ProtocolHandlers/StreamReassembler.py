@@ -668,12 +668,6 @@ class OffsetFile(File):
         self.readptr+=len(result)
         return result
 
-## There is no point in caching the offset file since its basically
-## not doing much underlying stuff
-#class CachedOffsetFile(CachedFile, OffsetFile):
-#    target_class = OffsetFile    
-#    specifier = 'O'
-
 import StringIO
 
 ## This is a memory cached version of the offset file driver - very useful for packets:

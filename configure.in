@@ -1,5 +1,8 @@
 # basics
 AC_INIT(pyflag.in)
+
+# Store the configuration in this header
+AC_CONFIG_HEADER(src/include/config.h)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE(pyflag, 0.80.2)
 
@@ -55,6 +58,7 @@ AC_OUTPUT([
 	src/indextools/Makefile
 	src/indextools_ng/Makefile
 	src/network/Makefile
+	src/network/libnids/Makefile
 	src/regtools/Makefile
 	src/virustools/Makefile
 	src/filesystems/Makefile

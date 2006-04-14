@@ -1,14 +1,25 @@
-import pyflag._dissect as _dissect
+import libnids
+import DB
+
+import _dissect
 import dissect
 
-filename = "/var/tmp/demo/stdcapture_0.2.pcap"
-start = 249272
-length = 105
-link_type = 1
+def Callback(stream):
+    print stream
+#    print "%s: %s" % (stream['con_id'], stream)
 
+libnids.set_tcp_callback(Callback)
+
+filename = "/var/tmp/demo/stdcapture_0.2.pcap"
 fd=open(filename)
-fd.seek(start)
-data = fd.read(length)
+dbh = DB.DBO("demo")
+dbh.execute("select * from pcap")
+for row in dbh:
+    fd.seek(row['offset'])
+    data = fd.read(row['length'])   
+    libnids.process_tcp(data[14:], row['id'], row['link_type'])
+
+libnids.clear_stream_buffers()
 
 root=dissect.dissector(data, link_type)
 print "%r" % root["tcp.seq"]
