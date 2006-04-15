@@ -18,6 +18,26 @@ class RevEng_GUI(Reports.report):
         pass
 
     def display(self, query, result):
+        def settings_cb(query, ui):
+            ui.decoration = "naked"
+
+            try:
+                if query['finish'] and query['MaxRows'] and query['StartOffset']:
+                    del query['finish']
+                    del query['submit']
+                    ui.refresh(0,query,parent=1)
+            except KeyError:
+                pass
+
+            ui.start_form(query)
+            ui.start_table()
+            ui.textfield("Starting Offset","StartOffset",size=20)
+            ui.textfield("Maximum Rows","MaxRows")
+            ui.checkbox("Click here to finish", "finish", "yes")
+            ui.end_table()
+            ui.end_form()
+            return ui
+            
         
         def popup_cb(query, ui, column_number = None, mode = ''):
             """Popup for defining column attributes"""
@@ -59,7 +79,7 @@ class RevEng_GUI(Reports.report):
 
             ui.checkbox("Visible","%svisible_%s" % (pre, column_number), "yes",
                         checked=True)
-            ui.checkbox("Click here to finish", "finish","yes");
+            ui.checkbox("Click here to finish", "finish","yes")
             ui.end_table()
             ui.end_form()
             return ui
@@ -99,7 +119,7 @@ class RevEng_GUI(Reports.report):
                     savelayout(query)
                     del query[k]
                     break
-                elif k.startswith('open'):
+                elif k.startswith('loadlayout'):
                     openlayout(query)
                     del query[k]
                     
@@ -171,7 +191,7 @@ class RevEng_GUI(Reports.report):
             dbh = self.DBO(query['case'])
             
             try:
-                if query['finish'] and query['loadlayout']:
+                if query['finish']:
                     del query['finish']
                     del query['submit']
                     ui.refresh(0,query,parent=1)
@@ -182,30 +202,52 @@ class RevEng_GUI(Reports.report):
             ui.start_table()
             ui.heading("Load a saved layout")
 
-            dbh.execute('select name from DAFTLayouts')
-            for row in dbh:
-                row['name']
-                    
+            try:
+                dbh.execute('select name from DAFTLayouts')
+                rows = []
+                for row in dbh:
+                    rows.append(row['name'])
+                ui.const_selector("Layout Name", "loadlayout", rows, rows)
+                
+                
+            except DB.DBError:
+                dbh.execute('create table DAFTLayouts (`name` text, `layout` text)')
+                ui.const_selector("Layout Name", "loadlayout", [''], [''])
 
+            ui.checkbox("Click here to finish", "finish", "yes")
+            ui.end_table()
+            ui.end_form()
+            return ui
             ### Create a list of saved layouts
 
         def openlayout(query):
-            values = ['StartOffset','MaxRows']
-            prefixes = ['name_','data_type_','parameter_','visible_','filelist_']
+            dbh = self.DBO(query['case'])
+            keylist = ['name_', 'data_type_', 'visible_', 'parameter_', 'fileselect',
+                       'MaxRows', 'StartOffset', 'savelayout']
+            try:
+                dbh.execute("select layout from DAFTLayouts where name='%s'" % query['loadlayout'])
+            except DB.DBError:
+                pass
 
+            rows=[]
+            oldkeys=[]
+            for row in dbh:
+                rows.append(row)
+            try:
+                if len(rows)<1:
+                    raise ValueError
+                for k in keylist:
+                    oldkeys = [x for x in query.keys() if x.startswith(k)]
+                for key in oldkeys:
+                    del query[key]
 
-            for k in values:
-                try:
-                    del query[k]
-                except KeyError:
-                    pass
-                
-            for p in prefixes:
-                keys = [x for x in query.keys() if x.startswith(p) != -1]
-                for k in keys:
-                    del query[k]
+                for kvpair in rows[0]['layout'].split(','):
+                    key, value = kvpair.split('=')
+                    query[key] = value
+                    
+            except ValueError:
+                pass
 
-            ### Add dbh command to get values from table
         
         def save_cb(query, ui):
             """Popup for saving layout"""
@@ -233,8 +275,30 @@ class RevEng_GUI(Reports.report):
             return ui
 
         def savelayout(query):
-            pass
+            """Saves the current layout into the DAFTLayouts table"""
+            dbh = self.DBO(query['case'])
+            keylist = ['name_', 'data_type_', 'visible_', 'parameter_', 'fileselect',
+                       'MaxRows', 'StartOffset', 'savelayout']
+            try:
+                dbh.execute("select name, layout from DAFTLayouts where name='%s'" % query['savelayout'])
+            except DB.DBError:
+                dbh.execute("create table DAFTLayouts (`name` text, `layout` text)")
+                dbh.execute("select name, layout from DAFTLayouts where name='%s'" % query['savelayout'])
         
+            rows = []
+            keys = []
+            for row in dbh:
+                rows.append(row)
+            for k in keylist:
+                keys = keys + [x for x in query.keys() if x.startswith(k)]
+                value = ','.join('%s=%s'%(x, query[x]) for x in keys)
+            if rows == []:
+                dbh.execute("insert into DAFTLayouts set name='%s', layout='%s'" %(query['savelayout'],
+                            value))
+            else:
+                dbh.execute("update DAFTLayouts set layout='%s' where name='%s'" %(value,
+                             query['savelayout']))
+
         def filelist_cb(query, ui):
             """Popup to select files to analyse"""
             ui.decoration = "naked"
@@ -278,10 +342,6 @@ class RevEng_GUI(Reports.report):
 
             processquery(query)
 
-            result.textfield("Starting Offset","StartOffset",size=20)
-            result.textfield("Maximum Rows","MaxRows")
-            result.end_table()
-          
             ## Build a struct to work from:
             try:
                 startoffset = DAFTFormats.numeric(query['StartOffset'])
@@ -314,13 +374,10 @@ class RevEng_GUI(Reports.report):
 
 ##            print 'File Size %s' % fdsize
 
-##            fd=open("/home/michael/dev/SERevEng/T630/SE_T630_351295000248246_23Apr05.bin")
-                
+               
             struct = DAFTFormats.DynamicStruct(buf)
             struct.create_fields(query, 'parameter_')
             
-#            result.row(*popup_row)
-
             struct.read(buf)
             popup_row = {}
             for i in range(struct.count):
@@ -333,6 +390,7 @@ class RevEng_GUI(Reports.report):
                           ,"Delete column", icon="delete.png")
                 popup_row[query['name_%s' % i]]=tmp
 
+            result.popup(settings_cb, "Change settings", icon="page.png")
             result.popup(FlagFramework.Curry(popup_cb, column_number = struct.count)
                           ,"Add new column", icon="red-plus.png")
             result.popup(filelist_cb, "Select files to use", icon="find.png")
