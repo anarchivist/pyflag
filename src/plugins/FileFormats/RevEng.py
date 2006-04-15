@@ -75,7 +75,7 @@ class RevEng_GUI(Reports.report):
 
                 temp.form("%sparameter_%s_" % (pre, column_number), query,ui)
             except KeyError,e:
-                pass
+                print 'KeyError: %s' %e
 
             ui.checkbox("Visible","%svisible_%s" % (pre, column_number), "yes",
                         checked=True)
