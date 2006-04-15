@@ -1478,8 +1478,11 @@ class HTMLUI(UI.GenericUI):
     def end_form(self,value='Submit',name='submit',**opts):
         for k,v in self.form_parms:
             self.result += "<input type=hidden name='%s' value='%s'>\n" % (k,v)
-        
-        self.result += "<input type=submit name=%s value='%s' %s></form>\n" % (name,value,self.opt_to_str(opts))
+
+        if value:
+            self.result += "<input type=submit name=%s value='%s' %s>\n" % (name,value,self.opt_to_str(opts))
+
+        self.result+="</form>"
 
     def join(self,ui):
         """ Joins the supplied ui object with this object """

@@ -277,7 +277,6 @@ class RevEng_GUI(Reports.report):
             dbh=DB.DBO(query['case'])
 
             processquery(query)
-            result.start_form(query)
 
             result.textfield("Starting Offset","StartOffset",size=20)
             result.textfield("Maximum Rows","MaxRows")
@@ -430,15 +429,14 @@ class RevEng_GUI(Reports.report):
                 print "Index Error: %s" % e
             except DB.DBError, e:
                 print "DB Error: %s" % e
-                            
-            result.end_form()
 
         except KeyError,e:
             result.case_selector()
             print "%r%s%s" %(e,e,FlagFramework.get_bt_string(e))
 
-
-
+        result.start_form(query)
+        result.end_form(None)
+        
     def reset(self, query):
         dbh = self.DBO(query['case'])
         dbh.execute("drop table reveng")
