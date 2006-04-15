@@ -292,7 +292,7 @@ class BuildDictionary(Reports.report):
                     dbh.execute("insert into dictionary set word=%r,class=%r,type=%r",(query['word'],query['class'],query['type']))
                     
             elif query['action']=='delete':
-                dbh.execute("delete from dictionary where word=%r,type=%r",query['word'],query['type'])
+                dbh.execute("delete from dictionary where word=%r and type=%r",(query['word'],query['type']))
                                 
         except KeyError:
             pass
