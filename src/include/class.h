@@ -323,7 +323,6 @@ super.add as well.
 
 typedef struct Object *Object;
 
-#ifdef __DEBUG__
 struct Object {
   //A reference to a class instance - this is useful to be able to
   //tell which class an object really belongs to:
@@ -340,21 +339,6 @@ struct Object {
   //How large the class is:
   int __size;
 };
-
-#else
-
-struct Object {
-  //A reference to a class instance - this is useful to be able to
-  //tell which class an object really belongs to:
-  Object __class__;
-
-  //And its super class:
-  Object __super__;
-
-  //How large the class is:
-  int __size;
-};
-#endif
 
 // Returns true if the obj belongs to the class
 #define ISINSTANCE(obj,class)			\

@@ -29,6 +29,11 @@
     This file defines a number of classes for parsing network packets
     of various types.
 **********************************************************************/
+#ifndef __NETWORK_H
+#define __NETWORK_H
+
+#include <netinet/ip.h>
+#include <netinet/tcp.h>
 #include "packet.h"
 #include "misc.h"
 
@@ -93,40 +98,9 @@ END_CLASS
     IP headers
 *************************************************/
 struct ip_struct {
-
-#ifdef LE
-  char header_length:4;
-  char version:4;
-#else
-  char version:4;
-  char header_length:4;
-#endif
-
-  uint8_t dsf;
-  uint16_t total_length;
-  uint16_t id;
-
-#ifdef LE
-  uint16_t fragment_offset:13;
-  uint16_t flags_mf:1;  
-  uint16_t flags_df:1;
-  uint16_t flags_res:1;
-#else
-  uint16_t flags_res:1;
-  uint16_t flags_df:1;
-  uint16_t flags_mf:1;  
-  uint16_t fragment_offset:13;
-#endif  
-
-  uint8_t ttl;
-  uint8_t protocol;
-
-  uint16_t checksum;
-  uint32_t src;
-  uint32_t dest;
+  struct iphdr header;
 
   /******* Everything after here will be manually filled in ****/
-
   uint32_t _src;
   uint32_t _dest;  
 
@@ -138,6 +112,8 @@ struct ip_struct {
 		    STRUCT_INT, STRUCT_INT)
 
 CLASS(IP, Packet)
+/** Each IP Packet has a unique number */
+     int id;
      struct ip_struct packet;
 END_CLASS
 
@@ -145,19 +121,7 @@ END_CLASS
     TCP headers
 *************************************************/
 struct tcp_struct {
-  uint16_t src_port;
-  uint16_t dest_port;
-  uint32_t seq;
-  uint32_t ack;
-
-#ifdef LE
-  uint8_t packing:4;
-#endif
-  uint8_t header_length:4;
-
-  uint8_t flags;
-  uint16_t window_size;
-  uint16_t checksum;
+  struct tcphdr header;
 
   /** Private derived data */
   int len;
@@ -196,3 +160,8 @@ struct udp_struct {
 CLASS(UDP, Packet)
      struct udp_struct packet;
 END_CLASS
+
+/** This must be called to initialise the network structs */
+void network_structs_init(void);
+
+#endif

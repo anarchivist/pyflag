@@ -6,6 +6,7 @@ import dissect
 
 def Callback(stream):
     print stream
+#    raise IOError
 #    print "%s: %s" % (stream['con_id'], stream)
 
 libnids.set_tcp_callback(Callback)
@@ -13,11 +14,20 @@ libnids.set_tcp_callback(Callback)
 filename = "/var/tmp/demo/stdcapture_0.2.pcap"
 fd=open(filename)
 dbh = DB.DBO("demo")
-dbh.execute("select * from pcap")
+
+dbh.execute("select * from pcap where id=8")
+delayed = dbh.fetch()
+
+dbh.execute("select * from pcap where id!=8")
 for row in dbh:
     fd.seek(row['offset'])
     data = fd.read(row['length'])   
     libnids.process_tcp(data[14:], row['id'], row['link_type'])
+    if row['id']==16:
+        row = delayed
+        fd.seek(row['offset'])
+        data = fd.read(row['length'])   
+        libnids.process_tcp(data[14:], row['id'], row['link_type'])
 
 libnids.clear_stream_buffers()
 

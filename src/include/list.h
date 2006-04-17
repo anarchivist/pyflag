@@ -255,7 +255,7 @@ static inline int list_count(struct list_head *head)
 }
 
 /** Given a list head, returns the first entry and assigns to i */
-#define LIST_FIRST(first, head, member)			\
-  first=list_entry((head)->next, typeof(*first), member)
+#define list_next(first, head, member)			\
+  do { first=list_entry((head)->next, typeof(*first), member); } while(0)
 
 #endif

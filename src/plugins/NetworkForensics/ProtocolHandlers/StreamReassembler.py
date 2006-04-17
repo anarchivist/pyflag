@@ -129,15 +129,15 @@ class StreamReassembler(NetworkScanFactory):
         self.connection_cache={}
 
     def reset(self):
-        self.dbh.execute("drop table connection")
-        self.dbh.execute("drop table connection_details")
+        self.dbh.execute("drop table `connection`")
+        self.dbh.execute("drop table `connection_details`")
 
     def process_stream(self, stream, factories):
         """ This will be called to store the stream information in the
         database. It gets called whenever we detect that a stream is
         finished.
         """
-        self.dbh.execute("insert into connection_details set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r ",(
+        self.dbh.execute("insert into `connection_details` set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r ",(
             stream.src_ip,stream.src_port,
             stream.dest_ip,stream.dest_port,
             stream.isn))
@@ -313,7 +313,7 @@ def combine_streams(query,result):
     fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'])
 
     number_of_rows = 0
-    dbh.execute("select con_id, concat(\"%s|p0|O\",cast(packet_id as char),\"|o\",cast(data_offset as char),\":\",cast(connection.length as char)) as inode from connection join pcap on packet_id=pcap.id where con_id=%r or con_id=%r order by packet_id limit %s,%s",(iosource,forward_cid,reverse_cid, limit, config.PAGESIZE))
+    dbh.execute("select con_id, concat(\"%s|p0|O\",cast(packet_id as char),\"|o\",cast(data_offset as char),\":\",cast(`connection`.length as char)) as inode from `connection` join pcap on packet_id=pcap.id where con_id=%r or con_id=%r order by packet_id limit %s,%s",(iosource,forward_cid,reverse_cid, limit, config.PAGESIZE))
     for row in dbh:
         number_of_rows += 1
         fd = fsfd.open(inode = row['inode'])
@@ -380,7 +380,7 @@ def show_packets(query,result):
                                            case=query['case'],
                                            __target__='inode'),
                   ],
-        table= 'connection as con , pcap',
+        table= '`connection` as con , pcap',
         where = 'con_id="%s" and packet_id=id ' % con_id,
         callbacks = { 'Data': show_data },
         case=query['case']
@@ -423,7 +423,7 @@ class StreamFile(File):
         try:
             self.con_id = int(inode[1:])
         except ValueError: ## We have / in the inode name
-            self.dbh.execute("select con_id from connection_details where inode=%r",(inode))
+            self.dbh.execute("select con_id from `connection_details` where inode=%r",(inode))
             row=self.dbh.fetch()
             if row:
                 self.con_id=row['con_id']
@@ -445,14 +445,14 @@ class StreamFile(File):
             ## the byte sequences we are missing.
 
 #            self.dbh = DB.DBO(self.case)
-            self.dbh.execute("select isn from connection_details where con_id=%r",(self.con_id))
+            self.dbh.execute("select isn from `connection_details` where con_id=%r",(self.con_id))
             row=self.dbh.fetch()
             if not row:
                 raise IOError("No stream with connection ID %s" % self.con_id)
 
             self.isn = row['isn']
 
-        self.dbh.execute("select max(seq+length) as size from connection where con_id=%r",(self.con_id))
+        self.dbh.execute("select max(seq+length) as size from `connection` where con_id=%r",(self.con_id))
         row=self.dbh.fetch()
         self.size=row['size']-self.isn
 
@@ -465,7 +465,7 @@ class StreamFile(File):
         @return the new stream id.
         """
         ## Store the new stream in the cache:
-        self.dbh.execute("insert into connection_details set inode=%r",(self.inode))
+        self.dbh.execute("insert into `connection_details` set inode=%r",(self.inode))
         con_id = self.dbh.autoincrement()
         self.dbh2 = self.dbh.clone()
 
@@ -476,7 +476,7 @@ class StreamFile(File):
         
         sum=0
         stream = Stream(0,0,0,0,0, self.fd)
-        self.dbh.execute("select packet_id, length, data_offset from connection where %s order by packet_id",(
+        self.dbh.execute("select packet_id, length, data_offset from `connection` where %s order by packet_id",(
             " or ".join(["con_id=%r" % a for a in stream_ids])
             ))
 
@@ -542,7 +542,7 @@ class StreamFile(File):
         result = cStringIO.StringIO()
 
         ## Find out which packets fall within the range of interest
-        self.dbh.execute("select packet_id, length, data_offset,seq from connection where con_id=%r and seq+length>=%r and seq<=%r order by seq",(
+        self.dbh.execute("select packet_id, length, data_offset,seq from `connection` where con_id=%r and seq+length>=%r and seq<=%r order by seq",(
             self.con_id,
             self.isn+self.readptr, ## Start of range
             self.isn+self.readptr+length, ## End of range
@@ -603,14 +603,14 @@ class StreamFile(File):
         if not position:
             position = self.tell()
             
-        self.dbh.execute("select con_id,isn from connection_details where inode=%r",(self.inode))
+        self.dbh.execute("select con_id,isn from `connection_details` where inode=%r",(self.inode))
         row=self.dbh.fetch()
         if not row:
-            self.dbh.execute("select con_id,isn from connection_details where con_id=%r",(self.con_id))
+            self.dbh.execute("select con_id,isn from `connection_details` where con_id=%r",(self.con_id))
             row=self.dbh.fetch()
             
         con_id,isn = row['con_id'],row['isn']
-        self.dbh.execute("""select packet_id from connection where
+        self.dbh.execute("""select packet_id from `connection` where
                          con_id = %r and seq <= (%r+%r) order by seq desc, length desc limit 1""",
                          (con_id, isn, position))
         row=self.dbh.fetch()

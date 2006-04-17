@@ -38,7 +38,6 @@ class RevEng_GUI(Reports.report):
             ui.end_form()
             return ui
             
-        
         def popup_cb(query, ui, column_number = None, mode = ''):
             """Popup for defining column attributes"""
 ##            print "I am here"
@@ -492,8 +491,7 @@ class RevEng_GUI(Reports.report):
             result.case_selector()
             print "%r%s%s" %(e,e,FlagFramework.get_bt_string(e))
 
-        result.start_form(query)
-        result.end_form(None)
+        result.end_form()
         
     def reset(self, query):
         dbh = self.DBO(query['case'])

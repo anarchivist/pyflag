@@ -197,7 +197,7 @@ void Struct_Register(unsigned char format, int size,
   unpackers[(int)format]=unpacker;
 };
 
-MODULE_INIT(struct_init) {
+void struct_init(void) {
   /** Zero out the packers and unpackers */
   memset(packers, 0, sizeof(packers));
   memset(unpackers, 0, sizeof(unpackers));

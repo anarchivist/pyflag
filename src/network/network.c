@@ -40,7 +40,9 @@ static int Eth2_MAC_unpack(void *context, StringIO input, char *output) {
   return 6;
 };
 
-MODULE_INIT(network_structs) {
+void network_structs_init(void) {
+  struct_init();
+
   Struct_Register(STRUCT_ETH_ADDR, 6,
 		  Eth2_MAC_pack, Eth2_MAC_unpack);
 };
@@ -165,19 +167,19 @@ int IP_Read(Packet self, StringIO input) {
   len=this->__super__->Read(self, input);
 
   /** The _ types are filled in to provide multiple access methods */
-  this->packet._src = this->packet.src;
-  this->packet._dest = this->packet.dest;
+  this->packet._src = this->packet.header.saddr;
+  this->packet._dest = this->packet.header.daddr;
 
   /** Sometimes we get trailing trash at the end of a packet, since
       the dissectors which follow us would not know how long the
       packet actually is - it is up to us to set the size of it.
    */
-  if(input->size > self->start + this->packet.total_length) {
-    CALL(input,truncate, self->start + this->packet.total_length);
+  if(input->size > self->start + this->packet.header.tot_len) {
+    CALL(input,truncate, self->start + this->packet.header.tot_len);
   };
 
   /** Now choose the dissector for the next layer */
-  switch(this->packet.protocol) {
+  switch(this->packet.header.protocol) {
   case 0x6:
     this->packet.payload = (Packet)CONSTRUCT(TCP, Packet, super.Con, self);
     break;
@@ -199,7 +201,7 @@ int IP_Read(Packet self, StringIO input) {
       position in case the packet has options that we did not account
       for.
   */
-  CALL(input, seek, self->start + this->packet.header_length * 4, 
+  CALL(input, seek, self->start + this->packet.header.ihl * 4, 
        SEEK_SET);
 
   CALL(this->packet.payload, Read, input);
@@ -210,12 +212,12 @@ int IP_Read(Packet self, StringIO input) {
 VIRTUAL(IP, Packet)
      INIT_STRUCT(packet, ip_Format);
 
-     NAME_ACCESS(packet, src, FIELD_TYPE_IP_ADDR);
-     NAME_ACCESS(packet, dest, FIELD_TYPE_IP_ADDR);
+     NAME_ACCESS(packet, header.saddr, FIELD_TYPE_IP_ADDR);
+     NAME_ACCESS(packet, header.daddr, FIELD_TYPE_IP_ADDR);
      NAME_ACCESS(packet, _src, FIELD_TYPE_INT);
      NAME_ACCESS(packet, _dest, FIELD_TYPE_INT);
-     NAME_ACCESS(packet, ttl, FIELD_TYPE_CHAR);
-     NAME_ACCESS(packet, protocol, FIELD_TYPE_CHAR);
+     NAME_ACCESS(packet, header.ttl, FIELD_TYPE_CHAR);
+     NAME_ACCESS(packet, header.protocol, FIELD_TYPE_CHAR);
      NAME_ACCESS(packet, payload, FIELD_TYPE_PACKET);
 
      VMETHOD(super.Read)=IP_Read;
@@ -229,7 +231,7 @@ int TCP_Read(Packet self, StringIO input) {
 
   this->__super__->Read(self, input);
 
-  this->packet.len  = this->packet.header_length * 4;
+  this->packet.len  = this->packet.header.doff * 4;
 
   /** Now we seek to the spot in the input stream where the data
       payload is supposed to start. This could be a few bytes after
@@ -256,13 +258,12 @@ int TCP_Read(Packet self, StringIO input) {
 VIRTUAL(TCP, Packet)
      INIT_STRUCT(packet, tcp_Format);
 
-     NAME_ACCESS(packet, src_port, FIELD_TYPE_SHORT);
-     NAME_ACCESS(packet, dest_port, FIELD_TYPE_SHORT);
-     NAME_ACCESS(packet, seq, FIELD_TYPE_INT);
-     NAME_ACCESS(packet, ack, FIELD_TYPE_INT);
+     NAME_ACCESS(packet, header.source, FIELD_TYPE_SHORT);
+     NAME_ACCESS(packet, header.dest, FIELD_TYPE_SHORT);
+     NAME_ACCESS(packet, header.seq, FIELD_TYPE_INT);
+     NAME_ACCESS(packet, header.ack_seq, FIELD_TYPE_INT);
      NAME_ACCESS(packet, len, FIELD_TYPE_INT);
-     NAME_ACCESS(packet, flags, FIELD_TYPE_CHAR_X);
-     NAME_ACCESS(packet, window_size, FIELD_TYPE_SHORT);
+     NAME_ACCESS(packet, header.window, FIELD_TYPE_SHORT);
      NAME_ACCESS(packet, data_offset, FIELD_TYPE_INT);
      NAME_ACCESS(packet, data_len, FIELD_TYPE_INT);
      NAME_ACCESS_SIZE(packet, data, FIELD_TYPE_STRING, data_len);

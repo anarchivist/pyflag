@@ -57,6 +57,8 @@ static PyObject *dissect(PyObject *self, PyObject *args) {
   */
   result = PyCObject_FromVoidPtr(root, (void (*)(void *))root->super.destroy);
 
+  talloc_free(tmp);
+
   return result;
 };
 
@@ -211,7 +213,7 @@ static PyObject *get_field(PyObject *self, PyObject *args) {
 
     case FIELD_TYPE_ETH_ADD:
       {
-	char *x= (unsigned char *)item;
+	unsigned char *x= (unsigned char *)item;
 	char temp[1024];
 
 	snprintf(temp,1024,"%02X:%02X:%02X:%02X:%02X:%02X",
@@ -298,8 +300,7 @@ static PyMethodDef DissectMethods[] = {
   {NULL, NULL, 0, NULL}
 };
 
-#include "init.h"
 PyMODINIT_FUNC init_dissect(void) {
   (void) Py_InitModule("_dissect", DissectMethods);
-#include "init.c"
+  network_structs_init();
 }

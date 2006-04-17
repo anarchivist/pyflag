@@ -31,8 +31,7 @@ enum
 };
 
 enum nids_state_t {
-  NIDS_NONE,
-  NIDS_JUST_EST,
+  NIDS_JUST_EST = 1,
   NIDS_DATA,
   NIDS_CLOSE,
   NIDS_RESET,

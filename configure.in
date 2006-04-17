@@ -45,7 +45,7 @@ AC_SUBST(magic)
             
 
 # defines and output
-AC_DEFINE([__DEBUG__])
+AC_DEFINE([__DEBUG__], [], [Debuging enabled])
 
 # Large file support
 AC_SYS_LARGEFILE

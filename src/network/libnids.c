@@ -3,16 +3,9 @@
 We use libnids to perform our stream reassembly.
 ***/
 #include <Python.h>
-#include <netinet/ip.h>
-#include <netinet/tcp.h>
-#include <netinet/udp.h>
-#include "libnids/nids.h"
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
 #include "class.h"
 #include "packet.h"
+#include "tcp.h"
 
 #define int_ntoa(x)     inet_ntoa(*((struct in_addr *)&x))
 
@@ -68,13 +61,13 @@ PyObject *New_Stream_Dict(struct tcp_stream *a_tcp) {
 
 /** This adds another packet to the stream object */
 int add_packet(PyObject *stream, struct half_stream *hlf) {
-  if(!PyList_Append(PyDict_GetItem(stream,PyString_FromString("packets")),PyInt_FromLong(packet_id)))
+  if(PyList_Append(PyDict_GetItem(stream,PyString_FromString("packets")),PyInt_FromLong(packet_id)))
     return 0;
 
-  if(!PyList_Append(PyDict_GetItem(stream,PyString_FromString("seq")),PyInt_FromLong(hlf->seq)))
+  if(PyList_Append(PyDict_GetItem(stream,PyString_FromString("seq")),PyInt_FromLong(hlf->seq)))
     return 0;
 
-  if(!PyList_Append(PyDict_GetItem(stream,PyString_FromString("length")),PyInt_FromLong(hlf->count)))
+  if(PyList_Append(PyDict_GetItem(stream,PyString_FromString("length")),PyInt_FromLong(hlf->count)))
     return 0;
  
   return 1;
@@ -87,6 +80,10 @@ PyObject *py_process_tcp(PyObject *self, PyObject *args) {
 
   if(!PyArg_ParseTuple(args, "s#II",  &data, &len, &packet_id, &link_type)) 
     return NULL;
+
+  printf("Processing packet %u\n", packet_id);
+  if(packet_id==8)
+    printf("got 8\n");
 
   process_tcp(data,len);
 
@@ -142,6 +139,10 @@ static PyMethodDef NIDSMethods[] = {
   {NULL, NULL, 0, NULL}
 };
 
+PyObject *proxy(PyObject *self, void *stream) {
+  return PyObject_CallFunction(self, "O", stream);
+};
+
 void
 tcp_callback (struct tcp_stream *a_tcp, void **stream_obj)
 {
@@ -185,17 +186,20 @@ tcp_callback (struct tcp_stream *a_tcp, void **stream_obj)
     if(PyDict_SetItem(half_stream, PyString_FromString("data"), PyString_FromStringAndSize(hlf->data, hlf->count_new))<0)
       return;    
 
+    /*
     if(!PyObject_CallFunction(python_cb, "O",stream)) {
       return;
     };
-    
+    */ 
+
     //write(1,hlf->data,hlf->count_new); // we print the newly arrived data
   } else if(a_tcp->nids_state == NIDS_CLOSE || a_tcp->nids_state == NIDS_RESET || 
 	    a_tcp->nids_state == NIDS_EXITING) {
     /** Handle the stream */
     if(python_cb) {
-      printf("Got %u for stream\n", a_tcp->nids_state);
-      if(!PyObject_CallFunction(python_cb, "O",stream)) {
+      printf("Got %u for stream\n", a_tcp->nids_state);      
+      if(!proxy(python_cb, stream)) {
+	//      if(!PyObject_CallFunction(python_cb, "O",stream)) {
 	return;
       };
     };

@@ -73,4 +73,7 @@ void Struct_Register(unsigned char format, int size,
 		     int (*packer)(char *input, StringIO output),
 		     int (*unpacker)(void *context, StringIO input, char *output)
 		     );
+
+void struct_init(void);
+
 #endif
