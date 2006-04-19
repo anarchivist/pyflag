@@ -1,38 +1,20 @@
-import libnids
 import DB
 
 import _dissect
 import dissect
-
-def Callback(stream):
-    print stream
-#    raise IOError
-#    print "%s: %s" % (stream['con_id'], stream)
-
-libnids.set_tcp_callback(Callback)
 
 filename = "/var/tmp/demo/stdcapture_0.2.pcap"
 fd=open(filename)
 dbh = DB.DBO("demo")
 
 dbh.execute("select * from pcap where id=8")
-delayed = dbh.fetch()
+row = dbh.fetch()
 
-dbh.execute("select * from pcap where id!=8")
-for row in dbh:
-    fd.seek(row['offset'])
-    data = fd.read(row['length'])   
-    libnids.process_tcp(data[14:], row['id'], row['link_type'])
-    if row['id']==16:
-        row = delayed
-        fd.seek(row['offset'])
-        data = fd.read(row['length'])   
-        libnids.process_tcp(data[14:], row['id'], row['link_type'])
+fd.seek(row['offset'])
+data = fd.read(row['length'])   
 
-libnids.clear_stream_buffers()
-
-root=dissect.dissector(data, link_type)
-print "%r" % root["tcp.seq"]
+root=dissect.dissector(data, row['link_type'])
+print "%r" % root["tcp.header.seq"]
 
 ## Now we try to print the tree recursively
 def print_leaf(name,node):

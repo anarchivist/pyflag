@@ -18,6 +18,8 @@ class RevEng_GUI(Reports.report):
         pass
 
     def display(self, query, result):
+        result.start_form(query)
+
         def settings_cb(query, ui):
             ui.decoration = "naked"
 

@@ -54,8 +54,8 @@ void TCPStream_add(TCPStream self, IP ip) {
   /** Now add the new skbuff after the candidate */
   list_add(&(new->list), candidate);
 
-  /** We now check to see if we can remove the any packets from the
-      queue by sending them to the callback.
+  /** We now check to see if we can remove any packets from the queue
+      by sending them to the callback.
 
       We check to see if the first packet in the queue has the
       expected sequence number.
@@ -78,13 +78,14 @@ void TCPStream_add(TCPStream self, IP ip) {
 
     /** Does this packet have some data for us? */
     if(self->next_seq >= tcp->packet.header.seq) {
-      int diff = tcp->packet.header.seq-self->next_seq;
+      int diff = self->next_seq - tcp->packet.header.seq;
 
       /** Adjust the data payload of the packet by the difference */
       tcp->packet.data+=diff;
       tcp->packet.data_len-=diff;
 
       /** Call our callback with this */
+      self->state = PYTCP_DATA;
       if(self->callback) self->callback(self, first->packet);
       
       /** Adjust the expected sequence number */
@@ -103,9 +104,17 @@ void TCPStream_add(TCPStream self, IP ip) {
 
 };
 
+/** Flush all the queues into the callback */
+void TCPStream_flush(TCPStream self) {
+  /** FIXME: For now ignore outstanding packets: */
+  self->state = PYTCP_DESTROY;
+  if(self->callback) self->callback(self, NULL);
+};
+
 VIRTUAL(TCPStream, Object)
      VMETHOD(Con) = TCPStream_Con;
      VMETHOD(add) = TCPStream_add;
+     VMETHOD(flush) = TCPStream_flush;
 END_VIRTUAL
 
 TCPHashTable TCPHashTable_Con(TCPHashTable self) {
@@ -223,10 +232,10 @@ int TCPHashTable_process_tcp(TCPHashTable self, IP ip) {
   */
   if(i->state == PYTCP_CLOSE && i->reverse->state == PYTCP_CLOSE) {
     i->state = PYTCP_DESTROY;
-    i->reverse->state = PYTCP_DESTROY;
+    if(i->callback) i->callback(i, NULL);
 
-    if(i->callback) i->callback(i, ip);
-    if(i->reverse->callback) i->reverse->callback(i->reverse, ip);
+    i->reverse->state = PYTCP_DESTROY;
+    if(i->reverse->callback) i->reverse->callback(i->reverse, NULL);
 
     list_del(&(i->list));
     list_del(&(i->reverse->list));

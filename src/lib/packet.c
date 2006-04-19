@@ -113,6 +113,7 @@ int Find_Property(OUT Packet *node, OUT struct struct_property_t **p,
       return False;
     };
 
+    *p=i;
     return True;
 
   } else {

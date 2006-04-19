@@ -16,7 +16,7 @@ filename = "/var/tmp/demo/stdcapture_0.2.pcap"
 fd=open(filename)
 dbh = DB.DBO("demo")
 
-dbh.execute("select * from pcap")
+dbh.execute("select * from pcap order by id")
 for row in dbh:
     fd.seek(row['offset'])
     data = fd.read(row['length'])

@@ -20,8 +20,6 @@
 # * along with this program; if not, write to the Free Software
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
-raise ImportError("This module is disabled for now")
-
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.Registry as Registry
@@ -34,42 +32,7 @@ import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
 import struct,re
 
-## A hash table for caching streams in memory. key=stream_id, value=Stream class
-stream_cache = {}
-
-class Stream:
-    """ This class represents a single stream """
-    con_id = 0
-    def __init__(self, isn, src_ip, src_port, dest_ip, dest_port, iosource, direction="forward"):
-        ## The list of packets which make up the stream.
-        self.packets = []
-        self.seq = []
-        self.length = []
-        self.data_offset = []
-
-        ## Properties of the stream itself
-        self.isn = isn
-        self.src_ip = src_ip
-        self.src_port = src_port
-        self.dest_ip = dest_ip
-        self.dest_port = dest_port
-        self.max_id = 0
-        self.direction= direction
-        self.con_id+=1
-        ## Ths iosource containing this stream
-        self.iosource = iosource
-
-    def add_packet(self, packet_id, seq, length, data_offset):
-        self.packets.append(packet_id)
-        self.seq.append(seq)
-        self.length.append(length)
-        self.data_offset.append(data_offset)
-        self.max_id = packet_id
-
-    def __str__(self):
-        return "Con id %s, from %s:%s to %s:%s has packets %s" % (
-            self.con_id, IP2str(self.src_ip), self.src_port,
-            IP2str(self.dest_ip), self.dest_port, self.packets)
+import reassembler
 
 class StreamReassembler(NetworkScanFactory):
     """ This scanner reassembles the packets into the streams.
@@ -98,7 +61,7 @@ class StreamReassembler(NetworkScanFactory):
         self.dbh.execute(
             """CREATE TABLE if not exists `connection_details` (
             `inode` varchar(250),
-            `con_id` int(11) unsigned NOT NULL auto_increment,
+            `con_id` int(11) unsigned NOT NULL,
             `src_ip` int(11) unsigned NOT NULL default '0',
             `src_port` int(11) unsigned NOT NULL default '0',
             `dest_ip` int(11) unsigned NOT NULL default '0',
@@ -127,9 +90,21 @@ class StreamReassembler(NetworkScanFactory):
         self.dbh.check_index("connection_details",'src_port')
         self.dbh.check_index("connection_details",'dest_ip')
         self.dbh.check_index("connection_details",'dest_port')
-        
-        self.connection_cache={}
 
+        self.hashtbl = reassembler.init()
+
+        def  Callback(s):
+            ## Add the stream to the connection details table:
+            self.dbh.execute("insert into `connection_details` set con_id=%r, src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r ",(
+                s['con_id'], s['src_ip'], s['src_port'],
+                s['dest_ip'],s['dest_port'], s['isn'], 
+                ))
+            
+            print s
+
+        ## Register the callback
+        reassembler.set_tcp_callback(self.hashtbl, Callback)
+        
     def reset(self):
         self.dbh.execute("drop table `connection`")
         self.dbh.execute("drop table `connection_details`")
@@ -180,15 +155,6 @@ class StreamReassembler(NetworkScanFactory):
                                   seq=seq,length=length,data_offset=data_offset)
 
         self.dbh.mass_insert_commit()
-##            self.dbh.execute("insert into connection set con_id=%r,packet_id=%r,seq=%r,length=%r, data_offset=%r",
-##                             ( stream.con_id,
-##                               packet_id,
-##                               seq,
-##                               length,
-##                               data_offset))
-
-        ## Add to local memory cache:
-        stream_cache[stream.con_id] = stream
 
     class Scan(NetworkScanner):
         """ Each packet will cause a new instantiation of this class. """
@@ -207,89 +173,17 @@ class StreamReassembler(NetworkScanFactory):
             """
             NetworkScanner.process(self,data,metadata)
 
-            ## See if we can find what we need in this packet
-            try:
-                tcpsrcport=self.proto_tree['tcp.header.source']
-                tcpdestport=self.proto_tree['tcp.header.dest']
-                
-                ## We want the int versions of these
-                ipsrc=self.proto_tree['ip._src']
-                ipdest=self.proto_tree['ip._dest']
-                data_offset = self.proto_tree['tcp.data_offset'] + self.packet_offset
-            except KeyError,e:
-                return
-
-            ## Here we try and cache connection information in memory
-            ## so we dont hit the db so much
-            forward_key = struct.pack("IIII",ipsrc,ipdest,tcpsrcport,tcpdestport)
-
-            ## The following tests the cache for both forward or
-            ## reverse connections, creating them if needed.
-            try:
-                stream = self.outer.connection_cache[forward_key]
-            except KeyError:
-                #We dont have the forward connection, maybe we have
-                #the reverse?
-                try:
-                    reverse_key = struct.pack("IIII",ipdest,ipsrc,tcpdestport,tcpsrcport)
-                    stream = self.outer.connection_cache[reverse_key]
-
-                    ## Create the current connection for this one:
-                    isn = self.proto_tree['tcp.header.seq']+1
-
-                    ## Create a stream class:
-                    stream = Stream(isn, ipsrc, tcpsrcport, ipdest, tcpdestport, self.fd.iosource, direction = "reverse")
-                    stream.ts_sec = self.fd.ts_sec
-                    
-                    ## Cache it:
-                    self.outer.connection_cache[forward_key]=stream
-                    
-                except KeyError:
-                    ## Nope - we dont have that either, we need to
-                    ## create a new node for the forward stream:
-                    
-                    isn = self.proto_tree['tcp.header.seq']+1
-
-                    ## Create a stream:
-                    stream = Stream(isn, ipsrc, tcpsrcport, ipdest, tcpdestport, self.fd.iosource, direction="forward")
-                    stream.ts_sec = self.fd.ts_sec
-
-                    ## Cache it:
-                    self.outer.connection_cache[forward_key]=stream
-
-                    ## END CREATE FORWARD STREAM
-                    
             packet_id = self.fd.tell()-1
-            seq = self.proto_tree['tcp.header.seq']
-            length = self.proto_tree['tcp.data_len']
             
-            ## Add this packet to the stream
-            stream.add_packet(packet_id, seq, length,data_offset)
-
-            ## Expire sessions which are too old.
-            for key,s in self.outer.connection_cache.items():
-                if s.max_id + config.MAX_SESSION_AGE < packet_id:
-                    try:
-                        self.process_stream(s)
-                    except Exception,e:
-                        logging.log(logging.ERRORS,"Unable to scan stream: %s." % e)
-                    del self.outer.connection_cache[key]
-
-            ## Note that we can not use fin/rst flags this since it is
-            ## legal to have packets exchanged even after fin/rst
-            ## which still belong to the present session (e.g. acks
-            ## etc).
+            ## Try to process the stream
+            try:
+                reassembler.process_tcp(self.outer.hashtbl, data, packet_id, 1)
+            except RuntimeError:
+                pass
 
         def finish(self):
-            if not NetworkScanner.finish(self): return
-
-            ## Now go through and process all the left over streams
-            ## (close them all):
-            for stream in self.outer.connection_cache.values():
-                self.process_stream(stream)
-
-            self.outer.connection_cache = {}
-            
+            reassembler.clear_stream_buffers(self.outer.hashtbl);
+        
 def combine_streams(query,result):
     """ Show both ends of the stream combined.
 
