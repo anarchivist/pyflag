@@ -39,6 +39,7 @@ import StringIO
 import re
 from pyflag.FlagFramework import normpath
 import pyflag.FlagFramework as FlagFramework
+import pexpect
 
 class PstScan(GenScanFactory):
     """ Recurse into Pst Files """
@@ -51,7 +52,16 @@ class PstScan(GenScanFactory):
         name = "File Scanners"
         contains = [ 'PstScan','IEIndex', 'RegistryScan', 'TypeScan']
         default = True
-        
+
+        # Let's check if this external tool exists into the PATH and then add it to the Drawer
+        try: 
+              s=pexpect.spawn('stegdetect -V')
+              s.expect(pexpect.EOF)
+              if "Stegdetect Version" in s.before :
+                     contains.append('AFTJpegScan')
+        except pexpect.ExceptionPexpect,e:
+              pass
+
     def __init__(self,fsfd):
         GenScanFactory.__init__(self, fsfd)
         self.to_re = re.compile('^to:\s+(.*?)\n(?:\w|\n)', re.IGNORECASE|re.MULTILINE|re.DOTALL)
