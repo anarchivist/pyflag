@@ -136,6 +136,9 @@ CLASS(Packet,Object)
       */
      struct struct_property_t properties;
 
+     /** This is the packet which may contain us */
+     Packet parent;
+
      /** This is a pointer to a struct which specified all the fields
 	 described in the format string above. Normally you would
 	 define the struct, include it in the derived class, and in
@@ -147,7 +150,7 @@ CLASS(Packet,Object)
      void *struct_p;
 
      /** A constructor which sets out the packet */
-     Packet METHOD(Packet,Con);
+     Packet METHOD(Packet,Con, Packet parent);
 
      /** Write our packet into the StringIO - return number of bytes
 	 written. */

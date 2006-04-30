@@ -24,12 +24,13 @@ _dissect_la_LIBADD	= libnetwork.la
 #libnids_la_LIBADD	= libtcp.la 
 
 reassembler_la_SOURCES = reassembler.c
-reassembler_la_CPPFLAGS= $(SWIG_PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
+reassembler_la_CPPFLAGS= $(SWIG_PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include -D__DEBUG__
 reassembler_la_LDFLAGS = -module
-reassembler_la_LIBADD  = libtcp.la 
+reassembler_la_LIBADD  = libtcp.la libnetwork.la
 
 libtcp_la_SOURCES	= tcp.c
-libtcp_la_LIBADD	= libnetwork.la
+libtcp_la_CPPFLAGS	= -D__DEBUG__
+#libtcp_la_LIBADD	= libnetwork.la
 
 noinst_HEADERS		= network.h
 

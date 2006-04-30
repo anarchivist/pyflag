@@ -1,4 +1,4 @@
-/***** This python module is use to reassemble a sequence of packets
+/***** This python module is used to reassemble a sequence of packets
        into streams.
 
 This is how it works:
@@ -43,7 +43,7 @@ PyObject *New_Stream_Dict(TCPStream tcp_stream) {
     if(PyDict_SetItemString(stream, "isn", PyInt_FromLong(0))<0)
       return NULL;
 
-    if(PyDict_SetItemString(stream, "con_id", PyInt_FromLong(tcp_stream->id))<0)
+    if(PyDict_SetItemString(stream, "con_id", PyInt_FromLong(tcp_stream->con_id))<0)
       return NULL;
 
     if(PyDict_SetItemString(stream, "src_ip", PyLong_FromUnsignedLong(tcp_stream->addr.saddr))<0)
@@ -58,7 +58,7 @@ PyObject *New_Stream_Dict(TCPStream tcp_stream) {
     if(PyDict_SetItemString(stream, "dest_port", PyInt_FromLong(tcp_stream->addr.dest))<0)
       return NULL;
 
-    if(PyDict_SetItemString(stream, "reverse", PyInt_FromLong(tcp_stream->reverse->id))<0)
+    if(PyDict_SetItemString(stream, "reverse", PyInt_FromLong(tcp_stream->reverse->con_id))<0)
       return NULL;
 
     return stream;
@@ -77,14 +77,28 @@ int add_packet(PyObject *stream, IP ip) {
   if(PyList_Append(PyDict_GetItem(stream,PyString_FromString("length")),PyInt_FromLong(tcp->packet.data_len)))
     return 0;
  
+  {
+    Packet i;
+    Root r;
+
+    /** Find the root node: */
+    for(i=(Packet)ip; i->parent; i=i->parent);
+    r=(Root)i;
+
+    if(PyList_Append(PyDict_GetItem(stream,PyString_FromString("data_offset")),PyInt_FromLong(tcp->packet.data_offset + r->packet_offset)))
+    return 0;
+  };
+ 
   return 1;
 };
 
+/** A talloc destructor to automatically decref the python objects
+    upon free 
+*/
 static void free_data(void *self) {
   TCPStream this=(TCPStream)self;
   PyObject *obj=(PyObject *)this->data;
 
-  printf("Freeing data %u\n",obj->ob_refcnt);
   Py_DECREF(obj);
 };
 
@@ -98,7 +112,7 @@ static void callback(TCPStream self, IP ip) {
   case PYTCP_JUST_EST:
     self->data = New_Stream_Dict(self);
     stream = (PyObject*)self->data;
-    talloc_set_destructor(self, free_data);
+    talloc_set_destructor(self, (int (*)(void*))free_data);
     break;
   case PYTCP_DATA:
     add_packet(stream, ip);
@@ -106,12 +120,14 @@ static void callback(TCPStream self, IP ip) {
 	  ip->id, tcp->packet.data);*/
     break;
   case PYTCP_DESTROY:
-    if(stream)
+    if(stream) {
       if(!PyObject_CallFunction(python_cb, "O",stream))
 	return;
-
-    /*    printf("Connection ID %u -> %u (%u) destroyed\n", self->id, 
-	  ip->id, self->reverse->id);*/
+    } else {
+      printf("Connection ID %u -> %u destroyed\n", self->con_id, 
+	     self->reverse->con_id);
+    };
+    
     break;    
   case PYTCP_CLOSE:
     /*    printf("Connection ID %u -> %u (%u) closing\n", self->id, 
@@ -120,6 +136,54 @@ static void callback(TCPStream self, IP ip) {
   default:
     break;
   };
+};
+
+PyObject *py_process_packet(PyObject *self, PyObject *args) {
+  Root root;
+  IP ip;
+  TCPHashTable hash;
+  PyObject *hash_py;
+  PyObject *root_py;
+
+  if(!PyArg_ParseTuple(args, "OO", &hash_py,
+		       &root_py)) 
+    return NULL;
+
+  hash = PyCObject_AsVoidPtr(hash_py);
+  if(!hash) {
+    return NULL;
+  };
+
+  /** Try to parse the packet */
+  root = PyCObject_AsVoidPtr(root_py);
+  if(!root) return NULL;
+
+  if(!ISSUBCLASS(root,Packet)) {
+    return PyErr_Format(PyExc_RuntimeError, "You must pass a valid packet object to this function.");
+  };
+
+  /** Find the IP header */
+  ip=(IP)root;
+  if(!Find_Property((Packet *)&ip, NULL, "ip", "") || !ip) {
+    return PyErr_Format(PyExc_RuntimeError, "Unable to find IP headers when procssing packet %d", root->packet_id);
+  };
+
+  //  printf("Processing %u\n", root->packet_id);
+  ip->id = root->packet_id;
+
+  /** Process the packet */
+  hash->process(hash, ip);
+
+  /** Currently there is no way for us to know if the callback
+      generated an error (since the callback returns void). So here we
+      check the exception state of the interpreter explicitely 
+  */
+  if(PyErr_Occurred()) {
+    return NULL;
+  };
+  
+  Py_INCREF(Py_None);
+  return Py_None;  
 };
 
 PyObject *py_process_tcp(PyObject *self, PyObject *args) {
@@ -142,7 +206,7 @@ PyObject *py_process_tcp(PyObject *self, PyObject *args) {
   };
 
   /** Try to parse the packet */
-  root = CONSTRUCT(Root, Packet, super.Con, tmp);
+  root = CONSTRUCT(Root, Packet, super.Con, tmp, NULL);
   root->link_type = link_type;
 
   root->super.Read((Packet)root, tmp);
@@ -187,9 +251,13 @@ PyObject *py_clear_stream_buffers(PyObject *self, PyObject *args) {
   
   for(i=0; i<TCP_STREAM_TABLE_SIZE; i++) {
     list_for_each_entry_safe(j, k, &(hash->table[i]->list), list) {
+      /** Flush both forward and reverse connections together */
       j->flush(j);
-      // list_del(&(j->list));
-      //     talloc_free(j);
+      j->reverse->flush(j->reverse);
+      list_del(&(j->list));
+      list_del(&(j->reverse->list));
+      talloc_free(j);
+      talloc_free(j->reverse);
     };
   };
 
@@ -234,7 +302,11 @@ static PyMethodDef ReassemblerMethods[] = {
   {"init" , py_init, METH_VARARGS,
    "initialise the reassembler returning a handle to it"},
   {"process_tcp",  py_process_tcp, METH_VARARGS,
-   "Process a tcp packet"},
+   "Process a tcp packet.\
+    prototype: process_tcp(handle, data, packet_id, link_type);"},
+  {"process_packet", py_process_packet, METH_VARARGS,
+   "Process an already dissected packet.\
+    prototype: process_packet(handle, packet);"},
   {"clear_stream_buffers", py_clear_stream_buffers, METH_VARARGS,
    "Clears all the stream buffers."},
   {"set_tcp_callback", set_tcp_callback, METH_VARARGS,

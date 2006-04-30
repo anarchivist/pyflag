@@ -1,3 +1,4 @@
+import _dissect
 import reassembler
 import DB
 
@@ -6,9 +7,9 @@ hnd = reassembler.init()
 print hnd
 
 def Callback(stream):
-    print stream
+#    print stream
 #    raise IOError
-#    print "%s: %s" % (stream['con_id'], stream)
+    print "%s: %s" % (stream['con_id'], stream)
 
 reassembler.set_tcp_callback(hnd, Callback)
 

@@ -2,13 +2,18 @@
 #define __TCP_H
 #include "network.h"
 
+/** If we do not see anything from a stream within this many packets
+    we determine it to be dead. 
+*/
+#define MAX_PACKETS_EXPIRED 10000
+
 struct tuple4
 {
   uint16_t source;
   uint16_t dest;
   uint32_t saddr;
   uint32_t daddr;
-};
+} __attribute__((packed));
 
 
 /** These are lists of packets which can not be processed just
@@ -17,8 +22,9 @@ struct tuple4
     stream.
 */
 struct skbuff {
-     IP packet;
-     struct list_head list;
+  IP packet;
+  Root root;
+  struct list_head list;
 };
 
 enum tcp_state_t {
@@ -38,7 +44,8 @@ CLASS(TCPStream, Object)
      struct skbuff queue;
      struct list_head list;
      TCPStream reverse;
-     int id;
+     int con_id;
+     int max_packet_id;
 
      /** The next sequence number we expect */
      uint32_t next_seq;
@@ -69,6 +76,7 @@ CLASS(TCPHashTable, Object)
      */
      void (*callback)(TCPStream self, IP ip);
      void *data;
+     int packets_processed;
 
      TCPHashTable METHOD(TCPHashTable, Con);
 
@@ -78,7 +86,7 @@ CLASS(TCPHashTable, Object)
      TCPStream    METHOD(TCPHashTable, find_stream, IP ip);
 
      /** Process the ip packet */
-     int METHOD(TCPHashTable, process, IP ip);
+     int          METHOD(TCPHashTable, process, IP ip);
 END_CLASS
 
 /** Given a packet finds the corresponding stream - or if one does not

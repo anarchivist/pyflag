@@ -152,7 +152,8 @@ class NetworkScanner(BaseScanner):
             self.proto_tree = metadata['proto_tree'][self.packet_id]
         except KeyError,e:
             ## Now dissect it.
-            self.proto_tree = dissect.dissector(data,link_type)
+            self.proto_tree = dissect.dissector(data, link_type,
+                                  self.packet_id, self.packet_offset)
 
             ## Store it for the future
             metadata['proto_tree']={ self.packet_id: self.proto_tree }

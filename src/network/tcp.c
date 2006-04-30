@@ -11,7 +11,7 @@ TCPStream TCPStream_Con(TCPStream self, struct tuple4 *addr) {
 
   INIT_LIST_HEAD(&(self->list));
 
-  self->id = con_id;
+  self->con_id = con_id;
   con_id++;
 
   INIT_LIST_HEAD(&(self->queue.list));
@@ -30,6 +30,9 @@ void TCPStream_add(TCPStream self, IP ip) {
   /** Take over the packet */
   new->packet = ip;
   talloc_steal(new, ip);
+
+  /** Record the most recent id we handled */
+  self->max_packet_id = ip->id;
 
   /** Now we add the new packet in the queue at the right place. We
       traverse the list and find the last position where the sequence
@@ -106,7 +109,9 @@ void TCPStream_add(TCPStream self, IP ip) {
 
 /** Flush all the queues into the callback */
 void TCPStream_flush(TCPStream self) {
-  /** FIXME: For now ignore outstanding packets: */
+  /** FIXME: For now ignore outstanding packets: in future add nulls
+      in
+  */
   self->state = PYTCP_DESTROY;
   if(self->callback) self->callback(self, NULL);
 };
@@ -145,7 +150,7 @@ static u_int mkhash (const struct tuple4 *addr) {
   for (i = 0; i < 3; i++)
     res += data_i[i];
 
-  return res % TCP_STREAM_TABLE_SIZE;
+  return res % (TCP_STREAM_TABLE_SIZE);
 };
 
 TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
@@ -155,7 +160,8 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   TCPStream i,j;
 
   /** If we did not get a TCP packet, we fail */
-  if(!tcp || !ISINSTANCE(tcp,TCP)) {
+  //  if(!tcp || !ISINSTANCE(tcp,TCP)) {
+  if(!tcp || strcmp(NAMEOF(tcp),"TCP")) {
     return NULL;
   };
   
@@ -200,6 +206,30 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   return i;
 };
 
+/** We expire connections that we do not see packets from in
+    MAX_PACKETS_EXPIRED. We do a check every 10*MAX_PACKETS_EXPIRED
+    packets 
+*/
+static void check_for_expired_packets(TCPHashTable self, int id) {
+  TCPStream i,j;
+  int k;
+
+  for(k=0; k<TCP_STREAM_TABLE_SIZE; k++) {
+    list_for_each_entry_safe(i,j, &(self->table[k]->list),list) {
+      if(i->max_packet_id + MAX_PACKETS_EXPIRED < id) {
+	i->flush(i);
+	i->reverse->flush(i->reverse);
+
+	list_del(&(i->list));
+	list_del(&(i->reverse->list));
+	
+	talloc_free(i->reverse);
+	talloc_free(i);
+      };
+    };
+  };
+};
+
 int TCPHashTable_process_tcp(TCPHashTable self, IP ip) {
   TCPStream i = self->find_stream(self,ip);
   TCP tcp = (TCP)ip->packet.payload;
@@ -219,29 +249,19 @@ int TCPHashTable_process_tcp(TCPHashTable self, IP ip) {
     i->state = PYTCP_DATA;
   };
 
-  /** check the flags of the connection to see if its terminated */
+  /** check the flags of the connection to see if its terminated
   if(tcp->packet.header.fin || tcp->packet.header.rst) {
     i->state = PYTCP_CLOSE;
   };
+  */
 
   /** Add the new IP packet to the stream queue */
   i->add(i, ip);
 
-  /** If both the forward and reverse stream are closed, we destroy
-      the streams - We send both streams the PYTCP_DESTROY signal.
-  */
-  if(i->state == PYTCP_CLOSE && i->reverse->state == PYTCP_CLOSE) {
-    i->state = PYTCP_DESTROY;
-    if(i->callback) i->callback(i, NULL);
-
-    i->reverse->state = PYTCP_DESTROY;
-    if(i->reverse->callback) i->reverse->callback(i->reverse, NULL);
-
-    list_del(&(i->list));
-    list_del(&(i->reverse->list));
-
-    talloc_free(i->reverse);
-    talloc_free(i);
+  self->packets_processed++;
+  if(self->packets_processed > 10*MAX_PACKETS_EXPIRED) {
+    check_for_expired_packets(self,ip->id);
+    self->packets_processed=0;
   };
 
   return 1;

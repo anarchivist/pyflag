@@ -99,7 +99,17 @@ class StreamReassembler(NetworkScanFactory):
                 s['con_id'], s['src_ip'], s['src_port'],
                 s['dest_ip'],s['dest_port'], s['isn'], 
                 ))
+
+            self.dbh.mass_insert_start("connection")
             
+            for i in range(len(s['seq'])):
+                self.dbh.mass_insert(
+                    con_id = s['con_id'], packet_id = s['packets'][i],
+                    seq = s['seq'][i], length = s['length'][i],
+                    data_offset = s['data_offset'][i],
+                    )
+
+            self.dbh.mass_insert_commit()
             print s
 
         ## Register the callback
@@ -173,12 +183,11 @@ class StreamReassembler(NetworkScanFactory):
             """
             NetworkScanner.process(self,data,metadata)
 
-            packet_id = self.fd.tell()-1
-            
             ## Try to process the stream
             try:
-                reassembler.process_tcp(self.outer.hashtbl, data, packet_id, 1)
-            except RuntimeError:
+                reassembler.process_packet(self.outer.hashtbl, self.proto_tree.d)
+            except RuntimeError,e:
+                print "Error %s" % e
                 pass
 
         def finish(self):

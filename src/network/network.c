@@ -57,11 +57,11 @@ int Root_Read(Packet self, StringIO input) {
   
   switch(this->link_type) {
   case DLT_EN10MB:
-    this->packet.eth = (Packet)CONSTRUCT(ETH_II, Packet, super.Con, self);
+    this->packet.eth = (Packet)CONSTRUCT(ETH_II, Packet, super.Con, self, self);
     return CALL(this->packet.eth, Read, input);
 
   case DLT_LINUX_SLL:
-    this->packet.eth = (Packet)CONSTRUCT(Cooked, Packet, super.Con, self);
+    this->packet.eth = (Packet)CONSTRUCT(Cooked, Packet, super.Con, self, self);
     return CALL(this->packet.eth, Read, input);
 
   default:
@@ -88,7 +88,7 @@ int Cooked_Read(Packet self, StringIO input) {
 
   switch(this->packet.type) {
   case 0x800:
-    this->packet.payload = (Packet)CONSTRUCT(IP, Packet, super.Con, self);
+    this->packet.payload = (Packet)CONSTRUCT(IP, Packet, super.Con, self, self);
     len += CALL(this->packet.payload, Read, input);
     break;
 
@@ -130,7 +130,7 @@ int Eth2_Read(Packet self, StringIO input) {
   /** Now depending on the ethernet type we dispatch another parser */
   switch(this->packet.type) {
   case 0x800:
-    this->packet.payload = (Packet)CONSTRUCT(IP, Packet, super.Con, self);
+    this->packet.payload = (Packet)CONSTRUCT(IP, Packet, super.Con, self, self);
     len += CALL(this->packet.payload, Read, input);
     break;
 
@@ -181,11 +181,11 @@ int IP_Read(Packet self, StringIO input) {
   /** Now choose the dissector for the next layer */
   switch(this->packet.header.protocol) {
   case 0x6:
-    this->packet.payload = (Packet)CONSTRUCT(TCP, Packet, super.Con, self);
+    this->packet.payload = (Packet)CONSTRUCT(TCP, Packet, super.Con, self, self);
     break;
 
   case 0x11:
-    this->packet.payload = (Packet)CONSTRUCT(UDP, Packet, super.Con, self);
+    this->packet.payload = (Packet)CONSTRUCT(UDP, Packet, super.Con, self, self);
     break;
     
   default:
@@ -238,7 +238,7 @@ int TCP_Read(Packet self, StringIO input) {
       our current position in case the packet has options that we did
       not account for.
   */
-  this->packet.data_offset = self->start + this->packet.len ;
+  this->packet.data_offset = self->start + this->packet.len;
   CALL(input, seek, this->packet.data_offset, SEEK_SET);
 
   /** Now populate the data payload of the tcp packet 

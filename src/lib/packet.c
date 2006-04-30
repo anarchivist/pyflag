@@ -38,13 +38,14 @@
 /*************************************************** 
                Packet implementation
 ****************************************************/
-Packet Packet_Con(Packet self) {
+Packet Packet_Con(Packet self, Packet parent) {
 
   /** adjust struct_p to point at the new allocated memory, which must
       be in the class body of derived classes. This is achieved
       through the INIT_STRUCT macro: 
   */
   self->struct_p = (void *)((char *)self + (unsigned long)(self->struct_p));
+  self->parent = parent;
 
   return self;
 };

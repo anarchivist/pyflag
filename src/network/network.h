@@ -57,6 +57,10 @@ struct root_node_struct {
 CLASS(Root, Packet)
      struct root_node_struct packet;
      int link_type;
+     int packet_id;
+
+     // The offset in the pcap file where this packet may be found
+     int packet_offset;
 END_CLASS
 /***********************************************
     Linux Cooked capture (The Any device)
@@ -105,6 +109,9 @@ struct ip_struct {
   uint32_t _dest;  
 
   Packet payload;
+
+  /** The offset in the pcap file where this packet starts */
+  uint32_t packet_offset;
 };
 
 #define ip_Format q(STRUCT_CHAR, STRUCT_CHAR, STRUCT_SHORT, STRUCT_SHORT, \
