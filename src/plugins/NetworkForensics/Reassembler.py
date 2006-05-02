@@ -30,8 +30,7 @@ from pyflag.FileSystem import File
 import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
-import struct,re
-
+import struct,re,os
 import reassembler
 
 class StreamReassembler(NetworkScanFactory):
@@ -52,120 +51,6 @@ class StreamReassembler(NetworkScanFactory):
         default = True
         special_fs_name = 'PCAPFS'
 
-            
-    def prepare(self):
-        ## We create the tables we need: The connection_details table
-        ## stores information about each connection, while the
-        ## connection table store all the packets belonging to each
-        ## connection.
-        self.dbh.execute(
-            """CREATE TABLE if not exists `connection_details` (
-            `inode` varchar(250),
-            `con_id` int(11) unsigned NOT NULL,
-            `src_ip` int(11) unsigned NOT NULL default '0',
-            `src_port` int(11) unsigned NOT NULL default '0',
-            `dest_ip` int(11) unsigned NOT NULL default '0',
-            `dest_port` int(11) unsigned NOT NULL default '0',
-            `isn` int(100) unsigned NOT NULL default 0,
-            KEY `con_id` (`con_id`)
-            )""")
-        
-        ### data offset is the offset within the iosource where we can
-        ### find the data section of this packet.
-        self.dbh.execute(
-            """CREATE TABLE if not exists `connection` (
-            `con_id` int(11) unsigned NOT NULL default '0',
-            `packet_id` int(11) unsigned NOT NULL default '0',
-            `seq` int(11) unsigned NOT NULL default '0',
-            `length` mediumint(9) unsigned NOT NULL default '0',
-            `data_offset`  mediumint(9) unsigned NOT NULL default '0'
-            ) """)
-
-        self.dbh.check_index("connection", 'con_id')
-        
-        ## Ensure that the connection_details table has indexes. We
-        ## need the indexes because we are about to do lots of selects
-        ## on this table.
-        self.dbh.check_index("connection_details",'src_ip')
-        self.dbh.check_index("connection_details",'src_port')
-        self.dbh.check_index("connection_details",'dest_ip')
-        self.dbh.check_index("connection_details",'dest_port')
-
-        self.hashtbl = reassembler.init()
-
-        def  Callback(s):
-            ## Add the stream to the connection details table:
-            self.dbh.execute("insert into `connection_details` set con_id=%r, src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r ",(
-                s['con_id'], s['src_ip'], s['src_port'],
-                s['dest_ip'],s['dest_port'], s['isn'], 
-                ))
-
-            self.dbh.mass_insert_start("connection")
-            
-            for i in range(len(s['seq'])):
-                self.dbh.mass_insert(
-                    con_id = s['con_id'], packet_id = s['packets'][i],
-                    seq = s['seq'][i], length = s['length'][i],
-                    data_offset = s['data_offset'][i],
-                    )
-
-            self.dbh.mass_insert_commit()
-            print s
-
-        ## Register the callback
-        reassembler.set_tcp_callback(self.hashtbl, Callback)
-        
-    def reset(self):
-        self.dbh.execute("drop table `connection`")
-        self.dbh.execute("drop table `connection_details`")
-
-    def process_stream(self, stream, factories):
-        """ This will be called to store the stream information in the
-        database. It gets called whenever we detect that a stream is
-        finished.
-        """
-        self.dbh.execute("insert into `connection_details` set src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r ",(
-            stream.src_ip,stream.src_port,
-            stream.dest_ip,stream.dest_port,
-            stream.isn))
-
-        stream.con_id=self.dbh.autoincrement()
-
-        if stream.direction == "forward":
-            self.fsfd.VFSCreate(
-                "I%s" % stream.iosource.name,
-                "S%s" % (stream.con_id) ,
-                "%s-%s/%s:%s/%s" % (IP2str(stream.dest_ip),
-                                    IP2str(stream.src_ip),
-                                    stream.dest_port,
-                                    stream.src_port,
-                                    stream.direction),
-                mtime = stream.ts_sec
-                )
-        else:
-            self.fsfd.VFSCreate(
-                "I%s" % stream.iosource.name,
-                "S%s" % (stream.con_id) ,
-                "%s-%s/%s:%s/%s" % (IP2str(stream.src_ip),
-                                    IP2str(stream.dest_ip),
-                                    stream.src_port,
-                                    stream.dest_port,
-                                    stream.direction),
-                mtime = stream.ts_sec
-                )            
-            
-        ## Now store the packets:
-        self.dbh.mass_insert_start("connection")
-        
-        for packet_id, seq, length, data_offset in zip(stream.packets,
-                                                         stream.seq,
-                                                         stream.length,
-                                                         stream.data_offset):
-            self.dbh.mass_insert(con_id=stream.con_id,packet_id=packet_id,
-                                  seq=seq,length=length,data_offset=data_offset)
-
-        self.dbh.mass_insert_commit()
-
     class Scan(NetworkScanner):
         """ Each packet will cause a new instantiation of this class. """
         def process_stream(self, stream):
@@ -176,23 +61,6 @@ class StreamReassembler(NetworkScanFactory):
                 if isinstance(factory, NetworkScanFactory):
                     factory.process_stream(stream, self.factories)
                 
-        def process(self,data, metadata=None):
-            """ We get a complete packet in data.
-
-            We dissect it and add it to the connection table.
-            """
-            NetworkScanner.process(self,data,metadata)
-
-            ## Try to process the stream
-            try:
-                reassembler.process_packet(self.outer.hashtbl, self.proto_tree.d)
-            except RuntimeError,e:
-                print "Error %s" % e
-                pass
-
-        def finish(self):
-            reassembler.clear_stream_buffers(self.outer.hashtbl);
-        
 def combine_streams(query,result):
     """ Show both ends of the stream combined.
 
@@ -290,10 +158,10 @@ def show_packets(query,result):
         callbacks = { 'Data': show_data },
         case=query['case']
         )
-            
-class StreamFile(File):
-    """ A File like object to reassemble the stream from individual packets.
 
+class StremFile(File):
+    """ A File like object to reassemble the stream from individual packets.
+    
     Note that this is currently a very Naive reassembler. Stream Reassembling is generally considered a very difficult task. The approach we take is to make a very simple reassembly, and have a different scanner check the stream for potetial inconsistancies.
 
     The inode format is:
@@ -306,12 +174,11 @@ class StreamFile(File):
     stat_cbs = [ show_packets, combine_streams ]
     stat_names = [ "Show Packets", "Combined streams"]
     specifier = 'S'
-    
-    def __init__(self, case, fd, inode, dbh=None):
-        File.__init__(self, case, fd, inode, dbh)
 
+    def __init__(self, case, fd, inode, dbh=None):
+        File.__init__(self,case, fd, inode, dbh=None)
         if self.cached_fd: return
-        
+
         inode = inode.split("|")[-1]
 
         ## We allow the user to ask for a number of streams which will
@@ -325,44 +192,7 @@ class StreamFile(File):
 
         ## We use the inode column in the connection_details table to
         ## cache this so we only have to combine the streams once.
-        try:
-            self.con_id = int(inode[1:])
-        except ValueError: ## We have / in the inode name
-            self.dbh.execute("select con_id from `connection_details` where inode=%r",(inode))
-            row=self.dbh.fetch()
-            if row:
-                self.con_id=row['con_id']
-            else:
-                self.con_id=self.create_new_stream(inode[1:].split("/"))
-
-        ## Optimization: Try to find this from the stream cache
-        try:
-            stream = stream_cache[self.con_id]
-            self.isn = stream.isn
-            self.stream = stream
-        except KeyError:
-            ## Strategy: We determine the ISN of this stream at
-            ## startup. When requested to read a range we select all those
-            ## packets whose seq number fall within the range, we then
-            ## initialise the output buffer and copy the data from each of
-            ## the hits onto the buffer at the correct spot. This allows
-            ## us to have missing packets, as we will simply return 0 for
-            ## the byte sequences we are missing.
-
-#            self.dbh = DB.DBO(self.case)
-            self.dbh.execute("select isn from `connection_details` where con_id=%r",(self.con_id))
-            row=self.dbh.fetch()
-            if not row:
-                raise IOError("No stream with connection ID %s" % self.con_id)
-
-            self.isn = row['isn']
-
-        self.dbh.execute("select max(seq+length) as size from `connection` where con_id=%r",(self.con_id))
-        row=self.dbh.fetch()
-        self.size=row['size']-self.isn
-
-        ## This VFS driver is disk backed
-        self.cache()
+        self.create_new_stream(inode[1:].split("/"))
 
     def create_new_stream(self,stream_ids):
         """ Creates a new stream by combining the streams given by the list stream_ids.
@@ -370,43 +200,63 @@ class StreamFile(File):
         @return the new stream id.
         """
         ## Store the new stream in the cache:
-        self.dbh.execute("insert into `connection_details` set inode=%r",(self.inode))
+        self.dbh.execute("insert into `connection_details` set inode=%r",
+                         (self.inode))
         con_id = self.dbh.autoincrement()
         self.dbh2 = self.dbh.clone()
 
-        ## This caches the current sequence number of each stream -
-        ## this is needed in order to avoid including multiple copies
-        ## of each packet when retransmission etc occur.
-#        seq_numbers = dict(zip(stream_ids, [ 0 ] * len(stream_ids)))
+        fds = {}
+        for s in stream_ids:
+            fds[int(s)] = open(FlagFramework.get_temp_path(
+                self.dbh.case, "%s|S%s" % (self.fd.inode, s)))
+
+        out_fd = open(FlagFramework.get_temp_path(self.dbh.case,
+                                                  self.inode),"w")
         
-        sum=0
-        stream = Stream(0,0,0,0,0, self.fd)
-        self.dbh.execute("select packet_id, length, data_offset from `connection` where %s order by packet_id",(
+        self.dbh.execute("select con_id,packet_id, length, cache_offset from `connection` where %s order by packet_id",(
             " or ".join(["con_id=%r" % a for a in stream_ids])
             ))
 
         self.dbh2.mass_insert_start("connection")
         for row in self.dbh:
+            offset = out_fd.tell()
+            fd=fds[row['con_id']]
+            fd.seek(row['cache_offset']) 
+            out_fd.write(fd.read(row['length']))
             self.dbh2.mass_insert(con_id=con_id,packet_id=row['packet_id'],
-                                  seq=sum,length=row['length'],data_offset=row['data_offset'])
-            stream.add_packet(row['packet_id'], sum,row['length'] ,row['data_offset'])
-            sum+=row['length']
+                                  seq=sum,length=row['length'],
+                                  cache_offset=offset)
 
         self.dbh2.mass_insert_commit()
-        
-##        for row in self.dbh:
-###            if row['seq'] > seq_numbers[row['con_id']]:
-###                seq_numbers[row['con_id']] = row['seq']
-            
-##            self.dbh2.execute("insert into connection set con_id=%r,packet_id=%r,seq=%r,length=%r,data_offset=%r",(
-##                con_id,row['packet_id'],sum,
-##                row['length'],row['data_offset']
-##                ))
-##            stream.add_packet(row['packet_id'], sum,row['length'] ,row['data_offset'])
-##            sum+=row['length']
 
-        stream_cache[con_id] = stream
-        return con_id
+        out_fd.close()
+        self.cached_fd = open(FlagFramework.get_temp_path(
+            self.dbh.case, self.inode),"w")
+        
+class xStreamFile(File):
+    """ A File like object to reassemble the stream from individual packets.
+
+    Note that this is currently a very Naive reassembler. Stream Reassembling is generally considered a very difficult task. The approach we take is to make a very simple reassembly, and have a different scanner check the stream for potetial inconsistancies.
+
+    The inode format is:
+    Scon_id/con_id/con_id
+
+    con_ids are the connection IDs. If more than one con_id is
+    specified we merge all connections into the same stream based on
+    arrival time.
+
+    """
+    stat_cbs = [ show_packets, combine_streams ]
+    stat_names = [ "Show Packets", "Combined streams"]
+#    specifier = 'S'
+    
+    def __init__(self, case, fd, inode, dbh=None):
+        File.__init__(self, case, fd, inode, dbh)
+
+        if self.cached_fd: return
+        
+        inode = inode.split("|")[-1]
+
 
     def readpkt(self,pkt_id,data_offset,start,end,result,result_offset):
         """ This function gets the data from pkt_id and pastes it into

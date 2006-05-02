@@ -2,7 +2,7 @@ import pyflag.IO as IO
 import pyflag.Registry as Registry
 Registry.Init()
 
-case = "pcap_demo"
+case = "demo"
 
 ## This gives us a handle to the VFS
 fsfd = Registry.FILESYSTEMS.fs['DBFS'](case)

@@ -222,8 +222,7 @@ def process_line(line):
         print "ValueError: %s" %e
 #        print FlagFramework.get_bt_string(e)
     except Exception,e:
-        print "Unknown error: %r %s" % (e,e)
-#        print FlagFramework.get_bt_string(e)
+        raise
 
 def shell_execv_iter(*argv):
     """ A helper routine to execute a shell command.
@@ -297,8 +296,11 @@ if __name__ == "__main__":
             try:
                 input = raw_input("Flag Shell: %s>" % env.CWD)
                 process_line(input)
-            except (EOFError):
-                print "\nBibi Then - Have a nice day."
+            except (EOFError, SystemExit):
+                print "Bibi Then - Have a nice day."
                 sys.exit(0)
             except KeyboardInterrupt:
                 print "\nInterrupted"
+            except Exception,e:
+                print "Unknown error: %r %s" % (e,e)
+                print FlagFramework.get_bt_string(e)

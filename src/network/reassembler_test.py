@@ -2,7 +2,7 @@ import _dissect
 import reassembler
 import DB
 
-hnd = reassembler.init()
+hnd = reassembler.init("/var/tmp/results/")
 
 print hnd
 

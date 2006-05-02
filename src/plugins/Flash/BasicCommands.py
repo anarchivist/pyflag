@@ -275,8 +275,11 @@ class set(pyflagsh.command):
 
 class exit(pyflagsh.command):
     """ Exits the shell"""
+    def help(self):
+        return "exit: Exits the PyFlag shell"
+    
     def execute(self):
-        raise EOFError
+        sys.exit()
 
 class istat(pyflagsh.command):
     """ stats an inode in the filesystem """

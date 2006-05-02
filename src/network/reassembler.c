@@ -22,11 +22,28 @@ describing the stream.
 static PyObject *python_cb = NULL;
 static int con_id = 0;
 
-PyObject *New_Stream_Dict(TCPStream tcp_stream) {
-  PyObject *stream = PyDict_New();
-  
+/** The path prefix which will be used to create stream files */
+static char *prefix = NULL;
+
+/* The initial dictionary which will be passed to the callback */
+static PyObject *initial_dict=NULL;
+static char iosource[255];
+
+static PyObject *New_Stream_Dict(TCPStream tcp_stream, char *direction) {
+  PyObject *stream = PyDict_Copy(initial_dict);
+  DiskStreamIO file;
+
   if(!stream) return NULL;
-  
+
+  file = CONSTRUCT(DiskStreamIO, DiskStreamIO, Con, tcp_stream, 
+		   talloc_asprintf(tcp_stream, "%sS%u", 
+				   prefix, tcp_stream->con_id));
+
+  if(!file) 
+    return PyErr_Format(PyExc_RuntimeError, "Unable to create cache files in prefix %s",prefix);
+
+  tcp_stream->file = file;
+
   /** Store important information about the connection here: */
   if(PyDict_SetItemString(stream, "packets", PyList_New(0))<0)
     return NULL;
@@ -37,7 +54,10 @@ PyObject *New_Stream_Dict(TCPStream tcp_stream) {
     if(PyDict_SetItemString(stream, "length", PyList_New(0))<0)
       return NULL;
 
-    if(PyDict_SetItemString(stream, "data_offset", PyList_New(0))<0)
+    /** This is the offset in the stream cache file where the payload
+	is 
+    */
+    if(PyDict_SetItemString(stream, "offset", PyList_New(0))<0)
       return NULL;
 
     if(PyDict_SetItemString(stream, "isn", PyInt_FromLong(0))<0)
@@ -61,12 +81,19 @@ PyObject *New_Stream_Dict(TCPStream tcp_stream) {
     if(PyDict_SetItemString(stream, "reverse", PyInt_FromLong(tcp_stream->reverse->con_id))<0)
       return NULL;
 
+    if(PyDict_SetItemString(stream, "direction", PyString_FromString(direction))<0)
+      return NULL;
+
+    if(PyDict_SetItemString(stream, "iosource", PyString_FromString(iosource))<0)
+      return NULL;
+
     return stream;
 };
 
 /** This adds another packet to the stream object */
-int add_packet(PyObject *stream, IP ip) {
+static int add_packet(TCPStream self, IP ip) {
   TCP tcp = (TCP)ip->packet.payload;
+  PyObject *stream = (PyObject *)self->data;
 
   if(PyList_Append(PyDict_GetItem(stream,PyString_FromString("packets")),PyInt_FromLong(ip->id)))
     return 0;
@@ -77,23 +104,17 @@ int add_packet(PyObject *stream, IP ip) {
   if(PyList_Append(PyDict_GetItem(stream,PyString_FromString("length")),PyInt_FromLong(tcp->packet.data_len)))
     return 0;
  
-  {
-    Packet i;
-    Root r;
-
-    /** Find the root node: */
-    for(i=(Packet)ip; i->parent; i=i->parent);
-    r=(Root)i;
-
-    if(PyList_Append(PyDict_GetItem(stream,PyString_FromString("data_offset")),PyInt_FromLong(tcp->packet.data_offset + r->packet_offset)))
+  if(PyList_Append(PyDict_GetItem(stream,PyString_FromString("offset")),PyInt_FromLong(self->file->get_offset(self->file))))
     return 0;
-  };
  
+  /** Write the data into the cache file: */
+  self->file->super.write((StringIO)self->file, tcp->packet.data, tcp->packet.data_len);
+
   return 1;
 };
 
 /** A talloc destructor to automatically decref the python objects
-    upon free 
+    upon free
 */
 static void free_data(void *self) {
   TCPStream this=(TCPStream)self;
@@ -110,14 +131,17 @@ static void callback(TCPStream self, IP ip) {
 
   switch(self->state) {
   case PYTCP_JUST_EST:
-    self->data = New_Stream_Dict(self);
+    //The first stream in a pair is the forward stream.
+    if(self->reverse->data)
+      self->data = New_Stream_Dict(self, "reverse");
+    else
+      self->data = New_Stream_Dict(self, "forward");
+
     stream = (PyObject*)self->data;
     talloc_set_destructor(self, (int (*)(void*))free_data);
     break;
   case PYTCP_DATA:
-    add_packet(stream, ip);
-    /*    printf("Connection ID %u -> %u (%u) data %s\n", self->id, self->reverse->id, 
-	  ip->id, tcp->packet.data);*/
+    add_packet(self, ip);
     break;
   case PYTCP_DESTROY:
     if(stream) {
@@ -138,16 +162,21 @@ static void callback(TCPStream self, IP ip) {
   };
 };
 
-PyObject *py_process_packet(PyObject *self, PyObject *args) {
+static PyObject *py_process_packet(PyObject *self, PyObject *args) {
   Root root;
   IP ip;
   TCPHashTable hash;
   PyObject *hash_py;
   PyObject *root_py;
+  char *io=NULL;
 
-  if(!PyArg_ParseTuple(args, "OO", &hash_py,
-		       &root_py)) 
+  if(!PyArg_ParseTuple(args, "OO|s", &hash_py,
+		       &root_py, &io)) 
     return NULL;
+
+  if(io && strcmp(io,iosource)) {
+    strcpy(iosource,io);
+  };
 
   hash = PyCObject_AsVoidPtr(hash_py);
   if(!hash) {
@@ -186,7 +215,7 @@ PyObject *py_process_packet(PyObject *self, PyObject *args) {
   return Py_None;  
 };
 
-PyObject *py_process_tcp(PyObject *self, PyObject *args) {
+static PyObject *py_process_tcp(PyObject *self, PyObject *args) {
   int link_type;
   int packet_id;
   Root root;
@@ -237,7 +266,7 @@ PyObject *py_process_tcp(PyObject *self, PyObject *args) {
   return Py_None;
 };
 
-PyObject *py_clear_stream_buffers(PyObject *self, PyObject *args) {
+static PyObject *py_clear_stream_buffers(PyObject *self, PyObject *args) {
   TCPHashTable hash;
   PyObject *hash_py;
   TCPStream j,k;
@@ -265,14 +294,16 @@ PyObject *py_clear_stream_buffers(PyObject *self, PyObject *args) {
   return Py_None;
 };
 
-PyObject *set_tcp_callback(PyObject *self, PyObject *args) {
+static PyObject *set_tcp_callback(PyObject *self, PyObject *args) {
   PyObject *cb;
   PyObject *hash_py;
   TCPHashTable hash;
   
-  if(!PyArg_ParseTuple(args, "OO", &hash_py, &cb)) 
+  if(!PyArg_ParseTuple(args, "OO|O", &hash_py, &cb, &initial_dict)) 
     return NULL;
-  
+    
+  if(!initial_dict) initial_dict=PyDict_New();
+
   hash = PyCObject_AsVoidPtr(hash_py);
   if(!hash) return NULL;
 
@@ -290,10 +321,23 @@ PyObject *set_tcp_callback(PyObject *self, PyObject *args) {
   return Py_None;
 };
 
-PyObject *py_init(PyObject *self, PyObject *args) {
-  TCPHashTable hash = CONSTRUCT(TCPHashTable, TCPHashTable, Con, NULL);
+static PyObject *py_init(PyObject *self, PyObject *args) {
+  TCPHashTable hash;
+  PyObject *result;
+  char *new_prefix;
+
+  if(!PyArg_ParseTuple(args, "s", &new_prefix)) 
+    return NULL;
+
+  if(prefix) {
+    talloc_free(prefix);
+  };
+
+  prefix = talloc_strdup(NULL, new_prefix);
+
+  hash = CONSTRUCT(TCPHashTable, TCPHashTable, Con, NULL);
   hash->callback = callback;
-  PyObject *result =  PyCObject_FromVoidPtr(hash, (void (*)(void *))talloc_free);
+  result =  PyCObject_FromVoidPtr(hash, (void (*)(void *))talloc_free);
 
   return result;
 };

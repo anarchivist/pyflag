@@ -164,9 +164,10 @@ class DBO:
             try:
                 ## We only do this if the params are truely iteratable
                 params.__getattribute__('__iter__')
-            ## Hopefully this does not bear a huge performance overhead???
+
+                ## Hopefully this does not bear a huge performance overhead???
                 params = tuple([ DBExpander(i) for i in params])
-            except AttributeError:
+            except AttributeError,e:
                 params=(DBExpander(params),)
 
             string= query_str % params

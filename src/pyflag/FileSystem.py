@@ -191,6 +191,7 @@ class DBFS(FileSystem):
         Note that derived classes need to actually do the loading
         after they call the base class.
         """
+        self.mount_point = mount_point
         scanners = [ "%r" % s.__name__ for s in Registry.SCANNERS.classes ]
     
         self.dbh.execute("""CREATE TABLE IF NOT EXISTS inode (
@@ -282,9 +283,19 @@ class DBFS(FileSystem):
             size = properties['size']
         except KeyError:
             size = 1
+
+        try:
+            ctime = properties['ctime']
+        except KeyError:
+            ctime = 0
+
+        try:
+            mtime = properties['mtime']
+        except KeyError:
+            mtime = 0
             
-        self.dbh.execute("insert into inode  set status='alloc', mode=%r, links=%r , inode=%r,gid=0,uid=0,size=%r",(
-            40755, 4,inode, size))
+        self.dbh.execute("insert into inode  set status='alloc', mode=%r, links=%r , inode=%r,gid=0,uid=0,size=%r, mtime=%r, ctime=%r",(
+            40755, 4,inode, size, mtime, ctime))
 
     def longls(self,path='/', dirs = None):
         if self.isdir(path):

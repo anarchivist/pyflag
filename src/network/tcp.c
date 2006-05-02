@@ -3,6 +3,9 @@
     pyflag.
 *************************************************************/
 #include "tcp.h"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 static int con_id=0;
 
@@ -29,6 +32,7 @@ void TCPStream_add(TCPStream self, IP ip) {
 
   /** Take over the packet */
   new->packet = ip;
+  new->root = 
   talloc_steal(new, ip);
 
   /** Record the most recent id we handled */
@@ -273,3 +277,80 @@ VIRTUAL(TCPHashTable, Object)
      VMETHOD(process) = TCPHashTable_process_tcp;
 END_VIRTUAL
 
+/** An automatic destructor to be called to flush out the stream. */
+static int DiskStreamIO_flush(void *self) {
+  DiskStreamIO this=(DiskStreamIO)self;
+  int fd;
+
+  fd=open(this->filename, O_APPEND | O_WRONLY);
+  if(fd) {
+    write(fd, this->super.data, this->super.size);
+    close(fd);
+  };
+
+  return 0;
+};
+
+DiskStreamIO DiskStreamIO_Con(DiskStreamIO self, char *filename) {
+  int fd;
+
+  /** Check to see if we can create the required file: */
+  fd=creat(filename, 0777);
+  if(fd>=0) {
+    /** It worked: */
+    close(fd);
+
+    /** Call our base classes constructor */
+    self->__super__->Con((StringIO)self);
+
+    self->filename = talloc_strdup(self, filename);
+
+    /** Ensure that we get flushed out when we get destroyed */
+    talloc_set_destructor(self, DiskStreamIO_flush);
+
+    return self;
+  } else {
+    /** We failed: */
+
+    talloc_free(self);
+
+    return NULL;
+  };
+};
+
+int DiskStreamIO_write(StringIO self, char *data, int len) {
+  DiskStreamIO this=(DiskStreamIO)self;
+  int written;
+
+  /** Write the data to our base class */
+  written=this->__super__->write(self, data, len);
+
+  /** If we are too large, we flush to disk: */
+  if(self->size > MAX_DISK_STREAM_SIZE) {
+    int fd;
+
+    fd=open(this->filename, O_APPEND | O_WRONLY);
+    if(!fd) return -1;
+
+    write(fd, self->data, self->size);
+
+    this->written+=self->size;
+    close(fd);
+
+    self->truncate(self, 0);
+  };
+
+  return written; 
+};
+
+/** Returns the current offset in the file where the current file
+    pointer is. */
+int DiskStreamIO_get_offset(DiskStreamIO self) {
+  return self->super.size + self->written;
+};
+
+VIRTUAL(DiskStreamIO, StringIO)
+     VMETHOD(Con) = DiskStreamIO_Con;
+     VMETHOD(get_offset) = DiskStreamIO_get_offset;
+     VMETHOD(super.write) = DiskStreamIO_write;
+END_VIRTUAL
