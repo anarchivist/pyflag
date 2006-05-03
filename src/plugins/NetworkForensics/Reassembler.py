@@ -39,33 +39,40 @@ def combine_streams(query,result):
     In each screenfull we show a maximum of MAXSIZE characters per connection. We stop as soon as either direction reaches this many characters.
     """
     inode = query['inode']
-    dbh = DBO.DB(query['case'])
-    dbh.execute("select * from connection_details where inode=%r", inode)
+
+    ## Parse out the inode
     try:
         iosource = inode[:inode.index("|")]
         stream_inode = inode[inode.rindex("|"):]
         forward_cid = int(stream_inode[2:])
     except ValueError:
-        raise ValueError("Inode format is not correct. %s is not a valid inode." % inode)
+        raise ValueError("Inode format is not correct. %s is not a valid inode or it already represents a combined inode." % inode)
 
+    ## This gives us a handle to the VFS
+    fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'])
+    dbh = fsfd.dbh
+
+    ## Find out the reverse connection
+    dbh.execute("select reverse from connection_details where inode=%r", inode)
+    row = dbh.fetch()
+
+    ## Now open the combined stream:
+    fd = fsfd.open(inode="%s/%s" % (inode,row['reverse']))
+    
     try:
         limit = int(query['stream_limit'])
     except:
         limit = 0
     
-    reverse_cid  = find_reverse_stream(forward_cid, dbh)
-
-    ## This gives us a handle to the VFS
-    fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'])
-
     number_of_rows = 0
-    dbh.execute("select con_id, concat(\"%s|p0|O\",cast(packet_id as char),\"|o\",cast(data_offset as char),\":\",cast(`connection`.length as char)) as inode from `connection` join pcap on packet_id=pcap.id where con_id=%r or con_id=%r order by packet_id limit %s,%s",(iosource,forward_cid,reverse_cid, limit, config.PAGESIZE))
+    dbh.execute("select * from `connection` where con_id = %r order by cache_offset limit %s, %s", (fd.con_id, limit, config.PAGESIZE))
+
     for row in dbh:
         number_of_rows += 1
-        fd = fsfd.open(inode = row['inode'])
+        fd.seek(row['cache_offset'])
         ## Get the data:
-        data=fd.read()
-        if row['con_id']==forward_cid:
+        data=fd.read(row['length'])
+        if row['original_id']==forward_cid:
             result.text(data,color="blue",font='typewriter',sanitise='full',wrap='full')
         else:
             result.text(data,color="red",font='typewriter',sanitise='full',wrap='full')    
@@ -212,7 +219,10 @@ class StreamFile(File):
             out_fd.write(fd.read(row['length']))
             self.dbh2.mass_insert(con_id=self.con_id,packet_id=row['packet_id'],
                                   seq=sum,length=row['length'],
-                                  cache_offset=offset)
+                                  cache_offset=offset,
+                                  # This is the original id this
+                                  # packet came from
+                                  original_id = row['con_id'])
             sum += row['length']
 
         self.dbh2.mass_insert_commit()

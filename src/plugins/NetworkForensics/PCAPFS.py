@@ -131,6 +131,7 @@ class PCAPFS(DBFS):
         self.dbh.execute(
             """CREATE TABLE if not exists `connection` (
             `con_id` int(11) unsigned NOT NULL default '0',
+            `original_id` int(11) unsigned NOT NULL default '0',
             `packet_id` int(11) unsigned NOT NULL default '0',
             `seq` int(11) unsigned NOT NULL default '0',
             `length` mediumint(9) unsigned NOT NULL default '0',

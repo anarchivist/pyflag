@@ -1675,24 +1675,29 @@ class HTMLUI(UI.GenericUI):
             cbfunc=callbacks[0]
             context_str=names[0]
 
-        out='\n<table border=0 cellspacing=0 cellpadding=0 width="100%"><tr><td colspan=50><img height=20 width=1 alt=""></td></tr><tr>'
+#        out='\n<table border=0 cellspacing=0 cellpadding=0 width="100%"><tr><td colspan=50><img height=20 width=1 alt=""></td></tr><tr>'
+        out='\n<div id="notebook"><ul id="topmenu">'
         
         for i in names:
             q=query.clone()
             tmplink=self.__class__()
             del q[context]
             q[context]=i
-            tmplink.link(i,q)
+            tmplink.link(i,q, options={'class':"tab"})
 
             if(i==context_str):
-                out+="<td width=15>&nbsp;</td><td bgcolor=#3366cc align=center nowrap><font color=#ffffff size=-1><b>%s</b></font></td>" % i
+##                out+="<td width=15>&nbsp;</td><td bgcolor=#3366cc align=center nowrap><font color=#ffffff size=-1><b>%s</b></font></td>" % i
+                out+="<li><a class='tabactive'>%s</a></li>\n" % i
             else:
-                out+='<td width=15>&nbsp;</td><td id=1 bgcolor=#efefef align=center nowrap><font size=-1>%s</font></td>' % (tmplink)
+##                out+='<td width=15>&nbsp;</td><td id=1 bgcolor=#efefef align=center nowrap><font size=-1>%s</font></td>' % (tmplink)
+                out+="<li>%s</li>\n" % tmplink
 
-        out+="<td colspan=50>&nbsp;</td></tr><tr><td colspan=50 bgcolor=#3366cc><img width=1 height=1 alt=""></td></tr>"
+        out+="</ul>"
+##        out+="<td colspan=50>&nbsp;</td></tr><tr><td colspan=50 bgcolor=#3366cc><img width=1 height=1 alt=""></td></tr>"
         
         #Now draw the results of the callback:
         result=self.__class__(self)
         cbfunc(query,result)
-        out+="<tr><td colspan=50><table border=1 width=\"100%%\"><tr><td>%s</td></tr></table></td></tr></table>" % result
+##        out+="<tr><td colspan=50><table border=1 width=\"100%%\"><tr><td>%s</td></tr></table></td></tr></table>" % result
+        out+="</div><div class='clearfloat'></div><div class='content'>%s</div>\n" % result
         self.result+=out

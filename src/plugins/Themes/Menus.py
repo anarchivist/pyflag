@@ -35,6 +35,7 @@ class Menu(Theme.BasicTheme):
         <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
         <title>%s</title>
+        <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
         <script src="images/functions.js" type="text/javascript" language="javascript"></script>
         <style>
         all.clsMenuItemNS, .clsMenuItemIE{text-decoration: none; font: bold 12px Arial; color: white; cursor: hand; z-index:100}

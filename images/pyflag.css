@@ -1,0 +1,122 @@
+a.tab:hover,
+a.tabcaution:hover,
+.tabactive,
+.tabactive:hover {
+    margin:             0;
+    padding:            0.2em 0.4em 0.2em 0.4em;
+    text-decoration:    none;
+}
+
+a.tab:hover,
+.tabactive {
+    background-color:   #D5D5D5;
+}
+
+#notebook li {
+    margin-bottom: 0.3em;
+}
+
+/* topmenu */
+ul#topmenu {
+    font-weight:        bold;
+    list-style-type:    none;
+    margin:             0;
+    padding:            0;
+  width:100%;
+}
+
+ul#topmenu li {
+    float:              left;
+    margin:             0;
+    padding:            1;
+    vertical-align:     middle;
+}
+
+#topmenu img {
+    vertical-align:     middle;
+    margin-right:       0.1em;
+}
+
+/* default tab styles */
+.tab, .tabcaution, .tabactive {
+    display:            block;
+    margin:             0.2em 0.2em 0 0.2em;
+    padding:            0.2em 0.2em 0 0.2em;
+    white-space:        nowrap;
+}
+
+/* default tab styles */
+.tab, .tabcaution, .tabactive {
+    display:            block;
+    margin:             0.2em 0.2em 0 0.2em;
+    padding:            0.2em 0.2em 0 0.2em;
+    white-space:        nowrap;
+}
+
+/* disabled tabs */
+span.tab {
+    color:              #666666;
+}
+
+/* disabled drop/empty tabs */
+span.tabcaution {
+    color:              #ff6666;
+}
+
+/* enabled drop/empty tabs */
+a.tabcaution {
+    color:              #FF0000;
+}
+a.tabcaution:hover {
+    color: #FFFFFF;
+    background-color:   #FF0000;
+}
+
+#topmenu {
+    margin-top:         0.5em;
+    padding:            0.1em 0.3em 0.1em 0.3em;
+}
+
+ul#topmenu li {
+    border-bottom:      1pt solid black;
+}
+
+/* default tab styles */
+.tab, .tabcaution, .tabactive {
+    background-color:   #E5E5E5;
+    border:             1pt solid #D5D5D5;
+    border-bottom:      0;
+    border-radius-topleft: 0.4em;
+    border-radius-topright: 0.4em;
+    -moz-border-radius-topleft: 0.4em;
+    -moz-border-radius-topright: 0.4em;
+}
+
+/* enabled hover/active tabs */
+a.tab:hover,
+a.tabcaution:hover,
+.tabactive,
+.tabactive:hover {
+    margin:             0;
+    padding:            0.2em 0.4em 0.2em 0.4em;
+    text-decoration:    none;
+}
+
+a.tab:hover,
+.tabactive {
+    background-color:   #D5D5D5;
+}
+
+/* disabled drop/empty tabs */
+span.tab,
+span.tabcaution {
+    cursor:             url(../themes/original/img/error.ico), default;
+}
+
+div.content { 
+  width: 100%;
+}
+.clearfloat { 
+  clear: both;
+}
+/* end topmenu */
