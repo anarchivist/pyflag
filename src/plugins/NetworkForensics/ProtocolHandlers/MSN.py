@@ -296,10 +296,9 @@ class ContextParser(HTMLParser):
     def handle_starttag(self, tag, attrs):
         self.context_meta_data = FlagFramework.query_type(attrs)
 
-class MSNScanner(NetworkScanFactory):
+class MSNScanner(StreamScannerFactory):
     """ Collect information about MSN Instant messanger traffic """
     default = True
-    depends = [ 'StreamReassembler']
 
     def prepare(self):
         self.dbh.execute(
@@ -334,7 +333,7 @@ class MSNScanner(NetworkScanFactory):
         if stream.src_port in ports or stream.dest_port in ports:
             logging.log(logging.DEBUG,"Openning S%s for MSN" % stream.con_id)
 
-            fd = self.fsfd.open(inode="I%s|S%s" % (stream.iosource.name, stream.con_id))
+            fd = self.fsfd.open(inode="I%s|S%s" % (stream.fd.name, stream.con_id))
             m=message(self.dbh,fd,self.fsfd)
             while 1:
                 try:

@@ -122,19 +122,18 @@ class SMTP:
             except KeyError:
                 logging.log(logging.DEBUG,"SMTP Command %r not implemented." % command[0])
         
-class SMTPScanner(NetworkScanFactory):
+class SMTPScanner(StreamScannerFactory):
     """ Collect information about SMTP transactions.
 
     This is an example of a scanner which uses packet dissection, as well as the result of the Stream reassembler.
     """
     default = True
-    depends = ['StreamReassembler']
 
     def process_stream(self, stream, factories):
         forward_stream, reverse_stream = self.stream_to_server(stream, "SMTP")
         if not reverse_stream or not forward_stream: return
 
-        combined_inode = "I%s|S%s/%s" % (stream.iosource.name, forward_stream, reverse_stream)
+        combined_inode = "I%s|S%s/%s" % (stream.fd.name, forward_stream, reverse_stream)
         logging.log(logging.DEBUG,"Openning %s for SMTP" % combined_inode)
 
         ## We open the file and scan it for emails:
@@ -146,7 +145,7 @@ class SMTPScanner(NetworkScanFactory):
             if not f: continue
             
             ## Create the VFS node:
-            path=self.fsfd.lookup(inode="I%s|S%s" % (stream.iosource.name, forward_stream))
+            path=self.fsfd.lookup(inode="I%s|S%s" % (stream.fd.name, forward_stream))
             path=os.path.dirname(path)
             new_inode="%s|o%s" % (combined_inode,f[1])
             self.fsfd.VFSCreate(None, new_inode,

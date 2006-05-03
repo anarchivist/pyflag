@@ -152,11 +152,10 @@ class HTTP:
                 end = self.fd.tell()
                 yield "%s:%s" % (offset, end-offset)
 
-class HTTPScanner(NetworkScanFactory):
+class HTTPScanner(StreamScannerFactory):
     """ Collect information about HTTP Transactions.
     """
     default = True
-    depends = ['StreamReassembler']
     
     def prepare(self):
         self.http_inodes = {}
@@ -187,7 +186,7 @@ class HTTPScanner(NetworkScanFactory):
         forward_stream, reverse_stream = self.stream_to_server(stream, "HTTP")
         if not reverse_stream or not forward_stream: return
 
-        combined_inode = "I%s|S%s/%s" % (stream.iosource.name, forward_stream, reverse_stream)
+        combined_inode = "I%s|S%s/%s" % (stream.fd.name, forward_stream, reverse_stream)
         logging.log(logging.DEBUG,"Openning %s for HTTP" % combined_inode)
 
         fd = self.fsfd.open(inode=combined_inode)
@@ -197,7 +196,7 @@ class HTTPScanner(NetworkScanFactory):
             if not f: continue
 
             ## Create the VFS node:
-            path=self.fsfd.lookup(inode="I%s|S%s" % (stream.iosource.name, forward_stream))
+            path=self.fsfd.lookup(inode="I%s|S%s" % (stream.fd.name, forward_stream))
             path=os.path.dirname(path)
             new_inode="%s|o%s" % (combined_inode,f)
 

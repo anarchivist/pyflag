@@ -399,10 +399,9 @@ class IRC:
                 logging.log(logging.WARNINGS, "unable to parse line %s (%s)" % (line,e))
                 
 
-class IRCScanner(NetworkScanFactory):
+class IRCScanner(StreamScannerFactory):
     """ Collect information about IRC traffic """
     default = True
-    depends = ['StreamReassembler']
     
     def prepare(self):
         self.dbh.execute(
@@ -444,7 +443,7 @@ class IRCScanner(NetworkScanFactory):
         forward_stream, reverse_stream = self.stream_to_server(stream, "IRC")
         if not reverse_stream or not forward_stream: return
 
-        combined_inode = "I%s|S%s/%s" % (stream.iosource.name, forward_stream, reverse_stream)
+        combined_inode = "I%s|S%s/%s" % (stream.fd.name, forward_stream, reverse_stream)
         logging.log(logging.DEBUG,"Openning %s for IRC" % combined_inode)
 
         ## We open the file and scan it for IRC:

@@ -33,41 +33,14 @@ from NetworkScanner import *
 import struct,re,os
 import reassembler
 
-class StreamReassembler(NetworkScanFactory):
-    """ This scanner reassembles the packets into the streams.
-
-    We internally use two tables. The first is connection_details,
-    which contains ip and port tuples identifying the connection. The
-    connection table contains a list of packets comprising each
-    connection and some shortcuts to access their data.
-    """
-    default = True
-    order=5
-
-    class Drawer(Scanner.Drawer):
-        description = "Network Scanners"
-        name = "NetworkScanners"
-        contains = [ "IRCScanner", "MSNScanner", "HTTPScanner", "POPScanner","SMTPScanner","RFC2822" ]
-        default = True
-        special_fs_name = 'PCAPFS'
-
-    class Scan(NetworkScanner):
-        """ Each packet will cause a new instantiation of this class. """
-        def process_stream(self, stream):
-            """ Calls all of the factory classes with the stream
-            object to allow them to process the completed stream.
-            """
-            for factory in self.factories:
-                if isinstance(factory, NetworkScanFactory):
-                    factory.process_stream(stream, self.factories)
-                
 def combine_streams(query,result):
     """ Show both ends of the stream combined.
 
     In each screenfull we show a maximum of MAXSIZE characters per connection. We stop as soon as either direction reaches this many characters.
     """
     inode = query['inode']
-    dbh = result.dbh
+    dbh = DBO.DB(query['case'])
+    dbh.execute("select * from connection_details where inode=%r", inode)
     try:
         iosource = inode[:inode.index("|")]
         stream_inode = inode[inode.rindex("|"):]
@@ -159,7 +132,7 @@ def show_packets(query,result):
         case=query['case']
         )
 
-class StremFile(File):
+class StreamFile(File):
     """ A File like object to reassemble the stream from individual packets.
     
     Note that this is currently a very Naive reassembler. Stream Reassembling is generally considered a very difficult task. The approach we take is to make a very simple reassembly, and have a different scanner check the stream for potetial inconsistancies.
@@ -177,7 +150,20 @@ class StremFile(File):
 
     def __init__(self, case, fd, inode, dbh=None):
         File.__init__(self,case, fd, inode, dbh=None)
-        if self.cached_fd: return
+
+        ## Fill in some vital stats
+        self.dbh.execute("select con_id, reverse, src_port, dest_port, ts_sec from `connection_details` where inode=%r", inode)
+        row=self.dbh.fetch()
+        if row:
+            self.con_id = row['con_id']
+            self.src_port = row['src_port']
+            self.dest_port = row['dest_port']
+            self.reverse = row['reverse']
+            self.ts_sec = row['ts_sec']
+
+        ## Are we already cached?
+        if self.cached_fd:
+            return
 
         inode = inode.split("|")[-1]
 
@@ -202,7 +188,7 @@ class StremFile(File):
         ## Store the new stream in the cache:
         self.dbh.execute("insert into `connection_details` set inode=%r",
                          (self.inode))
-        con_id = self.dbh.autoincrement()
+        self.con_id = self.dbh.autoincrement()
         self.dbh2 = self.dbh.clone()
 
         fds = {}
@@ -218,21 +204,35 @@ class StremFile(File):
             ))
 
         self.dbh2.mass_insert_start("connection")
+        sum = 0
         for row in self.dbh:
             offset = out_fd.tell()
             fd=fds[row['con_id']]
             fd.seek(row['cache_offset']) 
             out_fd.write(fd.read(row['length']))
-            self.dbh2.mass_insert(con_id=con_id,packet_id=row['packet_id'],
+            self.dbh2.mass_insert(con_id=self.con_id,packet_id=row['packet_id'],
                                   seq=sum,length=row['length'],
                                   cache_offset=offset)
+            sum += row['length']
 
         self.dbh2.mass_insert_commit()
 
         out_fd.close()
         self.cached_fd = open(FlagFramework.get_temp_path(
-            self.dbh.case, self.inode),"w")
-        
+            self.dbh.case, self.inode),"r")
+
+    def get_packet_id(self, position=None):
+        """ Gets the current packet id (where the readptr is currently at) """
+        if not position:
+            position = self.tell()
+            
+        self.dbh.execute("""select packet_id from `connection` where
+        con_id = %r and cache_offset <= %r order by cache_offset
+        desc, length desc limit 1""",
+                         (self.con_id, position))
+        row=self.dbh.fetch()
+        return row['packet_id']
+
 class xStreamFile(File):
     """ A File like object to reassemble the stream from individual packets.
 
@@ -352,24 +352,6 @@ class xStreamFile(File):
         result.close()
         self.readptr+=len(data)
         return data
-
-    def get_packet_id(self, position=None):
-        """ Gets the current packet id (where the readptr is currently at) """
-        if not position:
-            position = self.tell()
-            
-        self.dbh.execute("select con_id,isn from `connection_details` where inode=%r",(self.inode))
-        row=self.dbh.fetch()
-        if not row:
-            self.dbh.execute("select con_id,isn from `connection_details` where con_id=%r",(self.con_id))
-            row=self.dbh.fetch()
-            
-        con_id,isn = row['con_id'],row['isn']
-        self.dbh.execute("""select packet_id from `connection` where
-                         con_id = %r and seq <= (%r+%r) order by seq desc, length desc limit 1""",
-                         (con_id, isn, position))
-        row=self.dbh.fetch()
-        return row['packet_id']
 
 class OffsetFile(File):
     """ A simple offset:length file driver.

@@ -58,7 +58,6 @@ AC_OUTPUT([
 	src/indextools/Makefile
 	src/indextools_ng/Makefile
 	src/network/Makefile
-	src/network/libnids/Makefile
 	src/regtools/Makefile
 	src/virustools/Makefile
 	src/filesystems/Makefile

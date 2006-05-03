@@ -7,7 +7,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-static int con_id=0;
+static int con_id=1;
 
 TCPStream TCPStream_Con(TCPStream self, struct tuple4 *addr) {
   memcpy(&self->addr, addr, sizeof(*addr));

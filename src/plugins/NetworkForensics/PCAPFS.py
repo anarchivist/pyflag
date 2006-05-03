@@ -115,12 +115,14 @@ class PCAPFS(DBFS):
         self.dbh.execute(
             """CREATE TABLE if not exists `connection_details` (
             `inode` varchar(250),
-            `con_id` int(11) unsigned NOT NULL,
+            `con_id` int(11) unsigned NOT NULL auto_increment,
+            `reverse` int(11) unsigned NOT NULL default '0',
             `src_ip` int(11) unsigned NOT NULL default '0',
             `src_port` int(11) unsigned NOT NULL default '0',
             `dest_ip` int(11) unsigned NOT NULL default '0',
             `dest_port` int(11) unsigned NOT NULL default '0',
             `isn` int(100) unsigned NOT NULL default 0,
+            `ts_sec` int(100) unsigned NOT NULL default 0,
             KEY `con_id` (`con_id`)
             )""")
         
@@ -149,13 +151,6 @@ class PCAPFS(DBFS):
         hashtbl = reassembler.init(FlagFramework.get_temp_path(self.dbh.case,'I%s|' % iosource_name))
 
         def Callback(s):
-            ## Add the stream to the connection details table:
-            self.dbh.execute("insert into `connection_details` set con_id=%r, src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r ",(
-                s['con_id'], s['src_ip'], s['src_port'],
-                s['dest_ip'],s['dest_port'], s['isn'], 
-                ))
-
-            ## Create a new VFS node:
             ## Find the mtime of the first packet in the stream:
             try:
                 self.dbh.execute("select ts_sec from pcap where id=%r",
@@ -165,6 +160,15 @@ class PCAPFS(DBFS):
             except IndexError,e:
                 mtime = 0
 
+            ## Add the stream to the connection details table:
+            self.dbh.execute("insert into `connection_details` set con_id=%r, src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r, inode='I%s|S%s', reverse=%r, ts_sec=%r ",(
+                s['con_id'], s['src_ip'], s['src_port'],
+                s['dest_ip'],s['dest_port'], s['isn'],
+                iosource_name, s['con_id'], s['reverse'],
+                mtime
+                ))
+
+            ## Create a new VFS node:
             if s['direction'] == "forward":
                 self.VFSCreate(
                     None,

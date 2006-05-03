@@ -43,85 +43,12 @@ def IP2str(ip):
     tmp = list(struct.unpack('=BBBB',struct.pack('=L',ip)))
     tmp.reverse()
     return ".".join(["%s" % i for i in tmp])
-
-## FIXME: This is currently not implemented...
-class Storage:
-    """ This class enables Network scanners to store persistant information between packets.
-
-    We need to ensure that this persistant information does not consume too much memory. Every time a new piece of information is stored, we store the current packet number where it came from. Periodically we go through and expire those items which are too old.
-    """
-    data = {}
-    ages = {}
-    time_to_check = 100
-    _time_to_check = 100
-    max_age = 0
-    too_old = 100
-    
-    def store(self,age,key,value):
-        self.data[key]=value
-        self.ages[key]=age
-        if age>self.max_age:
-            self.max_age=age
-
-        self.check_me()
-
-    def __getitem__(self,item):
-        self.check_me()
-        return self.data[item]
-
-    def check_me(self):
-        if self._time_to_check<=0:
-            self._time_to_check=self.time_to_check
-            for k in data.keys():
-                if self.ages[k]+self.too_old<self.max_age:
-                    del self.data[k]
-                    del self.ages[k]
-                    
-        self._time_to_check-=1
-
-class NetworkScanFactory(GenScanFactory):
-    """ All network scanner factories come from here.
-
-    This is used for scanners which need to invoke factories on VFS
-    nodes. The VFS nodes are not network packets, so we only invoke
-    those scanners which do not derive from this class. This class is
-    therefore used to tag those scanners which only make sense to
-    run on network traffic.
-    """
-    def stream_to_server(self, stream, protocol):
-        if stream.dest_port in dissect.fix_ports(protocol):
-            forward_stream = stream.con_id
-            reverse_stream = find_reverse_stream(
-                forward_stream,  self.dbh)
-            
-        elif stream.src_port in dissect.fix_ports(protocol):
-            reverse_stream = stream.con_id
-            forward_stream = find_reverse_stream(
-                reverse_stream,  self.dbh)
-        else:
-            return None, None
-
-        return forward_stream, reverse_stream
-
-    def process_stream(self, stream, factories):
-        pass
-    
-    def scan_as_file(self, inode, factories):
-        """ Scans inode as a file (i.e. without any network scanners). """
-        fd = self.fsfd.open(inode=inode)
-        factories = [ x for x in factories if not isinstance(x,NetworkScanFactory) ]
-
-        Scanner.scanfile(self.fsfd,fd,factories)
-        fd.close()
-
                 
 class NetworkScanner(BaseScanner):
-    """ This is the base class for all network scanners.
-    """
-    ## Note that Storage is the same object across all NetworkScanners:
-    store = Storage()
-    proto_tree = dissect.empty_dissector()
+    """ This is the base class for network scanners.
 
+    Note that network scanners operate on discrete packets, where stream scanners operate on whole streams (and derive from StreamScannerFactory).
+    """
     def finish(self):
         """ Only allow scanners to operate on pcapfs inodes """
         try:
@@ -137,7 +64,6 @@ class NetworkScanner(BaseScanner):
             ## pcapfs.
             link_type = self.fd.link_type
         except:
-#            print "Not processing non network fs"
             return
         
         ## We try to get previously set proto_tree. We store it in
@@ -158,21 +84,51 @@ class NetworkScanner(BaseScanner):
             ## Store it for the future
             metadata['proto_tree']={ self.packet_id: self.proto_tree }
 
-def find_reverse_stream(forward_stream,dbh):
-    """ Given a connection ID, finds the reverse connection.
+class StreamScannerFactory(GenScanFactory):
+    """ This is a scanner factory allows scanners to only operate on streams.
 
-    return None if there is not reverse stream
     """
-    dbh.execute("select dest_ip,dest_port,src_ip,src_port from connection_details where con_id=%r",
-                (forward_stream))
-    
-    row=dbh.fetch()
-    
-    dbh.execute("select con_id from connection_details where src_ip=%r and src_port=%r and dest_ip=%r and dest_port=%r",(
-        row['dest_ip'],row['dest_port'],row['src_ip'],row['src_port']))
-    row=dbh.fetch()
+    class Drawer(Scanner.Drawer):
+        description = "Network Scanners"
+        name = "NetworkScanners"
+        contains = [ "IRCScanner", "MSNScanner", "HTTPScanner", "POPScanner","SMTPScanner","RFC2822" ]
+        default = True
+        special_fs_name = 'PCAPFS'
 
-    try:
-        return row['con_id']
-    except:
-        return None
+
+    def stream_to_server(self, stream, protocol):
+        if stream.dest_port in dissect.fix_ports(protocol):
+            forward_stream = stream.con_id
+            reverse_stream = stream.reverse
+            
+        elif stream.src_port in dissect.fix_ports(protocol):
+            reverse_stream = stream.con_id
+            forward_stream = stream.reverse
+        else:
+            return None, None
+
+        return forward_stream, reverse_stream
+
+    def process_stream(self, stream, factories):
+        """ Stream scanners need to over ride this to process each stream """
+        pass
+    
+    def scan_as_file(self, inode, factories):
+        """ Scans inode as a file (i.e. without any Stream scanners). """
+        fd = self.fsfd.open(inode=inode)
+        factories = [ x for x in factories if not isinstance(x, StreamScannerFactory) ]
+
+        Scanner.scanfile(self.fsfd,fd,factories)
+        fd.close()
+
+    class Scan(BaseScanner):
+        def process(self, data, metadata=None):
+            try:
+                ## This identifies our fd as a stream
+                self.fd.con_id
+            except AttributeError:
+                return
+
+            ## Call the base classes process_stream method with the
+            ## given stream.
+            self.outer.process_stream(self.fd, self.factories)

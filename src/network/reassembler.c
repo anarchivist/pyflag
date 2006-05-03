@@ -20,7 +20,6 @@ describing the stream.
 #include "tcp.h"
 
 static PyObject *python_cb = NULL;
-static int con_id = 0;
 
 /** The path prefix which will be used to create stream files */
 static char *prefix = NULL;
