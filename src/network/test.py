@@ -13,8 +13,8 @@ row = dbh.fetch()
 fd.seek(row['offset'])
 data = fd.read(row['length'])   
 
-root=dissect.dissector(data, row['link_type'])
-print "%r" % root["tcp.header.seq"]
+root=dissect.dissector(data, row['link_type'],1)
+print "%r" % root["tcp.seq"]
 
 ## Now we try to print the tree recursively
 def print_leaf(name,node):
@@ -22,6 +22,7 @@ def print_leaf(name,node):
         fields = _dissect.list_fields(node)
         print "Node %s" % name
         for field in fields:
+            print field
             print_leaf("%s.%s" % (_dissect.get_name(node),field),
                        _dissect.get_field(node, field))
         

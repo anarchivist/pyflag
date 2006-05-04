@@ -178,36 +178,36 @@ END_CLASS
   ((Packet)this)->format = struct_format;				\
   INIT_LIST_HEAD(&((Packet)this)->properties.list);
 
-#define __NAME_ACCESS_start(struct_member_name, member, type)	\
+#define __NAME_ACCESS_start(struct_member_name, member, ref_name, type)	\
   do {									\
     struct struct_property_t *p=talloc(NULL, struct struct_property_t);	\
-    p->name=#member;							\
+    p->name=#ref_name;							\
     p->field_type = type;						\
     p->item = (int)(&((typeof(this->struct_member_name) *)0)->member);	\
     p->size = sizeof(this->struct_member_name.member);			
 
-#define __NAME_ACCESS_end(struct_member_name, member, type)		\
+#define __NAME_ACCESS_end(struct_member_name, member, name, type)	\
   list_add_tail(&(p->list), &((Packet)this)->properties.list);		\
   } while(0)
 
 /** This macro enables access to a struct member by name - size is
     filled automatically from the size of the member
 */
-#define NAME_ACCESS(struct_member_name, member, type)	\
-  __NAME_ACCESS_start(struct_member_name, member, type);		\
+#define NAME_ACCESS(struct_member_name, member, name, type)		\
+  __NAME_ACCESS_start(struct_member_name, member, name, type);		\
   p->size = sizeof(this->struct_member_name.member);			\
-  __NAME_ACCESS_end(struct_member_name, member, type);		  
+  __NAME_ACCESS_end(struct_member_name, member, name, type);		  
 
 /** Here we explicitly fill in the size pointer. The size_p is a
     reference to the member (int) of the struct which contains the
     size (relative to the begining of the struct). It will get
     dereferenced once the struct is parsed properly.
  */
-#define NAME_ACCESS_SIZE(struct_member_name, member, type, size_member)	\
-  __NAME_ACCESS_start(struct_member_name, member, type);		\
+#define NAME_ACCESS_SIZE(struct_member_name, member, name, type, size_member) \
+  __NAME_ACCESS_start(struct_member_name, member, name, type);		\
   p->size_p = (int)(&((typeof(this->struct_member_name) *)0)->size_member); \
   p->size = 0;								\
-  __NAME_ACCESS_end(struct_member_name, member, type);		  
+  __NAME_ACCESS_end(struct_member_name, member, name, type);		  
   
 void print_property(Packet self, struct struct_property_t *i);
 int Find_Property(OUT Packet *node, OUT struct struct_property_t **p,

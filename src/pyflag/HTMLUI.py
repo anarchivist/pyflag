@@ -1657,7 +1657,8 @@ class HTMLUI(UI.GenericUI):
         self.result+="""<script language=javascript>var client; function open_wizard_window() {window.open('%s&%s=0&callback_stored=%s','client','toolbar=0,menubar=0,HEIGHT=600,WIDTH=800,scrollbars=yes')}; open_wizard_window(); </script><abbr title=\"If your browser blocks popups, click here to popup a wizard\"><a onclick=\"open_wizard_window()\">Click here to launch wizard</a></abbr>""" % (self.defaults,context,cb)
         raise FlagFramework.DontDraw()
                 
-    def notebook(self,names=[],context="notebook",callbacks=[],descriptions=[]):
+    def notebook(self,names=[],context="notebook",callbacks=[],
+                 descriptions=[], callback_args=[]):
         """ Draw a notebook like UI with tabs.
 
         If no tab is selected, the first tab will be selected.
@@ -1670,10 +1671,12 @@ class HTMLUI(UI.GenericUI):
         query=self.defaults.clone()            
         try:
             context_str=query[context]
-            cbfunc=callbacks[names.index(context_str)]
+            index = names.index(context_str)
+            cbfunc=callbacks[index]
         except (ValueError,KeyError):
             cbfunc=callbacks[0]
             context_str=names[0]
+            index=0
 
 #        out='\n<table border=0 cellspacing=0 cellpadding=0 width="100%"><tr><td colspan=50><img height=20 width=1 alt=""></td></tr><tr>'
         out='\n<div id="notebook"><ul id="topmenu">'
@@ -1697,7 +1700,12 @@ class HTMLUI(UI.GenericUI):
         
         #Now draw the results of the callback:
         result=self.__class__(self)
-        cbfunc(query,result)
+        try:
+            option = callback_args[index]
+            cbfunc(query,result, option)
+        except IndexError:
+            cbfunc(query,result)
+            
 ##        out+="<tr><td colspan=50><table border=1 width=\"100%%\"><tr><td>%s</td></tr></table></td></tr></table>" % result
         out+="</div><div class='clearfloat'></div><div class='content'>%s</div>\n" % result
         self.result+=out

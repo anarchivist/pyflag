@@ -55,7 +55,7 @@ int Root_Read(Packet self, StringIO input) {
 
   this->__super__->Read(self, input);
   
-  switch(this->link_type) {
+  switch(this->packet.link_type) {
   case DLT_EN10MB:
     this->packet.eth = (Packet)CONSTRUCT(ETH_II, Packet, super.Con, self, self);
     return CALL(this->packet.eth, Read, input);
@@ -65,7 +65,7 @@ int Root_Read(Packet self, StringIO input) {
     return CALL(this->packet.eth, Read, input);
 
   default:
-    DEBUG("unable to parse link type of %u\n", this->link_type);
+    DEBUG("unable to parse link type of %u\n", this->packet.link_type);
     return -1;
   };
 };
@@ -73,7 +73,9 @@ int Root_Read(Packet self, StringIO input) {
 VIRTUAL(Root, Packet)
      INIT_STRUCT(packet, q(STRUCT_NULL));
 
-     NAME_ACCESS(packet, eth, FIELD_TYPE_PACKET);
+     NAME_ACCESS(packet, packet_id, packet_id, FIELD_TYPE_INT);
+     NAME_ACCESS(packet, link_type, link_type, FIELD_TYPE_INT);
+     NAME_ACCESS(packet, eth, eth, FIELD_TYPE_PACKET);
 
      VMETHOD(super.Read) = Root_Read;
 END_VIRTUAL
@@ -106,8 +108,8 @@ int Cooked_Read(Packet self, StringIO input) {
 VIRTUAL(Cooked,Packet)
      INIT_STRUCT(packet, cooked_Format);
 
-     NAME_ACCESS(packet, type, FIELD_TYPE_SHORT_X);
-     NAME_ACCESS(packet, payload, FIELD_TYPE_PACKET);
+     NAME_ACCESS(packet, type, type, FIELD_TYPE_SHORT_X);
+     NAME_ACCESS(packet, payload, payload, FIELD_TYPE_PACKET);
 
      VMETHOD(super.Read) = Cooked_Read;
 END_VIRTUAL
@@ -148,10 +150,10 @@ int Eth2_Read(Packet self, StringIO input) {
 VIRTUAL(ETH_II, Packet)
      INIT_STRUCT(packet, ethernet_2_Format);
 
-     NAME_ACCESS(packet, destination, FIELD_TYPE_ETH_ADD);
-     NAME_ACCESS(packet, source, FIELD_TYPE_ETH_ADD);
-     NAME_ACCESS(packet, type, FIELD_TYPE_SHORT_X);
-     NAME_ACCESS(packet, payload, FIELD_TYPE_PACKET);
+     NAME_ACCESS(packet, destination, destination, FIELD_TYPE_ETH_ADD);
+     NAME_ACCESS(packet, source, source, FIELD_TYPE_ETH_ADD);
+     NAME_ACCESS(packet, type, type, FIELD_TYPE_SHORT_X);
+     NAME_ACCESS(packet, payload, payload, FIELD_TYPE_PACKET);
 
      NAMEOF(this) = "eth";
      VMETHOD(super.Read) = Eth2_Read;
@@ -212,13 +214,13 @@ int IP_Read(Packet self, StringIO input) {
 VIRTUAL(IP, Packet)
      INIT_STRUCT(packet, ip_Format);
 
-     NAME_ACCESS(packet, header.saddr, FIELD_TYPE_IP_ADDR);
-     NAME_ACCESS(packet, header.daddr, FIELD_TYPE_IP_ADDR);
-     NAME_ACCESS(packet, _src, FIELD_TYPE_INT);
-     NAME_ACCESS(packet, _dest, FIELD_TYPE_INT);
-     NAME_ACCESS(packet, header.ttl, FIELD_TYPE_CHAR);
-     NAME_ACCESS(packet, header.protocol, FIELD_TYPE_CHAR);
-     NAME_ACCESS(packet, payload, FIELD_TYPE_PACKET);
+     NAME_ACCESS(packet, header.saddr, source_addr, FIELD_TYPE_IP_ADDR);
+     NAME_ACCESS(packet, header.daddr, dest_addr, FIELD_TYPE_IP_ADDR);
+     NAME_ACCESS(packet, _src, src, FIELD_TYPE_INT);
+     NAME_ACCESS(packet, _dest, dest, FIELD_TYPE_INT);
+     NAME_ACCESS(packet, header.ttl, ttl, FIELD_TYPE_CHAR);
+     NAME_ACCESS(packet, header.protocol, protocol, FIELD_TYPE_CHAR);
+     NAME_ACCESS(packet, payload, payload, FIELD_TYPE_PACKET);
 
      VMETHOD(super.Read)=IP_Read;
 END_VIRTUAL
@@ -258,15 +260,15 @@ int TCP_Read(Packet self, StringIO input) {
 VIRTUAL(TCP, Packet)
      INIT_STRUCT(packet, tcp_Format);
 
-     NAME_ACCESS(packet, header.source, FIELD_TYPE_SHORT);
-     NAME_ACCESS(packet, header.dest, FIELD_TYPE_SHORT);
-     NAME_ACCESS(packet, header.seq, FIELD_TYPE_INT);
-     NAME_ACCESS(packet, header.ack_seq, FIELD_TYPE_INT);
-     NAME_ACCESS(packet, len, FIELD_TYPE_INT);
-     NAME_ACCESS(packet, header.window, FIELD_TYPE_SHORT);
-     NAME_ACCESS(packet, data_offset, FIELD_TYPE_INT);
-     NAME_ACCESS(packet, data_len, FIELD_TYPE_INT);
-     NAME_ACCESS_SIZE(packet, data, FIELD_TYPE_STRING, data_len);
+     NAME_ACCESS(packet, header.source, source, FIELD_TYPE_SHORT);
+     NAME_ACCESS(packet, header.dest, dest, FIELD_TYPE_SHORT);
+     NAME_ACCESS(packet, header.seq, seq, FIELD_TYPE_INT);
+     NAME_ACCESS(packet, header.ack_seq, ack_seq, FIELD_TYPE_INT);
+     NAME_ACCESS(packet, len, len, FIELD_TYPE_INT);
+     NAME_ACCESS(packet, header.window, window, FIELD_TYPE_SHORT);
+     NAME_ACCESS(packet, data_offset, data_offset, FIELD_TYPE_INT);
+     NAME_ACCESS(packet, data_len, data_len, FIELD_TYPE_INT);
+     NAME_ACCESS_SIZE(packet, data, data, FIELD_TYPE_STRING, data_len);
 
      VMETHOD(super.Read) = TCP_Read;
 END_VIRTUAL
@@ -291,11 +293,11 @@ int UDP_Read(Packet self, StringIO input) {
 VIRTUAL(UDP, Packet)
      INIT_STRUCT(packet, udp_Format);
 
-     NAME_ACCESS(packet, src_port, FIELD_TYPE_SHORT);
-     NAME_ACCESS(packet, dest_port, FIELD_TYPE_SHORT);
-     NAME_ACCESS(packet, length, FIELD_TYPE_SHORT);
-     NAME_ACCESS(packet, checksum, FIELD_TYPE_SHORT_X);
-     NAME_ACCESS_SIZE(packet, data, FIELD_TYPE_STRING, data_len);
+     NAME_ACCESS(packet, src_port, src_port, FIELD_TYPE_SHORT);
+     NAME_ACCESS(packet, dest_port, dest_port, FIELD_TYPE_SHORT);
+     NAME_ACCESS(packet, length, length, FIELD_TYPE_SHORT);
+     NAME_ACCESS(packet, checksum, checksum, FIELD_TYPE_SHORT_X);
+     NAME_ACCESS_SIZE(packet, data, data, FIELD_TYPE_STRING, data_len);
 
      VMETHOD(super.Read) = UDP_Read;
 END_VIRTUAL

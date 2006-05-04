@@ -52,15 +52,12 @@
 *************************************************/
 struct root_node_struct {
   Packet eth;
+  int link_type;
+  int packet_id;
 } __attribute__((packed));
 
 CLASS(Root, Packet)
      struct root_node_struct packet;
-     int link_type;
-     int packet_id;
-
-     // The offset in the pcap file where this packet may be found
-     int packet_offset;
 END_CLASS
 /***********************************************
     Linux Cooked capture (The Any device)

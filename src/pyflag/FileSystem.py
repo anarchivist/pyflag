@@ -59,6 +59,7 @@ import bisect
 import zipfile
 import cStringIO
 import pyflag.Scanner as Scanner
+import pyflag.Graph as Graph
 
 class FileSystem:
     """ This is the base class for accessing file systems in PyFlag. This class is abstract and is here purely for documentation purposes.
@@ -410,6 +411,41 @@ class DBFS(FileSystem):
         for c in scanners:
             c.destroy()
 
+## These are some of the default views that will be seen in View File
+def goto_page_cb(query,result,variable):
+    try:
+        limit = query[variable]
+    except KeyError:
+        limit='0'
+
+    try:
+        if query['refresh']:
+            del query['refresh']
+
+            ## Accept hex representation for limits
+            if limit.startswith('0x'):
+                del query[variable]
+                query[variable]=int(limit,16)
+
+            result.refresh(0,query,parent=1)            
+    except KeyError:
+        pass
+
+    result.decoration = 'naked'
+    result.heading("Skip directly to an offset")
+    result.para("You may specify the offset in hex by preceeding it with 0x")
+    result.start_form(query, refresh="parent")
+    result.start_table()
+    if limit.startswith('0x'):
+        limit=int(limit,16)
+    else:
+        limit=int(limit)
+
+    result.textfield('Offset in bytes (%s)' % hex(limit),variable)
+    result.end_table()
+    result.end_form()
+
+
 class File:
     """ This abstract base class documents the file like object used to read specific files in PyFlag.
 
@@ -429,6 +465,10 @@ class File:
         @arg inode: The inode of the file to open, the while inode ending with the part relevant to this vfs
         @note: This is not meant to be called directly, the File object must be created by a valid FileSystem object's open method.
         """
+        # Install default views
+        self.stat_names = ["Statistics","HexDump","Download"]
+        self.stat_cbs=[self.stats,self.hexdump,self.download]
+
         # each file should remember its own part of the inode
         self.case = case
         self.fd = fd
@@ -554,7 +594,8 @@ class File:
 
     def stats(self):
         """ Returns a dict of statistics about the content of the file. """
-        pass
+        self.dbh.execute("select inode, status, uid, gid, mtime as mtime_epoch, from_unixtime(mtime) as `mtime`, atime as atime_epoch, from_unixtime(atime) as `atime`, ctime as ctime_epoch, from_unixtime(ctime) as `ctime`, from_unixtime(dtime) as `dtime`, mode, links, link, size from inode where inode=%r",(self.inode))
+        return self.dbh.fetch()
 
     def __iter__(self):
         self.seek(0)
@@ -587,3 +628,121 @@ class File:
         data"""
         print "%s" % self.__class__.__name__
         result.row(self.__class__.__name__, self.__doc__)
+
+
+    def download(self, query,result):
+        """ Used for dumping the entire file into the browser """
+        result.download(self)
+
+    def hexdump(self, query,result):
+        """ Show the hexdump for the file."""
+        highlight=0
+        length=0
+        try:
+            highlight=int(query['highlight'])
+            length=int(query['length'])
+        except:
+            pass
+
+        max=config.MAX_DATA_DUMP_SIZE
+
+        def hexdumper(offset,data,result):
+            dump = FlagFramework.HexDump(data,result)
+            dump.dump(base_offset=offset,limit=max,highlight=highlight-offset,length=length)
+
+        return self.display_data(query,result, max,hexdumper)
+
+    def display_data(self, query,result,max,cb):
+        """ Displays the data.
+        
+        The callback takes care of paging the data from self. The callback cb is used to actually render the data:
+        
+        def cb(offset,data,result)
+        
+        offset is the offset in the file where we start, data is the data.
+        """
+        #Set limits for the dump
+        try:
+            limit=int(query['hexlimit'])
+        except KeyError:
+            limit=0
+
+            self.seek(limit)
+            data = self.read(max+1)
+
+            cb(limit,data,result)
+
+            #Do the navbar
+            new_query = query.clone()
+            previous=limit-max
+            if previous<0:
+                if limit>0:
+                    previous = 0
+                else:
+                    previous=None
+
+            if previous != None:
+                del new_query['hexlimit']
+                new_query['hexlimit']=previous
+                result.toolbar(text="Previous page", icon="stock_left.png",
+                               link = new_query )
+            else:
+                result.toolbar(text="Previous page", icon="stock_left_gray.png")
+
+            next=limit+max
+            ## If we did not read a full page, we do not display
+            ## the next arrow:
+            if len(data)>=max:
+                del new_query['hexlimit']
+                new_query['hexlimit']=next
+                result.toolbar(text="Next page", icon="stock_right.png",
+                               link = new_query )
+            else:
+                result.toolbar(text="Next page", icon="stock_right_gray.png")
+
+            ## Allow the user to skip to a certain page directly:
+            result.toolbar(
+                cb = FlagFramework.Curry(goto_page_cb, variable='hexlimit'),
+                text="Current Offset %s" % limit,
+                icon="stock_next-page.png"
+                )
+
+        else:
+            result.text("No Data Available")
+
+        return result
+
+    def stats(self, query,result):
+        """ Show statistics about the file """
+        fsfd = DBFS(query['case'])
+        istat = fsfd.istat(inode=query['inode'])
+        left = result.__class__(result)
+        link = result.__class__(result)
+
+        path = fsfd.lookup(inode=query['inode'])
+        base_path, name = os.path.split(path)
+        link.link(path,
+                  FlagFramework.query_type((),family="Disk Forensics",
+                      report='BrowseFS',
+                      open_tree=base_path, case=query['case'])
+                  )
+        left.row("Filename:",'',link)
+        try:
+            for k,v in istat.iteritems():
+                left.row('%s:' % k,'',v)
+        except AttributeError:
+            pass
+
+        left.end_table()
+
+        self.seek(0)
+        image = Graph.Thumbnailer(self,300)
+        if image:
+            right=result.__class__(result)
+            right.image(image,width=200)
+            result.start_table(width="100%")
+            result.row(left,right,valign='top',align="left")
+            image.headers=[("Content-Disposition","attachment; filename=%s" % name),]
+        else:
+            result.start_table(width="100%")
+            result.row(left,valign='top',align="left")

@@ -193,11 +193,11 @@ static PyObject *py_process_packet(PyObject *self, PyObject *args) {
   /** Find the IP header */
   ip=(IP)root;
   if(!Find_Property((Packet *)&ip, NULL, "ip", "") || !ip) {
-    return PyErr_Format(PyExc_RuntimeError, "Unable to find IP headers when procssing packet %d", root->packet_id);
+    return PyErr_Format(PyExc_RuntimeError, "Unable to find IP headers when procssing packet %d", root->packet.packet_id);
   };
 
   //  printf("Processing %u\n", root->packet_id);
-  ip->id = root->packet_id;
+  ip->id = root->packet.packet_id;
 
   /** Process the packet */
   hash->process(hash, ip);
@@ -235,7 +235,7 @@ static PyObject *py_process_tcp(PyObject *self, PyObject *args) {
 
   /** Try to parse the packet */
   root = CONSTRUCT(Root, Packet, super.Con, tmp, NULL);
-  root->link_type = link_type;
+  root->packet.link_type = link_type;
 
   root->super.Read((Packet)root, tmp);
 

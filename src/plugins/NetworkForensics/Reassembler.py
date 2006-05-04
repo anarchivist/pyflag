@@ -26,118 +26,13 @@ import pyflag.Registry as Registry
 from pyflag.Scanner import *
 import struct,sys,cStringIO
 import pyflag.DB as DB
+import pyflag.FileSystem as FileSystem
 from pyflag.FileSystem import File
 import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
 import struct,re,os
 import reassembler
-
-def combine_streams(query,result):
-    """ Show both ends of the stream combined.
-
-    In each screenfull we show a maximum of MAXSIZE characters per connection. We stop as soon as either direction reaches this many characters.
-    """
-    inode = query['inode']
-
-    ## Parse out the inode
-    try:
-        iosource = inode[:inode.index("|")]
-        stream_inode = inode[inode.rindex("|"):]
-        forward_cid = int(stream_inode[2:])
-    except ValueError:
-        raise ValueError("Inode format is not correct. %s is not a valid inode or it already represents a combined inode." % inode)
-
-    ## This gives us a handle to the VFS
-    fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'])
-    dbh = fsfd.dbh
-
-    ## Find out the reverse connection
-    dbh.execute("select reverse from connection_details where inode=%r", inode)
-    row = dbh.fetch()
-
-    ## Now open the combined stream:
-    fd = fsfd.open(inode="%s/%s" % (inode,row['reverse']))
-    
-    try:
-        limit = int(query['stream_limit'])
-    except:
-        limit = 0
-    
-    number_of_rows = 0
-    dbh.execute("select * from `connection` where con_id = %r order by cache_offset limit %s, %s", (fd.con_id, limit, config.PAGESIZE))
-
-    for row in dbh:
-        number_of_rows += 1
-        fd.seek(row['cache_offset'])
-        ## Get the data:
-        data=fd.read(row['length'])
-        if row['original_id']==forward_cid:
-            result.text(data,color="blue",font='typewriter',sanitise='full',wrap='full')
-        else:
-            result.text(data,color="red",font='typewriter',sanitise='full',wrap='full')    
-
-    ## Make the paging buttons
-    if limit > 0:
-        del query['stream_limit']
-        temp = limit-config.PAGESIZE
-        if temp < 0:
-            temp = 0
-            
-        query['stream_limit'] = temp
-        result.toolbar(text="Previous page", icon="stock_left.png",
-                       link = query )
-    else:
-        result.toolbar(text="Previous page", icon="stock_left_gray.png")
-
-    if number_of_rows >= config.PAGESIZE:
-        del query['stream_limit']
-        query['stream_limit'] = limit+config.PAGESIZE
-        result.toolbar(text="Next page", icon="stock_right.png",
-                       link = query )
-    else:
-        result.toolbar(text="Next page", icon="stock_right_gray.png")
-        
-def show_packets(query,result):
-    """ Shows the packets which belong in this stream """
-    inode = query['inode']
-    dbh = DB.DBO(query['case'])
-    try:
-        iosource = inode[:inode.index("|")]
-        stream_inode = inode[inode.rindex("|"):]
-        con_id = int(stream_inode[2:])
-    except ValueError:
-        raise ValueError("Inode format is not correct. %s is not a valid inode." % inode)
-
-    ## This gives us a handle to the VFS
-    fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'])
-            
-    def show_data(value):
-        fd = fsfd.open(inode=value)
-        ui=result.__class__(result)
-        ## We read at most this many chars from the packet:
-        data=fd.read(50)
-
-        if(len(data) ==50):
-            data += "  ...."
-
-        ui.text(data, sanitise='full', font='typewriter')
-        return ui
-    
-    result.table(
-        columns = ('concat("%s|p0|o",cast(packet_id as char))' % iosource, 'from_unixtime(pcap.ts_sec,"%Y-%m-%d")','concat(from_unixtime(pcap.ts_sec,"%H:%i:%s"),".",pcap.ts_usec)','seq','con.length','concat("%s|p0|O",cast(packet_id as char),"|o",cast(data_offset as char),":",cast(con.length as char))' % iosource),
-        names = ('Packet ID','Date','Time','Sequence Number','Length',"Data"),
-        links = [ FlagFramework.query_type((),
-                                           family="Network Forensics",
-                                           report='View Packet',
-                                           case=query['case'],
-                                           __target__='inode'),
-                  ],
-        table= '`connection` as con , pcap',
-        where = 'con_id="%s" and packet_id=id ' % con_id,
-        callbacks = { 'Data': show_data },
-        case=query['case']
-        )
 
 class StreamFile(File):
     """ A File like object to reassemble the stream from individual packets.
@@ -151,12 +46,14 @@ class StreamFile(File):
     specified we merge all connections into the same stream based on
     arrival time.
     """
-    stat_cbs = [ show_packets, combine_streams ]
-    stat_names = [ "Show Packets", "Combined streams"]
     specifier = 'S'
 
     def __init__(self, case, fd, inode, dbh=None):
         File.__init__(self,case, fd, inode, dbh=None)
+
+        self.stat_cbs.extend([ self.show_packets, self.combine_streams ])
+        self.stat_names.extend([ "Show Packets", "Combined streams"])
+
 
         ## Fill in some vital stats
         self.dbh.execute("select con_id, reverse, src_port, dest_port, ts_sec from `connection_details` where inode=%r", inode)
@@ -243,125 +140,89 @@ class StreamFile(File):
         row=self.dbh.fetch()
         return row['packet_id']
 
-class xStreamFile(File):
-    """ A File like object to reassemble the stream from individual packets.
+    def get_combined_fd(self):
+        """ Returns an fd opened to the combined stream """
+        fsfd = FileSystem.DBFS(self.dbh.case)
+        return fsfd.open(inode="%s/%s" % (self.inode,self.reverse))
 
-    Note that this is currently a very Naive reassembler. Stream Reassembling is generally considered a very difficult task. The approach we take is to make a very simple reassembly, and have a different scanner check the stream for potetial inconsistancies.
+    def combine_streams(self, query,result):
+        """ Show both ends of the stream combined.
 
-    The inode format is:
-    Scon_id/con_id/con_id
-
-    con_ids are the connection IDs. If more than one con_id is
-    specified we merge all connections into the same stream based on
-    arrival time.
-
-    """
-    stat_cbs = [ show_packets, combine_streams ]
-    stat_names = [ "Show Packets", "Combined streams"]
-#    specifier = 'S'
-    
-    def __init__(self, case, fd, inode, dbh=None):
-        File.__init__(self, case, fd, inode, dbh)
-
-        if self.cached_fd: return
-        
-        inode = inode.split("|")[-1]
-
-
-    def readpkt(self,pkt_id,data_offset,start,end,result,result_offset):
-        """ This function gets the data from pkt_id and pastes it into
-        the file like object in result at offset result_offset.
-
-        We basically do this: pkt_id.data[start:end] -> result[result_offset]
-        @arg pkt_id: The packet ID
-        @arg data_offset: The offset within the packet where the data starts
-        @arg start: The start within the data segment where we want to copy from
-        @arg end: The end point to copy till
-        @arg result: A cStringIO object to copy the data to
-        @arg result_offset: The position in the cStringIO to paste to
+        In each screenfull we show a maximum of MAXSIZE characters per connection. We stop as soon as either direction reaches this many characters.
         """
-##        dbh = DB.DBO(self.case)
-##        dbh.execute("select offset from pcap where id=%r",(pkt_id))
-##        row = dbh.fetch()
+        combined_fd = self.get_combined_fd()
 
-        self.fd.seek(data_offset+start)
-        
-        data = self.fd.read(end-start)
-        result.seek(result_offset)
-        result.write(data)
-
-    def read(self,length = None):
         try:
-            data=File.read(self,length)
-            #print "Read %s from cache" % len(data)
-            return data
-        except IOError:
-            pass
+            limit = int(query['stream_limit'])
+        except:
+            limit = 0
 
-        if length==None:
-            length=sys.maxint
+        number_of_rows = 0
+        self.dbh.execute("select * from `connection` where con_id = %r order by cache_offset limit %s, %s", (combined_fd.con_id, limit, config.PAGESIZE))
 
-        if length>self.size-self.readptr:
-            length=self.size-self.readptr
-        ##Initialise the output buffer:
-        result = cStringIO.StringIO()
-
-        ## Find out which packets fall within the range of interest
-        self.dbh.execute("select packet_id, length, data_offset,seq from `connection` where con_id=%r and seq+length>=%r and seq<=%r order by seq",(
-            self.con_id,
-            self.isn+self.readptr, ## Start of range
-            self.isn+self.readptr+length, ## End of range
-            ))
-
-        for row in self.dbh:
-            self.seq = row['seq']
-            ## This is the case where we start reading half way
-            ## through a packet
-
-            ##    row['seq']|--------->| row['length']
-            ##      self.isn----->| readptr
-            ##We are after  |<--->|
-            if self.seq <= self.isn+self.readptr :
-                start = self.isn + self.readptr - self.seq
+        for row in dbh:
+            number_of_rows += 1
+            combined_fd.seek(row['cache_offset'])
+            ## Get the data:
+            data=combined_fd.read(row['length'])
+            if row['original_id']==self.con_id:
+                result.text(data,color="blue",font='typewriter',sanitise='full',wrap='full')
             else:
-                start = 0
+                result.text(data,color="red",font='typewriter',sanitise='full',wrap='full')    
 
-            ## This is the case where the packet extends past where we
-            ## want to read:
-            ## LHS = Where the packet ends in the seq number space
-            ## RHS = Where we want to stop reading
+        ## Make the paging buttons
+        if limit > 0:
+            del query['stream_limit']
+            temp = limit-config.PAGESIZE
+            if temp < 0:
+                temp = 0
 
-            ##        row['seq']|------->| row['length']
-            ## self.isn--->readptr--->| length
-            ##     We are after |<--->|
-            if self.seq+row['length']>=self.isn+self.readptr+length:
-                end=self.isn + self.readptr + length - self.seq
+            query['stream_limit'] = temp
+            result.toolbar(text="Previous page", icon="stock_left.png",
+                           link = query )
+        else:
+            result.toolbar(text="Previous page", icon="stock_left_gray.png")
 
-            ##    row['seq']|------->| row['length']
-            ## self.isn--->readptr------>| length
-            ## We are after |<------>|
-            else:
-                end=row['length']
+        if number_of_rows >= config.PAGESIZE:
+            del query['stream_limit']
+            query['stream_limit'] = limit+config.PAGESIZE
+            result.toolbar(text="Next page", icon="stock_right.png",
+                           link = query )
+        else:
+            result.toolbar(text="Next page", icon="stock_right_gray.png")
 
-            ## We create the output buffer here:
-            ## current packet         |<--->|  (begings at start+row[seq])
-            ## self.isn--->readptr|---------->| length
-            ## Output buffer      |<--------->|
-            ## We want the offset |<->|  for result_offset
-         
-            self.readpkt(
-                row['packet_id'],
-                row['data_offset'],
-                start,
-                end,
-                result,
-                start+self.seq-self.isn-(self.readptr))
+    def show_packets(self,query,result):
+        """ Shows the packets which belong in this stream """
+        combined_fd = self.get_combined_fd()
 
-        result.seek(0)
-        data=result.read()
-        result.close()
-        self.readptr+=len(data)
-        return data
+        def show_data(value):
+            offset, length = value.split(",")
+            ui=result.__class__(result)
+            ## We read at most this many chars from the packet:
+            combined_fd.seek(int(offset))
+            data=combined_fd.read(min(int(length),50))
+
+            if(len(data) ==50):
+                data += "  ...."
+
+            ui.text(data, sanitise='full', font='typewriter')
+            return ui
+
+        result.table(
+            columns = ('packet_id', 'from_unixtime(pcap.ts_sec,"%Y-%m-%d")','concat(from_unixtime(pcap.ts_sec,"%H:%i:%s"),".",pcap.ts_usec)','con.length','concat(con.cache_offset, ",", con.length)'),
+            names = ('Packet ID','Date','Time','Length',"Data"),
+            links = [ FlagFramework.query_type((),
+                                               family="Network Forensics",
+                                               report='View Packet',
+                                               case=query['case'],
+                                               __target__='id'),
+                      ],
+            table= '`connection` as con , pcap',
+            where = 'con_id="%s" and packet_id=id ' % combined_fd.con_id,
+            callbacks = { 'Data': show_data },
+            case=query['case']
+            )
+
 
 class OffsetFile(File):
     """ A simple offset:length file driver.

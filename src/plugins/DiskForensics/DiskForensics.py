@@ -154,39 +154,6 @@ class BrowseFS(Reports.report):
     def form(self,query,result):
         result.case_selector()
 
-def goto_page_cb(query,result,variable):
-    try:
-        limit = query[variable]
-    except KeyError:
-        limit='0'
-
-    try:
-        if query['refresh']:
-            del query['refresh']
-
-            ## Accept hex representation for limits
-            if limit.startswith('0x'):
-                del query[variable]
-                query[variable]=int(limit,16)
-            
-            result.refresh(0,query,parent=1)            
-    except KeyError:
-        pass
-
-    result.decoration = 'naked'
-    result.heading("Skip directly to an offset")
-    result.para("You may specify the offset in hex by preceeding it with 0x")
-    result.start_form(query, refresh="parent")
-    result.start_table()
-    if limit.startswith('0x'):
-        limit=int(limit,16)
-    else:
-        limit=int(limit)
-        
-    result.textfield('Offset in bytes (%s)' % hex(limit),variable)
-    result.end_table()
-    result.end_form()
-
 class ViewFile(Reports.report):
     """ Report to browse the filesystem """
     parameters = {'inode':'string'}
@@ -202,212 +169,18 @@ class ViewFile(Reports.report):
 
         fsfd = FileSystem.DBFS( query["case"])
         ## If this is a directory, only show the stats
-        path = fsfd.lookup(inode=query['inode'])
-
         try:
             fd = fsfd.open(inode=query['inode'])
             image = Graph.Thumbnailer(fd,300)
         except IOError:
             fd = None
             image = None
-            
-        #How big is this file?
-        i=fsfd.istat(inode=query['inode'])
-        
-        #Add the filename into the headers:
-        if not path: path=query['inode']
-        base_path,name=os.path.split(path)
-        if image:
-            image.headers=[("Content-Disposition","attachment; filename=%s" % name),]
-            
+
         ## Make a series of links to each level of this inode - this
         ## way we can view parents of this inode.
         tmp = result.__class__(result)
         tmp.text("Viewing file in inode ",make_inode_link(query,result))
         result.heading(tmp)
-
-        def download(query,result):
-            """ Used for dumping the entire file into the browser """
-            if fd:
-                result.download(fd)
-        def hexdump(query,result):
-            """ Show the hexdump for the file."""
-            highlight=0
-            length=0
-            try:
-                highlight=int(query['highlight'])
-                length=int(query['length'])
-            except:
-                pass
-            
-            max=config.MAX_DATA_DUMP_SIZE
-                
-            def hexdumper(offset,data,result):
-                dump = FlagFramework.HexDump(data,result)
-                dump.dump(base_offset=offset,limit=max,highlight=highlight-offset,length=length)
-
-            return display_data(query,result,max,hexdumper)
-            
-        def display_data(query,result,max,cb):
-            """ Displays the data.
-
-            The callback takes care of paging the data from fd. The callback cb is used to actually render the data:
-
-            def cb(offset,data,result)
-
-            offset is the offset in the file where we start, data is the data.
-            """
-            if fd:
-                #Set limits for the dump
-                try:
-                    limit=int(query['hexlimit'])
-                except KeyError:
-                    limit=0
-
-                fd.seek(limit)
-                data = fd.read(max+1)
-                
-                cb(limit,data,result)
-                
-                #Do the navbar
-                new_query = query.clone()
-                previous=limit-max
-                if previous<0:
-                    if limit>0:
-                        previous = 0
-                    else:
-                        previous=None
-
-                if previous != None:
-                    del new_query['hexlimit']
-                    new_query['hexlimit']=previous
-                    result.toolbar(text="Previous page", icon="stock_left.png",
-                                   link = new_query )
-                else:
-                    result.toolbar(text="Previous page", icon="stock_left_gray.png")
-
-                next=limit+max
-                ## If we did not read a full page, we do not display
-                ## the next arrow:
-                if len(data)>=max:
-                    del new_query['hexlimit']
-                    new_query['hexlimit']=next
-                    result.toolbar(text="Next page", icon="stock_right.png",
-                                   link = new_query )
-                else:
-                    result.toolbar(text="Next page", icon="stock_right_gray.png")
-                    
-                ## Allow the user to skip to a certain page directly:
-                result.toolbar(
-                    cb = FlagFramework.Curry(goto_page_cb, variable='hexlimit'),
-                    text="Current Offset %s" % limit,
-                    icon="stock_next-page.png"
-                    )
-
-            else:
-                result.text("No Data Available")
-
-            return result
-
-        def strings(query,result):
-            """ Draw the strings in a file """
-            if not fd: return
-            str = pyflag.Strings.StringExtracter(fd)
-            try:
-                offset=query['stroffset']
-                if offset.startswith("!"):
-                    ## We search backwards for the correct offset
-                    offset=str.find_offset_prior(int(offset[1:]),config.PAGESIZE-1)
-            except KeyError:
-                offset=0
-
-            q=query.clone()
-            del q['mode']
-            del q['hexlimit']
-            
-            output=result
-            output.start_table()
-            row_number=0
-            file_offset=offset
-            try:
-                for i in str.extract_from_offset(int(offset)):
-                    row_number+=1
-                    if row_number>config.PAGESIZE: break
-                    file_offset=i[0]
-                    tmp_link=self.ui(result)
-                    tmp_link.link("0x%x (%s)" % (file_offset,file_offset),q,mode="HexDump",hexlimit=file_offset)
-          
-                    tmp_string=self.ui(result)
-                    tmp_string.text(i[1],color="red",sanitise="full",wrap='full')
-                    output.row(tmp_link,tmp_string,valign="top")
-
-            except IOError:
-                pass
-            
-            result.nav_query=query.clone()
-            result.nav_query['__target__']='stroffset'
-            result.next=file_offset
-            if row_number<config.PAGESIZE: result.next=None
-            result.previous="!%s" % offset
-            result.pageno=offset
-
-            return output
-
-        def textdump(query,result):
-            """ Dumps the file in a text window """
-            max=config.MAX_DATA_DUMP_SIZE
-            def textdumper(offset,data,result):
-                result.text(data,sanitise='full',font='typewriter',
-                            color="red",wrap="full")
-
-            return display_data(query,result,max,textdumper)
-        
-        def stats(query,result):
-            """ Show statistics about the file """
-            istat = fsfd.istat(inode=query['inode'])
-            left=self.ui(result)
-            link = result.__class__(result)
-            link.link(path,
-                      FlagFramework.query_type((),family="Disk Forensics",
-                          report='BrowseFS',
-                          open_tree=base_path, case=query['case'])
-                      )
-            left.row("Filename:",'',link)
-            try:
-                for k,v in istat.iteritems():
-                    left.row('%s:' % k,'',v)
-            except AttributeError:
-                pass
-
-            ## File specific statistics:
-            if fd:
-                istat = fd.stats()
-                try:
-                    for k,v in istat.iteritems():
-                        left.row('%s:' % k,'',v)
-                except AttributeError:
-                    pass
-            
-            left.end_table()
-
-            if image:
-                right=self.ui(result)
-                right.image(image,width=200)
-                result.start_table(width="100%")
-                result.row(left,right,valign='top',align="left")
-            else:
-                result.start_table(width="100%")
-                result.row(left,valign='top',align="left")
-
-        names=["Statistics","HexDump","Download","Text"]
-        callbacks=[stats,hexdump,download,textdump]
-
-        try:
-            names.extend(fd.stat_names)
-            callbacks.extend(fd.stat_cbs)
-        except:
-            pass
-
         
         try:
             result.text("Classified as %s by magic" % image.GetMagic())
@@ -418,8 +191,8 @@ class ViewFile(Reports.report):
             pass
 
         result.notebook(
-            names=names,
-            callbacks=callbacks,
+            names=fd.stat_names,
+            callbacks=fd.stat_cbs,
             context="mode"
             )
 
@@ -479,13 +252,17 @@ class Timeline(Reports.report):
     def reset(self, query):
         dbh = self.DBO(query['case'])
         dbh.execute("drop table mac")
-                
+
 ## Standard file objects:
 class DBFS_file(FileSystem.File):
     """ Class for reading files within a loaded dd image, supports typical file-like operations, seek, tell, read """
+    
     specifier = 'D'
     def __init__(self, case, fd, inode, dbh=None):
         FileSystem.File.__init__(self, case, fd, inode, dbh)
+
+        self.stat_names.extend(["Text"])
+        self.stat_cbs.extend([self.textdump])
 
         ## This is kind of a late initialization. We get the indexes
         ## on demand later.
@@ -589,6 +366,15 @@ class DBFS_file(FileSystem.File):
         bytes_left = count*self.fd.block_size-chunk_offset
         
         return ddoffset,bytes_left
+
+    def textdump(self, query,result):
+        """ Dumps the file in a text window """
+        max=config.MAX_DATA_DUMP_SIZE
+        def textdumper(offset,data,result):
+            result.text(data,sanitise='full',font='typewriter',
+                        color="red",wrap="full")
+
+        return self.display_data(query,result,max, textdumper)
 
 class MountedFS_file(FileSystem.File):
     """ access to real file in filesystem """

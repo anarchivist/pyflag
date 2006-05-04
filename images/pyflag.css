@@ -13,16 +13,17 @@ a.tab:hover,
 }
 
 #notebook li {
+  font-size: -10;
     margin-bottom: 0.3em;
 }
 
 /* topmenu */
 ul#topmenu {
-    font-weight:        bold;
-    list-style-type:    none;
-    margin:             0;
-    padding:            0;
-  width:100%;
+  font-weight:        bold;
+  list-style-type:    none;
+  margin:             0;
+  padding:            0;
+  width: 100%;
 }
 
 ul#topmenu li {

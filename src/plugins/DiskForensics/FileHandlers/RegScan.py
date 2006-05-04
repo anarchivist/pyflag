@@ -192,7 +192,7 @@ class BrowseRegistryKey(BrowseRegistry):
 
         def stats(query,out):
             """ display stats on a key """
-            out.para("not implimented yet")
+            out.para("not implemented yet")
             return out
 
         result.notebook(

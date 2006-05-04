@@ -42,17 +42,16 @@ static PyObject *dissect(PyObject *self, PyObject *args) {
   PyObject *result;
   Root root;
   int link_type;
-  int packet_id,packet_offset;
+  int packet_id;
   StringIO tmp=CONSTRUCT(StringIO, StringIO, Con, NULL);
   
-  if(!PyArg_ParseTuple(args, "s#iii", &tmp->data, &tmp->size, &link_type,
-		       &packet_id, &packet_offset)) 
+  if(!PyArg_ParseTuple(args, "s#ii", &tmp->data, &tmp->size, &link_type,
+		       &packet_id)) 
     return NULL;
 
   root = CONSTRUCT(Root, Packet, super.Con, NULL, NULL);
-  root->link_type = link_type;
-  root->packet_id = packet_id;
-  root->packet_offset = packet_offset;
+  root->packet.link_type = link_type;
+  root->packet.packet_id = packet_id;
 
   root->super.Read((Packet)root, tmp);
 

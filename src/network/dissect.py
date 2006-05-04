@@ -56,8 +56,8 @@ class base_dissector:
         return _dissect.get_range(self.d, field)
 
 class dissector(base_dissector):
-    def __init__(self, data, link_type, packet_id, packet_offset):
-        self.d = _dissect.dissect(data,link_type,packet_id, packet_offset);
+    def __init__(self, data, link_type, packet_id):
+        self.d = _dissect.dissect(data,link_type,packet_id);
         self.name = _dissect.get_name(self.d)
     
     def is_protocol_to_server(self,proto):

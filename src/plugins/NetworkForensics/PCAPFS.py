@@ -215,7 +215,7 @@ class PCAPFS(DBFS):
             self.fd.seek(row['offset'])
             data = self.fd.read(row['length'])
             d = _dissect.dissect(data,row['link_type'],
-                                  row['id'], row['offset'])
+                                  row['id'])
 
             ## Now reassemble it:
             try:
@@ -287,7 +287,7 @@ class PCAPFile(File):
 
 class ViewDissectedPacket(Reports.report):
     """ View Dissected packet in a tree. """
-    parameters = {'inode':'any'}
+    parameters = {'id':'numeric'}
     name = "View Packet"
     family = "Network Forensics"
     description = "Views the packet in a tree"
@@ -295,36 +295,24 @@ class ViewDissectedPacket(Reports.report):
     def form(self,query,result):
         try:
             result.case_selector()
-            result.textfield('Inode','inode')
+            result.textfield('Packet ID','id')
         except KeyError:
             pass
 
-    def display(self,query,result):        
-        ## Open the PCAPFS filesystem
-        fsfd = Registry.FILESYSTEMS.fs['PCAPFS']( query["case"],)
-        ## Open the root file in the filesystem
-        fd = fsfd.open(inode=query['inode'])
-
-        ## This is the binary dump of the packet
-        try:
-            temp = query['inode']
-            base_inode = temp[:temp.rindex("|")]
-            
-            id=int(temp[temp.rindex("|"):][2:]) 
-        except ValueError:
-            raise Reports.ReportError("This report must have an inode with an offset into the pcap file. e.g. Ixxx|p0|o1. We received an inode of %s" % query['inode'])
-
-        packet = fd.read()
-
-       
-        ## This is the link type of the packet (Etherenet by default)
-        try:
-            link_type = fd.link_type
-        except AttributeError:
-            link_type = 1
+    def display(self,query,result):
+        dbh = DB.DBO(query['case'])
+        dbh.execute("select * from pcap where id=%r", query['id'])
+        row=dbh.fetch()
+        
+        io = IO.open(query['case'], row['iosource'])
+        io.seek(row['offset'])
+        packet = io.read(row['length'])
+        id = int(query['id'])
+        
+        link_type = row['link_type']
 
         ## Now dissect it.
-        proto_tree = dissect.dissector(packet,link_type)
+        proto_tree = dissect.dissector(packet,link_type, id)
 
         def get_node(branch):
             node = proto_tree
@@ -393,15 +381,26 @@ class ViewDissectedPacket(Reports.report):
 
         ## We add forward and back toolbar buttons to let people move
         ## to next or previous packet:
+        dbh.execute("select min(id) as id from pcap")
+        row = dbh.fetch()
+
         new_query=query.clone()
-        if id>0:
-            del new_query['inode']
-            new_query['inode']=base_inode + "|o%s" % (id-1)
+        if id>row['id']:
+            del new_query['id']
+            new_query['id']=id-1
             result.toolbar(text="Previous Packet",icon="stock_left.png",link=new_query)
-        if id<fd.size:
-            del new_query['inode']
-            new_query['inode']=base_inode + "|o%s" % (id+1)
+        else:
+            result.toolbar(text="Previous Packet",icon="stock_left_gray.png")
+            
+        dbh.execute("select max(id) as id from pcap")
+        row = dbh.fetch()
+        
+        if id<row['id']:
+            del new_query['id']
+            new_query['id']=id+1
             result.toolbar(text="Next Packet",icon="stock_right.png",link=new_query)
+        else:
+            result.toolbar(text="Next Packet",icon="stock_right_gray.png")
 
 
 class NetworkingSummary(Reports.report):
