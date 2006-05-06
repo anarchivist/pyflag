@@ -32,7 +32,6 @@ void TCPStream_add(TCPStream self, IP ip) {
 
   /** Take over the packet */
   new->packet = ip;
-  new->root = 
   talloc_steal(new, ip);
 
   /** Record the most recent id we handled */
@@ -116,8 +115,15 @@ void TCPStream_flush(TCPStream self) {
   /** FIXME: For now ignore outstanding packets: in future add nulls
       in
   */
+  if(self->direction!=TCP_FORWARD) return;
+
   self->state = PYTCP_DESTROY;
   if(self->callback) self->callback(self, NULL);
+
+  /** Now do the reverse stream */
+  self->reverse->state = PYTCP_DESTROY;
+  if(self->reverse->callback) 
+    self->reverse->callback(self->reverse, NULL);
 };
 
 VIRTUAL(TCPStream, Object)
@@ -182,30 +188,42 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
     };
   };
   
-  /** If we get here we dont have a forward (or reverse stream)
-      so we need to make a forward/reverse stream pair.
-  */
   reverse.saddr  = ip->packet.header.daddr;
   reverse.daddr  = ip->packet.header.saddr;
   reverse.source = tcp->packet.header.dest;
   reverse.dest   = tcp->packet.header.source;
   reverse_hash = mkhash(&reverse);
 
+  /** Now try to find the reverse stream in our hash table */
+  list_for_each_entry(i, &(self->table[reverse_hash]->list), list) {
+    if(!memcmp(&(i->addr),&reverse, sizeof(reverse))) {
+      return i;
+    };
+  };  
+
+  /** If we get here we dont have a forward (or reverse stream)
+      so we need to make a forward/reverse stream pair.
+  */
   /** Build a forward stream */
   i = CONSTRUCT(TCPStream, TCPStream, Con, self, &forward);
   i->callback = self->callback;
   i->data = self->data;
+  i->direction = TCP_FORWARD;
   list_add_tail(&(self->table[forward_hash]->list), &(i->list));
 
   /** Now a reverse stream */
-  j = CONSTRUCT(TCPStream, TCPStream, Con, self, &reverse);
+  j = CONSTRUCT(TCPStream, TCPStream, Con, i, &reverse);
   j->callback = self->callback;
   j->data = self->data;
+  j->direction = TCP_REVERSE;
   list_add_tail(&(self->table[reverse_hash]->list), &(j->list));
 
   /** Make the streams point to each other */
   i->reverse = j;
   j->reverse = i;
+
+  /** When the streams are destroyed we flush them */
+  talloc_set_destructor(i, TCPStream_flush);
 
   return i;
 };
@@ -220,14 +238,8 @@ static void check_for_expired_packets(TCPHashTable self, int id) {
 
   for(k=0; k<TCP_STREAM_TABLE_SIZE; k++) {
     list_for_each_entry_safe(i,j, &(self->table[k]->list),list) {
-      if(i->max_packet_id + MAX_PACKETS_EXPIRED < id) {
-	i->flush(i);
-	i->reverse->flush(i->reverse);
-
-	list_del(&(i->list));
-	list_del(&(i->reverse->list));
-	
-	talloc_free(i->reverse);
+      if(i->direction == TCP_FORWARD && 
+	 i->max_packet_id + MAX_PACKETS_EXPIRED < id) {
 	talloc_free(i);
       };
     };

@@ -56,7 +56,7 @@ class StreamFile(File):
 
 
         ## Fill in some vital stats
-        self.dbh.execute("select con_id, reverse, src_port, dest_port, ts_sec from `connection_details` where inode=%r", inode)
+        self.dbh.execute("select con_id, reverse, src_ip, dest_ip, src_port, dest_port, ts_sec from `connection_details` where inode=%r", inode)
         row=self.dbh.fetch()
         if row:
             self.con_id = row['con_id']
@@ -64,6 +64,8 @@ class StreamFile(File):
             self.dest_port = row['dest_port']
             self.reverse = row['reverse']
             self.ts_sec = row['ts_sec']
+            self.dest_ip = row['dest_ip']
+            self.src_ip = row['src_ip']
 
         ## Are we already cached?
         if self.cached_fd:

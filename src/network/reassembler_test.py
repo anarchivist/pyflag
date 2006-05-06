@@ -13,7 +13,7 @@ def Callback(stream):
 
 reassembler.set_tcp_callback(hnd, Callback)
 
-filename = "/var/tmp/demo/stdcapture_0.2.pcap"
+filename = "/var/tmp/demo/ftp3.pcap"
 fd=open(filename)
 dbh = DB.DBO("demo")
 

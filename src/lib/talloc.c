@@ -203,6 +203,14 @@ void talloc_set_destructor(const void *ptr, int (*destructor)(void *))
 	tc->destructor = destructor;
 }
 
+void *talloc_get_destructor(const void *ptr)
+{
+	struct talloc_chunk *tc = talloc_chunk_from_ptr(ptr);
+	if(tc->destructor == -1) return NULL;
+	return tc->destructor;
+}
+
+
 /*
   increase the reference count on a piece of memory. 
 */

@@ -50,7 +50,7 @@ class HTTP:
         self.response = {}
         self.request_re = re.compile("(GET|POST|PUT|OPTIONS) +([^ ]+) +HTTP/1\..",
                                      re.IGNORECASE)
-        self.response_re = re.compile("HTTP/1\.. (\\d+) +OK", re.IGNORECASE)
+        self.response_re = re.compile("HTTP/1\.. (\\d+) +", re.IGNORECASE)
 
     def read_headers(self, dict):
         while True:

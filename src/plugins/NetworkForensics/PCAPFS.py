@@ -90,9 +90,17 @@ class PCAPFS(DBFS):
         
         ## This sets up the schema for pcap
         self.dbh.MySQLHarness("%s/pcaptool -c -t pcap" %(config.FLAG_BIN))
+        self.dbh.execute("select max(id) as id from pcap")
+        row=self.dbh.fetch()
+        if row:
+            max_id = row['id']
+        else:
+            max_id = 1
+
         ## This populates it 
-        sql =  "%s/iowrapper  -i %r -o %s -f foo -- %s/pcaptool -t pcap -i %r foo" % (
+        sql =  "%s/iowrapper -p %r -i %r -o %s -f foo -- %s/pcaptool -t pcap -i %r foo" % (
             config.FLAG_BIN,
+            max_id,
             self.iosource.subsystem,
             self.iosource.make_parameter_list(),
             config.FLAG_BIN, iosource_name)

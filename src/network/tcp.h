@@ -67,6 +67,9 @@ enum tcp_state_t {
   PYTCP_TIMED_OUT,
   PYTCP_DESTROY
 };
+
+#define TCP_FORWARD 1
+#define TCP_REVERSE 0
   
 /** This class holds information about each TCP Stream we find */
 CLASS(TCPStream, Object)
@@ -83,6 +86,8 @@ CLASS(TCPStream, Object)
 
      /** The next sequence number we expect */
      uint32_t next_seq;
+
+     int direction;
 
      TCPStream METHOD(TCPStream, Con, struct tuple4 *addr);
 

@@ -115,11 +115,14 @@ static int add_packet(TCPStream self, IP ip) {
 /** A talloc destructor to automatically decref the python objects
     upon free
 */
-static void free_data(void *self) {
-  TCPStream this=(TCPStream)self;
+static int free_data(void *self) {
+  TCPStream this=*(TCPStream *)self;
   PyObject *obj=(PyObject *)this->data;
 
-  Py_DECREF(obj);
+  if(obj)
+    Py_DECREF(obj);
+  
+  return 0;
 };
 
 static void callback(TCPStream self, IP ip) {
@@ -137,7 +140,15 @@ static void callback(TCPStream self, IP ip) {
       self->data = New_Stream_Dict(self, "forward");
 
     stream = (PyObject*)self->data;
-    talloc_set_destructor(self, (int (*)(void*))free_data);
+
+    // The following add another destructor to self without
+    // interfering with whatever destructor self has already.
+    {
+      TCPStream *tmp = talloc_size(self,sizeof(void *));
+
+      *tmp = self;
+      talloc_set_destructor(tmp, free_data);
+    };
     break;
   case PYTCP_DATA:
     add_packet(self, ip);
@@ -234,7 +245,7 @@ static PyObject *py_process_tcp(PyObject *self, PyObject *args) {
   };
 
   /** Try to parse the packet */
-  root = CONSTRUCT(Root, Packet, super.Con, tmp, NULL);
+  root = CONSTRUCT(Root, Packet, super.Con, NULL, NULL);
   root->packet.link_type = link_type;
 
   root->super.Read((Packet)root, tmp);
@@ -268,7 +279,7 @@ static PyObject *py_process_tcp(PyObject *self, PyObject *args) {
 static PyObject *py_clear_stream_buffers(PyObject *self, PyObject *args) {
   TCPHashTable hash;
   PyObject *hash_py;
-  TCPStream j,k;
+  TCPStream j;
   int i;
 
   if(!PyArg_ParseTuple(args, "O", &hash_py))
@@ -276,18 +287,8 @@ static PyObject *py_clear_stream_buffers(PyObject *self, PyObject *args) {
   
   hash = PyCObject_AsVoidPtr(hash_py);
   if(!hash) return NULL;
-  
-  for(i=0; i<TCP_STREAM_TABLE_SIZE; i++) {
-    list_for_each_entry_safe(j, k, &(hash->table[i]->list), list) {
-      /** Flush both forward and reverse connections together */
-      j->flush(j);
-      j->reverse->flush(j->reverse);
-      list_del(&(j->list));
-      list_del(&(j->reverse->list));
-      talloc_free(j);
-      talloc_free(j->reverse);
-    };
-  };
+
+  talloc_free(hash);
 
   Py_INCREF(Py_None);
   return Py_None;
@@ -336,7 +337,8 @@ static PyObject *py_init(PyObject *self, PyObject *args) {
 
   hash = CONSTRUCT(TCPHashTable, TCPHashTable, Con, NULL);
   hash->callback = callback;
-  result =  PyCObject_FromVoidPtr(hash, (void (*)(void *))talloc_free);
+  //  result =  PyCObject_FromVoidPtr(hash, (void (*)(void *))talloc_free);
+  result =  PyCObject_FromVoidPtr(hash, NULL);
 
   return result;
 };

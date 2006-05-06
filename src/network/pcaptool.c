@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
   int createNewTable = 0;
   int index, c;
 
-  while ((c = getopt (argc, argv, "t:ci:")) != -1) {
+  while ((c = getopt (argc, argv, "t:ci:p:")) != -1) {
     switch(c) {
     case 'c':
       createNewTable = TRUE;
@@ -121,6 +121,8 @@ int main(int argc, char **argv) {
     case 'i':
       iosource_name = optarg;
       break;
+    case 'p':
+      packet_id = atol(optarg);
     default:
       printUsage();
       exit(0);
