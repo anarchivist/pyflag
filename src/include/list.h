@@ -258,4 +258,7 @@ static inline int list_count(struct list_head *head)
 #define list_next(first, head, member)			\
   do { first=list_entry((head)->next, typeof(*first), member); } while(0)
 
+#define list_prev(first, head, member)			\
+  do { first=list_entry((head)->prev, typeof(*first), member); } while(0)
+
 #endif

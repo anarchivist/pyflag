@@ -62,7 +62,7 @@ class DBExpander:
         return self.string
 
     def __repr__(self):
-        return "'%s'"% MySQLdb.escape_string(self.string)
+        return "'%s'"% MySQLdb.escape_string(self.string.decode("latin1"))
 
 class Pool(Queue):
     """ Pyflag needs to maintain multiple simulataneous connections to

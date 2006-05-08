@@ -26,6 +26,7 @@ void TCPStream_add(TCPStream self, IP ip) {
   struct skbuff *new = talloc(self, struct skbuff);
   struct skbuff *i;
   TCP tcp=(TCP)ip->packet.payload;
+  int count=0;
 
   /** This is the location after which we insert the new structure */
   struct list_head *candidate = &(self->queue.list);
@@ -54,6 +55,7 @@ void TCPStream_add(TCPStream self, IP ip) {
 
     if(tcp->packet.header.seq >= list_tcp->packet.header.seq) {
       candidate = &(i->list);
+      count++;
     } else break;
   };
 
@@ -102,12 +104,61 @@ void TCPStream_add(TCPStream self, IP ip) {
       continue;
     };
 
+    /** If the list gets too large, we need to flush the data out to
+	the callback. This could be because we have missed a packet
+	permanently for example. We pad the data with 0 to make it
+	work. 
+
+	We do this by checking if the sequence number of the last
+	packet is further than window ahead of the first packet in the
+	list.
+    */
+    if(self->state == PYTCP_DATA){
+      struct skbuff *last;
+      TCP tcp_last;
+
+      list_prev(last, &(self->queue.list), list);
+      tcp_last = (TCP)last->packet->packet.payload;
+
+      if(tcp->packet.header.window + tcp->packet.header.seq 
+	 < tcp_last->packet.header.seq) {
+	int pad_length = tcp->packet.header.seq - self->next_seq;
+	char *new_data;
+
+	/** If we need to pad too much, we need to skip
+	    data. Otherwise we would be caught in a malloc bomb.
+	*/
+	if(pad_length > 50000) {
+	  printf("Needing to pad excessively, dropping data...\n");
+	  self->next_seq = tcp->packet.header.seq;
+	  continue;
+	};
+
+	new_data = talloc_size(tcp, tcp->packet.data_len + pad_length);
+	memset(new_data, 0, pad_length);
+	memcpy(new_data+pad_length, tcp->packet.data, tcp->packet.data_len);
+
+	tcp->packet.data_len+=pad_length;
+	tcp->packet.data = new_data;
+
+	self->next_seq+=tcp->packet.data_len;
+	
+	/** Call our callback with this */
+	if(self->callback) self->callback(self, first->packet);
+
+	printf("Forced to pad by %u bytes\n",pad_length);
+
+	list_del(&(first->list));
+	talloc_free(first);
+	continue;
+      };
+    }; 
+
     /** If we get here we can not process any more off the queue at
 	this time. 
     */
     break;
   };
-
 };
 
 /** Flush all the queues into the callback */
@@ -197,7 +248,7 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   /** Now try to find the reverse stream in our hash table */
   list_for_each_entry(i, &(self->table[reverse_hash]->list), list) {
     if(!memcmp(&(i->addr),&reverse, sizeof(reverse))) {
-      return i;
+      return i->reverse;
     };
   };  
 
