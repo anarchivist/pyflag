@@ -37,13 +37,13 @@ import md5
 class MD5Scan(GenScanFactory):
     """ Scan file and record file Hash (MD5Sum) """
     default = False
-    depends = 'TypeScan'
+    depends = ['TypeScan']
 
     def __init__(self,fsfd):
         GenScanFactory.__init__(self, fsfd)
         
         self.dbh.execute(""" CREATE TABLE IF NOT EXISTS `md5` (
-        `inode` varchar( 20 ) NOT NULL default '',
+        `inode` varchar( 250 ) NOT NULL default '',
         `md5` varchar( 35 ) NOT NULL default '',
         `binary_md5` varchar( 16 ) binary NOT NULL default '',
         `NSRL_productcode` int(11) not NULL default '0',
@@ -84,7 +84,7 @@ class MD5Scan(GenScanFactory):
             nsrl=dbh_flag.fetch()
             if not nsrl: nsrl={}
 
-            self.dbh.execute('INSERT INTO md5 set inode=%r,md5=%r,binary_md5=%r,NSRL_productcode=%r, NSRL_filename=%r', (self.inode, self.m.hexdigest(),self.m.digest(),nsrl.get('productcode',''),nsrl.get('filename','')))
+            self.dbh.execute('INSERT INTO md5 set inode=%r,md5=%r,binary_md5=%r,NSRL_productcode=%r, NSRL_filename=%r', (self.inode, self.m.hexdigest(),self.m.digest(),nsrl.get('productcode',0),nsrl.get('filename','')))
 
 class HashComparison(Reports.report):
     """ Compares MD5 hash against the NSRL database to classify files """
@@ -113,7 +113,7 @@ class HashComparison(Reports.report):
             
         try:
             dbh.check_index("type","inode")
-            dbh.execute("create table `hash` select a.inode as `Inode`,concat(path,b.name) as `Filename`,d.type as `File Type`,if(c.Code=0,'Unknown',c.Name) as `NSRL Product`,c.Code as `NSRL Code`,a.NSRL_filename,md5 as `MD5` from md5 as a,%s.NSRL_products as c, type as d left join file as b on a.inode=b.inode   where  a.NSRL_productcode=c.Code and d.inode=a.inode group by Inode,`NSRL Code`,MD5",(config.FLAGDB,))
+            dbh.execute("create table `hash` select a.inode as `Inode`,concat(path,b.name) as `Filename`,d.type as `File Type`,if(c.Code=0,'Unknown',c.Name) as `NSRL Product`,c.Code as `NSRL Code`,a.NSRL_filename,md5 as `MD5` from md5 as a join %s.NSRL_products as c join type as d on (a.NSRL_productcode=c.Code and d.inode=a.inode) left join file as b on (a.inode=b.inode) group by Inode,`NSRL Code`,MD5",(config.FLAGDB,))
         except DB.DBError,e:
             raise Reports.ReportError("Unable to find the types table for the current image. Did you run the TypeScan Scanner?.\n Error received was %s" % e)
         

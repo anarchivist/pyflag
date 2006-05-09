@@ -62,7 +62,7 @@ class DBExpander:
         return self.string
 
     def __repr__(self):
-        return "'%s'"% MySQLdb.escape_string(self.string.decode("latin1"))
+        return "'%s'"% escape(self.string)
 
 class Pool(Queue):
     """ Pyflag needs to maintain multiple simulataneous connections to
@@ -106,7 +106,9 @@ class Pool(Queue):
             mysql_bin_string = "%s -f -u %r -p%r -h%s -P%s" % (config.MYSQL_BIN,config.USER,config.PASSWD,config.HOST,config.PORT)
         except Exception,e:
             #or maybe over the socket?
-            dbh = MySQLdb.Connect(user = config.DBUSER, passwd = config.DBPASSWD,db = case, unix_socket = config.DBUNIXSOCKET)
+##  The following is used for debugging to ensure we dont have any SQL errors:
+            dbh = MySQLdb.Connect(user = config.DBUSER, passwd = config.DBPASSWD,db = case, unix_socket = config.DBUNIXSOCKET, sql_mode="STRICT_ALL_TABLES")
+##            dbh = MySQLdb.Connect(user = config.DBUSER, passwd = config.DBPASSWD,db = case, unix_socket = config.DBUNIXSOCKET)
             mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBUNIXSOCKET)
 
         return (dbh,mysql_bin_string)
@@ -173,7 +175,10 @@ class DBO:
             string= query_str % params
             
         try:
-            self.cursor.execute(string,None)
+            ## The following decode is required to go around MySQLdb's
+            ## stupid unicode crap - this has just recently been
+            ## introduced:
+            self.cursor.execute(string.decode('latin1'),None)
         #If anything went wrong we raise it as a DBError
         except Exception,e:
             str = "%s" % e

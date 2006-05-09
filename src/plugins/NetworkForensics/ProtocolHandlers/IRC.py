@@ -411,7 +411,7 @@ class IRCScanner(StreamScannerFactory):
             `full_sender` VARCHAR( 255 ) NOT NULL ,
             `recipient` VARCHAR(50),
             `command` VARCHAR(255) NOT NULL,
-            `inode` VARCHAR(50) NOT NULL,
+            `inode` VARCHAR(250) NOT NULL,
             `packet_id` INT,
             `session` VARCHAR(250),
             `data` TEXT NOT NULL,

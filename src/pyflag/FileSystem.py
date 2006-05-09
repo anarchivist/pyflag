@@ -197,7 +197,7 @@ class DBFS(FileSystem):
     
         self.dbh.execute("""CREATE TABLE IF NOT EXISTS inode (
         `inode` VARCHAR(250) NOT NULL,
-        `status` INT,
+        `status` set('unalloc','alloc'),
         `uid` INT,
         `gid` INT,
         `mtime` INT NOT NULL,
@@ -271,7 +271,7 @@ class DBFS(FileSystem):
             path = FlagFramework.normpath(path)
             self.dbh.execute("select * from file where path=%r and name=%r and mode='d/d'",(path, dirs[d]))
             if not self.dbh.fetch():
-                self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode='d/d'",(path,dirs[d]))
+                self.dbh.execute("insert into file set inode='',path=%r,name=%r,status='alloc',mode='d/d'",(path,dirs[d]))
 
         ## Now add to the file and inode tables:
         self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode=%r,inode=%r",  (
@@ -281,22 +281,27 @@ class DBFS(FileSystem):
             inode))
 
         try:
-            size = properties['size']
+            size = int(properties['size'])
         except KeyError:
             size = 1
 
         try:
-            ctime = properties['ctime']
+            ctime = int(properties['ctime'])
         except KeyError:
             ctime = 0
 
         try:
-            mtime = properties['mtime']
+            atime = int(properties['atime'])
+        except KeyError:
+            atime = 0
+
+        try:
+            mtime = int(properties['mtime'])
         except KeyError:
             mtime = 0
-            
-        self.dbh.execute("insert into inode  set status='alloc', mode=%r, links=%r , inode=%r,gid=0,uid=0,size=%r, mtime=%r, ctime=%r",(
-            40755, 4,inode, size, mtime, ctime))
+
+        self.dbh.execute("insert into inode  set status='alloc', mode=%r, links=%r , inode=%r,gid=0,uid=0,size=%r, mtime=%r, ctime=%r, atime=%r",(
+            40755, 4,inode, size, mtime, ctime, atime))
 
     def longls(self,path='/', dirs = None):
         if self.isdir(path):
@@ -318,7 +323,8 @@ class DBFS(FileSystem):
         self.dbh.execute("select path,mode,inode,name from file where %s %s", (where, mode))
 
         ## This is done rather than return the generator to ensure that self.dbh does not get interfered with...
-        return [dent for dent in self.dbh]
+        result=[dent for dent in self.dbh]
+        return result
     
     def ls(self, path="/", dirs=None):
         return [ dent['name'] for dent in self.longls(path,dirs) ]

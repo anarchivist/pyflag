@@ -72,7 +72,7 @@ class NetworkScanner(BaseScanner):
         ## dissect each packet.
         self.packet_id = self.fd.tell()-1
         self.packet_offset = self.fd.packet_offset
-        metadata['mime'] = None
+        metadata['mime'] = "text/packet"
           
         try:
             self.proto_tree = metadata['proto_tree'][self.packet_id]
@@ -88,6 +88,7 @@ class StreamScannerFactory(GenScanFactory):
     """ This is a scanner factory allows scanners to only operate on streams.
 
     """
+    order = 2
     class Drawer(Scanner.Drawer):
         description = "Network Scanners"
         name = "NetworkScanners"
@@ -95,15 +96,14 @@ class StreamScannerFactory(GenScanFactory):
         default = True
         special_fs_name = 'PCAPFS'
 
-
     def stream_to_server(self, stream, protocol):
         if stream.dest_port in dissect.fix_ports(protocol):
             forward_stream = stream.con_id
             reverse_stream = stream.reverse
             
-        elif stream.src_port in dissect.fix_ports(protocol):
-            reverse_stream = stream.con_id
-            forward_stream = stream.reverse
+##        elif stream.src_port in dissect.fix_ports(protocol):
+##            reverse_stream = stream.con_id
+##            forward_stream = stream.reverse
         else:
             return None, None
 
@@ -115,6 +115,7 @@ class StreamScannerFactory(GenScanFactory):
     
     def scan_as_file(self, inode, factories):
         """ Scans inode as a file (i.e. without any Stream scanners). """
+        print "Scanning as file inode %s" % inode
         fd = self.fsfd.open(inode=inode)
         factories = [ x for x in factories if not isinstance(x, StreamScannerFactory) ]
 
@@ -128,7 +129,8 @@ class StreamScannerFactory(GenScanFactory):
                 self.fd.con_id
             except AttributeError:
                 return
-
+            metadata['mime'] = "text/packet"
+            
             ## Call the base classes process_stream method with the
             ## given stream.
             self.outer.process_stream(self.fd, self.factories)

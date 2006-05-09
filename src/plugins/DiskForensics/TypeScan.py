@@ -43,7 +43,7 @@ class TypeScan(Scanner.GenScanFactory):
     def __init__(self,fsfd):
         Scanner.GenScanFactory.__init__(self, fsfd)
         self.dbh.execute(""" CREATE TABLE IF NOT EXISTS `type` (
-        `inode` varchar( 20 ) NOT NULL,
+        `inode` varchar( 250 ) NOT NULL,
         `mime` varchar( 50 ) NOT NULL,
         `type` tinytext NOT NULL )""")
 
@@ -58,8 +58,6 @@ class TypeScan(Scanner.GenScanFactory):
         pass
 
     class Scan(Scanner.BaseScanner):
-        size=0
-        
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
             Scanner.BaseScanner.__init__(self, inode,ddfs,outer,factories)
             self.filename=self.ddfs.lookup(inode=inode)
@@ -67,15 +65,13 @@ class TypeScan(Scanner.GenScanFactory):
             self.type_str = None
         
         def process(self, data,metadata=None):
-            if(self.size < 100):
+            if self.type_str==None:
                 magic = FlagFramework.Magic(mode='mime')
                 magic2 = FlagFramework.Magic()
                 self.type_mime = magic.buffer(data)
                 self.type_str = magic2.buffer(data)
                 metadata['mime']=self.type_mime
                 metadata['magic']=self.type_str
-
-            self.size = self.size + len(data)
 
         def finish(self):
             # insert type into DB

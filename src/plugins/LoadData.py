@@ -314,8 +314,14 @@ class ScanFS(Reports.report):
 
         def process_directory(root):
             """ Recursive function for scanning directories """
+            ## We need to capture the files and directories _before_
+            ## scanning because scanner may add files/directories
+            ## themselves:
+            files = fsfd.longls(path=root,dirs=0)
+            directories = fsfd.ls(path=root,dirs=1)
+            
             ## First scan all the files in the directory
-            for stat in fsfd.longls(path=root,dirs=0):
+            for stat in files:
                 logging.log(logging.DEBUG,"Scanning file %s%s (inode %s)" % (stat['path'],stat['name'],stat['inode']))
                 try:
                     fd=fsfd.open(inode=stat['inode'])
@@ -326,7 +332,7 @@ class ScanFS(Reports.report):
                     logging.log(logging.ERRORS,"Error scanning inode %s: %s" % (stat['inode'],e))
                     
             ## Now recursively scan all the directories in this directory:
-            for directory in fsfd.ls(path=root,dirs=1):
+            for directory in directories:
                 new_path = "%s%s/" % (root,directory)
                 process_directory(new_path)
                     

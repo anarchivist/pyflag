@@ -168,6 +168,43 @@ void TCPStream_flush(TCPStream self) {
   */
   if(self->direction!=TCP_FORWARD) return;
 
+#if 0
+  while(!list_empty(&(self->queue.list))) {
+    struct skbuff *first;
+    TCP tcp;
+    int pad_length;
+    char *new_data;
+
+    list_next(first, &(self->queue.list), list);
+    tcp = (TCP)first->packet->packet.payload;
+
+    pad_length = tcp->packet.header.seq - self->next_seq;
+    if(pad_length > 50000) {
+      printf("Needing to pad excessively, dropping data...\n");
+      self->next_seq = tcp->packet.header.seq;
+      continue;
+    };
+
+    new_data = talloc_size(tcp, tcp->packet.data_len + pad_length);
+    memset(new_data, 0, pad_length);
+    memcpy(new_data+pad_length, tcp->packet.data, tcp->packet.data_len);
+    
+    tcp->packet.data_len+=pad_length;
+    tcp->packet.data = new_data;
+    
+    self->next_seq+=tcp->packet.data_len;
+    
+    /** Call our callback with this */
+    if(self->callback) self->callback(self, first->packet);
+    
+    printf("Forced to pad by %u bytes\n",pad_length);
+    
+    list_del(&(first->list));
+    talloc_free(first);
+    continue;
+  };
+
+#endif
   self->state = PYTCP_DESTROY;
   if(self->callback) self->callback(self, NULL);
 
@@ -221,6 +258,13 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   TCPStream i,j;
 
   /** If we did not get a TCP packet, we fail */
+  /** The below should work but does not because __TCP is defined in 2
+      different shared objects reassemble.so and dissect.so. We are
+      likely to receive a class created from dissect.so here but __TCP
+      refers to our (reassemble.so) version.
+
+      Any ideas of how to fix this???
+   */
   //  if(!tcp || !ISINSTANCE(tcp,TCP)) {
   if(!tcp || strcmp(NAMEOF(tcp),"TCP")) {
     return NULL;

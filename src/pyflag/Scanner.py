@@ -299,15 +299,13 @@ def scanfile(ddfs,fd,factories):
                     if c.__class__.__name__ not in scanners_run ]
 
     if not objs: return
-##    for c in factories:
-##        ddfs.dbh.execute("select inode from inode where inode=%r and FIND_IN_SET(%r,scanner_cache)",(fd.inode,"%s" % c.__class__.__name__))
-##        if not ddfs.dbh.fetch():
-##            objs.append(c.Scan(fd.inode,ddfs,c,factories=factories,fd=fd))
 
-    # read data (in chunks)
+    ## This dict stores metadata about the file which may be filled in
+    ## by some scanners in order to indicate some fact to other
+    ## scanners.
+    metadata = {}
+
     while 1:
-        ## This dict stores metadata about the file which may be filled in by some scanners in order to indicate some fact to other scanners.
-        metadata = {}
         ## If the file is too fragmented, we skip it because it might take too long... NTFS is a shocking filesystem, with some files so fragmented that it takes a really long time to read them. In our experience these files are not important for scanning so we disable them here. Maybe this should be tunable?
         try:
             if len(fd.blocks)>1000 or fd.size>100000000:

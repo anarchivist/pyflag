@@ -86,7 +86,7 @@ class RFC2822(Scanner.GenScanFactory):
                 if not date:
                     raise Exception("No Date field in message - this is probably not an RFC2822 message at all.")
                     
-		self.dbh.execute("INSERT INTO `email` SET `inode`=%r,`date`=from_unixtime(%r),`to`=%r,`from`=%r,`subject`=%r", (self.inode, time.mktime(date), a.get('To'), a.get('From'), a.get('Subject')))
+		self.dbh.execute("INSERT INTO `email` SET `inode`=%r,`date`=from_unixtime(%r),`to`=%r,`from`=%r,`subject`=%r", (self.inode, int(time.mktime(date)), a.get('To'), a.get('From'), a.get('Subject')))
 
 		for part in a.walk():
                     if part.get_content_maintype() == 'multipart':
@@ -106,7 +106,6 @@ class RFC2822(Scanner.GenScanFactory):
                     if not filename: filename="Attachment %s" % count
 
                     ## Create the VFS node:
-                    print "Creating node %s|m%s" %(self.inode, count)
                     self.ddfs.VFSCreate(self.inode,"m%s" % count, filename,
                                         mtime = time.mktime(date)
                                         )

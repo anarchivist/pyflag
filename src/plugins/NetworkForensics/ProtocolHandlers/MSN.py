@@ -306,7 +306,7 @@ class MSNScanner(StreamScannerFactory):
             `sender` VARCHAR( 250 ) NOT NULL ,
             `friendly_name` VARCHAR( 255 ) NOT NULL ,
 	    `recipient` VARCHAR( 255 ),
-            `inode` VARCHAR(50) NOT NULL,
+            `inode` VARCHAR(250) NOT NULL,
             `packet_id` INT,
             `session` INT,
             `data` TEXT NOT NULL
@@ -323,7 +323,7 @@ class MSNScanner(StreamScannerFactory):
             `channel_id` INT,
             `to_user` VARCHAR(250),
             `from_user` VARCHAR(250),
-            `context` VARCHAR(250)
+            `context` TEXT
             )""")
             
         self.msn_connections = {}
