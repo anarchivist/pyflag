@@ -216,7 +216,7 @@ class Log:
         self.dbh=None
         data=pickle.dumps(self)
         self.dbh=tmp
-        self.dbh.set_meta("log_preset", name)
+        self.dbh.set_meta("log_preset", name,force_create=True)
         self.dbh.set_meta("log_preset_%s" % name, data)
 
     def display(self,query,result):

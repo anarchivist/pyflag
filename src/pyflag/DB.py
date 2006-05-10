@@ -304,11 +304,11 @@ class DBO:
 
         return None
 
-    def set_meta(self, property,value, table='meta', **args):
+    def set_meta(self, property,value, table='meta',force_create=False, **args):
         """ Sets the value in meta table
         """
         prevvalue = self.get_meta(property, table, **args)
-        if prevvalue != None:
+        if (prevvalue != None) and (not force_create):
             self.execute("update `%s` set property=%r,value=%r where property=%r",
                          (table, property,value, property))
         else:

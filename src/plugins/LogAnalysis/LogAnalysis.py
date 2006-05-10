@@ -272,7 +272,7 @@ class ManageLogPresets(Reports.report):
                 return "Unknown"
         
         result.table(
-            columns = ( "value","value",'value' ),
+            columns = ( 'value','value','value' ),
             names = ( "Delete?","Log Preset","Type"),
             links = [ FlagFramework.query_type((),family=query['family'],report='RemoveLogPreset',__target__='log_preset'),],
             callbacks = { 'Delete?':DeleteIcon, 'Type':Describe },

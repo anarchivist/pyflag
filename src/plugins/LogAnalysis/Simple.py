@@ -104,6 +104,16 @@ class prefilter:
         transform_list = self.res['PFDateFormatChange']
         return self.transform(transform_list,string)
 
+    def PFDateFormatChange(self,string):
+        """ DDMMYYYY->YYYYMMDD """
+        if not self.res.has_key('PFDateFormatChange3'):
+            tmp = []
+            self.prepare(r" s#(\d\d)(\d\d)(\d\d\d\d)#\3/\2/\1# ",tmp)
+            self.res['PFDateFormatChange3'] = tmp
+            
+        transform_list = self.res['PFDateFormatChange3']
+        return self.transform(transform_list,string)
+
     def PFDateFormatChange2(self,string):
         """ YYYY-MM-DD HH:MM:SS->YYYY/MM/DD:HH:MM:SS """
         if not self.res.has_key('PFDateFormatChange2'):

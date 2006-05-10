@@ -66,10 +66,10 @@ class CiscoPixSyslogged(Simple.SimpleLog):
         `protocol` VARCHAR(10) ,
         `src_if` VARCHAR( 10 ) NOT NULL ,
         `src_host` VARCHAR(50) ,
-        `src_port` SMALLINT ,
+        `src_port` INT UNSIGNED ,
         `dst_if` VARCHAR( 10 ) NOT NULL ,
         `dst_host` VARCHAR(50) ,
-        `dst_port` SMALLINT ,
+        `dst_port` INT UNSIGNED ,
         `rule` VARCHAR(255) NOT NULL ,
         `action` enum('deny','deny:no connection','built connection','tcp teardown','access-list','stored-file') default NULL ,
         `duration` TIME NOT NULL ,
@@ -150,7 +150,7 @@ class CiscoPixSyslogged(Simple.SimpleLog):
                     #e.g. %PIX-4-106023: Deny tcp src inside:myhost/55810 dst outside:192.168.0.1/80 by access-group "none_for_you"
                     #%PIX-6-106015: Deny TCP (no connection) from 192.168.0.1/40549 to 192.168.3.1/21 flags RST  on interface outside.  This means packet was not associated with a connection and was not a SYN.
 
-                    #%PIX-4-106023: Deny icmp src inside:xtFTPEXTERNAL dst outside:TransACT_SVR (type 8, code 0) by access-group "inside_access_in
+                    #%PIX-4-106023: Deny icmp src inside:myservername dst outside:destservername (type 8, code 0) by access-group "none_for_you"
 
                     colns = re.split(r"[\s+:/]",columns[9],17)
 
@@ -217,49 +217,101 @@ class CiscoPixSyslogged(Simple.SimpleLog):
 
                     #built connections
                     #e.g. %PIX-6-302013: Built inbound TCP connection 323796 for outside:192.168.0.1/40532 (192.168.0.1/40532) to inside:192.168.3.1/21 (192.168.3.1/21)
+                    # %PIX-6-302013: Built outbound TCP connection 1084734 for outside:192.168.3.1/20 (192.168.3.1/20) to inside:192.168.0.1/63076 (192.168.0.1/63076)
                     #Stuff in brackets is mapped address and mapped port.  I'm ignoring for now.
+                    #FIXME: This format is retarded.  If inbound:
+                    # Built inbound <outside host/high port> to <inside host/low port>
+                    #If outbound:
+                    # Built outbound <outside host/low port> to <inside host/high port>
+                    #Which means I will have to swap around src and dest for outbound for it to make sense.
                     elif columns[9].startswith("Built"):
-                        
+
                         inserted = {
                             'id':count,
                             'pix_ts':pix_ts,
                             'direction':colns[1],
                             'protocol':colns[2],
                             'conn_number':colns[4],
-                            'src_if':colns[6],
-                            'src_host':colns[7],
-                            'src_port':colns[8],
-                            'dst_if':colns[12],
-                            'dst_host':colns[13],
-                            'dst_port':colns[14],
                             'duration':'Null',
                             'bytes':0,
                             'rule':'',
                             'action':'built connection'
                             }
+                        
+                        if colns[1]=='inbound':
+                            directions={
+                            'src_if':colns[6],
+                            'src_host':colns[7],
+                            'src_port':colns[8],
+                            'dst_if':colns[12],
+                            'dst_host':colns[13],
+                            'dst_port':colns[14]
+                            }
+                            inserted.update(directions)
+                            
+                        elif colns[1]=='outbound':
+                            #Flip all this stuff around
+                            directions={
+                            'dst_if':colns[6],
+                            'dst_host':colns[7],
+                            'dst_port':colns[8],
+                            'src_if':colns[12],
+                            'src_host':colns[13],
+                            'src_port':colns[14]
+                            }
+                            inserted.update(directions)
+                        else:
+                            print "Didn't understand Built connection message, unable to insert line id %s: %s: %s" % (count, line)
+                            #Clear so we don't insert a duplicate of the last line
+                            inserted=None
 
                     #TCP teardown
                     #e.g. %PIX-6-302014: Teardown TCP connection 323796 for outside:192.168.0.1/63847 to inside:192.168.3.1/28905 duration 0:00:01 bytes 398 TCP FINs
                     #Doco says bytes is "for the connection" which I'm assuming means two-way.
+                    #Unfortunately tcp teardowns suffer from the same stupid reversing as built connections (see above) HOWEVER, there is no direction flag, which means I am just guessing based on the port number range which direction it is going.
+
                     elif columns[9].startswith("Teardown"):
                         
                         inserted={
                             'id':count,
                             'pix_ts':pix_ts,
-                            'direction':'',
                             'protocol':colns[1],
                             'conn_number':colns[3],
+                            'duration':":".join(colns[13:16]),
+                            'bytes':colns[17],
+                            'rule':'',
+                            'action':'tcp teardown'
+                            }
+
+                        if ((int(colns[7]) > 1024) and (int(colns[11]) < 1024)) :
+                            #High port to low port, so this is probably inbound
+                            directions = {
                             'src_if':colns[5],
                             'src_host':colns[6],
                             'src_port':colns[7],
                             'dst_if':colns[9],
                             'dst_host':colns[10],
                             'dst_port':colns[11],
-                            'duration':":".join(colns[13:16]),
-                            'bytes':colns[17],
-                            'rule':'',
-                            'action':'tcp teardown',
+                            'direction':'inbound'
                             }
+                            inserted.update(directions)
+                        elif ((int(colns[7]) < 1024) and (int(colns[11]) > 1024)):
+                            #low port to high port, so this is probably inbound
+                            directions = {
+                            'dst_if':colns[5],
+                            'dst_host':colns[6],
+                            'dst_port':colns[7],
+                            'src_if':colns[9],
+                            'src_host':colns[10],
+                            'src_port':colns[11],
+                            'direction':'outbound',
+                            }
+                            inserted.update(directions)
+                        else:
+                            print "Didn't understand TCP teardown message, unable to insert line id %s: %s" % (count, line)
+                            #Clear so we don't insert a duplicate of the last line
+                            inserted=None
+
                     #Access List info
                     #%PIX-6-106100: access-list outside_access_in permitted tcp outside/192.168.0.1(6666) -> inside/192.168.3.1(22) hit-cnt 1 (first hit)
                     elif columns[9].startswith("access-list"):
@@ -284,7 +336,7 @@ class CiscoPixSyslogged(Simple.SimpleLog):
 
                     #File stored
                     #%PIX-6-303002:  192.168.0.1 Stored 192.168.3.1:filename.ext
-                    #This code can actually by FTP stored or retrieved.
+                    #This code can actually be FTP stored or retrieved.
                     elif colns[1].startswith("Stored"):
                         
                         inserted={
@@ -304,20 +356,20 @@ class CiscoPixSyslogged(Simple.SimpleLog):
                             'rule':colns[3],
                             'action':'stored-file',
                             }
-                    #I'm ignoring these types:
+                    #You could explicitly ignore some types here, I just have one of the really noisy, not particularly interesting one excluded.
                     
                     #%PIX-6-602301: sa created, (sa) sa_dest= 192.168.0.1, sa_prot= 50, sa_spi= 0x888ddddd(9999999999), sa_trans= esp-3des esp-md5-hmac , sa_conn_id= 8\n.  New security association.  Appears to be specific to 6.something Pixes.
                     #%PIX-6-602302: deleting SA, (sa) sa_dest= 192.168.0.1, sa_prot= 50, sa_spi= 0x888ddddd(9999999999), sa_trans= esp-3des esp-md5-hmac , sa_conn_id= 6\n
                     #%PIX-6-302010: 1 in use, 399 most used.  Appears after a TCP connection restarts.  x in use indicates the current number of connections.
                     #%PIX-6-602201: ISAKMP Phase 1 SA created (local 192.168.0.1/500 (responder), remote myhost/500, authentication=pre-share, encryption=3DES-CBC, hash=MD5, group=2, lifetime=86400s)
-                    elif ((" ".join(colns[0:2]).startswith("sa created")) or \
-                         (" ".join(colns[0:2]).startswith("deleting SA")) or \
-                         (" ".join(colns[1:3]).startswith("in use")) or \
-                         (colns[0].startswith("ISAKMP"))):
-                        
+                    ## ((" ".join(colns[0:2]).startswith("sa created")) or \
+##                         (" ".join(colns[0:2]).startswith("deleting SA")) or \
+                           # (colns[0].startswith("ISAKMP"))
+
+                    elif (" ".join(colns[1:3]).startswith("in use")):
                         inserted=None
                     else:
-                        print "Unable to insert line id %s: %s: %s" % (count, line,e)
+                        print "Unable to insert line id %s: %s" % (count, line)
                         #Clear so we don't insert a duplicate of the last line
                         inserted=None
 

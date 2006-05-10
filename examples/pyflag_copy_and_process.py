@@ -226,8 +226,7 @@ class FlagFeeder:
             local_file_for_processing = os.path.basename(files).replace(".pcap","")
             pyflash_log_file=os.path.join(os.path.dirname(log.path), casename + "_" + date.current + "_" + local_file_for_processing + ".pyflag_log")
             log.write("Pyflash logfile: " + pyflash_log_file)
-
-            #log.write("pyflash -c " + pyflashconf + " -p case:" + casename + local_file_for_processing + ",iosource:" + casename + local_file_for_processing + ",iofilename:" + files + ",mountpoint:" + casename + " &> " + pyflash_log_file)            
+            
             log.write("pyflash -c " + pyflashconf + " -p case:" + casename + ",iosource:" + local_file_for_processing + ",iofilename:" + files + ",mountpoint:" + local_file_for_processing + " &> " + pyflash_log_file)
             os.system("pyflash -c " + pyflashconf + " -p case:" + casename + ",iosource:" + local_file_for_processing + ",iofilename:" + files + ",mountpoint:" + local_file_for_processing + " &> " + pyflash_log_file)
 
@@ -288,6 +287,7 @@ parser.add_option("-e", "--errorlogdir",type="string", dest="errorlogdir", help=
 parser.add_option("-t", "--tempdir",type="string", dest="tempdir", help="Temporary directory to store log files as they are being written (must be local)"),
 parser.add_option("-d", "--holdingdir",type="string", dest="holdingdir", help="Temporary directory to store the data for processing (must be local, will be moved from --src).  If no directory specified, the data will be processed in placed (assuming it is local)."),
 parser.add_option("-n", "--casename",type="string", dest="casename", help="The casename to use in pyFLAG for these files"),
+parser.add_option("-p", "--casenameprefix",type="string", dest="casenameprefix", help="The pyflag casename will be casenameprefix + date.  Use this when there is too much data to add to one case."),
 parser.add_option("-f", "--lockfile",type="string", dest="lockfilepath", help="The lockfile for the program (must be local)"),
 parser.add_option("-r", "--removepostprocess",action="store_true",dest="removedata",help="If this flag is set, data will be removed from source after it has been successfully copied  holdingdir.  Only necessary if source is remote - if src is local, the data is moved (not copied) to holdingdir regardless of this flag."),
 parser.add_option("-b", "--backupdir",type="string", dest="backupdir", help="The local directory to backup all data (excepts logs) to after processing is finished (this is the only copy of the data that will remain).  Only makes sense if --removepostprocess and holdingdir are specified.")
@@ -329,7 +329,10 @@ try:
         #FLAG Processing
         log.write("########### Starting pyflag processing #########")
         flag_feeder=FlagFeeder()
-        flag_err=flag_feeder.pcap(local_data_store,options.pyflashconf,options.casename,options.errorlogdir,handler)
+        if (options.casename):
+            flag_err=flag_feeder.pcap(local_data_store,options.pyflashconf,options.casename,options.errorlogdir,handler)
+        elif (options.casenameprefix):
+            flag_err=flag_feeder.pcap(local_data_store,options.pyflashconf,options.casenameprefix+date.current,options.errorlogdir,handler)
         log.write("Flag processing completed with errors in %s files" % flag_err)
 
         if ((options.backupdir) and (options.removedata)):
