@@ -44,7 +44,7 @@ class TypeScan(Scanner.GenScanFactory):
         Scanner.GenScanFactory.__init__(self, fsfd)
         self.dbh.execute(""" CREATE TABLE IF NOT EXISTS `type` (
         `inode` varchar( 250 ) NOT NULL,
-        `mime` varchar( 50 ) NOT NULL,
+        `mime` tinytext NOT NULL,
         `type` tinytext NOT NULL )""")
 
         ## Create indexes on this table immediately because we need to select
@@ -59,7 +59,7 @@ class TypeScan(Scanner.GenScanFactory):
 
     class Scan(Scanner.BaseScanner):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
-            Scanner.BaseScanner.__init__(self, inode,ddfs,outer,factories)
+            Scanner.BaseScanner.__init__(self, inode,ddfs,outer,factories, fd=fd)
             self.filename=self.ddfs.lookup(inode=inode)
             self.type_mime = None
             self.type_str = None

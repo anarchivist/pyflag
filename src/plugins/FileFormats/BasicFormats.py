@@ -137,8 +137,9 @@ class SimpleStruct(DataType):
         self.data=result
         for item in fields:
             tmp=item['Type'](data[offset:],item['Parameters'],parent=self)
+            s=tmp.size()
             self.offsets[item['Name']]=offset
-            offset+=tmp.size()
+            offset+=s
             result[item['Name']]=tmp
             
         return result
@@ -257,7 +258,7 @@ class StructArray(SimpleStruct):
 
     def size(self):
         size=0
-        if not self.data:
+        if len(self.data)==0:
             self.initialise()
             
         for x in self.data:
@@ -356,11 +357,13 @@ class STRING(BYTE):
             self.parent = None
         try:
             self.paralength = parameters['length']
-        except KeyError,e:
-            print 'KeyError %s' % e
-            self.paralength = '1'
+        except (KeyError),e:
+            raise RuntimeError("You must specify a length")
 
         BYTE.__init__(self,buffer,parameters,*args,**kwargs)
+
+    def size(self):
+        return self.paralength
 
     def __str__(self):
         if not self.data: self.initialise()
@@ -421,6 +424,7 @@ class TERMINATED_STRING(DataType):
     terminator='\x00'
     max_blocksize=1024*1024
     initial_blocksize=1024
+
     def read(self,data):
         blocksize=self.initial_blocksize
         tmp=''

@@ -326,8 +326,9 @@ def scanfile(ddfs,fd,factories):
         try:
             data = fd.read(buffsize)
             if not data: break
-        except IOError:
+        except IOError,e:
             break
+        
         # call process method of each class
         for o in objs:
             try:
@@ -345,7 +346,10 @@ def scanfile(ddfs,fd,factories):
 
     # Store the fact that we finished in the inode table:
     scanner_names = ','.join([ c.outer.__class__.__name__ for c in objs ])
-    ddfs.dbh.execute("update inode set scanner_cache = concat_ws(',',scanner_cache, %r) where inode=%r", (scanner_names, fd.inode))
+    try:
+        ddfs.dbh.execute("update inode set scanner_cache = concat_ws(',',scanner_cache, %r) where inode=%r", (scanner_names, fd.inode))
+    except DB.DBError:
+        pass
 
 class Drawer:
     """ This class is responsible for rendering scanners of similar classes.

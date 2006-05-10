@@ -127,7 +127,6 @@ class BrowseFS(Reports.report):
             def pane_cb(branch,tmp):
                 query['order']='Filename'
                 br=FlagFramework.normpath('/'.join(branch)+'/')
-                print "br %s %s" % (br,branch)
                 tmp.table(
                     columns=['f.inode','name','f.status','size', 'from_unixtime(mtime)','f.mode'],
                     names=('Inode','Filename','Del','File Size','Last Modified','Mode'),
@@ -285,7 +284,7 @@ class DBFS_file(FileSystem.File):
         if not self.index:
             # fetch inode data
             self.dbh.check_index("inode" ,"inode")
-            self.dbh.execute("select * from inode where inode=%r and status='alloc'", (self.inode))
+            self.dbh.execute("select * from inode where inode=%r", (self.inode))
             self.data = self.dbh.fetch()
             if not self.data:
                 raise IOError("Could not locate inode %s"% self.inode)

@@ -31,15 +31,16 @@ Supports IE versions from IE 5 onwards.
 """
 import format,sys
 from format import *
+from plugins.FileFormats.BasicFormats import *
 
 class Header(SimpleStruct):
     def init(self):
         self.fields = [
-            [ STRING, 0x1c, 'Magic' ],
-            [ LONG,1,'file_size'],
-            [ LONG,1,'hash_offset'],
-            [ WORD_ARRAY,7,'unknown'],
-            [ LONG,1,'blocksize'],
+            [ STRING, {"length":0x1c}, 'Magic' ],
+            [ LONG,{},'file_size'],
+            [ LONG,{},'hash_offset'],
+            [ WORD_ARRAY,{'count':7},'unknown'],
+            [ LONG,{},'blocksize'],
             ]
     
 ## The default blocksize
@@ -53,18 +54,18 @@ class Hash(LONG_ARRAY):
     Note that the hash section may point at more hash sections, which  we automatically traverse all sections, so callers do not need to worry about looking for more hash sections.
     """
     def read(self,data):
-        magic=STRING(data,4)
+        magic=STRING(data,{'length':4})
         # Check the magic for this section
         if magic!='HASH':
             raise IOError("Location %s is not a hash array - This file may be empty!!"%(data.offset))
         
-        section_length = LONG(data[4:],1).get_value()
-        next_hash = LONG(data[8:],1).get_value()
+        section_length = LONG(data[4:]).get_value()
+        next_hash = LONG(data[8:]).get_value()
         offset=16
         while offset<section_length*blocksize:
-            record_type=LONG(data[offset:],1).get_value()
+            record_type=LONG(data[offset:]).get_value()
             if record_type!=0x3:
-                off = LONG(data[offset+4:],1)
+                off = LONG(data[offset+4:])
                 ## If the offsets are nonsensical we dont add them (i.e. point at 0xBADF00D are null)
                 if off!=0 and LONG(data.set_offset(off.get_value()))!=0xBADF00D:
                     if off.get_value() not in self.data:
@@ -84,19 +85,19 @@ class URLEntry(SimpleStruct):
     """ URL records are stored here """
     def init(self):
         self.fields = [
-            [ STRING, 4,'type'],
-            [ LONG, 1, 'size'], #In multiples of the blocksize
-            [ WIN_FILETIME,1,'modified_time'],
-            [ WIN_FILETIME,1,'accessed_time'],
-            [ LONG_ARRAY,0x7,'unknown'],
-            [ HIST_STR_PTR,1,'url'],
-            [ BYTE,1,'unknown2'],
-            [ BYTE,1,'directory_index'],
-            [ WORD,1,'unknown3'],
-            [ HIST_STR_PTR,1,'filename'],
-            [ LONG,1,'0x00200001'],
-            [ PContent,1,'content'],
-            ]
+            [ STRING, {'length':4},'type'],
+            [ LONG, None, 'size'], #In multiples of the blocksize
+            [ WIN_FILETIME,None,'modified_time'],
+            [ WIN_FILETIME,None,'accessed_time'],
+            [ LONG_ARRAY, {'count':0x7}, 'unknown'],
+            [ HIST_STR_PTR, None, 'url'],
+            [ BYTE, None, 'unknown2'],
+            [ BYTE, None, 'directory_index'],
+            [ WORD, None, 'unknown3'],
+            [ HIST_STR_PTR, None, 'filename'],
+            [ LONG, None, '0x00200001'],
+            [ PContent, None, 'content'],
+            ] 
 
 class HIST_STR_PTR(LONG):
     """ This is a pointer to a string relative to the start of the section """
@@ -127,10 +128,10 @@ class Content(SimpleStruct):
     """
     def init(self):
         self.fields=[
-            [ LONG,1,'Magic'], #Always seems to be 0x0020010
-            [ LONG_ARRAY,3,'pad'],
-            [ WORD,1,'length'],
-            [ ContentType,1,'content_type']
+            [ LONG,None,'Magic'], #Always seems to be 0x0020010
+            [ LONG_ARRAY,{'count':3},'pad'],
+            [ WORD, None,'length'],
+            [ ContentType, None,'content_type']
             ]
 
     def read(self,data):
@@ -148,11 +149,11 @@ class Content(SimpleStruct):
         if length:
             ## Sometimes this is unicode, sometimes not depending on the type
             if result['content_type']=="Title":
-                data=UCS16_STR(data[20:],length)
+                data=UCS16_STR(data[20:],{'length':length})
             else:
-                data=STRING(data[20:],length)
+                data=STRING(data[20:],{'length':length})
         else:
-            data=STRING('',0)
+            data=STRING('',{'length':0})
 
         self.add_element(result,data,'data')
 
@@ -201,9 +202,9 @@ class IEHistoryFile:
     def next(self):
         result={}
         offset=self.hash_iter.next()
-        entry_type = STRING(self.buffer[offset:],4).__str__()
+        entry_type = STRING(self.buffer[offset:],{'length':4}).__str__()
         if entry_type == 'URL ':
-            entry=URLEntry(self.buffer[offset:],1)
+            entry=URLEntry(self.buffer[offset:])
             result['event']=entry
             for key in ('type','modified_time','accessed_time','url','filename'):
                 result[key]=entry[key]
