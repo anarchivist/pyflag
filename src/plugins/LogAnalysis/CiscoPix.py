@@ -104,7 +104,7 @@ class CiscoPixSyslogged(Simple.SimpleLog):
                 
                 if columns[4].startswith("last"):
                     #Also handle the case of repeated messages
-                    #Oct 21 16:28:31 wesf80 last message repeated 1 time
+                    #Oct 21 16:28:31 myhost last message repeated 1 time
                     #These messages are inserted with duplicate IDs.
                     if inserted:
                         for i in range(int(columns[7])):
@@ -143,14 +143,15 @@ class CiscoPixSyslogged(Simple.SimpleLog):
 
 
                     #FIXME: Should actually do all the splits on the CISCO codes rather than random words.  The doco can be found on the Cisco site - do a search for "Cisco Security Appliance System Log Messages" and download the PDF.
-
-
-
+                    
                     #denied connections
                     #e.g. %PIX-4-106023: Deny tcp src inside:myhost/55810 dst outside:192.168.0.1/80 by access-group "none_for_you"
-                    #%PIX-6-106015: Deny TCP (no connection) from 192.168.0.1/40549 to 192.168.3.1/21 flags RST  on interface outside.  This means packet was not associated with a connection and was not a SYN.
-
                     #%PIX-4-106023: Deny icmp src inside:myservername dst outside:destservername (type 8, code 0) by access-group "none_for_you"
+
+                    #This means packet was not associated with a connection and was not a SYN.
+                    #%PIX-6-106015: Deny TCP (no connection) from 192.168.0.1/40549 to 192.168.3.1/21 flags RST  on interface outside.
+                    
+                    
 
                     colns = re.split(r"[\s+:/]",columns[9],17)
 
@@ -356,16 +357,21 @@ class CiscoPixSyslogged(Simple.SimpleLog):
                             'rule':colns[3],
                             'action':'stored-file',
                             }
-                    #You could explicitly ignore some types here, I just have one of the really noisy, not particularly interesting one excluded.
-                    
-                    #%PIX-6-602301: sa created, (sa) sa_dest= 192.168.0.1, sa_prot= 50, sa_spi= 0x888ddddd(9999999999), sa_trans= esp-3des esp-md5-hmac , sa_conn_id= 8\n.  New security association.  Appears to be specific to 6.something Pixes.
-                    #%PIX-6-602302: deleting SA, (sa) sa_dest= 192.168.0.1, sa_prot= 50, sa_spi= 0x888ddddd(9999999999), sa_trans= esp-3des esp-md5-hmac , sa_conn_id= 6\n
-                    #%PIX-6-302010: 1 in use, 399 most used.  Appears after a TCP connection restarts.  x in use indicates the current number of connections.
-                    #%PIX-6-602201: ISAKMP Phase 1 SA created (local 192.168.0.1/500 (responder), remote myhost/500, authentication=pre-share, encryption=3DES-CBC, hash=MD5, group=2, lifetime=86400s)
-                    ## ((" ".join(colns[0:2]).startswith("sa created")) or \
-##                         (" ".join(colns[0:2]).startswith("deleting SA")) or \
-                           # (colns[0].startswith("ISAKMP"))
+                    #You could explicitly ignore some types here, I just have one of the really noisy, not particularly interesting ones excluded.
 
+                    #New security association.  Appears to be specific to 6.something Pixes.
+                    #%PIX-6-602301: sa created, (sa) sa_dest= 192.168.0.1, sa_prot= 50, sa_spi= 0x888ddddd(9999999999), sa_trans= esp-3des esp-md5-hmac , sa_conn_id= 8\n
+                    ## (" ".join(colns[0:2]).startswith("sa created"))
+
+                    #Delete security association.  Appears to be specific to 6.something Pixes.
+                    #%PIX-6-602302: deleting SA, (sa) sa_dest= 192.168.0.1, sa_prot= 50, sa_spi= 0x888ddddd(9999999999), sa_trans= esp-3des esp-md5-hmac , sa_conn_id= 6\n
+                    ## (" ".join(colns[0:2]).startswith("deleting SA"))
+                    
+                    #%PIX-6-602201: ISAKMP Phase 1 SA created (local 192.168.0.1/500 (responder), remote myhost/500, authentication=pre-share, encryption=3DES-CBC, hash=MD5, group=2, lifetime=86400s)
+                    # (colns[0].startswith("ISAKMP"))
+
+                    #Appears after a TCP connection restarts.  x in use indicates the current number of connections.
+                    #%PIX-6-302010: 1 in use, 399 most used.
                     elif (" ".join(colns[1:3]).startswith("in use")):
                         inserted=None
                     else:
