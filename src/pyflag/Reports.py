@@ -75,9 +75,8 @@ class report:
         ## By default everyone is authorised
         try:
             ## If it exists config.AUTHORISE consists of a line looking like:
-            ## authorise = mic:password,joe:letmein
-            tokens = config.AUTHORISE.split(",")
-            for token in tokens:
+            ## PYFLAG_AUTHORISE="mic:password,joe:letmein"
+            for token in config.AUTHORISE:
                 try:
                     username, password = token.split(':')
                     if username.lstrip().rstrip()==query.user and password.lstrip().rstrip()==query.passwd:

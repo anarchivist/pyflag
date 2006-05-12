@@ -75,7 +75,7 @@ PYFLAG_LOG_LEVEL=10
 
 # If you require HTTP authentication add more tokens to this comma
 # seperated list of username:passwords - Or override in ~/.pyflagrc
-# authorise = mic:password, joe:letmein
+# PYFLAG_AUTHORISE="mic:password,joe:letmein"
 
 ## This section configures the network scanners. Many of these setting
 ## influence which streams will get dissected as a certain

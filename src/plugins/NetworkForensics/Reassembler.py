@@ -162,7 +162,7 @@ class StreamFile(File):
         number_of_rows = 0
         self.dbh.execute("select * from `connection` where con_id = %r order by cache_offset limit %s, %s", (combined_fd.con_id, limit, config.PAGESIZE))
 
-        for row in dbh:
+        for row in self.dbh:
             number_of_rows += 1
             combined_fd.seek(row['cache_offset'])
             ## Get the data:
