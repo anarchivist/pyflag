@@ -66,12 +66,14 @@ def get_temp_path(case,inode):
 
 class message:
     """ A class representing the message """
-    def __init__(self,dbh,fd,ddfs):
+    def __init__(self,dbh,fd,ddfs,stream):
         self.dbh=dbh
         self.fd=fd
         self.ddfs = ddfs
         self.client_id=''
         self.session_id = -1
+        self.inodes = []
+        self.stream = stream
 
     def parse(self):
         """ We parse the first message from the file like object in
@@ -211,9 +213,8 @@ class message:
                                   headers['to'],headers['from'],context))
 
                 ## Add a VFS entry for this file:
-                path=self.ddfs.lookup(inode=self.fd.inode)
-                path=os.path.dirname(path)
-                new_inode = "CMSN%s-%s" % (headers['sessionid'],self.session_id)
+                new_inode = "CMSN%s-%s" % (headers['sessionid'],
+                                           self.session_id)
                 try:
                 ## Parse the context line:
                     parser = ContextParser()
@@ -233,13 +234,15 @@ class message:
                     mtime = 0
                 
                 ## The filename and size is given in the context
-                self.ddfs.VFSCreate(None,new_inode, "%s/MSN/%s" %
-                                    (path,filename) , mtime=mtime,
+                self.ddfs.VFSCreate(self.stream.inode, new_inode, "MSN/%s" %
+                                    (filename) , mtime=mtime,
                                     size=size)
 
+                self.inodes.append(new_inode)
+                
         ## We have a real channel id so this is an actual file:
         else:
-            filename = get_temp_path(self.dbh.case,"MSN%s-%s" % (channel_sid,self.session_id))
+            filename = get_temp_path(self.dbh.case,"%s|CMSN%s-%s" % (self.stream.inode, channel_sid,self.session_id))
             fd=os.open(filename,os.O_RDWR | os.O_CREAT)
             os.lseek(fd,offset,0)
             bytes = os.write(fd,data)
@@ -334,32 +337,20 @@ class MSNScanner(StreamScannerFactory):
             logging.log(logging.DEBUG,"Openning S%s for MSN" % stream.con_id)
 
             fd = self.fsfd.open(inode="I%s|S%s" % (stream.fd.name, stream.con_id))
-            m=message(self.dbh,fd,self.fsfd)
+            m=message(self.dbh, fd, self.fsfd, stream)
             while 1:
                 try:
                     result=m.parse()
                 except IOError:
-                    break                    
+                    break
+                
+            for inode in m.inodes:
+                self.scan_as_file("%s|%s" % (stream.inode, inode), factories)
                 
 class MSNFile(File):
     """ VFS driver for reading the cached MSN files """
     specifier = 'C'
-    
-    def __init__(self,case, fd, inode, dbh=None):
-        File.__init__(self, case,fd, inode, dbh)
         
-        ## Figure out the filename
-        cached_filename = get_temp_path(case,inode[1:])
-
-        ## open the previously cached copy
-        self.cached_fd = open(cached_filename,'r')
-        
-        ## Find our size:
-        self.cached_fd.seek(0,2)
-        self.size=self.cached_fd.tell()
-        self.cached_fd.seek(0)
-        self.readptr=0
-
 class BrowseMSNChat(Reports.report):
     """ This allows MSN chat messages to be browsed.
 

@@ -289,10 +289,12 @@ class istat(pyflagsh.command):
     def execute(self):
         args=self.args
         for arg in args[1:]:
+            filename = self.environment._FS.lookup(inode=arg)
             status=self.environment._FS.istat(inode=arg)
             if not status:
                 raise ParserException("No status available for %s" % arg)
-            
+
+            status['filename'] = filename
             yield status
 
 class execute(pyflagsh.command):

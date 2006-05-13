@@ -486,10 +486,10 @@ class File:
             self.dbh=DB.DBO(case)
 
         ## Now we check to see if there is a cached copy of the file for us:
-        cached_filename = self.get_temp_path()
+        self.cached_filename = self.get_temp_path()
         try:
             ## open the previously cached copy
-            self.cached_fd = open(cached_filename,'r')
+            self.cached_fd = open(self.cached_filename,'r')
 
             ## Find our size (This may not be important but we leave it for now):
             self.cached_fd.seek(0,2)

@@ -208,7 +208,7 @@ class RemoveLogPreset(Reports.report):
 
     def form(self,query,result):
         try:
-            result.selector("Select Preset to delete",'log_preset',"select value,value from meta where property='log_preset'",(),case=None)
+            result.selector("Select Preset to delete",'log_preset',"select value as `key`,value from meta where property='log_preset'",(),case=None)
 
             tmp=result.__class__(result)
             found=0

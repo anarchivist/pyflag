@@ -113,6 +113,7 @@ class HashComparison(Reports.report):
             
         try:
             dbh.check_index("type","inode")
+            dbh.execute("drop table if exists  `hash`")
             dbh.execute("create table `hash` select a.inode as `Inode`,concat(path,b.name) as `Filename`,d.type as `File Type`,if(c.Code=0,'Unknown',c.Name) as `NSRL Product`,c.Code as `NSRL Code`,a.NSRL_filename,md5 as `MD5` from md5 as a join %s.NSRL_products as c join type as d on (a.NSRL_productcode=c.Code and d.inode=a.inode) left join file as b on (a.inode=b.inode) group by Inode,`NSRL Code`,MD5",(config.FLAGDB,))
         except DB.DBError,e:
             raise Reports.ReportError("Unable to find the types table for the current image. Did you run the TypeScan Scanner?.\n Error received was %s" % e)

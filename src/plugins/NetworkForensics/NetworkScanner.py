@@ -89,12 +89,6 @@ class StreamScannerFactory(GenScanFactory):
 
     """
     order = 2
-    class Drawer(Scanner.Drawer):
-        description = "Network Scanners"
-        name = "NetworkScanners"
-        contains = [ "IRCScanner", "MSNScanner", "HTTPScanner", "POPScanner","SMTPScanner","RFC2822" ]
-        default = True
-        special_fs_name = 'PCAPFS'
 
     def stream_to_server(self, stream, protocol):
         if stream.dest_port in dissect.fix_ports(protocol):

@@ -106,8 +106,11 @@ class GenericUI:
         """
         logging.log(logging.DEBUG, "display not implemented")
 
-    def selector(self,description,name,sql,parms,**options):
-        """ Present a listbox selector based on sql. name is the target of the selector"""
+    def selector(self,description,name,sql,parms, key='key',
+                 value='value', **options):
+        """ Present a listbox selector based on sql. name is the target of the selector
+        Note that the sql must produce two columns named key and value.
+        """
         try:
             case = options['case']
             del options['case']
@@ -122,8 +125,8 @@ class GenericUI:
             while 1:
                 row = dbh.cursor.fetchone()
                 if not row: break
-                keys.append(row[0])
-                values.append(row[1])
+                keys.append(row[key])
+                values.append(row[value])
 
         ## If the SQL failed, we present an empty selector
         except DB.DBError:

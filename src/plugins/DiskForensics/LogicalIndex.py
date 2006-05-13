@@ -308,7 +308,7 @@ class BuildDictionary(Reports.report):
         form.start_table()
         form.const_selector("Action:",'action',('insert','delete'),('Add','Delete'))
         form.textfield('Word:','word')        
-        form.selector('Classification:','class','select class,class from dictionary group by class order by class',())
+        form.selector('Classification:','class','select class as `key`,class as `value` from dictionary group by class order by class',())
         form.textfield('(Or create a new class:)','class_override')
         form.const_selector('Type:','type',('word','literal','regex'),('word','Literal','RegEx'))
         form.end_table()

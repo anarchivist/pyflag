@@ -6,6 +6,8 @@ import pyflag.DB as DB
 import pyflag.HTMLUI as HTMLUI
 import plugins.FileFormats.DAFTFormats as DAFTFormats
 
+active = False
+
 class RevEng_GUI(Reports.report):
     """ Allows us to manipulate data structures in reverse engineering efforts """
     name = "DAFT"

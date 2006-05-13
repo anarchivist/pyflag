@@ -28,14 +28,25 @@
 
 """ This module contains db related functions """
 import MySQLdb
+import MySQLdb.cursors
+import _mysql
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.logging as logging
 import time,types
 import threading
 from Queue import Queue, Full, Empty
+from MySQLdb.constants import FIELD_TYPE
 
 db_connections=0
+
+## This is the dispatcher for db converters
+conv = { FIELD_TYPE.LONG: long,
+         FIELD_TYPE.INT24: long,
+         FIELD_TYPE.LONGLONG: long,
+         FIELD_TYPE.TINY: int,
+         FIELD_TYPE.TIMESTAMP: long
+         }
 
 def escape(string):
     return MySQLdb.escape_string(string)
@@ -84,6 +95,7 @@ class Pool(Queue):
     """
     def __init__(self, case, poolsize=0):
         self.case=case
+        self.indexes = {}
         Queue.__init__(self, poolsize)
 
     def get(self, block=1):
@@ -102,13 +114,34 @@ class Pool(Queue):
         case=self.case
         try:
             #Try to connect over TCP
-            dbh = MySQLdb.Connect(user = config.DBUSER, passwd = config.DBPASSWD,db = case, host=config.DBHOST, port=config.DBPORT)
+            dbh = MySQLdb.Connect(user = config.DBUSER,
+                                  passwd = config.DBPASSWD,
+                                  db = case,
+                                  host=config.DBHOST,
+                                  port=config.DBPORT,
+                                  cursorclass=MySQLdb.cursors.DictCursor,
+                                  conv = conv
+                                  )
             mysql_bin_string = "%s -f -u %r -p%r -h%s -P%s" % (config.MYSQL_BIN,config.USER,config.PASSWD,config.HOST,config.PORT)
         except Exception,e:
             #or maybe over the socket?
 ##  The following is used for debugging to ensure we dont have any SQL errors:
-            dbh = MySQLdb.Connect(user = config.DBUSER, passwd = config.DBPASSWD,db = case, unix_socket = config.DBUNIXSOCKET, sql_mode="STRICT_ALL_TABLES")
-##            dbh = MySQLdb.Connect(user = config.DBUSER, passwd = config.DBPASSWD,db = case, unix_socket = config.DBUNIXSOCKET)
+            dbh = MySQLdb.Connect(user = config.DBUSER,
+                                  passwd = config.DBPASSWD,
+                                  db = case,
+                                  unix_socket = config.DBUNIXSOCKET,
+                                  sql_mode="STRICT_ALL_TABLES",
+                                  cursorclass=MySQLdb.cursors.DictCursor,
+                                  conv = conv
+                                  )
+            
+##            dbh = MySQLdb.Connect(user = config.DBUSER,
+##                                  passwd = config.DBPASSWD,
+##                                  db = case,
+##                                  unix_socket = config.DBUNIXSOCKET,
+##                                  cursorclass=MySQLdb.cursors.DictCursor
+##                                  )
+
             mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBUNIXSOCKET)
 
         return (dbh,mysql_bin_string)
@@ -178,7 +211,7 @@ class DBO:
             ## The following decode is required to go around MySQLdb's
             ## stupid unicode crap - this has just recently been
             ## introduced:
-            self.cursor.execute(string.decode('latin1'),None)
+            self.cursor.execute(string.decode('latin1'))
         #If anything went wrong we raise it as a DBError
         except Exception,e:
             str = "%s" % e
@@ -230,9 +263,7 @@ class DBO:
 
     def autoincrement(self):
         """ Returns the value of the last autoincremented key """
-        self.execute("select LAST_INSERT_ID() as result")
-        row=self.fetch()
-        return row['result']
+        return self.cursor.connection.insert_id()
 
     def next(self):
         """ The db object supports an iterator so that callers can simply iterate over the result set.
@@ -247,37 +278,17 @@ class DBO:
         """ Returns the next cursor row as a dictionary.
 
         It is encouraged to use this function over cursor.fetchone to ensure that if columns get reordered in the future code does not break. The result of this function is a dictionary with keys being the column names and values being the values """
-        results = {}
-        temp = self.cursor.fetchone()
-        temp2=[]
-        if temp:
-            for i in temp:
-                try:
-                    temp2.append(i.tostring())
-                except AttributeError:
-                    temp2.append(i)
-                    pass
-            temp = temp2
-                            
-        if not temp: return None
-        
-        column = 0
-        for d in self.cursor.description:
-            if results.has_key(d[0]): raise DBError, "Duplicate names in query heading"
-            results[d[0]] = temp[column]
-            column += 1
-
-        return results
-
+        return self.cursor.fetchone()
+    
     def check_index(self, table, key, length=None):
         """ This checks the database to ensure that the said table has an index on said key.
 
         If an index is missing, we create it here, so we always ensure an index exists once we return. """
         ## We implement a local cache to ensure that we dont hit the DB all the time:
-##        try:
-##            return self.DBH[self.case].indexes["%s.%s" % (table,key)]
-##        except KeyError:        
-        if 1:
+        try:
+            return DBH[self.case].indexes["%s.%s" % (table,key)]
+        except KeyError:        
+##        if 1:
             self.execute("show index from `%s`",table)
             for row in self:
                 if row['Key_name'] == key:
@@ -294,7 +305,7 @@ class DBO:
             self.execute("Alter table `%s` add index%s",(table,sql))
 
             ## Add to cache:
-##            self.DBH[self.case].indexes["%s.%s" % (table,key)] = True
+            DBH[self.case].indexes["%s.%s" % (table,key)] = True
         
     def get_meta(self, property, table='meta',**args):
         """ Returns the value for the given property in meta table selected database
