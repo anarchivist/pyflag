@@ -200,9 +200,9 @@ class DBFS(FileSystem):
         `status` set('unalloc','alloc'),
         `uid` INT,
         `gid` INT,
-        `mtime` INT NOT NULL,
-        `atime` INT NOT NULL,
-        `ctime` INT NOT NULL,
+        `mtime` INT NULL,
+        `atime` INT NULL,
+        `ctime` INT NULL,
         `dtime` INT,
         `mode` INT,
         `links` INT,
@@ -478,6 +478,7 @@ class File:
         # each file should remember its own part of the inode
         self.case = case
         self.fd = fd
+        self.readptr = 0
         self.inode = inode
         if dbh:
             self.dbh = dbh
@@ -494,7 +495,6 @@ class File:
             self.cached_fd.seek(0,2)
             self.size=self.cached_fd.tell()
             self.cached_fd.seek(0)
-#            print "Using cached file %s" % cached_filename
             
         except IOError,e:
             self.cached_fd = None
@@ -517,12 +517,11 @@ class File:
     def cache(self):
         """ Creates a cache file if it does not exist """
         if not self.cached_fd:
-#            print "Building cache for %s" % self.inode
             self.force_cache()
 
     def force_cache(self):
         """ Recreates the cache file. """
-        readptr = self.tell()
+        readptr = self.readptr
 
         ## This forces the File class to regenerate the data instead
         ## of getting it from the cache
@@ -545,8 +544,8 @@ class File:
 
         ## Now set the cached fd so a subsequent read will get it from the cache:
         self.cached_fd =  open(cached_filename, 'r')
-        self.seek(readptr)
-        
+        self.size = size
+        self.readptr = readptr
         return size
 
     def close(self):
@@ -592,9 +591,14 @@ class File:
         """ Reads length bytes from file, or less if there are less bytes in file. If length is None, returns the whole file """
         try:
             if length!=None:
-                return self.cached_fd.read(length)
+                data = self.cached_fd.read(length)
+                self.readptr += len(data)
+                return data
             else:
-                return self.cached_fd.read()
+                data = self.cached_fd.read()
+                self.readptr += len(data)
+                return data
+
         except AttributeError:
             raise IOError("No cached file")
 

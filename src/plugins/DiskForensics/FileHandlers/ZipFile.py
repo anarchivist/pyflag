@@ -226,8 +226,8 @@ class GZ_file(File):
     def force_cache(self):
         cached_filename = self.get_temp_path()
         fd = open(cached_filename, 'w')
-        
-        self.gz = gzip.GzipFile(fileobj=self.fd)
+        self.fd.cache()
+        gz = gzip.GzipFile(fileobj=self.fd, mode='r')
         count = 0
         step = 1024
         
@@ -235,8 +235,8 @@ class GZ_file(File):
         ## in the file, we try to read as much as possible:
         while 1:
             try:
-                data=self.gz.read(step)
-            except:
+                data=gz.read(step)
+            except IOError,e:
                 step /= 2
                 if step<10:
                     logging.log(logging.DEBUG, "Error reading from %s, could only get %s bytes" % (self.fd.inode, count));
@@ -249,6 +249,7 @@ class GZ_file(File):
             if len(data)==0: break
             fd.write(data)
 
+        self.cached_fd =  open(cached_filename, 'r')
         return count
 
 class Tar_file(File):
