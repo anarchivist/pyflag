@@ -119,9 +119,10 @@ static int free_data(void *self) {
   TCPStream this=*(TCPStream *)self;
   PyObject *obj=(PyObject *)this->data;
 
-  if(obj)
+  if(obj) {
     Py_DECREF(obj);
-  
+  };
+
   return 0;
 };
 
@@ -279,8 +280,6 @@ static PyObject *py_process_tcp(PyObject *self, PyObject *args) {
 static PyObject *py_clear_stream_buffers(PyObject *self, PyObject *args) {
   TCPHashTable hash;
   PyObject *hash_py;
-  TCPStream j;
-  int i;
 
   if(!PyArg_ParseTuple(args, "O", &hash_py))
     return NULL;

@@ -22,11 +22,55 @@ TCPStream TCPStream_Con(TCPStream self, struct tuple4 *addr) {
   return self;
 };
 
+/** Pad with zeros up to the first stored packet, and process it */
+void pad_to_first_packet(TCPStream self) {
+  struct skbuff *first;
+  TCP tcp;
+  int pad_length;
+  char *new_data;
+  
+  list_next(first, &(self->queue.list), list);
+  tcp = (TCP)first->packet->packet.payload;
+  
+  pad_length = tcp->packet.header.seq - self->next_seq;
+  if(pad_length > 50000) {
+    printf("Needing to pad excessively, dropping data...\n");
+    self->next_seq = tcp->packet.header.seq;
+    return;
+  };
+  
+  if(pad_length>0) {
+    new_data = talloc_size(tcp, tcp->packet.data_len + pad_length);
+    memset(new_data, 0, pad_length);
+    memcpy(new_data+pad_length, tcp->packet.data, tcp->packet.data_len);
+    
+    tcp->packet.data_len+=pad_length;
+    tcp->packet.data = new_data;
+  };
+  
+  self->next_seq+=tcp->packet.data_len;
+  
+  /** Call our callback with this */
+  if(self->callback) self->callback(self, first->packet);
+  
+  printf("Forced to pad by %d bytes in stream %d\n",pad_length, self->con_id);
+  
+  list_del(&(first->list));
+  talloc_free(first);
+};
+
+
 void TCPStream_add(TCPStream self, IP ip) {
   struct skbuff *new = talloc(self, struct skbuff);
   struct skbuff *i;
   TCP tcp=(TCP)ip->packet.payload;
   int count=0;
+
+  /** If there is no data in there we move on */
+  if(tcp->packet.data_len==0) {
+    talloc_free(ip);
+    return;
+  }
 
   /** This is the location after which we insert the new structure */
   struct list_head *candidate = &(self->queue.list);
@@ -114,43 +158,23 @@ void TCPStream_add(TCPStream self, IP ip) {
 	list.
     */
     if(self->state == PYTCP_DATA){
-      struct skbuff *last;
-      TCP tcp_last;
+      struct skbuff *first,*last;
+      /** This is the last packet stored */
+      TCP tcp_last,tcp;
 
       list_prev(last, &(self->queue.list), list);
       tcp_last = (TCP)last->packet->packet.payload;
+      
+      list_next(first, &(self->queue.list), list);
+      tcp = (TCP)first->packet->packet.payload;
 
-      if(tcp->packet.header.window + tcp->packet.header.seq 
-	 < tcp_last->packet.header.seq) {
-	int pad_length = tcp->packet.header.seq - self->next_seq;
-	char *new_data;
-
-	/** If we need to pad too much, we need to skip
-	    data. Otherwise we would be caught in a malloc bomb.
-	*/
-	if(pad_length > 50000) {
-	  printf("Needing to pad excessively, dropping data...\n");
-	  self->next_seq = tcp->packet.header.seq;
-	  continue;
-	};
-
-	new_data = talloc_size(tcp, tcp->packet.data_len + pad_length);
-	memset(new_data, 0, pad_length);
-	memcpy(new_data+pad_length, tcp->packet.data, tcp->packet.data_len);
-
-	tcp->packet.data_len+=pad_length;
-	tcp->packet.data = new_data;
-
-	self->next_seq+=tcp->packet.data_len;
+      while(!list_empty(&(self->queue.list)) && 
+	    tcp->packet.header.window + tcp->packet.header.seq 
+	    < tcp_last->packet.header.seq) {
+	pad_to_first_packet(self);
 	
-	/** Call our callback with this */
-	if(self->callback) self->callback(self, first->packet);
-
-	printf("Forced to pad by %u bytes\n",pad_length);
-
-	list_del(&(first->list));
-	talloc_free(first);
-	continue;
+	list_next(first, &(self->queue.list), list);
+	tcp = (TCP)first->packet->packet.payload;
       };
     }; 
 
@@ -161,63 +185,48 @@ void TCPStream_add(TCPStream self, IP ip) {
   };
 };
 
-/** Flush all the queues into the callback */
-void TCPStream_flush(TCPStream self) {
-  /** FIXME: For now ignore outstanding packets: in future add nulls
-      in
-  */
-  if(self->direction!=TCP_FORWARD) return;
-
-#if 0
+/** Pads any left over data in self with zeros. Results in all
+    outstanding packets being flushed and removed from the packet
+    list.
+ */
+void pad_data(TCPStream self) {
   while(!list_empty(&(self->queue.list))) {
-    struct skbuff *first;
-    TCP tcp;
-    int pad_length;
-    char *new_data;
-
-    list_next(first, &(self->queue.list), list);
-    tcp = (TCP)first->packet->packet.payload;
-
-    pad_length = tcp->packet.header.seq - self->next_seq;
-    if(pad_length > 50000) {
-      printf("Needing to pad excessively, dropping data...\n");
-      self->next_seq = tcp->packet.header.seq;
-      continue;
-    };
-
-    new_data = talloc_size(tcp, tcp->packet.data_len + pad_length);
-    memset(new_data, 0, pad_length);
-    memcpy(new_data+pad_length, tcp->packet.data, tcp->packet.data_len);
-    
-    tcp->packet.data_len+=pad_length;
-    tcp->packet.data = new_data;
-    
-    self->next_seq+=tcp->packet.data_len;
-    
-    /** Call our callback with this */
-    if(self->callback) self->callback(self, first->packet);
-    
-    printf("Forced to pad by %u bytes\n",pad_length);
-    
-    list_del(&(first->list));
-    talloc_free(first);
-    continue;
+    pad_to_first_packet(self);
   };
+};
 
-#endif
+/** Flush all the queues into the callback */
+int TCPStream_flush(void * this) {
+  TCPStream self=(TCPStream)this;
+
+  if(self->direction!=TCP_FORWARD) 
+    return 0;
+
+  /** For each stream we pad out the remaining data */
+  pad_data(self);
+
+  /** Now we signal to the cb that the stream is destroyed */
   self->state = PYTCP_DESTROY;
   if(self->callback) self->callback(self, NULL);
 
+  /** and we remove it from its list */
+  list_del(&(self->list));
+
   /** Now do the reverse stream */
+  pad_data(self->reverse);
+
   self->reverse->state = PYTCP_DESTROY;
-  if(self->reverse->callback) 
+  if(self->reverse->callback)
     self->reverse->callback(self->reverse, NULL);
+
+  list_del(&(self->reverse->list));
+
+  return 0;
 };
 
 VIRTUAL(TCPStream, Object)
      VMETHOD(Con) = TCPStream_Con;
      VMETHOD(add) = TCPStream_add;
-     VMETHOD(flush) = TCPStream_flush;
 END_VIRTUAL
 
 TCPHashTable TCPHashTable_Con(TCPHashTable self) {

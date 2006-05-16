@@ -504,12 +504,14 @@ class Flag:
 
         return result
 
+    config_checked = False
     def check_config(self,result,query):
         """ Checks the configuration for empty entries.
 
         Queries the user for those entries and creates a new configuration file in the users home directory
         @return: 1 if some of the configuration parameters are missing, 0 if all is well.
         """
+        if self.config_checked: return
         report = None
 
         ## First check for missing parameters:
@@ -559,7 +561,8 @@ class Flag:
                 result.end_form('Submit')
 
             return True
-            
+
+        self.config_checked = True
         return False
                 
 class HexDump:

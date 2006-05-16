@@ -100,7 +100,6 @@ CLASS(TCPStream, Object)
 	 it will be automatically removed from the queue.
      */
      void METHOD(TCPStream, add, IP packet);
-     void METHOD(TCPStream, flush);
 END_CLASS
 
 /** The loading factor for the hash table */
