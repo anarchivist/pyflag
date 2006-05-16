@@ -49,7 +49,7 @@ class StreamFile(File):
     specifier = 'S'
 
     def __init__(self, case, fd, inode, dbh=None):
-        File.__init__(self,case, fd, inode, dbh=None)
+        File.__init__(self,case, fd, inode, dbh=dbh)
 
         self.stat_cbs.extend([ self.show_packets, self.combine_streams ])
         self.stat_names.extend([ "Show Packets", "Combined streams"])

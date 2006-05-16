@@ -126,21 +126,22 @@ class Pool(Queue):
         except Exception,e:
             #or maybe over the socket?
 ##  The following is used for debugging to ensure we dont have any SQL errors:
-            dbh = MySQLdb.Connect(user = config.DBUSER,
-                                  passwd = config.DBPASSWD,
-                                  db = case,
-                                  unix_socket = config.DBUNIXSOCKET,
-                                  sql_mode="STRICT_ALL_TABLES",
-                                  cursorclass=MySQLdb.cursors.DictCursor,
-                                  conv = conv
-                                  )
-            
-##            dbh = MySQLdb.Connect(user = config.DBUSER,
-##                                  passwd = config.DBPASSWD,
-##                                  db = case,
-##                                  unix_socket = config.DBUNIXSOCKET,
-##                                  cursorclass=MySQLdb.cursors.DictCursor
-##                                  )
+            if 1:
+                dbh = MySQLdb.Connect(user = config.DBUSER,
+                                      passwd = config.DBPASSWD,
+                                      db = case,
+                                      unix_socket = config.DBUNIXSOCKET,
+                                      sql_mode="STRICT_ALL_TABLES",
+                                      cursorclass=MySQLdb.cursors.DictCursor,
+                                      conv = conv
+                                      )
+            else:
+                dbh = MySQLdb.Connect(user = config.DBUSER,
+                                      passwd = config.DBPASSWD,
+                                      db = case,
+                                      unix_socket = config.DBUNIXSOCKET,
+                                      cursorclass=MySQLdb.cursors.DictCursor
+                                      )
 
             mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBUNIXSOCKET)
 

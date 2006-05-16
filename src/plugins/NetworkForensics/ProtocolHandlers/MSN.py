@@ -426,11 +426,11 @@ class message:
         """
         words = self.cmdline.split()
         
-        list_lookup['forward_list']=00001
-        list_lookup['allow_list']=00010
-        list_lookup['block_list']=00100
-        list_lookup['reverse_list']=01000
-        list_lookup['pending_list']=10000
+##        list_lookup['forward_list']=00001
+##        list_lookup['allow_list']=00010
+##        list_lookup['block_list']=00100
+##        list_lookup['reverse_list']=01000
+##        list_lookup['pending_list']=10000
         
         print "LST: %s" % self.cmdline
         
