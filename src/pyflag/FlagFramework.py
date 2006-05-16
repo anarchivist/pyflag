@@ -757,22 +757,44 @@ def make_sql_from_filter(filter_str,having,column,name):
     @arg column: The array of all the column names.
     @return: A condition text describing this condition.
     """
-    if filter_str.startswith('=') or filter_str.startswith('<') or filter_str.startswith('>'):
-        ## If the input starts with =<>, we do an exact match
-        having.append("%s %s %r " % (column,filter_str[0],filter_str[1:]))
-        condition_text="%s %s %s" % (name,filter_str[0],filter_str[1:])
-    elif (filter_str.find('%')>=0) and (not filter_str.startswith('!')):
-        #If the user already supplied the %, we dont add our own:
-        having.append("%s like %r " % (column,filter_str))
-        condition_text="%s like %s" % (name,filter_str)
-    elif filter_str.startswith('!'):
-        ## If the input starts with !, we do an exact match
-        having.append("%s not like %r " % (column,filter_str[1:]))
-        condition_text="%s not like %s" % (name,filter_str[1:])
+
+    def compose_simple_expression(simple_string):
+        if simple_string.startswith('=') or simple_string.startswith('<') or simple_string.startswith('>'):
+            ## If the input starts with =<>, we do an exact match
+            condition=simple_string[0]
+            operand=simple_string[1:]
+        elif (simple_string.find('%')>=0) and (not simple_string.startswith('!')):
+            #If the user already supplied the %, we dont add our own:
+            condition="like"
+            operand=simple_string
+        elif simple_string.startswith('!'):
+            ## If the input starts with !, we do an exact match
+            condition="not like"
+            operand=simple_string[1:]
+        else:
+            ## Otherwise we do a fuzzy match.
+            condition="like"
+            operand="%%%s%%"% simple_string
+            
+        return (condition,operand)
+        
+    if filter_str.find(" || ")>=0:
+        #TODO: Currently only a or b, c and d.  Would be nice to do a or b or c.
+        split_filter=filter_str.split(" || ")
+        (cond,op)=compose_simple_expression(split_filter[0])
+        (cond2,op2)=compose_simple_expression(split_filter[1])
+        having.append("((%s %s %r) or (%s %s %r))" % (column,cond,op,column,cond2,op2))
+        condition_text="((%s %s %r) or (%s %s %r))" % (name,cond,op,name,cond2,op2)
+    elif filter_str.find(" && ")>=0:
+        split_filter=filter_str.split(" && ")
+        (cond,op)=compose_simple_expression(split_filter[0])
+        (cond2,op2)=compose_simple_expression(split_filter[1])
+        having.append("((%s %s %r) and (%s %s %r))" % (column,cond,op,column,cond2,op2))
+        condition_text="((%s %s %r) and (%s %s %r))" % (name,cond,op,name,cond2,op2)
     else:
-        ## Otherwise we do a fuzzy match. 
-        having.append("%s like %r " % (column,"%%%s%%"% filter_str))
-        condition_text="%s like %s" % (name,"%%%s%%" % filter_str)
+        (cond,op)=compose_simple_expression(filter_str)
+        having.append("%s %s %r" % (column,cond,op))
+        condition_text=("%s %s %r" % (name,cond,op))
 
     return condition_text
 

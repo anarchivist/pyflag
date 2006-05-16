@@ -1263,7 +1263,7 @@ class HTMLUI(UI.GenericUI):
                 
             self.row(*tmp_links)
             
-        self.row("Enter a term to filter on field (% is wildcard)",colspan=50,align='center')
+        self.row("Enter a term to filter on field (%=wildcard,&&=AND,||=OR).  Valid operators are \"%,!,=,<,>,||,&&\".  For example: =Target || %jo%",colspan=50,align='center')
 
         #Now create a row with input boxes for each parameter
         tmp_links=[]
