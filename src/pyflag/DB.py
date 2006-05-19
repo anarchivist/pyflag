@@ -126,7 +126,8 @@ class Pool(Queue):
         except Exception,e:
             #or maybe over the socket?
 ##  The following is used for debugging to ensure we dont have any SQL errors:
-            if 1:
+
+            if 0:
                 dbh = MySQLdb.Connect(user = config.DBUSER,
                                       passwd = config.DBPASSWD,
                                       db = case,

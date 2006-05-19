@@ -66,14 +66,14 @@ def get_temp_path(case,inode):
 
 class message:
     """ A class representing the message """
-    def __init__(self,dbh,fd,ddfs,stream):
+    def __init__(self,dbh,fd,ddfs):
         self.dbh=dbh
         self.fd=fd
         self.ddfs = ddfs
-        self.client_id=''
+        self.client_id='Unknown'
         self.session_id = -1
         self.inodes = []
-        self.stream = stream
+        self.participants = []
 
     def get_packet_id(self):
         self.offset = self.fd.tell()
@@ -82,8 +82,29 @@ class message:
         self.packet_id = self.fd.get_packet_id(self.offset)
         #print "self.packet_id: %s" % self.packet_id
         return self.packet_id
+
+    def add_participant(self,username):
+        #Not sure I really need to check for uniqueness here, but seems sensible
+        try:
+            if (self.participants.index(username)):
+                #Already in the list
+                pass
+        except ValueError:
+            #Don't have this one, so insert it
+            self.participants.append(username)
+            print "Appending to participants:%s" % (self.participants)
+
+    def del_participant(self,username):
+        try:
+            print "Removing participant:%s" % username
+            self.participants.remove(username)
+        except:
+            #name wasn't in participants for some reason, shouldn't really happen.
+            pass
+
         
     def parse(self):
+
         """ We parse the first message from the file like object in
         fp, thereby consuming it"""
         
@@ -102,19 +123,21 @@ class message:
             if self.cmd != self.cmd.upper() or not self.cmd.isalpha(): return None
         except IndexError:
             return ''
-
+        
         ## Dispatch the command handler
         try:
             return getattr(self,self.cmd)()
         except AttributeError,e:
-            logging.log(logging.VERBOSE_DEBUG,"Unable to handle command %r from line %s (%s)" % (self.cmd,self.cmdline.split()[0],e))
+            logging.log(logging.VERBOSE_DEBUG,"Unable to handle command %r from line %s (%s)" % (self.cmd,self.cmdline,e))
             return None
 
     def get_data(self):
         return self.data
 
     def parse_mime(self):
-        """ Parse the contents of the headers """
+        """ Parse the contents of the headers
+
+        """
         words = self.cmdline.split()
         self.length = int(words[-1])
         self.offset = self.fd.tell()
@@ -127,71 +150,192 @@ class message:
                 header,value = line.split(":")
                 self.headers[header.lower()]=value.lower().strip()
             except ValueError:
+                print "Parse mime failed on:%s" % line
                 pass
 
         current_position = self.fd.tell()
         self.data = self.fd.read(self.length-(current_position-self.offset))
     
     def CAL(self):
+
+        """ Target is inviting someone to a new session
+
+        CAL 8 dave@passport.com\r\n
+
+        Server responds, saying I am ringing the person:
+
+        We use this to store the current session ID for the entire TCP stream.
+        
+        CAL 8 RINGING 17342299\r\n
+
         """
-	GJ: Sets the session ID when we try calling out
-	"""
-	words = self.cmdline.split()
-	if ((self.state == "USR")&(words[2] != "RINGING")):
-	  logging.log(logging.DEBUG, "Recipient is %s" % (words[2]))
-	  self.recipient = words[2]
-        self.state = "CAL"
+        words = self.cmdline.split()
+        if (words[2] == "RINGING"):
+            self.session_id=words[3]
+        else:
+            self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, session_id=%r, recipient=%r, type=%r, sender=%r",(self.fd.inode,self.get_packet_id(),self.session_id, words[2],"INVITE","%s (Target)" % self.client_id))
+            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,words[2],'user_msn_passport',words[2]))
+            
+	self.state = "CAL"
+
+    def OUT(self):
+        """Target left MSN session"""
+        
+        words = self.cmdline.split()
+        self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, session_id=%r, recipient=%r, type=%r, sender=%r",(self.fd.inode,self.get_packet_id(),self.session_id,'SWITCHBOARD SERVER',"TARGET LEFT SESSION","%s (Target)" % self.client_id))
+        
+    def BYE(self):
+        """A participant has left the session
+
+        e.g.
+
+        BYE blah@hotmail.com
+
+        """
+        
+        words = self.cmdline.split()
+        self.del_participant(words[1])
+        self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, session_id=%r, recipient=%r, type=%r, sender=%r",(self.fd.inode,self.get_packet_id(),self.session_id,'SWITCHBOARD SERVER',"USER LEFT SESSION",words[1]))
+        
 
     def USR(self):
         """
-        User logging into switchboard server using same auth string as passed back by server in XFR
+        Target logging into switchboard server using same auth string as passed back by server in XFR
+
+        Most of this info is pretty boring.  I only store stuff that has usernames in it.
+        
                 
         USR <transation id> example@passport.com 17262740.1050826919.32307
 
-        If successful, server passes back:
+        If successful, server passes back (currently ignoring):
         
         USR <same transaction id> OK example@passport.com Example%20Name
+
+
+        Initial USR
+
+        Initiates authentication process.
+
+        USR trid TWN I account_name
+
+            * trid : Transaction ID
+            * TWN : Name of authentication system (always "TWN")
+            * I : Status of authentication (always "I" for initial)
+            * account_name : Your passport address 
+
+        Returns
+        The server will either respond with XFR to transfer you, or with USR to continue the authentication process.
+
+        Subsequent USR Response:
+
+        USR trid TWN S auth_string
+
+            * trid : Transaction ID
+            * TWN : Name of authentication system (always "TWN")
+            * S : Status of authentication (always "S" for subsequent)
+            * auth_string : String used for Tweener authentication 
+
+
+        [edit]
+        Final USR
+
+        USR trid TWN S ticket
+
+            * trid : Transaction ID
+            * TWN : Name of authentication system (always "TWN" for Tweener)
+            * S : Status of authentication (always "S" for subsequent)
+            * ticket : Ticket retrieved after Tweener authentication 
+
+        Returns
+
+        USR trid OK account_name display_name verified 0
+
+            * trid : Transaction ID
+            * OK : Confirms a successful login
+            * account_name : Your Passport account-name
+            * display_name : Your URL Encoded friendly-name
+            * verified : Either 0 or 1 if your account is verified
+            * 0 : Unknown (Kids passport?) 
         
 	"""
 	words = self.cmdline.split()
-        if (words[2].find("OK")>=0):
-            self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, recipient=%r,type=%r,sender=%r,transaction_id=%r",(self.fd.inode,self.get_packet_id(),words[3],"LOGIN TO NEW SB SESSION SUCCESSFUL","SWITCHBOARD SERVER",words[1]))
-        else:
-            self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, recipient=%r,type=%r,sender=%r,transaction_id=%r,auth_string=%r",(self.fd.inode,self.get_packet_id(),"(Target)","ENTERING NEW SWITCHBOARD SESSION","(Target)="+words[2],words[1],words[3]))
+        
+        print "USR:%s" % self.cmdline.strip()
         self.state = "USR"
+        
+        
+        if (words[2]=="OK"):
+            
+            self.client_id = words[3]
+            self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, recipient=%r,type=%r,sender=%r,transaction_id=%r,session_id=%r",(self.fd.inode,self.get_packet_id(),"SWITCHBOARD SERVER","TARGET ENTERING NEW SWITCHBOARD SESSION","%s (Target)" % self.client_id,words[1],self.session_id))
+
+            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'target_msn_passport',words[3]))
+            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'url_enc_display_name',words[4]))
+            
+        elif (words[2]=="TWN")and(words[3]=="I"):
+            self.client_id = words[4]
+            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'target_msn_passport',words[4]))
+            
+        else:
+            #must be of form: USR <transation id> example@passport.com 17262740.1050826919.32307
+            self.client_id = words[2]
+            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'target_msn_passport',words[2]))
+            
+        
 
     def XFR(self):
-        """This command creates a new switchboard session.
 
-        Request:
-        XFR <transaction id> SB
-
-        e.g.
-        XFR 15 SB
-
-        Response:
-        XFR <same transaction id> SB <ip of switchboard server:port> <auth type, always=CKI> <auth string to prove identity>
-
-        e.g.
-        XFR 15 SB 207.46.108.37:1863 CKI 17262740.1050826919.32308"""
-
-        words = self.cmdline.split()
-
-        try:
-            self.switchboard_ip = words[3].split(":")[0]
-            self.switchboard_port = words[3].split(":")[1]
-            #This is a server response
-            self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, recipient=%r,type=%r,sender=%r,transaction_id=%r,auth_string=%r,sb_server_ip=%r",(self.fd.inode,self.get_packet_id(),"(Target)","SWITCHBOARD SERVER OFFER","NOTIFICATION SERVER",words[1],words[5],self.switchboard_ip))
-        except:
-            #This is a client request
-            self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, recipient=%r,type=%r,sender=%r,transaction_id=%r",(self.fd.inode,self.get_packet_id(),"NOTIFICATION SERVER","NEW SWITCHBOARD SESSION REQUEST","(Target)",words[1]))
+        #I don't think this information is userful enough to record,
+        #it is really just noise.  We already know the IPs from the
+        #stream data, so not really necessary or useful to record them
+        #here.
         self.state = "XFR"
+        pass
+        
+##        """This command creates a new switchboard session.
+
+##        Request:
+##        XFR <transaction id> SB
+
+##        e.g.
+##        XFR 15 SB
+
+##        Response:
+##        XFR <same transaction id> SB <ip of switchboard server:port> <auth type, always=CKI> <auth string to prove identity>
+
+##        e.g.
+##        XFR 15 SB 207.46.108.37:1863 CKI 17262740.1050826919.32308
+
+##        OR you can be transferred to a different nameserver:
+
+##        XFR trid NS address 0 current_address
+
+##        * trid : Transaction ID
+##        * NS : Tells you that you are being redirected to a notification server
+##        * address : IP and port of server you are being redirected to (separated by a colon)
+##        * 0 : unknown
+##        * current_address : The address of the dispatch/notification server you are currently connected to
+
+##        """
+
+##        words = self.cmdline.split()
+##        print "XFR:%s" % self.cmdline.strip()
+##        try:
+##            self.switchboard_ip = words[3].split(":")[0]
+##            self.switchboard_port = words[3].split(":")[1]
+##            #This is a server response
+##            self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, recipient=%r,type=%r,sender=%r,transaction_id=%r,auth_string=%r,sb_server_ip=%r",(self.fd.inode,self.get_packet_id(),"%s (Target)" % self.client_id,"SWITCHBOARD SERVER OFFER","NOTIFICATION SERVER",words[1],words[5],self.switchboard_ip))
+##        except:
+##            pass
+##            #This is a client request, I don't think it is interesting enough to record.
+##            #self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, recipient=%r,type=%r,sender=%r,transaction_id=%r",(self.fd.inode,self.get_packet_id(),"NOTIFICATION SERVER","NEW SWITCHBOARD SESSION REQUEST","%s (Target)" % self.client_id,words[1]))
+##        
             
 		
     def ANS(self):
         """ Logs into the Switchboard session.
 
-        We use this to store the current session ID for the entire TCP connection.
+        We use this to store the current session ID and client_id (target username) for this entire TCP stream.
 
         ANS <transaction id> <account name> <auth string> <session id>
         
@@ -208,12 +352,12 @@ class message:
 
             try:
                 self.session_id=int(words[-1])
-                self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r,transaction_id=%r, session_id=%r, recipient=%r,type=%r,sender=%r,auth_string=%r",
-                                 (self.fd.inode,self.get_packet_id(),words[1],self.session_id,"SWITCHBOARD SERVER","JOINING_SESSION","(Target)="+words[2],words[3]))
                 ## This stores the current clients username
                 self.client_id = words[2]
+                self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r,transaction_id=%r, session_id=%r, recipient=%r,type=%r,sender=%r",
+                                 (self.fd.inode,self.get_packet_id(),words[1],self.session_id,"SWITCHBOARD SERVER","TARGET JOINING_SESSION","%s (Target)" % self.client_id))
 
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,'Target','msn_passport',words[2]))
+                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'target_msn_passport',words[2]))
 
             except Exception,e:
                 print "ANS not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e)
@@ -234,50 +378,50 @@ class message:
                              (self.fd.inode,self.get_packet_id(),words[1],self.session_id, words[4],"CURRENT_PARTICIPANTS",words[4]))
             self.state = "IRO"
 
-            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,words[4],'display_name',words[5]))
+            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,words[4],'user_msn_passport',words[4]))
+            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,words[4],'url_enc_display_name',words[5]))
+
+            self.add_participant(words[4])                
 
         except Exception,e:
                 print "IRO not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e)
                 pass
 
     def RNG(self):
-        """ Format:
+        """ Target is being invited to a new session
+
+        We use this to store the current session ID for this entire TCP stream.
+
+        Format:
         RNG <sessionid> <switchboard server ip:port> <auth type, always=cki> <auth string> <nick of inviter> <url encoded display name of inviter>
         """
         words = self.cmdline.split()
-        self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, session_id=%r, recipient=%r, type=%r, sender=%r,sb_server_ip=%r,auth_string=%r",(self.fd.inode,self.get_packet_id(),words[1], "(Target)","INVITE",words[5],words[1].split(":")[0],words[4]))
+        self.session_id = words[1]
+
+        #The inviter is a participant
+        self.add_participant(words[5])
+        self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, session_id=%r, recipient=%r, type=%r, sender=%r",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,"TARGET INVITED",words[5]))
 	self.state = "RNG"
 
-        self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],words[5],'url_enc_display_name',words[6]))
+        self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,words[5],'user_msn_passport',words[5]))
+
+        self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,words[5],'url_enc_display_name',words[6]))
         
     def JOI(self):
+        """ Sent to all participants when a new client joins
+
+        JOI bob@passport.com Bob
+        
+        """
         words = self.cmdline.split()
-        self.dbh.execute("insert into msn_session set set inode=%r, packet_id=%r, session_id=%r, recipient=%r",
-                         (self.fd.inodeself.get_packet_id(),self.session_id, words[1]))
+        self.add_participant(words[1])
+        self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, session_id=%r, recipient=%r,type=%r,sender=%r",
+                          (self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,"USER JOINING_SESSION WITH TARGET",words[1]))
+
+        self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,words[1],'user_msn_passport',words[1]))
+        self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,words[1],'url_enc_display_name',words[2]))
+        
 	self.state = "JOI"
-
-# This is not useful. The CVR command provides much better information.
-##    def VER(self):
-##        """ Version information
-
-##        We use this to store the current session ID for the entire TCP connection.
-##        Not really any way to tell whether this is server->client or client->server.
-
-##        e.g.
-        
-##        < VER 1 MSNP9 MSNP10 MSNP11 MSNP12 CVR0\r\n
-##        > VER 1 MSNP12 MSNP11 MSNP10 MSNP9 CVR0\r\n
-
-##        """
-##        words = self.cmdline.split()
-##	print "VER command: %s" % self.cmdline
-        
-##	try:
-##            self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r,transaction_id=%r, recipient=%r,type=%r,sender=%r",
-##                             (self.fd.inode,self.get_packet_id(),words[1],"SERVER/Target","VERSION="+words[2:],"SERVER/Target"))
-##            ## This stores the current clients username
-##        except: pass
-##	self.state = "VER"
 
     def CVR(self):
         """Version information, including OS information
@@ -297,13 +441,13 @@ class message:
         words = self.cmdline.split()
 
         # I think we only care about the client, not the server, hence:
-        print "CVR: %s" % self.cmdline
         if (words[2].find("x")==1):
+            self.client_id=words[9]
             try:
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,'Target','locale',words[2]))
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,'Target','os'," ".join(words[3:6])))
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,'Target','client'," ".join(words[6:8])))
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,'Target','msn_passport',words[9]))
+                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'locale',words[2]))
+                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'os'," ".join(words[3:6])))
+                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'client'," ".join(words[6:8])))
+                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'target_msn_passport',words[9]))
                 
                 self.state = "CVR"
 
@@ -352,23 +496,23 @@ class message:
         try:
             if (words[1]=="PHH"):
                 
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,'Target','home_phone',words[2]))
+                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'home_phone',words[2]))
                 
             elif (words[1]=="PHW"):
                 
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,'Target','work_phone',words[2]))
+                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'work_phone',words[2]))
                 
             elif (words[1]=="PHM"):
                 
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,'Target','mobile_phone',words[2]))
+                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'mobile_phone',words[2]))
                 
             elif (words[1]=="MOB"):
                 
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,'Target','msn_mobile_auth',words[2]))
+                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'msn_mobile_auth',words[2]))
                 
             elif (words[1]=="MBE"):
                 
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,'Target','msn_mobile_device',words[2]))
+                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'msn_mobile_device',words[2]))
                 
             else:
 
@@ -395,7 +539,7 @@ class message:
         print "LSG: %s" % self.cmdline
         
         try:
-            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,'Target','contact_list_groups',words[1:2]))
+            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'contact_list_groups',words[1:2]))
 
         except Exception,e:
                 print "LSG not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e)
@@ -425,23 +569,66 @@ class message:
 
         """
         words = self.cmdline.split()
-        
-##        list_lookup['forward_list']=00001
-##        list_lookup['allow_list']=00010
-##        list_lookup['block_list']=00100
-##        list_lookup['reverse_list']=01000
-##        list_lookup['pending_list']=10000
+
+        list_lookup={}
+        list_lookup['forward_list']=1
+        list_lookup['allow_list']=2
+        list_lookup['block_list']=4
+        list_lookup['reverse_list']=8
+        list_lookup['pending_list']=16
         
         print "LST: %s" % self.cmdline
+
+        listresults=[]
+        for listtypes in list_lookup.keys():
+            if ((list_lookup[listtypes] & words[3])>0):
+                listresults.append(listtypes)
+        print listresults
         
         try:
-            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,'Target','contact_list_member',words[1:2]))
+            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'contact_list_member',"account name:%s. nickname:%s. in lists:%s. in groups:%s"%(words[1],words[2],listresults,words[4])))
 
         except Exception,e:
                 print "LST not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e)
                 pass
             
         self.state = "LST"
+
+    #Ignore these commands
+    def ACK (self):
+        pass
+    def PNG (self):
+        #Client ping
+        pass
+    def QNG (self):
+        #Server ping reply
+        pass
+    def VER (self):
+        #see below
+        pass
+# This is not useful. The CVR command provides much better information.
+##    def VER(self):
+##        """ Version information
+
+##        Not really any way to tell whether this is server->client or client->server.
+
+##        e.g.
+        
+##        < VER 1 MSNP9 MSNP10 MSNP11 MSNP12 CVR0\r\n
+##        > VER 1 MSNP12 MSNP11 MSNP10 MSNP9 CVR0\r\n
+
+##        """
+##        words = self.cmdline.split()
+##	print "VER command: %s" % self.cmdline
+        
+##	try:
+##            self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r,transaction_id=%r, recipient=%r,type=%r,sender=%r",
+##                             (self.fd.inode,self.get_packet_id(),words[1],"SERVER/Target","VERSION="+words[2:],"SERVER/Target"))
+##            ## This stores the current clients username
+##        except: pass
+##	self.state = "VER"
+
+
 
 ##    def ADD(self):
 ##        """Adding people to your lists.
@@ -519,46 +706,90 @@ class message:
 
 ##                self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, session_id=%r, recipient=%r, type=%r, sender=%r,sb_server_ip=%r,auth_string=%r",(self.fd.inode,self.get_packet_id(),words[1], "(Target)","INVITE",words[5],words[1].split(":")[0],words[4]))
                 
-##                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,'Target','home_phone',words[2]))
+##                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'home_phone',words[2]))
                 
 ##            elif (words[1]=="PHW"):
                 
-##                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,'Target','work_phone',words[2]))
+##                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'work_phone',words[2]))
                 
 ##            elif (words[1]=="PHM"):
                 
-##                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,'Target','mobile_phone',words[2]))
+##                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'mobile_phone',words[2]))
                 
 ##            elif (words[1]=="MOB"):
                 
-##                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,'Target','msn_mobile_auth',words[2]))
+##                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'msn_mobile_auth',words[2]))
                 
 ##            elif (words[1]=="MBE"):
                 
-##                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,'Target','msn_mobile_device',words[2]))
+##                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'msn_mobile_device',words[2]))
                 
 ##            else:
 
-##                print "PRP not decoded correctly: %s" % self.cmdline.strip()
+##                print "ADD not decoded correctly: %s" % self.cmdline.strip()
 
 ##        except Exception,e:
-##                print "PRP not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e)
+##                print "ADD not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e)
 ##                pass
             
-##        self.state = "PRP"
+##        self.state = "ADD"
                          
-    def plain_handler(self,content_type,sender,friendly_sender):
+    def plain_handler(self,content_type,sender,friendly_sender,is_server):
         """ A handler for content type text/plain """
 
-        self.dbh.execute(""" insert into msn_messages set sender=%r,friendly_name=%r,
-        recipient=%r, inode=%r, packet_id=%r, data=%r, session=%r
+        self.dbh.execute(""" insert into msn_session set sender=%r,friendly_name=%r,
+        recipient=%r, inode=%r, packet_id=%r, data=%r, session_id=%r, type=%r
         """,(
             sender,friendly_sender, self.recipient, self.fd.inode, self.get_packet_id(),
-            self.get_data(), self.session_id
+            self.get_data(), self.session_id,'MESSAGE'
             ))
 
-    def p2p_handler(self,content_type,sender,friendly_sender):
+    def control_msg_handler(self,content_type,sender,friendly_sender,is_server):
+        """ A handler for content type text/x-msmsgscontrol
+
+        If this is the client sending a message out:
+
+        This gives us another chance to set self.client_id
+        (i.e. target username) for the stream, using the Typing User
+        messages.  This means that if we miss the ANS, we can still
+        identify who 'Target' is.
+
+        If this is the server sending a message in:
+
+        This gives us another chance to find out the participating
+        users in the session.  This means if we miss one or all of the
+        IRO statements, we still know who is in the session
+        
+        """
+        if is_server:
+            #Typing user message from server - way to identify participants!
+            self.add_participant(self.headers['typinguser'])
+        else:
+            self.client_id = self.headers['typinguser']
+
+    def profile_msg_handler(self,content_type,sender,friendly_sender,is_server):
+        """ A handler for content type text/x-msmsgsprofile
+
+        These messages can potentially contain great info (providing
+        the user has set the settings in the client)
+        
+        """
+        ####Don't need this, just handle SBS as in S50.  Or maybe just make special case of MSG Hotmail
+        #self.client_id = self.headers['typinguser']
+        #print "The Typing User is: %s" % (self.client_id)
+
+    def ignore_type(self,content_type,sender,friendly_sender,is_server):
+        #Nonexistent callback for ignored types.
+        print "Ignoring message:%s.  Headers:%s. Data:%s" % (self.cmdline.strip(),self.headers,self.data.strip())
+
+    def p2p_handler(self,content_type,sender,friendly_sender,is_server):
         """ Handle a p2p transfer """
+
+        def strip_username(p2pusername):
+            # TO and FROM are of format <msnmsgr:name@hotmail.com> so strip the extra stuff out
+            return p2pusername.replace('<msnmsgr:','').strip('>')
+            
+            
         data = self.get_data()
         ## Now we break out the header:
         ( channel_sid, id, offset, total_data_size, message_size ) = struct.unpack(
@@ -587,6 +818,9 @@ class message:
                 self.dbh.execute("insert into msn_p2p set session_id = %r, channel_id = %r, to_user= %r, from_user= %r, context=%r",
                                  (self.session_id,headers['sessionid'],
                                   headers['to'],headers['from'],context))
+                
+                self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, session_id=%r, recipient=%r,type=%r,sender=%r,data=%r",
+                          (self.fd.inode,self.get_packet_id(),self.session_id,strip_username(headers['to']),"P2P FILE TRANSFER",strip_username(headers['from']),"p2p session id:%s" % headers['sessionid']))
 
                 ## Add a VFS entry for this file:
                 new_inode = "CMSN%s-%s" % (headers['sessionid'],
@@ -610,7 +844,7 @@ class message:
                     mtime = 0
                 
                 ## The filename and size is given in the context
-                self.ddfs.VFSCreate(self.stream.inode, new_inode, "MSN/%s" %
+                self.ddfs.VFSCreate(self.fd.inode, new_inode, "MSN/%s" %
                                     (filename) , mtime=mtime,
                                     size=size)
 
@@ -618,7 +852,7 @@ class message:
                 
         ## We have a real channel id so this is an actual file:
         else:
-            filename = get_temp_path(self.dbh.case,"%s|CMSN%s-%s" % (self.stream.inode, channel_sid,self.session_id))
+            filename = get_temp_path(self.dbh.case,"%s|CMSN%s-%s" % (self.fd.inode, channel_sid,self.session_id))
             fd=os.open(filename,os.O_RDWR | os.O_CREAT)
             os.lseek(fd,offset,0)
             bytes = os.write(fd,data)
@@ -627,8 +861,13 @@ class message:
             os.close(fd)
             
     ct_dispatcher = {
+        #Ignore list:
+        #text/x-msmsgscontrol are 'typing user' messages.
+        
         'text/plain': plain_handler,
         'application/x-msnmsgrp2p': p2p_handler,
+        'text/x-msmsgscontrol': control_msg_handler,
+        'text/x-msmsgsprofile': profile_msg_handler
         }
             
     def MSG(self):
@@ -659,32 +898,65 @@ class message:
         TypingUser: user2@hotmail.com
 
         Format is: MSG <Nick> <URL encoded displayname> <length of message in bytes>
+
+        The profile messages look like this:
+        
+        SBS 0 null
+        MSG Hotmail Hotmail 999
+        MIME-Version: 1.0
+        Content-Type: text/x-msmsgsprofile; charset=UTF-8
+        LoginTime: 1130000813
+        EmailEnabled: 1
+        MemberIdHigh: 98989
+        MemberIdLow: 9898989898
+        lang_preference: 1033
+        preferredEmail:
+        country: AU
+        PostalCode:
+        Gender:
+        Kid: 0
+        Age:
+        BDayPre:
+        Birthday:
+        Wallet:
+        Flags: 1073759303
+        sid: 500
+        kv: 7
+        MSPAuth: 78vuxsrLuGBgVaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaatdYDSaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa$$
+        ClientIP: 60.0.0.1
+        ClientPort: 39620
+        ABCHMigrated: 1
         
         """
         ## Read the data for this MSG:
         self.parse_mime()
         words = self.cmdline.split()
         try:
-            ## If the second word is a transaction id (int) its a message from client to server
+            ## If the second word is a transaction id (int) its a message from client to server.  ie. FROM target to all users in session.
             tid = int(words[1])
             sender = "%s (Target)" % self.client_id
             friendly_sender = "Implied Client Machine"
-	    #self.recipient = ""
+            print "participants:%s" % (",".join(self.participants))
+	    self.recipient = ",".join(self.participants)
+            server = False
         except ValueError:
+            # Message TO target
             tid = 0
             sender = words[1]
             friendly_sender = words[2]
-	    self.recipient = "(Target)"
+            server = True
+	    self.recipient = "%s (Target)" % self.client_id
         try:
             content_type = self.headers['content-type']
         except:
             content_type = "unknown/unknown"
+            logging.log(logging.VERBOSE_DEBUG,"Couldn't figure out MIME type for this message: %s" % self.cmdline)
 
         ## Now dispatch the relevant handler according to the content
         ## type:
         try:
             ct = content_type.split(';')[0]
-            self.ct_dispatcher[ct](self,content_type,sender,friendly_sender)
+            self.ct_dispatcher[ct](self,content_type,sender,friendly_sender,server)
         except KeyError,e:
             logging.log(logging.VERBOSE_DEBUG, "Unable to handle content-type %s(%s) - ignoring message %s " % (content_type,e,tid))
         self.state = "MSG"
@@ -700,28 +972,23 @@ class MSNScanner(StreamScannerFactory):
     """ Collect information about MSN Instant messanger traffic """
     default = True
 
+    def __init__(self,fsfd):
+        StreamScannerFactory.__init__(self,fsfd)
+        self.processed=[]
+
     def prepare(self):
-        self.dbh.execute(
-            """CREATE TABLE if not exists `msn_messages` (
-            `sender` VARCHAR( 250 ) NOT NULL ,
-            `friendly_name` VARCHAR( 255 ) NOT NULL ,
-	    `recipient` VARCHAR( 255 ),
-            `inode` VARCHAR(250) NOT NULL,
-            `packet_id` INT,
-            `session` INT,
-            `data` TEXT NOT NULL
-            )""")
+
         self.dbh.execute(
             """ CREATE TABLE if not exists `msn_session` (
             `inode` VARCHAR(50) NOT NULL,
             `packet_id` INT NOT NULL,
             `session_id` INT,
+            `sender` VARCHAR(250),
             `recipient` VARCHAR( 250 ),
+            `friendly_name` VARCHAR( 255 ) NOT NULL ,
             `type` VARCHAR(50),
-            `transaction_id`  INT,
-            `auth_string` VARCHAR(50),
-            `sb_server_ip` VARCHAR(50),
-            `sender` VARCHAR(250)
+            `data` TEXT NOT NULL,
+            `transaction_id`  INT
             )""")
         self.dbh.execute(
             """ CREATE TABLE if not exists `msn_p2p` (
@@ -739,7 +1006,7 @@ class MSNScanner(StreamScannerFactory):
             `session_id` INT,
             `transaction_id`  INT,
             `nick` VARCHAR(50) NOT NULL,
-            `user_data_type` enum('msn_passport','display_name','url_enc_display_name','locale','os','client') default NULL ,
+            `user_data_type` enum('target_msn_passport','user_msn_passport','url_enc_display_name','locale','os','client') default NULL ,
             `user_data` TEXT NOT NULL
             )""")
         self.msn_connections = {}
@@ -747,27 +1014,50 @@ class MSNScanner(StreamScannerFactory):
 
     def process_stream(self, stream, factories):
         ports = dissect.fix_ports("MSN")
+        
         if stream.src_port in ports or stream.dest_port in ports:
-            logging.log(logging.DEBUG,"Opening S%s for MSN" % stream.con_id)
+            try:
+                #Keep track of the streams we have combined so we don't process reverse again
+                #self.processed is a ring buffer so it doesn't get too big
+                if self.processed.index(stream.con_id):
+                    #Already processed
+                    pass
+            except ValueError:
 
-            fd = self.fsfd.open(inode="I%s|S%s" % (stream.fd.name, stream.con_id))
-            m=message(self.dbh, fd, self.fsfd, stream)
-            while 1:
-                try:
-                    result=m.parse()
-                except IOError:
+                #This returns the forward and reverse stream associated with the MSN port (uses port numbers in .pyflagrc).
+                forward_stream, reverse_stream = self.stream_to_server(stream, "MSN")
 
-                    break
+                #We need both streams otherwise this won't work
+                if not reverse_stream or not forward_stream: return
+
+                logging.log(logging.VERBOSE_DEBUG,"Opening Combined Stream S%s/%s for MSN" % (forward_stream, reverse_stream))
+
+                #Create the combined inode
+                combined_inode = "I%s|S%s/%s" % (stream.fd.name, forward_stream, reverse_stream)
+
+                # Open the combined stream.
+                fd = self.fsfd.open(inode=combined_inode)
                 
-            for inode in m.inodes:
-                self.scan_as_file("%s|%s" % (stream.inode, inode), factories)
+                m=message(self.dbh, fd, self.fsfd)
+                while 1:
+                    try:
+                        result=m.parse()
+                    except IOError:
+
+                        break
+
+                for inode in m.inodes:
+                    self.scan_as_file("%s|%s" % (stream.inode, inode), factories)
+
+                print "Appending ids: %s, %s" % (forward_stream,reverse_stream)
+                self.processed.append([forward_stream,reverse_stream])
                 
 class MSNFile(File):
     """ VFS driver for reading the cached MSN files """
     specifier = 'C'
         
-class BrowseMSNChat(Reports.report):
-    """ This allows MSN chat messages to be browsed.
+class BrowseMSNSessions(Reports.report):
+    """ This allows MSN sessions to be browsed.
 
     Note that to the left of each column there is an icon with an
     arrow pointing downwards. Clicking on this icon shows the full msn
@@ -777,7 +1067,7 @@ class BrowseMSNChat(Reports.report):
     searching for it, but want to see what messages were sent around
     the same time to get some context.
     """
-    name = "Browse MSN Chat"
+    name = "Browse MSN Sessions"
     family = "Network Forensics"
     def form(self,query,result):
         try:
@@ -804,15 +1094,19 @@ class BrowseMSNChat(Reports.report):
               icon = "stock_down-with-subpoints.png",
 	                     )
 
-            return tmp	
+            return tmp
 
         result.table(
-            columns = ['pcap.ts_sec', 'from_unixtime(pcap.ts_sec,"%Y-%m-%d")','concat(from_unixtime(pcap.ts_sec,"%H:%i:%s"),".",pcap.ts_usec)', 'inode', 'concat(left(inode,instr(inode,"|")),"p0|o",cast(packet_id as char))', 'session', 'sender', 'recipient','data'],
-            names = ['Prox','Date','Time','Stream', 'Packet', 'Session', 'Sender Nick', 'Recipient Nick','Text'],
-            table = "msn_messages join pcap on packet_id=id",
+            #TODO find a nice way to separate date and time (for exporting csv separate), but not have it as the default...
+            #date: 'from_unixtime(pcap.ts_sec,"%Y-%m-%d")'
+            #time: 'concat(from_unixtime(pcap.ts_sec,"%H:%i:%s"),".",pcap.ts_usec)'
+            
+            columns = ['pcap.ts_sec', 'concat(from_unixtime(pcap.ts_sec),".",pcap.ts_usec)', 'inode', 'concat(left(inode,instr(inode,"|")),"p0|o",cast(packet_id as char))', 'session_id','type','sender','recipient','data','transaction_id'],
+            names = ['Prox','Timestamp','Stream', 'Packet', 'Session ID', 'Type','Sender','Recipient','Text','Transaction ID'],
+            table = "msn_session join pcap on packet_id=id",
             callbacks = {'Prox':draw_prox_cb},
             links = [
-	    	     None,None,None,
+	    	     None,None,
 		     FlagFramework.query_type((),
                                               family="Disk Forensics", case=query['case'],
                                               report='View File Contents', 
@@ -826,34 +1120,11 @@ class BrowseMSNChat(Reports.report):
                                               report='BrowseMSNSessions', 
                                               __target__='where_Session ID'),
                      ],
-            case = query['case']
+            case = query['case'],
+            hide_columns = ['Date']
             )
 
-class BrowseMSNSessions(BrowseMSNChat):
-    """ This shows MSN Session Information. """
-    name = "Browse MSN Sessions"
-    family = "Network Forensics"
-    #hidden = True
-    def display(self,query,result):
-        result.heading("MSN Chat sessions")
-        result.table(
-            columns = ['inode', 'concat(left(inode,instr(inode,"|")),"p0|o",cast(packet_id as char))','concat(from_unixtime(pcap.ts_sec),".",pcap.ts_usec)','session_id','type','sender','recipient','transaction_id','auth_string','sb_server_ip'],
-            names = ['Stream','Packet','Timestamp','Session ID','Type','Sender','Recipient','Transaction ID','Authentication String','Switchboard Server'],
-            table = "msn_session join pcap on packet_id=id",
-            links = [FlagFramework.query_type((),
-                                              family="Disk Forensics", case=query['case'],
-                                              report='View File Contents', 
-                                              __target__='inode', mode="Combined streams"),
-                     FlagFramework.query_type((),
-                                              family="Network Forensics", case=query['case'],
-                                              report='View Packet', 
-                                              __target__='inode'),
-                     None,None,None,None,None,None,None,None
-                     ],
-            case = query['case']
-            )
-
-class BrowseMSNUsers(BrowseMSNChat):
+class BrowseMSNUsers(BrowseMSNSessions):
     """ This shows MSN participants (users). """
     name = "Browse MSN Users"
     family = "Network Forensics"
