@@ -46,6 +46,14 @@ void pad_to_first_packet(TCPStream self) {
     
     tcp->packet.data_len+=pad_length;
     tcp->packet.data = new_data;
+  } else if(pad_length<0) {
+    tcp->packet.data_len -= -pad_length;
+    tcp->packet.data += -pad_length;
+
+    if(tcp->packet.data_len<0) {
+      tcp->packet.data_len=0;
+      tcp->packet.data=NULL;
+    };
   };
   
   self->next_seq+=tcp->packet.data_len;
@@ -65,6 +73,7 @@ void TCPStream_add(TCPStream self, IP ip) {
   struct skbuff *i;
   TCP tcp=(TCP)ip->packet.payload;
   int count=0;
+  struct list_head *candidate;
 
   /** If there is no data in there we move on */
   if(tcp->packet.data_len==0) {
@@ -73,7 +82,7 @@ void TCPStream_add(TCPStream self, IP ip) {
   }
 
   /** This is the location after which we insert the new structure */
-  struct list_head *candidate = &(self->queue.list);
+  candidate = &(self->queue.list);
 
   /** Take over the packet */
   new->packet = ip;

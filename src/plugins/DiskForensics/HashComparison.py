@@ -59,20 +59,20 @@ class MD5Scan(GenScanFactory):
 
     class Scan(BaseScanner):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
-            BaseScanner.__init__(self, inode,ddfs,outer,factories)
+            BaseScanner.__init__(self, inode,ddfs,outer,factories, fd=fd)
             self.m = md5.new()
 
-            # Check that we have not done this inode before
-            self.dbh.check_index("md5","inode")
-            self.dbh.execute("select * from md5 where inode=%r",(inode))
-            if self.dbh.fetch():
-                self.ignore=1
-            else:
-                self.ignore=0
+##            # Check that we have not done this inode before
+##            self.dbh.check_index("md5","inode")
+##            self.dbh.execute("select * from md5 where inode=%r",(inode))
+##            if self.dbh.fetch():
+##                self.ignore=1
+##            else:
+##                self.ignore=0
 
         def process(self, data,metadata=None):
             self.m.update(data)
-            if len(data)<16: self.ignore=1
+            if len(data)<16: self.ignore=True
 
         def finish(self):
             if self.ignore:

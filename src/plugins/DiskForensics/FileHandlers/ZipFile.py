@@ -93,7 +93,7 @@ class GZScan(ZipScan):
             )
         
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
-            ScanIfType.__init__(self, inode,ddfs,outer,factories)
+            ScanIfType.__init__(self, inode,ddfs,outer,factories,fd=fd)
             self.filename = None
 
         def process(self, data, metadata=None):

@@ -87,7 +87,7 @@ class PstScan(GenScanFactory):
     
     class Scan(StoreAndScanType):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
-            StoreAndScanType.__init__(self, inode,ddfs,outer,factories)
+            StoreAndScanType.__init__(self, inode,ddfs,outer,factories,fd=fd)
             self.to_re = outer.to_re
             self.from_re = outer.from_re
 

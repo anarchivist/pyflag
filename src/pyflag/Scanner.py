@@ -62,6 +62,17 @@ class BaseScanner:
         self.dbh=outer.dbh
         self.outer=outer
         self.factories=factories
+        
+        # This flag indicates if we wish to be ignored from now on -
+        # it may be set if we determining that the file is boring, and
+        # do not wish to get any more of it. The default ignore state
+        # is taken from the fd itself - sometimes fds wish to be
+        # ignored and only selected by specific scanners. Other times
+        # the fds want to be processed by anyone.
+        try:
+            self.ignore = self.fd.ignore
+        except:
+            self.ignore = False
 
     def process(self, data, metadata={}):
         """ process the chunk of data.
@@ -137,7 +148,7 @@ class MemoryScan(BaseScanner):
     """
     windowsize=200
     def __init__(self, inode,ddfs,outer,factories=None,fd=None):
-        BaseScanner.__init__(self, inode,ddfs,outer,factories)
+        BaseScanner.__init__(self, inode,ddfs,outer,factories,fd=fd)
         self.window = ''
         self.offset=0
 
@@ -159,7 +170,7 @@ class StoreAndScan(BaseScanner):
     Note that this is a scanner inner class (which should be defined inside the factory class). This class should be extended by Scanner factories to provide real implementations to the 'boring','make_filename' and 'external_process' methods.
     """
     def __init__(self, inode,ddfs,outer,factories=None,fd=None):
-        BaseScanner.__init__(self, inode,ddfs,outer,factories)
+        BaseScanner.__init__(self, inode,ddfs,outer,factories, fd=fd)
         self.file = None
         self.name = None
         self.boring_status = True
@@ -243,6 +254,9 @@ class StoreAndScanType(StoreAndScan):
                 mime_type = row['mime']
             else:
                 metadata['mime'] = None
+                ## The type of the file may not change once magic has
+                ## been determined, so we ignore the rest of the file:
+                self.ignore = True
                 return True
 
         if mime_type:
@@ -251,6 +265,7 @@ class StoreAndScanType(StoreAndScan):
                     ## Not boring:
                     return False
 
+        self.ignore = True
         return True
 
 
@@ -260,7 +275,7 @@ class ScanIfType(StoreAndScanType):
     Just like StoreAndScanType but without creating the file.
     """
     def __init__(self, inode,ddfs,outer,factories=None,fd=None):
-        BaseScanner.__init__(self, inode,ddfs,outer,factories)
+        BaseScanner.__init__(self, inode,ddfs,outer,factories,fd=fd)
         self.boring_status = True
 
     def process(self, data,metadata=None):
@@ -330,13 +345,27 @@ def scanfile(ddfs,fd,factories):
             break
         
         # call process method of each class
+        interest = 0
+        
         for o in objs:
             try:
-                o.process(data,metadata=metadata)
+                if not o.ignore:
+                    interest+=1
+                    o.process(data,metadata=metadata)
+                    print "%s is interested" % o
+                else:
+                    print "%s is not interested" % o
+
             except Exception,e:
                 logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
                 raise
 
+        ## If none of the scanners are interested with this file, we
+        ## stop right here
+        if not interest:
+            print "No interest for %s" % fd.inode
+            break
+        
     # call finish method of each object
     for o in objs:
         try:

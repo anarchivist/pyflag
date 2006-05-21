@@ -75,7 +75,7 @@ class VirScan(GenScanFactory):
 
     class Scan(MemoryScan):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
-            MemoryScan.__init__(self, inode,ddfs,outer,factories)
+            MemoryScan.__init__(self, inode,ddfs,outer,factories,fd=fd)
             self.virus = None
             self.scanner = VScan()
 

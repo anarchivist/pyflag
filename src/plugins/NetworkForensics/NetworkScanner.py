@@ -49,6 +49,14 @@ class NetworkScanner(BaseScanner):
 
     Note that network scanners operate on discrete packets, where stream scanners operate on whole streams (and derive from StreamScannerFactory).
     """
+    def __init__(self,inode,ddfs,outer,factories=None,fd=None):
+        BaseScanner.__init__(self,inode,ddfs,outer,factories=factories,fd=fd)
+        try:
+            self.fd.link_type
+            self.ignore = False
+        except:
+            self.ignore = True
+            
     def finish(self):
         """ Only allow scanners to operate on pcapfs inodes """
         try:
@@ -85,8 +93,8 @@ class NetworkScanner(BaseScanner):
             metadata['proto_tree']={ self.packet_id: self.proto_tree }
 
 class StreamScannerFactory(GenScanFactory):
-    """ This is a scanner factory allows scanners to only operate on streams.
-
+    """ This is a scanner factory which allows scanners to only
+    operate on streams.
     """
     order = 2
 
@@ -117,12 +125,18 @@ class StreamScannerFactory(GenScanFactory):
         fd.close()
 
     class Scan(BaseScanner):
-        def process(self, data, metadata=None):
+        def __init__(self,inode,ddfs,outer,factories=None,fd=None):
+            BaseScanner.__init__(self,inode,ddfs,outer,factories=factories,fd=fd)
             try:
-                ## This identifies our fd as a stream
+                ## This identifies our fd as a stream. We only operate
+                ## on streams otherwise we do not wish to be bothered.
                 self.fd.con_id
+                self.ignore = False
             except AttributeError:
+                self.ignore = True
                 return
+            
+        def process(self, data, metadata=None):
             metadata['mime'] = "text/packet"
             
             ## Call the base classes process_stream method with the

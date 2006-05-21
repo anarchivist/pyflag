@@ -70,6 +70,7 @@ class RFC2822(Scanner.GenScanFactory):
 
                 print "RFC2822 thought %s is boring despite the magic" % line
 
+            self.ignore = True
             return True
  
         def external_process(self,name):		    

@@ -163,7 +163,7 @@ class IndexScan(GenScanFactory):
         
     class Scan(BaseScanner):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
-            BaseScanner.__init__(self, inode,ddfs,outer,factories)
+            BaseScanner.__init__(self, inode,ddfs,outer,factories,fd=fd)
             self.index = outer.index
             self.RegexpRows = outer.RegexpRows
             self.rel_offset=0

@@ -459,6 +459,7 @@ class File:
     @cvar stat_names: A list of names for the above callbacks.
     """
     specifier = None
+    ignore = False
 
     ## These can be overridden by the caller if they want to add stats to the ViewFile report
     #stat_cbs = None

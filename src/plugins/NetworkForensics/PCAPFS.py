@@ -246,6 +246,7 @@ class PCAPFile(File):
     do not work with this driver.
     """
     specifier = 'p'
+    ignore = True
 
     def __init__(self, case, fd, inode, dbh=None):
         """ This is a top level File driver for opening pcap files.
@@ -274,7 +275,7 @@ class PCAPFile(File):
 
         ## Is this the row we were expecting?
         if row['id'] != self.readptr:
-            self.dbh.execute("select id,offset,link_type,ts_sec,length from pcap where id>=%r", self.readptr)
+            self.dbh.execute("select id,offset,link_type,ts_sec,length from pcap where id=%r", self.readptr)
             row=self.dbh.fetch()
 
         if not row:
