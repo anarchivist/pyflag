@@ -1006,7 +1006,21 @@ class MSNScanner(StreamScannerFactory):
             `session_id` INT,
             `transaction_id`  INT,
             `nick` VARCHAR(50) NOT NULL,
-            `user_data_type` enum('msn_passport','display_name','url_enc_display_name','locale','os','client') default NULL ,
+            `user_data_type` enum('msn_passport',
+                                  'display_name',
+                                  'url_enc_display_name',
+                                  'locale',
+                                  'os',
+                                  'client',
+                                  'contact_list_groups',
+                                  'home_phone',
+                                  'work_phone',
+                                  'mobile_phone',
+                                  'msn_mobile_auth',
+                                  'msn_mobile_device',
+                                  'contact_list_groups',
+                                  'contact_list_member'
+                                  ) default NULL ,
             `user_data` TEXT NOT NULL
             )""")
         self.msn_connections = {}
