@@ -42,6 +42,7 @@ import pyflag.Reports as Reports
 import pyflag.logging as logging
 import base64
 import plugins.NetworkForensics.PCAPFS as PCAPFS
+import urllib
 
 class RingBuffer:
     def __init__(self, size_max):
@@ -284,7 +285,7 @@ class message:
             self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, recipient=%r,type=%r,sender=%r,transaction_id=%r,session_id=%r",(self.fd.inode,self.get_packet_id(),"SWITCHBOARD SERVER","TARGET ENTERING NEW SWITCHBOARD SESSION","%s (Target)" % self.client_id,words[1],self.session_id))
 
             self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'target_msn_passport',words[3]))
-            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'url_enc_display_name',words[4]))
+            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'url_enc_display_name',urllib.unquote(words[4])))
             
         elif (words[2]=="TWN")and(words[3]=="I"):
             #Ignore 'S' messages - no value.
@@ -393,7 +394,10 @@ class message:
             self.state = "IRO"
 
             self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,words[4],'user_msn_passport',words[4]))
-            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,words[4],'url_enc_display_name',words[5]))
+            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,words[4],'url_enc_display_name',urllib.unquote(words[5])))
+
+            
+            
 
             self.add_participant(words[4])                
 
@@ -419,7 +423,7 @@ class message:
 
         self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,words[5],'user_msn_passport',words[5]))
 
-        self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,words[5],'url_enc_display_name',words[6]))
+        self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,words[5],'url_enc_display_name',urllib.unquote(words[6])))
         
     def JOI(self):
         """ Sent to all participants when a new client joins
@@ -433,7 +437,7 @@ class message:
                           (self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,"USER JOINING_SESSION WITH TARGET",words[1]))
 
         self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,words[1],'user_msn_passport',words[1]))
-        self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,words[1],'url_enc_display_name',words[2]))
+        self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,words[1],'url_enc_display_name',urllib.unquote(words[2])))
         
 	self.state = "JOI"
 
@@ -832,12 +836,13 @@ class message:
                                  (self.session_id,headers['sessionid'],
                                   headers['to'],headers['from'],context))
                 
-                self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, session_id=%r, recipient=%r,type=%r,sender=%r,data=%r",
-                          (self.fd.inode,self.get_packet_id(),self.session_id,strip_username(headers['to']),"P2P FILE TRANSFER",strip_username(headers['from']),"p2p session id:%s" % headers['sessionid']))
-
                 ## Add a VFS entry for this file:
                 new_inode = "CMSN%s-%s" % (headers['sessionid'],
                                            self.session_id)
+
+                self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, session_id=%r, recipient=%r,type=%r,sender=%r,data=%r",
+                          (self.fd.inode,self.get_packet_id(),self.session_id,strip_username(headers['to']),"P2P FILE TRANSFER",strip_username(headers['from']),"p2p file:%s|%s" % (self.fd.inode, new_inode)))
+
                 try:
                 ## Parse the context line:
                     parser = ContextParser()
@@ -955,7 +960,7 @@ class message:
             # Message TO target
             tid = 0
             sender = words[1]
-            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,sender,'url_enc_display_name',words[2]))
+            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,sender,'url_enc_display_name',urllib.unquote(words[2])))
             server = True
 	    self.recipient = "%s (Target)" % self.client_id
         try:
@@ -1001,7 +1006,7 @@ class MSNScanner(StreamScannerFactory):
             `session_id` INT,
             `sender` VARCHAR(250),
             `recipient` VARCHAR( 250 ),
-            `type` VARCHAR(50),
+            `type` VARCHAR(100),
             `data` TEXT NOT NULL,
             `transaction_id`  INT
             )""")
@@ -1021,7 +1026,8 @@ class MSNScanner(StreamScannerFactory):
             `session_id` INT,
             `transaction_id`  INT,
             `nick` VARCHAR(50) NOT NULL,
-            `user_data_type` enum('msn_passport',
+            `user_data_type` enum('target_msn_passport',
+                                  'user_msn_passport',
                                   'display_name',
                                   'url_enc_display_name',
                                   'locale',
@@ -1163,21 +1169,50 @@ class BrowseMSNSessions(Reports.report):
                                               __target__='inode'))
             return tmp
 
+        def p2p_link(value):
+            tmp = result.__class__(result)
+                
+            if value.startswith("p2p file:"):
+                (key,p2p_inode)=value.split(":")
+                #We must be of the form p2p file:Itest|S137/138|CMSN8573970-684504
+                #Make a link to the inode
+                print "p2p:%s" % p2p_inode
+                tmp.link(value,
+                     FlagFramework.query_type((),
+                                              family="Disk Forensics", case=query['case'],
+                                              report='View File Contents',
+                                              inode=p2p_inode,
+                                              __target__=p2p_inode, mode="Statistics"))
+                return tmp
+            else:
+                #Not a p2p file
+                    return value
+          
+
         result.table(
             #TODO find a nice way to separate date and time (for exporting csv separate), but not have it as the default...
             #date: 'from_unixtime(pcap.ts_sec,"%Y-%m-%d")'
             #time: 'concat(from_unixtime(pcap.ts_sec,"%H:%i:%s"),".",pcap.ts_usec)'
             
             columns = ['pcap.ts_sec', 'concat(from_unixtime(pcap.ts_sec),".",pcap.ts_usec)', 'inode', 'concat(left(inode,instr(inode,"|")),"p0|o",cast(packet_id as char))', 'session_id','type','sender','recipient','data','transaction_id'],
-            names = ['Prox','Timestamp','Stream', 'Packet', 'Session ID', 'Type','Sender','Recipient','Text','Transaction ID'],
+            names = ['Prox','Timestamp','Stream', 'Packet', 'Session ID', 'Type','Sender','Recipient','Data','Transaction ID'],
             table = "msn_session join pcap on packet_id=id",
-            callbacks = {'Prox':draw_prox_cb,'Stream':stream_link,'Packet':packet_link},
+            callbacks = {'Prox':draw_prox_cb,'Stream':stream_link,'Packet':packet_link,'Data':p2p_link},
             links = [
 	    	     None,None,None,None,                     
                      FlagFramework.query_type((),
                                               family="Network Forensics", case=query['case'],
                                               report='BrowseMSNSessions', 
                                               __target__='where_Session ID'),
+                     None,
+                     FlagFramework.query_type((),
+                                              family="Network Forensics", case=query['case'],
+                                              report='BrowseMSNUsers', 
+                                              __target__='where_Nick'),
+                     FlagFramework.query_type((),
+                                              family="Network Forensics", case=query['case'],
+                                              report='BrowseMSNUsers', 
+                                              __target__='where_Nick')
                      ],
             case = query['case'],
             hide_columns = ['Date']
@@ -1191,17 +1226,24 @@ class BrowseMSNUsers(BrowseMSNSessions):
     def display(self,query,result):
         result.heading("MSN User Information Captured")
 
-        def stream_link(value):
-            tmp = result.__class__(result)
-            #Strip off the combined stream to get at the original
-            orig_stream=re.sub(r"\/\d+","",value)
-            tmp.link(value,
-                     FlagFramework.query_type((),
-                                              family="Disk Forensics", case=query['case'],
-                                              report='View File Contents',
-                                              inode=orig_stream,
-                                              __target__=orig_stream, mode="Combined streams"))
-            return tmp
+##        def stream_link(value):
+##            tmp = result.__class__(result)
+##            #Strip off the combined stream to get at the original
+##            orig_stream=re.sub(r"\/\d+","",value)
+##            tmp.link(value,
+##                     FlagFramework.query_type((),
+##                                              family="Disk Forensics", case=query['case'],
+##                                              report='View File Contents',
+##                                              inode=orig_stream,
+##                                              __target__=orig_stream, mode="Combined streams"))
+
+##            tmp.start_form(new_query)
+##            tmp.start_table()
+##            tmp.textfield('','where_inode',Additional=True)
+##            tmp.end_table()
+##            tmp.end_form('Go')
+            
+##            return tmp
 
         def packet_link(value):
             tmp = result.__class__(result)
@@ -1219,8 +1261,12 @@ class BrowseMSNUsers(BrowseMSNSessions):
             columns = ['inode', 'concat(left(inode,instr(inode,"|")),"p0|o",cast(packet_id as char))','concat(from_unixtime(pcap.ts_sec),".",pcap.ts_usec)','user_data_type','nick','user_data','transaction_id','session_id'],
             names = ['Stream','Packet','Timestamp','Data Type','Nick','User Data','Transaction ID','Session ID'],
             table = "msn_users join pcap on packet_id=id",
-            callbacks = {'Stream':stream_link,'Packet':packet_link},
-            case = query['case']
+            callbacks = {'Packet':packet_link},
+            case = query['case'],
+            links=[FlagFramework.query_type((),
+                                              family="Network Forensics", case=query['case'],
+                                              report='BrowseMSNSessions', 
+                                              __target__='where_Stream')]
             )
 
 if __name__ == "__main__":

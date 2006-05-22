@@ -286,7 +286,11 @@ import conf
 def urlencode(string):
     """ Utility function used for encoding strings inside URLs.
 
-    Replaces non-alphnumeric chars with their % representation """
+    Replaces non-alphnumeric chars with their % representation
+
+    Note: this could be replaced by urlllib.quote(string)
+
+    """
     result = ''
     for c in str(string):
         if not c.isalnum():
