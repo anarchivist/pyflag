@@ -93,9 +93,7 @@ class message:
     def get_packet_id(self):
         self.offset = self.fd.tell()
         ## Try to find the time stamp of this request:
-        #####This doesn't return the correct result at present, close but no cigar.
         self.packet_id = self.fd.get_packet_id(self.offset)
-        #print "self.packet_id: %s" % self.packet_id
         return self.packet_id
 
     def add_participant(self,username):
@@ -107,11 +105,11 @@ class message:
         except ValueError:
             #Don't have this one, so insert it
             self.participants.append(username)
-            print "Appending to participants:%s" % (self.participants)
+            logging.log(logging.VERBOSE_DEBUG, "Appending to participants:%s" % (self.participants))
 
     def del_participant(self,username):
         try:
-            print "Removing participant:%s" % username
+            logging.log(logging.VERBOSE_DEBUG, "Removing participant:%s" % username)
             self.participants.remove(username)
         except:
             #name wasn't in participants for some reason, shouldn't really happen.
@@ -165,7 +163,7 @@ class message:
                 header,value = line.split(":")
                 self.headers[header.lower()]=value.lower().strip()
             except ValueError:
-                print "Parse mime failed on:%s" % line
+                logging.log(logging.VERBOSE_DEBUG, "Parse mime failed on:%s" % line)
                 pass
 
         current_position = self.fd.tell()
@@ -275,7 +273,7 @@ class message:
 	"""
 	words = self.cmdline.split()
         
-        print "USR:%s" % self.cmdline.strip()
+        logging.log(logging.VERBOSE_DEBUG,  "USR:%s" % self.cmdline.strip())
         self.state = "USR"
         
         
@@ -375,7 +373,7 @@ class message:
                 self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'target_msn_passport',words[2]))
 
             except Exception,e:
-                print "ANS not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e)
+                logging.log(logging.VERBOSE_DEBUG,"ANS not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
                 pass
 
             self.state = "ANS"
@@ -402,7 +400,7 @@ class message:
             self.add_participant(words[4])                
 
         except Exception,e:
-                print "IRO not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e)
+                logging.log(logging.VERBOSE_DEBUG, "IRO not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
                 pass
 
     def RNG(self):
@@ -470,7 +468,7 @@ class message:
                 self.state = "CVR"
 
             except Exception,e:
-                print "CVR not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e)
+                logging.log(logging.VERBOSE_DEBUG,  "CVR not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
                 pass
 
     def PRP(self):
@@ -508,7 +506,7 @@ class message:
         """
         words = self.cmdline.split()
 
-        print "PRP: %s" % self.cmdline
+        logging.log(logging.VERBOSE_DEBUG,  "PRP: %s" % self.cmdline)
         
         
         try:
@@ -534,10 +532,10 @@ class message:
                 
             else:
 
-                print "PRP not decoded correctly: %s" % self.cmdline.strip()
+                logging.log(logging.VERBOSE_DEBUG, "PRP not decoded correctly: %s" % self.cmdline.strip())
 
         except Exception,e:
-                print "PRP not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e)
+                logging.log(logging.VERBOSE_DEBUG, "PRP not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
                 pass
             
         self.state = "PRP"    
@@ -554,13 +552,13 @@ class message:
         """
         words = self.cmdline.split()
 
-        print "LSG: %s" % self.cmdline
+        logging.log(logging.VERBOSE_DEBUG, "LSG: %s" % self.cmdline)
         
         try:
             self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'contact_list_groups',words[1:2]))
 
         except Exception,e:
-                print "LSG not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e)
+                logging.log(logging.VERBOSE_DEBUG, "LSG not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
                 pass
             
         self.state = "LSG"
@@ -595,19 +593,18 @@ class message:
         list_lookup['reverse_list']=8
         list_lookup['pending_list']=16
         
-        print "LST: %s" % self.cmdline
+        logging.log(logging.VERBOSE_DEBUG, "LST: %s" % self.cmdline)
 
         listresults=[]
         for listtypes in list_lookup.keys():
-            if ((list_lookup[listtypes] & words[3])>0):
+            if ((list_lookup[listtypes] and words[3])>0):
                 listresults.append(listtypes)
-        print listresults
         
         try:
             self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'contact_list_member',"account name:%s. nickname:%s. in lists:%s. in groups:%s"%(words[1],words[2],listresults,words[4])))
 
         except Exception,e:
-                print "LST not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e)
+                logging.log(logging.VERBOSE_DEBUG, "LST not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
                 pass
             
         self.state = "LST"
@@ -793,11 +790,11 @@ class message:
         """
         ####Don't need this, just handle SBS as in S50.  Or maybe just make special case of MSG Hotmail
         #self.client_id = self.headers['typinguser']
-        #print "The Typing User is: %s" % (self.client_id)
+        logging.log(logging.VERBOSE_DEBUG, "The Typing User is: %s" % (self.client_id))
 
     def ignore_type(self,content_type,sender,is_server):
         #Nonexistent callback for ignored types.
-        print "Ignoring message:%s.  Headers:%s. Data:%s" % (self.cmdline.strip(),self.headers,self.data.strip())
+        logging.log(logging.VERBOSE_DEBUG, "Ignoring message:%s.  Headers:%s. Data:%s" % (self.cmdline.strip(),self.headers,self.data.strip()))
 
     def p2p_handler(self,content_type,sender,is_server):
         """ Handle a p2p transfer """
@@ -953,7 +950,7 @@ class message:
             ## If the second word is a transaction id (int) its a message from client to server.  ie. FROM target to all users in session.
             tid = int(words[1])
             sender = "%s (Target)" % self.client_id
-            #print "participants:%s" % (",".join(self.participants))
+            logging.log(logging.VERBOSE_DEBUG, "participants:%s" % (",".join(self.participants)))
 	    self.recipient = ",".join(self.participants)
             server = False
         except ValueError:
@@ -1007,14 +1004,14 @@ class MSNScanner(StreamScannerFactory):
             `sender` VARCHAR(250),
             `recipient` VARCHAR( 250 ),
             `type` VARCHAR(100),
-            `data` TEXT NOT NULL,
+            `data` TEXT NULL,
             `transaction_id`  INT
             )""")
         self.dbh.execute(
             """ CREATE TABLE if not exists `msn_p2p` (
             `inode` VARCHAR(250),
             `session_id` INT,
-            `channel_id`  INT,
+            `channel_id` INT,
             `to_user` VARCHAR(250),
             `from_user` VARCHAR(250),
             `context` TEXT
@@ -1039,8 +1036,9 @@ class MSNScanner(StreamScannerFactory):
                                   'mobile_phone',
                                   'msn_mobile_auth',
                                   'msn_mobile_device',
-                                  'contact_list_groups',
-                                  'contact_list_member'
+                                  'contact_list_member',
+                                  'target_msn_passport',
+                                  'user_msn_passport'
                                   ) default NULL ,
             `user_data` TEXT NOT NULL
             )""")
@@ -1096,10 +1094,9 @@ class MSNScanner(StreamScannerFactory):
                     self.dbh.execute("update msn_session set recipient=%r where recipient='Unknown (Target)'",m.client_id)
                     self.dbh.execute("update msn_session set sender=%r where sender='Unknown (Target)'",m.client_id)
 
-                #print "Appending ids: %s, %s" % (forward_stream,reverse_stream)
                 self.processed.append(forward_stream)
                 self.processed.append(reverse_stream)
-                
+                logging.log(logging.VERBOSE_DEBUG, "Appending ids: %s, %s" % (forward_stream,reverse_stream))
                 
 class MSNFile(File):
     """ VFS driver for reading the cached MSN files """

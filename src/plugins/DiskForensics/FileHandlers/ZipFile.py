@@ -72,7 +72,9 @@ class ZipScan(GenScanFactory):
 
                 self.ddfs.VFSCreate(None, "%s|Z%s" % (self.inode,i),pathname+"/"+namelist[i],size=zip.infolist()[i].file_size,mtime=t)
 
-                ## Now call the scanners on this new file (FIXME limit the recursion level here)
+                ## Now call the scanners on this new file (FIXME limit
+                ## the recursion level here)
+                ## FIXME:  This needs to be a read VFS node:
                 fd = StringIO.StringIO(zip.read(namelist[i]))
                 fd.inode = "%s|Z%s" % (self.inode,i)
                 Scanner.scanfile(self.ddfs,fd,self.factories)

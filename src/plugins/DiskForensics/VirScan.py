@@ -66,6 +66,8 @@ class VirScan(GenScanFactory):
         `inode` varchar( 20 ) NOT NULL,
         `virus` tinytext NOT NULL )""")
 
+        self.scanner=VScan()
+
     def destroy(self):
         self.dbh.execute('ALTER TABLE virus ADD INDEX(inode)')
 
@@ -77,11 +79,10 @@ class VirScan(GenScanFactory):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
             MemoryScan.__init__(self, inode,ddfs,outer,factories,fd=fd)
             self.virus = None
-            self.scanner = VScan()
 
         def process_buffer(self,buf):
             if not self.virus:
-                self.virus=self.scanner.scan(buf)
+                self.virus=self.outer.scanner.scan(buf)
 
         def finish(self):
             if self.virus:

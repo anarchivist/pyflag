@@ -322,7 +322,6 @@ class ScanFS(Reports.report):
             
             ## First scan all the files in the directory
             for stat in files:
-                logging.log(logging.DEBUG,"Scanning file %s%s (inode %s)" % (stat['path'],stat['name'],stat['inode']))
                 try:
                     fd=fsfd.open(inode=stat['inode'])
                     Scanner.scanfile(fsfd,fd,scanners)

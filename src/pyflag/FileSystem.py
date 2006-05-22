@@ -603,10 +603,14 @@ class File:
         except AttributeError:
             raise IOError("No cached file")
 
-    def stats(self):
+    def stat(self):
         """ Returns a dict of statistics about the content of the file. """
         self.dbh.execute("select inode, status, uid, gid, mtime as mtime_epoch, from_unixtime(mtime) as `mtime`, atime as atime_epoch, from_unixtime(atime) as `atime`, ctime as ctime_epoch, from_unixtime(ctime) as `ctime`, from_unixtime(dtime) as `dtime`, mode, links, link, size from inode where inode=%r",(self.inode))
-        return self.dbh.fetch()
+        stats = self.dbh.fetch()
+
+        self.dbh.execute("select * from file where inode=%r", self.inode)
+        stats.update(self.dbh.fetch())
+        return stats
 
     def __iter__(self):
         self.seek(0)

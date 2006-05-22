@@ -295,6 +295,9 @@ def scanfile(ddfs,fd,factories):
     @arg fd: The file object of the file to scan
     @arg factories: A list of scanner factories to use when scanning the file.
     """
+    stat = fd.stat()
+    logging.log(logging.DEBUG,"Scanning file %s%s (inode %s)" % (stat['path'],stat['name'],stat['inode']))
+
     buffsize = 1024 * 1024
     # instantiate a scanner object from each of the factory. We only
     #instantiate scanners from factories which have not been run on
@@ -308,11 +311,12 @@ def scanfile(ddfs,fd,factories):
         scanners_run =row['scanner_cache'].split(',')
     except:
         scanners_run = []
-    
-    objs = [ c.Scan(fd.inode,ddfs,c,factories=factories,fd=fd)
-                 for c in factories
-                    if c.__class__.__name__ not in scanners_run ]
 
+    objs = []
+    for c in factories:
+        if c.__class__.__name__ not in scanners_run:
+            objs.append(c.Scan(fd.inode,ddfs,c,factories=factories,fd=fd))
+    
     if not objs: return
 
     ## This dict stores metadata about the file which may be filled in
@@ -343,22 +347,13 @@ def scanfile(ddfs,fd,factories):
             if not data: break
         except IOError,e:
             break
-        
+
         # call process method of each class
         interest = 0
-        
-        for o in objs:
-            try:
-                if not o.ignore:
-                    interest+=1
-                    o.process(data,metadata=metadata)
-                    print "%s is interested" % o
-                else:
-                    print "%s is not interested" % o
 
-            except Exception,e:
-                logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
-                raise
+        for o in objs:
+            if not o.ignore:
+                interest+=1
 
         ## If none of the scanners are interested with this file, we
         ## stop right here
@@ -366,6 +361,20 @@ def scanfile(ddfs,fd,factories):
             print "No interest for %s" % fd.inode
             break
         
+        for o in objs:
+            try:
+                if not o.ignore:
+                    interest+=1
+                    o.process(data,metadata=metadata)
+
+            except Exception,e:
+                logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
+                raise
+
+        if not interest:
+            print "No interest for %s" % fd.inode
+            break
+
     # call finish method of each object
     for o in objs:
         try:
