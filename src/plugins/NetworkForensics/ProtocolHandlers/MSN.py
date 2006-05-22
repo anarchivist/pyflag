@@ -43,6 +43,20 @@ import pyflag.logging as logging
 import base64
 import plugins.NetworkForensics.PCAPFS as PCAPFS
 
+class RingBuffer:
+    def __init__(self, size_max):
+        self.size_max = size_max
+        self.cur=0
+        self.data={}        
+
+    def append(self, datum):
+        #print "Inserting data:%s at %s" % (datum,self.cur)
+        self.data[self.cur]=datum
+        self.cur=(self.cur+1) % self.size_max
+
+    def has_key(self,string):
+        return self.data.has_key(string)
+
 def safe_base64_decode(s):
     """ This attempts to decode the string s, even if it has incorrect padding """
     tmp = s
@@ -273,10 +287,10 @@ class message:
             self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'url_enc_display_name',words[4]))
             
         elif (words[2]=="TWN")and(words[3]=="I"):
+            #Ignore 'S' messages - no value.
             self.client_id = words[4]
             self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'target_msn_passport',words[4]))
-            
-        else:
+        elif (words[2]!="TWN"):
             #must be of form: USR <transation id> example@passport.com 17262740.1050826919.32307
             self.client_id = words[2]
             self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'target_msn_passport',words[2]))
@@ -734,17 +748,16 @@ class message:
             
 ##        self.state = "ADD"
                          
-    def plain_handler(self,content_type,sender,friendly_sender,is_server):
+    def plain_handler(self,content_type,sender,is_server):
         """ A handler for content type text/plain """
 
-        self.dbh.execute(""" insert into msn_session set sender=%r,friendly_name=%r,
-        recipient=%r, inode=%r, packet_id=%r, data=%r, session_id=%r, type=%r
-        """,(
-            sender,friendly_sender, self.recipient, self.fd.inode, self.get_packet_id(),
+        self.dbh.execute(""" insert into msn_session set sender=%r,recipient=%r, inode=%r,
+ packet_id=%r, data=%r, session_id=%r, type=%r""",(
+            sender, self.recipient, self.fd.inode, self.get_packet_id(),
             self.get_data(), self.session_id,'MESSAGE'
             ))
 
-    def control_msg_handler(self,content_type,sender,friendly_sender,is_server):
+    def control_msg_handler(self,content_type,sender,is_server):
         """ A handler for content type text/x-msmsgscontrol
 
         If this is the client sending a message out:
@@ -767,7 +780,7 @@ class message:
         else:
             self.client_id = self.headers['typinguser']
 
-    def profile_msg_handler(self,content_type,sender,friendly_sender,is_server):
+    def profile_msg_handler(self,content_type,sender,is_server):
         """ A handler for content type text/x-msmsgsprofile
 
         These messages can potentially contain great info (providing
@@ -778,11 +791,11 @@ class message:
         #self.client_id = self.headers['typinguser']
         #print "The Typing User is: %s" % (self.client_id)
 
-    def ignore_type(self,content_type,sender,friendly_sender,is_server):
+    def ignore_type(self,content_type,sender,is_server):
         #Nonexistent callback for ignored types.
         print "Ignoring message:%s.  Headers:%s. Data:%s" % (self.cmdline.strip(),self.headers,self.data.strip())
 
-    def p2p_handler(self,content_type,sender,friendly_sender,is_server):
+    def p2p_handler(self,content_type,sender,is_server):
         """ Handle a p2p transfer """
 
         def strip_username(p2pusername):
@@ -935,15 +948,14 @@ class message:
             ## If the second word is a transaction id (int) its a message from client to server.  ie. FROM target to all users in session.
             tid = int(words[1])
             sender = "%s (Target)" % self.client_id
-            friendly_sender = "Implied Client Machine"
-            print "participants:%s" % (",".join(self.participants))
+            #print "participants:%s" % (",".join(self.participants))
 	    self.recipient = ",".join(self.participants)
             server = False
         except ValueError:
             # Message TO target
             tid = 0
             sender = words[1]
-            friendly_sender = words[2]
+            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,sender,'url_enc_display_name',words[2]))
             server = True
 	    self.recipient = "%s (Target)" % self.client_id
         try:
@@ -956,7 +968,7 @@ class message:
         ## type:
         try:
             ct = content_type.split(';')[0]
-            self.ct_dispatcher[ct](self,content_type,sender,friendly_sender,server)
+            self.ct_dispatcher[ct](self,content_type,sender,server)
         except KeyError,e:
             logging.log(logging.VERBOSE_DEBUG, "Unable to handle content-type %s(%s) - ignoring message %s " % (content_type,e,tid))
         self.state = "MSG"
@@ -974,7 +986,11 @@ class MSNScanner(StreamScannerFactory):
 
     def __init__(self,fsfd):
         StreamScannerFactory.__init__(self,fsfd)
-        self.processed=[]
+
+        #Should hit the reverse stream within 30 streams (usually it
+        #is the very next one)
+        
+        self.processed=RingBuffer(30)
 
     def prepare(self):
 
@@ -985,7 +1001,6 @@ class MSNScanner(StreamScannerFactory):
             `session_id` INT,
             `sender` VARCHAR(250),
             `recipient` VARCHAR( 250 ),
-            `friendly_name` VARCHAR( 255 ) NOT NULL ,
             `type` VARCHAR(50),
             `data` TEXT NOT NULL,
             `transaction_id`  INT
@@ -1026,21 +1041,19 @@ class MSNScanner(StreamScannerFactory):
         self.msn_connections = {}
         #self.user_data={}
 
+
     def process_stream(self, stream, factories):
         ports = dissect.fix_ports("MSN")
         
         if stream.src_port in ports or stream.dest_port in ports:
-            try:
-                #Keep track of the streams we have combined so we don't process reverse again
-                #self.processed is a ring buffer so it doesn't get too big
-                if self.processed.index(stream.con_id):
-                    #Already processed
-                    pass
-            except ValueError:
-
+            #Keep track of the streams we have combined so we don't process reverse again
+            #self.processed is a ring buffer so it doesn't get too big
+            if not self.processed.has_key(stream.con_id):
+                #Haven't processed this one.
+                
                 #This returns the forward and reverse stream associated with the MSN port (uses port numbers in .pyflagrc).
                 forward_stream, reverse_stream = self.stream_to_server(stream, "MSN")
-
+                
                 #We need both streams otherwise this won't work
                 if not reverse_stream or not forward_stream: return
 
@@ -1063,8 +1076,24 @@ class MSNScanner(StreamScannerFactory):
                 for inode in m.inodes:
                     self.scan_as_file("%s|%s" % (stream.inode, inode), factories)
 
-                print "Appending ids: %s, %s" % (forward_stream,reverse_stream)
-                self.processed.append([forward_stream,reverse_stream])
+                #Fix up all the session IDs (=-1) that were stored before we figured out the session ID.
+                if m.session_id==-1:
+                    logging.log(logging.VERBOSE_DEBUG,"Couldn't figure out the MSN session ID for stream S%s/%s" % (forward_stream, reverse_stream))
+                else:
+                    self.dbh.execute("update msn_session set session_id=%r where session_id=-1",m.session_id)
+                    self.dbh.execute("update msn_users set session_id=%r where session_id=-1",m.session_id)
+
+                #Similarly go back and fix up all the Unknown (Target) entries with the actual target name
+                if m.client_id=='Unknown':
+                    logging.log(logging.VERBOSE_DEBUG,"Couldn't figure out target identity for stream S%s/%s" % (forward_stream, reverse_stream))
+                else:
+                    self.dbh.execute("update msn_session set recipient=%r where recipient='Unknown (Target)'",m.client_id)
+                    self.dbh.execute("update msn_session set sender=%r where sender='Unknown (Target)'",m.client_id)
+
+                #print "Appending ids: %s, %s" % (forward_stream,reverse_stream)
+                self.processed.append(forward_stream)
+                self.processed.append(reverse_stream)
+                
                 
 class MSNFile(File):
     """ VFS driver for reading the cached MSN files """
@@ -1110,6 +1139,30 @@ class BrowseMSNSessions(Reports.report):
 
             return tmp
 
+        def stream_link(value):
+            tmp = result.__class__(result)
+            #Strip off the combined stream to get at the original
+            orig_stream=re.sub(r"\/\d+","",value)
+            tmp.link(value,
+                     FlagFramework.query_type((),
+                                              family="Disk Forensics", case=query['case'],
+                                              report='View File Contents',
+                                              inode=orig_stream,
+                                              __target__=orig_stream, mode="Combined streams"))
+            return tmp
+
+        def packet_link(value):
+            tmp = result.__class__(result)
+            #Strip off the extra stuff to get the original packet
+            packet=re.sub(r"\w*\|p0\|o","",value)
+            tmp.link(value,
+                     FlagFramework.query_type((),
+                                              family="Network Forensics", case=query['case'],
+                                              report='View Packet',
+                                              id=packet,
+                                              __target__='inode'))
+            return tmp
+
         result.table(
             #TODO find a nice way to separate date and time (for exporting csv separate), but not have it as the default...
             #date: 'from_unixtime(pcap.ts_sec,"%Y-%m-%d")'
@@ -1118,17 +1171,9 @@ class BrowseMSNSessions(Reports.report):
             columns = ['pcap.ts_sec', 'concat(from_unixtime(pcap.ts_sec),".",pcap.ts_usec)', 'inode', 'concat(left(inode,instr(inode,"|")),"p0|o",cast(packet_id as char))', 'session_id','type','sender','recipient','data','transaction_id'],
             names = ['Prox','Timestamp','Stream', 'Packet', 'Session ID', 'Type','Sender','Recipient','Text','Transaction ID'],
             table = "msn_session join pcap on packet_id=id",
-            callbacks = {'Prox':draw_prox_cb},
+            callbacks = {'Prox':draw_prox_cb,'Stream':stream_link,'Packet':packet_link},
             links = [
-	    	     None,None,
-		     FlagFramework.query_type((),
-                                              family="Disk Forensics", case=query['case'],
-                                              report='View File Contents', 
-                                              __target__='inode', mode="Combined streams"),
-                     FlagFramework.query_type((),
-                                              family="Network Forensics", case=query['case'],
-                                              report='View Packet', 
-                                              __target__='inode'),
+	    	     None,None,None,None,                     
                      FlagFramework.query_type((),
                                               family="Network Forensics", case=query['case'],
                                               report='BrowseMSNSessions', 
@@ -1145,20 +1190,36 @@ class BrowseMSNUsers(BrowseMSNSessions):
     #hidden = True
     def display(self,query,result):
         result.heading("MSN User Information Captured")
+
+        def stream_link(value):
+            tmp = result.__class__(result)
+            #Strip off the combined stream to get at the original
+            orig_stream=re.sub(r"\/\d+","",value)
+            tmp.link(value,
+                     FlagFramework.query_type((),
+                                              family="Disk Forensics", case=query['case'],
+                                              report='View File Contents',
+                                              inode=orig_stream,
+                                              __target__=orig_stream, mode="Combined streams"))
+            return tmp
+
+        def packet_link(value):
+            tmp = result.__class__(result)
+            #Strip off the extra stuff to get the original packet
+            packet=re.sub(r"\w*\|p0\|o","",value)
+            tmp.link(value,
+                     FlagFramework.query_type((),
+                                              family="Network Forensics", case=query['case'],
+                                              report='View Packet',
+                                              id=packet,
+                                              __target__='inode'))
+            return tmp
+        
         result.table(
             columns = ['inode', 'concat(left(inode,instr(inode,"|")),"p0|o",cast(packet_id as char))','concat(from_unixtime(pcap.ts_sec),".",pcap.ts_usec)','user_data_type','nick','user_data','transaction_id','session_id'],
             names = ['Stream','Packet','Timestamp','Data Type','Nick','User Data','Transaction ID','Session ID'],
             table = "msn_users join pcap on packet_id=id",
-            links = [FlagFramework.query_type((),
-                                              family="Disk Forensics", case=query['case'],
-                                              report='View File Contents', 
-                                              __target__='inode', mode="Combined streams"),
-                     FlagFramework.query_type((),
-                                              family="Network Forensics", case=query['case'],
-                                              report='View Packet', 
-                                              __target__='inode'),
-                     None,None,None,None,None,None
-                     ],
+            callbacks = {'Stream':stream_link,'Packet':packet_link},
             case = query['case']
             )
 
