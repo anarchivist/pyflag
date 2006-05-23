@@ -51,7 +51,6 @@ class RingBuffer:
         self.data={}        
 
     def append(self, datum):
-        #print "Inserting data:%s at %s" % (datum,self.cur)
         self.data[self.cur]=datum
         self.cur=(self.cur+1) % self.size_max
 
@@ -89,6 +88,7 @@ class message:
         self.session_id = -1
         self.inodes = []
         self.participants = []
+        self.contact_list = []
 
     def get_packet_id(self):
         self.offset = self.fd.tell()
@@ -115,6 +115,20 @@ class message:
             #name wasn't in participants for some reason, shouldn't really happen.
             pass
 
+    def insert_user_data(self,nick,data_type,data,tr_id=None):
+        """
+        Insert user data into the table.  We only keep each type of
+        user data once for each stream and session, otherwise we get
+        way too many rows of the same data.  The primary key is
+        inode,session_id,user_data_type.
+        
+        """
+        try:
+            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),tr_id,self.session_id,nick,data_type,data))
+        except:
+            #We have duplicate user data,
+            #logging.log(logging.VERBOSE_DEBUG, "Ignoring data as duplicate:%s,%s,%s" % (nick,data_type,data))
+            pass
         
     def parse(self):
 
@@ -187,7 +201,8 @@ class message:
             self.session_id=words[3]
         else:
             self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, session_id=%r, recipient=%r, type=%r, sender=%r",(self.fd.inode,self.get_packet_id(),self.session_id, words[2],"INVITE","%s (Target)" % self.client_id))
-            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,words[2],'user_msn_passport',words[2]))
+            
+            self.insert_user_data(words[2],'user_msn_passport',words[2],words[1])
             
 	self.state = "CAL"
 
@@ -273,76 +288,73 @@ class message:
 	"""
 	words = self.cmdline.split()
         
-        logging.log(logging.VERBOSE_DEBUG,  "USR:%s" % self.cmdline.strip())
+        #logging.log(logging.VERBOSE_DEBUG,  "USR:%s" % self.cmdline.strip())
         self.state = "USR"
-        
         
         if (words[2]=="OK"):
             
             self.client_id = words[3]
             self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, recipient=%r,type=%r,sender=%r,transaction_id=%r,session_id=%r",(self.fd.inode,self.get_packet_id(),"SWITCHBOARD SERVER","TARGET ENTERING NEW SWITCHBOARD SESSION","%s (Target)" % self.client_id,words[1],self.session_id))
 
-            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'target_msn_passport',words[3]))
-            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'url_enc_display_name',urllib.unquote(words[4])))
+            self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',words[3],words[1])
+            self.insert_user_data("%s (Target)" % self.client_id,'url_enc_display_name',urllib.unquote(words[4]),words[1])
             
         elif (words[2]=="TWN")and(words[3]=="I"):
             #Ignore 'S' messages - no value.
             self.client_id = words[4]
-            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'target_msn_passport',words[4]))
+            self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',words[4],words[1])
         elif (words[2]!="TWN"):
             #must be of form: USR <transation id> example@passport.com 17262740.1050826919.32307
             self.client_id = words[2]
-            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'target_msn_passport',words[2]))
-            
-        
+            self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',words[2],words[1])
 
     def XFR(self):
 
-        #I don't think this information is userful enough to record,
-        #it is really just noise.  We already know the IPs from the
-        #stream data, so not really necessary or useful to record them
-        #here.
         self.state = "XFR"
         pass
         
-##        """This command creates a new switchboard session.
+        """This command creates a new switchboard session.
 
-##        Request:
-##        XFR <transaction id> SB
+        It is largely uninteresting.  I have kept it to record the
+        switchboard server IP.  If this is proving to be useless we
+        can take it out.
 
-##        e.g.
-##        XFR 15 SB
+        Request:
+        XFR <transaction id> SB
 
-##        Response:
-##        XFR <same transaction id> SB <ip of switchboard server:port> <auth type, always=CKI> <auth string to prove identity>
+        e.g.
+        XFR 15 SB
 
-##        e.g.
-##        XFR 15 SB 207.46.108.37:1863 CKI 17262740.1050826919.32308
+        Response:
+        XFR <same transaction id> SB <ip of switchboard server:port> <auth type, always=CKI> <auth string to prove identity>
 
-##        OR you can be transferred to a different nameserver:
+        e.g.
+        XFR 15 SB 207.46.108.37:1863 CKI 17262740.1050826919.32308
 
-##        XFR trid NS address 0 current_address
+        OR you can be transferred to a different nameserver:
 
-##        * trid : Transaction ID
-##        * NS : Tells you that you are being redirected to a notification server
-##        * address : IP and port of server you are being redirected to (separated by a colon)
-##        * 0 : unknown
-##        * current_address : The address of the dispatch/notification server you are currently connected to
+        XFR trid NS address 0 current_address
 
-##        """
+        * trid : Transaction ID
+        * NS : Tells you that you are being redirected to a notification server
+        * address : IP and port of server you are being redirected to (separated by a colon)
+        * 0 : unknown
+        * current_address : The address of the dispatch/notification server you are currently connected to
 
-##        words = self.cmdline.split()
-##        print "XFR:%s" % self.cmdline.strip()
-##        try:
-##            self.switchboard_ip = words[3].split(":")[0]
-##            self.switchboard_port = words[3].split(":")[1]
-##            #This is a server response
-##            self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, recipient=%r,type=%r,sender=%r,transaction_id=%r,auth_string=%r,sb_server_ip=%r",(self.fd.inode,self.get_packet_id(),"%s (Target)" % self.client_id,"SWITCHBOARD SERVER OFFER","NOTIFICATION SERVER",words[1],words[5],self.switchboard_ip))
-##        except:
-##            pass
-##            #This is a client request, I don't think it is interesting enough to record.
-##            #self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, recipient=%r,type=%r,sender=%r,transaction_id=%r",(self.fd.inode,self.get_packet_id(),"NOTIFICATION SERVER","NEW SWITCHBOARD SESSION REQUEST","%s (Target)" % self.client_id,words[1]))
-##        
+        """
+
+        words = self.cmdline.split()
+        print "XFR:%s" % self.cmdline.strip()
+        try:
+            self.switchboard_ip = words[3].split(":")[0]
+            self.switchboard_port = words[3].split(":")[1]
+            #This is a server response
+            self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, session_id=%r, recipient=%r,type=%r,sender=%r,transaction_id=%r,data=%r",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,"SWITCHBOARD SERVER OFFER","NOTIFICATION SERVER",words[1],"switchboard server:%s" % words[3]))
+        except:
+            pass
+            #This is a client request, I don't think it is interesting enough to record.
+            #self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, recipient=%r,type=%r,sender=%r,transaction_id=%r",(self.fd.inode,self.get_packet_id(),"NOTIFICATION SERVER","NEW SWITCHBOARD SESSION REQUEST","%s (Target)" % self.client_id,words[1]))
+        
             
 		
     def ANS(self):
@@ -369,9 +381,7 @@ class message:
                 self.client_id = words[2]
                 self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r,transaction_id=%r, session_id=%r, recipient=%r,type=%r,sender=%r",
                                  (self.fd.inode,self.get_packet_id(),words[1],self.session_id,"SWITCHBOARD SERVER","TARGET JOINING_SESSION","%s (Target)" % self.client_id))
-
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'target_msn_passport',words[2]))
-
+                self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',words[2],words[1])
             except Exception,e:
                 logging.log(logging.VERBOSE_DEBUG,"ANS not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
                 pass
@@ -391,12 +401,8 @@ class message:
                              (self.fd.inode,self.get_packet_id(),words[1],self.session_id, words[4],"CURRENT_PARTICIPANTS",words[4]))
             self.state = "IRO"
 
-            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,words[4],'user_msn_passport',words[4]))
-            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,words[4],'url_enc_display_name',urllib.unquote(words[5])))
-
-            
-            
-
+            self.insert_user_data(words[4],'user_msn_passport',words[4],words[1])
+            self.insert_user_data(words[4],'url_enc_display_name',urllib.unquote(words[5]),words[1])
             self.add_participant(words[4])                
 
         except Exception,e:
@@ -419,10 +425,9 @@ class message:
         self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, session_id=%r, recipient=%r, type=%r, sender=%r",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,"TARGET INVITED",words[5]))
 	self.state = "RNG"
 
-        self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,words[5],'user_msn_passport',words[5]))
-
-        self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,words[5],'url_enc_display_name',urllib.unquote(words[6])))
-        
+        self.insert_user_data(words[5],'user_msn_passport',words[5])
+        self.insert_user_data(words[5],'url_enc_display_name',words[6])
+                
     def JOI(self):
         """ Sent to all participants when a new client joins
 
@@ -434,8 +439,8 @@ class message:
         self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, session_id=%r, recipient=%r,type=%r,sender=%r",
                           (self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,"USER JOINING_SESSION WITH TARGET",words[1]))
 
-        self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,words[1],'user_msn_passport',words[1]))
-        self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,words[1],'url_enc_display_name',urllib.unquote(words[2])))
+        self.insert_user_data(words[1],'user_msn_passport',words[1])
+        self.insert_user_data(words[1],'url_enc_display_name',urllib.unquote(words[2]))
         
 	self.state = "JOI"
 
@@ -460,10 +465,10 @@ class message:
         if (words[2].find("x")==1):
             self.client_id=words[9]
             try:
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'locale',words[2]))
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'os'," ".join(words[3:6])))
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'client'," ".join(words[6:8])))
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),words[1],self.session_id,"%s (Target)" % self.client_id,'target_msn_passport',words[9]))
+                self.insert_user_data("%s (Target)" % self.client_id,'locale',words[2],words[1])
+                self.insert_user_data("%s (Target)" % self.client_id,'os'," ".join(words[3:6]),words[1])
+                self.insert_user_data("%s (Target)" % self.client_id,'client'," ".join(words[6:8]),words[1])
+                self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',words[9],words[1])
                 
                 self.state = "CVR"
 
@@ -512,23 +517,23 @@ class message:
         try:
             if (words[1]=="PHH"):
                 
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'home_phone',words[2]))
+                self.insert_user_data("%s (Target)" % self.client_id,'home_phone',words[2])
                 
             elif (words[1]=="PHW"):
                 
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'work_phone',words[2]))
+                self.insert_user_data("%s (Target)" % self.client_id,'work_phone',words[2])
                 
             elif (words[1]=="PHM"):
                 
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'mobile_phone',words[2]))
+                self.insert_user_data("%s (Target)" % self.client_id,'mobile_phone',words[2])
                 
             elif (words[1]=="MOB"):
                 
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'msn_mobile_auth',words[2]))
+                self.insert_user_data("%s (Target)" % self.client_id,'msn_mobile_auth',words[2])
                 
             elif (words[1]=="MBE"):
                 
-                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'msn_mobile_device',words[2]))
+                self.insert_user_data("%s (Target)" % self.client_id,'msn_mobile_device',words[2])
                 
             else:
 
@@ -555,7 +560,7 @@ class message:
         logging.log(logging.VERBOSE_DEBUG, "LSG: %s" % self.cmdline)
         
         try:
-            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'contact_list_groups',words[1:2]))
+            self.insert_user_data("%s (Target)" % self.client_id,'contact_list_groups',words[1:2])
 
         except Exception,e:
                 logging.log(logging.VERBOSE_DEBUG, "LSG not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
@@ -597,11 +602,12 @@ class message:
 
         listresults=[]
         for listtypes in list_lookup.keys():
-            if ((list_lookup[listtypes] and words[3])>0):
+            #Do a bitwise and to figure out which lists this person is in.
+            if ((list_lookup[listtypes] & words[3])>0):
                 listresults.append(listtypes)
         
         try:
-            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'contact_list_member',"account name:%s. nickname:%s. in lists:%s. in groups:%s"%(words[1],words[2],listresults,words[4])))
+            self.insert_user_data("%s (Target)" % self.client_id,'contact_list_members',"account name:%s. nickname:%s. in lists:%s. in groups:%s" % (words[1],words[2],listresults,words[4]))
 
         except Exception,e:
                 logging.log(logging.VERBOSE_DEBUG, "LST not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
@@ -621,133 +627,129 @@ class message:
     def VER (self):
         #see below
         pass
-# This is not useful. The CVR command provides much better information.
-##    def VER(self):
-##        """ Version information
 
-##        Not really any way to tell whether this is server->client or client->server.
+    def CHG(self):
+        """
+        CHG
 
-##        e.g.
+        Target Changing status.
+
+        CHG trid statuscode clientid
+
+            * trid : Transaction ID
+            * statuscode : Three letter, case sensitive, code for the status you are changing to (NLN, BSY, IDL, BRB, AWY, PHN, LUN)
+            * clientid : Your Client ID number 
+
+        Returns The server will echo the command back if successful (ignored).
+
+        CHG trid statuscode clientid
+
+        """
+        words = self.cmdline.split()
+        if self.state!="CHG":
+            #ie. we didn't just process one.  This avoids storing the server's identical response.
+            self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, session_id=%r,transaction_id=%r,recipient=%r,type=%r,sender=%r",
+                          (self.fd.inode,self.get_packet_id(),self.session_id,words[1],"SWITCHBOARD SERVER","TARGET CHANGED ONLINE STATUS TO:%s" % words[2],"%s (Target)" % self.client_id))
+            self.state = "CHG"
         
-##        < VER 1 MSNP9 MSNP10 MSNP11 MSNP12 CVR0\r\n
-##        > VER 1 MSNP12 MSNP11 MSNP10 MSNP9 CVR0\r\n
 
-##        """
-##        words = self.cmdline.split()
-##	print "VER command: %s" % self.cmdline
+    def NLN(self):
+        """
+        NLN
+
+        Think you see this for everyone on your contact list **check.
         
-##	try:
-##            self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r,transaction_id=%r, recipient=%r,type=%r,sender=%r",
-##                             (self.fd.inode,self.get_packet_id(),words[1],"SERVER/Target","VERSION="+words[2:],"SERVER/Target"))
-##            ## This stores the current clients username
-##        except: pass
-##	self.state = "VER"
-
-
-
-##    def ADD(self):
-##        """Adding people to your lists.
-
-##        Forward List (FL)
+        Change of presence Returns
         
-##        The forward list, abbreviated as FL, is the list of principals
-##        whose presence you are subscribed to. You can expect to be
-##        notified about their on-line state, phone numbers, etc. This
-##        is what a layman would call their contact list.
-
-##        Everyone in your forward list belongs to one or more groups,
-##        identified by their group number. By default, they belong to
-##        group 0.
-
-##        Reverse List (RL)
+        NLN statuscode account_name display_name clientid
         
-##        The reverse list, abbreviated as RL, is the list of principals
-##        that have you on their forward list. You cannot make
-##        modifications to it. If you attempt to add or remove people
-##        from this list, you will be immediately disconnected from the
-##        NS with no error message.  [edit]
-
-##        Allow List (AL)
+            * statuscode : Principal's three letter status code (NLN, BSY, IDL, BRB, AWY, PHN, LUN)
+            * account_name : Principal's Passport address
+            * display_name : Principal's URL encoded display name
+            * clientid : Principal's Client ID number
+            """
+        words = self.cmdline.split()
+        self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, session_id=%r,recipient=%r,type=%r,sender=%r",
+                          (self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,"USER CHANGED ONLINE STATUS TO:%s" % words[1],words[2]))
+        self.contact_list.append(words[2])
+        self.insert_user_data(words[2],'url_enc_display_name',urllib.unquote(words[3]))
         
-##        The allow list, abbreviated as AL, is the list of principals
-##        that you allow to see your online presence - as opposed to
-##        your reverse list, which is the list of people who request to
-##        see your online presence. If someone removes you from his or
-##        her contact list, he or she is automatically removed from your
-##        RL but not your AL. He or she no longer receives online
-##        presence from you, but if he or she adds you again, your
-##        client can act in the knowledge that you previously allowed
-##        him or her to see your presence.
+        self.state = "NLN"
 
-##        Block List (BL)
-
-##        The block list, abbreviated as BL, is the list
-##        of people that are blocked from seeing your online
-##        presence. They will never receive your status, and when they
-##        try to invite you to a switchboard session, they will be
-##        notified that you are offline. No-one can be on the AL and the
-##        BL at the same time, and if you try to add someone to both
-##        lists, you will receive error 219.
-
-##        # The first parameter is the list you want to add the
-##        # principal to.
         
-##        # The second parameter is the principal's account name.
+    def ADD(self):
+        """Adding people to your lists.
 
-##        # The third parameter is a nickname you assign to the
-##        # principal. The official client always uses the principal's
-##        # account name as the nickname, and that is why when you add a
-##        # principal, his or her name always shows as his or her
-##        # account name until he or she logs on and you receive an
-##        # updated display name.
-
-##        # If you are adding a principal to your FL, there may be a
-##        # fourth parameter specifying the group ID that you are adding
-##        # the principal to. If you do not specify a group ID, zero is
-##        # implied. You may add the same principal to your FL later
-##        # specifying another group to have the principal in multiple
-##        # groups.
-
-##        e.g.
-##        ADD 20 AL example@passport.com example@passport.com
-
-##        """
-##        words = self.cmdline.split()
-
-##        print "ADD: %s" % self.cmdline
+        Forward List (FL)
         
-##        try:
-##            if (words[2]=="AL"):
+        The forward list, abbreviated as FL, is the list of principals
+        whose presence you are subscribed to. You can expect to be
+        notified about their on-line state, phone numbers, etc. This
+        is what a layman would call their contact list.
 
-##                self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, session_id=%r, recipient=%r, type=%r, sender=%r,sb_server_ip=%r,auth_string=%r",(self.fd.inode,self.get_packet_id(),words[1], "(Target)","INVITE",words[5],words[1].split(":")[0],words[4]))
-                
-##                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'home_phone',words[2]))
-                
-##            elif (words[1]=="PHW"):
-                
-##                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'work_phone',words[2]))
-                
-##            elif (words[1]=="PHM"):
-                
-##                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'mobile_phone',words[2]))
-                
-##            elif (words[1]=="MOB"):
-                
-##                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'msn_mobile_auth',words[2]))
-                
-##            elif (words[1]=="MBE"):
-                
-##                self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,"%s (Target)" % self.client_id,'msn_mobile_device',words[2]))
-                
-##            else:
+        Everyone in your forward list belongs to one or more groups,
+        identified by their group number. By default, they belong to
+        group 0.
 
-##                print "ADD not decoded correctly: %s" % self.cmdline.strip()
+        Reverse List (RL)
+        
+        The reverse list, abbreviated as RL, is the list of principals
+        that have you on their forward list. You cannot make
+        modifications to it. If you attempt to add or remove people
+        from this list, you will be immediately disconnected from the
+        NS with no error message.  [edit]
 
-##        except Exception,e:
-##                print "ADD not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e)
-##                pass
-            
-##        self.state = "ADD"
+        Allow List (AL)
+        
+        The allow list, abbreviated as AL, is the list of principals
+        that you allow to see your online presence - as opposed to
+        your reverse list, which is the list of people who request to
+        see your online presence. If someone removes you from his or
+        her contact list, he or she is automatically removed from your
+        RL but not your AL. He or she no longer receives online
+        presence from you, but if he or she adds you again, your
+        client can act in the knowledge that you previously allowed
+        him or her to see your presence.
+
+        Block List (BL)
+
+        The block list, abbreviated as BL, is the list
+        of people that are blocked from seeing your online
+        presence. They will never receive your status, and when they
+        try to invite you to a switchboard session, they will be
+        notified that you are offline. No-one can be on the AL and the
+        BL at the same time, and if you try to add someone to both
+        lists, you will receive error 219.
+
+        The first parameter is the list you want to add the
+        principal to.
+        
+        The second parameter is the principal's account name.
+
+        The third parameter is a nickname you assign to the
+        principal. The official client always uses the principal's
+        account name as the nickname, and that is why when you add a
+        principal, his or her name always shows as his or her
+        account name until he or she logs on and you receive an
+        updated display name.
+
+        If you are adding a principal to your FL, there may be a
+        fourth parameter specifying the group ID that you are adding
+        the principal to. If you do not specify a group ID, zero is
+        implied. You may add the same principal to your FL later
+        specifying another group to have the principal in multiple
+        groups.
+
+        e.g.
+        ADD 20 AL example@passport.com example@passport.com
+
+        """
+        words = self.cmdline.split()
+        
+        logging.log(logging.VERBOSE_DEBUG,"ADD: %s" % self.cmdline)
+        self.insert_user_data("%s (Target)" % self.client_id,'added_user_to_list',"list:%s,user:%s,nick:%s" % (words[2],words[3],words[4]))
+        self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, session_id=%r, recipient=%r, type=%r, sender=%r",(self.fd.inode,self.get_packet_id(),self.session_id,"SWITCHBOARD SERVER","ADDED USER TO LIST","%s (Target)" % self.client_id))
+        self.state = "ADD"
                          
     def plain_handler(self,content_type,sender,is_server):
         """ A handler for content type text/plain """
@@ -788,6 +790,7 @@ class message:
         the user has set the settings in the client)
         
         """
+        #Still TODO
         ####Don't need this, just handle SBS as in S50.  Or maybe just make special case of MSG Hotmail
         #self.client_id = self.headers['typinguser']
         logging.log(logging.VERBOSE_DEBUG, "The Typing User is: %s" % (self.client_id))
@@ -957,7 +960,7 @@ class message:
             # Message TO target
             tid = 0
             sender = words[1]
-            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),self.session_id,sender,'url_enc_display_name',urllib.unquote(words[2])))
+            self.insert_user_data(sender,'url_enc_display_name',urllib.unquote(words[2]))
             server = True
 	    self.recipient = "%s (Target)" % self.client_id
         try:
@@ -1003,7 +1006,7 @@ class MSNScanner(StreamScannerFactory):
             `session_id` INT,
             `sender` VARCHAR(250),
             `recipient` VARCHAR( 250 ),
-            `type` VARCHAR(100),
+            `type` VARCHAR(50),
             `data` TEXT NULL,
             `transaction_id`  INT
             )""")
@@ -1020,7 +1023,7 @@ class MSNScanner(StreamScannerFactory):
             """ CREATE TABLE if not exists `msn_users` (
             `inode` VARCHAR(50) NOT NULL,
             `packet_id`  INT NOT NULL,
-            `session_id` INT,
+            `session_id` INT NOT NULL,
             `transaction_id`  INT,
             `nick` VARCHAR(50) NOT NULL,
             `user_data_type` enum('target_msn_passport',
@@ -1036,11 +1039,12 @@ class MSNScanner(StreamScannerFactory):
                                   'mobile_phone',
                                   'msn_mobile_auth',
                                   'msn_mobile_device',
-                                  'contact_list_member',
-                                  'target_msn_passport',
-                                  'user_msn_passport'
-                                  ) default NULL ,
-            `user_data` TEXT NOT NULL
+                                  'contact_list',
+                                  'contact_list_members',
+                                  'added_user_to_list'
+                                  ) NOT NULL ,
+            `user_data` TEXT NOT NULL,
+            PRIMARY KEY (`inode`,`session_id`,`user_data_type`,`nick`)
             )""")
         self.msn_connections = {}
         #self.user_data={}
@@ -1077,15 +1081,32 @@ class MSNScanner(StreamScannerFactory):
 
                         break
 
+                #Scan p2p files we found
                 for inode in m.inodes:
-                    self.scan_as_file("%s|%s" % (stream.inode, inode), factories)
+                    self.scan_as_file("%s|%s" % (combined_inode, inode), factories)
 
+                #### Post Processing ####
+
+                if len(m.contact_list)>0:
+                    #Put in contact list built from status notifications.
+                    logging.log(logging.VERBOSE_DEBUG,"Inserting contact list: %s" % ",".join(m.contact_list))
+
+                    #The packet id for this entry will be the last packet in the stream, but this is irrelevant
+                    m.insert_user_data("%s (Target)" % m.client_id,'contact_list',",".join(m.contact_list))
+
+                    
                 #Fix up all the session IDs (=-1) that were stored before we figured out the session ID.
                 if m.session_id==-1:
                     logging.log(logging.VERBOSE_DEBUG,"Couldn't figure out the MSN session ID for stream S%s/%s" % (forward_stream, reverse_stream))
                 else:
                     self.dbh.execute("update msn_session set session_id=%r where session_id=-1",m.session_id)
-                    self.dbh.execute("update msn_users set session_id=%r where session_id=-1",m.session_id)
+                    try:
+                        self.dbh.execute("update msn_users set session_id=%r where session_id=-1",m.session_id)
+                    except Exception:
+                        #We already have this row with a real session ID and delete them below
+                        pass
+                    #We can delete everything with session id =-1 because we know we have an actual session id for this stream
+                    self.dbh.execute("delete from msn_users where session_id=-1")
 
                 #Similarly go back and fix up all the Unknown (Target) entries with the actual target name
                 if m.client_id=='Unknown':
@@ -1154,18 +1175,6 @@ class BrowseMSNSessions(Reports.report):
                                               __target__=orig_stream, mode="Combined streams"))
             return tmp
 
-        def packet_link(value):
-            tmp = result.__class__(result)
-            #Strip off the extra stuff to get the original packet
-            packet=re.sub(r"\w*\|p0\|o","",value)
-            tmp.link(value,
-                     FlagFramework.query_type((),
-                                              family="Network Forensics", case=query['case'],
-                                              report='View Packet',
-                                              id=packet,
-                                              __target__='inode'))
-            return tmp
-
         def p2p_link(value):
             tmp = result.__class__(result)
                 
@@ -1173,7 +1182,7 @@ class BrowseMSNSessions(Reports.report):
                 (key,p2p_inode)=value.split(":")
                 #We must be of the form p2p file:Itest|S137/138|CMSN8573970-684504
                 #Make a link to the inode
-                print "p2p:%s" % p2p_inode
+                #print "p2p:%s" % p2p_inode
                 tmp.link(value,
                      FlagFramework.query_type((),
                                               family="Disk Forensics", case=query['case'],
@@ -1183,7 +1192,7 @@ class BrowseMSNSessions(Reports.report):
                 return tmp
             else:
                 #Not a p2p file
-                    return value
+                return value
           
 
         result.table(
@@ -1191,12 +1200,16 @@ class BrowseMSNSessions(Reports.report):
             #date: 'from_unixtime(pcap.ts_sec,"%Y-%m-%d")'
             #time: 'concat(from_unixtime(pcap.ts_sec,"%H:%i:%s"),".",pcap.ts_usec)'
             
-            columns = ['pcap.ts_sec', 'concat(from_unixtime(pcap.ts_sec),".",pcap.ts_usec)', 'inode', 'concat(left(inode,instr(inode,"|")),"p0|o",cast(packet_id as char))', 'session_id','type','sender','recipient','data','transaction_id'],
+            columns = ['pcap.ts_sec', 'concat(from_unixtime(pcap.ts_sec),".",pcap.ts_usec)', 'inode', 'cast(packet_id as char)', 'session_id','type','sender','recipient','data','transaction_id'],
             names = ['Prox','Timestamp','Stream', 'Packet', 'Session ID', 'Type','Sender','Recipient','Data','Transaction ID'],
             table = "msn_session join pcap on packet_id=id",
-            callbacks = {'Prox':draw_prox_cb,'Stream':stream_link,'Packet':packet_link,'Data':p2p_link},
+            callbacks = {'Prox':draw_prox_cb,'Stream':stream_link,'Data':p2p_link},
             links = [
-	    	     None,None,None,None,                     
+	    	     None,None,None,
+                     FlagFramework.query_type((),
+                                              family="Network Forensics", case=query['case'],
+                                              report='View Packet',
+                                              __target__='id'),
                      FlagFramework.query_type((),
                                               family="Network Forensics", case=query['case'],
                                               report='BrowseMSNSessions', 
@@ -1216,54 +1229,34 @@ class BrowseMSNSessions(Reports.report):
             )
 
 class BrowseMSNUsers(BrowseMSNSessions):
-    """ This shows MSN participants (users). """
+    """ This report shows the data known about MSN participants (users).
+    """
     name = "Browse MSN Users"
     family = "Network Forensics"
-    #hidden = True
+    
     def display(self,query,result):
         result.heading("MSN User Information Captured")
-
-##        def stream_link(value):
-##            tmp = result.__class__(result)
-##            #Strip off the combined stream to get at the original
-##            orig_stream=re.sub(r"\/\d+","",value)
-##            tmp.link(value,
-##                     FlagFramework.query_type((),
-##                                              family="Disk Forensics", case=query['case'],
-##                                              report='View File Contents',
-##                                              inode=orig_stream,
-##                                              __target__=orig_stream, mode="Combined streams"))
-
-##            tmp.start_form(new_query)
-##            tmp.start_table()
-##            tmp.textfield('','where_inode',Additional=True)
-##            tmp.end_table()
-##            tmp.end_form('Go')
-            
-##            return tmp
-
-        def packet_link(value):
-            tmp = result.__class__(result)
-            #Strip off the extra stuff to get the original packet
-            packet=re.sub(r"\w*\|p0\|o","",value)
-            tmp.link(value,
-                     FlagFramework.query_type((),
-                                              family="Network Forensics", case=query['case'],
-                                              report='View Packet',
-                                              id=packet,
-                                              __target__='inode'))
-            return tmp
         
         result.table(
-            columns = ['inode', 'concat(left(inode,instr(inode,"|")),"p0|o",cast(packet_id as char))','concat(from_unixtime(pcap.ts_sec),".",pcap.ts_usec)','user_data_type','nick','user_data','transaction_id','session_id'],
+            columns = ['inode', 'cast(packet_id as char)','concat(from_unixtime(pcap.ts_sec),".",pcap.ts_usec)','user_data_type','nick','user_data','transaction_id','session_id'],
             names = ['Stream','Packet','Timestamp','Data Type','Nick','User Data','Transaction ID','Session ID'],
             table = "msn_users join pcap on packet_id=id",
-            callbacks = {'Packet':packet_link},
             case = query['case'],
             links=[FlagFramework.query_type((),
                                               family="Network Forensics", case=query['case'],
                                               report='BrowseMSNSessions', 
-                                              __target__='where_Stream')]
+                                              __target__='where_Stream'),
+                   FlagFramework.query_type((),
+                                              family="Network Forensics", case=query['case'],
+                                              report='View Packet',
+                                              __target__='id'),
+                   None,None,None,None,None,
+                   FlagFramework.query_type((),
+                                              family="Network Forensics", case=query['case'],
+                                              report='BrowseMSNSessions', 
+                                              __target__='where_Session ID')
+
+                   ]
             )
 
 if __name__ == "__main__":
