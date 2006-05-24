@@ -774,10 +774,16 @@ def make_sql_from_filter(filter_str,having,column,name):
             #If the user already supplied the %, we dont add our own:
             condition="like"
             operand=simple_string
+        elif simple_string.startswith('!='):
+            condition="!="
+            operand=simple_string[2:]
+        elif simple_string.startswith('!%'):
+            condition="not like"
+            operand=simple_string[1:]
         elif simple_string.startswith('!'):
             ## If the input starts with !, we do an exact match
             condition="not like"
-            operand=simple_string[1:]
+            operand="%%%s%%" % simple_string[1:]
         else:
             ## Otherwise we do a fuzzy match.
             condition="like"
