@@ -52,31 +52,35 @@ class ZipScan(GenScanFactory):
 
         def external_process(self,name):
             """ This is run on the extracted file """
-            zip=zipfile.ZipFile(name)
+            logging.log(logging.VERBOSE_DEBUG, "Decompressing Zip File %s" % name)
+            self.fd.zip_handle=zipfile.ZipFile(name)
 
             pathname = self.ddfs.lookup(inode = self.inode)
             
             ## List all the files in the zip file:
             dircount = 0
-            namelist = zip.namelist()
+            namelist = self.fd.zip_handle.namelist()
             for i in range(len(namelist)):
                 ## Add the file into the VFS
                 try:
                     ## Convert the time to a common format.
-                    t = time.mktime(list(zip.infolist()[i].date_time) +[0,0,0])
+                    t = time.mktime(list(self.fd.zip_handle.infolist()[i].date_time) +[0,0,0])
                 except:
                     t=0
 
                 ## If the entry corresponds to just a directory we ignore it.
                 if not os.path.basename(namelist[i]): continue
+                inode = "%s|Z%s" % (self.inode,i)
 
-                self.ddfs.VFSCreate(None, "%s|Z%s" % (self.inode,i),pathname+"/"+namelist[i],size=zip.infolist()[i].file_size,mtime=t)
+                self.ddfs.VFSCreate(None,
+                                    inode,pathname+"/"+namelist[i],
+                                    size=self.fd.zip_handle.infolist()[i].file_size,
+                                    mtime=t)
 
                 ## Now call the scanners on this new file (FIXME limit
                 ## the recursion level here)
-                ## FIXME:  This needs to be a read VFS node:
-                fd = StringIO.StringIO(zip.read(namelist[i]))
-                fd.inode = "%s|Z%s" % (self.inode,i)
+                fd = ZipFile(self.dbh.case, self.fd, inode, dbh=self.dbh)
+#                fd = self.ddfs.open(inode = inode)
                 Scanner.scanfile(self.ddfs,fd,self.factories)
 
 class GZScan(ZipScan):
@@ -147,7 +151,7 @@ class TarScan(GenScanFactory):
 
         def external_process(self,name):
             """ This is run on the extracted file """
-	        #Get a TarFile object
+            #Get a TarFile object
             tar=tarfile.TarFile(name)
             
             ## List all the files in the tar file:
@@ -172,10 +176,9 @@ class TarScan(GenScanFactory):
                 ## Scan the new file using the scanner train:
                 fd=self.ddfs.open(inode=new_inode)
                 Scanner.scanfile(self.ddfs,fd,self.factories)
-                fd.close()
 		
 ## These are the corresponding VFS modules:
-class Zip_file(File):
+class ZipFile(File):
     """ A file like object to read files from within zip files. Note that the zip file is specified as an inode in the DBFS """
     specifier = 'Z'
     
@@ -192,10 +195,25 @@ class Zip_file(File):
         # just read that file!
         parts = inode.split('|')
         try:
-            z = zipfile.ZipFile(fd,'r')
+            ## This is a performance boost - We try to cache the
+            ## zipfile object in our parent - if its not done
+            ## previously so speed up future accesses to other files
+            ## within the zip file. This will ensure we only need to
+            ## decompress the file once instead of many times for each
+            ## zip member.
+            z = self.fd.zip_handle
+        except AttributeError:
+            try:
+                logging.log(logging.VERBOSE_DEBUG, "Decompressing Zip File %s" % fd.inode)
+                z = zipfile.ZipFile(fd,'r')
+                self.fd.zip_handle = z
+            except zipfile.BadZipfile,e:
+                raise IOError("Zip_File: (%s)" % e)
+            
+        try:
             self.data = z.read(z.namelist()[int(parts[-1][1:])])
         except (IndexError, KeyError, zipfile.BadZipfile),e:
-            raise IOError, "Zip_File: (%s)" % e
+            raise IOError("Zip_File: (%s)" % e)
         
         self.readptr=0
         self.size=len(self.data)
@@ -261,7 +279,7 @@ class Tar_file(File):
     def __init__(self, case, fd, inode, dbh=None):
         File.__init__(self, case, fd, inode, dbh)
 
-        ## Tar file handling requires repeated access into the zip
+        ## Tar file handling requires repeated access into the tar
         ## file. Caching our input fd really helps to speed things
         ## up...
         fd.cache()
@@ -270,8 +288,17 @@ class Tar_file(File):
         # inode is the index into the namelist of the tar file (i hope this is consistant!!)
         # just read that file!
         parts = inode.split('|')
+
         try:
-            t = tarfile.TarFile(fileobj=fd)
+            t = self.fd.tar_handle
+        except AttributeError:
+            try:
+                t = tarfile.TarFile(fileobj=fd)
+                self.fd.tar_handle = t
+            except tarfile.CompressionError,e:
+                raise IOError("Tar file: %s" % e)
+        
+        try:
             name=t.getnames()[int(parts[-1][1:])]
             self.data = t.extractfile(name).read()
         except (IndexError, KeyError):

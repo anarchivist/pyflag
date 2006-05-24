@@ -628,7 +628,7 @@ class message:
         listresults=[]
         for listtypes in list_lookup.keys():
             #Do a bitwise and to figure out which lists this person is in.
-            if ((list_lookup[listtypes] & words[3])>0):
+            if ((list_lookup[listtypes] & int(words[3]))>0):
                 listresults.append(listtypes)
         
         try:

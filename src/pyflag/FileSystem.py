@@ -609,7 +609,11 @@ class File:
         stats = self.dbh.fetch()
 
         self.dbh.execute("select * from file where inode=%r", self.inode)
-        stats.update(self.dbh.fetch())
+        try:
+            stats.update(self.dbh.fetch())
+        except:
+            stats=self.dbh.fetch()
+            
         return stats
 
     def __iter__(self):

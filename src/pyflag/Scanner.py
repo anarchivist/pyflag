@@ -358,7 +358,7 @@ def scanfile(ddfs,fd,factories):
         ## If none of the scanners are interested with this file, we
         ## stop right here
         if not interest:
-            print "No interest for %s" % fd.inode
+            logging.log(logging.DEBUG, "No interest for %s" % fd.inode)
             break
         
         for o in objs:
@@ -372,7 +372,7 @@ def scanfile(ddfs,fd,factories):
                 raise
 
         if not interest:
-            print "No interest for %s" % fd.inode
+            logging.log(logging.DEBUG, "No interest for %s" % fd.inode)
             break
 
     # call finish method of each object

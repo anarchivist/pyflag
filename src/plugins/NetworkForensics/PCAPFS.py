@@ -257,11 +257,11 @@ class PCAPFile(File):
         """
         File.__init__(self, case, fd, inode, dbh)
         ## Calculates the size of this file:
-        self.dbh = dbh.clone()
+        self.private_dbh = dbh.clone()
         self.dbh.execute("select max(id) as max from pcap")
         row=self.dbh.fetch()
         self.size = row['max']
-        self.dbh.execute("select id,offset,link_type,ts_sec,length from pcap")
+        self.private_dbh.execute("select id,offset,link_type,ts_sec,length from pcap")
         self.iosource = fd
 
     def read(self,length=None):
@@ -271,12 +271,12 @@ class PCAPFile(File):
         if self.readptr>=self.size: return ''
 
         ## Find out the offset in the file of the packet:
-        row=self.dbh.fetch()
+        row=self.private_dbh.fetch()
 
         ## Is this the row we were expecting?
         if row['id'] != self.readptr:
-            self.dbh.execute("select id,offset,link_type,ts_sec,length from pcap where id=%r", self.readptr)
-            row=self.dbh.fetch()
+            self.private_dbh.execute("select id,offset,link_type,ts_sec,length from pcap where id=%r", self.readptr)
+            row=self.private_dbh.fetch()
 
         if not row:
             self.readptr+=1

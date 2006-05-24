@@ -53,7 +53,7 @@ if sys.argv[1]=="-i":
 dbh.execute("""CREATE TABLE if not exists `NSRL_hashes` (
   `md5` char(16) NOT NULL default '',
   `filename` varchar(60) NOT NULL default '',
-  `productcode` int NOT NULL default '',
+  `productcode` int NOT NULL default 0,
   `oscode` varchar(60) NOT NULL default ''
 )""")
 
