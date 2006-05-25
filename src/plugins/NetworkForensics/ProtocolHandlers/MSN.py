@@ -88,7 +88,14 @@ class message:
         self.session_id = -1
         self.inodes = []
         self.participants = []
-        self.forward_list = []
+        self.contact_list_groups = {}
+
+        self.list_lookup={}
+        self.list_lookup['forward_list']=self.forward_list = []
+        self.list_lookup['allow_list']=self.allow_list = []
+        self.list_lookup['block_list']=self.block_list = []
+        self.list_lookup['reverse_list']=self.reverse_list = []
+        self.list_lookup['pending_list']=self.pending_list = []
 
     def get_packet_id(self):
         self.offset = self.fd.tell()
@@ -96,20 +103,26 @@ class message:
         self.packet_id = self.fd.get_packet_id(self.offset)
         return self.packet_id
 
-    def add_unique_to_list(self,username,list):
+    def store_list(self,list,listname):
+        """Store list in DB"""
+        if len(list)>0:
+            #logging.log(logging.VERBOSE_DEBUG,"Inserting list: %s" % ",".join(list))
+            self.insert_user_data(nick="%s (Target)" % self.client_id,data_type=listname,data=",".join(list),sessionid=-99)
+                    
+    def add_unique_to_list(self,data,list):
         #Add a unique entry to the list specified
         try:
-            if (list.index(username)):
+            if (list.index(data)):
                 #Already in the list
                 pass
         except ValueError:
             #Don't have this one, so insert it
-            list.append(username)
+            list.append(data)
             #logging.log(logging.VERBOSE_DEBUG, "Appending to list:%s" % (list))
 
     def del_participant(self,username):
         try:
-            logging.log(logging.VERBOSE_DEBUG, "Removing participant:%s" % username)
+            #logging.log(logging.VERBOSE_DEBUG, "Removing participant:%s" % username)
             self.participants.remove(username)
         except:
             #name wasn't in participants for some reason, shouldn't really happen.
@@ -131,7 +144,7 @@ class message:
 
         """
         if not sessionid:
-            sessionid=self.session_id     
+            sessionid=self.session_id
         self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r,sender=%r,recipient=%r,type=%r,transaction_id=%r,data=%r,session_id=%r",
                           (self.fd.inode,self.get_packet_id(),sender,recipient,type,tr_id,data,sessionid))
         
@@ -145,13 +158,66 @@ class message:
         """
         if not sessionid:
             sessionid=self.session_id
-            
         try:
             self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),tr_id,sessionid,nick,data_type,data))
         except:
             #We have duplicate user data,
             #logging.log(logging.VERBOSE_DEBUG, "Ignoring data as duplicate:%s,%s,%s" % (nick,data_type,data))
             pass
+
+    def store_phone_nums(self,nick,type,number):
+        """
+        Store intercepted phone numbers
+        
+        Valid Types:
+        
+        # PHH - home phone number
+        # PHW - work phone number
+        # PHM - mobile phone number
+        # MOB - are other people authorised to contact me on my MSN Mobile (http://mobile.msn.com/) device?
+        # MBE - do I have a mobile device enabled on MSN Mobile (http://mobile.msn.com/)?
+        
+        Phone numbers are not sent if they are empty, MOB and MBE
+        aren't sent unless they are enabled. Because of this, the only
+        way to tell whether you've finished receiving PRPs is when you
+        receive the first LSG response (there will always be at least
+        one LSG response).
+
+        The value for the first three items can be anything up to 95
+        characters. This value can contain any characters allowed in a
+        nickname and is URL Encoded.
+
+        The value of MOB and MBE can only be Y (yes). If MOB is set,
+        the client has allowed other people to contact him on his
+        mobile device through the PAG command. If MBE is set, that
+        shows that the client has enabled a mobile device on MSN
+        Mobile (http://mobile.msn.com/). Note that these values are
+        completely independent from the PHM mobile device number.
+        """
+        
+        if (type=="PHH"):
+            
+            self.insert_user_data(nick,'home_phone',urllib.unquote(number),sessionid=-99)
+            
+        elif (type=="PHW"):
+            
+            self.insert_user_data(nick,'work_phone',urllib.unquote(number),sessionid=-99)
+            
+        elif (type=="PHM"):
+            
+            self.insert_user_data(nick,'mobile_phone',urllib.unquote(number),sessionid=-99)
+            
+        elif (type=="MOB"):
+            
+            self.insert_user_data(nick,'msn_mobile_auth',urllib.unquote(number),sessionid=-99)
+            
+        elif (type=="MBE"):
+            
+            self.insert_user_data(nick,'msn_mobile_device',urllib.unquote(number),sessionid=-99)
+            
+        else:
+            logging.log(logging.VERBOSE_DEBUG, "Unknown phone type: %s" % self.cmdline.strip())
+        
         
     def parse(self):
 
@@ -378,9 +444,6 @@ class message:
         except:
             pass
             #This is a client request, I don't think it is interesting enough to record.
-            #self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r, recipient=%r,type=%r,sender=%r,transaction_id=%r",(self.fd.inode,self.get_packet_id(),"NOTIFICATION SERVER","NEW SWITCHBOARD SESSION REQUEST","%s (Target)" % self.client_id,words[1]))
-        
-            
 		
     def ANS(self):
         """ Logs into the Switchboard session.
@@ -451,7 +514,7 @@ class message:
 	self.state = "RNG"
 
         self.insert_user_data(words[5],'user_msn_passport',words[5])
-        self.insert_user_data(words[5],'url_enc_display_name',words[6])
+        self.insert_user_data(words[5],'url_enc_display_name',urllib.unquote(words[6]))
                 
     def JOI(self):
         """ Sent to all participants when a new client joins
@@ -502,33 +565,11 @@ class message:
                 pass
 
     def PRP(self):
-        """Phone numbers.
+        """Target's Phone numbers.
 
-        Valid Types:
-        
-        # PHH - home phone number
-        # PHW - work phone number
-        # PHM - mobile phone number
-        # MOB - are other people authorised to contact me on my MSN Mobile (http://mobile.msn.com/) device?
-        # MBE - do I have a mobile device enabled on MSN Mobile (http://mobile.msn.com/)?
-        
-        Phone numbers are not sent if they are empty, MOB and MBE
-        aren't sent unless they are enabled. Because of this, the only
-        way to tell whether you've finished receiving PRPs is when you
-        receive the first LSG response (there will always be at least
-        one LSG response).
-
-        The value for the first three items can be anything up to 95
-        characters. This value can contain any characters allowed in a
-        nickname and is URL Encoded.
-
-        The value of MOB and MBE can only be Y (yes). If MOB is set,
-        the client has allowed other people to contact him on his
-        mobile device through the PAG command. If MBE is set, that
-        shows that the client has enabled a mobile device on MSN
-        Mobile (http://mobile.msn.com/). Note that these values are
-        completely independent from the PHM mobile device number.
-        
+        The only time you can receive the phone numbers that you have
+        set for yourself is during a SYN. Personal phone numbers are
+        sent immediately after BLP.
 
         e.g.
         PRP PHH 555%20555-0690
@@ -536,40 +577,32 @@ class message:
         """
         words = self.cmdline.split()
 
-        logging.log(logging.VERBOSE_DEBUG,  "PRP: %s" % self.cmdline)
+        #logging.log(logging.VERBOSE_DEBUG,  "PRP: %s" % self.cmdline)
         
-        
-        try:
-            if (words[1]=="PHH"):
-                
-                self.insert_user_data("%s (Target)" % self.client_id,'home_phone',words[2],sessionid=-99)
-                
-            elif (words[1]=="PHW"):
-                
-                self.insert_user_data("%s (Target)" % self.client_id,'work_phone',words[2],sessionid=-99)
-                
-            elif (words[1]=="PHM"):
-                
-                self.insert_user_data("%s (Target)" % self.client_id,'mobile_phone',words[2],sessionid=-99)
-                
-            elif (words[1]=="MOB"):
-                
-                self.insert_user_data("%s (Target)" % self.client_id,'msn_mobile_auth',words[2],sessionid=-99)
-                
-            elif (words[1]=="MBE"):
-                
-                self.insert_user_data("%s (Target)" % self.client_id,'msn_mobile_device',words[2],sessionid=-99)
-                
-            else:
-
-                logging.log(logging.VERBOSE_DEBUG, "PRP not decoded correctly: %s" % self.cmdline.strip())
-
-        except Exception,e:
-                logging.log(logging.VERBOSE_DEBUG, "PRP not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
-                pass
+        self.store_phone_nums(nick="%s (Target)" % self.client_id,type=words[1],number=words[2])
             
         self.state = "PRP"    
-    
+
+    def BPR(self):
+        """Phone numbers for other users.  Same format is PRP.  Only
+        way to know who owns the number is to look at the previous
+        command, which should have been a LST.
+        
+        e.g.
+        BPR PHH 555%20555-0690
+
+        """
+        words = self.cmdline.split()
+
+        #logging.log(logging.VERBOSE_DEBUG,  "BPR: %s" % self.cmdline)
+
+        try:
+            user=self.state.split(":")[1]
+        except:
+            user='Unknown'
+        self.store_phone_nums(nick=user,type=words[1],number=words[2])
+                    
+        self.state = "PRP"    
 
     def LSG(self):
         """Contact groups.  Sent by the server when target logs on.
@@ -579,17 +612,21 @@ class message:
         LSG 2 Friends 0\r\n
         LSG 3 Family 0\r\n
 
+        Shouldn't see more than one set of LSG messages per session
+        i.e. only one 'LSG 0 blah' message.  If we do get more than
+        one the new LSG is ignored to avoid trampling any data that
+        may already be in the array.
         """
         words = self.cmdline.split()
 
-        logging.log(logging.VERBOSE_DEBUG, "LSG: %s" % self.cmdline)
-        
+        #logging.log(logging.VERBOSE_DEBUG, "LSG: %s" % self.cmdline)
         try:
-            self.insert_user_data("%s (Target)" % self.client_id,'contact_list_groups',words[1:2])
-
-        except Exception,e:
-                logging.log(logging.VERBOSE_DEBUG, "LSG not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
+            if self.contact_list_groups[words[1]]:
+                #We already have LSG data for this list number.  Do nothing
                 pass
+        except KeyError:
+            #Create a new entry for this group number and initialise with name of group
+            self.contact_list_groups[words[1]]=newlist=[urllib.unquote(words[2])]
             
         self.state = "LSG"
 
@@ -615,30 +652,35 @@ class message:
 
         """
         words = self.cmdline.split()
-
-        list_lookup={}
-        list_lookup['forward_list']=1
-        list_lookup['allow_list']=2
-        list_lookup['block_list']=4
-        list_lookup['reverse_list']=8
-        list_lookup['pending_list']=16
         
-        logging.log(logging.VERBOSE_DEBUG, "LST: %s" % self.cmdline)
+        #logging.log(logging.VERBOSE_DEBUG, "LST: %s" % self.cmdline)
 
-        listresults=[]
-        for listtypes in list_lookup.keys():
+        self.list_table={}
+        self.list_table['forward_list']=1
+        self.list_table['allow_list']=2
+        self.list_table['block_list']=4
+        self.list_table['reverse_list']=8
+        self.list_table['pending_list']=16
+
+        for (listtype,listvalue) in self.list_table.items():
             #Do a bitwise and to figure out which lists this person is in.
-            if ((list_lookup[listtypes] & int(words[3]))>0):
-                listresults.append(listtypes)
+            if ((listvalue & int(words[3]))>0):
+                #add the nick to the relevant list
+                #logging.log(logging.VERBOSE_DEBUG, "Inserting %s into list %s" % (words[1],listtype))
+                self.add_unique_to_list(data=words[1],list=self.list_lookup[listtype])
+
+        self.insert_user_data(nick=words[1],data_type='url_enc_display_name',data=urllib.unquote(words[2]))
         
         try:
-            self.insert_user_data("%s (Target)" % self.client_id,'contact_list_members',"account name:%s. nickname:%s. in lists:%s. in groups:%s" % (words[1],words[2],listresults,words[4]),sessionid=-99)
-
-        except Exception,e:
-                logging.log(logging.VERBOSE_DEBUG, "LST not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
-                pass
+            for group in words[4].split(","):
+                self.add_unique_to_list(data=words[1],list=self.contact_list_groups[group])
+        except IndexError:
+            #This LST entry did not have a 4th parameter
+            pass
+        except KeyError,e:
+            logging.log(logging.VERBOSE_DEBUG, "No LSG entry for group specified in LST: %s. Exception: %s" % (self.cmdline.strip(),e))
             
-        self.state = "LST"
+        self.state = "LST:%s" % words[1]
 
     #Ignore these commands
     def ACK (self):
@@ -649,8 +691,112 @@ class message:
     def QNG (self):
         #Server ping reply
         pass
+    def CHL(self):
+        """
+        Ignore
+        
+        CHL
+
+        Server ping. Returns
+        
+        CHL 0 challengestring
+        
+        * 0 : unknown
+        * challengestring : A string required for the response 
+        """
+        pass
+
+    def QRY(self):
+        """
+        QRY
+        
+        Response to Server ping.
+        
+        QRY is a payload command.
+        
+        QRY trid idstring payload_length
+        md5digest
+        
+        * trid : Transaction ID
+        * idstring : See Notification:Challenges#Client_identification_information
+        * payload_length : Size of the payload, always 32 because MD5 hashes are constant in length
+        * md5digest : See Notification:Challenges#Client_identification_information
+        
+        """
+        pass
+    
     def VER (self):
-        #see below
+        #More useful info in CVR
+        pass
+    def SYN(self):
+        """
+        Ignore?  Maybe TODO
+        
+        SYN
+
+        Command to synchronize the client's buddy lists. The client should send this immediately after signon as the server wont send certain commands until this is done.
+        
+        SYN trid synchversion
+        
+        * trid : Transaction ID
+        * synchversion : The last cached synchronization version number, the client should send 0 if none exists 
+        
+        A synchronization version that matches the server's Returns
+        
+        SYN trid synchversion
+        
+        * trid : Transaction ID
+        * synchversion : The profile's synchronization version number 
+        
+        A synchronization version that doesn't match the server's Returns
+        
+        SYN trid synchversion numberbuddies numbergroups
+        
+        * trid : Transaction ID
+        * synchversion : The profile's synchronization version number
+        * numberbuddies : The number of people on the client's list
+        * numbergroups : The number of groups on the client's list
+        """
+        
+        pass
+    
+    def GTC (self):
+        """
+        Ignore?  Maybe TODO
+    
+        GTC
+        
+        Sent following a unmatched SYN's response. A value of 'A'
+        indicates that whenever someone is 'added' to the Reverse
+        List, the client should notify the user that someone has added
+        him/her and ask the user about what to do. A value of 'N'
+        means that inconsistancies in the contact list should be
+        largely ignored..
+        
+        GTC gtcSetting
+        
+        * gtcSetting : A string value of either 'A' or 'N'
+        """
+        pass
+    
+    def BLP (self):
+        """
+        Ignore?  Maybe TODO
+        
+        BLP
+
+        Sent following a unmatched SYN's response. A value of 'AL'
+        indicates that users that are neither on the client's Allow
+        List or Buddy List will be allowed to see the client's online
+        status and open a switchboard session with the client. A value
+        of 'BL' indicates that these users will see the client as
+        offline and will not be allowed to open a switchboard session.
+        
+        BLP blpSetting
+        
+        * blpSetting : A string value of either 'AL' or 'BL'
+        
+        """
         pass
 
     def CHG(self):
@@ -743,6 +889,44 @@ class message:
         
         self.state = "NLN"
 
+    def REA(self):
+        """
+        REA
+        
+        The REA command is used to change your displayed name to something else.
+        
+        REA trid your_email newname\r\n
+        
+        * trid : Transaction ID
+        * your_email : The email you use to sign on to MSN.
+        * newname : The name that you now wish to use in a URL Encoded format. 
+        
+        If the rename has been successful, the server will respond with the following.
+        
+        REA trid number your_email newname\r\n
+        
+        * trid : Transaction ID
+        * number : Purpose currently unknown.
+        * your_email : The email you use to sign on to MSN.
+        * newname : The name that you wished to use in plain text.
+        
+        
+        """
+        words = self.cmdline.split()
+        try:
+            if int(words[2]):
+                #This message is of type 2 above
+                #Try and record the new display name in case we missed the original REA
+                self.insert_user_data(nick=words[3],data_type='url_enc_display_name',data=urllib.unquote(words[4]))
+                
+        except ValueError:
+            
+            #This will not be recorded if a display name has already been recorded for this user in this session.
+            self.insert_user_data(nick=words[2],data_type='url_enc_display_name',data=urllib.unquote(words[3]))
+            
+            #Store the change as session data, so we know it happenedd
+            self.insert_session_data(sender=words[2],recipient="%s (Target)" % self.client_id,type="USER CHANGED DISPLAY NAME",data=urllib.unquote(words[3]))
+        
         
     def ADD(self):
         """Adding people to your lists.
@@ -809,6 +993,11 @@ class message:
 
         e.g.
         ADD 20 AL example@passport.com example@passport.com
+
+        Note: interesting that you can have someone on your fl
+        (ie. you receive notifications of their presence) and also on
+        your block list (so they don't receive notifications about you
+        and can't talk to you)
 
         """
         words = self.cmdline.split()
@@ -1111,7 +1300,10 @@ class MSNScanner(StreamScannerFactory):
                                   'msn_mobile_auth',
                                   'msn_mobile_device',
                                   'forward_list',
-                                  'contact_list_members',
+                                  'allow_list',
+                                  'block_list',
+                                  'reverse_list',
+                                  'pending_list',
                                   'added_user_to_list',
                                   'login_time',
                                   'lang_pref',
@@ -1128,8 +1320,6 @@ class MSNScanner(StreamScannerFactory):
             PRIMARY KEY (`inode`,`session_id`,`user_data_type`,`nick`)
             )""")
         self.msn_connections = {}
-        #self.user_data={}
-
 
     def process_stream(self, stream, factories):
         ports = dissect.fix_ports("MSN")
@@ -1169,13 +1359,15 @@ class MSNScanner(StreamScannerFactory):
 
                 #### Post Processing ####
 
-                if len(m.forward_list)>0:
-                    #Put in contact list built from status notifications.
-                    #logging.log(logging.VERBOSE_DEBUG,"Inserting contact list: %s" % ",".join(m.forward_list))
+                #Store each of fl,bl,al etc.
+                for (thislistname,thislist) in m.list_lookup.items():
+                    m.store_list(list=thislist,listname=thislistname)
 
-                    #The packet id for this entry will be the last packet in the stream, but this is irrelevant
-                    m.insert_user_data("%s (Target)" % m.client_id,'forward_list',",".join(m.forward_list))
-
+                #Flatten contact list groups and store as one entry
+                finallist=[]
+                for (thislistname,thislist) in m.contact_list_groups.items():
+                    finallist.append(thislistname+":"+",".join(thislist))
+                m.store_list(list=finallist,listname='contact_list_groups')
                     
                 #Fix up all the session IDs (=-1) that were stored before we figured out the session ID.
                 if m.session_id==-1:
@@ -1245,17 +1437,17 @@ class BrowseMSNSessions(Reports.report):
 
             return tmp
 
-        def stream_link(value):
-            tmp = result.__class__(result)
-            #Strip off the combined stream to get at the original
-            orig_stream=re.sub(r"\/\d+","",value)
-            tmp.link(value,
-                     FlagFramework.query_type((),
-                                              family="Disk Forensics", case=query['case'],
-                                              report='View File Contents',
-                                              inode=orig_stream,
-                                              __target__=orig_stream, mode="Combined streams"))
-            return tmp
+##        def stream_link(value):
+##            tmp = result.__class__(result)
+##            #Strip off the combined stream to get at the original
+##            orig_stream=re.sub(r"\/\d+","",value)
+##            tmp.link(value,
+##                     FlagFramework.query_type((),
+##                                              family="Disk Forensics", case=query['case'],
+##                                              report='View File Contents',
+##                                              inode=orig_stream,
+##                                              __target__=orig_stream, mode="Combined streams"))
+##            return tmp
 
         def p2p_link(value):
             tmp = result.__class__(result)
@@ -1281,13 +1473,18 @@ class BrowseMSNSessions(Reports.report):
             #TODO find a nice way to separate date and time (for exporting csv separate), but not have it as the default...
             #date: 'from_unixtime(pcap.ts_sec,"%Y-%m-%d")'
             #time: 'concat(from_unixtime(pcap.ts_sec,"%H:%i:%s"),".",pcap.ts_usec)'
-            
-            columns = ['pcap.ts_sec', 'concat(from_unixtime(pcap.ts_sec),".",pcap.ts_usec)', 'inode', 'cast(packet_id as char)', 'session_id','type','sender','recipient','data','transaction_id'],
+
+            #We are displaying single inodes, not combined streams to make the linking work            
+            columns = ['pcap.ts_sec', 'concat(from_unixtime(pcap.ts_sec),".",pcap.ts_usec)', 'left(inode,instr(inode,"/")-1)', 'cast(packet_id as char)', 'session_id','type','sender','recipient','data','transaction_id'],
             names = ['Prox','Timestamp','Stream', 'Packet', 'Session ID', 'Type','Sender','Recipient','Data','Transaction ID'],
             table = "msn_session join pcap on packet_id=id",
-            callbacks = {'Prox':draw_prox_cb,'Stream':stream_link,'Data':p2p_link},
+            callbacks = {'Prox':draw_prox_cb,'Data':p2p_link},
             links = [
-	    	     None,None,None,
+	    	     None,None,
+                     FlagFramework.query_type((),
+                                              family="Disk Forensics", case=query['case'],
+                                              report='View File Contents',
+                                              __target__='inode', mode="Combined streams"),
                      FlagFramework.query_type((),
                                               family="Network Forensics", case=query['case'],
                                               report='View Packet',
@@ -1332,8 +1529,16 @@ class BrowseMSNUsers(BrowseMSNSessions):
                                             family="Network Forensics", case=query['case'],
                                             report='BrowseMSNSessions', 
                                             __target__='where_Session ID'),
-                   None,None,None,None,
-                   
+                   None,
+                   FlagFramework.query_type((),
+                                              family="Network Forensics", case=query['case'],
+                                              report='BrowseMSNUsers', 
+                                              __target__='where_Data Type'),
+                   FlagFramework.query_type((),
+                                              family="Network Forensics", case=query['case'],
+                                              report='BrowseMSNUsers', 
+                                              __target__='where_Nick'),
+                   None,
                    FlagFramework.query_type((),
                                             family="Network Forensics", case=query['case'],
                                             report='View Packet',
