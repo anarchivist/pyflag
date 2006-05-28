@@ -97,15 +97,16 @@ class PstScan(GenScanFactory):
         
         def external_process(self,name):
             """ This is run on the extracted file """
-            pst=pypst2.Pstfile(name)
+            self.fd.pst_handle=pypst2.Pstfile(name)
 
             def scan_item(inode,item):
                 """ Scans the item with the scanner train.
 
                 inode is fully qualified inode (e.g. D12|Pxxxx.0)
                 """
-                fd = StringIO.StringIO(item.read())
-                fd.inode=inode
+                fd = PstFile(self.dbh.case, self.fd, inode, dbh=self.dbh)
+#                fd = StringIO.StringIO(item.read())
+#                fd.inode=inode
                 Scanner.scanfile(self.ddfs,fd,self.factories)               
 
             def add_email(new_inode,name,item):
@@ -252,13 +253,13 @@ class PstScan(GenScanFactory):
                 self.dbh.execute("INSERT INTO `journal` SET `inode`=%r, `startdate`=from_unixtime(%s), `enddate`=from_unixtime(%s), `type`=%r, `comment`=%r",(new_inode, item.start, item.end, jtype, comment))
 
             ## Just walk over all the files
-            for root, dirs, files in pst.walk():
+            for root, dirs, files in self.fd.pst_handle.walk():
                 ## We do not put empty directories (with no content) to prevent clutter
                 for name in files:
                     new_inode = "%s|P%s" % (self.inode, name[0])
                     root_directory = self.ddfs.lookup(inode=self.inode)
                     
-                    item = pst.getitem(name[0])
+                    item = self.fd.pst_handle.getitem(name[0])
                         ## We make the filename of the VFS object root/name[1]
                     if isinstance(item, pypst2.Pstfile.Email):
                         add_email(new_inode,"%s%s/%s" % (root_directory,root[1],name[1]),item)
@@ -270,7 +271,7 @@ class PstScan(GenScanFactory):
                         add_journal(new_inode,"%s%s/%s" % (root_directory,root[1],name[1]),item)
 
 ## The correspoding VFS module:
-class Pst_file(File):
+class PstFile(File):
     """ A file like object to read items from within pst files. The pst file is specified as an inode in the DBFS """
     specifier = 'P'
     blocks=()
@@ -284,9 +285,14 @@ class Pst_file(File):
         ## Force our predecessor to be cached
         self.fd.cache()
 
-        ## Reopen the cache file from our predecessor on disk:
-        pst = pypst2.Pstfile(self.fd.cached_fd.name)
-        item = pst.open(thispart[1:])
+        ## See if we can use the pst handle from our predecessor
+        ## (otherwise we need to reopen it)
+        try:
+            self.pst = self.fd.pst_handle
+        except AttributeError:
+            self.pst = pypst2.Pstfile(self.fd.cached_fd.name)
+            
+        item = self.pst.open(thispart[1:])
         self.data = item.read()
         self.pos = 0
         self.size=len(self.data)

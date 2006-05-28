@@ -130,6 +130,13 @@ class StreamFile(File):
         self.cached_fd = open(FlagFramework.get_temp_path(
             self.dbh.case, self.inode),"r")
 
+        ## Now create the stream in the VFS:
+        fsfd = FileSystem.DBFS(self.dbh.case)
+        inode = self.inode[:self.inode.rfind("|")] +"|S%s" % stream_ids[0]
+        pathname = fsfd.lookup(inode = inode)
+        print self.inode ,pathname, inode
+        fsfd.VFSCreate(None, self.inode, pathname)
+
     def get_packet_id(self, position=None):
         """ Gets the current packet id (where the readptr is currently at) """
         if not position:
@@ -144,6 +151,14 @@ class StreamFile(File):
 
     def get_combined_fd(self):
         """ Returns an fd opened to the combined stream """
+        ## If we are already a combined stream, we just return ourselves
+        inode = self.inode.split("|")[-1]
+
+        if '/' in inode:
+            self.forward_id = int(inode[1:].split("/")[0])
+            return self
+
+        self.forward_id = self.con_id
         fsfd = FileSystem.DBFS(self.dbh.case)
         return fsfd.open(inode="%s/%s" % (self.inode,self.reverse))
 
@@ -167,7 +182,7 @@ class StreamFile(File):
             combined_fd.seek(row['cache_offset'])
             ## Get the data:
             data=combined_fd.read(row['length'])
-            if row['original_id']==self.con_id:
+            if row['original_id']==self.forward_id:
                 result.text(data,color="blue",font='typewriter',sanitise='full',wrap='full')
             else:
                 result.text(data,color="red",font='typewriter',sanitise='full',wrap='full')    

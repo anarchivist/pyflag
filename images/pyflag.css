@@ -18,12 +18,12 @@ a.tab:hover,
 }
 
 /* topmenu */
-ul#topmenu {
+div#notebook {
   font-weight:        bold;
   list-style-type:    none;
   margin:             0;
   padding:            0;
-  width: 100%;
+  width: 500%;
 }
 
 ul#topmenu li {
@@ -31,6 +31,7 @@ ul#topmenu li {
     margin:             0;
     padding:            1;
     vertical-align:     middle;
+  list-style: none;
 }
 
 #topmenu img {
@@ -116,8 +117,10 @@ span.tabcaution {
 
 div.content { 
   width: 100%;
+  color: red;
 }
 .clearfloat { 
   clear: both;
 }
+
 /* end topmenu */
