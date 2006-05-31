@@ -12,7 +12,7 @@
 """
 
 from optparse import OptionParser
-import os, shutil, glob
+import os, shutil, glob, re
 
 class DataHandler:
     def create(self,path):
@@ -26,6 +26,11 @@ class Date:
     def __init__(self, format):
         output = os.popen("date +" + format)
         self.current = output.readlines()[0].strip()
+        self.format=format
+        
+    def new(self):
+        output = os.popen("date +" + self.format)
+        return output.readlines()[0].strip()
 
 class Remote:
     """This class is for remote data - i.e. data not available through the local filesystem.  We will use ssh to interact with it (assumes authorized keys have been set up)"""
@@ -223,12 +228,19 @@ class FlagFeeder:
         errors=0
         #For each pcap in the directory given, run it through flag
         for files in source.list:
-            local_file_for_processing = os.path.basename(files).replace(".pcap","")
+            local_file_for_processing = re.sub(r"[\_\-\.]","",os.path.basename(files))
             pyflash_log_file=os.path.join(os.path.dirname(log.path), casename + "_" + date.current + "_" + local_file_for_processing + ".pyflag_log")
             log.write("Pyflash logfile: " + pyflash_log_file)
+
+            if (options.casenameunique):
+                thiscase=casename+local_file_for_processing
+            else:
+                thiscase=casename
             
-            log.write("pyflash -c " + pyflashconf + " -p case:" + casename + ",iosource:" + local_file_for_processing + ",iofilename:" + files + ",mountpoint:" + local_file_for_processing + " &> " + pyflash_log_file)
-            os.system("pyflash -c " + pyflashconf + " -p case:" + casename + ",iosource:" + local_file_for_processing + ",iofilename:" + files + ",mountpoint:" + local_file_for_processing + " &> " + pyflash_log_file)
+            log.write("%s -c %s -p case:%s,iosource:%s,iofilename:%s,mountpoint:%s &> %s" % (options.flashpath,pyflashconf,thiscase,local_file_for_processing,files,re.sub(r"[\_\-\.]","",os.path.normpath(files)),pyflash_log_file))
+            os.system("%s -c %s -p case:%s,iosource:%s,iofilename:%s,mountpoint:%s &> %s" % (options.flashpath,pyflashconf,thiscase,local_file_for_processing,files,re.sub(r"[\_\-\.]","",os.path.normpath(files)),pyflash_log_file))
+            #log.write("%s -c %s -p case:%s,iosource:%s,iofilename:%s,mountpoint:%s" % (options.flashpath,pyflashconf,thiscase,local_file_for_processing,files,re.sub(r"[\_\-\.]","",os.path.normpath(files))))
+            #os.system("%s -c %s -p case:%s,iosource:%s,iofilename:%s,mountpoint:%s" % (options.flashpath,pyflashconf,thiscase,local_file_for_processing,files,re.sub(r"[\_\-\.]","",os.path.normpath(files))))
 
             if self.success(pyflash_log_file):
                 pass
@@ -287,8 +299,9 @@ parser.add_option("-e", "--errorlogdir",type="string", dest="errorlogdir", help=
 parser.add_option("-t", "--tempdir",type="string", dest="tempdir", help="Temporary directory to store log files as they are being written (must be local)"),
 parser.add_option("-d", "--holdingdir",type="string", dest="holdingdir", help="Temporary directory to store the data for processing (must be local, will be moved from --src).  If no directory specified, the data will be processed in placed (assuming it is local)."),
 parser.add_option("-n", "--casename",type="string", dest="casename", help="The casename to use in pyFLAG for these files"),
-parser.add_option("-p", "--casenameprefix",type="string", dest="casenameprefix", help="The pyflag casename will be casenameprefix + date.  Use this when there is too much data to add to one case."),
+parser.add_option("-p", "--casenameunique",action="store_true", dest="casenameunique", help="If enabled the pyflag casename will be casename + date (i.e.unique).  Use this when there is too much data to add to one case."),
 parser.add_option("-f", "--lockfile",type="string", dest="lockfilepath", help="The lockfile for the program (must be local)"),
+parser.add_option("-a", "--pyflash",type="string", dest="flashpath", help="The pyflagsh path /path/to/pyflash (must be local)"),
 parser.add_option("-r", "--removepostprocess",action="store_true",dest="removedata",help="If this flag is set, data will be removed from source after it has been successfully copied  holdingdir.  Only necessary if source is remote - if src is local, the data is moved (not copied) to holdingdir regardless of this flag."),
 parser.add_option("-b", "--backupdir",type="string", dest="backupdir", help="The local directory to backup all data (excepts logs) to after processing is finished (this is the only copy of the data that will remain).  Only makes sense if --removepostprocess and holdingdir are specified.")
 
@@ -329,10 +342,7 @@ try:
         #FLAG Processing
         log.write("########### Starting pyflag processing #########")
         flag_feeder=FlagFeeder()
-        if (options.casename):
-            flag_err=flag_feeder.pcap(local_data_store,options.pyflashconf,options.casename,options.errorlogdir,handler)
-        elif (options.casenameprefix):
-            flag_err=flag_feeder.pcap(local_data_store,options.pyflashconf,options.casenameprefix+date.current,options.errorlogdir,handler)
+        flag_err=flag_feeder.pcap(local_data_store,options.pyflashconf,options.casename,options.errorlogdir,handler)
         log.write("Flag processing completed with errors in %s files" % flag_err)
 
         if ((options.backupdir) and (options.removedata)):

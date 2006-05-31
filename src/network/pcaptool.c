@@ -131,7 +131,7 @@ int main(int argc, char **argv) {
 
   if (createNewTable == TRUE) {
     /* will prob need to do some validation of tableName */
-    printf ("CREATE TABLE `%s` ("
+    printf ("CREATE TABLE if not exists `%s` ("
 	    "  `id` INT NOT NULL auto_increment,"
 	    "  `iosource` varchar(50), "
 	    "  `offset` INT NOT NULL ,"

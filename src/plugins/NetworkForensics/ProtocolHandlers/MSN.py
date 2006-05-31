@@ -5,9 +5,15 @@ http://www.hypothetic.org/docs/msn/ietf_draft.txt
 http://www.hypothetic.org/docs/msn/client/file_transfer.php
 http://www.hypothetic.org/docs/msn/notification/authentication.php
 
+Further info from the MSNPiki (an MSN protocol wiki)
+
+TODO: Further work to make this scanner compatible with the latest MSN
+version (I believe this is version 11 at 20060531).
+
 """
 # Michael Cohen <scudette@users.sourceforge.net>
 # Gavin Jackson <gavz@users.sourceforge.net>
+# Greg <gregsfdev@users.sourceforge.net>
 #
 #
 # ******************************************************
@@ -128,7 +134,7 @@ class message:
             #name wasn't in participants for some reason, shouldn't really happen.
             pass
 
-    def insert_session_data(self,sender,recipient,type,tr_id=None,data=None,sessionid=None):
+    def insert_session_data(self,sender,recipient,type,tr_id=None,data=None,sessionid=None,p2pfile=None):
         """
         Insert MSN session data.  A session id of -1 means we couldn't
         figure out what the session id was, but it matters to this
@@ -145,8 +151,8 @@ class message:
         """
         if not sessionid:
             sessionid=self.session_id
-        self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r,sender=%r,recipient=%r,type=%r,transaction_id=%r,data=%r,session_id=%r",
-                          (self.fd.inode,self.get_packet_id(),sender,recipient,type,tr_id,data,sessionid))
+        self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r,sender=%r,recipient=%r,type=%r,transaction_id=%r,data=%r,session_id=%r,p2p_file=%r",
+                          (self.fd.inode,self.get_packet_id(),sender,recipient,type,tr_id,data,sessionid,p2pfile))
         
     def insert_user_data(self,nick,data_type,data,tr_id=None,sessionid=None):
         """
@@ -239,7 +245,8 @@ class message:
             if self.cmd != self.cmd.upper() or not self.cmd.isalpha(): return None
         except IndexError:
             return ''
-        
+
+        self.words = self.cmdline.split()
         ## Dispatch the command handler
         try:
             return getattr(self,self.cmd)()
@@ -254,8 +261,8 @@ class message:
         """ Parse the contents of the headers
 
         """
-        words = self.cmdline.split()
-        self.length = int(words[-1])
+        
+        self.length = int(self.words[-1])
         self.offset = self.fd.tell()
         self.headers = {}
         ## Read the headers:
@@ -285,19 +292,19 @@ class message:
         CAL 8 RINGING 17342299\r\n
 
         """
-        words = self.cmdline.split()
-        if (words[2] == "RINGING"):
-            self.session_id=words[3]
+        
+        if (self.words[2] == "RINGING"):
+            self.session_id=self.words[3]
         else:
-            self.insert_session_data("%s (Target)" % self.client_id,words[2],"INVITE FROM TARGET",tr_id=words[1])            
-            self.insert_user_data(words[2],'user_msn_passport',words[2],tr_id=words[1])
+            self.insert_session_data("%s (Target)" % self.client_id,self.words[2],"INVITE FROM TARGET",tr_id=self.words[1])            
+            self.insert_user_data(self.words[2],'user_msn_passport',self.words[2],tr_id=self.words[1])
             
 	self.state = "CAL"
 
     def OUT(self):
         """Target left MSN session"""
         
-        words = self.cmdline.split()
+        
         self.insert_session_data("%s (Target)" % self.client_id,'SWITCHBOARD SERVER',"TARGET LEFT SESSION")
         
     def BYE(self):
@@ -309,9 +316,9 @@ class message:
 
         """
         
-        words = self.cmdline.split()
-        self.del_participant(words[1])
-        self.insert_session_data(words[1],'SWITCHBOARD SERVER',"USER LEFT SESSION")
+        
+        self.del_participant(self.words[1])
+        self.insert_session_data(self.words[1],'SWITCHBOARD SERVER',"USER LEFT SESSION")
 
     def USR(self):
         """
@@ -373,30 +380,30 @@ class message:
             * 0 : Unknown (Kids passport?) 
         
 	"""
-	words = self.cmdline.split()
+	
         
         #logging.log(logging.VERBOSE_DEBUG,  "USR:%s" % self.cmdline.strip())
         self.state = "USR"
         
-        if (words[2]=="OK"):
+        if (self.words[2]=="OK"):
             
-            self.client_id = words[3]
+            self.client_id = self.words[3]
             #print "USR setting self.client_id to %s for inode %s" %(self.client_id,self.fd.inode)
             self.insert_session_data("%s (Target)" % self.client_id,'SWITCHBOARD SERVER',"TARGET ENTERING NEW SWITCHBOARD SESSION")
 
-            self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',words[3],tr_id=words[1])
-            self.insert_user_data("%s (Target)" % self.client_id,'url_enc_display_name',urllib.unquote(words[4]),tr_id=words[1])
+            self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',self.words[3],tr_id=self.words[1])
+            self.insert_user_data("%s (Target)" % self.client_id,'url_enc_display_name',urllib.unquote(self.words[4]),tr_id=self.words[1])
             
-        elif (words[2]=="TWN")and(words[3]=="I"):
+        elif (self.words[2]=="TWN")and(self.words[3]=="I"):
             #Ignore 'S' messages - no value.
-            self.client_id = words[4]
+            self.client_id = self.words[4]
             #print "USR setting self.client_id to %s for inode %s" %(self.client_id,self.fd.inode)
-            self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',words[4],tr_id=words[1])
-        elif (words[2]!="TWN"):
+            self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',self.words[4],tr_id=self.words[1])
+        elif (self.words[2]!="TWN"):
             #must be of form: USR <transation id> example@passport.com 17262740.1050826919.32307
-            self.client_id = words[2]
+            self.client_id = self.words[2]
             #print "USR  setting self.client_id to %s for inode %s" %(self.client_id,self.fd.inode)
-            self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',words[2],tr_id=words[1])
+            self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',self.words[2],tr_id=self.words[1])
 
     def XFR(self):
 
@@ -433,13 +440,13 @@ class message:
 
         """
 
-        words = self.cmdline.split()
+        
         #print "XFR:%s" % self.cmdline.strip()
         try:
-            self.switchboard_ip = words[3].split(":")[0]
-            self.switchboard_port = words[3].split(":")[1]
+            self.switchboard_ip = self.words[3].split(":")[0]
+            self.switchboard_port = self.words[3].split(":")[1]
             #This is a server response
-            self.insert_session_data("NOTIFICATION SERVER","%s (Target)" % self.client_id,"SWITCHBOARD SERVER OFFER",tr_id=words[1],data="switchboard server:%s" % words[3])
+            self.insert_session_data("NOTIFICATION SERVER","%s (Target)" % self.client_id,"SWITCHBOARD SERVER OFFER",tr_id=self.words[1],data="switchboard server:%s" % self.words[3])
 
         except:
             pass
@@ -459,18 +466,18 @@ class message:
         ANS 1854 OK
         
         """
-        words = self.cmdline.split()
+        
 
-        if (words[2].find("OK")<0):
+        if (self.words[2].find("OK")<0):
 
             try:
-                self.session_id=int(words[-1])
+                self.session_id=int(self.words[-1])
                 ## This stores the current clients username
-                self.client_id = words[2]
+                self.client_id = self.words[2]
                 #print "ANS setting self.client_id to %s for inode %s" %(self.client_id,self.fd.inode)
-                self.insert_session_data("%s (Target)" % self.client_id,"SWITCHBOARD SERVER","TARGET JOINING_SESSION",tr_id=words[1])
+                self.insert_session_data("%s (Target)" % self.client_id,"SWITCHBOARD SERVER","TARGET JOINING_SESSION",tr_id=self.words[1])
                 
-                self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',words[2],tr_id=words[1])
+                self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',self.words[2],tr_id=self.words[1])
             except Exception,e:
                 logging.log(logging.VERBOSE_DEBUG,"ANS not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
                 pass
@@ -484,18 +491,104 @@ class message:
         IRO <transaction id> <number of this IRO> <total number of IRO that will be sent> <username> <display name>
         
         """
-        words = self.cmdline.split()
+        
         try:
-            self.insert_session_data(sender=words[4],recipient="%s (Target)" % self.client_id,type="CURRENT_PARTICIPANTS",tr_id=words[1])
+            self.insert_session_data(sender=self.words[4],recipient="%s (Target)" % self.client_id,type="CURRENT_PARTICIPANTS",tr_id=self.words[1])
             self.state = "IRO"
 
-            self.insert_user_data(words[4],'user_msn_passport',words[4],tr_id=words[1])
-            self.insert_user_data(words[4],'url_enc_display_name',urllib.unquote(words[5]),tr_id=words[1])
-            self.add_unique_to_list(words[4],self.participants)                
+            self.insert_user_data(self.words[4],'user_msn_passport',self.words[4],tr_id=self.words[1])
+            self.insert_user_data(self.words[4],'url_enc_display_name',urllib.unquote(self.words[5]),tr_id=self.words[1])
+            self.add_unique_to_list(self.words[4],self.participants)                
 
         except Exception,e:
                 logging.log(logging.VERBOSE_DEBUG, "IRO not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
                 pass
+
+    def parse_psm(self,length,trid=None):
+        """ Parse read the contents of the xml personal message following a UBX/UUX command
+
+        """
+        if length > 0:
+            #print "Reading %s bytes of personal message" % length
+            self.insert_user_data(nick=self.words[1],data_type='personal_message',data=self.fd.read(length),tr_id=trid)
+        
+
+    def UUX(self):
+        """
+        UUX
+        
+        This is the command used to set your Personal Message (PSM) or currently playing song. It is a payload command, with the only parameter after the TrID being the length of the payload:
+        
+        < UUX 10 72\r\n
+        
+        If this command is successful, the server will reply with a message containing the TrID you used and a 0 as the only parameter.
+        
+        > UUX 10 0\r\n
+        
+        The contents of the payload depend on whether you have a currently playing song or not.
+        [edit]
+        Without a Current Media
+        
+        <Data><PSM>My Personal Message</PSM><CurrentMedia></CurrentMedia></Data>
+        
+        The contents of the PSM tag is your personal message (XML encoded!), leaving <CurrentMedia> blank. Both may be specified, but this is not recommended. See below to find out how to set both and show only the one you want (Enabled setting).
+        
+        The client will always limit your PSM to 129 characters (same as the friendly name). Server-wise however, a payload of up to 1KB (including XML) is being accepted. The client will always show only 129 characters in the main contact list, but will show the full PSM in conversation windows.
+        [edit]
+        With a Current Media
+        
+        The value of the CurrentMedia tag can be thought of as an array separated by the string "\0" (literal backslash followed by zero, not NULL). The elements of this 'array' are as follows:
+
+        * Application - This is the app you are using. Usually empty (iTunes and Winamp are the only ones known to be accepted)
+        * Type - This is the type of PSM, either 'Music', 'Games' or 'Office'
+        * Enabled - This is a boolean value (0/1) to enable/disable the Current Media setting
+        * Format - A formatter string (you may be familiar with this syntax if you've used .NET); for example, "{0} - {1}"
+        * First line - The first line (Matches {0} in the Format)
+        * Second line - The second line (Matches {1} in the Format)
+        * Third line - The third line (Matches {2} in the Format) 
+        
+        There is no known limit to the number of formatter tags, but it is speculated to be 99.
+        [edit]
+        Examples of the CurrentMedia Tag
+
+        Currently Playing Song
+        
+         <CurrentMedia>\0Music\01\0{0} - {1}\0 Song Title\0Song Artist\0Song Album\0\0</CurrentMedia>
+         
+         Playing a Game
+         
+         <CurrentMedia>\0Games\01\0Playing {0}\0Game Name\0</CurrentMedia>
+         
+         Microsoft Office
+         
+         <CurrentMedia>\0Office\01\0Office Message\0Office App Name\0</CurrentMedia>
+
+
+        """
+        
+        self.parse_psm(length=int(self.words[2]),trid=int(self.words[1]))
+        self.state = "UUX"
+        
+        
+    def UBX(self):
+        """
+        UBX
+
+        UBX is the sister command to UUX. UUX is used to set your personal message, UBX is sent by the server to all principles to inform them of the change (where B means Buddy). The format is similar to UUX; they are payload commands where the first parameter is the passport address of the contact who has just changed their personal message or currently playing song, and the second parameter is the length of the payload:
+        
+        > UBX passport@hotmail.com xxx\r\n
+        <Data><PSM>My Personal Message</PSM><CurrentMedia></CurrentMedia></Data>
+        
+        > UBX passport@hotmail.com xxx\r\n
+        <Data><PSM></PSM><CurrentMedia>\0Music\01\0{0} - {1}\0Song Title\0
+        Song Artist\0Song Album\0{xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}\0</CurrentMedia></Data>
+        
+        (Sent on one line - split for ease of viewing here)
+        """
+        
+        self.parse_psm(length=int(self.words[2]))
+        self.insert_user_data(nick=self.words[1],data_type='user_msn_passport',data=self.words[1])
+        self.state = "UBX"
 
     def RNG(self):
         """ Target is being invited to a new session
@@ -505,16 +598,16 @@ class message:
         Format:
         RNG <sessionid> <switchboard server ip:port> <auth type, always=cki> <auth string> <nick of inviter> <url encoded display name of inviter>
         """
-        words = self.cmdline.split()
-        self.session_id = words[1]
+        
+        self.session_id = self.words[1]
 
         #The inviter is a participant
-        self.add_unique_to_list(words[5],self.participants)
-        self.insert_session_data(sender=words[5],recipient="%s (Target)" % self.client_id,type="TARGET INVITED")
+        self.add_unique_to_list(self.words[5],self.participants)
+        self.insert_session_data(sender=self.words[5],recipient="%s (Target)" % self.client_id,type="TARGET INVITED")
 	self.state = "RNG"
 
-        self.insert_user_data(words[5],'user_msn_passport',words[5])
-        self.insert_user_data(words[5],'url_enc_display_name',urllib.unquote(words[6]))
+        self.insert_user_data(self.words[5],'user_msn_passport',self.words[5])
+        self.insert_user_data(self.words[5],'url_enc_display_name',urllib.unquote(self.words[6]))
                 
     def JOI(self):
         """ Sent to all participants when a new client joins
@@ -522,12 +615,12 @@ class message:
         JOI bob@passport.com Bob
         
         """
-        words = self.cmdline.split()
-        self.add_unique_to_list(words[1],self.participants)
-        self.insert_session_data(sender=words[1],recipient="%s (Target)" % self.client_id,type="USER JOINING_SESSION WITH TARGET")
+        
+        self.add_unique_to_list(self.words[1],self.participants)
+        self.insert_session_data(sender=self.words[1],recipient="%s (Target)" % self.client_id,type="USER JOINING_SESSION WITH TARGET")
 
-        self.insert_user_data(words[1],'user_msn_passport',words[1])
-        self.insert_user_data(words[1],'url_enc_display_name',urllib.unquote(words[2]))
+        self.insert_user_data(self.words[1],'user_msn_passport',self.words[1])
+        self.insert_user_data(self.words[1],'url_enc_display_name',urllib.unquote(self.words[2]))
         
 	self.state = "JOI"
 
@@ -546,17 +639,17 @@ class message:
         <<< CVR 2 6.0.0602 6.0.0602 1.0.0000 http://download.microsoft.com/download/8/a/4/8a42bcae-f533-4468-b871-d2bc8dd32e9e/SETUP9x.EXE http://messenger.msn.com\r\n
 
         """
-        words = self.cmdline.split()
+        
 
         # I think we only care about the client, not the server, hence:
-        if (words[2].find("x")==1):
-            self.client_id=words[9]
+        if (self.words[2].find("x")==1):
+            self.client_id=self.words[9]
             #print "CVR  setting self.client_id to %s for inode %s" %(self.client_id,self.fd.inode)
             try:
-                self.insert_user_data("%s (Target)" % self.client_id,'locale',words[2],tr_id=words[1])
-                self.insert_user_data("%s (Target)" % self.client_id,'os'," ".join(words[3:6]),tr_id=words[1])
-                self.insert_user_data("%s (Target)" % self.client_id,'client'," ".join(words[6:8]),tr_id=words[1])
-                self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',words[9],tr_id=words[1])
+                self.insert_user_data("%s (Target)" % self.client_id,'locale',self.words[2],tr_id=self.words[1])
+                self.insert_user_data("%s (Target)" % self.client_id,'os'," ".join(self.words[3:6]),tr_id=self.words[1])
+                self.insert_user_data("%s (Target)" % self.client_id,'client'," ".join(self.words[6:8]),tr_id=self.words[1])
+                self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',self.words[9],tr_id=self.words[1])
                 
                 self.state = "CVR"
 
@@ -575,11 +668,11 @@ class message:
         PRP PHH 555%20555-0690
 
         """
-        words = self.cmdline.split()
+        
 
         #logging.log(logging.VERBOSE_DEBUG,  "PRP: %s" % self.cmdline)
         
-        self.store_phone_nums(nick="%s (Target)" % self.client_id,type=words[1],number=words[2])
+        self.store_phone_nums(nick="%s (Target)" % self.client_id,type=self.words[1],number=self.words[2])
             
         self.state = "PRP"    
 
@@ -592,7 +685,7 @@ class message:
         BPR PHH 555%20555-0690
 
         """
-        words = self.cmdline.split()
+        
 
         #logging.log(logging.VERBOSE_DEBUG,  "BPR: %s" % self.cmdline)
 
@@ -600,12 +693,14 @@ class message:
             user=self.state.split(":")[1]
         except:
             user='Unknown'
-        self.store_phone_nums(nick=user,type=words[1],number=words[2])
+        self.store_phone_nums(nick=user,type=self.words[1],number=self.words[2])
                     
         self.state = "PRP"    
 
     def LSG(self):
         """Contact groups.  Sent by the server when target logs on.
+
+        TODO: Modify to handle GUIDs used in current version of protocol
 
         LSG 0 Other%20Contacts 0\r\n
         LSG 1 Coworkers 0\r\n
@@ -617,21 +712,23 @@ class message:
         one the new LSG is ignored to avoid trampling any data that
         may already be in the array.
         """
-        words = self.cmdline.split()
+        
 
         #logging.log(logging.VERBOSE_DEBUG, "LSG: %s" % self.cmdline)
         try:
-            if self.contact_list_groups[words[1]]:
+            if self.contact_list_groups[self.words[1]]:
                 #We already have LSG data for this list number.  Do nothing
                 pass
         except KeyError:
             #Create a new entry for this group number and initialise with name of group
-            self.contact_list_groups[words[1]]=newlist=[urllib.unquote(words[2])]
+            self.contact_list_groups[self.words[1]]=newlist=[urllib.unquote(self.words[2])]
             
         self.state = "LSG"
 
     def LST(self):
         """Contact list members.  Sent by the server when target logs on.
+
+        TODO: Modify to handle GUIDs used in current version of protocol
 
         LST principal1@passport.com principal1 4\r\n
         LST principal2@passport.com principal2 10\r\n
@@ -651,7 +748,7 @@ class message:
         list number of 3.
 
         """
-        words = self.cmdline.split()
+        
         
         #logging.log(logging.VERBOSE_DEBUG, "LST: %s" % self.cmdline)
 
@@ -664,23 +761,23 @@ class message:
 
         for (listtype,listvalue) in self.list_table.items():
             #Do a bitwise and to figure out which lists this person is in.
-            if ((listvalue & int(words[3]))>0):
+            if ((listvalue & int(self.words[3]))>0):
                 #add the nick to the relevant list
-                #logging.log(logging.VERBOSE_DEBUG, "Inserting %s into list %s" % (words[1],listtype))
-                self.add_unique_to_list(data=words[1],list=self.list_lookup[listtype])
+                #logging.log(logging.VERBOSE_DEBUG, "Inserting %s into list %s" % (self.words[1],listtype))
+                self.add_unique_to_list(data=self.words[1],list=self.list_lookup[listtype])
 
-        self.insert_user_data(nick=words[1],data_type='url_enc_display_name',data=urllib.unquote(words[2]))
+        self.insert_user_data(nick=self.words[1],data_type='url_enc_display_name',data=urllib.unquote(self.words[2]))
         
         try:
-            for group in words[4].split(","):
-                self.add_unique_to_list(data=words[1],list=self.contact_list_groups[group])
+            for group in self.words[4].split(","):
+                self.add_unique_to_list(data=self.words[1],list=self.contact_list_groups[group])
         except IndexError:
             #This LST entry did not have a 4th parameter
             pass
         except KeyError,e:
             logging.log(logging.VERBOSE_DEBUG, "No LSG entry for group specified in LST: %s. Exception: %s" % (self.cmdline.strip(),e))
             
-        self.state = "LST:%s" % words[1]
+        self.state = "LST:%s" % self.words[1]
 
     #Ignore these commands
     def ACK (self):
@@ -816,10 +913,10 @@ class message:
         CHG trid statuscode clientid
 
         """
-        words = self.cmdline.split()
+        
         if self.state!="CHG":
             #ie. we didn't just process one.  This avoids storing the server's identical response.
-            self.insert_session_data(sender="%s (Target)" % self.client_id,recipient="SWITCHBOARD SERVER",type="TARGET CHANGED ONLINE STATUS TO:%s" % words[2],tr_id=words[1],sessionid=-99)
+            self.insert_session_data(sender="%s (Target)" % self.client_id,recipient="SWITCHBOARD SERVER",type="TARGET CHANGED ONLINE STATUS TO:%s" % self.words[2],tr_id=self.words[1],sessionid=-99)
             self.state = "CHG"
 
     def ILN(self):
@@ -836,10 +933,10 @@ class message:
         * clientid : Principal's Client ID number 
 
         """
-        words = self.cmdline.split()
-        self.insert_session_data(sender=words[3],recipient="%s (Target)" % self.client_id,type="USER INITIAL STATUS:%s" % words[2],tr_id=words[1],sessionid=-99)
-        self.insert_user_data(nick=words[3],data_type='url_enc_display_name',data=urllib.unquote(words[4]),tr_id=words[1],sessionid=-99)
-        self.add_unique_to_list(words[3],self.forward_list)
+        
+        self.insert_session_data(sender=self.words[3],recipient="%s (Target)" % self.client_id,type="USER INITIAL STATUS:%s" % self.words[2],tr_id=self.words[1],sessionid=-99)
+        self.insert_user_data(nick=self.words[3],data_type='url_enc_display_name',data=urllib.unquote(self.words[4]),tr_id=self.words[1],sessionid=-99)
+        self.add_unique_to_list(self.words[3],self.forward_list)
         self.state = "ILN"
 
     def FLN(self):
@@ -854,9 +951,9 @@ class message:
         * account_name : Principal's Passport address 
 
         """
-        words = self.cmdline.split()
-        self.insert_session_data(sender=words[1],recipient="%s (Target)" % self.client_id,type="USER LOGGED OFF",sessionid=-99)
-        self.add_unique_to_list(words[1],self.forward_list)
+        
+        self.insert_session_data(sender=self.words[1],recipient="%s (Target)" % self.client_id,type="USER LOGGED OFF",sessionid=-99)
+        self.add_unique_to_list(self.words[1],self.forward_list)
         self.state = "FLN"
 
     def NLN(self):
@@ -882,10 +979,10 @@ class message:
         
         """
         
-        words = self.cmdline.split()
-        self.insert_session_data(sender=words[2],recipient="%s (Target)" % self.client_id,type="USER CHANGED ONLINE STATUS TO:%s" % words[1],sessionid=-99)
-        self.add_unique_to_list(words[2],self.forward_list)
-        self.insert_user_data(words[2],'url_enc_display_name',urllib.unquote(words[3]),sessionid=-99)
+        
+        self.insert_session_data(sender=self.words[2],recipient="%s (Target)" % self.client_id,type="USER CHANGED ONLINE STATUS TO:%s" % self.words[1],sessionid=-99)
+        self.add_unique_to_list(self.words[2],self.forward_list)
+        self.insert_user_data(self.words[2],'url_enc_display_name',urllib.unquote(self.words[3]),sessionid=-99)
         
         self.state = "NLN"
 
@@ -912,20 +1009,20 @@ class message:
         
         
         """
-        words = self.cmdline.split()
+        
         try:
-            if int(words[2]):
+            if int(self.words[2]):
                 #This message is of type 2 above
                 #Try and record the new display name in case we missed the original REA
-                self.insert_user_data(nick=words[3],data_type='url_enc_display_name',data=urllib.unquote(words[4]))
+                self.insert_user_data(nick=self.words[3],data_type='url_enc_display_name',data=urllib.unquote(self.words[4]))
                 
         except ValueError:
             
             #This will not be recorded if a display name has already been recorded for this user in this session.
-            self.insert_user_data(nick=words[2],data_type='url_enc_display_name',data=urllib.unquote(words[3]))
+            self.insert_user_data(nick=self.words[2],data_type='url_enc_display_name',data=urllib.unquote(self.words[3]))
             
             #Store the change as session data, so we know it happenedd
-            self.insert_session_data(sender=words[2],recipient="%s (Target)" % self.client_id,type="USER CHANGED DISPLAY NAME",data=urllib.unquote(words[3]))
+            self.insert_session_data(sender=self.words[2],recipient="%s (Target)" % self.client_id,type="USER CHANGED DISPLAY NAME",data=urllib.unquote(self.words[3]))
         
         
     def ADD(self):
@@ -1000,10 +1097,10 @@ class message:
         and can't talk to you)
 
         """
-        words = self.cmdline.split()
+        
         
         logging.log(logging.VERBOSE_DEBUG,"ADD: %s" % self.cmdline)
-        self.insert_user_data("%s (Target)" % self.client_id,'added_user_to_list',"list:%s,user:%s,nick:%s" % (words[2],words[3],words[4]),sessionid=-99)
+        self.insert_user_data("%s (Target)" % self.client_id,'added_user_to_list',"list:%s,user:%s,nick:%s" % (self.words[2],self.words[3],self.words[4]),sessionid=-99)
         self.insert_session_data(sender="%s (Target)" % self.client_id,recipient="SWITCHBOARD SERVER",type="ADDED USER TO LIST",sessionid=-99)
         self.state = "ADD"
                          
@@ -1127,7 +1224,7 @@ class message:
                 new_inode = "CMSN%s-%s" % (headers['sessionid'],
                                            self.session_id)
                 
-                self.insert_session_data(sender=strip_username(headers['from']),recipient=strip_username(headers['to']),type="P2P FILE TRANSFER",data="p2p file:%s|%s" % (self.fd.inode, new_inode))
+                self.insert_session_data(sender=strip_username(headers['from']),recipient=strip_username(headers['to']),type="P2P FILE TRANSFER",p2pfile="%s|%s" % (self.fd.inode, new_inode))
                 
                 try:
                 ## Parse the context line:
@@ -1206,10 +1303,10 @@ class message:
         """
         ## Read the data for this MSG:
         self.parse_mime()
-        words = self.cmdline.split()
+        
         try:
             ## If the second word is a transaction id (int) its a message from client to server.  ie. FROM target to all users in session.
-            tid = int(words[1])
+            tid = int(self.words[1])
             sender = "%s (Target)" % self.client_id
             #logging.log(logging.VERBOSE_DEBUG, "participants:%s" % (",".join(self.participants)))
 	    self.recipient = ",".join(self.participants)
@@ -1217,8 +1314,8 @@ class message:
         except ValueError:
             # Message TO target
             tid = 0
-            sender = words[1]
-            self.insert_user_data(sender,'url_enc_display_name',urllib.unquote(words[2]))
+            sender = self.words[1]
+            self.insert_user_data(sender,'url_enc_display_name',urllib.unquote(self.words[2]))
             server = True
 	    self.recipient = "%s (Target)" % self.client_id
         try:
@@ -1268,6 +1365,7 @@ class MSNScanner(StreamScannerFactory):
             `recipient` VARCHAR( 250 ),
             `type` VARCHAR(50),
             `data` TEXT NULL,
+            `p2p_file` VARCHAR( 250 ),
             `transaction_id`  INT
             )""")
         self.dbh.execute(
@@ -1314,7 +1412,8 @@ class MSNScanner(StreamScannerFactory):
                                   'kid',
                                   'age',
                                   'birthday',
-                                  'client_ip'
+                                  'client_ip',
+                                  'personal_message'
                                   ) NOT NULL ,
             `user_data` TEXT NOT NULL,
             PRIMARY KEY (`inode`,`session_id`,`user_data_type`,`nick`)
@@ -1437,48 +1536,16 @@ class BrowseMSNSessions(Reports.report):
 
             return tmp
 
-##        def stream_link(value):
-##            tmp = result.__class__(result)
-##            #Strip off the combined stream to get at the original
-##            orig_stream=re.sub(r"\/\d+","",value)
-##            tmp.link(value,
-##                     FlagFramework.query_type((),
-##                                              family="Disk Forensics", case=query['case'],
-##                                              report='View File Contents',
-##                                              inode=orig_stream,
-##                                              __target__=orig_stream, mode="Combined streams"))
-##            return tmp
-
-        def p2p_link(value):
-            tmp = result.__class__(result)
-                
-            if value.startswith("p2p file:"):
-                (key,p2p_inode)=value.split(":")
-                #We must be of the form p2p file:Itest|S137/138|CMSN8573970-684504
-                #Make a link to the inode
-                #print "p2p:%s" % p2p_inode
-                tmp.link(value,
-                     FlagFramework.query_type((),
-                                              family="Disk Forensics", case=query['case'],
-                                              report='View File Contents',
-                                              inode=p2p_inode,
-                                              __target__=p2p_inode, mode="Statistics"))
-                return tmp
-            else:
-                #Not a p2p file
-                return value
-          
-
         result.table(
             #TODO find a nice way to separate date and time (for exporting csv separate), but not have it as the default...
             #date: 'from_unixtime(pcap.ts_sec,"%Y-%m-%d")'
             #time: 'concat(from_unixtime(pcap.ts_sec,"%H:%i:%s"),".",pcap.ts_usec)'
 
             #We are displaying single inodes, not combined streams to make the linking work            
-            columns = ['pcap.ts_sec', 'concat(from_unixtime(pcap.ts_sec),".",pcap.ts_usec)', 'left(inode,instr(inode,"/")-1)', 'cast(packet_id as char)', 'session_id','type','sender','recipient','data','transaction_id'],
-            names = ['Prox','Timestamp','Stream', 'Packet', 'Session ID', 'Type','Sender','Recipient','Data','Transaction ID'],
+            columns = ['pcap.ts_sec', 'concat(from_unixtime(pcap.ts_sec),".",pcap.ts_usec)', 'left(inode,instr(inode,"/")-1)', 'cast(packet_id as char)', 'session_id','type','sender','recipient','data','transaction_id','p2p_file'],
+            names = ['Prox','Timestamp','Stream', 'Packet', 'Session ID', 'Type','Sender','Recipient','Data','Transaction ID','P2P File'],
             table = "msn_session join pcap on packet_id=id",
-            callbacks = {'Prox':draw_prox_cb,'Data':p2p_link},
+            callbacks = {'Prox':draw_prox_cb},
             links = [
 	    	     None,None,
                      FlagFramework.query_type((),
@@ -1501,7 +1568,12 @@ class BrowseMSNSessions(Reports.report):
                      FlagFramework.query_type((),
                                               family="Network Forensics", case=query['case'],
                                               report='BrowseMSNUsers', 
-                                              __target__='where_Nick')
+                                              __target__='where_Nick'),
+                     None,None,
+                     FlagFramework.query_type((),
+                                              family="Disk Forensics", case=query['case'],
+                                              report='View File Contents',
+                                              __target__='inode', mode="Statistics")
                      ],
             case = query['case'],
             hide_columns = ['Date']
