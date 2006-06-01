@@ -92,10 +92,12 @@ class PCAPFS(DBFS):
         self.dbh.MySQLHarness("%s/pcaptool -c -t pcap" %(config.FLAG_BIN))
         self.dbh.execute("select max(id) as id from pcap")
         row=self.dbh.fetch()
-        if row:
+
+        if row['id']:
             max_id = row['id']
         else:
-            max_id = 1
+            max_id = 0
+            
 
         ## This populates it 
         sql =  "%s/iowrapper -p %r -i %r -o %s -f foo -- %s/pcaptool -t pcap -i %r foo" % (
@@ -218,7 +220,7 @@ class PCAPFS(DBFS):
         reassembler.set_tcp_callback(hashtbl, Callback)
 
         ## Scan the filesystem:
-        self.dbh.execute("select id,offset,link_type,ts_sec,length from pcap")
+        self.dbh.execute ("select id,offset,link_type,ts_sec,length from pcap where id>%r" % int(max_id))
         for row in self.dbh:
             self.fd.seek(row['offset'])
             data = self.fd.read(row['length'])

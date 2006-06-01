@@ -1,0 +1,6 @@
+#Scan all the stuff loaded under /
+#Usage: pyflash -c pcap.flash_scan -p case:mycasename
+
+set case=%(case)s
+
+execute Load\ Data.ScanFS path=/ scangroup_NetworkScanners=on scangroup_File\ Scanners=off scangroup_Compressed\ File=off scangroup_Filesystem\ Analysis=off scangroup_General\ Forensics=off final=ok scan_IRCScanner=off scan_MSNScanner=on scan_HTTPScanner=off scan_POPScanner=off scan_SMTPScanner=off scan_RFC2822=off scan_PstScan=off

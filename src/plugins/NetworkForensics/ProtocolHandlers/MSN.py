@@ -261,23 +261,33 @@ class message:
         """ Parse the contents of the headers
 
         """
+        #print "words%s"%self.words
+        try:
+            self.length = int(self.words[-1])
+        except:
+            #The last parameter isn't the length, so this message is stuffed
+            logging.log(logging.VERBOSE_DEBUG,"Line %s is not a valid MSG, no length in bytes" % self.cmdline)
+            return False
         
-        self.length = int(self.words[-1])
         self.offset = self.fd.tell()
         self.headers = {}
         ## Read the headers:
         while 1:
             line = self.fd.readline()
-            if line =='\r\n': break
+            #print "parsing header line:%s" % line
+            #We are finished if we see a newline
+            if (line =='\r\n'): break
             try:
                 header,value = line.split(":")
                 self.headers[header.lower()]=value.lower().strip()
             except ValueError:
-                logging.log(logging.VERBOSE_DEBUG, "Parse mime failed on:%s" % line)
-                pass
+                #We don't have : separated parameters, so something is wrong.
+                logging.log(logging.VERBOSE_DEBUG, "Parse mime failed on:%s.  Headers:%s" % (line,self.headers))
+                return False
 
         current_position = self.fd.tell()
         self.data = self.fd.read(self.length-(current_position-self.offset))
+        return True
     
     def CAL(self):
 
@@ -1186,6 +1196,7 @@ class message:
     def p2p_handler(self,content_type,sender,is_server):
         """ Handle a p2p transfer """
 
+        #print "content_type%s,sender%s,is_server%s"%(content_type,sender,is_server)
         def strip_username(p2pusername):
             # TO and FROM are of format <msnmsgr:name@hotmail.com> so strip the extra stuff out
             return p2pusername.replace('<msnmsgr:','').strip('>')
@@ -1302,37 +1313,37 @@ class message:
         
         """
         ## Read the data for this MSG:
-        self.parse_mime()
+        if self.parse_mime():
         
-        try:
-            ## If the second word is a transaction id (int) its a message from client to server.  ie. FROM target to all users in session.
-            tid = int(self.words[1])
-            sender = "%s (Target)" % self.client_id
-            #logging.log(logging.VERBOSE_DEBUG, "participants:%s" % (",".join(self.participants)))
-	    self.recipient = ",".join(self.participants)
-            server = False
-        except ValueError:
-            # Message TO target
-            tid = 0
-            sender = self.words[1]
-            self.insert_user_data(sender,'url_enc_display_name',urllib.unquote(self.words[2]))
-            server = True
-	    self.recipient = "%s (Target)" % self.client_id
-        try:
-            #Cater for "text/x-msmsgsprofile; charset=UTF-8" by stripping charset
-            content_type = self.headers['content-type'].split(";")[0]
-            
-        except:
-            content_type = "unknown/unknown"
-            logging.log(logging.VERBOSE_DEBUG,"Couldn't figure out MIME type for this message: %s" % self.cmdline)
+            try:
+                ## If the second word is a transaction id (int) its a message from client to server.  ie. FROM target to all users in session.
+                tid = int(self.words[1])
+                sender = "%s (Target)" % self.client_id
+                #logging.log(logging.VERBOSE_DEBUG, "participants:%s" % (",".join(self.participants)))
+                self.recipient = ",".join(self.participants)
+                server = False
+            except ValueError:
+                # Message TO target
+                tid = 0
+                sender = self.words[1]
+                self.insert_user_data(sender,'url_enc_display_name',urllib.unquote(self.words[2]))
+                server = True
+                self.recipient = "%s (Target)" % self.client_id
+            try:
+                #Cater for "text/x-msmsgsprofile; charset=UTF-8" by stripping charset
+                content_type = self.headers['content-type'].split(";")[0]
 
-        ## Now dispatch the relevant handler according to the content
-        ## type:
-        try:
-            ct = content_type.split(';')[0]
-            self.ct_dispatcher[ct](self,content_type,sender,server)
-        except KeyError,e:
-            logging.log(logging.VERBOSE_DEBUG, "Unable to handle content-type %s(%s) - ignoring message %s " % (content_type,e,tid))
+            except:
+                content_type = "unknown/unknown"
+                logging.log(logging.VERBOSE_DEBUG,"Couldn't figure out MIME type for this message: %s" % self.cmdline)
+
+            ## Now dispatch the relevant handler according to the content
+            ## type:
+            try:
+                ct = content_type.split(';')[0]
+                self.ct_dispatcher[ct](self,content_type,sender,server)
+            except KeyError,e:
+                logging.log(logging.VERBOSE_DEBUG, "Unable to handle content-type %s(%s) - ignoring message %s " % (content_type,e,tid))
         self.state = "MSG"
 	
 from HTMLParser import HTMLParser

@@ -1,0 +1,4 @@
+#Usage: pyflash -c reset_case.flash -p case:mycasename
+execute Case\ Management.Remove\ case remove_case=%(case)s
+execute Case\ Management.Create\ new\ case create_case=%(case)s
+

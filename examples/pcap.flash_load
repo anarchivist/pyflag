@@ -1,0 +1,8 @@
+#Load up my pcap into flag ready for scanning
+#Usage: pyflash -c pcap.flash_load -p case:mycasename,iosource:blah,iofilename:/path/to/blah.pcap,mountpoint:/blah/blah.pcap
+
+set case=%(case)s
+
+execute Load\ Data.Load\ IO\ Data\ Source iosource=%(iosource)s subsys=standard io_filename=%(iofilename)s io_offset=0
+
+execute Load\ Data.Load\ Filesystem\ image iosource=%(iosource)s fstype=PCAP\ Filesystem mount_point=%(mountpoint)s

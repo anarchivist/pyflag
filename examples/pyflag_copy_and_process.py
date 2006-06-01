@@ -224,12 +224,18 @@ class Logfile(CaseDateDir):
 
 class FlagFeeder:
     """This class feeds data through pyflag using pyflash"""
-    def pcap(self,source,pyflashconf,casename,error_log_dir,handler):
+    def pcap_load(self,source,pyflashconf,casename,handler):
+        """
+        Load all the pcaps into the flag fs
+
+        """
         errors=0
         #For each pcap in the directory given, run it through flag
         for files in source.list:
-            local_file_for_processing = re.sub(r"[\_\-\.]","",os.path.basename(files))
-            pyflash_log_file=os.path.join(os.path.dirname(log.path), casename + "_" + date.current + "_" + local_file_for_processing + ".pyflag_log")
+            
+            #use the stripped path name as our iosource so we can easily identify file we are looking at
+            local_file_for_processing = self.get_io_source(files)
+            pyflash_log_file=os.path.join(os.path.dirname(log.path), casename + "_" + date.current + "_" + local_file_for_processing + ".pcap_load")
             log.write("Pyflash logfile: " + pyflash_log_file)
 
             if (options.casenameunique):
@@ -238,32 +244,54 @@ class FlagFeeder:
                 thiscase=casename
             
             log.write("%s -c %s -p case:%s,iosource:%s,iofilename:%s,mountpoint:%s &> %s" % (options.flashpath,pyflashconf,thiscase,local_file_for_processing,files,re.sub(r"[\_\-\.]","",os.path.normpath(files)),pyflash_log_file))
-            os.system("%s -c %s -p case:%s,iosource:%s,iofilename:%s,mountpoint:%s &> %s" % (options.flashpath,pyflashconf,thiscase,local_file_for_processing,files,re.sub(r"[\_\-\.]","",os.path.normpath(files)),pyflash_log_file))
-            #log.write("%s -c %s -p case:%s,iosource:%s,iofilename:%s,mountpoint:%s" % (options.flashpath,pyflashconf,thiscase,local_file_for_processing,files,re.sub(r"[\_\-\.]","",os.path.normpath(files))))
-            #os.system("%s -c %s -p case:%s,iosource:%s,iofilename:%s,mountpoint:%s" % (options.flashpath,pyflashconf,thiscase,local_file_for_processing,files,re.sub(r"[\_\-\.]","",os.path.normpath(files))))
-
-            if self.success(pyflash_log_file):
-                pass
-            else:
-                #Pyflash run did not complete sucessfully, copy the pyflash log to the location specified by --errorlogdir
-                log.write("Errors recorded in " + pyflash_log_file + " moved to: " + error_log_dir)
-                log_file=Local(pyflash_log_file)
-                log_dest=handler.create(error_log_dir)
-                log_file.move(log_dest)
-                errors +=1
+            output=os.system("%s -c %s -p case:%s,iosource:%s,iofilename:%s,mountpoint:%s &> %s" % (options.flashpath,pyflashconf,thiscase,local_file_for_processing,files,re.sub(r"[\_\-\.]","",os.path.normpath(files)),pyflash_log_file))
+            
+            errors +=self.count_errors(pyflash_log_file,"Execution of Load Data.Load Filesystem image successful")
         return errors
 
-    def success(self,pyflash_log_file):
+    def pcap_scan(self,source,pyflashconf,casename,handler):
+        """
+        Scan the root of all loaded fs
+
+        """
+        
+        pyflash_log_file=os.path.join(os.path.dirname(log.path), casename + "_" + date.current + ".pcap_scan")
+        log.write("%s -c %s -p case:%s &> %s" % (options.flashpath,pyflashconf,casename,pyflash_log_file))
+        os.system("%s -c %s -p case:%s &> %s" % (options.flashpath,pyflashconf,casename,pyflash_log_file))
+        
+        return self.count_errors(pyflash_log_file,"Execution of Load Data.ScanFS successful")
+
+    def count_errors(self,pyflash_log_file,success_string):
         try:
             log_file = open(pyflash_log_file, "r")
         except IOError:
             print "Error opening file %s" % pyflash_log_file
         for line in log_file:
-            if (line.find("Execution of Load Data.ScanFS successful") >=0 ):
+            if (line.find(success_string) >=0 ):
                 log.write("Pyflash execution successful")
-                return 1
+                return 0
         log.write("Pyflash execution did not complete successfully")
-        return 0            
+        #Pyflash run did not complete sucessfully, copy the pyflash log to the location specified by --errorlogdir
+        log.write("Errors recorded in %s, moved to:%s" %(pyflash_log_file,os.path.join(options.errorlogdir,os.path.basename(pyflash_log_file))))
+        log_file=Local(pyflash_log_file)
+        log_dest=handler.create(options.errorlogdir)
+        log_file.move(log_dest)
+        return 1
+    
+    def get_io_source(self,file):
+        """
+        Convert a path into a sensible and hopefully unique IO
+        source. Don't want it to be too long for the db and for
+        readability.  Assume most interesting info (and uniqueness) is
+        in last 49 characters
+        
+        """
+        maxlength=49
+        thisfile = re.sub(r"[\_\-\.\/\\]","",os.path.normpath(file))
+        if len(thisfile) > maxlength:
+            return thisfile[len(thisfile)-maxlength:]
+        else:
+            return thisfile
 
 class LockFile:
     """Creates a lock file in the specified path to make sure we don't trash a previous instance of the program."""
@@ -315,7 +343,7 @@ handler=DataHandler()
 #Create our log object (must be called "log") as it is used globally to save passing as argument to everywhere.
 log=Logfile(options.tempdir)
 log.write("logfile created at " + log.path)
-
+errors=0
 
 try:
     #Make sure we don't trash a previous cron that is still processing.
@@ -342,8 +370,11 @@ try:
         #FLAG Processing
         log.write("########### Starting pyflag processing #########")
         flag_feeder=FlagFeeder()
-        flag_err=flag_feeder.pcap(local_data_store,options.pyflashconf,options.casename,options.errorlogdir,handler)
-        log.write("Flag processing completed with errors in %s files" % flag_err)
+        flag_err=flag_feeder.pcap_load(local_data_store,options.pyflashconf+"_load",options.casename,handler)
+        log.write("Flag loaded %s files with errors in %s files" % (num_files,flag_err))
+        flag_err=flag_feeder.pcap_scan(local_data_store,options.pyflashconf+"_scan",options.casename,handler)
+        log.write("Flag scanned all files with %s errors" % flag_err)
+        
 
         if ((options.backupdir) and (options.removedata)):
             #Backing up data
