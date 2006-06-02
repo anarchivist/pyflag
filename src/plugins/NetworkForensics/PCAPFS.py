@@ -267,7 +267,7 @@ class PCAPFile(File):
         else:
             self.size = 0
         
-        self.private_dbh.execute("select id,offset,link_type,ts_sec,length from pcap")
+        self.private_dbh.execute("select id,offset,link_type,ts_sec,length from pcap where id>%r" % int(self.size))
         self.iosource = fd
 
     def read(self,length=None):
@@ -279,14 +279,14 @@ class PCAPFile(File):
         ## Find out the offset in the file of the packet:
         row=self.private_dbh.fetch()
 
+        if not row:
+            self.readptr+=1
+            return '\x00'
+        
         ## Is this the row we were expecting?
         if row['id'] != self.readptr:
             self.private_dbh.execute("select id,offset,link_type,ts_sec,length from pcap where id=%r", self.readptr)
             row=self.private_dbh.fetch()
-
-        if not row:
-            self.readptr+=1
-            return '\x00'
 
         self.packet_offset = row['offset']
         self.fd.seek(row['offset'])
