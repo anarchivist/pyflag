@@ -262,7 +262,11 @@ class PCAPFile(File):
         self.private_dbh = dbh.clone()
         self.dbh.execute("select max(id) as max from pcap")
         row=self.dbh.fetch()
-        self.size = row['max']
+        if row['max']:
+            self.size = row['max']
+        else:
+            self.size = 0
+        
         self.private_dbh.execute("select id,offset,link_type,ts_sec,length from pcap")
         self.iosource = fd
 
