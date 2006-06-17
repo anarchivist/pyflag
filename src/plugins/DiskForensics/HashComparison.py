@@ -80,7 +80,7 @@ class MD5Scan(GenScanFactory):
             
             dbh_flag=DB.DBO(None)
             dbh_flag.check_index("NSRL_hashes","md5",4)
-            dbh_flag.execute("select filename,productcode from NSRL_hashes where md5=%r",self.m.digest())
+            dbh_flag.execute("select filename,productcode from NSRL_hashes where md5=%r limit 1",self.m.digest())
             nsrl=dbh_flag.fetch()
             if not nsrl: nsrl={}
 

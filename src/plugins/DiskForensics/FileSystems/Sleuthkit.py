@@ -36,7 +36,8 @@ class AutoFS(DBFS):
             )
                 
         self.dbh.MySQLHarness(string)
-        
+
+        return
         # now find all the 'unallocated' files
         self.dbh.execute("drop table if exists unallocated")
         self.dbh.execute("CREATE TABLE unallocated (`inode` VARCHAR(250) NOT NULL,`offset` BIGINT NOT NULL,`size` BIGINT NOT NULL)")
@@ -44,7 +45,7 @@ class AutoFS(DBFS):
         
         ## We ask the filesystem whats the blocksize - if we dont know, we use 1
         try:
-            self.dbh.execute("select value from meta where property='block_size'");
+            self.dbh.execute("select value from meta where property='block_size' limit 1");
             blocksize = int(self.dbh.fetch()["value"])
         except:
             blocksize = 1

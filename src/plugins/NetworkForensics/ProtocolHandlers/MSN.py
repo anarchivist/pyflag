@@ -134,7 +134,7 @@ class message:
             #name wasn't in participants for some reason, shouldn't really happen.
             pass
 
-    def insert_session_data(self,sender,recipient,type,tr_id=None,data=None,sessionid=None,p2pfile=None):
+    def insert_session_data(self,sender,recipient,type,tr_id=-99,data=None,sessionid=None,p2pfile=None):
         """
         Insert MSN session data.  A session id of -1 means we couldn't
         figure out what the session id was, but it matters to this

@@ -51,7 +51,7 @@ class IO_File(FileSystem.File):
 
         ## IO Sources may have block_size specified:
         try:
-            self.dbh.execute("select value from filesystems where iosource=%r and property='block_size'", self.name);
+            self.dbh.execute("select value from filesystems where iosource=%r and property='block_size' limit 1", self.name);
             self.block_size = int(self.dbh.fetch()["value"])
         except TypeError:
             pass

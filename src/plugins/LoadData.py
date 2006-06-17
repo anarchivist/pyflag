@@ -141,7 +141,7 @@ class LoadPresetLog(Reports.report):
         log = LogFile.get_loader(dbh, query['log_preset'],query.getarray('datafile'))
         
         ## Check to make sure that this table is not used by some other preset:
-        dbh.execute("select * from meta where property='log_preset_%s' and value!='%s'" ,
+        dbh.execute("select * from meta where property='log_preset_%s' and value!='%s' limit 1" ,
                     (query['table'],query['log_preset']))
         row=dbh.fetch()
         if row:

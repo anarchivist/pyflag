@@ -75,6 +75,37 @@ class DBExpander:
     def __repr__(self):
         return "'%s'"% escape(self.string)
 
+class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
+    """ This cursor combines client side and server side result storage.
+
+    We store a limited cache of rows client side, and fetch rows from
+    the server when needed.
+    """
+    ## Maximum size of client cache
+    cache_size = 10
+    
+    def __init__(self, connection):
+        MySQLdb.cursors.SSDictCursor.__init__(self, connection)
+        self._row_cache = []
+
+    def fetchone(self):
+        """ Updates the row cache if needed otherwise returns a single
+        row from it.
+        """
+        self._check_executed()
+        if len(self._row_cache)==0:
+            self._row_cache = list(self._fetch_row(self.cache_size))
+
+        try:
+            result = self._row_cache.pop(0)
+            self.rownumber = self.rownumber + 1
+            return result
+        except IndexError:
+            return None
+
+    def close(self):
+        self.connection = None
+
 class Pool(Queue):
     """ Pyflag needs to maintain multiple simulataneous connections to
     the database sometimes.  To avoid having to reconnect on each
@@ -114,26 +145,39 @@ class Pool(Queue):
         case=self.case
         try:
             #Try to connect over TCP
-            dbh = MySQLdb.Connect(user = config.DBUSER,
+            if config.STRICTSQL:
+                dbh = MySQLdb.Connect(user = config.DBUSER,
+                                      passwd = config.DBPASSWD,
+                                      db = case,
+                                      host=config.DBHOST,
+                                      port=config.DBPORT,
+                                      cursorclass=PyFlagCursor,
+                                      sql_mode="STRICT_ALL_TABLES",
+                                      conv = conv
+                                      )
+            else:
+                dbh = MySQLdb.Connect(user = config.DBUSER,
                                   passwd = config.DBPASSWD,
                                   db = case,
                                   host=config.DBHOST,
                                   port=config.DBPORT,
-                                  cursorclass=MySQLdb.cursors.DictCursor,
+                                  cursorclass=PyFlagCursor,
                                   conv = conv
                                   )
-            mysql_bin_string = "%s -f -u %r -p%r -h%s -P%s" % (config.MYSQL_BIN,config.USER,config.PASSWD,config.HOST,config.PORT)
+                
+            mysql_bin_string = "%s -f -u %r -p%r -h%s -P%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBHOST,config.DBPORT)
         except Exception,e:
-            #or maybe over the socket?
-##  The following is used for debugging to ensure we dont have any SQL errors:
-
-            if 0:
+            print e
+            ## or maybe over the socket?
+            ##  The following is used for debugging to ensure we dont
+            ##  have any SQL errors:
+            if config.STRICTSQL:
                 dbh = MySQLdb.Connect(user = config.DBUSER,
                                       passwd = config.DBPASSWD,
                                       db = case,
                                       unix_socket = config.DBUNIXSOCKET,
                                       sql_mode="STRICT_ALL_TABLES",
-                                      cursorclass=MySQLdb.cursors.DictCursor,
+                                      cursorclass=PyFlagCursor,
                                       conv = conv
                                       )
             else:
@@ -141,7 +185,7 @@ class Pool(Queue):
                                       passwd = config.DBPASSWD,
                                       db = case,
                                       unix_socket = config.DBUNIXSOCKET,
-                                      cursorclass=MySQLdb.cursors.DictCursor
+                                      cursorclass=PyFlagCursor
                                       )
 
             mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBUNIXSOCKET)
@@ -217,9 +261,23 @@ class DBO:
         #If anything went wrong we raise it as a DBError
         except Exception,e:
             str = "%s" % e
-            if not str.startswith('Records'):
-                raise DBError,e
+            if 'Commands out of sync' in str:
+                ## We terminate the current connection and reconnect
+                ## to the DB
+                del self.dbh
 
+                global db_connections
+                db_connections -=1
+
+                self.dbh,self.mysql_bin_string=DBH[self.case].connect()
+                self.cursor = self.dbh.cursor()
+
+                ## Redo the query with the new connection
+                return self.execute(query_str, params)
+                
+            elif not str.startswith('Records'):
+                raise DBError,e
+            
 
     def commit(self):
         self.cursor.connection.commit()

@@ -58,7 +58,7 @@ class ListLogFile(Reports.report):
     def display(self,query,result):
         result.heading("Log File in Table %s" % query['logtable'])            
         dbh = self.DBO(query['case'])
-        dbh.execute("select value from meta where property = 'log_preset_%s'",(query['logtable']))
+        dbh.execute("select value from meta where property = 'log_preset_%s' limit 1",(query['logtable']))
         row=dbh.fetch()
         try:
             log = LogFile.get_loader(dbh,row['value'],None)

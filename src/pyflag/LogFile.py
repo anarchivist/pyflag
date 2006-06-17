@@ -191,7 +191,7 @@ class Log:
                     self.fields[field_number]))
                 for row in self.dbh:
                     whois_id = Whois.lookup_whois(row['IP'])
-                    dbh_pyflag.execute("select * from whois where id=%r",(whois_id))
+                    dbh_pyflag.execute("select * from whois where id=%r limit 1",(whois_id))
                     row2=dbh_pyflag.fetch()
                     try:
                         dbh2.execute("insert into whois set IP=%r,country=%r,NetName=%r,whois_id=%r",(

@@ -56,7 +56,7 @@ class StreamFile(File):
 
 
         ## Fill in some vital stats
-        self.dbh.execute("select con_id, reverse, src_ip, dest_ip, src_port, dest_port, ts_sec from `connection_details` where inode=%r", inode)
+        self.dbh.execute("select con_id, reverse, src_ip, dest_ip, src_port, dest_port, ts_sec from `connection_details` where inode=%r limit 1", inode)
         row=self.dbh.fetch()
         if row:
             self.con_id = row['con_id']

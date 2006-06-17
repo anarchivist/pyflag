@@ -240,7 +240,7 @@ class IndexScan(GenScanFactory):
             #Store the stats table with the hits for the search
             pydbh = DB.DBO(None)
             for row in self.stats_count.iteritems():
-                pydbh.execute("select word,class from dictionary where id=%s",row[0])
+                pydbh.execute("select word,class from dictionary where id=%s limit 1",row[0])
                 class_hit=pydbh.fetch()
                 try:
                     self.dbh.execute("insert into LogicalIndexStats set id=%r,word=%r,class=%r,hits=%r",(row[0],class_hit['word'],class_hit['class'],row[1]))
@@ -286,7 +286,7 @@ class BuildDictionary(Reports.report):
                     raise DB.DBError("Class name is too short, minimum of 3 letter words are used as class names")
                 ## We only insert into the dictionary if the word is
                 ## not in there already:
-                dbh.execute("select * from dictionary where word=%r",(query['word']))
+                dbh.execute("select * from dictionary where word=%r limit 1",(query['word']))
                 row = dbh.fetch()
                 if not row:
                     dbh.execute("insert into dictionary set word=%r,class=%r,type=%r",(query['word'],query['class'],query['type']))
@@ -342,13 +342,13 @@ def resolve_offset(dbh, encoded_offset):
 
     As mentioned above the encoded offset includes a bit mask with block number. This makes the encoded offset unique within the entire image.
     """
-    dbh.execute("select (block_number <<%s) + (%r & ((1<<%s)-1)) as `Offset` from LogicalIndex where ( %r >>%s = block )",(BLOCKBITS,encoded_offset,BLOCKBITS,encoded_offset, BLOCKBITS))
+    dbh.execute("select (block_number <<%s) + (%r & ((1<<%s)-1)) as `Offset` from LogicalIndex where ( %r >>%s = block ) limit 1",(BLOCKBITS,encoded_offset,BLOCKBITS,encoded_offset, BLOCKBITS))
     row=dbh.fetch()
     return row['Offset']
 
 def resolve_inode(dbh, encoded_offset):
     """ Converts the encoded_offset to an Inode """
-    dbh.execute("select inode from LogicalIndex where block=%r>>%s",(encoded_offset, BLOCKBITS))
+    dbh.execute("select inode from LogicalIndex where block=%r>>%s limit 1",(encoded_offset, BLOCKBITS))
     row=dbh.fetch()
     return row['inode']
 
@@ -482,7 +482,7 @@ class SearchIndex(Reports.report):
         ## First is it already here? - This should not happen, since
         ## we will never be run again with the same set of data, but
         ## better be safe:
-        dbh.execute("select * from `LogicalIndexCache_reference` where query=%r",(canonicalised_query))
+        dbh.execute("select * from `LogicalIndexCache_reference` where query=%r limit 1",(canonicalised_query))
         row=dbh.fetch()
 
         ## The cache table already exists, we dont need to do anything.
@@ -491,7 +491,7 @@ class SearchIndex(Reports.report):
         ## We start off by isolating offset ranges of interest
         for word in query.getarray('keyword'):
             temp_table = dbh.get_temp()
-            pyflag_dbh.execute("select id from dictionary where word=%r",(word))
+            pyflag_dbh.execute("select id from dictionary where word=%r limit 1",(word))
             row=pyflag_dbh.fetch()
             word_id = row['id']
             word_ids.append(word_id)
@@ -530,7 +530,7 @@ class SearchIndex(Reports.report):
 
         ## This should be here because we create it in the analyse
         ## method.
-        dbh.execute("select * from `LogicalIndexCache_reference` where  query=%r",(canonicalised_query))
+        dbh.execute("select * from `LogicalIndexCache_reference` where  query=%r limit 1",(canonicalised_query))
         row=dbh.fetch()
         cache_id=row['id']
         
@@ -543,7 +543,7 @@ class SearchIndex(Reports.report):
 
         words = []
         for word in offset_columns:
-            pydbh.execute("select word,id from dictionary where id=%r" % word[len("offset_"):])
+            pydbh.execute("select word,id from dictionary where id=%r limit 1" % word[len("offset_"):])
             row=pydbh.fetch()
             words.append(row['word'])
 

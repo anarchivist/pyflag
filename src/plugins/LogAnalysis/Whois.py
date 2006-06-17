@@ -75,7 +75,7 @@ def identify_network(whois_id):
     """ Returns a uniq netname/country combination """
     dbh = DB.DBO(None)
     dbh.check_index("whois","id")
-    dbh.execute("select netname,country from whois where id=%r" , (whois_id))
+    dbh.execute("select netname,country from whois where id=%r limit 1" , (whois_id))
     row = dbh.fetch()
     try:
         return "%s/%s" % (row['country'],row['netname'])
@@ -103,7 +103,7 @@ class LookupIP(Reports.report):
         # lookup IP address and show a nice summary of Whois Data
         dbh = self.DBO(None)
         dbh.check_index("whois","id")
-        dbh.execute("SELECT INET_NTOA(start_ip) as start_ip, numhosts, country, descr, remarks, adminc, techc, status from whois where id=%s",whois_id)
+        dbh.execute("SELECT INET_NTOA(start_ip) as start_ip, numhosts, country, descr, remarks, adminc, techc, status from whois where id=%s limit 1",whois_id)
         res = dbh.fetch()
         
         for name in res.keys():

@@ -181,7 +181,7 @@ class DBFS(FileSystem):
         self.case = case
         self.dbh = DB.DBO(case)
         try:
-            self.dbh.execute("select value from meta where property='block_size'");
+            self.dbh.execute("select value from meta where property='block_size' limit 1");
             self.blocksize = int(self.dbh.fetch()["value"])
         except:
             self.blocksize = 1024
@@ -269,7 +269,7 @@ class DBFS(FileSystem):
         for d in range(1,len(dirs)):
             path = "/".join(dirs[:d])+"/"
             path = FlagFramework.normpath(path)
-            self.dbh.execute("select * from file where path=%r and name=%r and mode='d/d'",(path, dirs[d]))
+            self.dbh.execute("select * from file where path=%r and name=%r and mode='d/d' limit 1",(path, dirs[d]))
             if not self.dbh.fetch():
                 self.dbh.execute("insert into file set inode='',path=%r,name=%r,status='alloc',mode='d/d'",(path,dirs[d]))
 
@@ -342,13 +342,13 @@ class DBFS(FileSystem):
             if dir == '/':
                 dir = ''
 
-            self.dbh.execute("select inode from file where path=%r and (name=%r or name=concat(%r,'/')) and inode!=''", (dir+'/',name,name))
+            self.dbh.execute("select inode from file where path=%r and (name=%r or name=concat(%r,'/')) and inode!='' limit 1", (dir+'/',name,name))
             res = self.dbh.fetch()
             if not res:
                 return None
             return res["inode"]
         else:
-            self.dbh.execute("select concat(path,name) as path from file where inode=%r order by status", (inode))
+            self.dbh.execute("select concat(path,name) as path from file where inode=%r order by status limit 1", (inode))
             res = self.dbh.fetch()
             if not res:
                 return None
@@ -359,7 +359,7 @@ class DBFS(FileSystem):
             inode = self.lookup(path)
         if not inode:
             return None
-        self.dbh.execute("select inode, status, uid, gid, mtime as mtime_epoch, from_unixtime(mtime) as `mtime`, atime as atime_epoch, from_unixtime(atime) as `atime`, ctime as ctime_epoch, from_unixtime(ctime) as `ctime`, from_unixtime(dtime) as `dtime`, mode, links, link, size from inode where inode=%r",(inode))
+        self.dbh.execute("select inode, status, uid, gid, mtime as mtime_epoch, from_unixtime(mtime) as `mtime`, atime as atime_epoch, from_unixtime(atime) as `atime`, ctime as ctime_epoch, from_unixtime(ctime) as `ctime`, from_unixtime(dtime) as `dtime`, mode, links, link, size from inode where inode=%r limit 1",(inode))
         return self.dbh.fetch()
 
     def isdir(self,directory):
@@ -367,7 +367,7 @@ class DBFS(FileSystem):
         if directory=='/': return 1
         
         dirname=FlagFramework.normpath(os.path.dirname(directory)+'/')
-        self.dbh.execute("select mode from file where path=%r and name=%r and mode like 'd%%' ",(dirname,os.path.basename(directory)))
+        self.dbh.execute("select mode from file where path=%r and name=%r and mode like 'd%%' limit 1",(dirname,os.path.basename(directory)))
         row=self.dbh.fetch()
         if row:
             return 1
@@ -376,7 +376,7 @@ class DBFS(FileSystem):
         
     def exists(self,path):
         dir,file=os.path.split(path)
-        self.dbh.execute("select mode from file where path=%r and name=%r",(dir,file))
+        self.dbh.execute("select mode from file where path=%r and name=%r limit 1",(dir,file))
         row=self.dbh.fetch()
         if row:
             return 1
@@ -605,10 +605,10 @@ class File:
 
     def stat(self):
         """ Returns a dict of statistics about the content of the file. """
-        self.dbh.execute("select inode, status, uid, gid, mtime as mtime_epoch, from_unixtime(mtime) as `mtime`, atime as atime_epoch, from_unixtime(atime) as `atime`, ctime as ctime_epoch, from_unixtime(ctime) as `ctime`, from_unixtime(dtime) as `dtime`, mode, links, link, size from inode where inode=%r",(self.inode))
+        self.dbh.execute("select inode, status, uid, gid, mtime as mtime_epoch, from_unixtime(mtime) as `mtime`, atime as atime_epoch, from_unixtime(atime) as `atime`, ctime as ctime_epoch, from_unixtime(ctime) as `ctime`, from_unixtime(dtime) as `dtime`, mode, links, link, size from inode where inode=%r limit 1",(self.inode))
         stats = self.dbh.fetch()
 
-        self.dbh.execute("select * from file where inode=%r", self.inode)
+        self.dbh.execute("select * from file where inode=%r limit 1", self.inode)
         try:
             stats.update(self.dbh.fetch())
         except:

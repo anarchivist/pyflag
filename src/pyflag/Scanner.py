@@ -248,7 +248,7 @@ class StoreAndScanType(StoreAndScan):
         try:
             mime_type = metadata['mime']
         except KeyError:
-            self.dbh.execute("select mime from type where inode=%r",(self.inode))
+            self.dbh.execute("select mime from type where inode=%r limit 1",(self.inode))
             row=self.dbh.fetch()
             if row:
                 mime_type = row['mime']
@@ -305,7 +305,7 @@ def scanfile(ddfs,fd,factories):
     #by checking the inode table.  Note that we still pass the full
     #list of factories to the Scan class so that it may invoke all of
     #the scanners on new files it discovers.
-    ddfs.dbh.execute("select scanner_cache from inode where inode=%r", fd.inode);
+    ddfs.dbh.execute("select scanner_cache from inode where inode=%r limit 1", fd.inode);
     row=ddfs.dbh.fetch()
     try:
         scanners_run =row['scanner_cache'].split(',')

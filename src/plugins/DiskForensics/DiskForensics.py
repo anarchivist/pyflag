@@ -284,7 +284,7 @@ class DBFS_file(FileSystem.File):
         if not self.index:
             # fetch inode data
             self.dbh.check_index("inode" ,"inode")
-            self.dbh.execute("select * from inode where inode=%r", (self.inode))
+            self.dbh.execute("select * from inode where inode=%r limit 1", (self.inode))
             self.data = self.dbh.fetch()
             if not self.data:
                 raise IOError("Could not locate inode %s"% self.inode)
@@ -308,7 +308,7 @@ class DBFS_file(FileSystem.File):
         if not self.blocks:
             # now try to find blocks in the resident table
             self.dbh.check_index("resident","inode")
-            self.dbh.execute("select data from resident where inode=%r" % (self.data['inode']));
+            self.dbh.execute("select data from resident where inode=%r limit 1" % (self.data['inode']));
             row = self.dbh.fetch()
             if not row:
                 raise IOError("Cant find any file data")
@@ -388,7 +388,7 @@ class MountedFS_file(FileSystem.File):
         dbh = DB.DBO(case)
         self.dbh=dbh
         self.dbh.check_index("file" ,"inode")
-        dbh.execute("select path,name from file where inode=%r",(inode))
+        dbh.execute("select path,name from file where inode=%r limit 1",(inode))
         row=self.dbh.fetch()
         path=row['path']+"/"+row['name']
         self.fd=open(fd.mount_point+'/'+path,'r')
@@ -423,7 +423,7 @@ class Unallocated_File(FileSystem.File):
         FileSystem.File.__init__(self, case, fd, inode, dbh)
         self.fd=fd
         self.dbh = DB.DBO(case)
-        self.dbh.execute("select * from unallocated where inode=%r",(inode))
+        self.dbh.execute("select * from unallocated where inode=%r limit 1",(inode))
         row=self.dbh.fetch()
         try:
             self.size=row['size']

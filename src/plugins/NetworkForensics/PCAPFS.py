@@ -164,7 +164,7 @@ class PCAPFS(DBFS):
         def Callback(s):
             ## Find the mtime of the first packet in the stream:
             try:
-                self.dbh.execute("select ts_sec from pcap where id=%r",
+                self.dbh.execute("select ts_sec from pcap where id=%r limit 1",
                                  s['packets'][0])
                 row = self.dbh.fetch()
                 mtime = row['ts_sec']
@@ -316,7 +316,7 @@ class ViewDissectedPacket(Reports.report):
 
     def display(self,query,result):
         dbh = DB.DBO(query['case'])
-        dbh.execute("select * from pcap where id=%r", query['id'])
+        dbh.execute("select * from pcap where id=%r limit 1", query['id'])
         row=dbh.fetch()
         
         io = IO.open(query['case'], row['iosource'])

@@ -120,7 +120,7 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                 def pane_cb(branch,table):
                     path = FlagFramework.normpath('/'.join(branch))
                     tmp=result.__class__(result)
-                    dbh.execute("select from_unixtime(modified) as time from reg where path=%r",(path))
+                    dbh.execute("select from_unixtime(modified) as time from reg where path=%r limit 1",(path))
                     row=dbh.fetch()
 
                     try:
@@ -179,7 +179,7 @@ class BrowseRegistryKey(BrowseRegistry):
 
         def hexdump(query,out):
             """ Show the hexdump for the key """
-            dbh.execute("select value from reg where path=%r and reg_key=%r",(path,key))
+            dbh.execute("select value from reg where path=%r and reg_key=%r limit 1",(path,key))
             row=dbh.fetch()
             if row:
                 FlagFramework.HexDump(row['value'],out).dump()

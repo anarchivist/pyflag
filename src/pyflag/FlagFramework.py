@@ -333,7 +333,7 @@ class Flag:
         """ Checks the database to see if the report has been cached """
         try:
             dbh = DB.DBO(query['case'])
-            dbh.execute("select * from meta where property=%r and value=%r",("report_executed",canonicalise(query)))
+            dbh.execute("select * from meta where property=%r and value=%r limit 1",("report_executed",canonicalise(query)))
             if dbh.fetch():
                 return True
         except:
