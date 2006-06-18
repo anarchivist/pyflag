@@ -111,7 +111,7 @@ hfs_is_bit_b_alloc(uint32_t b, uint8_t * alloc_file)
 
 
 /* return the offset into the image that btree node 'node' is at */
-DADDR_T
+OFF_T
 hfs_cat_find_node_offset(HFS_INFO * hfs, int nodenum)
 {
     FS_INFO *fs = (FS_INFO *) & (hfs->fs_info);

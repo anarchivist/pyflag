@@ -6,7 +6,6 @@
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2004-2005 Brian Carrier.  All rights reserved
 */
-
 #ifndef _TSK_TYPES_H
 #define _TSK_TYPES_H
 

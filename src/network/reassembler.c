@@ -38,9 +38,6 @@ static PyObject *New_Stream_Dict(TCPStream tcp_stream, char *direction) {
 		   talloc_asprintf(tcp_stream, "%sS%u", 
 				   prefix, tcp_stream->con_id));
 
-  if(!file) 
-    return PyErr_Format(PyExc_RuntimeError, "Unable to create cache files in prefix %s",prefix);
-
   tcp_stream->file = file;
 
   /** Store important information about the connection here: */
@@ -107,7 +104,11 @@ static int add_packet(TCPStream self, IP ip) {
     return 0;
  
   /** Write the data into the cache file: */
-  self->file->super.write((StringIO)self->file, tcp->packet.data, tcp->packet.data_len);
+  if(self->file->super.write((StringIO)self->file, tcp->packet.data, tcp->packet.data_len)<0) {
+    PyErr_Format(PyExc_RuntimeError, "Unable to create or write to cache file %s",self->file->filename);
+    return NULL;
+  };
+;
 
   return 1;
 };

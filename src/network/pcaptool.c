@@ -49,7 +49,7 @@ struct packet_data_t {
   int encap;
 };
 
-#define MAX_BUFF_SIZE 1024
+#define MAX_BUFF_SIZE 500
 
 static struct packet_data_t buffer[MAX_BUFF_SIZE+1];
 static int buffer_count=0;
@@ -64,13 +64,13 @@ void print_buffer(char *tableName) {
   int i;
   struct packet_data_t *p=buffer;
 
-  printf("INSERT INTO `%s` VALUES (Null,'%s',%lu,%u,%lu,%lu,%u)",tableName,iosource_name,
+  printf("INSERT INTO `%s` (iosource,offset, length,ts_sec, ts_usec, link_type) VALUES ('%s',%lu,%u,%lu,%lu,%u)",tableName,iosource_name,
 	 p->data_offset, p->caplen,p->sec,p->usec,p->encap);
 
   for(i=1;i<buffer_count;i++) {
     p=&buffer[i];
 
-    printf(",(Null,'%s',%lu,%u,%lu,%lu,%u)", 
+    printf(",('%s',%lu,%u,%lu,%lu,%u)", 
 	   iosource_name, p->data_offset, p->caplen,p->sec,p->usec,p->encap);
   };
   printf(";\n");

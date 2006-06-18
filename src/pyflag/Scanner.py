@@ -296,7 +296,6 @@ def scanfile(ddfs,fd,factories):
     @arg factories: A list of scanner factories to use when scanning the file.
     """
     stat = fd.stat()
-    logging.log(logging.DEBUG,"Scanning file %s%s (inode %s)" % (stat['path'],stat['name'],stat['inode']))
 
     buffsize = 1024 * 1024
     # instantiate a scanner object from each of the factory. We only
@@ -310,6 +309,7 @@ def scanfile(ddfs,fd,factories):
     try:
         scanners_run =row['scanner_cache'].split(',')
     except:
+        ## This is not a valid inode, we skip it:
         scanners_run = []
 
     objs = []
@@ -317,12 +317,14 @@ def scanfile(ddfs,fd,factories):
         if c.__class__.__name__ not in scanners_run:
             objs.append(c.Scan(fd.inode,ddfs,c,factories=factories,fd=fd))
     
-    if not objs: return
+    if len(objs)==0: return
 
     ## This dict stores metadata about the file which may be filled in
     ## by some scanners in order to indicate some fact to other
     ## scanners.
     metadata = {}
+
+    logging.log(logging.DEBUG,"Scanning file %s%s (inode %s)" % (stat['path'],stat['name'],stat['inode']))
 
     while 1:
         ## If the file is too fragmented, we skip it because it might take too long... NTFS is a shocking filesystem, with some files so fragmented that it takes a really long time to read them. In our experience these files are not important for scanning so we disable them here. Maybe this should be tunable?

@@ -1,4 +1,4 @@
-AM_CFLAGS = -I$(srcdir)/../auxtools -DLINUX2
+AM_CFLAGS = -I$(srcdir)/../auxtools -DLINUX2 -include config.h
 
 noinst_PROGRAMS		= img_stat
 noinst_LTLIBRARIES 	= libimgtools.la

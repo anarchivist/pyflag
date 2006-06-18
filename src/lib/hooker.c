@@ -23,7 +23,6 @@
 #include "hooker.h"
 #include "iosubsys.h"
 #include "except.h"
-//#include <fcntl.h>
 
 #define O_RDONLY 0
 
@@ -222,6 +221,8 @@ off_t lseek(int fildes, off_t offset, int whence) {
     } else if(whence==SEEK_CUR) {
       iosources[fildes]->fpos += offset;
     };
+
+    if(offset<0) iosources[fildes]->fpos=0;
     return iosources[fildes]->fpos;
   };
 };

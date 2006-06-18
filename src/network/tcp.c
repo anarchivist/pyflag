@@ -34,7 +34,7 @@ void pad_to_first_packet(TCPStream self) {
   
   pad_length = tcp->packet.header.seq - self->next_seq;
   if(pad_length > 50000) {
-    printf("Needing to pad excessively, dropping data...\n");
+    //printf("Needing to pad excessively, dropping data...\n");
     self->next_seq = tcp->packet.header.seq;
     return;
   };
@@ -46,6 +46,8 @@ void pad_to_first_packet(TCPStream self) {
     
     tcp->packet.data_len+=pad_length;
     tcp->packet.data = new_data;
+
+    //printf("Forced to pad by %d bytes in stream %d\n",pad_length, self->con_id);
   } else if(pad_length<0) {
     tcp->packet.data_len -= -pad_length;
     tcp->packet.data += -pad_length;
@@ -60,8 +62,6 @@ void pad_to_first_packet(TCPStream self) {
   
   /** Call our callback with this */
   if(self->callback) self->callback(self, first->packet);
-  
-  printf("Forced to pad by %d bytes in stream %d\n",pad_length, self->con_id);
   
   list_del(&(first->list));
   talloc_free(first);
@@ -388,7 +388,7 @@ int TCPHashTable_process_tcp(TCPHashTable self, IP ip) {
   i->add(i, ip);
 
   self->packets_processed++;
-  if(self->packets_processed > 10*MAX_PACKETS_EXPIRED) {
+  if(self->packets_processed > 2*MAX_PACKETS_EXPIRED) {
     check_for_expired_packets(self,ip->id);
     self->packets_processed=0;
   };
@@ -407,6 +407,8 @@ static int DiskStreamIO_flush(void *self) {
   DiskStreamIO this=(DiskStreamIO)self;
   int fd;
 
+  if(this->super.size==0) return 0;
+
   fd=open(this->filename, O_APPEND | O_WRONLY);
   if(fd) {
     write(fd, this->super.data, this->super.size);
@@ -419,28 +421,15 @@ static int DiskStreamIO_flush(void *self) {
 DiskStreamIO DiskStreamIO_Con(DiskStreamIO self, char *filename) {
   int fd;
 
-  /** Check to see if we can create the required file: */
-  fd=creat(filename, 0777);
-  if(fd>=0) {
-    /** It worked: */
-    close(fd);
+  /** Call our base classes constructor */
+  self->__super__->Con((StringIO)self);
+  
+  self->filename = talloc_strdup(self, filename);
 
-    /** Call our base classes constructor */
-    self->__super__->Con((StringIO)self);
+  /** Ensure that we get flushed out when we get destroyed */
+  talloc_set_destructor(self, DiskStreamIO_flush);
 
-    self->filename = talloc_strdup(self, filename);
-
-    /** Ensure that we get flushed out when we get destroyed */
-    talloc_set_destructor(self, DiskStreamIO_flush);
-
-    return self;
-  } else {
-    /** We failed: */
-
-    talloc_free(self);
-
-    return NULL;
-  };
+  return self;
 };
 
 int DiskStreamIO_write(StringIO self, char *data, int len) {
@@ -454,7 +443,14 @@ int DiskStreamIO_write(StringIO self, char *data, int len) {
   if(self->size > MAX_DISK_STREAM_SIZE) {
     int fd;
 
-    fd=open(this->filename, O_APPEND | O_WRONLY);
+    if(!this->created) {
+      /** Check to see if we can create the required file: */
+      fd=creat(this->filename, 0777);
+      this->created = 1;
+    } else {
+      fd=open(this->filename, O_APPEND | O_WRONLY);
+    };
+    
     if(!fd) return -1;
 
     write(fd, self->data, self->size);

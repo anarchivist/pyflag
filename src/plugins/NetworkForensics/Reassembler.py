@@ -91,6 +91,8 @@ class StreamFile(File):
         
         @return the new stream id.
         """
+        if len(stream_ids)<2: return
+        
         ## Store the new stream in the cache:
         self.dbh.execute("insert into `connection_details` set inode=%r",
                          (self.inode))
@@ -99,8 +101,11 @@ class StreamFile(File):
 
         fds = {}
         for s in stream_ids:
-            fds[int(s)] = open(FlagFramework.get_temp_path(
-                self.dbh.case, "%s|S%s" % (self.fd.inode, s)))
+            try:
+                fds[int(s)] = open(FlagFramework.get_temp_path(
+                    self.dbh.case, "%s|S%s" % (self.fd.inode, s)))
+            except IOError:
+                fds[int(s)] = -1
 
         out_fd = open(FlagFramework.get_temp_path(self.dbh.case,
                                                   self.inode),"w")
@@ -114,6 +119,8 @@ class StreamFile(File):
         for row in self.dbh:
             offset = out_fd.tell()
             fd=fds[row['con_id']]
+            if fd<0: continue
+            
             fd.seek(row['cache_offset']) 
             out_fd.write(fd.read(row['length']))
             self.dbh2.mass_insert(con_id=self.con_id,packet_id=row['packet_id'],
@@ -134,7 +141,6 @@ class StreamFile(File):
         fsfd = FileSystem.DBFS(self.dbh.case)
         inode = self.inode[:self.inode.rfind("|")] +"|S%s" % stream_ids[0]
         pathname = fsfd.lookup(inode = inode)
-        print self.inode ,pathname, inode
         fsfd.VFSCreate(None, self.inode, pathname)
 
     def get_packet_id(self, position=None):

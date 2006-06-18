@@ -29,6 +29,9 @@ CLASS(DiskStreamIO, StringIO)
      /** Total number of bytes written to the file so far */
      int written;
 
+     /** A Flag to indicate if we already created the file */
+     int created;
+
      DiskStreamIO METHOD(DiskStreamIO, Con, char *filename);
      int METHOD(DiskStreamIO, get_offset);
 END_CLASS

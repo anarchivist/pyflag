@@ -194,29 +194,8 @@ class ZipFile(File):
         # inode is the index into the namelist of the zip file (i hope this is consistant!!)
         # just read that file!
         parts = inode.split('|')
-        try:
-            ## This is a performance boost - We try to cache the
-            ## zipfile object in our parent - if its not done
-            ## previously so speed up future accesses to other files
-            ## within the zip file. This will ensure we only need to
-            ## decompress the file once instead of many times for each
-            ## zip member.
-            z = self.fd.zip_handle
-        except AttributeError:
-            try:
-                logging.log(logging.VERBOSE_DEBUG, "Decompressing Zip File %s" % fd.inode)
-                z = zipfile.ZipFile(fd,'r')
-                self.fd.zip_handle = z
-            except zipfile.BadZipfile,e:
-                raise IOError("Zip_File: (%s)" % e)
-            
-        try:
-            self.data = z.read(z.namelist()[int(parts[-1][1:])])
-        except (IndexError, KeyError, zipfile.BadZipfile),e:
-            raise IOError("Zip_File: (%s)" % e)
-        
-        self.readptr=0
-        self.size=len(self.data)
+        self.data = None
+        self.index = int(parts[-1][1:])
         
     def read(self,len=None):
         ## Call our baseclass to see if we have cached data:
@@ -224,6 +203,30 @@ class ZipFile(File):
             return File.read(self,len)
         except IOError:
             pass
+
+        if self.data==None:
+            try:
+                ## This is a performance boost - We try to cache the
+                ## zipfile object in our parent - if its not done
+                ## previously so speed up future accesses to other files
+                ## within the zip file. This will ensure we only need to
+                ## decompress the file once instead of many times for each
+                ## zip member.
+                z = self.fd.zip_handle
+            except AttributeError:
+                try:
+                    logging.log(logging.VERBOSE_DEBUG, "Decompressing Zip File %s" % fd.inode)
+                    z = zipfile.ZipFile(fd,'r')
+                    self.fd.zip_handle = z
+                except zipfile.BadZipfile,e:
+                    raise IOError("Zip_File: (%s)" % e)
+
+            try:
+                self.data = z.read(z.namelist()[self.index])
+            except (IndexError, KeyError, zipfile.BadZipfile),e:
+                raise IOError("Zip_File: (%s)" % e)
+
+            #self.size=len(self.data)
         
         if len:
             temp=self.data[self.readptr:self.readptr+len]

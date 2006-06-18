@@ -43,6 +43,7 @@ class SMTP:
         self.ddfs = ddfs
         self.dispatcher = {
             'EHLO': self.NOOP,
+            'HELO': self.NOOP,
             'MAIL': self.MAIL,
             'RCPT': self.RCPT,
             'DATA': self.DATA,

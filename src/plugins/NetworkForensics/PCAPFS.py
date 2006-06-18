@@ -179,6 +179,9 @@ class PCAPFS(DBFS):
                 mtime
                 ))
 
+            ## If the stream is empty we dont really want to record it.
+            if len(s['seq'])==0: return
+	    
             ## Create a new VFS node:
             if s['direction'] == "forward":
                 self.VFSCreate(
@@ -225,14 +228,14 @@ class PCAPFS(DBFS):
             self.fd.seek(row['offset'])
             data = self.fd.read(row['length'])
             d = _dissect.dissect(data,row['link_type'],
-                                  row['id'])
+                                 row['id'])
 
-            ## Now reassemble it:
+        ## Now reassemble it:
             try:
                 reassembler.process_packet(hashtbl, d, self.fd.name)
             except RuntimeError,e:
                 pass
-
+            
         # Finish it up
         reassembler.clear_stream_buffers(hashtbl);
 

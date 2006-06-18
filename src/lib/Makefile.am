@@ -1,4 +1,4 @@
-INCLUDES        	= -I$(top_srcdir)/src/include
+INCLUDES        	= -I$(top_srcdir)/src/include -include config.h 
 
 # main bin and lib targets
 #noinst_PROGRAMS		= open
