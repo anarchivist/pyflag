@@ -402,6 +402,23 @@ VIRTUAL(TCPHashTable, Object)
      VMETHOD(process) = TCPHashTable_process_tcp;
 END_VIRTUAL
 
+/** Create a new file, or if it already exists, open the file for writing.
+    Note - caller must close fd when done to ensure no fds are leaked.
+*/
+static int get_working_fd(DiskStreamIO this) {
+  int fd;
+
+  if(!this->created) {
+    /** Check to see if we can create the required file: */
+    fd=creat(this->filename, 0777);
+    this->created = 1;
+  } else {
+    fd=open(this->filename, O_APPEND | O_WRONLY);
+  };
+
+  return fd;
+};
+
 /** An automatic destructor to be called to flush out the stream. */
 static int DiskStreamIO_flush(void *self) {
   DiskStreamIO this=(DiskStreamIO)self;
@@ -409,8 +426,8 @@ static int DiskStreamIO_flush(void *self) {
 
   if(this->super.size==0) return 0;
 
-  fd=open(this->filename, O_APPEND | O_WRONLY);
-  if(fd) {
+  fd=get_working_fd(this);
+  if(fd>=0) {
     write(fd, this->super.data, this->super.size);
     close(fd);
   };
@@ -419,8 +436,6 @@ static int DiskStreamIO_flush(void *self) {
 };
 
 DiskStreamIO DiskStreamIO_Con(DiskStreamIO self, char *filename) {
-  int fd;
-
   /** Call our base classes constructor */
   self->__super__->Con((StringIO)self);
   
@@ -441,17 +456,9 @@ int DiskStreamIO_write(StringIO self, char *data, int len) {
 
   /** If we are too large, we flush to disk: */
   if(self->size > MAX_DISK_STREAM_SIZE) {
-    int fd;
-
-    if(!this->created) {
-      /** Check to see if we can create the required file: */
-      fd=creat(this->filename, 0777);
-      this->created = 1;
-    } else {
-      fd=open(this->filename, O_APPEND | O_WRONLY);
-    };
+    int fd=get_working_fd(this);
     
-    if(!fd) return -1;
+    if(fd==-1) return fd;
 
     write(fd, self->data, self->size);
 

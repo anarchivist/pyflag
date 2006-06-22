@@ -289,8 +289,12 @@ if __name__ == "__main__":
       file=file % asker
       for f in file.split('\n'):
           print "# %s" % f
-          process_line(f)
-                      
+          try:
+              process_line(f)
+          except Exception,e:
+              print "Unknown error: %r %s" % (e,e)
+              print FlagFramework.get_bt_string(e)
+                  
     else:
         while(1):
             try:
