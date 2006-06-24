@@ -58,8 +58,8 @@ class UnallocatedScan(GenScanFactory):
         default = True
         special_fs_name = 'AutoFS'
         
-    def reset(self):
-        GenScanFactory.reset(self)
+    def reset(self, inode):
+        GenScanFactory.reset(self, inode)
         self.dbh.execute("drop table if exists unallocated" )
 
     def prepare(self):

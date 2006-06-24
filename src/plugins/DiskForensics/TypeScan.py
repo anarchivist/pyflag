@@ -50,8 +50,8 @@ class TypeScan(Scanner.GenScanFactory):
         ## Create indexes on this table immediately because we need to select
         self.dbh.check_index('type','inode')
 
-    def reset(self):
-        Scanner.GenScanFactory.reset(self)
+    def reset(self,inode):
+        Scanner.GenScanFactory.reset(self, inode)
         self.dbh.execute("drop table if exists `type`")
 
     def destroy(self):

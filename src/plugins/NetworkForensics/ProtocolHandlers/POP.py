@@ -148,7 +148,7 @@ class POPScanner(StreamScannerFactory):
             `type` VARCHAR(255) NOT NULL
             ) """)
             
-    def reset(self):
+    def reset(self, inode):
         self.dbh.execute("delete from passwords where type='POP3'")
 
     def process_stream(self, stream, factories):

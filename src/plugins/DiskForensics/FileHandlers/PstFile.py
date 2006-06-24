@@ -75,12 +75,12 @@ class PstScan(GenScanFactory):
         self.dbh.execute("CREATE TABLE IF NOT EXISTS `journal` (`inode` VARCHAR(250), `startdate` DATETIME, `enddate` DATETIME, `type` VARCHAR(250), `comment` VARCHAR(250));")
 
 
-    def reset(self):
-        GenScanFactory.reset(self)
+    def reset(self, inode):
+        GenScanFactory.reset(self, inode)
         # reset the groupware tables, this should not be done here
         # if ever another scanner wants to use them also
         for name in ('email','contact','appointment','journal'):
-            self.dbh.execute("DROP TABLE `%s`;", (name))
+            self.dbh.execute("DROP TABLE if exists `%s`;", (name))
         
     def destroy(self):
         pass

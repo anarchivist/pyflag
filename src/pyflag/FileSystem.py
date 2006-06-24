@@ -320,7 +320,7 @@ class DBFS(FileSystem):
         elif(dirs == 0):
             mode=" and mode like 'r%'"
 
-        self.dbh.execute("select path,mode,inode,name from file where %s %s group by inode", (where, mode))
+        self.dbh.execute("select path,mode,inode,name from file where %s %s", (where, mode))
 
         ## This is done rather than return the generator to ensure that self.dbh does not get interfered with...
         result=[dent for dent in self.dbh]
@@ -686,48 +686,49 @@ class File:
         except KeyError:
             limit=0
 
-            self.seek(limit)
-            data = self.read(max+1)
+        self.seek(limit)
+        data = self.read(max+1)
+        
+        if (not data or len(data)==0):
+           result.text("No Data Available")
+           return result
 
-            cb(limit,data,result)
+        cb(limit,data,result)
 
-            #Do the navbar
-            new_query = query.clone()
-            previous=limit-max
-            if previous<0:
-                if limit>0:
-                    previous = 0
-                else:
-                    previous=None
-
-            if previous != None:
-                del new_query['hexlimit']
-                new_query['hexlimit']=previous
-                result.toolbar(text="Previous page", icon="stock_left.png",
-                               link = new_query )
+        #Do the navbar
+        new_query = query.clone()
+        previous=limit-max
+        if previous<0:
+            if limit>0:
+                previous = 0
             else:
-                result.toolbar(text="Previous page", icon="stock_left_gray.png")
+                previous=None
 
-            next=limit+max
-            ## If we did not read a full page, we do not display
-            ## the next arrow:
-            if len(data)>=max:
-                del new_query['hexlimit']
-                new_query['hexlimit']=next
-                result.toolbar(text="Next page", icon="stock_right.png",
-                               link = new_query )
-            else:
-                result.toolbar(text="Next page", icon="stock_right_gray.png")
-
-            ## Allow the user to skip to a certain page directly:
-            result.toolbar(
-                cb = FlagFramework.Curry(goto_page_cb, variable='hexlimit'),
-                text="Current Offset %s" % limit,
-                icon="stock_next-page.png"
-                )
-
+        if previous != None:
+            del new_query['hexlimit']
+            new_query['hexlimit']=previous
+            result.toolbar(text="Previous page", icon="stock_left.png",
+                           link = new_query )
         else:
-            result.text("No Data Available")
+            result.toolbar(text="Previous page", icon="stock_left_gray.png")
+
+        next=limit+max
+        ## If we did not read a full page, we do not display
+        ## the next arrow:
+        if len(data)>=max:
+            del new_query['hexlimit']
+            new_query['hexlimit']=next
+            result.toolbar(text="Next page", icon="stock_right.png",
+                           link = new_query )
+        else:
+            result.toolbar(text="Next page", icon="stock_right_gray.png")
+
+        ## Allow the user to skip to a certain page directly:
+        result.toolbar(
+            cb = FlagFramework.Curry(goto_page_cb, variable='hexlimit'),
+            text="Current Offset %s" % limit,
+            icon="stock_next-page.png"
+            )
 
         return result
 

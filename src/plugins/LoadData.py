@@ -370,7 +370,7 @@ class ResetScanners(ScanFS):
     description = "Reset Scanners ran on the VFS"
     order = 40
 
-    def analyse(self,query):
+    def display(self,query, result):
         dbh=DB.DBO(query['case'])
         fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'])
 
@@ -408,6 +408,12 @@ class ResetScanners(ScanFS):
         ## Reset the ScanFS reports from the database
         FlagFramework.reset_all(family = query['family'], report="ScanFS", case=query['case'])
 
+        ## Browse the filesystem instantly
+        result.refresh(0, FlagFramework.query_type((),case=query['case'],
+           family='Disk Forensics', report='BrowseFS',
+           open_tree = query['path'])
+                       )
+ 
 def get_default_fs_driver(query,sig):
     """ Try to guess a good default filesystem driver based on the magic """
     ## Only do this if one was not already supplied
@@ -440,7 +446,6 @@ class LoadFS(Reports.report):
             result.meta_selector(message='Select IO Data Source', case=query['case'], property='iosource')
             
             # initialise/open the subsystem
-            dbh = self.DBO(query['case'])
             fd=IO.open(query['case'],query['iosource'])
 
             fs_types = Registry.FILESYSTEMS.filesystems.keys()

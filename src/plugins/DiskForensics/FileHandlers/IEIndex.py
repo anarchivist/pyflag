@@ -49,8 +49,8 @@ class IEIndex(Scanner.GenScanFactory):
         `headers` TEXT)""")        
 #        self.dbh.MySQLHarness("pasco -t %s -g create " % (self.table))
 
-    def reset(self):
-        Scanner.GenScanFactory.reset(self)
+    def reset(self, inode):
+        Scanner.GenScanFactory.reset(self, inode)
         self.dbh.execute("DROP TABLE IF EXISTS history")
 #        self.dbh.MySQLHarness("pasco -t %s -g drop " % (self.table))
         

@@ -122,9 +122,7 @@ class GenericUI:
         values=[]
         try:
             dbh.execute(sql,parms)
-            while 1:
-                row = dbh.cursor.fetchone()
-                if not row: break
+            for row in dbh:
                 keys.append(row[key])
                 values.append(row[value])
 
@@ -163,7 +161,7 @@ class GenericUI:
 
     def meta_selector(self, case=config.FLAGDB,message='Select Value',property=None, **options):
         """ Present a selection box to select stuff from the meta table"""
-        self.selector(message,property,'select value,value from meta where property=%r group by value',(property),case=case, **options)
+        self.selector(message,property,'select value as `key`,value as `value` from meta where property=%r group by value',(property),case=case, **options)
         
     def tooltip(self,message):
         """ Renders the tooltip message each time the mouse hovers over this UI.

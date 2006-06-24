@@ -227,8 +227,17 @@ class Timeline(Reports.report):
         dbh.execute("insert into %s select i.inode,f.status,atime,0,1,0,0,concat(path,name) from inode as i left join file as f on i.inode=f.inode" % (temp_table,))
         dbh.execute("insert into %s select i.inode,f.status,ctime,0,0,1,0,concat(path,name) from inode as i left join file as f on i.inode=f.inode" % (temp_table, ))
         dbh.execute("insert into %s select i.inode,f.status,dtime,0,0,0,1,concat(path,name) from inode as i left join file as f on i.inode=f.inode" % (temp_table, ))
-        dbh.execute("create table if not exists mac select inode,status,time,sum(m) as `m`,sum(a) as `a`,sum(c) as `c`,sum(d) as `d`,name from %s where time>0 group by time,name order by time,name" %
-                    temp_table)
+        dbh.execute("""create table if not exists mac(
+        `inode` varchar(250) NOT NULL default '',
+        `status` varchar(8) default '',
+        `time` int(11) default NULL,
+        `m` int default NULL,
+        `a` tinyint default NULL,
+        `c` tinyint default NULL,
+        `d` tinyint default NULL,
+        `name` text
+        ) """)
+        dbh.execute("insert into mac select inode,status,time,sum(m) as `m`,sum(a) as `a`,sum(c) as `c`,sum(d) as `d`,name from %s where time>0 group by time,name order by time,name" % temp_table)
         dbh.check_index("mac","inode")
         
     def progress(self, query, result):

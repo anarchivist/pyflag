@@ -187,7 +187,7 @@ class HTTPScanner(StreamScannerFactory):
         self.dbh.check_index("http", "inode")
         self.dbh.check_index("http", "url")
         
-    def reset(self):
+    def reset(self, inode):
         self.dbh.execute("drop table if exists http")
 
     def process_stream(self, stream, factories):

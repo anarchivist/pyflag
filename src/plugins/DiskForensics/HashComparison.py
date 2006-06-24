@@ -50,8 +50,8 @@ class MD5Scan(GenScanFactory):
         `NSRL_filename` varchar(60) not NULL default ''
         )""")
 
-    def reset(self):
-        GenScanFactory.reset(self)
+    def reset(self, inode):
+        GenScanFactory.reset(self, inode)
         self.dbh.execute("drop table `md5`")
 
     def destroy(self):

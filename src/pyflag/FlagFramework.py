@@ -336,7 +336,7 @@ class Flag:
             dbh.execute("select * from meta where property=%r and value=%r limit 1",("report_executed",canonicalise(query)))
             if dbh.fetch():
                 return True
-        except:
+        except Exception,e:
             pass
         
         return False

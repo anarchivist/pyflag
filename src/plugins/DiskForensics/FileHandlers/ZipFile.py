@@ -215,8 +215,8 @@ class ZipFile(File):
                 z = self.fd.zip_handle
             except AttributeError:
                 try:
-                    logging.log(logging.VERBOSE_DEBUG, "Decompressing Zip File %s" % fd.inode)
-                    z = zipfile.ZipFile(fd,'r')
+                    logging.log(logging.VERBOSE_DEBUG, "Decompressing Zip File %s" % self.fd.inode)
+                    z = zipfile.ZipFile(self.fd,'r')
                     self.fd.zip_handle = z
                 except zipfile.BadZipfile,e:
                     raise IOError("Zip_File: (%s)" % e)

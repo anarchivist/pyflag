@@ -71,8 +71,8 @@ class VirScan(GenScanFactory):
     def destroy(self):
         self.dbh.check_index('virus','inode')
 
-    def reset(self):
-        GenScanFactory.reset(self)
+    def reset(self, inode):
+        GenScanFactory.reset(self, inode)
         self.dbh.execute('drop table virus')
 
     class Scan(MemoryScan):

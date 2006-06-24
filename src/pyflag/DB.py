@@ -45,7 +45,6 @@ conv = { FIELD_TYPE.LONG: long,
          FIELD_TYPE.INT24: long,
          FIELD_TYPE.LONGLONG: long,
          FIELD_TYPE.TINY: int,
-         FIELD_TYPE.TIMESTAMP: long
          }
 
 def escape(string):

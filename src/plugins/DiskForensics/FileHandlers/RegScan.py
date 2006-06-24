@@ -40,9 +40,9 @@ class RegistryScan(GenScanFactory):
         GenScanFactory.__init__(self, fsfd)
         self.dbh.MySQLHarness("regtool -t reg -d create")
 
-    def reset(self):
-        GenScanFactory.reset(self)
-        self.dbh.MySQLHarness("regtool -t reg -d drop")
+    def reset(self, inode):
+        GenScanFactory.reset(self, inode)
+        self.dbh.execute('drop table if exists reg')
         self.dbh.execute('drop table if exists regi')
         
     def destroy(self):
