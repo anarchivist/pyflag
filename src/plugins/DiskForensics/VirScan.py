@@ -69,7 +69,7 @@ class VirScan(GenScanFactory):
         self.scanner=VScan()
 
     def destroy(self):
-        self.dbh.execute('ALTER TABLE virus ADD INDEX(inode)')
+        self.dbh.check_index('virus','inode')
 
     def reset(self):
         GenScanFactory.reset(self)

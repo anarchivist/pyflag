@@ -320,7 +320,7 @@ class DBFS(FileSystem):
         elif(dirs == 0):
             mode=" and mode like 'r%'"
 
-        self.dbh.execute("select path,mode,inode,name from file where %s %s", (where, mode))
+        self.dbh.execute("select path,mode,inode,name from file where %s %s group by inode", (where, mode))
 
         ## This is done rather than return the generator to ensure that self.dbh does not get interfered with...
         result=[dent for dent in self.dbh]
