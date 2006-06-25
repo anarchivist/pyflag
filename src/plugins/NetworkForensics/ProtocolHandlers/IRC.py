@@ -6,7 +6,7 @@
 #   Added recipient column to table
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.80.1 Date: Tue Jan 24 13:51:25 NZDT 2006$
+#  Version: FLAG $Version: 0.82 Date: Sat Jun 24 23:38:33 EST 2006$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or

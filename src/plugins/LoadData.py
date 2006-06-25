@@ -9,7 +9,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.80.1 Date: Tue Jan 24 13:51:25 NZDT 2006$
+#  Version: FLAG $Version: 0.82 Date: Sat Jun 24 23:38:33 EST 2006$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -327,6 +327,7 @@ class ScanFS(Reports.report):
                     Scanner.scanfile(fsfd,fd,scanners)
                 except IOError,e:
                     logging.log(logging.WARNINGS,"Unable to open file %s%s: %s" % (stat['path'],stat['name'],e))
+                    print FlagFramework.get_bt_string(e)
                 except Exception,e:
                     logging.log(logging.ERRORS,"Error scanning inode %s: %s" % (stat['inode'],e))
                     
@@ -358,7 +359,7 @@ class ScanFS(Reports.report):
            family='Disk Forensics', report='BrowseFS',
            open_tree = query['path'])
                        )
-
+ 
 class ResetScanners(ScanFS):
     """ This report will reset the specified scanners.
 
@@ -469,6 +470,7 @@ class LoadFS(Reports.report):
         except IOError,e:
             result.text("IOError %s" % e,color='red')
         except (KeyError,TypeError),e:
+#            print e
 #            FlagFramework.get_traceback(e,result)
             pass
 

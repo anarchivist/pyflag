@@ -33,7 +33,7 @@ libtcp_la_SOURCES	= tcp.c
 libtcp_la_CPPFLAGS	= -D__DEBUG__
 #libtcp_la_LIBADD	= libnetwork.la
 
-noinst_HEADERS		= network.h
+noinst_HEADERS		= network.h tcp.h
 
 dissect.c: init.h
 

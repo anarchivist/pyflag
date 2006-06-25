@@ -5,7 +5,8 @@ noinst_LTLIBRARIES	= libfstools.la
 #noinst_PROGRAMS	= ils dls icat fls dcat ffind istat ifind dcalc dstat \
 #		          fsstat jls jcat
 libfstools_la_SOURCES	= ext2fs.h fatfs.h ffs.h fs_data.h fs_lib.h fs_tools.h \
-			  fs_types.h fs_unicode.h hfs.h iso9660.c iso9660_dent.c libfstools.h ntfs.h \
+			  fs_types.h fs_unicode.h hfs.h iso9660.c iso9660_dent.c \
+			  libfstools.h ntfs.h iso9660.h \
 			  fs_inode.c fs_io.c fs_open.c \
 			  fs_dent.c fs_types.c fs_data.c fs_load.c fs_unicode.c \
 			  ffs.c ffs_dent.c ext2fs.c ext2fs_dent.c ext2fs_journal.c \

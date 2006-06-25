@@ -4,7 +4,7 @@ AC_INIT(pyflag.in)
 # Store the configuration in this header
 AC_CONFIG_HEADER(src/include/config.h)
 AC_CONFIG_AUX_DIR(config)
-AM_INIT_AUTOMAKE(pyflag, 0.80.2)
+AM_INIT_AUTOMAKE(pyflag, 0.82)
 
 # check standard stuff
 AC_PROG_LIBTOOL
@@ -55,7 +55,6 @@ AC_OUTPUT([
 	src/lib/Makefile 
 	src/mailtools/Makefile 
 	src/mailtools/libpst-0.5/Makefile 
-	src/indextools/Makefile
 	src/indextools_ng/Makefile
 	src/network/Makefile
 	src/regtools/Makefile
