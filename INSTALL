@@ -1,5 +1,6 @@
-PyFLAG Installation instructions.
-========================
+================================
+PyFLAG Installation instructions
+================================
 
 PyFlag is now shipped with an autoconf build system. For most systems
 you should be able to do:
@@ -8,31 +9,64 @@ you should be able to do:
 make
 make install
 
+On Debian this installs pyflag into:
+
+/usr/local/lib/pyflag
+/usr/local/bin
+/usr/local/share/pyflag/
+/usr/local/lib/python2.4/site-packages/pyflag/
+
+--------------
+Pre-Requisites
+--------------
+
 The following package pre-requisites are required. This is what they
 are named on debian/Ubuntu - other distributions might name them
 differently:
 
-Here are the packages needed for installing on debian:
+sudo apt-get install \
+python2.4 \
+python2.4-mysqldb \
+python2.4-imaging \
+python2.4-pexpect \
+python2.4-dev \
+libclamav1 \
+zlib1g-dev \
+libmagic-dev \
+mysql-server \
+mysql-client \
+libtool \
+make \
+g++ \
+automake1.9 \
+swig1.3
 
-   apt-get install python2.4
-   apt-get install python2.4-mysqldb
-   apt-get install python2.4-imaging
-   apt-get install python2.4-pexpect
-   apt-get install clamav
-   apt-get install zlib1g-dev
-   apt-get install libpcap0.8-dev
-   apt-get install libmagic-dev
-   apt-get install python2.4-dev
-   apt-get install libclamav-dev
-   apt-get install mysql-server
-   apt-get install mysql-client
+To make the debian package you also need: fakeroot
 
-Set the root password on mysql
+---------
+SQL Setup
+---------
+
+Once you are installed, you need to set the root password on mysql:
 
   mysqladmin -u root password "password"
 
-Optional Features:
-==============
+----------
+Run PyFlag
+----------
+
+Run pyflag with:
+
+  pyflag [port number]
+
+Run the pyflag shell (pyflash) with:
+
+  pyflash
+
+=================
+Optional Features
+=================
+
 The following steps are recommended to do prior to using Flag.
 
 1) Flag may use the NSRL when loading new filesystems. If you have the
@@ -43,3 +77,19 @@ The following steps are recommended to do prior to using Flag.
    files. By Downloading the whois databases its possible to do very
    fast whois lookups on every IP in imported logs and then see the
    contact details for each network owner.
+
+=================
+Debug/Development
+=================
+
+If you want to tinker with the source you should probably install to a different location (so you don't need root to edit files).  The scripts in the test directory are set-up to work with this install process:
+
+./autogen.sh
+./configure --prefix=/var/tmp/build/pyflag
+make
+make install
+
+Now run pyflag and pyflash like:
+
+~/pyflag/tests$ ./pyflag
+~/pyflag/tests$ ./pyflash
