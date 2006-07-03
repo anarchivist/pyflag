@@ -30,6 +30,8 @@ import plugins.DiskForensics.DiskForensics as DiskForensics
 import pyflag.DB as DB
 import pyflag.FlagFramework as FlagFramework
 import pyflag.Reports as Reports
+from FileFormats.RegFile import ls_r, RegF
+from format import Buffer
 
 class RegistryScan(GenScanFactory):
     """ Load in Windows Registry files """
@@ -38,7 +40,16 @@ class RegistryScan(GenScanFactory):
     
     def __init__(self,fsfd):
         GenScanFactory.__init__(self, fsfd)
-        self.dbh.MySQLHarness("regtool -t reg -d create")
+        self.dbh.execute("""CREATE TABLE `reg` (
+        `path` CHAR(250) NOT NULL,
+        `offset` INT(11),
+        `modified` INT(11),
+        `remainder` INT(11),
+        `type` CHAR(50) NOT NULL,
+        `reg_key` VARCHAR(200) NOT NULL,
+        `value` text
+        )""")
+#        self.dbh.MySQLHarness("regtool -t reg -d create")
 
     def reset(self, inode):
         GenScanFactory.reset(self, inode)
@@ -47,7 +58,7 @@ class RegistryScan(GenScanFactory):
         
     def destroy(self):
         ## Create the directory indexes to speed up tree navigation:
-        self.dbh.execute("create table if not exists regi (`dirname` TEXT NOT NULL ,`basename` TEXT NOT NULL,KEY `dirname` (`dirname`(100)))")
+        self.dbh.execute("create table if not exists regi (`dirname` TEXT NOT NULL ,`basename` TEXT NOT NULL)")
         dirtable = {}
         self.dbh.execute("select path from reg")
         for row in self.dbh:
@@ -63,21 +74,51 @@ class RegistryScan(GenScanFactory):
                 except KeyError:
                     dirtable[new_dirname]=[new_basename]
 
+        self.dbh.mass_insert_start("regi")
         for k,v in dirtable.items():
             for name in v:
-                self.dbh.execute("insert into regi set dirname=%r,basename=%r",(k,name))
+                self.dbh.mass_insert(dirname=k,basename=name)
 
+        self.dbh.mass_insert_commit()
         ## Add indexes:
         self.dbh.check_index("reg" ,"path")
+        self.dbh.check_index("regi" ,"dirname",100)
 
     class Scan(StoreAndScanType):
         types =  (
             'application/x-winnt-registry',
-            'application/x-win9x-registry',
+## FIXME: NOT Currently supported temporarily
+#            'application/x-win9x-registry',
             )
         
         def external_process(self,filename):
-            self.dbh.MySQLHarness("regtool -f %r -t reg -p %r " % (filename,self.ddfs.lookup(inode=self.inode)))
+            b=Buffer(fd=open(filename))
+            header = RegF(b)
+            root_key = header['root_key_offset'].get_value()
+##            self.dbh.MySQLHarness("regtool -f %r -t reg -p %r " % (filename,self.ddfs.lookup(inode=self.inode)))
+            parent_path = self.ddfs.lookup(inode=self.inode)
+            def store_key(nk_key, path):
+                if nk_key['no_values'].get_value()>0:
+                    try:
+                        for value in nk_key['vk_list']:
+                            vk=value.get_value()
+                            if vk:
+                                last_write_time = nk_key['WriteTS'].to_unixtime()
+                                self.dbh.mass_insert(
+                                    path="%s/%s" % (parent_path,path),
+                                    modified=int(last_write_time),
+                                    remainder=int((last_write_time - int(last_write_time))*1000000),
+                                    type=vk['data']['val_type'].get_value(),
+                                    reg_key=vk['keyname'],
+                                    value=("%s" % vk['data'])[:1024],
+                                    offset=vk.buffer.offset
+                                    )
+                    except IOError:
+                        print "Oops: Cant parse values in %s at offset 0x%08X!" % (nk_key['key_name'], nk_key.buffer.offset)
+                        
+            self.dbh.mass_insert_start("reg")
+            ls_r(root_key, cb=store_key)
+            self.dbh.mass_insert_commit()
 
 ## Report to browse Loaded Registry Files:
 class BrowseRegistry(DiskForensics.BrowseFS):
@@ -108,8 +149,8 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                 del new_q['mode']
                 del new_q['mark']
                 result.table(
-                    columns=['path','type','reg_key','from_unixtime(modified)','size','value'],
-                    names=['Path','Type','Key','Modified','Size','Value'],
+                    columns=['path','type','reg_key','from_unixtime(modified)','value'],
+                    names=['Path','Type','Key','Modified','Value'],
                     links=[ result.make_link(new_q,'open_tree',mark='target',mode='Tree View') ],
                     table='reg',
                     case=query['case'],
@@ -133,8 +174,8 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                     new_q['mode'] = 'display'
                     new_q['path']=path
                     table.table(
-                        columns=['reg_key','type','size',"if(length(value)<50,value,concat(left(value,50),' .... '))"],
-                        names=('Key','Type','Size','Value'),
+                        columns=['reg_key','type',"if(length(value)<50,value,concat(left(value,50),' .... '))"],
+                        names=('Key','Type','Value'),
                         table='reg',
                         where="path=%r" % path,
                         case=query['case'],

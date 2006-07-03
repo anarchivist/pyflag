@@ -31,31 +31,6 @@ This is most useful when reading data structure with a fixed format (structs, ar
 """
 import struct,time,cStringIO
 
-number_of_sections=4
-
-## Some helper functions    
-class NamedArray:
-    """ A simple helper class to address arrays by names.
-    """
-    def __init__(self,array,names):        
-        self.names = names
-        self.array=array
-
-    def __getitem__(self,item):
-        return self.array[self.names.index(item)]
-
-    def __iter__(self):
-        self.index=0
-        return self
-
-    def next(self):
-        try:
-            result = self.__class__(self.array[self.index],self.names)
-            self.index+=1
-            return result
-        except:
-            raise StopIteration()
-
 class Buffer:
     """ This class looks very much like a string, but in fact uses a file object.
 
@@ -127,25 +102,24 @@ class DataType:
         else:
             self.buffer=buffer
         self.data=None
-        try:
-            self.parent=kwargs['parent']
-        except:
-            pass
+        self.parent = None
+##        try:
+##            self.parent=kwargs['parent']
+##        except:
+##            pass
+        self.data=self.read()
 
-    def initialise(self):
-        self.data=self.read(self.buffer)
-        
     def size(self):
         """ This is the size of this data type - it returns the number of bytes we consume. """
         return 0
 
     def __str__(self):
-        if not self.data:
-            self.initialise()
-
         return "%s" % (self.data,)
 
-    def read(self,data):
+    def read(self):
+        """ Abstract method that returns the data type required to be
+        stored internally
+        """
         return None
 
     def __ne__(self,target):

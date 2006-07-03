@@ -29,30 +29,33 @@
 
 """
 from format import *
+from plugins.FileFormats.BasicFormats import *
 import sys
 
 ## This is where the first page starts
 FIRST_PAGE_OFFSET=0x1000
 
 class NK_TYPE(WORD_ENUM):
+    """ The different types of NK nodes """
     types = {
         0x20: 'key',
         0x2c: 'ROOT_KEY'
         }
 
 class RegF(SimpleStruct):
+    """ This is the registry file header """
     def init(self):
-        self.fields=[
-            [ STRING,4,'Magic'],
-            [ LONG_ARRAY,2,'Unknown1'],
-            [ WIN_FILETIME,1,'Last Modified'],
-            [ LONG_ARRAY,4,'Unknown2'],
+        self.fields = [
+            [ 'Magic',          STRING , dict(length=4) ],
+            [ 'Unknown1',       LONG_ARRAY, dict(count=2) ],
+            [ 'Last Modified',  WIN_FILETIME],
+            [ 'Unknown2',       LONG_ARRAY,{'count':4}],
             ##Offset is relative to FIRST_PAGE_OFFSET. This offset is
             ##to the root key's nk record.
-            [ PNK_key,1,'root_key_offset'],
-            [ LONG,1,'filesize'],
-            [ RegFName,0x1fc-0x2c,'Name'],
-            [ RegFCheckSum,1,'checksum'],
+            [ 'root_key_offset',PNK_key],
+            [ 'filesize',       LONG],
+            [ 'Name',           RegFName,{'length':0x1fc-0x2c}],
+            [ 'checksum',       ULONG ],
             ]
 
 class RegFName(STRING):
@@ -61,207 +64,82 @@ class RegFName(STRING):
         result=[c for c in STRING.__str__(self) if c!='\x00' ]
         return ''.join(result)
 
-class RegFCheckSum(STRING):
-    def read(self,data):
-        cs = ULONG(data).get_value()
-        section_offset = self.parent.buffer.offset
-        our_offset=self.buffer.offset
-        sum=0
-        offset=section_offset
-        while offset<our_offset:
-            data=data.set_offset(offset)
-            byte=ULONG(data)
-#            print "0x%X" % (0L + byte.get_value())
-            sum+=byte.get_value()
-            offset+=byte.size()
-
-        return "given %x calculated %x" % (cs,sum)
-
-class Block(SimpleStruct):
-    """ Blocks contain data within hbin sections.
-    
-    They can contain any number of different structs within the RAW data,
-    but are always seperated by the size.
-    """
-    def init(self):
-        self.fields = [
-            [ LONG,1,'size'],
-            ]
-
-    def read(self,data):
- #       print "Reading data at offset %s" % data.offset
-        result=SimpleStruct.read(self,data)
-
-        ## This is the total size of the block:
-        size=result['size'].get_value()
-        if size<0:
-            size=-size
-        elif size==0:
-            raise("Size is 0??? at offset %s" %data.offset)
-#        else:
-#            print "Got a positive size (%s) which must be ignored" % size
-            
-        ## If we dont have enough data to read from we raise
-        if size>len(data):
-            raise IOError("Error, last block is larger than data %s %s" % (size,len(data)))
-                    
-        ## The size of the data payload is the remainder of this block
-        offset = result['size'].size()
-        data_size = size - offset
-        ## Add the new member as RAW data
-        self.add_element(result,RAW(data[offset:], data_size),'data')
-        return result
-
-class BlockArray(ARRAY):
-    """ This array represents all the blocks within a section.
-
-    We keep adding blocks until we run out of space. """
-    target_class=Block
-
-    def __init__(self,buffer,*args,**kwargs):
-        ARRAY.__init__(self,buffer,100000,*args,**kwargs)
-
-class HBin(SimpleStruct):
-    """ A hbin is a container which stores blocks in it.
-
-    hbins form a doubly linked list with links to the next and previous hbin.
-    """
-    def init(self):
-        self.fields=[
-            [ STRING,4,'Magic'],
-            [ LONG,1,'offset_from_1st'], #Offset from the 1st hbin-Block
-            [ LONG,1,'size'],
-            [ BYTE_ARRAY,14,'unknown1'],
-            ## This is ignored as it is unclear what it is... (See ntchpw), we only use size above
-            [ LONG,1,'page_length'],
-            ]
-
-    def read(self,data):
-        result=SimpleStruct.read(self,data)
-        if result['Magic'].get_value()!='hbin':
-            raise IOError("This is not a hbin record at offset %s. Stopping to read (%s)"% ( data.offset,result['Magic']))
-
-        ## The size of the data payload is the remainder of this block
-        size=result['size'].get_value()-32
-        self.add_element(result,RAW(data[32:],size),'data')
-        return result
-
-    def size(self):
-        return self['size'].get_value()
-    
-class HBinArray(ARRAY):
-    """ This is an array of hbin records.
-
-    The length of the array is determined by the first non-hbin record.
-    """
-    target_class=HBin
-
-    def read(self,data):
-        result=[]
-        offset=0
-        try:
-            while 1:
-                tmp=self.target_class(data[offset:],parent=self)
-                offset+=tmp.size()
-                result.append(tmp)
-        except:
-            pass
-        
-        return result
-    
-class sk_key(SimpleStruct):
-    def init(self):
-        self.fields=[
-            [ STRING,2,'id'],
-            [ WORD,1,'pad'],
-            [ LONG,1,'offset_prev'], #Offset of previous "sk"-Record
-            [ LONG,1,'offset_next'], # To next sk record
-            [ LONG,1,'usage_count'],
-            [ LONG,1,'size'],
-            ]
-
 class NK_key(SimpleStruct):
+    """ The main key node """
     def init(self):
         self.fields=[
-            [ STRING,2,'id'],
-            [ NK_TYPE,1,'Type'],
-            [ WIN12_FILETIME,1,'WriteTS'],
-            [ LONG,1,'parent_offset'],
-            [ ULONG,1,'number_of_subkeys'],
-            [ LONG,4,'pad'],
-            [ Plf_key,1,'offs_lf'],
-            [ LONG,1,'pad'],
-            [ LONG,1,'no_values'],
-            [ LONG,1,'offs_vk_list'],  ## This will be replaced later with the contents of the array
-            [ LONG,1,'offs_sk'],
-            [ LONG,1,'offs_class_name'],
-            [ LONG_ARRAY,5,'pad2'],
-            [ KEY_NAME,1,'key_name'],
+            [ 'id',                STRING,{'length':2}],
+            [ 'Type',              NK_TYPE],
+            [ 'WriteTS',           WIN12_FILETIME],
+            [ 'parent_offset',     LONG],
+            [ 'number_of_subkeys', ULONG],
+            [ 'pad',               LONG],
+            [ 'offs_lh',           Plh_key],
+            [ 'pad',               LONG],
+            [ 'no_values',         LONG],
+            [ 'offs_vk_list',      LONG],  
+            [ 'offs_sk',           LONG],
+            [ 'offs_class_name',   LONG],
+            [ 'pad',               LONG_ARRAY,{'count':5}],
+            [ 'key_name',          KEY_NAME],
             ]
 
-    def read(self,data):
-        result=SimpleStruct.read(self,data)
+    def read(self):
+        result=SimpleStruct.read(self)
         if result['id']!='nk':
-            raise IOError("nk record expected, but not found at offset %s" % data.offset)
+            raise IOError("nk record expected, but not found at offset %s" % self.buffer.offset)
 
-        ## Fixup offs_vk_list:
+        ## Find the list of value keys (VKs)
         offs_vk_list = result['offs_vk_list'].get_value()
-        data=data.set_offset(FIRST_PAGE_OFFSET+4+offs_vk_list)
+
+        data=self.buffer.set_offset(FIRST_PAGE_OFFSET+4+offs_vk_list)
         no_values=result['no_values'].get_value()
-        ## Try to find the vk lists:
-        result['offs_vk_list'] = VK_Array(data,no_values)
-        
-        return result
-        
-class KEY_NAME(STRING):
-    """ A key name is specified as a length and a string.
-    
-    Note that here we ignore the class name and its offset.
-    """
-    def read(self,data):
-        length=WORD(data).get_value()
-        self.fmt = "%ss" % length
-        return STRING.read(self,data[4:])
 
-class lf_hash(SimpleStruct):
-    def init(self):
-        self.fields = [
-            [ PNK_key,1,'ofs_nk'],
-            [ STRING,4,'name'],
-            ]
+        ## Add the list to ourselves
+        self.add_element(result,'vk_list', VK_Array(data,count=no_values))
 
-class LF_HashArray(ARRAY):
-    target_class=lf_hash
-
-class lf_key(SimpleStruct):
-    def init(self):
-        self.fields = [
-            [ STRING,2,'id'],
-            [ WORD,1,'no_keys'],
-            ]
-
-    def read(self,data):
-        result=SimpleStruct.read(self,data)
-        if result['id']!='lf':
-            raise IOError("lf record expected, but not found at offset 0x%08X" % data.offset)
-        
-        no_keys=result['no_keys'].get_value()
-        self.add_element(result,LF_HashArray(data[4:],no_keys),'hashes')
         return result
 
 class ri_key(SimpleStruct):
     def init(self):
         self.fields = [
-            [ STRING,2,'id'],
-            [ WORD,1,'no_pointers'],
+            [ 'id',         STRING,{'length':2}],
+            [ 'no_pointers',WORD ],
             ]
 
-    def read(self,data):
-        result=SimpleStruct.read(self,data)
+    def read(self):
+        result=SimpleStruct.read(self)
         if result['id']!='ri':
             raise IOError("ri record expected, but not found at offset 0x%08X" % data.offset)
-        
+
+class Pri_key(POINTER):
+    """ This is a pointer to the ri_key struct for a particular nk.
+
+    It is pointing relative to FIRST_PAGE_OFFSET.
+    """
+    target_class=ri_key
+
+    def calc_offset(self):
+        offset = self.data
+        if offset>0:
+            offset=offset+FIRST_PAGE_OFFSET+4
+            data=self.buffer.set_offset(offset)
+            
+            return data
+        else: return None
+
+class PNK_key(Pri_key):
+    target_class=NK_key
+
+class KEY_NAME(STRING):
+    """ The key names are a 32 bit length followed by data """
+    def __init__(self,buffer,*args,**kwargs):
+        offset = WORD(buffer)
+        kwargs['length']=offset.get_value()
+        STRING.__init__(self,buffer[4:], *args, **kwargs)
+
 class DATA_TYPE(LONG_ENUM):
+    """ Different types of data stored in the registry """
     types = {
         0:'REG_NONE',
         1:'REG_SZ',  # Unicode nul terminated string 
@@ -283,13 +161,14 @@ class DATA(SimpleStruct):
     """
     def init(self):
         self.fields=[
-            [ LONG,1,'len_data'],
-            [ LONG,1,'offs_data'],
-            [ DATA_TYPE,1,'val_type'],
+            [ 'len_data',  LONG ],
+            [ 'offs_data', LONG ],
+            [ 'val_type',  DATA_TYPE ],
             ]
         
-    def read(self,data):
-        result=SimpleStruct.read(self,data)
+    def read(self):
+        result=SimpleStruct.read(self)
+        
         len_data=result['len_data'].get_value()
         size=len_data& 0x7fffffff
         offs_data=result['offs_data'].get_value()
@@ -307,13 +186,10 @@ class DATA(SimpleStruct):
             self.raw_data=None
         else:
             ## Data is referenced by offs_data:
-            data=data.set_offset(offs_data+FIRST_PAGE_OFFSET+4)
+            data=self.buffer.set_offset(offs_data+FIRST_PAGE_OFFSET+4)
             self.raw_data=data[:len_data]
             
         return result
-
-    def __repr__(self):
-        return SimpleStruct.__str__(self)
 
     def __str__(self):
         """ We display ourselves nicely """
@@ -321,54 +197,67 @@ class DATA(SimpleStruct):
         val_type=self['val_type']
         if self.raw_data==None:
             return 'None'
-        elif val_type=='REG_SZ' or val_type=='REG_EXPAND_SZ':
-            result+="%s" % UCS16_STR(self.raw_data,len(self.raw_data))
+        elif val_type=='REG_SZ' or val_type=='REG_EXPAND_SZ' or val_type=='REG_MULTI_SZ':
+            result+="%s" % UCS16_STR(self.raw_data, length=len(self.raw_data))
         elif val_type=='REG_DWORD':
             result+="0x08%X" % ULONG(self.raw_data).get_value()
         else:
             result+="%r" % "%s" % self.raw_data
         return result
-    
+
 class vk_key(SimpleStruct):
     def init(self):
         self.fields = [
-            [ STRING,2,'id'],
-            [ WORD,1,'len_name'],
-            [ DATA,1,'data'],
-            [ WORD,1,'flag'],
-            [ WORD,1,'pad'],
+            [ 'id',      STRING,{'length':2}],
+            [ 'len_name',WORD ],
+            [ 'data',    DATA ],
+            [ 'flag',    WORD ],
+            [ 'pad',     WORD ],
             ]
 
-    def read(self,data):
-        result=SimpleStruct.read(self,data)
+    def read(self):
+        result=SimpleStruct.read(self)
         if result['id']!='vk':
             raise IOError("vk record expected, but not found at offset 0x%08X" % data.offset)
 
         strlen=result['len_name'].get_value()
         if strlen>0:
-            keyname=STRING(data[5*4:],strlen)
+            keyname=STRING(self.buffer[5*4:],length=strlen)
         else:
-            keyname=STRING('@',1)
+            keyname=STRING('@',length=1)
 
         ## New struct member is keyname:
-        self.add_element(result,keyname,'keyname')
+        self.add_element(result,'keyname',keyname)
         return result
 
-class Pri_key(POINTER):
-    """ This is a pointer to the ri_key struct for a particular nk.
+class lf_hash(SimpleStruct):
+    def init(self):
+        self.fields = [
+            [ 'ofs_nk', PNK_key],
+            [ 'name',   STRING,{'length':4}],
+            ]
 
-    It is pointing relative to FIRST_PAGE_OFFSET.
-    """
-    target_class=ri_key
-    def calc_offset(self,data,offset):
-        if offset>0:
-            offset=offset+FIRST_PAGE_OFFSET+4
-            data=data.set_offset(offset)
-            return data
-        else: return None
+class LF_HashArray(ARRAY):
+    target_class=lf_hash
 
-class Plf_key(Pri_key):
-    target_class=lf_key
+class lh_key(SimpleStruct):
+    def init(self):
+        self.fields = [
+            [ 'id',      STRING,{'length':2}],
+            [ 'no_keys', WORD ],
+            ]
+
+    def read(self):
+        result=SimpleStruct.read(self)
+#        if result['id']!='lh':
+#            raise IOError("lh record expected, but not found at offset 0x%08X" % self.buffer.offset)
+        
+        no_keys=result['no_keys'].get_value()
+        self.add_element(result,'hashes', LF_HashArray(self.buffer[4:],count=no_keys))
+        return result
+
+class Plh_key(Pri_key):
+    target_class=lh_key
 
 class PNK_key(Pri_key):
     target_class=NK_key
@@ -379,30 +268,35 @@ class Pvk_key(Pri_key):
 class VK_Array(ARRAY):
     target_class=Pvk_key
 
-def ls_r(root_key,path='/'):
+def print_values(nk_key, path):
+    if nk_key['no_values'].get_value()>0:
+        try:
+            for value in nk_key['vk_list']:
+                vk=value.get_value()
+                if vk:
+                    print "       Values:  %s\t->\t%s\t%s" % (vk['keyname'],vk['data']['val_type'],vk['data'])
+        except IOError:
+            print "Oops: Cant parse values in %s at offset 0x%08X!" % (nk_key['key_name'], nk_key.buffer.offset)                    
+
+def ls_r(root_key,path='', cb=print_values):
     """ Lists all paths under root_key recursively.
 
     @arg root_key: An NK_key object
     """
-    lf_key=root_key['offs_lf'].p()
-    
+    lh_key=root_key['offs_lh'].get_value()
+
     ## Node has no lf list, therefore no children:
-    if not lf_key: return
+    if not lh_key: return
 
     ## Iterate over all children:
-    for lf in lf_key['hashes']:
+    for lh in lh_key['hashes']:
         try:
-            nk_key=lf['ofs_nk'].p()
-            print "%s%s" % (path,nk_key['key_name'])
-            if nk_key['no_values'].get_value()>0:
-                try:
-                    for value in nk_key['offs_vk_list']:
-                        vk=value.p()
-                        print "       Values:  %s\t->\t%s\t%s" % (vk['keyname'],vk['data']['val_type'],vk['data'])
-                except IOError:
-                    print "Oops: Cant parse values in %s at offset 0x%08X!" % (path,nk_key.buffer.offset)                    
+            nk_key=lh['ofs_nk'].get_value()
+#            print "%s%s" % (path,nk_key['key_name'])
 
-            ls_r(nk_key,"%s%s/" % (path,nk_key['key_name']))
+            cb(nk_key, path=path)
+            
+            ls_r(nk_key,"%s%s/" % (path,nk_key['key_name']), cb=cb)
         except IOError,e:
             print "Oops: Cant parse nk node %s at offset 0x%08X!: The error was %s" % (path,root_key.buffer.offset,e)
             
@@ -412,6 +306,6 @@ if __name__ == "__main__":
     buffer = Buffer(fd=fd)
     header = RegF(buffer)
     print header
-    root_key = header['root_key_offset'].p()
+    root_key = header['root_key_offset'].get_value()
     print root_key
-    ls_r(root_key)
+    ls_r(root_key, cb=print_values)

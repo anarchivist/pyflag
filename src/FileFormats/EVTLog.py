@@ -43,7 +43,7 @@ HKEY_LOCAL_MACHINE
     SYSTEM
      CurrentControlSet
        Services
-         EventLog
+         Eventlog
             Application
               AppName
             Security
@@ -69,6 +69,7 @@ Windows System adminsitrators need to be aware of the limitations, and in fact s
 Forensic examiners have to live with it, and should use PyFlags event log message database to guess what the log files say (That sounds rediculous, but unfortunately thats how it is).
 """
 from format import *
+from plugins.FileFormats.BasicFormats import *
 import sys
 
 class EventType(WORD_ENUM):
@@ -81,14 +82,13 @@ class EventType(WORD_ENUM):
 class TERMINATED_UCS16(TERMINATED_STRING):
     """ The UCS16 strings in the array are seperated by 3 nulls """
     terminator='\x00\x00\x00'
-    def read(self,data):
-        result=TERMINATED_STRING.read(self,data)
+    def read(self):
+        result=TERMINATED_STRING.read(self)
         ## Note that result includes the terminator, so we subtract 2
         ## nulls to remove it and still maintain a sane Unicode string
         try:
-            string=UCS16_STR(result,len(result)-2)
-            "%s" % string
-        except:
+            string=UCS16_STR(result,length=len(result)-2)
+        except Exception,e:
             string=UCS16_STR('',0)
             self.raw_size=0
         
@@ -102,20 +102,17 @@ class Header(SimpleStruct):
     """ This is the header of the event file. """
     def init(self):
         self.fields = [
-            [ LONG,1,'size'],
-            [ STRING,4,'Magic'],
-            [ LONG,1,'RecordNumber'],
-            [ LONG,1,'FirstEventID'],
-            [ LONG,1,'FirstEventOffset'],
-            [ LONG,1,'LastEventOffset'],
-            [ LONG,1,'LastEventID'],
+            [ 'size',  LONG ],
+            [ 'Magic', STRING,{'length':4}],
+            [ 'RecordNumber', LONG ],
+            [ 'FirstEventID', LONG ],
+            [ 'FirstEventOffset',LONG ],
+            [ 'LastEventOffset',LONG ],
+            [ 'LastEventID',LONG ],
             ]
 
     def size(self):
         """ The size of this structure is determined by the size element """
-        if not self.data:
-            self.initialise()
-            
         return self['size'].get_value()
     
 class Event(Header):
@@ -123,27 +120,27 @@ class Event(Header):
     """
     def init(self):
         self.fields = [
-            [ LONG,1,'size' ],
-            [ STRING,4,'Magic'],
-            [ LONG,1,'RecordNumber'],
-            [ TIMESTAMP,1,'TimeGenerated'],
-            [ TIMESTAMP,1,'TimeWritten'],
-            [ WORD,1,'EventID'],
-            [ WORD,1, 'pad'],
-            [ EventType,1, 'EventType'],
-            [ WORD,1, 'NumStrings'],
-            [ WORD,1, 'EventCategory'],
-            [ BYTE_ARRAY,26,'Unknown'],
+            [ 'size' ,LONG ],
+            [ 'Magic', STRING,{'length':4}],
+            [ 'RecordNumber',LONG ],
+            [ 'TimeGenerated',TIMESTAMP ],
+            [ 'TimeWritten',TIMESTAMP ],
+            [ 'EventID',WORD ],
+            [ 'pad',WORD ],
+            [ 'EventType', EventType ],
+            [ 'NumStrings', WORD ],
+            [ 'EventCategory', WORD ],
+            [ 'Unknown', BYTE_ARRAY,{'length':26} ],
             ]
 
-    def read(self,data):
-        result=SimpleStruct.read(self,data)
+    def read(self):
+        result=SimpleStruct.read(self)
         if result['Magic']!='LfLe':
-            raise IOError('LfLe record not found at location 0x%08X' % data.offset)
+            raise IOError('LfLe record not found at location 0x%08X' % self.buffer.offset)
         
         ## Following the struct is an array of NumStrings UCS16 strings:
         NumStrings=result['NumStrings'].get_value()
-        self.add_element(result,TERMINATED_UCS16_Array(data[14*4:],NumStrings),'Strings')
+        self.add_element(result,'Strings', TERMINATED_UCS16_Array(self.buffer[14*4:],count=NumStrings))
         return result
         
 if __name__ == "__main__":

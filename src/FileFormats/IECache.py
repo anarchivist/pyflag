@@ -1,5 +1,5 @@
 # ******************************************************
-# Copyright 2004: Commonwealth of Australia.
+# Copyright 2006: Commonwealth of Australia.
 #
 # Developed by the Computer Network Vulnerability Team,
 # Information Security Group.
@@ -36,11 +36,11 @@ from plugins.FileFormats.BasicFormats import *
 class Header(SimpleStruct):
     def init(self):
         self.fields = [
-            [ STRING, {"length":0x1c}, 'Magic' ],
-            [ LONG,{},'file_size'],
-            [ LONG,{},'hash_offset'],
-            [ WORD_ARRAY,{'count':7},'unknown'],
-            [ LONG,{},'blocksize'],
+            [ 'Magic', STRING, {"length":0x1c}  ],
+            [ 'file_size', LONG],
+            [ 'hash_offset', LONG],
+            [ 'unknown', WORD_ARRAY,{'count':7}],
+            [ 'blocksize', LONG],
             ]
     
 ## The default blocksize
@@ -53,70 +53,69 @@ class Hash(LONG_ARRAY):
     We collect all of these and return a list of all offsets in all hash sections.
     Note that the hash section may point at more hash sections, which  we automatically traverse all sections, so callers do not need to worry about looking for more hash sections.
     """
-    def read(self,data):
-        magic=STRING(data,{'length':4})
+    def read(self):
+        data = []
+        magic=STRING(self.buffer,length=4)
         # Check the magic for this section
         if magic!='HASH':
             raise IOError("Location %s is not a hash array - This file may be empty!!"%(data.offset))
         
-        section_length = LONG(data[4:]).get_value()
-        next_hash = LONG(data[8:]).get_value()
+        section_length = LONG(self.buffer[4:]).get_value()
+        self.next_hash_offset = LONG(self.buffer[8:]).get_value()
         offset=16
         while offset<section_length*blocksize:
-            record_type=LONG(data[offset:]).get_value()
+            record_type=LONG(self.buffer[offset:]).get_value()
             if record_type!=0x3:
-                off = LONG(data[offset+4:])
+                off = LONG(self.buffer[offset+4:]).get_value()
                 ## If the offsets are nonsensical we dont add them (i.e. point at 0xBADF00D are null)
-                if off!=0 and LONG(data.set_offset(off.get_value()))!=0xBADF00D:
-                    if off.get_value() not in self.data:
-                        self.data.append(off.get_value())
+                if off!=0 and off!=0xBADF00D:
+                    if off not in data:
+                        data.append(off)
                     
             ## Go to the next offset in the list
             offset+=8
                 
-        ## Add the next section to our list:
-        if next_hash:
-            data=data.set_offset(next_hash)
-            self.read(data)
+        return data
 
-        return self.data
+class PHASH(POINTER):
+    target_class = Hash
 
 class URLEntry(SimpleStruct):
     """ URL records are stored here """
     def init(self):
         self.fields = [
-            [ STRING, {'length':4},'type'],
-            [ LONG, None, 'size'], #In multiples of the blocksize
-            [ WIN_FILETIME,None,'modified_time'],
-            [ WIN_FILETIME,None,'accessed_time'],
-            [ LONG_ARRAY, {'count':0x7}, 'unknown'],
-            [ HIST_STR_PTR, None, 'url'],
-            [ BYTE, None, 'unknown2'],
-            [ BYTE, None, 'directory_index'],
-            [ WORD, None, 'unknown3'],
-            [ HIST_STR_PTR, None, 'filename'],
-            [ LONG, None, '0x00200001'],
-            [ PContent, None, 'content'],
+            [ 'type', STRING, {'length':4},],
+            [ 'size', LONG ], #In multiples of the blocksize
+            [ 'modified_time', WIN_FILETIME ],
+            [ 'accessed_time', WIN_FILETIME ],
+            [ 'unknown', LONG_ARRAY, {'count':0x7} ],
+            [ 'url', HIST_STR_PTR, dict(section_offset=self.buffer.offset)],
+            [ 'unknown', BYTE ],
+            [ 'directory_index', BYTE ],
+            [ 'unknown', WORD ],
+            [ 'filename', HIST_STR_PTR, dict(section_offset=self.buffer.offset)],
+            [ '0x00200001', LONG ],
+            [ 'content', PContent ],
             ] 
 
 class HIST_STR_PTR(LONG):
     """ This is a pointer to a string relative to the start of the section """
-    def read(self,data):
+    def __init__(self,buffer,*args,**kwargs):
+        self.section_offset = kwargs['section_offset']
+        LONG.__init__(self,buffer,args,kwargs)
+        
+    def read(self):
         ## These offsets are all relative to the start of the URL
         ## section, we find its absolute offset here
-        section_offset = self.parent.buffer.offset
-        offset=LONG.read(self,data)
+        offset=LONG.read(self)
 
         ## set our absolute offset to the start of our section
-        data=data.set_offset(section_offset)
+        data=self.buffer.set_offset(self.section_offset)
 
         ## Return the null terminated string:
         return TERMINATED_STRING(data[offset:])
 
     def __str__(self):
-        if not self.data:
-            self.initialise()
-
         result="%s" % (self.data,)
         return result.split('\0',1)[0]
 
@@ -128,23 +127,23 @@ class Content(SimpleStruct):
     """
     def init(self):
         self.fields=[
-            [ LONG,None,'Magic'], #Always seems to be 0x0020010
-            [ LONG_ARRAY,{'count':3},'pad'],
-            [ WORD, None,'length'],
-            [ ContentType, None,'content_type']
+            [ 'Magic', LONG ], #Always seems to be 0x0020010
+            [ 'pad', LONG_ARRAY,{'count':3},],
+            [ 'length', WORD ],
+            [ 'content_type', ContentType ]
             ]
 
-    def read(self,data):
-        magic = LONG(data,1)
+    def read(self):
+        magic = LONG(self.buffer)
         ## The magic refers to a special structure if its there,
         ## otherwise its just a null terminated string:
         if magic!=0x0020010:
             result={}
-            self.add_element(result,TERMINATED_STRING(data),'data')
+            self.add_element(result,'data',TERMINATED_STRING(self.buffer[4:]))
             result['content_type']=ContentType("\xff\xff",1)
             return result
 
-        result=SimpleStruct.read(self,data)
+        result=SimpleStruct.read(self)
         length=result['length'].get_value()
         if length:
             ## Sometimes this is unicode, sometimes not depending on the type
@@ -188,12 +187,18 @@ class IEHistoryFile:
     def __init__(self,fd):
         self.buffer=Buffer(fd=fd)
         self.header=Header(self.buffer)
+        
         magic=self.header['Magic']
         if magic != "Client UrlCache MMF Ver 5.2\x00":
             raise IOError("File is not supported, we only support MMF Ver 5.2, this magic is %r" % magic.get_value())
         
         hash_offset = self.header['hash_offset'].get_value()
-        self.hashes = Hash(self.buffer[hash_offset:],1)
+        self.hashes = []
+        
+        while hash_offset > 0:
+            h=Hash(self.buffer[hash_offset:],1)
+            self.hashes.extend(h.data)
+            hash_offset = h.next_hash_offset
 
     def __iter__(self):
         self.hash_iter=self.hashes.__iter__()
@@ -201,15 +206,24 @@ class IEHistoryFile:
 
     def next(self):
         result={}
-        offset=self.hash_iter.next()
-        entry_type = STRING(self.buffer[offset:],{'length':4}).__str__()
+
+        ## Chase all offsets to only include those in the file
+        while 1:
+            try:
+                offset=self.hash_iter.next()
+                entry_type = STRING(self.buffer.set_offset(offset),length=4).__str__()
+            except IOError:
+                continue
+
+            break
+            
         if entry_type == 'URL ':
             entry=URLEntry(self.buffer[offset:])
             result['event']=entry
             for key in ('type','modified_time','accessed_time','url','filename'):
                 result[key]=entry[key]
 
-            c=entry['content'].p()
+            c=entry['content'].get_value()
             result['data']=c
             for key in ('content_type','data'):
                 result[key]=c[key]
@@ -228,8 +242,8 @@ if __name__ == "__main__":
     for event in history:
         if event:
 #            print event['event']
-            r=["%s=%r" % (k,"%s"%v) for k,v in event.items() if k!='event' ]
-            print '\n'.join(r)
+#            r=["%s=%r" % (k,"%s"%v) for k,v in event.items() if k!='event' ]
+#            print '\n'.join(r)
 
             print "url is %s" % event['event']
 
