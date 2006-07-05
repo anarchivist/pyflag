@@ -105,7 +105,7 @@ class RegistryScan(GenScanFactory):
                             if vk:
                                 last_write_time = nk_key['WriteTS'].to_unixtime()
                                 self.dbh.mass_insert(
-                                    path="%s/%s" % (parent_path,path),
+                                    path=path,
                                     modified=int(last_write_time),
                                     remainder=int((last_write_time - int(last_write_time))*1000000),
                                     type=vk['data']['val_type'].get_value(),
@@ -117,7 +117,7 @@ class RegistryScan(GenScanFactory):
                         print "Oops: Cant parse values in %s at offset 0x%08X!" % (nk_key['key_name'], nk_key.buffer.offset)
                         
             self.dbh.mass_insert_start("reg")
-            ls_r(root_key, cb=store_key)
+            ls_r(root_key, path=parent_path, cb=store_key)
             self.dbh.mass_insert_commit()
 
 ## Report to browse Loaded Registry Files:

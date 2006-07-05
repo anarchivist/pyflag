@@ -87,12 +87,9 @@ class SimpleStruct(DataType):
     ## ["Name","Type","Parameters","Description","Function" ]
 
     def __init__(self,buffer,*args,**kwargs):
-#        try:
-#            self.parent=kwargs['parent']
-#        except:
-#            self.parent=None
         self.buffer = buffer
         self.init()
+            
         self.data={}
         self.offsets={}
         DataType.__init__(self,buffer,*args,**kwargs)
@@ -111,7 +108,7 @@ class SimpleStruct(DataType):
         self.offsets[name]=element.buffer.offset-self.buffer.offset
     
     def read(self):
-        offset=0
+        self.offset=0
         result={}
         ## Temporarily set our data dict to be result, so that
         ## instantiated classes can call parent['boo'] to retrieve
@@ -130,9 +127,9 @@ class SimpleStruct(DataType):
             except:
                 parameters = {}
 
-            result[name]=element(self.buffer[offset:],**parameters)
-            self.offsets[name]=offset            
-            offset+=result[name].size()
+            result[name]=element(self.buffer[self.offset:],**parameters)
+            self.offsets[name]=self.offset            
+            self.offset+=result[name].size()
                 
         return result
 
@@ -159,16 +156,14 @@ class SimpleStruct(DataType):
         for i in range(len(self.fields)):
             item=self.fields[i]
             try:
-                desc = item[3]
+                desc = "%s(%s)" % (item[0],item[3])
             except:
                 desc = item[0]
 
             element=self.data[item[0]]
             tmp = "\n   ".join((element.__str__()).splitlines())
-            result+="%04X - %s(%s): %s\n" % (
-#                self.offsets[item['Name']] + self.buffer.offset,
+            result+="%04X - %s: %s\n" % (
                 element.buffer.offset,
-                item[0],
                 desc,tmp)
                                   
         return result
@@ -411,7 +406,6 @@ class BitField(BYTE):
     masks = {}
 
     def __str__(self):
-        if not self.data: self.initialise()
         result=[ v for k,v in self.masks.items() if k & self.data ]
         return ','.join(result)
 
@@ -441,14 +435,13 @@ class CLSID(ULONG_ARRAY):
         ARRAY.__init__(self,buffer,4,*args,**kwargs)
 
     def __str__(self):
-        if not self.data: self.initialise()
         result=[]
         for i in self:
             result.append("%0.8X" % i.get_value())
 
         return "{%s}" % '-'.join(result)
 
-class TIMESTAMP(LONG):
+class TIMESTAMP(ULONG):
     """ A standard unix timestamp.
 
     Number of seconds since the epoch (1970-1-1)
@@ -456,9 +449,6 @@ class TIMESTAMP(LONG):
     visible = True
     
     def __str__(self):
-        if not self.data:
-            self.initialise()
-            
         return "%s" % time.ctime(self.data)
 
 class WIN_FILETIME(SimpleStruct):

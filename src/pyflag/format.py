@@ -102,7 +102,7 @@ class DataType:
         else:
             self.buffer=buffer
         self.data=None
-        self.parent = None
+        self.parameters = kwargs
 ##        try:
 ##            self.parent=kwargs['parent']
 ##        except:
