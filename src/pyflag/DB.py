@@ -314,7 +314,7 @@ class DBO:
 
             values.append(",".join(["%r"] * len(keys)))
 
-        sql = "insert into `%s` (%s) values (%s)" % (self.mass_insert_table,
+        sql = "insert ignore into `%s` (%s) values (%s)" % (self.mass_insert_table,
                                                    ','.join(["`%s`" % c for c in keys]),
                                                    "),(".join(values))
         self.execute(sql,args)

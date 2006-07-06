@@ -317,6 +317,8 @@ class Messages(SimpleStruct):
         return '\r\n'.join(result)
     
 def get_messages(buffer):
+    """ opens the PE executable in buffer and returns a Messages object containing all the event log messages within it. If there are no messages, raise an IndexError.
+    """
     header = IMAGE_DOS_HEADER(buffer)
     
     optional_header = header['e_lfanew'].get_value()['OptionalHeader']

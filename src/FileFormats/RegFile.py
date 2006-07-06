@@ -100,6 +100,44 @@ class NK_key(SimpleStruct):
 
         return result
 
+    def keys(self):
+        """ A generator which yields the keys under this node """
+        lh_key=self['offs_lh'].get_value()
+
+        if not lh_key: return 
+
+        for lh in lh_key['hashes']:
+            nk_key = lh['ofs_nk'].get_value()
+            yield nk_key
+
+    def key(self,name):
+        """ Find the named child of this node """
+        for k in self.keys():
+            if k['key_name']==name:
+                return k
+
+        raise KeyError("Key %s not found under %s" % (name, self['key_name']))
+
+    def value(self,name):
+        """ Find the named child of this node """
+        for v in self.values():
+            if v['keyname']==name:
+                return v
+
+        raise KeyError("Value %s not found under %s" % (name, self['key_name']))
+
+    def values(self):
+        """ A Generator which returns all the value nodes of this key """
+        if self['no_values'].get_value()>0:
+            try:
+                for value in self['vk_list']:
+                    vk=value.get_value()
+                    if vk:
+                        yield vk
+                        
+            except IOError:
+                return
+
 class ri_key(SimpleStruct):
     def init(self):
         self.fields = [
@@ -269,6 +307,8 @@ class VK_Array(ARRAY):
     target_class=Pvk_key
 
 def print_values(nk_key, path):
+    print "%s%s" % (path,nk_key['key_name'])
+
     if nk_key['no_values'].get_value()>0:
         try:
             for value in nk_key['vk_list']:
@@ -299,13 +339,31 @@ def ls_r(root_key,path='', cb=print_values):
             ls_r(nk_key,"%s%s/" % (path,nk_key['key_name']), cb=cb)
         except IOError,e:
             print "Oops: Cant parse nk node %s at offset 0x%08X!: The error was %s" % (path,root_key.buffer.offset,e)
+
+def get_key(root_key, path):
+    p = path.split("/")
+    while p:
+        root_key = root_key.key(p.pop(0))
+
+    return root_key
             
 if __name__ == "__main__":
     fd=open(sys.argv[1],'r')
 
     buffer = Buffer(fd=fd)
     header = RegF(buffer)
-    print header
     root_key = header['root_key_offset'].get_value()
-    print root_key
-    ls_r(root_key, cb=print_values)
+
+    path = 'ControlSet001/Services/A3AB'
+    key = get_key(root_key,path)
+    print key
+
+    print "Values for %s" % path
+    for v in key.values():
+        print v
+
+    print "Keys under %s" % path
+    for k in key.keys():
+        print k
+
+    ls_r(root_key)
