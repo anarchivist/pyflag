@@ -302,7 +302,7 @@ class Messages(SimpleStruct):
         for chunk in a:
             data = self.buffer[chunk['Offset'].get_value():]
             for i in range(chunk['From'].get_value(),
-                           chunk['To'].get_value()):
+                           chunk['To'].get_value()+1):
                 m=Message(data)
                 self.messages[i] = m
                 data = data[m.size():]
@@ -315,6 +315,23 @@ class Messages(SimpleStruct):
             result.append( "%X - %s" % (k,v['Message']))
 
         return '\r\n'.join(result)
+
+RESOURCE_TYPES = {
+    'cursor' :          1,
+    'bitmap' :          2,
+    'icon' :            3,
+    'menu' :            4,
+    'dialog' :          5,
+    'string table' :    6,
+    'font directory' :  7,
+    'font' :            8,
+    'accelerators' :    9,
+    'unformatted resource data' :     10,
+    'message table' :   11,
+    'group cursor' :    12,
+    'group icon' :      14,
+    'version information' :     16,
+    }
     
 def get_messages(buffer):
     """ opens the PE executable in buffer and returns a Messages object containing all the event log messages within it. If there are no messages, raise an IndexError.
@@ -328,22 +345,27 @@ def get_messages(buffer):
             r = RSRC(buffer[section_offset:])
 
             ## First level is resource type - we need RT_MESSAGE
-            e = r['Directories'][11]
+            e = r['Directories'][RESOURCE_TYPES['message table']]
             r = RSRC(buffer[e['Offset'].get_value()+section_offset:])
 
             ## Second level is name
             e = r['Directories'][1]
             r = RSRC(buffer[e['Offset'].get_value()+section_offset:])
 
-            ## Third level is language - we need english
-            e = r['Directories'][0x0409]
-            r = RSRCDataEntry(buffer[e['Offset'].get_value()+section_offset:])
+            ## Third level is language - we get all languages
+            for e in r['Directories']:
+                t = e['Type'].get_value()
 
-            ## Now r points into the message array:
-            offset = (r['RVA'].get_value()
-                      - s['VirtualAddress'].get_value() + section_offset)
+                ## We are only interested in english
+                if t & 0xFF != 0x09: continue
+                
+                r = RSRCDataEntry(buffer[e['Offset'].get_value()+section_offset:])
 
-            m = Messages(buffer.set_offset(offset))
+                ## Now r points into the message array:
+                offset = (r['RVA'].get_value()
+                          - s['VirtualAddress'].get_value() + section_offset)
+
+                m = Messages(buffer.set_offset(offset))
 
             return m
             
@@ -352,3 +374,6 @@ if __name__ == "__main__":
 
     buffer = Buffer(fd=fd)
     print get_messages(buffer)
+##    for k,v in get_messages(buffer).items():
+##        v='\n'.join(["    "+x for x in v.__str__().split('\n')])
+##        print "%s -> %s" % (k,v)

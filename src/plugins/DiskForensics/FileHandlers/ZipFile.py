@@ -50,10 +50,10 @@ class ZipScan(GenScanFactory):
             'application/x-zip',
             )
 
-        def external_process(self,name):
+        def external_process(self,fd):
             """ This is run on the extracted file """
-            logging.log(logging.VERBOSE_DEBUG, "Decompressing Zip File %s" % name)
-            self.fd.zip_handle=zipfile.ZipFile(name)
+            logging.log(logging.VERBOSE_DEBUG, "Decompressing Zip File %s" % fd.name)
+            self.fd.zip_handle=zipfile.ZipFile(fd.name)
 
             pathname = self.ddfs.lookup(inode = self.inode)
             
@@ -149,10 +149,10 @@ class TarScan(GenScanFactory):
             'application/x-tar',
             )
 
-        def external_process(self,name):
+        def external_process(self,fd):
             """ This is run on the extracted file """
             #Get a TarFile object
-            tar=tarfile.TarFile(name)
+            tar=tarfile.TarFile(fileobj=fd)
             
             ## List all the files in the tar file:
             dircount = 0

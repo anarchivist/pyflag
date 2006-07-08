@@ -36,18 +36,19 @@ class Buffer:
 
     The advantage here is that when we do string slicing, we are not duplicating strings all over the place (better performace). Also it is always possible to tell where a particular piece of data came from.
     """
-    def __init__(self,string='',fd=None,offset=0,size=None):
-        """ We can either specify a string, or a fd """
+    def __init__(self,fd,offset=0,size=None):
+        """ We can either specify a string, or a fd as the first arg """
         self.offset=offset
-        if fd!=None:
+        ## If fd is really a string, we make a StringIO
+        if isinstance(fd, basestring):
+            self.fd=cStringIO.StringIO(fd)
+            self.size=len(fd)
+        else:
             self.fd=fd
             if size!=None:
                 self.size=size
             else:
                 self.size=2147483647
-        else:
-            self.fd=cStringIO.StringIO(string)
-            self.size=len(string)
 
         if self.size<0:
             raise IOError("Unable to set negative size (%s) for buffer (offset was %s)" % (self.size,self.offset))

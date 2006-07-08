@@ -73,9 +73,8 @@ class RFC2822(Scanner.GenScanFactory):
             self.ignore = True
             return True
  
-        def external_process(self,name):		    
+        def external_process(self,fd):		    
 	    count = 0
-            fd = open(name,'r')
 
             try:
                 a=email.message_from_file(fd)

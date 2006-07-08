@@ -220,15 +220,18 @@ class StoreAndScan(BaseScanner):
         return FlagFramework.get_temp_path(self.dbh.case, self.inode)
 
     def finish(self):
+        if not self.boring_status:
+            self.file.flush()
+            ## Reopen the file to read
+            fd = open(self.file.name,'r')
+            self.external_process(fd)
+
         if self.file:
             self.file.close()
             ## We now remove the file from the central storage place:
             StoreAndScanFiles.remove(self.name)
 
-        if not self.boring_status:
-            self.external_process(self.name)
-
-    def external_process(self,name):
+    def external_process(self,fd):
         """ This function is invoked by the scanner to process a temporary file.
 
         This function my be overridden by derived classes.
@@ -268,6 +271,32 @@ class StoreAndScanType(StoreAndScan):
         self.ignore = True
         return True
 
+class StringIOType(StoreAndScanType):
+    """ Just like StoreAndScanType but the file exists in memory only.
+    """
+    def process(self, data, metadata=None):
+        try:
+            if self.boring_status:
+                self.boring_status = self.boring(metadata, data=data)
+
+            if not self.name:
+                self.name = self.make_filename()
+                
+            if not self.file and not self.boring_status and self.name not in StoreAndScanFiles:
+                StoreAndScanFiles.append(self.name)
+                self.file = StringIO.StringIO()
+        except KeyError:
+            pass
+
+        if self.file:
+            self.file.write(data)
+
+    def finish(self):
+        if self.file:
+            StoreAndScanFiles.remove(self.name)
+
+        if not self.boring_status:
+            self.external_process(self.file)
 
 class ScanIfType(StoreAndScanType):
     """ Only Scans if the type matches self.types.

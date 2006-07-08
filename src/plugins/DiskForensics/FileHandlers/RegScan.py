@@ -40,8 +40,8 @@ class RegistryScan(GenScanFactory):
     
     def __init__(self,fsfd):
         GenScanFactory.__init__(self, fsfd)
-        self.dbh.execute("""CREATE TABLE `reg` (
-        `path` CHAR(250) NOT NULL,
+        self.dbh.execute("""CREATE TABLE if not exists `reg` (
+        `path` text NOT NULL,
         `offset` INT(11),
         `modified` INT(11),
         `remainder` INT(11),
@@ -81,7 +81,7 @@ class RegistryScan(GenScanFactory):
 
         self.dbh.mass_insert_commit()
         ## Add indexes:
-        self.dbh.check_index("reg" ,"path")
+        self.dbh.check_index("reg" ,"path",250)
         self.dbh.check_index("regi" ,"dirname",100)
 
     class Scan(StoreAndScanType):
@@ -91,8 +91,8 @@ class RegistryScan(GenScanFactory):
 #            'application/x-win9x-registry',
             )
         
-        def external_process(self,filename):
-            b=Buffer(fd=open(filename))
+        def external_process(self,fd):
+            b=Buffer(fd)
             header = RegF(b)
             root_key = header['root_key_offset'].get_value()
 ##            self.dbh.MySQLHarness("regtool -f %r -t reg -p %r " % (filename,self.ddfs.lookup(inode=self.inode)))

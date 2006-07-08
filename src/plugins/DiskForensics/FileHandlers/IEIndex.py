@@ -61,8 +61,7 @@ class IEIndex(Scanner.GenScanFactory):
     class Scan(Scanner.StoreAndScanType):
         types = ['application/x-ie-index']
 
-        def external_process(self,name):
-            fd = open(name,'r')
+        def external_process(self,fd):
             history = IECache.IEHistoryFile(fd)
             for event in history:
                 if event:                    

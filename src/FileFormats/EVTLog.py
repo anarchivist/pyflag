@@ -70,7 +70,7 @@ Forensic examiners have to live with it, and should use PyFlags event log messag
 """
 from format import *
 from plugins.FileFormats.BasicFormats import *
-import sys
+import sys,re
 
 class EventType(WORD_ENUM):
     types = {
@@ -126,11 +126,10 @@ class Event(Header):
             [ 'TimeGenerated',TIMESTAMP ],
             [ 'TimeWritten',TIMESTAMP ],
             [ 'EventID',ULONG ],
-#            [ 'pad',WORD ],
             [ 'EventType', EventType ],
             [ 'NumStrings', WORD ],
             [ 'EventCategory', WORD ],
-            [ 'Unknown', BYTE_ARRAY,{'length':26} ],
+            [ 'Unknown', BYTE_ARRAY,{'count':26} ],
             ]
 
     def read(self):
@@ -138,11 +137,55 @@ class Event(Header):
         if result['Magic']!='LfLe':
             raise IOError('LfLe record not found at location 0x%08X' % self.buffer.offset)
         
-        ## Following the struct is an array of NumStrings UCS16 strings:
+        ## Following the struct is an array of NumStrings UCS16
+        ## strings. The first 2 strings are name of service and
+        ## machine name:
         NumStrings=result['NumStrings'].get_value()
-        self.add_element(result,'Strings', TERMINATED_UCS16_Array(self.buffer[14*4:],count=NumStrings))
-        return result
+
+        ## The first string is the source name:
+        s = TERMINATED_UCS16(self.buffer[self.offset:])
+        self.offset += s.size()
+        self.add_element(result,'Source' , s)
+
+        ## The second string is the machine name:
+        s = TERMINATED_UCS16(self.buffer[self.offset:])
+        self.offset += s.size()
+        self.add_element(result,'Machine' , s)
+
+        ## The rest are the strings:
+        self.add_element(result,'Strings', TERMINATED_UCS16_Array(self.buffer[self.offset:],count=NumStrings))
         
+        return result
+
+format = re.compile("%(\d+|n|r|t)")
+def format_message(message, parameters):
+    """ Formats a message from a format string and an array of parameters.
+
+    Similar to:
+    http://msdn.microsoft.com/library/en-us/debug/base/formatmessage.asp
+    """
+    offset=0
+    result=''
+    for m in format.finditer(message):
+        result+=message[offset:m.start()]
+        x=m.group(1)
+        if x=='n':
+            result+="\n"
+        elif x=='r':
+            result+="\r"
+        elif x=='t':
+            result+="\t"
+        elif x=='0':
+            pass
+        else:
+            result+=parameters[int(x)-1].__str__()
+
+        offset=m.end()
+
+    result+=message[offset:]
+
+    return result
+
 if __name__ == "__main__":
     fd=open(sys.argv[1],'r')
 

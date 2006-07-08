@@ -172,7 +172,7 @@ class SimpleStruct(DataType):
         return self.data[attr]
 
     def __setitem__(self,k,attr):
-        print "Setting %s to %s " % (k,attr)
+##        print "Setting %s to %s " % (k,attr)
         self.data[k]=attr
 
     def form(self,prefix, query,result):
@@ -325,7 +325,7 @@ class STRING(BYTE):
 ##            raise IOError("%s"% e)
 
     def form(self,prefix, query,result):
-        print "\nString Form\n"
+##        print "\nString Form\n"
         result.textfield("String length","%slength" % prefix)
 
     def display(self, result):
@@ -371,7 +371,7 @@ class TERMINATED_STRING(DataType):
         return self.data==target
 
     def __getitem__(self,x):
-        print "x is %s" % x
+##        print "x is %s" % x
         return self.data[x]
         
 class BYTE_ENUM(BYTE):
@@ -379,7 +379,7 @@ class BYTE_ENUM(BYTE):
 
     def __str__(self):
         try:
-            return "%s (%s)" % (self.data,self.types[self.data])
+            return "%s" % (self.types[self.data])
         except KeyError:
             return "Unknown (%s)" % self.data
     
@@ -414,12 +414,15 @@ class UCS16_STR(STRING):
     
     def  read(self):
         result=STRING.read(self)
+
         ## This is the common encoding for windows system:
         try:
             return result.decode("utf_16_le")
         except UnicodeDecodeError:
-            print "Unable to decode %s" % result
-            return "Unable to decode '%r'" % result
+            if result=='\0':
+                return ''
+            else:
+                return "%r" % result
 
     def __str__(self):
         try:
@@ -449,7 +452,7 @@ class TIMESTAMP(ULONG):
     visible = True
     
     def __str__(self):
-        return "%s" % time.ctime(self.data)
+        return time.strftime("%Y/%m/%d %H:%M:%S",time.localtime(self.data))
 
 class WIN_FILETIME(SimpleStruct):
     """ A FileTime 8 byte time commonly see in windows.

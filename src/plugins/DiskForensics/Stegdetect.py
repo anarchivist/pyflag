@@ -67,7 +67,7 @@ class AFTJpegScan(GenScanFactory):
             'image/jpeg' ,
             )
 	    	    
-        def external_process(self,name):
+        def external_process(self,fd):
             """ This is run on the extracted file """
 		    
 #	    No checks on stegdetect since if we get here we already know it exists
@@ -79,7 +79,7 @@ class AFTJpegScan(GenScanFactory):
 #	    else: 
 #	    	return
 	    
-	    args = ['-s','2.00','-t','jopifa','-n','%s' % name ]
+	    args = ['-s','2.00','-t','jopifa','-n','%s' % fd.name ]
 	    stegbin = 'stegdetect'
 	    logging.log(logging.DEBUG,"Will launch %s %s %s %s %s %s %s" % (stegbin, args[0],args[1],args[2],args[3],args[4],args[5]))
 	    s=pexpect.spawn(stegbin, args)

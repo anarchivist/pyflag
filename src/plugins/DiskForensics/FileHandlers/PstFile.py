@@ -50,7 +50,7 @@ class PstScan(GenScanFactory):
     class Drawer(Scanner.Drawer):
         description = "File Type Related Scanners"
         name = "File Scanners"
-        contains = [ 'PstScan','IEIndex', 'RegistryScan', 'TypeScan']
+        contains = [ 'PstScan','IEIndex', 'RegistryScan', 'TypeScan', 'DLLScan']
         default = True
 
         # Let's check if this external tool exists into the PATH and then add it to the Drawer
@@ -95,9 +95,9 @@ class PstScan(GenScanFactory):
             'application/x-msoutlook',
             )
         
-        def external_process(self,name):
+        def external_process(self,fd):
             """ This is run on the extracted file """
-            self.fd.pst_handle=pypst2.Pstfile(name)
+            self.fd.pst_handle=pypst2.Pstfile(fd.name)
 
             def scan_item(inode,item):
                 """ Scans the item with the scanner train.
