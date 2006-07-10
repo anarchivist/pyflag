@@ -33,6 +33,10 @@ These are needed by both the DiskForensics and NetworkForensics
 """
 import pyflag.FileSystem as FileSystem
 import pyflag.IO as IO
+import pyflag.Reports as Reports
+import pyflag.conf
+config=pyflag.conf.ConfObject()
+import os.path
 
 class IO_File(FileSystem.File):
     """ A VFS Driver to make the io source available.
@@ -74,3 +78,18 @@ class IO_File(FileSystem.File):
         self.io.explain(tmp)
         result.row("IO Subsys %s:" % self.name, tmp, valign="top")
         result.row("Mount point",self.dbh.get_meta("mount_point_%s" % self.name))
+
+class Help(Reports.report):
+    """ This facility displays helpful messages """
+    hidden = False
+    family = "Misc"
+    name = "Help"
+    parameters = {'topic':'any'}
+
+    def form(self,query,result):
+        result.textfield("Topic",'topic')
+    
+    def display(self,query,result):
+        fd=open("%s/%s.html" % (config.DATADIR, os.path.normpath(query['topic'])))
+        result.result+=fd.read()
+        result.decoration='naked'

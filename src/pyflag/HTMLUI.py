@@ -1262,8 +1262,11 @@ class HTMLUI(UI.GenericUI):
                 tmp_links.append(tmp)
                 
             self.row(*tmp_links)
-            
-        self.row("Enter a term to filter on field (%=wildcard,&&=AND,||=OR).  Valid operators are \"%,!,=,<,>,||,&&\".  For example: =Target || %jo%",colspan=50,align='center')
+
+        tmp = self.__class__(self)
+        tmp.link("Enter a term to filter on",tooltip="(%=wildcard,&&=AND,||=OR).",target=FlagFramework.query_type(report="Help",topic="help_search",family="Misc",__opt__='popup'))
+        #"  Valid operators are \"%,!,=,<,>,||,&&\".  For example: =Target || %jo%'"
+        self.row(tmp,colspan=50,align='center')
 
         #Now create a row with input boxes for each parameter
         tmp_links=[]

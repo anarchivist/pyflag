@@ -72,7 +72,8 @@ class DLLScan(Scanner.GenScanFactory):
             self.pydbh.execute("select * from EventMessageSources where source=%r limit 1",service)
             pyrow=self.pydbh.fetch()
             if not pyrow:
-                self.pydbh.execute("insert into EventMessageSources set filename=%r, source=%r" , (row['value'], service))
+                filename = row['value'].split("\\")[-1].lower()
+                self.pydbh.execute("insert ignore into EventMessageSources set filename=%r, source=%r" , (filename, service))
 
     class Scan(Scanner.StoreAndScanType):
         types = [ 'application/x-dosexec' ]

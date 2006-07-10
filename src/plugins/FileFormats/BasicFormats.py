@@ -425,8 +425,14 @@ class UCS16_STR(STRING):
                 return "%r" % result
 
     def __str__(self):
+        ## Return up to the first null termination
         try:
-            return "%s" % self.data.__str__()
+            result = self.data.__str__()
+            try:
+                return result[:result.index("\0")]
+            except ValueError:
+                return result
+            
         except UnicodeEncodeError:
             return "%r" % self.data
         

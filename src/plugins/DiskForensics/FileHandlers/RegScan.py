@@ -38,18 +38,20 @@ class RegistryScan(GenScanFactory):
     default = True
     depends = ['TypeScan']
     
-    def __init__(self,fsfd):
-        GenScanFactory.__init__(self, fsfd)
+    def prepare(self):
+        ## The reg table is used for storing all the values in each
+        ## key
         self.dbh.execute("""CREATE TABLE if not exists `reg` (
         `path` text NOT NULL,
         `offset` INT(11),
-        `modified` INT(11),
-        `remainder` INT(11),
-        `type` CHAR(50) NOT NULL,
+        `type` enum('REG_NONE','REG_SZ','REG_EXPAND_SZ','REG_BINARY','REG_DWORD','REG_DWORD_BIG_ENDIAN','REG_LINK','REG_MULTI_SZ','REG_RESOURCE_LIST','REG_FULL_RESOURCE_DESCRIPTOR','REG_RESOURCE_REQUIREMENTS_LIST','Unknown') NOT NULL,
+        `modified` timestamp,
         `reg_key` VARCHAR(200) NOT NULL,
-        `value` text
-        )""")
-#        self.dbh.MySQLHarness("regtool -t reg -d create")
+        `value` text)""")
+
+        ## The regi table is used for the key navigation
+        self.dbh.execute("""create table if not exists regi (
+        `dirname` TEXT NOT NULL ,`basename` TEXT NOT NULL)""")
 
     def reset(self, inode):
         GenScanFactory.reset(self, inode)
@@ -57,32 +59,10 @@ class RegistryScan(GenScanFactory):
         self.dbh.execute('drop table if exists regi')
         
     def destroy(self):
-        ## Create the directory indexes to speed up tree navigation:
-        self.dbh.execute("create table if not exists regi (`dirname` TEXT NOT NULL ,`basename` TEXT NOT NULL)")
-        dirtable = {}
-        self.dbh.execute("select path from reg")
-        for row in self.dbh:
-            array=row['path'].split("/")
-            while len(array)>1:
-                new_dirname="/".join(array[:-1])
-                new_basename=array.pop()
-                try:
-                    ## See if the value is already in the dictionary
-                    dirtable[new_dirname].index(new_basename)
-                except ValueError:
-                    dirtable[new_dirname].append(new_basename)
-                except KeyError:
-                    dirtable[new_dirname]=[new_basename]
-
-        self.dbh.mass_insert_start("regi")
-        for k,v in dirtable.items():
-            for name in v:
-                self.dbh.mass_insert(dirname=k,basename=name)
-
-        self.dbh.mass_insert_commit()
         ## Add indexes:
         self.dbh.check_index("reg" ,"path",250)
         self.dbh.check_index("regi" ,"dirname",100)
+
 
     class Scan(StoreAndScanType):
         types =  (
@@ -95,30 +75,39 @@ class RegistryScan(GenScanFactory):
             b=Buffer(fd)
             header = RegF(b)
             root_key = header['root_key_offset'].get_value()
-##            self.dbh.MySQLHarness("regtool -f %r -t reg -p %r " % (filename,self.ddfs.lookup(inode=self.inode)))
             parent_path = self.ddfs.lookup(inode=self.inode)
+            
+            ## One handle does the reg table, the other handle the
+            ## regi table:
+            regi_handle=self.dbh.clone()
+            reg_handle = self.dbh
+
+            reg_handle.mass_insert_start('reg')
+            regi_handle.mass_insert_start('regi')
+            
             def store_key(nk_key, path):
-                if nk_key['no_values'].get_value()>0:
-                    try:
-                        for value in nk_key['vk_list']:
-                            vk=value.get_value()
-                            if vk:
-                                last_write_time = nk_key['WriteTS'].to_unixtime()
-                                self.dbh.mass_insert(
-                                    path=path,
-                                    modified=int(last_write_time),
-                                    remainder=int((last_write_time - int(last_write_time))*1000000),
-                                    type=vk['data']['val_type'].get_value(),
-                                    reg_key=vk['keyname'],
-                                    value=("%s" % vk['data'])[:1024],
-                                    offset=vk.buffer.offset
-                                    )
-                    except IOError:
-                        print "Oops: Cant parse values in %s at offset 0x%08X!" % (nk_key['key_name'], nk_key.buffer.offset)
-                        
-            self.dbh.mass_insert_start("reg")
-            ls_r(root_key, path=parent_path, cb=store_key)
-            self.dbh.mass_insert_commit()
+                regi_handle.mass_insert(dirname=path,
+                                        basename=nk_key['key_name'])
+
+                new_path="%s/%s" % (path,nk_key['key_name'])
+
+                ## Store all the values:
+                for v in nk_key.values():
+                    reg_handle.mass_insert(path=new_path,
+                                           offset=v['data']['offs_data'],
+                                           modified=nk_key['WriteTS'],
+                                           type=v['data']['val_type'],
+                                           reg_key=v['keyname'],
+                                           value=v['data']
+                                           )
+                    
+                for k in nk_key.keys():
+                    store_key(k,new_path)
+
+            store_key(root_key,path=parent_path)
+            reg_handle.mass_insert_commit()
+            regi_handle.mass_insert_commit()
+            
 
 ## Report to browse Loaded Registry Files:
 class BrowseRegistry(DiskForensics.BrowseFS):
@@ -135,11 +124,11 @@ class BrowseRegistry(DiskForensics.BrowseFS):
         def treecb(branch):
             """ This call back will render the branch within the registry file. """
             path =FlagFramework.normpath('/'.join(branch))
-            if path=='/': path=''
+
             dbh = self.DBO(query['case'])
 
             ##Show the directory entries:
-            dbh.execute("select basename from regi where dirname=%r and length(basename)>1 group by basename",(path))
+            dbh.execute("select basename from regi where dirname=%r",(path))
             for row in dbh:
                 yield(([row['basename'],row['basename'],'branch']))
                 
@@ -161,7 +150,7 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                 def pane_cb(branch,table):
                     path = FlagFramework.normpath('/'.join(branch))
                     tmp=result.__class__(result)
-                    dbh.execute("select from_unixtime(modified) as time from reg where path=%r limit 1",(path))
+                    dbh.execute("select modified as time from reg where path=%r limit 1",(path))
                     row=dbh.fetch()
 
                     try:

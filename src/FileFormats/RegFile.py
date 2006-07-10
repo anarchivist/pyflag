@@ -189,7 +189,8 @@ class DATA_TYPE(LONG_ENUM):
         7:'REG_MULTI_SZ',  # Multiple Unicode strings 
         8:'REG_RESOURCE_LIST',  # Resource list in the resource map 
         9:'REG_FULL_RESOURCE_DESCRIPTOR', # Resource list in the hardware description 
-        10:'REG_RESOURCE_REQUIREMENTS_LIST'
+        10:'REG_RESOURCE_REQUIREMENTS_LIST',
+        11:'Unknown'
         }
 
 class DATA(SimpleStruct):
@@ -225,22 +226,26 @@ class DATA(SimpleStruct):
         else:
             ## Data is referenced by offs_data:
             data=self.buffer.set_offset(offs_data+FIRST_PAGE_OFFSET+4)
-            self.raw_data=data[:len_data]
+            self.raw_data=data[:min(size,1024)]
             
         return result
 
+    def __repr__(self):
+        return self.__str__()
+
     def __str__(self):
         """ We display ourselves nicely """
-        result=''
         val_type=self['val_type']
         if self.raw_data==None:
             return 'None'
+        
         elif val_type=='REG_SZ' or val_type=='REG_EXPAND_SZ' or val_type=='REG_MULTI_SZ':
-            result+="%s" % UCS16_STR(self.raw_data, length=len(self.raw_data))
+            result="%s" % UCS16_STR(self.raw_data, length=len(self.raw_data))
         elif val_type=='REG_DWORD':
-            result+="0x08%X" % ULONG(self.raw_data).get_value()
+            result="0x08%X" % ULONG(self.raw_data).get_value()
         else:
-            result+="%r" % "%s" % self.raw_data
+            result="%r" % "%s" % self.raw_data
+            
         return result
 
 class vk_key(SimpleStruct):
@@ -260,7 +265,7 @@ class vk_key(SimpleStruct):
 
         strlen=result['len_name'].get_value()
         if strlen>0:
-            keyname=STRING(self.buffer[5*4:],length=strlen)
+            keyname=STRING(self.buffer[self.offset:],length=strlen)
         else:
             keyname=STRING('@',length=1)
 
@@ -353,17 +358,17 @@ if __name__ == "__main__":
     buffer = Buffer(fd=fd)
     header = RegF(buffer)
     root_key = header['root_key_offset'].get_value()
-
-    path = 'ControlSet001/Services/A3AB'
+    
+    path = 'Software/Microsoft/Windows/CurrentVersion/Explorer/TrayNotify'
     key = get_key(root_key,path)
     print key
 
     print "Values for %s" % path
     for v in key.values():
-        print v
+        print v['data']['val_type'],v['data']['len_data'],v['data']
 
     print "Keys under %s" % path
     for k in key.keys():
         print k
 
-    ls_r(root_key)
+#    ls_r(root_key)
