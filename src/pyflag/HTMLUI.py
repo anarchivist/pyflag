@@ -137,11 +137,13 @@ class HTMLUI(UI.GenericUI):
         #window not ones which are added to other UIs:
         self.decoration='full'
         self.title=''
+
+    preamble = "<form name=PseudoForm method=POST action='/post'><input type=hidden id=pseudo_post_query name=pseudo_post_query value='' /></form><script>if(!window.name) window.name='ID%s'; </script>\n<script src='/javascript/functions.js'></script>\n"
         
     def display(self):
         ## If the method is post, we need to emit the pseudo post form:
         if self.decoration!='raw':
-            self.result="<form name=PseudoForm method=POST action='/post'><input type=hidden id=pseudo_post_query name=pseudo_post_query value='' /></form><script>if(!window.name) window.name='ID%s'; </script>\n<script src='/images/functions.js'></script>\n" % self.id + self.result
+            self.result=self.preamble % self.id + self.result
 
         #Make a toolbar
         if not self.nav_query:
@@ -566,9 +568,9 @@ class HTMLUI(UI.GenericUI):
                 sv=value.__str__().replace(' ','&nbsp;')
                 
                 if state=="branch":
-                    result.result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img border=0 src=\"/folder.png\"></a>" % (cb,query['right_pane_cb'],link)
+                    result.result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img border=0 src=\"/images/folder.png\"></a>" % (cb,query['right_pane_cb'],link)
                 else:
-                    result.result+="<a href=\"javascript:tree_pane_open('%s','%s','f?%s')\"><img border=0 src=\"/corner.png\"></a>" % (cb,query['right_pane_cb'],link)
+                    result.result+="<a href=\"javascript:tree_pane_open('%s','%s','f?%s')\"><img border=0 src=\"/images/corner.png\"></a>" % (cb,query['right_pane_cb'],link)
                     
                 result.result+="&nbsp;%s</td></tr>\n" % str(sv)
                 result.result+="\n"
@@ -587,7 +589,7 @@ class HTMLUI(UI.GenericUI):
             #The first item in the tree is the first one provided in branch
             link = query.clone()
             del link['callback_stored']
-            result.result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img border=0 src=\"/folder.png\"></a>" % (query['callback_stored'],query['right_pane_cb'],link)
+            result.result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img border=0 src=\"/images/folder.png\"></a>" % (query['callback_stored'],query['right_pane_cb'],link)
             result.result+="&nbsp;/<br>\n"
 
             result.result+="<table width=100%>"
@@ -679,7 +681,7 @@ class HTMLUI(UI.GenericUI):
                     if found and len(tmp)>config.MAXTREESIZE:
                         tree_array += tmp
                         if len(tmp) > config.MAXTREESIZE:
-                            tree_array.append((depth,tmp[-1][1],'<img src=/flag/images/down.png border=0> ...','special'))
+                            tree_array.append((depth,tmp[-1][1],'<img src=//images/down.png border=0> ...','special'))
                         return
 
                     #Do we find the current item in the list?
@@ -691,7 +693,7 @@ class HTMLUI(UI.GenericUI):
                             start = 0
                         else:
                             start = match_pos - config.MAXTREESIZE
-                            tree_array.append((depth,tmp[start-1][1],'<img src=/flag/images/up.png border=0> ...','special'))
+                            tree_array.append((depth,tmp[start-1][1],'<img src=//images/up.png border=0> ...','special'))
                         
                         tree_array += tmp[start:]
                         tmp = []
@@ -710,7 +712,7 @@ class HTMLUI(UI.GenericUI):
             split =  tmp[:config.MAXTREESIZE]
             tree_array += split
             if len(split) == config.MAXTREESIZE:
-                tree_array.append( (depth,split[-1][1],'<img src=/flag/images/down.png border=0> ...','special'))
+                tree_array.append( (depth,split[-1][1],'<img src=//images/down.png border=0> ...','special'))
 
         #### End draw_branch
 
@@ -746,7 +748,7 @@ class HTMLUI(UI.GenericUI):
             left.icon("spacer.png",width=20*depth,height=20)
             if t =='branch':
                 new_query = link
-                left.link(str(sv),tooltip=link['open_tree'],target=link, name=open_tree,icon="folder.png")
+                left.link(str(sv),tooltip=link['open_tree'],target=link, name=open_tree,icon="images/folder.png")
                 left.text("&nbsp;%s\n" % str(sv),color='black')
             elif t == 'special':
                 left.link(str(v),tooltip=link['open_tree'],target=link, name=open_tree)
@@ -1583,7 +1585,7 @@ class HTMLUI(UI.GenericUI):
     def icon(self, path, tooltip=None, **options):
         """ This allows the insertion of a small static icon picture. The image should reside in the images directory."""
         option_str = self.opt_to_str(options)
-        data = "<img border=0 src=/flag/images/%s %s />" % (path, option_str)
+        data = "<img border=0 src='images/%s' %s />" % (path, option_str)
         if tooltip:
             data = "<abbr title='%s'>%s</abbr>" % (tooltip,data)
         self.result += data

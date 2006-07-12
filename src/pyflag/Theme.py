@@ -89,7 +89,7 @@ class BasicTheme:
     banner = '''<table width="100%%">
         <tbody> 
         <tr>
-        <td align=left width=10><img src="/flag/images/pyflag.png" alt="flag_heading" border="0"></td><td align=center> ''' 
+        <td align=left width=10><img src="/images/pyflag.png" alt="flag_heading" border="0"></td><td align=center> ''' 
 
     def naked_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
         """ Render the ui with minimal interventions """
@@ -140,23 +140,23 @@ class BasicTheme:
             #Make a link
             q=query.clone()
             q.FillQueryTarget(next)
-            next = '<a href="f?%s"><img src="/flag/images/forward.png" border="0"></a>' % (str(q))
+            next = '<a href="f?%s"><img src="/images/forward.png" border="0"></a>' % (str(q))
         else:
-            next = '<img src="/flag/images/g_forward.png" border="0">'
+            next = '<img src="/images/g_forward.png" border="0">'
 
         if previous<0:
-            previous =  '<img src="/flag/images/g_back.png" border="0">'
+            previous =  '<img src="/images/g_back.png" border="0">'
         else:
             q=query.clone()
             q.FillQueryTarget(previous)
-            previous = '<a href="f?%s"><img src="/flag/images/back.png"  border="0"></a>' %  (str(q))
+            previous = '<a href="f?%s"><img src="/images/back.png"  border="0"></a>' %  (str(q))
 
         bar = {'family': propegate(query,FlagFramework.query_type()),'back': previous,'case': query['case'],'pageno':  pageno,'next': next,'reset': str(query)+'&reset=1','stop': str(query)+'&stop=1'}
 
         toolbar = '''<table><tr>
-        <td valign="bottom"><a href="f?family=%(family)s"><img src="/flag/images/home.png" border="0"></a></td><td valign="bottom">%(back)s</td>%(case)s - page %(pageno)s<td valign="bottom">%(next)s</td> <td valign="bottom">
-        <td valign="bottom"><a href="flag?%(reset)s"><img src="/flag/images/reset.png" border="0"></a></td>	  
-        <td valign="bottom"><a href=flag?%(stop)s><img src="/flag/images/stop.png" border="0"></a></td></tr></table>''' % bar
+        <td valign="bottom"><a href="f?family=%(family)s"><img src="/images/home.png" border="0"></a></td><td valign="bottom">%(back)s</td>%(case)s - page %(pageno)s<td valign="bottom">%(next)s</td> <td valign="bottom">
+        <td valign="bottom"><a href="flag?%(reset)s"><img src="/images/reset.png" border="0"></a></td>	  
+        <td valign="bottom"><a href=flag?%(stop)s><img src="/images/stop.png" border="0"></a></td></tr></table>''' % bar
 
         return toolbar
 
@@ -167,7 +167,7 @@ class BasicTheme:
         except:
             toolbar_str=''
 
-        return " ".join((self.header,self.banner,meta,"<td align=left>%s</td><td align=center>"%toolbar_str,toolbar,'''</td><td width=10><center><img src="/flag/images/logo.png"><br><font size="+1"><a href="http://www.gnu.org/copyleft/gpl.html"> &copy;GPL</a></font></center></td></tr></tbody></table> </tr></table>\n''', data ,"<table width=100%%><tr><td></td></tr><tr><td align=center>%s</td></tr></table>"%(toolbar),self.footer))
+        return " ".join((self.header,self.banner,meta,"<td align=left>%s</td><td align=center>"%toolbar_str,toolbar,'''</td><td width=10><center><img src="/images/logo.png"><br><font size="+1"><a href="http://www.gnu.org/copyleft/gpl.html"> &copy;GPL</a></font></center></td></tr></tbody></table> </tr></table>\n''', data ,"<table width=100%%><tr><td></td></tr><tr><td align=center>%s</td></tr></table>"%(toolbar),self.footer))
 
 
 def get_theme(query):

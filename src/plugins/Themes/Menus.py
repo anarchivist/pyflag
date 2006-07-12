@@ -20,7 +20,7 @@ class Menu(Theme.BasicTheme):
         }
         UpdateIt();
     </script>
-    <table cellspacing=0 cellpadding=0 width="100%%" background="flag/images/topfill.jpg" border=0> <tbody>
+    <table cellspacing=0 cellpadding=0 width="100%%" background="/images/topfill.jpg" border=0> <tbody>
     <tr><td align=left>%s</td>
     <td height=25>
     <div align="right">%s PyFlag</div>
@@ -36,7 +36,7 @@ class Menu(Theme.BasicTheme):
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
         <title>%s</title>
         <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
-        <script src="images/functions.js" type="text/javascript" language="javascript"></script>
+        <script src="javascript/functions.js" type="text/javascript" language="javascript"></script>
         <style>
         all.clsMenuItemNS, .clsMenuItemIE{text-decoration: none; font: bold 12px Arial; color: white; cursor: hand; z-index:100}
         #MainTable A:hover {color: yellow;}
@@ -49,7 +49,7 @@ class Menu(Theme.BasicTheme):
         var menucolor="black" 
         var submenuwidth=150
         </script>
-        <script type="text/javascript" src="menu.js" language="javascript"></script>'''
+        <script type="text/javascript" src="/javascript/menu.js" language="javascript"></script>'''
 
     def make_menu_javascript(self,query):
         """ Creates the javascript function required to generate the menu """
@@ -129,5 +129,6 @@ class Menu(Theme.BasicTheme):
              meta,
              '''&nbsp </tr></table>\n''',
              self.hilight_bar % (toolbar_str,case),
-             "<table><tr><td>%s</td></tr></table>" % (data),
+             data,
+#             "<table><tr><td>%s</td></tr></table>" % (data),
              self.hilight_bar % (toolbar_str,case),self.footer))

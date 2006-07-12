@@ -32,8 +32,9 @@
 import BaseHTTPServer, SimpleHTTPServer, SocketServer
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
-import pyflag.HTMLUI as UI
-import cgi
+import pyflag.AJAXUI as AJAXUI
+import pyflag.HTMLUI as HTMLUI
+import cgi,os
 import re,time,sys
 import pyflag.conf
 config=pyflag.conf.ConfObject()
@@ -151,7 +152,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         headers = {}
         
         result = flag.ui()
-        result.generator=UI.HTTPObject()
+        result.generator=HTMLUI.HTTPObject()
 
         ## Calculate the query from the request.
         query=self.parse_query()
@@ -159,7 +160,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         ## Work out if the request was for a static object
         ct=''
         if query.base.endswith(".js"):
-            ct="text/javascript"
+            ct="application/x-javascript"
             
         #Is this a request for an image?
         if re.search("\.(png|jpg|gif|ico)$",query.base):
@@ -168,20 +169,28 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         if re.search("\.(css)$",query.base):
             ct="text/css"
 
+        if re.search("\.(htm)l?$",query.base):
+            ct="text/html"
+            
         if ct:
-            i=query.base.rfind('/')
             try:
                 import sys
                 self.send_response(200)
                 self.send_header("Content-type",ct)
+                self.send_header("Last-Modified","Sun, 17 Jan 2000 19:14:07 GMT")
+                self.send_header("Etag","123456789")
+                self.send_header("Expires","Sun, 17 Jan 2038 19:14:07 GMT")                
                 self.end_headers()
-                fd = open(config.IMAGEDIR + query.base[i+1:])
-                f = fd.read()
-                self.wfile.write(f)
-                fd.close()
-                return
-            except TypeError:
-                self.wfile.write("File not found")
+                path = os.path.normpath(config.DATADIR + query.base)
+                if path.startswith(os.path.normpath(config.DATADIR)):
+                    fd = open(path)
+                    f = fd.read()
+                    self.wfile.write(f)
+                    fd.close()
+                    return
+                else: raise TypeError("Forbidden")
+            except TypeError,e:
+                self.wfile.write("File not found: %s"%e)
                 return
 
         #We need to check the configuration and if it is incorrect, we prompt the user
@@ -193,19 +202,19 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             return
 
         #Is this a request for a saved UI?
-        if query.has_key('draw_stored') and UI.HTMLUI.store_dict.has_key(query['draw_stored']):
-            result = UI.HTMLUI.store_dict[query['draw_stored']]
+        if query.has_key('draw_stored') and flag.ui.store_dict.has_key(query['draw_stored']):
+            result = flag.ui.store_dict[query['draw_stored']]
             
             ## This expires stored pictures in case pyflag is
             ## restarted
             headers['Expires']='-1'
-        elif query.has_key('callback_stored') and UI.HTMLUI.callback_dict.has_key(query['callback_stored']):
+        elif query.has_key('callback_stored') and flag.ui.callback_dict.has_key(query['callback_stored']):
             cb = query.getarray('callback_stored')[-1]
 
             result=flag.ui(query=query)
 #            cb=query['callback_stored']
 #            del query['callback_stored']
-            cb=UI.HTMLUI.callback_dict[cb]
+            cb=flag.ui.callback_dict[cb]
 #            del UI.HTMLUI.callback_dict[cb]
             cb(query,result)
             ## This ensures that callbacks are recalled each time they
@@ -216,10 +225,10 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         else:            
               #Clear the store if its been there too long:
               expired_time = time.time() - 100
-              for k in UI.HTMLUI.store_dict.keys():
+              for k in flag.ui.store_dict.keys():
                   if expired_time > UI.HTMLUI.time_dict[k]:
-                      del UI.HTMLUI.store_dict[k]
-                      del UI.HTMLUI.time_dict[k]
+                      del flag.ui.store_dict[k]
+                      del flag.ui.time_dict[k]
                       
               ## We sometimes need to force the gc, this may prove to be a performance hit?
               try:
@@ -316,7 +325,7 @@ if __name__ == "__main__":
     flag = FlagFramework.Flag()
     FlagFramework.GLOBAL_FLAG_OBJ =flag
     #Set the UI module to produce HTML
-    flag.ui = UI.HTMLUI
+    flag.ui = AJAXUI.AJAXUI
 
     #Set the default graphing module to produce SVG using ploticus
     import pyflag.Graph as Graph

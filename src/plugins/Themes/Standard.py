@@ -8,7 +8,7 @@ import pyflag.Theme as Theme
 class BlueTheme(Theme.BasicTheme):
     """ This class encapsulates the theme elements. The results from this class really depend on the UI used - for example the HTMLUI will expect HTML to come back from here. """
 
-    hilight_bar = '''<table cellspacing=0 cellpadding=0 width="100%%" background="flag/images/topfill.jpg" border=0> <tbody>
+    hilight_bar = '''<table cellspacing=0 cellpadding=0 width="100%%" background="/images/topfill.jpg" border=0> <tbody>
     <tr><td align=left>%s</td>
     <td height=25 align=center>%s</td>
     <td height=25>
@@ -31,22 +31,22 @@ class BlueTheme(Theme.BasicTheme):
             #Make a link
             q=query.clone()
             q.FillQueryTarget(next)
-            next = '<a href="f?%s"><img height=25 src="/flag/images/forward.png" border="0"></a>' % (str(q))
+            next = '<a href="f?%s"><img height=25 src="/images/forward.png" border="0"></a>' % (str(q))
         else:
-            next = '<img src="/flag/images/arrow_right_grey.gif" height=25 border="0">'
+            next = '<img src="/images/arrow_right_grey.gif" height=25 border="0">'
 
         if previous<0:
-            previous =  '<img src="/flag/images/arrow_left_grey.gif" height=25 border="0">'
+            previous =  '<img src="/images/arrow_left_grey.gif" height=25 border="0">'
         else:
             q=query.clone()
             q.FillQueryTarget(previous)
-            previous = '<a href="f?%s"><img height=25 src="/flag/images/back.png"  border="0"></a>' %  (str(q))
+            previous = '<a href="f?%s"><img height=25 src="/images/back.png"  border="0"></a>' %  (str(q))
 
         bar = {'family': Theme.propegate(query,FlagFramework.query_type()),'back': previous,'case': query['case'],'pageno':  pageno,'next': next,'reset': str(query)+'&reset=1','stop': str(query)+'&stop=1'}
 
         toolbar = '''<table><tr>
-        <td valign="bottom"><a href="%(family)s"><img height=25 src="/flag/images/home_grey.png" border="0"></a></td><td valign="bottom">%(back)s</td><td>%(case)s - page %(pageno)s</td><td valign="bottom">%(next)s</td> <td valign="bottom">
-        <td valign="bottom"><a href="flag?%(reset)s"><img height=25 src="/flag/images/reset_grey.png" border="0"></a></td></tr></table>''' % bar
+        <td valign="bottom"><a href="%(family)s"><img height=25 src="/images/home_grey.png" border="0"></a></td><td valign="bottom">%(back)s</td><td>%(case)s - page %(pageno)s</td><td valign="bottom">%(next)s</td> <td valign="bottom">
+        <td valign="bottom"><a href="flag?%(reset)s"><img height=25 src="/images/reset_grey.png" border="0"></a></td></tr></table>''' % bar
 
         return toolbar
 
@@ -58,7 +58,7 @@ class BlueTheme(Theme.BasicTheme):
             toolbar_str=ui.toolbar_ui.__str__()
 
         toolbar=self.navbar(query=query , next=next , previous=previous , pageno=pageno)
-        return " ".join((self.header % title,self.banner,meta,'''</td><td width=10><img src="/flag/images/logo.png"></td></tr></tbody></table> </tr></table>\n''',self.hilight_bar % (toolbar_str,toolbar), data ,self.hilight_bar % (toolbar_str,toolbar),self.footer))
+        return " ".join((self.header % title,self.banner,meta,'''</td><td width=10><img src="/images/logo.png"></td></tr></tbody></table> </tr></table>\n''',self.hilight_bar % (toolbar_str,toolbar), data ,self.hilight_bar % (toolbar_str,toolbar),self.footer))
 
     def menu(self,flag,query):
         """ Draws the menu for the current family.
@@ -77,11 +77,11 @@ class BlueTheme(Theme.BasicTheme):
               <tbody> 
               <tr> 
                 <td width=5><img height=22 alt="table corner" 
-                        src="flag/images/metbarleft.gif" 
+                        src="images/metbarleft.gif" 
                         width=5></td>
                 <td width="918"> 
                   <table cellspacing=0 cellpadding=0 width="100%" 
-                        background="flag/images/metbarfill.gif" 
+                        background="images/metbarfill.gif" 
                         border=0 hspace="0" vspace="0">
 
                     <tbody>                    <tr> 
@@ -96,12 +96,12 @@ class BlueTheme(Theme.BasicTheme):
                   </table>
                 </td>
                 <td width=10><img height=22 alt="table corner" 
-                        src="flag/images/metbarend.gif" 
+                        src="images/metbarend.gif" 
                         width=8></td>
 
               </tr>              <tr> 
                 <td width=5 
-                      background="flag/images/sidebarleft.gif">&nbsp;</td>
+                      background="images/sidebarleft.gif">&nbsp;</td>
                 <td valign=top width="918"> 
                   <p><font size="+1" face="Arial, Helvetica, sans-serif">'''
         
@@ -123,16 +123,16 @@ class BlueTheme(Theme.BasicTheme):
         result.result+='''                    </font></p>
                 </td>
                 <td width=10 
-                      background="flag/images/sidebarrgt.gif">&nbsp;</td>
+                      background="images/sidebarrgt.gif">&nbsp;</td>
 
               </tr>
               <tr> 
                 <td width=5><img height=22 alt="table corner" 
-                        src="flag/images/greenbarleft.gif" 
+                        src="images/greenbarleft.gif" 
                         width=5></td>
                 <td width="918"> 
                   <table cellspacing=0 cellpadding=0 width="100%" 
-                        background="flag/images/greenbarfill.gif" 
+                        background="images/greenbarfill.gif" 
                         border=0>
                     <tbody> 
                     <tr> 
@@ -142,7 +142,7 @@ class BlueTheme(Theme.BasicTheme):
                   </table>
 
                 </td>
-                <td width=10><img height=22 alt="table corner" src="flag/images/greenbarrgt.gif" width=8></td>
+                <td width=10><img height=22 alt="table corner" src="images/greenbarrgt.gif" width=8></td>
               </tr>
               </tbody> 
             </table>
