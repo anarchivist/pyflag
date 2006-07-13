@@ -27,35 +27,145 @@ class AJAX(Menu):
         dojo.require("dojo.widget.TabContainer");
 	dojo.require("dojo.widget.LinkPane");
 	dojo.require("dojo.widget.LayoutContainer");
-
-        function update_tree(leftcb,rightcb,url) {
-        var treepane = dojo.widget.getWidgetById("treepane");
-        var rightpane = dojo.widget.getWidgetById("rightpane");
+        dojo.require("dojo.widget.Tree");
+        dojo.require("dojo.widget.TreeSelector");
+        dojo.require("dojo.widget.TreeLoadingController");
+        dojo.require("dojo.widget.Menu2");
+	dojo.require("dojo.widget.Button");
         
-        treepane.setUrl(url+"&callback_stored="+leftcb+"&right_pane_cb=" + rightcb);
+        function update_tree(rightcb,url) {
+        var rightpane = dojo.widget.getWidgetById("rightpane");
         rightpane.setUrl(url+"&callback_stored="+rightcb);
+        };
+
+        function update_main(url) {
+          var main = dojo.widget.getWidgetById("main");
+          main.setUrl(url);
         };
 
         </script>
 
-        <style>
-        all.clsMenuItemNS, .clsMenuItemIE{text-decoration: none; font: bold 12px Arial; color: white; cursor: hand; z-index:100}
-        #MainTable A:hover {color: yellow;}
-        </style>
         <style type="text/css">
         body {
 	font-family : sans-serif;
         }
+        
         .dojoTabPaneWrapper {
         padding : 10px 10px 10px 10px;
         }
+        
         </style>
         </head>
         <body link=blue vlink=blue bgcolor="#FFFFFF">
-        <script>
-        var keepstatic=1 //specify whether menu should stay static 0=non static (works only in IE4+)
-        var menucolor="black" 
-        var submenuwidth=150
-        </script>
-        <script type="text/javascript" src="/javascript/menu.js" language="javascript"></script>
+        
+        <div dojoType="LayoutContainer"
+	layoutChildPriority='top-bottom'
+	style="width: 100%%; height: 100%%;">
         '''
+
+    footer="</div>"
+    def make_menu_javascript(self,query):
+        """ Creates the javascript required to generate the menu """
+        ## Find all families:
+        module_list = Registry.REPORTS.get_families()
+        Theme.order_families(module_list)
+        menus = []
+
+        result = '''<style>
+	/* group multiple buttons in a row */
+	.box {
+		display: block;
+		text-align: center;
+	}
+	.box .dojoButton {
+		float: left;
+		margin-right: 10px;
+	}
+	.dojoButton .dojoButtonContents {
+		font-size: medium;
+	}
+
+	/* make the menu style match the buttons */
+	.dojoPopupMenu2, .dojoPopupMenu2Client, .dojoMenuItem2,
+		.dojoMenuItem2Label, 
+		.dojoMenuItem2Accel {
+		color: black;
+		background-color: #B9D4FE;
+		border:1px solid #b8d4fe;
+	}
+	
+	body .dojoMenuItem2.dojoMenuItem2Hover,
+		.dojoMenuItem2.dojoMenuItem2Hover .dojoMenuItem2Label, 
+		.dojoMenuItem2.dojoMenuItem2Hover .dojoMenuItem2Accel,
+		.dojoMenuItem2.dojoMenuItem2Hover .dojoMenuItem2Icon {
+			background-color: #6F95CD;
+		border-color:#6F95CD;
+	}
+
+	/* todo: find good color for disabled menuitems, and teset */
+	.dojoMenuItem2Disabled .dojoMenuItem2Label span,
+	.dojoMenuItem2Disabled .dojoMenuItem2Accel span {
+		color: ThreeDShadow;
+	}
+	
+	.dojoMenuItem2Disabled .dojoMenuItem2Label span span,
+	.dojoMenuItem2Disabled .dojoMenuItem2Accel span span {
+		color: ThreeDHighlight;
+	}
+
+        html, body{	
+           width: 100%;	/* make the body expand to fill the visible window */
+           height: 100%;
+           overflow: hidden;	/* erase window level scrollbars */
+           padding: 0 0 0 0;
+           margin: 0 0 0 0;
+        }
+        </style>'''
+
+        for k in module_list:
+            submenu_text = ''
+            ## Add the reports in the family:
+            report_list = Registry.REPORTS.family[k]
+            for r in report_list:
+                if r.hidden: continue
+
+                submenu_text+='''<div dojoType="MenuItem2" caption="%s" onClick="update_main('%s');"></div>\n''' % (r.name,FlagFramework.query_type((),family=k,report=r.name))
+
+            if len(submenu_text)>0:
+                menus.append('<div dojoType="PopupMenu2" id="%s" toggle="wipe">%s</div> <button dojoType="dropdownButton" menuId="%s">%s</button>' % (k,submenu_text,k,k))
+
+
+        return result+'''<div dojoType="ContentPane" layoutAlign="top" style="background-color: #274383; color: white;">
+		<div class="box">%s</div>
+	</div>''' % (''.join(menus))
+
+    def naked_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
+        """ Render the ui with minimal interventions """
+        if not ui.toolbar_ui:
+            toolbar_str='&nbsp;&nbsp;'
+        else:
+            toolbar_str=ui.toolbar_ui.__str__()
+
+        return " ".join(
+            (self.header % (title),
+             data))
+
+    def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None,ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
+        print "rendering"
+        return data
+        
+    def menu(self,flag,query):
+        result=flag.ui()
+        
+        self.menu_javascript = self.make_menu_javascript(query)
+        title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version
+
+        data="<img src='images/logo.png>"
+        
+        result.result+=" ".join(
+            (self.header % (title),self.menu_javascript,
+             '<div dojoType="ContentPane" id="toolbar">\n</div>\n',
+             '<div dojoType="ContentPane" id="main">\n %s</div>\n'% data,
+             self.footer))
+
+        return result

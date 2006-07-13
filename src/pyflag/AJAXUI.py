@@ -83,61 +83,7 @@ class AJAXUI(HTMLUI.HTMLUI):
         """ A tree widget.
 
         This implementation uses javascript/iframes extensively.
-        """
-        def draw_branch(depth,query, result):
-            try:
-            ## Get the right part:
-                branch=query['open_tree'].split('/')
-            except KeyError:
-                branch=['/']
-            
-            for name,value,state in tree_cb(branch[:depth]):
-                ## Must have a name and value
-                if not name or not value: continue
-                result.result+="<tr><td>"
-                result.icon("spacer.png", width=20*depth, height=20)
-                link = query.clone()
-                del link['open_tree']
-                cb = link['callback_stored']
-                del link['callback_stored'] 
-                del link['right_pane_cb']
-               
-                link['open_tree'] = FlagFramework.normpath("/".join(branch[:depth] + [name]))
-                open_tree = FlagFramework.urlencode(link['open_tree'])
-                sv=value.__str__().replace(' ','&nbsp;')
-                
-                if state=="branch":
-                    result.result+="<a href=\"javascript:update_tree('%s','%s','f?%s')\"><img border=0 src=\"/images/folder.png\"></a>" % (cb,query['right_pane_cb'],link)
-                else:
-                    result.result+="<a href=\"javascript:update_tree('%s','%s','f?%s')\"><img border=0 src=\"/images/corner.png\"></a>" % (cb,query['right_pane_cb'],link)
-
-                result.result+="&nbsp;%s</td></tr>\n" % str(sv)
-                result.result+="\n"
-
-                try:
-                ## Draw any opened branches
-                    if name == branch[depth]:
-                        draw_branch(depth+1,query, result)
-                except IndexError:
-                    pass
-
-        def left(query,result):
-            result.decoration = "raw"
-            result.content_type = "text/html"
-
-            #The first item in the tree is the first one provided in branch
-            link = query.clone()
-            del link['callback_stored']
-            del link['right_pane_cb']
-            
-            result.result+="<a href=\"javascript:update_tree('%s','%s','f?%s')\"><img border=0 src=\"/images/folder.png\"></a>" % (query['callback_stored'],query['right_pane_cb'],link)
-            
-            result.result+="&nbsp;/<br>\n"
-
-            result.result+="<table width=100%>"
-            draw_branch(1,query, result)
-            result.result+="</table>"
-            
+        """            
         def right(query,result):
             result.decoration = "raw"
             result.content_type = "text/html"
@@ -149,41 +95,70 @@ class AJAXUI(HTMLUI.HTMLUI):
 
             pane_cb(branch,result)
 
-        l = self.store_callback(left)
+        def tree(query,result):
+            result.decoration = "raw"
+            result.content_type = "text/html"
+
+            ## I think this is secure enough???
+            data = eval(query['data'],{'__builtins__':None, 'true':True, 'false':False})
+            path=FlagFramework.normpath(data['node']['objectId'])
+            if path.startswith('/'): path=path[1:]
+
+            branch=path.split("/")
+            r=[]
+            for x in tree_cb(branch):
+                tmp = dict(title = x[0], objectId="/%s/%s" % (path,x[1]))
+                if x[2]=='branch':
+                    tmp['isFolder']='true'
+                else:
+                    tmp['isFolder']='false'
+                r.append(tmp)
+
+            result.result=r
+         
+        t=self.store_callback(tree)
         r = self.store_callback(right)
+
+        query = self.defaults.clone()
+        del query['open_tree']
         
         self.result+="""
         <div dojoType="SplitContainer"
 	orientation="horizontal"
 	sizerWidth="5"
 	activeSizing="0"
-        style="border: 0px ; width: 100%; height: 100%; overflow: auto;"
+        style="border: 0px ; width: 100%%; height: 100%%; overflow: auto;"
         >
         <div dojoType="ContentPane"
         layoutAlign="client"
         id="treepane"
         sizeMin="20" sizeShare="80"
-        style="border: 0px ; width: 100%; height: 100%; overflow: auto;"
+        style="border: 0px ; width: 100%%; height: 100%%; overflow: auto;"
         executeScripts="true">
-        left
+
+        <dojo:TreeSelector widgetId="treeSelector" eventNames="select:nodeSelected"></dojo:TreeSelector>
+        <div dojoType="TreeLoadingController" RPCUrl="f?%s&callback_stored=%s" widgetId="treeController" ></div>
+            <div dojoType="Tree" toggle="fade" controller="treeController" selector="treeSelector" widgetId="firstTree">
+            <div dojoType="TreeNode" isFolder="true" title="/" objectId="/"></div>
+          </div>
+        
 	</div>
 	<div dojoType="ContentPane"
         id="rightpane"
         executeScripts="true"
-        style="border: 0px ; width: 100%; height: 100%; overflow: auto;"
+        style="border: 0px ; width: 100%%; height: 100%%; overflow: auto;"
         sizeMin="50" sizeShare="50">
-        right
 	</div>
         </div>
-        """
+        """ % (query,t)
 
         ## Populate the initial tree state:
         self.result+="""<script>
 
-        function tree_init() {
-        update_tree("%s","%s","f?%s");
-        };
-
-        _container_.addOnLoad(tree_init);
+        _container_.addOnLoad(function() {
+		dojo.event.topic.subscribe("nodeSelected",
+			 function(message) { update_tree("%s","f?%s&open_tree="+message.node.objectId); }
+		);
+                });
         </script>
-        """ % (l,r,self.defaults)
+        """ % (r, query )

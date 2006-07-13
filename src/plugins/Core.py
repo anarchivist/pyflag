@@ -81,7 +81,7 @@ class IO_File(FileSystem.File):
 
 class Help(Reports.report):
     """ This facility displays helpful messages """
-    hidden = False
+    hidden = True
     family = "Misc"
     name = "Help"
     parameters = {'topic':'any'}
