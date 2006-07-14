@@ -245,15 +245,26 @@ class GenericUI:
         """
         logging.log(logging.DEBUG, "text not implemented")
 
-    def _make_sql(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):
+    def _make_sql(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},query={},**opts):
         """ An SQL generator for the table widget (private) """
         #in case the user forgot and gave us a tuple, we forgive them:
         names=list(names)
         columns = list(columns)
 
+        ## Establish the sorting order
+        try:
+            self.sort=[list(names).index(query['order']),'order']
+        except KeyError:
+            try:
+                self.sort=[query['dorder'],'dorder']
+            except KeyError:
+                self.sort=[0,'order']
+                
+        self.filter_conditions=[]
+        self.filter_text=[]
+
         #First work out what is the query string:
         query_str = sql;
-        query = self.defaults
         
         #The new_query is the same one we got minus all the UI
         #specific commands. The following section, just add UI

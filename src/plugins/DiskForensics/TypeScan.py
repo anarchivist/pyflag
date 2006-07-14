@@ -121,7 +121,7 @@ class ViewFileTypes(Reports.report):
                 columns = ['a.inode','concat(path,name)','type', 'from_unixtime(c.mtime)'],
                 names = [ 'Thumbnail', 'Filename', 'Type', 'Time stamp'],
                 table = 'file as a, type as b, inode as c',
-                where = 'b.inode=c.inode and a.inode=b.inode and a.mode like "r%" ',
+                where = 'b.inode=c.inode and a.inode=b.inode and a.mode like "r%%" ',
                 callbacks  = { 'Thumbnail': thumbnail_cb,
                                },
                 case = query['case']

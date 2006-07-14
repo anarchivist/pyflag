@@ -981,18 +981,6 @@ class GTKUI(UI.GenericUI):
         """
         names=list(names)
         
-        ## Establish the sorting order
-        try:
-            self.sort=[list(names).index(self.defaults['order']),'order']
-        except KeyError:
-            try:
-                self.sort=[self.defaults['dorder'],'dorder']
-            except KeyError:
-                self.sort=[0,'order']
-                
-        self.filter_conditions=[]
-        self.filter_text=[]
-
         # Get a new SQL generator for building the table with.
         generator,new_query,names,columns,links = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks,**opts)
         if not new_query: new_query=self.defaults

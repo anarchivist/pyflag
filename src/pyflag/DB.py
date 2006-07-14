@@ -250,6 +250,7 @@ class DBO:
             except AttributeError,e:
                 params=(DBExpander(params),)
 
+            print query_str
             string= query_str % params
             
         try:

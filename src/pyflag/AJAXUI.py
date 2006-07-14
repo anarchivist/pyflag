@@ -4,10 +4,11 @@ import pyflag.conf
 import pyflag.logging as logging
 import pyflag.FlagFramework as FlagFramework
 config=pyflag.conf.ConfObject()
+import cgi
 
 class AJAXUI(HTMLUI.HTMLUI):
     """ An AJAX driven web framework for PyFlag """
-    preamble='%s'
+    preamble='<script> PyFlag_Session=%s</script>'
     
     def const_selector(self,description,name,keys,values,**options):
         if options:
@@ -59,7 +60,7 @@ class AJAXUI(HTMLUI.HTMLUI):
         out = '''<div
         id="mainTabContainer"
         dojoType="TabContainer"
-        style="width: 100%; height: 70%"
+        style="width: 100%; height: 100%"
         executeScripts="true"
         selectedTab="0">\n'''
 
@@ -103,10 +104,11 @@ class AJAXUI(HTMLUI.HTMLUI):
             data = eval(query['data'],{'__builtins__':None, 'true':True, 'false':False})
             path=FlagFramework.normpath(data['node']['objectId'])
             if path.startswith('/'): path=path[1:]
-
             branch=path.split("/")
             r=[]
             for x in tree_cb(branch):
+                if len(x[0])==0: continue
+                
                 tmp = dict(title = x[0], objectId="/%s/%s" % (path,x[1]))
                 if x[2]=='branch':
                     tmp['isFolder']='true'
@@ -162,3 +164,65 @@ class AJAXUI(HTMLUI.HTMLUI):
                 });
         </script>
         """ % (r, query )
+
+
+    def end_form(self,value='Submit',name='submit',**opts):
+        for k,v in self.form_parms:
+            self.result += "<input type=hidden name='%s' value='%s'>\n" % (k,v)
+
+        if value:
+            self.result += "<a  href='javascript:submitForm(\"pyflag_form_%s\");'>%s %s</a>\n" % (self.depth, name,value)
+
+        self.result+="</form>"
+
+    def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):        
+        self.result += '''
+        <div id="tableContainer%s" dojoType="ContentPane"
+        style="width: 100%%; height: 100%%; overflow: auto; wrap: full"
+        executeScripts="true" >''' % self.id
+
+        def table_cb(query,result):
+            del query['callback_stored']
+            
+            dbh,new_query,new_names,new_columns,new_links = self._make_sql(
+                sql,
+                columns,
+                names,
+                links,
+                table,
+                where,
+                groupby,
+                case,
+                callbacks,
+                query)
+
+            result.result+='''<table dojoType="PyFlagTable" widgetId="testTable%s" headClass="fixedHeader" tbodyClass="scrollContent" enableMultipleSelect="true" enableAlternateRows="true" rowAlternateClass="alternateRow" cellpadding="0" cellspacing="0" border="0" query="%s&callback_stored=%s">
+            <thead><tr>''' % (self.id, new_query, cb)
+
+            ## Now make the table headers:
+            for n in new_names:
+                result.result+="<th id='%s'>%s</th>\n" % (n,n)
+
+            result.result+='''</tr></thead><tbody style="height: 100%;">'''
+
+            ## Now the contents:
+            for row in dbh:
+                result.result+="\n<tr>"
+                for i in range(len(new_names)):
+                    value = row[new_names[i]].__str__()
+
+                    ## Check if the user specified a callback for this column
+                    if callbacks.has_key(new_names[i]):
+                        value=callbacks[new_names[i]](value)
+                    else:
+                    ## Sanitise the value to make it HTML safe. Note that
+                    ## callbacks are required to ensure they sanitise
+                    ## their output if they need.
+                        value=cgi.escape(value)
+
+                    result.result+="<td>%s</td>" % value
+                result.result+="</tr>"
+            result.result+="</tbody></table></div>"
+
+        cb=self.store_callback(table_cb)
+        table_cb(self.defaults,self)

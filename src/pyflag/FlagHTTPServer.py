@@ -226,7 +226,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
               #Clear the store if its been there too long:
               expired_time = time.time() - 100
               for k in flag.ui.store_dict.keys():
-                  if expired_time > UI.HTMLUI.time_dict[k]:
+                  if expired_time > HTMLUI.HTMLUI.time_dict[k]:
                       del flag.ui.store_dict[k]
                       del flag.ui.time_dict[k]
                       

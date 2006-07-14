@@ -185,3 +185,9 @@ function tree_open(left_cb, right_cb,url) {
 
   tree_pane_open(left_cb, right_cb, url);
 };
+
+function set_dojo_pane(pane,url) {
+  var treepane = dojo.widget.getWidgetById(pane);
+  treepane.setUrl(url);
+};
+

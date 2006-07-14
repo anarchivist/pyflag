@@ -299,7 +299,7 @@ class HTMLUI(UI.GenericUI):
     
     def start_table(self,**options):
         self.table_depth += 1
-        self.result += "<table %s>\n" % self.opt_to_str(options)
+        self.result += "<table %s style='border: 0;'>\n" % self.opt_to_str(options)
 
     def row(self,*columns, **options):
         #Sort through all the options for the ones that should go to the td html element
@@ -1478,7 +1478,7 @@ class HTMLUI(UI.GenericUI):
         for k,v in hiddens.items():
             self.form_parms[k]=v
 
-        self.result += '<form name=pyflag_form_%s method=%s action="/f" enctype="multipart/form-data">\n' % (self.depth, config.METHOD)
+        self.result += '<form id="pyflag_form_%s" name="pyflag_form_%s" method=%s action="/f" enctype="multipart/form-data">\n' % (self.depth,self.depth, config.METHOD)
 
     def end_form(self,value='Submit',name='submit',**opts):
         for k,v in self.form_parms:
