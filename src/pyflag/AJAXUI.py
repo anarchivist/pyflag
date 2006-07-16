@@ -171,7 +171,7 @@ class AJAXUI(HTMLUI.HTMLUI):
             self.result += "<input type=hidden name='%s' value='%s'>\n" % (k,v)
 
         if value:
-            self.result += "<a  href='javascript:submitForm(\"pyflag_form_%s\");'>%s %s</a>\n" % (self.depth, name,value)
+            self.result += "<button dojoType='Button' onClick='javascript:submitForm(\"pyflag_form_%s\");'>%s</button>\n" % (self.depth, value)
 
         self.result+="</form>"
 
@@ -183,6 +183,10 @@ class AJAXUI(HTMLUI.HTMLUI):
 
         def table_cb(query,result):
             del query['callback_stored']
+
+            ## If no ordering is specified we order by the first column
+            if not query.has_key('order') and not query.has_key('dorder'):
+                query['order']=names[0]
             
             dbh,new_query,new_names,new_columns,new_links = self._make_sql(
                 sql,
@@ -201,8 +205,22 @@ class AJAXUI(HTMLUI.HTMLUI):
 
             ## Now make the table headers:
             for n in new_names:
-                result.result+="<th id='%s'>%s</th>\n" % (n,n)
+                try:
+                    if query['order']==n:
+                        result.result+="<th id='%s' sort='1' >%s</th>\n" % (n,n)
+                        continue
 
+                except KeyError:
+                    try:
+                        if query['dorder']==n:
+                            result.result+="<th id='%s' sort='0' >%s</th>\n" % (n,n)
+                            continue
+                    
+                    except KeyError:
+                        pass
+
+                result.result+="<th id='%s' >%s</th>\n" % (n,n)
+                    
             result.result+='''</tr></thead><tbody style="height: 100%;">'''
 
             ## Now the contents:

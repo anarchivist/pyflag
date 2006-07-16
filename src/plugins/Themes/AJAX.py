@@ -139,6 +139,10 @@ class AJAX(Menu):
 			padding: 2px;
 		}
 
+                tbody.scrollContent td.sorted-column {
+                        background: pink;
+                }
+
         </style>
         </head>
         <body link=blue vlink=blue bgcolor="#FFFFFF">
@@ -205,7 +209,8 @@ class AJAX(Menu):
            padding: 0 0 0 0;
            margin: 0 0 0 0;
         }
-        
+
+
         </style>'''
 
         for k in module_list:

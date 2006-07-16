@@ -251,15 +251,6 @@ class GenericUI:
         names=list(names)
         columns = list(columns)
 
-        ## Establish the sorting order
-        try:
-            self.sort=[list(names).index(query['order']),'order']
-        except KeyError:
-            try:
-                self.sort=[query['dorder'],'dorder']
-            except KeyError:
-                self.sort=[0,'order']
-                
         self.filter_conditions=[]
         self.filter_text=[]
 
@@ -351,28 +342,37 @@ class GenericUI:
         if group_by_str:
             query_str += " group by %s " % group_by_str
 
-        #Find the order by clause - We look at self.sort to establish which column needs to be sorted. We assume self.sort is correctly initialised first.
-        if self.sort[1]=='order':
-            order= " `%s` asc " % names[self.sort[0]]
-        else:
-            order= " `%s` desc " % names[self.sort[0]]
-
-        query_str+= " order by %s " % order
-
+        #Find the order by clause
+        #Were we given a dorder param?
+        try:
+            order = " `%s` desc " % query['dorder']
+            #Remember the column number that was ordered
+            ordered_col = names.index(query['dorder'])
+        except (ValueError,KeyError):
+            #Ok then were we given an order param?
+            try:
+                order = " `%s` asc " % query['order']
+                ordered_col = names.index(query['order'])
+            except (ValueError,KeyError):
+                #If an order was not specified, we pick the first column as the order
+                order = " `%s` asc " % names[0]
+                ordered_col = 0
+        
         #Calculate limits
         if not query.has_key('limit'):
             query['limit'] = "0"
 
-        self.previous = int(query['limit']) - config.PAGESIZE
+        limit = int(query['limit'])
+        self.previous = limit - config.PAGESIZE
         if self.previous<0: self.previous=0
 
-        self.next = int(query['limit']) + config.PAGESIZE
-        self.pageno =  int(query['limit']) /config.PAGESIZE
+        self.next = limit + config.PAGESIZE
+        self.pageno =  limit /config.PAGESIZE
                 
-        query_str+=" limit %s, %s" % (int(query['limit']) , config.PAGESIZE)
+        query_str+="order by %s limit %s, %s" % (order, int(query['limit']) , config.PAGESIZE)
 
         dbh = DB.DBO(case)
 
         #Do the query, and find out the names of all the columns
-        dbh.execute(query_str,())
+        dbh.execute(query_str)
         return dbh,new_query,names,columns,links
