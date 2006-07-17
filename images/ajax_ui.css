@@ -1,0 +1,134 @@
+body {
+  font-family : sans-serif;
+}
+
+.dojoTabPaneWrapper {
+  padding : 10px 10px 10px 10px;
+}
+
+/***
+   The following is just an example of how to use the table.
+   You can override any class names to be used if you wish.
+   ***/
+
+table {
+  font-family:Lucida Grande, Verdana;
+  font-size:0.8em;
+  width:100%;
+  border:1px solid #ccc;
+  cursor:default;
+}
+
+* html div.tableContainer {	/* IE only hack */
+  width:95%;
+  border:1px solid #ccc;
+  height: 285px;
+  overflow-x:hidden;
+  overflow-y: auto;
+}
+
+table td,
+table th{
+  border-right:1px solid #999;
+  padding:2px;
+  font-weight:normal;
+}
+table thead td, table thead th {
+  background:#94BEFF;
+}
+
+* html div.tableContainer table thead tr td,
+* html div.tableContainer table thead tr th{
+  /* IE Only hacks */
+  position:relative;
+  top:expression(dojo.html.getFirstAncestorByTag(this,'table').parentNode.scrollTop-2);
+}
+
+tbody.scrollContent {
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+tbody.scrollContent td, tbody.scrollContent tr td {
+  background: #FFF;
+  padding: 2px;
+}
+
+tbody.scrollContent tr.alternateRow td {
+  background: #e3edfa;
+  padding: 2px;
+}
+
+tbody.scrollContent tr.selected td {
+  background: yellow;
+  padding: 2px;
+}
+
+tbody.scrollContent tr:hover td,tbody.scrollContent tr.alternateRow:hover td.sorted-column {
+  background: #a6c2e7;
+  padding: 2px;
+}
+
+tbody.scrollContent td.sorted-column, tbody.scrollContent tr.alternateRow td.sorted-column {
+  background: pink;
+}
+
+/* group multiple buttons in a row */
+.box {
+  display: block;
+  text-align: center;
+}
+.box .dojoButton {
+  float: left;
+  margin-right: 10px;
+}
+.dojoButton .dojoButtonContents {
+  font-size: small;
+}
+
+/* make the menu style match the buttons */
+.dojoPopupMenu2, .dojoPopupMenu2Client, .dojoMenuItem2,
+.dojoMenuItem2Label, 
+.dojoMenuItem2Accel {
+  color: black;
+  background-color: #B9D4FE;
+  border:1px solid #b8d4fe;
+}
+
+body .dojoMenuItem2.dojoMenuItem2Hover,
+.dojoMenuItem2.dojoMenuItem2Hover .dojoMenuItem2Label, 
+.dojoMenuItem2.dojoMenuItem2Hover .dojoMenuItem2Accel,
+.dojoMenuItem2.dojoMenuItem2Hover .dojoMenuItem2Icon {
+  background-color: white;
+  border-color: white;
+}
+
+/* todo: find good color for disabled menuitems, and teset */
+.dojoMenuItem2Disabled .dojoMenuItem2Label span,
+.dojoMenuItem2Disabled .dojoMenuItem2Accel span {
+  color: ThreeDShadow;
+}
+
+.dojoMenuItem2Disabled .dojoMenuItem2Label span span,
+.dojoMenuItem2Disabled .dojoMenuItem2Accel span span {
+  color: ThreeDHighlight;
+}
+
+html, body{	
+  width: 100%;	/* make the body expand to fill the visible window */
+  height: 100%;
+  overflow: hidden;	/* erase window level scrollbars */
+  padding: 0 0 0 0;
+  margin: 0 0 0 0;
+}
+
+.dojoDialog {
+	background : #eee;
+	border : 1px solid #999;
+	-moz-border-radius : 5px;
+	padding : 4px;
+}
+
+form {
+	margin-bottom : 0;
+}

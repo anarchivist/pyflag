@@ -107,7 +107,9 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
     def _warning_check(self):
         """ We need to override this because for some cases it issues
         a SHOW WARININGS query. Which will raise an 'out of sync
-        error' when we operate in SS
+        error' when we operate in SS. This is a most sane approach -
+        when warnings are detected, we simply try to drain the
+        resultsets and then read the warnings.
         """
         ## We have warnings to show
         if self._warnings:

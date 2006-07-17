@@ -199,11 +199,10 @@ class AJAXUI(HTMLUI.HTMLUI):
                 q=query.clone()
                 del q['group_by']
                 menus.append('<div dojoType="MenuItem2" caption="Ungroup" onClick="update_container(\'tableContainer%s\',\'%s\')"></div>' % (id,q))
-#                menus.append('<div dojoType="MenuItem2" caption="Ungroup""></div>')
             else:
                 menus.append('<div dojoType="MenuItem2" caption="Group By Column" onClick="group_by(\'%s\')"></div>' % id)
-#                menus.append('<div dojoType="MenuItem2" caption="Group By Column"></div>')
 
+            menus.append('<div dojoType="MenuItem2" caption="Filter Column" onClick="filter_column(\'%s\')"></div>' % id)
 
             result.result+='''
             <div dojoType="PopupMenu2" targetNodeIds="popup" toggle="explode">

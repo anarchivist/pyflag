@@ -13,7 +13,7 @@ class AJAX(Menu):
         <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
         <title>%s</title>
-        <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
+        <link rel="stylesheet" type="text/css" href="images/ajax_ui.css" />
         <script type="text/javascript">
         var djConfig = { isDebug: true, baseScriptUri: "javascript/" };
         </script>
@@ -33,130 +33,39 @@ class AJAX(Menu):
         dojo.require("dojo.widget.Menu2");
 	dojo.require("dojo.widget.Button");
         dojo.require("dojo.widget.PyFlagTable");
+        dojo.require("dojo.widget.Dialog");
         
-        function update_tree(rightcb,url) {
-        var rightpane = dojo.widget.getWidgetById("rightpane");
-        rightpane.setUrl(url+"&callback_stored="+rightcb);
-        };
-
-        function update_main(url) {
-          var main = dojo.widget.getWidgetById("main");
-          main.setUrl(url);
-        };
-
-        function submitForm(form_name) {
-        
-          var kw = {
-            url:	   "/f",
-            formNode:dojo.byId(form_name),
-            load:	   function(type, data)	{
-                  var main = dojo.widget.getWidgetById("main");
-                  main.setContent(data);
-                },
-            error:   function(type, error)	{ alert(String(type)+ String(error)); },
-            method:  "POST",
-          };
-        
-          dojo.io.bind(kw);
-	}
-
-        function group_by(table_id) {
-           var container = dojo.widget.getWidgetById("tableContainer"+table_id);
-           var table     = dojo.widget.getWidgetById("Table" + table_id);
-
-           container.setUrl(table.query + "&dorder=Count&group_by="+last_column_name);
-        };
-
-        last_column_name = "";
-
-        function update_container(container,url) {
-          var c = dojo.widget.getWidgetById(container);
-          c.setUrl(url);
-        };
-
         </script>
-
-        <style type="text/css">
-        body {
-	font-family : sans-serif;
-        }
+        <script type="text/javascript" src="/javascript/ajax_misc.js"></script>
+        <style type="text/css" src="/images/ajax_ui.css"></style>
         
-        .dojoTabPaneWrapper {
-        padding : 10px 10px 10px 10px;
-        }
-
-		/***
-			The following is just an example of how to use the table.
-			You can override any class names to be used if you wish.
-		***/
-
-		table {
-			font-family:Lucida Grande, Verdana;
-			font-size:0.8em;
-			width:100%%;
-			border:1px solid #ccc;
-			cursor:default;
-		}
-
-		* html div.tableContainer {	/* IE only hack */
-			width:95%%;
-			border:1px solid #ccc;
-			height: 285px;
-			overflow-x:hidden;
-			overflow-y: auto;
-		}
-
-		table td,
-		table th{
-			border-right:1px solid #999;
-			padding:2px;
-			font-weight:normal;
-		}
-		table thead td, table thead th {
-			background:#94BEFF;
-		}
-		
-		* html div.tableContainer table thead tr td,
-		* html div.tableContainer table thead tr th{
-			/* IE Only hacks */
-			position:relative;
-			top:expression(dojo.html.getFirstAncestorByTag(this,'table').parentNode.scrollTop-2);
-		}
-		
-		tbody.scrollContent {
-			overflow-x: auto;
-			overflow-y: auto;
-		}
-
-		tbody.scrollContent td, tbody.scrollContent tr td {
-			background: #FFF;
-			padding: 2px;
-		}
-
-		tbody.scrollContent tr.alternateRow td {
-			background: #e3edfa;
-			padding: 2px;
-		}
-
-		tbody.scrollContent tr.selected td {
-			background: yellow;
-			padding: 2px;
-		}
-
-		tbody.scrollContent tr:hover td,tbody.scrollContent tr.alternateRow:hover td.sorted-column {
-			background: #a6c2e7;
-			padding: 2px;
-		}
-
-                tbody.scrollContent td.sorted-column, tbody.scrollContent tr.alternateRow td.sorted-column {
-                        background: pink;
-                }
-
-
-        </style>
         </head>
         <body link=blue vlink=blue bgcolor="#FFFFFF">
+
         
+        <div dojoType="dialog" id="FilterDialog" bgColor="white" bgOpacity="0.5" toggle="fade" toggleDuration="250">
+	<form onsubmit="return false;">
+		<table>
+			<tr>
+				<td>Name:</td>
+				<td><input type="text"></td>
+			</tr>
+			<tr>
+				<td>Location:</td>
+
+				<td><input type="text"></td>
+			</tr>
+			<tr>
+				<td>Description:</td>
+				<td><input type="text" id="search_dialog_table"></td>
+			</tr>
+			<tr>
+				<td colspan="2" align="left">
+					<input type="button" id="hider" value="OK"></td>
+			</tr>
+		</table>
+	</form>
+</div>
         <div dojoType="LayoutContainer"
 	layoutChildPriority='top-bottom'
 	style="width: 100%%; height: 100%%;">
@@ -170,59 +79,7 @@ class AJAX(Menu):
         Theme.order_families(module_list)
         menus = []
 
-        result = '''<style>
-	/* group multiple buttons in a row */
-	.box {
-		display: block;
-		text-align: center;
-	}
-	.box .dojoButton {
-		float: left;
-		margin-right: 10px;
-	}
-	.dojoButton .dojoButtonContents {
-		font-size: small;
-	}
-
-	/* make the menu style match the buttons */
-	.dojoPopupMenu2, .dojoPopupMenu2Client, .dojoMenuItem2,
-		.dojoMenuItem2Label, 
-		.dojoMenuItem2Accel {
-		color: black;
-		background-color: #B9D4FE;
-		border:1px solid #b8d4fe;
-	}
-	
-	body .dojoMenuItem2.dojoMenuItem2Hover,
-		.dojoMenuItem2.dojoMenuItem2Hover .dojoMenuItem2Label, 
-		.dojoMenuItem2.dojoMenuItem2Hover .dojoMenuItem2Accel,
-		.dojoMenuItem2.dojoMenuItem2Hover .dojoMenuItem2Icon {
-			background-color: white;
-                        border-color: white;
-	}
-
-	/* todo: find good color for disabled menuitems, and teset */
-	.dojoMenuItem2Disabled .dojoMenuItem2Label span,
-	.dojoMenuItem2Disabled .dojoMenuItem2Accel span {
-		color: ThreeDShadow;
-	}
-	
-	.dojoMenuItem2Disabled .dojoMenuItem2Label span span,
-	.dojoMenuItem2Disabled .dojoMenuItem2Accel span span {
-		color: ThreeDHighlight;
-	}
-
-        html, body{	
-           width: 100%;	/* make the body expand to fill the visible window */
-           height: 100%;
-           overflow: hidden;	/* erase window level scrollbars */
-           padding: 0 0 0 0;
-           margin: 0 0 0 0;
-        }
-
-
-        </style>'''
-
+        result = ''
         for k in module_list:
             submenu_text = ''
             ## Add the reports in the family:
@@ -253,19 +110,6 @@ class AJAX(Menu):
 
     def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None,ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
         return data
-        result="""<style>
-        div.main {
-           border: 5px;
-           width: 100%;
-           height: 100%;
-           overflow-x: scroll;
-           overflow-y: auto;
-        };
-        </style>
-        """+data
-
-#        print result
-        return result
         
     def menu(self,flag,query):
         result=flag.ui()
