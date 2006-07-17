@@ -236,7 +236,7 @@ class AJAX(Menu):
                 menus.append('<div dojoType="PopupMenu2" id="%s" toggle="wipe">%s</div> <button dojoType="dropdownButton" menuId="%s">%s</button>' % (k,submenu_text,k,k))
 
 
-        return result+'''<div dojoType="ContentPane" layoutAlign="top" style="color: black; text-color: black;">
+        return result+'''<div dojoType="ContentPane" layoutAlign="top" style="color: black; ">
 		<div class="box">%s</div>
 	</div>''' % (''.join(menus))
 

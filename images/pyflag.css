@@ -13,8 +13,8 @@ a.tab:hover,
 }
 
 #notebook li {
-  font-size: -10;
-    margin-bottom: 0.3em;
+  font-size: small;
+  margin-bottom: 0.3em;
 }
 
 /* topmenu */
@@ -89,8 +89,6 @@ ul#topmenu li {
     background-color:   #E5E5E5;
     border:             1pt solid #D5D5D5;
     border-bottom:      0;
-    border-radius-topleft: 0.4em;
-    border-radius-topright: 0.4em;
     -moz-border-radius-topleft: 0.4em;
     -moz-border-radius-topright: 0.4em;
 }

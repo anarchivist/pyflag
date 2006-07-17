@@ -80,13 +80,12 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
     We store a limited cache of rows client side, and fetch rows from
     the server when needed.
     """
-    ## Maximum size of client cache
-    cache_size = 10
-    
     def __init__(self, connection):
         MySQLdb.cursors.SSDictCursor.__init__(self, connection)
         self._row_cache = []
-
+        ## Maximum size of client cache
+        self.cache_size = 10
+        
     def fetchone(self):
         """ Updates the row cache if needed otherwise returns a single
         row from it.
@@ -104,6 +103,28 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
 
     def close(self):
         self.connection = None
+
+    def _warning_check(self):
+        """ We need to override this because for some cases it issues
+        a SHOW WARININGS query. Which will raise an 'out of sync
+        error' when we operate in SS
+        """
+        ## We have warnings to show
+        if self._warnings:
+            results = list(self._fetch_row(1000))
+            if len(results)<1000:
+                self.execute("SHOW WARNINGS")
+                while 1:
+                    a=self.fetchone()
+                    if not a: break
+                    logging.log(logging.DEBUG,"Mysql warnings: %s" % a)
+            else:
+                logging.log(logging.DEBUG,"Mysql issued warnings but we are unable to drain result queue")
+
+            self._row_cache.extend(results)
+        pass
+        #return MySQLdb.cursors.SSDictCursor._warning_check(self)
+        
 
 class Pool(Queue):
     """ Pyflag needs to maintain multiple simulataneous connections to
@@ -251,7 +272,6 @@ class DBO:
                 params=(DBExpander(params),)
 
             string= query_str % params
-            
         try:
             ## The following decode is required to go around MySQLdb's
             ## stupid unicode crap - this has just recently been
@@ -261,6 +281,9 @@ class DBO:
         except Exception,e:
             str = "%s" % e
             if 'Commands out of sync' in str:
+                logging.log(logging.VERBOSE_DEBUG,
+                            "Got DB Error: %s, %s" % (str,self.dbh))
+
                 ## We terminate the current connection and reconnect
                 ## to the DB
                 del self.dbh
@@ -271,8 +294,10 @@ class DBO:
                 self.dbh,self.mysql_bin_string=DBH[self.case].connect()
                 self.cursor = self.dbh.cursor()
 
-                ## Redo the query with the new connection
-                return self.execute(query_str, params)
+                ## Redo the query with the new connection - if we fail
+                ## again, we just raise - otherwise we risk running
+                ## into recursion issues:
+                return self.cursor.execute(string.decode('latin1'))
                 
             elif not str.startswith('Records'):
                 raise DBError,e

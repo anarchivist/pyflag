@@ -188,26 +188,28 @@ class AJAXUI(HTMLUI.HTMLUI):
             
             result.result += '''
             <div id="tableContainer%s" dojoType="ContentPane" layoutAlign="client"
-            style="overflow: auto; wrap: full"
+            style="overflow: auto;"
             executeScripts="true" >''' % (id)
+            
+            result.result += '''<div id="popup" >'''
             
             menus = []
             
             if query.has_key("group_by"):
                 q=query.clone()
                 del q['group_by']
-                menus.append('<div dojoType="MenuItem2" caption="Ungroup" onClick="update_container("tableContainer%s","%s")"></div>' % (id,q))
+                menus.append('<div dojoType="MenuItem2" caption="Ungroup" onClick="update_container(\'tableContainer%s\',\'%s\')"></div>' % (id,q))
 #                menus.append('<div dojoType="MenuItem2" caption="Ungroup""></div>')
             else:
-                menus.append('<div dojoType="MenuItem2" caption="Group By Column" onClick="group_by(%s)"></div>' % id)
+                menus.append('<div dojoType="MenuItem2" caption="Group By Column" onClick="group_by(\'%s\')"></div>' % id)
 #                menus.append('<div dojoType="MenuItem2" caption="Group By Column"></div>')
 
 
             result.result+='''
-            <div dojoType="PopupMenu2" targetNodeIds="Table%s" toggle="explode">
+            <div dojoType="PopupMenu2" targetNodeIds="popup" toggle="explode">
             %s
             </div>
-            ''' % (id,''.join(menus))
+            ''' % (''.join(menus))
 
 
             del query['callback_stored']
@@ -228,8 +230,8 @@ class AJAXUI(HTMLUI.HTMLUI):
                 callbacks,
                 query)
 
-            result.result+='''<table dojoType="PyFlagTable" widgetId="Table%s" headClass="fixedHeader" tbodyClass="scrollContent" enableMultipleSelect="true" enableAlternateRows="true" rowAlternateClass="alternateRow" cellpadding="0" cellspacing="0" border="0" query="%s&callback_stored=%s">
-            <thead><tr>''' % (id, new_query, cb)
+            result.result+='''<table dojoType="PyFlagTable" widgetId="Table%s" headClass="fixedHeader" tbodyClass="scrollContent" enableMultipleSelect="true" enableAlternateRows="true" rowAlternateClass="alternateRow" cellpadding="0" cellspacing="0" border="0" query="%s&callback_stored=%s" global_id="%s">
+            <thead><tr>''' % (id, new_query, cb,id)
 
             ## Now make the table headers:
             for n in new_names:
@@ -249,7 +251,7 @@ class AJAXUI(HTMLUI.HTMLUI):
 
                 result.result+="<th id='%s' >%s</th>\n" % (n,n)
                     
-            result.result+='''</tr></thead><tbody style="height: 100%;">'''
+            result.result+='''</tr></thead><tbody>'''
 
             ## Now the contents:
             for row in dbh:
@@ -269,7 +271,7 @@ class AJAXUI(HTMLUI.HTMLUI):
                     if value==' ': value="&nbsp;"
                     result.result+="<td>%s</td>" % (value)
                 result.result+="</tr>"
-            result.result+="</tbody></table></div>"
+            result.result+="</tbody></table></div></div>"
 
         cb=self.store_callback(table_cb)
         table_cb(self.defaults,self)

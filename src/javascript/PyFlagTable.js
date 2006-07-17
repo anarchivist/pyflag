@@ -10,6 +10,7 @@ dojo.widget.html.PyFlagTable=function() {
 	dojo.widget.html.SortableTable.call(this);
 	this.widgetType="PyFlagTable";
 	this.query='/';
+	this.global_id =0;
 };
 
 dojo.inherits(dojo.widget.html.PyFlagTable, dojo.widget.html.SortableTable);
@@ -19,9 +20,8 @@ dojo.lang.extend(dojo.widget.html.PyFlagTable,
 
 dojo.lang.extend(dojo.widget.html.PyFlagTable, {
   onHeaderClick: function(e){
-		var source=e.target;
-		var div=dojo.html.getParentByType(source,"div");
-		var table=dojo.widget.getWidgetById(div.id);
+		var table=dojo.widget.getWidgetById("tableContainer"+
+						    this.global_id);
 
 		if(this.sortDirection) {
 		  parameter='dorder';
@@ -41,6 +41,7 @@ dojo.lang.extend(dojo.widget.html.PyFlagTable, {
 		     var headers=thead.getElementsByTagName("th");
 
 		     // Find the column header for the selected event:
+		     
 		     for(var i=0; i<peers.length; i++) {
 		       if(peers[i]==e.target) {
 			 last_column_name = headers[i].innerHTML;
