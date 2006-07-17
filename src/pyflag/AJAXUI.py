@@ -135,7 +135,7 @@ class AJAXUI(HTMLUI.HTMLUI):
         layoutAlign="client"
         id="treepane"
         sizeMin="20" sizeShare="80"
-        style="border: 0px ; width: 100%%; height: 100%%; overflow: auto;"
+        style="border: 0px ; width: 40%%; height: 100%%; overflow: auto;"
         executeScripts="true">
 
         <dojo:TreeSelector widgetId="treeSelector" eventNames="select:nodeSelected"></dojo:TreeSelector>
@@ -148,7 +148,7 @@ class AJAXUI(HTMLUI.HTMLUI):
 	<div dojoType="ContentPane"
         id="rightpane"
         executeScripts="true"
-        style="border: 0px ; width: 100%%; height: 100%%; overflow: auto;"
+        style="border: 0px ; width: 60%%; height: 100%%; overflow: auto;"
         sizeMin="50" sizeShare="50">
 	</div>
         </div>
@@ -175,13 +175,41 @@ class AJAXUI(HTMLUI.HTMLUI):
 
         self.result+="</form>"
 
+    def get_uniue_id(self):
+        self.id+=1
+        return self.id
+
     def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):        
-        self.result += '''
-        <div id="tableContainer%s" dojoType="ContentPane"
-        style="width: 100%%; height: 100%%; overflow: auto; wrap: full"
-        executeScripts="true" >''' % self.id
 
         def table_cb(query,result):
+            id=self.get_uniue_id()
+
+            print id
+            
+            result.result += '''
+            <div id="tableContainer%s" dojoType="ContentPane" layoutAlign="client"
+            style="overflow: auto; wrap: full"
+            executeScripts="true" >''' % (id)
+            
+            menus = []
+            
+            if query.has_key("group_by"):
+                q=query.clone()
+                del q['group_by']
+                menus.append('<div dojoType="MenuItem2" caption="Ungroup" onClick="update_container("tableContainer%s","%s")"></div>' % (id,q))
+#                menus.append('<div dojoType="MenuItem2" caption="Ungroup""></div>')
+            else:
+                menus.append('<div dojoType="MenuItem2" caption="Group By Column" onClick="group_by(%s)"></div>' % id)
+#                menus.append('<div dojoType="MenuItem2" caption="Group By Column"></div>')
+
+
+            result.result+='''
+            <div dojoType="PopupMenu2" targetNodeIds="Table%s" toggle="explode">
+            %s
+            </div>
+            ''' % (id,''.join(menus))
+
+
             del query['callback_stored']
 
             ## If no ordering is specified we order by the first column
@@ -200,8 +228,8 @@ class AJAXUI(HTMLUI.HTMLUI):
                 callbacks,
                 query)
 
-            result.result+='''<table dojoType="PyFlagTable" widgetId="testTable%s" headClass="fixedHeader" tbodyClass="scrollContent" enableMultipleSelect="true" enableAlternateRows="true" rowAlternateClass="alternateRow" cellpadding="0" cellspacing="0" border="0" query="%s&callback_stored=%s">
-            <thead><tr>''' % (self.id, new_query, cb)
+            result.result+='''<table dojoType="PyFlagTable" widgetId="Table%s" headClass="fixedHeader" tbodyClass="scrollContent" enableMultipleSelect="true" enableAlternateRows="true" rowAlternateClass="alternateRow" cellpadding="0" cellspacing="0" border="0" query="%s&callback_stored=%s">
+            <thead><tr>''' % (id, new_query, cb)
 
             ## Now make the table headers:
             for n in new_names:
@@ -238,7 +266,8 @@ class AJAXUI(HTMLUI.HTMLUI):
                     ## their output if they need.
                         value=cgi.escape(value)
 
-                    result.result+="<td>%s</td>" % value
+                    if value==' ': value="&nbsp;"
+                    result.result+="<td>%s</td>" % (value)
                 result.result+="</tr>"
             result.result+="</tbody></table></div>"
 

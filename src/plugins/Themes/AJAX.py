@@ -45,21 +45,34 @@ class AJAX(Menu):
         };
 
         function submitForm(form_name) {
-
         
-        var kw = {
-          url:	   "/f",
-          formNode:dojo.byId(form_name),
-          load:	   function(type, data)	{
+          var kw = {
+            url:	   "/f",
+            formNode:dojo.byId(form_name),
+            load:	   function(type, data)	{
                   var main = dojo.widget.getWidgetById("main");
                   main.setContent(data);
                 },
-          error:   function(type, error)	{ alert(String(type)+ String(error)); },
-          method:  "POST",
-        };
+            error:   function(type, error)	{ alert(String(type)+ String(error)); },
+            method:  "POST",
+          };
         
-        dojo.io.bind(kw);
+          dojo.io.bind(kw);
 	}
+
+        function group_by(table_id) {
+           var container = dojo.widget.getWidgetById("tableContainer"+table_id);
+           var table     = dojo.widget.getWidgetById("Table" + table_id);
+
+           container.setUrl(table.query + "&dorder=Count&group_by="+last_column_name);
+        };
+
+        last_column_name = "";
+
+        function update_container(container,url) {
+          var c = dojo.widget.getWidgetById(container);
+          c.setUrl(url);
+        };
 
         </script>
 
@@ -110,9 +123,8 @@ class AJAX(Menu):
 			top:expression(dojo.html.getFirstAncestorByTag(this,'table').parentNode.scrollTop-2);
 		}
 		
-		html>body tbody.scrollContent {
-			height: 262px;
-			overflow-x:hidden;
+		tbody.scrollContent {
+			overflow-x: auto;
 			overflow-y: auto;
 		}
 
@@ -130,18 +142,16 @@ class AJAX(Menu):
 			background: yellow;
 			padding: 2px;
 		}
-		tbody.scrollContent tr:hover td {
+
+		tbody.scrollContent tr:hover td,tbody.scrollContent tr.alternateRow:hover td.sorted-column {
 			background: #a6c2e7;
 			padding: 2px;
 		}
-		tbody.scrollContent tr.selected:hover td {
-			background: #ff3;
-			padding: 2px;
-		}
 
-                tbody.scrollContent td.sorted-column {
+                tbody.scrollContent td.sorted-column, tbody.scrollContent tr.alternateRow td.sorted-column {
                         background: pink;
                 }
+
 
         </style>
         </head>
@@ -149,7 +159,7 @@ class AJAX(Menu):
         
         <div dojoType="LayoutContainer"
 	layoutChildPriority='top-bottom'
-	style="width: 100%%; height: 70%%;">
+	style="width: 100%%; height: 100%%;">
         '''
 
     footer="</div>"
@@ -267,8 +277,8 @@ class AJAX(Menu):
         
         result.result+=" ".join(
             (self.header % (title),self.menu_javascript,
-             '<div dojoType="ContentPane" id="toolbar">\n</div>\n',
-             '<div dojoType="ContentPane" id="main" style="border: 5px">\n %s</div>\n'% data,
+             '<div dojoType="ContentPane" layoutAlign="top" id="toolbar">This is where the toolbar goes</div>\n',
+             '<div dojoType="ContentPane" id="main" layoutAlign="client" style="border: 5px">\n %s</div>\n'% data,
              self.footer))
 
         return result

@@ -34,6 +34,28 @@ dojo.lang.extend(dojo.widget.html.PyFlagTable, {
 		//This relies on the id field being set properly
 		table.setUrl(url);
 		   },
+  onRightClick: function(e) {
+		     var row=dojo.html.getParentByType(e.target,"tr");
+		     var peers=row.getElementsByTagName("td");
+		     var thead=dojo.html.getParentByType(row,"table");
+		     var headers=thead.getElementsByTagName("th");
+
+		     // Find the column header for the selected event:
+		     for(var i=0; i<peers.length; i++) {
+		       if(peers[i]==e.target) {
+			 last_column_name = headers[i].innerHTML;
+			 return;
+		       };
+		     };
+		   },
+  parseColumns: function(/* HTMLTableHeadElement */ node){
+		     dojo.widget.html.PyFlagTable.superclass.parseColumns.call(this, node);
+
+		     // This ensures that all columns copy their markup directly.
+		     for(i=0; i<this.columns.length; i++) {
+		       this.columns[i].sortType="__markup__";
+		     };
+		   },
   render:function(bDontPreserve){
 		var data=[]
 		var body=this.domNode.getElementsByTagName("tbody")[0];
@@ -79,11 +101,12 @@ dojo.lang.extend(dojo.widget.html.PyFlagTable, {
 					cell.className=this.columnSelected;
 				}
 
-				cell.appendChild(document.createTextNode(data[i][this.columns[j].getField()]));
-				row.appendChild(cell);
+				
+				cell.innerHTML=data[i][this.columns[j].getField()];			  		        row.appendChild(cell);
 			}
 			body.appendChild(row);
 			dojo.event.connect(row, "onclick", this, "onUISelect");
+			dojo.event.connect(row, "oncontextmenu", this, "onRightClick");
 		}
 	},
   });
