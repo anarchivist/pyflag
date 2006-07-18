@@ -52,8 +52,6 @@ function filter_column(table_id) {
   var container = dojo.widget.getWidgetById("tableContainer"+table_id);
   var input = dojo.widget.getWidgetById("search_dialog_table");
 
-  alert(input);
-
   dlg.show();
   //  container.setUrl(table.query + "&dorder=Count&group_by="+last_column_name);
 };

@@ -69,6 +69,7 @@ class report:
     flag = None
     hidden = False
     order = 10
+    req_priviledges=0
 
     def authenticate(self, query, result):
         """ This method is called first by FlagFramework to evaluate authentication and determine if the user is allowed to execute this report."""

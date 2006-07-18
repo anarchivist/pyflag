@@ -415,18 +415,21 @@ class Flag:
         
         #Check to see if the report is valid:
         try:
-            report = Registry.REPORTS.dispatch(query['family'],query['report'])
+            report_cls = Registry.REPORTS.dispatch(query['family'],query['report'])
             ## Instantiate the report:
-            report = report(self,ui=self.ui)
+            report = report_cls(self,ui=self.ui)
             
         except (IndexError):
             result.heading("Report Or family not recognized")
             result.para("It is possible that the appropriate module is not installed.")
             return result
 
+        ## We must make copies here to allow the report to be destroyed!!!
+        report_name = report.name
+        report_doc  = report.__doc__
         def show_help(query,result):
-            result.heading("Help for %s" % report.name)
-            result.text(report.__doc__)
+            result.heading("Help for %s" % report_name)
+            result.text(report_doc)
             result.decoration='naked'
 
         #Since flag must always operate on a case, if there is no case, we use the default flagdb as a case

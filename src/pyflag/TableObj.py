@@ -76,10 +76,6 @@ class TableObj:
     delete_actions = {}
     
     def __init__(self,dbh=None,id=None):
-        if dbh:
-            self.dbh=dbh
-        else:
-            self.dbh=DB.DBO(None)
         self.id=id
         self._column_keys= [ self.columns[i] for i in range(0,len(self.columns)) if not i % 2 ]
         self._column_names = [ self.columns[i] for i in range(0,len(self.columns)) if i % 2 ]
@@ -92,8 +88,9 @@ class TableObj:
 
         id is the key value which will be retrieved. We return a row record.
         """
-        self.dbh.execute("select %s from %s where %s=%r",(self._make_column_sql(),self.table,self.key,id))
-        return self.dbh.fetch()
+        dbh =DB.DBO()
+        dbh.execute("select %s from %s where %s=%r",(self._make_column_sql(),self.table,self.key,id))
+        return dbh.fetch()
 
     def edit(self,query,results):
         """ Updates the row with id given in query[self.table.key] to the values in query """
@@ -116,8 +113,9 @@ class TableObj:
                 tmp.append("%s=%r" % (k,query[k]))
             except KeyError:
                 pass
-            
-        self.dbh.execute("UPDATE %s set %s where %s=%r ",(self.table,
+
+        dbh = DB.DBO()
+        dbh.execute("UPDATE %s set %s where %s=%r ",(self.table,
                          ','.join(tmp),
                          self.key, query[self.key]))
         
@@ -144,8 +142,9 @@ class TableObj:
                 result.append("%s=%r" % (k,query[k]))
             except KeyError:
                 pass
-                
-        self.dbh.execute("insert into %s set %s ",(self.table,
+
+        dbh = DB.DBO()                
+        dbh.execute("insert into %s set %s ",(self.table,
                          ",".join(result),
                          ))
         
@@ -188,9 +187,10 @@ class TableObj:
     def edit_form(self,query,results):
         """ Generates an editing form for the current table """
         id=query[self.key]
-        
-        self.dbh.execute("select * from %s where %s=%r",(self.table,self.key,id))
-        row=self.dbh.fetch()
+
+        dbh = DB.DBO()
+        dbh.execute("select * from %s where %s=%r",(self.table,self.key,id))
+        row=dbh.fetch()
         self.form(self._column_keys,query,results,row)
 
     def delete(self,id,result,commit=False):
@@ -211,15 +211,17 @@ class TableObj:
                 self.delete_actions[k](description=v, variable=k, value=value, ui=result, row=row, id=id)
 
         if commit:
-            self.dbh.execute("delete from %s where %s=%r",
+            dbh = DB.DBO()
+            dbh.execute("delete from %s where %s=%r",
                              ( self.table,self.key,id))
 
     def show(self,id,result):
-        self.dbh.execute("select %s from %s where %s=%r",
+        dbh = DB.DBO()
+        dbh.execute("select %s from %s where %s=%r",
                          ( ','.join(self._column_keys),
                            self.table,self.key,id))
 
-        row=self.dbh.fetch()
+        row=dbh.fetch()
         if not row:
             tmp=result.__class__(result)
             tmp.text("Error: Record %s not found" % id,color='red')

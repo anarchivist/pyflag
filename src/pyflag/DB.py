@@ -154,7 +154,8 @@ class Pool(Queue):
     def get(self, block=1):
         """Get an object from the pool or a new one if empty."""
         try:
-            return self.empty() and self.connect() or Queue.get(self, block)
+            result=self.empty() and self.connect() or Queue.get(self, block)
+            return result
         except Empty:
             return self.connect()
 

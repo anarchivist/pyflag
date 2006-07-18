@@ -41,7 +41,6 @@ class AJAX(Menu):
         
         </head>
         <body link=blue vlink=blue bgcolor="#FFFFFF">
-
         
         <div dojoType="dialog" id="FilterDialog" bgColor="white" bgOpacity="0.5" toggle="fade" toggleDuration="250">
 	<form onsubmit="return false;">
