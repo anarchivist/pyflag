@@ -43,24 +43,16 @@ class AJAX(Menu):
         <body link=blue vlink=blue bgcolor="#FFFFFF">
         
         <div dojoType="dialog" id="FilterDialog" bgColor="white" bgOpacity="0.5" toggle="fade" toggleDuration="250">
-	<form onsubmit="return false;">
+	<form onsubmit="update_filter_column();">
 		<table>
+                        <th><td colspan="2" align="left">Search Column <span id="search_name"></span></td></th>
 			<tr>
-				<td>Name:</td>
-				<td><input type="text"></td>
-			</tr>
-			<tr>
-				<td>Location:</td>
-
-				<td><input type="text"></td>
-			</tr>
-			<tr>
-				<td>Description:</td>
-				<td><input type="text" id="search_dialog_table"></td>
+				<td>Search expression:</td>
+				<td><input type="text" id="search_expression"></td>
 			</tr>
 			<tr>
 				<td colspan="2" align="left">
-					<input type="button" id="hider" value="OK"></td>
+					<input type="button" id="hider" value="OK" onClick="update_filter_column();"></td>
 			</tr>
 		</table>
 	</form>

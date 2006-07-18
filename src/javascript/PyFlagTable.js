@@ -45,6 +45,7 @@ dojo.lang.extend(dojo.widget.html.PyFlagTable, {
 		     for(var i=0; i<peers.length; i++) {
 		       if(peers[i]==e.target) {
 			 last_column_name = headers[i].innerHTML;
+			 last_table_id = thead.id;
 			 return;
 		       };
 		     };

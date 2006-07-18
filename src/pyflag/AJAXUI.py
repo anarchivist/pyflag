@@ -180,6 +180,8 @@ class AJAXUI(HTMLUI.HTMLUI):
         return self.id
 
     def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):        
+        names = list(names)
+        columns = list(columns)
 
         def table_cb(query,result):
             id=self.get_uniue_id()
@@ -198,11 +200,30 @@ class AJAXUI(HTMLUI.HTMLUI):
             if query.has_key("group_by"):
                 q=query.clone()
                 del q['group_by']
-                menus.append('<div dojoType="MenuItem2" caption="Ungroup" onClick="update_container(\'tableContainer%s\',\'%s\')"></div>' % (id,q))
+                menus.append('<div dojoType="MenuItem2" caption="Ungroup" onClick="update_container(\'tableContainer%s\',\'%s\');"></div>' % (id,q))
             else:
                 menus.append('<div dojoType="MenuItem2" caption="Group By Column" onClick="group_by(\'%s\')"></div>' % id)
 
             menus.append('<div dojoType="MenuItem2" caption="Filter Column" onClick="filter_column(\'%s\')"></div>' % id)
+            menus.append('<div dojoType="MenuSeparator2"></div>')
+
+            ## Now present the user with options of removing conditions:
+            having=[]
+            for d,v in query:
+                if d.startswith('where_'):
+                    #Find the column for that name
+                    try:
+                        index=names.index(d[len('where_'):])
+                    except ValueError:
+                    ## If we dont know about this name, we ignore it.
+                        continue
+
+                    condition_text = FlagFramework.make_sql_from_filter(v, having, columns[index],d[len('where_'):])
+
+                    q=query.clone()
+                    q.remove(d,v)
+                    menus.append('<div dojoType="MenuItem2" caption=%r onClick="update_container(\'tableContainer%s\',\'%s\');"></div>' % (condition_text,id,q))
+
 
             result.result+='''
             <div dojoType="PopupMenu2" targetNodeIds="popup" toggle="explode">

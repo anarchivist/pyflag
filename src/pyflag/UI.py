@@ -321,7 +321,7 @@ class GenericUI:
                     ## If we dont know about this name, we ignore it.
                     continue
 
-                self.filter_text.append(FlagFramework.make_sql_from_filter(v,self.filter_conditions,columns[index],d[len('where_'):]))
+                self.filter_text.append(FlagFramework.make_sql_from_filter(v,having,columns[index],d[len('where_'):]))
 
                 #Create a link which deletes the current variable from
                 #the query string, allows the user to remove the
