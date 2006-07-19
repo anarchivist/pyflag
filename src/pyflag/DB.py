@@ -113,13 +113,15 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
         """
         ## We have warnings to show
         if self._warnings:
+            last_executed = self._last_executed
+            
             results = list(self._fetch_row(1000))
             if len(results)<1000:
                 self.execute("SHOW WARNINGS")
                 while 1:
                     a=self.fetchone()
                     if not a: break
-                    logging.log(logging.DEBUG,"Mysql warnings: %s" % a)
+                    logging.log(logging.DEBUG,"Mysql warnings: query %r: %s" % (last_executed,a))
             else:
                 logging.log(logging.DEBUG,"Mysql issued warnings but we are unable to drain result queue")
 

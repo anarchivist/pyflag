@@ -291,9 +291,9 @@ class GenericUI:
                      #Note that you cant have a group_by and a having
                      #clause together - so if you get a group_by we
                      #drop the having conditions
-                     for d in query.keys():
-                         if d.startswith('where_'):
-                             del query[d]
+##                     for d in query.keys():
+##                         if d.startswith('where_'):
+##                             del query[d]
                         
                  #if the user asked for a weird group by , we ignore it.
                  except ValueError:
@@ -302,9 +302,9 @@ class GenericUI:
             group_by_str = groupby
 
         #Form the columns in the sql
-        tmp = [ k+ " as `" +v+"`" for (k,v) in zip(columns,names) ]
+        select_clause = [ k+ " as `" +v+"`" for (k,v) in zip(columns,names) ]
             
-        query_str+=",".join(tmp) 
+        query_str+=",".join(select_clause) 
 
         #Form the table and where clause
         query_str+=" from %s " % table

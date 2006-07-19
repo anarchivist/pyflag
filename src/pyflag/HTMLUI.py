@@ -271,6 +271,7 @@ class HTMLUI(UI.GenericUI):
         HTMLUI.callback_dict[key] = callback
         HTMLUI.callback_time_dict[key] = time.time()
         HTMLUI.max_callback_count+=1
+        print "Registered callback %s" % key
         return key
     
     def store(self,ui):

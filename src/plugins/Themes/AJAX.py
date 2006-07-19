@@ -35,6 +35,7 @@ class AJAX(Menu):
         dojo.require("dojo.widget.PyFlagTable");
         dojo.require("dojo.widget.Dialog");
         dojo.require("dojo.widget.Toolbar");
+        dojo.require("dojo.uri.dojoUri");
         
         </script>
         <script type="text/javascript" src="/javascript/ajax_misc.js"></script>
@@ -52,8 +53,8 @@ class AJAX(Menu):
 				<td><input type="text" id="search_expression"></td>
 			</tr>
 			<tr>
-				<td colspan="2" align="left">
-					<input type="button" id="hider" value="OK" onClick="update_filter_column();"></td>
+				<td align="left" colspan="2">
+					<input type="button" id="search_ok" value="OK" onClick="update_filter_column();"><input type="button" id="search_cancel" value="Cancel" onClick="return false;"></td>
 			</tr>
 		</table>
 	</form>
@@ -104,6 +105,7 @@ class AJAX(Menu):
              data))
 
     def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None,ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
+        print data
         ## This is a little scriptlet to ensure we are loaded within
         ## dojo environment FIXME: How do we solve the link problem? 
         ## Is it possible? The problem is that the URL is not enough
@@ -119,52 +121,7 @@ class AJAX(Menu):
 
         result.result+=" ".join(
             (self.header % (title),self.menu_javascript,
-             '<div dojoType="ContentPane" id="main" layoutAlign="client" style="border: 5px">'))
-
-        ## Now create the tool bar:
-        result.result+='''
-        <script type="text/javascript" >
-        function img(name) {
-		return dojo.uri.dojoUri("src/widget/templates/buttons/" + name + ".gif").toString();
-	}
-	
-	function toolbar_init(e) {
-		tb = dojo.widget.getWidgetById("toolbar");
-		var bg = dojo.widget.createWidget("ToolbarButtonGroup", {
-			name: "justify",
-			defaultButton: "justifyleft",
-			preventDeselect: true
-		});
-		bg.addChild(img("justifyleft"));
-		bg.addChild(img("justifycenter"));
-		bg.addChild(img("justifyright"));
-		bg.addChild(img("justifyfull"));
-		var items = [img("bold"), img("italic"), img("underline"),
-			"|", bg, //["justify", img("justifyleft"), img("justifycenter"), img("justifyright"), img("justifyfull")],
-			"|", img("createlink"), img("insertimage"),
-			"|", img("indent"), img("outdent"),
-			img("insertorderedlist"), img("insertunorderedlist"),
-			"|", img("undo"), img("redo")];
-		for(var i = 0; i < items.length; i++) {
-			tb.addChild(items[i], null, {toggleItem:i<3});
-		}
-
-		var headings = dojo.widget.createWidget("ToolbarSelect", {
-			name: "formatBlock",
-			values: {
-				"Normal": "p",
-				"Heading 1": "h1"
-			}
-		});
-		dojo.event.connect(headings, "onSetValue", function(item, val) {
-			alert(item + "\\n" + val);
-		});
-		tb.addChild(headings);
-	}
-	
-	dojo.event.connect(dojo, "loaded", toolbar_init);
-        </SCRIPT>
-        '''
+             '<div dojoType="ContentPane" id="main" layoutAlign="client" style="border: 5px" executeScripts="true">'))
 
         ## Now create the initial front page:
         result.result+="<img src='images/logo.png'>" + self.footer

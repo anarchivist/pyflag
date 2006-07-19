@@ -185,7 +185,7 @@ class AJAXUI(HTMLUI.HTMLUI):
 
         def table_cb(query,result):
             id=self.get_uniue_id()
-            
+
             result.result += '''
             <div id="tableContainer%s" dojoType="ContentPane" layoutAlign="client"
             style="overflow: auto;"
@@ -194,13 +194,16 @@ class AJAXUI(HTMLUI.HTMLUI):
             result.result += '''<div id="popup" >'''
             
             menus = []
-            
-            if query.has_key("group_by"):
-                q=query.clone()
-                del q['group_by']
-                menus.append('<div dojoType="MenuItem2" caption="Ungroup" onClick="update_container(\'tableContainer%s\',\'%s\');"></div>' % (id,q))
-            else:
-                menus.append('<div dojoType="MenuItem2" caption="Group By Column" onClick="group_by(\'%s\')"></div>' % id)
+
+            ## May only offer to group by if the report does not issue
+            ## its own
+            if not groupby:
+                if query.has_key("group_by"):
+                    q=query.clone()
+                    del q['group_by']
+                    menus.append('<div dojoType="MenuItem2" caption="Ungroup" onClick="update_container(\'tableContainer%s\',\'%s\');"></div>' % (id,q))
+                else:
+                    menus.append('<div dojoType="MenuItem2" caption="Group By Column" onClick="group_by(\'%s\')"></div>' % id)
 
             menus.append('<div dojoType="MenuItem2" caption="Filter Column" onClick="filter_column(\'%s\')"></div>' % id)
             menus.append('<div dojoType="MenuSeparator2"></div>')
@@ -360,3 +363,18 @@ class AJAXUI(HTMLUI.HTMLUI):
             self.result+="<abbr title='%s'>%s</abbr>" % (tooltip,base)
         else:
             self.result+=base
+
+    def toolbar(self,cb=None,text=None,icon=None,popup=True,tooltip=None,link=None):
+        """ Create a toolbar button.
+
+        When the user clicks on the toolbar button, a popup window is
+        created which the callback function then uses to render on.
+        """
+        if link:
+            result="<script>\n add_toolbar_link('/images/%s','%s');\n</script>" % (icon, link)
+        elif cb:
+            result="<script>\n add_toolbar_link('/images/%s','%s');\n</script>" % (icon, link)
+        else:
+            result="<script>\n add_toolbar_link('/images/%s','%s');\n</script>" % (icon, link)
+
+        self.result+=result

@@ -27,12 +27,6 @@ table {
   overflow-y: auto;
 }
 
-table td,
-table th{
-  border-right:1px solid #999;
-  padding:2px;
-  font-weight:normal;
-}
 table thead td, table thead th {
   background:#94BEFF;
 }

@@ -43,8 +43,12 @@ function update_container(container,url) {
 var dlg;
 function init_search_dialog(e) {
   dlg = dojo.widget.byId("FilterDialog");
-  var btn = document.getElementById("hider");
+  var btn = document.getElementById("search_ok");
   dlg.setCloseControl(btn);
+  
+  btn = document.getElementById("search_cancel");
+  dlg.setCloseControl(btn);
+
 }
 
 dojo.addOnLoad(init_search_dialog);
@@ -68,4 +72,17 @@ function update_filter_column() {
   };
 
   return false;
+};
+
+/** This function add a single toolbar link. A toolbar link is an icon
+    which when clicked refreshes the main frame to the link */
+function add_toolbar_link(icon, link) {
+  var toolbar  = dojo.widget.getWidgetById("toolbar");
+  var dojo_icon= dojo.widget.createWidget("ToolbarButton",
+					  {icon: icon})
+
+    dojo.event.connect(dojo_icon, "onClick", function () {
+			 alert(link);
+		       });
+  toolbar.addChild(dojo_icon);
 };
