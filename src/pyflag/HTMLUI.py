@@ -1388,7 +1388,7 @@ class HTMLUI(UI.GenericUI):
                         ## last line
                         if len(new_line)<len(line) and i<len(new_lines)-1:
                             self.result+="&nbsp;" * (wrap-len(new_line))
-                            self.result+="<img src='next_line.png'>"
+                            self.result+="<img src='images/next_line.png'>"
                         self.result+=line_break                
             else:
                 do_options(self.text_var,options)

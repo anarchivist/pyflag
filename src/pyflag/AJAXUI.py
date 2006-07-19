@@ -185,8 +185,6 @@ class AJAXUI(HTMLUI.HTMLUI):
 
         def table_cb(query,result):
             id=self.get_uniue_id()
-
-            print id
             
             result.result += '''
             <div id="tableContainer%s" dojoType="ContentPane" layoutAlign="client"
@@ -276,6 +274,10 @@ class AJAXUI(HTMLUI.HTMLUI):
             ## Now the contents:
             for row in dbh:
                 result.result+="\n<tr>"
+
+                row_elements = []
+                
+                ## Render each row at a time:
                 for i in range(len(new_names)):
                     value = row[new_names[i]].__str__()
 
@@ -288,10 +290,73 @@ class AJAXUI(HTMLUI.HTMLUI):
                     ## their output if they need.
                         value=cgi.escape(value)
 
+                    ## Now add links if they are required
+                    try:
+                        if new_links[i]:
+                            q = new_links[i]
+                            try:
+                                q=q.clone()
+                                q.FillQueryTarget(value)
+
+                            #No __target__ specified go straight here
+                            finally:
+                                tmp = self.__class__(self)
+                                tmp.link(value, q)
+                                value=tmp
+
+                    #links array is too short
+                    except IndexError:
+                        pass
+
                     if value==' ': value="&nbsp;"
                     result.result+="<td>%s</td>" % (value)
+                    
                 result.result+="</tr>"
             result.result+="</tbody></table></div></div>"
 
         cb=self.store_callback(table_cb)
         table_cb(self.defaults,self)
+
+    def link(self,string,target=None,options=None,icon=None,tooltip=None,**target_options):
+        ## If the user specified a URL, we just use it as is:
+        try:
+            self.result+="<a href='%s'>%s</a>" % (target_options['url'],string)
+            return
+        except KeyError:
+            pass
+        
+        if target==None:
+            target=FlagFramework.query_type(())
+        q=target.clone()
+        if target_options:
+            for k,v in target_options.items():
+                del q[k]
+                q[k]=v
+
+        if not options:
+            options={}
+
+        if icon:
+            tmp = self.__class__(self)
+            tmp.icon(icon,alt=string,border=0)
+            tooltip=string
+            string=tmp
+
+        tmp = []
+        try:
+            tmp=target['__opt__'].split(',')
+            del q['__opt__']
+            if 'popup' in tmp:
+                options['onclick'] ="window.open('%s','client','HEIGHT=600,WIDTH=600,scrollbars=yes')" % q
+                self.result+="<a href=# %s >%s</a>" %(self.opt_to_str(options),string)
+                return
+        except KeyError:
+            pass
+
+        ## If the user right clicked, we open in a new window
+        base = '<a %s onclick="update_main(\'/f?%s\');" href="#">%s</a>' % (self.opt_to_str(options),q,string)
+            
+        if tooltip:
+            self.result+="<abbr title='%s'>%s</abbr>" % (tooltip,base)
+        else:
+            self.result+=base

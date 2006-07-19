@@ -133,3 +133,7 @@ html, body{
 form {
 	margin-bottom : 0;
 }
+
+a { 
+  color: blue;
+}

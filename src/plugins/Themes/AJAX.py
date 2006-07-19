@@ -34,6 +34,7 @@ class AJAX(Menu):
 	dojo.require("dojo.widget.Button");
         dojo.require("dojo.widget.PyFlagTable");
         dojo.require("dojo.widget.Dialog");
+        dojo.require("dojo.widget.Toolbar");
         
         </script>
         <script type="text/javascript" src="/javascript/ajax_misc.js"></script>
@@ -43,7 +44,7 @@ class AJAX(Menu):
         <body link=blue vlink=blue bgcolor="#FFFFFF">
         
         <div dojoType="dialog" id="FilterDialog" bgColor="white" bgOpacity="0.5" toggle="fade" toggleDuration="250">
-	<form onsubmit="update_filter_column();">
+	<form action="javascript:update_filter_column();">
 		<table>
                         <th><td colspan="2" align="left">Search Column <span id="search_name"></span></td></th>
 			<tr>
@@ -85,8 +86,11 @@ class AJAX(Menu):
 
 
         return result+'''<div dojoType="ContentPane" layoutAlign="top" style="color: black; ">
-		<div class="box">%s</div>
-	</div>''' % (''.join(menus))
+		<div class="box" layoutAlign="bottom">%s</div></div>
+                <div dojoType="ToolbarContainer" layoutAlign="top" id="ToolbarContainer">
+                <div dojoType="Toolbar" id="toolbar"></div>
+                </div>
+                ''' % ('\n'.join(menus))
 
     def naked_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
         """ Render the ui with minimal interventions """
@@ -100,7 +104,12 @@ class AJAX(Menu):
              data))
 
     def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None,ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
-        return data
+        ## This is a little scriptlet to ensure we are loaded within
+        ## dojo environment FIXME: How do we solve the link problem? 
+        ## Is it possible? The problem is that the URL is not enough
+        ## to specify the state because it might include stored UIs.
+        result = '<script>\ntry { djConfig; } catch(err) { document.location="/";  };\n</script>'
+        return data+result
         
     def menu(self,flag,query):
         result=flag.ui()
@@ -108,12 +117,56 @@ class AJAX(Menu):
         self.menu_javascript = self.make_menu_javascript(query)
         title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version
 
-        data="<img src='images/logo.png>"
-        
         result.result+=" ".join(
             (self.header % (title),self.menu_javascript,
-             '<div dojoType="ContentPane" layoutAlign="top" id="toolbar">This is where the toolbar goes</div>\n',
-             '<div dojoType="ContentPane" id="main" layoutAlign="client" style="border: 5px">\n %s</div>\n'% data,
-             self.footer))
+             '<div dojoType="ContentPane" id="main" layoutAlign="client" style="border: 5px">'))
+
+        ## Now create the tool bar:
+        result.result+='''
+        <script type="text/javascript" >
+        function img(name) {
+		return dojo.uri.dojoUri("src/widget/templates/buttons/" + name + ".gif").toString();
+	}
+	
+	function toolbar_init(e) {
+		tb = dojo.widget.getWidgetById("toolbar");
+		var bg = dojo.widget.createWidget("ToolbarButtonGroup", {
+			name: "justify",
+			defaultButton: "justifyleft",
+			preventDeselect: true
+		});
+		bg.addChild(img("justifyleft"));
+		bg.addChild(img("justifycenter"));
+		bg.addChild(img("justifyright"));
+		bg.addChild(img("justifyfull"));
+		var items = [img("bold"), img("italic"), img("underline"),
+			"|", bg, //["justify", img("justifyleft"), img("justifycenter"), img("justifyright"), img("justifyfull")],
+			"|", img("createlink"), img("insertimage"),
+			"|", img("indent"), img("outdent"),
+			img("insertorderedlist"), img("insertunorderedlist"),
+			"|", img("undo"), img("redo")];
+		for(var i = 0; i < items.length; i++) {
+			tb.addChild(items[i], null, {toggleItem:i<3});
+		}
+
+		var headings = dojo.widget.createWidget("ToolbarSelect", {
+			name: "formatBlock",
+			values: {
+				"Normal": "p",
+				"Heading 1": "h1"
+			}
+		});
+		dojo.event.connect(headings, "onSetValue", function(item, val) {
+			alert(item + "\\n" + val);
+		});
+		tb.addChild(headings);
+	}
+	
+	dojo.event.connect(dojo, "loaded", toolbar_init);
+        </SCRIPT>
+        '''
+
+        ## Now create the initial front page:
+        result.result+="<img src='images/logo.png'>" + self.footer
 
         return result

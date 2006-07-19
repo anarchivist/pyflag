@@ -5,6 +5,7 @@ function update_tree(rightcb,url) {
 
 function update_main(url) {
   var main = dojo.widget.getWidgetById("main");
+
   main.setUrl(url);
 };
 
@@ -54,7 +55,6 @@ function filter_column(table_id) {
   element.innerHTML = last_column_name;
   last_table_id = table_id;
   dlg.show();
-  //  container.setUrl(table.query + "&dorder=Count&group_by="+last_column_name);
 };
 
 function update_filter_column() {
