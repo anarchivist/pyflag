@@ -8,6 +8,8 @@ import pyflag.DB as DB
 
 class Menu(Theme.BasicTheme):
     """ Class to implement the Menus theme """
+    preamble = "<form name=PseudoForm method=POST action='/post'><input type=hidden id=pseudo_post_query name=pseudo_post_query value='' /></form><script>if(!window.name) window.name='ID%s'; </script>\n<script src='/javascript/functions.js'></script>\n"
+
     hilight_bar = '''
     <script>        
         showToolbar();
@@ -94,6 +96,10 @@ class Menu(Theme.BasicTheme):
         right.text("PyFlag is a GPL Project maintained at http://pyflag.sourceforge.net/ . \nThis is %s" % FlagFramework.flag_version ,color="red",font="bold")
         result.row(tmp,right,align="center")
         return result
+
+    def raw_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
+        print data
+        return self.preamble + data
 
     def naked_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
         """ Render the ui with minimal interventions """

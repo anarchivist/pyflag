@@ -70,12 +70,12 @@ class AJAXUI(HTMLUI.HTMLUI):
             del query['tab']
             query['tab']=i
             tmplink=self.__class__()
-            out+='''<div
-            dojoType="LinkPane"
+            out+='''<div id="%s"
+            dojoType="ContentPane"
             href="f?%s"
             executeScripts="true"
             refreshOnShow="false"
-            label="%s"></div>\n''' % (query,names[i])
+            label="%s"></div>\n''' % (self.id, query,names[i])
         
         self.result+=out+"</div>"
                  
@@ -171,7 +171,7 @@ class AJAXUI(HTMLUI.HTMLUI):
             self.result += "<input type=hidden name='%s' value='%s'>\n" % (k,v)
 
         if value:
-            self.result += "<button dojoType='Button' onClick='javascript:submitForm(\"pyflag_form_%s\");'>%s</button>\n" % (self.depth, value)
+            self.result += "<button dojoType='Button' onClick='javascript:submitForm(\"pyflag_form_%s\",\"form%s\");'>%s</button><div id=\"form%s\"></div>\n" % (self.depth, self.id, value, self.id)
 
         self.result+="</form>"
 
@@ -371,11 +371,17 @@ class AJAXUI(HTMLUI.HTMLUI):
         created which the callback function then uses to render on.
         """
         if link:
-            result="<script>\n add_toolbar_link('/images/%s','%s');\n</script>" % (icon, link)
+            id = self.id
+            result="<script>\n add_toolbar_link('/images/%s','f?%s','dummy%s');\n</script><div id='dummy%s'></div>" % (icon, link, id,id)
+                        
         elif cb:
-            result="<script>\n add_toolbar_link('/images/%s','%s');\n</script>" % (icon, link)
+            cb_key = self.store_callback(cb)
+            id = self.id
+            result="<script>\n add_toolbar_callback('/images/%s','f?callback_stored=%s','dummy%s');\n</script><div id='dummy%s'></div>" % (icon, cb_key, id,id)
+
+        ## Button is disabled:
         else:
-            result="<script>\n add_toolbar_link('/images/%s','%s');\n</script>" % (icon, link)
+            result="<script>\n add_toolbar_disabled('/images/%s');\n</script>" % (icon)
 
         self.result+=result
 
@@ -397,3 +403,6 @@ class AJAXUI(HTMLUI.HTMLUI):
         cb=self.store_callback(Download_file)
         
         self.result = "<a href='f?%s&callback_stored=%s'>Click to Download file</a>" % (self.defaults,cb)
+
+    def refresh(self,interval,query,**options):
+        pass

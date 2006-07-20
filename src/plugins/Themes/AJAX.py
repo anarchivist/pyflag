@@ -95,22 +95,17 @@ class AJAX(Menu):
 
     def naked_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
         """ Render the ui with minimal interventions """
-        if not ui.toolbar_ui:
-            toolbar_str='&nbsp;&nbsp;'
-        else:
-            toolbar_str=ui.toolbar_ui.__str__()
-
-        return " ".join(
-            (self.header % (title),
-             data))
+        result= data
+        print result
+        return result
 
     def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None,ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
-        print data
         ## This is a little scriptlet to ensure we are loaded within
         ## dojo environment FIXME: How do we solve the link problem? 
         ## Is it possible? The problem is that the URL is not enough
         ## to specify the state because it might include stored UIs.
         result = '<script>\ntry { djConfig; } catch(err) { document.location="/";  };\n</script>'
+        print data+result
         return data+result
         
     def menu(self,flag,query):

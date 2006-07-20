@@ -139,14 +139,9 @@ class HTMLUI(UI.GenericUI):
         #window not ones which are added to other UIs:
         self.decoration='full'
         self.title=''
-
-    preamble = "<form name=PseudoForm method=POST action='/post'><input type=hidden id=pseudo_post_query name=pseudo_post_query value='' /></form><script>if(!window.name) window.name='ID%s'; </script>\n<script src='/javascript/functions.js'></script>\n"
         
     def display(self):
         ## If the method is post, we need to emit the pseudo post form:
-        if self.decoration!='raw':
-            self.result=self.preamble % self.id + self.result
-
         #Make a toolbar
         if not self.nav_query:
             q = self.defaults.clone()
@@ -161,6 +156,8 @@ class HTMLUI(UI.GenericUI):
             
         ## Get the right theme
         theme=Theme.get_theme(q)
+        if self.decoration!='raw':
+            return theme.raw_render(data=self.__str__(), ui=self,title=self.title)
         
         if self.decoration=='naked':
             return theme.naked_render(data=self.__str__(), ui=self,title=self.title)

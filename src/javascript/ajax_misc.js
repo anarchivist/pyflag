@@ -11,17 +11,17 @@ function update_main(url) {
   main.setUrl(url);
 };
 
-function submitForm(form_name) {
+function submitForm(form_name,id) {
   
   var kw = {
     url:	   "/f",
     formNode:dojo.byId(form_name),
     load:	   function(type, data)	{
-      var main = dojo.widget.getWidgetById("main");
+      var container = find_widget_type_above("ContentPane",id);
       var toolbar = dojo.widget.getWidgetById("toolbar");
       
       dojo.dom.removeChildren(toolbar.domNode);
-      main.setContent(data);
+      container.setContent(data);
     },
     error:   function(type, error)	{ alert(String(type)+ String(error)); },
     method:  "POST",
@@ -81,13 +81,73 @@ function update_filter_column() {
 
 /** This function add a single toolbar link. A toolbar link is an icon
     which when clicked refreshes the main frame to the link */
-function add_toolbar_link(icon, link) {
+function add_toolbar_link(icon, link, id) {
   var toolbar  = dojo.widget.getWidgetById("toolbar");
   var dojo_icon= dojo.widget.createWidget("ToolbarButton",
-					  {icon: icon})
+					  {icon: icon});
+  var container = find_widget_type_above("ContentPane",id);
+
+  if(!container) return;
 
   dojo.event.connect(dojo_icon, "onClick", function () {
-			 alert(link);
+		       container.setUrl(link);
+		     });
+  toolbar.addChild(dojo_icon);
+};
+
+/** Adds a disabled button */
+function add_toolbar_disabled(icon) {
+  var toolbar  = dojo.widget.getWidgetById("toolbar");
+  var dojo_icon= dojo.widget.createWidget("ToolbarButton",
+					  {icon: icon});
+
+  dojo_icon.disable();
+  toolbar.addChild(dojo_icon);
+};
+
+/** Returns the widget of given type found directly above the DOM
+    element id 
+*/
+function find_widget_type_above(type,id) {
+  var container; 
+  var parent=document.getElementById(id);
+
+  if(!parent) {
+    alert("Cant find id "+id);
+    return null;
+  };
+
+  while(1) {
+    container = dojo.widget.getWidgetById(parent.id);
+
+    // It has to be a dojo widget:
+    if(container) {
+      if(container.widgetType == "ContentPane") {
+	break;
+      };
+    };
+
+    if(parent==(document["body"]||document["documentElement"])){
+      return null;
+    };
+
+    parent = parent.parentNode;
+  };
+
+  return container;
+};
+
+function add_toolbar_callback(icon, link, id) {
+  var toolbar  = dojo.widget.getWidgetById("toolbar");
+  var dojo_icon= dojo.widget.createWidget("ToolbarButton",
+					  {icon: icon});
+
+  var container = find_widget_type_above("ContentPane",id);
+
+  if(!container) return;
+
+  dojo.event.connect(dojo_icon, "onClick", function () {
+		       container.setUrl(link);
 		       });
   toolbar.addChild(dojo_icon);
 };

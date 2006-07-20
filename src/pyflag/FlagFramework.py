@@ -436,12 +436,6 @@ class Flag:
             result.text(report_doc)
             result.decoration='naked'
 
-        #Since flag must always operate on a case, if there is no case, we use the default flagdb as a case
-#        try:
-#            query['case']
-#        except KeyError:
-#            query['case'] = config.FLAGDB
-
         import pyflag.TypeCheck as TypeCheck
 
         # First check authentication, do this always
