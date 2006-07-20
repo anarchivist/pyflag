@@ -135,7 +135,7 @@ class AJAXUI(HTMLUI.HTMLUI):
         layoutAlign="client"
         id="treepane"
         sizeMin="20" sizeShare="80"
-        style="border: 0px ; width: 40%%; height: 100%%; overflow: auto;"
+        style="border: 0px ; width: 25%%; height: 100%%; overflow: auto;"
         executeScripts="true">
 
         <dojo:TreeSelector widgetId="treeSelector" eventNames="select:nodeSelected"></dojo:TreeSelector>
@@ -148,7 +148,7 @@ class AJAXUI(HTMLUI.HTMLUI):
 	<div dojoType="ContentPane"
         id="rightpane"
         executeScripts="true"
-        style="border: 0px ; width: 60%%; height: 100%%; overflow: auto;"
+        style="border: 0px ; height: 100%%; overflow: auto;"
         sizeMin="50" sizeShare="50">
 	</div>
         </div>
@@ -378,3 +378,22 @@ class AJAXUI(HTMLUI.HTMLUI):
             result="<script>\n add_toolbar_link('/images/%s','%s');\n</script>" % (icon, link)
 
         self.result+=result
+
+    def download(self,file):
+
+        def Download_file(query,result):
+            magic=FlagFramework.Magic(mode='mime')
+            file.seek(0)
+            data=file.read(1000)
+            result.generator.content_type=magic.buffer(data)
+            try:
+                result.generator.headers=[("Content-Disposition","attachment; filename=%s" % file.inode),]
+            except AttributeError:
+                result.generator.headers=[("Content-Disposition","attachment; filename=%s" % file.name),]
+
+            file.seek(0)
+            result.generator.generator=file
+
+        cb=self.store_callback(Download_file)
+        
+        self.result = "<a href='f?%s&callback_stored=%s'>Click to Download file</a>" % (self.defaults,cb)

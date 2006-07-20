@@ -102,7 +102,10 @@ class HTMLUI(UI.GenericUI):
         HTMLUI.id+=1
         
         self.result = ''
-        
+
+        import pyflag.FlagFramework as FlagFramework
+        self.flag = FlagFramework.GLOBAL_FLAG_OBJ
+            
         if default != None:
             self.form_parms = default.form_parms
             self.defaults = default.defaults
@@ -110,7 +113,6 @@ class HTMLUI(UI.GenericUI):
             self.generator=default.generator
             self.depth = default.depth+1
         else:
-            import pyflag.FlagFramework as FlagFramework
             self.form_parms =FlagFramework.query_type(())
             self.defaults = FlagFramework.query_type(())
             self.toolbar_ui=None
@@ -264,15 +266,9 @@ class HTMLUI(UI.GenericUI):
         example if we show a pop up window, we dont actually render
         the window until the user pops it up.
         """
-        count = HTMLUI.max_callback_count
-        import time
-        
-        key= "CB%u" % count
-        HTMLUI.callback_dict[key] = callback
-        HTMLUI.callback_time_dict[key] = time.time()
-        HTMLUI.max_callback_count+=1
-        print "Registered callback %s" % key
-        return key
+
+        cb_key = self.flag.store.put(callback, prefix="CB")
+        return cb_key
     
     def store(self,ui):
         """ Function stores the current UI in a dict in the class method. This is required when we need to store a UI and later get the browser to retrieve it. """

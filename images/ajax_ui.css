@@ -13,7 +13,8 @@ body {
 
 table {
   font-family:Lucida Grande, Verdana;
-  font-size:0.8em;
+/*  font-size:0.8em; */
+  align:left;
   width:100%;
   border:1px solid #ccc;
   cursor:default;
@@ -27,8 +28,11 @@ table {
   overflow-y: auto;
 }
 
-table thead td, table thead th {
+tbody.scrollContent td, thead th {
   background:#94BEFF;
+  border-right:1px solid #999;
+  padding:2px;
+  font-weight:normal;
 }
 
 * html div.tableContainer table thead tr td,

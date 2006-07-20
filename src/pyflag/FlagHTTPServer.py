@@ -208,18 +208,25 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             ## This expires stored pictures in case pyflag is
             ## restarted
             headers['Expires']='-1'
-        elif query.has_key('callback_stored') and flag.ui.callback_dict.has_key(query['callback_stored']):
-            cb = query.getarray('callback_stored')[-1]
+        elif query.has_key('callback_stored'):
+            cb_key = query.getarray('callback_stored')[-1]
 
+            ## Make a new UI
             result=flag.ui(query=query)
-#            cb=query['callback_stored']
-#            del query['callback_stored']
-            cb=flag.ui.callback_dict[cb]
-#            del UI.HTMLUI.callback_dict[cb]
+
+            ## Get the callback from the store
+            cb=flag.store.get(cb_key)
+
+            ## Use it
             cb(query,result)
+
+            ## Return the cb to the store:
+            #flag.store.put(cb, key=cb_key)
+            
             ## This ensures that callbacks are recalled each time they
             ## are drawn
             headers['Expires']='-1'
+
 
         #Nope - just do it
         else:            

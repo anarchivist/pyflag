@@ -35,6 +35,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.logging as logging
 import pyflag.Registry as Registry
+import pyflag.Store as Store
 
 flag_version = config.VERSION
 
@@ -328,6 +329,9 @@ class Flag:
 
         ## Initialise the registry:
         Registry.Init()
+
+        ## Create a store for us:
+        self.store = Store.Store()
                 
     def is_cached(self,query):
         """ Checks the database to see if the report has been cached """

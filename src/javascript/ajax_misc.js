@@ -5,7 +5,9 @@ function update_tree(rightcb,url) {
 
 function update_main(url) {
   var main = dojo.widget.getWidgetById("main");
-
+  var toolbar = dojo.widget.getWidgetById("toolbar");
+  
+  dojo.dom.removeChildren(toolbar.domNode);
   main.setUrl(url);
 };
 
@@ -16,6 +18,9 @@ function submitForm(form_name) {
     formNode:dojo.byId(form_name),
     load:	   function(type, data)	{
       var main = dojo.widget.getWidgetById("main");
+      var toolbar = dojo.widget.getWidgetById("toolbar");
+      
+      dojo.dom.removeChildren(toolbar.domNode);
       main.setContent(data);
     },
     error:   function(type, error)	{ alert(String(type)+ String(error)); },
@@ -81,7 +86,7 @@ function add_toolbar_link(icon, link) {
   var dojo_icon= dojo.widget.createWidget("ToolbarButton",
 					  {icon: icon})
 
-    dojo.event.connect(dojo_icon, "onClick", function () {
+  dojo.event.connect(dojo_icon, "onClick", function () {
 			 alert(link);
 		       });
   toolbar.addChild(dojo_icon);
