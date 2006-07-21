@@ -3,12 +3,67 @@ function update_tree(rightcb,url) {
   rightpane.setUrl(url+"&callback_stored="+rightcb);
 };
 
+function push_on_history(container, url) {
+  pyflag_history.push([container, url]);
+};
+
 function update_main(url) {
   var main = dojo.widget.getWidgetById("main");
-  var toolbar = dojo.widget.getWidgetById("toolbar");
-  
-  dojo.dom.removeChildren(toolbar.domNode);
+  push_on_history("main",url);
+
+  clear_toolbar();
   main.setUrl(url);
+};
+
+/** Clears the toolbar and installs the default handlers */
+function clear_toolbar() {
+  var toolbar = dojo.widget.getWidgetById("toolbar");
+
+  dojo.dom.removeChildren(toolbar.domNode);
+
+  //History back:
+  var dojo_icon= dojo.widget.createWidget("ToolbarButton",
+					  {icon: "/images/stock_left.png"});
+
+  if(pyflag_history.count==0) {dojo_icon.disable() };
+  
+  dojo.event.connect(dojo_icon, "onClick", function () {
+		       var tmp = pyflag_history.pop()
+		       var container_name = tmp[0];
+		       var url = tmp[1];
+		       var container = dojo.widget.getWidgetById(container_name);
+
+		       
+		       pyflag_forward_history.push([container_name, url]);
+
+		       if(!container) return;
+
+		       clear_toolbar();
+		       container.setUrl(url);
+		     });
+  toolbar.addChild(dojo_icon);
+
+  //History Forward:
+  var dojo_icon= dojo.widget.createWidget("ToolbarButton",
+					  {icon: "/images/stock_right.png"});1
+
+  if(pyflag_forward_history.count==0) {dojo_icon.disable() };
+
+  dojo.event.connect(dojo_icon, "onClick", function () {
+		       var tmp = pyflag_forward_history.pop();
+		       var container_name = tmp[0];
+		       var url = tmp[1];
+		       var container = dojo.widget.getWidgetById(container_name);
+
+		       pyflag_history.push([container_name, url]);
+
+		       if(!container) return;
+
+		       clear_toolbar();
+		       container.setUrl(url);
+		     });
+  toolbar.addChild(dojo_icon);
+
 };
 
 function submitForm(form_name,id) {
@@ -18,10 +73,9 @@ function submitForm(form_name,id) {
     formNode:dojo.byId(form_name),
     load:	   function(type, data)	{
       var container = find_widget_type_above("ContentPane",id);
-      var toolbar = dojo.widget.getWidgetById("toolbar");
-      
-      dojo.dom.removeChildren(toolbar.domNode);
+      clear_toolbar();
       container.setContent(data);
+      alert(this.url);
     },
     error:   function(type, error)	{ alert(String(type)+ String(error)); },
     method:  "POST",
@@ -56,7 +110,11 @@ function init_search_dialog(e) {
 
 }
 
+
 dojo.addOnLoad(init_search_dialog);
+
+pyflag_history  = new dojo.collections.Stack();
+pyflag_forward_history = new dojo.collections.Stack();
 
 function filter_column(table_id) {
   var element=document.getElementById("search_name");

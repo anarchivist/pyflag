@@ -36,7 +36,8 @@ class AJAX(Menu):
         dojo.require("dojo.widget.Dialog");
         dojo.require("dojo.widget.Toolbar");
         dojo.require("dojo.uri.dojoUri");
-        
+        dojo.require("dojo.collections.Stack");
+
         </script>
         <script type="text/javascript" src="/javascript/ajax_misc.js"></script>
         <style type="text/css" src="/images/ajax_ui.css"></style>
