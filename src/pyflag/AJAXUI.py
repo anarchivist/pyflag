@@ -73,6 +73,7 @@ class AJAXUI(HTMLUI.HTMLUI):
             out+='''<div id="%s"
             dojoType="ContentPane"
             href="f?%s"
+            cacheContent="false" 
             executeScripts="true"
             refreshOnShow="false"
             label="%s"></div>\n''' % (self.id, query,names[i])
@@ -85,6 +86,8 @@ class AJAXUI(HTMLUI.HTMLUI):
 
         This implementation uses javascript/iframes extensively.
         """            
+        id = self.get_uniue_id()
+
         def right(query,result):
             result.decoration = "raw"
             result.content_type = "text/html"
@@ -132,39 +135,42 @@ class AJAXUI(HTMLUI.HTMLUI):
         style="border: 0px ; width: 100%%; height: 100%%; overflow: auto;"
         >
         <div dojoType="ContentPane"
+        cacheContent="false" 
         layoutAlign="client"
-        id="treepane"
+        id="treepane%(id)s"
+        right_cb="%(r)s"
         sizeMin="20" sizeShare="80"
         style="border: 0px ; width: 25%%; height: 100%%; overflow: auto;"
         executeScripts="true">
 
-        <dojo:TreeSelector widgetId="treeSelector" eventNames="select:nodeSelected"></dojo:TreeSelector>
-        <div dojoType="TreeLoadingController" RPCUrl="f?%s&callback_stored=%s" widgetId="treeController" ></div>
-            <div dojoType="Tree" toggle="fade" controller="treeController" selector="treeSelector" widgetId="firstTree">
+        <dojo:TreeSelector widgetId="treeSelector%(id)s" eventNames="select:nodeSelected"></dojo:TreeSelector>
+        <div dojoType="TreeLoadingController" RPCUrl="f?%(query)s&callback_stored=%(t)s" widgetId="treeController%(id)s" ></div>
+            <div dojoType="Tree" toggle="fade" controller="treeController%(id)s" selector="treeSelector%(id)s" widgetId="tree%(id)s">
             <div dojoType="TreeNode" isFolder="true" title="/" objectId="/"></div>
           </div>
         
 	</div>
 	<div dojoType="ContentPane"
-        id="rightpane"
+        cacheContent="false" 
+        id="rightpane%(id)s"
         executeScripts="true"
         style="border: 0px ; height: 100%%; overflow: auto;"
         sizeMin="50" sizeShare="50">
 	</div>
         </div>
-        """ % (query,t)
+        """ % {'query':query,'t':t,'id':id, 'r':r}
 
-        ## Populate the initial tree state:
+        ## Populate the initial tree state: FIXME: This needs to be a
+        ## lot more specific.
         self.result+="""<script>
 
         _container_.addOnLoad(function() {
 		dojo.event.topic.subscribe("nodeSelected",
-			 function(message) { update_tree("%s","f?%s&open_tree="+message.node.objectId); }
+			 function(message) { update_tree(\"%s\",\"f?%s&open_tree=\"+message.node.objectId,'%s'); }
 		);
                 });
         </script>
-        """ % (r, query )
-
+        """ % (r, query, id )
 
     def end_form(self,value='Submit',name='submit',**opts):
         for k,v in self.form_parms:
@@ -187,7 +193,7 @@ class AJAXUI(HTMLUI.HTMLUI):
             id=self.get_uniue_id()
 
             result.result += '''
-            <div id="tableContainer%s" dojoType="ContentPane" layoutAlign="client"
+            <div id="tableContainer%s" dojoType="ContentPane"  cacheContent="false"  layoutAlign="client"
             style="overflow: auto;"
             executeScripts="true" >''' % (id)
             

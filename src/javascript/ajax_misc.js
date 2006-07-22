@@ -1,6 +1,8 @@
-function update_tree(rightcb,url) {
-  var rightpane = dojo.widget.getWidgetById("rightpane");
-  rightpane.setUrl(url+"&callback_stored="+rightcb);
+function update_tree(rightcb,url,id) {
+  var rightpane = dojo.widget.getWidgetById("rightpane"+id);
+  if(rightpane) {
+    rightpane.setUrl(url+"&callback_stored="+rightcb);
+  };
 };
 
 function push_on_history(container, url) {
@@ -9,7 +11,11 @@ function push_on_history(container, url) {
 
 function update_main(url) {
   var main = dojo.widget.getWidgetById("main");
-  push_on_history("main",url);
+
+  /* Store the old url in the history */
+  if(main.href) {
+    push_on_history("main",main.href);
+  };
 
   clear_toolbar();
   main.setUrl(url);
@@ -28,15 +34,17 @@ function clear_toolbar() {
   if(pyflag_history.count==0) {dojo_icon.disable() };
   
   dojo.event.connect(dojo_icon, "onClick", function () {
-		       var tmp = pyflag_history.pop()
+		       // The first element on the history is the current page.
+		       var tmp = pyflag_history.pop();
 		       var container_name = tmp[0];
 		       var url = tmp[1];
 		       var container = dojo.widget.getWidgetById(container_name);
 
 		       
-		       pyflag_forward_history.push([container_name, url]);
-
 		       if(!container) return;
+
+		       // Place the current container url in the forward history.
+		       pyflag_forward_history.push([container_name, container.href]);
 
 		       clear_toolbar();
 		       container.setUrl(url);
@@ -55,9 +63,11 @@ function clear_toolbar() {
 		       var url = tmp[1];
 		       var container = dojo.widget.getWidgetById(container_name);
 
-		       pyflag_history.push([container_name, url]);
-
 		       if(!container) return;
+
+		       // Push the current containers url on the history
+		       if(container.href)
+			 pyflag_history.push([container_name, container.href]);
 
 		       clear_toolbar();
 		       container.setUrl(url);
@@ -67,18 +77,37 @@ function clear_toolbar() {
 };
 
 function submitForm(form_name,id) {
-  
+
+  /** We try to save a get version of the current form in the
+      history */
+  var form = dojo.byId(form_name);
+  var inputs = form.getElementsByTagName("input");
+  var query = new dojo.collections.Stack();
+
+  for(var i = 0; i < inputs.length; i++) {
+    var input = inputs[i];
+    if(input.name.length>0)
+      query.push(input.name + '=' + input.value);
+  };
+
+  var url="/f?"+query.toArray().join("&");
+  var container = find_widget_type_above("ContentPane",id);
+
+  if(container.href) {
+    push_on_history("main",container.href);
+  };
+
   var kw = {
     url:	   "/f",
-    formNode:dojo.byId(form_name),
+    formNode:      dojo.byId(form_name),
     load:	   function(type, data)	{
-      var container = find_widget_type_above("ContentPane",id);
       clear_toolbar();
       container.setContent(data);
-      alert(this.url);
+      container.href=url;
     },
     error:   function(type, error)	{ alert(String(type)+ String(error)); },
     method:  "POST",
+    useCache: false,
   };
   
   dojo.io.bind(kw);
@@ -95,7 +124,13 @@ last_column_name = "";
 last_table_id = 0;
 function update_container(container,url) {
   var c = dojo.widget.getWidgetById(container);
-  c.setUrl(url);
+  
+  // If we are actually updating the main frame, we handle it
+  // specially so the history works etc.
+  if(c && container=="main") 
+    update_main(url);
+  else
+    c.setUrl(url);
 };
 
 
@@ -203,7 +238,7 @@ function add_toolbar_callback(icon, link, id) {
   if(!container) return;
 
   dojo.event.connect(dojo_icon, "onClick", function () {
-		       container.setUrl(link);
-		       });
+		       update_container(container.domNode.id,link);
+		     });
   toolbar.addChild(dojo_icon);
 };

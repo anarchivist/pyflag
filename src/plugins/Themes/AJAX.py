@@ -86,7 +86,7 @@ class AJAX(Menu):
                 menus.append('<div dojoType="PopupMenu2" id="%s" toggle="wipe">%s</div> <button dojoType="dropdownButton" menuId="%s">%s</button>' % (k,submenu_text,k,k))
 
 
-        return result+'''<div dojoType="ContentPane" layoutAlign="top" style="color: black; ">
+        return result+'''<div dojoType="ContentPane" layoutAlign="top" style="color: black; " id="top">
 		<div class="box" layoutAlign="bottom">%s</div></div>
                 <div dojoType="ToolbarContainer" layoutAlign="top" id="ToolbarContainer">
                 <div dojoType="Toolbar" id="toolbar"></div>
@@ -119,7 +119,7 @@ class AJAX(Menu):
 
         result.result+=" ".join(
             (self.header % (title),self.menu_javascript,
-             '<div dojoType="ContentPane" id="main" layoutAlign="client" style="border: 5px" executeScripts="true">'))
+             '<div dojoType="ContentPane" cacheContent="false" id="main" layoutAlign="client" style="border: 5px" executeScripts="true">'))
 
         ## Now create the initial front page:
         result.result+="<img src='images/logo.png'>" + self.footer

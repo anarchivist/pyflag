@@ -171,7 +171,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         ## Work out if the request was for a static object
         ct=''
         if query.base.endswith(".js"):
-            ct="application/x-javascript"
+            ct="text/javascript"
             
         #Is this a request for an image?
         if re.search("\.(png|jpg|gif|ico)$",query.base):
