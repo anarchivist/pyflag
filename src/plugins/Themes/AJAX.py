@@ -18,7 +18,6 @@ class AJAX(Menu):
         var djConfig = { isDebug: true, baseScriptUri: "javascript/" };
         </script>
         <script type="text/javascript" src="/javascript/dojo.js"></script>
-        <script type="text/javascript" src="/javascript/functions.js"></script>
  
         <script type="text/javascript">
         dojo.require("dojo.widget.ComboBox");
@@ -65,7 +64,7 @@ class AJAX(Menu):
 	style="width: 100%%; height: 100%%;">
         '''
 
-    footer="</div>"
+    footer="\n</div></div></body></html>"
     def make_menu_javascript(self,query):
         """ Creates the javascript required to generate the menu """
         ## Find all families:
@@ -108,7 +107,10 @@ class AJAX(Menu):
         result = '<script>\ntry { djConfig; } catch(err) { document.location="/";  };\n</script>'
         print data+result
         return data+result
-        
+
+    def raw_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
+        return data
+
     def menu(self,flag,query):
         result=flag.ui()
         

@@ -107,9 +107,7 @@ function init_search_dialog(e) {
   
   btn = document.getElementById("search_cancel");
   dlg.setCloseControl(btn);
-
 }
-
 
 dojo.addOnLoad(init_search_dialog);
 

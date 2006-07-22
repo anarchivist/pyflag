@@ -139,6 +139,17 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 ##        else:
 ##            base, query = (self.path , FlagFramework.query_type([], user=user, passwd=passwd ))
 
+    def format_date_time_string(self, sec):
+        year, month, day, hh, mm, ss, wd, y, z = time.gmtime(sec)
+        s = "%s, %02d %3s %4d %02d:%02d:%02d GMT" % (
+                self.weekdayname[wd],
+                day, self.monthname[month], year,
+                hh, mm, ss)
+        return s
+
+    def parse_date_time_string(self, s):
+        return time.mktime(time.strptime(s, "%a, %d %b %Y %H:%M:%S %Z"))
+
     def do_POST(self):
         self.do_GET()
 
@@ -175,14 +186,35 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         if ct:
             try:
                 import sys
-                self.send_response(200)
-                self.send_header("Content-type",ct)
-                self.send_header("Last-Modified","Sun, 17 Jan 2000 19:14:07 GMT")
-                self.send_header("Etag","123456789")
-                self.send_header("Expires","Sun, 17 Jan 2038 19:14:07 GMT")                
-                self.end_headers()
                 path = os.path.normpath(config.DATADIR + query.base)
                 if path.startswith(os.path.normpath(config.DATADIR)):
+                    s = os.stat(path)
+                    try:
+                        ## This is the last modified time the browser
+                        ## is asking for in local time (not GMT)
+                        last_time = self.parse_date_time_string(
+                            self.headers.get('If-Modified-Since','')
+                            )-time.timezone
+
+                        ## If the browsers idea of the modified time
+                        ## is different that ours, we cant say it was
+                        ## not modified and to be safe we return the
+                        ## current version.
+                        if int(last_time) == int(s.st_mtime):
+                            self.send_response(304)
+                            self.send_header("Expires","Sun, 17 Jan 2038 19:14:07 GMT")                
+                            self.end_headers()
+                            return
+                        
+                    except ValueError:
+                        print self.headers.get('If-Modified-Since','')
+                    
+                    self.send_response(200)
+                    self.send_header("Content-type",ct)
+                    self.send_header("Last-Modified",self.format_date_time_string(s.st_mtime))
+                    self.send_header("Etag",s.st_ino)
+                    self.send_header("Expires","Sun, 17 Jan 2038 19:14:07 GMT")                
+                    self.end_headers()
                     fd = open(path)
                     f = fd.read()
                     self.wfile.write(f)
