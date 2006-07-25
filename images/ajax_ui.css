@@ -14,10 +14,8 @@ body {
 table {
   font-family:Lucida Grande, Verdana;
 /*  font-size:0.8em; */
-  align:left;
   width:100%;
   border:1px solid #ccc;
-  cursor:default;
 }
 
 * html div.tableContainer {	/* IE only hack */
@@ -40,7 +38,7 @@ tbody.scrollContent td, thead th {
 * html div.tableContainer table thead tr th{
   /* IE Only hacks */
   position:relative;
-  top:expression(dojo.html.getFirstAncestorByTag(this,'table').parentNode.scrollTop-2);
+  top: expression(dojo.html.getFirstAncestorByTag(this,'table').parentNode.scrollTop-2);
 }
 
 tbody.scrollContent {

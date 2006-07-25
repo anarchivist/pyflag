@@ -14,6 +14,7 @@ the store at any one time.
 """
 
 import thread,time
+import pyflag.logging as logging
 
 class Store:
     """ Stores objects for a length of time.
@@ -57,7 +58,7 @@ class Store:
         finally:
             self.mutex.release()
 
-        print "Stored key %s" % key
+        logging.log(logging.VERBOSE_DEBUG, "Stored key %s" % key)
         return key
 
     def get(self, key):
@@ -71,7 +72,7 @@ class Store:
                 if k==key:
                     #self.creation_times.pop(i)
                     self.check_full()
-                    print "Got key %s" % key
+                    logging.log(logging.VERBOSE_DEBUG, "Got key %s" % key)
                     return obj
                 i+=1
 
@@ -87,7 +88,7 @@ class Store:
         ## objects first:
         while len(self.creation_times)>self.max_size:
             t, key, o = self.creation_times.pop(0)
-#            print "Removed object %s because store is full" % o
+            logging.log(logging.VERBOSE_DEBUG, "Removed object %s because store is full" % o)
 
         ## Now ensure that objects are not too old:
         now = time.time()
@@ -96,7 +97,7 @@ class Store:
                 t,key,o = self.creation_times[0]
                 if t+self.max_age < now:
                     self.creation_times.pop(0)
-#                    print "Removed object %s because it is too old" % o
+                    logging.log(logging.VERBOSE_DEBUG,"Removed object %s because it is too old" % o)
                 else:
                     break
         except IndexError:

@@ -15,14 +15,11 @@ class AJAXUI(HTMLUI.HTMLUI):
             opt_str = self.opt_to_str(options)
         else: opt_str = ''
 
+        ## Convert the keys and values to json:
         def const_selector_cb(query,result):
-            out = []
-            for k,v in zip(keys,values):
-                out.append("[%r,%r]\n" % (k,v))
-
+            out = [ [k,v] for k,v in zip(keys,values) ]
             result.decoration='raw'
-            result.result = "[\n%s\n]" % ',\n'.join(out)
-
+            result.result = "%s" % out
 
         cb = self.store_callback(const_selector_cb)
         
@@ -86,7 +83,16 @@ class AJAXUI(HTMLUI.HTMLUI):
             label="%s"></div>\n''' % (self.id, query,names[i])
         
         self.result+=out+"</div>"
-                 
+
+    def make_branch(self, string):
+        try:
+            ## Get the right part:
+            path = FlagFramework.normpath(string)
+            branch=path.split('/')
+        except KeyError:
+            branch=['/']
+        
+        return branch
 
     def tree(self, tree_cb = None, pane_cb=None, branch = None, layout=None):
         """ A tree widget.
@@ -98,12 +104,7 @@ class AJAXUI(HTMLUI.HTMLUI):
         def right(query,result):
             result.decoration = "raw"
             result.content_type = "text/html"
-            try:
-            ## Get the right part:
-                branch=query['open_tree'].split('/')
-            except KeyError:
-                branch=['/']
-
+            branch = self.make_branch(query['open_tree'])
             pane_cb(branch,result)
 
         def tree(query,result):
@@ -115,6 +116,7 @@ class AJAXUI(HTMLUI.HTMLUI):
             path=FlagFramework.normpath(data['node']['objectId'])
             if path.startswith('/'): path=path[1:]
             branch=path.split("/")
+
             r=[]
             for x in tree_cb(branch):
                 if len(x[0])==0: continue
@@ -130,15 +132,46 @@ class AJAXUI(HTMLUI.HTMLUI):
          
         t=self.store_callback(tree)
         r = self.store_callback(right)
-
         query = self.defaults.clone()
+
+        ## Calculate the default tree structure which is obtained from query['open_tree']
+        branch = self.make_branch(query['open_tree'])
+        
+        def do_node(depth,path):
+            if depth>=len(branch): return ''
+            
+            result=''
+            for x in tree_cb(branch[:depth]):
+                if len(x[0])==0: continue
+
+                if x[2]=='branch':
+                    isFolder='true'
+                else:
+                    isFolder='false'
+
+                children=''
+                opened='0'
+                if x[1]==branch[depth]:
+                    children = do_node(depth+1,path+'/'+branch[depth])
+                    opened='1'
+                    
+                result+='<div dojoType="TreeNode" isFolder="%s" title="%s" objectId="%s" expandlevel="%s" >%s</div>' % (isFolder,x[0],'/'.join((path,x[1])),opened,children)
+                
+            return result
+
+        tree_nodes='<div dojoType="TreeNode" isFolder="true" title="/" objectId="/" expandlevel="1">%s</div>' % do_node(1,'')
+
+        ## Calculate the initial contents of the right pane:
+        right_ui = self.__class__(self)
+        right(query,right_ui)
+        
         del query['open_tree']
         
         self.result+="""
         <div dojoType="SplitContainer"
 	orientation="horizontal"
 	sizerWidth="5"
-	activeSizing="0"
+	activeSizing="1"
         style="border: 0px ; width: 100%%; height: 100%%; overflow: auto;"
         >
         <div dojoType="ContentPane"
@@ -153,19 +186,21 @@ class AJAXUI(HTMLUI.HTMLUI):
         <dojo:TreeSelector widgetId="treeSelector%(id)s" eventNames="select:nodeSelected"></dojo:TreeSelector>
         <div dojoType="TreeLoadingController" RPCUrl="f?%(query)s&callback_stored=%(t)s" widgetId="treeController%(id)s" ></div>
             <div dojoType="Tree" toggle="fade" controller="treeController%(id)s" selector="treeSelector%(id)s" widgetId="tree%(id)s">
-            <div dojoType="TreeNode" isFolder="true" title="/" objectId="/"></div>
+            %(tree_nodes)s
           </div>
         
 	</div>
+
 	<div dojoType="ContentPane"
         cacheContent="false" 
         id="rightpane%(id)s"
         executeScripts="true"
         style="border: 0px ; height: 100%%; overflow: auto;"
-        sizeMin="50" sizeShare="50">
+        sizeMin="50" sizeShare="50"> %(right_pane)s
 	</div>
         </div>
-        """ % {'query':query,'t':t,'id':id, 'r':r}
+        """ % {'query':query,'t':t,'id':id, 'r':r, 'right_pane': right_ui,
+               'tree_nodes':tree_nodes}
 
         ## Populate the initial tree state: FIXME: This needs to be a
         ## lot more specific.
@@ -173,11 +208,11 @@ class AJAXUI(HTMLUI.HTMLUI):
 
         _container_.addOnLoad(function() {
 		dojo.event.topic.subscribe("nodeSelected",
-			 function(message) { update_tree(\"%s\",\"f?%s&open_tree=\"+message.node.objectId,'%s'); }
+			 function(message) { update_tree(\"%(r)s\",\"f?%(query)s&open_tree=\"+message.node.objectId,'%(id)s'); }
 		);
                 });
         </script>
-        """ % (r, query, id )
+        """ % {'r':r, 'query':query, 'id':id }
 
     def end_form(self,value='Submit',name='submit',**opts):
         for k,v in self.form_parms:
