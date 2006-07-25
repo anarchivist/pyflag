@@ -14,13 +14,20 @@ class AJAXUI(HTMLUI.HTMLUI):
         if options:
             opt_str = self.opt_to_str(options)
         else: opt_str = ''
+
+        def const_selector_cb(query,result):
+            out = []
+            for k,v in zip(keys,values):
+                out.append("[%r,%r]\n" % (k,v))
+
+            result.decoration='raw'
+            result.result = "[\n%s\n]" % ',\n'.join(out)
+
+
+        cb = self.store_callback(const_selector_cb)
         
-        tmp = '<select name=\"%s\" dojoType="combobox" style="width: 300px;" autocomplete="false" %s maxListLength="15">\n' % (name,opt_str);
+        tmp = '<input name=\"%s\" dojoType="combobox" style="width: 300px;" autocomplete="true" %s maxListLength="15" dataUrl="f?callback_stored=%s" />\n' % (name,opt_str,cb);
 
-        for k,v in zip(keys,values):
-            tmp +="<option value='%s'>%s</option>\n" % (k,v)
-
-        tmp+="</select>\n"
         #Remove this from the form_parms
         if self.form_parms.has_key(name):
             del self.form_parms[name]
