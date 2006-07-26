@@ -89,8 +89,6 @@ class BrowseFS(Reports.report):
         dbh = self.DBO(query['case'])
         main_result=result
         
-        fsfd = FileSystem.DBFS( query["case"])
-        
         branch = ['']
         new_query = result.make_link(query, '')
 
@@ -126,12 +124,19 @@ class BrowseFS(Reports.report):
 
             def pane_cb(branch,tmp):
                 query['order']='Filename'
-                br=FlagFramework.normpath('/'.join(branch)+'/')
+                br=FlagFramework.normpath('/'.join(branch))
+
+                ## If we are asked to show a file, we will show the
+                ## contents of the directory the file is in:
+                fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])
+                if not fsfd.isdir(br):
+                    br=os.path.dirname(br)
+
                 tmp.table(
                     columns=['f.inode','name','f.status','size', 'from_unixtime(mtime)','f.mode'],
                     names=('Inode','Filename','Del','File Size','Last Modified','Mode'),
                     table='file as f, inode as i',
-                    where="f.inode=i.inode and path=%r and f.mode!='d/d'" % (br),
+                    where="f.inode=i.inode and path=%r and f.mode!='d/d'" % (br+'/'),
                     case=query['case'],
                     links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='View File Contents', __target__='inode', inode="%s")]
                     )

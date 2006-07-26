@@ -278,13 +278,32 @@ class GenericUI:
                  #clause
                  try:
                      mask = [ names.index(d) for d in query.getarray('group_by') ]
-                     links = [None]+ [ self.make_link(query,"where_%s" % names[d],target_format="=%s") for d in mask ]
-                     for d in links:
-                         if d:
-                             #For links we dont want these variables to be there
-                             del d['group_by']
-                             del d['limit']
+                     
+                     links = [None]
+                     for d in mask:
+                         q = query.clone()
+                         del q['group_by']
+                         del q['limit']
+                         try:
+                             del q[q['__target__']]
+                         except:
+                             pass
+                         
+                         del q['__target__']
+                         del q['limit']
+                         del q['order']
+                         del q['dorder']
+                         for i in q.keys():
+                             if i.startswith('where_'):
+                                 del q[i]
+                                 
+                         q['__target__'] = "where_%s" % names[d]
+                         q["where_%s" % names[d]] = "=%s"
+                         
+                         q['__pane__'] = self.id
 
+                         links.append(q)
+                         
                      names = ['Count'] + [ names[d] for d in mask ]
                      columns = [ 'count(*)' ] +  [ columns[d] for d in mask ]
 

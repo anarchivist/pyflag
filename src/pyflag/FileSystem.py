@@ -180,11 +180,6 @@ class DBFS(FileSystem):
         """ Initialise the DBFS object """
         self.case = case
         self.dbh = DB.DBO(case)
-        try:
-            self.dbh.execute("select value from meta where property='block_size' limit 1");
-            self.blocksize = int(self.dbh.fetch()["value"])
-        except:
-            self.blocksize = 1024
 
     def load(self, mount_point, iosource_name):
         """ Sets up the schema for loading the filesystem.
@@ -360,7 +355,11 @@ class DBFS(FileSystem):
         if not inode:
             return None
         self.dbh.execute("select inode, status, uid, gid, mtime as mtime_epoch, from_unixtime(mtime) as `mtime`, atime as atime_epoch, from_unixtime(atime) as `atime`, ctime as ctime_epoch, from_unixtime(ctime) as `ctime`, from_unixtime(dtime) as `dtime`, mode, links, link, size from inode where inode=%r limit 1",(inode))
-        return self.dbh.fetch()
+        row = self.dbh.fetch()
+
+        self.dbh.execute("select * from file where inode=%r order by mode limit 1", inode);
+        row.update(self.dbh.fetch())
+        return row
 
     def isdir(self,directory):
         directory=os.path.normpath(directory)

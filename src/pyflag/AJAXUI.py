@@ -79,6 +79,7 @@ class AJAXUI(HTMLUI.HTMLUI):
             href="f?%s"
             cacheContent="false" 
             executeScripts="true"
+            style="display: none;"
             refreshOnShow="false"
             label="%s"></div>\n''' % (self.id, query,names[i])
         
@@ -131,7 +132,7 @@ class AJAXUI(HTMLUI.HTMLUI):
             result.result=r
          
         t=self.store_callback(tree)
-        r = self.store_callback(right)
+        r=self.store_callback(right)
         query = self.defaults.clone()
 
         ## Calculate the default tree structure which is obtained from query['open_tree']
@@ -166,7 +167,7 @@ class AJAXUI(HTMLUI.HTMLUI):
         right(query,right_ui)
         
         del query['open_tree']
-        
+
         self.result+="""
         <div dojoType="SplitContainer"
 	orientation="horizontal"
@@ -208,7 +209,10 @@ class AJAXUI(HTMLUI.HTMLUI):
 
         _container_.addOnLoad(function() {
 		dojo.event.topic.subscribe("nodeSelected",
-			 function(message) { update_tree(\"%(r)s\",\"f?%(query)s&open_tree=\"+message.node.objectId,'%(id)s'); }
+			 function(message) {
+                         update_tree(\"%(r)s\",\"f?%(query)s&open_tree=\"+message.node.objectId,'%(id)s');
+                         message.node.onTreeClick();
+                         }
 		);
                 });
         </script>
@@ -239,7 +243,7 @@ class AJAXUI(HTMLUI.HTMLUI):
             style="overflow: auto;"
             executeScripts="true" >''' % (id)
             
-            result.result += '''<div id="popup" >'''
+            result.result += '''<div id="popup%s" >''' % id
             
             menus = []
 
@@ -275,13 +279,11 @@ class AJAXUI(HTMLUI.HTMLUI):
 
 
             result.result+='''
-            <div dojoType="PopupMenu2" targetNodeIds="popup" toggle="explode">
+            <div dojoType="PopupMenu2" targetNodeIds="popup%s" toggle="explode">
             %s
             </div>
-            ''' % (''.join(menus))
+            ''' % (id,''.join(menus))
 
-
-            del query['callback_stored']
 
             ## If no ordering is specified we order by the first column
             if not query.has_key('order') and not query.has_key('dorder'):
@@ -299,8 +301,11 @@ class AJAXUI(HTMLUI.HTMLUI):
                 callbacks,
                 query)
 
-            result.result+='''<table dojoType="PyFlagTable" widgetId="Table%s" headClass="fixedHeader" tbodyClass="scrollContent" enableMultipleSelect="true" enableAlternateRows="true" rowAlternateClass="alternateRow" cellpadding="0" cellspacing="0" border="0" query="%s&callback_stored=%s" global_id="%s">
-            <thead><tr>''' % (id, new_query, cb,id)
+            if not new_query.has_key('callback_stored'):
+                new_query['callback_stored'] = cb
+
+            result.result+='''<table dojoType="PyFlagTable" widgetId="Table%s" headClass="fixedHeader" tbodyClass="scrollContent" enableMultipleSelect="true" enableAlternateRows="true" rowAlternateClass="alternateRow" cellpadding="0" cellspacing="0" border="0" query="%s" global_id="%s">
+            <thead><tr>''' % (id, new_query, id)
 
             ## Now make the table headers:
             for n in new_names:
@@ -375,7 +380,8 @@ class AJAXUI(HTMLUI.HTMLUI):
             return
         except KeyError:
             pass
-        
+
+
         if target==None:
             target=FlagFramework.query_type(())
         q=target.clone()
@@ -383,6 +389,11 @@ class AJAXUI(HTMLUI.HTMLUI):
             for k,v in target_options.items():
                 del q[k]
                 q[k]=v
+
+        if target.has_key("__pane__"):
+            pane = "find_widget_type_above('ContentPane','Link%s')" % self.id
+        else:
+            pane = "'main'"
 
         if not options:
             options={}
@@ -405,7 +416,7 @@ class AJAXUI(HTMLUI.HTMLUI):
             pass
 
         ## If the user right clicked, we open in a new window
-        base = '<a %s onclick="update_main(\'/f?%s\');" href="#">%s</a>' % (self.opt_to_str(options),q,string)
+        base = '<a %s id="Link%s" onclick="update_container(%s, \'/f?%s\');" href="#">%s</a>' % (self.opt_to_str(options),self.id, pane, q,string)
             
         if tooltip:
             self.result+="<abbr title='%s'>%s</abbr>" % (tooltip,base)
@@ -418,18 +429,18 @@ class AJAXUI(HTMLUI.HTMLUI):
         When the user clicks on the toolbar button, a popup window is
         created which the callback function then uses to render on.
         """
+        id = self.id
+
         if link:
-            id = self.id
             result="<script>\n add_toolbar_link('/images/%s','f?%s','dummy%s');\n</script><div id='dummy%s'></div>" % (icon, link, id,id)
                         
         elif cb:
             cb_key = self.store_callback(cb)
-            id = self.id
             result="<script>\n add_toolbar_callback('/images/%s','f?callback_stored=%s','dummy%s');\n</script><div id='dummy%s'></div>" % (icon, cb_key, id,id)
 
         ## Button is disabled:
         else:
-            result="<script>\n add_toolbar_disabled('/images/%s');\n</script>" % (icon)
+            result="<script>\n add_toolbar_disabled('/images/%s','dummy%s');\n</script><div id='dummy%s'></div>" % (icon,id, id)
 
         self.result+=result
 
@@ -454,3 +465,4 @@ class AJAXUI(HTMLUI.HTMLUI):
 
     def refresh(self,interval,query,**options):
         pass
+        

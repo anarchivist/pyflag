@@ -1,7 +1,35 @@
+
+/** This function is used to set the url of a ContentPane. We cant use
+    the ContentPane's set url because it either caches the page (which
+    causes memory explosion in the browser) or add
+    ?dojo..preventCache=115369481689 */
+function set_url(widget, url) { 
+  widget.setContent("Loading...");
+
+  dojo.io.bind({
+    url: url,
+	useCache: false,
+	preventCache: false,
+	method:  "GET",
+	mimetype: "text/html",
+	handler: function(type, data, e) {
+	if(type == "load") {
+	  update_default_toolbar();
+	  widget.setContent(data);
+	  widget.href = url;
+	} else {
+	  // works best when from a live server instead of from file system 
+	  widget._handleDefaults.call("Error loading '" + url + "' (" + e.status + " "+  e.statusText + ")", "onDownloadError");
+	}
+      }
+    });
+};
+
+
 function update_tree(rightcb,url,id) {
   var rightpane = dojo.widget.getWidgetById("rightpane"+id);
   if(rightpane) {
-    rightpane.setUrl(url+"&callback_stored="+rightcb);
+    set_url(rightpane,url+"&callback_stored="+rightcb);
   };
 };
 
@@ -17,63 +45,7 @@ function update_main(url) {
     push_on_history("main",main.href);
   };
 
-  clear_toolbar();
-  main.setUrl(url);
-};
-
-/** Clears the toolbar and installs the default handlers */
-function clear_toolbar() {
-  var toolbar = dojo.widget.getWidgetById("toolbar");
-
-  dojo.dom.removeChildren(toolbar.domNode);
-
-  //History back:
-  var dojo_icon= dojo.widget.createWidget("ToolbarButton",
-					  {icon: "/images/stock_left.png"});
-
-  if(pyflag_history.count==0) {dojo_icon.disable() };
-  
-  dojo.event.connect(dojo_icon, "onClick", function () {
-		       // The first element on the history is the current page.
-		       var tmp = pyflag_history.pop();
-		       var container_name = tmp[0];
-		       var url = tmp[1];
-		       var container = dojo.widget.getWidgetById(container_name);
-
-		       
-		       if(!container) return;
-
-		       // Place the current container url in the forward history.
-		       pyflag_forward_history.push([container_name, container.href]);
-
-		       clear_toolbar();
-		       container.setUrl(url);
-		     });
-  toolbar.addChild(dojo_icon);
-
-  //History Forward:
-  var dojo_icon= dojo.widget.createWidget("ToolbarButton",
-					  {icon: "/images/stock_right.png"});1
-
-  if(pyflag_forward_history.count==0) {dojo_icon.disable() };
-
-  dojo.event.connect(dojo_icon, "onClick", function () {
-		       var tmp = pyflag_forward_history.pop();
-		       var container_name = tmp[0];
-		       var url = tmp[1];
-		       var container = dojo.widget.getWidgetById(container_name);
-
-		       if(!container) return;
-
-		       // Push the current containers url on the history
-		       if(container.href)
-			 pyflag_history.push([container_name, container.href]);
-
-		       clear_toolbar();
-		       container.setUrl(url);
-		     });
-  toolbar.addChild(dojo_icon);
-
+  set_url(main,url);
 };
 
 function submitForm(form_name,id) {
@@ -93,21 +65,21 @@ function submitForm(form_name,id) {
   var url="/f?"+query.toArray().join("&");
   var container = find_widget_type_above("ContentPane",id);
 
-  if(container.href) {
-    push_on_history("main",container.href);
-  };
-
   var kw = {
     url:	   "/f",
     formNode:      dojo.byId(form_name),
     load:	   function(type, data)	{
-      clear_toolbar();
+      if(container.href) {
+	push_on_history("main",container.href);
+      };
+      update_default_toolbar();      
       container.setContent(data);
       container.href=url;
     },
     error:   function(type, error)	{ alert(String(type)+ String(error)); },
     method:  "POST",
     useCache: false,
+    preventCache: false,
   };
   
   dojo.io.bind(kw);
@@ -117,24 +89,34 @@ function group_by(table_id) {
   var container = dojo.widget.getWidgetById("tableContainer"+table_id);
   var table     = dojo.widget.getWidgetById("Table" + table_id);
   
-  container.setUrl(table.query + "&dorder=Count&group_by="+last_column_name);
+  set_url(container,table.query + "&dorder=Count&group_by="+last_column_name);
 };
 
 last_column_name = "";
 last_table_id = 0;
+
 function update_container(container,url) {
-  var c = dojo.widget.getWidgetById(container);
+  var c= container;
   
+  if(dojo.lang.isString(container))
+    c = dojo.widget.getWidgetById(container);
+  
+  // We must be operating on contentpanes
+  if(c.widgetType!="ContentPane") return;
+
   // If we are actually updating the main frame, we handle it
   // specially so the history works etc.
-  if(c && container=="main") 
+  if(container=="main") 
     update_main(url);
   else
-    c.setUrl(url);
+    set_url(c,url);
+
+  update_default_toolbar();
 };
 
 
 var dlg;
+
 function init_search_dialog(e) {
   dlg = dojo.widget.byId("FilterDialog");
   var btn = document.getElementById("search_ok");
@@ -148,6 +130,88 @@ dojo.addOnLoad(init_search_dialog);
 
 pyflag_history  = new dojo.collections.Stack();
 pyflag_forward_history = new dojo.collections.Stack();
+
+function update_default_toolbar() {
+  // Update the toolbars to ensure the correct ones are disabled:
+  var bb = dojo.widget.getWidgetById("BackButton");
+  
+  if(pyflag_history.count==0) {
+    bb.disable();
+  } else bb.enable();
+  
+  var fb = dojo.widget.getWidgetById("ForwardButton");
+  
+  if(pyflag_forward_history.count==0) {
+    fb.disable();
+  } else fb.enable();
+};
+
+/** Clears the toolbar and installs the default handlers */
+function init_toolbar() {
+  var toolbar = dojo.widget.getWidgetById("toolbar");
+
+  //History back:
+  var dojo_icon= dojo.widget.createWidget("ToolbarButton",
+					  {icon: "/images/stock_left.png",
+					      id: "BackButton"
+					      });
+
+  dojo_icon.disable();
+
+  dojo.event.connect(dojo_icon, "onClick", function () {
+		       // The first element on the history is the current page.
+		       var tmp = pyflag_history.pop();
+		       if(!tmp) {
+			 this.disable();
+			 return;
+		       };
+
+		       var container_name = tmp[0];
+		       var url = tmp[1];
+		       var container = dojo.widget.getWidgetById(container_name);
+
+		       
+		       if(!container) return;
+
+		       // Place the current container url in the forward history.
+		       pyflag_forward_history.push([container_name, container.href]);
+
+		       set_url(container,url);
+		     });
+
+  toolbar.addChild(dojo_icon);
+
+  //History Forward:
+  var dojo_icon= dojo.widget.createWidget("ToolbarButton",
+					  {icon: "/images/stock_right.png",
+					      id: "ForwardButton"
+					      });1
+  dojo_icon.disable();
+
+  dojo.event.connect(dojo_icon, "onClick", function () {
+		       var tmp = pyflag_forward_history.pop();
+		       if(!tmp) {
+			 this.disable();
+			 return;
+		       };
+		       var container_name = tmp[0];
+		       var url = tmp[1];
+		       var container = dojo.widget.getWidgetById(container_name);
+
+		       if(!container) return;
+
+		       // Push the current containers url on the history
+		       if(container.href)
+			 pyflag_history.push([container_name, container.href]);
+
+		       set_url(container, url);
+		     });
+
+  toolbar.addChild(dojo_icon);
+};
+
+/** Initialise the toolbar */
+dojo.addOnLoad(init_toolbar);
 
 function filter_column(table_id) {
   var element=document.getElementById("search_name");
@@ -163,7 +227,7 @@ function update_filter_column() {
   var search    = document.getElementById('search_expression');
 
   if(search.value.length>0) {
-    container.setUrl("/f?"+table.query + "&where_"+last_column_name +
+    set_url(container,"/f?"+table.query + "&where_"+last_column_name +
 		     "=" + search.value);
   };
 
@@ -181,18 +245,52 @@ function add_toolbar_link(icon, link, id) {
   if(!container) return;
 
   dojo.event.connect(dojo_icon, "onClick", function () {
-		       container.setUrl(link);
+		       set_url(container,link);
 		     });
-  toolbar.addChild(dojo_icon);
+
+  install_toolbar_widget(container, toolbar, dojo_icon);
 };
 
 /** Adds a disabled button */
-function add_toolbar_disabled(icon) {
+function add_toolbar_disabled(icon, id) {
   var toolbar  = dojo.widget.getWidgetById("toolbar");
   var dojo_icon= dojo.widget.createWidget("ToolbarButton",
 					  {icon: icon});
 
+  var container = find_widget_type_above("ContentPane",id);
+
+  if(!container) return;
+
   dojo_icon.disable();
+
+  install_toolbar_widget(container, toolbar, dojo_icon);
+  toolbar.addChild(dojo_icon);
+};
+
+function add_toolbar_callback(icon, link, id) {
+  var toolbar  = dojo.widget.getWidgetById("toolbar");
+  var dojo_icon= dojo.widget.createWidget("ToolbarButton",
+					  {icon: icon});
+
+  var container = find_widget_type_above("ContentPane",id);
+
+  if(!container) return;
+
+  dojo.event.connect(dojo_icon, "onClick", function () {
+		       update_container(container.domNode.id,link);
+		     });
+
+  install_toolbar_widget(container, toolbar, dojo_icon);
+};
+
+function install_toolbar_widget(container, toolbar, dojo_icon) {
+  // When the ContentPane is unloaded, we remove this button:
+  container.addOnUnLoad(function() {
+			  try {
+			    toolbar.domNode.removeChild(dojo_icon.domNode);
+			  } catch(e) {};
+			});
+
   toolbar.addChild(dojo_icon);
 };
 
@@ -204,7 +302,6 @@ function find_widget_type_above(type,id) {
   var parent=document.getElementById(id);
 
   if(!parent) {
-    alert("Cant find id "+id);
     return null;
   };
 
@@ -228,17 +325,3 @@ function find_widget_type_above(type,id) {
   return container;
 };
 
-function add_toolbar_callback(icon, link, id) {
-  var toolbar  = dojo.widget.getWidgetById("toolbar");
-  var dojo_icon= dojo.widget.createWidget("ToolbarButton",
-					  {icon: icon});
-
-  var container = find_widget_type_above("ContentPane",id);
-
-  if(!container) return;
-
-  dojo.event.connect(dojo_icon, "onClick", function () {
-		       update_container(container.domNode.id,link);
-		     });
-  toolbar.addChild(dojo_icon);
-};

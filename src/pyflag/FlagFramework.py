@@ -141,11 +141,20 @@ class query_type:
     def __str__(self):
         """ Prints the query object as a url string """
         mark=''
-        if self.has_key('__mark__'):
-            mark='#'+self.__getitem__('__mark__')
-            self.__delitem__('__mark__')
+        tmp = self.clone()
+        
+        if tmp.has_key('__mark__'):
+            mark='#'+ tmp.__getitem__('__mark__')
+            tmp.__delitem__('__mark__')
 
-        return cgi.urllib.urlencode(self.q)+mark
+        for k in tmp.keys():
+            if k.startswith("__"):
+                del tmp[k]
+
+        return cgi.urllib.urlencode(tmp.q)+mark
+
+    def __repr__(self):
+        return cgi.urllib.urlencode(self.q)
     
     def __delitem__(self,item):
         """ Removes all instance of item from the CGI object """
@@ -251,6 +260,10 @@ class query_type:
 
         self.iter_count+=1
         return result
+
+    def extend(self,dict):
+        for k in dict.keys():
+            self[k]=dict[k]
 
     def FillQueryTarget(self,dest):
         """ Given a target, this function returns a updates the query object with a filled in target

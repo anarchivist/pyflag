@@ -116,7 +116,7 @@ dojo.lang.extend(dojo.widget.html.ContentPane, {
 		dojo.io.bind({
 			url: url,
 			useCache: useCache,
-		      //preventCache: !useCache,
+		        preventCache: !useCache,
 			mimetype: "text/html",
 			handler: function(type, data, e) {
 				if(type == "load") {

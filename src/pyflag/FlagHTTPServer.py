@@ -67,13 +67,12 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         ## to use POST, upload files etc:
         i = self.path.rfind('?')
         if i>=0:
-            rest, query = self.path[:i], self.path[i+1:]
+            rest, query_str = self.path[:i], self.path[i+1:]
         elif '=' in self.path:
-            rest,query = '',self.path[1:]
+            rest,query_str = '',self.path[1:]
         else:
-            rest,query = self.path,''
-            
-            
+            rest,query_str = self.path,''
+
         env = {}
         env['GATEWAY_INTERFACE'] = 'CGI/1.1'
         env['SERVER_PROTOCOL'] = self.protocol_version
@@ -87,12 +86,18 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         if length:
             env['CONTENT_LENGTH'] = length
             
-        if query:
-            env['QUERY_STRING'] = query
+        if query_str:
+            env['QUERY_STRING'] = query_str
 
-        form = cgi.FieldStorage(fp=self.rfile,headers = None, environ=env)
-        query=FlagFramework.query_type(base=rest,user=user, passwd=passwd)
+        ## FieldStorage does not seem to include GET parameters in POSTs:
+        if self.command=="POST":
+            query_list=cgi.parse_qsl(query_str)
+        else:
+            query_list=()
         
+        form = cgi.FieldStorage(fp=self.rfile,headers = None, environ=env)
+        query=FlagFramework.query_type(query_list, base=rest,user=user, passwd=passwd)
+
         for key in form.keys():
             ## See if key has a filename, if so we store it ala php:
             try:
@@ -129,7 +134,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         for k,v in query.q:
             if v=='None':
                 del query[k]
-
+                
         self.query=query
         return query
 ##            self.wfile.write("%s = %s <br>\n" % (key,form[key]))
