@@ -1,13 +1,14 @@
-SUBDIRS = src examples debian
+SUBDIRS = src debian
 
 my_images	 	=	$(shell find images -not -name .\*)
 my_data			=	$(shell find data -not -name .\*)
 my_utilities		=	$(shell find utilities -not -name .\*)
+my_examples		=	$(shell find examples -not -name .\*)
 bin_SCRIPTS		=	pyflag pyflash pyflag_launch
 sysconf_DATA		=	pyflagrc
 pkgdata_DATA		=	$(my_data) \
 				data/magic.mgc data/magic.mime.mgc
-nobase_pkgdata_DATA	=	$(my_images) $(my_utilities)
+nobase_pkgdata_DATA	=	$(my_images) $(my_utilities) $(my_examples)
 man_MANS		=	pyflag.1
 EXTRA_DIST		=	pyflag.in pyflagrc.in pyflash.in \
 				pyflag_launch.in $(nobase_pkgdata_DATA) $(pkgdata_DATA) $(man_MANS)

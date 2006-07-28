@@ -66,6 +66,5 @@ AC_OUTPUT([
 	src/filesystems/sleuthkit/fstools/Makefile
 	src/filesystems/magic/Makefile
 	src/include/Makefile
-	examples/Makefile
 	debian/Makefile
 	])
