@@ -346,7 +346,10 @@ class ViewDissectedPacket(Reports.report):
 
             return previous_node,node
         
-        def tree_cb(branch):
+        def tree_cb(path):
+            print path
+            branch = FlagFramework.splitpath(path)
+            
             previous_node, node = get_node(branch)
             try:
                 for field in node.list_fields():
@@ -361,7 +364,9 @@ class ViewDissectedPacket(Reports.report):
             
             return
         
-        def pane_cb(branch,result):
+        def pane_cb(path,result):
+            branch = FlagFramework.splitpath(path)
+            
             previous_node, node = get_node(branch)
 
             result.heading("Packet %s" % id)

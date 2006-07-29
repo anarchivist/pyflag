@@ -769,6 +769,13 @@ def normpath(string):
         tmp=tmp+'/'
     return tmp
 
+def splitpath(path):
+    """ Returns all the elements in path as a list """
+    path=normpath(path)
+    return [ x for x in path.split('/') if x ]
+
+def joinpath(branch):
+    return '/'+'/'.join(branch)
 
 def make_sql_from_filter(filter_str,having,column,name):
     """ This function creates the SQL depending on the filter_str that was provided and its prefixes.

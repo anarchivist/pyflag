@@ -156,13 +156,11 @@ class HTMLUI(UI.GenericUI):
             
         ## Get the right theme
         theme=Theme.get_theme(q)
-        if self.decoration!='raw':
+        if self.decoration=='raw' or self.decoration=='js':
             return theme.raw_render(data=self.__str__(), ui=self,title=self.title)
         
         if self.decoration=='naked':
             return theme.naked_render(data=self.__str__(), ui=self,title=self.title)
-        elif self.decoration=='raw' or self.decoration=='js':
-            return self.__str__()
         else:
             return theme.render(q,meta=self.meta,data=self.__str__(),next=self.next , previous=self.previous , pageno=self.pageno, ui=self)
     
@@ -541,15 +539,16 @@ class HTMLUI(UI.GenericUI):
         def draw_branch(depth,query, result):
             try:
             ## Get the right part:
-                branch=query['open_tree'].split('/')
+                branch=FlagFramework.splitpath(query['open_tree'])
             except KeyError:
-                branch=['/']
-            
-            for name,value,state in tree_cb(branch[:depth]):
+                branch=['']
+
+            path = FlagFramework.joinpath(branch[:depth])
+            for name,value,state in tree_cb(path):
                 ## Must have a name and value
                 if not name or not value: continue
                 result.result+="<tr><td>"
-                result.icon("spacer.png", width=20*depth, height=20)
+                result.icon("spacer.png", width=20*(depth+1), height=20)
                 link = query.clone()
                 del link['open_tree']
                 del link['yoffset']
@@ -587,7 +586,7 @@ class HTMLUI(UI.GenericUI):
             result.result+="&nbsp;/<br>\n"
 
             result.result+="<table width=100%>"
-            draw_branch(1,query, result)
+            draw_branch(0,query, result)
             try:
                 result.result+="<script>document.body.scrollTop = %s; document.body.scrollLeft = %s;</script>\n" % (query['yoffset'], query['xoffset'])
             except:
@@ -601,11 +600,11 @@ class HTMLUI(UI.GenericUI):
 #            result.result += "<script>window.onunload = function() { if(document != top) top.location = window.document.location; }; </script>\n"
             try:
             ## Get the right part:
-                branch=query['open_tree'].split('/')
+                path=FlagFramework.normpath(query['open_tree'])
             except KeyError:
-                branch=['/']
+                path='/'
 
-            pane_cb(branch,result)
+            pane_cb(path,result)
 
         l = self.store_callback(left)
         r = self.store_callback(right)
@@ -663,8 +662,8 @@ class HTMLUI(UI.GenericUI):
             #We search through all the items until we find the one
             #that matches the branch for this depth, then recurse into
             #it.
-            branch_array=branch[:depth]
-            for k,v,t in tree_cb(branch_array):
+            path=FlagFramework.joinpath(branch[:depth])
+            for k,v,t in tree_cb(path):
                 if not k: continue
                 if not t: continue
                 tmp.append((depth,k,v,t))
@@ -752,14 +751,10 @@ class HTMLUI(UI.GenericUI):
                 left.text("&nbsp;%s\n" % str(sv),color='black')
 
         right=self.__class__(self)
-        
-        try:
-            ## Get the right part:
-            branch=query['open_tree'].split('/')
-        except KeyError:
-            branch=['/']
 
-        pane_cb(branch,right)
+
+        path=FlagFramework.normpath(query['open_tree'])
+        pane_cb(path,right)
         
         ## Now draw the left part
         if layout=="vertical":            

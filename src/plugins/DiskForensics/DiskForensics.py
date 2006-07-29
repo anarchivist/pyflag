@@ -112,8 +112,10 @@ class BrowseFS(Reports.report):
                 br = '/'
                 
             if not query.has_key('open_tree'): query['open_tree']='/'
-            def tree_cb(branch):
-                path =FlagFramework.normpath('/'.join(branch)+'/')
+            def tree_cb(path):
+                ## We expect a directory here:
+                if not path.endswith('/'): path=path+'/'
+                
                 ## We need a local copy of the filesystem factory so
                 ## as not to affect other instances!!!
                 fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])
@@ -122,21 +124,20 @@ class BrowseFS(Reports.report):
                     if i['mode']=="d/d" and i['status']=='alloc':
                         yield(([i['name'],i['name'],'branch']))
 
-            def pane_cb(branch,tmp):
+            def pane_cb(path,tmp):
                 query['order']='Filename'
-                br=FlagFramework.normpath('/'.join(branch))
 
                 ## If we are asked to show a file, we will show the
                 ## contents of the directory the file is in:
                 fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])
-                if not fsfd.isdir(br):
-                    br=os.path.dirname(br)
+                if not fsfd.isdir(path):
+                    path=os.path.dirname(path)
 
                 tmp.table(
                     columns=['f.inode','name','f.status','size', 'from_unixtime(mtime)','f.mode'],
                     names=('Inode','Filename','Del','File Size','Last Modified','Mode'),
                     table='file as f, inode as i',
-                    where="f.inode=i.inode and path=%r and f.mode!='d/d'" % (br+'/'),
+                    where="f.inode=i.inode and path=%r and f.mode!='d/d'" % (path+'/'),
                     case=query['case'],
                     links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='View File Contents', __target__='inode', inode="%s")]
                     )

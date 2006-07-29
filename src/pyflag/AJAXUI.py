@@ -85,16 +85,6 @@ class AJAXUI(HTMLUI.HTMLUI):
         
         self.result+=out+"</div>"
 
-    def make_branch(self, string):
-        try:
-            ## Get the right part:
-            path = FlagFramework.normpath(string)
-            branch=path.split('/')
-        except KeyError:
-            branch=['/']
-        
-        return branch
-
     def tree(self, tree_cb = None, pane_cb=None, branch = None, layout=None):
         """ A tree widget.
 
@@ -105,21 +95,26 @@ class AJAXUI(HTMLUI.HTMLUI):
         def right(query,result):
             result.decoration = "raw"
             result.content_type = "text/html"
-            branch = self.make_branch(query['open_tree'])
-            pane_cb(branch,result)
+            
+            try:
+                path=FlagFramework.normpath(query['open_tree'])
+            except KeyError:
+                path='/'
+                
+            pane_cb(path,result)
 
         def tree(query,result):
             result.decoration = "raw"
             result.content_type = "text/html"
 
-            ## I think this is secure enough???
+            ## I think this is secure enough??? This should really be
+            ## json.parse but do we need to pull in a whole module
+            ## just for this???
             data = eval(query['data'],{'__builtins__':None, 'true':True, 'false':False})
             path=FlagFramework.normpath(data['node']['objectId'])
-            if path.startswith('/'): path=path[1:]
-            branch=path.split("/")
 
             r=[]
-            for x in tree_cb(branch):
+            for x in tree_cb(path):
                 if len(x[0])==0: continue
                 
                 tmp = dict(title = x[0], objectId="/%s/%s" % (path,x[1]))
@@ -136,13 +131,16 @@ class AJAXUI(HTMLUI.HTMLUI):
         query = self.defaults.clone()
 
         ## Calculate the default tree structure which is obtained from query['open_tree']
-        branch = self.make_branch(query['open_tree'])
-        
+        try:
+            branch = FlagFramework.splitpath(self.defaults['open_tree'])
+        except KeyError:
+            branch = ['']
+
         def do_node(depth,path):
             if depth>=len(branch): return ''
             
             result=''
-            for x in tree_cb(branch[:depth]):
+            for x in tree_cb('/'+'/'.join(branch[:depth])):
                 if len(x[0])==0: continue
 
                 if x[2]=='branch':
@@ -160,7 +158,7 @@ class AJAXUI(HTMLUI.HTMLUI):
                 
             return result
 
-        tree_nodes='<div dojoType="TreeNode" isFolder="true" title="/" objectId="/" expandlevel="1">%s</div>' % do_node(1,'')
+        tree_nodes='<div dojoType="TreeNode" isFolder="true" title="/" objectId="/" expandlevel="1">%s</div>' % do_node(0,'')
 
         ## Calculate the initial contents of the right pane:
         right_ui = self.__class__(self)
@@ -241,9 +239,7 @@ class AJAXUI(HTMLUI.HTMLUI):
             result.result += '''
             <div id="tableContainer%s" dojoType="ContentPane"  cacheContent="false"  layoutAlign="client"
             style="overflow: auto;"
-            executeScripts="true" >''' % (id)
-            
-            result.result += '''<div id="popup%s" >''' % id
+            executeScripts="false">''' % (id)
             
             menus = []
 
@@ -253,12 +249,12 @@ class AJAXUI(HTMLUI.HTMLUI):
                 if query.has_key("group_by"):
                     q=query.clone()
                     del q['group_by']
-                    menus.append('<div dojoType="MenuItem2" caption="Ungroup" onClick="update_container(\'tableContainer%s\',\'%s\');"></div>' % (id,q))
+                    menus.append('<div dojoType="MenuItem2" caption="Ungroup" onClick="update_container(\'tableContainer%s\',\'%s\');"></div>\n' % (id,q))
                 else:
-                    menus.append('<div dojoType="MenuItem2" caption="Group By Column" onClick="group_by(\'%s\')"></div>' % id)
+                    menus.append('<div dojoType="MenuItem2" caption="Group By Column" onClick="group_by(\'%s\')"></div>\n' % id)
 
-            menus.append('<div dojoType="MenuItem2" caption="Filter Column" onClick="filter_column(\'%s\')"></div>' % id)
-            menus.append('<div dojoType="MenuSeparator2"></div>')
+            menus.append('<div dojoType="MenuItem2" caption="Filter Column" onClick="filter_column(\'%s\')"></div>\n' % id)
+            menus.append('<div dojoType="MenuSeparator2"></div>\n')
 
             ## Now present the user with options of removing conditions:
             having=[]
@@ -275,14 +271,24 @@ class AJAXUI(HTMLUI.HTMLUI):
 
                     q=query.clone()
                     q.remove(d,v)
-                    menus.append('<div dojoType="MenuItem2" caption=%r onClick="update_container(\'tableContainer%s\',\'%s\');"></div>' % (condition_text,id,q))
+                    menus.append('<div dojoType="MenuItem2" caption=%r onClick="update_container(\'tableContainer%s\',\'%s\');"></div>\n' % (condition_text,id,q))
 
 
-            result.result+='''
-            <div dojoType="PopupMenu2" targetNodeIds="popup%s" toggle="explode">
+            menu ='''
+            <div dojoType="popupmenu2" targetNodeIds="tableContainer%s" toggle="explode"  >
             %s
             </div>
-            ''' % (id,''.join(menus))
+            <script>
+            _container_.addOnLoad(function() {
+               var target_container = "tableContainer%s";
+               var target = dojo.widget.getWidgetById(target_container);
+
+               if(target) {
+                 target.addOnUnLoad(function () {remove_popups(target_container)});
+                 };
+               });
+            </script>
+            ''' % (id,''.join(menus),id)
 
 
             ## If no ordering is specified we order by the first column
@@ -368,7 +374,7 @@ class AJAXUI(HTMLUI.HTMLUI):
                     result.result+="<td>%s</td>" % (value)
                     
                 result.result+="</tr>"
-            result.result+="</tbody></table></div></div>"
+            result.result+="</tbody></table></div></span>\n"+menu
 
         cb=self.store_callback(table_cb)
         table_cb(self.defaults,self)

@@ -119,20 +119,7 @@ class BrowseRegistry(DiskForensics.BrowseFS):
         result.heading("Registry Hive")
         dbh = self.DBO(query['case'])
         new_q=query.clone()
-            
-        #Make a tree call back:
-        def treecb(branch):
-            """ This call back will render the branch within the registry file. """
-            path =FlagFramework.normpath('/'.join(branch))
-
-            dbh = self.DBO(query['case'])
-
-            ##Show the directory entries:
-            dbh.execute("select basename from regi where dirname=%r",(path))
-            for row in dbh:
-                yield(([row['basename'],row['basename'],'branch']))
-                
-        ## End Tree Callback
+                            
         try:
             def table_notebook_cb(query,result):
                 del new_q['mode']
@@ -147,8 +134,18 @@ class BrowseRegistry(DiskForensics.BrowseFS):
 
             def tree_notebook_cb(query,result):
                 
-                def pane_cb(branch,table):
-                    path = FlagFramework.normpath('/'.join(branch))
+                #Make a tree call back:
+                def treecb(path):
+                    """ This call back will render the branch within
+                    the registry file."""
+                    dbh = DB.DBO(query['case'])
+
+                    ##Show the directory entries:
+                    dbh.execute("select basename from regi where dirname=%r",(path))
+                    for row in dbh:
+                        yield(([row['basename'],row['basename'],'branch']))
+    
+                def pane_cb(path,table):
                     tmp=result.__class__(result)
                     dbh.execute("select modified as time from reg where path=%r limit 1",(path))
                     row=dbh.fetch()

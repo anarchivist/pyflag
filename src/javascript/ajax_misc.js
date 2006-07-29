@@ -325,3 +325,17 @@ function find_widget_type_above(type,id) {
   return container;
 };
 
+/** Searches through all the popups to see which one is targetting
+    this node, and unbind them. This is needed before unloading the
+    node to ensure there are no context menu popups still referencing
+    the node - or weird things will happen.
+*/
+function remove_popups(node_name) {
+  var popups = dojo.widget.getWidgetsByType("PopupMenu2");
+
+  for(var i=0; i<popups.length; i++) {
+    if(popups[i].targetNodeIds==node_name) {
+      popups[i].unBindDomNode(node_name);
+    };
+  };
+};

@@ -38,7 +38,7 @@ class Menu(Theme.BasicTheme):
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
         <title>%s</title>
         <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
-        <script src="javascript/functions.js" type="text/javascript" language="javascript"></script>
+        <script src="/javascript/functions.js" type="text/javascript" language="javascript"></script>
         <style>
         all.clsMenuItemNS, .clsMenuItemIE{text-decoration: none; font: bold 12px Arial; color: white; cursor: hand; z-index:100}
         #MainTable A:hover {color: yellow;}
@@ -95,10 +95,10 @@ class Menu(Theme.BasicTheme):
         right = result.__class__(result)
         right.text("PyFlag is a GPL Project maintained at http://pyflag.sourceforge.net/ . \nThis is %s" % FlagFramework.flag_version ,color="red",font="bold")
         result.row(tmp,right,align="center")
+
         return result
 
     def raw_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
-        print data
         return self.preamble + data
 
     def naked_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
@@ -109,7 +109,7 @@ class Menu(Theme.BasicTheme):
             toolbar_str=ui.toolbar_ui.__str__()
 
         return " ".join(
-        (self.header % (title),
+        (self.header % (title),self.preamble,
          '''&nbsp </tr></table>\n''',
          self.hilight_bar % (toolbar_str,''),
          "<table><tr><td>%s</td></tr></table>" % (data),
@@ -131,7 +131,7 @@ class Menu(Theme.BasicTheme):
             case =''
 
         return " ".join(
-            (self.header % (title),self.menu_javascript,
+            (self.header % (title),self.menu_javascript,self.preamble,
              meta,
              '''&nbsp </tr></table>\n''',
              self.hilight_bar % (toolbar_str,case),

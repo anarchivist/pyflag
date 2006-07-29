@@ -32,7 +32,6 @@
 import BaseHTTPServer, SimpleHTTPServer, SocketServer
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
-import pyflag.AJAXUI as AJAXUI
 import pyflag.HTMLUI as HTMLUI
 import cgi,os
 import re,time,sys
@@ -369,7 +368,12 @@ if __name__ == "__main__":
     flag = FlagFramework.Flag()
     FlagFramework.GLOBAL_FLAG_OBJ =flag
     #Set the UI module to produce HTML
-    flag.ui = AJAXUI.AJAXUI
+    if config.THEME=="AJAX":
+        import pyflag.AJAXUI as AJAXUI
+        flag.ui = AJAXUI.AJAXUI
+    else:
+        import pyflag.HTMLUI as HTMLUI
+        flag.ui = HTMLUI.HTMLUI
 
     #Set the default graphing module to produce SVG using ploticus
     import pyflag.Graph as Graph

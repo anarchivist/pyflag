@@ -96,7 +96,6 @@ class AJAX(Menu):
     def naked_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
         """ Render the ui with minimal interventions """
         result= data
-        print result
         return result
 
     def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None,ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
@@ -105,7 +104,7 @@ class AJAX(Menu):
         ## Is it possible? The problem is that the URL is not enough
         ## to specify the state because it might include stored UIs.
         result = '<script>\ntry { djConfig; } catch(err) { document.location="/";  };\n</script>'
-        print data+result
+#        print data
         return data+result
 
     def raw_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
