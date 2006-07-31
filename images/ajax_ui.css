@@ -134,3 +134,12 @@ form {
 a { 
   color: blue;
 }
+
+.dojoMenuBar2 {
+  border-top:1px solid #d4d4d4;
+}
+
+.dojoMenuBar2Client {
+  padding: 1px;
+  background-image: url(/javascript/src/widget/templates/images/toolbar-bg.gif);
+}

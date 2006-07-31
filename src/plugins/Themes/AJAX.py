@@ -15,7 +15,7 @@ class AJAX(Menu):
         <title>%s</title>
         <link rel="stylesheet" type="text/css" href="images/ajax_ui.css" />
         <script type="text/javascript">
-        var djConfig = { isDebug: true, baseScriptUri: "javascript/" };
+        var djConfig = { isDebug: true, baseScriptUri: "/javascript/" };
         </script>
         <script type="text/javascript" src="/javascript/dojo.js"></script>
  
@@ -59,9 +59,6 @@ class AJAX(Menu):
 		</table>
 	</form>
 </div>
-        <div dojoType="LayoutContainer"
-	layoutChildPriority='top-bottom'
-	style="width: 100%%; height: 100%%;">
         '''
 
     footer="\n</div></div></body></html>"
@@ -71,6 +68,7 @@ class AJAX(Menu):
         module_list = Registry.REPORTS.get_families()
         Theme.order_families(module_list)
         menus = []
+        menus_titles=[]
 
         result = ''
         for k in module_list:
@@ -83,15 +81,18 @@ class AJAX(Menu):
                 submenu_text+='''<div dojoType="MenuItem2" caption="%s" onClick="update_main('%s');"></div>\n''' % (r.name,FlagFramework.query_type((),family=k,report=r.name))
 
             if len(submenu_text)>0:
-                menus.append('<div dojoType="PopupMenu2" id="%s" toggle="wipe">%s</div> <button dojoType="dropdownButton" menuId="%s">%s</button>' % (k,submenu_text,k,k))
+                menus.append('<div dojoType="PopupMenu2" widgetId="%s" toggle="wipe">%s</div>\n' % (k,submenu_text))
+                menus_titles.append('<div dojoType="MenuBarItem2" caption="%s" submenuId="%s"></div>\n'%(k,k))
 
 
-        return result+'''<div dojoType="ContentPane" layoutAlign="top" style="color: black; " id="top">
-		<div class="box" layoutAlign="bottom">%s</div></div>
+        return result+'''
+        %s
+        <div dojoType="MenuBar2">%s</div>
+        <div dojoType="ContentPane" layoutAlign="top" style="color: black; " id="top">
                 <div dojoType="ToolbarContainer" layoutAlign="top" id="ToolbarContainer">
                 <div dojoType="Toolbar" id="toolbar"></div>
                 </div>
-                ''' % ('\n'.join(menus))
+                ''' % ('\n'.join(menus),'\n'.join(menus_titles))
 
     def naked_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
         """ Render the ui with minimal interventions """
@@ -117,7 +118,10 @@ class AJAX(Menu):
         title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version
 
         result.result+=" ".join(
-            (self.header % (title),self.menu_javascript,
+            (self.header % (title),             self.menu_javascript,
+             '''        <div dojoType="LayoutContainer"
+             layoutChildPriority='top-bottom'
+             style="width: 100%; height: 100%;">''',
              '<div dojoType="ContentPane" cacheContent="false" id="main" layoutAlign="client" style="border: 5px" executeScripts="true">'))
 
         ## Now create the initial front page:
