@@ -218,7 +218,7 @@ class AJAXUI(HTMLUI.HTMLUI):
 
     def end_form(self,value='Submit',name='submit',**opts):
         for k,v in self.form_parms:
-            self.result += "<input type=hidden name='%s' value='%s'>\n" % (k,v)
+            self.result += "<input type='hidden' name='%s' value='%s'>\n" % (k,v)
 
         if value:
             self.result += "<button dojoType='Button' onClick='javascript:submitForm(\"pyflag_form_%s\",\"form%s\");'>%s</button><div id=\"form%s\"></div>\n" % (self.depth, self.id, value, self.id)
@@ -232,15 +232,9 @@ class AJAXUI(HTMLUI.HTMLUI):
     def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):        
         names = list(names)
         columns = list(columns)
-
-        def table_cb(query,result):
-            id=self.get_uniue_id()
-
-            result.result += '''
-            <div id="tableContainer%s" dojoType="ContentPane"  cacheContent="false"  layoutAlign="client"
-            style="overflow: auto;"
-            executeScripts="false">''' % (id)
+        id=self.get_uniue_id()
             
+        def table_cb(query,result):
             menus = []
 
             ## May only offer to group by if the report does not issue
@@ -274,27 +268,19 @@ class AJAXUI(HTMLUI.HTMLUI):
                     menus.append('<div dojoType="MenuItem2" caption=%r onClick="update_container(\'tableContainer%s\',\'%s\');"></div>\n' % (condition_text,id,q))
 
 
-            menu ='''
+            result.result +='''
             <div dojoType="popupmenu2" targetNodeIds="tableContainer%s" toggle="explode"  >
             %s
             </div>
-            <script>
-            _container_.addOnLoad(function() {
-               var target_container = "tableContainer%s";
-               var target = dojo.widget.getWidgetById(target_container);
-
-               if(target) {
-                 target.addOnUnLoad(function () {remove_popups(target_container)});
-                 };
-               });
-            </script>
-            ''' % (id,''.join(menus),id)
+            ''' % (id,''.join(menus))
 
 
             ## If no ordering is specified we order by the first column
             if not query.has_key('order') and not query.has_key('dorder'):
                 query['order']=names[0]
-            
+                
+            order = names[0]
+
             dbh,new_query,new_names,new_columns,new_links = self._make_sql(
                 sql,
                 columns,
@@ -310,34 +296,38 @@ class AJAXUI(HTMLUI.HTMLUI):
             if not new_query.has_key('callback_stored'):
                 new_query['callback_stored'] = cb
 
-            result.result+='''<table dojoType="PyFlagTable" widgetId="Table%s" headClass="fixedHeader" tbodyClass="scrollContent" enableMultipleSelect="true" enableAlternateRows="true" rowAlternateClass="alternateRow" cellpadding="0" cellspacing="0" border="0" query="%s" global_id="%s">
-            <thead><tr>''' % (id, new_query, id)
+            result.result+='''<table id="Table%s" query="%s" class="PyFlagTable" >
+            <thead><tr>''' % (id, new_query)
 
             ## Now make the table headers:
             for n in new_names:
                 try:
-                    if query['order']==n:
-                        result.result+="<th id='%s' sort='1' >%s</th>\n" % (n,n)
+                    if query['dorder']==n:
+                        result.result+="<th id='%s' sort='1' onclick=\"update_container('tableContainer%s','%s&order=%s')\" >%s<img src='/images/increment.png' /></th>\n" % (n,id, new_query,n,n)
+                        order = query['dorder']
                         continue
 
                 except KeyError:
                     try:
-                        if query['dorder']==n:
-                            result.result+="<th id='%s' sort='0' >%s</th>\n" % (n,n)
+                        if query['order']==n:
+                            result.result+="<th id='%s' sort='0' onclick=\"update_container('tableContainer%s','%s&dorder=%s')\" >%s<img src='/images/decrement.png' /></th>\n" % (n,id, new_query,n,n)
+                            order = query['order']
                             continue
                     
                     except KeyError:
                         pass
 
-                result.result+="<th id='%s' >%s</th>\n" % (n,n)
+                result.result+="<th id='%s' sort='1' onclick=\"update_container('tableContainer%s','%s&order=%s')\" >%s</th>\n" % (n,id, new_query,n,n)
                     
-            result.result+='''</tr></thead><tbody>'''
+            result.result+='''</tr></thead><tbody class="scrollContent">'''
 
             ## Now the contents:
+            old_sorted = None
+            old_sorted_style = ''
+            
             for row in dbh:
-                result.result+="\n<tr>"
-
                 row_elements = []
+                tds = ''
                 
                 ## Render each row at a time:
                 for i in range(len(new_names)):
@@ -351,6 +341,14 @@ class AJAXUI(HTMLUI.HTMLUI):
                     ## callbacks are required to ensure they sanitise
                     ## their output if they need.
                         value=cgi.escape(value)
+
+                    ## If the value is the same as above we do not need to flip it:
+                    if new_names[i]==order and value!=old_sorted:
+                        old_sorted=value
+                        if old_sorted_style=='':
+                            old_sorted_style='alternateRow'
+                        else:
+                            old_sorted_style=''
 
                     ## Now add links if they are required
                     try:
@@ -371,13 +369,25 @@ class AJAXUI(HTMLUI.HTMLUI):
                         pass
 
                     if value==' ': value="&nbsp;"
-                    result.result+="<td>%s</td>" % (value)
+                    if new_names[i]==order:
+                        tds+="<td class='sorted-column' column='%s' table_id='%s'>%s</td>" % (new_names[i],id, value)
+                    else:
+                        tds+="<td column='%s'>%s</td>" % (new_names[i],value)
                     
-                result.result+="</tr>"
-            result.result+="</tbody></table></div></span>\n"+menu
+                result.result+="<tr class='%s'> %s </tr>\n" % (old_sorted_style,tds)
+            result.result+="</tbody></table>"
 
         cb=self.store_callback(table_cb)
+        
+        self.result += '''
+        <div id="tableContainer%s" dojoType="ContentPane"  cacheContent="false"  layoutAlign="client"
+        style="overflow: auto;"
+        executeScripts="true"
+        onunload="remove_popups(this);"
+        >''' % (id)
         table_cb(self.defaults,self)
+
+        self.result+="</div>"
 
     def link(self,string,target=None,options=None,icon=None,tooltip=None,**target_options):
         ## If the user specified a URL, we just use it as is:

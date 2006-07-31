@@ -4,25 +4,10 @@
     causes memory explosion in the browser) or add
     ?dojo..preventCache=115369481689 */
 function set_url(widget, url) { 
-  widget.setContent("Loading...");
+  update_default_toolbar();
 
-  dojo.io.bind({
-    url: url,
-	useCache: false,
-	preventCache: false,
-	method:  "GET",
-	mimetype: "text/html",
-	handler: function(type, data, e) {
-	if(type == "load") {
-	  update_default_toolbar();
-	  widget.setContent(data);
-	  widget.href = url;
-	} else {
-	  // works best when from a live server instead of from file system 
-	  widget._handleDefaults.call("Error loading '" + url + "' (" + e.status + " "+  e.statusText + ")", "onDownloadError");
-	}
-      }
-    });
+  widget.setUrl(url);
+
 };
 
 
@@ -44,6 +29,8 @@ function update_main(url) {
   if(main.href) {
     push_on_history("main",main.href);
   };
+
+  remove_popups();
 
   set_url(main,url);
 };
@@ -87,9 +74,10 @@ function submitForm(form_name,id) {
 
 function group_by(table_id) {
   var container = dojo.widget.getWidgetById("tableContainer"+table_id);
-  var table     = dojo.widget.getWidgetById("Table" + table_id);
+  var table     = document.getElementById("Table" + table_id);
   
-  set_url(container,table.query + "&dorder=Count&group_by="+last_column_name);
+  remove_popups(container);
+  set_url(container,table.getAttribute('query') + "&dorder=Count&group_by="+last_column_name);
 };
 
 last_column_name = "";
@@ -103,6 +91,8 @@ function update_container(container,url) {
   
   // We must be operating on contentpanes
   if(c.widgetType!="ContentPane") return;
+
+  remove_popups(c);
 
   // If we are actually updating the main frame, we handle it
   // specially so the history works etc.
@@ -223,12 +213,14 @@ function filter_column(table_id) {
 
 function update_filter_column() {
   var container = dojo.widget.getWidgetById("tableContainer"+last_table_id);
-  var table     = dojo.widget.getWidgetById("Table" + last_table_id);
+  var table     = document.getElementById("Table" + last_table_id);
   var search    = document.getElementById('search_expression');
 
+  remove_popups(container);
+
   if(search.value.length>0) {
-    set_url(container,"/f?"+table.query + "&where_"+last_column_name +
-		     "=" + search.value);
+    set_url(container,"/f?"+table.getAttribute('query') + "&where_"+
+	    last_column_name + "=" + search.value);
   };
 
   return false;
@@ -330,12 +322,43 @@ function find_widget_type_above(type,id) {
     node to ensure there are no context menu popups still referencing
     the node - or weird things will happen.
 */
-function remove_popups(node_name) {
+function remove_popups(node) {
   var popups = dojo.widget.getWidgetsByType("PopupMenu2");
 
   for(var i=0; i<popups.length; i++) {
-    if(popups[i].targetNodeIds==node_name) {
-      popups[i].unBindDomNode(node_name);
+    if(node) {
+      if(popups[i] && popups[i].targetNodeIds==node.widgetId) {
+	popups[i].unBindDomNode(popups[i].targetNodeIds);
+	popups[i].destroyRendering();
+      };
+    } else {
+      if(popups[i] && popups[i].targetNodeIds && popups[i].targetNodeIds.length>0) {
+	popups[i].unBindDomNode(popups[i].targetNodeIds);
+	popups[i].destroyRendering();	
+	//alert("Deleting target "+popups[i].targetNodeIds);
+      };
     };
   };
 };
+
+
+/** We override the popupmenu to ensure we know which object was
+    clicked 
+*/
+dojo.lang.extend(dojo.widget.PopupMenu2, {
+  onOpen: function (e){
+		     this.openEvent = e;
+		     
+		     if(e.target.getAttribute('column')) {
+		       last_column_name = e.target.getAttribute('column');
+		       last_table_id = e.target.getAttribute('table_id');
+		     };
+
+		     //dojo.debugShallow(e);
+		     this.open(e.clientX, e.clientY, null, [e.clientX, e.clientY]);
+		     
+		     if(e["preventDefault"]){
+		       e.preventDefault();
+		     }
+		   }
+  });

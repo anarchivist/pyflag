@@ -15,7 +15,7 @@ class AJAX(Menu):
         <title>%s</title>
         <link rel="stylesheet" type="text/css" href="images/ajax_ui.css" />
         <script type="text/javascript">
-        var djConfig = { isDebug: true, baseScriptUri: "/javascript/" };
+        var djConfig = { isDebug: true, baseScriptUri: "/javascript/", debugAtAllCosts:true };
         </script>
         <script type="text/javascript" src="/javascript/dojo.js"></script>
  
@@ -31,15 +31,14 @@ class AJAX(Menu):
         dojo.require("dojo.widget.TreeLoadingController");
         dojo.require("dojo.widget.Menu2");
 	dojo.require("dojo.widget.Button");
-        dojo.require("dojo.widget.PyFlagTable");
         dojo.require("dojo.widget.Dialog");
         dojo.require("dojo.widget.Toolbar");
-        dojo.require("dojo.uri.dojoUri");
+        dojo.require("dojo.uri.Uri");
         dojo.require("dojo.collections.Stack");
+        dojo.hostenv.writeIncludes();
 
         </script>
         <script type="text/javascript" src="/javascript/ajax_misc.js"></script>
-        <style type="text/css" src="/images/ajax_ui.css"></style>
         
         </head>
         <body link=blue vlink=blue bgcolor="#FFFFFF">
@@ -78,7 +77,7 @@ class AJAX(Menu):
             for r in report_list:
                 if r.hidden: continue
 
-                submenu_text+='''<div dojoType="MenuItem2" caption="%s" onClick="update_main('%s');"></div>\n''' % (r.name,FlagFramework.query_type((),family=k,report=r.name))
+                submenu_text+='''<div dojoType="MenuItem2" caption="%s"  onClick="update_main('%s');"></div>\n''' % (r.name,FlagFramework.query_type((),family=k,report=r.name))
 
             if len(submenu_text)>0:
                 menus.append('<div dojoType="PopupMenu2" widgetId="%s" toggle="wipe">%s</div>\n' % (k,submenu_text))
@@ -105,10 +104,11 @@ class AJAX(Menu):
         ## Is it possible? The problem is that the URL is not enough
         ## to specify the state because it might include stored UIs.
         result = '<script>\ntry { djConfig; } catch(err) { document.location="/";  };\n</script>'
-#        print data
+        #print data
         return data+result
 
     def raw_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
+        #print data
         return data
 
     def menu(self,flag,query):

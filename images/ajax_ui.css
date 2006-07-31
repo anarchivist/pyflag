@@ -11,7 +11,7 @@ body {
    You can override any class names to be used if you wish.
    ***/
 
-table {
+table.PyFlagTable {
   font-family:Lucida Grande, Verdana;
 /*  font-size:0.8em; */
   width:100%;
@@ -22,7 +22,7 @@ table {
   width:95%;
   border:1px solid #ccc;
   height: 285px;
-  overflow-x:hidden;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
@@ -90,6 +90,7 @@ tbody.scrollContent td.sorted-column, tbody.scrollContent tr.alternateRow td.sor
   color: black;
   background-color: #B9D4FE;
   border:1px solid #b8d4fe;
+  cursor: pointer;
 }
 
 body .dojoMenuItem2.dojoMenuItem2Hover,
@@ -100,7 +101,7 @@ body .dojoMenuItem2.dojoMenuItem2Hover,
   border-color: white;
 }
 
-/* todo: find good color for disabled menuitems, and teset */
+/* todo: find good color for disabled menuitems, and teset
 .dojoMenuItem2Disabled .dojoMenuItem2Label span,
 .dojoMenuItem2Disabled .dojoMenuItem2Accel span {
   color: ThreeDShadow;
@@ -110,6 +111,7 @@ body .dojoMenuItem2.dojoMenuItem2Hover,
 .dojoMenuItem2Disabled .dojoMenuItem2Accel span span {
   color: ThreeDHighlight;
 }
+*/
 
 html, body{	
   width: 100%;	/* make the body expand to fill the visible window */
@@ -142,4 +144,14 @@ a {
 .dojoMenuBar2Client {
   padding: 1px;
   background-image: url(/javascript/src/widget/templates/images/toolbar-bg.gif);
+  cursor: pointer;
+}
+
+.dojoMenuItem2Icon {
+	position: relative;
+	background-position: center center;
+	background-repeat: no-repeat;
+	z-index: 1;
+	width: 16px;
+	height: 16px;
 }
