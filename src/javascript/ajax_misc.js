@@ -1,13 +1,44 @@
+/** This is a debugging aid to show a full backtrace - nice trick */
+function alert_bt() {
+  alert((new Error()).stack);
+};
 
 /** This function is used to set the url of a ContentPane. We cant use
     the ContentPane's set url because it either caches the page (which
     causes memory explosion in the browser) or add
     ?dojo..preventCache=115369481689 */
-function set_url(widget, url) { 
+function xx_set_url(widget, url) { 
   update_default_toolbar();
 
   widget.setUrl(url);
 
+  //remove_popups(widget);
+
+  dojo.io.bind({
+    url: url,
+	useCache: false,
+	preventCache: false,
+	method:  "GET",
+	mimetype: "text/html",
+	handler: function(type, data, e) {
+	if(type == "load") {
+	  update_default_toolbar();
+	  widget.setContent(data);
+	  widget.href = url;
+	} else {
+	  // works best when from a live server instead of from file system 
+	  widget._handleDefaults.call("Error loading '" + url + "' (" + e.status + " "+  e.statusText + ")", "onDownloadError");
+	}
+      }
+    });
+};
+
+function set_url(widget, url) { 
+  widget.setUrl(url);
+  
+  //Is this needed? default toolbars do not get removed with seturl
+  update_default_toolbar();
+  remove_popups(widget);
 };
 
 
@@ -329,12 +360,13 @@ function remove_popups(node) {
     if(node) {
       if(popups[i] && popups[i].targetNodeIds==node.widgetId) {
 	popups[i].unBindDomNode(popups[i].targetNodeIds);
-	popups[i].destroyRendering();
+	popups[i].destroy();
+
       };
     } else {
       if(popups[i] && popups[i].targetNodeIds && popups[i].targetNodeIds.length>0) {
 	popups[i].unBindDomNode(popups[i].targetNodeIds);
-	popups[i].destroyRendering();	
+	popups[i].destroy();	
 	//alert("Deleting target "+popups[i].targetNodeIds);
       };
     };
@@ -354,11 +386,21 @@ dojo.lang.extend(dojo.widget.PopupMenu2, {
 		       last_table_id = e.target.getAttribute('table_id');
 		     };
 
+		     // Ensure we are a valid popupmenu at all.
+		     if(!this.domNode) return;
+		     
 		     //dojo.debugShallow(e);
 		     this.open(e.clientX, e.clientY, null, [e.clientX, e.clientY]);
 		     
 		     if(e["preventDefault"]){
 		       e.preventDefault();
 		     }
+		   }
+  });
+
+dojo.lang.extend(dojo.widget.PopupMenu2, {
+  isShowing: function() {
+		     if(this.domNode)
+		       return dojo.html.isShowing(this.domNode);
 		   }
   });

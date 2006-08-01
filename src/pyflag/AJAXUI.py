@@ -269,11 +269,10 @@ class AJAXUI(HTMLUI.HTMLUI):
 
 
             result.result +='''
-            <div dojoType="popupmenu2" targetNodeIds="tableContainer%s" toggle="explode"  >
+            <div id="popup%s" dojoType="PopupMenu2" targetNodeIds="tableContainer%s" toggle="explode"  >
             %s
             </div>
-            ''' % (id,''.join(menus))
-
+            ''' % (id,id,''.join(menus))
 
             ## If no ordering is specified we order by the first column
             if not query.has_key('order') and not query.has_key('dorder'):
