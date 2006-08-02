@@ -124,44 +124,14 @@ class test2(Reports.report):
         result.row("absabsdajhdfsfds skjsdfkljdfs fdsalkj fdsalkjsfd lkjfdsa lfskdj sfdalkj fdsalkj fdsalkjsfd lksfdj sfdalkj sfdlkjfsda lkfsdaj lksfdaj dfsalkj fdsalk jsfdalkj sdaflkj fsdalk jsfdalk jdsfalk jdfsalk jsfdalkjsfdalk jdfsalk jfdsalkj fdsalk jfsda")
         result.end_table()
 
-import dissect
+import time
 
-class EtherealTest(Reports.report):
-    """ A sample ethereal report """
-    name="Ethereal Test"
-    family="Test"
+class Refresher(Reports.report):
+    """ What is the time? """
+    parameters = {}
+    family = "Test"
+    name = "Refresher"
     def display(self,query,result):
-        a=pyethereal.open_file("/tmp/test.pcap")
-        proto_tree = pyethereal.ReadPacket(a)
-
-        def tree_cb(branch):
-            try:
-                if branch:
-                    node = proto_tree[branch[-1]]
-                else:
-                    node = proto_tree
-            except KeyError:
-                node=proto_tree
-
-            child = node.get_child()
-            if not child: return
-            for peer in child:
-                print peer.name(),peer
-                if peer.get_child():
-                    yield  ( peer.name(), "%s" % peer,'branch')
-                else:
-                    yield  ( peer.name(),"%s" % (peer),'leaf')
-        
-        def pane_cb(branch,result):
-            try:
-                if branch:
-                    node = proto_tree[branch[-1]]
-                else:
-                    node = proto_tree
-            except KeyError:
-                node=proto_tree
-
-            result.heading("%s" % node.name())
-            result.text("value is %s" % node.value(),color='red')
-
-        result.tree(tree_cb=tree_cb, pane_cb=pane_cb, branch=['/'])
+        result.heading("At the sound of the tone the time will be:")
+        result.text(time.ctime())
+        result.refresh(2,query)

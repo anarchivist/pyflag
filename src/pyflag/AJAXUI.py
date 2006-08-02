@@ -22,8 +22,13 @@ class AJAXUI(HTMLUI.HTMLUI):
             result.result = "%s" % out
 
         cb = self.store_callback(const_selector_cb)
+
+        try:
+            default = self.defaults[name]
+        except:
+            default = ''
         
-        tmp = '<input name=\"%s\" dojoType="combobox" style="width: 300px;" autocomplete="true" %s maxListLength="15" dataUrl="f?callback_stored=%s" />\n' % (name,opt_str,cb);
+        tmp = '<input name=\"%s\" dojoType="combobox" style="width: 300px;" autocomplete="true" %s maxListLength="15" dataUrl="f?callback_stored=%s" defaultValue=%r />\n' % (name,opt_str,cb, default);
 
         #Remove this from the form_parms
         if self.form_parms.has_key(name):
@@ -479,5 +484,29 @@ class AJAXUI(HTMLUI.HTMLUI):
         self.result = "<a href='f?%s&callback_stored=%s'>Click to Download file</a>" % (self.defaults,cb)
 
     def refresh(self,interval,query,**options):
-        pass
+        """ Refreshes the given content pane into the specified query in a certain time.
+
+        if interval is 0 we do it immediately.
+        """
+        try:
+            pane = options['pane']
+        except KeyError:
+            pane = 'main'
         
+        if interval==0:
+            self.result+="""<script>
+            update_container('%s','%s');
+            </script>""" % (pane, query)
+        else:
+            ## We mark the current container as pending an update, and
+            ## then schedule an update fo it later on. If it has been
+            ## updated by some other mechanism, it will be marked as
+            ## not longer pending, and we ignore it.
+            self.result+="""<script>
+            _container_.pending = true;
+            
+            dojo.lang.setTimeout(function () {
+            if(_container_.pending)
+                 update_container(_container_,'%s');
+            } , %s);
+            </script>""" % (query, interval*1000)

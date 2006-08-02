@@ -53,21 +53,7 @@ function push_on_history(container, url) {
   pyflag_history.push([container, url]);
 };
 
-function update_main(url) {
-  var main = dojo.widget.getWidgetById("main");
-
-  /* Store the old url in the history */
-  if(main.href) {
-    push_on_history("main",main.href);
-  };
-
-  remove_popups();
-
-  set_url(main,url);
-};
-
 function submitForm(form_name,id) {
-
   /** We try to save a get version of the current form in the
       history */
   var form = dojo.byId(form_name);
@@ -127,10 +113,17 @@ function update_container(container,url) {
 
   // If we are actually updating the main frame, we handle it
   // specially so the history works etc.
-  if(container=="main") 
-    update_main(url);
-  else
-    set_url(c,url);
+  if(container=="main") {
+    /* Store the old url in the history */
+    if(!c.pending && c.href) {
+      push_on_history("main",c.href);
+    };
+  };
+
+  // Ensure that we mark c as not pending:
+  c.pending = false
+
+  set_url(c,url);
 
   update_default_toolbar();
 };
@@ -197,7 +190,7 @@ function init_toolbar() {
 		       // Place the current container url in the forward history.
 		       pyflag_forward_history.push([container_name, container.href]);
 
-		       set_url(container,url);
+		       update_container(container,url);
 		     });
 
   toolbar.addChild(dojo_icon);
@@ -225,7 +218,7 @@ function init_toolbar() {
 		       if(container.href)
 			 pyflag_history.push([container_name, container.href]);
 
-		       set_url(container, url);
+		       update_container(container, url);
 		     });
 
   toolbar.addChild(dojo_icon);
@@ -403,4 +396,16 @@ dojo.lang.extend(dojo.widget.PopupMenu2, {
 		     if(this.domNode)
 		       return dojo.html.isShowing(this.domNode);
 		   }
+  });
+
+dojo.lang.extend(dojo.widget.ComboBox, {
+  defaultValue:'',
+    
+  initialize: function(args, frag) {
+      dojo.widget.ComboBox.superclass.initialize.call(this, args, frag);
+
+      if(this.defaultValue) {
+	this.setValue(this.defaultValue);
+      };
+    },
   });
