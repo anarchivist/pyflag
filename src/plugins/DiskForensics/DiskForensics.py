@@ -77,7 +77,28 @@ def make_inode_link(query,result, variable='inode'):
     return out
 
 class BrowseFS(Reports.report):
-    """ Report to browse the filesystem"""
+    """
+    Browsing the FileSystem
+    -----------------------
+
+    The Virtual Filesystem is a central concept to PyFlag's
+    operation. This report allows users to browse through the
+    filesystem in a natural way.
+
+    The report presents two views:
+
+    - A Tree View:
+
+       Allows for the perusal of files and directories in a tree hirarchy.
+
+    - A Table View:
+
+       This presents the list of files within the VFS in a tabular
+       fasion. It is them possible to search through the list simply
+       by introducing filter conditions.
+
+
+    """
     hidden = False
     order=5
     name = "Browse Filesystem"

@@ -421,7 +421,8 @@ class Flag:
         #we are not executing
         else: return None
 
-    ui = None    
+    ui = None
+    ### FIXME- This needs to move to FlagHTTPServer
     def process_request(self,query):
         """ Function responsible for processing the request presented by query, which is of query_type. Results returned are a UI object which may be used to display the results
         @arg query: A query_type object.
@@ -445,9 +446,17 @@ class Flag:
         report_name = report.name
         report_doc  = report.__doc__
         def show_help(query,result):
-            result.heading("Help for %s" % report_name)
-            result.text(report_doc)
-            result.decoration='naked'
+            ## Try to use rst2html to produce nice looking html:
+            try:
+                import docutils.core, textwrap
+
+                result.result += docutils.core.publish_string(textwrap.dedent(report_doc),
+                                                              writer_name='html')
+            except Exception,e:
+                logging.log(logging.Error,"Error running docutils: %s" % e)
+                result.heading("Help for %s" % report_name)
+                result.text(report_doc)
+                result.decoration='naked'
 
         import pyflag.TypeCheck as TypeCheck
 
