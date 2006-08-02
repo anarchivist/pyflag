@@ -136,12 +136,6 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                 
         self.query=query
         return query
-##            self.wfile.write("%s = %s <br>\n" % (key,form[key]))
-
-##        if i >= 0:
-##            base, query = self.path[:i], FlagFramework.query_type(cgi.parse_qsl(self.path[i+1:]), user=user, passwd=passwd)
-##        else:
-##            base, query = (self.path , FlagFramework.query_type([], user=user, passwd=passwd ))
 
     def format_date_time_string(self, sec):
         year, month, day, hh, mm, ss, wd, y, z = time.gmtime(sec)
@@ -238,8 +232,8 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             return
 
         #Is this a request for a saved UI?
-        if query.has_key('draw_stored') and flag.ui.store_dict.has_key(query['draw_stored']):
-            result = flag.ui.store_dict[query['draw_stored']]
+        if query.has_key('draw_stored'):
+            result = flag.store.get(query['draw_stored'])
             
             ## This expires stored pictures in case pyflag is
             ## restarted
@@ -266,13 +260,6 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
         #Nope - just do it
         else:            
-              #Clear the store if its been there too long:
-              expired_time = time.time() - 100
-              for k in flag.ui.store_dict.keys():
-                  if expired_time > HTMLUI.HTMLUI.time_dict[k]:
-                      del flag.ui.store_dict[k]
-                      del flag.ui.time_dict[k]
-                      
               ## We sometimes need to force the gc, this may prove to be a performance hit?
               try:
                   import gc

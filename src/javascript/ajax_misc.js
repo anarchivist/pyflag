@@ -398,6 +398,8 @@ dojo.lang.extend(dojo.widget.PopupMenu2, {
 		   }
   });
 
+
+/** Extend the ComboBox to have a default value */
 dojo.lang.extend(dojo.widget.ComboBox, {
   defaultValue:'',
     

@@ -90,10 +90,6 @@ class HTMLUI(UI.GenericUI):
 
     name = "HTMLUI"
     tree_id = 0
-    store_dict = {}
-    callback_dict = {}
-    callback_time_dict={}
-    time_dict={}
     ## This is used as a unique count of ids
     id=0
     
@@ -248,9 +244,6 @@ class HTMLUI(UI.GenericUI):
         ## Store the ui for later retrieval by the browser when we fetch the target:
             self.result +=  '<object type=%r data="f?draw_stored=%s" %s />'  % (tmp.type,self.store(tmp),opt)
 
-    max_store_count = 1
-    max_callback_count = 1
-
     def store_callback(self,callback):
         """ Function registers the callback with the server.
 
@@ -267,13 +260,7 @@ class HTMLUI(UI.GenericUI):
     
     def store(self,ui):
         """ Function stores the current UI in a dict in the class method. This is required when we need to store a UI and later get the browser to retrieve it. """
-        count = HTMLUI.max_store_count
-        import time
-        
-        key= "UI%u" % count
-        HTMLUI.store_dict[key] = ui
-        HTMLUI.time_dict[key] = time.time()
-        HTMLUI.max_store_count+=1
+        key = self.flag.store.put(ui, prefix="UI")
         return key
 
     def svg(self,text):
