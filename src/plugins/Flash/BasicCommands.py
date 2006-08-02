@@ -342,8 +342,7 @@ class execute(pyflagsh.command):
         """ Returns a report, query all ready from the current args """
         args=self.args
         query=FlagFramework.query_type(())
-        del query['case']
-
+ 
         try:
             query['family'],query['report']=args[1].split('.')
         except:
@@ -367,7 +366,7 @@ class execute(pyflagsh.command):
                 except KeyError:
                     pass
 
-        if not query.has_key('case'): query['case']=config.FLAGDB
+#        if not query.has_key('case'): query['case']=config.FLAGDB
         return report,query
 
     def execute(self):

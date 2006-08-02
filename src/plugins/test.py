@@ -39,7 +39,7 @@ import os,os.path,sys
 
 description = "Test Class"
 #Remove this line to ensure this appears in the menu
-active = False
+active = True
 
 class TemplateReport(Reports.report):
     """ A sample report.

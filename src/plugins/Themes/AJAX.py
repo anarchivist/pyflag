@@ -96,6 +96,7 @@ class AJAX(Menu):
     def naked_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
         """ Render the ui with minimal interventions """
         result= data
+        print result
         return result
 
     def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None,ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
@@ -108,7 +109,7 @@ class AJAX(Menu):
         return data+result
 
     def raw_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
-        #print data
+        # print data
         return data
 
     def menu(self,flag,query):

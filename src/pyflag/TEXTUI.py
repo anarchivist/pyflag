@@ -92,7 +92,7 @@ class TEXTUI(UI.GenericUI):
             groupby=None
 
         # Get a new SQL generator for building the table with.
-        generator,new_query,names,columns,links = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks)
+        generator,new_query,names,columns,links = self._make_sql(sql=sql,columns=columns,names=names,links=links,table=table,where=where,groupby = groupby,case=case,callbacks=callbacks, query=self.defaults)
 
         output = cStringIO.StringIO()
 
@@ -128,6 +128,7 @@ class TEXTUI(UI.GenericUI):
         
     def notebook(self,names=[],context="notebook",callbacks=[],descriptions=[]):
         """ This text implementation of notebook will only show the page which is currently selected """
+        print "%r" % self.defaults
         query=self.defaults.clone()            
         try:
             context_str=query[context]
@@ -161,7 +162,10 @@ class TEXTUI(UI.GenericUI):
                 temp.append(lines + ["\r\n"] * (max_height - len(lines)))
 
             for i in range(0,max_height):
-                self.result+="".join([c[i] for c in temp ]) + "\r\n"
+                try:
+                    self.result+="".join([c[i] for c in temp ]) + "\r\n"
+                except IndexError:
+                    pass
 
     def toolbar(self,cb=None,text=None,icon=None,popup=True,tooltip=None,link=None):
         pass
@@ -189,12 +193,11 @@ class TEXTUI(UI.GenericUI):
         """ A Text tree implementation """
         query = self.defaults
 
-        if query.has_key('open_tree'):
-            path = query['open_tree']
-            branch = [ d for d in path.split('/') ]
-            branch[0]='/'
-        else:
-            branch = ['']
+        try:
+            ## Get the right part:
+            branch=FlagFramework.splitpath(query['open_tree'])
+        except KeyError:
+            branch=['']
 
         #Start building the tree using the branch.
         def draw_branch(depth,tree_array):
@@ -202,7 +205,8 @@ class TEXTUI(UI.GenericUI):
             #that matches the branch for this depth, then recurse into
             #it.
             branch_array=branch[:depth]
-            for k,v,t in tree_cb(branch_array):
+            path = FlagFramework.joinpath(branch[:depth])
+            for k,v,t in tree_cb(path):
                 if not k: continue
                 if not t: continue
                 tree_array.append((depth,k,v,t))
@@ -234,7 +238,8 @@ class TEXTUI(UI.GenericUI):
             left.text(" "*depth + icon + v.__str__() + "\r\n")
 
         right = self.__class__(self)
-        pane_cb(branch, right)
+        path = FlagFramework.joinpath(branch)
+        pane_cb(path, right)
 
         self.row(left, right)
 
