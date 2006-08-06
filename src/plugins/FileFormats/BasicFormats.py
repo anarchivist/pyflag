@@ -64,7 +64,7 @@ class CHAR(BasicType):
     visible = True
 
 class BYTE(BasicType):
-    fmt='=b'
+    fmt='b'
     visible = True
         
     def __str__(self):
@@ -208,7 +208,7 @@ class POINTER(LONG):
 class StructArray(SimpleStruct):
     def __init__(self,buffer,*args,**kwargs):
         try:
-            self.count=kwargs['count']
+            self.count=int(kwargs['count'])
         except:
             self.count=0
 
@@ -261,6 +261,9 @@ class ARRAY(StructArray):
 class BYTE_ARRAY(ARRAY):
     target_class=BYTE
 
+class UBYTE_ARRAY(ARRAY):
+    target_class=UBYTE
+
 class WORD_ARRAY(ARRAY):
     target_class=WORD
 
@@ -270,13 +273,28 @@ class LONG_ARRAY(ARRAY):
 class ULONG_ARRAY(ARRAY):
     target_class = ULONG
 
+class BLOB(ARRAY):
+    """ A Blob is an array of bytes which prints only printable chars. Non printable chars are printed as hex """
+    target_class=UBYTE
+
+    def __str__(self):
+        tmp = []
+        for i in range(self.count):
+            char = "%s" % self.data[i]
+            if char.isalnum() or char in '!@#$%^&*()_+-=;\'[]\,./<>?':
+                tmp.append(char)
+            else:
+                tmp.append('.')
+
+        return ''.join(tmp)
+
 class STRING(BYTE):
     visible = True
     sql_type="text"
     
     def __init__(self,buffer,*args,**kwargs):
         try:
-            self.fmt = "%ss" % kwargs['length']
+            self.fmt = "%ss" % kwargs['length'].__int__()
         except:
             raise SystemError("you must specify the length of a STRING")
         
