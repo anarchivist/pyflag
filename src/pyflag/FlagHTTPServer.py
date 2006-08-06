@@ -172,13 +172,13 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             ct="text/javascript"
             
         #Is this a request for an image?
-        if re.search("\.(png|jpg|gif|ico)$",query.base):
+        elif re.search("\.(png|jpg|gif|ico)$",query.base):
             ct="image/jpeg"
         
-        if re.search("\.(css)$",query.base):
+        elif re.search("\.(css)$",query.base):
             ct="text/css"
 
-        if re.search("\.(htm)l?$",query.base):
+        elif re.search("\.(htm)l?$",query.base):
             ct="text/html"
             
         if ct:
@@ -200,7 +200,8 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                         ## current version.
                         if int(last_time) == int(s.st_mtime):
                             self.send_response(304)
-                            self.send_header("Expires","Sun, 17 Jan 2038 19:14:07 GMT")                
+                            self.send_header("Expires","Sun, 17 Jan 2038 19:14:07 GMT")
+                            self.send_header("Connection","close")
                             self.end_headers()
                             return
                         
@@ -211,6 +212,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                     self.send_header("Content-type",ct)
                     self.send_header("Last-Modified",self.format_date_time_string(s.st_mtime))
                     self.send_header("Etag",s.st_ino)
+                    self.send_header("Connection","close")
                     self.send_header("Expires","Sun, 17 Jan 2038 19:14:07 GMT")                
                     self.end_headers()
                     fd = open(path)

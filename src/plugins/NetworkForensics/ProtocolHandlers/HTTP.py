@@ -32,7 +32,7 @@ import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
 import pyflag.Reports as Reports
 import plugins.NetworkForensics.PCAPFS as PCAPFS
-import re
+import re,time
 
 
 def escape(uri):
@@ -181,7 +181,10 @@ class HTTPScanner(StreamScannerFactory):
             `method` VARCHAR( 10 ) NOT NULL ,
             `url` VARCHAR( 255 ) NOT NULL,
             `response_packet` int not null,
-            `content_type` VARCHAR( 255 ) NOT NULL
+            `content_type` VARCHAR( 255 ) NOT NULL,
+            `referrer` VARCHAR(255) NULL,
+            `date` int,
+            `host` VARCHAR(255)
             )""")
 
         self.dbh.check_index("http", "inode")
@@ -189,6 +192,13 @@ class HTTPScanner(StreamScannerFactory):
         
     def reset(self, inode):
         self.dbh.execute("drop table if exists http")
+
+    def parse_date_time_string(self, s):
+        try:
+            return time.mktime(time.strptime(s, "%a, %d %b %Y %H:%M:%S %Z"))
+        except:
+            print "Cant parse %s as a time" % s
+            return 0
 
     def process_stream(self, stream, factories):
         forward_stream, reverse_stream = self.stream_to_server(stream, "HTTP")
@@ -230,9 +240,23 @@ class HTTPScanner(StreamScannerFactory):
             ## http table:
             host = p.request.get("host",IP2str(stream.dest_ip))
             url = p.request.get("url")
+            try:
+                date = p.response.get("date")
+                date = int(self.parse_date_time_string(date))
+            except (KeyError,ValueError):
+                date = 0
+
+            try:
+                referer = p.request['referer']
+            except KeyError:
+                try:
+                    referer = p.request['referrer']
+                except KeyError:
+                    referer = ''
+                
             if not url.startswith("http://") or not url.startswith("ftp://"):
                 url = "http://%s%s" % (host, url)
-            self.dbh.execute("insert into http set inode=%r, request_packet=%r, method=%r, url=%r, response_packet=%r, content_type=%r",(new_inode, p.request.get("packet_id"), p.request.get("method"), url, p.response.get("packet_id"), p.response.get("content-type","text/html")))
+            self.dbh.execute("insert into http set inode=%r, request_packet=%r, method=%r, url=%r, response_packet=%r, content_type=%r, date=%r, referrer=%r, host=%r",(new_inode, p.request.get("packet_id"), p.request.get("method"), url, p.response.get("packet_id"), p.response.get("content-type","text/html"), date, referer, host))
 
             ## Scan the new file using the scanner train. 
             self.scan_as_file(new_inode, factories)
@@ -254,8 +278,7 @@ class BrowseHTTPRequests(Reports.report):
     name = "Browse HTTP Requests"
     family = "Network Forensics"
     
-    def display(self,query,result):
-    
+    def display(self,query,result):    
         result.heading("Requested URLs")
         result.table(
             columns = ['from_unixtime(ts_sec,"%Y-%m-%d")','concat(from_unixtime(ts_sec,"%H:%i:%s"),".",ts_usec)','request_packet','inode','method','url', 'content_type'],

@@ -390,7 +390,11 @@ class execute(pyflagsh.command):
         ## Execute the report:
         try:
             report.analyse(query)
-            dbh = self.environment._DBO(query['case'])
+            try:
+                dbh = DB.DBO(query['case'])
+            except KeyError:
+                dbh = DB.DBO()
+                
             canonical_query = FlagFramework.canonicalise(query)
             dbh.execute("insert into meta set property=%r,value=%r",('report_executed',canonical_query))
 

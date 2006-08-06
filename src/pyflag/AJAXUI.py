@@ -510,3 +510,11 @@ class AJAXUI(HTMLUI.HTMLUI):
                  update_container(_container_,'%s');
             } , %s);
             </script>""" % (query, interval*1000)
+
+    def popup(self,callback, label,icon=None,toolbar=0, menubar=0, tooltip=None, **options):
+        if not tooltip: tooltip = label
+        cb = self.store_callback(callback)
+
+        self.result+='''<div widgetId="%s" dojoType="FloatingPane" style="width: 300px; height: 300px; left: 100px; top: 100px; display: none;" executeScripts="true" title="%s"></div>\n''' % (self.id,tooltip)
+
+        self.result+='''<a href="#" onclick="update_container(%r,%r)">click</a>\n''' % (self.id, "%s&callback_stored=%s" % (self.defaults,cb))
