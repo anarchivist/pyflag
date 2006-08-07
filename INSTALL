@@ -31,6 +31,8 @@ python2.4-imaging \
 python2.4-pexpect \
 python2.4-dev \
 libclamav-dev \
+libclamav-dev \
+libpcap-dev \
 zlib1g-dev \
 libmagic-dev \
 libpcap-dev \

@@ -321,7 +321,6 @@ class SimpleLog(LogFile.Log):
 
         ## If we have more columns we set their names,types and
         ## indexes from the users data.
-        print fields
 
         field = []
         type = []

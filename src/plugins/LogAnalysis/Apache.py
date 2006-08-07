@@ -22,6 +22,7 @@
 # ******************************************************
 import pyflag.LogFile as LogFile
 import plugins.LogAnalysis.Simple as Simple
+import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 import re
 
@@ -101,12 +102,13 @@ def legend(query, result):
         result.row(key, field_codes[key][0])
     result.end_table()
 
-class ApacheLog(LogFile.Log):
+class ApacheLog(Simple.SimpleLog):
     """ Log parser for apache log files """
     name = "Apache Log"
-    
-    def __init__(self, variable, query):
-        LogFile.Log.__init__(self,variable,query)
+
+
+    def __init__(self, case=None):
+        Simple.SimpleLog.__init__(self)
         self.separators = []
         self.types = []
         self.trans = []
@@ -114,7 +116,15 @@ class ApacheLog(LogFile.Log):
         self.fields = []
         self.format = ''
         self.split_req = ''
-        
+        self.num_fields = 1
+
+    def parse(self, query, datafile='datafile'):
+        """ Do this:
+        find '%', consume modifier, check/consume field code,
+        find/consume delimiter(extra stuff), repeat
+        """
+        self.datafile = query.getarray(datafile)
+
         if not query.has_key('format'):
             query['format'] = formats[formats.keys()[0]]
         try:
@@ -123,29 +133,29 @@ class ApacheLog(LogFile.Log):
         except KeyError:
             pass
 
-        self.parse_format()
-
-        # should any fields be ignored?
-        for n in range(len(self.fields)):
-            try:
-                if query['ignore%s' % n] == 'true':
-                    self.fields[n] = 'ignore'
-                    self.indexes[n] = False
-            except KeyError:
-                pass
-            
-    def parse_format(self):
-        """ Do this:
-        find '%', consume modifier, check/consume field code,
-        find/consume delimiter(extra stuff), repeat
-        """
-
         # fixup string to split request into method/request/version
         if self.split_req == 'true':
             newformat = re.sub("%r", "%m %r %H", self.format)
             if newformat and len(newformat) > len(self.format):
                 self.format = newformat
-                
+        
+        self.num_fields = 1
+        ## If this object was called with an unknown number of fields
+        ## we work it out. Note that we may not have all the
+        ## consecutive fields defined:
+        for k in query.keys():
+            if k.startswith('field'):
+                number=int(k[len('field'):])
+                if number>self.num_fields:
+                    #We need to set all this stuff
+                    self.num_fields=number
+                    
+        self.separators = []
+        self.types = []
+        self.trans = []
+        self.indexes = []
+        self.fields = []
+
         done = 0
         while 1:
             idx = self.format.find('%', done)
@@ -182,14 +192,28 @@ class ApacheLog(LogFile.Log):
                     except IndexError:
                         self.trans.append('')
                     break
-                
+
             # skip up to the next '%'
             done = self.format.find('%', idx+1)
             if done == -1:
                 self.separators.append(self.format[idx+1:])
             else:
-                self.separators.append(self.format[idx+1:done])
-                
+                            self.separators.append(self.format[idx+1:done])
+
+        self.set_ignore_fields(query)
+
+    def set_ignore_fields(self,query):
+
+        # should any fields be ignored?
+        for n in range(len(self.fields)):
+            try:
+                if query['ignore%s' % n] == 'true':
+                    print "ignoring"
+                    self.fields[n] = 'ignore'
+                    self.indexes[n] = False
+            except KeyError:
+                pass
+        
     def get_fields(self):
         """ A generator that returns all the columns in a log file.
 
@@ -211,31 +235,59 @@ class ApacheLog(LogFile.Log):
                     arr[i] = self.trans[i](arr[i])
             yield arr
 
+    
+
     def form(self,query,result):
         """ This draws the form required to fulfill all the parameters for this report
         """
-
-        # show a preview, may help user choose format
-        result.row("Unprocessed text from file")
-        sample = []
-        count =0
-        for line in self.read_record():
-            sample.append(line)
-            count +=1
-            if count>3:
-                break
+        def configure(query, result):
             
-        [result.row(s,bgcolor='lightgray',colspan=50) for s in sample]
-        result.ruler()
-        # select an existing format string
-        result.const_selector("Choose Format String", 'format', formats.values(), formats.keys())
-        #result.popup(legend, "Display format string legend")
-        #legend(None, result)
-        result.row("Current Selection:",self.format)
-        result.ruler()
-        result.row("Select Filters:")
-        result.checkbox("Split Request into Method/URL/Version", "split_req", "true")
-        result.ruler()
-        result.row("Select Fields to ignore:")
-        for i in range(len(self.fields)):
-            result.checkbox(self.fields[i], 'ignore%s' % i, 'true') 
+            result.start_table(hstretch=False)
+            result.const_selector("Choose Format String", 'format', formats.values(), formats.keys())
+            result.ruler()
+            result.checkbox("Split Request into Method/URL/Version", "split_req", "true")
+            result.end_table()
+            
+
+        def extra_options(query, result):
+            self.parse(query)
+            result.start_table()
+            result.row("Raw text from file")
+            sample = []
+            count =0
+            for line in self.read_record():
+                sample.append(line)
+                count +=1
+                if count>3:
+                    break
+
+            [result.row(s,bgcolor='lightgray') for s in sample]
+            result.end_table()
+            
+            result.start_table()
+            result.heading("Select Options:")
+            result.row("Select Fields to ignore:")
+            print "self.fields: %s" % self.fields
+            for i in range(len(self.fields)):
+                result.checkbox(self.fields[i], 'ignore%s' % i, 'true') 
+            result.end_table()
+
+            #self.draw_type_selector(result)
+
+        def test(query,result):
+            self.parse(query)
+            print "self.fields: %s" % self.fields
+            result.text("The following is the result of importing the first few lines from the log file into the database.\nPlease check that the importation was successfull before continuing.",wrap='full')
+            self.display_test_log(result,query)
+            return True
+
+        result.wizard(
+            names = (
+            "Step 1: Select Log File",
+            "Step 2: Select Format String",
+            "Step 3: Select Options",
+            "Step 4: View test result",
+            "Step 5: Save Preset"),
+            callbacks = (LogFile.get_file, configure, extra_options, test, FlagFramework.Curry(LogFile.save_preset, log=self))
+            )
+

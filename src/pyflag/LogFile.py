@@ -224,7 +224,7 @@ class Log:
         file after it has been loaded
         """
 
-def get_loader(dbh,name,datafile):
+def get_loader(dbh,name,datafile="datafile"):
     """ lookup and unpickle log object from the database, return loader object
 
     We also initialise the object to the datafile list of filenames to use.

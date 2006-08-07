@@ -266,7 +266,7 @@ class ManageLogPresets(Reports.report):
 
         def Describe(value):
             try:
-                log = LogFile.get_loader(dbh, value,None)
+                log = LogFile.get_loader(dbh, value)
                 return( "%s" % log.__class__)
             except KeyError:
                 return "Unknown"

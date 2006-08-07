@@ -113,19 +113,27 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
         """
         ## We have warnings to show
         if self._warnings:
-            last_executed = self._last_executed
+            try:
+                #FIXME mic:
+                #Keep getting 'PyFlagCursor' object has no attribute '_last_executed' when creating an Apache log preset
+                #I wrapped it in a try, but don't know why this is happening.
+                last_executed = self._last_executed
             
-            results = list(self._fetch_row(1000))
-            if len(results)<1000:
-                self.execute("SHOW WARNINGS")
-                while 1:
-                    a=self.fetchone()
-                    if not a: break
-                    logging.log(logging.DEBUG,"Mysql warnings: query %r: %s" % (last_executed,a))
-            else:
-                logging.log(logging.DEBUG,"Mysql issued warnings but we are unable to drain result queue")
+                results = list(self._fetch_row(1000))
+                if len(results)<1000:
+                    self.execute("SHOW WARNINGS")
+                    while 1:
+                        a=self.fetchone()
+                        if not a: break
+                        logging.log(logging.DEBUG,"Mysql warnings: query %r: %s" % (last_executed,a))
+                    else:
+                        logging.log(logging.DEBUG,"Mysql issued warnings but we are unable to drain result queue")
 
-            self._row_cache.extend(results)
+                self._row_cache.extend(results)
+                
+            except Exception,e:
+                pass
+                #logging.log(logging.DEBUG,"MYSQL warning:%s" % e)
         pass
         #return MySQLdb.cursors.SSDictCursor._warning_check(self)
         
