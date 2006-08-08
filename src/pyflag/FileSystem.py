@@ -44,6 +44,7 @@ This inode therefore refers to the 14th file in the zip archive contained in ino
 Note that typically VFS modules go hand in hand with scanners, since scanner discover new files, calling VFSCreate on the filesystem to add them, and VFS drivers are used to read those from the Inode specifications.
 """
 import os,os.path
+import extractor
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 
@@ -751,6 +752,19 @@ class File:
                 left.row('%s:' % k,'',v)
         except AttributeError:
             pass
+
+        #Try to extract the metadata and display it.
+        try:
+            myex=extractor.Extractor()
+            fd = fsfd.open(inode=query['inode'])
+            mybuf=fd.read()
+            meta=myex.extractFromData(mybuf,len(mybuf))
+        except Exception,e:
+            logging.log(logging.DEBUG,"Error occurred during meta data extraction:%s" % e)
+            
+        if meta:
+            for pair in meta:
+                left.row(pair[0],': ',pair[1])
 
         left.end_table()
 

@@ -15,6 +15,7 @@ AC_CHECK_HEADER(zlib.h,,AC_MSG_ERROR([You Must install zlib-dev to build pyflag]
 AC_CHECK_HEADER(pcap.h,,AC_MSG_ERROR([You Must install libpcap-dev to build pyflag]))
 AC_CHECK_HEADER(magic.h,,AC_MSG_ERROR([You Must install libmagic-dev to build pyflag this may be part of file the package for some distros]))
 #AC_CHECK_FILE($srcdir/src/filesystems/sleuthkit-2.03.tar.gz,,AC_MSG_ERROR([You Must download sleuthkit-2.03.tar.gz and place in src/filesystems ]))
+AC_CHECK_LIB(extractor, EXTRACTOR_getKeywords,,AC_MSG_ERROR([You Must install libextractor to use pyflag under debian/ubuntu this requires libextractor-dev]))
 
 # python checks 
 # (requires autoconf 1.5+ and the macros in acinclude.m4)
@@ -23,6 +24,7 @@ AC_PYTHON_DEVEL
 AC_PYTHON_MODULE(MySQLdb, REQUIRED)
 AC_PYTHON_MODULE(pexpect, REQUIRED)
 AC_PYTHON_MODULE(PIL, REQUIRED)
+AC_PYTHON_MODULE(ctypes, REQUIRED)
 
 # check for swig, custom macro in acinclude.m4
 AC_PROG_SWIG(1.3)

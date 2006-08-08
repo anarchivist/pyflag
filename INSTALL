@@ -29,13 +29,13 @@ python2.4 \
 python2.4-mysqldb \
 python2.4-imaging \
 python2.4-pexpect \
+python2.4-ctypes \
 python2.4-dev \
-libclamav-dev \
+libextractor-dev \
 libclamav-dev \
 libpcap-dev \
 zlib1g-dev \
 libmagic-dev \
-libpcap-dev \
 mysql-server \
 mysql-client \
 libtool \
