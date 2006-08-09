@@ -80,6 +80,8 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
     We store a limited cache of rows client side, and fetch rows from
     the server when needed.
     """
+    _last_executed = None
+
     def __init__(self, connection):
         MySQLdb.cursors.SSDictCursor.__init__(self, connection)
         self._row_cache = []

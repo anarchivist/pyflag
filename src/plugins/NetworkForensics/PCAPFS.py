@@ -100,12 +100,13 @@ class PCAPFS(DBFS):
             
 
         ## This populates it 
-        sql =  "%s/iowrapper -p %r -i %r -o %s -f foo -- %s/pcaptool -t pcap -i %r foo" % (
+        sql =  "%s/iowrapper -i %r -o %s -f foo -- %s/pcaptool -t pcap -i %r  -p %r foo" % (
             config.FLAG_BIN,
-            max_id,
             self.iosource.subsystem,
             self.iosource.make_parameter_list(),
-            config.FLAG_BIN, iosource_name)
+            config.FLAG_BIN, iosource_name
+            ,max_id,
+            )
 
         self.dbh.MySQLHarness(sql)
 

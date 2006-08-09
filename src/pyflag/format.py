@@ -54,7 +54,7 @@ class Buffer:
             raise IOError("Unable to set negative size (%s) for buffer (offset was %s)" % (self.size,self.offset))
         
     def clone(self):
-        return self.__class__(fd=self.fd)
+        return self.__class__(fd=self.fd, offset=self.offset, size=self.size)
 
     def __len__(self):
         return self.size
@@ -103,7 +103,7 @@ class DataType:
         else:
             self.buffer=buffer
         self.data=None
-        self.parameters = kwargs
+##        self.parameters = kwargs
 ##        try:
 ##            self.parent=kwargs['parent']
 ##        except:
@@ -142,15 +142,33 @@ class DataType:
 
 class RAW(DataType):
     """ This data type is simply a data buffer. """
-    def __init__(self,buffer,count,*args,**kwargs):
+    def __init__(self,buffer,*args,**kwargs):
         DataType.__init__(self,buffer,*args,**kwargs)
-        self.raw_size=count
+        self.buffer.size = kwargs['count']
 
     def size(self):
-        return self.raw_size
+        return self.buffer.size
         
-    def __str__(self):
-        return "Raw data of %s byte" % self.raw_size
-
     def get_value(self):
-        return self.buffer[:self.raw_size]
+        return self.buffer.clone()
+
+    def read_data(self):
+        print self.buffer.size
+        self.data = self.buffer.__str__()
+
+    def __repr__(self):
+        if not self.data: self.read()
+        result = ''.join([self.data[a].__str__() for a in range(len(self.data))])
+        return result     
+
+    def __str__(self):
+        if not self.data: self.read_data()
+        tmp = []
+        for i in range(len(self.data)):
+            char = "%s" % self.data[i]
+            if char.isalnum() or char in '!@#$%^&*()_+-=;\'[]\,./<>? ':
+                tmp.append(char)
+            else:
+                tmp.append('.')
+
+        return ''.join(tmp)

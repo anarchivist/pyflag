@@ -99,7 +99,7 @@ class Menu(Theme.BasicTheme):
         return result
 
     def raw_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
-        return self.preamble + data
+        return data
 
     def naked_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
         """ Render the ui with minimal interventions """

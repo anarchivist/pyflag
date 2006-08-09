@@ -28,7 +28,8 @@
 """ A library for reading PCAP files.
 
 PCAP format is really simple so this is a nobrainer. Good example of
-using the file format library though.
+using the file format library though. This shows how we can handle the
+endianess issue simply.
 """
 from format import *
 from plugins.FileFormats.BasicFormats import *
@@ -38,22 +39,32 @@ class FileHeader(SimpleStruct):
     """ The PCAP file header """
     def init(self):
         self.fields = [
-            ['magic', ULONG],
-            ['version_major', WORD],
-            ['version_minor', WORD],
-            ['thiszone', ULONG], #    /* gmt to local correction */
-            ['sigfigs', ULONG],  #    /* accuracy of timestamps */
-            ['snaplen', ULONG],  #    /* max length saved portion of each pkt */
-            ['linktype', ULONG], #    /* data link type (LINKTYPE_*) */
+            ['magic',         ULONG, self.parameters],
+            ['version_major', WORD,  self.parameters],
+            ['version_minor', WORD,  self.parameters],
+            ['thiszone',      ULONG, self.parameters], #    /* gmt to local correction */
+            ['sigfigs',       ULONG, self.parameters], #    /* accuracy of timestamps */
+            ['snaplen',       ULONG, self.parameters], #    /* max length saved portion of each pkt */
+            ['linktype',      ULONG, self.parameters], #    /* data link type (LINKTYPE_*) */
             ]
         
     def read(self):
+        ## Try to read the file with little endianess
+        self.parameters['endianess']='l'
         result=SimpleStruct.read(self)
-        if result['magic']!=0xa1b2c3d4:
-            raise IOError('This is not a pcap magic at offset 0x%08X' % self.buffer.offset)
+        if result['magic']==0xa1b2c3d4:
+            self.start_of_file = self.offset
+            return result
+        
+        ## Its the wrong endianess, reread:
+        elif result['magic']==0xd4c3b2a1:
+            self.parameters['endianess']='b'
+            result=SimpleStruct.read(self)
+            self.start_of_file = self.offset
+            return result
 
-        self.start_of_file = self.offset
-        return result
+        ## Dont know the magic
+        raise IOError('This is not a pcap magic (%s) at offset 0x%08X' % (result['magic'], self.buffer.offset))
     
     def __iter__(self):
         self.offset = self.start_of_file
@@ -61,27 +72,31 @@ class FileHeader(SimpleStruct):
 
     def next(self):
         ## Try to read the next packet and return it:
-        p = Packet(self.buffer[self.offset:])
-        self.offset+=p.size()
-        return p
+        try:
+            p = Packet(self.buffer[self.offset:], endianess=self.parameters['endianess'])
+            self.offset+=p.size()
+            return p
+        except IOError:
+            raise StopIteration
         
 class Packet(SimpleStruct):
     """ Each packet is preceeded by this. """
     def init(self):
         self.fields = [
-            ['ts_sec', TIMESTAMP],    #      /* time stamp */
-            ['ts_usec', ULONG],       #      /* Time in usecs */
-            ['caplen', ULONG],        #      /* length of portion present */
-            ['length', ULONG],        #      /* length this packet (off wire) */
+            ['ts_sec',  TIMESTAMP, self.parameters],    #      /* time stamp */
+            ['ts_usec', ULONG,     self.parameters],    #      /* Time in usecs */
+            ['caplen',  ULONG,     self.parameters],    #      /* length of portion present */
+            ['length',  ULONG,     self.parameters],    #      /* length this packet (off wire) */
             ]
 
     def read(self):
         result=SimpleStruct.read(self)
-        s=BLOB(self.buffer[self.offset:],count=result['caplen'])
-        if s.size()!=result['caplen']:
+        caplen = int(result['caplen'])
+        s=RAW(self.buffer[self.offset:],count=caplen)
+        if s.size()!=caplen:
             raise IOError("Unable to read the last packet from the file (wanted %s, got %s). Is the file truncated?" % (result['caplen'], s.size()))
         
-        self.offset+=s.size()
+        self.offset+=caplen
         self.add_element(result, 'data', s)
 
         return result
@@ -94,3 +109,4 @@ if __name__ == "__main__":
     print pcap
     for packet in pcap:
         print packet
+#        print "%r" % packet['data']

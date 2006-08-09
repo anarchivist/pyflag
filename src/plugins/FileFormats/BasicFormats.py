@@ -3,6 +3,16 @@ from pyflag.format import *
 class BasicType(DataType):
     """ Base class for basic types that unpack understands """
     sql_type = "int"
+
+    def __init__(self,buffer,*args,**kwargs):
+        try:
+            if kwargs['endianess'].startswith('l'):
+                self.fmt = '<'+self.fmt[1:]
+            elif kwargs['endianess'].startswith('b'):
+                self.fmt = '>'+self.fmt[1:]
+        except KeyError:
+            pass
+        DataType.__init__(self,buffer,*args,**kwargs)
     
     def size(self):
         ## We consume 2 bytes here
@@ -52,6 +62,24 @@ class ULONG(BasicType):
     def __str__(self):
         return "%s (0x%X)" % (self.data,self.data)
 
+class LEWORD(WORD):
+    fmt = "<H"
+
+class LELONG(LONG):
+    fmt = "<l"
+
+class LEULONG(ULONG):
+    fmt = "<L"
+
+class BEWORD(WORD):
+    fmt = ">H"
+
+class BELONG(LONG):
+    fmt = ">l"
+
+class BEULONG(ULONG):
+    fmt = ">L"
+
 class LONGLONG(BasicType):
     fmt='=q'
     visible = True
@@ -88,6 +116,7 @@ class SimpleStruct(DataType):
 
     def __init__(self,buffer,*args,**kwargs):
         self.buffer = buffer
+        self.parameters = kwargs
         self.init()
             
         self.data={}
@@ -272,21 +301,6 @@ class LONG_ARRAY(ARRAY):
 
 class ULONG_ARRAY(ARRAY):
     target_class = ULONG
-
-class BLOB(ARRAY):
-    """ A Blob is an array of bytes which prints only printable chars. Non printable chars are printed as hex """
-    target_class=UBYTE
-
-    def __str__(self):
-        tmp = []
-        for i in range(self.count):
-            char = "%s" % self.data[i]
-            if char.isalnum() or char in '!@#$%^&*()_+-=;\'[]\,./<>?':
-                tmp.append(char)
-            else:
-                tmp.append('.')
-
-        return ''.join(tmp)
 
 class STRING(BYTE):
     visible = True

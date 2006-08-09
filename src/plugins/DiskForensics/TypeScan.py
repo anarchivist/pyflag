@@ -107,6 +107,7 @@ class ViewFileTypes(Reports.report):
                 tmp.image(image,width=image.width)
 
             tmp2 = result.__class__(result)
+            tmp2.decoration="raw"
             tmp2.link( tmp, target = 
                        FlagFramework.query_type((), case=query['case'],
                        inode=inode,
