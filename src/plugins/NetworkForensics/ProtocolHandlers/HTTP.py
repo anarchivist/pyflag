@@ -253,8 +253,8 @@ class HTTPScanner(StreamScannerFactory):
                     referer = p.request['referrer']
                 except KeyError:
                     referer = ''
-                
-            if not url.startswith("http://") or not url.startswith("ftp://"):
+
+            if not url.startswith("http://") and not url.startswith("ftp://"):
                 url = "http://%s%s" % (host, url)
             self.dbh.execute("insert into http set inode=%r, request_packet=%r, method=%r, url=%r, response_packet=%r, content_type=%r, date=%r, referrer=%r, host=%r",(new_inode, p.request.get("packet_id"), p.request.get("method"), url, p.response.get("packet_id"), p.response.get("content-type","text/html"), date, referer, host))
 

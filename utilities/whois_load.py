@@ -184,7 +184,7 @@ class Whois:
         if match:
           self.source, self.date = match.groups()
           if not self.date.isdigit():
-            self.date = ':'.join(["%i"% i for i in time.localtime()])
+            self.date = ':'.join(["%i"% i for i in time.localtime()[:6]])
         else:
           return None
       else:
@@ -192,7 +192,7 @@ class Whois:
         if match:
           self.whois = 1
           self.source = match.group(1)
-          self.date = ':'.join(["%i"% i for i in time.localtime()])
+          self.date = ':'.join(["%i"% i for i in time.localtime()[:6]])
         else:
           return None
 
@@ -256,13 +256,40 @@ dbh = DB.DBO(None)
 dbh.execute("drop table if exists whois_sources")
 dbh.execute("drop table if exists whois")
 dbh.execute("drop table if exists whois_routes")
-dbh.execute("CREATE TABLE IF NOT EXISTS whois_sources ( `id` int auto_increment, `source` varchar(20), `url` varchar(255), `updated` datetime, key(id))")
-dbh.execute("CREATE TABLE IF NOT EXISTS whois (`id` int auto_increment, `src_id` int, `start_ip` int(10) unsigned, `netname` varchar(50), `numhosts` int, `country` char(2), `adminc` varchar(50), `techc` varchar(50),`descr` varchar(255),`remarks` varchar(255), `status` enum('assigned','allocated','reserved','unallocated'), key(id))")
+dbh.execute("""CREATE TABLE IF NOT EXISTS whois_sources (
+`id` int auto_increment, `source` varchar(20),
+`url` varchar(255),
+`updated` datetime,
+key(id))""")
+dbh.execute("""CREATE TABLE IF NOT EXISTS whois (
+`id` int auto_increment,
+`src_id` int,
+`start_ip` int(10) unsigned,
+`netname` varchar(250),
+`numhosts` int,
+`country` char(2),
+`adminc` varchar(50),
+`techc` varchar(50),
+`descr` text,
+`remarks` text,
+`status` enum('assigned','allocated','reserved','unallocated'),
+key(id))""")
 dbh.execute("CREATE TABLE IF NOT EXISTS whois_routes ( `network` int(10) unsigned, `netmask` int(10) unsigned, `whois_id` int)")
 
 # add default (fallthrough) route and reserved ranges
-dbh.execute("INSERT INTO whois_sources VALUES ( 0, 'static', 'static', %r )", ':'.join(["%i"% i for i in time.localtime()]))
-dbh.execute("INSERT INTO whois VALUES (0,%s,0,0,'Default','--','','','Default Fallthrough Route: IP INVALID OR UNASSIGNED', '', 'unallocated')", str(dbh.cursor.lastrowid))
+dbh.execute("INSERT INTO whois_sources VALUES ( 0, 'static', 'static', %r )", ':'.join(["%i"% i for i in time.localtime()[:6]]))
+dbh.execute("""INSERT INTO whois set
+`id`=0,
+`src_id`=%r,
+`start_ip`=0,
+`netname`='Default',
+numhosts=0,
+country='--',
+adminc='',
+techc='',
+descr='Default Fallthrough Route: IP INVALID OR UNASSIGNED',
+remarks='',
+status='unallocated'""", str(dbh.cursor.lastrowid))
 dbh.execute("INSERT INTO whois_routes VALUES (0,0,%s)", str(dbh.cursor.lastrowid))
 
 # process files
