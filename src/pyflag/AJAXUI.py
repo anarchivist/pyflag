@@ -148,6 +148,8 @@ class AJAXUI(HTMLUI.HTMLUI):
             for x in tree_cb('/'+'/'.join(branch[:depth])):
                 if len(x[0])==0: continue
 
+                if not x[1]: continue
+
                 if x[2]=='branch':
                     isFolder='true'
                 else:

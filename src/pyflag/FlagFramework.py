@@ -446,6 +446,8 @@ class Flag:
         report_name = report.name
         report_doc  = report.__doc__
         def show_help(query,result):
+            result.decoration='naked'
+
             ## Try to use rst2html to produce nice looking html:
             try:
                 import docutils.core, textwrap
@@ -456,8 +458,7 @@ class Flag:
                 logging.log(logging.Error,"Error running docutils: %s" % e)
                 result.heading("Help for %s" % report_name)
                 result.text(report_doc)
-                result.decoration='naked'
-
+            
         import pyflag.TypeCheck as TypeCheck
 
         # First check authentication, do this always

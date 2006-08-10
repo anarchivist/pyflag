@@ -109,11 +109,9 @@ class Menu(Theme.BasicTheme):
             toolbar_str=ui.toolbar_ui.__str__()
 
         return " ".join(
-        (self.header % (title),self.preamble,
-         '''&nbsp </tr></table>\n''',
-         self.hilight_bar % (toolbar_str,''),
+        (self.preamble,
          "<table><tr><td>%s</td></tr></table>" % (data),
-         self.hilight_bar % (toolbar_str,''),self.footer))
+         ))
 
     def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None,ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
 

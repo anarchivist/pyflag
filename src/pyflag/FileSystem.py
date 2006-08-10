@@ -44,7 +44,7 @@ This inode therefore refers to the 14th file in the zip archive contained in ino
 Note that typically VFS modules go hand in hand with scanners, since scanner discover new files, calling VFSCreate on the filesystem to add them, and VFS drivers are used to read those from the Inode specifications.
 """
 import os,os.path
-import extractor
+#import extractor
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 

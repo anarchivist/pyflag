@@ -324,6 +324,17 @@ class DBO:
     def __iter__(self):
         return self
 
+    def insert(self, table, **fields):
+        """ A helper function to make inserting a little more
+        readable. This is especially good for lots of fields.
+        """
+        tmp = [table]
+        for k,v in fields.items():
+            tmp.extend([k,v])
+
+        sql = "insert into %s set " + ','.join( ['`%s`=%r'] * len(fields.keys()))
+        self.execute(sql, tmp)
+                    
     def mass_insert_start(self, table):
         self.mass_insert_cache = {}
         self.mass_insert_table = table

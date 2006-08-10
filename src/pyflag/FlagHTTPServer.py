@@ -194,6 +194,8 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                             self.headers.get('If-Modified-Since','')
                             )-time.timezone
 
+                        #print last_time, s.st_mtime, path
+
                         ## If the browsers idea of the modified time
                         ## is different that ours, we cant say it was
                         ## not modified and to be safe we return the

@@ -152,10 +152,10 @@ class HTMLUI(UI.GenericUI):
             
         ## Get the right theme
         theme=Theme.get_theme(q)
-        if self.decoration=='raw' or self.decoration=='js':
+        if self.decoration=='raw':
             return theme.raw_render(data=self.__str__(), ui=self,title=self.title)
         
-        if self.decoration=='naked':
+        if self.decoration=='naked' or self.decoration=='js':
             return theme.naked_render(data=self.__str__(), ui=self,title=self.title)
         else:
             return theme.render(q,meta=self.meta,data=self.__str__(),next=self.next , previous=self.previous , pageno=self.pageno, ui=self)

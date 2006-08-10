@@ -33,7 +33,7 @@ from NetworkScanner import *
 import pyflag.Reports as Reports
 import plugins.NetworkForensics.PCAPFS as PCAPFS
 import re,time
-
+import TreeObj
 
 def escape(uri):
     """ Make a filename from a URI by escaping / chars """
@@ -176,15 +176,18 @@ class HTTPScanner(StreamScannerFactory):
         ## content_type - The content type
         self.dbh.execute(
             """CREATE TABLE if not exists `http` (
-            `inode` VARCHAR( 255 ) NOT NULL ,
-            `request_packet` int not null,
-            `method` VARCHAR( 10 ) NOT NULL ,
-            `url` VARCHAR( 255 ) NOT NULL,
-            `response_packet` int not null,
-            `content_type` VARCHAR( 255 ) NOT NULL,
+            `id` INT(11) not null auto_increment,
+            `parent` INT(11) default 0 not null,
+            `inode` VARCHAR( 255 ) NULL ,
+            `request_packet` int null,
+            `method` VARCHAR( 10 ) NULL ,
+            `url` VARCHAR( 255 ) NULL,
+            `response_packet` int null,
+            `content_type` VARCHAR( 255 ) NULL,
             `referrer` VARCHAR(255) NULL,
             `date` int,
-            `host` VARCHAR(255)
+            `host` VARCHAR(255),
+            primary key (`id`)
             )""")
 
         self.dbh.check_index("http", "inode")
@@ -256,48 +259,141 @@ class HTTPScanner(StreamScannerFactory):
 
             if not url.startswith("http://") and not url.startswith("ftp://"):
                 url = "http://%s%s" % (host, url)
-            self.dbh.execute("insert into http set inode=%r, request_packet=%r, method=%r, url=%r, response_packet=%r, content_type=%r, date=%r, referrer=%r, host=%r",(new_inode, p.request.get("packet_id"), p.request.get("method"), url, p.response.get("packet_id"), p.response.get("content-type","text/html"), date, referer, host))
+
+            ## Find referred page:
+            parent = 0
+            if referer:
+                self.dbh.execute("select id from http where url=%r order by id desc limit 1", referer)
+                row = self.dbh.fetch()
+                if not row:
+                    self.dbh.insert("http", url=referer)
+                    parent = self.dbh.autoincrement()
+                else:
+                    parent = row['id']
+
+            self.dbh.insert('http',
+                            inode          = new_inode,
+                            request_packet = p.request.get("packet_id"),
+                            method         = p.request.get("method"),
+                            url            = url,
+                            response_packet= p.response.get("packet_id"),
+                            content_type   = p.response.get("content-type","text/html"),
+                            date           = date,
+                            referrer       = referer,
+                            host           = host,
+                            parent         = parent)                            
 
             ## Scan the new file using the scanner train. 
             self.scan_as_file(new_inode, factories)
         
 class BrowseHTTPRequests(Reports.report):
-    """ This allows users to search the HTTP Requests that were loaded as part of the PCAP File system.
+    """
+    Browse HTTP Requests
+    --------------------
+    
+    This allows users to search the HTTP Requests that were loaded as
+    part of the PCAP File system.
 
     This is the information we store about each http request:
 
-    <ul>
-    <li><b>inode</b> - the inode which represents the response to this request</li>
-    <li><b>request_packet</b> - the packet id the request was sent in</li>
-    <li><b>method</b> - method requested</li>
-    <li><b>url</b> - the URL requested (This is the fully qualified url with host header included if present).</li>
-    <li><b>response_packet</b> - the packet where the response was seen</li>
-    <li><b>content_type</b> - The content type of the response to this request.</li>
-    </ul>
+       - inode:
+         the inode which represents the response to this request
+
+       - request_packet:
+         the packet id the request was sent in
+         
+       - method:
+         method requested
+         
+       - url:
+         the URL requested (This is the fully qualified url with host header included if present).
+         
+       - response_packet:
+         the packet where the response was seen
+         
+       - content_type:
+         The content type of the response to this request.
+
+    HTTP Sessions
+    -------------
+
+    The HTTP Protocol is typically used to serve up HTML pages. The
+    HTML pages make references to other pages via hyperlinks, object
+    tags, image tags etc.
+
+    In a typical browsing session, the user follows from page to page
+    via a series of links. The browser notifies the web server of
+    where its previously been via the referer tag, or via cookies. The
+    path of navigation from page to page is thought of as a user
+    session.
+
+    In a forensic context, the user session places context around the
+    users activity with a clear timeline of events showing
+    progression, rather than treating each web request as an
+    individual discrete event.
+
+    This report shows the user sessions as deduced by the referer tags
+    or cookies.         
     """
     name = "Browse HTTP Requests"
     family = "Network Forensics"
     
     def display(self,query,result):    
         result.heading("Requested URLs")
-        result.table(
-            columns = ['from_unixtime(ts_sec,"%Y-%m-%d")','concat(from_unixtime(ts_sec,"%H:%i:%s"),".",ts_usec)','request_packet','inode','method','url', 'content_type'],
-            names = [ "Date","Time",  "Request Packet", 'Inode', "Method" ,"URL", "Content Type" ],
-            table=" http join pcap on request_packet=id ",
-            links = [
-            None,
-            None,
-            FlagFramework.query_type((),
-                                     family=query['family'], report="View Packet",
-                                     case=query['case'], __target__='id'),
-            FlagFramework.query_type((),
-                                     family="Disk Forensics",case=query['case'],
-                                     report="View File Contents",mode="Combined streams",
-                                     __target__="inode"),
-            ], 
-            case=query['case']
-            )
 
+        def tabular_view(query,result):
+            result.table(
+                columns = ['from_unixtime(ts_sec,"%Y-%m-%d")','concat(from_unixtime(ts_sec,"%H:%i:%s"),".",ts_usec)','request_packet','inode','method','url', 'content_type'],
+                names = [ "Date","Time",  "Request Packet", 'Inode', "Method" ,"URL", "Content Type" ],
+                table=" http join pcap on request_packet=pcap.id ",
+                links = [
+                None,
+                None,
+                FlagFramework.query_type((),
+                                         family=query['family'], report="View Packet",
+                                         case=query['case'], __target__='id'),
+                FlagFramework.query_type((),
+                                         family="Disk Forensics",case=query['case'],
+                                         report="View File Contents",mode="Combined streams",
+                                         __target__="inode"),
+                ], 
+                case=query['case']
+                )
+
+        def tree_view(query,result):
+            def tree_cb(path):
+                t = HTTPTree(path=path, case=query['case'], table='http')
+                for row in t.children():
+                    try:
+                        m=re.match("(http://|ftp://)([^/]+)/([^\?\&\=]+)",
+                                   "%s" % row['url'])
+                        if t['host']==m.group(2):
+                            result = m.group(3)
+                        else:
+                            result = row['url']
+                    except AttributeError:
+                        result=row['url']
+
+                    type = 'leaf'
+                    for children in row.children():
+                        type = 'branch'
+                        break
+
+                    yield(("%s" % row['id'],result,type))
+
+            def pane_cb(path, result):
+                t = HTTPTree(path=path, case=query['case'], table='http')
+                result.heading(t['url'])
+                for k,v in t.row.items():
+                    if v:
+                        result.row(k,v)
+
+            result.tree(tree_cb=tree_cb, pane_cb=pane_cb)
+
+        result.notebook(
+            names=['HTTP Requests','HTTP Sessions'],
+            callbacks = [tabular_view, tree_view]
+            )
 
 class Chunked(File):
     """ This reads chunked HTTP Streams.
@@ -353,3 +449,10 @@ class Chunked(File):
             length=self.size-self.tell()
             
         return self.cached_fd.read(length)
+
+class HTTPTree(TreeObj.TreeObj):
+    """ HTTP Requests can be thought of as forming a tree, relating
+    each request to its previous ones. The users select nodes in the
+    tree which causes more pages to be downloaded.
+    """
+    node_name = "id"

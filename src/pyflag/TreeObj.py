@@ -35,7 +35,7 @@ to work around something like:
 CREATE TABLE `tree` (
   `id` int(11) NOT NULL auto_increment,
   `name` varchar(250) NOT NULL,
-  `parent` int(11) NOT NULL,
+  `parent` int(11) default 0 NOT NULL,
   PRIMARY KEY  (`id`)
 )
 
@@ -43,6 +43,8 @@ CREATE TABLE `tree` (
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
+import os
+import pyflag.FlagFramework as FlagFramework
 
 class TreeObj:
     """ An abstract class to manage representing trees in the database"""
@@ -55,18 +57,18 @@ class TreeObj:
     ## The column which contains the parent id of this node
     parent_field = 'parent'
 
-    ## The name of the table
-    table = "tree"
+    ## Paths are delimited by this:
+    delimiter = '/'
 
-    ## The case the table is in (we expect it to be there)
-    case  = "demo"
-
-    def __init__(self, id=None, **node):
+    def __init__(self, case=None, table=None, id=None, path=None, **node):
         """ Retrieve or create the node with the id given.
 
         if id is given we retrieve said node, else we create a new
         node with fields as in the dictionary 'node'.
         """
+        self.case = case
+        self.table = table
+        
         dbh = DB.DBO(self.case)
         if id!=None:
             dbh.execute("select * from %s where `%s`=%r",(self.table, self.key, id))
@@ -75,7 +77,20 @@ class TreeObj:
                 raise IOError("Can not find node with id %s" % id)
 
             self.id = self.row[self.key]
+        elif path!=None:
+            parent = 0
+            branches = ['']+FlagFramework.splitpath(path)
+            for name in branches:
+                dbh.execute("select * from `%s` where `%s`=%r and `%s`=%r",
+                            (self.table, self.parent_field,
+                             parent, self.node_name, name))
+                self.row = dbh.fetch()
+                if not self.row:
+                    raise IOError("Can not find path element %s" % name)
+                
+                parent = self.row[self.key]
 
+            self.id = self.row[self.key]
         else:
             self.id = self.new_node(node)
             self.row = node
@@ -110,7 +125,7 @@ class TreeObj:
         dbh = DB.DBO(self.case)
         dbh.execute("select id from %s where `%s`=%r",(self.table, self.parent_field, self.id))
         for row in dbh:
-            yield self.__class__(id=row[self.key])
+            yield self.__class__(id=row[self.key], case=self.case, table=self.table)
 
     def get_root(self):
         """ Follow our parent until we reach the root. Returns the root node """
@@ -124,4 +139,13 @@ class TreeObj:
 
             id=row[self.parent_field]
 
-        return self.__class__(id=id)
+        return self.__class__(id=id, case=self.case, table=self.table)
+
+    def __getitem__(self,item):
+        return self.row[item]
+
+    def __setitem__(self, item, value):
+        dbh = DB.DBO(self.case)
+        dbh.execute("update `%s` set `%s`=%r where `%s`=%r",
+                    (self.table, item, value, self.key, self.id))
+        self.row[item]=value

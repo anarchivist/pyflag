@@ -15,7 +15,7 @@ class AJAX(Menu):
         <title>%s</title>
         <link rel="stylesheet" type="text/css" href="images/ajax_ui.css" />
         <script type="text/javascript">
-        var djConfig = { isDebug: true, baseScriptUri: "/javascript/", debugAtAllCosts:true };
+        var djConfig = { isDebug: true, baseScriptUri: "/javascript/", debugAtAllCosts: false };
         </script>
         <script type="text/javascript" src="/javascript/dojo.js"></script>
  

@@ -123,6 +123,7 @@ int main(int argc, char **argv) {
       break;
     case 'p':
       packet_id = atol(optarg);
+      break;
     default:
       printUsage();
       exit(0);
