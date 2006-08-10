@@ -80,24 +80,30 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
     We store a limited cache of rows client side, and fetch rows from
     the server when needed.
     """
-    _last_executed = None
 
     def __init__(self, connection):
         MySQLdb.cursors.SSDictCursor.__init__(self, connection)
-        self._row_cache = []
+        self.py_row_cache = []
         ## Maximum size of client cache
-        self.cache_size = 10
-        
+        self.py_cache_size = 10
+        self._last_executed = None
+
+    def execute(self,string):
+        self.py_row_cache = []
+        self.py_cache_size = 10
+        self._last_executed = string
+        MySQLdb.cursors.SSDictCursor.execute(self,string)
+
     def fetchone(self):
         """ Updates the row cache if needed otherwise returns a single
         row from it.
         """
         self._check_executed()
-        if len(self._row_cache)==0:
-            self._row_cache = list(self._fetch_row(self.cache_size))
+        if len(self.py_row_cache)==0:
+            self.py_row_cache = list(self._fetch_row(self.py_cache_size))
 
         try:
-            result = self._row_cache.pop(0)
+            result = self.py_row_cache.pop(0)
             self.rownumber = self.rownumber + 1
             return result
         except IndexError:
@@ -131,7 +137,7 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
                     else:
                         logging.log(logging.DEBUG,"Mysql issued warnings but we are unable to drain result queue")
 
-                self._row_cache.extend(results)
+                self.py_row_cache.extend(results)
                 
             except Exception,e:
                 pass

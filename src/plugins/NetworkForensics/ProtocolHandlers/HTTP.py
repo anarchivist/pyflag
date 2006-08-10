@@ -365,15 +365,24 @@ class BrowseHTTPRequests(Reports.report):
                 t = HTTPTree(path=path, case=query['case'], table='http')
                 for row in t.children():
                     try:
-                        m=re.match("(http://|ftp://)([^/]+)/([^\?\&\=]+)",
+                        m=re.match("(http://|ftp://)([^/]+)([^\?\&\=]*)",
                                    "%s" % row['url'])
-                        if t['host']==m.group(2):
-                            result = m.group(3)
+                        child_host = m.group(2)
+                        child_uri = m.group(3)
+
+                        m=re.match("(http://|ftp://)([^/]+)([^\?\&\=]*)",
+                                   "%s" % t['url'])
+
+                        parent_host = m.group(2)
+                        
+                        if parent_host==child_host:
+                            result = child_uri
                         else:
                             result = row['url']
                     except AttributeError:
                         result=row['url']
 
+                    type='branch'
                     type = 'leaf'
                     for children in row.children():
                         type = 'branch'

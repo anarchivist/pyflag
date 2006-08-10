@@ -79,11 +79,17 @@ class TreeObj:
             self.id = self.row[self.key]
         elif path!=None:
             parent = 0
-            branches = ['']+FlagFramework.splitpath(path)
+            branches = FlagFramework.splitpath(path)
+            if not branches:
+                self.id = 0
+                self.row = {self.parent_field: 0}
+                return
+            
             for name in branches:
                 dbh.execute("select * from `%s` where `%s`=%r and `%s`=%r",
                             (self.table, self.parent_field,
                              parent, self.node_name, name))
+                    
                 self.row = dbh.fetch()
                 if not self.row:
                     raise IOError("Can not find path element %s" % name)
@@ -123,7 +129,8 @@ class TreeObj:
     def children(self):
         """ Generates all our children """
         dbh = DB.DBO(self.case)
-        dbh.execute("select id from %s where `%s`=%r",(self.table, self.parent_field, self.id))
+        dbh.execute("select `%s` from %s where `%s`=%r",
+                    (self.key, self.table, self.parent_field, self.id))
         for row in dbh:
             yield self.__class__(id=row[self.key], case=self.case, table=self.table)
 
@@ -142,7 +149,7 @@ class TreeObj:
         return self.__class__(id=id, case=self.case, table=self.table)
 
     def __getitem__(self,item):
-        return self.row[item]
+        return self.row.get(item, None)
 
     def __setitem__(self, item, value):
         dbh = DB.DBO(self.case)
