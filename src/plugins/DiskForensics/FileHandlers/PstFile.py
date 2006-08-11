@@ -50,7 +50,8 @@ class PstScan(GenScanFactory):
     class Drawer(Scanner.Drawer):
         description = "File Type Related Scanners"
         name = "File Scanners"
-        contains = [ 'PstScan','IEIndex', 'RegistryScan', 'TypeScan', 'DLLScan']
+        contains = [ 'PstScan','IEIndex', 'RegistryScan', 'TypeScan', 'DLLScan',
+                     'ExtractorScan' ]
         default = True
 
         # Let's check if this external tool exists into the PATH and then add it to the Drawer
@@ -104,7 +105,8 @@ class PstScan(GenScanFactory):
 
                 inode is fully qualified inode (e.g. D12|Pxxxx.0)
                 """
-                fd = PstFile(self.dbh.case, self.fd, inode, dbh=self.dbh)
+                fd = self.ddfs.open(inode=inode)
+#                fd = PstFile(self.dbh.case, self.fd, inode, dbh=self.dbh)
 #                fd = StringIO.StringIO(item.read())
 #                fd.inode=inode
                 Scanner.scanfile(self.ddfs,fd,self.factories)               

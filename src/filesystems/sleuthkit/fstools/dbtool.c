@@ -326,13 +326,13 @@ print_dent2(FILE *hFile, FS_DENT *fs_dent, int flags, FS_INFO *fs,
 			    (strcmp(fs_data->name, "$Data") != 0)) ||
 			   ((fs_data->type == NTFS_ATYPE_IDXROOT) && 
 			    (strcmp(fs_data->name, "$I30") != 0))) ) {
-            fprintf(hFile, "INSERT INTO file VALUES('I%s|D%llu-%i-%i','%s','%s','%s/%s','%s:%s');\n", 
+            fprintf(hFile, "INSERT INTO file (`inode`,`mode`, `status`, `path`, `name`) VALUES('I%s|D%llu-%i-%i','%s','%s','%s/%s','%s:%s');\n", 
 		    iosource,
 		    fs_dent->inode, fs_data->type, fs_data->id,
 		    t1,t2,mount_point,t3,t4,t5);
 
 	  } else {
-	    fprintf(hFile, "INSERT INTO file VALUES('I%s|D%llu-%i-%i','%s','%s','%s/%s','%s');\n", 
+	    fprintf(hFile, "INSERT INTO file (`inode`,`mode`, `status`, `path`, `name`) VALUES('I%s|D%llu-%i-%i','%s','%s','%s/%s','%s');\n", 
 		    iosource,
 		    fs_dent->inode, fs_data->type, fs_data->id, 
 		    t1,t2,mount_point,t3,t4);
@@ -341,7 +341,7 @@ print_dent2(FILE *hFile, FS_DENT *fs_dent, int flags, FS_INFO *fs,
 
 	  //No Data stream
 	} else {	    
-	  fprintf(hFile, "INSERT INTO file VALUES('I%s|D%llu','%s','%s','%s/%s','%s');\n", 
+	  fprintf(hFile, "INSERT INTO file (`inode`,`mode`, `status`, `path`, `name`) VALUES('I%s|D%llu','%s','%s','%s/%s','%s');\n", 
 		  iosource,
 		  fs_dent->inode,
 		  t1,t2,mount_point,t3,t4); 
@@ -419,8 +419,15 @@ print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
 					run.next = NULL;
 					ptr = &run;
 					
-					printf("INSERT INTO inode VALUES('I%s|D%lu-%d-%d','%c','%d','%d','%lu'," \
-					       "'%lu','%lu',%lu,'%lo','%d','%s','%lu','');\n",
+					printf("INSERT INTO inode "
+					       "(`inode`,`status`,`uid`,"
+					       " `gid`,`mtime`,`atime`,"
+					       " `ctime`,`dtime`,`mode`,"
+					       " `links`,`link`,`size`) "
+					       " VALUES('I%s|D%lu-%d-%d',"
+					       "'%c','%d','%d','%lu',"
+					       "'%lu','%lu',%lu,'%lo',"
+					       "'%d','%s','%lu');\n",
 					       iosource,
 					       (ULONG) fs_inode->addr, fs_data->type, fs_data->id,
 					       (flags & FS_FLAG_META_ALLOC) ? 'a' : 'f',
@@ -442,8 +449,13 @@ print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
 	}
 	else {
 
-	  printf("INSERT INTO inode VALUES('I%s|D%lu','%c','%d','%d','%lu'," \
-		 "'%lu','%lu',%lu,'%lo','%d','%s','%lu','');\n",
+	  printf("INSERT INTO inode "
+		 "(`inode`,`status`,`uid`,"
+		 " `gid`,`mtime`,`atime`,"
+		 " `ctime`,`dtime`,`mode`,"
+		 " `links`,`link`,`size`) "
+		 "VALUES('I%s|D%lu','%c','%d','%d','%lu'," \
+		 "'%lu','%lu',%lu,'%lo','%d','%s','%lu');\n",
 		 iosource,
 		 (ULONG) fs_inode->addr, (flags & FS_FLAG_META_ALLOC) ? 'a' : 'f',
 		 (int) fs_inode->uid, (int) fs_inode->gid,

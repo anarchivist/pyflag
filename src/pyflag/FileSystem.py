@@ -118,9 +118,11 @@ class FileSystem:
 
         if not inode:
             inode = self.lookup(path)
+
         if not inode:
             raise IOError('Inode not found for file')
 
+        inode_id = self.lookup_id(inode)
         ## We should be allowed to open inodes which do not exist in
         ## the filesystem proper, but the VFS may be able to do
         ## something with them -- all it means is that we cant really
@@ -143,6 +145,7 @@ class FileSystem:
             except IndexError:
                 raise IOError, "Unable to open inode: %s, no VFS" % part
 
+        retfd.inode_id = inode_id
         return retfd
 
     def istat(self, path=None, inode=None):
@@ -192,6 +195,7 @@ class DBFS(FileSystem):
         scanners = [ "%r" % s.__name__ for s in Registry.SCANNERS.classes ]
     
         self.dbh.execute("""CREATE TABLE IF NOT EXISTS inode (
+        `inode_id` int auto_increment,
         `inode` VARCHAR(250) NOT NULL,
         `status` set('unalloc','alloc'),
         `uid` INT,
@@ -204,7 +208,8 @@ class DBFS(FileSystem):
         `links` INT,
         `link` TEXT,
         `size` BIGINT NOT NULL,
-        `scanner_cache` set('',%s)
+        `scanner_cache` set('',%s),
+        primary key (inode_id)
         )""",",".join(scanners))
 
         self.dbh.execute("""CREATE TABLE IF NOT EXISTS file (
@@ -230,6 +235,21 @@ class DBFS(FileSystem):
         `value` MEDIUMTEXT NOT NULL ,
         KEY ( `iosource` )
         )""")
+
+        ## Create the xattr table by interrogating libextractor:
+        types = ['Magic']
+        try:
+            import extractor
+            e = extractor.Extractor()
+            types.extend(e.keywordTypes())
+        except ImportError:
+            pass
+
+        self.dbh.execute("""CREATE TABLE `xattr` (
+                            `inode_id` INT NOT NULL ,
+                            `property` ENUM( %s ) NOT NULL ,
+                            `value` VARCHAR( 250 ) NOT NULL
+                            ) """ % ','.join([ "%r" % x for x in types]))
         
         ## Ensure the VFS contains the mount point:
         self.VFSCreate(None, "I%s" % iosource_name, mount_point, directory=True)
@@ -329,7 +349,15 @@ class DBFS(FileSystem):
         self.dbh.execute("select name, mode, status from file where path=%r order by name" % ( path))
         for i in self.dbh:
             yield(i)
-    
+
+    def lookup_id(self, inode):
+        self.dbh.execute("select inode_id from inode where inode=%r", inode)
+        res = self.dbh.fetch()
+        try:
+            return res["inode_id"]
+        except:
+            return None
+
     def lookup(self, path=None,inode=None):
         if path:
             dir,name = os.path.split(path)
@@ -355,7 +383,7 @@ class DBFS(FileSystem):
             inode = self.lookup(path)
         if not inode:
             return None
-        self.dbh.execute("select inode, status, uid, gid, mtime as mtime_epoch, from_unixtime(mtime) as `mtime`, atime as atime_epoch, from_unixtime(atime) as `atime`, ctime as ctime_epoch, from_unixtime(ctime) as `ctime`, from_unixtime(dtime) as `dtime`, mode, links, link, size from inode where inode=%r limit 1",(inode))
+        self.dbh.execute("select inode_id, inode, status, uid, gid, mtime as mtime_epoch, from_unixtime(mtime) as `mtime`, atime as atime_epoch, from_unixtime(atime) as `atime`, ctime as ctime_epoch, from_unixtime(ctime) as `ctime`, from_unixtime(dtime) as `dtime`, mode, links, link, size from inode where inode=%r limit 1",(inode))
         row = self.dbh.fetch()
 
         self.dbh.execute("select * from file where inode=%r order by mode limit 1", inode);
