@@ -322,7 +322,7 @@ class DBO:
         #If anything went wrong we raise it as a DBError
         except Exception,e:
             str = "%s" % e
-            if 'Commands out of sync' in str:
+            if 'Commands out of sync' in str or 'server has gone away' in str:
                 logging.log(logging.VERBOSE_DEBUG,
                             "Got DB Error: %s, %s" % (str,self.dbh))
 

@@ -363,7 +363,7 @@ FILE *fopen(const char *path, const char *mode) {
 
   CHECK_INIT;
 
-  if( context == HOOKED) {
+  if( context == HOOKED && iosubsys) {
     if(mode[0]=='r') {
       return ((FILE *)open(path,O_RDONLY));
     };
@@ -390,6 +390,9 @@ FILE *fdopen(int fd, const char *mode) {
 size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream) 
 {
   CHECK_INIT;
+
+  if( context == UNHOOKED || !iosubsys)
+    return dispatch->fread(ptr,size,nmemb,stream);
 
   //Stream is actually a hooked io subsys
   if((unsigned int)stream<256) {

@@ -111,7 +111,7 @@ class HTTP:
             skip = int(headers['content-length'])
             self.fd.read(skip)
             return
-        except KeyError:
+        except ValueError:
             pass
 
         try:
