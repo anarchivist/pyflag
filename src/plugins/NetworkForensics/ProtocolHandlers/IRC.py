@@ -437,10 +437,10 @@ class IRC:
         fd is the file descriptor.
         """
         offset = self.fd.tell()
-        ## We test 3 lines:
+        ## We test 5 lines:
         count = 0
         try:
-            while count<3:
+            while count<5:
                 count+=1
                 line=self.fd.readline().strip()
                 m = self.regex.match(line)

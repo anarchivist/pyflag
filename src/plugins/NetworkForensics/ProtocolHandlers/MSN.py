@@ -151,8 +151,18 @@ class message:
         """
         if not sessionid:
             sessionid=self.session_id
-        self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r,sender=%r,recipient=%r,type=%r,transaction_id=%r,data=%r,session_id=%r,p2p_file=%r",
-                          (self.fd.inode,self.get_packet_id(),sender,recipient,type,tr_id,data,sessionid,p2pfile))
+
+        self.dbh.insert("msn_session",
+                        inode=self.fd.inode,
+                        packet_id=self.get_packet_id(),
+                        sender=sender,
+                        recipient=recipient,
+                        type=type,
+                        transaction_id=tr_id,
+                        data=data,
+                        session_id=sessionid,
+                        p2p_file= p2pfile,
+                        )
         
     def insert_user_data(self,nick,data_type,data,tr_id=-1,sessionid=None):
         """
@@ -234,7 +244,6 @@ class message:
         
         
     def parse(self):
-
         """ We parse the first message from the file like object in
         fp, thereby consuming it"""
         
@@ -1235,9 +1244,13 @@ class message:
 
                 context = safe_base64_decode(headers['context'])
 
-                self.dbh.execute("insert into msn_p2p set session_id = %r, channel_id = %r, to_user= %r, from_user= %r, context=%r",
-                                 (self.session_id,headers['sessionid'],
-                                  headers['to'],headers['from'],context))
+                self.dbh.insert("msn_p2p",
+                                session_id = self.session_id,
+                                channel_id = headers['sessionid'],
+                                to_user= headers['to'],
+                                from_user= headers['from'],
+                                context=context,
+                                )
                 
                 ## Add a VFS entry for this file:
                 new_inode = "CMSN%s-%s" % (headers['sessionid'],

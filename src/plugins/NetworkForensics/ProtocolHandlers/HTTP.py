@@ -152,6 +152,21 @@ class HTTP:
                 end = self.fd.tell()
                 yield "%s:%s" % (offset, end-offset)
 
+    def identity(self):
+        offset = self.fd.tell()
+        ## Currently the HTTP scanner needs both sides of the
+        ## conversation to work properly. So we must have a request
+        ## header. We try to resync if we are given a partial HTTP/1.1
+        ## stream by looking ahead for a HTTP request. We check the
+        ## first 1024 bytes.
+        header = self.fd.read(1024)
+        m = self.request_re.search(header)
+        if m:
+            self.fd.seek(offset+m.start())
+            return True
+
+        return False
+        
 class HTTPScanner(StreamScannerFactory):
     """ Collect information about HTTP Transactions.
     """
@@ -204,20 +219,27 @@ class HTTPScanner(StreamScannerFactory):
             return 0
 
     def process_stream(self, stream, factories):
-        forward_stream, reverse_stream = self.stream_to_server(stream, "HTTP")
-        if not reverse_stream or not forward_stream: return
-
-        combined_inode = "I%s|S%s/%s" % (stream.fd.name, forward_stream, reverse_stream)
-        logging.log(logging.DEBUG,"Openning %s for HTTP" % combined_inode)
+        """ We look for HTTP requests to identify the stream. This
+        allows us to processes HTTP connections on unusual ports. This
+        situation might arise if HTTP proxies are used for example.
+        """
+        ## We only want to process the combined stream once:
+        if stream.con_id>stream.reverse: return
+        combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.con_id, stream.reverse)
 
         fd = self.fsfd.open(inode=combined_inode)
         p=HTTP(fd,self.dbh,self.fsfd)
+        ## Check that this is really HTTP
+        if not p.identity():
+            return
+        
+        logging.log(logging.DEBUG,"Openning %s for HTTP" % combined_inode)
         ## Iterate over all the messages in this connection
         for f in p.parse():
             if not f: continue
 
             ## Create the VFS node:
-            path=self.fsfd.lookup(inode="I%s|S%s" % (stream.fd.name, forward_stream))
+            path=self.fsfd.lookup(inode="I%s|S%s" % (stream.fd.name, stream.con_id))
             path=os.path.dirname(path)
             new_inode="%s|o%s" % (combined_inode,f)
 
