@@ -181,17 +181,17 @@ class HTTPScanner(StreamScannerFactory):
             `inode` VARCHAR( 255 ) NULL ,
             `request_packet` int null,
             `method` VARCHAR( 10 ) NULL ,
-            `url` VARCHAR( 255 ) NULL,
+            `url` text NULL,
             `response_packet` int null,
             `content_type` VARCHAR( 255 ) NULL,
-            `referrer` VARCHAR(255) NULL,
+            `referrer` text NULL,
             `date` int,
             `host` VARCHAR(255),
             primary key (`id`)
             )""")
 
         self.dbh.check_index("http", "inode")
-        self.dbh.check_index("http", "url")
+        self.dbh.check_index("http", "url", 100)
         
     def reset(self, inode):
         self.dbh.execute("drop table if exists http")

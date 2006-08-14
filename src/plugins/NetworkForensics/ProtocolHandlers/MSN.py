@@ -154,7 +154,7 @@ class message:
         self.dbh.execute("insert into msn_session set inode=%r, packet_id=%r,sender=%r,recipient=%r,type=%r,transaction_id=%r,data=%r,session_id=%r,p2p_file=%r",
                           (self.fd.inode,self.get_packet_id(),sender,recipient,type,tr_id,data,sessionid,p2pfile))
         
-    def insert_user_data(self,nick,data_type,data,tr_id=None,sessionid=None):
+    def insert_user_data(self,nick,data_type,data,tr_id=-1,sessionid=None):
         """
         Insert user data into the table.  We only keep each type of
         user data once for each stream and session, otherwise we get
@@ -164,8 +164,16 @@ class message:
         """
         if not sessionid:
             sessionid=self.session_id
+
         try:
-            self.dbh.execute("""insert into msn_users set inode=%r,packet_id=%r,transaction_id=%r,session_id=%r,nick=%r,user_data_type=%r,user_data=%r""",(self.fd.inode,self.get_packet_id(),tr_id,sessionid,nick,data_type,data))
+            self.dbh.insert("msn_users",
+                           inode=self.fd.inode,
+                           packet_id=self.get_packet_id(),
+                           transaction_id=tr_id,
+                           session_id=session_id,
+                           nick=nick,
+                           user_data_type=data_type,
+                           user_data=data)
         except:
             #We have duplicate user data,
             #logging.log(logging.VERBOSE_DEBUG, "Ignoring data as duplicate:%s,%s,%s" % (nick,data_type,data))

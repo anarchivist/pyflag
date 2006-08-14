@@ -256,11 +256,8 @@ class Extractor(object):
 	    return self.extracted
 
 	while True:
-	    keyword_type = libextractor.EXTRACTOR_getKeywordTypeAsString(self.keywords.keywordType).decode(EXTRACTOR_ENCODING)
+	    keyword_type = libextractor.EXTRACTOR_getKeywordTypeAsString(self.keywords.keywordType)
 	    keyword = self.keywords.keyword
-	    
-	    if not isBinaryType(self.keywords.keywordType):
-		keyword = keyword.decode(EXTRACTOR_ENCODING)
 		
 	    self.extracted.append((keyword_type, keyword))
 	    try:
@@ -340,9 +337,7 @@ class Extractor(object):
 	()
 	"""
 	self._libraries = {}
-	if self.extractors:
-	    libextractor.EXTRACTOR_removeAll(self.extractors)
-	    self.extractors = None
+        self.extractors = None
 	
     def keywordTypes(self):
 	"""

@@ -311,11 +311,41 @@ class IRC:
         619: "Reply: ENDOFDCCLIST",
         620: "Reply: DCCINFO",
         999: "Error: NUMERIC_ERR",
+        "NOTICE": 1,
+        "SERVER":1,
+        "OPER":1,
+        "QUIT":1,
+        "SQUIT":1,
+        "JOIN":1,
+        "PART":1,
+        "MODE":1,
+        "TOPIC":1,
+        "NAMES":1,
+        "LIST":1,
+        "INVITE":1,
+        "KICK":1,
+        "VERSION":1,
+        "STATS":1,
+        "LINKS":1,
+        "TIME":1,
+        "CONNECT":1,
+        "TRACE":1,
+        "ADMIN":1,
+        "INFO":1,
+        "PRIVMSG":1,
+        "WHO":1,
+        "WHOIS":1,
+        "WHOWAS":1,
+        "KILL":1,
+        "PING":1,
+        "PONG":1,
+        "ERROR":1,
         }
 
     def __init__(self,fd,dbh):
         self.fd=fd
         self.dbh = dbh
+        self.regex = re.compile("(?::([^ ]+) )?([^ ]+)(?: (.*))?")
 
     def rewrite_reply(self,prefix,command,line):
         return line, self.command_lookup[command]+"(%s)" % command
@@ -346,6 +376,9 @@ class IRC:
             short_name,prefix,base_stream_inode, packet_id,
             line, command, recipient 
             ))
+
+    def NOOP(self, prefix,command,line):
+        return line, command
 
     password = ''
     def PASS(self,prefix,command,line):
@@ -386,19 +419,67 @@ class IRC:
         self.store_command(prefix,command,line)
 
     def parse(self):
-        regex = re.compile("(?::([^ ]+) )?([^ ]+)(?: (.*))?")
-        
         while 1:
             line = self.fd.readline().strip()
             if len(line)==0: break
             try:
-                m=regex.match(line)
+                m=self.regex.match(line)
                 ## Dispatch a command handler:
                 self.dispatch(m.group(1),m.group(2),m.group(3))
             except IndexError,e:
                 logging.log(logging.WARNINGS, "unable to parse line %s (%s)" % (line,e))
                 
+    def identify(self):
+        """ Given a small extract from the combined stream, we try to
+        identify it as IRC. This is used to identify IRC operating on
+        a different port than usual.
 
+        fd is the file descriptor.
+        """
+        offset = self.fd.tell()
+        ## We test 3 lines:
+        count = 0
+        try:
+            while count<3:
+                count+=1
+                line=self.fd.readline().strip()
+                m = self.regex.match(line)
+                if not m:
+                    return False
+
+                command = m.group(2)
+
+                # Do we need to allow for some errors? just in case? 
+                # currently we bail on the first error.
+                try:
+                    ## First try an integer command
+                   self.command_lookup[int(command)]
+                   continue
+                except (KeyError,ValueError):
+                    ## Is it a NOOP Command?
+                    try:
+                        self.command_lookup[command]
+                        continue
+                    except KeyError:
+                        pass
+                
+                ## Ok, maybe the command is a word:
+                try:
+                    if getattr(self, command):
+                        continue
+                except AttributeError:
+                    pass
+                    
+                ## No valid commands found
+                return False
+
+            ## Ok - maybe this is IRC afterall
+            return True
+
+        ## Ensure we do not upset the seek position of the file.
+        finally:
+            self.fd.seek(offset)
+            
 class IRCScanner(StreamScannerFactory):
     """ Collect information about IRC traffic """
     default = True
@@ -407,13 +488,13 @@ class IRCScanner(StreamScannerFactory):
         self.dbh.execute(
             """CREATE TABLE if not exists `irc_messages` (
             `id` int auto_increment,
-            `sender` VARCHAR( 250 ) NOT NULL ,
+            `sender` VARCHAR( 255 ) NOT NULL ,
             `full_sender` VARCHAR( 255 ) NOT NULL ,
-            `recipient` VARCHAR(50),
+            `recipient` VARCHAR(255),
             `command` VARCHAR(255) NOT NULL,
-            `inode` VARCHAR(250) NOT NULL,
+            `inode` VARCHAR(255) NOT NULL,
             `packet_id` INT,
-            `session` VARCHAR(250),
+            `session` VARCHAR(255),
             `data` TEXT NOT NULL,
             key(id)
             )""")
@@ -440,17 +521,19 @@ class IRCScanner(StreamScannerFactory):
             )""")
 
     def process_stream(self, stream, factories):
-        forward_stream, reverse_stream = self.stream_to_server(stream, "IRC")
-        if not reverse_stream or not forward_stream: return
-
-        combined_inode = "I%s|S%s/%s" % (stream.fd.name, forward_stream, reverse_stream)
-        logging.log(logging.DEBUG,"Openning %s for IRC" % combined_inode)
-
-        ## We open the file and scan it for IRC:
+        ## We only want to process the combined stream once:
+        if stream.con_id>stream.reverse: return
+        
+        combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.con_id, stream.reverse)
+        ## Check to see if this is an IRC stream at all:
         fd = self.fsfd.open(inode=combined_inode)
         irc=IRC(fd,self.dbh)
+        if not irc.identify():
+            return
+        
+        logging.log(logging.DEBUG,"Openning %s for IRC" % combined_inode)
         irc.parse()
-                    
+            
 class BrowseIRCChat(Reports.report):
     """ This allows chat messages to be browsed. """
     name = "Browse IRC Chat"

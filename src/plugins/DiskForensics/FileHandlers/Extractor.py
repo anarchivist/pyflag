@@ -27,8 +27,8 @@ try:
                 for pair in meta:
                     self.dbh.insert("xattr",
                                     inode_id = self.fd.inode_id,
-                                    property = pair[0].encode('ascii','replace'),
-                                    value = pair[1].encode('ascii','replace')
+                                    property = pair[0],
+                                    value = pair[1],
                                     )
 
 
