@@ -937,6 +937,9 @@ class HTMLUI(UI.GenericUI):
 
         dbh = DB.DBO(case)
 
+        ## We dont want this query to take too long:
+        dbh.cursor.timeout = config.TABLE_QUERY_TIMEOUT
+
         #Do the query, and find out the names of all the columns
         dbh.execute(query_str)
 

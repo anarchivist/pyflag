@@ -95,3 +95,6 @@ PYFLAG_MAX_SESSION_AGE=100000
 
 ## The encodings that will be searched on in the index scanner
 PYFLAG_INDEX_ENCODINGS=UTF-8,UTF-16LE
+
+## The table widget will not wait this long for a query:
+PYFLAG_TABLE_QUERY_TIMEOUT=20

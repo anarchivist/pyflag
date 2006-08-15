@@ -81,13 +81,15 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
     We store a limited cache of rows client side, and fetch rows from
     the server when needed.
     """
-
     def __init__(self, connection):
         MySQLdb.cursors.SSDictCursor.__init__(self, connection)
         self.py_row_cache = []
         ## Maximum size of client cache
         self.py_cache_size = 10
         self._last_executed = None
+
+        ## By default queries are allowed to take a long time
+        self.timeout = 3600
 
     def kill_connection(self, what=''):
         dbh = DBO()
@@ -105,7 +107,7 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
             logging.log(logging.WARNINGS, "Killing query in thread %s because it took too long" % self.connection.thread_id())
             self.kill_connection('query')
             
-        t = threading.Timer(5.0, cancel)
+        t = threading.Timer(self.timeout, cancel)
         t.start()
         try:
             MySQLdb.cursors.SSDictCursor.execute(self,string)
