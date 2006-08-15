@@ -37,6 +37,7 @@ import time,types
 import threading
 from Queue import Queue, Full, Empty
 from MySQLdb.constants import FIELD_TYPE
+import threading
 
 db_connections=0
 
@@ -88,11 +89,29 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
         self.py_cache_size = 10
         self._last_executed = None
 
+    def kill_connection(self, what=''):
+        dbh = DBO()
+        try:
+            dbh.execute("kill %s %s" % (what,self.connection.thread_id()))
+        except:
+            pass
+
     def execute(self,string):
         self.py_row_cache = []
         self.py_cache_size = 10
         self._last_executed = string
-        MySQLdb.cursors.SSDictCursor.execute(self,string)
+        
+        def cancel():
+            logging.log(logging.WARNINGS, "Killing query in thread %s because it took too long" % self.connection.thread_id())
+            self.kill_connection('query')
+            
+        t = threading.Timer(5.0, cancel)
+        t.start()
+        try:
+            MySQLdb.cursors.SSDictCursor.execute(self,string)
+        finally:
+            t.cancel()
+            t.join()
 
     def fetchone(self):
         """ Updates the row cache if needed otherwise returns a single
@@ -114,7 +133,7 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
 
     def _warning_check(self):
         """ We need to override this because for some cases it issues
-        a SHOW WARININGS query. Which will raise an 'out of sync
+        a SHOW WARNINGS query. Which will raise an 'out of sync
         error' when we operate in SS. This is a most sane approach -
         when warnings are detected, we simply try to drain the
         resultsets and then read the warnings.
@@ -307,8 +326,9 @@ class DBO:
 
                 ## We terminate the current connection and reconnect
                 ## to the DB
+                self.cursor.kill_connection()
                 del self.dbh
-
+                
                 global db_connections
                 db_connections -=1
 
