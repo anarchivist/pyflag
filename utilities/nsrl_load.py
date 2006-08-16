@@ -44,17 +44,25 @@ parser.add_option("-p", "--path", default=None,
 parser.add_option("-d", "--db", default=None,
                   help = "The Database to load NSRL into")
 
-parser.add_option('-i', '--index',default=None,
+parser.add_option('-i', '--index', default=False, action='store_true',
+                  help = "Create indexes on the NSRL table instead")
+
+parser.add_option('-r', '--reset',action="store_true", default=False,
                   help = "Create indexes on the NSRL table instead")
 
 (options, args) = parser.parse_args()
 
+#Get a handle to our database
+dbh=DB.DBO(options.db)
+if options.reset:
+    print "Dropping NSRL tables"
+    dbh.execute("drop table if exists NSRL_hashes")
+    dbh.execute("drop table if exists NSRL_products")
+    sys.exit(-1)
+
 if not options.path:
     print "No NSRL Directory specified - use -h for help."
     sys.exit(-1)
-
-#Get a handle to our database
-dbh=DB.DBO(options.db)
 
 if options.index:
     print "Creating indexes on NSRL hashs (This could take several hours!!!)"
@@ -122,7 +130,13 @@ def MainNSRLHash(dirname):
 
 ## Now insert the product table:
 def ProductTable(dirname):
-    fd=csv.reader(file(dirname+"/NSRLProd.txt"))
+    file_fd=file(dirname+"/NSRLProd.txt")
+    ## Work out the size:
+    file_fd.seek(0,2)
+    size = file_fd.tell()
+    file_fd.seek(0)
+    
+    fd=csv.reader(file_fd)
     print "Starting to import %s/NSRLProd.txt" % dirname
     ## Ensure the NSRL tables do not have any indexes - this speeds up insert significantly
     
@@ -135,7 +149,7 @@ def ProductTable(dirname):
     dbh.mass_insert_start('NSRL_products')
     for row in fd:
         if not count % 10000:
-            sys.stdout.write("Inserted %s rows\r" % count)
+            sys.stdout.write(" Progress %02u%% Done - %uk rows\r" % (file_fd.tell()*100/size,count/1000))
             sys.stdout.flush()
         count+=1
 
