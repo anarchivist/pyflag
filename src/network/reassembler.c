@@ -160,8 +160,8 @@ static void callback(TCPStream self, IP ip) {
       if(!PyObject_CallFunction(python_cb, "O",stream))
 	return;
     } else {
-      printf("Connection ID %u -> %u destroyed\n", self->con_id, 
-	     self->reverse->con_id);
+      //printf("Connection ID %u -> %u destroyed\n", self->con_id, 
+      //     self->reverse->con_id);
     };
     
     break;    

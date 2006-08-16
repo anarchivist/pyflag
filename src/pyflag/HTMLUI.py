@@ -596,7 +596,7 @@ class HTMLUI(UI.GenericUI):
         l = self.store_callback(left)
         r = self.store_callback(right)
 
-        self.result+='<table width="100%%"  height="100%%"><tr height="400+"><td width="40%%" height="80%%"><iframe id="left" name="left" height="100%%" width=300 src="%s&callback_stored=%s&right_pane_cb=%s"></iframe></td><td width="40%%" height="80%%"><iframe name="right" id="right" height="100%%" width=1000 src="%s&callback_stored=%s" > </iframe></td></tr></table>' % (self.defaults,l,r,self.defaults,r)
+        self.result+='<table width="100%%"  height="100%%"><tr height="400+"><td  style="overflow: auto"><iframe id="left" name="left" height="100%%" width=300 src="%s&callback_stored=%s&right_pane_cb=%s"></iframe></td><td width="40%%" height="80%%"><iframe name="right" id="right" height="100%%" width=1000 src="%s&callback_stored=%s" > </iframe></td></tr></table>' % (self.defaults,l,r,self.defaults,r)
 
     def xtree(self,tree_cb = None, pane_cb=None, branch = ('/'), layout="horizontal"):
         """ A tree widget.

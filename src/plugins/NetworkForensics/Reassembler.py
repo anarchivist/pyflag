@@ -238,6 +238,7 @@ class StreamFile(File):
                                                family="Network Forensics",
                                                report='View Packet',
                                                case=query['case'],
+                                               open_tree ="/eth/payload/payload/data",
                                                __target__='id'),
                       ],
             table= '`connection` as con , pcap',

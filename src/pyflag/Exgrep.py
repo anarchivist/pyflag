@@ -37,156 +37,125 @@ config=pyflag.conf.ConfObject()
 ## This initialises the cut definition stack:
 definitions=[]
 
-cut={}
-cut["Extension"]="jpg"
-cut["StartRE"]="\\xff\\xd8....(JFIF|Exif)"
-cut["MaxLength"]=1500000
-cut["Comment"]="JPEG picture file type"
-definitions.append(cut)
-
-cut={}
-cut["Extension"]="gif"
-cut["StartRE"]="GIF8[79]a"
-cut["MaxLength"]=50000
-cut["Comment"]="GIF picture file type"
-definitions.append(cut)
-
-cut={}
-cut["Extension"]="png"
-cut["StartRE"]="\\x89PNG\\x0d\\x0a\\x1a\\x0a"
-cut["EndRE"]="\\x45\\x4e\\x44\\xae\\x42\\x60\\x82"
-cut["MaxLength"]=500000
-cut["Comment"]="PNG picture file type"
-definitions.append(cut)
-
-#cut={}
-#cut["Extension"]="tif"
-#cut["StartRE"]="\\x49\\x49\\x2a\\x00\\x08"
-#cut["MaxLength"]=1000000
-#cut["Comment"]="TIF picture file type 1"
-#definitions.append(cut)
-
-cut={}
-cut["Extension"]="tif"
-cut["StartRE"]="\\x4d\\x4d\\x00\\x2a\\x00"
-cut["MaxLength"]=1000000
-cut["Comment"]="TIF picture file type 2"
-definitions.append(cut)
-
-cut={}
-cut["Extension"]="doc"
-cut["StartRE"]="\\xd0\\xcf\\x11\\xe0"
-cut["MaxLength"]=500000
-cut["Comment"]="MS Word document"
-definitions.append(cut)
-
-cut={}
-cut["Extension"]="pdf"
-cut["StartRE"]="%PDF-"
-cut["EndRE"]=".%%EOF\\x0d"
-cut["MaxLength"]=1000000
-cut["Comment"]="Portable Document Format"
-definitions.append(cut)
-
-cut={}
-cut["Extension"]="eps"
-cut["StartRE"]="%!PS-Adobe"
-cut["EndRE"]="end.%%.trailer"
-cut["MaxLength"]=1000000
-cut['Comment']='Encapsulated Postscript'
-definitions.append(cut)
-
-cut={}
-cut["Extension"]="eps"
-cut["StartRE"]="%!PS-Adobe"
-cut["EndRE"]="%%EOF."
-cut["MaxLength"]=1000000
-cut['Comment']='Encapsulated Postscript'
-definitions.append(cut)
-
-cut={}
-cut["Extension"]="ie_hist"
-cut["StartRE"]="Client UrlCache"
-cut["MaxLength"]=300000
-cut["Comment"]="Internet Explorer URL cache"
-definitions.append(cut)
-
-cut={}
-cut["Extension"]="url"
-cut["StartRE"]="URL \\x03\\x00\\x00\\x00"
-cut["MaxLength"]=384
-cut["Comment"]="Internet Explorer URL cache"
-definitions.append(cut)
-
-cut={}
-cut["Extension"]="url"
-cut["StartRE"]="URL \\x02\\x00\\x00\\x00"
-cut["MaxLength"]=256
-cut["Comment"]="Internet Explorer URL cache"
-definitions.append(cut)
-
-cut={}
-cut["Extension"]="mov"
-cut["StartRE"]="....free.....mov"
-cut["MaxLength"]=1000000
-cut["Comment"]="Quicktime MOV format type 1"
-definitions.append(cut)
-
-cut={}
-cut["Extension"]="mov"
-cut["StartRE"]="MOVI"
-cut["MaxLength"]=1000000
-cut["Comment"]="Quicktime MOV format type 2"
-definitions.append(cut)
-
-cut={}
-cut["Extension"]="mov"
-cut["StartRE"]="....moov"
-cut["MaxLength"]=1000000
-cut["Comment"]="Quicktime MOV format type 3"
-definitions.append(cut)
-
-cut={}
-cut["Extension"]="mov"
-cut["StartRE"]="....mdat"
-cut["MaxLength"]=1000000
-cut["Comment"]="Quicktime MOV format type 4"
-definitions.append(cut)
-
-cut={}
-cut["Extension"]="avi"
-cut["StartRE"]="RIFF....AVI"
-cut["MaxLength"]=1000000
-cut["Comment"]="AVI video format"
-definitions.append(cut)
-
-cut={}
-cut["Extension"]="wmv"
-cut["StartRE"]="\\x30\\x26\\xb2\\x75\\x8e\\x66"
-cut["MaxLength"]=1000000
-cut["Comment"]="Windows movie file"
-definitions.append(cut)
-
-cut={}
-cut["Extension"]="zip"
-cut['StartRE']= "PK\\x03\\x04"
-cut['EndRE']="PK\\x05\\x06.{18}"
-cut["MaxLength"]=1000000
-cut["Comment"]="Zip file"
-definitions.append(cut)
-
-cut={}
-cut["Extension"]="pst"
-cut['StartRE']="!BDNF"
-cut['MaxLength'] = 10000000
-cut['Comment'] = "Outlook PST File"
-definitions.append(cut)
-
-for i in definitions:
+def add_definition(i):
     i["CStartRE"]=re.compile(i["StartRE"])
     try:
         i["CEndRE"]=re.compile(i["EndRE"])
     except: pass
+
+    definitions.append(i)
+
+
+add_definition(dict(
+    Extension="jpg",
+    StartRE="\\xff\\xd8....(JFIF|Exif)",
+    MaxLength=1500000,
+    Comment="JPEG picture file type",
+    ))
+
+add_definition(dict(
+    Extension="gif",
+    StartRE="GIF8[79]a",
+    MaxLength=50000,
+    Comment="GIF picture file type",
+    ))
+
+add_definition(dict(
+    Extension="png",
+    StartRE="\\x89PNG\\x0d\\x0a\\x1a\\x0a",
+    EndRE="\\x45\\x4e\\x44\\xae\\x42\\x60\\x82",
+    MaxLength=500000,
+    Comment="PNG picture file type",
+    ))
+
+add_definition(dict(
+    Extension="tif",
+    StartRE="\\x4d\\x4d\\x00\\x2a\\x00",
+    MaxLength=1000000,
+    Comment="TIF picture file type 2",
+    ))
+
+add_definition(dict(
+    Extension="doc",
+    StartRE="\\xd0\\xcf\\x11\\xe0",
+    MaxLength=500000,
+    Comment="MS Word document",
+    ))
+
+add_definition(dict(
+    Extension="pdf",
+    StartRE="%PDF-",
+    EndRE=".%%EOF\\x0d",
+    MaxLength=1000000,
+    Comment="Portable Document Format",
+    ))
+
+add_definition(dict(
+    Extension="eps",
+    StartRE="%!PS-Adobe",
+    EndRE="end.%%.trailer",
+    MaxLength=1000000,
+    Comment='Encapsulated Postscript',
+    ))
+
+add_definition(dict(
+    Extension="eps",
+    StartRE="%!PS-Adobe",
+    EndRE="%%EOF.",
+    MaxLength=1000000,
+    Comment='Encapsulated Postscript',
+    ))
+
+add_definition(dict(
+    Extension="ie_hist",
+    StartRE="Client UrlCache",
+    MaxLength=300000,
+    Comment="Internet Explorer URL cache",
+))
+
+add_definition(dict(
+    Extension="url",
+    StartRE="URL \\x03\\x00\\x00\\x00",
+    MaxLength=384,
+    Comment="Internet Explorer URL cache",
+    ))
+
+add_definition(dict(
+    Extension="wmv",
+    StartRE="\\x30\\x26\\xb2\\x75\\x8e\\x66",
+    MaxLength=1000000,
+    Comment="Windows movie file",
+    ))
+
+add_definition(dict(
+    Extension="zip",
+    StartRE= "PK\\x03\\x04",
+    EndRE="PK\\x05\\x06.{18}",
+    MaxLength=1000000,
+    Comment="Zip file",
+    ))
+
+add_definition(dict(
+    Extension="pst",
+    StartRE ="!BDNF",
+    MaxLength = 10000000,
+    Comment = "Outlook PST File",
+    ))
+
+add_definition(dict(
+    Extension = 'gz',
+    StartRE='\x1F\x8B\x08[\x00\x08]',
+    MaxLength=10000,
+    Comment = "Gziped files"
+    ))
+
+def add_definition(i):
+    i["CStartRE"]=re.compile(i["StartRE"])
+    try:
+        i["CEndRE"]=re.compile(i["EndRE"])
+    except: pass
+
+    definitions.append(i)
 
 import pyflag.IO as IO
 

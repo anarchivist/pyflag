@@ -113,23 +113,7 @@ class CiscoPixSyslogged(Simple.SimpleLog):
                     
                 else:
                     if inserted:
-                        self.dbh_conn.mass_insert(
-                            id=inserted['id'],
-                            pix_ts=inserted['pix_ts'],
-                            direction=inserted['direction'],
-                            protocol=inserted['protocol'],
-                            conn_number=inserted['conn_number'],
-                            src_if=inserted['src_if'],
-                            src_host=inserted['src_host'],
-                            src_port=inserted['src_port'],
-                            dst_if=inserted['dst_if'],
-                            dst_host=inserted['dst_host'],
-                            dst_port=inserted['dst_port'],
-                            duration=inserted['duration'],
-                            bytes=inserted['bytes'],
-                            rule=inserted['rule'],
-                            action=inserted['action']    
-                            )
+                        self.dbh_conn.mass_insert(**inserted)
                         
                     pix_ts=normalise_time(columns[4], int(columns[5]), columns[7], year=columns[6])
                     self.dbh.mass_insert(
@@ -280,38 +264,14 @@ class CiscoPixSyslogged(Simple.SimpleLog):
                             'conn_number':colns[3],
                             'duration':":".join(colns[13:16]),
                             'bytes':colns[17],
-                            'rule':'',
                             'action':'tcp teardown'
-                            }
-
-                        if ((int(colns[7]) > 1024) and (int(colns[11]) < 1024)) :
-                            #High port to low port, so this is probably inbound
-                            directions = {
                             'src_if':colns[5],
                             'src_host':colns[6],
                             'src_port':colns[7],
                             'dst_if':colns[9],
                             'dst_host':colns[10],
                             'dst_port':colns[11],
-                            'direction':'inbound'
                             }
-                            inserted.update(directions)
-                        elif ((int(colns[7]) < 1024) and (int(colns[11]) > 1024)):
-                            #low port to high port, so this is probably inbound
-                            directions = {
-                            'dst_if':colns[5],
-                            'dst_host':colns[6],
-                            'dst_port':colns[7],
-                            'src_if':colns[9],
-                            'src_host':colns[10],
-                            'src_port':colns[11],
-                            'direction':'outbound',
-                            }
-                            inserted.update(directions)
-                        else:
-                            print "Didn't understand TCP teardown message, unable to insert line id %s: %s" % (count, line)
-                            #Clear so we don't insert a duplicate of the last line
-                            inserted=None
 
                     #Access List info
                     #%PIX-6-106100: access-list outside_access_in permitted tcp outside/192.168.0.1(6666) -> inside/192.168.3.1(22) hit-cnt 1 (first hit)

@@ -154,7 +154,7 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
                     while 1:
                         a=self.fetchone()
                         if not a: break
-                        logging.log(logging.DEBUG,"Mysql warnings: query %r: %s" % (last_executed,a))
+                        logging.log(logging.DEBUG,"Mysql warnings: query %r: %s" % (last_executed[:500],a))
                     else:
                         logging.log(logging.DEBUG,"Mysql issued warnings but we are unable to drain result queue")
 
@@ -366,18 +366,19 @@ class DBO:
     def mass_insert_start(self, table):
         self.mass_insert_cache = {}
         self.mass_insert_table = table
+        self.mass_insert_row_count = 0
     
     def mass_insert(self, **columns):
         """ Starts a mass insert operation. When done adding rows, call commit_mass_insert to finalise the insert.
         """
         for k,v in columns.items():
             try:
-                self.mass_insert_cache[k].append(v)
+                self.mass_insert_cache[k][self.mass_insert_row_count]=v
             except:
-                self.mass_insert_cache[k] = [ v, ]
+                self.mass_insert_cache[k]={ self.mass_insert_row_count: v}
 
-        ## If the transaction is too large, we need to commit it and restart:
-        if len(self.mass_insert_cache[k]) > 100:
+        self.mass_insert_row_count+=1
+        if self.mass_insert_row_count > 100:
             self.mass_insert_commit()
             self.mass_insert_start(self.mass_insert_table)
 
@@ -387,9 +388,12 @@ class DBO:
         
         args = []
         values = []
-        for i in range(len(self.mass_insert_cache[keys[0]])):
+        for i in range(self.mass_insert_row_count):
             for k in keys:
-                args.append( self.mass_insert_cache[k][i])
+                try:
+                    args.append(self.mass_insert_cache[k][i])
+                except KeyError:
+                    args.append('NULL')
 
             values.append(",".join(["%r"] * len(keys)))
 
