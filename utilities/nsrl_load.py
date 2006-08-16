@@ -32,45 +32,51 @@ An NSRL directory is one of the CDs, and usually has in it NSRLFile.txt,NSRLProd
 IMPORTANT:
 The first time the database is used (in loading a case) the index will be automatically built. This may take a long time, but is only done once.
 """
-
+from optparse import OptionParser
 import DB,conf,sys
 import csv
 import sys,os
 
-if len(sys.argv)<2:
-    print "Usage: %s path_to_nsrl_directory\n\nAn NSRL directory is one of the CDs, and usually has in it NSRLFile.txt,NSRLProd.txt.\n" % os.path.basename(sys.argv[0])
-    sys.exit(0)
+parser = OptionParser()
+parser.add_option("-p", "--path", default=None,
+                  help = "An NSRL directory is one of the CDs, and usually has in it NSRLFile.txt,NSRLProd.txt")
+
+parser.add_option("-d", "--db", default=None,
+                  help = "The Database to load NSRL into")
+
+parser.add_option('-i', '--index',default=None,
+                  help = "Create indexes on the NSRL table instead")
+
+(options, args) = parser.parse_args()
+
+if not options.path:
+    print "No NSRL Directory specified - use -h for help."
+    sys.exit(-1)
 
 #Get a handle to our database
-dbh=DB.DBO(None)
+dbh=DB.DBO(options.db)
 
-if sys.argv[1]=="-i":
+if options.index:
     print "Creating indexes on NSRL hashs (This could take several hours!!!)"
     dbh.check_index("NSRL_hashes","md5",4)
     print "Done!!"
-    sys.exit()
+    sys.exit(0)
     
 dbh.execute("""CREATE TABLE if not exists `NSRL_hashes` (
   `md5` char(16) NOT NULL default '',
-  `filename` varchar(60) NOT NULL default '',
+  `filename` varchar(250) NOT NULL default '',
   `productcode` int NOT NULL default 0,
-  `oscode` varchar(60) NOT NULL default ''
+  `oscode` varchar(250) NOT NULL default ''
 )""")
 
 dbh.execute("""CREATE TABLE if not exists `NSRL_products` (
 `Code` MEDIUMINT NOT NULL ,
 `Name` VARCHAR( 250 ) NOT NULL ,
-`Version` VARCHAR( 20 ) NOT NULL ,
-`OpSystemCode` VARCHAR( 20 ) NOT NULL ,
+`Version` VARCHAR( 250 ) NOT NULL ,
+`OpSystemCode` VARCHAR( 250 ) NOT NULL ,
 `ApplicationType` VARCHAR( 250 ) NOT NULL
 ) COMMENT = 'Stores NSRL Products'
 """)
-
-try:
-    dirname = sys.argv[1]
-except IndexError:
-    print "Usage: %s path_to_nsrl" % sys.argv[0]
-    sys.exit(0)
 
 def to_md5(string):
     result=[]
@@ -80,7 +86,13 @@ def to_md5(string):
 
 ## First do the main NSRL hash table
 def MainNSRLHash(dirname):
-    fd=csv.reader(file(dirname+"/NSRLFile.txt"))
+    file_fd=file(dirname+"/NSRLFile.txt")
+    ## Work out the size:
+    file_fd.seek(0,2)
+    size = file_fd.tell()
+    file_fd.seek(0)
+    
+    fd=csv.reader(file_fd)
     print "Starting to import %s/NSRLFile.txt" % dirname
     ## Ensure the NSRL tables do not have any indexes - this speeds up insert significantly
     try:
@@ -88,11 +100,25 @@ def MainNSRLHash(dirname):
     except:
         pass
 
+    count = 0
+    dbh.mass_insert_start('NSRL_hashes')
     for row in fd:
+        if not count % 10000:
+            sys.stdout.write(" Progress %02u%% Done - %uk rows\r" % (file_fd.tell()*100/size,count/1000))
+            sys.stdout.flush()
+        count+=1
+
         try:
-            dbh.execute("insert into NSRL_hashes set md5=%r,filename=%r,productcode=%r,oscode=%r",(to_md5(row[1]),row[3],row[5],row[6]))
+            dbh.mass_insert(
+                md5=to_md5(row[1]),
+                filename=row[3],
+                productcode=row[5],
+                oscode=row[6],
+                )
         except (ValueError,DB.DBError),e:
             print "SQL Error skipped %s" %e
+
+    dbh.mass_insert_commit()
 
 ## Now insert the product table:
 def ProductTable(dirname):
@@ -104,18 +130,33 @@ def ProductTable(dirname):
         dbh.execute("alter table NSRL_products drop index Code");
     except:
         pass
-    
+
+    count = 0
+    dbh.mass_insert_start('NSRL_products')
     for row in fd:
+        if not count % 10000:
+            sys.stdout.write("Inserted %s rows\r" % count)
+            sys.stdout.flush()
+        count+=1
+
         try:
-            dbh.execute("insert into NSRL_products set Code=%r,Name=%r,Version=%r,OpSystemCode=%r,ApplicationType=%r",(row[0],row[1],row[2],row[3],row[6]))
+            dbh.mass_insert(
+                Code=row[0],
+                Name=row[1],
+                Version=row[2],
+                OpSystemCode=row[3],
+                ApplicationType=row[6],
+                )
         except (ValueError,DB.DBError),e:
             print "SQL Error skipped %s" %e
 
+    dbh.mass_insert_commit()
+        
 if __name__=="__main__":
     try:
-        MainNSRLHash(dirname)
+        MainNSRLHash(options.path)
     except IOError:
         print "Unable to read main hash db, doing product table only"
         
-    ProductTable(dirname)    
+    ProductTable(options.path)    
     print "You may wish to run this program with the -i arg to create indexes now. Otherwise indexes will be created the first time they are needed."
