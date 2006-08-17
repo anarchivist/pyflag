@@ -1,3 +1,5 @@
+SUBDIRS		= libewf
+
 INCLUDES        	= -I$(top_srcdir)/src/include -include config.h 
 
 # main bin and lib targets

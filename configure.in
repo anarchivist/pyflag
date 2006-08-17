@@ -55,6 +55,7 @@ AC_OUTPUT([
 	Makefile 
 	src/Makefile 
 	src/lib/Makefile 
+	src/lib/libewf/Makefile
 	src/mailtools/Makefile 
 	src/mailtools/libpst-0.5/Makefile 
 	src/indextools_ng/Makefile

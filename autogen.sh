@@ -2,6 +2,6 @@
 
 libtoolize
 aclocal-1.9 -I config
-#autoheader
+autoheader
 automake-1.9 --add-missing --copy
 autoconf
