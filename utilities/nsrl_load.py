@@ -62,22 +62,22 @@ if options.reset:
     dbh.execute("drop table if exists NSRL_products")
     sys.exit(-1)
 
-if not options.path:
-    print "No NSRL Directory specified - use -h for help."
-    sys.exit(-1)
-
 if options.index:
     print "Creating indexes on NSRL hashs (This could take several hours!!!)"
     dbh.check_index("NSRL_hashes","md5",4)
     print "Done!!"
     sys.exit(0)
+
+if not options.path:
+    print "No NSRL Directory specified - use -h for help."
+    sys.exit(-1)
     
 dbh.execute("""CREATE TABLE if not exists `NSRL_hashes` (
   `md5` char(16) binary NOT NULL default '',
   `filename` varchar(250) NOT NULL default '',
   `productcode` int NOT NULL default 0,
   `oscode` varchar(250) NOT NULL default ''
-)""")
+) DEFAULT CHARACTER SET latin1 """)
 
 dbh.execute("""CREATE TABLE if not exists `NSRL_products` (
 `Code` MEDIUMINT NOT NULL ,
@@ -127,6 +127,8 @@ def MainNSRLHash(dirname):
                 )
         except (ValueError,DB.DBError),e:
             print "SQL Error skipped %s" %e
+        except IndexError:
+            continue
 
     dbh.mass_insert_commit()
 

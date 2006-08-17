@@ -42,11 +42,12 @@ import threading
 db_connections=0
 
 ## This is the dispatcher for db converters
-conv = { FIELD_TYPE.LONG: long,
-         FIELD_TYPE.INT24: long,
-         FIELD_TYPE.LONGLONG: long,
-         FIELD_TYPE.TINY: int,
-         }
+conv = {
+    FIELD_TYPE.LONG: long,
+    FIELD_TYPE.INT24: long,
+    FIELD_TYPE.LONGLONG: long,
+    FIELD_TYPE.TINY: int
+    }
 
 def escape(string):
     return MySQLdb.escape_string(string)
@@ -215,17 +216,21 @@ class Pool(Queue):
                                       port=config.DBPORT,
                                       cursorclass=PyFlagCursor,
                                       sql_mode="STRICT_ALL_TABLES",
-                                      conv = conv
+                                      conv = conv,
+                                      use_unicode = False,
+                                      charset='latin1'
                                       )
             else:
                 dbh = MySQLdb.Connect(user = config.DBUSER,
-                                  passwd = config.DBPASSWD,
-                                  db = case,
-                                  host=config.DBHOST,
-                                  port=config.DBPORT,
-                                  cursorclass=PyFlagCursor,
-                                  conv = conv
-                                  )
+                                      passwd = config.DBPASSWD,
+                                      db = case,
+                                      host=config.DBHOST,
+                                      port=config.DBPORT,
+                                      cursorclass=PyFlagCursor,
+                                      conv = conv,
+                                      use_unicode = False,
+                                      charset = 'latin1'
+                                      )
                 
             mysql_bin_string = "%s -f -u %r -p%r -h%s -P%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBHOST,config.DBPORT)
         except Exception,e:
@@ -240,14 +245,19 @@ class Pool(Queue):
                                       unix_socket = config.DBUNIXSOCKET,
                                       sql_mode="STRICT_ALL_TABLES",
                                       cursorclass=PyFlagCursor,
-                                      conv = conv
+                                      conv = conv,
+                                      use_unicode = False,
+                                      charset='latin1'
                                       )
             else:
                 dbh = MySQLdb.Connect(user = config.DBUSER,
                                       passwd = config.DBPASSWD,
                                       db = case,
                                       unix_socket = config.DBUNIXSOCKET,
-                                      cursorclass=PyFlagCursor
+                                      cursorclass=PyFlagCursor,
+                                      conv = conv,
+                                      use_unicode = False,
+                                      charset='latin1'
                                       )
 
             mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBUNIXSOCKET)
