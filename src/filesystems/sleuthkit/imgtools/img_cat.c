@@ -1,12 +1,11 @@
 /*
- * imgstat
+ * img_cat
  * The Sleuth Kit 
  *
  * $Date: 2006/07/10 13:26:20 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
- * Copyright (c) 2005 Brian Carrier.  All rights reserved 
- *
+ * Copyright (c) 2006 Brian Carrier, Basis Technology.  All rights reserved 
  *
  * This software is distributed under the Common Public License 1.0
  *
@@ -16,10 +15,9 @@
 static void
 usage()
 {
-    fprintf(stderr, "usage: %s [-tvV] [-i imgtype] image\n", progname);
-    fprintf(stderr, "\t-t: display type only\n");
+    fprintf(stderr, "usage: %s [-vV] [-i imgtype] image\n", progname);
     fprintf(stderr,
-	"\t-i imgtype: The format of the image file (use '-i list' for list of supported types)\n");
+	"\t-i imgtype: The format of the image file (use 'i list' for supported types)\n");
     fprintf(stderr, "\t-v: verbose output to stderr\n");
     fprintf(stderr, "\t-V: Print version\n");
 
@@ -33,11 +31,11 @@ main(int argc, char **argv)
     IMG_INFO *img;
     char *imgtype = NULL;
     int ch;
-    uint8_t type = 0;
+    SSIZE_T cnt, done;
 
     progname = argv[0];
 
-    while ((ch = getopt(argc, argv, "i:tvV")) > 0) {
+    while ((ch = getopt(argc, argv, "i:vV")) > 0) {
 	switch (ch) {
 	case '?':
 	default:
@@ -51,10 +49,6 @@ main(int argc, char **argv)
 		exit(1);
 	    }
 
-	    break;
-
-	case 't':
-	    type = 1;
 	    break;
 
 	case 'v':
@@ -80,12 +74,41 @@ main(int argc, char **argv)
 	exit(1);
     }
 
-    if (type) {
-	char *str = img_get_type(img->itype);
-	printf("%s\n", str);
-    }
-    else {
-	img->imgstat(img, stdout);
+    for (done = 0; done < img->size; done += cnt) {
+	char buf[16 * 1024];
+	OFF_T len;
+
+
+	if (done + sizeof(buf) > img->size) {
+	    len = img->size - done;
+	}
+	else {
+	    len = sizeof(buf);
+	}
+
+	cnt = img->read_random(img, 0, buf, len, done);
+	if (cnt != len) {
+	    if (cnt != -1) {
+		fprintf(stderr,
+		    "img_cat: Error reading image file at offset: %"
+		    PRIuOFF ", len: %" PRIuOFF ", return: %" PRIuOFF "\n",
+		    done, len, cnt);
+	    }
+	    else {
+		tsk_error_print(stderr);
+	    }
+	    img->close(img);
+	    exit(1);
+	}
+
+	if (fwrite(buf, cnt, 1, stdout) != 1) {
+	    tsk_errno = TSK_ERR_IMG_WRITE;
+	    snprintf(tsk_errstr, TSK_ERRSTR_L,
+		"img_cat: Error writing to stdout:  %s", strerror(errno));
+	    tsk_error_print(stderr);
+	    img->close(img);
+	    exit(1);
+	}
     }
 
     img->close(img);

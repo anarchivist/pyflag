@@ -1,7 +1,9 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2005/06/15 15:58:03 $
+ * $Date: 2006/04/05 03:47:35 $
+ *
+ * Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
  *
  * LICENSE
  *	This software is distributed under the IBM Public License.
@@ -15,22 +17,30 @@
 #include "fs_tools.h"
 #include "fs_data.h"
 
-/* fs_inode_alloc - allocate generic inode structure */
-
+/* fs_inode_alloc - allocate generic inode structure 
+ *
+ * return NULL on error
+ * */
 FS_INODE *
 fs_inode_alloc(int direct_count, int indir_count)
 {
     FS_INODE *fs_inode;
 
     fs_inode = (FS_INODE *) mymalloc(sizeof(*fs_inode));
+    if (fs_inode == NULL)
+	return NULL;
 
     fs_inode->direct_count = direct_count;
     fs_inode->direct_addr =
 	(DADDR_T *) mymalloc(direct_count * sizeof(DADDR_T));
+    if (fs_inode->direct_addr == NULL)
+	return NULL;
 
     fs_inode->indir_count = indir_count;
     fs_inode->indir_addr =
 	(DADDR_T *) mymalloc(indir_count * sizeof(DADDR_T));
+    if (fs_inode->indir_addr == NULL)
+	return NULL;
 
     fs_inode->attr = NULL;
     fs_inode->name = NULL;
@@ -43,7 +53,10 @@ fs_inode_alloc(int direct_count, int indir_count)
     return (fs_inode);
 }
 
-/* fs_inode_realloc - resize generic inode structure */
+/* fs_inode_realloc - resize generic inode structure 
+ *
+ * return NULL on error
+ * */
 
 FS_INODE *
 fs_inode_realloc(FS_INODE * fs_inode, int direct_count, int indir_count)
@@ -52,13 +65,23 @@ fs_inode_realloc(FS_INODE * fs_inode, int direct_count, int indir_count)
 	fs_inode->direct_count = direct_count;
 	fs_inode->direct_addr =
 	    (DADDR_T *) myrealloc((char *) fs_inode->direct_addr,
-				  direct_count * sizeof(DADDR_T));
+	    direct_count * sizeof(DADDR_T));
+	if (fs_inode->direct_addr == NULL) {
+	    free(fs_inode->indir_addr);
+	    free(fs_inode);
+	    return NULL;
+	}
     }
     if (fs_inode->indir_count != indir_count) {
 	fs_inode->indir_count = indir_count;
 	fs_inode->indir_addr =
 	    (DADDR_T *) myrealloc((char *) fs_inode->indir_addr,
-				  indir_count * sizeof(DADDR_T));
+	    indir_count * sizeof(DADDR_T));
+	if (fs_inode->indir_addr == NULL) {
+	    free(fs_inode->direct_addr);
+	    free(fs_inode);
+	    return NULL;
+	}
     }
     return (fs_inode);
 }

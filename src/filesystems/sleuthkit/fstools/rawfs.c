@@ -1,9 +1,10 @@
 /*
 ** The Sleuth Kit
 **
-** $Date: 2005/09/02 23:34:03 $
+** $Date: 2006/06/19 22:21:07 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2004-2005 Brian Carrier.  All rights reserved 
 **
 **
@@ -23,19 +24,26 @@
 
 /* rawfs_inode_walk - inode iterator 
  *
+ * return 1 on error and 0 on success
  */
-void
+uint8_t
 rawfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
-		 int flags, FS_INODE_WALK_FN action, void *ptr)
+    int flags, FS_INODE_WALK_FN action, void *ptr)
 {
-    error("rawfs: Illegal analysis method for raw data");
-    return;
+    tsk_errno = TSK_ERR_FS_FUNC;
+    snprintf(tsk_errstr, TSK_ERRSTR_L,
+	"Illegal analysis method for raw data ");
+    tsk_errstr2[0] = '\0';
+    return 1;
 }
 
 static FS_INODE *
 rawfs_inode_lookup(FS_INFO * fs, INUM_T inum)
 {
-    error("rawfs: Illegal analysis method for raw data");
+    tsk_errno = TSK_ERR_FS_FUNC;
+    snprintf(tsk_errstr, TSK_ERRSTR_L,
+	"Illegal analysis method for raw data");
+    tsk_errstr2[0] = '\0';
     return NULL;
 }
 
@@ -49,43 +57,72 @@ rawfs_inode_lookup(FS_INFO * fs, INUM_T inum)
 /* rawpfs_block_walk - block iterator 
  *
  * flags used: ALIGN, META, ALLOC, UNALLOC
+ *
+ * return 1 on error and 0 on success
  */
 
-void
+uint8_t
 rawfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
-		 int flags, FS_BLOCK_WALK_FN action, void *ptr)
+    int flags, FS_BLOCK_WALK_FN action, void *ptr)
 {
-    char *myname = "rawfs_block_walk";
-    DATA_BUF *data_buf = data_buf_alloc(fs->block_size);
+    DATA_BUF *data_buf;
     DADDR_T addr;
 
     /*
      * Sanity checks.
      */
-    if (start_blk < fs->first_block || start_blk > fs->last_block)
-	error("%s: invalid start block number: %" PRIuDADDR "", myname,
-	      start_blk);
+    if (start_blk < fs->first_block || start_blk > fs->last_block) {
+	tsk_errno = TSK_ERR_FS_WALK_RNG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "rawfs_block_walk: Start block number: %" PRIuDADDR,
+	    start_blk);
+	tsk_errstr2[0] = '\0';
+	return 1;
+    }
 
     if (end_blk < fs->first_block || end_blk > fs->last_block
-	|| end_blk < start_blk)
-	error("%s: invalid last block number: %" PRIuDADDR "", myname,
-	      end_blk);
+	|| end_blk < start_blk) {
+	tsk_errno = TSK_ERR_FS_WALK_RNG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "rawfs_block_walk: Last block number: %" PRIuDADDR, end_blk);
+	tsk_errstr2[0] = '\0';
+	return 1;
+    }
 
-    if (!(flags & FS_FLAG_DATA_ALLOC))
-	return;
+    /* If allocated is not wanted, then exit now */
+    if (!(flags & FS_FLAG_DATA_ALLOC)) {
+	return 0;
+    }
+
+    if ((data_buf = data_buf_alloc(fs->block_size)) == NULL) {
+	return 1;
+    }
 
     for (addr = start_blk; addr <= end_blk; addr++) {
-	if (fs_read_block(fs, data_buf, fs->block_size, addr) !=
-	    fs->block_size) {
-	    error("rawfs_block_walk: Error reading block at %" PRIuDADDR
-		  ": %m", addr);
+	SSIZE_T cnt;
+	int retval;
+
+	cnt = fs_read_block(fs, data_buf, fs->block_size, addr);
+	if (cnt != fs->block_size) {
+	    if (cnt != -1) {
+		tsk_errno = TSK_ERR_FS_READ;
+		tsk_errstr[0] = '\0';
+	    }
+	    snprintf(tsk_errstr2, TSK_ERRSTR_L,
+		"rawfs_block_walk: Block %" PRIuDADDR, addr);
+	    data_buf_free(data_buf);
+	    return 1;
 	}
 
-	if (WALK_STOP == action(fs, addr, data_buf->data,
-				FS_FLAG_DATA_ALLOC | FS_FLAG_DATA_CONT,
-				ptr)) {
+	retval = action(fs, addr, data_buf->data,
+	    FS_FLAG_DATA_ALLOC | FS_FLAG_DATA_CONT, ptr);
+	if (retval == WALK_STOP) {
 	    data_buf_free(data_buf);
-	    return;
+	    return 0;
+	}
+	else if (retval == WALK_ERROR) {
+	    data_buf_free(data_buf);
+	    return 1;
 	}
     }
 
@@ -93,7 +130,7 @@ rawfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
      * Cleanup.
      */
     data_buf_free(data_buf);
-    return;
+    return 0;
 }
 
 /**************************************************************************
@@ -104,69 +141,100 @@ rawfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
 
 
 /*  
+ *  return 1 on error and 0 on success
  */
-void
+uint8_t
 rawfs_file_walk(FS_INFO * fs, FS_INODE * inode, uint32_t type, uint16_t id,
-		int flags, FS_FILE_WALK_FN action, void *ptr)
+    int flags, FS_FILE_WALK_FN action, void *ptr)
 {
-    error("rawfs: Illegal analysis method for raw data");
-    return;
+    tsk_errno = TSK_ERR_FS_FUNC;
+    snprintf(tsk_errstr, TSK_ERRSTR_L,
+	" Illegal analysis method for raw data ");
+    tsk_errstr2[0] = '\0';
+    return 1;
 }
 
-void
+/*
+ * return 1 on error and 0 on success
+ */
+uint8_t
 rawfs_dent_walk(FS_INFO * fs, INUM_T inode, int flags,
-		FS_DENT_WALK_FN action, void *ptr)
+    FS_DENT_WALK_FN action, void *ptr)
 {
-    error("rawfs: Illegal analysis method for raw data");
-    return;
+    tsk_errno = TSK_ERR_FS_FUNC;
+    snprintf(tsk_errstr, TSK_ERRSTR_L,
+	"Illegal analysis method for raw data");
+    tsk_errstr2[0] = '\0';
+    return 1;
 }
 
 
-static void
+/*
+ * return 1 on error and 0 on success
+ */
+static uint8_t
 rawfs_fsstat(FS_INFO * fs, FILE * hFile)
 {
     fprintf(hFile, "Raw Data\n");
     fprintf(hFile, "Block Size: %d\n", fs->block_size);
-    return;
+    fprintf(hFile, "Block Range: 0 - %" PRIuDADDR "\n", fs->last_block);
+    return 0;
 }
 
 
 /************************* istat *******************************/
 
-static void
+/*
+ * return 1 on error and 0 on success
+ */
+static uint8_t
 rawfs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
-	    int32_t sec_skew)
+    int32_t sec_skew)
 {
-    error("rawfs: Illegal analysis method for raw data");
-    return;
+    tsk_errno = TSK_ERR_FS_FUNC;
+    snprintf(tsk_errstr, TSK_ERRSTR_L,
+	" Illegal analysis method for raw data ");
+    tsk_errstr2[0] = '\0';
+    return 1;
 }
 
 
-
-
-
-void
+/* return 1 on error and 0 on success
+ */
+uint8_t
 rawfs_jopen(FS_INFO * fs, INUM_T inum)
 {
-    fprintf(stderr, "Error: RAW does not have a journal\n");
-    exit(1);
+    tsk_errno = TSK_ERR_FS_FUNC;
+    snprintf(tsk_errstr, TSK_ERRSTR_L, "RAW does not have a journal");
+    tsk_errstr2[0] = '\0';
+    return 1;
 }
 
-void
+/*
+ * return 1 on error and 0 on success
+ */
+uint8_t
 rawfs_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
-		  void *ptr)
+    void *ptr)
 {
-    fprintf(stderr, "Error: RAW does not have a journal\n");
-    exit(1);
+    tsk_errno = TSK_ERR_FS_FUNC;
+    snprintf(tsk_errstr, TSK_ERRSTR_L, "RAW does not have a journal ");
+    tsk_errstr2[0] = '\0';
+    return 1;
 }
 
 
-void
+/*
+ * return 1 on error and 0 on success
+ */
+uint8_t
 rawfs_jblk_walk(FS_INFO * fs, DADDR_T start, DADDR_T end, int flags,
-		FS_JBLK_WALK_FN action, void *ptr)
+    FS_JBLK_WALK_FN action, void *ptr)
 {
-    fprintf(stderr, "Error: RAW does not have a journal\n");
-    exit(1);
+    tsk_errno = TSK_ERR_FS_FUNC;
+    snprintf(tsk_errstr, TSK_ERRSTR_L, "RAW does not have a journal ");
+    tsk_errstr2[0] = '\0';
+    return 1;
 }
 
 
@@ -179,24 +247,25 @@ rawfs_close(FS_INFO * fs)
 }
 
 
-/* rawfs_open - open a fast file system */
-
+/* rawfs_open - open a file as raw 
+ *
+ * Return NULL on error
+ * */
 FS_INFO *
-rawfs_open(IMG_INFO * img_info, unsigned char ftype)
+rawfs_open(IMG_INFO * img_info, SSIZE_T offset)
 {
-    FS_INFO *fs = (FS_INFO *) mymalloc(sizeof(FS_INFO));
     OFF_T len;
+    FS_INFO *fs = (FS_INFO *) mymalloc(sizeof(FS_INFO));
+    if (fs == NULL)
+	return NULL;
 
-    if ((ftype & FSMASK) != RAWFS_TYPE)
-	error("Invalid FS Type in rawfs_open");
 
-
-    /* All we need to set are the block sizes and max bloc size etc. */
+    /* All we need to set are the block sizes and max block size etc. */
     fs->img_info = img_info;
+    fs->offset = offset;
 
-    fs->ftype = ftype;
+    fs->ftype = RAW;
     fs->flags = 0;
-
 
     fs->inum_count = 0;
     fs->root_inum = 0;

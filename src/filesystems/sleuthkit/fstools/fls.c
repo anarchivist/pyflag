@@ -2,12 +2,13 @@
 ** fls
 ** The Sleuth Kit 
 **
-** $Date: 2005/09/02 23:34:03 $
+** $Date: 2006/07/10 13:26:20 $
 **
 ** Given an image and directory inode, display the file names and 
 ** directories that exist (both active and deleted)
 **
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2003-2005 Brian Carier.  All rights reserved
 **
 ** TASK
@@ -27,36 +28,33 @@ void
 usage()
 {
     fprintf(stderr,
-	    "usage: %s [-adDFlpruvV] [-f fstype] [-i imgtype] [-m dir/] [-o imgoffset] [-z ZONE] [-s seconds] image [images] [inode]\n",
-	    progname);
+	"usage: %s [-adDFlpruvV] [-f fstype] [-i imgtype] [-m dir/] [-o imgoffset] [-z ZONE] [-s seconds] image [images] [inode]\n",
+	progname);
     fprintf(stderr,
-	    "\tIf [inode] is not given, the root directory is used\n");
+	"\tIf [inode] is not given, the root directory is used\n");
     fprintf(stderr, "\t-a: Display \".\" and \"..\" entries\n");
     fprintf(stderr, "\t-d: Display deleted entries only\n");
-    fprintf(stderr, "\t-D: Display directory entries only\n");
-    fprintf(stderr,
-	    "\t-F: Display file entries only (NOTE: This was -f in TCTUTILs)\n");
+    fprintf(stderr, "\t-D: Display only directories\n");
+    fprintf(stderr, "\t-F: Display only files\n");
     fprintf(stderr, "\t-l: Display long version (like ls -l)\n");
-    fprintf(stderr, "\t-i imgtype: Format of image file\n");
+    fprintf(stderr,
+	"\t-i imgtype: Format of image file (use '-i list' for supported types)\n");
+    fprintf(stderr,
+	"\t-f fstype: File system type (use '-f list' for supported types)\n");
     fprintf(stderr, "\t-m: Display output in mactime input format with\n");
     fprintf(stderr,
-	    "\t      dir/ as the actual mount point of the image\n");
+	"\t      dir/ as the actual mount point of the image\n");
     fprintf(stderr,
-	    "\t-o imgoffset: Offset into image file (in sectors)\n");
+	"\t-o imgoffset: Offset into image file (in sectors)\n");
     fprintf(stderr, "\t-p: Display full path for each file\n");
     fprintf(stderr, "\t-r: Recurse on directory entries\n");
     fprintf(stderr, "\t-u: Display undeleted entries only\n");
     fprintf(stderr, "\t-v: verbose output to stderr\n");
     fprintf(stderr, "\t-V: Print version\n");
     fprintf(stderr,
-	    "\t-z: Time zone of original machine (i.e. EST5EDT or GMT) (only useful with -l)\n");
+	"\t-z: Time zone of original machine (i.e. EST5EDT or GMT) (only useful with -l)\n");
     fprintf(stderr,
-	    "\t-s seconds: Time skew of original machine (in seconds) (only useful with -l & -m)\n");
-    fprintf(stderr, "\t-f fstype: File system type\n");
-    fprintf(stderr, "Supported file system types:\n");
-    fs_print_types(stderr);
-    fprintf(stderr, "Supported image format types:\n");
-    img_print_types(stderr);
+	"\t-s seconds: Time skew of original machine (in seconds) (only useful with -l & -m)\n");
 
     exit(1);
 }
@@ -65,16 +63,17 @@ int
 main(int argc, char **argv)
 {
     char *fstype = NULL;
-    int inode;
+    INUM_T inode;
     int flags = FS_FLAG_NAME_ALLOC | FS_FLAG_NAME_UNALLOC;
     int ch;
     FS_INFO *fs;
     extern int optind;
     IMG_INFO *img;
-    char *imgtype = NULL, *imgoff = NULL, *cp;
+    char *imgtype = NULL, *cp;
     int lclflags;
     int32_t sec_skew = 0;
     static char *macpre = NULL;
+    SSIZE_T imgoff = 0;
 
     progname = argv[0];
     setlocale(LC_ALL, "");
@@ -99,6 +98,11 @@ main(int argc, char **argv)
 	    break;
 	case 'f':
 	    fstype = optarg;
+	    if (strcmp(fstype, "list") == 0) {
+		fs_print_types(stderr);
+		exit(1);
+	    }
+
 	    break;
 	case 'F':
 	    lclflags &= ~FLS_DIR;
@@ -106,6 +110,11 @@ main(int argc, char **argv)
 	    break;
 	case 'i':
 	    imgtype = optarg;
+	    if (strcmp(imgtype, "list") == 0) {
+		img_print_types(stderr);
+		exit(1);
+	    }
+
 	    break;
 	case 'l':
 	    lclflags |= FLS_LONG;
@@ -115,7 +124,10 @@ main(int argc, char **argv)
 	    macpre = optarg;
 	    break;
 	case 'o':
-	    imgoff = optarg;
+	    if ((imgoff = parse_offset(optarg)) == -1) {
+		tsk_error_print(stderr);
+		exit(1);
+	    }
 	    break;
 	case 'p':
 	    lclflags |= FLS_FULL;
@@ -140,7 +152,8 @@ main(int argc, char **argv)
 		char envstr[32];
 		snprintf(envstr, 32, "TZ=%s", optarg);
 		if (0 != putenv(envstr)) {
-		    error("error setting environment");
+		    fprintf(stderr, "error setting environment");
+		    exit(1);
 		}
 
 		/* we should be checking this somehow */
@@ -162,12 +175,9 @@ main(int argc, char **argv)
      ** set and we are only displaying files or deleted files
      */
     if ((flags & FS_FLAG_NAME_RECURSE) && (((flags & FS_FLAG_NAME_UNALLOC)
-					    &&
-					    (!(flags &
-					       FS_FLAG_NAME_ALLOC)))
-					   || ((lclflags & FLS_FILE)
-					       &&
-					       (!(lclflags & FLS_DIR))))) {
+		&& (!(flags & FS_FLAG_NAME_ALLOC)))
+	    || ((lclflags & FLS_FILE)
+		&& (!(lclflags & FLS_DIR))))) {
 
 	lclflags |= FLS_FULL;
     }
@@ -197,21 +207,46 @@ main(int argc, char **argv)
     inode = strtoull(argv[argc - 1], &cp, 0);
     if (*cp || cp == argv[argc - 1]) {
 	/* Not an inode at the end */
-	img =
-	    img_open(imgtype, imgoff, argc - optind,
-		     (const char **) &argv[optind]);
-	fs = fs_open(img, fstype);
+	if ((img =
+		img_open(imgtype, argc - optind,
+		    (const char **) &argv[optind])) == NULL) {
+	    tsk_error_print(stderr);
+	    exit(1);
+	}
+
+	if ((fs = fs_open(img, imgoff, fstype)) == NULL) {
+	    tsk_error_print(stderr);
+	    if (tsk_errno == TSK_ERR_FS_UNSUPTYPE)
+		fs_print_types(stderr);
+
+	    img->close(img);
+	    exit(1);
+	}
 	inode = fs->root_inum;
     }
     else {
-	img =
-	    img_open(imgtype, imgoff, argc - optind - 1,
-		     (const char **) &argv[optind]);
-	fs = fs_open(img, fstype);
+	if ((img =
+		img_open(imgtype, argc - optind - 1,
+		    (const char **) &argv[optind])) == NULL) {
+	    tsk_error_print(stderr);
+	    exit(1);
+	}
+
+	if ((fs = fs_open(img, imgoff, fstype)) == NULL) {
+	    tsk_error_print(stderr);
+	    if (tsk_errno == TSK_ERR_FS_UNSUPTYPE)
+		fs_print_types(stderr);
+	    img->close(img);
+	    exit(1);
+	}
     }
 
-
-    fs_fls(fs, lclflags, inode, flags, macpre, sec_skew);
+    if (fs_fls(fs, lclflags, inode, flags, macpre, sec_skew)) {
+	tsk_error_print(stderr);
+	fs->close(fs);
+	img->close(img);
+	exit(1);
+    }
 
     fs->close(fs);
     img->close(img);

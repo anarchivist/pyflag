@@ -111,7 +111,7 @@ hfs_is_bit_b_alloc(uint32_t b, uint8_t * alloc_file)
 
 
 /* return the offset into the image that btree node 'node' is at */
-OFF_T
+DADDR_T
 hfs_cat_find_node_offset(HFS_INFO * hfs, int nodenum)
 {
     FS_INFO *fs = (FS_INFO *) & (hfs->fs_info);
@@ -125,7 +125,7 @@ hfs_cat_find_node_offset(HFS_INFO * hfs, int nodenum)
 
     if (verbose)
 	fprintf(stderr, "hfs_cat_find_node_offset: finding offset of "
-		"btree node: %" PRIu32 "\n", nodenum);
+	    "btree node: %" PRIu32 "\n", nodenum);
 
     /* find first extent with data in it */
     i = 0;
@@ -161,15 +161,15 @@ hfs_cat_find_node_offset(HFS_INFO * hfs, int nodenum)
 	    if (i > 7)
 		error
 		    ("hfs_cat_find_node_offset: File seek error while searching for node %"
-		     PRIu32 "\n", nodenum);
+		    PRIu32 "\n", nodenum);
 
 	    r_offs =
 		getu32(fs,
-		       sb->cat_file.extents[i].start_blk) * fs->block_size;
+		sb->cat_file.extents[i].start_blk) * fs->block_size;
 	    f_offs += bytes;
 	    bytes =
 		getu64(fs,
-		       sb->cat_file.extents[i].blk_cnt) * fs->block_size;
+		sb->cat_file.extents[i].blk_cnt) * fs->block_size;
 
 	}
     }
@@ -281,7 +281,7 @@ hfs_load_inode_list(HFS_INFO * hfs)
 
 	    if (verbose)
 		fprintf(stderr, "hfs_load_inode_list: node %i is a leaf\n",
-			i);
+		    i);
 
 	    n_offs = hfs_cat_find_node_offset(hfs, i);
 
@@ -350,8 +350,7 @@ hfs_catalog_lookup(HFS_INFO * hfs, hfs_file * cat, INUM_T inum)
 
     if (verbose)
 	fprintf(stderr,
-		"hfs_catalog_lookup: Processing CAT %" PRIuINUM "\n",
-		inum);
+	    "hfs_catalog_lookup: Processing CAT %" PRIuINUM "\n", inum);
 
     /* sanity checks */
     if (!cat)
@@ -366,7 +365,7 @@ hfs_catalog_lookup(HFS_INFO * hfs, hfs_file * cat, INUM_T inum)
 
     if (in->node == 0)
 	error("Error finding catalog entry %" PRIuINUM " in catalog",
-	      inum);
+	    inum);
 
     hfs->key = in->offs;
 
@@ -388,7 +387,7 @@ hfs_catalog_lookup(HFS_INFO * hfs, hfs_file * cat, INUM_T inum)
 	fs_read_random(fs, (char *) hfs->cat, sizeof(hfs_file), read_offs);
     else
 	fs_read_random(fs, (char *) hfs->cat, sizeof(hfs_folder),
-		       read_offs);
+	    read_offs);
 }
 
 
@@ -609,7 +608,7 @@ hfs_dinode_lookup(HFS_INFO * hfs, INUM_T inum)
 {
     if (verbose)
 	fprintf(stderr, "hfs_dinode_lookup: looking up %" PRIuINUM "\n",
-		inum);
+	    inum);
 
     /* cat_lookup does a sanity check, so we can skip it here */
     hfs_catalog_lookup(hfs, hfs->cat, inum);
@@ -630,7 +629,7 @@ hfs_inode_lookup(FS_INFO * fs, INUM_T inum)
 
     if (verbose)
 	fprintf(stderr, "hfs_inode_lookup: looking up %" PRIuINUM "\n",
-		inum);
+	    inum);
 
     /* Lookup inode and store it in the HFS structure */
     hfs_dinode_lookup(hfs, inum);
@@ -644,7 +643,7 @@ hfs_inode_lookup(FS_INFO * fs, INUM_T inum)
 
 void
 hfs_file_walk(FS_INFO * fs, FS_INODE * inode, uint32_t type,
-	      uint16_t id, int flags, FS_FILE_WALK_FN action, void *ptr)
+    uint16_t id, int flags, FS_FILE_WALK_FN action, void *ptr)
 {
     HFS_INFO *hfs = (HFS_INFO *) fs;
     char *data_buf;
@@ -657,9 +656,8 @@ hfs_file_walk(FS_INFO * fs, FS_INODE * inode, uint32_t type,
 
     if (verbose)
 	fprintf(stderr,
-		"hfs_file_walk: inode: %" PRIuINUM " type: %" PRIu32
-		" id: %" PRIu16 " flags: %X\n", inode->addr, type, id,
-		flags);
+	    "hfs_file_walk: inode: %" PRIuINUM " type: %" PRIu32
+	    " id: %" PRIu16 " flags: %X\n", inode->addr, type, id, flags);
 
     myflags = FS_FLAG_DATA_CONT;
 
@@ -693,7 +691,7 @@ hfs_file_walk(FS_INFO * fs, FS_INODE * inode, uint32_t type,
 		bytes_read = fs_read_random(fs, data_buf, size, offs);
 		if (bytes_read != size) {
 		    error("hfs_file_walk: Error reading block %" PRIuDADDR
-			  " %m", addr);
+			" %m", addr);
 		}
 	    }
 	    else {
@@ -719,7 +717,7 @@ hfs_file_walk(FS_INFO * fs, FS_INODE * inode, uint32_t type,
 
 void
 hfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
-	       int flags, FS_BLOCK_WALK_FN action, void *ptr)
+    int flags, FS_BLOCK_WALK_FN action, void *ptr)
 {
     char *myname = "hfs_block_walk";
     HFS_INFO *hfs = (HFS_INFO *) fs;
@@ -729,19 +727,18 @@ hfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
 
     if (verbose)
 	fprintf(stderr,
-		"hfs_block_walk: start_blk: %" PRIuDADDR " end_blk: %"
-		PRIuDADDR " flags: %" PRIu32 "\n", start_blk, end_blk,
-		flags);
+	    "hfs_block_walk: start_blk: %" PRIuDADDR " end_blk: %"
+	    PRIuDADDR " flags: %" PRIu32 "\n", start_blk, end_blk, flags);
 
     /*
      * Sanity checks.
      */
     if (start_blk < fs->first_block || start_blk > fs->last_block)
 	error("%s: invalid start block number: %" PRIuDADDR "", myname,
-	      start_blk);
+	    start_blk);
     if (end_blk < fs->first_block || end_blk > fs->last_block)
 	error("%s: invalid last block number: %" PRIuDADDR "", myname,
-	      end_blk);
+	    end_blk);
 
     /*
      * Iterate
@@ -756,7 +753,7 @@ hfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
 	    if (fs_read_block(fs, data_buf, fs->block_size, addr) !=
 		fs->block_size) {
 		error("hfs_block_walk: Error reading block %" PRIuDADDR
-		      ": %m", addr);
+		    ": %m", addr);
 	    }
 	    if (WALK_STOP ==
 		action(fs, addr, data_buf->data, myflags, ptr)) {
@@ -773,7 +770,7 @@ hfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
 
 void
 hfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
-	       int flags, FS_INODE_WALK_FN action, void *ptr)
+    int flags, FS_INODE_WALK_FN action, void *ptr)
 {
     HFS_INFO *hfs = (HFS_INFO *) fs;
     INUM_T inum;
@@ -782,26 +779,25 @@ hfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 
     if (verbose)
 	fprintf(stderr,
-		"hfs_inode_walk: start_inum: %" PRIuINUM " end_inum: %"
-		PRIuINUM " flags: %" PRIu32 "\n", start_inum, end_inum,
-		flags);
+	    "hfs_inode_walk: start_inum: %" PRIuINUM " end_inum: %"
+	    PRIuINUM " flags: %" PRIu32 "\n", start_inum, end_inum, flags);
 
     /*
      * Sanity checks.
      */
     if (start_inum < fs->first_inum)
 	error("Starting inode number is too small (%" PRIuINUM ")",
-	      start_inum);
+	    start_inum);
     if (start_inum > fs->last_inum)
 	error("Starting inode number is too large (%" PRIuINUM ")",
-	      start_inum);
+	    start_inum);
 
     if (end_inum < fs->first_inum)
 	error("Ending inode number is too small (%" PRIuINUM ")",
-	      end_inum);
+	    end_inum);
     if (end_inum > fs->last_inum)
 	error("Ending inode number is too large (%" PRIuINUM ")",
-	      end_inum);
+	    end_inum);
 
     for (inum = start_inum; inum <= end_inum; inum++) {
 
@@ -866,10 +862,10 @@ hfs_fsstat(FS_INFO * fs, FILE * hFile)
 
 
     fprintf(hFile, "Number of files: %" PRIu32 "\n",
-	    getu32(fs, sb->file_cnt));
+	getu32(fs, sb->file_cnt));
 
     fprintf(hFile, "Number of folders: %" PRIu32 "\n",
-	    getu32(fs, sb->fldr_cnt));
+	getu32(fs, sb->fldr_cnt));
 
     mac_time = hfs2unixtime(getu32(fs, hfs->fs->c_date));
     fprintf(hFile, "Created: %s", ctime(&mac_time));
@@ -889,29 +885,29 @@ hfs_fsstat(FS_INFO * fs, FILE * hFile)
     /* Print journal information */
     if (getu32(fs, sb->attr) & HFS_BIT_VOLUME_JOURNALED) {
 	fprintf(hFile, "\nJournal Info Block: %" PRIu32 "\n",
-		getu32(fs, sb->jinfo_blk));
+	    getu32(fs, sb->jinfo_blk));
     }
 
     fprintf(hFile, "\nMETADATA INFORMATION\n");
     fprintf(hFile, "--------------------------------------------\n");
 
     fprintf(hFile, "First Block of Catalog File: %" PRIu32 "\n",
-	    getu32(fs, hfs->fs->cat_file.extents[0].start_blk));
+	getu32(fs, hfs->fs->cat_file.extents[0].start_blk));
 
     fprintf(hFile, "Range: %" PRIuINUM " - %" PRIuINUM "\n",
-	    fs->first_inum, fs->last_inum);
+	fs->first_inum, fs->last_inum);
 
 
     fprintf(hFile, "\nCONTENT INFORMATION\n");
     fprintf(hFile, "--------------------------------------------\n");
 
     fprintf(hFile, "Block Range: %" PRIuDADDR " - %" PRIuDADDR "\n",
-	    fs->first_block, fs->last_block);
+	fs->first_block, fs->last_block);
 
     fprintf(hFile, "Allocation Block Size: %u\n", fs->block_size);
 
     fprintf(hFile, "Free Blocks: %" PRIu32 "\n",
-	    getu32(fs, sb->free_blks));
+	getu32(fs, sb->free_blks));
 }
 
 
@@ -925,7 +921,7 @@ typedef struct {
 
 static uint8_t
 print_addr_act(FS_INFO * fs, DADDR_T addr, char *buf,
-	       unsigned int size, int flags, void *ptr)
+    unsigned int size, int flags, void *ptr)
 {
     HFS_PRINT_ADDR *print = (HFS_PRINT_ADDR *) ptr;
     fprintf(print->hFile, "%" PRIuDADDR " ", addr);
@@ -940,7 +936,7 @@ print_addr_act(FS_INFO * fs, DADDR_T addr, char *buf,
 
 static void
 hfs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
-	  int32_t sec_skew)
+    int32_t sec_skew)
 {
     HFS_INFO *hfs = (HFS_INFO *) fs;
     FS_INODE *fs_inode;
@@ -950,8 +946,8 @@ hfs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 
     if (verbose)
 	fprintf(stderr,
-		"hfs_istat: inum: %" PRIuINUM " numblock: %" PRIu32 "\n",
-		inum, numblock);
+	    "hfs_istat: inum: %" PRIuINUM " numblock: %" PRIu32 "\n",
+	    inum, numblock);
 
     fs_inode = hfs_inode_lookup(fs, inum);
 
@@ -991,8 +987,8 @@ hfs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
     print.hFile = hFile;
 
     fs->file_walk(fs, fs_inode, 0, 0,
-		  (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_META |
-		   FS_FLAG_FILE_NOID), print_addr_act, (void *) &print);
+	(FS_FLAG_FILE_AONLY | FS_FLAG_FILE_META |
+	    FS_FLAG_FILE_NOID), print_addr_act, (void *) &print);
 
     if (print.idx != 0)
 	fprintf(hFile, "\n");

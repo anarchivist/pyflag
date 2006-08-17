@@ -2,12 +2,13 @@
 ** ffs_dent
 ** The  Sleuth Kit 
 **
-** $Date: 2005/10/13 04:15:21 $
+** $Date: 2006/07/05 18:24:09 $
 **
-** Human Interface Layer Support for a FFS image 
+** File name layer for a FFS/UFS image 
 **
 ** Brian Carrier [carrier@sleuthkit.org]
-** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved 
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
+** Copyright (c) 2003-2006 Brian Carrier.  All rights reserved 
 **
 ** TASK
 ** Copyright (c) 2002 Brian Carrier, @stake Inc.  All rights reserved
@@ -42,16 +43,18 @@ typedef struct {
 
 } FFS_DINFO;
 
-static void ffs_dent_walk_lcl(FS_INFO *, FFS_DINFO *, INUM_T, int,
-			      FS_DENT_WALK_FN, void *);
+static uint8_t ffs_dent_walk_lcl(FS_INFO *, FFS_DINFO *, INUM_T, int,
+    FS_DENT_WALK_FN, void *);
 
 
 /* 
 ** copy OS specific directory inode to generic FS_DENT
+ * 
+ * Return 1 on error and 0 on success
 */
-static void
+static uint8_t
 ffs_dent_copy(FFS_INFO * ffs, FFS_DINFO * dinfo, char *ffs_dent,
-	      FS_DENT * fs_dent)
+    FS_DENT * fs_dent)
 {
     FS_INFO *fs = &(ffs->fs_info);
 
@@ -61,8 +64,11 @@ ffs_dent_copy(FFS_INFO * ffs, FFS_DINFO * dinfo, char *ffs_dent,
 
 	fs_dent->inode = getu32(fs, dir->d_ino);
 
-	if (fs_dent->name_max != FFS_MAXNAMLEN)
-	    fs_dent_realloc(fs_dent, FFS_MAXNAMLEN);
+	if (fs_dent->name_max != FFS_MAXNAMLEN) {
+	    if ((fs_dent =
+		    fs_dent_realloc(fs_dent, FFS_MAXNAMLEN)) == NULL)
+		return 1;
+	}
 
 	/* ffs null terminates so we can strncpy */
 	strncpy(fs_dent->name, dir->d_name, fs_dent->name_max);
@@ -76,8 +82,11 @@ ffs_dent_copy(FFS_INFO * ffs, FFS_DINFO * dinfo, char *ffs_dent,
 
 	fs_dent->inode = getu32(fs, dir->d_ino);
 
-	if (fs_dent->name_max != FFS_MAXNAMLEN)
-	    fs_dent_realloc(fs_dent, FFS_MAXNAMLEN);
+	if (fs_dent->name_max != FFS_MAXNAMLEN) {
+	    if ((fs_dent =
+		    fs_dent_realloc(fs_dent, FFS_MAXNAMLEN)) == NULL)
+		return 1;
+	}
 
 	/* ffs null terminates so we can strncpy */
 	strncpy(fs_dent->name, dir->d_name, fs_dent->name_max);
@@ -85,22 +94,36 @@ ffs_dent_copy(FFS_INFO * ffs, FFS_DINFO * dinfo, char *ffs_dent,
 	fs_dent->ent_type = FS_DENT_UNDEF;
     }
     else {
-	error("dent_copy: Unknown FFS Type");
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "ffs_dent_copy: Unknown FS type");
+	tsk_errstr2[0] = '\0';
+	return 1;
     }
 
     /* copy the path data */
     fs_dent->path = dinfo->dirs;
     fs_dent->pathdepth = dinfo->depth;
 
-    if ((fs != NULL) && (fs_dent->inode)) {
+    if ((fs != NULL) && (fs_dent->inode)
+	&& (fs_dent->inode <= fs->last_inum)) {
 	/* Get inode */
 	if (fs_dent->fsi)
 	    fs_inode_free(fs_dent->fsi);
-	fs_dent->fsi = fs->inode_lookup(fs, fs_dent->inode);
+
+	if ((fs_dent->fsi = fs->inode_lookup(fs, fs_dent->inode)) == NULL) {
+	    strncat(tsk_errstr2, " - ffs_dent_copy",
+		TSK_ERRSTR_L - strlen(tsk_errstr2));
+	    return 1;
+	}
     }
     else {
+	if (fs_dent->fsi)
+	    fs_inode_free(fs_dent->fsi);
 	fs_dent->fsi = NULL;
     }
+
+    return 0;
 }
 
 
@@ -111,12 +134,11 @@ ffs_dent_copy(FFS_INFO * ffs, FFS_DINFO * dinfo, char *ffs_dent,
 **
 ** len is size of buf
 **
-** return how much was read this time, or 0 if action said to stop
+** return 0 on success, -1 on error, and 1 to stop 
 */
 static int
 ffs_dent_parse_block(FFS_INFO * ffs, FFS_DINFO * dinfo, char *buf,
-		     unsigned int len, int flags, FS_DENT_WALK_FN action,
-		     void *ptr)
+    unsigned int len, int flags, FS_DENT_WALK_FN action, void *ptr)
 {
     unsigned int idx;
     unsigned int inode = 0, dellen = 0, reclen = 0;
@@ -126,7 +148,8 @@ ffs_dent_parse_block(FFS_INFO * ffs, FFS_DINFO * dinfo, char *buf,
     char *dirPtr;
     FS_DENT *fs_dent;
 
-    fs_dent = fs_dent_alloc(FFS_MAXNAMLEN + 1, 0);
+    if ((fs_dent = fs_dent_alloc(FFS_MAXNAMLEN + 1, 0)) == NULL)
+	return -1;
 
     /* update each time by the actual length instead of the
      ** recorded length so we can view the deleted entries 
@@ -177,31 +200,50 @@ ffs_dent_parse_block(FFS_INFO * ffs, FFS_DINFO * dinfo, char *buf,
 	 * sure that it also ends in the unalloc space */
 	if ((dellen) && (dellen < minreclen)) {
 	    minreclen = 4;
-	    dellen -= 4;
+	    if (dellen)
+		dellen -= 4;
+
 	    continue;
 	}
 
 	/* the entry is valid */
-	ffs_dent_copy(ffs, dinfo, dirPtr, fs_dent);
+	if (ffs_dent_copy(ffs, dinfo, dirPtr, fs_dent)) {
+	    fs_dent_free(fs_dent);
+	    return -1;
+	}
 
 	myflags = 0;
 	/* Do we have a deleted entry? (are we in a deleted space) */
 	if ((dellen > 0) || (inode == 0)) {
 	    myflags |= FS_FLAG_NAME_UNALLOC;
-	    dellen -= minreclen;
+	    if (dellen)
+		dellen -= minreclen;
+
 	    if (flags & FS_FLAG_NAME_UNALLOC) {
-		if (WALK_STOP == action(fs, fs_dent, myflags, ptr)) {
+		int retval;
+		retval = action(fs, fs_dent, myflags, ptr);
+		if (retval == WALK_STOP) {
 		    fs_dent_free(fs_dent);
-		    return 0;
+		    return 1;
+		}
+		else if (retval == WALK_ERROR) {
+		    fs_dent_free(fs_dent);
+		    return -1;
 		}
 	    }
 	}
 	else {
 	    myflags |= FS_FLAG_NAME_ALLOC;
 	    if (flags & FS_FLAG_NAME_ALLOC) {
-		if (WALK_STOP == action(fs, fs_dent, myflags, ptr)) {
+		int retval;
+		retval = action(fs, fs_dent, myflags, ptr);
+		if (retval == WALK_STOP) {
 		    fs_dent_free(fs_dent);
-		    return 0;
+		    return 1;
+		}
+		else if (retval == WALK_ERROR) {
+		    fs_dent_free(fs_dent);
+		    return -1;
 		}
 	    }
 	}
@@ -224,14 +266,24 @@ ffs_dent_parse_block(FFS_INFO * ffs, FFS_DINFO * dinfo, char *buf,
 		dinfo->didx[dinfo->depth] =
 		    &dinfo->dirs[strlen(dinfo->dirs)];
 		strncpy(dinfo->didx[dinfo->depth], fs_dent->name,
-			DIR_STRSZ - strlen(dinfo->dirs));
+		    DIR_STRSZ - strlen(dinfo->dirs));
 		strncat(dinfo->dirs, "/", DIR_STRSZ);
 	    }
 	    dinfo->depth++;
 
 	    /* Call ourselves again */
-	    ffs_dent_walk_lcl(&(ffs->fs_info), dinfo, fs_dent->inode,
-			      flags, action, ptr);
+	    if (ffs_dent_walk_lcl(&(ffs->fs_info), dinfo, fs_dent->inode,
+		    flags, action, ptr)) {
+		/* If the directory could not be loaded, 
+		 * then move on */
+		if (verbose) {
+		    fprintf(stderr,
+			"ffs_dent_parse_block: error reading directory: %"
+			PRIuINUM "\n", fs_dent->inode);
+		    tsk_error_print(stderr);
+		}
+		tsk_error_reset();
+	    }
 
 	    dinfo->depth--;
 	    if (dinfo->depth < MAX_DEPTH)
@@ -241,8 +293,7 @@ ffs_dent_parse_block(FFS_INFO * ffs, FFS_DINFO * dinfo, char *buf,
     }				/* end for size */
 
     fs_dent_free(fs_dent);
-    return len;
-
+    return 0;
 }				/* end ffs_dent_parse_block */
 
 
@@ -254,20 +305,23 @@ ffs_dent_parse_block(FFS_INFO * ffs, FFS_DINFO * dinfo, char *buf,
 **
 ** Use the following flags: FS_FLAG_NAME_ALLOC, FS_FLAG_NAME_UNALLOC, 
 ** FS_FLAG_NAME_RECURSE
-*/
-void
+ *
+ * returns 1 on error and 0 on success
+ */
+uint8_t
 ffs_dent_walk(FS_INFO * fs, INUM_T inode, int flags,
-	      FS_DENT_WALK_FN action, void *ptr)
+    FS_DENT_WALK_FN action, void *ptr)
 {
     FFS_DINFO dinfo;
     memset(&dinfo, 0, sizeof(FFS_DINFO));
 
-    ffs_dent_walk_lcl(fs, &dinfo, inode, flags, action, ptr);
+    return ffs_dent_walk_lcl(fs, &dinfo, inode, flags, action, ptr);
 }
 
-static void
+/* Return 0 on success and 1 on error */
+static uint8_t
 ffs_dent_walk_lcl(FS_INFO * fs, FFS_DINFO * dinfo, INUM_T inode, int flags,
-		  FS_DENT_WALK_FN action, void *ptr)
+    FS_DENT_WALK_FN action, void *ptr)
 {
     OFF_T size;
     FS_INODE *fs_inode;
@@ -275,40 +329,56 @@ ffs_dent_walk_lcl(FS_INFO * fs, FFS_DINFO * dinfo, INUM_T inode, int flags,
     char *dirbuf;
     int nchnk, cidx;
     FS_LOAD_FILE load_file;
+    int retval = 0;
 
-    if (inode < fs->first_inum || inode > fs->last_inum)
-	error("invalid inode value: %" PRIuINUM "\n", inode);
+    if (inode < fs->first_inum || inode > fs->last_inum) {
+	tsk_errno = TSK_ERR_FS_WALK_RNG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "ffs_dent_walk_lcl: Invalid inode value: %" PRIuINUM, inode);
+	tsk_errstr2[0] = '\0';
+	return 1;
+    }
 
     if (verbose)
 	fprintf(stderr,
-		"fffs_dent_walk: Processing directory %" PRIuINUM "\n",
-		inode);
+	    "ffs_dent_walk: Processing directory %" PRIuINUM "\n", inode);
 
-    fs_inode = fs->inode_lookup(fs, inode);
+    if ((fs_inode = fs->inode_lookup(fs, inode)) == NULL) {
+	strncat(tsk_errstr2, " - ffs_dent_walk_lcl",
+	    TSK_ERRSTR_L - strlen(tsk_errstr2));
+	return 1;
+    }
 
     /* make a copy of the directory contents that we can process */
     /* round up cause we want the slack space too */
     size = roundup(fs_inode->size, FFS_DIRBLKSIZ);
-    dirbuf = mymalloc(size);
+    if ((dirbuf = mymalloc(size)) == NULL) {
+	fs_inode_free(fs_inode);
+	return 1;
+    }
 
     load_file.total = load_file.left = size;
     load_file.base = load_file.cur = dirbuf;
 
-    fs->file_walk(fs, fs_inode, 0, 0,
-		  FS_FLAG_FILE_SLACK | FS_FLAG_FILE_NOID |
-		  FS_FLAG_FILE_NOABORT, load_file_action,
-		  (void *) &load_file);
-
-    /* Not all of the directory was copied, so we exit */
-    if (load_file.left > 0) {
+    if (fs->file_walk(fs, fs_inode, 0, 0,
+	    FS_FLAG_FILE_SLACK | FS_FLAG_FILE_NOID,
+	    load_file_action, (void *) &load_file)) {
 	free(dirbuf);
 	fs_inode_free(fs_inode);
+	strncat(tsk_errstr2, " - ffs_dent_walk_lcl",
+	    TSK_ERRSTR_L - strlen(tsk_errstr2));
+	return 1;
+    }
 
-	if (dinfo->depth == 0)
-	    error("Error reading directory contents: %" PRIuINUM "\n",
-		  inode);
-
-	return;
+    /* Not all of the directory was copied, so we return */
+    if (load_file.left > 0) {
+	tsk_errno = TSK_ERR_FS_FWALK;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "ffs_dent_walk: Error reading directory %" PRIuINUM, inode);
+	tsk_errstr2[0] = '\0';
+	free(dirbuf);
+	fs_inode_free(fs_inode);
+	return 1;
     }
 
     /* Directory entries are written in chunks of DIRBLKSIZ
@@ -321,20 +391,22 @@ ffs_dent_walk_lcl(FS_INFO * fs, FFS_DINFO * dinfo, INUM_T inode, int flags,
 
     for (cidx = 0; cidx < nchnk && size > 0; cidx++) {
 	int len = (FFS_DIRBLKSIZ < size) ? FFS_DIRBLKSIZ : size;
-	int retval;
 
 	retval =
 	    ffs_dent_parse_block(ffs, dinfo, dirbuf + cidx * FFS_DIRBLKSIZ,
-				 len, flags, action, ptr);
+	    len, flags, action, ptr);
 
-	size -= retval;
-
-	/* zero is returned when the action wants to stop */
-	if (!retval)
+	/* one is returned when the action wants to stop */
+	if ((retval == 1) || (retval == -1))
 	    break;
+
+	size -= len;
     }
 
     fs_inode_free(fs_inode);
     free(dirbuf);
-    return;
+    if (retval == -1)
+	return 1;
+    else
+	return 0;
 }

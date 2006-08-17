@@ -1,3 +1,8 @@
+/*
+ * Brian Carrier [carrier@sleuthkit.org]
+ * Copyright (c) 2006 Brian Carrier, Basis Technology.  All rights reserved
+ *
+ */
 /*++
 * NAME
 *	mymalloc 3
@@ -46,41 +51,45 @@
 
 /* System library. */
 
+#include <stdio.h>
 #include <stdlib.h>
+#if defined (HAVE_UNISTD)
 #include <unistd.h>
+#endif
+#if defined (_WIN32)
+#include <tchar.h>
+#endif
 #include <string.h>
+#include <errno.h>
 
-/* Utility library. */
+#include "tsk_os.h"
+#include "tsk_types.h"
+#include "tsk_error.h"
 
-#include "error.h"
-#include "mymalloc.h"
 
-/* mymalloc - allocate memory or bust */
-
+/* mymalloc - allocate memory and set error values on error
+ */
 char *
-mymalloc(int len)
+mymalloc(size_t len)
 {
     char *ptr;
 
-    if ((ptr = (char *) malloc(len)) == 0)
-	error("Insufficient memory: %m");
+    if ((ptr = (char *) malloc(len)) == 0) {
+	tsk_errno = TSK_ERR_AUX_MALLOC;
+	snprintf(tsk_errstr, TSK_ERRSTR_L, "mymalloc: %s",
+	    strerror(errno));
+    }
     return (ptr);
 }
 
-/* myrealloc - reallocate memory or bust */
-
+/* myrealloc - reallocate memory and set error values if needed */
 char *
-myrealloc(char *ptr, int len)
+myrealloc(char *ptr, size_t len)
 {
-    if ((ptr = (char *) realloc(ptr, len)) == 0)
-	error("Insufficient memory: %m");
+    if ((ptr = (char *) realloc(ptr, len)) == 0) {
+	tsk_errno = TSK_ERR_AUX_MALLOC;
+	snprintf(tsk_errstr, TSK_ERRSTR_L, "myrealloc: %s",
+	    strerror(errno));
+    }
     return (ptr);
-}
-
-/* mystrdup - save string to heap */
-
-char *
-mystrdup(const char *str)
-{
-    return (strcpy(mymalloc(strlen(str) + 1), str));
 }

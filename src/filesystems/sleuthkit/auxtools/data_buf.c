@@ -34,7 +34,10 @@
 #include "mymalloc.h"
 
 
-/* data_buf_alloc - allocate file system I/O buffer */
+/* data_buf_alloc - allocate file system I/O buffer 
+ *
+ * Returns NULL on error
+ * */
 
 DATA_BUF *
 data_buf_alloc(size_t size)
@@ -42,7 +45,14 @@ data_buf_alloc(size_t size)
     DATA_BUF *buf;
 
     buf = (DATA_BUF *) mymalloc(sizeof(*buf));
+    if (buf == NULL)
+	return NULL;
+
     buf->data = mymalloc(size);
+    if (buf->data == NULL) {
+	free(buf);
+	return NULL;
+    }
     buf->size = size;
     buf->used = 0;
     buf->addr = 0;

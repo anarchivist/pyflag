@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2005/09/02 19:53:28 $
+ * $Date: 2006/06/20 22:35:41 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2005 Brian Carrier.  All rights reserved 
@@ -16,12 +16,18 @@ extern "C" {
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include "tsk_os.h"
+
+#ifdef HAVE_UNISTD
+#include <unistd.h>
+#endif
+
 #include "tsk_types.h"
 
+#include "img_types.h"
 
 #include "libauxtools.h"
 
@@ -34,25 +40,17 @@ extern "C" {
 	/* Image specific function pointers */
 	uint8_t itype;
 
-	OFF_T offset;		/* Offset for reads (in bytes) */
 	OFF_T size;		/* Size of image in bytes */
 
 	/* Read random */
-	 OFF_T(*read_random) (IMG_INFO *, char *, OFF_T, OFF_T);
+	 SSIZE_T(*read_random) (IMG_INFO *, OFF_T, char *, OFF_T, OFF_T);
 	 OFF_T(*get_size) (IMG_INFO *);
 	void (*close) (IMG_INFO *);
 	void (*imgstat) (IMG_INFO *, FILE *);
     };
 
-#define IMG_RAW		0x01
-#define IMG_SPLIT	0x02
 
-
-    extern IMG_INFO *img_open(const char *, const char *, const int,
-			      const char **);
-
-    extern void img_print_types(FILE *);
-    extern char *img_get_type(uint8_t);
+    extern IMG_INFO *img_open(const char *, const int, const char **);
 
 #ifdef __cplusplus
 }

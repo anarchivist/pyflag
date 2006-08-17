@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2005/10/13 04:15:21 $
+** $Date: 2006/03/27 03:33:19 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -323,21 +323,14 @@ extern "C" {
     } FATFS_INFO;
 
 
-/*
- * Macro to identify if a cluster is allocated
- * returns 1 if it is allocated and 0 if not
- */
-#define is_clustalloc(fs, c) \
-    (getFAT((fs), (c)) != FATFS_UNALLOC)
+    extern int8_t is_sectalloc(FATFS_INFO *, DADDR_T);
 
-    extern uint8_t is_sectalloc(FATFS_INFO *, DADDR_T);
-
-    extern void fatfs_dent_walk(FS_INFO *, INUM_T, int, FS_DENT_WALK_FN,
-				void *);
+    extern uint8_t fatfs_dent_walk(FS_INFO *, INUM_T, int, FS_DENT_WALK_FN,
+	void *);
     extern uint8_t fatfs_isdentry(FATFS_INFO *, fatfs_dentry *);
-    extern void fatfs_make_root(FATFS_INFO *, FS_INODE *);
-    extern void fatfs_dinode_copy(FATFS_INFO *, FS_INODE *, fatfs_dentry *,
-				  DADDR_T, INUM_T);
+    extern uint8_t fatfs_make_root(FATFS_INFO *, FS_INODE *);
+    extern uint8_t fatfs_dinode_copy(FATFS_INFO *, FS_INODE *,
+	fatfs_dentry *, DADDR_T, INUM_T);
 
 #ifdef __cplusplus
 }

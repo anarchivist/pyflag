@@ -1,11 +1,12 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2005/09/02 19:53:26 $
+** $Date: 2006/06/19 22:20:41 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2004-2005 Brian Carrier.  All rights reserved
 */
+
 #ifndef _TSK_TYPES_H
 #define _TSK_TYPES_H
 
@@ -98,6 +99,14 @@ extern "C" {
 #define PRIuOFF		PRIu64
 #define PRIxOFF		PRIx64
 #define PRIdOFF		PRId64
+
+#if !defined (_WIN32) && !defined(__WIN32__)
+    typedef int64_t SSIZE_T;
+#endif
+
+#define PRIuSSIZE		PRIu64
+#define PRIxSSIZE		PRIx64
+#define PRIdSSIZE		PRId64
 
 // Partition Number
     typedef uint32_t PNUM_T;

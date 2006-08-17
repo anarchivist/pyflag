@@ -2,11 +2,12 @@
 ** fatfs_dent
 ** The Sleuth Kit 
 **
-** $Date: 2005/10/13 04:15:21 $
+** $Date: 2006/07/05 18:24:09 $
 **
 ** Human interface Layer support for the FAT file system
 **
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved 
 **
 ** TASK
@@ -90,8 +91,8 @@ typedef struct {
 } FATFS_DINFO;
 
 
-static void fatfs_dent_walk_lcl(FS_INFO *, FATFS_DINFO *, INUM_T, int,
-				FS_DENT_WALK_FN, void *);
+static uint8_t fatfs_dent_walk_lcl(FS_INFO *, FATFS_DINFO *, INUM_T, int,
+    FS_DENT_WALK_FN, void *);
 
 
 /**************************************************************************
@@ -123,7 +124,7 @@ find_parent_act(FS_INFO * fs, FS_DENT * fsd, int flags, void *ptr)
  * specified in fs_dent. It works by walking the directory tree
  * starting at the root.  
  *
- * return the inode number
+ * return the inode number or 0 on error 
  */
 static INUM_T
 find_parent(FATFS_INFO * fatfs, FS_DENT * fs_dent)
@@ -138,8 +139,8 @@ find_parent(FATFS_INFO * fatfs, FS_DENT * fs_dent)
 
     if (verbose)
 	fprintf(stderr,
-		"fatfs_find_parent: Looking for directory in cluster %"
-		PRIuDADDR "\n", dinfo.find_clust);
+	    "fatfs_find_parent: Looking for directory in cluster %"
+	    PRIuDADDR "\n", dinfo.find_clust);
 
     /* Are we searching for the root directory? */
     if (fs->ftype == FAT32) {
@@ -156,7 +157,10 @@ find_parent(FATFS_INFO * fatfs, FS_DENT * fs_dent)
     }
 
     if ((fs_dent->fsi->mode & FS_INODE_FMT) != FS_INODE_DIR) {
-	error("fatfs_find_parent called on a non-directory");
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "fatfs_find_parent called on a non-directory");
+	return 0;
     }
 
 
@@ -164,20 +168,23 @@ find_parent(FATFS_INFO * fatfs, FS_DENT * fs_dent)
      * same first sector 
      */
 
-    fatfs_dent_walk_lcl(fs, &dinfo, fs->root_inum,
-			FS_FLAG_NAME_ALLOC | FS_FLAG_NAME_RECURSE,
-			find_parent_act, (void *) &dinfo);
+    if (fatfs_dent_walk_lcl(fs, &dinfo, fs->root_inum,
+	    FS_FLAG_NAME_ALLOC | FS_FLAG_NAME_RECURSE,
+	    find_parent_act, (void *) &dinfo)) {
+	return 0;
+    }
 
 
     if (verbose)
 	fprintf(stderr,
-		"fatfs_find_parent: Directory %" PRIuINUM
-		" found for cluster %" PRIuDADDR "\n", dinfo.find_inode,
-		dinfo.find_clust);
+	    "fatfs_find_parent: Directory %" PRIuINUM
+	    " found for cluster %" PRIuDADDR "\n", dinfo.find_inode,
+	    dinfo.find_clust);
 
     /* if we didn't find anything then 0 will be returned */
     return dinfo.find_inode;
 }
+
 
 /* 
 **
@@ -188,12 +195,13 @@ find_parent(FATFS_INFO * fatfs, FS_DENT * fs_dent)
 ** it only once... 
 **
 ** flags: FS_FLAG_NAME_ALLOC, FS_FLAG_NAME_UNALLOC, FS_FLAG_NAME_RECURSE
+**
+** Return -1 on error, 0 on success, and 1 to stop
 */
-static void
+static int8_t
 fatfs_dent_parse_buf(FATFS_INFO * fatfs, FATFS_DINFO * dinfo,
-		     char *buf, int len,
-		     DADDR_T * addrs, int flags,
-		     FS_DENT_WALK_FN action, void *ptr)
+    char *buf, int len,
+    DADDR_T * addrs, int flags, FS_DENT_WALK_FN action, void *ptr)
 {
     unsigned int idx, sidx;
     int a, b;
@@ -204,13 +212,24 @@ fatfs_dent_parse_buf(FATFS_INFO * fatfs, FATFS_DINFO * dinfo,
     FS_DENT *fs_dent;
     FATFS_LFN lfninfo;
 
-    if (buf == NULL)
-	error("fatfs_dent_parse_buf: buffer is NULL");
+    if (buf == NULL) {
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "fatfs_dent_parse_buf: buffer is NULL");
+	tsk_errstr2[0] = '\0';
+	return -1;
+    }
 
     dep = (fatfs_dentry *) buf;
 
-    fs_dent = fs_dent_alloc(FATFS_MAXNAMLEN_UTF8, 32);
-    fs_dent->fsi = fs_inode_alloc(FATFS_NDADDR, FATFS_NIADDR);
+    if ((fs_dent = fs_dent_alloc(FATFS_MAXNAMLEN_UTF8, 32)) == NULL) {
+	return -1;
+    }
+    else if ((fs_dent->fsi =
+	    fs_inode_alloc(FATFS_NDADDR, FATFS_NIADDR)) == NULL) {
+	fs_dent_free(fs_dent);
+	return -1;
+    }
 
     memset(&lfninfo, 0, sizeof(FATFS_LFN));
     lfninfo.start = FATFS_MAXNAMLEN_UTF8 - 1;
@@ -219,15 +238,23 @@ fatfs_dent_parse_buf(FATFS_INFO * fatfs, FATFS_DINFO * dinfo,
 
 	/* Get the base inode for this sector */
 	ibase = FATFS_SECT_2_INODE(fatfs, addrs[sidx]);
-	if (ibase > fs->last_inum)
-	    error("parse error: inode address is too large");
+	if (ibase > fs->last_inum) {
+	    tsk_errno = TSK_ERR_FS_ARG;
+	    snprintf(tsk_errstr, TSK_ERRSTR_L,
+		"fatfs_parse: inode address is too large");
+	    fs_dent_free(fs_dent);
+	    return -1;
+	}
 
 	if (verbose)
 	    fprintf(stderr,
-		    "fatfs_dent_parse_buf: Parsing sector %" PRIuDADDR
-		    "\n", addrs[sidx]);
+		"fatfs_dent_parse_buf: Parsing sector %" PRIuDADDR
+		"\n", addrs[sidx]);
 
-	sectalloc = is_sectalloc(fatfs, addrs[sidx]);
+	if ((sectalloc = is_sectalloc(fatfs, addrs[sidx])) == -1) {
+	    fs_dent_free(fs_dent);
+	    return -1;
+	}
 
 	/* cycle through the directory entries */
 	for (idx = 0; idx < fatfs->dentry_cnt_se; idx++, dep++) {
@@ -243,24 +270,26 @@ fatfs_dent_parse_buf(FATFS_INFO * fatfs, FATFS_DINFO * dinfo,
 
 	    inode = ibase + idx;
 
-	    /* Take care of the name */
+	    /* Take care of the name 
+	     * Copy a long name to a buffer and take action if it
+	     * is a small name */
 	    if ((dir->attrib & FATFS_ATTR_LFN) == FATFS_ATTR_LFN) {
 		fatfs_dentry_lfn *dirl = (fatfs_dentry_lfn *) dir;
 
-		/* Store the name in dinfo until we get the 8.3 name */
-
-		/* Is this a new sequence?  The checksum is the same for all entries
-		 * in the same sequence 
-		 */
+		/* Store the name in dinfo until we get the 8.3 name 
+		 * Use the checksum to identify a new sequence 
+		 * */
 		if (((dirl->seq & FATFS_LFN_SEQ_FIRST)
-		     && (dirl->seq != FATFS_SLOT_DELETED))
+			&& (dirl->seq != FATFS_SLOT_DELETED))
 		    || (dirl->chksum != lfninfo.chk)) {
 		    // @@@ Do a partial output here
 
 
+		    /* Reset the values */
 		    lfninfo.seq = dirl->seq & FATFS_LFN_SEQ_MASK;
 		    lfninfo.chk = dirl->chksum;
 		    lfninfo.start = FATFS_MAXNAMLEN_UTF8 - 1;
+
 		}
 		else if (dirl->seq != lfninfo.seq - 1) {
 		    // @@@ Check the sequence number - the checksum is correct though...
@@ -287,7 +316,7 @@ fatfs_dent_parse_buf(FATFS_INFO * fatfs, FATFS_DINFO * dinfo,
 	    /* Special case for volume label: name does not have an
 	     * extension and we add a note at the end that it is a label */
 	    else if ((dir->attrib & FATFS_ATTR_VOLUME) ==
-		     FATFS_ATTR_VOLUME) {
+		FATFS_ATTR_VOLUME) {
 		a = 0;
 
 		for (b = 0; b < 8; b++) {
@@ -306,7 +335,7 @@ fatfs_dent_parse_buf(FATFS_INFO * fatfs, FATFS_DINFO * dinfo,
 		if (a + 22 < FATFS_MAXNAMLEN_UTF8) {
 		    char *volstr = " (Volume Label Entry)";
 		    strncat(fs_dent->name, volstr,
-			    FATFS_MAXNAMLEN_UTF8 - a);
+			FATFS_MAXNAMLEN_UTF8 - a);
 		}
 	    }
 
@@ -325,20 +354,22 @@ fatfs_dent_parse_buf(FATFS_INFO * fatfs, FATFS_DINFO * dinfo,
 		    /* Convert the UTF16 to UTF8 */
 		    UTF16 *name16 =
 			(UTF16 *) ((uintptr_t) & lfninfo.
-				   name[lfninfo.start + 1]);
+			name[lfninfo.start + 1]);
 		    UTF8 *name8 = (UTF8 *) fs_dent->name;
 
 		    retVal = fs_UTF16toUTF8(fs, (const UTF16 **) &name16,
-					    (UTF16 *) & lfninfo.
-					    name[FATFS_MAXNAMLEN_UTF8],
-					    &name8,
-					    (UTF8 *) ((uintptr_t) name8 +
-						      FATFS_MAXNAMLEN_UTF8),
-					    lenientConversion);
+			(UTF16 *) & lfninfo.
+			name[FATFS_MAXNAMLEN_UTF8],
+			&name8,
+			(UTF8 *) ((uintptr_t) name8 +
+			    FATFS_MAXNAMLEN_UTF8), lenientConversion);
 
 		    if (retVal != conversionOK) {
-			error("Error converting FAT LFN to UTF8: %d",
-			      retVal);
+			tsk_errno = TSK_ERR_FS_UNICODE;
+			snprintf(tsk_errstr, TSK_ERRSTR_L,
+			    "fatfs_parse: Error converting FAT LFN to UTF8: %d",
+			    retVal);
+			continue;
 		    }
 
 		    /* Make sure it is NULL Terminated */
@@ -368,8 +399,8 @@ fatfs_dent_parse_buf(FATFS_INFO * fatfs, FATFS_DINFO * dinfo,
 			    name_ptr[a++] = '_';
 			}
 			else if ((dir->lowercase & FATFS_CASE_LOWER_BASE)
-				 && (dir->name[b] >= 'A')
-				 && (dir->name[b] <= 'Z')) {
+			    && (dir->name[b] >= 'A')
+			    && (dir->name[b] <= 'Z')) {
 			    name_ptr[a++] = dir->name[b] + 32;
 			}
 			else {
@@ -407,8 +438,12 @@ fatfs_dent_parse_buf(FATFS_INFO * fatfs, FATFS_DINFO * dinfo,
 
 	    /* Get inode */
 	    fs_dent->inode = inode;
-	    fatfs_dinode_copy(fatfs, fs_dent->fsi, dir, addrs[sidx],
-			      inode);
+	    if (fatfs_dinode_copy(fatfs, fs_dent->fsi, dir, addrs[sidx],
+		    inode)) {
+		if (verbose)
+		    fprintf(stderr,
+			"fatfs_dent_parse: could not copy inode -- ignoring\n");
+	    }
 
 
 	    /* Handle the . and .. entries specially
@@ -433,8 +468,13 @@ fatfs_dent_parse_buf(FATFS_INFO * fatfs, FATFS_DINFO * dinfo,
 		    /* If the .. entry is for the root directory, then make
 		     * up the data
 		     */
-		    if (inode == fs->root_inum)
-			fatfs_make_root(fatfs, fs_dent->fsi);
+		    if (inode == fs->root_inum) {
+			if (fatfs_make_root(fatfs, fs_dent->fsi)) {
+			    if (verbose)
+				fprintf(stderr,
+				    "fatfs_dent_parse: could not make root directory -- ignoring\n");
+			}
+		    }
 		}
 	    }
 
@@ -452,8 +492,15 @@ fatfs_dent_parse_buf(FATFS_INFO * fatfs, FATFS_DINFO * dinfo,
 	    }
 
 	    if ((flags & myflags) == myflags) {
-		if (WALK_STOP == action(fs, fs_dent, myflags, ptr)) {
-		    return;
+		int retval = action(fs, fs_dent, myflags, ptr);
+
+		if (retval == WALK_STOP) {
+		    fs_dent_free(fs_dent);
+		    return 1;
+		}
+		else if (retval == WALK_ERROR) {
+		    fs_dent_free(fs_dent);
+		    return -1;
 		}
 	    }
 
@@ -472,7 +519,7 @@ fatfs_dent_parse_buf(FATFS_INFO * fatfs, FATFS_DINFO * dinfo,
 		    dinfo->didx[dinfo->depth] =
 			&dinfo->dirs[strlen(dinfo->dirs)];
 		    strncpy(dinfo->didx[dinfo->depth], fs_dent->name,
-			    DIR_STRSZ - strlen(dinfo->dirs));
+			DIR_STRSZ - strlen(dinfo->dirs));
 		    strncat(dinfo->dirs, "/", DIR_STRSZ);
 		}
 
@@ -489,8 +536,18 @@ fatfs_dent_parse_buf(FATFS_INFO * fatfs, FATFS_DINFO * dinfo,
 		    dinfo->recdel = 1;
 		}
 
-		fatfs_dent_walk_lcl(&(fatfs->fs_info), dinfo,
-				    fs_dent->inode, flags, action, ptr);
+		if (fatfs_dent_walk_lcl(&(fatfs->fs_info), dinfo,
+			fs_dent->inode, flags, action, ptr)) {
+		    /* If the directory could not be loaded,
+		     *                  * then move on */
+		    if (verbose) {
+			fprintf(stderr,
+			    "fatfs_dent_parse: error reading directory: %"
+			    PRIuINUM "\n", fs_dent->inode);
+			tsk_error_print(stderr);
+		    }
+		    tsk_error_reset();
+		}
 
 		dinfo->depth--;
 		dinfo->curdir_inode = dinfo->pardir_inode;
@@ -506,6 +563,8 @@ fatfs_dent_parse_buf(FATFS_INFO * fatfs, FATFS_DINFO * dinfo,
 	    }
 	}
     }
+
+    return 0;
 }
 
 
@@ -544,7 +603,7 @@ typedef struct {
  */
 static uint8_t
 fatfs_dent_action(FS_INFO * fs, DADDR_T addr, char *buf,
-		  unsigned int size, int flags, void *ptr)
+    unsigned int size, int flags, void *ptr)
 {
     FATFS_LOAD_DIR *load = (FATFS_LOAD_DIR *) ptr;
 
@@ -565,8 +624,10 @@ fatfs_dent_action(FS_INFO * fs, DADDR_T addr, char *buf,
 
 	load->addrsize += 512;
 	load->curaddrbuf = (DADDR_T *) myrealloc((char *) load->curaddrbuf,
-						 load->addrsize *
-						 sizeof(DADDR_T));
+	    load->addrsize * sizeof(DADDR_T));
+	if (load->curaddrbuf == NULL) {
+	    return WALK_ERROR;
+	}
     }
 
     /* Add this sector to the stack */
@@ -588,20 +649,20 @@ fatfs_dent_action(FS_INFO * fs, DADDR_T addr, char *buf,
 ** Use the following flags: FS_FLAG_NAME_ALLOC, FS_FLAG_NAME_UNALLOC, 
 ** FS_FLAG_NAME_RECURSE
 */
-void
+uint8_t
 fatfs_dent_walk(FS_INFO * fs, INUM_T inode, int flags,
-		FS_DENT_WALK_FN action, void *ptr)
+    FS_DENT_WALK_FN action, void *ptr)
 {
     FATFS_DINFO dinfo;
 
     memset(&dinfo, 0, sizeof(FATFS_DINFO));
-    fatfs_dent_walk_lcl(fs, &dinfo, inode, flags, action, ptr);
+    return fatfs_dent_walk_lcl(fs, &dinfo, inode, flags, action, ptr);
 }
 
 
-static void
+static uint8_t
 fatfs_dent_walk_lcl(FS_INFO * fs, FATFS_DINFO * dinfo, INUM_T inode,
-		    int flags, FS_DENT_WALK_FN action, void *ptr)
+    int flags, FS_DENT_WALK_FN action, void *ptr)
 {
     OFF_T size, len;
     FS_INODE *fs_inode;
@@ -609,27 +670,40 @@ fatfs_dent_walk_lcl(FS_INFO * fs, FATFS_DINFO * dinfo, INUM_T inode,
     char *dirbuf;
     DADDR_T *addrbuf;
     FATFS_LOAD_DIR load;
+    int retval;
 
-    if ((inode < fs->first_inum) || (inode > fs->last_inum))
-	error("invalid inode value: %" PRIuINUM "\n", inode);
+    if ((inode < fs->first_inum) || (inode > fs->last_inum)) {
+	tsk_errno = TSK_ERR_FS_WALK_RNG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "fatfs_dent_walk: invalid inode value: %" PRIuINUM "\n",
+	    inode);
+	return 1;
+    }
 
     fs_inode = fs->inode_lookup(fs, inode);
-    if (!fs_inode)
-	error("%" PRIuINUM " is not a valid inode", inode);
+    if (!fs_inode) {
+	tsk_errno = TSK_ERR_FS_INODE_NUM;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "fatfs_dent_walk: %" PRIuINUM " is not a valid inode", inode);
+	return 1;
+    }
 
     size = fs_inode->size;
     len = roundup(size, 512);
 
     if (verbose)
 	fprintf(stderr,
-		"fatfs_dent_walk: Processing directory %" PRIuINUM "\n",
-		inode);
+	    "fatfs_dent_walk: Processing directory %" PRIuINUM "\n",
+	    inode);
 
     /* Save the current inode value ('.') */
     dinfo->curdir_inode = inode;
 
     /* Make a copy of the directory contents using file_walk */
-    dirbuf = mymalloc(len);
+    if ((dirbuf = mymalloc(len)) == NULL) {
+	fs_inode_free(fs_inode);
+	return 1;
+    }
     memset(dirbuf, 0, len);
     load.curdirptr = dirbuf;
     load.dirleft = size;
@@ -638,40 +712,53 @@ fatfs_dent_walk_lcl(FS_INFO * fs, FATFS_DINFO * dinfo, INUM_T inode,
      * in a stack - they are needed to determine the inode address */
     load.addrsize = 512;
     addrbuf = (DADDR_T *) mymalloc(load.addrsize * sizeof(DADDR_T));
+    if (addrbuf == NULL) {
+	fs_inode_free(fs_inode);
+	free(dirbuf);
+	return 1;
+    }
 
     /* Set the variables that are used during the copy */
     load.addridx = 0;
     load.curaddrbuf = addrbuf;
 
     /* save the directory contents into dirbuf */
-    fs->file_walk(fs, fs_inode, 0, 0,
-		  FS_FLAG_FILE_SLACK | FS_FLAG_FILE_RECOVER |
-		  FS_FLAG_FILE_NOID | FS_FLAG_FILE_NOABORT,
-		  fatfs_dent_action, (void *) &load);
-
+    if (fs->file_walk(fs, fs_inode, 0, 0,
+	    FS_FLAG_FILE_SLACK | FS_FLAG_FILE_RECOVER |
+	    FS_FLAG_FILE_NOID, fatfs_dent_action, (void *) &load)) {
+	fs_inode_free(fs_inode);
+	free(dirbuf);
+	strncat(tsk_errstr2, " - fatfs_dent_walk",
+	    TSK_ERRSTR_L - strlen(tsk_errstr2));
+	return 1;
+    }
 
     /* We did not copy the entire directory, which occurs if an error occured */
     if (load.dirleft > 0) {
+
+	tsk_errno = TSK_ERR_FS_FWALK;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "fatfs_dent_walk: Error reading directory %" PRIuINUM, inode);
+	tsk_errstr2[0] = '\0';
 
 	/* Free the local buffers */
 	free(load.curaddrbuf);
 	free(load.curdirptr);
 	fs_inode_free(fs_inode);
 
-	if (dinfo->depth == 0)
-	    error("Error reading directory contents: %" PRIuINUM "\n",
-		  inode);
-
-	return;
+	return 1;
     }
 
     /* Reset the local pointer because we could have done a realloc */
     addrbuf = load.curaddrbuf;
+    retval =
+	fatfs_dent_parse_buf(fatfs, dinfo, dirbuf, len, addrbuf, flags,
+	action, ptr);
 
-    fatfs_dent_parse_buf(fatfs, dinfo, dirbuf, len, addrbuf, flags,
-			 action, ptr);
 
     fs_inode_free(fs_inode);
     free(dirbuf);
     free(addrbuf);
+
+    return (retval == -1) ? 1 : 0;
 }

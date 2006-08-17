@@ -2,11 +2,12 @@
 ** ffind  (file find)
 ** The Sleuth Kit 
 **
-** $Date: 2005/09/02 23:34:02 $
+** $Date: 2006/04/05 03:47:35 $
 **
 ** Find the file that uses the specified inode (including deleted files)
 ** 
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved 
 **
 ** TASK
@@ -22,9 +23,9 @@
 #include "libfstools.h"
 
 /* NTFS has an optimized version of this function */
-extern void
- ntfs_find_file(FS_INFO *, INUM_T, uint32_t,
-		uint16_t, int, FS_DENT_WALK_FN, void *ptr);
+extern uint8_t
+ntfs_find_file(FS_INFO *, INUM_T, uint32_t,
+    uint16_t, int, FS_DENT_WALK_FN, void *ptr);
 
 
 static INUM_T inode = 0;
@@ -50,9 +51,10 @@ find_file_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
 }
 
 
+/* Return 0 on success and 1 on error */
 uint8_t
 fs_ffind(FS_INFO * fs, uint8_t lclflags, INUM_T inode_a, uint32_t type,
-	 uint16_t id, int flags)
+    uint16_t id, int flags)
 {
 
     found = 0;
@@ -73,10 +75,13 @@ fs_ffind(FS_INFO * fs, uint8_t lclflags, INUM_T inode_a, uint32_t type,
     }
 
     if ((fs->ftype & FSMASK) == NTFS_TYPE) {
-	ntfs_find_file(fs, inode, type, id, flags, find_file_act, NULL);
+	if (ntfs_find_file(fs, inode, type, id, flags, find_file_act,
+		NULL))
+	    return 1;
     }
     else {
-	fs->dent_walk(fs, fs->root_inum, flags, find_file_act, NULL);
+	if (fs->dent_walk(fs, fs->root_inum, flags, find_file_act, NULL))
+	    return 1;
     }
 
     if (found == 0) {
@@ -86,17 +91,17 @@ fs_ffind(FS_INFO * fs, uint8_t lclflags, INUM_T inode_a, uint32_t type,
 	 */
 	if ((fs->ftype & FSMASK) == FATFS_TYPE) {
 	    FS_INODE *fs_inode = fs->inode_lookup(fs, inode);
-	    if (fs_inode->name != NULL) {
+	    if ((fs_inode != NULL) && (fs_inode->name != NULL)) {
 		if (fs_inode->flags & FS_FLAG_NAME_UNALLOC)
 		    printf("* ");
 		printf("%s/%s\n", ORPHAN_STR, fs_inode->name->name);
 	    }
-	    fs_inode_free(fs_inode);
+	    if (fs_inode)
+		fs_inode_free(fs_inode);
 	}
 	else {
 	    printf("inode not currently used\n");
 	}
     }
-
     return 0;
 }

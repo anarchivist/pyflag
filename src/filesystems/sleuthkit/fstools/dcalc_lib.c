@@ -2,7 +2,7 @@
 ** dcalc
 ** The Sleuth Kit 
 **
-** $Date: 2005/09/02 23:34:02 $
+** $Date: 2006/07/05 18:24:09 $
 **
 ** Calculates the corresponding block number between 'dls' and 'dd' images
 ** when given an 'dls' block number, it determines the block number it
@@ -10,6 +10,7 @@
 ** value it would have in a 'dls' image (if the block is unallocated)
 **
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2003-2005 Brian Carrier. All Rights reserved
 **
 ** TASK
@@ -82,13 +83,13 @@ static OFF_T flen;
 
 static uint8_t
 count_slack_file_act(FS_INFO * fs, DADDR_T addr, char *buf,
-		     unsigned int size, int flags, void *ptr)
+    unsigned int size, int flags, void *ptr)
 {
 
     if (verbose)
 	fprintf(stderr,
-		"count_slack_file_act: Remaining File:  %lu  Buffer: %lu\n",
-		(ULONG) flen, (ULONG) size);
+	    "count_slack_file_act: Remaining File:  %lu  Buffer: %lu\n",
+	    (ULONG) flen, (ULONG) size);
 
     /* This is not the last data unit */
     if (flen >= size) {
@@ -119,20 +120,27 @@ count_slack_file_act(FS_INFO * fs, DADDR_T addr, char *buf,
 
 static uint8_t
 count_slack_inode_act(FS_INFO * fs, FS_INODE * fs_inode,
-		      int flags, void *ptr)
+    int flags, void *ptr)
 {
 
     if (verbose)
 	fprintf(stderr,
-		"count_slack_inode_act: Processing meta data: %" PRIuINUM
-		"\n", fs_inode->addr);
+	    "count_slack_inode_act: Processing meta data: %" PRIuINUM
+	    "\n", fs_inode->addr);
 
     /* We will now do a file walk on the content */
     if ((fs->ftype & FSMASK) != NTFS_TYPE) {
 	flen = fs_inode->size;
-	fs->file_walk(fs, fs_inode, 0, 0,
-		      FS_FLAG_FILE_SLACK | FS_FLAG_FILE_NOABORT |
-		      FS_FLAG_FILE_NOID, count_slack_file_act, ptr);
+	if (fs->file_walk(fs, fs_inode, 0, 0,
+		FS_FLAG_FILE_SLACK |
+		FS_FLAG_FILE_NOID, count_slack_file_act, ptr)) {
+
+	    /* ignore any errors */
+	    if (verbose)
+		fprintf(stderr, "Error walking file %" PRIuINUM,
+		    fs_inode->addr);
+	    tsk_error_reset();
+	}
     }
 
     /* For NTFS we go through each non-resident attribute */
@@ -143,9 +151,14 @@ count_slack_inode_act(FS_INFO * fs, FS_INODE * fs_inode,
 
 	    if (fs_data->flags & FS_DATA_NONRES) {
 		flen = fs_data->size;
-		fs->file_walk(fs, fs_inode, fs_data->type, fs_data->id,
-			      FS_FLAG_FILE_SLACK | FS_FLAG_FILE_NOABORT,
-			      count_slack_file_act, ptr);
+		if (fs->file_walk(fs, fs_inode, fs_data->type, fs_data->id,
+			FS_FLAG_FILE_SLACK, count_slack_file_act, ptr)) {
+		    /* ignore any errors */
+		    if (verbose)
+			fprintf(stderr, "Error walking file %" PRIuINUM,
+			    fs_inode->addr);
+		    tsk_error_reset();
+		}
 	    }
 
 	    fs_data = fs_data->next;
@@ -157,7 +170,8 @@ count_slack_inode_act(FS_INFO * fs, FS_INODE * fs_inode,
 
 
 
-uint8_t
+/* Return 1 if block is not found, 0 if it was found, and -1 on error */
+int8_t
 fs_dcalc(FS_INFO * fs, uint8_t lclflags, DADDR_T cnt)
 {
     count = cnt;
@@ -165,21 +179,24 @@ fs_dcalc(FS_INFO * fs, uint8_t lclflags, DADDR_T cnt)
     found = 0;
 
     if (lclflags == DCALC_DLS) {
-	fs->block_walk(fs, fs->first_block, fs->last_block,
-		       (FS_FLAG_DATA_UNALLOC | FS_FLAG_DATA_ALIGN |
-			FS_FLAG_DATA_META | FS_FLAG_DATA_CONT),
-		       count_dls_act, NULL);
+	if (fs->block_walk(fs, fs->first_block, fs->last_block,
+		(FS_FLAG_DATA_UNALLOC | FS_FLAG_DATA_ALIGN |
+		    FS_FLAG_DATA_META | FS_FLAG_DATA_CONT),
+		count_dls_act, NULL))
+	    return -1;
     }
     else if (lclflags == DCALC_DD) {
-	fs->block_walk(fs, fs->first_block, fs->last_block,
-		       (FS_FLAG_DATA_ALLOC | FS_FLAG_DATA_UNALLOC |
-			FS_FLAG_DATA_ALIGN | FS_FLAG_DATA_META |
-			FS_FLAG_DATA_CONT), count_dd_act, NULL);
+	if (fs->block_walk(fs, fs->first_block, fs->last_block,
+		(FS_FLAG_DATA_ALLOC | FS_FLAG_DATA_UNALLOC |
+		    FS_FLAG_DATA_ALIGN | FS_FLAG_DATA_META |
+		    FS_FLAG_DATA_CONT), count_dd_act, NULL))
+	    return -1;
     }
     else if (lclflags == DCALC_SLACK) {
-	fs->inode_walk(fs, fs->first_inum, fs->last_inum,
-		       (FS_FLAG_META_ALLOC | FS_FLAG_META_USED |
-			FS_FLAG_META_LINK), count_slack_inode_act, NULL);
+	if (fs->inode_walk(fs, fs->first_inum, fs->last_inum,
+		(FS_FLAG_META_ALLOC | FS_FLAG_META_USED |
+		    FS_FLAG_META_LINK), count_slack_inode_act, NULL))
+	    return -1;
     }
 
     if (found == 0) {

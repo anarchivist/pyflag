@@ -94,7 +94,7 @@ typedef struct {
 
 static void
  hfs_dent_walk_lcl(FS_INFO *, HFS_DINFO *, INUM_T, int,
-		   FS_DENT_WALK_FN, void *);
+    FS_DENT_WALK_FN, void *);
 
 
 /* convert unicode to ascii */
@@ -158,7 +158,7 @@ hfs_uni2ascii(FS_INFO * fs, char *uni, int ulen, char *asc, int alen)
 
 void
 hfs_dent_walk(FS_INFO * fs, INUM_T inum, int flags,
-	      FS_DENT_WALK_FN action, void *ptr)
+    FS_DENT_WALK_FN action, void *ptr)
 {
     HFS_DINFO dinfo;
     memset(&dinfo, 0, sizeof(HFS_DINFO));
@@ -168,7 +168,7 @@ hfs_dent_walk(FS_INFO * fs, INUM_T inum, int flags,
 
 void
 hfs_dent_walk_lcl(FS_INFO * fs, HFS_DINFO * dinfo, INUM_T inum,
-		  int flags, FS_DENT_WALK_FN action, void *ptr)
+    int flags, FS_DENT_WALK_FN action, void *ptr)
 {
     FS_DENT *fs_dent = fs_dent_alloc(HFS_MAXNAMLEN, 0);
     HFS_INFO *hfs = (HFS_INFO *) fs;
@@ -184,7 +184,7 @@ hfs_dent_walk_lcl(FS_INFO * fs, HFS_DINFO * dinfo, INUM_T inum,
 
     if (verbose)
 	fprintf(stderr, "hfs_dent_walk: Processing directory %lu\n",
-		(ULONG) inum);
+	    (ULONG) inum);
 
     if (inum < fs->first_inum || inum > fs->last_inum)
 	error("invalid inode value: %i\n", inum);
@@ -269,7 +269,7 @@ hfs_dent_walk_lcl(FS_INFO * fs, HFS_DINFO * dinfo, INUM_T inum,
 		fs_read_random(fs, ucs_fn, keylen, offs);
 
 		hfs_uni2ascii(fs, ucs_fn, keylen / 2, fs_dent->name,
-			      HFS_MAXNAMLEN);
+		    HFS_MAXNAMLEN);
 
 		fs_inode = fs->inode_lookup(fs, newinum);
 
@@ -296,14 +296,14 @@ hfs_dent_walk_lcl(FS_INFO * fs, HFS_DINFO * dinfo, INUM_T inum,
 			    dinfo->didx[dinfo->depth] =
 				&dinfo->dirs[strlen(dinfo->dirs)];
 			    strncpy(dinfo->didx[dinfo->depth],
-				    fs_dent->name,
-				    DIR_STRSZ - strlen(dinfo->dirs));
+				fs_dent->name,
+				DIR_STRSZ - strlen(dinfo->dirs));
 			    strncat(dinfo->dirs, "/", DIR_STRSZ);
 			}
 			dinfo->depth++;
 
 			hfs_dent_walk_lcl(fs, dinfo, newinum, flags,
-					  action, ptr);
+			    action, ptr);
 			dinfo->depth--;
 
 			if (dinfo->depth < MAX_DEPTH)
@@ -332,7 +332,7 @@ hfs_dent_walk_lcl(FS_INFO * fs, HFS_DINFO * dinfo, INUM_T inum,
 	fs_read_random(fs, ucs_fn, keylen, offs);
 
 	hfs_uni2ascii(fs, ucs_fn, keylen / 2, fs_dent->name,
-		      HFS_MAXNAMLEN);
+	    HFS_MAXNAMLEN);
 
 	fs_dent->path = dinfo->dirs;
 	fs_dent->pathdepth = dinfo->depth;

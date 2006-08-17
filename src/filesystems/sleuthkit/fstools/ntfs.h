@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit
 **
-** $Date: 2005/09/02 19:53:28 $
+** $Date: 2006/06/29 10:11:57 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -31,6 +31,14 @@ extern "C" {
 
 #define NTFS_NDADDR			0
 #define NTFS_NIADDR			0
+
+/* uncompression values */
+#define NTFS_TOKEN_MASK   1
+#define NTFS_SYMBOL_TOKEN 0
+#define NTFS_TOKEN_LENGTH 8
+/* (64 * 1024) = 65536 */
+#define NTFS_MAX_UNCOMPRESSION_BUFFER_SIZE 65536
+
 
 
 /************************************************************************
@@ -115,7 +123,8 @@ extern "C" {
 #define NTFS_MFT_BMAP	0x6
 #define NTFS_MFT_BOOT	0x7
 #define NTFS_MFT_BAD	0x8
-#define NTFS_MFT_QUOT	0x9
+//#define NTFS_MFT_QUOT 0x9
+#define NTFS_MFT_SECURE	0x9
 #define NTFS_MFT_UPCASE	0xA
 
 
@@ -466,6 +475,169 @@ extern "C" {
 
 
 /************************************************************************
+ * Self-relative security descriptor
+ */
+
+    typedef struct {
+	uint8_t revision;	/* Revision level of the security descriptor. */
+	uint8_t pad;
+	uint8_t control[2];	/* Flags qualifying the type of
+				   the descriptor as well as the following fields. */
+
+	uint8_t owner[4];	/* Byte offset to a SID representing an object's
+				   owner. If this is NULL, no owner SID is present in
+				   the descriptor. */
+
+	uint8_t group[4];	/* Byte offset to a SID representing an object's
+				   primary group. If this is NULL, no primary group
+				   SID is present in the descriptor. */
+
+	uint8_t sacl[4];	/* Byte offset to a system ACL. Only valid, if
+				   SE_SACL_PRESENT is set in the control field. If
+				   SE_SACL_PRESENT is set but sacl is NULL, a NULL ACL
+				   is specified. */
+
+	uint8_t dacl[4];	/* Byte offset to a discretionary ACL. Only valid, if
+				   SE_DACL_PRESENT is set in the control field. If
+				   SE_DACL_PRESENT is set but dacl is NULL, a NULL ACL
+				   (unconditionally granting access) is specified. */
+
+    } ntfs_self_relative_security_descriptor;
+
+
+
+
+/************************************************************************
+ * Structure used in Security Descriptor lookups
+ */
+    typedef struct {
+	char *buffer;
+	unsigned int size;
+    } NTFS_SXX_BUFFER;
+
+
+
+/************************************************************************
+ * SID attribute
+ */
+
+    typedef struct {
+	uint8_t revision;	/* Revision */
+	uint8_t sub_auth_count;	/* Sub Authority Count */
+	uint8_t ident_auth[6];	/* NT Authority ::NOTE:: big endian number */
+	uint32_t sub_auth[1];	/* At least one sub_auth */
+    } ntfs_sid;
+
+    void ntfs_print_sid(FS_INFO * fs, FILE * hFile);
+
+    char *ntfs_get_sid_as_string(FS_INFO * fs, uint32_t security_id);
+
+
+
+#define NTFS_ACE_SIZE	16	/* Size in bytes of ACE information proceeding
+
+				   the SID.  Since we don't current require
+
+				   the ACE information, we will use this as an
+
+				   offset to get to the start of the SID */
+
+    typedef struct NTFS_SID_ENTRY NTFS_SID_ENTRY;
+
+    struct NTFS_SID_ENTRY {
+	NTFS_SID_ENTRY *next;
+	ntfs_sid *data;		/* ntfs_sid record */
+	uint32_t sec_id;	/* Security ID */
+	char *sid_str;		/* SID string representation */
+    };
+
+
+
+/************************************************************************
+ * SDS attribute
+ */
+
+    typedef struct {
+	uint8_t hash_sec_desc[4];	/* Hash of Security Descriptor */
+	uint8_t sec_id[4];	/* Security ID */
+	uint8_t file_off[8];	/* Offset of this entry in this file */
+	uint8_t ent_size[4];	/* Size of this entry */
+	ntfs_self_relative_security_descriptor self_rel_sec_desc;	/* Self-relative Security Descriptor */
+    } ntfs_attr_sds;
+
+
+#define NTFS_SDS_BLOCK_OFFSET	262144	/* Data offset within $SDS (1024x256) */
+
+    typedef struct NTFS_SDS_ENTRY NTFS_SDS_ENTRY;
+
+    struct NTFS_SDS_ENTRY {
+	NTFS_SDS_ENTRY *next;
+	uint32_t len;		/* Length of data */
+	uint8_t *data;		/* Raw data */
+    };
+
+
+
+/************************************************************************
+ * SDH attribute
+ */
+
+
+    typedef struct {
+	uint8_t data_off[2];	/* Offset to data */
+	uint8_t size[2];	/* Size of data */
+	uint8_t pad1[4];	/* Padding */
+	uint8_t ent_size[2];	/* Size of Index Entry */
+	uint8_t key_size[2];	/* Size of Index Key */
+	uint8_t flags[2];	/* Flags */
+	uint8_t pad2[2];	/* Padding */
+	uint8_t key_hash_sec_desc[4];	/* Hash of Security Descriptor */
+	uint8_t key_sec_id[4];	/* Security ID */
+	uint8_t data_hash_sec_desc[4];	/* Hash of Security Descriptor */
+	uint8_t data_sec_id[4];	/* Security ID */
+	uint8_t sec_desc_off[8];	/* Offset to Security Descriptor (in $SDS) */
+	uint8_t sec_desc_size[4];	/* Size of Security Descriptor (in $SDS) */
+	uint8_t pad3[4];	/* Padding */
+    } ntfs_attr_sdh;
+
+    typedef struct NTFS_SDH_ENTRY NTFS_SDH_ENTRY;
+
+    struct NTFS_SDH_ENTRY {
+	NTFS_SDH_ENTRY *next;
+	ntfs_attr_sdh *data;	/* ntfs_attr_sdh record */
+    };
+
+
+
+/************************************************************************
+ * SII attribute
+ */
+
+    typedef struct {
+	uint8_t data_off[2];	/* Offset to data */
+	uint8_t size[2];	/* Size of data */
+	uint8_t pad1[4];	/* Padding */
+	uint8_t ent_size[2];	/* Size of Index Entry */
+	uint8_t key_size[2];	/* Size of Index Key */
+	uint8_t flags[2];	/* Flags */
+	uint8_t pad2[2];	/* Padding */
+	uint8_t key_sec_id[4];	/* Security ID */
+	uint8_t data_hash_sec_desc[4];	/* Hash of Security Descriptor */
+	uint8_t data_sec_id[4];	/* Security ID */
+	uint8_t sec_desc_off[8];	/* Offset to Security Descriptor (in $SDS) */
+	uint8_t sec_desc_size[4];	/* Size of Security Descriptor (in $SDS) */
+
+    } ntfs_attr_sii;
+
+    typedef struct NTFS_SII_ENTRY NTFS_SII_ENTRY;
+
+    struct NTFS_SII_ENTRY {
+	NTFS_SII_ENTRY *next;
+	ntfs_attr_sii *data;	/* ntfs_attr_sii record */
+    };
+
+
+/************************************************************************
 */
     typedef struct {
 	FS_INFO fs_info;	/* super class */
@@ -488,19 +660,19 @@ extern "C" {
 	DADDR_T bmap_buf_off;	/* offset cluster in cached bitmap */
 	ntfs_attrdef *attrdef;
 
+	NTFS_SDS_ENTRY *sds;	/* Data run of ntfs_attr_sds */
+	NTFS_SDH_ENTRY *sdh;	/* Data run of ntfs_attr_sdh */
+	NTFS_SII_ENTRY *sii;	/* Data run of ntfs_attr_sii */
+	NTFS_SID_ENTRY *sid;	/* Data run of ntfs_sid */
     } NTFS_INFO;
 
-    extern void
-     ntfs_data_walk(NTFS_INFO *, INUM_T, FS_DATA *, int, FS_FILE_WALK_FN,
-		    void *);
-
-    extern void
-     ntfs_dent_walk(FS_INFO *, INUM_T, int, FS_DENT_WALK_FN, void *);
-
+    extern uint8_t
+	ntfs_data_walk(NTFS_INFO *, INUM_T, FS_DATA *, int,
+	FS_FILE_WALK_FN, void *);
+    extern uint8_t
+	ntfs_dent_walk(FS_INFO *, INUM_T, int, FS_DENT_WALK_FN, void *);
     extern uint32_t nt2unixtime(uint64_t ntdate);
-
-    extern void
-     ntfs_attrname_lookup(FS_INFO *, uint16_t, char *, int);
+    extern uint8_t ntfs_attrname_lookup(FS_INFO *, uint16_t, char *, int);
 
 #ifdef __cplusplus
 }

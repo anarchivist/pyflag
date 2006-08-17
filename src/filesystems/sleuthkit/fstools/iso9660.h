@@ -92,7 +92,7 @@
 #define ISO9660_RESERVE_CEIL		254
 #define ISO9660_VOL_DESC_SET_TERM	255	/* volume descriptor set terminator */
 
-#define ISO9660_MAXNAMLEN	1024	/* joliet max name length */
+#define ISO9660_MAXNAMLEN	103	/* joliet max name length */
 
 /* Bits in permissions used in extended attribute records.  */
 #define ISO9660_BIT_UR	0x0010
@@ -103,14 +103,14 @@
 #define ISO9660_BIT_AX	0x4000
 
 /* directory descriptor flags */
-#define ISO9660_FLAG_EXIST	0x01
-#define ISO9660_FLAG_DIR	0x02
-#define ISO9660_FLAG_ASSOC	0x04
-#define ISO9660_FLAG_RECORD	0X08
-#define ISO9660_FLAG_PROT	0X10
-#define ISO9660_FLAG_RES1	0X20
-#define ISO9660_FLAG_RES2	0x40
-#define ISO9660_FLAG_MULT	0X80
+#define ISO9660_FLAG_HIDE	0x01	/* Hide file -- called EXISTENCE */
+#define ISO9660_FLAG_DIR	0x02	/* Directory */
+#define ISO9660_FLAG_ASSOC	0x04	/* File is associated */
+#define ISO9660_FLAG_RECORD	0X08	/* Record format in extended attr */
+#define ISO9660_FLAG_PROT	0X10	/* No read / exec perm in ext attr */
+#define ISO9660_FLAG_RES1	0X20	/* reserved */
+#define ISO9660_FLAG_RES2	0x40	/* reserved */
+#define ISO9660_FLAG_MULT	0X80	/* not final entry of mult ext file */
 
 /* POSIX modes used in ISO9660 not already defined */
 #define MODE_IFSOCK 0140000	/* socket */
@@ -346,13 +346,14 @@ typedef struct {
     ext_attr_rec *ea;		/* extended attribute record */
     char fn[ISO9660_MAXNAMLEN];	/* file name */
     rockridge_ext *rr;		/* RockRidge Extensions */
+    int version;
 } iso9660_inode;
 
 /* inode linked list node */
 typedef struct in_node {
     iso9660_inode inode;
     OFF_T offset;		/* byte offset of inode into disk */
-    int inum;			/* identifier of inode */
+    INUM_T inum;		/* identifier of inode */
     int size;			/* kludge: used to flag fifos, etc */
     struct in_node *next;
 } in_node;
@@ -370,10 +371,10 @@ typedef struct {
     uint8_t rr_found;		/* 1 if rockridge found */
 } ISO_INFO;
 
-extern void iso9660_dent_walk(FS_INFO * fs, INUM_T inode, int flags,
-			      FS_DENT_WALK_FN action, void *ptr);
+extern uint8_t iso9660_dent_walk(FS_INFO * fs, INUM_T inode, int flags,
+    FS_DENT_WALK_FN action, void *ptr);
 
-extern void iso9660_dinode_load(ISO_INFO * iso, INUM_T inum);
+extern uint8_t iso9660_dinode_load(ISO_INFO * iso, INUM_T inum);
 
 /**********************************************************
  *

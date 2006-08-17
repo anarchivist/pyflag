@@ -3,11 +3,12 @@
 ** ext2fs_journal
 ** The Sleuth Kit 
 **
-** $Date: 2005/09/02 23:34:02 $
+** $Date: 2006/04/05 03:47:34 $
 **
 ** Journaling code for EXT3FS image
 **
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2004-2005 Brian Carrier.  All rights reserved 
 **
 **
@@ -28,25 +29,34 @@
 	(((uint8_t *)x)[0] << 24) )
 
 
+/*
+ *
+ */
 
 static uint8_t
 load_sb_action(FS_INFO * fs, DADDR_T addr, char *buf, unsigned int size,
-	       int flags, void *ptr)
+    int flags, void *ptr)
 {
     ext2fs_journ_sb *sb;
     EXT2FS_INFO *ext2fs = (EXT2FS_INFO *) fs;
     EXT2FS_JINFO *jinfo = ext2fs->jinfo;
 
-    if (size < 1024)
-	error
-	    ("FS block size is less than 1024, not supported in journal yet");
+    if (size < 1024) {
+	tsk_errno = TSK_ERR_FS_FUNC;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "FS block size is less than 1024, not supported in journal yet");
+	return WALK_ERROR;
+    }
 
     sb = (ext2fs_journ_sb *) buf;
 
     if (big_getu32(sb->magic) != EXT2_JMAGIC) {
-	error("Journal inode %" PRIu32
-	      " does not have a valid magic value: %" PRIx32,
-	      jinfo->j_inum, big_getu32(sb->magic));
+	tsk_errno = TSK_ERR_FS_MAGIC;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "Journal inode %" PRIuINUM
+	    " does not have a valid magic value: %" PRIx32,
+	    jinfo->j_inum, big_getu32(sb->magic));
+	return WALK_ERROR;
     }
 
     jinfo->bsize = big_getu32(sb->bsize);
@@ -58,40 +68,62 @@ load_sb_action(FS_INFO * fs, DADDR_T addr, char *buf, unsigned int size,
     return WALK_STOP;
 }
 
-void
+/* Place journal data in *fs
+ *
+ * Return 0 on success and 1 on error 
+ * */
+uint8_t
 ext2fs_jopen(FS_INFO * fs, INUM_T inum)
 {
     EXT2FS_INFO *ext2fs = (EXT2FS_INFO *) fs;
     EXT2FS_JINFO *jinfo;
 
-    if (!fs)
-	error("ext2fs_jopen: fs is null");
+    if (!fs) {
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L, "ext2fs_jopen: fs is null");
+	return 1;
+    }
 
     ext2fs->jinfo = jinfo =
 	(EXT2FS_JINFO *) mymalloc(sizeof(EXT2FS_JINFO));
+    if (jinfo == NULL) {
+	return 1;
+    }
     jinfo->j_inum = inum;
 
     jinfo->fs_inode = fs->inode_lookup(fs, inum);
-    if (!jinfo->fs_inode)
-	error("error finding journal inode %" PRIu32, inum);
+    if (!jinfo->fs_inode) {
+	free(jinfo);
+	return 1;
+//      error("error finding journal inode %" PRIu32, inum);
+    }
 
-    fs->file_walk(fs, jinfo->fs_inode, 0, 0, FS_FLAG_FILE_NOID,
-		  load_sb_action, NULL);
+    if (fs->file_walk(fs, jinfo->fs_inode, 0, 0, FS_FLAG_FILE_NOID,
+	    load_sb_action, NULL)) {
+	tsk_errno = TSK_ERR_FS_FWALK;
+	snprintf(tsk_errstr, TSK_ERRSTR_L, "Error loading ext3 journal");
+	fs_inode_free(jinfo->fs_inode);
+	free(jinfo);
+	return 1;
+    }
 
     if (verbose)
 	fprintf(stderr,
-		"journal opened at inode %" PRIuINUM " bsize: %" PRIu32
-		" First JBlk: %" PRIuDADDR " Last JBlk: %" PRIuDADDR "\n",
-		inum, jinfo->bsize, jinfo->first_block, jinfo->last_block);
+	    "journal opened at inode %" PRIuINUM " bsize: %" PRIu32
+	    " First JBlk: %" PRIuDADDR " Last JBlk: %" PRIuDADDR "\n",
+	    inum, jinfo->bsize, jinfo->first_block, jinfo->last_block);
 
-    return;
+    return 0;
 }
 
 
-/* Limitations: does not use the action or any flags */
-void
+/* Limitations: does not use the action or any flags 
+ *
+ * return 0 on success and 1 on error
+ * */
+uint8_t
 ext2fs_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
-		   void *ptr)
+    void *ptr)
 {
     EXT2FS_INFO *ext2fs = (EXT2FS_INFO *) fs;
     EXT2FS_JINFO *jinfo = ext2fs->jinfo;
@@ -101,22 +133,40 @@ ext2fs_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
     int b_desc_seen = 0;
 
 
-    if (jinfo == NULL)
-	error("ext2fs_jentry_walk: journal is not open");
+    if (jinfo == NULL) {
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "ext2fs_jentry_walk: journal is not open");
+	return 1;
+    }
 
-    if (jinfo->fs_inode->size != (jinfo->last_block + 1) * jinfo->bsize)
-	error
-	    ("ext2fs_jentry_walk: journal file size is different from size reported in journal super block");
+    if (jinfo->fs_inode->size != (jinfo->last_block + 1) * jinfo->bsize) {
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "ext2fs_jentry_walk: journal file size is different from \nsize reported in journal super block");
+	return 1;
+    }
 
     /* Load the journal into a buffer */
     buf1.left = buf1.total = jinfo->fs_inode->size;
     journ = buf1.cur = buf1.base = mymalloc(buf1.left);
+    if (journ == NULL) {
+	return 1;
+    }
 
-    fs->file_walk(fs, jinfo->fs_inode, 0, 0, FS_FLAG_FILE_NOID,
-		  load_file_action, (void *) &buf1);
+    if (fs->file_walk(fs, jinfo->fs_inode, 0, 0, FS_FLAG_FILE_NOID,
+	    load_file_action, (void *) &buf1)) {
+	free(journ);
+	return 1;
+    }
 
-    if (buf1.left > 0)
-	error("ext2fs_jentry_walk: Buffer not fully copied");
+    if (buf1.left > 0) {
+	tsk_errno = TSK_ERR_FS_FWALK;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "ext2fs_jentry_walk: Buffer not fully copied");
+	free(journ);
+	return 1;
+    }
 
 
     /* Process the journal 
@@ -196,12 +246,12 @@ ext2fs_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
 
 		dentry =
 		    (ext2fs_journ_dentry *) ((uintptr_t) head2 +
-					     sizeof(ext2fs_journ_head));;
+		    sizeof(ext2fs_journ_head));;
 
 
 		/* Cycle through the descriptor entries */
 		while ((uintptr_t) dentry <=
-		       ((uintptr_t) head2 + jinfo->bsize -
+		    ((uintptr_t) head2 + jinfo->bsize -
 			sizeof(ext2fs_journ_head))) {
 
 
@@ -212,7 +262,7 @@ ext2fs_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
 			/* Look at the block that this entry refers to */
 			head3 =
 			    (ext2fs_journ_head *) & journ[i *
-							  jinfo->bsize];
+			    jinfo->bsize];
 			if ((big_getu32(head3->magic) == EXT2_JMAGIC)) {
 			    i--;
 			    break;
@@ -221,7 +271,7 @@ ext2fs_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
 			/* If it doesn't have the magic, then it is a
 			 * journal entry and we print the FS info */
 			printf("%" PRIuDADDR ":\tFS Block %" PRIu32 "\n",
-			       i, big_getu32(dentry->fs_blk));
+			    i, big_getu32(dentry->fs_blk));
 
 			/* Our counter is over the end of the journ */
 			if (++i > jinfo->last_block)
@@ -235,53 +285,51 @@ ext2fs_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
 
 		    /* If the SAMEID value is set, then we advance by the size of the entry, otherwise add 16 for the ID */
 		    else if (big_getu32(dentry->flag) &
-			     EXT2_J_DENTRY_SAMEID)
+			EXT2_J_DENTRY_SAMEID)
 			dentry =
 			    (ext2fs_journ_dentry *) ((uintptr_t) dentry +
-						     sizeof
-						     (ext2fs_journ_dentry));
+			    sizeof(ext2fs_journ_dentry));
 
 		    else
 			dentry =
 			    (ext2fs_journ_dentry *) ((uintptr_t) dentry +
-						     sizeof
-						     (ext2fs_journ_dentry)
-						     + 16);
+			    sizeof(ext2fs_journ_dentry)
+			    + 16);
 
 		}
 	    }
 #endif
 	    else {
 		printf("%" PRIuDADDR ":\tUnallocated FS Block Unknown\n",
-		       i);
+		    i);
 	    }
 	}
 
 	/* The super block */
 	else if ((big_getu32(head->entry_type) == EXT2_J_ETYPE_SB1) ||
-		 (big_getu32(head->entry_type) == EXT2_J_ETYPE_SB2)) {
+	    (big_getu32(head->entry_type) == EXT2_J_ETYPE_SB2)) {
 	    printf("%" PRIuDADDR ":\tSuperblock (seq: %" PRIu32 ")\n", i,
-		   big_getu32(head->entry_seq));
+		big_getu32(head->entry_seq));
 	}
 
 	/* Revoke Block */
 	else if (big_getu32(head->entry_type) == EXT2_J_ETYPE_REV) {
 	    printf("%" PRIuDADDR ":\t%sRevoke Block (seq: %" PRIu32 ")\n",
-		   i, ((i < jinfo->start_blk)
-		       || (big_getu32(head->entry_seq) <
-			   jinfo->
-			   start_seq)) ? "Unallocated " : "Allocated ",
-		   big_getu32(head->entry_seq));
+		i, ((i < jinfo->start_blk)
+		    || (big_getu32(head->entry_seq) <
+			jinfo->
+			start_seq)) ? "Unallocated " : "Allocated ",
+		big_getu32(head->entry_seq));
 	}
 
 	/* The commit is the end of the entries */
 	else if (big_getu32(head->entry_type) == EXT2_J_ETYPE_COM) {
 	    printf("%" PRIuDADDR ":\t%sCommit Block (seq: %" PRIu32 ")\n",
-		   i, ((i < jinfo->start_blk)
-		       || (big_getu32(head->entry_seq) <
-			   jinfo->
-			   start_seq)) ? "Unallocated " : "Allocated ",
-		   big_getu32(head->entry_seq));
+		i, ((i < jinfo->start_blk)
+		    || (big_getu32(head->entry_seq) <
+			jinfo->
+			start_seq)) ? "Unallocated " : "Allocated ",
+		big_getu32(head->entry_seq));
 	}
 
 	/* The descriptor describes the FS blocks that follow it */
@@ -299,16 +347,16 @@ ext2fs_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
 		unalloc = 1;
 
 	    printf("%" PRIuDADDR ":\t%sDescriptor Block (seq: %" PRIu32
-		   ")\n", i, (unalloc) ? "Unallocated " : "Allocated ",
-		   big_getu32(head->entry_seq));
+		")\n", i, (unalloc) ? "Unallocated " : "Allocated ",
+		big_getu32(head->entry_seq));
 
 	    dentry =
 		(ext2fs_journ_dentry *) ((uintptr_t) head +
-					 sizeof(ext2fs_journ_head));;
+		sizeof(ext2fs_journ_head));;
 
 	    /* Cycle through the descriptor entries to account for the journal blocks */
 	    while ((uintptr_t) dentry <=
-		   ((uintptr_t) head + jinfo->bsize -
+		((uintptr_t) head + jinfo->bsize -
 		    sizeof(ext2fs_journ_head))) {
 
 
@@ -321,7 +369,7 @@ ext2fs_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
 		head2 = (ext2fs_journ_head *) & journ[i * jinfo->bsize];
 		if ((big_getu32(head2->magic) == EXT2_JMAGIC) &&
 		    (big_getu32(head2->entry_seq) >=
-		     big_getu32(head->entry_seq))) {
+			big_getu32(head->entry_seq))) {
 		    i--;
 		    break;
 		}
@@ -329,8 +377,8 @@ ext2fs_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
 		/* If it doesn't have the magic, then it is a
 		 * journal entry and we print the FS info */
 		printf("%" PRIuDADDR ":\t%sFS Block %" PRIu32 "\n", i,
-		       (unalloc) ? "Unallocated " : "Allocated ",
-		       big_getu32(dentry->fs_blk));
+		    (unalloc) ? "Unallocated " : "Allocated ",
+		    big_getu32(dentry->fs_blk));
 
 		/* Increment to the next */
 		if (big_getu32(dentry->flag) & EXT2_J_DENTRY_LAST)
@@ -340,21 +388,18 @@ ext2fs_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
 		else if (big_getu32(dentry->flag) & EXT2_J_DENTRY_SAMEID)
 		    dentry =
 			(ext2fs_journ_dentry *) ((uintptr_t) dentry +
-						 sizeof
-						 (ext2fs_journ_dentry));
+			sizeof(ext2fs_journ_dentry));
 
 		else
 		    dentry =
 			(ext2fs_journ_dentry *) ((uintptr_t) dentry +
-						 sizeof
-						 (ext2fs_journ_dentry) +
-						 16);
+			sizeof(ext2fs_journ_dentry) + 16);
 	    }
 	}
     }
 
     free(journ);
-    return;
+    return 0;
 }
 
 
@@ -363,10 +408,12 @@ ext2fs_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
 
 /* 
  * Limitations for 1st version: start must equal end and action is ignored
+ *
+ * Return 0 on success and 1 on error
  */
-void
+uint8_t
 ext2fs_jblk_walk(FS_INFO * fs, DADDR_T start, DADDR_T end, int flags,
-		 FS_JBLK_WALK_FN action, void *ptr)
+    FS_JBLK_WALK_FN action, void *ptr)
 {
     EXT2FS_INFO *ext2fs = (EXT2FS_INFO *) fs;
     EXT2FS_JINFO *jinfo = ext2fs->jinfo;
@@ -375,18 +422,33 @@ ext2fs_jblk_walk(FS_INFO * fs, DADDR_T start, DADDR_T end, int flags,
     DADDR_T i;
     ext2fs_journ_head *head;
 
-    if (jinfo == NULL)
-	error("ext2fs_jblk_walk: journal is not open");
+    if (jinfo == NULL) {
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "ext2fs_jblk_walk: journal is not open");
+	return 1;
+    }
 
-    if (jinfo->last_block < end)
-	error("ext2fs_jblk_walk: end is too large for journal");
+    if (jinfo->last_block < end) {
+	tsk_errno = TSK_ERR_FS_WALK_RNG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "ext2fs_jblk_walk: end is too large ");
+	return 1;
+    }
 
-    if (start != end)
-	error("ext2fs_blk_walk: only start == end is currently supported");
+    if (start != end) {
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "ext2fs_blk_walk: only start == end is currently supported");
+	return 1;
+    }
 
-    if (jinfo->fs_inode->size != (jinfo->last_block + 1) * jinfo->bsize)
-	error
-	    ("ext2fs_jblk_walk: journal file size is different from size reported in journal super block");
+    if (jinfo->fs_inode->size != (jinfo->last_block + 1) * jinfo->bsize) {
+	tsk_errno = TSK_ERR_FS_FUNC;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "ext2fs_jblk_walk: journal file size is different from size reported in journal super block");
+	return 1;
+    }
 
 
     /* Load into buffer and then process it 
@@ -394,12 +456,23 @@ ext2fs_jblk_walk(FS_INFO * fs, DADDR_T start, DADDR_T end, int flags,
      */
     buf1.left = buf1.total = (end + 1) * jinfo->bsize;
     journ = buf1.cur = buf1.base = mymalloc(buf1.left);
+    if (journ == NULL) {
+	return 1;
+    }
 
-    fs->file_walk(fs, jinfo->fs_inode, 0, 0, FS_FLAG_FILE_NOID,
-		  load_file_action, (void *) &buf1);
+    if (fs->file_walk(fs, jinfo->fs_inode, 0, 0, FS_FLAG_FILE_NOID,
+	    load_file_action, (void *) &buf1)) {
+	free(journ);
+	return 1;
+    }
 
-    if (buf1.left > 0)
-	error("ext2fs_jblk_walk: Buffer not fully copied");
+    if (buf1.left > 0) {
+	tsk_errno = TSK_ERR_FS_FWALK;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "ext2fs_jblk_walk: Buffer not fully copied");
+	free(journ);
+	return 1;
+    }
 
     head = (ext2fs_journ_head *) & journ[end * jinfo->bsize];
 
@@ -441,10 +514,10 @@ ext2fs_jblk_walk(FS_INFO * fs, DADDR_T start, DADDR_T end, int flags,
 
 	    dentry =
 		(ext2fs_journ_dentry *) (&journ[i * jinfo->bsize] +
-					 sizeof(ext2fs_journ_head));
+		sizeof(ext2fs_journ_head));
 
 	    while ((uintptr_t) dentry <=
-		   ((uintptr_t) & journ[(i + 1) * jinfo->bsize] -
+		((uintptr_t) & journ[(i + 1) * jinfo->bsize] -
 		    sizeof(ext2fs_journ_head))) {
 
 		if (--diff == 0) {
@@ -461,23 +534,25 @@ ext2fs_jblk_walk(FS_INFO * fs, DADDR_T start, DADDR_T end, int flags,
 		if (big_getu32(dentry->flag) & EXT2_J_DENTRY_SAMEID)
 		    dentry =
 			(ext2fs_journ_dentry *) ((uintptr_t) dentry +
-						 sizeof
-						 (ext2fs_journ_dentry));
+			sizeof(ext2fs_journ_dentry));
 		else
 		    dentry =
 			(ext2fs_journ_dentry *) ((uintptr_t) dentry +
-						 sizeof
-						 (ext2fs_journ_dentry) +
-						 16);
+			sizeof(ext2fs_journ_dentry) + 16);
 
 	    }
 	    break;
 	}
     }
 
-    if (fwrite(&journ[end * jinfo->bsize], jinfo->bsize, 1, stdout) != 1)
-	error("ext2fs_jblk_walk: error writing buffer block");
+    if (fwrite(&journ[end * jinfo->bsize], jinfo->bsize, 1, stdout) != 1) {
+	tsk_errno = TSK_ERR_FS_WRITE;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "ext2fs_jblk_walk: error writing buffer block");
+	free(journ);
+	return 1;
+    }
 
     free(journ);
-    return;
+    return 0;
 }

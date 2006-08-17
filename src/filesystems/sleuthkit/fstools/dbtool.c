@@ -438,7 +438,7 @@ print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
 					       (ULONG) fs_data->size);
 					
 	 		           	fs->file_walk(fs, fs_inode, fs_data->type, fs_data->id,
-					     FS_FLAG_FILE_AONLY | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOSPARSE | FS_FLAG_FILE_NOABORT,
+					     FS_FLAG_FILE_AONLY | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOSPARSE,
 	 	              			(FS_FILE_WALK_FN) print_addr, (char *)&ptr);
 		
 					print_blocks(fs_inode->addr, fs_data->type, fs_data->id, &run);
@@ -472,7 +472,7 @@ print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
 	    ptr = &run;   
 	    
 	    fs->file_walk(fs, fs_inode, 0, 0, 
-			  (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOSPARSE | FS_FLAG_FILE_NOABORT),
+			  (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOSPARSE),
 			  (FS_FILE_WALK_FN) print_addr, (char *)&ptr);
 	    
 	    print_blocks(fs_inode->addr, 0, 0, &run);
@@ -501,7 +501,7 @@ print_addr (FS_INFO *fs, DADDR_T addr, char *buf,
 
   // skip if no data
   if(size > 0) {
-    if(flags & FS_FLAG_DATA_RESIDENT) {
+    if(flags & FS_FLAG_DATA_RES) {
       // we have resident ntfs data
       printf("INSERT INTO resident values('I%s|D%lu-%d-%d','", 
 	     iosource,
@@ -696,12 +696,12 @@ main(int argc, char **argv)
 	if(optind == argc)
 	  usage(argv[0]);
 
-	img = img_open(NULL, NULL, 1,
+	img = img_open("raw", 1,
 		       (const char **) &argv[optind++]);
 
 	/* open image */
 	//	fs = fs_open(argv[optind++], fstype);
-	fs = fs_open(img, fstype);
+	fs = fs_open(img,0, fstype);
 	if(!fs) RAISE(E_GENERIC,NULL,"Unable to open file system as %s",fstype);
 
 	/* print filesystem info 
@@ -716,7 +716,7 @@ main(int argc, char **argv)
 
 	fs->close(fs);
 	fs = NULL;
-	fs = fs_open(img, fstype);
+	fs = fs_open(img,0, fstype);
 	if(!fs) RAISE(E_GENERIC,NULL,"Unable to open file system as %s",fstype);
 
 	/* inode walk

@@ -2,7 +2,7 @@
 ** get
 ** The Sleuth Kit
 **
-** $Date: 2005/09/02 23:34:02 $ 
+** $Date: 2006/05/11 15:45:50 $ 
 **
 ** routines to get values in a structure that solves endian issues
 **
@@ -18,7 +18,6 @@
 #include "tsk_os.h"
 #include "tsk_types.h"
 #include "tsk_endian.h"
-#include "error.h"
 
 
 /* A temporary data structure with an endian field */

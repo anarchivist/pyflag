@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2005/09/02 19:53:27 $
+** $Date: 2006/05/11 15:53:20 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -323,7 +323,7 @@ extern "C" {
 	uint8_t start_seq[4];	/* first commit ID in log */
 	uint8_t start_blk[4];	/* journ blk for 1st valid entry */
 
-	uint8_t errno[4];	/* signed error number */
+	uint8_t j_errno[4];	/* signed error number */
 
 /* the rest are not valid for v1 sb */
 	uint8_t feature_compat[4];
@@ -412,13 +412,13 @@ extern "C" {
 	EXT2FS_JINFO *jinfo;
     } EXT2FS_INFO;
 
-    extern void ext2fs_dent_walk(FS_INFO *, INUM_T, int, FS_DENT_WALK_FN,
-				 void *);
-    extern void ext2fs_jentry_walk(FS_INFO *, int, FS_JENTRY_WALK_FN,
-				   void *);
-    extern void ext2fs_jblk_walk(FS_INFO *, DADDR_T, DADDR_T, int,
-				 FS_JBLK_WALK_FN, void *);
-    extern void ext2fs_jopen(FS_INFO *, INUM_T);
+    extern uint8_t ext2fs_dent_walk(FS_INFO *, INUM_T, int,
+	FS_DENT_WALK_FN, void *);
+    extern uint8_t ext2fs_jentry_walk(FS_INFO *, int, FS_JENTRY_WALK_FN,
+	void *);
+    extern uint8_t ext2fs_jblk_walk(FS_INFO *, DADDR_T, DADDR_T, int,
+	FS_JBLK_WALK_FN, void *);
+    extern uint8_t ext2fs_jopen(FS_INFO *, INUM_T);
 
 #ifdef __cplusplus
 }

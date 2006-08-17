@@ -1,7 +1,8 @@
 /*
- * $Date: 2005/09/02 23:34:04 $
+ * $Date: 2006/06/20 22:35:41 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
+ * Copyright (c) 2006 Brian Carrier, Basis Technology.  All rights reserved
  * Copyright (c) 2005 Brian Carrier.  All rights reserved
  *
  * split
@@ -16,8 +17,11 @@
 #include "img_tools.h"
 #include "split.h"
 
-static OFF_T
-split_read_random(IMG_INFO * img_info, char *buf, OFF_T len, OFF_T offset)
+
+/* return the size read or -1 on error */
+static SSIZE_T
+split_read_random(IMG_INFO * img_info, OFF_T vol_offset, char *buf,
+    OFF_T len, OFF_T offset)
 {
     IMG_SPLIT_INFO *split_info = (IMG_SPLIT_INFO *) img_info;
     OFF_T tot_offset;
@@ -25,19 +29,20 @@ split_read_random(IMG_INFO * img_info, char *buf, OFF_T len, OFF_T offset)
 
     if (verbose)
 	fprintf(stderr,
-		"split_read_random: byte offset: %" PRIuOFF " len: %"
-		PRIuOFF "\n", offset, len);
+	    "split_read_random: byte offset: %" PRIuOFF " len: %"
+	    PRIuOFF "\n", offset, len);
 
     // Find the offset of the data
-    tot_offset = offset + img_info->offset;
+    tot_offset = offset + vol_offset;
 
     // Find the location of the offset
     for (i = 0; i < split_info->num_img; i++) {
 
 	/* Does the data start in this image? */
 	if (tot_offset < split_info->max_off[i]) {
-	    off_t rel_offset;
-	    OFF_T cnt, read_len;
+	    OFF_T rel_offset;
+	    OFF_T read_len;
+	    SSIZE_T cnt;
 	    IMG_SPLIT_CACHE *cimg;;
 
 
@@ -58,16 +63,16 @@ split_read_random(IMG_INFO * img_info, char *buf, OFF_T len, OFF_T offset)
 
 	    if (verbose)
 		fprintf(stderr,
-			"split_read_rand: found in image %d relative: %"
-			PRIuOFF "  len: %" PRIuOFF "\n", i, rel_offset,
-			read_len);
+		    "split_read_rand: found in image %d relative: %"
+		    PRIuOFF "  len: %" PRIuOFF "\n", i, rel_offset,
+		    read_len);
 
 	    /* Is the image already open? */
 	    if (split_info->cptr[i] == -1) {
 		if (verbose)
 		    fprintf(stderr,
-			    "split_read_rand: opening file into slot %d %s\n",
-			    split_info->next_slot, split_info->images[i]);
+			"split_read_rand: opening file into slot %d %s\n",
+			split_info->next_slot, split_info->images[i]);
 
 		/* Grab the next cache slot */
 		cimg = &split_info->cache[split_info->next_slot];
@@ -76,15 +81,20 @@ split_read_random(IMG_INFO * img_info, char *buf, OFF_T len, OFF_T offset)
 		if (cimg->fd != 0) {
 		    if (verbose)
 			fprintf(stderr,
-				"split_read_rand: closing file %s\n",
-				split_info->images[cimg->image]);
+			    "split_read_rand: closing file %s\n",
+			    split_info->images[cimg->image]);
 		    close(cimg->fd);
 		    split_info->cptr[cimg->image] = -1;
 		}
 
-		if ((cimg->fd = open(split_info->images[i], O_RDONLY)) < 0)
-		    error("split_open: open %s: %m",
-			  split_info->images[i]);
+		if ((cimg->fd = open(split_info->images[i], O_RDONLY)) < 0) {
+		    tsk_errno = TSK_ERR_IMG_OPEN;
+		    snprintf(tsk_errstr, TSK_ERRSTR_L,
+			"split_read_random file: %s msg: %s",
+			split_info->images[i], strerror(errno));
+		    tsk_errstr2[0] = '\0';
+		    return -1;
+		}
 
 		cimg->image = i;
 		cimg->seek_pos = 0;
@@ -99,18 +109,33 @@ split_read_random(IMG_INFO * img_info, char *buf, OFF_T len, OFF_T offset)
 
 	    if (cimg->seek_pos != rel_offset) {
 		if (lseek(cimg->fd, rel_offset, SEEK_SET) != rel_offset) {
-		    return 0;
+		    tsk_errno = TSK_ERR_IMG_SEEK;
+		    snprintf(tsk_errstr, TSK_ERRSTR_L,
+			"split_read_random - %s - %" PRIuOFF " - %s",
+			split_info->images[i], rel_offset,
+			strerror(errno));
+		    tsk_errstr2[0] = '\0';
+		    return -1;
 		}
 		cimg->seek_pos = rel_offset;
 	    }
 
 	    cnt = read(cimg->fd, buf, read_len);
+	    if (cnt == -1) {
+		tsk_errno = TSK_ERR_IMG_READ;
+		snprintf(tsk_errstr, TSK_ERRSTR_L,
+		    "split_read_random - offset: %" PRIuOFF
+		    " - len: %" PRIuOFF " - %s", tot_offset, len,
+		    strerror(errno));
+		tsk_errstr2[0] = '\0';
+		return -1;
+	    }
 	    cimg->seek_pos += cnt;
 
 
 	    /* Go to the next image(s) */
-	    if ((cnt == read_len) && (read_len != len)) {
-		OFF_T cnt2;
+	    if (((OFF_T) cnt == read_len) && (read_len != len)) {
+		SSIZE_T cnt2;
 
 		len -= read_len;
 
@@ -128,16 +153,16 @@ split_read_random(IMG_INFO * img_info, char *buf, OFF_T len, OFF_T offset)
 
 		    if (verbose)
 			fprintf(stderr,
-				"split_read_rand: Additional image reads: image %d  len: %"
-				PRIuOFF "\n", i, read_len);
+			    "split_read_rand: Additional image reads: image %d  len: %"
+			    PRIuOFF "\n", i, read_len);
 
 		    /* Is the image already open? */
 		    if (split_info->cptr[i] == -1) {
 			if (verbose)
 			    fprintf(stderr,
-				    "split_read_rand: opening file into slot %d %s\n",
-				    split_info->next_slot,
-				    split_info->images[i]);
+				"split_read_rand: opening file into slot %d %s\n",
+				split_info->next_slot,
+				split_info->images[i]);
 
 			/* Grab the next cache slot */
 			cimg = &split_info->cache[split_info->next_slot];
@@ -146,16 +171,22 @@ split_read_random(IMG_INFO * img_info, char *buf, OFF_T len, OFF_T offset)
 			if (cimg->fd != 0) {
 			    if (verbose)
 				fprintf(stderr,
-					"split_read_rand: closing file %s\n",
-					split_info->images[cimg->image]);
+				    "split_read_rand: closing file %s\n",
+				    split_info->images[cimg->image]);
 			    close(cimg->fd);
 			    split_info->cptr[cimg->image] = -1;
 			}
 
 			if ((cimg->fd =
-			     open(split_info->images[i], O_RDONLY)) < 0)
-			    error("split_open: open %s: %m",
-				  split_info->images[i]);
+				open(split_info->images[i],
+				    O_RDONLY)) < 0) {
+			    tsk_errno = TSK_ERR_IMG_OPEN;
+			    snprintf(tsk_errstr, TSK_ERRSTR_L,
+				"split_read_random file: %s   msg: %s",
+				split_info->images[i], strerror(errno));
+			    tsk_errstr2[0] = '\0';
+			    return -1;
+			}
 
 			cimg->image = i;
 			cimg->seek_pos = 0;
@@ -171,16 +202,29 @@ split_read_random(IMG_INFO * img_info, char *buf, OFF_T len, OFF_T offset)
 		    /* Go to the beginning */
 		    if (cimg->seek_pos != 0) {
 			if (lseek(cimg->fd, 0, SEEK_SET) != 0) {
-			    return cnt;
+			    tsk_errno = TSK_ERR_IMG_SEEK;
+			    snprintf(tsk_errstr, TSK_ERRSTR_L,
+				"split_read_random - %s - 0 - %s",
+				split_info->images[i], strerror(errno));
+			    tsk_errstr2[0] = '\0';
+			    return -1;
 			}
 			cimg->seek_pos = 0;
 		    }
 
 		    cnt2 = read(cimg->fd, &buf[cnt], read_len);
+		    if (cnt2 == -1) {
+			tsk_errno = TSK_ERR_IMG_READ;
+			snprintf(tsk_errstr, TSK_ERRSTR_L,
+			    "split_read_random - offset: 0 - len: %"
+			    PRIuOFF " - %s", read_len, strerror(errno));
+			tsk_errstr2[0] = '\0';
+			return -1;
+		    }
 		    cimg->seek_pos += cnt2;
 		    cnt += cnt2;
 
-		    if (cnt2 != read_len)
+		    if ((OFF_T) cnt2 != read_len)
 			return cnt;
 
 		    len -= cnt2;
@@ -190,7 +234,13 @@ split_read_random(IMG_INFO * img_info, char *buf, OFF_T len, OFF_T offset)
 	    return cnt;
 	}
     }
-    return 0;
+
+    tsk_errno = TSK_ERR_IMG_READ_OFF;
+    snprintf(tsk_errstr, TSK_ERRSTR_L,
+	"split_read_random - %" PRIuOFF " - %s", tot_offset,
+	strerror(errno));
+    tsk_errstr2[0] = '\0';
+    return -1;
 }
 
 void
@@ -209,9 +259,9 @@ split_imgstat(IMG_INFO * img_info, FILE * hFile)
 
     for (i = 0; i < split_info->num_img; i++) {
 	fprintf(hFile, "%s  (%" PRIuOFF " to %" PRIuOFF ")\n",
-		split_info->images[i],
-		(i == 0) ? 0 : split_info->max_off[i - 1],
-		split_info->max_off[i] - 1);
+	    split_info->images[i],
+	    (OFF_T) (i == 0) ? 0 : split_info->max_off[i - 1],
+	    (OFF_T) (split_info->max_off[i] - 1));
     }
 
 }
@@ -232,45 +282,60 @@ split_close(IMG_INFO * img_info)
 	if (split_info->cache[i].fd != 0)
 	    close(split_info->cache[i].fd);
     }
+    free(split_info->cptr);
+    free(split_info);
 }
 
 
+/*
+ * Return IMG_INFO or NULL if an error occurs
+ */
 IMG_INFO *
-split_open(OFF_T offset, int num_img, const char **images, IMG_INFO * next)
+split_open(int num_img, const char **images, IMG_INFO * next)
 {
     IMG_SPLIT_INFO *split_info;
     IMG_INFO *img_info;
     int i;
 
     if (next != NULL) {
-	fprintf(stderr,
-		"Invalid image layers - split must be lowest layer\n");
-	exit(1);
+	tsk_errno = TSK_ERR_IMG_LAYERS;
+	snprintf(tsk_errstr, TSK_ERRSTR_L, "split must be lowest layer");
+	tsk_errstr2[0] = '\0';
+	return NULL;
     }
 
-    split_info = (IMG_SPLIT_INFO *) mymalloc(sizeof(IMG_SPLIT_INFO));
-    memset((void *) split_info, 0, sizeof(IMG_SPLIT_INFO));
+    if ((split_info =
+	    (IMG_SPLIT_INFO *) mymalloc(sizeof(IMG_SPLIT_INFO))) == NULL)
+	return NULL;
 
+    memset((void *) split_info, 0, sizeof(IMG_SPLIT_INFO));
 
     img_info = (IMG_INFO *) split_info;
 
-    img_info->itype = IMG_SPLIT;
-    img_info->offset = offset;
+    img_info->itype = RAW_SPLIT;
     img_info->read_random = split_read_random;
     img_info->get_size = split_get_size;
     img_info->close = split_close;
     img_info->imgstat = split_imgstat;
     img_info->next = NULL;
 
-
     /* Open the files */
     split_info->cptr = (int *) mymalloc(num_img * sizeof(int));
+    if (split_info->cptr == NULL) {
+	free(split_info);
+	return NULL;
+    }
 
     memset((void *) &split_info->cache, 0,
-	   SPLIT_CACHE * sizeof(IMG_SPLIT_CACHE));
+	SPLIT_CACHE * sizeof(IMG_SPLIT_CACHE));
     split_info->next_slot = 0;
 
     split_info->max_off = (OFF_T *) mymalloc(num_img * sizeof(OFF_T));
+    if (split_info->max_off == NULL) {
+	free(split_info->cptr);
+	free(split_info);
+	return NULL;
+    }
     img_info->size = 0;
 
     split_info->num_img = num_img;
@@ -285,7 +350,25 @@ split_open(OFF_T offset, int num_img, const char **images, IMG_INFO * next)
 
 	split_info->cptr[i] = -1;
 	if (stat(images[i], &sb) == -1) {
-	    error("split_open: state %s: %m", images[i]);
+	    tsk_errno = TSK_ERR_IMG_STAT;
+	    snprintf(tsk_errstr, TSK_ERRSTR_L, "split_open - %s - %s",
+		images[i], strerror(errno));
+	    tsk_errstr2[0] = '\0';
+	    free(split_info->max_off);
+	    free(split_info->cptr);
+	    free(split_info);
+	    return NULL;
+	}
+	else if ((sb.st_mode & S_IFMT) == S_IFDIR) {
+	    if (verbose)
+		fprintf(stderr, "split_open: image %s is a directory\n",
+		    images[i]);
+
+	    tsk_errno = TSK_ERR_IMG_MAGIC;
+	    snprintf(tsk_errstr, TSK_ERRSTR_L,
+		"split_open: Image is a directory");
+	    tsk_errstr2[0] = '\0';
+	    return NULL;
 	}
 
 	/* Add the size of this image to the total and save the current max */
@@ -294,9 +377,9 @@ split_open(OFF_T offset, int num_img, const char **images, IMG_INFO * next)
 
 	if (verbose)
 	    fprintf(stderr,
-		    "split_open: %d  size: %" PRIuOFF "  max offset: %"
-		    PRIuOFF "  Name: %s\n", i, sb.st_size,
-		    split_info->max_off[i], images[i]);
+		"split_open: %d  size: %" PRIuOFF "  max offset: %"
+		PRIuOFF "  Name: %s\n", i, sb.st_size,
+		split_info->max_off[i], images[i]);
     }
 
     return img_info;

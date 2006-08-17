@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2005/09/02 19:53:28 $
+ * $Date: 2006/06/19 21:54:27 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2005 Brian Carrier.  All rights reserved 
@@ -14,17 +14,15 @@
 extern "C" {
 #endif
 
-    extern IMG_INFO *split_open(OFF_T, int, const char **, IMG_INFO *);
+    extern IMG_INFO *split_open(int, const char **, IMG_INFO *);
 
 #define SPLIT_CACHE	15
 
-    typedef struct IMG_SPLIT_CACHE IMG_SPLIT_CACHE;
-
-    struct IMG_SPLIT_CACHE {
+    typedef struct {
 	int fd;
 	int image;
-	off_t seek_pos;
-    };
+	OFF_T seek_pos;
+    } IMG_SPLIT_CACHE;
 
     typedef struct IMG_SPLIT_INFO IMG_SPLIT_INFO;
 

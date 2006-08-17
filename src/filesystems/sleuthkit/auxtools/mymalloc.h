@@ -19,8 +19,8 @@ extern "C" {
     /*
      * External interface.
      */
-    extern char *mymalloc(int);
-    extern char *myrealloc(char *, int);
+    extern char *mymalloc(size_t);
+    extern char *myrealloc(char *, size_t);
     extern char *mystrdup(const char *);
 
 #ifdef __cplusplus

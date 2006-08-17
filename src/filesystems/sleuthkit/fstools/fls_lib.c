@@ -2,12 +2,13 @@
 ** fls
 ** The Sleuth Kit 
 **
-** $Date: 2005/09/02 23:34:03 $
+** $Date: 2006/04/05 03:47:35 $
 **
 ** Given an image and directory inode, display the file names and 
 ** directories that exist (both active and deleted)
 **
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2003-2005 Brian Carier.  All rights reserved
 **
 ** TASK
@@ -118,12 +119,12 @@ print_dent_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
      ** else if FLS_FILE is set (or we aren't sure what it is)
      */
     if (((localflags & FLS_DIR) &&
-	 ((fs_dent->fsi) &&
-	  ((fs_dent->fsi->mode & FS_INODE_FMT) == FS_INODE_DIR))) ||
+	    ((fs_dent->fsi) &&
+		((fs_dent->fsi->mode & FS_INODE_FMT) == FS_INODE_DIR))) ||
 	((localflags & FLS_FILE) &&
-	 (((fs_dent->fsi) &&
-	   ((fs_dent->fsi->mode & FS_INODE_FMT) != FS_INODE_DIR)) ||
-	  (!fs_dent->fsi)))) {
+	    (((fs_dent->fsi) &&
+		    ((fs_dent->fsi->mode & FS_INODE_FMT) != FS_INODE_DIR))
+		|| (!fs_dent->fsi)))) {
 
 
 	/* Make a special case for NTFS so we can identify all of the
@@ -185,7 +186,7 @@ print_dent_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
 		     * directory has a data stream 
 		     */
 		    if (!((ISDOT(fs_dent->name)) &&
-			  ((localflags & FLS_DOT) == 0)))
+			    ((localflags & FLS_DOT) == 0)))
 			printit(fs, fs_dent, flags, fs_data);
 		}
 
@@ -209,17 +210,14 @@ print_dent_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
 }
 
 
+/* Returns 0 on success and 1 on error */
 uint8_t
 fs_fls(FS_INFO * fs, uint8_t lclflags, INUM_T inode, int flags, char *pre,
-       int32_t skew)
+    int32_t skew)
 {
     localflags = lclflags;
     macpre = pre;
     sec_skew = skew;
 
-
-    /* begin walk */
-    fs->dent_walk(fs, inode, flags, print_dent_act, NULL);
-
-    return 0;
+    return fs->dent_walk(fs, inode, flags, print_dent_act, NULL);
 }

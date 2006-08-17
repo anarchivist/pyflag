@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit
 **
-** $Date: 2005/09/02 19:53:28 $
+** $Date: 2006/07/10 15:09:56 $
 **
 */
 
@@ -18,11 +18,11 @@ extern "C" {
     extern void fs_data_clear_list(FS_DATA *);
 
     extern FS_DATA *fs_data_put_str(FS_DATA *, char *, uint32_t, uint16_t,
-				    void *, unsigned int);
+	void *, unsigned int);
 
     extern FS_DATA *fs_data_put_run(FS_DATA *, DADDR_T, OFF_T,
-				    FS_DATA_RUN *, char *, uint32_t,
-				    uint16_t, OFF_T, uint8_t);
+	FS_DATA_RUN *, char *, uint32_t, uint16_t, OFF_T, uint8_t,
+	uint64_t);
 
     extern FS_DATA *fs_data_lookup(FS_DATA *, uint32_t, uint16_t);
     extern FS_DATA *fs_data_lookup_noid(FS_DATA *, uint32_t);

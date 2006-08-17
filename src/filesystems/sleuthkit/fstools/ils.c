@@ -1,9 +1,10 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2005/09/02 19:53:28 $
+** $Date: 2006/07/10 13:26:20 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved 
 **
 ** TASK
@@ -39,8 +40,10 @@ atoinum(const char *str)
 	return (0);
 
     inum = strtoull(str, &cp, 0);
-    if (*cp || cp == str)
-	error("bad inode number: %s", str);
+    if (*cp || cp == str) {
+	fprintf(stderr, "bad inode number: %s", str);
+	exit(1);
+    }
 
     return (inum);
 }
@@ -51,33 +54,31 @@ static void
 usage()
 {
     fprintf(stderr,
-	    "usage: %s [-eOmrvV] [-aAlLzZ] [-f fstype] [-i imgtype] [-o imgoffset] [-s seconds] image [images] [inum[-end]]\n",
-	    progname);
+	"usage: %s [-eOmrvV] [-aAlLzZ] [-f fstype] [-i imgtype] [-o imgoffset] [-s seconds] image [images] [inum[-end]]\n",
+	progname);
 
     fprintf(stderr, "\t-e: Display all inodes\n");
     fprintf(stderr,
-	    "\t-O: Display inodes that are removed, but sill open (was -o)\n");
+	"\t-O: Display inodes that are removed, but sill open (was -o)\n");
     fprintf(stderr,
-	    "\t-m: Display output in the mactime format (replaces ils2mac from TCT)\n");
+	"\t-m: Display output in the mactime format (replaces ils2mac from TCT)\n");
     fprintf(stderr, "\t-r: Display removed inodes (default)\n");
     fprintf(stderr,
-	    "\t-s seconds: Time skew of original machine (in seconds)\n");
+	"\t-s seconds: Time skew of original machine (in seconds)\n");
     fprintf(stderr, "\t-a: Allocated files\n");
     fprintf(stderr, "\t-A: Un-Allocated files\n");
     fprintf(stderr, "\t-l: Linked files\n");
     fprintf(stderr, "\t-L: Un-Linked files\n");
     fprintf(stderr, "\t-z: Un-Used files (ctime is 0)\n");
     fprintf(stderr, "\t-Z: Used files (ctime is not 0)\n");
-    fprintf(stderr, "\t-i imgtype: The format of the image file\n");
     fprintf(stderr,
-	    "\t-o imgoffset: The offset of the file system in the image (in sectors)\n");
+	"\t-i imgtype: The format of the image file (use '-i list' for supported types)\n");
+    fprintf(stderr,
+	"\t-f fstype: File system type (use '-f list' for supported types)\n");
+    fprintf(stderr,
+	"\t-o imgoffset: The offset of the file system in the image (in sectors)\n");
     fprintf(stderr, "\t-v: verbose output to stderr\n");
     fprintf(stderr, "\t-V: Display version number\n");
-    fprintf(stderr, "\t-f fstype: File system type\n");
-    fprintf(stderr, "Supported file system types:\n");
-    fs_print_types(stderr);
-    fprintf(stderr, "Supported image format types:\n");
-    img_print_types(stderr);
     exit(1);
 }
 
@@ -95,7 +96,8 @@ main(int argc, char **argv)
     int argflags = 0;
     char *fstype = NULL;
     FS_INFO *fs;
-    char *imgtype = NULL, *imgoff = NULL, *cp, *dash;
+    char *imgtype = NULL, *cp, *dash;
+    SSIZE_T imgoff = 0;
     IMG_INFO *img;
     int set_range = 1;
     char *image = NULL;
@@ -119,15 +121,28 @@ main(int argc, char **argv)
 	    break;
 	case 'f':
 	    fstype = optarg;
+	    if (strcmp(fstype, "list") == 0) {
+		fs_print_types(stderr);
+		exit(1);
+	    }
+
 	    break;
 	case 'i':
 	    imgtype = optarg;
+	    if (strcmp(imgtype, "list") == 0) {
+		img_print_types(stderr);
+		exit(1);
+	    }
+
 	    break;
 	case 'm':
 	    argflags |= ILS_MAC;
 	    break;
 	case 'o':
-	    imgoff = optarg;
+	    if ((imgoff = parse_offset(optarg)) == -1) {
+		tsk_error_print(stderr);
+		exit(1);
+	    }
 	    break;
 	case 'O':
 	    flags |= (FS_FLAG_META_ALLOC | FS_FLAG_META_UNLINK);
@@ -189,18 +204,26 @@ main(int argc, char **argv)
 	if (*cp || cp == argv[argc - 1]) {
 	    /* Not a number - consider it a file name */
 	    image = argv[optind];
-	    img =
-		img_open(imgtype, imgoff, argc - optind,
-			 (const char **) &argv[optind]);
+	    if ((img =
+		    img_open(imgtype, argc - optind,
+			(const char **) &argv[optind])) == NULL) {
+		tsk_error_print(stderr);
+		exit(1);
+	    }
+
 	}
 	else {
 	    /* Single address set end addr to start */
 	    ilast = istart;
 	    set_range = 0;
 	    image = argv[optind];
-	    img =
-		img_open(imgtype, imgoff, argc - optind - 1,
-			 (const char **) &argv[optind]);
+	    if ((img =
+		    img_open(imgtype, argc - optind - 1,
+			(const char **) &argv[optind])) == NULL) {
+		tsk_error_print(stderr);
+		exit(1);
+	    }
+
 	}
     }
     else {
@@ -212,9 +235,13 @@ main(int argc, char **argv)
 	    /* Not a number - consider it a file name */
 	    *dash = '-';
 	    image = argv[optind];
-	    img =
-		img_open(imgtype, imgoff, argc - optind,
-			 (const char **) &argv[optind]);
+	    if ((img =
+		    img_open(imgtype, argc - optind,
+			(const char **) &argv[optind])) == NULL) {
+		tsk_error_print(stderr);
+		exit(1);
+	    }
+
 	}
 	else {
 	    dash++;
@@ -224,23 +251,38 @@ main(int argc, char **argv)
 		dash--;
 		*dash = '-';
 		image = argv[optind];
-		img =
-		    img_open(imgtype, imgoff, argc - optind,
-			     (const char **) &argv[optind]);
+		if ((img =
+			img_open(imgtype, argc - optind,
+			    (const char **) &argv[optind])) == NULL) {
+		    tsk_error_print(stderr);
+		    exit(1);
+		}
+
 	    }
 	    else {
 
 		set_range = 0;
 		/* It was a block range, so do not include it in the open */
 		image = argv[optind];
-		img =
-		    img_open(imgtype, imgoff, argc - optind - 1,
-			     (const char **) &argv[optind]);
+		if ((img =
+			img_open(imgtype, argc - optind - 1,
+			    (const char **) &argv[optind])) == NULL) {
+		    tsk_error_print(stderr);
+		    exit(1);
+		}
+
 	    }
 	}
     }
 
-    fs = fs_open(img, fstype);
+    if ((fs = fs_open(img, imgoff, fstype)) == NULL) {
+	tsk_error_print(stderr);
+	if (tsk_errno == TSK_ERR_FS_UNSUPTYPE)
+	    fs_print_types(stderr);
+	img->close(img);
+	exit(1);
+    }
+
 
     /* do we need to set the range or just check them? */
     if (set_range) {
@@ -264,9 +306,10 @@ main(int argc, char **argv)
     /* NTFS and FAT have no notion of deleted but still open */
     if ((argflags & ILS_OPEN) &&
 	(((fs->ftype & FSMASK) == NTFS_TYPE) ||
-	 ((fs->ftype & FSMASK) == FATFS_TYPE))) {
-	printf
-	    ("Error: '-o' argument does not work with NTFS and FAT images\n");
+	    ((fs->ftype & FSMASK) == FATFS_TYPE))) {
+	fprintf
+	    (stderr,
+	    "Error: '-o' argument does not work with NTFS and FAT images\n");
 	exit(1);
     }
 
@@ -294,7 +337,12 @@ main(int argc, char **argv)
 	flags |= FS_FLAG_META_USED | FS_FLAG_META_UNUSED;
 
 
-    fs_ils(fs, argflags, istart, ilast, flags, sec_skew, image);
+    if (fs_ils(fs, argflags, istart, ilast, flags, sec_skew, image)) {
+	tsk_error_print(stderr);
+	fs->close(fs);
+	img->close(img);
+	exit(1);
+    }
 
     fs->close(fs);
     img->close(img);

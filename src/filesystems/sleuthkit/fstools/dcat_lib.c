@@ -2,12 +2,13 @@
 ** dcat
 ** The  Sleuth Kit 
 **
-** $Date: 2005/09/02 23:34:02 $
+** $Date: 2006/05/11 15:53:20 $
 **
 ** Given an image , block number, and size, display the contents
 ** of the block to stdout.
 ** 
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
 **
 ** TASK
@@ -32,16 +33,18 @@ stats(FS_INFO * fs)
 }
 
 
+/* return 1 on error and 0 on success */
 uint8_t
 fs_dcat(FS_INFO * fs, uint8_t lclflags, DADDR_T addr,
-	DADDR_T read_num_units)
+    DADDR_T read_num_units)
 {
     OFF_T read_num_bytes;
     DATA_BUF *buf;
+    SSIZE_T cnt;
 
     if (lclflags & DCAT_STAT) {
 	stats(fs);
-	return 1;
+	return 0;
     }
 
     /* Multiply number of units by block size  to get size in bytes */
@@ -51,22 +54,34 @@ fs_dcat(FS_INFO * fs, uint8_t lclflags, DADDR_T addr,
 	printf("<html>\n");
 	printf("<head>\n");
 	printf("<title>Unit: %" PRIuDADDR "   Size: %" PRIuOFF
-	       " bytes</title>\n", addr, read_num_bytes);
+	    " bytes</title>\n", addr, read_num_bytes);
 	printf("</head>\n");
 	printf("<body>\n");
 
     }
 
     buf = data_buf_alloc(read_num_bytes);
+    if (buf == NULL) {
+	return 1;
+    }
 
     /* Read the data */
     if (addr > fs->last_block) {
-	printf("Error: block is larger than last block in image (%"
-	       PRIuDADDR ")\n", fs->last_block);
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "fs_dcat: block is larger than last block in image (%"
+	    PRIuDADDR ")", fs->last_block);
 	return 1;
     }
-    if (fs_read_block(fs, buf, read_num_bytes, addr) != read_num_bytes) {
-	error("dcat: Error reading block at %" PRIuDADDR ": %m", addr);
+    cnt = fs_read_block(fs, buf, read_num_bytes, addr);
+    if (cnt != (SSIZE_T) read_num_bytes) {
+	if (cnt != -1) {
+	    tsk_errno = TSK_ERR_FS_READ;
+	    tsk_errstr[0] = '\0';
+	}
+	snprintf(tsk_errstr2, TSK_ERRSTR_L,
+	    "dcat: Error reading block at %" PRIuDADDR, addr);
+	return 1;
     }
 
 
@@ -156,8 +171,13 @@ fs_dcat(FS_INFO * fs, uint8_t lclflags, DADDR_T addr,
 
     /* print raw */
     else {
-	if (fwrite(buf->data, read_num_bytes, 1, stdout) != 1)
-	    error("write: %m");
+	if (fwrite(buf->data, read_num_bytes, 1, stdout) != 1) {
+	    tsk_errno = TSK_ERR_FS_WRITE;
+	    snprintf(tsk_errstr, TSK_ERRSTR_L,
+		"dcat_lib: error writing to stdout: %s", strerror(errno));
+	    data_buf_free(buf);
+	    return 1;
+	}
 
 	if (lclflags & DCAT_HTML)
 	    printf("<br>\n");

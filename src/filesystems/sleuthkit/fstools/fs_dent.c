@@ -2,13 +2,14 @@
 ** fs_dent
 ** The Sleuth Kit 
 **
-** $Date: 2005/09/02 23:34:03 $
+** $Date: 2006/04/05 03:47:35 $
 **
 ** Display and manipulate directory entries 
 ** This file contains generic functions that call the appropriate function
 ** depending on the file system type
 **
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved 
 **
 ** TASK
@@ -40,8 +41,14 @@ fs_dent_alloc(ULONG norm_namelen, ULONG shrt_namelen)
 {
     FS_DENT *fs_dent;
     fs_dent = (FS_DENT *) mymalloc(sizeof(*fs_dent));
+    if (fs_dent == NULL)
+	return NULL;
 
     fs_dent->name = (char *) mymalloc(norm_namelen + 1);
+    if (fs_dent->name == NULL) {
+	free(fs_dent);
+	return NULL;
+    }
     fs_dent->name_max = norm_namelen;
 
     fs_dent->shrt_name_max = shrt_namelen;
@@ -50,6 +57,11 @@ fs_dent_alloc(ULONG norm_namelen, ULONG shrt_namelen)
     }
     else {
 	fs_dent->shrt_name = (char *) mymalloc(shrt_namelen + 1);
+	if (fs_dent->shrt_name == NULL) {
+	    free(fs_dent->name);
+	    free(fs_dent);
+	    return NULL;
+	}
     }
 
     fs_dent->ent_type = FS_DENT_UNDEF;
@@ -67,6 +79,16 @@ fs_dent_realloc(FS_DENT * fs_dent, ULONG namelen)
 	return fs_dent;
 
     fs_dent->name = (char *) myrealloc(fs_dent->name, namelen + 1);
+    if (fs_dent->name == NULL) {
+	if (fs_dent->fsi)
+	    fs_inode_free(fs_dent->fsi);
+
+	if (fs_dent->shrt_name)
+	    free(fs_dent->shrt_name);
+
+	free(fs_dent);
+	return NULL;
+    }
 
     fs_dent->ent_type = FS_DENT_UNDEF;
     fs_dent->name_max = namelen;
@@ -94,14 +116,13 @@ fs_dent_free(FS_DENT * fs_dent)
 
 /*
  * make the ls -l output from the mode 
+ *
+ * ls must be 12 bytes or more!
  */
 void
-make_ls(mode_t mode, char *ls, int len)
+make_ls(mode_t mode, char *ls)
 {
     int typ;
-
-    if (len < 11)
-	error("make_ls: array too short");
 
     /* put the default values in */
     strcpy(ls, "----------");
@@ -168,11 +189,11 @@ fs_print_time(FILE * hFile, time_t time)
 	struct tm *tmTime = localtime(&time);
 
 	fprintf(hFile, "%.4d.%.2d.%.2d %.2d:%.2d:%.2d (%s)",
-		(int) tmTime->tm_year + 1900,
-		(int) tmTime->tm_mon + 1, (int) tmTime->tm_mday,
-		tmTime->tm_hour,
-		(int) tmTime->tm_min, (int) tmTime->tm_sec,
-		tzname[(tmTime->tm_isdst == 0) ? 0 : 1]);
+	    (int) tmTime->tm_year + 1900,
+	    (int) tmTime->tm_mon + 1, (int) tmTime->tm_mday,
+	    tmTime->tm_hour,
+	    (int) tmTime->tm_min, (int) tmTime->tm_sec,
+	    tzname[(tmTime->tm_isdst == 0) ? 0 : 1]);
     }
 }
 
@@ -192,9 +213,9 @@ fs_print_day(FILE * hFile, time_t time)
 	struct tm *tmTime = localtime(&time);
 
 	fprintf(hFile, "%.4d.%.2d.%.2d 00:00:00 (%s)",
-		(int) tmTime->tm_year + 1900,
-		(int) tmTime->tm_mon + 1, (int) tmTime->tm_mday,
-		tzname[(tmTime->tm_isdst == 0) ? 0 : 1]);
+	    (int) tmTime->tm_year + 1900,
+	    (int) tmTime->tm_mon + 1, (int) tmTime->tm_mday,
+	    tzname[(tmTime->tm_isdst == 0) ? 0 : 1]);
     }
 }
 
@@ -212,14 +233,14 @@ fs_print_day(FILE * hFile, time_t time)
  */
 void
 fs_dent_print(FILE * hFile, FS_DENT * fs_dent, int flags, FS_INFO * fs,
-	      FS_DATA * fs_data)
+    FS_DATA * fs_data)
 {
     FS_INODE *fs_inode = fs_dent->fsi;
 
     /* type of file - based on dentry type */
     if ((fs_dent->ent_type & FS_DENT_MASK) < FS_DENT_MAX_STR)
 	fprintf(hFile, "%s/",
-		fs_dent_str[fs_dent->ent_type & FS_DENT_MASK]);
+	    fs_dent_str[fs_dent->ent_type & FS_DENT_MASK]);
     else
 	fprintf(hFile, "-/");
 
@@ -246,11 +267,11 @@ fs_dent_print(FILE * hFile, FS_DENT * fs_dent, int flags, FS_INFO * fs,
     /* print the id and type if we have fs_data (NTFS) */
     if (fs_data)
 	fprintf(hFile, "-%lu-%lu", (ULONG) fs_data->type,
-		(ULONG) fs_data->id);
+	    (ULONG) fs_data->id);
 
     fprintf(hFile, "%s:\t",
-	    ((fs_inode) && (fs_inode->flags & FS_FLAG_META_ALLOC) &&
-	     (flags & FS_FLAG_NAME_UNALLOC)) ? "(realloc)" : "");
+	((fs_inode) && (fs_inode->flags & FS_FLAG_META_ALLOC) &&
+	    (flags & FS_FLAG_NAME_UNALLOC)) ? "(realloc)" : "");
 
     if (fs_dent->path != NULL)
 	fprintf(hFile, "%s", fs_dent->path);
@@ -265,9 +286,9 @@ fs_dent_print(FILE * hFile, FS_DENT * fs_dent, int flags, FS_INFO * fs,
     /* print the data stream name if we the non-data NTFS stream */
     if (fs_data) {
 	if (((fs_data->type == NTFS_ATYPE_DATA) &&
-	     (strcmp(fs_data->name, "$Data") != 0)) ||
+		(strcmp(fs_data->name, "$Data") != 0)) ||
 	    ((fs_data->type == NTFS_ATYPE_IDXROOT) &&
-	     (strcmp(fs_data->name, "$I30") != 0)))
+		(strcmp(fs_data->name, "$I30") != 0)))
 	    fprintf(hFile, ":%s", fs_data->name);
     }
 
@@ -283,7 +304,7 @@ fs_dent_print(FILE * hFile, FS_DENT * fs_dent, int flags, FS_INFO * fs,
 */
 void
 fs_dent_print_long(FILE * hFile, FS_DENT * fs_dent, int flags,
-		   FS_INFO * fs, FS_DATA * fs_data)
+    FS_INFO * fs, FS_DATA * fs_data)
 {
     FS_INODE *fs_inode = fs_dent->fsi;
 
@@ -321,7 +342,7 @@ fs_dent_print_long(FILE * hFile, FS_DENT * fs_dent, int flags,
 	    fprintf(hFile, "\t%llu", (ULLONG) fs_inode->size);
 
 	fprintf(hFile, "\t%lu\t%lu\n",
-		(ULONG) fs_inode->gid, (ULONG) fs_inode->uid);
+	    (ULONG) fs_inode->gid, (ULONG) fs_inode->uid);
     }
 
     return;
@@ -349,7 +370,7 @@ fs_dent_print_long(FILE * hFile, FS_DENT * fs_dent, int flags,
 */
 void
 fs_dent_print_mac(FILE * hFile, FS_DENT * fs_dent, int flags,
-		  FS_INFO * fs, FS_DATA * fs_data, char *prefix)
+    FS_INFO * fs, FS_DATA * fs_data, char *prefix)
 {
     FS_INODE *fs_inode;
     char ls[12];
@@ -367,9 +388,9 @@ fs_dent_print_mac(FILE * hFile, FS_DENT * fs_dent, int flags,
 
     /* print the data stream name if it exists and is not the default NTFS */
     if ((fs_data) && (((fs_data->type == NTFS_ATYPE_DATA) &&
-		       (strcmp(fs_data->name, "$Data") != 0)) ||
-		      ((fs_data->type == NTFS_ATYPE_IDXROOT) &&
-		       (strcmp(fs_data->name, "$I30") != 0))))
+		(strcmp(fs_data->name, "$Data") != 0)) ||
+	    ((fs_data->type == NTFS_ATYPE_IDXROOT) &&
+		(strcmp(fs_data->name, "$I30") != 0))))
 	fprintf(hFile, ":%s", fs_data->name);
 
     if ((fs_inode) && ((fs_inode->mode & FS_INODE_FMT) == FS_INODE_LNK) &&
@@ -381,15 +402,14 @@ fs_dent_print_mac(FILE * hFile, FS_DENT * fs_dent, int flags,
      * allocated, then add realloc comment */
     if (flags & FS_FLAG_NAME_UNALLOC)
 	fprintf(hFile, " (deleted%s)", ((fs_inode)
-					&& (fs_inode->
-					    flags & FS_FLAG_META_ALLOC)) ?
-		"-realloc" : "");
+		&& (fs_inode->
+		    flags & FS_FLAG_META_ALLOC)) ? "-realloc" : "");
 
     /* device, inode */
     fprintf(hFile, "|0|%" PRIuINUM "", fs_dent->inode);
     if (fs_data)
 	fprintf(hFile, "-%lu-%lu", (ULONG) fs_data->type,
-		(ULONG) fs_data->id);
+	    (ULONG) fs_data->id);
 
     /* mode val */
     fprintf(hFile, "|%lu|", (ULONG) ((fs_inode) ? fs_inode->mode : 0));
@@ -399,7 +419,7 @@ fs_dent_print_mac(FILE * hFile, FS_DENT * fs_dent, int flags,
      */
     if ((fs_dent->ent_type & FS_DENT_MASK) < FS_INODE_MAX_STR)
 	fprintf(hFile, "%s/",
-		fs_inode_str[fs_dent->ent_type & FS_DENT_MASK]);
+	    fs_inode_str[fs_dent->ent_type & FS_DENT_MASK]);
     else
 	fprintf(hFile, "-/");
 
@@ -409,12 +429,12 @@ fs_dent_print_mac(FILE * hFile, FS_DENT * fs_dent, int flags,
     else {
 
 	/* mode as string */
-	make_ls(fs_inode->mode, ls, 12);
+	make_ls(fs_inode->mode, ls);
 	fprintf(hFile, "%s|", ls);
 
 	/* num link, uid, gid, rdev */
 	fprintf(hFile, "%d|%d|%d|0|", (int) fs_inode->nlink,
-		(int) fs_inode->uid, (int) fs_inode->gid);
+	    (int) fs_inode->uid, (int) fs_inode->gid);
 
 	/* size - use data stream if we have it */
 	if (fs_data)
@@ -424,8 +444,8 @@ fs_dent_print_mac(FILE * hFile, FS_DENT * fs_dent, int flags,
 
 	/* atime, mtime, ctime */
 	fprintf(hFile, "%lu|%lu|%lu|",
-		(ULONG) fs_inode->atime, (ULONG) fs_inode->mtime,
-		(ULONG) fs_inode->ctime);
+	    (ULONG) fs_inode->atime, (ULONG) fs_inode->mtime,
+	    (ULONG) fs_inode->ctime);
     }
 
     /* block size and num of blocks */

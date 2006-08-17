@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2005/09/02 19:53:27 $
+** $Date: 2006/03/22 03:44:58 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -16,8 +16,8 @@
 extern "C" {
 #endif
 
-    extern void
-     ffs_dent_walk(FS_INFO *, INUM_T, int, FS_DENT_WALK_FN, void *);
+    extern uint8_t
+	ffs_dent_walk(FS_INFO *, INUM_T, int, FS_DENT_WALK_FN, void *);
 
 
     typedef uint32_t FFS_GRPNUM_T;

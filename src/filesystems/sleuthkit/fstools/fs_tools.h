@@ -2,7 +2,7 @@
 ** fs_tools
 ** The Sleuth Kit 
 **
-** $Date: 2005/09/02 23:34:03 $
+** $Date: 2006/07/10 15:09:56 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -26,18 +26,27 @@ extern "C" {
      */
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
-#include <sys/fcntl.h>
-#include <sys/param.h>
+
 #include <sys/types.h>
-#include <sys/time.h>
 #include <time.h>
 #include <locale.h>
+#include <errno.h>
 
 #include "tsk_os.h"
+
+#if defined (HAVE_UNISTD)
+#include <unistd.h>
+#endif
+
+#if !defined (TSK_WIN32)
+#include <sys/fcntl.h>
+#include <sys/param.h>
+#include <sys/time.h>
+#endif
+
 #include "tsk_types.h"
 
 #include "libauxtools.h"
@@ -72,19 +81,20 @@ extern "C" {
  */
 #define WALK_CONT	0x0
 #define WALK_STOP	0x1
+#define WALK_ERROR	0x2
 
 /* walk action functions */
     typedef uint8_t(*FS_INODE_WALK_FN) (FS_INFO *, FS_INODE *, int,
-					void *);
+	void *);
     typedef uint8_t(*FS_BLOCK_WALK_FN) (FS_INFO *, DADDR_T, char *, int,
-					void *);
+	void *);
     typedef uint8_t(*FS_DENT_WALK_FN) (FS_INFO *, FS_DENT *, int, void *);
     typedef uint8_t(*FS_FILE_WALK_FN) (FS_INFO *, DADDR_T, char *,
-				       unsigned int, int, void *);
+	unsigned int, int, void *);
 
     typedef uint8_t(*FS_JBLK_WALK_FN) (FS_INFO *, char *, int, void *);
     typedef uint8_t(*FS_JENTRY_WALK_FN) (FS_INFO *, FS_JENTRY *, int,
-					 void *);
+	void *);
 
 
 
@@ -98,13 +108,14 @@ extern "C" {
     } FS_LOAD_FILE;
 
     extern uint8_t load_file_action(FS_INFO *, DADDR_T, char *,
-				    unsigned int, int, void *);
+	unsigned int, int, void *);
 
 /***************************************************************
  * FS_INFO: Allocated when an image is opened
  */
     struct FS_INFO {
 	IMG_INFO *img_info;
+	SSIZE_T offset;		/* byte offset into img_info that fs starts */
 
 	/* meta data */
 	INUM_T inum_count;	/* number of inodes */
@@ -130,28 +141,28 @@ extern "C" {
 
 
 	/* file system specific function pointers */
-	void (*block_walk) (FS_INFO *, DADDR_T, DADDR_T, int,
-			    FS_BLOCK_WALK_FN, void *);
+	 uint8_t(*block_walk) (FS_INFO *, DADDR_T, DADDR_T, int,
+	    FS_BLOCK_WALK_FN, void *);
 
-	void (*inode_walk) (FS_INFO *, INUM_T, INUM_T, int,
-			    FS_INODE_WALK_FN, void *);
+	 uint8_t(*inode_walk) (FS_INFO *, INUM_T, INUM_T, int,
+	    FS_INODE_WALK_FN, void *);
 	FS_INODE *(*inode_lookup) (FS_INFO *, INUM_T);
-	void (*istat) (FS_INFO *, FILE *, INUM_T, int, int32_t);
+	 uint8_t(*istat) (FS_INFO *, FILE *, INUM_T, int, int32_t);
 
-	void (*file_walk) (FS_INFO *, FS_INODE *, uint32_t, uint16_t,
-			   int, FS_FILE_WALK_FN, void *);
+	 uint8_t(*file_walk) (FS_INFO *, FS_INODE *, uint32_t, uint16_t,
+	    int, FS_FILE_WALK_FN, void *);
 
-	void (*dent_walk) (FS_INFO *, INUM_T, int, FS_DENT_WALK_FN,
-			   void *);
+	 uint8_t(*dent_walk) (FS_INFO *, INUM_T, int, FS_DENT_WALK_FN,
+	    void *);
 
-	void (*jopen) (FS_INFO *, INUM_T);
-	void (*jblk_walk) (FS_INFO *, DADDR_T, DADDR_T, int,
-			   FS_JBLK_WALK_FN, void *);
-	void (*jentry_walk) (FS_INFO *, int, FS_JENTRY_WALK_FN, void *);
+	 uint8_t(*jopen) (FS_INFO *, INUM_T);
+	 uint8_t(*jblk_walk) (FS_INFO *, DADDR_T, DADDR_T, int,
+	    FS_JBLK_WALK_FN, void *);
+	 uint8_t(*jentry_walk) (FS_INFO *, int, FS_JENTRY_WALK_FN, void *);
 
 
-	void (*fsstat) (FS_INFO *, FILE *);
-	void (*fscheck) (FS_INFO *, FILE *);
+	 uint8_t(*fsstat) (FS_INFO *, FILE *);
+	 uint8_t(*fscheck) (FS_INFO *, FILE *);
 
 	void (*close) (FS_INFO *);
     };
@@ -182,7 +193,8 @@ extern "C" {
 #define FS_FLAG_DATA_META	(1<<3)	/* allocated for meta data */
 #define FS_FLAG_DATA_BAD	(1<<4)	/* marked as bad by the FS */
 #define FS_FLAG_DATA_ALIGN	(1<<5)	/* block align (i.e. send a whole block) */
-#define FS_FLAG_DATA_RESIDENT      (1<<6)  /* Marks file as resident */
+#define FS_FLAG_DATA_RES	(1<<6)	/* This data is resident (NTFS ONLY) -- used by ntfs_data_walk */
+
 
 
 /* Flags used when calling file_walk, action of file_walk uses
@@ -192,8 +204,7 @@ extern "C" {
 #define FS_FLAG_FILE_RECOVER    (1<<2)	/* Recover a deleted file */
 #define FS_FLAG_FILE_META	(1<<3)	/* return meta data units too */
 #define FS_FLAG_FILE_NOSPARSE   (1<<4)	/* don't return sparse data units */
-#define FS_FLAG_FILE_NOABORT    (1<<5)	/* do not abort when errors are found */
-#define FS_FLAG_FILE_NOID	(1<<6)	/* Ignore the id field in the argument - use only type */
+#define FS_FLAG_FILE_NOID	(1<<5)	/* Ignore the id field in the argument - use only type */
 
 
 
@@ -237,6 +248,7 @@ extern "C" {
 	FS_DATA_RUN *run;	/* a linked list of data runs */
 	OFF_T runlen;		/* number of bytes that are allocated in
 				 * original run (larger than size) */
+	uint64_t compsize;	/* size of the compression unit */
 
 	/* stream data (resident) */
 	size_t buflen;		/* allocated bytes in buf */
@@ -246,7 +258,7 @@ extern "C" {
 #define FS_DATA_INUSE	0x1	// structre in use
 #define FS_DATA_NONRES	0x2	// non-resident
 #define FS_DATA_RES		0x4	// resident
-#define FS_DATA_ENC		0x10	// encrypted
+#define	FS_DATA_ENC		0x10	// encrypted
 #define FS_DATA_COMP	0x20	// compressed
 #define FS_DATA_SPAR	0x40	// sparse
 
@@ -266,12 +278,26 @@ extern "C" {
 	OFF_T size;		/* file size */
 	uid_t uid;		/* owner */
 	gid_t gid;		/* group */
+
 	/* @@@ Need to make these 64-bits ... ? */
 	time_t mtime;		/* last modified */
 	time_t atime;		/* last access */
 	time_t ctime;		/* last status change */
-	time_t crtime;		/* create time (NTFS only: not used by ils) */
-	time_t dtime;		/* delete time (Linux only) */
+
+	/* filesystem specific times */
+	union {
+	    struct {		/* NTFS Times */
+		time_t crtime;	/* create time */
+	    };
+	    struct {		/* Linux Times */
+		time_t dtime;	/* delete time */
+	    };
+	    struct {		/* HFS Times */
+		time_t bkup_time;
+		time_t attr_mtime;
+	    };
+	};
+
 	DADDR_T *direct_addr;	/* direct blocks */
 	int direct_count;	/* number of blocks */
 	DADDR_T *indir_addr;	/* indirect blocks */
@@ -385,13 +411,13 @@ extern "C" {
     extern FS_DENT *fs_dent_realloc(FS_DENT *, ULONG);
     extern void fs_dent_free(FS_DENT *);
     extern void fs_dent_print(FILE *, FS_DENT *, int, FS_INFO *,
-			      FS_DATA *);
+	FS_DATA *);
     extern void fs_dent_print_long(FILE *, FS_DENT *, int, FS_INFO *,
-				   FS_DATA *);
+	FS_DATA *);
     extern void fs_dent_print_mac(FILE *, FS_DENT *, int, FS_INFO *,
-				  FS_DATA * fs_data, char *);
+	FS_DATA * fs_data, char *);
 
-    extern void make_ls(mode_t, char *, int);
+    extern void make_ls(mode_t, char *);
     extern void fs_print_day(FILE *, time_t);
     extern void fs_print_time(FILE *, time_t);
 
@@ -406,32 +432,33 @@ extern "C" {
 /**************************************************************8
  * Generic routines.
  */
-    extern FS_INFO *fs_open(IMG_INFO *, const char *);
+    extern FS_INFO *fs_open(IMG_INFO *, SSIZE_T, const char *);
 
 /* fs_io routines */
-    extern OFF_T fs_read_block(FS_INFO *, DATA_BUF *, OFF_T, DADDR_T);
-    extern OFF_T fs_read_block_nobuf(FS_INFO *, char *, OFF_T, DADDR_T);
+    extern SSIZE_T fs_read_block(FS_INFO *, DATA_BUF *, OFF_T, DADDR_T);
+    extern SSIZE_T fs_read_block_nobuf(FS_INFO *, char *, OFF_T, DADDR_T);
 #define fs_read_random(fsi, buf, len, offs)	\
-	(fsi)->img_info->read_random((fsi)->img_info, (buf), (len), (offs))
+	(fsi)->img_info->read_random((fsi)->img_info, (fsi)->offset, (buf), (len), (offs))
 
 
 /* Specific file system routines */
-    extern FS_INFO *ext2fs_open(IMG_INFO *, unsigned char, uint8_t);
-    extern FS_INFO *fatfs_open(IMG_INFO *, unsigned char, uint8_t);
-    extern FS_INFO *ffs_open(IMG_INFO *, unsigned char, uint8_t);
-    extern FS_INFO *ntfs_open(IMG_INFO *, unsigned char, uint8_t);
-    extern FS_INFO *rawfs_open(IMG_INFO *, unsigned char);
-    extern FS_INFO *swapfs_open(IMG_INFO *, unsigned char);
-    extern FS_INFO *iso9660_open(IMG_INFO *, unsigned char, uint8_t);
-    extern FS_INFO *hfs_open(IMG_INFO *, unsigned char, uint8_t);
+    extern FS_INFO *ext2fs_open(IMG_INFO *, SSIZE_T, uint8_t, uint8_t);
+    extern FS_INFO *fatfs_open(IMG_INFO *, SSIZE_T, uint8_t, uint8_t);
+    extern FS_INFO *ffs_open(IMG_INFO *, SSIZE_T, uint8_t);
+    extern FS_INFO *ntfs_open(IMG_INFO *, SSIZE_T, uint8_t, uint8_t);
+    extern FS_INFO *rawfs_open(IMG_INFO *, SSIZE_T);
+    extern FS_INFO *swapfs_open(IMG_INFO *, SSIZE_T);
+    extern FS_INFO *iso9660_open(IMG_INFO *, SSIZE_T, unsigned char,
+	uint8_t);
+    extern FS_INFO *hfs_open(IMG_INFO *, SSIZE_T, unsigned char, uint8_t);
 
 
 // Endian macros - actual functions in misc/
 
-#define guessu16(fs, x, mag)   \
+#define fs_guessu16(fs, x, mag)   \
 	guess_end_u16(&(fs->endian), (x), (mag))
 
-#define guessu32(fs, x, mag)   \
+#define fs_guessu32(fs, x, mag)   \
 	guess_end_u32(&(fs->endian), (x), (mag))
 
 #ifdef __cplusplus

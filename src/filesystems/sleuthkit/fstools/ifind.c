@@ -2,11 +2,12 @@
 ** ifind (inode find)
 ** The Sleuth Kit
 **
-** $Date: 2005/09/02 23:34:03 $
+** $Date: 2006/07/10 13:26:20 $
 **
 ** Given an image  and block number, identify which inode it is used by
 ** 
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
 **
 ** TASK
@@ -28,26 +29,24 @@ static void
 usage()
 {
     fprintf(stderr,
-	    "usage: %s [-alvV] [-f fstype] [-i imgtype] [-o imgoffset] [-d unit_addr] [-n file] [-p par_addr] [-z ZONE] image [images]\n",
-	    progname);
+	"usage: %s [-alvV] [-f fstype] [-i imgtype] [-o imgoffset] [-d unit_addr] [-n file] [-p par_addr] [-z ZONE] image [images]\n",
+	progname);
     fprintf(stderr, "\t-a: find all inodes\n");
     fprintf(stderr,
-	    "\t-d unit_addr: Find the meta data given the data unit\n");
+	"\t-d unit_addr: Find the meta data given the data unit\n");
     fprintf(stderr, "\t-l: long format when -p is given\n");
     fprintf(stderr, "\t-n file: Find the meta data given the file name\n");
     fprintf(stderr,
-	    "\t-p par_addr: Find UNALLOCATED MFT entries given the parent's meta address (NTFS only)\n");
-    fprintf(stderr, "\t-i imgtype: The format of the image file\n");
+	"\t-p par_addr: Find UNALLOCATED MFT entries given the parent's meta address (NTFS only)\n");
     fprintf(stderr,
-	    "\t-o imgoffset: The offset of the file system in the image (in sectors)\n");
+	"\t-i imgtype: The format of the image file (use '-i list' for supported types)\n");
+    fprintf(stderr,
+	"\t-f fstype: File system type (use '-f list' for supported types)\n");
+    fprintf(stderr,
+	"\t-o imgoffset: The offset of the file system in the image (in sectors)\n");
     fprintf(stderr, "\t-v: Verbose output to stderr\n");
     fprintf(stderr, "\t-V: Print version\n");
     fprintf(stderr, "\t-z ZONE: Time zone setting when -l -p is given\n");
-    fprintf(stderr, "\t-f fstype: File system type\n");
-    fprintf(stderr, "Supported file system types:\n");
-    fs_print_types(stderr);
-    fprintf(stderr, "Supported image format types:\n");
-    img_print_types(stderr);
 
     exit(1);
 }
@@ -64,11 +63,12 @@ main(int argc, char **argv)
     int ch;
     char *cp;
     extern int optind;
-    char *imgtype = NULL, *imgoff = NULL;
+    char *imgtype = NULL;
     IMG_INFO *img;
     DADDR_T block = 0;		/* the block to find */
     INUM_T parinode = 0;
     char *path = NULL;
+    SSIZE_T imgoff = 0;
 
     progname = argv[0];
     setlocale(LC_ALL, "");
@@ -84,7 +84,7 @@ main(int argc, char **argv)
 	case 'd':
 	    if (localflags & (IFIND_PAR | IFIND_PATH)) {
 		fprintf(stderr,
-			"error: only one address type can be given\n");
+		    "error: only one address type can be given\n");
 		usage();
 	    }
 	    localflags |= IFIND_DATA;
@@ -97,9 +97,19 @@ main(int argc, char **argv)
 
 	case 'f':
 	    fstype = optarg;
+	    if (strcmp(fstype, "list") == 0) {
+		fs_print_types(stderr);
+		exit(1);
+	    }
+
 	    break;
 	case 'i':
 	    imgtype = optarg;
+	    if (strcmp(imgtype, "list") == 0) {
+		img_print_types(stderr);
+		exit(1);
+	    }
+
 	    break;
 
 	case 'l':
@@ -109,21 +119,27 @@ main(int argc, char **argv)
 	case 'n':
 	    if (localflags & (IFIND_PAR | IFIND_DATA)) {
 		fprintf(stderr,
-			"error: only one address type can be given\n");
+		    "error: only one address type can be given\n");
 		usage();
 	    }
 	    localflags |= IFIND_PATH;
-	    path = mymalloc(strlen(optarg) + 1);
+	    if ((path = mymalloc(strlen(optarg) + 1)) == NULL) {
+		tsk_error_print(stderr);
+		exit(1);
+	    }
 	    strncpy(path, optarg, strlen(optarg) + 1);
 	    break;
 	case 'o':
-	    imgoff = optarg;
+	    if ((imgoff = parse_offset(optarg)) == -1) {
+		tsk_error_print(stderr);
+		exit(1);
+	    }
 	    break;
 
 	case 'p':
 	    if (localflags & (IFIND_PATH | IFIND_DATA)) {
 		fprintf(stderr,
-			"error: only one address type can be given\n");
+		    "error: only one address type can be given\n");
 		usage();
 	    }
 	    localflags |= IFIND_PAR;
@@ -147,7 +163,8 @@ main(int argc, char **argv)
 		char envstr[32];
 		snprintf(envstr, 32, "TZ=%s", optarg);
 		if (0 != putenv(envstr)) {
-		    error("error setting environment");
+		    fprintf(stderr, "error setting environment");
+		    exit(1);
 		}
 
 		/* we should be checking this somehow */
@@ -173,19 +190,28 @@ main(int argc, char **argv)
     }
 
 
-    img =
-	img_open(imgtype, imgoff, argc - optind,
-		 (const char **) &argv[optind]);
-    fs = fs_open(img, fstype);
+    if ((img =
+	    img_open(imgtype, argc - optind,
+		(const char **) &argv[optind])) == NULL) {
+	tsk_error_print(stderr);
+	exit(1);
+    }
 
+    if ((fs = fs_open(img, imgoff, fstype)) == NULL) {
+	tsk_error_print(stderr);
+	if (tsk_errno == TSK_ERR_FS_UNSUPTYPE)
+	    fs_print_types(stderr);
+	img->close(img);
+	exit(1);
+    }
 
     if (localflags & IFIND_DATA) {
 
 	if (block > fs->last_block) {
 	    fprintf(stderr,
-		    "Block %" PRIuDADDR
-		    " is larger than last block in image (%" PRIuDADDR
-		    ")\n", block, fs->last_block);
+		"Block %" PRIuDADDR
+		" is larger than last block in image (%" PRIuDADDR
+		")\n", block, fs->last_block);
 	    fs->close(fs);
 	    img->close(img);
 	    exit(1);
@@ -196,8 +222,14 @@ main(int argc, char **argv)
 	    img->close(img);
 	    exit(1);
 	}
-	fs_ifind_data(fs, localflags, block);
+	if (fs_ifind_data(fs, localflags, block)) {
+	    tsk_error_print(stderr);
+	    fs->close(fs);
+	    img->close(img);
+	    exit(1);
+	}
     }
+
     else if (localflags & IFIND_PAR) {
 	if ((fs->ftype & FSMASK) != NTFS_TYPE) {
 	    fprintf(stderr, "-p works only with NTFS file systems\n");
@@ -207,18 +239,29 @@ main(int argc, char **argv)
 	}
 	else if (parinode > fs->last_inum) {
 	    fprintf(stderr,
-		    "Meta data %" PRIuINUM
-		    " is larger than last MFT entry in image (%" PRIuINUM
-		    ")\n", parinode, fs->last_inum);
+		"Meta data %" PRIuINUM
+		" is larger than last MFT entry in image (%" PRIuINUM
+		")\n", parinode, fs->last_inum);
 	    fs->close(fs);
 	    img->close(img);
 	    exit(1);
 	}
-	fs_ifind_par(fs, localflags, parinode);
+	if (fs_ifind_par(fs, localflags, parinode)) {
+	    tsk_error_print(stderr);
+	    fs->close(fs);
+	    img->close(img);
+	    exit(1);
+
+	}
     }
 
     else if (localflags & IFIND_PATH) {
-	fs_ifind_path(fs, localflags, path);
+	if (fs_ifind_path(fs, localflags, path)) {
+	    tsk_error_print(stderr);
+	    fs->close(fs);
+	    img->close(img);
+	    exit(1);
+	}
     }
 
     fs->close(fs);

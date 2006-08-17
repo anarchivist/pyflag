@@ -1,7 +1,7 @@
 /* 
  * The Sleuth Kit
  *
- * $Date: 2005/09/02 23:34:03 $
+ * $Date: 2006/03/27 03:33:19 $
  * 
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2005 Brian Carrier.  All rights reserved
@@ -19,7 +19,7 @@
 
 uint8_t
 load_file_action(FS_INFO * fs, DADDR_T addr, char *buf, unsigned int size,
-		 int flags, void *ptr)
+    int flags, void *ptr)
 {
     FS_LOAD_FILE *buf1 = (FS_LOAD_FILE *) ptr;
     size_t cp_size;

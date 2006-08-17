@@ -2,16 +2,16 @@
 ** dstat
 ** The Sleuth Kit 
 **
-** $Date: 2005/09/02 23:34:02 $
+** $Date: 2006/07/10 13:26:20 $
 **
 ** Get the details about a data unit
 **
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved 
 **
 ** TASK
 ** Copyright (c) 2002 Brian Carrier, @stake Inc.  All rights reserved
-**
 **
 ** This software is distributed under the Common Public License 1.0
 **
@@ -22,18 +22,16 @@ void
 usage()
 {
     fprintf(stderr,
-	    "usage: %s [-vV] [-f fstype] [-i imgtype] [-o imgoffset] image [images] addr\n",
-	    progname);
-    fprintf(stderr, "\t-i imgtype: The format of the image file\n");
+	"usage: %s [-vV] [-f fstype] [-i imgtype] [-o imgoffset] image [images] addr\n",
+	progname);
     fprintf(stderr,
-	    "\t-o imgoffset: The offset of the file system in the image (in sectors)\n");
+	"\t-f fstype: File system type (use '-f list' for supported types)\n");
+    fprintf(stderr,
+	"\t-i imgtype: The format of the image file (use '-i list' for supported types)\n");
+    fprintf(stderr,
+	"\t-o imgoffset: The offset of the file system in the image (in sectors)\n");
     fprintf(stderr, "\t-v: Verbose output to stderr\n");
     fprintf(stderr, "\t-V: Print version\n");
-    fprintf(stderr, "\t-f fstype: File system type\n");
-    fprintf(stderr, "Supported file system types:\n");
-    fs_print_types(stderr);
-    fprintf(stderr, "Supported image format types:\n");
-    img_print_types(stderr);
 
     exit(1);
 }
@@ -51,9 +49,10 @@ main(int argc, char **argv)
     FS_INFO *fs;
     int flags =
 	(FS_FLAG_DATA_UNALLOC | FS_FLAG_DATA_ALLOC | FS_FLAG_DATA_META |
-	 FS_FLAG_DATA_CONT);
-    char *imgtype = NULL, *imgoff = NULL;
+	FS_FLAG_DATA_CONT);
+    char *imgtype = NULL;
     IMG_INFO *img;
+    SSIZE_T imgoff = 0;
 
     progname = argv[0];
     setlocale(LC_ALL, "");
@@ -62,12 +61,25 @@ main(int argc, char **argv)
 	switch (ch) {
 	case 'f':
 	    fstype = optarg;
+	    if (strcmp(fstype, "list") == 0) {
+		fs_print_types(stderr);
+		exit(1);
+	    }
+
 	    break;
 	case 'i':
 	    imgtype = optarg;
+	    if (strcmp(imgtype, "list") == 0) {
+		img_print_types(stderr);
+		exit(1);
+	    }
+
 	    break;
 	case 'o':
-	    imgoff = optarg;
+	    if ((imgoff = parse_offset(optarg)) == -1) {
+		tsk_error_print(stderr);
+		exit(1);
+	    }
 	    break;
 	case 'v':
 	    verbose++;
@@ -95,29 +107,45 @@ main(int argc, char **argv)
     }
 
     /* open image */
-    img =
-	img_open(imgtype, imgoff, argc - optind - 1,
-		 (const char **) &argv[optind]);
-    fs = fs_open(img, fstype);
+    if ((img =
+	    img_open(imgtype, argc - optind - 1,
+		(const char **) &argv[optind])) == NULL) {
+	tsk_error_print(stderr);
+	exit(1);
+    }
+    if ((fs = fs_open(img, imgoff, fstype)) == NULL) {
+	tsk_error_print(stderr);
+	if (tsk_errno == TSK_ERR_FS_UNSUPTYPE)
+	    fs_print_types(stderr);
+	img->close(img);
+	exit(1);
+    }
+
 
     if (addr > fs->last_block) {
 	fprintf(stderr,
-		"Data unit address too large for image (%" PRIuDADDR ")\n",
-		fs->last_block);
+	    "Data unit address too large for image (%" PRIuDADDR ")\n",
+	    fs->last_block);
 	fs->close(fs);
 	img->close(img);
 	exit(1);
     }
     if (addr < fs->first_block) {
 	fprintf(stderr,
-		"Data unit address too small for image (%" PRIuDADDR ")\n",
-		fs->first_block);
+	    "Data unit address too small for image (%" PRIuDADDR ")\n",
+	    fs->first_block);
 	fs->close(fs);
 	img->close(img);
 	exit(1);
     }
 
-    fs_dstat(fs, 0, addr, flags);
+    if (fs_dstat(fs, 0, addr, flags)) {
+	tsk_error_print(stderr);
+	fs->close(fs);
+	img->close(img);
+	exit(1);
+
+    }
 
     fs->close(fs);
     img->close(img);

@@ -2,11 +2,12 @@
 ** fs_types
 ** The Sleuth Kit 
 **
-** $Date: 2005/10/13 17:06:04 $
+** $Date: 2006/04/07 18:12:00 $
 **
 ** Identify the type of file system being used
 **
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved 
 **
 ** TASK
@@ -23,7 +24,7 @@
 
 typedef struct {
     char *name;
-    char code;
+    uint8_t code;
     char *comment;
 } FS_TYPES;
 
@@ -35,7 +36,7 @@ FS_TYPES fs_open_table[] = {
     {"fat", FATAUTO, "auto-detect FAT"},
     {"ext", EXTAUTO, "Ext2/Ext3"},
     {"iso9660", ISO9660, "ISO9660 CD"},
-    {"hfs", HFS, "HFS+"},
+//    {"hfs", HFS, "HFS+"},
     {"ufs", FFSAUTO, "UFS 1 & 2"},
     {"raw", RAW, "Raw Data"},
     {"swap", SWAP, "Swap Space"},
@@ -59,7 +60,7 @@ FS_TYPES fs_test_table[] = {
     {"fat", FATAUTO, ""},
     {"ext", EXTAUTO, ""},
     {"ufs", FFSAUTO, ""},
-    {"hfs", HFS, ""},
+//    {"hfs", HFS, ""},
     {"iso9660", ISO9660, ""},
     {"raw", RAW, ""},
     {"swap", SWAP, ""},
@@ -78,7 +79,7 @@ FS_TYPES fs_usage_table[] = {
     {"ext", 0, "Ext2/Ext3"},
     {"fat", 0, "FAT12/16/32"},
     {"ntfs", 0, "NTFS"},
-    {"hfs", 0, "HFS+"},
+    //{"hfs", 0, "HFS+"},
     {"iso9660", 0, "ISO9660 CD"},
     {"ufs", 0, "UFS 1 & 2"},
     {"raw", 0, "Raw Data"},
@@ -87,7 +88,7 @@ FS_TYPES fs_usage_table[] = {
 };
 
 
-char
+uint8_t
 fs_parse_type(const char *str)
 {
     FS_TYPES *sp;
@@ -106,12 +107,13 @@ void
 fs_print_types(FILE * hFile)
 {
     FS_TYPES *sp;
+    fprintf(hFile, "Supported file system types:\n");
     for (sp = fs_usage_table; sp->name; sp++)
 	fprintf(hFile, "\t%s (%s)\n", sp->name, sp->comment);
 }
 
 char *
-fs_get_type(char ftype)
+fs_get_type(uint8_t ftype)
 {
     FS_TYPES *sp;
     for (sp = fs_test_table; sp->name; sp++)

@@ -126,8 +126,8 @@ static const UTF8 firstByteMark[7] =
 
 ConversionResult
 fs_UTF16toUTF8(FS_INFO * fs, const UTF16 ** sourceStart,
-	       const UTF16 * sourceEnd, UTF8 ** targetStart,
-	       UTF8 * targetEnd, ConversionFlags flags)
+    const UTF16 * sourceEnd, UTF8 ** targetStart,
+    UTF8 * targetEnd, ConversionFlags flags)
 {
     ConversionResult result = conversionOK;
     const UTF16 *source = *sourceStart;
@@ -303,8 +303,8 @@ isLegalUTF8Sequence(const UTF8 * source, const UTF8 * sourceEnd)
 // THIS HAS NOT BEEN COVERTED FOR ENDIAN-ness yet
 ConversionResult
 fs_UTF8toUTF16(FS_INFO * fs, const UTF8 ** sourceStart,
-	       const UTF8 * sourceEnd, UTF16 ** targetStart,
-	       UTF16 * targetEnd, ConversionFlags flags)
+    const UTF8 * sourceEnd, UTF16 ** targetStart,
+    UTF16 * targetEnd, ConversionFlags flags)
 {
     ConversionResult result = conversionOK;
     const UTF8 *source = *sourceStart;

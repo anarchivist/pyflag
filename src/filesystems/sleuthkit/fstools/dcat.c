@@ -2,12 +2,13 @@
 ** dcat
 ** The  Sleuth Kit 
 **
-** $Date: 2005/09/02 23:34:02 $
+** $Date: 2006/07/10 13:26:20 $
 **
 ** Given an image , block number, and size, display the contents
 ** of the block to stdout.
 ** 
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
 **
 ** TASK
@@ -30,30 +31,25 @@ void
 usage()
 {
     fprintf(stderr,
-	    "usage: %s [-ahsvVw] [-f fstype] [-i imgtype] [-o imgoffset] [-u usize] image [images] unit_addr [num]\n",
-	    progname);
+	"usage: %s [-ahsvVw] [-f fstype] [-i imgtype] [-o imgoffset] [-u usize] image [images] unit_addr [num]\n",
+	progname);
     fprintf(stderr, "\t-a: displays in all ASCII \n");
     fprintf(stderr, "\t-h: displays in hexdump-like fashion\n");
-    fprintf(stderr, "\t-i imgtype: The format of the image file\n");
     fprintf(stderr,
-	    "\t-o imgoffset: The offset of the file system in the image (in sectors)\n");
+	"\t-i imgtype: The format of the image file (use '-i list' for supported types)\n");
     fprintf(stderr,
-	    "\t-s: display basic block stats such as unit size, fragments, etc.\n");
+	"\t-o imgoffset: The offset of the file system in the image (in sectors)\n");
+    fprintf(stderr,
+	"\t-f fstype: File system type (use '-f list' for supported types)\n");
+    fprintf(stderr,
+	"\t-s: display basic block stats such as unit size, fragments, etc.\n");
     fprintf(stderr, "\t-v: verbose output to stderr\n");
     fprintf(stderr, "\t-V: display version\n");
     fprintf(stderr, "\t-w: displays in web-like (html) fashion\n");
-    fprintf(stderr, "\t-f fstype: File system type\n");
     fprintf(stderr,
-	    "\t-u usize: size of each data unit in image (for raw, dls, swap)\n");
+	"\t-u usize: size of each data unit in image (for raw, dls, swap)\n");
     fprintf(stderr,
-	    "\t[num] is the number of data units to display (default is 1)\n");
-    fprintf(stderr, "Supported file system types:\n");
-    fs_print_types(stderr);
-    fprintf(stderr, "\t%s (Unallocated Space)\n", DLS_TYPE);
-    fprintf(stderr, "Supported image format types:\n");
-    img_print_types(stderr);
-
-
+	"\t[num] is the number of data units to display (default is 1)\n");
 
     exit(1);
 }
@@ -68,9 +64,10 @@ main(int argc, char **argv)
     DADDR_T read_num_units;	/* Number of data units */
     int usize = 0;		/* Length of each data unit */
     int ch;
-    char format = 0, *cp, *imgtype = NULL, *imgoff = NULL;
+    char format = 0, *cp, *imgtype = NULL;
     IMG_INFO *img;
     extern int optind;
+    SSIZE_T imgoff = 0;
 
     progname = argv[0];
     setlocale(LC_ALL, "");
@@ -84,6 +81,12 @@ main(int argc, char **argv)
 	    fstype = optarg;
 	    if (strcmp(fstype, DLS_TYPE) == 0)
 		fstype = RAW_STR;
+	    if (strcmp(fstype, "list") == 0) {
+		fprintf(stderr, "\t%s (Unallocated Space)\n", DLS_TYPE);
+		fs_print_types(stderr);
+		exit(1);
+	    }
+
 
 	    break;
 	case 'h':
@@ -91,9 +94,17 @@ main(int argc, char **argv)
 	    break;
 	case 'i':
 	    imgtype = optarg;
+	    if (strcmp(imgtype, "list") == 0) {
+		img_print_types(stderr);
+		exit(1);
+	    }
+
 	    break;
 	case 'o':
-	    imgoff = optarg;
+	    if ((imgoff = parse_offset(optarg)) == -1) {
+		tsk_error_print(stderr);
+		exit(1);
+	    }
 	    break;
 	case 's':
 	    format |= DCAT_STAT;
@@ -149,9 +160,13 @@ main(int argc, char **argv)
 
     /* Get the block address */
     if (format & DCAT_STAT) {
-	img =
-	    img_open(imgtype, imgoff, argc - optind,
-		     (const char **) &argv[optind]);
+	if ((img =
+		img_open(imgtype, argc - optind,
+		    (const char **) &argv[optind])) == NULL) {
+	    tsk_error_print(stderr);
+	    exit(1);
+	}
+
     }
     else {
 	addr = strtoull(argv[argc - 2], &cp, 0);
@@ -161,13 +176,17 @@ main(int argc, char **argv)
 	    addr = strtoull(argv[argc - 1], &cp, 0);
 	    if (*cp || cp == argv[argc - 1]) {
 		fprintf(stderr, "Invalid block address: %s\n",
-			argv[argc - 1]);
+		    argv[argc - 1]);
 		usage();
 	    }
 
-	    img =
-		img_open(imgtype, imgoff, argc - optind - 1,
-			 (const char **) &argv[optind]);
+	    if ((img =
+		    img_open(imgtype, argc - optind - 1,
+			(const char **) &argv[optind])) == NULL) {
+		tsk_error_print(stderr);
+		exit(1);
+	    }
+
 	}
 	else {
 	    /* We got a number, so take the length as well while we are at it */
@@ -177,31 +196,44 @@ main(int argc, char **argv)
 		usage();
 	    }
 	    else if (read_num_units <= 0) {
-		error("Invalid size: %i\n", read_num_units);
+		fprintf(stderr, "Invalid size: %" PRIuDADDR "\n",
+		    read_num_units);
+		usage();
 	    }
 
-	    img =
-		img_open(imgtype, imgoff, argc - optind - 2,
-			 (const char **) &argv[optind]);
+	    if ((img =
+		    img_open(imgtype, argc - optind - 2,
+			(const char **) &argv[optind])) == NULL) {
+
+		tsk_error_print(stderr);
+		exit(1);
+	    }
+
 	}
     }
 
     /* open the file */
-    fs = fs_open(img, fstype);
+    if ((fs = fs_open(img, imgoff, fstype)) == NULL) {
+	tsk_error_print(stderr);
+	if (tsk_errno == TSK_ERR_FS_UNSUPTYPE)
+	    fs_print_types(stderr);
+	img->close(img);
+	exit(1);
+    }
+
 
 
     /* Set the default size if given */
     if ((usize != 0) &&
 	(((fs->ftype & FSMASK) == RAWFS_TYPE) ||
-	 ((fs->ftype & FSMASK) == SWAPFS_TYPE))) {
+	    ((fs->ftype & FSMASK) == SWAPFS_TYPE))) {
 
 	DADDR_T sectors;
 	int orig_dsize, new_dsize;
 
 	if (usize % 512) {
 	    fprintf(stderr,
-		    "New data unit size not a multiple of 512 (%d)\n",
-		    usize);
+		"New data unit size not a multiple of 512 (%d)\n", usize);
 	    usage();
 	}
 
@@ -221,7 +253,29 @@ main(int argc, char **argv)
 	fs->block_size = usize;
     }
 
-    fs_dcat(fs, format, addr, read_num_units);
+    if (addr > fs->last_block) {
+	fprintf(stderr,
+	    "Data unit address too large for image (%" PRIuDADDR ")\n",
+	    fs->last_block);
+	fs->close(fs);
+	img->close(img);
+	exit(1);
+    }
+    if (addr < fs->first_block) {
+	fprintf(stderr,
+	    "Data unit address too small for image (%" PRIuDADDR ")\n",
+	    fs->first_block);
+	fs->close(fs);
+	img->close(img);
+	exit(1);
+    }
+
+    if (fs_dcat(fs, format, addr, read_num_units)) {
+	tsk_error_print(stderr);
+	fs->close(fs);
+	img->close(img);
+	exit(1);
+    }
 
     fs->close(fs);
     img->close(img);

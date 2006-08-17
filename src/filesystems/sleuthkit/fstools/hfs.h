@@ -320,15 +320,15 @@ typedef struct {
  * Prototypes
  */
 extern void hfs_inode_walk(FS_INFO *, INUM_T, INUM_T, int,
-			   FS_INODE_WALK_FN, void *);
+    FS_INODE_WALK_FN, void *);
 extern void hfs_file_walk(FS_INFO *, FS_INODE *, uint32_t,
-			  uint16_t, int, FS_FILE_WALK_FN, void *);
+    uint16_t, int, FS_FILE_WALK_FN, void *);
 extern void hfs_dinode_lookup(HFS_INFO *, INUM_T);
 extern void hfs_dent_walk(FS_INFO *, INUM_T, int, FS_DENT_WALK_FN, void *);
 extern void hfs_jopen(FS_INFO *, INUM_T);
 extern void hfs_jentry_walk(FS_INFO *, int, FS_JENTRY_WALK_FN, void *);
 extern void hfs_jblk_walk(FS_INFO *, DADDR_T, DADDR_T, int,
-			  FS_JBLK_WALK_FN, void *);
+    FS_JBLK_WALK_FN, void *);
 extern int hfs_is_block_alloc(uint32_t, uint8_t *);
 extern OFF_T hfs_cat_find_node_offset(HFS_INFO *, int);
 extern int hfs_is_bit_b_alloc(uint32_t, uint8_t *);

@@ -25,12 +25,14 @@ Loads a NSRL database into flag.
 
 Use this program like so:
 
->>> nsrl_load.py path_to_nsrl_directory/
+>>> pyflag_launch nsrl_load.py -p path_to_nsrl_directory/
 
 An NSRL directory is one of the CDs, and usually has in it NSRLFile.txt,NSRLProd.txt.
 
 IMPORTANT:
 The first time the database is used (in loading a case) the index will be automatically built. This may take a long time, but is only done once.
+
+You can build the index using the -i parameter.
 """
 from optparse import OptionParser
 import DB,conf,sys
@@ -71,7 +73,7 @@ if options.index:
     sys.exit(0)
     
 dbh.execute("""CREATE TABLE if not exists `NSRL_hashes` (
-  `md5` char(16) NOT NULL default '',
+  `md5` char(16) binary NOT NULL default '',
   `filename` varchar(250) NOT NULL default '',
   `productcode` int NOT NULL default 0,
   `oscode` varchar(250) NOT NULL default ''

@@ -2,7 +2,7 @@
 ** fs_types
 ** The Sleuth Kit 
 **
-** $Date: 2005/09/02 23:34:03 $
+** $Date: 2006/04/05 03:47:35 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -18,9 +18,9 @@
 extern "C" {
 #endif
 
-    extern char fs_parse_type(const char *);
+    extern uint8_t fs_parse_type(const char *);
     extern void fs_print_types(FILE *);
-    extern char *fs_get_type(char);
+    extern char *fs_get_type(uint8_t);
 
 /*
 ** the most-sig-nibble is the file system type, which indictates which

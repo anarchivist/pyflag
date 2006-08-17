@@ -1,9 +1,10 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2005/08/13 05:27:45 $
+ * $Date: 2006/04/06 01:15:55 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
+ * Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
  * Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
  * 
  * Copyright (c) 1997,1998,1999, International Business Machines          
@@ -25,69 +26,69 @@
 
 /* fs_read_block - read a block given the address - calls the read_random at the img layer */
 
-OFF_T
+SSIZE_T
 fs_read_block(FS_INFO * fs, DATA_BUF * buf, OFF_T len, DADDR_T addr)
 {
-    OFF_T offs, cnt;
+    OFF_T offs;
+    SSIZE_T cnt;
 
     if (len % fs->dev_bsize) {
-	if (verbose)
-	    fprintf(stderr,
-		    "fs_read_block: Block read request with length (%"
-		    PRIuOFF ") not a multiple of %d", len, fs->dev_bsize);
-	errno = EIO;
-	return 0;
+	tsk_errno = TSK_ERR_FS_READ;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "fs_read_block: length %" PRIuOFF " not a multiple of %d",
+	    len, fs->dev_bsize);
+	tsk_errstr2[0] = '\0';
+	return -1;
     }
 
 
     if (len > buf->size) {
-	if (verbose)
-	    fprintf(stderr,
-		    "fs_read_block: Buffer length is too short for read (%"
-		    PRIuOFF " > %u)", len, (int) buf->size);
-
-	errno = EIO;
-	return 0;
+	tsk_errno = TSK_ERR_FS_READ;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "fs_read_block: Buffer too small - %"
+	    PRIuOFF " > %Zd", len, buf->size);
+	tsk_errstr2[0] = '\0';
+	return -1;
     }
 
     if (addr > fs->last_block) {
-	if (verbose)
-	    fprintf(stderr,
-		    "fs_read_block: File system block address is too large for image %"
-		    PRIuDADDR ")", addr);
-	errno = EFAULT;
-	return 0;
+	tsk_errno = TSK_ERR_FS_READ;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "fs_read_block: Address is too large: %" PRIuDADDR ")", addr);
+	tsk_errstr2[0] = '\0';
+	return -1;
     }
 
     buf->addr = addr;
     offs = (OFF_T) addr *fs->block_size;
 
-    cnt = fs->img_info->read_random(fs->img_info, buf->data, len, offs);
+    cnt =
+	fs->img_info->read_random(fs->img_info, fs->offset, buf->data, len,
+	offs);
     buf->used = cnt;
     return cnt;
 }
 
-OFF_T
+SSIZE_T
 fs_read_block_nobuf(FS_INFO * fs, char *buf, OFF_T len, DADDR_T addr)
 {
     if (len % fs->dev_bsize) {
-	if (verbose)
-	    fprintf(stderr,
-		    "fs_read_block_nobuf: Block read request with length (%"
-		    PRIuOFF ") not a multiple of %d", len, fs->dev_bsize);
-	errno = EIO;
-	return 0;
+	tsk_errno = TSK_ERR_FS_READ;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "fs_read_block_nobuf: length %" PRIuOFF
+	    " not a multiple of %d", len, fs->dev_bsize);
+	tsk_errstr2[0] = '\0';
+	return -1;
     }
 
     if (addr > fs->last_block) {
-	if (verbose)
-	    fprintf(stderr,
-		    "fs_read_block_nobuf: File system block address is too large for image %"
-		    PRIuDADDR ")", addr);
-	errno = EFAULT;
-	return 0;
+	tsk_errno = TSK_ERR_FS_READ;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "fs_read_block: Address is too large: %" PRIuDADDR ")", addr);
+	tsk_errstr2[0] = '\0';
+	return -1;
     }
 
-    return fs->img_info->read_random(fs->img_info, buf, len,
-				     (OFF_T) addr * fs->block_size);
+    return fs->img_info->read_random(fs->img_info, fs->offset, buf, len,
+	(OFF_T) addr * fs->block_size);
 }

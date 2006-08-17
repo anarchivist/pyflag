@@ -1,9 +1,10 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2005/09/02 23:34:03 $
+** $Date: 2006/06/19 22:21:07 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2004-2005 Brian Carrier.  All rights reserved 
 **
 **
@@ -22,19 +23,26 @@
 
 /* swapfs_inode_walk - inode iterator 
  *
+ * return 1 on error and 0 on success
  */
-void
+uint8_t
 swapfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
-		  int flags, FS_INODE_WALK_FN action, void *ptr)
+    int flags, FS_INODE_WALK_FN action, void *ptr)
 {
-    error("swapfs: Illegal analysis method for swap space data");
-    return;
+    tsk_errno = TSK_ERR_FS_FUNC;
+    snprintf(tsk_errstr, TSK_ERRSTR_L,
+	"Illegal analysis method for swap space data");
+    tsk_errstr2[0] = '\0';
+    return 1;
 }
 
 static FS_INODE *
 swapfs_inode_lookup(FS_INFO * fs, INUM_T inum)
 {
-    error("swapfs: Illegal analysis method for swap space data");
+    tsk_errno = TSK_ERR_FS_FUNC;
+    snprintf(tsk_errstr, TSK_ERRSTR_L,
+	"Illegal analysis method for swap space data");
+    tsk_errstr2[0] = '\0';
     return NULL;
 }
 
@@ -48,43 +56,73 @@ swapfs_inode_lookup(FS_INFO * fs, INUM_T inum)
 /* swapfs_block_walk - block iterator 
  *
  * flags used: ALLOC
+ *
+ * return 1 on error and 0 on success
  */
 
-void
+uint8_t
 swapfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
-		  int flags, FS_BLOCK_WALK_FN action, void *ptr)
+    int flags, FS_BLOCK_WALK_FN action, void *ptr)
 {
-    char *myname = "swapfs_block_walk";
-    DATA_BUF *data_buf = data_buf_alloc(fs->block_size);
+    DATA_BUF *data_buf;
     DADDR_T addr;
 
     /*
      * Sanity checks.
      */
-    if (start_blk < fs->first_block || start_blk > fs->last_block)
-	error("%s: invalid start block number: %lu", myname, start_blk);
+    if (start_blk < fs->first_block || start_blk > fs->last_block) {
+	tsk_errno = TSK_ERR_FS_WALK_RNG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "swapfs_block_walk: Start block number: %" PRIuDADDR,
+	    start_blk);
+	tsk_errstr2[0] = '\0';
+	return 1;
+    }
 
     if (end_blk < fs->first_block || end_blk > fs->last_block
-	|| end_blk < start_blk)
-	error("%s: invalid last block number: %lu", myname, end_blk);
+	|| end_blk < start_blk) {
+	tsk_errno = TSK_ERR_FS_WALK_RNG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "swapfs_block_walk: Last block number: %" PRIuDADDR, end_blk);
+	tsk_errstr2[0] = '\0';
+	return 1;
+    }
 
-    /* All we have is ALLOC */
-    if (!(flags & FS_FLAG_DATA_ALLOC))
-	return;
+    /* All swap has is allocated blocks... exit if not wanted */
+    if (!(flags & FS_FLAG_DATA_ALLOC)) {
+	return 0;
+    }
+
+    if ((data_buf = data_buf_alloc(fs->block_size)) == NULL) {
+	return 1;
+    }
 
     for (addr = start_blk; addr <= end_blk; addr++) {
+	SSIZE_T cnt;
+	int retval;
 
-	if (fs_read_block(fs, data_buf, fs->block_size, addr) !=
-	    fs->block_size) {
-	    error("swapfs_block_walk: Error reading block at %" PRIuDADDR
-		  ": %m", addr);
+	cnt = fs_read_block(fs, data_buf, fs->block_size, addr);
+	if (cnt != fs->block_size) {
+	    if (cnt != -1) {
+		tsk_errno = TSK_ERR_FS_READ;
+		tsk_errstr[0] = '\0';
+	    }
+	    snprintf(tsk_errstr2, TSK_ERRSTR_L,
+		"swapfs_block_walk: Block %" PRIuDADDR, addr);
+	    data_buf_free(data_buf);
+	    return 1;
 	}
 
-	if (WALK_STOP == action(fs, addr, data_buf->data,
-				FS_FLAG_DATA_ALLOC | FS_FLAG_DATA_CONT,
-				ptr)) {
+	retval = action(fs, addr, data_buf->data,
+	    FS_FLAG_DATA_ALLOC | FS_FLAG_DATA_CONT, ptr);
+
+	if (retval == WALK_STOP) {
 	    data_buf_free(data_buf);
-	    return;
+	    return 0;
+	}
+	else if (retval == WALK_ERROR) {
+	    data_buf_free(data_buf);
+	    return 1;
 	}
     }
 
@@ -92,7 +130,7 @@ swapfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
      * Cleanup.
      */
     data_buf_free(data_buf);
-    return;
+    return 0;
 }
 
 /**************************************************************************
@@ -103,66 +141,93 @@ swapfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
 
 
 /*  
+ *  return 1 on error and 0 on success
  */
-void
+uint8_t
 swapfs_file_walk(FS_INFO * fs, FS_INODE * inode, uint32_t type,
-		 uint16_t id, int flags, FS_FILE_WALK_FN action, void *ptr)
+    uint16_t id, int flags, FS_FILE_WALK_FN action, void *ptr)
 {
-    error("swapfs: Illegal analysis method for swap space data");
-    return;
+    tsk_errno = TSK_ERR_FS_FUNC;
+    snprintf(tsk_errstr, TSK_ERRSTR_L,
+	"Illegal analysis method for swap space data");
+    tsk_errstr2[0] = '\0';
+    return 1;
 }
 
-void
+/*
+ * return 1 on error and 0 on success
+ */
+uint8_t
 swapfs_dent_walk(FS_INFO * fs, INUM_T inode, int flags,
-		 FS_DENT_WALK_FN action, void *ptr)
+    FS_DENT_WALK_FN action, void *ptr)
 {
-    error("swapfs: Illegal analysis method for swap space data");
-    return;
+    tsk_errno = TSK_ERR_FS_FUNC;
+    snprintf(tsk_errstr, TSK_ERRSTR_L,
+	"Illegal analysis method for swap space data");
+    tsk_errstr2[0] = '\0';
+    return 1;
 }
 
 
-static void
+/*
+ * return 1 on error and 0 on success
+ */
+static uint8_t
 swapfs_fsstat(FS_INFO * fs, FILE * hFile)
 {
     fprintf(hFile, "Swap Space\n");
     fprintf(hFile, "Page Size: %d\n", fs->block_size);
-    return;
+    fprintf(hFile, "Page Range: 0 - %" PRIuDADDR "\n", fs->last_block);
+    return 0;
 }
 
 
 /************************* istat *******************************/
 
-static void
+/* Return 1 on error and 0 on success */
+static uint8_t
 swapfs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
-	     int32_t sec_skew)
+    int32_t sec_skew)
 {
-    error("swapfs: Illegal analysis method for swap space data");
-    return;
+    tsk_errno = TSK_ERR_FS_FUNC;
+    snprintf(tsk_errstr, TSK_ERRSTR_L,
+	"Illegal analysis method for swap space data");
+    tsk_errstr2[0] = '\0';
+    return 1;
 }
 
 
-void
+/* Return 1 on error and 0 on success */
+uint8_t
 swapfs_jopen(FS_INFO * fs, INUM_T inum)
 {
-    fprintf(stderr, "Error: SWAP does not have a journal\n");
-    exit(1);
+    tsk_errno = TSK_ERR_FS_FUNC;
+    snprintf(tsk_errstr, TSK_ERRSTR_L, "SWAP does not have a journal\n");
+    tsk_errstr2[0] = '\0';
+    return 1;
 }
 
-void
+/* Return 1 on error and 0 on success */
+uint8_t
 swapfs_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
-		   void *ptr)
+    void *ptr)
 {
-    fprintf(stderr, "Error: SWAP does not have a journal\n");
-    exit(1);
+    tsk_errno = TSK_ERR_FS_FUNC;
+    snprintf(tsk_errstr, TSK_ERRSTR_L, "SWAP does not have a journal\n");
+    tsk_errstr2[0] = '\0';
+    return 1;
 }
 
 
-void
+/* Return 1 on error and 0 on success */
+uint8_t
 swapfs_jblk_walk(FS_INFO * fs, INUM_T start, INUM_T end, int flags,
-		 FS_JBLK_WALK_FN action, void *ptr)
+    FS_JBLK_WALK_FN action, void *ptr)
 {
-    fprintf(stderr, "Error: SWAP does not have a journal\n");
-    exit(1);
+    tsk_errno = TSK_ERR_FS_FUNC;
+    snprintf(tsk_errstr, TSK_ERRSTR_L, "SWAP does not have a journal\n");
+    tsk_errstr2[0] = '\0';
+    return 1;
 }
 
 
@@ -175,22 +240,23 @@ swapfs_close(FS_INFO * fs)
 }
 
 
-/* swaps_open - open a fast file system */
+/* swaps_open - open a swap file
+ * Return FS_INFO on success and NULL on error
+ * */
 
 FS_INFO *
-swapfs_open(IMG_INFO * img_info, unsigned char ftype)
+swapfs_open(IMG_INFO * img_info, SSIZE_T offset)
 {
-    FS_INFO *fs = (FS_INFO *) mymalloc(sizeof(*fs));
     OFF_T len;
-
-    if ((ftype & FSMASK) != SWAPFS_TYPE)
-	error("Invalid FS Type in swapfs_open");
+    FS_INFO *fs = (FS_INFO *) mymalloc(sizeof(*fs));
+    if (fs == NULL)
+	return NULL;
 
 
     /* All we need to set are the block sizes and max bloc size etc. */
-
     fs->img_info = img_info;
-    fs->ftype = ftype;
+    fs->offset = offset;
+    fs->ftype = SWAP;
     fs->flags = 0;
 
 

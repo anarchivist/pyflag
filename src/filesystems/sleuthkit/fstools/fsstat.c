@@ -2,9 +2,10 @@
 ** fsstat
 ** The Sleuth Kit 
 **
-** $Date: 2005/09/02 23:34:03 $
+** $Date: 2006/07/10 13:26:20 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved 
 **
 ** TASK
@@ -20,19 +21,17 @@ static void
 usage()
 {
     fprintf(stderr,
-	    "usage: %s [-tvV] [-f fstype] [-i imgtype] [-o imgoffset] image\n",
-	    progname);
+	"usage: %s [-tvV] [-f fstype] [-i imgtype] [-o imgoffset] image\n",
+	progname);
     fprintf(stderr, "\t-t: display type only\n");
-    fprintf(stderr, "\t-i imgtype: The format of the image file\n");
     fprintf(stderr,
-	    "\t-o imgoffset: The offset of the file system in the image (in sectors)\n");
+	"\t-i imgtype: The format of the image file (use '-i list' for supported types)\n");
+    fprintf(stderr,
+	"\t-f fstype: File system type (use '-f list' for supported types)\n");
+    fprintf(stderr,
+	"\t-o imgoffset: The offset of the file system in the image (in sectors)\n");
     fprintf(stderr, "\t-v: verbose output to stderr\n");
     fprintf(stderr, "\t-V: Print version\n");
-    fprintf(stderr, "\t-f fstype: File system type\n");
-    fprintf(stderr, "Supported file system types:\n");
-    fs_print_types(stderr);
-    fprintf(stderr, "Supported image format types:\n");
-    img_print_types(stderr);
 
     exit(1);
 }
@@ -44,8 +43,10 @@ main(int argc, char **argv)
     FS_INFO *fs;
     IMG_INFO *img;
     char *fstype = NULL;
-    char ch, *imgtype = NULL, *imgoff = NULL;
+    char *imgtype = NULL;
+    int ch;
     uint8_t type = 0;
+    SSIZE_T imgoff = 0;
 
     progname = argv[0];
     setlocale(LC_ALL, "");
@@ -59,14 +60,27 @@ main(int argc, char **argv)
 
 	case 'f':
 	    fstype = optarg;
+	    if (strcmp(fstype, "list") == 0) {
+		fs_print_types(stderr);
+		exit(1);
+	    }
+
 	    break;
 
 	case 'i':
 	    imgtype = optarg;
+	    if (strcmp(imgtype, "list") == 0) {
+		img_print_types(stderr);
+		exit(1);
+	    }
+
 	    break;
 
 	case 'o':
-	    imgoff = optarg;
+	    if ((imgoff = parse_offset(optarg)) == -1) {
+		tsk_error_print(stderr);
+		exit(1);
+	    }
 	    break;
 
 	case 't':
@@ -89,17 +103,33 @@ main(int argc, char **argv)
 	usage();
     }
 
-    img =
-	img_open(imgtype, imgoff, argc - optind,
-		 (const char **) &argv[optind]);
-    fs = fs_open(img, fstype);
+    if ((img =
+	    img_open(imgtype, argc - optind,
+		(const char **) &argv[optind])) == NULL) {
+	tsk_error_print(stderr);
+	exit(1);
+    }
+
+    if ((fs = fs_open(img, imgoff, fstype)) == NULL) {
+	tsk_error_print(stderr);
+	if (tsk_errno == TSK_ERR_FS_UNSUPTYPE)
+	    fs_print_types(stderr);
+	img->close(img);
+	exit(1);
+    }
+
 
     if (type) {
 	char *str = fs_get_type(fs->ftype);
 	printf("%s\n", str);
     }
     else {
-	fs->fsstat(fs, stdout);
+	if (fs->fsstat(fs, stdout)) {
+	    tsk_error_print(stderr);
+	    fs->close(fs);
+	    img->close(img);
+	    exit(1);
+	}
     }
 
     fs->close(fs);

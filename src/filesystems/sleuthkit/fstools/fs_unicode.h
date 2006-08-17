@@ -120,19 +120,15 @@ extern "C" {
 #endif
 
     ConversionResult fs_UTF8toUTF16(FS_INFO *, const UTF8 ** sourceStart,
-				    const UTF8 * sourceEnd,
-				    UTF16 ** targetStart,
-				    UTF16 * targetEnd,
-				    ConversionFlags flags);
+	const UTF8 * sourceEnd,
+	UTF16 ** targetStart, UTF16 * targetEnd, ConversionFlags flags);
 
     ConversionResult fs_UTF16toUTF8(FS_INFO *, const UTF16 ** sourceStart,
-				    const UTF16 * sourceEnd,
-				    UTF8 ** targetStart,
-				    UTF8 * targetEnd,
-				    ConversionFlags flags);
+	const UTF16 * sourceEnd,
+	UTF8 ** targetStart, UTF8 * targetEnd, ConversionFlags flags);
 
     Boolean isLegalUTF8Sequence(const UTF8 * source,
-				const UTF8 * sourceEnd);
+	const UTF8 * sourceEnd);
 
 #ifdef __cplusplus
 }

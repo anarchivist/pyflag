@@ -2,11 +2,12 @@
 ** dstat
 ** The Sleuth Kit 
 **
-** $Date: 2005/09/02 23:34:02 $
+** $Date: 2006/05/08 17:56:51 $
 **
 ** Get the details about a data unit
 **
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved 
 **
 ** TASK
@@ -39,13 +40,18 @@ dstat_act(FS_INFO * fs, DADDR_T addr, char *buf, int flags, void *ptr)
     case NTFS_TYPE:
 	printf("Cluster: %" PRIuDADDR "\n", addr);
 	break;
+    case ISO9660_TYPE:
+	printf("Block: %" PRIuDADDR "\n", addr);
+	break;
     default:
-	printf("Unsupported File System\n");
-	exit(1);
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "dstat_act: Unsupported File System\n");
+	return WALK_ERROR;
     }
 
     printf("%sAllocated%s\n", (flags & FS_FLAG_DATA_ALLOC) ? "" : "Not ",
-	   (flags & FS_FLAG_DATA_META) ? " (Meta)" : "");
+	(flags & FS_FLAG_DATA_META) ? " (Meta)" : "");
 
     if ((fs->ftype & FSMASK) == FFS_TYPE) {
 	FFS_INFO *ffs = (FFS_INFO *) fs;
@@ -61,9 +67,8 @@ dstat_act(FS_INFO * fs, DADDR_T addr, char *buf, int flags, void *ptr)
 	/* Does this have a cluster address? */
 	if (addr >= fatfs->firstclustsect) {
 	    printf("Cluster: %lu\n",
-		   (ULONG) (2 +
-			    (addr -
-			     fatfs->firstclustsect) / fatfs->csize));
+		(ULONG) (2 +
+		    (addr - fatfs->firstclustsect) / fatfs->csize));
 	}
     }
 
@@ -75,6 +80,6 @@ dstat_act(FS_INFO * fs, DADDR_T addr, char *buf, int flags, void *ptr)
 uint8_t
 fs_dstat(FS_INFO * fs, uint8_t lclflags, DADDR_T addr, int flags)
 {
-    fs->block_walk(fs, addr, addr, flags, dstat_act, (void *) "dstat");
-    return 0;
+    return fs->block_walk(fs, addr, addr, flags, dstat_act,
+	(void *) "dstat");
 }

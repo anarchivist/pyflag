@@ -2,11 +2,12 @@
 ** ntfs_dent
 ** The Sleuth Kit
 **
-** $Date: 2005/10/13 04:15:22 $
+** $Date: 2006/07/05 18:24:09 $
 **
 ** name layer support for the NTFS file system
 **
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
 **
 ** TASK
@@ -42,17 +43,19 @@ typedef struct {
 } NTFS_DINFO;
 
 
-static void
- ntfs_dent_walk_lcl(FS_INFO *, NTFS_DINFO *, INUM_T, int,
-		    FS_DENT_WALK_FN, void *);
+static uint8_t
+ntfs_dent_walk_lcl(FS_INFO *, NTFS_DINFO *, INUM_T, int,
+    FS_DENT_WALK_FN, void *);
 /* 
  * copy the index (directory) entry into the generic structure
  *
  * uses the global variables 'dirs' and 'depth'
+ *
+ * Returns 1 on eror and 0 on success
  */
-static void
+static uint8_t
 ntfs_dent_copy(NTFS_INFO * ntfs, NTFS_DINFO * dinfo, ntfs_idxentry * idxe,
-	       FS_DENT * fs_dent)
+    FS_DENT * fs_dent)
 {
     ntfs_attr_fname *fname = (ntfs_attr_fname *) & idxe->stream;
     FS_INFO *fs = (FS_INFO *) & ntfs->fs_info;
@@ -66,15 +69,17 @@ ntfs_dent_copy(NTFS_INFO * ntfs, NTFS_DINFO * dinfo, ntfs_idxentry * idxe,
     name8 = (UTF8 *) fs_dent->name;
 
     retVal = fs_UTF16toUTF8(fs, (const UTF16 **) &name16,
-			    (UTF16 *) ((uintptr_t) name16 +
-				       fname->nlen * 2), &name8,
-			    (UTF8 *) ((uintptr_t) name8 +
-				      fs_dent->name_max),
-			    lenientConversion);
+	(UTF16 *) ((uintptr_t) name16 +
+	    fname->nlen * 2), &name8,
+	(UTF8 *) ((uintptr_t) name8 +
+	    fs_dent->name_max), lenientConversion);
 
     if (retVal != conversionOK) {
-	error("Error converting NTFS name to UTF8: %d %d", retVal,
-	      fs_dent->inode);
+	*name8 = '\0';
+	if (verbose)
+	    fprintf(stderr,
+		"Error converting NTFS name to UTF8: %d %" PRIuINUM,
+		retVal, fs_dent->inode);
     }
 
     /* Make sure it is NULL Terminated */
@@ -92,13 +97,17 @@ ntfs_dent_copy(NTFS_INFO * ntfs, NTFS_DINFO * dinfo, ntfs_idxentry * idxe,
 	fs_inode_free(fs_dent->fsi);
 
     fs_dent->fsi = fs->inode_lookup(fs, fs_dent->inode);
+    if (verbose)
+	fprintf(stderr,
+	    "ntfs_dent_copy: error looking up inode: %" PRIuINUM "\n",
+	    fs_dent->inode);
 
     if (getu64(fs, fname->flags) & NTFS_FNAME_FLAGS_DIR)
 	fs_dent->ent_type = FS_DENT_DIR;
     else
 	fs_dent->ent_type = FS_DENT_REG;
 
-    return;
+    return 0;
 }
 
 
@@ -112,7 +121,7 @@ static uint8_t
 is_time(uint64_t t)
 {
 #define SEC_BTWN_1601_1970_DIV100 ((369*365 + 89) * 24 * 36)
-#define SEC_BTWN_1601_2010_DIV100 (SEC_BTWN_1601_1970_DIV100 + (40*356 + 6) * 24 * 36)
+#define SEC_BTWN_1601_2010_DIV100 (SEC_BTWN_1601_1970_DIV100 + (40*365 + 6) * 24 * 36)
 
     t /= 1000000000;		/* put the time in seconds div by additional 100 */
 
@@ -134,26 +143,29 @@ is_time(uint64_t t)
  * idxelist header.  in other words, everything after _len_ bytes is
  * considered unallocated area and therefore deleted content 
  *
- * The only flag that we care about is ALLOC (no UNALLOC entries exist
- * in the tree)
+ * The only flag that we care about is ALLOC and UNALLOC
  *
- * Return WALK_STOP if the action returned stop -- otherwise return WALK_CONT
+ * Return 1 to stop, 0 on success, and -1 on error
  */
 static int
 ntfs_dent_idxentry(NTFS_INFO * ntfs, NTFS_DINFO * dinfo,
-		   ntfs_idxentry * idxe, uint32_t size, uint32_t len,
-		   int flags, FS_DENT_WALK_FN action, void *ptr)
+    ntfs_idxentry * idxe, uint32_t size, uint32_t len,
+    int flags, FS_DENT_WALK_FN action, void *ptr)
 {
     uintptr_t endaddr, endaddr_alloc;
     int myflags = 0;
-    FS_DENT *fs_dent = fs_dent_alloc(NTFS_MAXNAMLEN_UTF8, 0);
+    FS_DENT *fs_dent;
     FS_INFO *fs = (FS_INFO *) & ntfs->fs_info;
+
+    if ((fs_dent = fs_dent_alloc(NTFS_MAXNAMLEN_UTF8, 0)) == NULL) {
+	return -1;
+    }
 
     if (verbose)
 	fprintf(stderr,
-		"ntfs_dent_idxentry: Processing entry: %" PRIu64
-		"  Size: %" PRIu32 "  Len: %" PRIu32 "\n",
-		(uint64_t) ((uintptr_t) idxe), size, len);
+	    "ntfs_dent_idxentry: Processing entry: %" PRIu64
+	    "  Size: %" PRIu32 "  Len: %" PRIu32 "\n",
+	    (uint64_t) ((uintptr_t) idxe), size, len);
 
     /* where is the end of the buffer */
     endaddr = ((uintptr_t) idxe + size);
@@ -163,21 +175,21 @@ ntfs_dent_idxentry(NTFS_INFO * ntfs, NTFS_DINFO * dinfo,
 
     /* cycle through the index entries, based on provided size */
     while (((uintptr_t) & (idxe->stream) + sizeof(ntfs_attr_fname)) <
-	   endaddr) {
+	endaddr) {
 
 	ntfs_attr_fname *fname = (ntfs_attr_fname *) & idxe->stream;
 
 
 	if (verbose)
 	    fprintf(stderr,
-		    "ntfs_dent_idxentry: New IdxEnt: %" PRIu64
-		    " $FILE_NAME Entry: %" PRIu64 "  File Ref: %" PRIu64
-		    "  IdxEnt Len: %" PRIu16 "  StrLen: %" PRIu16 "\n",
-		    (uint64_t) ((uintptr_t) idxe),
-		    (uint64_t) ((uintptr_t) fname), (uint64_t) getu48(fs,
-								      idxe->
-								      file_ref),
-		    getu16(fs, idxe->idxlen), getu16(fs, idxe->strlen));
+		"ntfs_dent_idxentry: New IdxEnt: %" PRIu64
+		" $FILE_NAME Entry: %" PRIu64 "  File Ref: %" PRIu64
+		"  IdxEnt Len: %" PRIu16 "  StrLen: %" PRIu16 "\n",
+		(uint64_t) ((uintptr_t) idxe),
+		(uint64_t) ((uintptr_t) fname), (uint64_t) getu48(fs,
+		    idxe->
+		    file_ref),
+		getu16(fs, idxe->idxlen), getu16(fs, idxe->strlen));
 
 	/* perform some sanity checks on index buffer head
 	 * and advance by 4-bytes if invalid
@@ -195,7 +207,7 @@ ntfs_dent_idxentry(NTFS_INFO * ntfs, NTFS_DINFO * dinfo,
 	 */
 	if ((getu16(fs, idxe->strlen) == 0) ||
 	    (((uintptr_t) idxe + getu16(fs, idxe->idxlen)) >
-	     endaddr_alloc)) {
+		endaddr_alloc)) {
 
 	    /* name space checks */
 	    if ((fname->nspace != NTFS_FNAME_POSIX) &&
@@ -207,7 +219,7 @@ ntfs_dent_idxentry(NTFS_INFO * ntfs, NTFS_DINFO * dinfo,
 	    }
 
 	    if ((getu64(fs, fname->alloc_fsize) <
-		 getu64(fs, fname->real_fsize)) || (fname->nlen == 0)
+		    getu64(fs, fname->real_fsize)) || (fname->nlen == 0)
 		|| (*(uint8_t *) & fname->name == 0)) {
 
 		idxe = (ntfs_idxentry *) ((uintptr_t) idxe + 4);
@@ -241,8 +253,8 @@ ntfs_dent_idxentry(NTFS_INFO * ntfs, NTFS_DINFO * dinfo,
 	if (fname->nspace == NTFS_FNAME_DOS) {
 	    if (verbose)
 		fprintf(stderr,
-			"ntfs_dent_idxentry: Skipping because of name space: %d\n",
-			fname->nspace);
+		    "ntfs_dent_idxentry: Skipping because of name space: %d\n",
+		    fname->nspace);
 
 	    goto incr_entry;
 	}
@@ -252,11 +264,11 @@ ntfs_dent_idxentry(NTFS_INFO * ntfs, NTFS_DINFO * dinfo,
 
 	if (verbose)
 	    fprintf(stderr,
-		    "ntfs_dent_idxentry: Deletion Check Details of %s: Str Len: %"
-		    PRIu16 "  Len to end after current: %" PRIu64 "\n",
-		    fs_dent->name, getu16(fs, idxe->strlen),
-		    (uint64_t) (endaddr_alloc - (uintptr_t) idxe -
-				getu16(fs, idxe->idxlen)));
+		"ntfs_dent_idxentry: Deletion Check Details of %s: Str Len: %"
+		PRIu16 "  Len to end after current: %" PRIu64 "\n",
+		fs_dent->name, getu16(fs, idxe->strlen),
+		(uint64_t) (endaddr_alloc - (uintptr_t) idxe -
+		    getu16(fs, idxe->idxlen)));
 
 	/* 
 	 * Check if this entry is deleted
@@ -266,7 +278,7 @@ ntfs_dent_idxentry(NTFS_INFO * ntfs, NTFS_DINFO * dinfo,
 	 */
 	if ((getu16(fs, idxe->strlen) == 0) ||
 	    (((uintptr_t) idxe + getu16(fs, idxe->idxlen)) >
-	     endaddr_alloc)) {
+		endaddr_alloc)) {
 
 	    /* we know deleted entries with an inode of 0 are not legit because
 	     * that is the MFT value.  Free it so it does not confuse
@@ -284,8 +296,14 @@ ntfs_dent_idxentry(NTFS_INFO * ntfs, NTFS_DINFO * dinfo,
 
 
 	if ((flags & myflags) == myflags) {
-	    if (WALK_STOP == action(fs, fs_dent, myflags, ptr)) {
-		return WALK_STOP;
+	    int retval = action(fs, fs_dent, myflags, ptr);
+	    if (retval == WALK_STOP) {
+		fs_dent_free(fs_dent);
+		return 1;
+	    }
+	    else if (retval == WALK_ERROR) {
+		fs_dent_free(fs_dent);
+		return -1;
 	    }
 	}
 
@@ -293,6 +311,7 @@ ntfs_dent_idxentry(NTFS_INFO * ntfs, NTFS_DINFO * dinfo,
 	if ((myflags & FS_FLAG_NAME_ALLOC) &&
 	    (flags & FS_FLAG_NAME_RECURSE) &&
 	    (!ISDOT(fs_dent->name)) &&
+	    (fs_dent->fsi) &&
 	    ((fs_dent->fsi->mode & FS_INODE_FMT) == FS_INODE_DIR) &&
 	    (fs_dent->inode)) {
 
@@ -300,13 +319,17 @@ ntfs_dent_idxentry(NTFS_INFO * ntfs, NTFS_DINFO * dinfo,
 		dinfo->didx[dinfo->depth] =
 		    &dinfo->dirs[strlen(dinfo->dirs)];
 		strncpy(dinfo->didx[dinfo->depth], fs_dent->name,
-			DIR_STRSZ - strlen(dinfo->dirs));
+		    DIR_STRSZ - strlen(dinfo->dirs));
 		strncat(dinfo->dirs, "/", DIR_STRSZ);
 	    }
 	    dinfo->depth++;
 
-	    ntfs_dent_walk_lcl(&(ntfs->fs_info), dinfo, fs_dent->inode,
-			       flags, action, ptr);
+	    if (ntfs_dent_walk_lcl(&(ntfs->fs_info), dinfo, fs_dent->inode,
+		    flags, action, ptr)) {
+		if (verbose)
+		    fprintf(stderr, "Error recursing into directory\n");
+		tsk_error_reset();
+	    }
 
 	    dinfo->depth--;
 	    if (dinfo->depth < MAX_DEPTH)
@@ -330,20 +353,19 @@ ntfs_dent_idxentry(NTFS_INFO * ntfs, NTFS_DINFO * dinfo,
 	if (getu16(fs, idxe->strlen) == 0) {
 	    idxe =
 		(ntfs_idxentry
-		 *) ((((uintptr_t) idxe + 16 + 66 + 2 * fname->nlen +
-		       3) / 4) * 4);
+		*) ((((uintptr_t) idxe + 16 + 66 + 2 * fname->nlen +
+			3) / 4) * 4);
 	}
 	else {
 	    idxe =
 		(ntfs_idxentry *) ((uintptr_t) idxe +
-				   getu16(fs, idxe->idxlen));
+		getu16(fs, idxe->idxlen));
 	}
 
     }				/* end of loop of index entries */
 
     fs_dent_free(fs_dent);
-
-    return WALK_CONT;
+    return 0;
 }
 
 
@@ -353,8 +375,9 @@ ntfs_dent_idxentry(NTFS_INFO * ntfs, NTFS_DINFO * dinfo,
  * remove the update sequence values that are changed in the last two 
  * bytes of each sector 
  *
+ * return 1 on error and 0 on success
  */
-static void
+static uint8_t
 ntfs_fix_idxrec(NTFS_INFO * ntfs, ntfs_idxrec * idxrec, uint32_t len)
 {
     int i;
@@ -364,13 +387,17 @@ ntfs_fix_idxrec(NTFS_INFO * ntfs, ntfs_idxrec * idxrec, uint32_t len)
 
     if (verbose)
 	fprintf(stderr,
-		"ntfs_fix_idxrec: Fixing idxrec: %" PRIu64 "  Len: %"
-		PRIu32 "\n", (uint64_t) ((uintptr_t) idxrec), len);
+	    "ntfs_fix_idxrec: Fixing idxrec: %" PRIu64 "  Len: %"
+	    PRIu32 "\n", (uint64_t) ((uintptr_t) idxrec), len);
 
     /* sanity check so we don't run over in the next loop */
     if ((unsigned int) ((getu16(fs, idxrec->upd_cnt) - 1) *
-			ntfs->ssize_b) > len)
-	error("More Update Sequence Entries than idx record size");
+	    ntfs->ssize_b) > len) {
+	tsk_errno = TSK_ERR_FS_INODE_INT;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "fix_idxrec: More Update Sequence Entries than idx record size");
+	return 1;
+    }
 
     /* Apply the update sequence structure template */
     upd = (ntfs_upd *) ((uintptr_t) idxrec + getu16(fs, idxrec->upd_off));
@@ -392,12 +419,14 @@ ntfs_fix_idxrec(NTFS_INFO * ntfs, ntfs_idxrec * idxrec, uint32_t len)
 	    /* get the replacement value */
 	    uint16_t cur_repl = getu16(fs, &upd->upd_seq + (i - 1) * 2);
 
-	    error
-		("Incorrect update sequence value in index buffer\nUpdate Value: 0x%"
-		 PRIx16 " Actual Value: 0x%" PRIx16
-		 " Replacement Value: 0x%" PRIx16
-		 "\nThis is typically because of a corrupted entry",
-		 orig_seq, cur_seq, cur_repl);
+	    tsk_errno = TSK_ERR_FS_INODE_INT;
+	    snprintf(tsk_errstr, TSK_ERRSTR_L,
+		"fix_idxrec: Incorrect update sequence value in index buffer\nUpdate Value: 0x%"
+		PRIx16 " Actual Value: 0x%" PRIx16
+		" Replacement Value: 0x%" PRIx16
+		"\nThis is typically because of a corrupted entry",
+		orig_seq, cur_seq, cur_repl);
+	    return 1;
 	}
 
 	new_val = &upd->upd_seq + (i - 1) * 2;
@@ -405,15 +434,15 @@ ntfs_fix_idxrec(NTFS_INFO * ntfs, ntfs_idxrec * idxrec, uint32_t len)
 
 	if (verbose)
 	    fprintf(stderr,
-		    "ntfs_fix_idxrec: upd_seq %i   Replacing: %.4" PRIx16
-		    "   With: %.4" PRIx16 "\n", i, getu16(fs, old_val),
-		    getu16(fs, new_val));
+		"ntfs_fix_idxrec: upd_seq %i   Replacing: %.4" PRIx16
+		"   With: %.4" PRIx16 "\n", i, getu16(fs, old_val),
+		getu16(fs, new_val));
 
 	*old_val++ = *new_val++;
 	*old_val = *new_val;
     }
 
-    return;
+    return 0;
 }
 
 
@@ -424,21 +453,21 @@ ntfs_fix_idxrec(NTFS_INFO * ntfs, ntfs_idxrec * idxrec, uint32_t len)
  * This function looks up the inode and processes its tree
  *
  */
-void
+uint8_t
 ntfs_dent_walk(FS_INFO * fs, INUM_T inum, int flags,
-	       FS_DENT_WALK_FN action, void *ptr)
+    FS_DENT_WALK_FN action, void *ptr)
 {
     NTFS_DINFO dinfo;
 
     memset(&dinfo, 0, sizeof(NTFS_DINFO));
 
-    ntfs_dent_walk_lcl(fs, &dinfo, inum, flags, action, ptr);
+    return ntfs_dent_walk_lcl(fs, &dinfo, inum, flags, action, ptr);
 }
 
 
-static void
+static uint8_t
 ntfs_dent_walk_lcl(FS_INFO * fs, NTFS_DINFO * dinfo, INUM_T inum,
-		   int flags, FS_DENT_WALK_FN action, void *ptr)
+    int flags, FS_DENT_WALK_FN action, void *ptr)
 {
 
     NTFS_INFO *ntfs = (NTFS_INFO *) fs;
@@ -451,21 +480,81 @@ ntfs_dent_walk_lcl(FS_INFO * fs, NTFS_DINFO * dinfo, INUM_T inum,
     ntfs_idxrec *idxrec_p, *idxrec;
     int off, idxalloc_len;
     FS_LOAD_FILE load_file;
+    int retval;
 
     /* sanity check */
-    if (inum < fs->first_inum || inum > fs->last_inum)
-	error("invalid inode value: %" PRIuINUM "\n", inum);
+    if (inum < fs->first_inum || inum > fs->last_inum) {
+	tsk_errno = TSK_ERR_FS_WALK_RNG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "ntfs_dent_walk: inode value: %" PRIuINUM "\n", inum);
+	return 1;
+    }
 
     if (verbose)
 	fprintf(stderr,
-		"ntfs_dent_walk: Processing directory %" PRIuINUM "\n",
-		inum);
+	    "ntfs_dent_walk: Processing directory %" PRIuINUM "\n", inum);
 
     /* Get the inode and verify it has attributes */
     fs_inode = fs->inode_lookup(fs, inum);
-    if (!fs_inode->attr)
-	error("Error: Directory MFT has no attributes");
+    if (!fs_inode) {
+	strncat(tsk_errstr2, " - ntfs_dent_walk",
+	    TSK_ERRSTR_L - strlen(tsk_errstr2));
+	return 1;
+    }
+    if (!fs_inode->attr) {
+	tsk_errno = TSK_ERR_FS_INODE_INT;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "dent_walk: Error: Directory address %" PRIuINUM
+	    " has no attributes", inum);
+	return 1;
+    }
 
+
+    /* 
+     * Read the Index Root Attribute  -- we do some sanity checking here
+     * to report errors before we start to make up data for the "." and ".."
+     * entries
+     */
+    fs_data_root = fs_data_lookup_noid(fs_inode->attr, NTFS_ATYPE_IDXROOT);
+    if (!fs_data_root) {
+	strncat(tsk_errstr2, " - dent_walk: $IDX_ROOT not found",
+	    TSK_ERRSTR_L - strlen(tsk_errstr2));
+	fs_inode_free(fs_inode);
+	return 1;
+    }
+
+    if (fs_data_root->flags & FS_DATA_NONRES) {
+	tsk_errno = TSK_ERR_FS_INODE_INT;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "dent_walk: $IDX_ROOT is not resident - it should be");
+	fs_inode_free(fs_inode);
+	return 1;
+    }
+    idxroot = (ntfs_idxroot *) fs_data_root->buf;
+
+    /* Verify that the attribute type is $FILE_NAME */
+    if (getu32(fs, idxroot->type) == 0) {
+	tsk_errno = TSK_ERR_FS_INODE_INT;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "dent_walk: Attribute type in index root is 0");
+	fs_inode_free(fs_inode);
+	return 1;
+    }
+    else if (getu32(fs, idxroot->type) != NTFS_ATYPE_FNAME) {
+	tsk_errno = TSK_ERR_FS_INODE_INT;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "ERROR: Directory index is sorted by type: %" PRIu32
+	    ".\nOnly $FNAME is currently supported", getu32(fs,
+		idxroot->type));
+	return 1;
+    }
+
+    /* Get the header of the index entry list */
+    idxelist = &idxroot->list;
+
+    /* Get the offset to the start of the index entry list */
+    idxe = (ntfs_idxentry *) ((uintptr_t) idxelist +
+	getu32(fs, idxelist->begin_off));
 
     /* 
      * NTFS does not have "." and ".." entries in the index trees
@@ -475,13 +564,17 @@ ntfs_dent_walk_lcl(FS_INFO * fs, NTFS_DINFO * dinfo, INUM_T inum,
      * a '.' and '..' entry and call the action
      */
     if ((inum != fs->root_inum) && (flags & FS_FLAG_NAME_ALLOC)) {
-	FS_DENT *fs_dent = fs_dent_alloc(16, 0);
+	FS_DENT *fs_dent;
 	FS_NAME *fs_name;
 	int myflags = FS_FLAG_NAME_ALLOC;
 
 	if (verbose)
 	    fprintf(stderr, "ntfs_dent_walk: Creating . and .. entries\n");
 
+	if ((fs_dent = fs_dent_alloc(16, 0)) == NULL) {
+	    fs_inode_free(fs_inode);
+	    return 1;
+	}
 	/* 
 	 * "." 
 	 */
@@ -496,12 +589,25 @@ ntfs_dent_walk_lcl(FS_INFO * fs, NTFS_DINFO * dinfo, INUM_T inum,
 	 * with it ...
 	 */
 	fs_dent->fsi = fs->inode_lookup(fs, fs_dent->inode);
-	fs_dent->ent_type = FS_DENT_DIR;
+	if (fs_dent->fsi != NULL) {
+	    fs_dent->ent_type = FS_DENT_DIR;
 
-	if (WALK_STOP == action(fs, fs_dent, myflags, ptr)) {
-	    fs_dent_free(fs_dent);
-	    fs_inode_free(fs_inode);
-	    return;
+	    retval = action(fs, fs_dent, myflags, ptr);
+	    if (retval == WALK_STOP) {
+		fs_dent_free(fs_dent);
+		fs_inode_free(fs_inode);
+		return 0;
+	    }
+	    else if (retval == WALK_ERROR) {
+		fs_dent_free(fs_dent);
+		fs_inode_free(fs_inode);
+		return 1;
+	    }
+	}
+	else {
+	    if (verbose)
+		fprintf(stderr, "Error reading . entry: %" PRIuINUM,
+		    fs_dent->inode);
 	}
 
 
@@ -516,7 +622,7 @@ ntfs_dent_walk_lcl(FS_INFO * fs, NTFS_DINFO * dinfo, INUM_T inum,
 	 * just cycle using those
 	 */
 	for (fs_name = fs_inode->name; fs_name != NULL;
-	     fs_name = fs_name->next) {
+	    fs_name = fs_name->next) {
 	    if (fs_dent->fsi) {
 		fs_inode_free(fs_dent->fsi);
 		fs_dent->fsi = NULL;
@@ -524,10 +630,24 @@ ntfs_dent_walk_lcl(FS_INFO * fs, NTFS_DINFO * dinfo, INUM_T inum,
 
 	    fs_dent->inode = fs_name->par_inode;
 	    fs_dent->fsi = fs->inode_lookup(fs, fs_dent->inode);
-	    if (WALK_STOP == action(fs, fs_dent, myflags, ptr)) {
-		fs_dent_free(fs_dent);
-		fs_inode_free(fs_inode);
-		return;
+	    if (fs_dent->fsi) {
+		retval = action(fs, fs_dent, myflags, ptr);
+		if (retval == WALK_STOP) {
+		    fs_dent_free(fs_dent);
+		    fs_inode_free(fs_inode);
+		    return 0;
+		}
+		else if (retval == WALK_ERROR) {
+		    fs_dent_free(fs_dent);
+		    fs_inode_free(fs_inode);
+		    return 1;
+		}
+	    }
+	    else {
+		if (verbose)
+		    fprintf(stderr,
+			"dent_walk: Error reading .. inode: %"
+			PRIuINUM, fs_dent->inode);
 	    }
 
 	}
@@ -537,45 +657,19 @@ ntfs_dent_walk_lcl(FS_INFO * fs, NTFS_DINFO * dinfo, INUM_T inum,
     }
 
 
-    /* 
-     * Read & process the Index Root Attribute 
-     */
-    fs_data_root = fs_data_lookup_noid(fs_inode->attr, NTFS_ATYPE_IDXROOT);
-    if (!fs_data_root)
-	error("$IDX_ROOT not found in MFT %" PRIuINUM "", inum);
 
-    if (fs_data_root->flags & FS_DATA_NONRES)
-	error("$IDX_ROOT is not resident - it should be");
+    /* Now we return to processing the Index Root Attribute */
+    retval = ntfs_dent_idxentry(ntfs, dinfo, idxe,
+	getu32(fs,
+	    idxelist->buf_off) -
+	getu32(fs, idxelist->begin_off),
+	getu32(fs,
+	    idxelist->end_off) -
+	getu32(fs, idxelist->begin_off), flags, action, ptr);
 
-    idxroot = (ntfs_idxroot *) fs_data_root->buf;
-
-    /* Verify that the attribute type is $FILE_NAME */
-    if (getu32(fs, idxroot->type) == 0)
-	return;
-    else if (getu32(fs, idxroot->type) != NTFS_ATYPE_FNAME)
-	error("ERROR: Directory index is sorted by type: %" PRIu32
-	      ".\nOnly $FNAME is currently supported", getu32(fs,
-							      idxroot->
-							      type));
-
-    /* Get the header of the index entry list */
-    idxelist = &idxroot->list;
-
-    /* Get the offset to the start of the index entry list */
-    idxe = (ntfs_idxentry *) ((uintptr_t) idxelist +
-			      getu32(fs, idxelist->begin_off));
-
-    /* Process $IDX_ROOT  */
-    if (WALK_STOP == ntfs_dent_idxentry(ntfs, dinfo, idxe,
-					getu32(fs,
-					       idxelist->buf_off) -
-					getu32(fs, idxelist->begin_off),
-					getu32(fs,
-					       idxelist->end_off) -
-					getu32(fs, idxelist->begin_off),
-					flags, action, ptr)) {
+    if (retval != 0) {
 	fs_inode_free(fs_inode);
-	return;
+	return (retval == -1) ? 1 : 0;
     }
 
     /* 
@@ -590,24 +684,37 @@ ntfs_dent_walk_lcl(FS_INFO * fs, NTFS_DINFO * dinfo, INUM_T inum,
      * all of the entries 
      */
     if (!fs_data_alloc) {
-	if (getu32(fs, idxelist->flags) & NTFS_IDXELIST_CHILD)
-	    error
-		("Error: $IDX_ROOT says there should be children, but there isn't");
-
 	fs_inode_free(fs_inode);
-	return;
+	if (getu32(fs, idxelist->flags) & NTFS_IDXELIST_CHILD) {
+	    tsk_errno = TSK_ERR_FS_INODE_INT;
+	    snprintf(tsk_errstr, TSK_ERRSTR_L,
+		"Error: $IDX_ROOT says there should be children, but there isn't");
+
+	    return 1;
+	}
+	else {
+	    return 0;
+	}
     }
 
 
-    if (fs_data_alloc->flags & FS_DATA_RES)
-	error("$IDX_ALLOC is Resident - it shouldn't be");
+    if (fs_data_alloc->flags & FS_DATA_RES) {
+	tsk_errno = TSK_ERR_FS_INODE_INT;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "$IDX_ALLOC is Resident - it shouldn't be");
+	fs_inode_free(fs_inode);
+	return 1;
+    }
 
     /* 
      * Copy the index allocation run into a big buffer
      */
 
     idxalloc_len = fs_data_alloc->runlen;
-    idxalloc = mymalloc(idxalloc_len);
+    if ((idxalloc = mymalloc(idxalloc_len)) == NULL) {
+	fs_inode_free(fs_inode);
+	return 1;
+    }
 
     /* Fill in the loading data structure */
     load_file.total = load_file.left = idxalloc_len;
@@ -615,22 +722,26 @@ ntfs_dent_walk_lcl(FS_INFO * fs, NTFS_DINFO * dinfo, INUM_T inum,
 
     if (verbose)
 	fprintf(stderr,
-		"ntfs_dent_walk: Copying $IDX_ALLOC into buffer\n");
+	    "ntfs_dent_walk: Copying $IDX_ALLOC into buffer\n");
 
-    ntfs_data_walk(ntfs, fs_inode->addr, fs_data_alloc,
-		   FS_FLAG_FILE_SLACK | FS_FLAG_FILE_NOABORT,
-		   load_file_action, (void *) &load_file);
+    if (ntfs_data_walk(ntfs, fs_inode->addr, fs_data_alloc,
+	    FS_FLAG_FILE_SLACK, load_file_action, (void *) &load_file)) {
+	free(idxalloc);
+	fs_inode_free(fs_inode);
+	strncat(tsk_errstr2, " - ntfs_dent_walk",
+	    TSK_ERRSTR_L - strlen(tsk_errstr2));
+	return 1;
+    }
 
     /* Not all of the directory was copied, so we exit */
     if (load_file.left > 0) {
 	free(idxalloc);
 	fs_inode_free(fs_inode);
 
-	if (dinfo->depth == 0)
-	    error("Error reading directory contents: %" PRIuINUM "\n",
-		  inum);
-
-	return;
+	tsk_errno = TSK_ERR_FS_FWALK;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "Error reading directory contents: %" PRIuINUM "\n", inum);
+	return 1;
     }
 
     /*
@@ -657,8 +768,8 @@ ntfs_dent_walk_lcl(FS_INFO * fs, NTFS_DINFO * dinfo, INUM_T inum,
 
 	if (verbose)
 	    fprintf(stderr,
-		    "ntfs_dent_walk: Index Buffer Offset: %d  Magic: %"
-		    PRIx32 "\n", off, getu32(fs, idxrec->magic));
+		"ntfs_dent_walk: Index Buffer Offset: %d  Magic: %"
+		PRIx32 "\n", off, getu32(fs, idxrec->magic));
 
 	/* Is this the begining of an index record? */
 	if (getu32(fs, idxrec->magic) != NTFS_IDXREC_MAGIC)
@@ -681,16 +792,20 @@ ntfs_dent_walk_lcl(FS_INFO * fs, NTFS_DINFO * dinfo, INUM_T inum,
 
 	if (verbose)
 	    fprintf(stderr,
-		    "ntfs_dent_walk: Processing previous index record (len: %"
-		    PRIu32 ")\n", rec_len);
+		"ntfs_dent_walk: Processing previous index record (len: %"
+		PRIu32 ")\n", rec_len);
 
 	/* remove the update sequence in the index record */
-	ntfs_fix_idxrec(ntfs, idxrec_p, rec_len);
+	if (ntfs_fix_idxrec(ntfs, idxrec_p, rec_len)) {
+	    free(idxalloc);
+	    fs_inode_free(fs_inode);
+	    return 1;
+	}
 
 	/* Locate the start of the index entry list */
 	idxelist = &idxrec_p->list;
 	idxe = (ntfs_idxentry *) ((uintptr_t) idxelist +
-				  getu32(fs, idxelist->begin_off));
+	    getu32(fs, idxelist->begin_off));
 
 	/* the length from the start of the next record to where our
 	 * list starts.
@@ -700,15 +815,14 @@ ntfs_dent_walk_lcl(FS_INFO * fs, NTFS_DINFO * dinfo, INUM_T inum,
 	list_len = (uintptr_t) idxrec - (uintptr_t) idxe;
 
 	/* process the list of index entries */
-	if (WALK_STOP == ntfs_dent_idxentry(ntfs, dinfo, idxe, list_len,
-					    getu32(fs,
-						   idxelist->end_off) -
-					    getu32(fs,
-						   idxelist->begin_off),
-					    flags, action, ptr)) {
+	retval = ntfs_dent_idxentry(ntfs, dinfo, idxe, list_len,
+	    getu32(fs,
+		idxelist->end_off) -
+	    getu32(fs, idxelist->begin_off), flags, action, ptr);
+	if (retval != 0) {
 	    fs_inode_free(fs_inode);
 	    free(idxalloc);
-	    return;
+	    return (retval == -1) ? 1 : 0;
 	}
 
 	/* reset the pointer to the next record */
@@ -727,37 +841,40 @@ ntfs_dent_walk_lcl(FS_INFO * fs, NTFS_DINFO * dinfo, INUM_T inum,
 
 	if (verbose)
 	    fprintf(stderr,
-		    "ntfs_dent_walk: Processing final index record (len: %"
-		    PRIu32 ")\n", rec_len);
+		"ntfs_dent_walk: Processing final index record (len: %"
+		PRIu32 ")\n", rec_len);
 
 	/* remove the update sequence */
-	ntfs_fix_idxrec(ntfs, idxrec_p, rec_len);
+	if (ntfs_fix_idxrec(ntfs, idxrec_p, rec_len)) {
+	    fs_inode_free(fs_inode);
+	    free(idxalloc);
+	    return 1;
+	}
 
 	idxelist = &idxrec_p->list;
 	idxe = (ntfs_idxentry *) ((uintptr_t) idxelist +
-				  getu32(fs, idxelist->begin_off));
+	    getu32(fs, idxelist->begin_off));
 
 	/* This is the length of the idx entries */
 	list_len =
 	    ((uintptr_t) idxalloc + idxalloc_len) - (uintptr_t) idxe;
 
 	/* process the list of index entries */
-	if (WALK_STOP == ntfs_dent_idxentry(ntfs, dinfo, idxe, list_len,
-					    getu32(fs,
-						   idxelist->end_off) -
-					    getu32(fs,
-						   idxelist->begin_off),
-					    flags, action, ptr)) {
+	retval = ntfs_dent_idxentry(ntfs, dinfo, idxe, list_len,
+	    getu32(fs,
+		idxelist->end_off) -
+	    getu32(fs, idxelist->begin_off), flags, action, ptr);
+	if (retval != 0) {
 	    fs_inode_free(fs_inode);
 	    free(idxalloc);
-	    return;
+	    return (retval == -1) ? 1 : 0;
 	}
     }
 
     fs_inode_free(fs_inode);
     free(idxalloc);
 
-    return;
+    return 0;
 }				/* end of dent_walk */
 
 
@@ -775,23 +892,36 @@ ntfs_dent_walk_lcl(FS_INFO * fs, NTFS_DINFO * dinfo, INUM_T inum,
  *
  * fs_dent was filled in by ntfs_find_file and will get the final path
  * added to it before action is called
+ *
+ * return 1 on error and 0 on success
  */
-static void
+static uint8_t
 ntfs_find_file_rec(FS_INFO * fs, NTFS_DINFO * dinfo, FS_DENT * fs_dent,
-		   FS_NAME * fs_name, int myflags, int flags,
-		   FS_DENT_WALK_FN action, void *ptr)
+    FS_NAME * fs_name, int myflags, int flags,
+    FS_DENT_WALK_FN action, void *ptr)
 {
     FS_INODE *fs_inode_par;
     FS_NAME *fs_name_par;
     uint8_t decrem = 0;
     int len = 0, i;
     char *begin = NULL;
+    int retval;
+
 
     if (fs_name->par_inode < fs->first_inum ||
-	fs_name->par_inode > fs->last_inum)
-	error("invalid inode value: %" PRIuINUM "\n", fs_name->par_inode);
+	fs_name->par_inode > fs->last_inum) {
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "invalid inode value: %" PRIuINUM "\n", fs_name->par_inode);
+	return 1;
+    }
 
     fs_inode_par = fs->inode_lookup(fs, fs_name->par_inode);
+    if (fs_inode_par == NULL) {
+	strncat(tsk_errstr2, " - ntfs_find_file_rec",
+	    TSK_ERRSTR_L - strlen(tsk_errstr2));
+	return 1;
+    }
 
     /* 
      * Orphan File
@@ -808,7 +938,7 @@ ntfs_find_file_rec(FS_INFO * fs, NTFS_DINFO * dinfo, FS_DENT * fs_dent,
 	 * previous name was unallocated ... but how do I get it again?
 	 */
 	if ((((uintptr_t) dinfo->didx[dinfo->depth - 1] - len) >=
-	     (uintptr_t) & dinfo->dirs[0])
+		(uintptr_t) & dinfo->dirs[0])
 	    && (dinfo->depth < MAX_DEPTH)) {
 	    begin = dinfo->didx[dinfo->depth] =
 		(char *) ((uintptr_t) dinfo->didx[dinfo->depth - 1] - len);
@@ -822,27 +952,28 @@ ntfs_find_file_rec(FS_INFO * fs, NTFS_DINFO * dinfo, FS_DENT * fs_dent,
 
 	fs_dent->path = begin;
 	fs_dent->pathdepth = dinfo->depth;
-	action(fs, fs_dent, myflags, ptr);
+	retval = action(fs, fs_dent, myflags, ptr);
 
 	if (decrem)
 	    dinfo->depth--;
 
 	fs_inode_free(fs_inode_par);
-	return;
+	return (retval == WALK_ERROR) ? 1 : 0;
     }
 
     for (fs_name_par = fs_inode_par->name; fs_name_par != NULL;
-	 fs_name_par = fs_name_par->next) {
+	fs_name_par = fs_name_par->next) {
 
 	len = strlen(fs_name_par->name);
 
 	/* do some length checks on the dir structure 
 	 * if we can't fit it then forget about it */
 	if ((((uintptr_t) dinfo->didx[dinfo->depth - 1] - len - 1) >=
-	     (uintptr_t) & dinfo->dirs[0]) && (dinfo->depth < MAX_DEPTH)) {
+		(uintptr_t) & dinfo->dirs[0])
+	    && (dinfo->depth < MAX_DEPTH)) {
 	    begin = dinfo->didx[dinfo->depth] =
 		(char *) ((uintptr_t) dinfo->didx[dinfo->depth - 1] - len -
-			  1);
+		1);
 
 	    dinfo->depth++;
 	    decrem = 1;
@@ -867,20 +998,28 @@ ntfs_find_file_rec(FS_INFO * fs, NTFS_DINFO * dinfo, FS_DENT * fs_dent,
 	     */
 	    fs_dent->path = (char *) ((uintptr_t) begin + 1);
 	    fs_dent->pathdepth = dinfo->depth;
-	    action(fs, fs_dent, myflags, ptr);
+	    if (WALK_ERROR == action(fs, fs_dent, myflags, ptr)) {
+		fs_inode_free(fs_inode_par);
+		return 1;
+	    }
 	}
 
 	/* otherwise, recurse some more */
 	else {
-	    ntfs_find_file_rec(fs, dinfo, fs_dent, fs_name_par, myflags,
-			       flags, action, ptr);
+	    if (ntfs_find_file_rec(fs, dinfo, fs_dent, fs_name_par,
+		    myflags, flags, action, ptr)) {
+		fs_inode_free(fs_inode_par);
+		return 1;
+	    }
 	}
 
 	/* if we incremented before, then decrement the depth now */
 	if (decrem)
 	    dinfo->depth--;
     }
+
     fs_inode_free(fs_inode_par);
+    return 0;
 }
 
 /* 
@@ -893,15 +1032,12 @@ ntfs_find_file_rec(FS_INFO * fs, NTFS_DINFO * dinfo, FS_DENT * fs_dent,
  * structure will get messed up!
  */
 
-void
+uint8_t
 ntfs_find_file(FS_INFO * fs, INUM_T inode_toid, uint32_t type_toid,
-	       uint16_t id_toid, int flags, FS_DENT_WALK_FN action,
-	       void *ptr)
+    uint16_t id_toid, int flags, FS_DENT_WALK_FN action, void *ptr)
 {
-
-    FS_INODE *fs_inode;
     FS_NAME *fs_name;
-    FS_DENT *fs_dent = fs_dent_alloc(NTFS_MAXNAMLEN_UTF8, 0);
+    FS_DENT *fs_dent;
     int myflags;
     NTFS_INFO *ntfs = (NTFS_INFO *) fs;
     char *attr = NULL;
@@ -909,8 +1045,17 @@ ntfs_find_file(FS_INFO * fs, INUM_T inode_toid, uint32_t type_toid,
 
 
     /* sanity check */
-    if (inode_toid < fs->first_inum || inode_toid > fs->last_inum)
-	error("invalid inode value: " PRIuINUM "i\n", inode_toid);
+    if (inode_toid < fs->first_inum || inode_toid > fs->last_inum) {
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "ntfs_find_file: invalid inode value: %" PRIuINUM "\n",
+	    inode_toid);
+	return 1;
+    }
+
+    if ((fs_dent = fs_dent_alloc(NTFS_MAXNAMLEN_UTF8, 0)) == NULL) {
+	return 1;
+    }
 
     memset(&dinfo, 0, sizeof(NTFS_DINFO));
 
@@ -929,17 +1074,28 @@ ntfs_find_file(FS_INFO * fs, INUM_T inode_toid, uint32_t type_toid,
 
     /* lookup the inode and get its allocation status */
     fs_dent->inode = inode_toid;
-    fs_dent->fsi = fs_inode = fs->inode_lookup(fs, inode_toid);
+    fs_dent->fsi = fs->inode_lookup(fs, inode_toid);
+    if (fs_dent->fsi == NULL) {
+	strncat(tsk_errstr2, " - ntfs_find_file",
+	    TSK_ERRSTR_L - strlen(tsk_errstr2));
+	fs_dent_free(fs_dent);
+	return 1;
+    }
     myflags = ((getu16(fs, ntfs->mft->flags) & NTFS_MFT_INUSE) ?
-	       FS_FLAG_NAME_ALLOC : FS_FLAG_NAME_UNALLOC);
+	FS_FLAG_NAME_ALLOC : FS_FLAG_NAME_UNALLOC);
 
     /* Get the name for the attribute - if specified */
     if (type_toid != 0) {
 	FS_DATA *fs_data =
-	    fs_data_lookup(fs_inode->attr, type_toid, id_toid);
+	    fs_data_lookup(fs_dent->fsi->attr, type_toid, id_toid);
 	if (!fs_data) {
-	    error("Type %" PRIu32 " Id %" PRIu16 " not found in MFT %"
-		  PRIuINUM "", type_toid, id_toid, inode_toid);
+	    tsk_errno = TSK_ERR_FS_INODE_INT;
+	    snprintf(tsk_errstr, TSK_ERRSTR_L,
+		"find_file: Type %" PRIu32 " Id %" PRIu16
+		" not found in MFT %" PRIuINUM "", type_toid, id_toid,
+		inode_toid);
+	    fs_dent_free(fs_dent);
+	    return 1;
 	}
 
 	/* only add the attribute name if it is the non-default data stream */
@@ -948,13 +1104,14 @@ ntfs_find_file(FS_INFO * fs, INUM_T inode_toid, uint32_t type_toid,
     }
 
     /* loop through all the names it may have */
-    for (fs_name = fs_inode->name; fs_name != NULL;
-	 fs_name = fs_name->next) {
+    for (fs_name = fs_dent->fsi->name; fs_name != NULL;
+	fs_name = fs_name->next) {
+	int retval;
 
 	/* Append on the attribute name, if it exists */
 	if (attr != NULL) {
 	    snprintf(fs_dent->name, fs_dent->name_max, "%s:%s",
-		     fs_name->name, attr);
+		fs_name->name, attr);
 	}
 	else {
 	    strncpy(fs_dent->name, fs_name->name, fs_dent->name_max);
@@ -964,17 +1121,26 @@ ntfs_find_file(FS_INFO * fs, INUM_T inode_toid, uint32_t type_toid,
 	if (fs_name->par_inode == NTFS_ROOTINO) {
 	    fs_dent->path = dinfo.didx[0];
 	    fs_dent->pathdepth = dinfo.depth;
-	    action(fs, fs_dent, myflags, ptr);
+	    retval = action(fs, fs_dent, myflags, ptr);
+	    if (retval == WALK_STOP) {
+		fs_dent_free(fs_dent);
+		return 0;
+	    }
+	    else if (retval == WALK_ERROR) {
+		fs_dent_free(fs_dent);
+		return 1;
+	    }
 	}
 	/* call the recursive function on the parent */
 	else {
-	    ntfs_find_file_rec(fs, &dinfo, fs_dent, fs_name, myflags,
-			       flags, action, ptr);
+	    if (ntfs_find_file_rec(fs, &dinfo, fs_dent, fs_name, myflags,
+		    flags, action, ptr)) {
+		fs_dent_free(fs_dent);
+		return 1;
+	    }
 	}
-
     }				/* end of name loop */
 
     fs_dent_free(fs_dent);
-
-    return;
+    return 0;
 }

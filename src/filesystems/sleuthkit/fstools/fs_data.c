@@ -2,9 +2,10 @@
 ** fs_data
 ** The Sleuth Kit 
 **
-** $Date: 2005/09/02 23:34:03 $
+** $Date: 2006/07/10 15:09:56 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
+** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved 
 **
 ** TASK
@@ -33,19 +34,28 @@
  * Allocates and initializes a new structure.  
  * Specify which type (RES or NON_RES) for autmatic allocation, 
  * else if 0 is specified then a generic one is made
+ *
+ * Returns NULL on error
  */
 FS_DATA *
 fs_data_alloc(uint8_t type)
 {
     FS_DATA *data = (FS_DATA *) mymalloc(sizeof(FS_DATA));
+    if (data == NULL) {
+	return NULL;
+    }
     data->nsize = 128;
-    data->name = (char *) mymalloc(data->nsize);
+    if ((data->name = (char *) mymalloc(data->nsize)) == NULL) {
+	free(data);
+	return NULL;
+    }
 
     data->size = 0;
     data->flags = 0;
     data->run = NULL;
     data->type = 0;
     data->next = NULL;
+    data->compsize = 0;
 
     if (type == FS_DATA_NONRES) {
 	data->buflen = 0;
@@ -55,21 +65,32 @@ fs_data_alloc(uint8_t type)
     else if (type == FS_DATA_RES) {
 	data->buflen = 1024;
 	data->buf = (uint8_t *) mymalloc(data->buflen);
+	if (data->buf == NULL) {
+	    free(data->name);
+	    return NULL;
+	}
 	data->flags = (FS_DATA_RES | FS_DATA_INUSE);
     }
     else {
-	error("fs_data_alloc: Invalid Type: %d\n", type);
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "fs_data_alloc: Invalid Type: %d\n", type);
+	return NULL;
     }
 
     return data;
 }
 
 
+/* return NULL On error */
 FS_DATA_RUN *
 fs_data_run_alloc()
 {
     FS_DATA_RUN *fs_data_run =
 	(FS_DATA_RUN *) mymalloc(sizeof(FS_DATA_RUN));
+    if (fs_data_run == NULL)
+	return NULL;
+
     memset(fs_data_run, 0, sizeof(FS_DATA_RUN));
     return fs_data_run;
 }
@@ -142,14 +163,20 @@ fs_data_clear_list(FS_DATA * data)
  * Preference is given to finding one of the same type to prevent
  * excessive malloc's, but if one is not found then a different
  * type is used: type = [FS_DATA_NONRES | FS_DATA_RES]
+ *
+ * Return NULL on error
  */
 FS_DATA *
 fs_data_getnew_attr(FS_DATA * begin, uint8_t type)
 {
     FS_DATA *temp = NULL, *data = begin;
 
-    if ((type != FS_DATA_NONRES) && (type != FS_DATA_RES))
-	error("Invalid Type in fs_data_getnew_attr()");
+    if ((type != FS_DATA_NONRES) && (type != FS_DATA_RES)) {
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "Invalid Type in fs_data_getnew_attr()");
+	return NULL;
+    }
 
     while (data) {
 	if (data->flags == 0) {
@@ -176,7 +203,8 @@ fs_data_getnew_attr(FS_DATA * begin, uint8_t type)
 	    data = temp;
 	else {
 	    /* make a new one */
-	    data = fs_data_alloc(type);
+	    if ((data = fs_data_alloc(type)) == NULL)
+		return NULL;
 
 	    /* find the end of the list to add this to */
 	    temp = begin;
@@ -197,7 +225,8 @@ fs_data_getnew_attr(FS_DATA * begin, uint8_t type)
  * type and id.  If _id_ is 0, then the lowest id of the given type
  * is returned
  *
- * if the entry is not found, NULL is returned
+ * if the entry is not found (or an error occurs), NULL is returned
+ * The difference can be determined by checking if tsk_errno is not 0
  *
  */
 FS_DATA *
@@ -205,15 +234,21 @@ fs_data_lookup(FS_DATA * data_head, uint32_t type, uint16_t id)
 {
     FS_DATA *fs_data = data_head;
 
-    if (!data_head)
+    if (!data_head) {
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "fs_data_lookup: Null head pointer");
+	tsk_errstr2[0] = '\0';
 	return NULL;
+    }
 
     while ((fs_data) && (fs_data->flags & FS_DATA_INUSE) &&
-	   ((fs_data->type != type) || (fs_data->id != id)))
+	((fs_data->type != type) || (fs_data->id != id)))
 	fs_data = fs_data->next;
 
-    if ((!fs_data) || (fs_data->type != type) || (fs_data->id != id))
+    if ((!fs_data) || (fs_data->type != type) || (fs_data->id != id)) {
 	return NULL;
+    }
 
     return fs_data;
 }
@@ -222,16 +257,24 @@ fs_data_lookup(FS_DATA * data_head, uint32_t type, uint16_t id)
  * Search the list of FS_DATA structures for an entry with the same
  * type.  The attribute with the lowest id or the default $Data attribute
  * is returned.
+ *
+ * Return NULL on error or if it is not found
+ * The difference between the NULL cases can be determined by checking if
+ * tsk_errno is not 0
  */
-
 FS_DATA *
 fs_data_lookup_noid(FS_DATA * data_head, uint32_t type)
 {
     FS_DATA *fs_data = data_head;
     FS_DATA *fs_data_ret = NULL;
 
-    if (!data_head)
+    if (!data_head) {
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "fs_data_lookup_noid: NULL head pointer");
+	tsk_errstr[0] = '\0';
 	return NULL;
+    }
 
     /* If no id was given, then we will return the entry with the
      * lowest id of the given type (if more than one exists) 
@@ -255,7 +298,6 @@ fs_data_lookup_noid(FS_DATA * data_head, uint32_t type)
 	}
 	fs_data = fs_data->next;
     }
-
     return fs_data_ret;
 }
 
@@ -264,15 +306,20 @@ fs_data_lookup_noid(FS_DATA * data_head, uint32_t type)
 /* Add _name_ to the FS_DATA structure 
  *
  * Handles the size reallocation if needed
+ *
+ * Returns 1 on error and 0 on success
  */
-static void
+static uint8_t
 fs_data_put_name(FS_DATA * data, char *name)
 {
     if (data->nsize < (strlen(name) + 1)) {
 	data->name = myrealloc(data->name, strlen(name) + 1);
+	if (data->name == NULL)
+	    return 1;
 	data->nsize = strlen(name) + 1;
     }
     strncpy(data->name, name, data->nsize);
+    return 0;
 }
 
 /*
@@ -280,16 +327,18 @@ fs_data_put_name(FS_DATA * data, char *name)
  * data_head list.  if _data_head_ is NULL, a new list will be started
  *
  * the head of the list is returned
+ *
+ * NULL is returned on error
  */
 FS_DATA *
 fs_data_put_str(FS_DATA * data_head, char *name, uint32_t type,
-		uint16_t id, void *addr, unsigned int len)
+    uint16_t id, void *addr, unsigned int len)
 {
-
     FS_DATA *data;
 
     /* get a new attribute entry in the list */
-    data = fs_data_getnew_attr(data_head, FS_DATA_RES);
+    if ((data = fs_data_getnew_attr(data_head, FS_DATA_RES)) == NULL)
+	return NULL;
 
     /* if the head of the list is null, then set it now */
     if (!data_head)
@@ -299,11 +348,16 @@ fs_data_put_str(FS_DATA * data_head, char *name, uint32_t type,
     data->flags = (FS_DATA_INUSE | FS_DATA_RES);
     data->type = type;
     data->id = id;
+    data->compsize = 0;
 
-    fs_data_put_name(data, name);
+    if (fs_data_put_name(data, name)) {
+	return NULL;
+    }
 
     if (data->buflen < len) {
 	data->buf = (uint8_t *) myrealloc((char *) data->buf, len);
+	if (data->buf == NULL)
+	    return NULL;
 	data->buflen = len;
     }
 
@@ -329,12 +383,15 @@ fs_data_put_str(FS_DATA * data_head, char *name, uint32_t type,
  * name: name of the attribute
  * type & id: The Type and id of the attribute
  * size: total size of the attribute
+ * compsize: Compression unit size
+ *
+ * NULL is returned on error
  */
 FS_DATA *
 fs_data_put_run(FS_DATA * data_head,
-		DADDR_T start_vcn, OFF_T runlen, FS_DATA_RUN * run,
-		char *name, uint32_t type, uint16_t id, OFF_T size,
-		uint8_t flags)
+    DADDR_T start_vcn, OFF_T runlen, FS_DATA_RUN * run,
+    char *name, uint32_t type, uint16_t id, OFF_T size, uint8_t flags,
+    uint64_t compsize)
 {
     FS_DATA *data;
     FS_DATA_RUN *data_run, *data_run_prev;
@@ -345,8 +402,16 @@ fs_data_put_run(FS_DATA * data_head,
 
     /* one does not already exist, so get a new one */
     if (!data) {
+
+	/* fs_data_lookup returns NULL both on error and if it can't 
+	 * the attribute, so check errno */
+	if (tsk_errno != 0)
+	    return NULL;
+
 	/* get a new attribute entry in the list */
-	data = fs_data_getnew_attr(data_head, FS_DATA_NONRES);
+	if ((data =
+		fs_data_getnew_attr(data_head, FS_DATA_NONRES)) == NULL)
+	    return NULL;
 
 
 	/* if the head of the list is null, then set it now */
@@ -357,8 +422,11 @@ fs_data_put_run(FS_DATA * data_head,
 	data->type = type;
 	data->id = id;
 	data->size = size;
+	data->compsize = compsize;
 
-	fs_data_put_name(data, name);
+	if (fs_data_put_name(data, name)) {
+	    return NULL;
+	}
 
 
 	/* if this is not in the begining, then we need to make a filler 
@@ -401,8 +469,13 @@ fs_data_put_run(FS_DATA * data_head,
 	    /* This should never happen because we always add 
 	     * the filler to start from VCN 0
 	     */
-	    if (cur_vcn > start_vcn)
-		error("could not add data_run");
+	    if (cur_vcn > start_vcn) {
+		tsk_errno = TSK_ERR_FS_ARG;
+		snprintf(tsk_errstr, TSK_ERRSTR_L,
+		    "fs_data_put_run: could not add data_run");
+		tsk_errstr2[0] = '\0';
+		return NULL;
+	    }
 
 	    /* The current filler ends after where we need to 
 	     * start, so it will be added here 
@@ -423,6 +496,8 @@ fs_data_put_run(FS_DATA * data_head,
 		 */
 		else {
 		    FS_DATA_RUN *newfill = fs_data_run_alloc();
+		    if (newfill == NULL)
+			return NULL;
 
 		    if (data_run_prev)
 			data_run_prev->next = newfill;
@@ -496,11 +571,13 @@ fs_data_put_run(FS_DATA * data_head,
 	    return data_head;
 	}
 
-	printf("Previous %" PRIuDADDR " -> %" PRIuDADDR "   Current %"
-	       PRIuDADDR " -> %" PRIuDADDR "\n", data_run_prev->addr,
-	       data_run_prev->len, run->addr, run->len);
-	error("fs_data_put_run: error adding additional run: %" PRIuDADDR
-	      "", start_vcn);
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "fs_data_run: error adding aditional run: %" PRIuDADDR
+	    ", Previous %" PRIuDADDR " -> %" PRIuDADDR "   Current %"
+	    PRIuDADDR " -> %" PRIuDADDR "\n", start_vcn,
+	    data_run_prev->addr, data_run_prev->len, run->addr, run->len);
+	return NULL;
     }
 
     /* we should add it right here */
@@ -513,6 +590,9 @@ fs_data_put_run(FS_DATA * data_head,
     /* we need to make a filler before it */
     else {
 	FS_DATA_RUN *tmprun = fs_data_run_alloc();
+	if (tmprun == NULL)
+	    return NULL;
+
 	if (data_run_prev)
 	    data_run_prev->next = tmprun;
 	else
