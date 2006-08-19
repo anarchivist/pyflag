@@ -133,6 +133,7 @@ static PyObject *py_read_random(PyObject *dummy, PyObject *args) {
   TRY {
     length=driver->read_random(driver, PyString_AsString(result), len, offs);
   } EXCEPT(E_ANY) {
+    Py_DECREF(result);
     return PyErr_Format(PyExc_IOError, "%s",except_str);
   };
 
@@ -153,8 +154,11 @@ static PyObject *size(PyObject *dummy, PyObject *args) {
 
   // Check that what we got is actually an iosource driver:
   driver = (IOSource)PyCObject_AsVoidPtr(py_driver);
-  if(!driver || !ISSUBCLASS(driver, IOSource)) {
+  if(!driver)     
     return PyErr_Format(PyExc_RuntimeError, "This is not an iosource driver");
+
+  if(!ISSUBCLASS(driver, IOSource)) {
+    return PyErr_Format(PyExc_RuntimeError, "This is not an iosource driver - it is a %s", NAMEOF(driver));
   };
 
   return PyLong_FromUnsignedLongLong(driver->size);

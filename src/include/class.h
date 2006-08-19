@@ -342,8 +342,9 @@ struct Object {
 #define ISINSTANCE(obj,class)			\
   (((Object)obj)->__class__ == (Object)&__ ## class)
 
+// We need to ensure that class was properly initialised:
 #define ISSUBCLASS(obj,class)			\
-  issubclass((Object)obj, (Object)&__ ## class)
+  issubclass((Object)obj, (Object)&__ ## class, &class ## _init)
 
 #define CLASSOF(obj)				\
   ((Object)obj)->__class__
@@ -353,7 +354,7 @@ inline void Object_Alloc(Object this);
 
 extern struct Object __Object;
 
-int issubclass(Object obj, Object class);
+int issubclass(Object obj, Object class, void (init)());
 
 /** This is used for error reporting. This is similar to the way
     python does it, i.e. we set the error flag and return NULL.

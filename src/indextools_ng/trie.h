@@ -6,7 +6,7 @@
 ***********************************/
 #ifndef __TRIE_H
 #define __TRIE_H
-
+#include "config.h"
 #include <Python.h>
 #include "class.h"
 #include "list.h"
