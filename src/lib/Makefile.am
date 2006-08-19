@@ -1,4 +1,4 @@
-SUBDIRS		= libewf libiosubsys
+SUBDIRS		= . libewf libiosubsys
 
 INCLUDES        	= -I$(top_srcdir)/src/include -include config.h 
 

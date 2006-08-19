@@ -24,6 +24,9 @@
 #include "misc.h"
 #include "class.h"
 #include "list.h"
+#include "stringio.h"
+#include "../sgzlib.h"
+#include "../libewf/libewf.h"
 
 /** Options are kept as lists: */
 CLASS(IOOptions, Object)
@@ -53,3 +56,25 @@ CLASS(IOSource, Object)
      int METHOD(IOSource, read_random, char *buf, uint32_t len, uint64_t offs);
 END_CLASS
 
+CLASS(AdvIOSource, IOSource)
+// This is the array of struct split_files:
+     StringIO buffer;
+
+     // Number of individual chunks
+     int number;
+
+     // Total size in bytes of this source
+     uint64_t size;
+END_CLASS
+
+CLASS(SgzipIOSource, IOSource)
+     struct sgzip_obj sgzip;
+     uint64_t *index;
+     uint64_t *offset;
+END_CLASS
+
+CLASS(EWFIOSource, IOSource)
+     StringIO buffer;
+     int number_of_files;
+     LIBEWF_HANDLE *handle;
+END_CLASS

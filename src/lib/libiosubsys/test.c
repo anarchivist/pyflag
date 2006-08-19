@@ -1,17 +1,24 @@
 #include "libiosubsys.h"
 
-void main() {
+int main() {
   IOOptions opts = CONSTRUCT(IOOptions, IOOptions, add, NULL, NULL, NULL, NULL);
   IOSource io;
-  char buf[255];
+  char buf[2550];
+  int len;
 
-  CONSTRUCT(IOOptions, IOOptions, add, opts, opts, "filename", "/etc/passwd");
+  CONSTRUCT(IOOptions, IOOptions, add, opts, opts, "filename", "passwd.e01");
   
-  printf("Option filename is %s\n" , opts->get_value(opts, "filename"));
+  io = CONSTRUCT(EWFIOSource, IOSource, super.Con, opts, opts);
+  if(!io) { 
+    printf("%s",_error_buff);
+    return -1;
+  };
+  len = io->read_random(io, buf, 2500, 0);
 
-  io = CONSTRUCT(IOSource, IOSource, Con, opts, opts);
-  io->read_random(io, buf, 200, 0);
-
-  buf[200]=0;
+  buf[len]=0;
   printf("contents %s" , buf);
+  
+  talloc_free(opts);
+
+  return 1;
 };

@@ -244,7 +244,7 @@ class DBFS(FileSystem):
         except ImportError:
             pass
 
-        self.dbh.execute("""CREATE TABLE `xattr` (
+        self.dbh.execute("""CREATE TABLE if not exists `xattr` (
                             `inode_id` INT NOT NULL ,
                             `property` ENUM( %s ) NOT NULL ,
                             `value` VARCHAR( 250 ) NOT NULL

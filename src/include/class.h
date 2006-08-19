@@ -233,9 +233,6 @@ super.add as well.
     ((Object)this)->__size = sizeof(struct class);			\
     ((Object)this)->__name__ = #class;
 
-#define SET_DOCSTRING(string)			\
-  ((Object)this)->__doc__ = string
-
 #else
 
 #define VIRTUAL(class,superclass)				\
@@ -255,9 +252,10 @@ super.add as well.
     ((Object)this)->__super__ = (Object)&__ ## superclass;		\
     ((Object)this)->__size = sizeof(struct class);
 
-#define SET_DOCSTRING(string) ;
-
 #endif
+
+#define SET_DOCSTRING(string)			\
+  ((Object)this)->__doc__ = string
 
 #define END_VIRTUAL };
 
@@ -356,5 +354,17 @@ inline void Object_Alloc(Object this);
 extern struct Object __Object;
 
 int issubclass(Object obj, Object class);
+
+/** This is used for error reporting. This is similar to the way
+    python does it, i.e. we set the error flag and return NULL.
+*/
+enum _error_type {
+  EZero,EGeneric,EOverflow,
+  EUnderflow,EIOError, ENoMemory
+};
+
+extern char _error_buff[];
+
+void *raise_errors(enum _error_type t, char *string,  ...);
 
 #endif

@@ -7,7 +7,7 @@ noinst_PROGRAMS		= test
 pkgpyexec_LTLIBRARIES 	= iosubsys.la
 
 libiosubsys_la_SOURCES     = libiosubsys.c
-libiosubsys_la_LIBADD       = ../liboo.la
+libiosubsys_la_LIBADD       = ../liboo.la ../libsgz.la ../libexcept.la ../libewf/libewf.la
 
 # python module specifics
 iosubsys_la_SOURCES 	= iosubsys.c

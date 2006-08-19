@@ -27,6 +27,27 @@
 # ******************************************************/
 #include "class.h"
 
+/** This is used for error reporting.
+ */
+char *__error_str;
+enum _error_type _global_error;
+#define ERROR_BUFFER_SIZE 1024
+char _error_buff[ERROR_BUFFER_SIZE];
+
+void *raise_errors(enum _error_type t, char *reason, ...) {
+  if(reason) {
+    va_list ap;
+    va_start(ap, reason);
+    vsnprintf(_error_buff, ERROR_BUFFER_SIZE-1,reason,ap);
+    _error_buff[ERROR_BUFFER_SIZE]=0;
+    va_end(ap);
+  };
+
+  _global_error = t;
+
+  return NULL;
+};
+
 // Noone should instantiate Object directly. this should be already
 // allocated therefore:
 
