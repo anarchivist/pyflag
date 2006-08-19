@@ -47,6 +47,7 @@
 
 #include "definitions.h"
 #include "notify.h"
+#include "except.h"
 
 #ifdef __STDC__
 
@@ -93,13 +94,15 @@ void VARARGS( libewf_warning_print, char *, format )
 
 	VASTART( argument_list, char *, format );
 
-	vfprintf( stderr, format, argument_list );
+	vsnprintf( except_str, EXCEPT_BUFFER_SIZE-1, format, argument_list );
 
 	VAEND( argument_list );
 
 	if( libewf_warning_non_fatal != 0 )
 	{
-		exit( EXIT_FAILURE );
+	  //		exit( EXIT_FAILURE );
+	  // Ensure that exceptions are raised instead of quitting:
+	  RAISE(E_IOERROR, NULL, NULL);
 	}
 }
 
@@ -111,11 +114,11 @@ void VARARGS( libewf_fatal_print, char *, format )
 
 	VASTART( argument_list, char *, format );
 
-	vfprintf( stderr, format, argument_list );
+	vsnprintf( except_str, EXCEPT_BUFFER_SIZE-1, format, argument_list );
 
 	VAEND( argument_list );
 
-	exit( EXIT_FAILURE );
+	RAISE(E_IOERROR, NULL, NULL);
 }
 
 /* Prints a dump of data

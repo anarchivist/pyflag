@@ -5,6 +5,7 @@
 #include "misc.h"
 #include "class.h"
 #include "libiosubsys.h"
+#include "except.h"
 
 IOOptions IOOptions_add(IOOptions self, IOOptions list, char *name, char *value) {
 
@@ -56,6 +57,7 @@ IOSource IOSource_Con(IOSource self, IOOptions opts) {
   };
 
   if(name) {
+    self->filename = talloc_strdup(self,name);
     self->fd = open(name,O_RDONLY);
 
     /** We failed to open the file */
@@ -64,6 +66,9 @@ IOSource IOSource_Con(IOSource self, IOOptions opts) {
       return raise_errors(EIOError, "Unable to open file %s\n", name);
     };
   };
+
+  // Find out the size of the file:
+  self->size = lseek(self->fd, 0, SEEK_END);
 
   talloc_set_destructor(self,IOSource_Destructor);
   return self;
@@ -76,7 +81,6 @@ int IOSource_read_random(IOSource self, char *buf, uint32_t len, uint64_t offs) 
 };
 
 VIRTUAL(IOSource, Object)
-     VATTR(name) = "Standard";
      SET_DOCSTRING("Standard IO Source:\n\n"
 		   "This is basically a pass through driver.\n\n"
 		   "filename - The filename to open (just 1)\n");
@@ -149,7 +153,7 @@ IOSource AdvIOSource_Con(IOSource self, IOOptions opts) {
   };
 
   // Done.
-  this->size = last_max_length;
+  self->size = last_max_length;
   talloc_set_destructor(self, AdvIOSource_Destructor);
   return self;
 };
@@ -161,7 +165,7 @@ int AdvIOSource_read_random(IOSource self, char *buf, uint32_t len, uint64_t off
   int i,total=0;
 
   /** First check if the offset is too much: */
-  if(offs>this->size) return 0;
+  if(offs>self->size) return 0;
 
   /** We need to work out which file it is - this could be a binary
       search but for now its linear. 
@@ -187,7 +191,6 @@ int AdvIOSource_read_random(IOSource self, char *buf, uint32_t len, uint64_t off
 }
 
 VIRTUAL(AdvIOSource, IOSource)
-     VATTR(super.name) = "advanced";
      SET_DOCSTRING("Advanced io subsystem options\n\n"
 		   "\toffset=bytes\t\tNumber of bytes to seek to in the image file. "
 		   "Useful if there is some extra data at the start of the dd image "
@@ -220,7 +223,7 @@ IOSource SgzipIOSource_Con(IOSource self, IOOptions opts) {
   this->sgzip.header = sgzip_read_header(self->fd);
   if(!this->sgzip.header) {
     talloc_free(self);
-    return raise_errors(EIOError, "%s is not an sgz file", self->name);
+    return raise_errors(EIOError, "%s is not an sgz file", self->filename);
   };
 
   this->index=sgzip_read_index(self->fd,&(this->sgzip));
@@ -230,6 +233,9 @@ IOSource SgzipIOSource_Con(IOSource self, IOOptions opts) {
     fprintf(stderr, "You may consider rebuilding the index on this file to speed things up, falling back to non-indexed method\n");
     this->index=sgzip_calculate_index_from_stream(self->fd,&(this->sgzip));
   };
+
+  //Set the size of this file:
+  self->size = this->sgzip.header->x.max_chunks * this->sgzip.header->blocksize;
 
   talloc_set_destructor(self, SgzipIOSource_Destructor);
   return self;
@@ -242,7 +248,6 @@ int SgzipIOSource_read_random(IOSource self, char *buf, uint32_t len, uint64_t o
 };
 
 VIRTUAL(SgzipIOSource, IOSource)
-     VATTR(super.name) = "sgzip";
      SET_DOCSTRING("sgzip subsystem options\n\n"
 		   "\tfile=filename\t\tFilename to open\n"
 		   "\toffset=bytes\t\tNumber of bytes to seek to in the "
@@ -282,12 +287,19 @@ IOSource EWFIOSource_Con(IOSource self, IOOptions opts) {
     return raise_errors(EIOError, "No files were given");
   };
 
-  this->handle = libewf_open((char **)this->buffer->data, this->number_of_files, 
-			     LIBEWF_OPEN_READ);
+  TRY {
+    this->handle = libewf_open((const char **)this->buffer->data, this->number_of_files, 
+			       LIBEWF_OPEN_READ);
+  } EXCEPT(E_ANY) {
+    return raise_errors(EIOError, except_str);
+  };
+
   if(!this->handle) {
     talloc_free(self);
     return raise_errors(EIOError, "This does not appear to be an EWF file");
   };
+
+  self->size = libewf_data_size(this->handle);
 
   talloc_set_destructor(self, EWFIOSource_Destructor);
   return self;
@@ -300,7 +312,6 @@ int EWFIOSource_read_random(IOSource self, char *buf, uint32_t len, uint64_t off
 };
 
 VIRTUAL(EWFIOSource, IOSource)
-     VATTR(super.name) = "ewf";
      SET_DOCSTRING("An Expert Witness IO subsystem\n\n"
 		   "\toffset=bytes\t\tNumber of bytes to seek to in the "
 		   "(uncompressed) image file. Useful if there is some extra data "

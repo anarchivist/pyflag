@@ -43,9 +43,10 @@ END_CLASS
 This is also the standard IO source which will be subclassed by everyone else.
 */
 CLASS(IOSource, Object)
-     char *name;
-     char *description;
+     // Total size in bytes of this source
+     uint64_t size;
      int fd;
+     char *filename;
 
      char *METHOD(IOSource, help);
 
@@ -62,9 +63,6 @@ CLASS(AdvIOSource, IOSource)
 
      // Number of individual chunks
      int number;
-
-     // Total size in bytes of this source
-     uint64_t size;
 END_CLASS
 
 CLASS(SgzipIOSource, IOSource)
@@ -78,3 +76,4 @@ CLASS(EWFIOSource, IOSource)
      int number_of_files;
      LIBEWF_HANDLE *handle;
 END_CLASS
+

@@ -13,7 +13,7 @@ libiosubsys_la_LIBADD       = ../liboo.la ../libsgz.la ../libexcept.la ../libewf
 iosubsys_la_SOURCES 	= iosubsys.c
 iosubsys_la_CPPFLAGS 	= $(PYTHON_CPPFLAGS)
 iosubsys_la_LDFLAGS 	= -module
-iosubsys_la_LIBADD	= libiosubsys.la
+iosubsys_la_LIBADD	                  = libiosubsys.la 
 
 test_SOURCES		= test.c
 test_LDADD		= libiosubsys.la

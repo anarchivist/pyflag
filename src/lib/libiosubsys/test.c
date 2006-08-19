@@ -13,7 +13,7 @@ int main() {
     printf("%s",_error_buff);
     return -1;
   };
-  len = io->read_random(io, buf, 2500, 0);
+  len = io->read_random(io, buf, 2500, 1000);
 
   buf[len]=0;
   printf("contents %s" , buf);

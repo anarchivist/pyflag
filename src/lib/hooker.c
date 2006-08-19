@@ -21,9 +21,10 @@
 # ******************************************************
 */
 #include "hooker.h"
-#include "iosubsys.h"
+#include "libiosubsys/libiosubsys.h"
 #include "except.h"
 
+#undef O_RDONLY
 #define O_RDONLY 0
 
 static char *iosubsys=NULL;
@@ -32,7 +33,7 @@ enum context_t context=HOOKED;
 #define IOSNUM 256
 
 //These store the different IO sources which will be opened.
-static IO_INFO *iosources[IOSNUM];
+static IOSource iosources[IOSNUM];
 static int iosource_count=10;
 
 void check_errors() {
