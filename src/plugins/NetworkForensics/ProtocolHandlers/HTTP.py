@@ -243,6 +243,17 @@ class HTTPScanner(StreamScannerFactory):
         """ Store the parameters of the request in the http_parameters
         table
         """
+        base, query = request['url'].split('?',1)
+        def insert_query(query):
+            for key,value in cgi.parse_qsl(query, True):
+                self.dbh.insert('http_parameters',
+                                id = id,
+                                key = key,
+                                value = value)
+
+        insert_query(query)
+        if request['method']=='POST':
+            insert_query(request['body'])
 
     def process_stream(self, stream, factories):
         """ We look for HTTP requests to identify the stream. This

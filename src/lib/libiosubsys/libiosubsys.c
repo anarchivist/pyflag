@@ -6,6 +6,8 @@
 #include "class.h"
 #include "libiosubsys.h"
 #include "except.h"
+#include "../sgzlib.h"
+#include "../libewf/libewf.h"
 
 IOOptions IOOptions_add(IOOptions self, IOOptions list, char *name, char *value) {
 
@@ -81,6 +83,7 @@ int IOSource_read_random(IOSource self, char *buf, uint32_t len, uint64_t offs) 
 };
 
 VIRTUAL(IOSource, Object)
+     VATTR(name) = "standard";
      SET_DOCSTRING("Standard IO Source:\n\n"
 		   "This is basically a pass through driver.\n\n"
 		   "filename - The filename to open (just 1)\n");
@@ -191,6 +194,7 @@ int AdvIOSource_read_random(IOSource self, char *buf, uint32_t len, uint64_t off
 }
 
 VIRTUAL(AdvIOSource, IOSource)
+     VATTR(super.name) = "advanced";
      SET_DOCSTRING("Advanced io subsystem options\n\n"
 		   "\toffset=bytes\t\tNumber of bytes to seek to in the image file. "
 		   "Useful if there is some extra data at the start of the dd image "
@@ -207,8 +211,10 @@ END_VIRTUAL
 /** The sgzip IO Source */
 static int SgzipIOSource_Destructor(void *this) {
   SgzipIOSource self = (SgzipIOSource)this;
+  struct sgzip_obj *s = (struct sgzip_obj *)self->_handle;
+
   free(self->index);
-  free(self->sgzip.header);
+  free(s->header);
   close(self->super.fd);
   
   return 0;
@@ -216,26 +222,29 @@ static int SgzipIOSource_Destructor(void *this) {
 
 IOSource SgzipIOSource_Con(IOSource self, IOOptions opts) {
   SgzipIOSource this = (SgzipIOSource) self;
+  struct sgzip_obj *s;
 
   /** Get our base class to open the file: */
   if(!IOSource_Con(self, opts)) return NULL;
 
-  this->sgzip.header = sgzip_read_header(self->fd);
-  if(!this->sgzip.header) {
+  s=talloc(self,struct sgzip_obj);
+  this->_handle = s;
+  s->header = sgzip_read_header(self->fd);
+  if(!s->header) {
     talloc_free(self);
     return raise_errors(EIOError, "%s is not an sgz file", self->filename);
   };
 
-  this->index=sgzip_read_index(self->fd,&(this->sgzip));
+  this->index=sgzip_read_index(self->fd,s);
 
   if(!this->index) {
-    this->sgzip.header=sgzip_read_header(self->fd);
+    s->header=sgzip_read_header(self->fd);
     fprintf(stderr, "You may consider rebuilding the index on this file to speed things up, falling back to non-indexed method\n");
-    this->index=sgzip_calculate_index_from_stream(self->fd,&(this->sgzip));
+    this->index=sgzip_calculate_index_from_stream(self->fd,s);
   };
 
   //Set the size of this file:
-  self->size = this->sgzip.header->x.max_chunks * this->sgzip.header->blocksize;
+  self->size = s->header->x.max_chunks * s->header->blocksize;
 
   talloc_set_destructor(self, SgzipIOSource_Destructor);
   return self;
@@ -243,11 +252,13 @@ IOSource SgzipIOSource_Con(IOSource self, IOOptions opts) {
 
 int SgzipIOSource_read_random(IOSource self, char *buf, uint32_t len, uint64_t offs) {
   SgzipIOSource this = (SgzipIOSource) self;
+  struct sgzip_obj *s = (struct sgzip_obj *)this->_handle;
 
-  return sgzip_read_random(buf, len, offs, self->fd, this->index, &(this->sgzip));
+  return sgzip_read_random(buf, len, offs, self->fd, this->index, s);
 };
 
 VIRTUAL(SgzipIOSource, IOSource)
+     VATTR(super.name) = "sgzip";
      SET_DOCSTRING("sgzip subsystem options\n\n"
 		   "\tfile=filename\t\tFilename to open\n"
 		   "\toffset=bytes\t\tNumber of bytes to seek to in the "
@@ -262,7 +273,7 @@ END_VIRTUAL
 int EWFIOSource_Destructor(void *self) {
   EWFIOSource this = (EWFIOSource) self;
 
-  libewf_close(this->handle);
+  libewf_close(this->_handle);
 
   return 0;
 };
@@ -270,6 +281,7 @@ int EWFIOSource_Destructor(void *self) {
 IOSource EWFIOSource_Con(IOSource self, IOOptions opts) {
   EWFIOSource this = (EWFIOSource)self;
   IOOptions i;
+  LIBEWF_HANDLE *e;
   
   this->buffer = CONSTRUCT(StringIO, StringIO, Con, self);
   this->number_of_files =0;
@@ -288,18 +300,19 @@ IOSource EWFIOSource_Con(IOSource self, IOOptions opts) {
   };
 
   TRY {
-    this->handle = libewf_open((const char **)this->buffer->data, this->number_of_files, 
+    e = libewf_open((const char **)this->buffer->data, this->number_of_files, 
 			       LIBEWF_OPEN_READ);
+    this->_handle = e;
   } EXCEPT(E_ANY) {
     return raise_errors(EIOError, except_str);
   };
 
-  if(!this->handle) {
+  if(!e) {
     talloc_free(self);
     return raise_errors(EIOError, "This does not appear to be an EWF file");
   };
 
-  self->size = libewf_data_size(this->handle);
+  self->size = libewf_data_size(e);
 
   talloc_set_destructor(self, EWFIOSource_Destructor);
   return self;
@@ -307,11 +320,13 @@ IOSource EWFIOSource_Con(IOSource self, IOOptions opts) {
 
 int EWFIOSource_read_random(IOSource self, char *buf, uint32_t len, uint64_t offs) {
   EWFIOSource this = (EWFIOSource) self;
+  LIBEWF_HANDLE *e=(LIBEWF_HANDLE *)this->_handle;
 
-  return libewf_read_random(this->handle, buf, len, offs);
+  return libewf_read_random(e, buf, len, offs);
 };
 
 VIRTUAL(EWFIOSource, IOSource)
+     VATTR(super.name) = "ewf";
      SET_DOCSTRING("An Expert Witness IO subsystem\n\n"
 		   "\toffset=bytes\t\tNumber of bytes to seek to in the "
 		   "(uncompressed) image file. Useful if there is some extra data "
@@ -324,3 +339,54 @@ VIRTUAL(EWFIOSource, IOSource)
      VMETHOD(super.Con) = EWFIOSource_Con;
      VMETHOD(super.read_random) = EWFIOSource_read_random;
 END_VIRTUAL
+
+/** This is a central dispatcher for all iosubsystems by their name: */
+IOSource iosubsys_Open(char *drivername, IOOptions options) {
+  IOSource driver;
+
+  if(!strcasecmp(drivername,"standard")) {
+    driver = CONSTRUCT(IOSource, IOSource, Con, NULL, options);
+  } else if(!strcasecmp(drivername,"advanced")) {
+    driver = (IOSource)CONSTRUCT(AdvIOSource, IOSource, super.Con, NULL, options);
+  } else if(!strcasecmp(drivername,"sgzip")) {
+    driver = (IOSource)CONSTRUCT(SgzipIOSource, IOSource, super.Con, NULL, options);
+  } else if(!strcasecmp(drivername,"ewf")) {
+    driver = (IOSource)CONSTRUCT(EWFIOSource, IOSource, super.Con, NULL, options);
+  } else {
+    return raise_errors(EIOError, "No such driver %s", drivername);
+  };
+
+  return driver;
+};
+
+/** Returns an option object initialised from the string s. */
+IOOptions iosubsys_parse_options(char *s) {
+  char *x,*y,*z;
+  IOOptions result;
+  char *temp;
+
+  if(!s) return NULL;
+
+  result =  CONSTRUCT(IOOptions, IOOptions, add, NULL, NULL, NULL, NULL);
+  temp = talloc_strdup(result, s);
+  z=temp;
+  while(1) {
+    // Find the next comma:
+    y=index(z,',');
+    if (y) *y='\0';
+    
+    //Now find the = sign
+    x=index(z,'=');
+    
+    if(x) {
+      *x='\0';
+      x++;
+    };
+    
+    CONSTRUCT(IOOptions, IOOptions, add, result, result, z,x);
+    if(!y) break;
+    z=y+1;
+  };
+
+  return result;
+};

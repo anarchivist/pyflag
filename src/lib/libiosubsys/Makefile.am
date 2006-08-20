@@ -3,6 +3,17 @@ INCLUDES        	= -I$(top_srcdir)/src/include -include config.h
 noinst_LTLIBRARIES	= libiosubsys.la
 noinst_PROGRAMS		= test
 
+bin_PROGRAMS		= iowrapper
+pkglib_LTLIBRARIES	= libio_hooker.la
+
+libio_hooker_la_SOURCES = hooker.c
+libio_hooker_la_LDFLAGS	= -ldl
+libio_hooker_la_LIBADD	= libiosubsys.la
+
+iowrapper_SOURCES	= iowrapper.c 
+iowrapper_CFLAGS		= -DPYFLAG_LIBDIR=\"$(pkglibdir)\"
+iowrapper_LDADD		= libiosubsys.la libio_hooker.la
+
 # python stuff
 pkgpyexec_LTLIBRARIES 	= iosubsys.la
 

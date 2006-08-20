@@ -127,12 +127,7 @@ class IO:
 
     def make_parameter_list(self):
         """ Returns a parameter list formatted as parameter=value,parameter=value """
-        opts = []
-        for i in range(len(self.parameters)-1):
-            for j in range(len(self.options[i+1])):
-                opts.append("%s=%s" % (self.parameters[i+1][3:], self.options[i+1][j]))
-
-        return ','.join(opts)
+        return ','.join([ '%s=%s' % (k,v) for (k,v) in self.options])
 
     def set_options(self,key,value):
         """ Sets key and value to the subsystem """
@@ -158,30 +153,23 @@ class IO:
         
         try:
             if not options:
-                options=tuple([query.getarray(i) for i in self.parameters])
-                               
+                options = []
+                for i in self.parameters:
+                    for j in query.getarray(i):
+                        if i.startswith('io_'):
+                            i=i[3:]
+                        options.append([i, j])
+                        
             self.options = options
 
             ## Restore the subsystem type
             try:
                 self.subsystem = query[subsys]
             except TypeError:
-                self.subsystem=self.options[0][0]
+                self.subsystem=self.options[0][1]
 
             #Try and make the subsystem based on the args
-            self.io=iosubsys.Open(self.subsystem)
-            try:
-                for k in range(len(self.options) - 1):
-                    for j in range(len(self.options[k+1])):
-                        self.set_options(self.parameters[k+1],self.options[k+1][j])
-
-                # try reading to see if we get an IOError
-                self.read(10)
-
-            except (KeyError,IOError):
-                #iosubsys.io_close(self.io)
-                raise
-
+            self.io=iosubsys.Open(self.subsystem,options)
             self.readptr = 0
             
         except (KeyError, IOError):
@@ -388,11 +376,11 @@ def open(case, iosource):
             raise IOError, "Not a valid IO Data Source: %s" % iosource
 
         # unmarshal the option tuple from the database
-        opts = cPickle.loads(optstr)    
-        io=subsystems[opts[0][0]](options=opts)
+        opts = cPickle.loads(optstr)
+        io=subsystems[opts[0][1]](options=opts)
         io.name = iosource
 
         ## Cache the option string:
-        IO_Cache[(case,iosource)] = (opts[0][0], io)
+        IO_Cache[(case,iosource)] = (opts[0][1], io)
         return io
  

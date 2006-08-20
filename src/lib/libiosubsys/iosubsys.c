@@ -54,6 +54,9 @@ static PyObject *Open(PyObject *dummy, PyObject *args, PyObject *kwd) {
     return NULL;
   };
 
+  if(!PyList_Check(opts))
+    return PyErr_Format(PyExc_TypeError, "Options must be a list of tuples");
+
   if(!iodriver) {
     return PyErr_Format(PyExc_TypeError, "No iodriver specified");
   } else {
@@ -66,14 +69,24 @@ static PyObject *Open(PyObject *dummy, PyObject *args, PyObject *kwd) {
 
   options = CONSTRUCT(IOOptions, IOOptions, add, NULL, NULL, NULL, NULL);
   {
-    PyObject *keys = PyDict_Keys(opts);
     int i=0;
 
-    for(i=0;i<PyList_Size(keys);i++) {
-      PyObject *key = PyList_GetItem(keys,i);
-      PyObject *value = PyDict_GetItem(opts,key);
-      char *keyc = PyString_AsString(key);
-      char *valuec= PyString_AsString(value);
+    for(i=0;i<PyList_Size(opts);i++) {
+      PyObject *temp,*key,*value;
+      char *keyc, *valuec;
+
+      temp = PyList_GetItem(opts,i); 
+      if(!PyList_Check(temp))
+	return PyErr_Format(PyExc_TypeError, "Element must be a list, not %s", PyString_AsString(PyObject_Str(temp)));
+
+      key = PyList_GetItem(temp,0);
+      if(!key) return NULL;
+
+      value = PyList_GetItem(temp,1);
+      if(!value) return NULL;
+
+      keyc = PyString_AsString(PyObject_Str(key));
+      valuec= PyString_AsString(PyObject_Str(value));
 
       if(!keyc || !valuec) {
 	talloc_free(options);
@@ -84,17 +97,7 @@ static PyObject *Open(PyObject *dummy, PyObject *args, PyObject *kwd) {
     };
   };
 
-  if(!strcasecmp(drivername,"standard")) {
-    driver = CONSTRUCT(IOSource, IOSource, Con, NULL, options);
-  } else if(!strcasecmp(drivername,"advanced")) {
-    driver = (IOSource)CONSTRUCT(AdvIOSource, IOSource, super.Con, NULL, options);
-  } else if(!strcasecmp(drivername,"sgzip")) {
-    driver = (IOSource)CONSTRUCT(SgzipIOSource, IOSource, super.Con, NULL, options);
-  } else if(!strcasecmp(drivername,"ewf")) {
-    driver = (IOSource)CONSTRUCT(EWFIOSource, IOSource, super.Con, NULL, options);
-  } else {
-    return PyErr_Format(PyExc_KeyError, "No such driver %s", PyString_AsString(iodriver));
-  };
+  driver = iosubsys_Open(drivername, options);
 
   // We failed to instantiate this driver
   if(!driver) {

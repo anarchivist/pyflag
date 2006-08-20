@@ -25,8 +25,8 @@
 #include "class.h"
 #include "list.h"
 #include "stringio.h"
-#include "../sgzlib.h"
-#include "../libewf/libewf.h"
+//#include "../sgzlib.h"
+//#include "../libewf/libewf.h"
 
 /** Options are kept as lists: */
 CLASS(IOOptions, Object)
@@ -43,8 +43,14 @@ END_CLASS
 This is also the standard IO source which will be subclassed by everyone else.
 */
 CLASS(IOSource, Object)
+// Name of driver - this is the name we shall be registered as.
+     char *name;
      // Total size in bytes of this source
      uint64_t size;
+
+     // Position of the last read_random
+     uint64_t fpos;
+
      int fd;
      char *filename;
 
@@ -66,7 +72,8 @@ CLASS(AdvIOSource, IOSource)
 END_CLASS
 
 CLASS(SgzipIOSource, IOSource)
-     struct sgzip_obj sgzip;
+//     struct sgzip_obj sgzip;
+     void *_handle;
      uint64_t *index;
      uint64_t *offset;
 END_CLASS
@@ -74,6 +81,12 @@ END_CLASS
 CLASS(EWFIOSource, IOSource)
      StringIO buffer;
      int number_of_files;
-     LIBEWF_HANDLE *handle;
+     void *_handle;
+     //     LIBEWF_HANDLE *handle;
 END_CLASS
 
+// A central dispatcher to all drivers:
+IOSource iosubsys_Open(char *name, IOOptions opts);
+
+//A parser for option strings:
+IOOptions iosubsys_parse_options(char *s);

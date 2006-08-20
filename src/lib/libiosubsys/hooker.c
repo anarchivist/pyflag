@@ -21,7 +21,7 @@
 # ******************************************************
 */
 #include "hooker.h"
-#include "libiosubsys/libiosubsys.h"
+#include "libiosubsys.h"
 #include "except.h"
 
 #undef O_RDONLY
@@ -89,7 +89,7 @@ void load_library(void) {
 //This function initialises the hooker
 void init_hooker() {
   char *io_name;
-  char *options=getenv("IO_OPTS");
+  IOOptions opts = iosubsys_parse_options((char *)getenv("IO_OPTS"));
 
   //First load the libraries:
   load_library();
@@ -102,13 +102,9 @@ void init_hooker() {
     iosource_count++;
 
     context=UNHOOKED;
-    iosources[iosource_count] = io_open(io_name);
-    //Parse options for this io subsystem:
-    if(options)
-      io_parse_options(iosources[iosource_count],options);
+    iosources[iosource_count] = iosubsys_Open(io_name, opts);
     context=HOOKED;
   };
-
 };
 
 /* These are wrappers for all the functions we will be hooking.
@@ -163,7 +159,7 @@ int open64(const char *pathname, int flags,int mode) {
     // Turn off hooking. NOTE: This makes us non-reentrant!!!
     context = UNHOOKED;
     debug(1,"Will hook open64\n");
-    iosources[iosource_count]->open(iosources[iosource_count]);
+    //    iosources[iosource_count]->Open(iosources[iosource_count]);
     //Turn hooking back on:
     context = HOOKED;
     //Return the iosource number as a file handle (we will hopefully
@@ -269,7 +265,7 @@ ssize_t read(int fd, void *buf, size_t count) {
 
     context = UNHOOKED;
     read_len = iosources[fd]->read_random
-      (iosources[fd], buf, count, iosources[fd]->fpos, "nothing");
+      (iosources[fd], buf, count, iosources[fd]->fpos);
 
     if(read_len>0) iosources[fd]->fpos+=read_len;
     context = HOOKED;
@@ -468,7 +464,7 @@ int fileno(FILE *stream) {
 	return((long int)stream);
 };
 
-int fcntl(int fd, int cmd, void *lock) {
+int fcntl(int fd, int cmd, ... ) {
   CHECK_INIT;
 
   return( 0);

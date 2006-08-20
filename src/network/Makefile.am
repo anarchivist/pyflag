@@ -4,7 +4,7 @@ bin_PROGRAMS		= pcaptool
 
 pcaptool_SOURCES	= pcaptool.c
 pcaptool_LDFLAGS	= /usr/lib/libpcap.a
-pcaptool_LDADD		= ../lib/libiosubsys.la ../lib/libio_hooker.la
+pcaptool_LDADD		= ../lib/libiosubsys/libiosubsys.la ../lib/libiosubsys/libio_hooker.la
 
 pkgpython_PYTHON 	= dissect.py
 pkgpyexec_LTLIBRARIES 	= _dissect.la reassembler.la

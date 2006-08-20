@@ -4,10 +4,9 @@ INCLUDES        	= -I$(top_srcdir)/src/include -include config.h
 
 # main bin and lib targets
 #noinst_PROGRAMS		= open
-bin_PROGRAMS		= sgzip evtool iowrapper remote_server
+bin_PROGRAMS		= sgzip evtool remote_server
 #lib_LTLIBRARIES	= libexcept.la libsgz.la libevf.la libio_hooker.la liboo.la libmd5.la
 
-pkglib_LTLIBRARIES	= libio_hooker.la
 # convenience libs: just to reduce re-building, could instead install as shared libs by 
 # commenting this line out and uncommenting the one above
 noinst_LTLIBRARIES	= libexcept.la libsgz.la libevf.la liboo.la libmd5.la
@@ -28,10 +27,6 @@ libsgz_la_LDFLAGS	= -lz
 libevf_la_SOURCES       = libevf.c
 libevf_la_LDFLAGS	= -lz
 
-libio_hooker_la_SOURCES = hooker.c
-libio_hooker_la_LDFLAGS	= -ldl
-libio_hooker_la_LIBADD	= libiosubsys/libiosubsys.la
-
 liboo_la_SOURCES	= class.c stringio.c struct.c talloc.c packet.c misc.c
 
 libmd5_la_SOURCES	= md5c.c 
@@ -41,10 +36,6 @@ sgzip_LDADD             = libsgz.la libexcept.la
 
 evtool_SOURCES		= evtool.c
 evtool_LDADD		= libevf.la libsgz.la libmd5.la libexcept.la
-
-iowrapper_SOURCES	= iowrapper.c 
-iowrapper_CFLAGS		= -DPYFLAG_LIBDIR=\"$(pkglibdir)\"
-iowrapper_LDADD		= libiosubsys/libiosubsys.la libio_hooker.la
 
 remote_server_LDADD	= libexcept.la
 
