@@ -32,7 +32,7 @@ import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
 import pyflag.Reports as Reports
 import plugins.NetworkForensics.PCAPFS as PCAPFS
-import re,time
+import re,time,cgi
 import TreeObj
 
 def escape(uri):
@@ -243,7 +243,11 @@ class HTTPScanner(StreamScannerFactory):
         """ Store the parameters of the request in the http_parameters
         table
         """
-        base, query = request['url'].split('?',1)
+        try:
+            base, query = request['url'].split('?',1)
+        except:
+            return
+        
         def insert_query(query):
             for key,value in cgi.parse_qsl(query, True):
                 self.dbh.insert('http_parameters',

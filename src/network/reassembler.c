@@ -199,9 +199,11 @@ static PyObject *py_process_packet(PyObject *self, PyObject *args) {
   root = PyCObject_AsVoidPtr(root_py);
   if(!root) return NULL;
 
+  /* This does not work becaue root and packet are defined in two shared objects - do we need to maybe do a string comparison?
   if(!ISSUBCLASS(root,Packet)) {
     return PyErr_Format(PyExc_RuntimeError, "You must pass a valid packet object to this function.");
   };
+  */
 
   /** Find the IP header */
   ip=(IP)root;

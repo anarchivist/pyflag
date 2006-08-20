@@ -235,7 +235,7 @@ class PCAPFS(DBFS):
             try:
                 reassembler.process_packet(hashtbl, d, self.fd.name)
             except RuntimeError,e:
-                pass
+                logging.log(logging.VERBOSE_DEBUG, "%s" % e)
             
         # Finish it up
         reassembler.clear_stream_buffers(hashtbl);
