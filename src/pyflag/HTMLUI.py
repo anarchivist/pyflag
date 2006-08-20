@@ -933,7 +933,8 @@ class HTMLUI(UI.GenericUI):
         
         self.pageno =  int(query['limit']) /config.PAGESIZE
                 
-        query_str+=" limit %u, %u" % (int(query['limit']) , config.PAGESIZE)
+        if query['limit']:
+            query_str+=" limit %u, %u" % (int(query['limit']) , config.PAGESIZE)
 
         dbh = DB.DBO(case)
 

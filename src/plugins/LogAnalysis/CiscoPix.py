@@ -264,7 +264,7 @@ class CiscoPixSyslogged(Simple.SimpleLog):
                             'conn_number':colns[3],
                             'duration':":".join(colns[13:16]),
                             'bytes':colns[17],
-                            'action':'tcp teardown'
+                            'action':'tcp teardown',
                             'src_if':colns[5],
                             'src_host':colns[6],
                             'src_port':colns[7],

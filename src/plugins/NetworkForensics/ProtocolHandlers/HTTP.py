@@ -44,7 +44,7 @@ class HTTP:
     """ Class used to parse HTTP Protocol """
     def __init__(self,fd,dbh,ddfs):
         self.fd=fd
-        self.dbh = dbh
+        self.dbh = DB.DBO(dbh.case)
         self.ddfs = ddfs
         self.request = { 'url':'/unknown_request' }
         self.response = {}
@@ -101,7 +101,7 @@ class HTTP:
     def skip_body(self, headers):
         """ Reads the body of the HTTP object depending on the values
         in the headers. This function takes care of correctly parsing
-        chunked and encoding.
+        chunked encoding.
 
         We assume that the fd is already positioned at the very start
         of the object. After this function we will be positioned at
@@ -109,13 +109,15 @@ class HTTP:
         """
         try:
             skip = int(headers['content-length'])
-            self.fd.read(skip)
+            headers['body'] = self.fd.read(skip)
             return
-        except ValueError:
+        except KeyError:
             pass
 
+        ## If no content-length is specified maybe its chunked
         try:
             if "chunked" in headers['transfer-encoding'].lower():
+                headers['body'] = ''
                 while True:
                     line = self.fd.readline()
                     try:
@@ -127,7 +129,18 @@ class HTTP:
                         return
 
                     ## There is a \r\n delimiter after the data chunk
-                    self.fd.read(length+2)
+                    headers['body'] += self.fd.read(length+2)
+                    
+                return
+        except KeyError:
+            pass
+
+        ## If the header says close then the rest of the file is the
+        ## body (all data until connection is closed)
+        try:
+            if "closed" in headers['connection'].lower():
+                headers['body'] = self.fd.read()
+                return
         except KeyError:
             pass
         
@@ -152,7 +165,7 @@ class HTTP:
                 end = self.fd.tell()
                 yield "%s:%s" % (offset, end-offset)
 
-    def identity(self):
+    def identify(self):
         offset = self.fd.tell()
         ## Currently the HTTP scanner needs both sides of the
         ## conversation to work properly. So we must have a request
@@ -202,8 +215,16 @@ class HTTPScanner(StreamScannerFactory):
             `referrer` text NULL,
             `date` int,
             `host` VARCHAR(255),
+            `useragent` VARCHAR(255),
             primary key (`id`)
             )""")
+
+        self.dbh.execute(
+            """CREATE TABLE if not exists `http_parameters` (
+            `id` int(11) not null,
+            `key` VARCHAR(255) not null,
+            `value` VARCHAR(255) not null
+            ) """)
 
         self.dbh.check_index("http", "inode")
         self.dbh.check_index("http", "url", 100)
@@ -218,6 +239,11 @@ class HTTPScanner(StreamScannerFactory):
             print "Cant parse %s as a time" % s
             return 0
 
+    def handle_parameters(self, request, id):
+        """ Store the parameters of the request in the http_parameters
+        table
+        """
+
     def process_stream(self, stream, factories):
         """ We look for HTTP requests to identify the stream. This
         allows us to processes HTTP connections on unusual ports. This
@@ -225,12 +251,13 @@ class HTTPScanner(StreamScannerFactory):
         """
         ## We only want to process the combined stream once:
         if stream.con_id>stream.reverse: return
+        
         combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.con_id, stream.reverse)
 
         fd = self.fsfd.open(inode=combined_inode)
         p=HTTP(fd,self.dbh,self.fsfd)
         ## Check that this is really HTTP
-        if not p.identity():
+        if not p.identify():
             return
         
         logging.log(logging.DEBUG,"Openning %s for HTTP" % combined_inode)
@@ -287,8 +314,14 @@ class HTTPScanner(StreamScannerFactory):
             if referer:
                 self.dbh.execute("select id from http where url=%r order by id desc limit 1", referer)
                 row = self.dbh.fetch()
+
+                ## If there is no referrer we just make a psuedo entry
                 if not row:
-                    self.dbh.insert("http", url=referer)
+                    ## Find out the host
+                    m=re.match("(http://|ftp://)([^/]+)([^\?\&\=]*)",
+                               "%s" % referer)
+                    host = m.group(2)
+                    self.dbh.insert("http", url=referer, host=host)
                     parent = self.dbh.autoincrement()
                 else:
                     parent = row['id']
@@ -303,8 +336,12 @@ class HTTPScanner(StreamScannerFactory):
                             date           = date,
                             referrer       = referer,
                             host           = host,
+                            useragent      = p.request.get('user-agent', 'NULL'),
                             parent         = parent)                            
 
+            ## handle the request's parameters:
+            self.handle_parameters(p.request, self.dbh.autoincrement())
+            
             ## Scan the new file using the scanner train. 
             self.scan_as_file(new_inode, factories)
         
