@@ -68,6 +68,7 @@ AC_OUTPUT([
 	src/filesystems/sleuthkit/auxtools/Makefile
 	src/filesystems/sleuthkit/imgtools/Makefile
 	src/filesystems/sleuthkit/fstools/Makefile
+	src/filesystems/sleuthkit/mmtools/Makefile
 	src/filesystems/magic/Makefile
 	src/include/Makefile
 	debian/Makefile
