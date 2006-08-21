@@ -284,6 +284,7 @@ class DBFS(FileSystem):
         for d in range(1,len(dirs)):
             path = "/".join(dirs[:d])+"/"
             path = FlagFramework.normpath(path)
+            self.dbh.check_index('file','path', 200)
             self.dbh.execute("select * from file where path=%r and name=%r and mode='d/d' limit 1",(path, dirs[d]))
             if not self.dbh.fetch():
                 self.dbh.execute("insert into file set inode='',path=%r,name=%r,status='alloc',mode='d/d'",(path,dirs[d]))

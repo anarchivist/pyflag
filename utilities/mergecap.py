@@ -159,8 +159,11 @@ class FileList:
 
     def next(self):
         ## Grab the next packet with the smallest timestamp:
-        f = self.files.pop(0)
-        t = self.times.pop(0)
+        try:
+            f = self.files.pop(0)
+            t = self.times.pop(0)
+        except IndexError:
+            raise StopIteration
 
         raw_data = f.raw_data
 
@@ -171,7 +174,6 @@ class FileList:
 
 
 outfile = open(options.write,'w')
-
 f=FileList(args)
 
 ## Write the file header on:

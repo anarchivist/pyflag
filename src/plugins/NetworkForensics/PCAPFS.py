@@ -80,8 +80,6 @@ def draw_only_PCAPFS(query,result):
 
 class PCAPFS(DBFS):
     """ This implements a simple filesystem for PCAP files.
-
-    We start off with a single file '/rawdata'. The scanners will do the rest.
     """
     name = 'PCAP Filesystem'
 
@@ -146,7 +144,7 @@ class PCAPFS(DBFS):
             `packet_id` int(11) unsigned NOT NULL default '0',
             `seq` int(11) unsigned NOT NULL default '0',
             `length` mediumint(9) unsigned NOT NULL default '0',
-            `cache_offset`  mediumint(9) unsigned NOT NULL default '0'
+            `cache_offset`  bigint(9) unsigned NOT NULL default '0'
             ) """)
 
         self.dbh.check_index("connection", 'con_id')
@@ -224,8 +222,9 @@ class PCAPFS(DBFS):
         reassembler.set_tcp_callback(hashtbl, Callback)
 
         ## Scan the filesystem:
-        self.dbh.execute ("select id,offset,link_type,ts_sec,length from pcap where id>%r" % int(max_id))
-        for row in self.dbh:
+        dbh2=self.dbh.clone()
+        dbh2.execute ("select id,offset,link_type,ts_sec,length from pcap where id>%r" % int(max_id))
+        for row in dbh2:
             self.fd.seek(row['offset'])
             data = self.fd.read(row['length'])
             d = _dissect.dissect(data,row['link_type'],

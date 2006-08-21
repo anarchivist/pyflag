@@ -135,7 +135,7 @@ int main(int argc, char **argv) {
     printf ("CREATE TABLE if not exists `%s` ("
 	    "  `id` INT NOT NULL auto_increment,"
 	    "  `iosource` varchar(50), "
-	    "  `offset` INT NOT NULL ,"
+	    "  `offset` BIGINT NOT NULL ,"
 	    "  `length` INT NOT NULL ,"
 	    "  `ts_sec` INT NOT NULL ,"
 	    "  `ts_usec` INT NOT NULL,"
