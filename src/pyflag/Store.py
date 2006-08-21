@@ -88,7 +88,7 @@ class Store:
         ## objects first:
         while len(self.creation_times)>self.max_size:
             t, key, o = self.creation_times.pop(0)
-            logging.log(logging.VERBOSE_DEBUG, "Removed object %s because store is full" % o)
+            logging.log(logging.VERBOSE_DEBUG, "Removed object %r because store is full" % o)
 
         ## Now ensure that objects are not too old:
         now = time.time()

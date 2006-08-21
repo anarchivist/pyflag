@@ -48,10 +48,10 @@ class Buffer:
             if size!=None:
                 self.size=size
             else:
-                self.size=2147483647
+                self.size=-1
 
-        if self.size<0:
-            raise IOError("Unable to set negative size (%s) for buffer (offset was %s)" % (self.size,self.offset))
+#        if self.size<0:
+#            raise IOError("Unable to set negative size (%s) for buffer (offset was %s)" % (self.size,self.offset))
         
     def clone(self):
         return self.__class__(fd=self.fd, offset=self.offset, size=self.size)
@@ -80,9 +80,13 @@ class Buffer:
 
     def __str__(self):
         self.fd.seek(self.offset)
-        data=self.fd.read(self.size)
-        if len(data) < self.size:
-            raise IOError("Unable to read %s bytes from %s" %(self.size,self.offset))
+        if self.size>0:
+            data=self.fd.read(self.size)
+        else:
+            data=self.fd.read()
+            
+#        if len(data) < self.size:
+#            raise IOError("Unable to read %s bytes from %s" %(self.size,self.offset))
 
         return data
 
@@ -153,7 +157,6 @@ class RAW(DataType):
         return self.buffer.clone()
 
     def read_data(self):
-        print self.buffer.size
         self.data = self.buffer.__str__()
 
     def __repr__(self):

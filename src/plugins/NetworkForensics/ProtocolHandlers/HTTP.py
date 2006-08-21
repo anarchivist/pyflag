@@ -249,7 +249,9 @@ class HTTPScanner(StreamScannerFactory):
             return
         
         def insert_query(query):
-            for key,value in cgi.parse_qsl(query, True):
+            for key,value in cgi.parse_qsl(query, False):
+                ## Non printable keys are probably not keys at all.
+                if re.match("[^a-z0-9]+",key): return
                 self.dbh.insert('http_parameters',
                                 id = id,
                                 key = key,

@@ -218,7 +218,7 @@ class Pool(Queue):
                                       sql_mode="STRICT_ALL_TABLES",
                                       conv = conv,
                                       use_unicode = False,
-                                      charset='latin1'
+                                      #charset='latin1'
                                       )
             else:
                 dbh = MySQLdb.Connect(user = config.DBUSER,
@@ -229,7 +229,7 @@ class Pool(Queue):
                                       cursorclass=PyFlagCursor,
                                       conv = conv,
                                       use_unicode = False,
-                                      charset = 'latin1'
+                                      #charset = 'latin1'
                                       )
                 
             mysql_bin_string = "%s -f -u %r -p%r -h%s -P%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBHOST,config.DBPORT)
@@ -247,7 +247,7 @@ class Pool(Queue):
                                       cursorclass=PyFlagCursor,
                                       conv = conv,
                                       use_unicode = False,
-                                      charset='latin1'
+                                      #charset='latin1'
                                       )
             else:
                 dbh = MySQLdb.Connect(user = config.DBUSER,
@@ -257,7 +257,7 @@ class Pool(Queue):
                                       cursorclass=PyFlagCursor,
                                       conv = conv,
                                       use_unicode = False,
-                                      charset='latin1'
+                                      #charset='latin1'
                                       )
 
             mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBUNIXSOCKET)
