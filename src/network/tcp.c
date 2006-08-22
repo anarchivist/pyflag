@@ -393,14 +393,15 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
     packets 
 */
 static void check_for_expired_packets(TCPHashTable self, int id) {
-  TCPStream i,j;
+  TCPStream i;
   int k;
 
   for(k=0; k<TCP_STREAM_TABLE_SIZE; k++) {
-    list_for_each_entry_safe(i,j, &(self->table[k]->list),list) {
+    list_for_each_entry(i, &(self->table[k]->list),list) {
       if(i->direction == TCP_FORWARD && 
 	 i->max_packet_id + MAX_PACKETS_EXPIRED < id) {
 	talloc_free(i);
+	break;
       };
     };
   };
@@ -438,14 +439,15 @@ int TCPHashTable_process_tcp(TCPHashTable self, IP ip) {
       them:
   **/
   if(_total_streams>MAX_NUMBER_OF_STREAMS) {
-    TCPStream x,y;
+    TCPStream x;
 
-    list_for_each_entry_safe_prev(x,y, &(self->sorted->global_list), global_list) {
+    list_for_each_entry_prev(x, &(self->sorted->global_list), global_list) {
       if(x->direction == TCP_FORWARD) {
 	printf("Total streams exceeded %u\n", _total_streams);
     	talloc_free(x);
-
-	if(_total_streams < MAX_NUMBER_OF_STREAMS) break;
+	// Freeing the above will remove at least 2 streams from the
+	// list, which means its no longer safe to recurse over it!!!
+	break;
       };
     };
   };
