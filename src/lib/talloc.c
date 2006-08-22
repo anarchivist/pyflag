@@ -50,6 +50,8 @@
 #define TALLOC_MAGIC_FREE 0x7faebef3
 #define TALLOC_MAGIC_REFERENCE ((const char *)1)
 
+int _total_tallocs = 0;
+
 /* by default we abort when given a bad pointer (such as when talloc_free() is called 
    on a pointer that came from malloc() */
 #ifndef TALLOC_ABORT
@@ -163,6 +165,7 @@ void *_talloc(const void *context, size_t size)
 		return NULL;
 	}
 
+	_total_tallocs++;
 	tc = malloc(sizeof(*tc)+size);
 	if (tc == NULL) return NULL;
 
@@ -558,6 +561,7 @@ int talloc_free(void *ptr)
 
 	tc->magic = TALLOC_MAGIC_FREE;
 
+	_total_tallocs--;
 	free(tc);
 	return 0;
 }

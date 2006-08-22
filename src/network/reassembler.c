@@ -28,9 +28,14 @@ static char *prefix = NULL;
 static PyObject *initial_dict=NULL;
 static char iosource[255];
 
+void got_freed(void *temp) {
+  //  printf("got freed\n");
+};
+
 static PyObject *New_Stream_Dict(TCPStream tcp_stream, char *direction) {
   PyObject *stream = PyDict_Copy(initial_dict);
   DiskStreamIO file;
+  PyObject *tmp;
 
   if(!stream) return NULL;
 
@@ -41,67 +46,115 @@ static PyObject *New_Stream_Dict(TCPStream tcp_stream, char *direction) {
   tcp_stream->file = file;
 
   /** Store important information about the connection here: */
-  if(PyDict_SetItemString(stream, "packets", PyList_New(0))<0)
-    return NULL;
+  tmp = PyList_New(0);
+  if(PyDict_SetItemString(stream, "packets", tmp)<0)
+    goto error;
+  Py_DECREF(tmp);
 
-    if(PyDict_SetItemString(stream, "seq", PyList_New(0))<0)
-      return NULL;
+  tmp = PyCObject_FromVoidPtr(file, got_freed);
+  if(PyDict_SetItemString(stream, "test", tmp)<0)
+    goto error;
+  Py_DECREF(tmp);
 
-    if(PyDict_SetItemString(stream, "length", PyList_New(0))<0)
-      return NULL;
+  tmp = PyList_New(0);
+  if(PyDict_SetItemString(stream, "seq", tmp)<0)
+    goto error;
+  Py_DECREF(tmp);
 
-    /** This is the offset in the stream cache file where the payload
-	is 
-    */
-    if(PyDict_SetItemString(stream, "offset", PyList_New(0))<0)
-      return NULL;
+  tmp = PyList_New(0);
+  if(PyDict_SetItemString(stream, "length", tmp)<0)
+    goto error;
+  Py_DECREF(tmp);
 
-    if(PyDict_SetItemString(stream, "isn", PyInt_FromLong(0))<0)
-      return NULL;
+  /** This is the offset in the stream cache file where the payload
+      is 
+  */
+  tmp = PyList_New(0);
+  if(PyDict_SetItemString(stream, "offset", tmp)<0)
+    goto error;
+  Py_DECREF(tmp);
 
-    if(PyDict_SetItemString(stream, "con_id", PyInt_FromLong(tcp_stream->con_id))<0)
-      return NULL;
+  tmp = PyInt_FromLong(0);
+  if(PyDict_SetItemString(stream, "isn", tmp)<0)
+    goto error;
+  Py_DECREF(tmp);
 
-    if(PyDict_SetItemString(stream, "src_ip", PyLong_FromUnsignedLong(tcp_stream->addr.saddr))<0)
-      return NULL;
 
-    if(PyDict_SetItemString(stream, "src_port", PyInt_FromLong(tcp_stream->addr.source))<0)
-      return NULL;
+  tmp=PyInt_FromLong(tcp_stream->con_id);
+  if(PyDict_SetItemString(stream, "con_id", tmp)<0)
+    goto error;
+  Py_DECREF(tmp);
 
-    if(PyDict_SetItemString(stream, "dest_ip", PyLong_FromUnsignedLong(tcp_stream->addr.daddr))<0)
-      return NULL;
+  tmp = PyLong_FromUnsignedLong(tcp_stream->addr.saddr);
+  if(PyDict_SetItemString(stream, "src_ip", tmp)<0)
+    goto error;
+  Py_DECREF(tmp);
 
-    if(PyDict_SetItemString(stream, "dest_port", PyInt_FromLong(tcp_stream->addr.dest))<0)
-      return NULL;
 
-    if(PyDict_SetItemString(stream, "reverse", PyInt_FromLong(tcp_stream->reverse->con_id))<0)
-      return NULL;
+  tmp = PyInt_FromLong(tcp_stream->addr.source);
+  if(PyDict_SetItemString(stream, "src_port", tmp)<0)
+    goto error;
+  Py_DECREF(tmp);
 
-    if(PyDict_SetItemString(stream, "direction", PyString_FromString(direction))<0)
-      return NULL;
+  tmp = PyLong_FromUnsignedLong(tcp_stream->addr.daddr);
+  if(PyDict_SetItemString(stream, "dest_ip", tmp)<0)
+    goto error;
+  Py_DECREF(tmp);
 
-    if(PyDict_SetItemString(stream, "iosource", PyString_FromString(iosource))<0)
-      return NULL;
+  tmp=PyInt_FromLong(tcp_stream->addr.dest);
+  if(PyDict_SetItemString(stream, "dest_port", tmp)<0)
+    goto error;
+  Py_DECREF(tmp);
 
-    return stream;
+  tmp=PyInt_FromLong(tcp_stream->reverse->con_id);
+  if(PyDict_SetItemString(stream, "reverse", tmp)<0)
+    goto error;
+  Py_DECREF(tmp);
+
+  tmp=PyString_FromString(direction);
+  if(PyDict_SetItemString(stream, "direction", tmp)<0)
+    goto error;
+  Py_DECREF(tmp);
+  
+  tmp=PyString_FromString(iosource);
+  if(PyDict_SetItemString(stream, "iosource", tmp)<0)
+    goto error;
+  Py_DECREF(tmp);
+
+  return stream;
+ error:
+  Py_DECREF(tmp);
+  return NULL;
 };
 
 /** This adds another packet to the stream object */
 static int add_packet(TCPStream self, IP ip) {
   TCP tcp = (TCP)ip->packet.payload;
   PyObject *stream = (PyObject *)self->data;
+  PyObject *t1;
 
-  if(PyList_Append(PyDict_GetItem(stream,PyString_FromString("packets")),PyInt_FromLong(ip->id)))
-    return 0;
+  // All this gymnastics is required because PyList_Append increases
+  // the ref count!!!
+  t1 = PyInt_FromLong(ip->id);
+  if(PyList_Append(PyDict_GetItemString(stream,"packets"),t1))
+    goto error;
+  Py_DECREF(t1);
 
-  if(PyList_Append(PyDict_GetItem(stream,PyString_FromString("seq")),PyLong_FromUnsignedLong(tcp->packet.header.seq)))
-    return 0;
 
-  if(PyList_Append(PyDict_GetItem(stream,PyString_FromString("length")),PyInt_FromLong(tcp->packet.data_len)))
-    return 0;
- 
-  if(PyList_Append(PyDict_GetItem(stream,PyString_FromString("offset")),PyInt_FromLong(self->file->get_offset(self->file))))
-    return 0;
+  t1=PyLong_FromUnsignedLong(tcp->packet.header.seq);
+  if(PyList_Append(PyDict_GetItemString(stream,"seq"),t1))
+    goto error;
+  Py_DECREF(t1);
+
+  t1=PyInt_FromLong(tcp->packet.data_len);
+  if(PyList_Append(PyDict_GetItemString(stream,"length"),t1))
+    goto error;
+  Py_DECREF(t1);
+
+  t1 =  PyInt_FromLong(self->file->get_offset(self->file));
+  if(PyList_Append(PyDict_GetItemString(stream,"offset"),t1))
+    goto error;
+  Py_DECREF(t1);
  
   /** Write the data into the cache file: */
   if(self->file->super.write((StringIO)self->file, tcp->packet.data, tcp->packet.data_len)<0) {
@@ -111,6 +164,10 @@ static int add_packet(TCPStream self, IP ip) {
 ;
 
   return 1;
+
+ error:
+  Py_DECREF(t1);
+  return 0;
 };
 
 /** A talloc destructor to automatically decref the python objects
@@ -119,6 +176,8 @@ static int add_packet(TCPStream self, IP ip) {
 static int free_data(void *self) {
   TCPStream this=*(TCPStream *)self;
   PyObject *obj=(PyObject *)this->data;
+
+  //  printf("Free Data\n");
 
   if(obj) {
     Py_DECREF(obj);
@@ -339,7 +398,7 @@ static PyObject *py_init(PyObject *self, PyObject *args) {
 
   hash = CONSTRUCT(TCPHashTable, TCPHashTable, Con, NULL);
   hash->callback = callback;
-  //  result =  PyCObject_FromVoidPtr(hash, (void (*)(void *))talloc_free);
+  //result =  PyCObject_FromVoidPtr(hash, (void (*)(void *))talloc_free);
   result =  PyCObject_FromVoidPtr(hash, NULL);
 
   return result;

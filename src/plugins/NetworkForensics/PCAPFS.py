@@ -87,9 +87,10 @@ class PCAPFS(DBFS):
         DBFS.load(self, mount_point, iosource_name)
         
         ## This sets up the schema for pcap
-        self.dbh.MySQLHarness("%s/pcaptool -c -t pcap" %(config.FLAG_BIN))
-        self.dbh.execute("select max(id) as id from pcap")
-        row=self.dbh.fetch()
+        dbh = DB.DBO(self.dbh.case)
+        dbh.MySQLHarness("%s/pcaptool -c -t pcap" %(config.FLAG_BIN))
+        dbh.execute("select max(id) as id from pcap")
+        row=dbh.fetch()
 
         if row['id']:
             max_id = row['id']
@@ -106,13 +107,13 @@ class PCAPFS(DBFS):
             ,max_id,
             )
 
-        self.dbh.MySQLHarness(sql)
+        dbh.MySQLHarness(sql)
 
         ## Add our VFS node
         self.VFSCreate(None,"I%s|p0" % iosource_name,'%s/rawdata' % mount_point);
 
         ## Creates indexes on id:
-        self.dbh.check_index("pcap",'id')
+        dbh.check_index("pcap",'id')
 
         self.fd = IO.open(self.dbh.case, iosource_name)
 
@@ -121,7 +122,7 @@ class PCAPFS(DBFS):
         ## stores information about each connection, while the
         ## connection table store all the packets belonging to each
         ## connection.
-        self.dbh.execute(
+        dbh.execute(
             """CREATE TABLE if not exists `connection_details` (
             `inode` varchar(250),
             `con_id` int(11) unsigned NOT NULL auto_increment,
@@ -137,7 +138,7 @@ class PCAPFS(DBFS):
         
         ### data offset is the offset within the iosource where we can
         ### find the data section of this packet.
-        self.dbh.execute(
+        dbh.execute(
             """CREATE TABLE if not exists `connection` (
             `con_id` int(11) unsigned NOT NULL default '0',
             `original_id` int(11) unsigned NOT NULL default '0',
@@ -146,32 +147,28 @@ class PCAPFS(DBFS):
             `length` mediumint(9) unsigned NOT NULL default '0',
             `cache_offset`  bigint(9) unsigned NOT NULL default '0'
             ) """)
-
-        self.dbh.check_index("connection", 'con_id')
         
-        ## Ensure that the connection_details table has indexes. We
-        ## need the indexes because we are about to do lots of selects
-        ## on this table.
-        self.dbh.check_index("connection_details",'src_ip')
-        self.dbh.check_index("connection_details",'src_port')
-        self.dbh.check_index("connection_details",'dest_ip')
-        self.dbh.check_index("connection_details",'dest_port')
+        logging.log(logging.DEBUG, "Reassembling streams, this might take a while")
 
         ## Where to store the reassembled stream files
-        hashtbl = reassembler.init(FlagFramework.get_temp_path(self.dbh.case,'I%s|' % iosource_name))
+        hashtbl = reassembler.init(FlagFramework.get_temp_path(dbh.case,'I%s|' % iosource_name))
+        case = dbh.case
+
 
         def Callback(s):
+            dbh=DB.DBO(case)
+            
             ## Find the mtime of the first packet in the stream:
             try:
-                self.dbh.execute("select ts_sec from pcap where id=%r limit 1",
+                dbh.execute("select ts_sec from pcap where id=%r limit 1",
                                  s['packets'][0])
-                row = self.dbh.fetch()
+                row = dbh.fetch()
                 mtime = row['ts_sec']
             except IndexError,e:
                 mtime = 0
 
             ## Add the stream to the connection details table:
-            self.dbh.execute("insert into `connection_details` set con_id=%r, src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r, inode='I%s|S%s', reverse=%r, ts_sec=%r ",(
+            dbh.execute("insert into `connection_details` set con_id=%r, src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r, inode='I%s|S%s', reverse=%r, ts_sec=%r ",(
                 s['con_id'], s['src_ip'], s['src_port'],
                 s['dest_ip'],s['dest_port'], s['isn'],
                 iosource_name, s['con_id'], s['reverse'],
@@ -207,26 +204,31 @@ class PCAPFS(DBFS):
                     mtime = mtime
                     )
                 
-            self.dbh.mass_insert_start("connection")
+            dbh.mass_insert_start("connection")
             
             for i in range(len(s['seq'])):
-                self.dbh.mass_insert(
+                dbh.mass_insert(
                     con_id = s['con_id'], packet_id = s['packets'][i],
                     seq = s['seq'][i], length = s['length'][i],
                     cache_offset = s['offset'][i],
                     )
 
-            self.dbh.mass_insert_commit()
+            dbh.mass_insert_commit()
 
         ## Register the callback
         reassembler.set_tcp_callback(hashtbl, Callback)
 
         ## Scan the filesystem:
-        dbh2=self.dbh.clone()
-        dbh2.execute ("select id,offset,link_type,ts_sec,length from pcap where id>%r" % int(max_id))
-        for row in dbh2:
+        dbh.execute ("select id,offset,link_type,ts_sec,length from pcap where id>%r" % int(max_id))
+        for row in dbh:
             self.fd.seek(row['offset'])
             data = self.fd.read(row['length'])
+
+            ## Some progress reporting
+            if not row['id'] % 10000:
+                logging.log(logging.VERBOSE_DEBUG, "processed %s packets" % row['id'])
+
+                
             d = _dissect.dissect(data,row['link_type'],
                                  row['id'])
 
@@ -235,9 +237,19 @@ class PCAPFS(DBFS):
                 reassembler.process_packet(hashtbl, d, self.fd.name)
             except RuntimeError,e:
                 logging.log(logging.VERBOSE_DEBUG, "%s" % e)
-            
+
+        logging.log(logging.DEBUG, "Finalising streams, nearly done")
+
         # Finish it up
         reassembler.clear_stream_buffers(hashtbl);
+
+        dbh.check_index("connection_details",'src_ip')
+        dbh.check_index("connection_details",'src_port')
+        dbh.check_index("connection_details",'dest_ip')
+        dbh.check_index("connection_details",'dest_port')
+        dbh.check_index("connection", 'con_id')
+        dbh.check_index('connection_details','inode')
+
 
     def delete(self):
         DBFS.delete(self)

@@ -285,6 +285,7 @@ class DBFS(FileSystem):
             path = "/".join(dirs[:d])+"/"
             path = FlagFramework.normpath(path)
             self.dbh.check_index('file','path', 200)
+            self.dbh.check_index('file','name', 200)
             self.dbh.execute("select * from file where path=%r and name=%r and mode='d/d' limit 1",(path, dirs[d]))
             if not self.dbh.fetch():
                 self.dbh.execute("insert into file set inode='',path=%r,name=%r,status='alloc',mode='d/d'",(path,dirs[d]))
@@ -346,11 +347,13 @@ class DBFS(FileSystem):
         return [ dent['name'] for dent in self.longls(path,dirs) ]
 
     def dent_walk(self, path='/'):
+        self.dbh.check_index('file','path', 200)
         self.dbh.execute("select name, mode, status from file where path=%r order by name" % ( path))
         for i in self.dbh:
             yield(i)
 
     def lookup_id(self, inode):
+        self.dbh.check_index('inode','inode')
         self.dbh.execute("select inode_id from inode where inode=%r", inode)
         res = self.dbh.fetch()
         try:
@@ -366,12 +369,15 @@ class DBFS(FileSystem):
             if dir == '/':
                 dir = ''
 
+            self.dbh.check_index('file','path', 200)
+            self.dbh.check_index('file','name', 200)
             self.dbh.execute("select inode from file where path=%r and (name=%r or name=concat(%r,'/')) and inode!='' limit 1", (dir+'/',name,name))
             res = self.dbh.fetch()
             if not res:
                 return None
             return res["inode"]
         else:
+            self.dbh.check_index('file','inode')
             self.dbh.execute("select concat(path,name) as path from file where inode=%r order by status limit 1", (inode))
             res = self.dbh.fetch()
             if not res:
@@ -383,6 +389,8 @@ class DBFS(FileSystem):
             inode = self.lookup(path)
         if not inode:
             return None
+
+        self.dbh.check_index('inode','inode')
         self.dbh.execute("select inode_id, inode, status, uid, gid, mtime as mtime_epoch, from_unixtime(mtime) as `mtime`, atime as atime_epoch, from_unixtime(atime) as `atime`, ctime as ctime_epoch, from_unixtime(ctime) as `ctime`, from_unixtime(dtime) as `dtime`, mode, links, link, size from inode where inode=%r limit 1",(inode))
         row = self.dbh.fetch()
 
@@ -395,6 +403,8 @@ class DBFS(FileSystem):
         if directory=='/': return 1
         
         dirname=FlagFramework.normpath(os.path.dirname(directory)+'/')
+        self.dbh.check_index('file','path', 200)
+        self.dbh.check_index('file','name', 200)
         self.dbh.execute("select mode from file where path=%r and name=%r and mode like 'd%%' limit 1",(dirname,os.path.basename(directory)))
         row=self.dbh.fetch()
         if row:

@@ -41,6 +41,17 @@ END_CLASS
 */
 #define MAX_PACKETS_EXPIRED 10000
 
+/** This limits the total number of simulatneous streams we are
+    tracking.
+
+    If the number of streams is exceeded, old ones are
+    purged. Whenever a stream is touched, it is considered new, but
+    only if it has at least MINIMUM_STREAM_SIZE in it. (Otherwise we
+    would be purged by portscans etc).
+*/
+#define MAX_NUMBER_OF_STREAMS 1000
+#define MINIMUM_STREAM_SIZE 100
+
 struct tuple4
 {
   uint16_t source;
@@ -79,7 +90,14 @@ CLASS(TCPStream, Object)
      struct tuple4 addr;
      enum tcp_state_t state;
      struct skbuff queue;
+
+     // This list keeps all the streams with the same hash value
      struct list_head list;
+
+     // This is a global list of all streams. It is kept ordered by
+     // use time so we can expire older connections.
+     struct list_head global_list;
+
      TCPStream reverse;
      int con_id;
      int max_packet_id;
@@ -91,6 +109,9 @@ CLASS(TCPStream, Object)
      uint32_t next_seq;
 
      int direction;
+
+     /** The total size of this stream */
+     int total_size;
 
      TCPStream METHOD(TCPStream, Con, struct tuple4 *addr);
 
@@ -111,6 +132,9 @@ END_CLASS
 /** This class manages a bunch of TCPStreams in a hash_table */
 CLASS(TCPHashTable, Object)
      TCPStream table[TCP_STREAM_TABLE_SIZE];
+
+     /** This list keeps all streams in sorted order */
+     TCPStream sorted;
 
      /** This is the callback which will be invoked upon processing
 	 packets

@@ -9,15 +9,20 @@
 
 static int con_id=1;
 
+/** 
+    We keep count of the total number of streams we are currenrtly
+    keeping track of.
+*/
+static int _total_streams=0;
+
 TCPStream TCPStream_Con(TCPStream self, struct tuple4 *addr) {
   memcpy(&self->addr, addr, sizeof(*addr));
-
-  INIT_LIST_HEAD(&(self->list));
 
   self->con_id = con_id;
   con_id++;
 
   INIT_LIST_HEAD(&(self->queue.list));
+  _total_streams++;
 
   return self;
 };
@@ -86,10 +91,15 @@ void TCPStream_add(TCPStream self, IP ip) {
 
   /** Take over the packet */
   new->packet = ip;
+
   talloc_steal(new, ip);
 
   /** Record the most recent id we handled */
   self->max_packet_id = ip->id;
+
+  /** The total size of both directions */
+  self->total_size += tcp->packet.data_len + self->reverse->total_size;
+  self->reverse->total_size = self->total_size;
 
   /** Now we add the new packet in the queue at the right place. We
       traverse the list and find the last position where the sequence
@@ -183,6 +193,10 @@ void TCPStream_add(TCPStream self, IP ip) {
 	pad_to_first_packet(self);
 	
 	list_next(first, &(self->queue.list), list);
+
+	// If the skbuff does not contain a packet we leave - this
+	// should not happen but does??
+	if(!first || !first->packet) break;
 	tcp = (TCP)first->packet->packet.payload;
       };
     }; 
@@ -218,8 +232,9 @@ int TCPStream_flush(void * this) {
   self->state = PYTCP_DESTROY;
   if(self->callback) self->callback(self, NULL);
 
-  /** and we remove it from its list */
+  /** and we remove it from its lists */
   list_del(&(self->list));
+  list_del(&(self->global_list));
 
   /** Now do the reverse stream */
   pad_data(self->reverse);
@@ -229,6 +244,10 @@ int TCPStream_flush(void * this) {
     self->reverse->callback(self->reverse, NULL);
 
   list_del(&(self->reverse->list));
+  list_del(&(self->reverse->global_list));
+
+  // Keep count of our streams
+  _total_streams-=2;
 
   return 0;
 };
@@ -247,6 +266,9 @@ TCPHashTable TCPHashTable_Con(TCPHashTable self) {
     INIT_LIST_HEAD(&(self->table[i]->list));
   };
 
+  // This list keeps all streams in order:
+  self->sorted = talloc(self, struct TCPStream);
+  INIT_LIST_HEAD(&(self->sorted->global_list));
   return self;
 };
 
@@ -297,6 +319,19 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   /** Now try to find the forward stream in our hash table */
   list_for_each_entry(i, &(self->table[forward_hash]->list), list) {
     if(!memcmp(&(i->addr),&forward, sizeof(forward))) {
+      /** When we find a stream, we remove it from its place in the
+	  list and put it at the top of the list - this keeps the list
+	  ordered wrt the last seen time 
+      */
+      if(1 || i->total_size > MINIMUM_STREAM_SIZE) {
+	list_del(&(i->global_list));
+	list_add(&(i->global_list), &(self->sorted->global_list));
+      };
+
+      if(1 || i->reverse->total_size > MINIMUM_STREAM_SIZE) {
+	list_del(&(i->reverse->global_list));
+	list_add(&(i->reverse->global_list), &(self->sorted->global_list));
+      };
       return i;
     };
   };
@@ -310,7 +345,17 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   /** Now try to find the reverse stream in our hash table */
   list_for_each_entry(i, &(self->table[reverse_hash]->list), list) {
     if(!memcmp(&(i->addr),&reverse, sizeof(reverse))) {
-      return i->reverse;
+      /** Readjust the order of the global list */
+      if(1 || i->total_size > MINIMUM_STREAM_SIZE) {
+	list_del(&(i->global_list));
+	list_add(&(i->global_list), &(self->sorted->global_list));
+      };
+
+      if(1 || i->reverse->total_size > MINIMUM_STREAM_SIZE) {
+	list_del(&(i->reverse->global_list));
+	list_add(&(i->reverse->global_list), &(self->sorted->global_list));
+	return i->reverse;
+      };
     };
   };  
 
@@ -322,14 +367,16 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   i->callback = self->callback;
   i->data = self->data;
   i->direction = TCP_FORWARD;
-  list_add_tail(&(self->table[forward_hash]->list), &(i->list));
+  list_add_tail(&(i->list),&(self->table[forward_hash]->list));
+  list_add(&(i->global_list),&(self->sorted->global_list));
 
   /** Now a reverse stream */
   j = CONSTRUCT(TCPStream, TCPStream, Con, i, &reverse);
   j->callback = self->callback;
   j->data = self->data;
   j->direction = TCP_REVERSE;
-  list_add_tail(&(self->table[reverse_hash]->list), &(j->list));
+  list_add_tail(&(j->list),&(self->table[reverse_hash]->list));
+  list_add(&(j->global_list),&(self->sorted->global_list));
 
   /** Make the streams point to each other */
   i->reverse = j;
@@ -386,6 +433,22 @@ int TCPHashTable_process_tcp(TCPHashTable self, IP ip) {
 
   /** Add the new IP packet to the stream queue */
   i->add(i, ip);
+
+  /** If we are keeping track of too many streams we need to expire
+      them:
+  **/
+  if(_total_streams>MAX_NUMBER_OF_STREAMS) {
+    TCPStream x,y;
+
+    list_for_each_entry_safe_prev(x,y, &(self->sorted->global_list), global_list) {
+      if(x->direction == TCP_FORWARD) {
+	printf("Total streams exceeded %u\n", _total_streams);
+    	talloc_free(x);
+
+	if(_total_streams < MAX_NUMBER_OF_STREAMS) break;
+      };
+    };
+  };
 
   self->packets_processed++;
   if(self->packets_processed > 2*MAX_PACKETS_EXPIRED) {

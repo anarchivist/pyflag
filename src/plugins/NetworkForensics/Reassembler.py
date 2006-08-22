@@ -148,9 +148,7 @@ class StreamFile(File):
         if not position:
             position = self.tell()
             
-        self.dbh.execute("""select packet_id from `connection` where
-        con_id = %r and cache_offset <= %r order by cache_offset
-        desc, length desc limit 1""",
+        self.dbh.execute("""select packet_id from `connection` where con_id = %r and cache_offset <= %r order by cache_offset desc, length desc limit 1""",
                          (self.con_id, position))
         row=self.dbh.fetch()
         return row['packet_id']

@@ -108,13 +108,14 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
             logging.log(logging.WARNINGS, "Killing query in thread %s because it took too long" % self.connection.thread_id())
             self.kill_connection('query')
             
-        t = threading.Timer(self.timeout, cancel)
-        t.start()
+        #t = threading.Timer(self.timeout, cancel)
+        #t.start()
         try:
             MySQLdb.cursors.SSDictCursor.execute(self,string)
         finally:
-            t.cancel()
-            t.join()
+            #t.cancel()
+            #t.join()
+            pass
 
     def fetchone(self):
         """ Updates the row cache if needed otherwise returns a single

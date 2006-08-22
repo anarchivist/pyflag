@@ -1,5 +1,3 @@
-#SUBDIRS = libnids
-
 bin_PROGRAMS		= pcaptool
 
 pcaptool_SOURCES	= pcaptool.c
@@ -18,11 +16,6 @@ _dissect_la_SOURCES 	= dissect.c
 _dissect_la_CPPFLAGS 	= $(SWIG_PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include -D__DEBUG__
 _dissect_la_LDFLAGS 	= -module
 _dissect_la_LIBADD	= libnetwork.la
-
-#libnids_la_SOURCES 	= libnids.c
-#libnids_la_CPPFLAGS 	= $(SWIG_PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
-#libnids_la_LDFLAGS 	= -module
-#libnids_la_LIBADD	= libtcp.la 
 
 reassembler_la_SOURCES = reassembler.c
 reassembler_la_CPPFLAGS= $(SWIG_PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include -D__DEBUG__

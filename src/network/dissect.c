@@ -50,6 +50,7 @@ static PyObject *dissect(PyObject *self, PyObject *args) {
     return NULL;
 
   root = CONSTRUCT(Root, Packet, super.Con, NULL, NULL);
+
   root->packet.link_type = link_type;
   root->packet.packet_id = packet_id;
 

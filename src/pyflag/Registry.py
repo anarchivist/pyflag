@@ -399,3 +399,7 @@ def Init():
 def import_module(name,load_as=None):
     Init()
     REPORTS.import_module(name,load_as)
+
+
+import gc
+gc.set_debug(gc.DEBUG_UNCOLLECTABLE | gc.DEBUG_INSTANCES)
