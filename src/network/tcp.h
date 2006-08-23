@@ -21,7 +21,7 @@ large, we flush the data to disk. This allows us to have numerous
 pending streams open without running out of file descriptors.
 ***************************************************************/
   /** The maximum size to remain buffered */
-#define MAX_DISK_STREAM_SIZE 4096
+#define MAX_DISK_STREAM_SIZE 40960
 
 CLASS(DiskStreamIO, StringIO)
      char *filename;

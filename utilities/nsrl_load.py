@@ -25,7 +25,7 @@ Loads a NSRL database into flag.
 
 Use this program like so:
 
->>> pyflag_launch nsrl_load.py -p path_to_nsrl_directory/
+>>> pyflag_launch nsrl_load.py path_to_nsrl_directory/
 
 An NSRL directory is one of the CDs, and usually has in it NSRLFile.txt,NSRLProd.txt.
 
@@ -38,10 +38,13 @@ from optparse import OptionParser
 import DB,conf,sys
 import csv
 import sys,os
+import pyflag.conf
+config=pyflag.conf.ConfObject()
 
-parser = OptionParser()
-parser.add_option("-p", "--path", default=None,
-                  help = "An NSRL directory is one of the CDs, and usually has in it NSRLFile.txt,NSRLProd.txt")
+parser = OptionParser(usage="""%prog path_to_nsrl_directory path_to_nsrl_directory
+
+Loads the NSRL hashes stored in the specified paths.""",
+                      version="Version: %prog PyFlag "+config.VERSION)
 
 parser.add_option("-d", "--db", default=None,
                   help = "The Database to load NSRL into")
@@ -55,7 +58,6 @@ parser.add_option('-r', '--reset',action="store_true", default=False,
 (options, args) = parser.parse_args()
 
 #Get a handle to our database
-dbh=DB.DBO(options.db)
 if options.reset:
     print "Dropping NSRL tables"
     dbh.execute("drop table if exists NSRL_hashes")
@@ -67,26 +69,6 @@ if options.index:
     dbh.check_index("NSRL_hashes","md5",4)
     print "Done!!"
     sys.exit(0)
-
-if not options.path:
-    print "No NSRL Directory specified - use -h for help."
-    sys.exit(-1)
-    
-dbh.execute("""CREATE TABLE if not exists `NSRL_hashes` (
-  `md5` char(16) binary NOT NULL default '',
-  `filename` varchar(250) NOT NULL default '',
-  `productcode` int NOT NULL default 0,
-  `oscode` varchar(250) NOT NULL default ''
-) DEFAULT CHARACTER SET latin1 """)
-
-dbh.execute("""CREATE TABLE if not exists `NSRL_products` (
-`Code` MEDIUMINT NOT NULL ,
-`Name` VARCHAR( 250 ) NOT NULL ,
-`Version` VARCHAR( 250 ) NOT NULL ,
-`OpSystemCode` VARCHAR( 250 ) NOT NULL ,
-`ApplicationType` VARCHAR( 250 ) NOT NULL
-) COMMENT = 'Stores NSRL Products'
-""")
 
 def to_md5(string):
     result=[]
@@ -171,10 +153,32 @@ def ProductTable(dirname):
     dbh.mass_insert_commit()
         
 if __name__=="__main__":
-    try:
-        MainNSRLHash(options.path)
-    except IOError:
-        print "Unable to read main hash db, doing product table only"
+    if not args:
+        print "You didn't specify any NSRL directories to operate on. Nothing to do!!!"
+    else:
+        dbh=DB.DBO(options.db)
+
+        dbh.execute("""CREATE TABLE if not exists `NSRL_hashes` (
+          `md5` char(16) binary NOT NULL default '',
+          `filename` varchar(250) NOT NULL default '',
+          `productcode` int NOT NULL default 0,
+          `oscode` varchar(250) NOT NULL default ''
+        ) DEFAULT CHARACTER SET latin1 """)
+
+        dbh.execute("""CREATE TABLE if not exists `NSRL_products` (
+        `Code` MEDIUMINT NOT NULL ,
+        `Name` VARCHAR( 250 ) NOT NULL ,
+        `Version` VARCHAR( 250 ) NOT NULL ,
+        `OpSystemCode` VARCHAR( 250 ) NOT NULL ,
+        `ApplicationType` VARCHAR( 250 ) NOT NULL
+        ) COMMENT = 'Stores NSRL Products'
+        """)
         
-    ProductTable(options.path)    
-    print "You may wish to run this program with the -i arg to create indexes now. Otherwise indexes will be created the first time they are needed."
+        for arg in args:
+            try:
+                MainNSRLHash(arg)
+            except IOError:
+                print "Unable to read main hash db, doing product table only"
+
+            ProductTable(arg)    
+            print "You may wish to run this program with the -i arg to create indexes now. Otherwise indexes will be created the first time they are needed."

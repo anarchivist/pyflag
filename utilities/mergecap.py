@@ -1,12 +1,5 @@
 # ******************************************************
-# Copyright 2004: Commonwealth of Australia.
-#
-# Developed by the Computer Network Vulnerability Team,
-# Information Security Group.
-# Department of Defence.
-#
 # Michael Cohen <scudette@users.sourceforge.net>
-# David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
 #  Version: FLAG $Version: 0.82 Date: Sat Jun 24 23:38:33 EST 2006$
@@ -34,24 +27,42 @@ to open all the files at once running out of filehandles if there are
 too many files.
 """
 from optparse import OptionParser
-import glob,bisect
+import glob,bisect,sys
 import Store
 import FileFormats.PCAP as PCAP
 from format import Buffer
 import pyflag.logging as logging
+import pyflag.conf
+config=pyflag.conf.ConfObject()
 
-## Hush up a bit
-logging.config.LOG_LEVEL=5
+parser = OptionParser(usage="""%prog -w Output [options] pcap_file ... pcap_file
 
-parser = OptionParser()
+Will merge all pcap files into the Output file which must be
+specified. The pcap files are sorted on their PCAP timestamps. It is
+assumed that each file contains packets in time order.
+
+This version of mergecap has no file size limits or file number
+limits.""", version="Version: %prog PyFlag "+config.VERSION)
 
 parser.add_option("-g", "--glob", default=None,
-                  help = "Load All files in the glob. This is useful when there are too many files to expand in the commandline.")
+                  help = """Load All files in the glob. This is useful when there are too many
+files to expand in the command line. To use this option you will need
+to escape the * or ? to stop the shell from trying to expand them.""")
 
 parser.add_option("-w", "--write", default="merged.pcap",
-                  help = "The output file to write.")
+                  help = "The output file to write. (Mandatory)")
+
+parser.add_option("-v", "--verbose", default=5, type='int',
+                  help = "Level of verbosity")
 
 (options, args) = parser.parse_args()
+
+if len(args)==0:
+    print "Must specify some files to merge, try -h for help"
+    sys.exit(-1)
+
+## Hush up a bit
+logging.config.LOG_LEVEL=options.verbose
 
 if options.glob:
     g = options.glob.replace('\\*','*')

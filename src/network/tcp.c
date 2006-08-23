@@ -443,7 +443,8 @@ int TCPHashTable_process_tcp(TCPHashTable self, IP ip) {
 
     list_for_each_entry_prev(x, &(self->sorted->global_list), global_list) {
       if(x->direction == TCP_FORWARD) {
-	printf("Total streams exceeded %u\n", _total_streams);
+	//printf("Total streams exceeded %u - proceesing %u, freeing %u\n", 
+	//       _total_streams, i->con_id, x->con_id);
     	talloc_free(x);
 	// Freeing the above will remove at least 2 streams from the
 	// list, which means its no longer safe to recurse over it!!!

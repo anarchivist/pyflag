@@ -1,33 +1,49 @@
 """ EventLogTool is a stand alone event log manipulation utility.
 
-It uses the main PyFlag Event log messge database to resolve messages in event logs (.evt files).
+It uses the main PyFlag Event log messge database to resolve messages
+in event logs (.evt files).
 
-Windows event logs do not contain the entirety of the message. They typically refer to service name containing specific messages. The service name in turns names a DLL through the registry which contains the messages in its .rsrc section. (For more details see FileFormats/EVTLog.py)
+Windows event logs do not contain the entirety of the message. They
+typically refer to service name containing specific messages. The
+service name in turns names a DLL through the registry which contains
+the messages in its .rsrc section. (For more details see
+FileFormats/EVTLog.py)
 
-PyFlag maintains a database linking messages with services. This is so that event logs may be read independantly from the registry and files on the system. Unfortunately, the messages themselves can not be distributed with PyFlag due to copyright reasons, hence EventLogTool must first populate the database from an existing known good system.
+PyFlag maintains a database linking messages with services. This is so
+that event logs may be read independantly from the registry and files
+on the system. Unfortunately, the messages themselves can not be
+distributed with PyFlag due to copyright reasons, hence EventLogTool
+must first populate the database from an existing known good system.
 
 PyFlag maintains two main event log tables:
 
 EventServices: links the Event log service name with the dll name
 EventMessages: links messages with the dll name
 
-prior to being able to load event logs with PyFlag, you must populate the event messages and services in the database.
+prior to being able to load event logs with PyFlag, you must populate
+the event messages and services in the database.
 
 First populate the dll associations via the registry:
 pyflag_launch utilities/EventLogTool --mode=reg /dos/windows/system32/config/system
 
-Then populate the event messages (This will recurse throughout the mounted directory to find all PE executables and add their messages, if any, to the database).
+Then populate the event messages (This will recurse throughout the
+mounted directory to find all PE executables and add their messages,
+if any, to the database).
+
 pyflag_launch utilities/EventLogTool --mode=dll /dos/
 
 Finally to be able to view the event log file:
 pyflag_launch utilities/EventLogTool AppEvent.evt
 
 Note:
-This is only needed when using the standalone EventLogTool, or before using the EventLog log driver within the PyFlag GUI. For a forensic image loaded into a PyFlag case, you just need to enable the EventLog scanner (which is enabled by default) during a filesystem scan.
-
+This is only needed when using the standalone EventLogTool, or
+before using the EventLog log driver within the PyFlag GUI. For a
+forensic image loaded into a PyFlag case, you just need to enable the
+EventLog scanner (which is enabled by default) during a filesystem
+scan.
 """
 # ******************************************************
-# Copyright 2004
+# Copyright 2004-2006
 #
 # Michael Cohen <scudette@users.sourceforge.net>
 #
@@ -55,13 +71,29 @@ from format import *
 from plugins.FileFormats.BasicFormats import *
 import DB
 import logging
+import sys
+import pyflag.conf
+config=pyflag.conf.ConfObject()
 
-parser = OptionParser()
+parser = OptionParser(usage="""%prog [options]
+
+Will perform according to mode the following functions:
+-m dll:      Search all dlls under path for message resources and insert into the pyflag DB.
+-m reg:     Extrach service name to dll mappings from registry files.
+-m event:  Print all event logs in an evt file based on values in the pyflag DB.""",
+                      version="Version: %prog PyFlag "+config.VERSION)
 
 parser.add_option("-m", "--mode", default='dll',
-                  help="search a list of directories for dll with messages")
+                  help="Set mode for operation (see above)")
+
+parser.add_option("-H", "--more_help", default=None, action='store_true',
+                  help="Print more help")
 
 (options, args) = parser.parse_args()
+
+if options.more_help:
+    print __doc__
+    sys.exit(-1)
 
 def recurse(path):
     """ Recurses into all directories under path yielding real files """

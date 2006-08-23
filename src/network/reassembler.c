@@ -267,7 +267,9 @@ static PyObject *py_process_packet(PyObject *self, PyObject *args) {
   /** Find the IP header */
   ip=(IP)root;
   if(!Find_Property((Packet *)&ip, NULL, "ip", "") || !ip) {
-    return PyErr_Format(PyExc_RuntimeError, "Unable to find IP headers when procssing packet %d", root->packet.packet_id);
+    // Just silently quit
+    goto exit;
+    //return PyErr_Format(PyExc_RuntimeError, "Unable to find IP headers when procssing packet %d", root->packet.packet_id);
   };
 
   //  printf("Processing %u\n", root->packet_id);
@@ -283,7 +285,8 @@ static PyObject *py_process_packet(PyObject *self, PyObject *args) {
   if(PyErr_Occurred()) {
     return NULL;
   };
-  
+
+ exit:  
   Py_INCREF(Py_None);
   return Py_None;  
 };
