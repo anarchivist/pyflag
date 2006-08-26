@@ -147,7 +147,7 @@ class TypeChecker:
         
         try:
             IO.IOFactory(query,subsys=field)
-        except (IOError, KeyError):
+        except (IOError, KeyError, RuntimeError):
             return False
 
     def iosource(self,field,query):

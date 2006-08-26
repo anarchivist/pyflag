@@ -393,14 +393,16 @@ class SearchIndex(Reports.report):
             del q['callback_stored']
             q['__opt__']='parent'
             q['__target__']='new_keyword'
-            result.table(
-                columns = ['word','class','hits'],
-                names=['Index Term','Dictionary Class','Number of Hits'],
-                links = [ q ],
-                table='LogicalIndexStats',
-                case=query['case'],
-                )
-            
+            try:
+                result.table(
+                    columns = ['word','class','hits'],
+                    names=['Index Term','Dictionary Class','Number of Hits'],
+                    links = [ q ],
+                    table='LogicalIndexStats',
+                    case=query['case'],
+                    )
+            except KeyError:
+                pass
         try:
             result.case_selector()
 

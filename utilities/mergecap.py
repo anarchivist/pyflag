@@ -57,10 +57,6 @@ parser.add_option("-v", "--verbose", default=5, type='int',
 
 (options, args) = parser.parse_args()
 
-if len(args)==0:
-    print "Must specify some files to merge, try -h for help"
-    sys.exit(-1)
-
 ## Hush up a bit
 logging.config.LOG_LEVEL=options.verbose
 
@@ -68,6 +64,10 @@ if options.glob:
     g = options.glob.replace('\\*','*')
     args.extend(glob.glob(g))
 
+if len(args)==0:
+    print "Must specify some files to merge, try -h for help"
+    sys.exit(-1)
+    
 ## This will hold our filehandles - if this number is too large, we
 ## will run out of file handles.
 store = Store.Store(max_size=50)

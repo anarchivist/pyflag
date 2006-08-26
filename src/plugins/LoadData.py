@@ -186,7 +186,7 @@ class LoadIOSource(Reports.report):
             #this will cause a form to be placed into result.
             fd=IO.IOFactory(query,result)
             result.textfield("Unique Data Load ID","iosource")
-        except KeyError:
+        except (KeyError, RuntimeError):
             pass
         except IOError, e:
             result.row("Error: %s" % e, bgcolor=config.HILIGHT)

@@ -172,7 +172,7 @@ class IO:
             self.io=iosubsys.Open(self.subsystem,options)
             self.readptr = 0
             
-        except (KeyError, IOError):
+        except (KeyError, IOError, RuntimeError):
             if(query and result):
                 self.form(query,result)
             raise

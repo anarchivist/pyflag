@@ -411,3 +411,11 @@ dojo.lang.extend(dojo.widget.ComboBox, {
       };
     },
   });
+
+function show_popup(container, url) {
+  var c = dojo.widget.getWidgetById(container);
+  var parent = find_widget_type_above("ContentPane",container);
+  alert(parent);
+  c.show();
+  c.setUrl(url);
+};

@@ -490,6 +490,13 @@ class AJAXUI(HTMLUI.HTMLUI):
 
         if interval is 0 we do it immediately.
         """
+        if options.has_key('parent'):
+            del query['callback_stored']
+            self.result+="""<script>
+            update_container(find_widget_type_above('ContentPane',_container_.widgetId),'%s');
+            </script>""" % query
+            return
+        
         try:
             pane = options['pane']
         except KeyError:
@@ -517,6 +524,13 @@ class AJAXUI(HTMLUI.HTMLUI):
         if not tooltip: tooltip = label
         cb = self.store_callback(callback)
 
-        self.result+='''<div widgetId="%s" dojoType="FloatingPane" style="width: 300px; height: 300px; left: 100px; top: 100px; display: none;" executeScripts="true" title="%s"></div>\n''' % (self.id,tooltip)
+        self.result+='''<div widgetId="float%s"
+        dojoType="FloatingPane"
+        style="width: 640px; height: 400px; left: 100px; top: 100px;"
+        windowState="minimized"
+        displayMinimizeAction = "true"
+        hasShadow="true"
+        resizable="true"
+        executeScripts="true" title="%s"></div>\n''' % (self.id,tooltip)
 
-        self.result+='''<a href="#" onclick="update_container(%r,%r)">click</a>\n''' % (self.id, "%s&callback_stored=%s" % (self.defaults,cb))
+        self.result+='''<a href="#" onclick="show_popup('float%s',%r)">click</a>\n''' % (self.id, "%s&callback_stored=%s" % (self.defaults,cb))
