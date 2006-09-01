@@ -223,7 +223,7 @@ class HTTPScanner(StreamScannerFactory):
             """CREATE TABLE if not exists `http_parameters` (
             `id` int(11) not null,
             `key` VARCHAR(255) not null,
-            `value` VARCHAR(255) not null
+            `value` text not null
             ) """)
 
         self.dbh.check_index("http", "inode")

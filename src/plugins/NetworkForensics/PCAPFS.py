@@ -60,6 +60,8 @@ import pyflag.Registry as Registry
 import os,sys
 import dissect,reassembler, _dissect
 from NetworkScanner import *
+import FileFormats.PCAP as PCAP
+from format import Buffer
 
 description = "Network Forensics"
 
@@ -86,9 +88,23 @@ class PCAPFS(DBFS):
     def load(self, mount_point, iosource_name):
         DBFS.load(self, mount_point, iosource_name)
         
-        ## This sets up the schema for pcap
+        ## We create the tables we need:
+        ## The pcap table stores indexes into the pcap file,
+        ## The connection_details table stores information about each
+        ## connection, while the connection table store all the
+        ## packets belonging to each connection.
         dbh = DB.DBO(self.dbh.case)
-        dbh.MySQLHarness("%s/pcaptool -c -t pcap" %(config.FLAG_BIN))
+        dbh.execute("""CREATE TABLE if not exists `pcap` (
+        `id` INT NOT NULL,
+        `iosource` varchar(50),
+        `offset` BIGINT NOT NULL ,
+        `length` INT NOT NULL ,
+        `ts_sec` INT NOT NULL ,
+        `ts_usec` INT NOT NULL,
+        `link_type`  TINYINT not null,
+        KEY `id` (`id`)
+        )""")
+        
         dbh.execute("select max(id) as id from pcap")
         row=dbh.fetch()
 
@@ -97,31 +113,6 @@ class PCAPFS(DBFS):
         else:
             max_id = 0
             
-
-        ## This populates it 
-        sql =  "%s/iowrapper -i %r -o %s -f foo -- %s/pcaptool -t pcap -i %r  -p %r foo" % (
-            config.FLAG_BIN,
-            self.iosource.subsystem,
-            self.iosource.make_parameter_list(),
-            config.FLAG_BIN, iosource_name
-            ,max_id,
-            )
-
-        dbh.MySQLHarness(sql)
-
-        ## Add our VFS node
-        self.VFSCreate(None,"I%s|p0" % iosource_name,'%s/rawdata' % mount_point);
-
-        ## Creates indexes on id:
-        dbh.check_index("pcap",'id')
-
-        self.fd = IO.open(self.dbh.case, iosource_name)
-
-        ## Build our streams:
-        ## We create the tables we need: The connection_details table
-        ## stores information about each connection, while the
-        ## connection table store all the packets belonging to each
-        ## connection.
         dbh.execute(
             """CREATE TABLE if not exists `connection_details` (
             `inode` varchar(250),
@@ -138,6 +129,8 @@ class PCAPFS(DBFS):
         
         ### data offset is the offset within the iosource where we can
         ### find the data section of this packet.
+        ## This must be autoincrement to assign unique ids to new
+        ## streams which get created by the scanners.
         dbh.execute(
             """CREATE TABLE if not exists `connection` (
             `con_id` int(11) unsigned NOT NULL default '0',
@@ -147,33 +140,69 @@ class PCAPFS(DBFS):
             `length` mediumint(9) unsigned NOT NULL default '0',
             `cache_offset`  bigint(9) unsigned NOT NULL default '0'
             ) """)
+
+
+##        ## This populates it:
         
+##        sql =  "%s/iowrapper -i %r -o %s -f foo -- %s/pcaptool -t pcap -i %r  -p %r foo" % (
+##            config.FLAG_BIN,
+##            self.iosource.subsystem,
+##            self.iosource.make_parameter_list(),
+##            config.FLAG_BIN, iosource_name
+##            ,max_id,
+##            )
+
+##        dbh.MySQLHarness(sql)
+
+        ## Is this all needed any more?
+##        ## Add our VFS node
+##        self.VFSCreate(None,"I%s|p0" % iosource_name,'%s/rawdata' % mount_point);
+
+##        ## Creates indexes on id:
+##        dbh.check_index("pcap",'id')
+
+        ## Open the file descriptor
+        self.fd = IO.open(self.dbh.case, iosource_name)
+        buffer = Buffer(fd=self.fd)
+
+        ## Try to open the file as a pcap file:
+        pcap_file = PCAP.FileHeader(buffer)
+
+        ## Build our streams:
         logging.log(logging.DEBUG, "Reassembling streams, this might take a while")
 
         ## Where to store the reassembled stream files
         hashtbl = reassembler.init(FlagFramework.get_temp_path(dbh.case,'I%s|' % iosource_name))
         case = dbh.case
 
-
+        ## Prepare the dbh for the callback
+        dbh2 = DB.DBO(case)
+        dbh2.mass_insert_start("connection")
         def Callback(s):
-            dbh=DB.DBO(case)
+            ## Flush the mass insert pcap:
+            dbh.mass_insert_commit()
             
             ## Find the mtime of the first packet in the stream:
             try:
-                dbh.execute("select ts_sec from pcap where id=%r limit 1",
+                dbh2.execute("select ts_sec from pcap where id=%r limit 1",
                                  s['packets'][0])
-                row = dbh.fetch()
+                row = dbh2.fetch()
                 mtime = row['ts_sec']
             except IndexError,e:
                 mtime = 0
 
             ## Add the stream to the connection details table:
-            dbh.execute("insert into `connection_details` set con_id=%r, src_ip=%r, src_port=%r, dest_ip=%r, dest_port=%r, isn=%r, inode='I%s|S%s', reverse=%r, ts_sec=%r ",(
-                s['con_id'], s['src_ip'], s['src_port'],
-                s['dest_ip'],s['dest_port'], s['isn'],
-                iosource_name, s['con_id'], s['reverse'],
-                mtime
-                ))
+            dbh2.insert("connection_details",
+                       con_id=s['con_id'],
+                       src_ip=s['src_ip'],
+                       src_port=s['src_port'],
+                       dest_ip=s['dest_ip'],
+                       dest_port=s['dest_port'],
+                       isn=s['isn'],
+                       inode='I%s|S%s' % (iosource_name, s['con_id']),
+                       reverse=s['reverse'],
+                       ts_sec=mtime
+                       )
 
             ## If the stream is empty we dont really want to record it.
             if len(s['seq'])==0: return
@@ -204,33 +233,45 @@ class PCAPFS(DBFS):
                     mtime = mtime
                     )
                 
-            dbh.mass_insert_start("connection")
-            
             for i in range(len(s['seq'])):
-                dbh.mass_insert(
+                dbh2.mass_insert(
                     con_id = s['con_id'], packet_id = s['packets'][i],
                     seq = s['seq'][i], length = s['length'][i],
                     cache_offset = s['offset'][i],
                     )
 
-            dbh.mass_insert_commit()
-
         ## Register the callback
         reassembler.set_tcp_callback(hashtbl, Callback)
 
         ## Scan the filesystem:
-        dbh.execute ("select id,offset,link_type,ts_sec,length from pcap where id>%r" % int(max_id))
-        for row in dbh:
-            self.fd.seek(row['offset'])
-            data = self.fd.read(row['length'])
+        ## Load the packets into the indes:
+        dbh.mass_insert_start("pcap")
+        link_type = int(pcap_file['linktype'])
 
+        ## A small test:
+        ##pcap_file.start_of_file = 0x7FFFF985
+        
+        for p in pcap_file:
+            ## Store information about this packet in the db:
+            dbh.mass_insert(
+                iosource = iosource_name,
+                offset = p.buffer.offset,
+                length = p.size(),
+                ts_sec = int(p['ts_sec']),
+                ts_usec = int(p['ts_usec']),
+                link_type = link_type,
+                id = max_id
+                )
+
+##            max_id = dbh.autoincrement()
+            max_id+=1
             ## Some progress reporting
-            if not row['id'] % 10000:
-                logging.log(logging.VERBOSE_DEBUG, "processed %s packets" % row['id'])
+            if max_id % 10000 == 0:
+                logging.log(logging.VERBOSE_DEBUG, "processed %s packets (%s bytes)" % (max_id, p.buffer.offset))
 
-                
-            d = _dissect.dissect(data,row['link_type'],
-                                 row['id'])
+            data = p.payload()
+#            print "%r" % data[:100]
+            d = _dissect.dissect(data,link_type, max_id)
 
         ## Now reassemble it:
             try:
@@ -239,10 +280,13 @@ class PCAPFS(DBFS):
                 logging.log(logging.VERBOSE_DEBUG, "%s" % e)
 
         logging.log(logging.DEBUG, "Finalising streams, nearly done")
-
+        dbh.mass_insert_commit()
+        dbh2.mass_insert_commit()
+        
         # Finish it up
         reassembler.clear_stream_buffers(hashtbl);
-
+        reassembler.set_tcp_callback(hashtbl,None);
+        
         dbh.check_index("connection_details",'src_ip')
         dbh.check_index("connection_details",'src_port')
         dbh.check_index("connection_details",'dest_ip')

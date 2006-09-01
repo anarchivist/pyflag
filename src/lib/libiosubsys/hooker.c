@@ -20,6 +20,7 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 */
+#include "config.h"
 #include "hooker.h"
 #include "libiosubsys.h"
 #include "except.h"
@@ -77,6 +78,7 @@ void load_library(void) {
   HOOK(fclose);
   HOOK(fread);
   HOOK(ftell);
+  HOOK(ftello);
   HOOK(fgets);
   HOOK(__fxstat64);
   HOOK(ferror);
@@ -245,6 +247,12 @@ int fseek(FILE *stream, long offset, int whence) {
   return 0;
 };
 
+off_t ftello(FILE *stream) {
+  int fd=(int)stream;
+
+  return lseek(fd, 0, SEEK_CUR);
+};
+
 long ftell(FILE *stream) {
   int fd=(int)stream;
 
@@ -362,7 +370,7 @@ FILE *fopen(const char *path, const char *mode) {
 
   if( context == HOOKED && iosubsys) {
     if(mode[0]=='r') {
-      return ((FILE *)open(path,O_RDONLY));
+      return ((FILE *)open64(path,O_RDONLY, 0));
     };
     RAISE(E_GENERIC,NULL,"Writing is not supported to %s",path);
   };

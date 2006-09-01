@@ -28,9 +28,11 @@ static char *prefix = NULL;
 static PyObject *initial_dict=NULL;
 static char iosource[255];
 
+/**  This is a check for gc
 void got_freed(void *temp) {
-  //  printf("got freed\n");
+   printf("got freed\n");
 };
+*/
 
 static PyObject *New_Stream_Dict(TCPStream tcp_stream, char *direction) {
   PyObject *stream = PyDict_Copy(initial_dict);
@@ -51,10 +53,12 @@ static PyObject *New_Stream_Dict(TCPStream tcp_stream, char *direction) {
     goto error;
   Py_DECREF(tmp);
 
+  /**
   tmp = PyCObject_FromVoidPtr(file, got_freed);
   if(PyDict_SetItemString(stream, "test", tmp)<0)
     goto error;
   Py_DECREF(tmp);
+  **/
 
   tmp = PyList_New(0);
   if(PyDict_SetItemString(stream, "seq", tmp)<0)
@@ -159,7 +163,7 @@ static int add_packet(TCPStream self, IP ip) {
   /** Write the data into the cache file: */
   if(self->file->super.write((StringIO)self->file, tcp->packet.data, tcp->packet.data_len)<0) {
     PyErr_Format(PyExc_RuntimeError, "Unable to create or write to cache file %s",self->file->filename);
-    return NULL;
+    return 0;
   };
 ;
 
@@ -299,9 +303,11 @@ static PyObject *py_process_tcp(PyObject *self, PyObject *args) {
   IP ip;
   TCPHashTable hash;
   PyObject *hash_py;
+  char *data;
+  int size;
 
   if(!PyArg_ParseTuple(args, "Os#II", &hash_py,
-		       &tmp->data, &tmp->size, &packet_id, &link_type)) 
+		       &data, &size, &packet_id, &link_type)) 
     return NULL;
 
   hash = PyCObject_AsVoidPtr(hash_py);
@@ -313,6 +319,8 @@ static PyObject *py_process_tcp(PyObject *self, PyObject *args) {
   /** Try to parse the packet */
   root = CONSTRUCT(Root, Packet, super.Con, NULL, NULL);
   root->packet.link_type = link_type;
+  tmp->write(tmp, data,size);
+  tmp->seek(tmp, 0,SEEK_SET);
 
   root->super.Read((Packet)root, tmp);
 

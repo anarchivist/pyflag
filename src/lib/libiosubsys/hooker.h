@@ -61,6 +61,7 @@ struct dispatcher_t {
   FILE * (*fopen)(const char *path, const char *mode);
   FILE * (*fopen64)(const char *path, const char *mode);
   long (*ftell)(FILE *stream);
+  off_t (*ftello)(FILE *stream);
   int (*fgets)(char *s, int size, FILE *stream);
   FILE * (*fseek)(FILE *stream, long offset, int whence);
   FILE * (*fdopen)(int fd, const char *mode);

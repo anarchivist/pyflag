@@ -190,8 +190,6 @@ void usage(char *myProg) {
 	printf("\t-n iosource: name of iosource");
 	printf("Supported file system types:\n");
 	fs_print_types(stderr);
-
-	exit(1);
 }
 
 FILE *logfp;
@@ -515,7 +513,7 @@ print_addr (FS_INFO *fs, DADDR_T addr, char *buf,
       (*run)->next = (RUN *)malloc(sizeof(RUN));
       if(!(*run)->next) {
 	printf("unable to allocate memory\n");
-	exit(0);
+	exit(-1);
       }
       (*run)->next->addr = -1;
       (*run)->next->next = NULL;
@@ -628,6 +626,7 @@ main(int argc, char **argv)
 	  case '?':
 	  default: 
 	    usage(argv[0]);
+	    return 0;
 	  case 'f':
 	    fs_type = optarg;
 	    if(strstr(optarg, "auto")==NULL)
@@ -657,7 +656,7 @@ main(int argc, char **argv)
 	  case 'V':
 	    print_version(stdout);
 	    
-	    exit(0);
+	    return 0;
 	    break;
 	  case 'z':
 	    {
@@ -684,17 +683,20 @@ main(int argc, char **argv)
 	if(dbaction) {
 	  if(!strcmp(dbaction, "create")) {
 	    create_tables();
-	    exit(0);
+	    return 0;
 	  } else if(dbaction && !strcmp(dbaction, "drop")) {
 	    drop_tables();
-	    exit(0);
+	    return 0;
 	  } else {
 	    RAISE(E_GENERIC,NULL,"Only valid parameters to -d are create or drop");
 	  };
 	};
 	
-	if(optind == argc)
+	if(optind == argc) {
 	  usage(argv[0]);
+	  return 0;
+	};
+	
 
 	img = img_open("raw", 1,
 		       (const char **) &argv[optind++]);
@@ -731,7 +733,7 @@ main(int argc, char **argv)
 	/* close file */
 	fs->close(fs);
 
-	exit (0);
+	return 0;
 }
 
 void create_tables() {

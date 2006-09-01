@@ -413,6 +413,8 @@ class DBO:
                                                    "),(".join(values))
         self.execute(sql,args)
 
+        ## Ensure the cache is now empty:
+        self.mass_insert_start(self.mass_insert_table)
 
     def autoincrement(self):
         """ Returns the value of the last autoincremented key """

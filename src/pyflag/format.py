@@ -71,12 +71,17 @@ class Buffer:
         self.fd.seek(offset+self.offset)
         return self.fd.read(1)
 
-    def __getslice__(self,a=None,b=None):
+
+    ## FIXME: Python slicing will only pass uint_32 using the syntax
+    def __getslice__(self,a=0,b=None):
         """ Returns another Buffer object which may be manipulated completely independently from this one.
 
         Note that the new buffer object references the same fd that we are based on.
         """
-        return self.__class__(fd=self.fd,offset=self.offset+a,size=b-a)
+        if b:
+            return self.__class__(fd=self.fd,offset=self.offset+a,size=b-a)
+        else:
+            return self.__class__(fd=self.fd,offset=self.offset+a)
 
     def __str__(self):
         self.fd.seek(self.offset)

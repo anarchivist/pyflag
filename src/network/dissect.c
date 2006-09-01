@@ -44,8 +44,10 @@ static PyObject *dissect(PyObject *self, PyObject *args) {
   int link_type;
   int packet_id;
   StringIO tmp=CONSTRUCT(StringIO, StringIO, Con, NULL);
-  
-  if(!PyArg_ParseTuple(args, "s#ii", &tmp->data, &tmp->size, &link_type,
+  char *data;
+  int size;
+
+  if(!PyArg_ParseTuple(args, "s#ii", &data, &size, &link_type,
 		       &packet_id)) 
     return NULL;
 
@@ -53,6 +55,10 @@ static PyObject *dissect(PyObject *self, PyObject *args) {
 
   root->packet.link_type = link_type;
   root->packet.packet_id = packet_id;
+
+  /** Copy the data into our stringio */
+  tmp->write(tmp, data, size);
+  tmp->seek(tmp,0,SEEK_SET);
 
   root->super.Read((Packet)root, tmp);
 

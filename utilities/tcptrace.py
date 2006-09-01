@@ -90,7 +90,7 @@ for f in args:
     buffer = Buffer(fd=fd)
     header = PCAP.FileHeader(buffer)
     for p in header:
-        data = "%s" % p['data'].get_value()
+        data = p.payload()
         d = _dissect.dissect(data,header['linktype'], count)
         count+=1
         try:

@@ -73,7 +73,8 @@ class FileHeader(SimpleStruct):
     def next(self):
         ## Try to read the next packet and return it:
         try:
-            p = Packet(self.buffer[self.offset:], endianess=self.parameters['endianess'])
+            b = self.buffer.__getslice__(self.offset)
+            p = Packet(b, endianess=self.parameters['endianess'])
             self.offset+=p.size()
             return p
         except IOError:
@@ -92,6 +93,9 @@ class Packet(SimpleStruct):
     def read(self):
         result=SimpleStruct.read(self)
         caplen = int(result['caplen'])
+        if caplen>64000:
+            raise IOError("packet too large at %s, maybe PCAP file is corrupted" % caplen)
+        
         s=RAW(self.buffer[self.offset:],count=caplen)
         if s.size()!=caplen:
             raise IOError("Unable to read the last packet from the file (wanted %s, got %s). Is the file truncated?" % (result['caplen'], s.size()))
@@ -100,6 +104,9 @@ class Packet(SimpleStruct):
         self.add_element(result, 'data', s)
 
         return result
+
+    def payload(self):
+        return self.data['data'].get_value().__str__()
 
 if __name__ == "__main__":
     fd=open(sys.argv[1],'r')
