@@ -53,7 +53,7 @@ parser.add_option('-i', '--index', default=False, action='store_true',
                   help = "Create indexes on the NSRL table instead")
 
 parser.add_option('-r', '--reset',action="store_true", default=False,
-                  help = "Create indexes on the NSRL table instead")
+                  help = "Drops (deletes) the NSRL tables from the database")
 
 (options, args) = parser.parse_args()
 

@@ -44,6 +44,19 @@ class NK_TYPE(WORD_ENUM):
 
 class RegF(SimpleStruct):
     """ This is the registry file header """
+    def __init__(self,  buffer, *args, **kwargs):
+        SimpleStruct.__init__(self, buffer, *args, **kwargs)
+        self.root_key = self['root_key_offset'].get_value()
+
+    def get_key(self, path):
+        """ Given a path, retrieve the key object stored there """
+        p = path.split("/")
+        root_key = self.root_key
+        while p:
+            root_key = root_key.key(p.pop(0))
+            
+        return root_key
+
     def init(self):
         self.fields = [
             [ 'Magic',          STRING , dict(length=4) ],
@@ -357,10 +370,10 @@ if __name__ == "__main__":
 
     buffer = Buffer(fd=fd)
     header = RegF(buffer)
-    root_key = header['root_key_offset'].get_value()
+    print header
     
     path = 'Software/Microsoft/Windows/CurrentVersion/Explorer/TrayNotify'
-    key = get_key(root_key,path)
+    key = header.get_key(path)
     print key
 
     print "Values for %s" % path
