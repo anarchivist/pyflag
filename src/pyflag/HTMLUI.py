@@ -92,7 +92,6 @@ class HTMLUI(UI.GenericUI):
     tree_id = 0
     ## This is used as a unique count of ids
     id=0
-    
     def __init__(self,default = None,query=None):
         
         HTMLUI.id+=1
@@ -104,16 +103,20 @@ class HTMLUI(UI.GenericUI):
             
         if default != None:
             self.form_parms = default.form_parms
+            self.form_target = None
             self.defaults = default.defaults
             self.toolbar_ui=default.toolbar_ui
             self.generator=default.generator
             self.depth = default.depth+1
+            self.parent = default
         else:
             self.form_parms =FlagFramework.query_type(())
+            self.form_target = None
             self.defaults = FlagFramework.query_type(())
             self.toolbar_ui=None
             self.generator=HTTPObject()
             self.depth=1
+            self.parent = None
 
         if query:
             self.defaults=query
@@ -1454,11 +1457,19 @@ class HTMLUI(UI.GenericUI):
         @arg target: A query_type object which is the target to the form. All parameters passed through this object are passed to the form's action.
         """
         self.form_parms=target.clone()
+        self.form_id=self.get_uniue_id()
+        try:
+            ## FIXME - this should be named to something better than "refresh"
+            self.form_target = hiddens['refresh']
+            del hiddens['refresh']
+        except KeyError:
+            self.form_target = 'self'
+
         #Append the hidden params to the object
         for k,v in hiddens.items():
             self.form_parms[k]=v
 
-        self.result += '<form id="pyflag_form_%s" name="pyflag_form_%s" method=%s action="/f" enctype="multipart/form-data">\n' % (self.depth,self.depth, config.METHOD)
+        self.result += '<form id="pyflag_form_%s" name="pyflag_form_%s" method=%s action="/f" enctype="multipart/form-data">\n' % (self.form_id,self.form_id, config.METHOD)
 
     def end_form(self,value='Submit',name='submit',**opts):
         for k,v in self.form_parms:

@@ -5,17 +5,20 @@ function alert_bt() {
 
 /** This function is used to set the url of a ContentPane. We cant use
     the ContentPane's set url because it either caches the page (which
-    causes memory explosion in the browser) or add
-    ?dojo..preventCache=115369481689 */
-function xx_set_url(widget, url) { 
+    causes memory explosion in the browser) or adds rubbish to the url
+    like ?dojo..preventCache=115369481689 */
+function set_url(widget, url) { 
+  if(dojo.lang.isString(widget))
+    widget = dojo.widget.getWidgetById(widget); 
+
   update_default_toolbar();
 
-  widget.setUrl(url);
+  //  widget.setUrl(url);
 
-  //remove_popups(widget);
+  remove_popups(widget);
 
   dojo.io.bind({
-    url: url,
+    url: url+"&__pane__="+widget.widgetId,
 	useCache: false,
 	preventCache: false,
 	method:  "GET",
@@ -33,7 +36,7 @@ function xx_set_url(widget, url) {
     });
 };
 
-function set_url(widget, url) { 
+function xx_set_url(widget, url) { 
   widget.setUrl(url);
   
   //Is this needed? default toolbars do not get removed with seturl
@@ -66,11 +69,11 @@ function submitForm(form_name,id) {
       query.push(input.name + '=' + input.value);
   };
 
-  var url="/f?"+query.toArray().join("&");
   var container = find_widget_type_above("ContentPane",id);
+  var url="f?"+query.toArray().join("&");
 
   var kw = {
-    url:	   "/f",
+    url:	   "/f?__pane__="+container.widgetId,
     formNode:      dojo.byId(form_name),
     load:	   function(type, data)	{
       if(container.href) {
@@ -414,8 +417,25 @@ dojo.lang.extend(dojo.widget.ComboBox, {
 
 function show_popup(container, url) {
   var c = dojo.widget.getWidgetById(container);
-  var parent = find_widget_type_above("ContentPane",container);
-  alert(parent);
+
   c.show();
-  c.setUrl(url);
+  
+  // Cant use setUrl due to caching problems mentioned above:
+  //  c.setUrl(url);
+  dojo.io.bind({
+    url: url+"&__pane__="+container,
+	useCache: false,
+	preventCache: false,
+	method:  "GET",
+	mimetype: "text/html",
+	handler: function(type, data, e) {
+	if(type == "load") {
+	  c.setContent(data);
+	  c.href = url;
+	} else {
+	  // works best when from a live server instead of from file system 
+	  c._handleDefaults.call("Error loading '" + url + "' (" + e.status + " "+  e.statusText + ")", "onDownloadError");
+	}
+      }
+    });
 };

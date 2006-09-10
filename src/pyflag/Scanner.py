@@ -528,7 +528,6 @@ class Drawer:
             result.end_table()
             result.end_form()
 
-
         right=result.__class__(result)
         right.popup(configure_cb,"Configure",icon="spanner.png")
         left.row(right,self.description)

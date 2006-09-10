@@ -199,7 +199,7 @@ class ViewFile(Reports.report):
             fd = fsfd.open(inode=query['inode'])
             image = Graph.Thumbnailer(fd,300)
         except IOError:
-            fd = None
+            fd = FileSystem.File(query['case'], None, '')
             image = None
 
         ## Make a series of links to each level of this inode - this

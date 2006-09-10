@@ -9,7 +9,20 @@ import cgi
 class AJAXUI(HTMLUI.HTMLUI):
     """ An AJAX driven web framework for PyFlag """
     preamble='<script> PyFlag_Session=%s</script>'
-    
+    def __init__(self,default = None,query=None):
+        HTMLUI.HTMLUI.__init__(self, default,query)
+        self.floats = []
+
+    def __str__(self):
+        ## Ensure that floats occur _after_ everything else - this is
+        ## required if they need to have forms later:
+        result = HTMLUI.HTMLUI.__str__(self)
+
+        if self.floats:
+            result += "\n".join(self.floats)
+            
+        return result
+        
     def const_selector(self,description,name,keys,values,**options):
         if options:
             opt_str = self.opt_to_str(options)
@@ -120,7 +133,7 @@ class AJAXUI(HTMLUI.HTMLUI):
 
             r=[]
             for x in tree_cb(path):
-                if len(x[0])==0: continue
+                if not x[0] or len(x[0])==0: continue
                 
                 tmp = dict(title = x[0], objectId="/%s/%s" % (path,x[1]))
                 if x[2]=='branch':
@@ -222,13 +235,37 @@ class AJAXUI(HTMLUI.HTMLUI):
                 });
         </script>
         """ % {'r':r, 'query':query, 'id':id }
+                         
+    def start_form(self,target, **hiddens):
+        """ start a new form with a local scope for parameters.
+
+        @arg target: A query_type object which is the target to the form. All parameters passed through this object are passed to the form's action.
+        """
+        self.form_parms=target.clone()
+        self.form_id=self.get_uniue_id()
+        try:
+            ## FIXME - this should be named to something better than "refresh"
+            self.form_target = hiddens['refresh']
+            del hiddens['refresh']
+        except KeyError:
+            self.form_target = 'self'
+
+        #Append the hidden params to the object
+        for k,v in hiddens.items():
+            self.form_parms[k]=v
+
+        self.result += '<form id="pyflag_form_%s" name="pyflag_form_%s" method=%s action="/f" enctype="multipart/form-data">\n' % (self.form_id,self.form_id, config.METHOD)
 
     def end_form(self,value='Submit',name='submit',**opts):
         for k,v in self.form_parms:
+            ## If we want to refresh to our parent, we need to ensure
+            ## that our callback does not propegate:
+            if self.form_target=="parent" and k=="callback_stored": continue
+
             self.result += "<input type='hidden' name='%s' value='%s'>\n" % (k,v)
 
         if value:
-            self.result += "<button dojoType='Button' onClick='javascript:submitForm(\"pyflag_form_%s\",\"form%s\");'>%s</button><div id=\"form%s\"></div>\n" % (self.depth, self.id, value, self.id)
+            self.result += "<button dojoType='Button' onClick='javascript:submitForm(\"pyflag_form_%s\",\"form%s\");'>%s</button><div id=\"form%s\"></div>\n" % (self.form_id, self.form_id, value, self.form_id)
 
         self.result+="</form>"
 
@@ -402,20 +439,26 @@ class AJAXUI(HTMLUI.HTMLUI):
             return
         except KeyError:
             pass
-
-
+        
         if target==None:
             target=FlagFramework.query_type(())
+            
         q=target.clone()
         if target_options:
             for k,v in target_options.items():
                 del q[k]
                 q[k]=v
 
-        if target.has_key("__pane__"):
-            pane = "find_widget_type_above('ContentPane','Link%s')" % self.id
+        if self.defaults.has_key("__pane__"):
+            pane = "%r" % self.defaults['__pane__']
         else:
-            pane = "'main'"
+            pane = "find_widget_type_above('ContentPane','Link%s')" % self.id
+
+##       else:
+##          pane = "'main'"
+##        else:
+##            pane = "find_widget_type_above('FloatingPane','Link%s')" % self.id
+##        pane="dojo.widget.getWidgetById('Link%s')"% self.id
 
         if not options:
             options={}
@@ -430,7 +473,11 @@ class AJAXUI(HTMLUI.HTMLUI):
         try:
             tmp=target['__opt__'].split(',')
             del q['__opt__']
-            if 'popup' in tmp:
+            if 'parent' in tmp:
+                pane = "find_widget_type_above('ContentPane','Link%s')" % self.id
+                del q['callback_stored']
+                    
+            elif 'popup' in tmp:
                 options['onclick'] ="window.open('%s','client','HEIGHT=600,WIDTH=600,scrollbars=yes')" % q
                 self.result+="<a href=# %s >%s</a>" %(self.opt_to_str(options),string)
                 return
@@ -438,7 +485,7 @@ class AJAXUI(HTMLUI.HTMLUI):
             pass
 
         ## If the user right clicked, we open in a new window
-        base = '<a %s id="Link%s" onclick="update_container(%s, \'/f?%s\');" href="#">%s</a>' % (self.opt_to_str(options),self.id, pane, q,string)
+        base = '<a %s id="Link%s" onclick="set_url(%s, \'/f?%s\');" href="#">%s</a>' % (self.opt_to_str(options),self.id, pane, q,string)
             
         if tooltip:
             self.result+="<abbr title='%s'>%s</abbr>" % (tooltip,base)
@@ -492,19 +539,18 @@ class AJAXUI(HTMLUI.HTMLUI):
         """
         if options.has_key('parent'):
             del query['callback_stored']
-            self.result+="""<script>
-            update_container(find_widget_type_above('ContentPane',_container_.widgetId),'%s');
-            </script>""" % query
-            return
-        
-        try:
-            pane = options['pane']
-        except KeyError:
-            pane = 'main'
-        
+            ## This is the pane we will try to refresh
+            pane = "find_widget_type_above('ContentPane',_container_.widgetId)"
+        ## Unless a specific pane is specified
+        elif options.has_key('pane'):
+            pane = "%r" % options['pane']
+        else:
+            pane = "_container_"
+            
+        ## Do we want to do this immediately?
         if interval==0:
             self.result+="""<script>
-            update_container('%s','%s');
+            update_container(%s,'%s');
             </script>""" % (pane, query)
         else:
             ## We mark the current container as pending an update, and
@@ -516,21 +562,23 @@ class AJAXUI(HTMLUI.HTMLUI):
             
             dojo.lang.setTimeout(function () {
             if(_container_.pending)
-                 update_container(_container_,'%s');
+                 update_container(%s,'%s');
             } , %s);
-            </script>""" % (query, interval*1000)
+            </script>""" % (pane,query, interval*1000)
+
+    def add_to_top_ui(self, data):
+        s = self
+        while s.parent:
+            s=s.parent
+
+        s.floats.append(data)
 
     def popup(self,callback, label,icon=None,toolbar=0, menubar=0, tooltip=None, **options):
         if not tooltip: tooltip = label
         cb = self.store_callback(callback)
+        self.add_to_top_ui('''<div widgetId="float%s" dojoType="FloatingPane" style="width: 640px; height: 400px; left: 100px; top: 100px;" windowState="minimized" displayMinimizeAction = "true"  hasShadow="true"  resizable="true"  executeScripts="true" title="%s"></div>''' % (self.id,tooltip))
 
-        self.result+='''<div widgetId="float%s"
-        dojoType="FloatingPane"
-        style="width: 640px; height: 400px; left: 100px; top: 100px;"
-        windowState="minimized"
-        displayMinimizeAction = "true"
-        hasShadow="true"
-        resizable="true"
-        executeScripts="true" title="%s"></div>\n''' % (self.id,tooltip)
+        if icon:
+            label = "<img alt=%r border=0 src='images/%s' />" % (label, icon)
 
-        self.result+='''<a href="#" onclick="show_popup('float%s',%r)">click</a>\n''' % (self.id, "%s&callback_stored=%s" % (self.defaults,cb))
+        self.result+='''<a href="#" onclick="show_popup('float%s',%r)">%s</a>\n''' % (self.id, "%s&callback_stored=%s" % (self.defaults,cb), label)

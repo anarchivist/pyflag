@@ -29,6 +29,7 @@ import sys,traceback
 
 ## These are predefined logging levels:
 ERRORS=1
+ERROR=1
 WARNINGS=2
 INFO=3
 DEBUG=7

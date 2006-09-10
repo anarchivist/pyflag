@@ -90,7 +90,8 @@ class PcapFile:
         if self.offset==0: 
             ## This is done to ensure its a pcap file:
             header = PCAP.FileHeader(buffer)
-
+            self.endianess = header.parameters['endianess']
+            
             ## Position the offset at the end of the header
             self.offset = header.size()
 
@@ -122,8 +123,9 @@ class PcapFile:
             data = buffer[:1600].__str__()
         except IOError:
             data = buffer.__str__()
-            
-        packet = PCAP.Packet(data)
+
+        ## Preserve the endianess of the file:
+        packet = PCAP.Packet(data, endianess = self.parameters['endianess'])
         self.timestamp = int(packet['ts_sec'])+int(packet['ts_usec'])/1.0e6
         self.last_packet = packet
         size = packet.size()

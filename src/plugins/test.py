@@ -27,9 +27,12 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 
-""" An example of a test plugin """
+""" This is a test plugin for the GUI.
 
+It is designed to push the GUI to its limits, but can also be used to demonstrate how to use the abstracted UI to write reports.
+"""
 import pyflag.Reports as Reports
+from pyflag.FlagFramework import query_type
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 
@@ -39,16 +42,16 @@ import os,os.path,sys
 
 description = "Test Class"
 #Remove this line to ensure this appears in the menu
-active = True
+#active = False
 
-class TemplateReport(Reports.report):
+class TreeTest(Reports.report):
     """ A sample report.
 
     Note that all reports must inherit from Reports.report and should override the methods and attributes listed below.
     """
-    parameters = {'a':'numeric','b':'alphanum'}
+    parameters = {}
     hidden = False
-    name = "Test report"
+    name = "Tree Test"
     family = "Test"
     
     def display(self,query,result):
@@ -57,10 +60,7 @@ class TemplateReport(Reports.report):
 
         #We are testing the tree widget. Note this could have been
         #written as a generator for faster performance...
-        def tree_cb(branch):
-            path ='/'+'/'.join(branch)  + '/'
-            print path,branch
-            
+        def tree_cb(path):
             try:
                 files = []
                 dirs = []
@@ -84,36 +84,26 @@ class TemplateReport(Reports.report):
             result.text("You clicked on %s" % str(branch))
             print "Called back for %s" % (branch,)
 
-        result.xtree(tree_cb = tree_cb,pane_cb = pane_cb ,branch = branch )
-    
+        result.tree(tree_cb = tree_cb,pane_cb = pane_cb ,branch = branch )
+
+class InputTest(Reports.report):
+    """ Tests the type checking on input parameters """
+    parameters = {'a':'numeric','b':'alphanum'}
+    name = "Input Test"
+    family = "Test"
+
     def form(self,query,result):
-        result.defaults = query
-        result.case_selector()
-        result.heading("I am calling the form method")
         result.const_selector("This is a selector","select",('1st','2nd','3rd'),('1st','2nd','3rd'))
-        result.textfield('a parameter','a',size='5')
-        result.textfield('b parameter','b',size='10')
+        result.textfield('numeric parameter','a',size='5')
+        result.textfield('alphanumeric parameter','b',size='10')
 
-    def progress(self,query,result):
-        result.heading("Im progressing along nicely")
-
-class SomeClass:
-    """ A private class that lives within the plugin.
-
-    This class will not be added as a report because it does not inherit from the Reports.report class """
-    pass
-    
-def mod_fun(a,b):
-    """ A module private function. """
-    return b
-
-class test2(Reports.report):
+class LayOutTest(Reports.report):
     """ A sample report.
     
     Note that all reports must inherit from Reports.report and should override the methods and attributes listed below.
     """
     hidden = False
-    name = "Test report2"
+    name = "LayOut Test"
     family = "Test"
     def display(self,query,result):
         result.start_table()
@@ -135,3 +125,47 @@ class Refresher(Reports.report):
         result.heading("At the sound of the tone the time will be:")
         result.text(time.ctime())
         result.refresh(2,query)
+
+class PopUpTest(Refresher):
+    """ Tests the ability to use popups in the UI """
+    name = "PopUpTest"
+    def display(self, query,result):
+        result.heading("Popup Test")
+        
+        def popup_cb1(query,result):
+            result.heading("I am a popup")
+            result.text("This floating pane will be closed in 5 seconds!!!")
+            result.refresh(5, query, parent=True)
+
+        result.popup(popup_cb1, "Click Me")
+
+        def popup_form_cb(query, result):
+            result.heading("A form popup test")
+            result.start_form(query, refresh="parent")
+            result.textfield("Type something here","something")
+            result.end_form()
+
+        result.popup(popup_form_cb, "Form popup Test")
+
+        def popup_link_cb(query,result):
+            result.heading("Tests links within popups")
+            try:
+                result.text("link is %s" % query['link'])
+            except KeyError:
+                pass
+
+            del query['link']
+            query['link'] = "Internal link"
+            result.link("Internal popup link", target=query)
+
+            new_query = query.clone()
+            del new_query['something']
+            new_query['something'] = "Data from popup"
+            new_query['__opt__'] = "parent"
+            result.link("back to parent link", target=new_query)
+
+        result.popup(popup_link_cb, "Popup Links test")
+        try:
+            result.para("Something is %s" % query['something'])
+        except:
+            pass

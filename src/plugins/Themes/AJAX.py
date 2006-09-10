@@ -22,17 +22,18 @@ class AJAX(Menu):
         <script type="text/javascript">
         dojo.require("dojo.widget.ComboBox");
         dojo.require("dojo.widget.SplitContainer");
-	dojo.require("dojo.widget.ContentPane");
+        dojo.require("dojo.widget.ContentPane");
         dojo.require("dojo.widget.TabContainer");
-	dojo.require("dojo.widget.LinkPane");
-	dojo.require("dojo.widget.LayoutContainer");
+        dojo.require("dojo.widget.LinkPane");
+        dojo.require("dojo.widget.LayoutContainer");
         dojo.require("dojo.widget.Tree");
         dojo.require("dojo.widget.TreeSelector");
         dojo.require("dojo.widget.TreeLoadingController");
         dojo.require("dojo.widget.Menu2");
-	dojo.require("dojo.widget.Button");
+        dojo.require("dojo.widget.Button");
         dojo.require("dojo.widget.Dialog");
         dojo.require("dojo.widget.Toolbar");
+        dojo.require("dojo.widget.FloatingPane");
         dojo.require("dojo.uri.Uri");
         dojo.require("dojo.collections.Stack");
         dojo.hostenv.writeIncludes();
@@ -87,8 +88,8 @@ class AJAX(Menu):
         return result+'''
         %s
         <div dojoType="MenuBar2">%s</div>
-        <div dojoType="ContentPane" layoutAlign="top" style="color: black; " id="top">
-                <div dojoType="ToolbarContainer" layoutAlign="top" id="ToolbarContainer">
+        <div dojoType="ContentPane" layoutAlign="top" style="color: black; " id="top" bindArgs="preventCache:false;">
+                <div dojoType="ToolbarContainer" layoutAlign="top" id="ToolbarContainer" bindArgs="preventCache:false;">
                 <div dojoType="Toolbar" id="toolbar"></div>
                 </div>
                 ''' % ('\n'.join(menus),'\n'.join(menus_titles))
@@ -96,7 +97,7 @@ class AJAX(Menu):
     def naked_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
         """ Render the ui with minimal interventions """
         result= data
-        print result
+        #print result
         return result
 
     def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None,ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
@@ -104,12 +105,12 @@ class AJAX(Menu):
         ## dojo environment FIXME: How do we solve the link problem? 
         ## Is it possible? The problem is that the URL is not enough
         ## to specify the state because it might include stored UIs.
-        result = '<script>\ntry { djConfig; } catch(err) { document.location="/";  };\n</script>'
+        result = '<script>\ntry { djConfig; } catch(err) { alert(err); document.location="/";  };\n</script>'
         #print data
         return data+result
 
     def raw_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
-        # print data
+        #print data
         return data
 
     def menu(self,flag,query):
@@ -121,9 +122,16 @@ class AJAX(Menu):
         result.result+=" ".join(
             (self.header % (title),             self.menu_javascript,
              '''        <div dojoType="LayoutContainer"
+             bindArgs="preventCache:false;"
              layoutChildPriority='top-bottom'
              style="width: 100%; height: 100%;">''',
-             '<div dojoType="ContentPane" cacheContent="false" id="main" layoutAlign="client" style="border: 5px" executeScripts="true">'))
+             '''<div dojoType="ContentPane"
+             bindArgs="preventCache:false;"
+             cacheContent="false"
+             id="main"
+             layoutAlign="client"
+             style="border: 5px"
+             executeScripts="true">'''))
 
         ## Now create the initial front page:
         result.result+="<img src='images/logo.png'>" + self.footer
