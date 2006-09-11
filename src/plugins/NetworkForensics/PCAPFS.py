@@ -191,7 +191,9 @@ class PCAPFS(DBFS):
             except IndexError,e:
                 mtime = 0
 
-            ## Add the stream to the connection details table:
+            ## Add the stream to the connection details table: (Note
+            ## here that dbh.insert and dbh.mass_insert do not
+            ## interfer with each other and can be used alternatively
             dbh2.insert("connection_details",
                        con_id=s['con_id'],
                        src_ip=s['src_ip'],
@@ -280,8 +282,6 @@ class PCAPFS(DBFS):
                 logging.log(logging.VERBOSE_DEBUG, "%s" % e)
 
         logging.log(logging.DEBUG, "Finalising streams, nearly done")
-        dbh.mass_insert_commit()
-        dbh2.mass_insert_commit()
         
         # Finish it up
         reassembler.clear_stream_buffers(hashtbl);
@@ -293,7 +293,6 @@ class PCAPFS(DBFS):
         dbh.check_index("connection_details",'dest_port')
         dbh.check_index("connection", 'con_id')
         dbh.check_index('connection_details','inode')
-
 
     def delete(self):
         DBFS.delete(self)

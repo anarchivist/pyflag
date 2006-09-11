@@ -394,7 +394,12 @@ class DBO:
             self.mass_insert_start(self.mass_insert_table)
 
     def mass_insert_commit(self):
-        keys = self.mass_insert_cache.keys()
+        try:
+            keys = self.mass_insert_cache.keys()
+        except AttributeError:
+            ## We called commit without start
+            return
+
         if len(keys)==0: return
         
         args = []
@@ -522,6 +527,10 @@ class DBO:
         try:
             for i in self.temp_tables:
                 self.execute('drop table if exists %s' % i)
+
+            ## Ensure that our mass insert case is comitted in case
+            ## users forgot to flush it:
+            self.mass_insert_commit()
 
             DBH[self.case].put((self.dbh, self.mysql_bin_string))
         except (TypeError,AssertionError):
