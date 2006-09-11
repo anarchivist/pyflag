@@ -48,7 +48,11 @@ class Buffer:
             if size!=None:
                 self.size=size
             else:
-                self.size=-1
+                ## Try to calculate the size by seeking the fd to the end
+                offset = fd.tell()
+                fd.seek(0,2)
+                self.size=fd.tell()
+                fd.seek(offset)
 
 #        if self.size<0:
 #            raise IOError("Unable to set negative size (%s) for buffer (offset was %s)" % (self.size,self.offset))
@@ -79,6 +83,8 @@ class Buffer:
         Note that the new buffer object references the same fd that we are based on.
         """
         if b:
+            if b>self.size:
+                b=self.size
             return self.__class__(fd=self.fd,offset=self.offset+a,size=b-a)
         else:
             return self.__class__(fd=self.fd,offset=self.offset+a)

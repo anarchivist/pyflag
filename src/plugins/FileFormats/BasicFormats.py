@@ -372,6 +372,8 @@ class TERMINATED_STRING(DataType):
     terminator='\x00'
     max_blocksize=1024*1024
     initial_blocksize=1024
+    ## Do we include the terminator?
+    inclusive = True
 
     def read(self):
         blocksize=self.initial_blocksize
@@ -381,7 +383,7 @@ class TERMINATED_STRING(DataType):
             tmp=self.buffer[0:blocksize].__str__()
             end=tmp.find(self.terminator)
 
-            if end>0:
+            if end>=0:
                 break
             
             blocksize*=2
@@ -391,13 +393,16 @@ class TERMINATED_STRING(DataType):
 
         ## The size of this string includes the terminator
         self.raw_size=end+len(self.terminator)
-        return self.buffer[0:self.raw_size]
+        return self.buffer[0:self.raw_size].__str__()
     
     def size(self):
         return self.raw_size
 
     def get_value(self):
-        return self.data
+        if self.inclusive:
+            return self.data
+        else:
+            return self.data[:-len(self.terminator)]
 
     def __eq__(self,target):
         return self.data==target
