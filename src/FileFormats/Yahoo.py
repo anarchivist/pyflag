@@ -24,6 +24,8 @@ This is a format library to parse Yahoo instant messenger communication streams.
 
 Most of the information here comes from:
 http://libyahoo2.sourceforge.net/ymsg-9.txt
+
+and the associated libyahoo source code.
 """
 from format import *
 from plugins.FileFormats.BasicFormats import *
@@ -129,16 +131,21 @@ class Message(SimpleStruct):
         if pkt_len > 64000:
             raise IOError("Packet too large... Maybe traffic is corrupt?")
 
-        ## This is where we expect the data to end:
-        end = self.offset + pkt_len
+        ## This is where we expect the data to end. Often the last
+        ## element in the payload is just padding:
+        tmp = self.buffer[self.offset:self.offset+pkt_len]
         self.properties = {}
-        while self.offset<end:
-            key = Element(self.buffer[self.offset:])
-            self.offset += key.size()
-            value = Element(self.buffer[self.offset:])
-            self.offset += value.size()
+        while tmp.size>2:
+            key = Element(tmp)
+            tmp=tmp[key.size():]
+            value = Element(tmp)
+            tmp=tmp[value.size():]
             self.properties[key.get_value()] = value.get_value()
-            
+            #print "%s -> %s" % (key.get_value(),value.get_value())
+
+        ## This ensures that the YMSG packet takes up exactly as much
+        ## as its meant to - without overflowing into the next packet
+        self.offset+=pkt_len
         return result
 
     def __str__(self):

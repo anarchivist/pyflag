@@ -135,9 +135,7 @@ class StreamScannerFactory(GenScanFactory):
                 self.ignore = True
                 return
             
-        def process(self, data, metadata=None):
-            metadata['mime'] = "text/packet"
-            
+        def finish(self):            
             ## Call the base classes process_stream method with the
             ## given stream.
             self.outer.process_stream(self.fd, self.factories)

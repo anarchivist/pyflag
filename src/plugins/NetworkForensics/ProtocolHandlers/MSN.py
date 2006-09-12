@@ -1387,7 +1387,6 @@ class MSNScanner(StreamScannerFactory):
         self.processed=RingBuffer(30)
 
     def prepare(self):
-
         self.dbh.execute(
             """ CREATE TABLE if not exists `msn_session` (
             `inode` VARCHAR(50) NOT NULL,

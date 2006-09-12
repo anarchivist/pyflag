@@ -188,7 +188,8 @@ class HTTPScanner(StreamScannerFactory):
     class Drawer(Scanner.Drawer):
         description = "Network Scanners"
         name = "NetworkScanners"
-        contains = [ "IRCScanner", "MSNScanner", "HTTPScanner", "POPScanner","SMTPScanner","RFC2822" ]
+        contains = [ "IRCScanner", "MSNScanner", "HTTPScanner", "POPScanner",
+                     "SMTPScanner","RFC2822", "YahooScanner" ]
         default = True
         special_fs_name = 'PCAPFS'
 

@@ -50,7 +50,10 @@ class Buffer:
             else:
                 ## Try to calculate the size by seeking the fd to the end
                 offset = fd.tell()
-                fd.seek(0,2)
+                try:
+                    fd.seek(0,2)
+                except Exception,e:
+                    print "%s: %r" % (e,fd)
                 self.size=fd.tell()
                 fd.seek(offset)
 

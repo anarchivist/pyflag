@@ -416,8 +416,13 @@ int TCPHashTable_process_tcp(TCPHashTable self, IP ip) {
 
   /** This is a new connection */
   if(i->state == PYTCP_NONE) {
-    /** The next sequence number we expect */
-    i->next_seq = tcp->packet.header.seq+1;
+    /** The next sequence number we expect. Note that the syn packet
+       increments the seq number by 1 even though it has a length of
+       zero.
+    */
+    if(tcp->packet.header.syn)
+      i->next_seq = tcp->packet.header.seq+1;
+    else i->next_seq = tcp->packet.header.seq;
     i->state = PYTCP_JUST_EST;
     
     /** Notify the callback of the establishment of the new connection */
