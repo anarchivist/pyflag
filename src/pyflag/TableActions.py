@@ -156,14 +156,15 @@ def uniq(table_object,fieldname,proposed_value,query=None,id=None,result=None):
     @arg proposed_value: The value we want to set this field
     @arg id: If set, we exclude this ID from the comparison. This is used for example when editing a row to ensure that the current row id is not considered a duplicate.
     """
+    dbh = DB.DBO(table_object.case)
     if id:
-        table_object.dbh.execute("select * from %s where %s=%r and %s!=%r",(table_object.table,fieldname,proposed_value,table_object.key,id))
+        dbh.execute("select * from %s where %s=%r and %s!=%r",(table_object.table,fieldname,proposed_value,table_object.key,id))
     else:
-        table_object.dbh.execute("select %s from %s where %s=%r",(table_object.key, table_object.table,fieldname,proposed_value))
-    row=table_object.dbh.fetch()
+        dbh.execute("select %s from %s where %s=%r",(table_object.key, table_object.table,fieldname,proposed_value))
+    row=dbh.fetch()
     
     if(row):
-        result.heading("Error")
+        result = result.__class__(result)
         result.text("there is already a row (key %s) with field %s set to %s. These are the details of the existing row:" % (row[table_object.key],fieldname,proposed_value),color='red')
         table_object.show(row[table_object.key],result)
         raise TableObj.ConstraintError(result)

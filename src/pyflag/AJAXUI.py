@@ -479,11 +479,16 @@ class AJAXUI(HTMLUI.HTMLUI):
             if 'parent' in tmp:
                 pane = "find_widget_type_above('ContentPane','Link%s')" % self.id
                 del q['callback_stored']
-                    
+
+            elif 'main' in tmp:
+                pane = "'main'"
+                del q['callback_stored']
+                
             elif 'popup' in tmp:
                 options['onclick'] ="window.open('%s','client','HEIGHT=600,WIDTH=600,scrollbars=yes')" % q
                 self.result+="<a href=# %s >%s</a>" %(self.opt_to_str(options),string)
                 return
+                
         except KeyError:
             pass
 

@@ -73,7 +73,7 @@ function submitForm(form_name,id) {
   var url="f?"+query.toArray().join("&");
 
   var kw = {
-    url:	   "/f?__pane__="+container.widgetId,
+    url:	   "/f?submit=1&__pane__="+container.widgetId,
     formNode:      dojo.byId(form_name),
     load:	   function(type, data)	{
       if(container.href) {

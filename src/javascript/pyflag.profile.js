@@ -12,6 +12,7 @@ var dependencies = [
 "dojo.widget.Button",
 "dojo.widget.Dialog",
 "dojo.widget.Toolbar",
+"dojo.widget.FloatingPane",
 "dojo.uri.Uri",
 "dojo.collections.Stack",
 ];

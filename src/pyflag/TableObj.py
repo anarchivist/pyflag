@@ -45,6 +45,9 @@ class ConstraintError(Exception):
     def __init__(self,result):
         self.result=result
 
+    def __str__(self):
+        return self.result.__str__()
+
 class TableObj:
     """ An abstract object representing a table in the database """
     table = ""
@@ -74,11 +77,13 @@ class TableObj:
     edit_constraints = {}
     display_actions = {}
     delete_actions = {}
-    
-    def __init__(self,dbh=None,id=None):
+    form_actions = {}
+
+    def __init__(self,case=None,id=None):
         self.id=id
         self._column_keys= [ self.columns[i] for i in range(0,len(self.columns)) if not i % 2 ]
         self._column_names = [ self.columns[i] for i in range(0,len(self.columns)) if i % 2 ]
+        self.case = case
 
     def _make_column_sql(self):
         return ','.join([ "%s as %r" % (self._column_keys[i],self._column_names[i]) for i in range(len(self._column_keys)) ] + self._column_keys)
@@ -88,7 +93,7 @@ class TableObj:
 
         id is the key value which will be retrieved. We return a row record.
         """
-        dbh =DB.DBO()
+        dbh =DB.DBO(self.case)
         dbh.execute("select %s from %s where %s=%r",(self._make_column_sql(),self.table,self.key,id))
         return dbh.fetch()
 
@@ -114,7 +119,7 @@ class TableObj:
             except KeyError:
                 pass
 
-        dbh = DB.DBO()
+        dbh = DB.DBO(self.case)
         dbh.execute("UPDATE %s set %s where %s=%r ",(self.table,
                          ','.join(tmp),
                          self.key, query[self.key]))
@@ -143,7 +148,7 @@ class TableObj:
             except KeyError:
                 pass
 
-        dbh = DB.DBO()                
+        dbh = DB.DBO(self.case)                
         dbh.execute("insert into %s set %s ",(self.table,
                          ",".join(result),
                          ))
@@ -188,7 +193,7 @@ class TableObj:
         """ Generates an editing form for the current table """
         id=query[self.key]
 
-        dbh = DB.DBO()
+        dbh = DB.DBO(self.case)
         dbh.execute("select * from %s where %s=%r",(self.table,self.key,id))
         row=dbh.fetch()
         self.form(self._column_keys,query,results,row)
@@ -211,12 +216,12 @@ class TableObj:
                 self.delete_actions[k](description=v, variable=k, value=value, ui=result, row=row, id=id)
 
         if commit:
-            dbh = DB.DBO()
+            dbh = DB.DBO(self.case)
             dbh.execute("delete from %s where %s=%r",
                              ( self.table,self.key,id))
 
     def show(self,id,result):
-        dbh = DB.DBO()
+        dbh = DB.DBO(self.case)
         dbh.execute("select %s from %s where %s=%r",
                          ( ','.join(self._column_keys),
                            self.table,self.key,id))
@@ -242,3 +247,79 @@ class TableObj:
                     result.row(v,tmp)
                 except KeyError:
                     pass
+
+class DisplayItem(Reports.report):
+    """ Displays an item from the table """
+    name = 'Generic Display Item'
+    table=TableObj
+
+    def __init__(self,flag,ui=None):
+        self.table = self.table()
+        self.parameters[self.table.key]='numeric'
+        Reports.report.__init__(self,flag,ui)
+
+        try:
+            tablename = self.tblname
+        except AttributeError:
+            self.tblname = self.table.table
+
+    def display(self,query,result):
+        table=self.table(query.get('case',None))
+        result.heading("%s id %s" % (self.name,query[self.table.key]))
+        table.show(query[self.table.key],result)
+
+    def form(self,query,result):
+        result.textfield("Select key %s" % (self.table.key),self.table.key)
+
+class EditItem(DisplayItem):
+    """ Edit a row from a table """
+
+    def __init__(self,flag,ui=None):
+        self.parameters['submit']='any'
+        DisplayItem.__init__(self,flag,ui)
+        ## Add the required fields to the parameters list so the
+        ## framework can ensure that they are all satisfied.
+        for k in self.table._column_keys:
+            self.parameters[k] = 'any'
+
+    def display(self,query,result):
+        self.table.case=query.get('case',None)
+        try:
+            self.table.edit(query,result)
+            result.heading("Updated %s" % self.tblname)
+        except ConstraintError,e:
+            result.heading("Error editing a %s" % self.tblname )
+            result.para("Updating record failed because:")
+            result.para(e)
+            result.para("Press the back button and try again")
+
+    def form(self,query,result):
+        print self.parameters
+        self.table.case=query.get('case',None)
+        try:
+            self.table.edit_form(query,result)
+        except KeyError:
+            result.textfield("Select key %s" % self.table.key,self.table.key)
+    
+class AddItem(EditItem):
+    """ Add a row to table """
+        
+    def display(self,query,result):
+        self.table.case=query.get('case',None)
+        try:
+            self.table.add(query,result)
+            result.heading("Added a new %s" % self.tblname)
+        except ConstraintError,e:
+            result.heading("Error Adding %s" % self.tblname )
+            result.para("Adding a row failed because:")
+            result.para(e)
+            result.para("Press the back button and try again")
+
+    def __init__(self,flag,ui=None):
+        EditItem.__init__(self,flag,ui)
+        self.parameters = { 'submitted':'numeric'}
+
+    def form(self,query,result):
+        self.table.case=query.get('case',None)
+        result.hidden("submitted","1")
+        self.table.add_form(query,result)

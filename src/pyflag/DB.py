@@ -82,6 +82,8 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
     We store a limited cache of rows client side, and fetch rows from
     the server when needed.
     """
+    ignore_warnings = False
+    
     def __init__(self, connection):
         MySQLdb.cursors.SSDictCursor.__init__(self, connection)
         self.py_row_cache = []
@@ -142,6 +144,8 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
         when warnings are detected, we simply try to drain the
         resultsets and then read the warnings.
         """
+        if self.ignore_warnings: return
+        
         ## We have warnings to show
         if self._warnings:
             try:
@@ -531,6 +535,7 @@ class DBO:
             ## Ensure that our mass insert case is comitted in case
             ## users forgot to flush it:
             self.mass_insert_commit()
+            self.cursor.ignore_warnings = False
 
             DBH[self.case].put((self.dbh, self.mysql_bin_string))
         except (TypeError,AssertionError):
