@@ -44,6 +44,36 @@ description = "Test Class"
 #Remove this line to ensure this appears in the menu
 #active = False
 
+#We are testing the tree widget. Note this could have been
+#written as a generator for faster performance...
+def tree_cb(path):
+    try:
+        files = []
+        dirs = []
+        for d in os.listdir(path):
+            if os.path.isdir(os.path.join(path,d)):
+                dirs.append((d,d,'branch'))
+            else:
+                files.append((d,d,'leaf'))
+
+        files.sort()
+        dirs.sort()
+        
+        ## Just for testing we limit the number of nodes
+        return dirs[:10] + files[:10]
+    except OSError: return [(None,None,None)]
+
+def pane_cb(branch,result):
+    """ A callback for rendering the right pane.
+
+    @arg branch: A list indicating the currently selected item in the tree
+    @arg result: A UI object to draw on
+    """
+    result.text("You clicked on %s" % str(branch))
+    print "Called back for %s" % (branch,)
+
+
+
 class TreeTest(Reports.report):
     """ A sample report.
 
@@ -57,32 +87,6 @@ class TreeTest(Reports.report):
     def display(self,query,result):
         result.heading("I am calling the display method")
         branch = ['/']
-
-        #We are testing the tree widget. Note this could have been
-        #written as a generator for faster performance...
-        def tree_cb(path):
-            try:
-                files = []
-                dirs = []
-                for d in os.listdir(path):
-                    if os.path.isdir(os.path.join(path,d)):
-                        dirs.append((d,d,'branch'))
-                    else:
-                        files.append((d,d,'leaf'))
-
-                files.sort()
-                dirs.sort()
-                return dirs + files 
-            except OSError: return [(None,None,None)]
-
-        def pane_cb(branch,result):
-            """ A callback for rendering the right pane.
-
-            @arg branch: A list indicating the currently selected item in the tree
-            @arg result: A UI object to draw on
-            """
-            result.text("You clicked on %s" % str(branch))
-            print "Called back for %s" % (branch,)
 
         result.tree(tree_cb = tree_cb,pane_cb = pane_cb ,branch = branch )
 
@@ -137,7 +141,7 @@ class PopUpTest(Refresher):
             result.text("This floating pane will be closed in 5 seconds!!!")
             result.refresh(5, query, parent=True)
 
-        result.popup(popup_cb1, "Click Me")
+        result.popup(popup_cb1, "Click Me", tooltip="This will pop a new window up")
 
         def popup_form_cb(query, result):
             result.heading("A form popup test")
@@ -145,7 +149,7 @@ class PopUpTest(Refresher):
             result.textfield("Type something here","something")
             result.end_form()
 
-        result.popup(popup_form_cb, "Form popup Test")
+        result.popup(popup_form_cb, "Form popup Test", tooltip="Tryout the form in the popup")
 
         def popup_link_cb(query,result):
             result.heading("Tests links within popups")
@@ -164,8 +168,25 @@ class PopUpTest(Refresher):
             new_query['__opt__'] = "parent"
             result.link("back to parent link", target=new_query)
 
-        result.popup(popup_link_cb, "Popup Links test")
+        result.popup(popup_link_cb, "Popup Links test", tooltip="Try links in the popup")
         try:
             result.para("Something is %s" % query['something'])
         except:
             pass
+
+class ToolTipTest(PopUpTest):
+    """ Demonstrates some of the tooltip capabilities """
+    name = "ToolTipTest"
+    def display(self, query, result):
+        result.heading("Tooltip Test")
+
+        def popup_cb(query,result):
+            result.heading("I am a popup")
+
+        result.popup(popup_cb, "Launch popup", tooltip="I am a tooltip on a popup launcher")
+
+        tmp = result.__class__(result)
+        tmp.heading("A heavy tooltip")
+        tmp.para("This tooltip is a fully blown UI object")
+
+        result.link("Go to self",target=query, tooltip=tmp)

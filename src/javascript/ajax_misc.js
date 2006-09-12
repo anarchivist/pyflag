@@ -295,6 +295,8 @@ function add_toolbar_callback(icon, link, id) {
 
   if(!container) return;
 
+  dojo_icon.domNode.id = "image"+id
+
   dojo.event.connect(dojo_icon, "onClick", function () {
 		       update_container(container.domNode.id,link);
 		     });

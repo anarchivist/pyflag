@@ -34,6 +34,7 @@ class AJAX(Menu):
         dojo.require("dojo.widget.Dialog");
         dojo.require("dojo.widget.Toolbar");
         dojo.require("dojo.widget.FloatingPane");
+        dojo.require("dojo.widget.Tooltip");
         dojo.require("dojo.uri.Uri");
         dojo.require("dojo.collections.Stack");
         dojo.hostenv.writeIncludes();
@@ -106,7 +107,7 @@ class AJAX(Menu):
         ## Is it possible? The problem is that the URL is not enough
         ## to specify the state because it might include stored UIs.
         result = '<script>\ntry { djConfig; } catch(err) { alert(err); document.location="/";  };\n</script>'
-        #print data
+        print data
         return data+result
 
     def raw_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):

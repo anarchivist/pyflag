@@ -154,3 +154,6 @@ a {
 	width: 16px;
 	height: 16px;
 }
+
+.tt { border-bottom: 1px dotted black; cursor: pointer; }
+body .dojoTooltip { color: blue; }

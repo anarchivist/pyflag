@@ -346,21 +346,24 @@ class AJAXUI(HTMLUI.HTMLUI):
             for n in new_names:
                 try:
                     if query['dorder']==n:
-                        result.result+="<th id='%s' sort='1' onclick=\"update_container('tableContainer%s','%s&order=%s')\" >%s<img src='/images/increment.png' /></th>\n" % (n,id, new_query,n,n)
+                        result.result+="<th id='th_%s' sort='1' onclick=\"update_container('tableContainer%s','%s&order=%s')\" >%s<img src='/images/increment.png' /></th>\n" % (n,id, new_query,n,n)
                         order = query['dorder']
+                        self.tooltip("th_%s" % n, "Sort by %s" % n)
                         continue
 
                 except KeyError:
                     try:
                         if query['order']==n:
-                            result.result+="<th id='%s' sort='0' onclick=\"update_container('tableContainer%s','%s&dorder=%s')\" >%s<img src='/images/decrement.png' /></th>\n" % (n,id, new_query,n,n)
+                            result.result+="<th id='th_%s' sort='0' onclick=\"update_container('tableContainer%s','%s&dorder=%s')\" >%s<img src='/images/decrement.png' /></th>\n" % (n,id, new_query,n,n)
                             order = query['order']
+                            self.tooltip("th_%s" % n, "Reverse sort by %s" % n)
                             continue
                     
                     except KeyError:
                         pass
 
-                result.result+="<th id='%s' sort='1' onclick=\"update_container('tableContainer%s','%s&order=%s')\" >%s</th>\n" % (n,id, new_query,n,n)
+                result.result+="<th id='th_%s' sort='1' onclick=\"update_container('tableContainer%s','%s&order=%s')\" >%s</th>\n" % (n,id, new_query,n,n)
+                self.tooltip("th_%s" %n, "Sort by %s" % n)
                     
             result.result+='''</tr></thead><tbody class="scrollContent">'''
 
@@ -432,7 +435,7 @@ class AJAXUI(HTMLUI.HTMLUI):
 
         self.result+="</div>"
 
-    def link(self,string,target=None,options=None,icon=None,tooltip=None,**target_options):
+    def link(self,string,target=None,options=None,icon=None,tooltip='',**target_options):
         ## If the user specified a URL, we just use it as is:
         try:
             self.result+="<a href='%s'>%s</a>" % (target_options['url'],string)
@@ -466,7 +469,7 @@ class AJAXUI(HTMLUI.HTMLUI):
         if icon:
             tmp = self.__class__(self)
             tmp.icon(icon,alt=string,border=0)
-            tooltip=string
+            tooltip+=string
             string=tmp
 
         tmp = []
@@ -488,11 +491,11 @@ class AJAXUI(HTMLUI.HTMLUI):
         base = '<a %s id="Link%s" onclick="set_url(%s, \'/f?%s\');" href="#">%s</a>' % (self.opt_to_str(options),self.id, pane, q,string)
             
         if tooltip:
-            self.result+="<abbr title='%s'>%s</abbr>" % (tooltip,base)
-        else:
-            self.result+=base
+            self.tooltip("Link%s" % self.id, tooltip)
 
-    def toolbar(self,cb=None,text=None,icon=None,popup=True,tooltip=None,link=None):
+        self.result+=base
+
+    def toolbar(self,cb=None,text='',icon=None,popup=True,tooltip='',link=None):
         """ Create a toolbar button.
 
         When the user clicks on the toolbar button, a popup window is
@@ -510,6 +513,9 @@ class AJAXUI(HTMLUI.HTMLUI):
         ## Button is disabled:
         else:
             result="<script>\n add_toolbar_disabled('/images/%s','dummy%s');\n</script><div id='dummy%s'></div>" % (icon,id, id)
+
+        if tooltip or text:
+            self.tooltip("imagedummy%s" % id, tooltip+text)
 
         self.result+=result
 
@@ -573,12 +579,21 @@ class AJAXUI(HTMLUI.HTMLUI):
 
         s.floats.append(data)
 
+    def tooltip(self, widget, text):
+        """ Inserts a tooltip on a widgetId. Mostly used from within AJAXUI """
+        self.add_to_top_ui('''<span dojoType="tooltip" connectId="%s" toggle="explode" toggleDuration="250">%s</span>\n''' % (widget, text))
+        
     def popup(self,callback, label,icon=None,toolbar=0, menubar=0, tooltip=None, **options):
         if not tooltip: tooltip = label
+        image_id = self.get_uniue_id()
         cb = self.store_callback(callback)
-        self.add_to_top_ui('''<div widgetId="float%s" dojoType="FloatingPane" style="width: 640px; height: 400px; left: 100px; top: 100px;" windowState="minimized" displayMinimizeAction = "true"  hasShadow="true"  resizable="true"  executeScripts="true" title="%s"></div>''' % (self.id,tooltip))
-
+        self.add_to_top_ui('''<div widgetId="float%s" dojoType="FloatingPane" style="width: 640px; height: 400px; left: 100px; top: 100px;" windowState="minimized" displayMinimizeAction = "true"  hasShadow="true"  resizable="true"  executeScripts="true" title="%s"></div>''' % (image_id,tooltip))
+        
         if icon:
             label = "<img alt=%r border=0 src='images/%s' />" % (label, icon)
 
-        self.result+='''<a href="#" onclick="show_popup('float%s',%r)">%s</a>\n''' % (self.id, "%s&callback_stored=%s" % (self.defaults,cb), label)
+        if tooltip:
+            self.tooltip("popup%s" % image_id, tooltip)
+
+        self.result+='''<a href="#" id="popup%s" onclick="show_popup('float%s',%r)">%s</a>\n''' % (image_id,image_id, "%s&callback_stored=%s" % (self.defaults,cb), label)
+

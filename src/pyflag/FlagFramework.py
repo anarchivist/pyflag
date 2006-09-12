@@ -470,7 +470,7 @@ class Flag:
             if report.check_parameters(query):
                 canonical_query = canonicalise(query)
                 #Parameters ok, lets go
-                result.toolbar(show_help,text="Help",icon="help.png")
+                result.toolbar(show_help,text="Help on %s" % report.name,icon="help.png")
 
                 #Check to see if the user wants to reset this report?
                 if query.has_key('reset'):
@@ -514,7 +514,8 @@ class Flag:
             else:
                 #Set the default form behaviour
                 result.defaults = query
-                result.toolbar(show_help,text="Help",icon="help.png")
+                result.toolbar(show_help,text="Help on %s" % report.name,
+                               icon="help.png")
                 result.heading(report.name)
                 try:
                     result.start_form(query)

@@ -180,9 +180,14 @@ class IO:
         if(query and result):
             self.form(query,result)
   
-    def seek(self, offset):
+    def seek(self, offset, whence=0):
         """ fake seeking routine """
-        self.readptr = offset
+        if whence==0:
+            self.readptr = offset
+        elif whence==1:
+            self.readptr+=offset
+        elif whence==2:
+            self.readptr = iosubsys.size(self.io)
 
     def tell(self):
         """ return current read pointer """

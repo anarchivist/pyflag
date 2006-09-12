@@ -529,7 +529,7 @@ class Drawer:
             result.end_form()
 
         right=result.__class__(result)
-        right.popup(configure_cb,"Configure",icon="spanner.png")
+        right.popup(configure_cb,"Configure %s" % self.name,icon="spanner.png")
         left.row(right,self.description)
         result.const_selector(left,
                            scan_group_name,
