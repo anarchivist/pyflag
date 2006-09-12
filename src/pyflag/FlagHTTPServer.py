@@ -187,7 +187,15 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                 import sys
                 path = os.path.normpath(config.DATADIR + query.base)
                 if path.startswith(os.path.normpath(config.DATADIR)):
-                    s = os.stat(path)
+                    ## Check if there is a compressed version of this file:
+                    try:
+                        s=os.stat(path+".gz")
+                        path = path+".gz"
+                        content_encoding = "gzip"
+                    except:
+                        s = os.stat(path)
+                        content_encoding = None
+                        
                     try:
                         ## This is the last modified time the browser
                         ## is asking for in local time (not GMT)
@@ -213,6 +221,14 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                     
                     self.send_response(200)
                     self.send_header("Content-type",ct)
+
+                    ## Support content encodings. FIXME: This needs to
+                    ## do this only when the browser sends the
+                    ## Accept-Encodings.
+                    if content_encoding:
+                        print "Will send %s as %s encoding" % (content_encoding,path)
+                        self.send_header("Content-Encoding",content_encoding)
+                        
                     self.send_header("Last-Modified",self.format_date_time_string(s.st_mtime))
                     self.send_header("Etag",s.st_ino)
                     self.send_header("Connection","close")
