@@ -190,3 +190,39 @@ class ToolTipTest(PopUpTest):
         tmp.para("This tooltip is a fully blown UI object")
 
         result.link("Go to self",target=query, tooltip=tmp)
+
+class LinkTest(PopUpTest):
+    """ Tests linking """
+    name = "LinkTest"
+
+    def display(self, query, result):
+        result.heading("Link tests")
+
+        result.link("Simple link to this page!", target=query, icon="floppy.png")
+        
+        def popup_cb(query,result):
+            result.heading("This is a popup")
+
+            try:
+                i=int(query['internal'])
+                result.para("Following %s internal links" % i)
+            except:
+                i=0
+
+            target =query.clone()
+            target['value'] = "Value from popup"
+            result.link("Will open in our parent", target=target, pane='parent')
+
+            target = query.clone()
+            del target['internal']
+            target['internal']=i+1
+            result.link("This is an internal link", target=target, pane='self')
+
+            result.link("Open to main", target=query, pane='main')
+
+        result.popup(popup_cb, "Open a popup")
+
+        try:
+            result.para(query['value'])
+        except:
+            pass

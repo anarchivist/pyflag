@@ -435,7 +435,16 @@ class AJAXUI(HTMLUI.HTMLUI):
 
         self.result+="</div>"
 
-    def link(self,string,target=None,options=None,icon=None,tooltip='',**target_options):
+    def link(self,string,target=None,options=None,icon=None,tooltip='',pane=None, **target_options):
+        """ The user can specify which pane the link will open in by using the pane variable:
+
+        pane can be:
+
+        main (default): refresh to the main pane (default).
+        parent: refresh to the pane that contains this pane. (useful for popups etc).
+        popup: open a new popup window and draw the target in that.
+        self: refresh to the current pane (useful for internal links in popups etc).
+        """
         ## If the user specified a URL, we just use it as is:
         try:
             self.result+="<a href='%s'>%s</a>" % (target_options['url'],string)
@@ -445,6 +454,9 @@ class AJAXUI(HTMLUI.HTMLUI):
         
         if target==None:
             target=FlagFramework.query_type(())
+
+        if not options:
+            options={}
             
         q=target.clone()
         if target_options:
@@ -452,19 +464,24 @@ class AJAXUI(HTMLUI.HTMLUI):
                 del q[k]
                 q[k]=v
 
-        if self.defaults.has_key("__pane__"):
-            pane = "%r" % self.defaults['__pane__']
-        else:
-            pane = "find_widget_type_above('ContentPane','Link%s')" % self.id
+        ## Open to the container we live in
+        if pane=='parent':
+            del q['callback_stored']
+            if self.defaults.has_key("__pane__"):
+                pane = "find_widget_type_above('ContentPane',%r)" % self.defaults['__pane__']
+            else:
+                pane = '"main"'
 
-##       else:
-##          pane = "'main'"
-##        else:
-##            pane = "find_widget_type_above('FloatingPane','Link%s')" % self.id
-##        pane="dojo.widget.getWidgetById('Link%s')"% self.id
+        # open to the current container:
+        elif pane=='self':
+            if self.defaults.has_key("__pane__"):
+                pane = "%r" % self.defaults['__pane__']
+            else:
+                pane = "find_widget_type_above('ContentPane','Link%s')" % self.id
 
-        if not options:
-            options={}
+        elif pane=='main':
+            del q['callback_stored']
+            pane = "'main'"
 
         if icon:
             tmp = self.__class__(self)
@@ -472,31 +489,18 @@ class AJAXUI(HTMLUI.HTMLUI):
             tooltip+=string
             string=tmp
 
-        tmp = []
-        try:
-            tmp=target['__opt__'].split(',')
-            del q['__opt__']
-            if 'parent' in tmp:
-                pane = "find_widget_type_above('ContentPane','Link%s')" % self.id
-                del q['callback_stored']
-
-            elif 'main' in tmp:
-                pane = "'main'"
-                del q['callback_stored']
+        if pane=='popup':
+            def popup_cb(query, result):
+                self.refresh(0, target)
                 
-            elif 'popup' in tmp:
-                options['onclick'] ="window.open('%s','client','HEIGHT=600,WIDTH=600,scrollbars=yes')" % q
-                self.result+="<a href=# %s >%s</a>" %(self.opt_to_str(options),string)
-                return
-                
-        except KeyError:
-            pass
-
-        ## If the user right clicked, we open in a new window
-        base = '<a %s id="Link%s" onclick="set_url(%s, \'/f?%s\');" href="#">%s</a>' % (self.opt_to_str(options),self.id, pane, q,string)
+            self.popup(popup_cb, string, icon=icon, tooltip=tooltip)
+            return
+        
+        else:
+            base = '<a %s id="Link%s" onclick="set_url(%s, \'/f?%s\');" href="#">%s</a>' % (self.opt_to_str(options),self.id, pane, q,string)
             
-        if tooltip:
-            self.tooltip("Link%s" % self.id, tooltip)
+            if tooltip:
+                self.tooltip("Link%s" % self.id, tooltip)
 
         self.result+=base
 
