@@ -88,32 +88,6 @@ class TreeTest(Reports.report):
         result.heading("I am calling the display method")
         branch = ['/']
 
-        #We are testing the tree widget. Note this could have been
-        #written as a generator for faster performance...
-        def tree_cb(path):
-            try:
-                files = []
-                dirs = []
-                for d in os.listdir(path):
-                    if os.path.isdir(os.path.join(path,d)):
-                        dirs.append((d,d,'branch'))
-                    else:
-                        files.append((d,d,'leaf'))
-
-                files.sort()
-                dirs.sort()
-                return dirs + files 
-            except OSError: return [(None,None,None)]
-
-        def pane_cb(branch,result):
-            """ A callback for rendering the right pane.
-
-            @arg branch: A list indicating the currently selected item in the tree
-            @arg result: A UI object to draw on
-            """
-            result.text("You clicked on %s" % str(branch))
-            print "Called back for %s" % (branch,)
-
         result.tree(tree_cb = tree_cb,pane_cb = pane_cb ,branch = branch )
 
 class InputTest(Reports.report):
