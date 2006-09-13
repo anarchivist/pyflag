@@ -1391,7 +1391,7 @@ class MSNScanner(StreamScannerFactory):
             """ CREATE TABLE if not exists `msn_session` (
             `inode` VARCHAR(50) NOT NULL,
             `packet_id` INT NOT NULL,
-            `session_id` INT,
+            `session_id` BIGINT,
             `sender` VARCHAR(250),
             `recipient` VARCHAR( 250 ),
             `type` VARCHAR(50),

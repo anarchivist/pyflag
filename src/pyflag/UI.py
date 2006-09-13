@@ -143,6 +143,10 @@ class GenericUI:
     def hidden(self,name,value):
         """ Create a hidden parameter to be passed on form submission """
         logging.log(logging.DEBUG, "hidden not implemented")
+
+    def clear(self):
+        """ Clear the current object, as if it has not been drawn on """
+        self.result=''
         
     def checkbox(self,description,name,value,**options):
         """ Create a checkbox input for the name,value pair given. """

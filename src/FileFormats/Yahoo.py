@@ -144,7 +144,10 @@ class Message(SimpleStruct):
             #print "%s -> %s" % (key.get_value(),value.get_value())
 
         ## This ensures that the YMSG packet takes up exactly as much
-        ## as its meant to - without overflowing into the next packet
+        ## as its meant to - without overflowing into the next
+        ## packet. Note that sometimes packet length is not accurate,
+        ## so the scanner may resync by searching for the next YMSG
+        ## header.
         self.offset+=pkt_len
         return result
 
@@ -158,6 +161,19 @@ class Message(SimpleStruct):
     
     def payload(self):
         return self.data['data'].get_value().__str__()
+
+    def get_property(self,*args):
+        """ Tries to retrieve the property in one of the args in order.
+
+        If none are found, we return None.
+        """
+        for a in args:
+            try:
+                return self.properties[a]
+            except:
+                pass
+
+        return None
 
 if __name__ == "__main__":
     fd = open(sys.argv[1],'r')

@@ -36,6 +36,7 @@ config=pyflag.conf.ConfObject()
 import pyflag.logging as logging
 import pyflag.Registry as Registry
 import pyflag.Store as Store
+import textwrap
 
 flag_version = config.VERSION
 
@@ -450,14 +451,14 @@ class Flag:
 
             ## Try to use rst2html to produce nice looking html:
             try:
-                import docutils.core, textwrap
+                import docutils.core
 
                 result.result += docutils.core.publish_string(textwrap.dedent(report_doc),
                                                               writer_name='html')
             except Exception,e:
-                logging.log(logging.Error,"Error running docutils: %s" % e)
+                logging.log(logging.ERROR,"Error running docutils: %s" % e)
                 result.heading("Help for %s" % report_name)
-                result.text(report_doc)
+                result.text(textwrap.dedent(report_doc), font='typewriter')
             
         import pyflag.TypeCheck as TypeCheck
 

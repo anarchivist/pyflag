@@ -274,6 +274,10 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                 ## If the cb raises an exception, we let the user know:
             except Exception,e:
                 logging.log(logging.ERROR,"Unable to call callback %s" % cb)
+                result.clear()
+                result.heading("Error")
+                result.text("%s" % e)
+                result.text(FlagFramework.get_bt_string(e))
 
             ## Return the cb to the store:
             #flag.store.put(cb, key=cb_key)

@@ -146,6 +146,16 @@ class prefilter:
         transform_list = self.res['PFDateConvert']
         return self.transform(transform_list,string)
 
+    def PFDateFormatChange3(self, string):
+        """MM DD HH:mm:SS YYYY ->  YYYY/MM/DD:HH:MM:SS"""
+        if not self.res.has_key('PFDateFormatChange3'):
+            tmp=[]
+            self.prepare(r"s|(\d{,2}) +(\d{,2}) +(\d\d:\d\d:\d\d) +(\d{4})|\4/\1/\2:\3|" , tmp)
+            self.res['PFDateFormatChange3'] = tmp
+
+        transform_list = self.res['PFDateFormatChange3']
+        return self.transform(transform_list,string)
+
     def PFRemoveChars(self,string):
         """ Remove [\'\"] chars """
         if not self.res.has_key('PFRemoveChars'):
@@ -197,7 +207,7 @@ class SimpleLog(LogFile.Log):
         for i in self.prefilters:
             #Call the relevant methods on the prefilter object:
             string = p.filters[i][0](p,string)
-            
+
         return string
 
     def get_fields(self):

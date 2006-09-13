@@ -160,13 +160,12 @@ class PopUpTest(Refresher):
 
             del query['link']
             query['link'] = "Internal link"
-            result.link("Internal popup link", target=query)
+            result.link("Internal popup link", target=query, pane='self')
 
             new_query = query.clone()
             del new_query['something']
             new_query['something'] = "Data from popup"
-            new_query['__opt__'] = "parent"
-            result.link("back to parent link", target=new_query)
+            result.link("back to parent link", target=new_query, pane='parent')
 
         result.popup(popup_link_cb, "Popup Links test", tooltip="Try links in the popup")
         try:

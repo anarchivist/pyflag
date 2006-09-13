@@ -74,8 +74,14 @@ class AJAXUI(HTMLUI.HTMLUI):
 
             del query['callback_stored']
             del query['right_pane_cb']
-            
-            callbacks[index](query,result)
+
+            try:
+                callbacks[index](query,result)
+            except Exception,e:
+                ## Error occured present to user:
+                result.clear()
+                result.heading("Error occured %s" % e)
+                result.text(FlagFramework.get_bt_string(e))
 
         t=self.store_callback(tab)
 
@@ -435,7 +441,7 @@ class AJAXUI(HTMLUI.HTMLUI):
 
         self.result+="</div>"
 
-    def link(self,string,target=None,options=None,icon=None,tooltip='',pane=None, **target_options):
+    def link(self,string,target=None,options=None,icon=None,tooltip='',pane='main', **target_options):
         """ The user can specify which pane the link will open in by using the pane variable:
 
         pane can be:
