@@ -35,6 +35,7 @@ class AJAX(Menu):
         dojo.require("dojo.widget.Toolbar");
         dojo.require("dojo.widget.FloatingPane");
         dojo.require("dojo.widget.Tooltip");
+        dojo.require("dojo.widget.DropdownDatePicker");
         dojo.require("dojo.uri.Uri");
         dojo.require("dojo.collections.Stack");
         dojo.hostenv.writeIncludes();

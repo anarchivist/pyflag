@@ -13,6 +13,7 @@ var dependencies = [
 "dojo.widget.Dialog",
 "dojo.widget.Toolbar",
 "dojo.widget.FloatingPane",
+"dojo.widget.DropdownDatePicker",
 "dojo.uri.Uri",
 "dojo.collections.Stack",
 ];

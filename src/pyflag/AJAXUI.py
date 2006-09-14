@@ -4,7 +4,7 @@ import pyflag.conf
 import pyflag.logging as logging
 import pyflag.FlagFramework as FlagFramework
 config=pyflag.conf.ConfObject()
-import cgi
+import cgi,time
 
 class AJAXUI(HTMLUI.HTMLUI):
     """ An AJAX driven web framework for PyFlag """
@@ -491,8 +491,7 @@ class AJAXUI(HTMLUI.HTMLUI):
 
         if icon:
             tmp = self.__class__(self)
-            tmp.icon(icon,alt=string,border=0)
-            tooltip+=string
+            tmp.icon(icon,tooltip=string+tooltip,border=0)
             string=tmp
 
         if pane=='popup':
@@ -509,6 +508,13 @@ class AJAXUI(HTMLUI.HTMLUI):
                 self.tooltip("Link%s" % self.id, tooltip)
 
         self.result+=base
+
+    def icon(self, path, tooltip=None, **options):
+        id = self.get_uniue_id()
+        option_str = self.opt_to_str(options)
+        self.result += "<img id='img%s' border=0 src='images/%s' %s />" % (id, path, option_str)
+        if tooltip:
+            self.tooltip("img%s" % id, tooltip)
 
     def toolbar(self,cb=None,text='',icon=None,popup=True,tooltip='',link=None):
         """ Create a toolbar button.
@@ -612,3 +618,11 @@ class AJAXUI(HTMLUI.HTMLUI):
 
         self.result+='''<a href="#" id="popup%s" onclick="show_popup('float%s',%r)">%s</a>\n''' % (image_id,image_id, "%s&callback_stored=%s" % (self.defaults,cb), label)
 
+
+    def date_selector(self, description, variable):
+        try:
+            date = self.defaults[variable]
+        except KeyError:
+            date = time.strftime("%m/%d/%Y")
+        text = '<div dojoType="dropdowndatepicker" date="%s" containerToggle="fade" name=%r></div>\n' % (date,variable)
+        self.row(description, text)
