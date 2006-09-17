@@ -623,6 +623,44 @@ class AJAXUI(HTMLUI.HTMLUI):
         try:
             date = self.defaults[variable]
         except KeyError:
-            date = time.strftime("%m/%d/%Y")
-        text = '<div dojoType="dropdowndatepicker" date="%s" containerToggle="fade" name=%r></div>\n' % (date,variable)
+            date = time.strftime("%Y-%m-%d")
+        text = '<div dojoType="dropdowndatepicker" date="%s" containerToggle="fade" displayFormat="dd/MM/yyyy" name=%r></div>\n' % (date,variable)
         self.row(description, text)
+        ## And remove if from the form
+        if self.form_parms.has_key(variable):
+            del self.form_parms[variable]
+
+    def textarea(self, description, name, **options):
+        import cgi
+        try:
+            default = cgi.escape(self.defaults[name],quote=True)
+        except (KeyError,AttributeError):
+            default =''
+        
+        ## And remove if from the form
+        if self.form_parms.has_key(name):
+            del self.form_parms[name]
+
+        left = description
+        right = """<div widgetId="%s" dojoType="Editor">%s</div>""" % (name,default)
+        self.row(left,right,valign="top")
+
+    def wizard(self,names=[],context="wizard",callbacks=[],title=''):
+        tmp = []
+        for i in range(len(names)):
+            tmp.append('<div widgetId="page%s" dojoType="WizardPane" label="%s"></div>' % (i,names[i]))
+
+        self.result+='''<div id="wizard1" dojoType="WizardContainer"
+        style="width: 100%%; height: 200px;"
+        nextButtonLabel="next >>"
+        previousButtonLabel="<< previous"
+        cancelFunction="cancel"
+         >%s</div>''' % '\n'.join(tmp)
+
+        cb = [ self.store_callback(c) for c in callbacks ]
+
+        self.result+='''<script>
+        _container_.addOnLoad( function() {
+            set_url("page0","f?%s&callback_stored=%s");
+        });
+        </script>''' % (self.defaults, cb[0])

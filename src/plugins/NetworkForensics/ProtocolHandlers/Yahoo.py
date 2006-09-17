@@ -80,8 +80,8 @@ class YahooParser:
         if not m:
             m=message['status']
             
-        result = dict(sender = message.get_property('1','4'),
-                      recipient = message.get_property('0','5'),
+        result = dict(sender = message.get_property(1,4),
+                      recipient = message.get_property(0,5),
                       data=m,
                       type="MESSAGE",
                       )
@@ -94,12 +94,12 @@ class YahooParser:
         self.dbh.insert('msn_session', **result)
 
     def YAHOO_SERVICE_LIST(self, message):
-        result = dict(sender = message.get_property('3'),
-                      data = message.get_property('87'),
+        result = dict(sender = message.get_property(3),
+                      data = message.get_property(87),
                       type = "BUDDY LIST")
 
-        result2 = dict(sender = message.get_property('3'),
-                      data = message.get_property('88'),
+        result2 = dict(sender = message.get_property(3),
+                      data = message.get_property(88),
                       type = "IGNORE LIST")
 
         details = self.get_details(message)
@@ -111,14 +111,42 @@ class YahooParser:
         self.dbh.insert('msn_session', **result2)
 
     def YAHOO_SERVICE_NOTIFY(self, message):
-        result = dict(sender = message.get_property('1','4'),
-                      recipient = message.get_property('5'),
-                      data = message.get_property('49'),
+        result = dict(sender = message.get_property(1,4),
+                      recipient = message.get_property(5),
+                      data = message.get_property(49),
                       type = "NOTIFY")
         
         result.update(self.get_details(message))
         self.dbh.insert('msn_session', **result)
 
+    def get_chat_parameters(self, message):
+        result= dict(sender = message.get_property(109),
+                    recipient = message.get_property(104),
+                    type = message['service'])
+        result.update(self.get_details(message))
+        return result
+    
+    def YAHOO_SERVICE_CHATEXIT(self,message):
+        result = self.get_chat_parameters(message)
+        result['data'] = "Exiting chatroom with topic: %s" % message.get_property(105)
+        self.dbh.insert('msn_session', **result)
+
+    def YAHOO_SERVICE_COMMENT(self,message):
+        result = self.get_chat_parameters(message)
+        result['data'] = message.get_property(117)
+        self.dbh.insert('msn_session', **result)
+
+    def YAHOO_SERVICE_CHATJOIN(self,message):
+        result = self.get_chat_parameters(message)
+        result['data'] = "Joined Chatroom of topic: %s" % message.get_property(105)
+        self.dbh.insert('msn_session', **result)
+
+    def YAHOO_SERVICE_CHATPING(self,message):
+        pass
+
+    def YAHOO_SERVICE_PING(self,message):
+        pass
+        
 class YahooScanner(StreamScannerFactory):
     """ A Yahoo IM Protocol scanner """
     default = True

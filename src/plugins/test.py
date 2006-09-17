@@ -225,3 +225,51 @@ class LinkTest(PopUpTest):
             result.para(query['value'])
         except:
             pass
+
+class DateSelectorTest(PopUpTest):
+    """ Test the Date Selector widget """
+    name = "DateSelectorTest"
+    parameters = {'start_date': 'any', 'end_date': 'any', 'foo':'any'}
+    
+    def form(self,query,result):
+        result.date_selector("Start Date", 'start_date')
+        result.date_selector("End Date", 'end_date')
+        result.textfield("Some field","foo")
+
+    def display(self,query,result):
+        result.heading("Date Selector test")
+        result.para("will show data between %s and %s" % (query['start_date'],query['end_date']))
+
+class FormTest(PopUpTest):
+    """ Test the various form widgets """
+    name = "FormTest"
+    parameters = { "var1": "any", "var2":"any"}
+
+    def form(self,query,result):
+        result.textarea("Enter value 1","var1")
+        result.textarea("Enter value 2","var2")
+
+    def display(self,query,result):
+        result.heading("Form test")
+
+class WizardTest(PopUpTest):
+    """ Tests the Wizard """
+    name ="Wizard Test"
+    parameters = {"var1":"any", "var2":"any", "var3":"any", "finished":"any"}
+
+    def form(self,query,result):
+        def page1_cb(query,result):
+            result.heading("Please enter your name")
+            result.textfield("Name","var1")
+
+        def page2_cb(query,result):
+            result.date_selector("Birthday",'var2')
+
+        def page3_cb(query,result):
+            result.textfield("Age",'var3')
+            result.checkbox("Finished?",'finished')
+
+        result.wizard(
+            names = ["Enter Your Name", "Birthday", "Your Age"],
+            callbacks = [page1_cb, page2_cb, page3_cb]
+            )

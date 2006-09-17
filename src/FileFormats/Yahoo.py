@@ -70,14 +70,24 @@ class Services(WORD_ENUM):
         0x4a: 'YAHOO_SERVICE_VOICECHAT', 
         0x4b: 'YAHOO_SERVICE_NOTIFY', 
         0x4d: 'YAHOO_SERVICE_P2PFILEXFER', 
-        0x4f: 'YAHOO_SERVICE_PEERTOPEER', 
+        0x4f: 'YAHOO_SERVICE_PEERTOPEER',
+        0x50: 'YAHOO_SERVICE_WEBCAM',
         0x54: 'YAHOO_SERVICE_AUTHRESP', 
         0x55: 'YAHOO_SERVICE_LIST', 
         0x57: 'YAHOO_SERVICE_AUTH', 
         0x83: 'YAHOO_SERVICE_ADDBUDDY', 
         0x84: 'YAHOO_SERVICE_REMBUDDY', 
         0x85: 'YAHOO_SERVICE_IGNORECONTACT', 
-        0x86: 'YAHOO_SERVICE_REJECTCONTACT', 
+        0x86: 'YAHOO_SERVICE_REJECTCONTACT',
+        0x89: 'YAHOO_SERVICE_GROUPRENAME',
+        0x96: 'YAHOO_SERVICE_CHATONLINE',
+        0x97: 'YAHOO_SERVICE_CHATGOTO',
+        0x98: 'YAHOO_SERVICE_CHATJOIN',
+        0x99: 'YAHOO_SERVICE_CHATLEAVE',
+        0x9b: 'YAHOO_SERVICE_CHATEXIT',
+        0xa0: 'YAHOO_SERVICE_CHATLOGOUT',
+        0xa1: 'YAHOO_SERVICE_CHATPING',
+        0xa8: 'YAHOO_SERVICE_COMMENT',
         }
 
 class Status(LONG_ENUM):
@@ -169,7 +179,7 @@ class Message(SimpleStruct):
         """
         for a in args:
             try:
-                return self.properties[a]
+                return self.properties[a.__str__()]
             except:
                 pass
 
