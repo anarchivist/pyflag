@@ -6,7 +6,10 @@ function alert_bt() {
 /** This function is used to set the url of a ContentPane. We cant use
     the ContentPane's set url because it either caches the page (which
     causes memory explosion in the browser) or adds rubbish to the url
-    like ?dojo..preventCache=115369481689 */
+    like ?dojo..preventCache=115369481689 
+
+    widget can be a proper widget, or the name of a widget.
+*/
 function set_url(widget, url) { 
   if(dojo.lang.isString(widget))
     widget = dojo.widget.getWidgetById(widget); 
@@ -110,7 +113,7 @@ function update_container(container,url) {
     c = dojo.widget.getWidgetById(container);
   
   // We must be operating on contentpanes
-  if(c.widgetType!="ContentPane") return;
+  //if(c.widgetType!="ContentPane") return;
 
   remove_popups(c);
 
@@ -254,51 +257,78 @@ function update_filter_column() {
 };
 
 /** This function add a single toolbar link. A toolbar link is an icon
-    which when clicked refreshes the main frame to the link */
-function add_toolbar_link(icon, link, id) {
-  var toolbar  = dojo.widget.getWidgetById("toolbar");
+    which when clicked refreshes a content pane to the link 
+
+    icon: the name of the icon which will be drawn.
+
+    link: the url to open in the container.
+
+    target: Is the target content pane which will be refreshed to the
+    link.
+
+    container: This is the name of the container which when unloaded
+    will cause the button to disappear.
+
+    widget_id: the id that should be assigned to the new button
+    toolbar.
+
+    toolbar_id: the id on the toolbar which needs to be used.
+*/
+function add_toolbar_link(icon, link, target, container, widget_id, toolbar_id) {
+  var toolbar  = dojo.widget.getWidgetById(toolbar_id);
+  if(!toolbar) return;
+
   var dojo_icon= dojo.widget.createWidget("ToolbarButton",
 					  {icon: icon});
-  var container = find_widget_type_above("ContentPane",id);
+  
+  dojo_icon.domNode.id = widget_id;
 
-  if(!container) return;
+  var container;
+
+  if(dojo.lang.isString(container))
+    container = dojo.widget.getWidgetById(container); 
 
   dojo.event.connect(dojo_icon, "onClick", function () {
-		       set_url(container,link);
+		       update_container(target,link);
 		     });
 
-  install_toolbar_widget(container, toolbar, dojo_icon);
+  // When the container is unloaded we remove this button.
+  container.addOnUnLoad(function() {
+			  try {
+			    toolbar.domNode.removeChild(dojo_icon.domNode);
+			  } catch(e) {};
+			});
+
+  toolbar.addChild(dojo_icon);
 };
 
 /** Adds a disabled button */
-function add_toolbar_disabled(icon, id) {
+function add_toolbar_disabled(icon, container) {
   var toolbar  = dojo.widget.getWidgetById("toolbar");
   var dojo_icon= dojo.widget.createWidget("ToolbarButton",
 					  {icon: icon});
-
-  var container = find_widget_type_above("ContentPane",id);
-
-  if(!container) return;
 
   dojo_icon.disable();
 
   install_toolbar_widget(container, toolbar, dojo_icon);
-  toolbar.addChild(dojo_icon);
 };
 
-function add_toolbar_callback(icon, link, id) {
+function add_toolbar_callback(icon, link, target, container) {
   var toolbar  = dojo.widget.getWidgetById("toolbar");
   var dojo_icon= dojo.widget.createWidget("ToolbarButton",
 					  {icon: icon});
 
-  var container = find_widget_type_above("ContentPane",id);
+  
+  var container;
+  if(dojo.lang.isString(container))
+    container = dojo.widget.getWidgetById(container); 
 
   if(!container) return;
 
-  dojo_icon.domNode.id = "image"+id
+  dojo_icon.domNode.id = "image"+target
 
   dojo.event.connect(dojo_icon, "onClick", function () {
-		       update_container(container.domNode.id,link);
+		       set_url(container,link);
 		     });
 
   install_toolbar_widget(container, toolbar, dojo_icon);

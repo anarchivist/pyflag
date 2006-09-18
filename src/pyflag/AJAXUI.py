@@ -283,8 +283,11 @@ class AJAXUI(HTMLUI.HTMLUI):
         names = list(names)
         columns = list(columns)
         id=self.get_uniue_id()
-            
+        
         def table_cb(query,result):
+            """ This callback is used to render the actual table in
+            its requested pane
+            """
             menus = []
 
             ## May only offer to group by if the report does not issue
@@ -329,18 +332,23 @@ class AJAXUI(HTMLUI.HTMLUI):
                 query['order']=names[0]
                 
             order = names[0]
-
+            try:
+                limit = int(query['limit'])
+            except:
+                limit = 0
+            
             dbh,new_query,new_names,new_columns,new_links = self._make_sql(
-                sql,
-                columns,
-                names,
-                links,
-                table,
-                where,
-                groupby,
-                case,
-                callbacks,
-                query)
+                sql=sql,
+                columns=columns,
+                names=names,
+                links=links,
+                table=table,
+                where=where,
+                groupby=groupby,
+                case=case,
+                callbacks=callbacks,
+                limit = limit,
+                query=query)
 
             if not new_query.has_key('callback_stored'):
                 new_query['callback_stored'] = cb
@@ -429,17 +437,89 @@ class AJAXUI(HTMLUI.HTMLUI):
                 result.result+="<tr class='%s'> %s </tr>\n" % (old_sorted_style,tds)
             result.result+="</tbody></table>"
 
+            ## Add the various toolbar icons:
+            new_id = self.get_uniue_id()
+
+            ## The next button allows user to page to the next page
+            next_button = "add_toolbar_link('/images/stock_next-page.png','f?limit=%(limit)s&%(query)s', 'tableContainer%(id)s', 'tableContainer%(id)s', 'next_button_%(new_id)s', 'tabletoolbar%(id)s');" % (
+                dict(limit = limit + config.PAGESIZE,
+                     query = query,
+                     id=id,
+                     new_id=new_id));
+
+
+            result.result+='''<script>
+            %s
+            </script>''' % (next_button)
+
+            ## Tooltips for the toolbar buttons:
+            result.tooltip('next_button_%s' % new_id, "Next Page (rows %s-%s)" % (limit,limit+config.PAGESIZE))
+
         cb=self.store_callback(table_cb)
         
         self.result += '''
-        <div id="tableContainer%s" dojoType="ContentPane"  cacheContent="false"  layoutAlign="client"
+        <div id="TableMain%(id)s" dojoType="ContentPane"  cacheContent="false"  layoutAlign="client"
+        style="overflow: auto;"
+        executeScripts="true"
+        >
+        <div dojoType="ToolbarContainer" layoutAlign="top" id="TableToolbar%(id)s">
+        <div dojoType="Toolbar" id="tabletoolbar%(id)s"></div>
+        </div>
+        <div id="tableContainer%(id)s" dojoType="ContentPane"  cacheContent="false"  layoutAlign="client"
         style="overflow: auto;"
         executeScripts="true"
         onunload="remove_popups(this);"
-        >''' % (id)
-        table_cb(self.defaults,self)
+        ></div>\n''' % {'id':id}
 
-        self.result+="</div>"
+        self.result+='''<script>
+        _container_.addOnLoad( function() {
+            set_url("tableContainer%s","f?%s&callback_stored=%s");
+        });
+        </script>''' % (id, self.defaults,cb)
+
+    def _calculate_js_for_pane(self, element_id=None, target=None, pane="'main'"):
+        """ Returns the JS string required to facilitate opening in the requested pane
+
+        Modifies query to remove stored callbacks if needed.
+
+        element_id: The ID of the element we are trying to
+        create. This will be used to calculate the container we are
+        in, if that was not supplied.
+
+        target: The query we should link to. We will delete callbacks from it if needed.
+
+        pane: Where we want to open the link can be:
+        main (default): refresh to the main pane (default).
+        parent: refresh to the pane that contains this pane. (useful for popups etc).
+        popup: open a new popup window and draw the target in that.
+        self: refresh to the current pane (useful for internal links in popups etc).
+        """
+        ## Open to the container we live in
+        if pane=='parent':
+            if target:
+                del target['callback_stored']
+                
+            if self.defaults.has_key("__pane__"):
+                pane = "find_widget_type_above('ContentPane',%r)" % self.defaults['__pane__']
+            else:
+                pane = '"main"'
+
+        # open to the current container:
+        elif pane=='self':
+            if self.defaults.has_key("__pane__"):
+                pane = "%r" % self.defaults['__pane__']
+            elif element_id:
+                pane = "find_widget_type_above('ContentPane',%r)" % element_id
+            else:
+                pane="'main'"
+
+        elif pane=='main':
+            if target:
+                del target['callback_stored']
+                
+            pane = "'main'"
+
+        return pane
 
     def link(self,string,target=None,options=None,icon=None,tooltip='',pane='main', **target_options):
         """ The user can specify which pane the link will open in by using the pane variable:
@@ -470,24 +550,7 @@ class AJAXUI(HTMLUI.HTMLUI):
                 del q[k]
                 q[k]=v
 
-        ## Open to the container we live in
-        if pane=='parent':
-            del q['callback_stored']
-            if self.defaults.has_key("__pane__"):
-                pane = "find_widget_type_above('ContentPane',%r)" % self.defaults['__pane__']
-            else:
-                pane = '"main"'
-
-        # open to the current container:
-        elif pane=='self':
-            if self.defaults.has_key("__pane__"):
-                pane = "%r" % self.defaults['__pane__']
-            else:
-                pane = "find_widget_type_above('ContentPane','Link%s')" % self.id
-
-        elif pane=='main':
-            del q['callback_stored']
-            pane = "'main'"
+        pane = self._calculate_js_for_pane("Link%s" % self.id, target=q, pane=pane)
 
         if icon:
             tmp = self.__class__(self)
@@ -502,7 +565,7 @@ class AJAXUI(HTMLUI.HTMLUI):
             return
         
         else:
-            base = '<a %s id="Link%s" onclick="set_url(%s, \'/f?%s\');" href="#">%s</a>' % (self.opt_to_str(options),self.id, pane, q,string)
+            base = '<a %s id="Link%s" onclick="update_container(%s, \'/f?%s\');" href="#">%s</a>' % (self.opt_to_str(options),self.id, pane, q,string)
             
             if tooltip:
                 self.tooltip("Link%s" % self.id, tooltip)
@@ -516,27 +579,46 @@ class AJAXUI(HTMLUI.HTMLUI):
         if tooltip:
             self.tooltip("img%s" % id, tooltip)
 
-    def toolbar(self,cb=None,text='',icon=None,popup=True,tooltip='',link=None):
+    def toolbar(self,cb=None,text='',icon=None,popup=True,tooltip='',
+                link=None, pane="'main'", toolbar="'toolbar'"):
         """ Create a toolbar button.
 
         When the user clicks on the toolbar button, a popup window is
         created which the callback function then uses to render on.
+
+        pane specifies the target of the toolbar's action:
+        main (default): refresh to the main pane (default).
+        parent: refresh to the pane that contains this pane. (useful for popups etc).
+        popup: open a new popup window and draw the target in that.
+        self: refresh to the current pane (useful for internal links in popups etc).
+
+        toolbar is the name of the toolbar we want to add to. Its normally left as the default main toolbar.
         """
         id = self.id
 
+        try:
+            container = self.defaults['__pane__']
+        except:
+            container = "'main'"
+
         if link:
-            result="<script>\n add_toolbar_link('/images/%s','f?%s','dummy%s');\n</script><div id='dummy%s'></div>" % (icon, link, id,id)
+            pane = self._calculate_js_for_pane(target=link, pane=pane)
+            result="<script>\n add_toolbar_link('/images/%s','f?%s',%s, %s, 'toolbarbutton%s', %s);\n</script>" % (icon, link, pane, container, id, toolbar)
                         
         elif cb:
             cb_key = self.store_callback(cb)
-            result="<script>\n add_toolbar_callback('/images/%s','f?callback_stored=%s','dummy%s');\n</script><div id='dummy%s'></div>" % (icon, cb_key, id,id)
+            target = self.defaults.clone()
+            target['callback_stored'] = cb_key
+            pane = self._calculate_js_for_pane(target=target, pane=pane)
+            result="<script>\n add_toolbar_link('/images/%s','%s',%s, %r, 'toolbarbutton%s', %s);\n</script>" % (icon, target, pane, container, id, toolbar)
 
         ## Button is disabled:
         else:
-            result="<script>\n add_toolbar_disabled('/images/%s','dummy%s');\n</script><div id='dummy%s'></div>" % (icon,id, id)
+            pane = self._calculate_js_for_pane(pane=pane)
+            result="<script>\n add_toolbar_disabled('/images/%s',%s, %s);\n</script>" % (icon, pane, container)
 
         if tooltip or text:
-            self.tooltip("imagedummy%s" % id, tooltip+text)
+            self.tooltip("toolbarbutton%s" % id, tooltip+text)
 
         self.result+=result
 

@@ -249,7 +249,7 @@ class GenericUI:
         """
         logging.log(logging.DEBUG, "text not implemented")
 
-    def _make_sql(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},query={},**opts):
+    def _make_sql(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},query={},limit=0,**opts):
         """ An SQL generator for the table widget (private) """
         #in case the user forgot and gave us a tuple, we forgive them:
         names=list(names)
@@ -267,7 +267,6 @@ class GenericUI:
         new_query = query.clone()
         del new_query['dorder']
         del new_query['order']
-        del new_query['limit']
 
         #find the group by clause - if we get a group by clause we
         #need to change the rest of the query so heavily that we need
@@ -287,14 +286,12 @@ class GenericUI:
                      for d in mask:
                          q = query.clone()
                          del q['group_by']
-                         del q['limit']
                          try:
                              del q[q['__target__']]
                          except:
                              pass
                          
                          del q['__target__']
-                         del q['limit']
                          del q['order']
                          del q['dorder']
                          for i in q.keys():
@@ -310,13 +307,6 @@ class GenericUI:
                          
                      names = ['Count'] + [ names[d] for d in mask ]
                      columns = [ 'count(*)' ] +  [ columns[d] for d in mask ]
-
-                     #Note that you cant have a group_by and a having
-                     #clause together - so if you get a group_by we
-                     #drop the having conditions
-##                     for d in query.keys():
-##                         if d.startswith('where_'):
-##                             del query[d]
                         
                  #if the user asked for a weird group by , we ignore it.
                  except ValueError:
@@ -346,15 +336,6 @@ class GenericUI:
 
                 self.filter_text.append(FlagFramework.make_sql_from_filter(v,having,columns[index],d[len('where_'):]))
 
-                #Create a link which deletes the current variable from
-                #the query string, allows the user to remove the
-                #current condition:
-##                tmp_query=query.clone()
-##                tmp_query.remove(d,v)
-##                tmp_link=self.__class__(self)
-##                tmp_link.link(condition_text,target=tmp_query)
-##                conditions.append(tmp_link)
-
         having_str = " and ".join(having)
 
         if where:
@@ -381,18 +362,7 @@ class GenericUI:
                 order = " `%s` asc " % names[0]
                 ordered_col = 0
         
-        #Calculate limits
-        if not query.has_key('limit'):
-            query['limit'] = "0"
-
-        limit = int(query['limit'])
-        self.previous = limit - config.PAGESIZE
-        if self.previous<0: self.previous=0
-
-        self.next = limit + config.PAGESIZE
-        self.pageno =  limit /config.PAGESIZE
-                
-        query_str+="order by %s limit %s, %s" % (order, int(query['limit']) , config.PAGESIZE)
+        query_str+="order by %s limit %s, %s" % (order, limit , config.PAGESIZE)
 
         dbh = DB.DBO(case)
 

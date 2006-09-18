@@ -273,3 +273,34 @@ class WizardTest(PopUpTest):
             names = ["Enter Your Name", "Birthday", "Your Age"],
             callbacks = [page1_cb, page2_cb, page3_cb]
             )
+
+
+class TableTest(PopUpTest):
+    """ Tests the Table widget """
+    name = "Table Test"
+
+    def display(self, query,result):
+        ## Tables need to act on the DB so we create a temporary table
+        ## just for this test:
+        dbh=DB.DBO()
+        dbh.cursor.warnings=False
+        dbh.execute("drop table if exists TestTable")
+        dbh.execute("""create TABLE `TestTable` (
+        `id` int(11) NOT NULL auto_increment,
+        `time` int(11) NOT NULL default '0',
+        `data` tinyblob NOT NULL,
+        PRIMARY KEY  (`id`)
+        )""")
+        
+        dbh.mass_insert_start("TestTable")
+        dbh.mass_insert(time=1147329821, data="Some Data")
+        dbh.mass_insert(time=1147329831, data="More Data")
+        dbh.mass_insert(time=1147329841, data="Some More Data")
+        dbh.mass_insert(time=1147329851, data="Another Lot of Data")
+        dbh.mass_insert_commit()
+        
+        result.table(
+            columns = ["from_unixtime(time)", "data"],
+            names = ["TimeStamp", "Data" ],
+            table = "TestTable",
+            )

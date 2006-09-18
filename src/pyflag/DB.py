@@ -505,11 +505,11 @@ class DBO:
     def get_temp(self):
         """ Gets a unique name for a table.
 
-        This can be used to create temporary tables - since flag is multi-threaded, temporary tables remain within the same thread. Use this function to get names for temporary tables.
+        This can be used to create temporary tables - since flag is multi-threaded, normal mysql temporary tables remain within the same thread. Use this function to get names for temporary tables which can be shared between all threads.
 
         Note that each DBO object maintains a list of temporary tables, and drops those when gc'd so users of this class do not need to clean temporary tables up.
 
-        The result from this function is guaranteed to exist - so a create temporary table (or even a create table) call should work.
+        The result from this function is guaranteed to not exist - so a create temporary table (or even a create table) call should work.
         """
         thread_name = threading.currentThread().getName()
         thread_name = thread_name.replace('-','_')
