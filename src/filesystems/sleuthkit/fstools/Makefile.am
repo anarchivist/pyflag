@@ -1,6 +1,6 @@
 AM_CFLAGS		= -I$(srcdir)/../auxtools -I$(srcdir)/../imgtools -I$(top_srcdir)/src/include -DLINUX2 -include config.h 
 
-bin_PROGRAMS		= dbtool
+bin_PROGRAMS		= dbtool fls ils icat istat
 noinst_LTLIBRARIES	= libfstools.la
 #noinst_PROGRAMS	= ils dls icat fls dcat ffind istat ifind dcalc dstat \
 #		          fsstat jls jcat
@@ -18,13 +18,13 @@ libfstools_la_SOURCES	= ext2fs.h fatfs.h ffs.h fs_data.h fs_lib.h fs_tools.h \
 libfstools_la_LIBADD	= ../auxtools/libauxtools.la ../imgtools/libimgtools.la
 dbtool_LDADD		= libfstools.la ../../../lib/libexcept.la ../../../lib/libiosubsys/libiosubsys.la  ../../../lib/libiosubsys/libio_hooker.la
 
-#ils_LDADD		= libfstools.la
+ils_LDADD		= libfstools.la
 #dls_LDADD		= libfstools.la
-#icat_LDADD		= libfstools.la
-#fls_LDADD		= libfstools.la
+icat_LDADD		= libfstools.la
+fls_LDADD		= libfstools.la
 #dcat_LDADD		= libfstools.la
 #ffind_LDADD		= libfstools.la
-#istat_LDADD		= libfstools.la
+istat_LDADD		= libfstools.la
 #ifind_LDADD		= libfstools.la
 #dcalc_LDADD		= libfstools.la
 #dstat_LDADD		= libfstools.la

@@ -1705,3 +1705,8 @@ class HTMLUI(UI.GenericUI):
 ##        out+="<tr><td colspan=50><table border=1 width=\"100%%\"><tr><td>%s</td></tr></table></td></tr></table>" % result
         out+="</div><div class='clearfloat'></div><div class='content'>%s</div>\n" % result
         self.result+=out
+
+    def get_uniue_id(self):
+        self.id+=1
+        return self.id
+

@@ -25,10 +25,10 @@ The scanner recurses into zip files, executing the scanner factory train on file
 
 This feature complements the ZIP and Gzip filesystem driver to ensure that zip and gzip files are transparently viewable by the FLAG GUI.
 """
-import os.path
+import os.path,sys
 import pyflag.logging as logging
 from pyflag.Scanner import *
-import zipfile,gzip,tarfile
+import zipfile,gzip,tarfile, zlib
 from pyflag.FileSystem import File
 import pyflag.FlagFramework as FlagFramework
 import time,re,os
@@ -179,7 +179,12 @@ class TarScan(GenScanFactory):
 		
 ## These are the corresponding VFS modules:
 class ZipFile(File):
-    """ A file like object to read files from within zip files. Note that the zip file is specified as an inode in the DBFS """
+    """ A file like object to read files from within zip files. Note
+    that the zip file is specified as an inode in the DBFS
+
+    We essentially decompress the file on the disk because the file
+    may be exceptionally large.
+    """
     specifier = 'Z'
     
     def __init__(self, case, fd, inode, dbh=None):
@@ -187,52 +192,115 @@ class ZipFile(File):
 
         ## Zip file handling requires repeated access into the zip
         ## file. Caching our input fd really helps to speed things
-        ## up...
+        ## up... This causes our input fd to be disk cached
         fd.cache()
 
-        # strategy:
-        # inode is the index into the namelist of the zip file (i hope this is consistant!!)
-        # just read that file!
-        parts = inode.split('|')
-        self.data = None
-        self.index = int(parts[-1][1:])
-        
-    def read(self,len=None):
+        ## If we are already cached on disk, we dont need to
+        ## decompress anything
+        if self.cached_fd: return
+
+        ## Initialise our internal variables:
+        self.seek(0)
+
+    def read(self,length=sys.maxint):
         ## Call our baseclass to see if we have cached data:
         try:
-            return File.read(self,len)
+            return File.read(self,length)
         except IOError:
             pass
 
-        if self.data==None:
+        ## This is done in order to decompress the file in small
+        ## chunks. We try to return as much data as was required
+        ## and not much more
+        try:
+            ## Consume the data left over from previous reads
+            result = self.left_over[:length]
+            self.left_over=self.left_over[length:]
+
+            ## We keep reading compressed data until we can satify
+            ## the desired length
+            while len(result)<length and self.compressed_length>0:
+                ## Read up to 1k of the file:
+                available_clength = min(self.blocksize,self.compressed_length)
+                cdata = self.z.fp.read(available_clength)
+                self.compressed_length -= available_clength
+
+                if self.type == zipfile.ZIP_DEFLATED:
+                    ## Now Decompress that:
+                    ddata = self.d.decompress(cdata)
+                elif self.type == zipfile.ZIP_STORED:
+                    ddata = cdata
+                else:
+                    raise RuntimeError("Compression method %s is not supported" % self.type)
+
+                ## How much data do we require?
+                required_length = length - len(result)
+                result += ddata[:required_length]
+
+                ## This will be '' if we have not finished making
+                ## up the result, and store the rest for next time
+                ## if we have
+                self.left_over = ddata[required_length:]
+
+        except (IndexError, KeyError, zipfile.BadZipfile),e:
+            raise IOError("Zip_File: (%s)" % e)
+
+        self.readptr += len(result)
+        return result
+
+    def seek(self, offset, rel=None):
+        File.seek(self,offset,rel)
+
+        ## We want to reinitialise the file pointer:
+        if self.readptr==0:
             try:
                 ## This is a performance boost - We try to cache the
                 ## zipfile object in our parent - if its not done
-                ## previously so speed up future accesses to other files
-                ## within the zip file. This will ensure we only need to
-                ## decompress the file once instead of many times for each
-                ## zip member.
-                z = self.fd.zip_handle
+                ## previously to speed up future accesses to other
+                ## files within the zip file. This will ensure we only
+                ## need to read the zip directory once instead of many
+                ## times for each zip member.
+                self.z = self.fd.zip_handle
             except AttributeError:
                 try:
-                    logging.log(logging.VERBOSE_DEBUG, "Decompressing Zip File %s" % self.fd.inode)
-                    z = zipfile.ZipFile(self.fd,'r')
-                    self.fd.zip_handle = z
+                    logging.log(logging.VERBOSE_DEBUG, "Reading Zip Directory for %s" % self.fd.inode)
+                    self.z = zipfile.ZipFile(self.fd,'r')
+                    self.fd.zip_handle = self.z
                 except zipfile.BadZipfile,e:
                     raise IOError("Zip_File: (%s)" % e)
 
-            try:
-                self.data = z.read(z.namelist()[self.index])
-            except (IndexError, KeyError, zipfile.BadZipfile),e:
-                raise IOError("Zip_File: (%s)" % e)
+            parts = self.inode.split('|')
+            index = int(parts[-1][1:])
+            self.zinfo = self.z.filelist[index]
 
-            #self.size=len(self.data)
-        
-        if len:
-            temp=self.data[self.readptr:self.readptr+len]
-            self.readptr+=len
-            return temp
-        else: return self.data
+            ## Prepare our parent's readptr to be at the right place
+            self.z.fp.seek(self.zinfo.file_offset,0)
+
+            ## The decompressor we are going to use
+            self.d = zlib.decompressobj(-15)
+            self.compressed_length = self.zinfo.compress_size
+            self.type = self.zinfo.compress_type
+
+            ## We try to choose sensible buffer sizes
+            if self.type == zipfile.ZIP_STORED:
+                self.blocksize = 1024*1024
+            else:
+                self.blocksize = 1024
+
+            ## This stores the extra data which was decompressed, but not
+            ## consumed by previous reads.
+            self.left_over=''
+        else:
+            ## We need to seek to somewhere in the middle of the zip
+            ## file. This is bad because we need to essentially
+            ## decompress all the data in that file until the desired
+            ## point. If this happens we need to warn the user that
+            ## they better cache this file on the disk. FIXME: Should
+            ## we automatically force caching here?
+            if self.type == zipfile.ZIP_DEFLATED:
+                logging.log(logging.DEBUG, "Required to seek to offset %s in Zip File %s. This is inefficient, consider disk caching." % (self.readptr, self.inode))
+            self.seek(0,0)
+            self.read(self.readptr)
 
     def close(self):
         pass
