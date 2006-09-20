@@ -37,6 +37,7 @@ function set_url(widget, url) {
 	}
       }
     });
+
 };
 
 function xx_set_url(widget, url) { 
@@ -302,19 +303,41 @@ function add_toolbar_link(icon, link, target, container, widget_id, toolbar_id) 
   toolbar.addChild(dojo_icon);
 };
 
-/** Adds a disabled button */
-function add_toolbar_disabled(icon, container) {
-  var toolbar  = dojo.widget.getWidgetById("toolbar");
+/** Adds a disabled button 
+
+icon: The icon to draw
+container: The container when unloaded will delete the button.
+widget_id: The id of the button to be created
+toolbar_id: The toolbar to add the button to
+*/
+function add_toolbar_disabled(icon, container,widget_id, toolbar_id) {
+  var toolbar  = dojo.widget.getWidgetById(toolbar_id);
+  if(!toolbar) return;
+
   var dojo_icon= dojo.widget.createWidget("ToolbarButton",
 					  {icon: icon});
 
+  dojo_icon.domNode.id = widget_id;
   dojo_icon.disable();
 
-  install_toolbar_widget(container, toolbar, dojo_icon);
+  var container;
+
+  if(dojo.lang.isString(container))
+    container = dojo.widget.getWidgetById(container); 
+
+  // When the container is unloaded we remove this button.
+  container.addOnUnLoad(function() {
+			  try {
+			    toolbar.domNode.removeChild(dojo_icon.domNode);
+			  } catch(e) {};
+			});
+
+  toolbar.addChild(dojo_icon);
 };
 
-function add_toolbar_callback(icon, link, target, container) {
-  var toolbar  = dojo.widget.getWidgetById("toolbar");
+function add_toolbar_callback(icon, link, target, container, toolbar_id) {
+  var toolbar  = dojo.widget.getWidgetById(toolbar_id);
+  if(!toolbar) return;
   var dojo_icon= dojo.widget.createWidget("ToolbarButton",
 					  {icon: icon});
 

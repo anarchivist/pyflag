@@ -265,15 +265,18 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             ## Make a new UI
             result=flag.ui(query=query)
 
-            ## Get the callback from the store
-            cb=flag.store.get(cb_key)
-
-            ## Use it
             try:
+                ## Get the callback from the store
+                try:
+                    cb=flag.store.get(cb_key)
+                except KeyError:
+                    raise Exception("Session expired. Please try to select this report from the menu\n")
+
+                ## Use it
                 cb(query,result)
                 ## If the cb raises an exception, we let the user know:
             except Exception,e:
-                logging.log(logging.ERROR,"Unable to call callback %s" % cb)
+                logging.log(logging.ERROR,"Unable to call callback %s" % cb_key)
                 result.clear()
                 result.heading("Error")
                 result.text("%s" % e)

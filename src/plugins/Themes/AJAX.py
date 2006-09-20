@@ -89,12 +89,10 @@ class AJAX(Menu):
 
         return result+'''
         %s
-        <div dojoType="MenuBar2">%s</div>
-        <div dojoType="ContentPane" layoutAlign="top" style="color: black; " id="top" bindArgs="preventCache:false;">
-                <div dojoType="ToolbarContainer" layoutAlign="top" id="ToolbarContainer" bindArgs="preventCache:false;">
-                <div dojoType="Toolbar" id="toolbar"></div>
-                </div>
-                ''' % ('\n'.join(menus),'\n'.join(menus_titles))
+        <div dojoType="MenuBar2" id="menubar" layoutAlign="top">%s</div>
+        <div dojoType="ToolbarContainer" layoutAlign="top" id="ToolbarContainer" bindArgs="preventCache:false;">
+        <div dojoType="Toolbar" id="toolbar"></div></div>
+        ''' % ('\n'.join(menus),'\n'.join(menus_titles))
 
     def naked_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
         """ Render the ui with minimal interventions """
@@ -122,17 +120,17 @@ class AJAX(Menu):
         title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version
 
         result.result+=" ".join(
-            (self.header % (title),             self.menu_javascript,
-             '''        <div dojoType="LayoutContainer"
+            (self.header % (title),
+             '''        <div dojoType="LayoutContainer" widgetId="MainPyFlag" id="MainPyFlag"
              bindArgs="preventCache:false;"
              layoutChildPriority='top-bottom'
-             style="width: 100%; height: 100%;">''',
+             style="width: 100%; height: 100%;">''',             self.menu_javascript,
              '''<div dojoType="ContentPane"
              bindArgs="preventCache:false;"
              cacheContent="false"
              id="main"
              layoutAlign="client"
-             style="border: 5px"
+             style="border: 5px; overflow-y: auto;"
              executeScripts="true">'''))
 
         ## Now create the initial front page:

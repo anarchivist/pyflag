@@ -88,7 +88,7 @@ class AJAXUI(HTMLUI.HTMLUI):
         out = '''<div
         id="mainTabContainer"
         dojoType="TabContainer"
-        style="width: 100%; height: 100%"
+        style="width: 100%; height: 90%"
         executeScripts="true"
         selectedTab="0">\n'''
 
@@ -103,7 +103,7 @@ class AJAXUI(HTMLUI.HTMLUI):
             href="f?%s"
             cacheContent="false" 
             executeScripts="true"
-            style="display: none;"
+            style="display: none; height: 100%%"
             refreshOnShow="false"
             label="%s"></div>\n''' % (self.id, query,names[i])
         
@@ -196,16 +196,16 @@ class AJAXUI(HTMLUI.HTMLUI):
         <div dojoType="SplitContainer"
 	orientation="horizontal"
 	sizerWidth="5"
-	activeSizing="1"
-        style="border: 0px ; width: 100%%; height: 100%%; overflow: auto;"
+	activeSizing="0"
+        style="border: 0px ; width: 100%%; height: 100%%; overflow: hidden;"
         >
         <div dojoType="ContentPane"
         cacheContent="false" 
-        layoutAlign="client"
+        layoutAlign="left"
         id="treepane%(id)s"
         right_cb="%(r)s"
         sizeMin="20" sizeShare="80"
-        style="border: 0px ; width: 25%%; height: 100%%; overflow: auto;"
+        style="border: 0px ; width: 25%%; min-height: 100%%; overflow: auto;"
         executeScripts="true">
 
         <dojo:TreeSelector widgetId="treeSelector%(id)s" eventNames="select:nodeSelected"></dojo:TreeSelector>
@@ -220,7 +220,8 @@ class AJAXUI(HTMLUI.HTMLUI):
         cacheContent="false" 
         id="rightpane%(id)s"
         executeScripts="true"
-        style="border: 0px ; height: 100%%; overflow: auto;"
+        layoutAlign="client"
+        style="border: 0px ; width: 75%%; height: 100%%; overflow: auto;"
         sizeMin="50" sizeShare="50"> %(right_pane)s
 	</div>
         </div>
@@ -274,10 +275,6 @@ class AJAXUI(HTMLUI.HTMLUI):
             self.result += "<button dojoType='Button' onClick='javascript:submitForm(\"pyflag_form_%s\",\"form%s\");'>%s</button><div id=\"form%s\"></div>\n" % (self.form_id, self.form_id, value, self.form_id)
 
         self.result+="</form>"
-
-    def get_uniue_id(self):
-        self.id+=1
-        return self.id
 
     def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):        
         names = list(names)
@@ -336,7 +333,7 @@ class AJAXUI(HTMLUI.HTMLUI):
                 limit = int(query['limit'])
             except:
                 limit = 0
-            
+
             dbh,new_query,new_names,new_columns,new_links = self._make_sql(
                 sql=sql,
                 columns=columns,
@@ -384,6 +381,8 @@ class AJAXUI(HTMLUI.HTMLUI):
             ## Now the contents:
             old_sorted = None
             old_sorted_style = ''
+            ## Total number of rows
+            row_count=0
             
             for row in dbh:
                 row_elements = []
@@ -435,38 +434,59 @@ class AJAXUI(HTMLUI.HTMLUI):
                         tds+="<td column='%s'>%s</td>" % (new_names[i],value)
                     
                 result.result+="<tr class='%s'> %s </tr>\n" % (old_sorted_style,tds)
+                row_count += 1
             result.result+="</tbody></table>"
 
             ## Add the various toolbar icons:
             new_id = self.get_uniue_id()
 
             ## The next button allows user to page to the next page
-            next_button = "add_toolbar_link('/images/stock_next-page.png','f?limit=%(limit)s&%(query)s', 'tableContainer%(id)s', 'tableContainer%(id)s', 'next_button_%(new_id)s', 'tabletoolbar%(id)s');" % (
-                dict(limit = limit + config.PAGESIZE,
-                     query = query,
-                     id=id,
-                     new_id=new_id));
+            if row_count<config.PAGESIZE:
+                ## We could not fill a full page - means we ran out of
+                ## rows in this table
+                next_button = "add_toolbar_disabled('/images/stock_next-page.png', 'tableContainer%(id)s', 'next_button_%(new_id)s', 'tabletoolbar%(id)s');" % (
+                    dict(id=id,
+                         new_id=new_id));
+            else:
+                next_button = "add_toolbar_link('/images/stock_next-page.png','f?limit=%(limit)s&%(query)s', 'tableContainer%(id)s', 'tableContainer%(id)s', 'next_button_%(new_id)s', 'tabletoolbar%(id)s');" % (
+                    dict(limit = limit + config.PAGESIZE,
+                         query = query,
+                         id=id,
+                         new_id=new_id));
+                result.tooltip('next_button_%s' % new_id, "Next Page (rows %s-%s)" % (limit,limit+config.PAGESIZE))
 
+            ## The previous button goes back if possible:
+            previous_limit = limit-config.PAGESIZE
+            if previous_limit<0:
+                previous_button = "add_toolbar_disabled('/images/stock_previous-page.png', 'tableContainer%(id)s', 'prev_button_%(new_id)s', 'tabletoolbar%(id)s');" % (
+                    dict(id=id,
+                         new_id=new_id));
+            else:
+                previous_button = "add_toolbar_link('/images/stock_previous-page.png','f?limit=%(limit)s&%(query)s', 'tableContainer%(id)s', 'tableContainer%(id)s', 'prev_button_%(new_id)s', 'tabletoolbar%(id)s');" % (
+                    dict(limit = previous_limit,
+                         query = query,
+                         id=id,
+                         new_id=new_id));
+                
+                result.tooltip('prev_button_%s' % new_id, "Previous Page (rows %s-%s)" % (previous_limit, previous_limit+config.PAGESIZE))
 
             result.result+='''<script>
-            %s
-            </script>''' % (next_button)
-
-            ## Tooltips for the toolbar buttons:
-            result.tooltip('next_button_%s' % new_id, "Next Page (rows %s-%s)" % (limit,limit+config.PAGESIZE))
+            %s%s
+            </script>''' % (previous_button, next_button)
 
         cb=self.store_callback(table_cb)
         
         self.result += '''
-        <div id="TableMain%(id)s" dojoType="ContentPane"  cacheContent="false"  layoutAlign="client"
-        style="overflow: auto;"
-        executeScripts="true"
+        <div class="TableLayout" id="TableMain%(id)s" dojoType="LayoutContainer"  cacheContent="false"
+        layoutChildPriority='top-bottom'
+        style="height: 90%%;"
         >
-        <div dojoType="ToolbarContainer" layoutAlign="top" id="TableToolbar%(id)s">
+        <div dojoType="ToolbarContainer" layoutAlign="top" id="TableToolbarContainer%(id)s" layoutAlign="top">
         <div dojoType="Toolbar" id="tabletoolbar%(id)s"></div>
         </div>
-        <div id="tableContainer%(id)s" dojoType="ContentPane"  cacheContent="false"  layoutAlign="client"
-        style="overflow: auto;"
+        <div class="tableContainer" id="tableContainer%(id)s" dojoType="ContentPane"  cacheContent="false"
+        layoutAlign="client"
+        style="overflow-x: auto; overflow-y: hidden;"
         executeScripts="true"
         onunload="remove_popups(this);"
         ></div>\n''' % {'id':id}

@@ -6,23 +6,37 @@ body {
   padding : 10px 10px 10px 10px;
 }
 
-/***
-   The following is just an example of how to use the table.
-   You can override any class names to be used if you wish.
-   ***/
+thead {
+  height: 5%;
+}
+
+table.PyFlagTable tbody {
+ height: 90%;
+ overflow-x: hidden;
+}
+
+/** The main window div is where all the action takes place */
+div#main { 
+  overflow: auto;
+  max-height: 90%;
+  max-width: 100%;
+}
+
 
 table.PyFlagTable {
   font-family:Lucida Grande, Verdana;
 /*  font-size:0.8em; */
   width:100%;
+  height: 100%;
   border:1px solid #ccc;
+  overflow-x: auto;
 }
 
-* html div.tableContainer {	/* IE only hack */
-  width:95%;
+* html div.tableContainer {
+  width:100%;
   border:1px solid #ccc;
-  height: 285px;
-  overflow-x: hidden;
+  height: 20em;
+  overflow-x: auto;
   overflow-y: auto;
 }
 
@@ -68,6 +82,10 @@ tbody.scrollContent tr:hover td,tbody.scrollContent tr.alternateRow:hover td.sor
 
 tbody.scrollContent td.sorted-column, tbody.scrollContent tr.alternateRow td.sorted-column {
   background: pink;
+}
+
+thead th {
+ cursor: pointer;
 }
 
 /* group multiple buttons in a row */

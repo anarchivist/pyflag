@@ -280,6 +280,8 @@ class TableTest(PopUpTest):
     name = "Table Test"
 
     def display(self, query,result):
+        result.heading("Table Tests")
+        
         ## Tables need to act on the DB so we create a temporary table
         ## just for this test:
         dbh=DB.DBO()
@@ -297,6 +299,9 @@ class TableTest(PopUpTest):
         dbh.mass_insert(time=1147329831, data="More Data")
         dbh.mass_insert(time=1147329841, data="Some More Data")
         dbh.mass_insert(time=1147329851, data="Another Lot of Data")
+        for i in range(0,100):
+            dbh.mass_insert(time=1147329851+i, data="Data %s" % i)
+
         dbh.mass_insert_commit()
         
         result.table(

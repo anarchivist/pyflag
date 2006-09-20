@@ -98,9 +98,14 @@ class ViewFileTypes(Reports.report):
         fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])
         
         def thumbnail_cb(inode):
-            fd = fsfd.open(inode=inode)
-            image = Graph.Thumbnailer(fd,200)
             tmp = result.__class__(result)
+            try:
+                fd = fsfd.open(inode=inode)
+                image = Graph.Thumbnailer(fd,200)
+            except IOError:
+                tmp.icon("broken.png")
+                return
+                
             if image.height>0:
                 tmp.image(image,width=image.width,height=image.height)
             else:
