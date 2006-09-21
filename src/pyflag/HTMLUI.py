@@ -1470,7 +1470,7 @@ class HTMLUI(UI.GenericUI):
         for k,v in hiddens.items():
             self.form_parms[k]=v
 
-        self.result += '<form id="pyflag_form_%s" name="pyflag_form_%s" method=%s action="/f" enctype="multipart/form-data">\n' % (self.form_id,self.form_id, config.METHOD)
+        self.result += '<form id="pyflag_form_1" name="pyflag_form_1" method=%s action="/f" enctype="multipart/form-data">\n' % (config.METHOD)
 
     def end_form(self,value='Submit',name='submit',**opts):
         for k,v in self.form_parms:

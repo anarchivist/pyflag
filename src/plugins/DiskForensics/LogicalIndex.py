@@ -174,43 +174,9 @@ class IndexScan(GenScanFactory):
             #A dictionary for counting hit stats
             self.stats_count={}
 
-        def process(self,data,metadata=None):
-##            #Store the offsets we got from the index C code
-##            for i in self.index.get_offsets():
-##                offsets.append((i.id, i.offset))
-##                try:
-##                    self.stats_count[i.id]+=1
-##                except KeyError:
-##                    #Must be a new id for the dictionary
-##                    self.stats_count[i.id]=1
-                
-##            #Now search for all the regex's in the dictionary and store the results
-##            for row in self.RegexpRows:
-##                for match in row[0].finditer(data):
-##                    offsets.append((row[1],match.start()))
-##                    try:
-##                        self.stats_count[row[1]]+=1
-##                    except KeyError:
-##                        #Must be a new id for the dictionary
-##                        self.stats_count[row[1]]=1
-
-##            #Sort the results so the offsets are in order
-##            #element 0 is ID, element 1 is offset
-##            def compfunc(x,y):
-##                if x[1]>y[1]:
-##                    return 1
-##                elif x[1]<y[1]:
-##                    return -1
-
-##                return 0
-            
-##            offsets.sort(compfunc)
-            
+        def process(self,data,metadata=None):            
             # Store indexing results in the dbase
-            ## Store any hits in the database - NOTE: We use extended
-            ## insert syntax here for speed (This may not be portable
-            ## to other databases):
-            results = []
+            self.dbh.mass_insert_start("LogicalIndexOffsets")
             for offset, matches in index.index_buffer(self.index, data):
                 for id, length in matches:
                     try:
@@ -228,11 +194,13 @@ class IndexScan(GenScanFactory):
                         #block is the current block number we are looking at
                         self.block = self.dbh.autoincrement()
 
-                #Final result ie. absolute offset is (current block number * blocksize) + (offset from start of data chunk where we found the term + offset of the data block)
-                results.append("(%s,(%s<<%s)+%s+%s, %s)" % (id,self.block,BLOCKBITS,offset,self.rel_offset,length))
-
-            if results:
-                self.dbh.execute("insert into LogicalIndexOffsets values %s",(",".join(results)))
+                    #Final result ie. absolute offset is (current block
+                    #number * blocksize) + (offset from start of data
+                    #chunk where we found the term + offset of the data
+                    #block)
+                    self.dbh.mass_insert( id=id,
+                                          offset = (self.block<<BLOCKBITS)+offset+self.rel_offset,
+                                          length = length)
                 
             self.rel_offset += len(data)
                 

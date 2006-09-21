@@ -33,7 +33,8 @@ function set_url(widget, url) {
 	  widget.href = url;
 	} else {
 	  // works best when from a live server instead of from file system 
-	  widget._handleDefaults.call("Error loading '" + url + "' (" + e.status + " "+  e.statusText + ")", "onDownloadError");
+	  alert("Error contacting server. Is it down?");
+	  //loading '" + url + "' (" + e.status + " "+  e.statusText + ")", "onDownloadError");
 	}
       }
     });

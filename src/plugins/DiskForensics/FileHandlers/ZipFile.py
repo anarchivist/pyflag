@@ -251,6 +251,8 @@ class ZipFile(File):
     def seek(self, offset, rel=None):
         File.seek(self,offset,rel)
 
+        if self.cached_fd: return
+
         ## We want to reinitialise the file pointer:
         if self.readptr==0:
             try:
@@ -298,7 +300,12 @@ class ZipFile(File):
             ## they better cache this file on the disk. FIXME: Should
             ## we automatically force caching here?
             if self.type == zipfile.ZIP_DEFLATED:
-                logging.log(logging.DEBUG, "Required to seek to offset %s in Zip File %s. This is inefficient, consider disk caching." % (self.readptr, self.inode))
+                logging.log(logging.DEBUG, "Required to seek to offset %s in Zip File %s. This is inefficient, forcing disk caching." % (self.readptr, self.inode))
+                self.cache()
+                #File.__init__(self,self.case,self.fd,self.inode,self.dbh)
+                self.seek(offset, rel)
+                return
+            
             self.seek(0,0)
             self.read(self.readptr)
 

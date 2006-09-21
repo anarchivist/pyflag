@@ -43,19 +43,25 @@ static PyObject *index_buffer(PyObject *self, PyObject *args) {
   for(i=0; i<length; i++) {
     char *new_buffer = buffer+i;
     int new_length = length-i;
+    PyObject *tmp;
 
     if(root->super.Match((TrieNode)root, new_buffer, 
 			 &new_buffer, &new_length, match_list)) {
 
-      /** Append temp to the result */
-      if(PyList_Append(result, Py_BuildValue("iN",i,match_list))<0)
+      /** Append temp to the result. Note that match_list is given to tmp */
+      tmp = Py_BuildValue("iN",i,match_list);
+      if(PyList_Append(result, tmp)<0) {
+	Py_DECREF(tmp);
 	return NULL;
+      };
+
+      Py_DECREF(tmp);
+      
+      // Make a new match_list
       match_list=PyList_New(0);
     };
   };
 
-
-  //exit(0);
   Py_DECREF(match_list);
   return(result);
 };
