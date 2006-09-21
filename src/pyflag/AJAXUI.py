@@ -63,28 +63,6 @@ class AJAXUI(HTMLUI.HTMLUI):
         """
         query=self.defaults.clone()            
 
-        def tab(query,result):
-            result.decoration = "raw"
-            result.content_type = "text/html"
-
-            try:
-                index = int(query['tab'])
-            except (ValueError,KeyError):
-                index=0
-
-            del query['callback_stored']
-            del query['right_pane_cb']
-
-            try:
-                callbacks[index](query,result)
-            except Exception,e:
-                ## Error occured present to user:
-                result.clear()
-                result.heading("Error occured %s" % e)
-                result.text(FlagFramework.get_bt_string(e))
-
-        t=self.store_callback(tab)
-
         out = '''<div
         id="mainTabContainer"
         dojoType="TabContainer"
@@ -92,20 +70,20 @@ class AJAXUI(HTMLUI.HTMLUI):
         executeScripts="true"
         selectedTab="0">\n'''
 
-        del query['callback_stored']
-        query['callback_stored'] = t
         for i in range(len(names)):
-            del query['tab']
-            query['tab']=i
-            tmplink=self.__class__()
-            out+='''<div id="%s"
+            id = self.get_uniue_id()
+
+            del query['callback_stored']
+            query['callback_stored'] = self.store_callback(callbacks[i])
+
+            out+='''<div id="PagePane%s"
             dojoType="ContentPane"
-            href="f?%s"
+            href="f?__pane__=PagePane%s&%s"
             cacheContent="false" 
             executeScripts="true"
-            style="display: none; height: 100%%"
+            style="display: none; height: 100%%; overflow: auto;"
             refreshOnShow="false"
-            label="%s"></div>\n''' % (self.id, query,names[i])
+            label="%s"></div>\n''' % (id,id, query,names[i])
         
         self.result+=out+"</div>"
 
@@ -527,7 +505,7 @@ class AJAXUI(HTMLUI.HTMLUI):
         # open to the current container:
         elif pane=='self':
             if self.defaults.has_key("__pane__"):
-                pane = "%r" % self.defaults['__pane__']
+                pane = "'%s'" % self.defaults['__pane__']
             elif element_id:
                 pane = "find_widget_type_above('ContentPane',%r)" % element_id
             else:
@@ -599,8 +577,41 @@ class AJAXUI(HTMLUI.HTMLUI):
         if tooltip:
             self.tooltip("img%s" % id, tooltip)
 
+    def _dojo_delayed_execution(self,string):
+        self.result+='''<script>
+        _container_.addOnLoad( function() {
+        %s
+        });
+        </script>''' % string
+        
+
+    def new_toolbar(self):
+        """ Creates a new toolbar in the current UI to allow private
+        buttons to be added to it
+
+        Returns the toolbar ID which may be used as an option for
+        toolbar().
+        """
+        id = "Toolbar%s" % self.get_uniue_id()
+        self.result+='''<div dojoType="LayoutContainer"
+        cacheContent="false" layoutChildPriority="top-bottom"
+        >'''
+        self.result+='''<div dojoType="ToolbarContainer" id="container%s" layoutAlign="top">
+        <div dojoType="Toolbar" id="%s"></div>
+        </div>
+        <div dojoType="ContentPane"
+        layoutAlign="top"
+        style="overflow-y: auto; height: 40%%;"
+        executeScripts="true"
+        cacheContent="false" 
+        >
+        ''' % (id,id)
+
+        self.add_to_top_ui("</div></div>")
+        return id
+
     def toolbar(self,cb=None,text='',icon=None,popup=True,tooltip='',
-                link=None, pane="'main'", toolbar="'toolbar'"):
+                link=None, pane="'main'", toolbar="toolbar"):
         """ Create a toolbar button.
 
         When the user clicks on the toolbar button, a popup window is
@@ -616,31 +627,35 @@ class AJAXUI(HTMLUI.HTMLUI):
         """
         id = self.id
 
+        ## Find out the value of the current container we are at
         try:
-            container = self.defaults['__pane__']
+            container = "'%s'" % self.defaults['__pane__']
         except:
             container = "'main'"
 
+
+        ## We delay execution to add_toolbar* functions in case a
+        ## local toolbar was created
         if link:
             pane = self._calculate_js_for_pane(target=link, pane=pane)
-            result="<script>\n add_toolbar_link('/images/%s','f?%s',%s, %s, 'toolbarbutton%s', %s);\n</script>" % (icon, link, pane, container, id, toolbar)
+            self._dojo_delayed_execution("add_toolbar_link('/images/%s','f?%s',%s, %s, 'toolbarbutton%s', %r);" % (icon, link, pane, container, id, toolbar))
                         
         elif cb:
             cb_key = self.store_callback(cb)
             target = self.defaults.clone()
             target['callback_stored'] = cb_key
             pane = self._calculate_js_for_pane(target=target, pane=pane)
-            result="<script>\n add_toolbar_link('/images/%s','%s',%s, %r, 'toolbarbutton%s', %s);\n</script>" % (icon, target, pane, container, id, toolbar)
+            self._dojo_delayed_execution("add_toolbar_link('/images/%s','f?%s',%s, %s, 'toolbarbutton%s', %r);" % (icon, target, pane, container, id, toolbar))
 
         ## Button is disabled:
         else:
             pane = self._calculate_js_for_pane(pane=pane)
-            result="<script>\n add_toolbar_disabled('/images/%s',%s, %s);\n</script>" % (icon, pane, container)
+            self._dojo_delayed_execution("add_toolbar_disabled('/images/%s',%s, %s, %r);" % (icon, pane, container, toolbar))
 
-        if tooltip or text:
-            self.tooltip("toolbarbutton%s" % id, tooltip+text)
-
-        self.result+=result
+        ## FIXME: This needs to be done using js so it can be delayed
+        ## until the delayed execution clauses are done.
+#        if tooltip or text:
+#            self.tooltip("toolbarbutton%s" % id, tooltip+text)
 
     def download(self,file):
 

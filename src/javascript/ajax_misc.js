@@ -277,7 +277,10 @@ function update_filter_column() {
 */
 function add_toolbar_link(icon, link, target, container, widget_id, toolbar_id) {
   var toolbar  = dojo.widget.getWidgetById(toolbar_id);
-  if(!toolbar) return;
+  if(!toolbar) {
+    alert("Cant find toolbar "+toolbar_id);
+    return;
+  }
 
   var dojo_icon= dojo.widget.createWidget("ToolbarButton",
 					  {icon: icon});
