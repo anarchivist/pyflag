@@ -466,7 +466,6 @@ class AJAXUI(HTMLUI.HTMLUI):
         layoutAlign="client"
         style="overflow-x: auto; overflow-y: hidden;"
         executeScripts="true"
-        onunload="remove_popups(this);"
         ></div>\n''' % {'id':id}
 
         self.result+='''<script>

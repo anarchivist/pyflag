@@ -17,9 +17,6 @@ function set_url(widget, url) {
   update_default_toolbar();
 
   //  widget.setUrl(url);
-
-  remove_popups(widget);
-
   dojo.io.bind({
     url: url+"&__pane__="+widget.widgetId,
 	useCache: false,
@@ -40,15 +37,6 @@ function set_url(widget, url) {
     });
 
 };
-
-function xx_set_url(widget, url) { 
-  widget.setUrl(url);
-  
-  //Is this needed? default toolbars do not get removed with seturl
-  update_default_toolbar();
-  remove_popups(widget);
-};
-
 
 function update_tree(rightcb,url,id) {
   var rightpane = dojo.widget.getWidgetById("rightpane"+id);
@@ -101,7 +89,6 @@ function group_by(table_id) {
   var container = dojo.widget.getWidgetById("tableContainer"+table_id);
   var table     = document.getElementById("Table" + table_id);
   
-  remove_popups(container);
   set_url(container,table.getAttribute('query') + "&dorder=Count&group_by="+last_column_name);
 };
 
@@ -116,8 +103,6 @@ function update_container(container,url) {
   
   // We must be operating on contentpanes
   //if(c.widgetType!="ContentPane") return;
-
-  remove_popups(c);
 
   // If we are actually updating the main frame, we handle it
   // specially so the history works etc.
@@ -247,8 +232,6 @@ function update_filter_column() {
   var container = dojo.widget.getWidgetById("tableContainer"+last_table_id);
   var table     = document.getElementById("Table" + last_table_id);
   var search    = document.getElementById('search_expression');
-
-  remove_popups(container);
 
   if(search.value.length>0) {
     set_url(container,"/f?"+table.getAttribute('query') + "&where_"+
@@ -409,6 +392,8 @@ function find_widget_type_above(type,id) {
     the node - or weird things will happen.
 */
 function remove_popups(node) {
+  alert("remove_popups is deprecated");
+  return;
   var popups = dojo.widget.getWidgetsByType("PopupMenu2");
 
   for(var i=0; i<popups.length; i++) {
@@ -447,9 +432,8 @@ dojo.lang.extend(dojo.widget.PopupMenu2, {
 		     //dojo.debugShallow(e);
 		     this.open(e.clientX, e.clientY, null, [e.clientX, e.clientY]);
 		     
-		     if(e["preventDefault"]){
-		       e.preventDefault();
-		     }
+		     e.preventDefault();
+		     e.stopPropagation();
 		   }
   });
 
