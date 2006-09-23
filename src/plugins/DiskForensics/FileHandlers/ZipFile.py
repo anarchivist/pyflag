@@ -35,6 +35,7 @@ import time,re,os
 import StringIO
 import pyflag.Scanner as Scanner
 import gzip
+import plugins.DiskForensics.DiskForensics as DiskForensics
 
 class ZipScan(GenScanFactory):
     """ Recurse into Zip Files """
@@ -178,7 +179,7 @@ class TarScan(GenScanFactory):
                 Scanner.scanfile(self.ddfs,fd,self.factories)
 		
 ## These are the corresponding VFS modules:
-class ZipFile(File):
+class ZipFile(DiskForensics.DBFS_file):
     """ A file like object to read files from within zip files. Note
     that the zip file is specified as an inode in the DBFS
 
@@ -188,7 +189,7 @@ class ZipFile(File):
     specifier = 'Z'
     
     def __init__(self, case, fd, inode, dbh=None):
-        File.__init__(self, case, fd, inode, dbh)
+        DiskForensics.DBFS_file.__init__(self, case, fd, inode, dbh)
 
         ## Zip file handling requires repeated access into the zip
         ## file. Caching our input fd really helps to speed things
@@ -312,7 +313,7 @@ class ZipFile(File):
     def close(self):
         pass
 
-class GZ_file(File):
+class GZ_file(DiskForensics.DBFS_file):
     """ A file like object to read gzipped files. """
     specifier = 'G'
     
@@ -350,7 +351,7 @@ class GZ_file(File):
         self.cached_fd =  open(cached_filename, 'r')
         return count
 
-class Tar_file(File):
+class Tar_file(DiskForensics.DBFS_file):
     """ A file like object to read files from within tar files. Note that the tar file is specified as an inode in the DBFS """
     specifier = 'T'
     

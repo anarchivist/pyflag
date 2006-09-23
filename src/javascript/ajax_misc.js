@@ -14,6 +14,8 @@ function set_url(widget, url) {
   if(dojo.lang.isString(widget))
     widget = dojo.widget.getWidgetById(widget); 
 
+  if(!widget) alert("Cant find target "+widget);
+
   update_default_toolbar();
 
   //  widget.setUrl(url);
@@ -49,7 +51,9 @@ function push_on_history(container, url) {
   pyflag_history.push([container, url]);
 };
 
-function submitForm(form_name,id) {
+/** form_name: The name of the form we should get elements from
+    target: the target of this form.*/
+function submitForm(form_name,target) {
   /** We try to save a get version of the current form in the
       history */
   var form = dojo.byId(form_name);
@@ -62,15 +66,17 @@ function submitForm(form_name,id) {
       query.push(input.name + '=' + input.value);
   };
 
-  var container = find_widget_type_above("ContentPane",id);
-  var url="f?"+query.toArray().join("&");
+  var url="f?submit=1&"+query.toArray().join("&");
+
+  update_container(target,url);
+  return;
 
   var kw = {
-    url:	   "/f?submit=1&__pane__="+container.widgetId,
+    url:	   "/f?submit=1&__pane__="+target.widgetId,
     formNode:      dojo.byId(form_name),
     load:	   function(type, data)	{
-      if(container.href) {
-	push_on_history("main",container.href);
+      if(target.href) {
+	push_on_history("main",target.href);
       };
       update_default_toolbar();      
       container.setContent(data);
@@ -85,11 +91,10 @@ function submitForm(form_name,id) {
   dojo.io.bind(kw);
 }
 
-function group_by(table_id) {
-  var container = dojo.widget.getWidgetById("tableContainer"+table_id);
-  var table     = document.getElementById("Table" + table_id);
+function group_by(table, target) {
+  var table     = document.getElementById(table);
   
-  set_url(container,table.getAttribute('query') + "&dorder=Count&group_by="+last_column_name);
+  set_url(target,table.getAttribute('query') + "&dorder=Count&group_by="+last_column_name);
 };
 
 last_column_name = "";
@@ -101,6 +106,9 @@ function update_container(container,url) {
   if(dojo.lang.isString(container))
     c = dojo.widget.getWidgetById(container);
   
+  if(!c) return;
+  c.show();
+
   // We must be operating on contentpanes
   //if(c.widgetType!="ContentPane") return;
 
@@ -276,6 +284,8 @@ function add_toolbar_link(icon, link, target, container, widget_id, toolbar_id) 
   if(dojo.lang.isString(container))
     container = dojo.widget.getWidgetById(container); 
 
+  if(!container) return;
+
   dojo.event.connect(dojo_icon, "onClick", function () {
 		       update_container(target,link);
 		     });
@@ -311,6 +321,8 @@ function add_toolbar_disabled(icon, container,widget_id, toolbar_id) {
 
   if(dojo.lang.isString(container))
     container = dojo.widget.getWidgetById(container); 
+
+  if(!container) return;
 
   // When the container is unloaded we remove this button.
   container.addOnUnLoad(function() {

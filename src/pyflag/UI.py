@@ -301,7 +301,7 @@ class GenericUI:
                          q['__target__'] = "where_%s" % names[d]
                          q["where_%s" % names[d]] = "=%s"
                          
-                         q['__pane__'] = self.id
+                         q['__targetpane__'] = "self"
 
                          links.append(q)
                          

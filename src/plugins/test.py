@@ -135,44 +135,58 @@ class PopUpTest(Refresher):
     name = "PopUpTest"
     def display(self, query,result):
         result.heading("Popup Test")
-        
-        def popup_cb1(query,result):
-            result.heading("I am a popup")
-            result.text("This floating pane will be closed in 5 seconds!!!")
-            result.refresh(5, query, parent=True)
 
-        result.popup(popup_cb1, "Click Me", tooltip="This will pop a new window up")
+        def pane1(query,result):
+            def popup_cb1(query,result):
+                result.heading("I am a popup")
+                result.text("This floating pane will be closed in 5 seconds!!!")
+                result.refresh(5, query, pane='parent')
 
-        def popup_form_cb(query, result):
-            result.heading("A form popup test")
-            result.start_form(query, refresh="parent")
-            result.textfield("Type something here","something")
-            result.end_form()
+            result.popup(popup_cb1, "Click Me", tooltip="This will pop a new window up")
 
-        result.popup(popup_form_cb, "Form popup Test", tooltip="Tryout the form in the popup")
+        def pane2(query,result):
+            def popup_form_cb(query, result):
+                result.heading("A form popup test")
+                result.start_form(query, pane="parent")
+                result.textfield("Type something here","something")
+                result.end_form()
 
-        def popup_link_cb(query,result):
-            result.heading("Tests links within popups")
             try:
-                result.text("link is %s" % query['link'])
-            except KeyError:
+                result.para("Something is %s" % query['something'])
+            except:
                 pass
 
-            del query['link']
-            query['link'] = "Internal link"
-            result.link("Internal popup link", target=query, pane='self')
+            result.popup(popup_form_cb, "Form popup Test", tooltip="Tryout the form in the popup")
 
-            new_query = query.clone()
-            del new_query['something']
-            new_query['something'] = "Data from popup"
-            result.link("back to parent link", target=new_query, pane='parent')
+        def pane3(query,result):
+            def popup_link_cb(query,result):
+                result.heading("Tests links within popups")
+                try:
+                    result.text("link is %s" % query['link'])
+                except KeyError:
+                    pass
 
-        result.popup(popup_link_cb, "Popup Links test", tooltip="Try links in the popup")
-        try:
-            result.para("Something is %s" % query['something'])
-        except:
-            pass
+                del query['link']
+                query['link'] = "Internal link"
+                result.link("Internal popup link", target=query, pane='self')
 
+                new_query = query.clone()
+                del new_query['something']
+                new_query['something'] = "Data from popup"
+                result.link("back to parent link", target=new_query, pane='parent')
+
+            try:
+                result.para("Something is %s" % query['something'])
+            except:
+                pass
+
+            result.popup(popup_link_cb, "Popup Links test", tooltip="Try links in the popup")
+
+        result.notebook(
+            names=['Pane 1','Pane 2','Pane 3'],
+            callbacks = [ pane1, pane2, pane3]
+            )
+        
 class ToolTipTest(PopUpTest):
     """ Demonstrates some of the tooltip capabilities """
     name = "ToolTipTest"

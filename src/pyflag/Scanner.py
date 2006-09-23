@@ -502,13 +502,13 @@ class Drawer:
                 if query['refresh']:
                     del query['refresh']
 
-                    result.refresh(0,query,parent=1)
+                    result.refresh(0,query,pane="parent")
             except KeyError:
                 pass
 
             ## Draw the gui for all the classes we manage:
             result.decoration = 'naked'
-            result.start_form(query,refresh="parent")
+            result.start_form(query,pane="parent")
             result.start_table()
 
             self.add_defaults(query,query.clone())

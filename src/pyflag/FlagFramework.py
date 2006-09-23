@@ -215,7 +215,8 @@ class query_type:
         try:
             self.remove(tmp[-1][0],tmp[-1][1])
         except IndexError:
-            raise KeyError
+            return None
+            #raise KeyError
 
         return tmp[-1][1]
     

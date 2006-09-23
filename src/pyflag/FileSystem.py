@@ -463,22 +463,22 @@ def goto_page_cb(query,result,variable):
         limit='0'
 
     try:
-        if query['refresh']:
-            del query['refresh']
+        if query['submit']:
+            del query['submit']
 
             ## Accept hex representation for limits
             if limit.startswith('0x'):
                 del query[variable]
                 query[variable]=int(limit,16)
 
-            result.refresh(0,query,parent=1)            
+            result.refresh(0,query,pane='parent')
+            return
     except KeyError:
         pass
-
-    result.decoration = 'naked'
+    
     result.heading("Skip directly to an offset")
     result.para("You may specify the offset in hex by preceeding it with 0x")
-    result.start_form(query, refresh="parent")
+    result.start_form(query)
     result.start_table()
     if limit.startswith('0x'):
         limit=int(limit,16)
@@ -707,7 +707,7 @@ class File:
             dump = FlagFramework.HexDump(data,result)
             dump.dump(base_offset=offset,limit=max,highlight=highlight-offset,length=length)
 
-        return self.display_data(query,result, max,hexdumper)
+        return self.display_data(query,result, max, hexdumper)
 
     def display_data(self, query,result,max,cb):
         """ Displays the data.
@@ -726,6 +726,9 @@ class File:
 
         self.seek(limit)
         data = self.read(max+1)
+
+        ## We try to use our own private toolbar if possible:
+        toolbar_id = result.new_toolbar()
         
         if (not data or len(data)==0):
            result.text("No Data Available")
@@ -746,9 +749,9 @@ class File:
             del new_query['hexlimit']
             new_query['hexlimit']=previous
             result.toolbar(text="Previous page", icon="stock_left.png",
-                           link = new_query )
+                           link = new_query, toolbar=toolbar_id , pane="self")
         else:
-            result.toolbar(text="Previous page", icon="stock_left_gray.png")
+            result.toolbar(text="Previous page", icon="stock_left_gray.png", toolbar=toolbar_id, pane="self")
 
         next=limit+max
         ## If we did not read a full page, we do not display
@@ -757,15 +760,15 @@ class File:
             del new_query['hexlimit']
             new_query['hexlimit']=next
             result.toolbar(text="Next page", icon="stock_right.png",
-                           link = new_query )
+                           link = new_query , toolbar=toolbar_id, pane="self")
         else:
-            result.toolbar(text="Next page", icon="stock_right_gray.png")
+            result.toolbar(text="Next page", icon="stock_right_gray.png", toolbar=toolbar_id, pane="self")
 
         ## Allow the user to skip to a certain page directly:
         result.toolbar(
             cb = FlagFramework.Curry(goto_page_cb, variable='hexlimit'),
             text="Current Offset %s" % limit,
-            icon="stock_next-page.png"
+            icon="stock_next-page.png", toolbar=toolbar_id, pane="popup"
             )
 
         return result

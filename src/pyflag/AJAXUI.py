@@ -63,29 +63,38 @@ class AJAXUI(HTMLUI.HTMLUI):
         """
         query=self.defaults.clone()            
 
-        out = '''<div
-        id="mainTabContainer"
-        dojoType="TabContainer"
-        style="width: 100%; height: 90%"
-        executeScripts="true"
-        selectedTab="0">\n'''
-
+        out=''
+        selectedTab = None
+        
         for i in range(len(names)):
-            id = self.get_uniue_id()
+            id = "PagePane%s" % self.get_uniue_id()
+            if selectedTab==None: selectedTab=id
+            try:
+                if query['mode']==names[i]:
+                    selectedTab = id
+            except:
+                pass
+            
+            new_query = query.clone()
+            new_query['callback_stored'] = self.store_callback(callbacks[i])
 
-            del query['callback_stored']
-            query['callback_stored'] = self.store_callback(callbacks[i])
-
-            out+='''<div id="PagePane%s"
+            out+='''<div id="%s" widgetId="%s"
             dojoType="ContentPane"
-            href="f?__pane__=PagePane%s&%s"
+            href="f?__pane__=%s&%s"
             cacheContent="false" 
             executeScripts="true"
             style="display: none; height: 100%%; overflow: auto;"
             refreshOnShow="false"
-            label="%s"></div>\n''' % (id,id, query,names[i])
+            label="%s"></div>\n''' % (id,id, id, new_query,names[i])
         
-        self.result+=out+"</div>"
+        self.result+='''<div
+        id="mainTabContainer"
+        widgetId="mainTabContainer"
+        dojoType="TabContainer"
+        selectedTab="%s"
+        style="width: 100%%; height: 90%%"
+        executeScripts="true"
+        selectedTab="0">%s</div>''' % (selectedTab,out)
 
     def tree(self, tree_cb = None, pane_cb=None, branch = None, layout=None):
         """ A tree widget.
@@ -181,6 +190,7 @@ class AJAXUI(HTMLUI.HTMLUI):
         cacheContent="false" 
         layoutAlign="left"
         id="treepane%(id)s"
+        widgetId="treepane%(id)s"
         right_cb="%(r)s"
         sizeMin="20" sizeShare="80"
         style="border: 0px ; width: 25%%; min-height: 100%%; overflow: auto;"
@@ -197,6 +207,7 @@ class AJAXUI(HTMLUI.HTMLUI):
 	<div dojoType="ContentPane"
         cacheContent="false" 
         id="rightpane%(id)s"
+        widgetId="rightpane%(id)s"
         executeScripts="true"
         layoutAlign="client"
         style="border: 0px ; width: 75%%; height: 100%%; overflow: auto;"
@@ -229,9 +240,8 @@ class AJAXUI(HTMLUI.HTMLUI):
         self.form_parms=target.clone()
         self.form_id=self.get_uniue_id()
         try:
-            ## FIXME - this should be named to something better than "refresh"
-            self.form_target = hiddens['refresh']
-            del hiddens['refresh']
+            self.form_target = hiddens['pane']
+            del hiddens['pane']
         except KeyError:
             self.form_target = 'self'
 
@@ -242,15 +252,18 @@ class AJAXUI(HTMLUI.HTMLUI):
         self.result += '<form id="pyflag_form_%s" name="pyflag_form_%s" method=%s action="/f" enctype="multipart/form-data">\n' % (self.form_id,self.form_id, config.METHOD)
 
     def end_form(self,value='Submit',name='submit',**opts):
+        pane = self._calculate_js_for_pane("Button%s" % self.form_id, target=self.form_parms, pane=self.form_target)
+
         for k,v in self.form_parms:
             ## If we want to refresh to our parent, we need to ensure
             ## that our callback does not propegate:
-            if self.form_target=="parent" and k=="callback_stored": continue
+            if k=="submit" or k.startswith("__") or k.startswith("dojo."):
+                continue
 
             self.result += "<input type='hidden' name='%s' value='%s'>\n" % (k,v)
 
         if value:
-            self.result += "<button dojoType='Button' onClick='javascript:submitForm(\"pyflag_form_%s\",\"form%s\");'>%s</button><div id=\"form%s\"></div>\n" % (self.form_id, self.form_id, value, self.form_id)
+            self.result += "<button dojoType='Button' widgetId='Button%s' onClick=\"javascript:submitForm('pyflag_form_%s',%s);\">%s</button>\n" % (self.form_id, self.form_id, pane, value)
 
         self.result+="</form>"
 
@@ -264,6 +277,7 @@ class AJAXUI(HTMLUI.HTMLUI):
             its requested pane
             """
             menus = []
+            new_id = self.get_uniue_id()
 
             ## May only offer to group by if the report does not issue
             ## its own
@@ -273,7 +287,8 @@ class AJAXUI(HTMLUI.HTMLUI):
                     del q['group_by']
                     menus.append('<div dojoType="MenuItem2" caption="Ungroup" onClick="update_container(\'tableContainer%s\',\'%s\');"></div>\n' % (id,q))
                 else:
-                    menus.append('<div dojoType="MenuItem2" caption="Group By Column" onClick="group_by(\'%s\')"></div>\n' % id)
+                    pane = result._calculate_js_for_pane(None, None, "self")
+                    menus.append('<div dojoType="MenuItem2" caption="Group By Column" onClick="group_by(\'Table%s\',%s)"></div>\n' % (id,pane))
 
             menus.append('<div dojoType="MenuItem2" caption="Filter Column" onClick="filter_column(\'%s\')"></div>\n' % id)
             menus.append('<div dojoType="MenuSeparator2"></div>\n')
@@ -297,10 +312,10 @@ class AJAXUI(HTMLUI.HTMLUI):
 
 
             result.result +='''
-            <div id="popup%s" dojoType="PopupMenu2" targetNodeIds="tableContainer%s" toggle="explode"  >
+            <div id="popup%s" widgetId="popup%s" dojoType="PopupMenu2" targetNodeIds="tableContainer%s" toggle="explode"  >
             %s
             </div>
-            ''' % (id,id,''.join(menus))
+            ''' % (id,id, id,''.join(menus))
 
             ## If no ordering is specified we order by the first column
             if not query.has_key('order') and not query.has_key('dorder'):
@@ -416,8 +431,6 @@ class AJAXUI(HTMLUI.HTMLUI):
             result.result+="</tbody></table>"
 
             ## Add the various toolbar icons:
-            new_id = self.get_uniue_id()
-
             ## The next button allows user to page to the next page
             if row_count<config.PAGESIZE:
                 ## We could not fill a full page - means we ran out of
@@ -455,14 +468,15 @@ class AJAXUI(HTMLUI.HTMLUI):
         cb=self.store_callback(table_cb)
         
         self.result += '''
-        <div class="TableLayout" id="TableMain%(id)s" dojoType="LayoutContainer"  cacheContent="false"
+        <div class="TableLayout" id="TableMain%(id)s" widgetId="TableMain%(id)s" dojoType="LayoutContainer"  cacheContent="false"
         layoutChildPriority='top-bottom'
         style="height: 90%%;"
         >
-        <div dojoType="ToolbarContainer" layoutAlign="top" id="TableToolbarContainer%(id)s" layoutAlign="top">
-        <div dojoType="Toolbar" id="tabletoolbar%(id)s"></div>
+        <div dojoType="ToolbarContainer" layoutAlign="top" id="TableToolbarContainer%(id)s" widgetId="TableToolbarContainer%(id)s" layoutAlign="top">
+        <div dojoType="Toolbar" id="tabletoolbar%(id)s" widgetId="tabletoolbar%(id)s"></div>
         </div>
-        <div class="tableContainer" id="tableContainer%(id)s" dojoType="ContentPane"  cacheContent="false"
+        <div class="tableContainer" widgetId="tableContainer%(id)s" id="tableContainer%(id)s"
+        dojoType="ContentPane"  cacheContent="false"
         layoutAlign="client"
         style="overflow-x: auto; overflow-y: hidden;"
         executeScripts="true"
@@ -494,7 +508,7 @@ class AJAXUI(HTMLUI.HTMLUI):
         ## Open to the container we live in
         if pane=='parent':
             if target:
-                del target['callback_stored']
+                target.poparray('callback_stored')
                 
             if self.defaults.has_key("__pane__"):
                 pane = "find_widget_type_above('ContentPane',%r)" % self.defaults['__pane__']
@@ -512,10 +526,16 @@ class AJAXUI(HTMLUI.HTMLUI):
 
         elif pane=='main':
             if target:
-                del target['callback_stored']
+                target.poparray('callback_stored')
                 
             pane = "'main'"
 
+        elif pane=='popup':
+            popup_id = self.get_uniue_id()
+            self.add_to_top_ui('''<div widgetId="float%s" dojoType="FloatingPane" style="display: none; width: 640px; height: 400px; left: 100px; top: 100px;" windowState="minimized" displayMinimizeAction = "true"  hasShadow="true"  resizable="true"  executeScripts="true"></div>''' % (popup_id))
+
+            pane = "'float%s'" % (popup_id)
+            
         return pane
 
     def link(self,string,target=None,options=None,icon=None,tooltip='',pane='main', **target_options):
@@ -533,6 +553,13 @@ class AJAXUI(HTMLUI.HTMLUI):
             self.result+="<a href='%s'>%s</a>" % (target_options['url'],string)
             return
         except KeyError:
+            pass
+
+        ## The target query can over ride the pane specification
+        try:
+            pane = target['__targetpane__']
+            del target['__targetpane__']
+        except:
             pass
         
         if target==None:
@@ -593,18 +620,15 @@ class AJAXUI(HTMLUI.HTMLUI):
         """
         id = "Toolbar%s" % self.get_uniue_id()
         self.result+='''<div dojoType="LayoutContainer"
-        cacheContent="false" layoutChildPriority="top-bottom"
-        >'''
-        self.result+='''<div dojoType="ToolbarContainer" id="container%s" layoutAlign="top">
-        <div dojoType="Toolbar" id="%s"></div>
+        cacheContent="false" layoutChildPriority="top-bottom" >'''
+        self.result+='''<div dojoType="ToolbarContainer" id="container%(id)s" widgetId="container%(id)s" layoutAlign="top">
+        <div dojoType="Toolbar" id="%(id)s"></div>
         </div>
         <div dojoType="ContentPane"
         layoutAlign="top"
-        style="overflow-y: auto; height: 40%%;"
         executeScripts="true"
-        cacheContent="false" 
-        >
-        ''' % (id,id)
+        cacheContent="false">
+        ''' % dict(id=id)
 
         self.add_to_top_ui("</div></div>")
         return id
@@ -642,6 +666,7 @@ class AJAXUI(HTMLUI.HTMLUI):
         elif cb:
             cb_key = self.store_callback(cb)
             target = self.defaults.clone()
+            #target.poparray('callback_stored')
             target['callback_stored'] = cb_key
             pane = self._calculate_js_for_pane(target=target, pane=pane)
             self._dojo_delayed_execution("add_toolbar_link('/images/%s','f?%s',%s, %s, 'toolbarbutton%s', %r);" % (icon, target, pane, container, id, toolbar))
@@ -675,20 +700,21 @@ class AJAXUI(HTMLUI.HTMLUI):
         
         self.result = "<a href='f?%s&callback_stored=%s'>Click to Download file</a>" % (self.defaults,cb)
 
-    def refresh(self,interval,query,**options):
+    def refresh(self,interval,query, pane='self', **options):
         """ Refreshes the given content pane into the specified query in a certain time.
 
         if interval is 0 we do it immediately.
         """
-        if options.has_key('parent'):
-            del query['callback_stored']
-            ## This is the pane we will try to refresh
-            pane = "find_widget_type_above('ContentPane',_container_.widgetId)"
-        ## Unless a specific pane is specified
-        elif options.has_key('pane'):
-            pane = "%r" % options['pane']
-        else:
-            pane = "_container_"
+        pane = self._calculate_js_for_pane(None, query, pane)
+##        if options.has_key('parent'):
+##            del query['callback_stored']
+##            ## This is the pane we will try to refresh
+##            pane = "find_widget_type_above('ContentPane',_container_.widgetId)"
+##        ## Unless a specific pane is specified
+##        elif options.has_key('pane'):
+##            pane = "%r" % options['pane']
+##        else:
+##            pane = "_container_"
             
         ## Do we want to do this immediately?
         if interval==0:

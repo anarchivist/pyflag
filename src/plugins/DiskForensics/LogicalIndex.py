@@ -173,10 +173,10 @@ class IndexScan(GenScanFactory):
             self.block = self.dbh.autoincrement()
             #A dictionary for counting hit stats
             self.stats_count={}
-
+            self.dbh.mass_insert_start("LogicalIndexOffsets")
+            
         def process(self,data,metadata=None):            
             # Store indexing results in the dbase
-            self.dbh.mass_insert_start("LogicalIndexOffsets")
             for offset, matches in index.index_buffer(self.index, data):
                 for id, length in matches:
                     try:
@@ -206,6 +206,7 @@ class IndexScan(GenScanFactory):
                 
         def finish(self):
             #Store the stats table with the hits for the search
+            self.dbh.mass_insert_commit()
             pydbh = DB.DBO(None)
             for row in self.stats_count.iteritems():
                 pydbh.execute("select word,class from dictionary where id=%s limit 1",row[0])
@@ -350,7 +351,7 @@ class SearchIndex(Reports.report):
                 query['keyword']=k
 
             result.heading("Removing word %s" % word)
-            result.refresh(0,query,parent='yes')
+            result.refresh(0,query,pane="parent")
         
         def add_word_cb(query,result):
             """ Call back to add a new word to the list of words to
@@ -359,7 +360,7 @@ class SearchIndex(Reports.report):
             result.heading("Add a word to search terms")
             q=query.clone()
             del q['callback_stored']
-            q['__opt__']='parent'
+            q['__pane__']='parent'
             q['__target__']='new_keyword'
             try:
                 result.table(
