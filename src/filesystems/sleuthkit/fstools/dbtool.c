@@ -202,7 +202,6 @@ FILE *logfp;
 static u_int8_t
 print_dent (FS_INFO *fs, FS_DENT *fs_dent, int flags, char *ptr) 
 {
-
   // print progress message
   file_count++;
   if(file_count % 200 == 0)
@@ -614,6 +613,8 @@ main(int argc, char **argv)
 	IMG_INFO *img;
 	char *dbaction = NULL;
 	extern int optind;	
+	// Mode is i for inode walk, and d for dent walk
+	char mode='d';
 
 	progname = argv[0];
 	//fstype = DEF_FSTYPE;
@@ -621,12 +622,15 @@ main(int argc, char **argv)
 
 	i_flags |= ~0;
 
-	while ((ch = getopt(argc, argv, "i:m:n:f:d:s:vVz:")) > 0) {
+	while ((ch = getopt(argc, argv, "im:n:f:d:s:vVz:")) > 0) {
 	  switch (ch) {
 	  case '?':
 	  default: 
 	    usage(argv[0]);
 	    return 0;
+	  case 'i':
+	    mode = 'i';
+	    break;
 	  case 'f':
 	    fs_type = optarg;
 	    if(strstr(optarg, "auto")==NULL)
@@ -697,39 +701,35 @@ main(int argc, char **argv)
 	  return 0;
 	};
 	
-
 	img = img_open("raw", 1,
-		       (const char **) &argv[optind++]);
-
+		       (const char **) &argv[optind]);
+	
 	/* open image */
-	//	fs = fs_open(argv[optind++], fstype);
 	fs = fs_open(img,0, fstype);
 	if(!fs) RAISE(E_GENERIC,NULL,"Unable to open file system as %s",fstype);
+	
+	if(mode=='i') {
+	  /* inode walk
+	   * This fills in the inode table, the callback also calls file_walk
+	   * which fills in the blocks table.
+	   */
+	  inode_count = fs->first_inum;
+	  inode_total = fs->last_inum;
+	  fprintf(stderr, "Loading Inode Entries\n");
+	  fs->inode_walk(fs, fs->first_inum, fs->last_inum, i_flags, 
+			 (FS_INODE_WALK_FN) print_inode, (char *)0);
+	  
+	  /* print filesystem info 
+	   * This fills in the meta table
+	   */
+	  print_fsinfo(fs);
+	} else {
+	  /* directory walk, fills in the file table
+	   */
+	  fprintf(stderr, "Loading Directory Entries\n");
+	  fs->dent_walk(fs, fs->root_inum, f_flags, (FS_DENT_WALK_FN) print_dent, (char *)0); 
+	};
 
-	/* print filesystem info 
-	 * This fills in the meta table
-	 */
-	print_fsinfo(fs);
-
-	/* directory walk, fills in the file table
-	 */
-	fprintf(stderr, "Loading Directory Entries\n");
-	fs->dent_walk(fs, fs->root_inum, f_flags, (FS_DENT_WALK_FN) print_dent, (char *)0); 
-
-	fs->close(fs);
-	fs = NULL;
-	fs = fs_open(img,0, fstype);
-	if(!fs) RAISE(E_GENERIC,NULL,"Unable to open file system as %s",fstype);
-
-	/* inode walk
-	 * This fills in the inode table, the callback also calls file_walk
-	 * which fills in the blocks table.
-	 */
-	inode_count = fs->first_inum;
-	inode_total = fs->last_inum;
-	fprintf(stderr, "Loading Inode Entries\n");
-	fs->inode_walk(fs, fs->first_inum, fs->last_inum, i_flags, 
-		      (FS_INODE_WALK_FN) print_inode, (char *)0);
 	/* close file */
 	fs->close(fs);
 

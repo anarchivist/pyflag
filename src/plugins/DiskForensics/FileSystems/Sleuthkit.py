@@ -26,8 +26,19 @@ class AutoFS(DBFS):
         mount_point = os.path.normpath(mount_point)
         DBFS.load(self, mount_point, iosource_name)
 
-        # run sleuthkit
+        # run sleuthkit. First for the dents:
         string= "%s -i %r -o %r %r -n %r -f %r -m %r %r" % (
+            config.IOWRAPPER,
+            self.iosource.subsystem,
+            self.iosource.make_parameter_list(),config.SLEUTHKIT,
+            iosource_name, self.sk_type, mount_point,
+            "foo"
+            )
+                
+        self.dbh.MySQLHarness(string)
+
+        ## Now for the inodes:
+        string= "%s -i %r -o %r %r -n %r -f %r -m %r -i %r" % (
             config.IOWRAPPER,
             self.iosource.subsystem,
             self.iosource.make_parameter_list(),config.SLEUTHKIT,

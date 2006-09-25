@@ -1314,12 +1314,16 @@ ntfs_data_walk(NTFS_INFO * ntfs, INUM_T inum,
      */
     if (fs_data->flags & FS_DATA_RES) {
 	char *buf = NULL;
-	if ((flags & FS_FLAG_FILE_AONLY) == 0) {
-	    if ((buf = mymalloc(fs_data->size)) == NULL) {
-		return 1;
-	    }
-	    memcpy(buf, fs_data->buf, fs_data->size);
+
+	// Make sure that we keep a copy of the buffer. Original SK
+	// does not provide a copy if FS_FLAG_FILE_AONLY was provided,
+	// which makes it difficult for us to get the data if the file
+	// was resident (because it does not have a block list).
+
+	if ((buf = mymalloc(fs_data->size)) == NULL) {
+	  return 1;
 	}
+	memcpy(buf, fs_data->buf, fs_data->size);
 
 	myflags =
 	    FS_FLAG_DATA_CONT | FS_FLAG_DATA_ALLOC | FS_FLAG_DATA_RES;
@@ -1327,17 +1331,15 @@ ntfs_data_walk(NTFS_INFO * ntfs, INUM_T inum,
 	    action(fs, ntfs->root_mft_addr, buf, fs_data->size, myflags,
 	    ptr);
 	if (retval == WALK_STOP) {
-	    if ((flags & FS_FLAG_FILE_AONLY) == 0)
-		free(buf);
-	    return 0;
+	  free(buf);
+	  return 0;
 	}
 	else if (retval == WALK_ERROR) {
-	    if ((flags & FS_FLAG_FILE_AONLY) == 0)
-		free(buf);
-	    return 1;
+	  free(buf);
+	  return 1;
 	}
-	if ((flags & FS_FLAG_FILE_AONLY) == 0)
-	    free(buf);
+	
+	free(buf);
     }
     else if (fs_data->flags & FS_DATA_COMP) {
 	unsigned int a;

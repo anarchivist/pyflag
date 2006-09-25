@@ -147,7 +147,10 @@ class GenericUI:
     def clear(self):
         """ Clear the current object, as if it has not been drawn on """
         self.result=''
-        
+
+    def date_selector(self, description, name):
+        self.textfield(description,name)
+    
     def checkbox(self,description,name,value,**options):
         """ Create a checkbox input for the name,value pair given. """
         logging.log(logging.DEBUG, "checkbox not implemented")

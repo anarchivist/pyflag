@@ -93,6 +93,8 @@ fs_inode_free(FS_INODE * fs_inode)
 {
     FS_NAME *fs_name, *fs_name2;
 
+    if(!fs_inode) return;
+
     if (fs_inode->direct_addr)
 	free((char *) fs_inode->direct_addr);
     fs_inode->direct_addr = NULL;
