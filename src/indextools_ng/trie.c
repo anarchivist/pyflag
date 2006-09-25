@@ -122,11 +122,19 @@ static TrieNode add_unique_to_peer_list(struct list_head *l, TrieNode n,
     return n;
 };
 
+// This is a character comparison map it represents those characters
+// which must have an offset added to their value in order to
+// normalise them. This is not unicode aware but is very fast.
+char cmap[] = { ['A' ... 'Z']='a'-'A' };
+
 int Compare_literal_nodes(TrieNode a, TrieNode b) {
   if(!ISSUBCLASS(a,LiteralNode) || !ISSUBCLASS(b,LiteralNode)) 
     return False;
 
-  return (((LiteralNode)a)->value == ((LiteralNode)b)->value);
+  char left=((LiteralNode)a)->value;
+  char right= ((LiteralNode)b)->value;
+  // FIXME: This case comparison will not do with foreign languages
+  return (left+cmap[left]==right+cmap[right]);
 };
 
 TrieNode TrieNode_Con(TrieNode self) {
@@ -290,7 +298,8 @@ VIRTUAL(TrieNode, Object)
 END_VIRTUAL
 
 LiteralNode LiteralNode_Con(LiteralNode self, char **value, int *len) {
-  self->value = **value;
+  // Lowercase the value.
+  self->value = **value+cmap[**value];
 
 #ifdef __DEBUG_V_
   talloc_set_name(self, "%s: %c", NAMEOF(self),**value);
@@ -306,7 +315,7 @@ LiteralNode LiteralNode_Con(LiteralNode self, char **value, int *len) {
 
 int LiteralNode_compare(TrieNode self, char **buffer, int *len) {
   LiteralNode this = (LiteralNode)self;
-  int result = (**buffer == this->value);
+  int result = **buffer+cmap[**buffer]==this->value;
 
   if(result)
     (*buffer)++; (*len)--;
