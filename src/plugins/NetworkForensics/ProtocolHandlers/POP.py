@@ -138,9 +138,10 @@ class POPScanner(StreamScannerFactory):
         ## streams which are not on port 110, we need to tell ethereal
         ## this via its config file.
         self.pop_connections = {}
-
+        
+        dbh = DB.DBO(self.case)
         ## This table stores common usernames/passwords:
-        self.dbh.execute(
+        dbh.execute(
             """ CREATE TABLE if not exists `passwords` (
             `inode` VARCHAR(255) NOT NULL,
             `username` VARCHAR(255) NOT NULL,
@@ -149,7 +150,8 @@ class POPScanner(StreamScannerFactory):
             ) """)
             
     def reset(self, inode):
-        self.dbh.execute("delete from passwords where type='POP3'")
+        dbh = DB.DBO(self.case)    
+        dbh.execute("delete from passwords where type='POP3'")
 
     def process_stream(self, stream, factories):
         forward_stream, reverse_stream = self.stream_to_server(stream, "POP3")
@@ -185,7 +187,8 @@ class POPScanner(StreamScannerFactory):
 
         ## If there is any authentication information in here,
         ## we save it for Ron:
+        dbh = DB.DBO(self.case)
         if p.username and p.password:
-            self.dbh.execute("insert into passwords set inode='S%s',username=%r,password=%r,type='POP3'",(
+            dbh.execute("insert into passwords set inode='S%s',username=%r,password=%r,type='POP3'",(
                 forward_stream,p.username,p.password))
 

@@ -80,7 +80,7 @@ class ZipScan(GenScanFactory):
 
                 ## Now call the scanners on this new file (FIXME limit
                 ## the recursion level here)
-                fd = ZipFile(self.dbh.case, self.fd, inode, dbh=self.dbh)
+                fd = ZipFile(self.case, self.fd, inode)
 #                fd = self.ddfs.open(inode = inode)
                 Scanner.scanfile(self.ddfs,fd,self.factories)
 
@@ -188,8 +188,8 @@ class ZipFile(DiskForensics.DBFS_file):
     """
     specifier = 'Z'
     
-    def __init__(self, case, fd, inode, dbh=None):
-        DiskForensics.DBFS_file.__init__(self, case, fd, inode, dbh)
+    def __init__(self, case, fd, inode):
+        DiskForensics.DBFS_file.__init__(self, case, fd, inode)
 
         ## Zip file handling requires repeated access into the zip
         ## file. Caching our input fd really helps to speed things
@@ -303,7 +303,6 @@ class ZipFile(DiskForensics.DBFS_file):
             if self.type == zipfile.ZIP_DEFLATED:
                 logging.log(logging.DEBUG, "Required to seek to offset %s in Zip File %s. This is inefficient, forcing disk caching." % (self.readptr, self.inode))
                 self.cache()
-                #File.__init__(self,self.case,self.fd,self.inode,self.dbh)
                 self.seek(offset, rel)
                 return
             
@@ -317,8 +316,8 @@ class GZ_file(DiskForensics.DBFS_file):
     """ A file like object to read gzipped files. """
     specifier = 'G'
     
-    def __init__(self, case, fd, inode, dbh=None):
-        File.__init__(self, case, fd, inode, dbh)
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
 
         self.cache()
         
@@ -355,8 +354,8 @@ class Tar_file(DiskForensics.DBFS_file):
     """ A file like object to read files from within tar files. Note that the tar file is specified as an inode in the DBFS """
     specifier = 'T'
     
-    def __init__(self, case, fd, inode, dbh=None):
-        File.__init__(self, case, fd, inode, dbh)
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
 
         ## Tar file handling requires repeated access into the tar
         ## file. Caching our input fd really helps to speed things

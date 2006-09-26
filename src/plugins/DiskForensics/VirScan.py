@@ -61,19 +61,21 @@ class VirScan(GenScanFactory):
     """ Scan file for viruses """
     def __init__(self,fsfd):
         GenScanFactory.__init__(self, fsfd)        
-
-        self.dbh.execute(""" CREATE TABLE IF NOT EXISTS `virus` (
+        dbh=DB.DBO(self.case)
+        dbh.execute(""" CREATE TABLE IF NOT EXISTS `virus` (
         `inode` varchar( 20 ) NOT NULL,
         `virus` tinytext NOT NULL )""")
 
         self.scanner=VScan()
 
     def destroy(self):
-        self.dbh.check_index('virus','inode')
+        dbh=DB.DBO(self.case)
+        dbh.check_index('virus','inode')
 
     def reset(self, inode):
         GenScanFactory.reset(self, inode)
-        self.dbh.execute('drop table virus')
+        dbh=DB.DBO(self.case)
+        dbh.execute('drop table virus')
 
     class Scan(MemoryScan):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
@@ -85,8 +87,9 @@ class VirScan(GenScanFactory):
                 self.virus=self.outer.scanner.scan(buf)
 
         def finish(self):
+            dbh=DB.DBO(self.case)
             if self.virus:
-                self.dbh.execute("INSERT INTO virus VALUES(%r,%r)", (self.inode, self.virus))
+                dbh.execute("INSERT INTO virus VALUES(%r,%r)", (self.inode, self.virus))
 
 class VirusScan(Reports.report):
     """ Scan Filesystem for Viruses using clamav"""

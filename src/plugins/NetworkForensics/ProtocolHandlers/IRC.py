@@ -342,9 +342,8 @@ class IRC:
         "ERROR":1,
         }
 
-    def __init__(self,fd,dbh):
+    def __init__(self,fd):
         self.fd=fd
-        self.dbh = dbh
         self.regex = re.compile("(?::([^ ]+) )?([^ ]+)(?: (.*))?")
 
     def rewrite_reply(self,prefix,command,line):
@@ -370,8 +369,10 @@ class IRC:
             recipient = line.split(':')[0]
         else:
             recipient = ""
-            
-        self.dbh.execute(""" insert into irc_messages set sender=%r,full_sender=%r,
+
+        self.case = self.fd.case
+        dbh = DB.DBO(self.case)
+        dbh.execute(""" insert into irc_messages set sender=%r,full_sender=%r,
         inode=%r, packet_id=%r, data=%r, command = %r, recipient = %r""",(
             short_name,prefix,base_stream_inode, packet_id,
             line, command, recipient 
@@ -389,7 +390,8 @@ class IRC:
     def NICK(self,prefix,command,line):
         """ When a user changes their nick we store it in the database """
         self.nick = line
-        self.dbh.execute(
+        dbh = DB.DBO(self.case)    
+        dbh.execute(
             """ insert into  `irc_userdetails`  set
             inode=%r, nick=%r, username=%r, password=%r
             """,( self.fd.inode, self.nick, self.username, self.password))
@@ -485,7 +487,8 @@ class IRCScanner(StreamScannerFactory):
     default = True
     
     def prepare(self):
-        self.dbh.execute(
+        dbh = DB.DBO(self.case)    
+        dbh.execute(
             """CREATE TABLE if not exists `irc_messages` (
             `id` int auto_increment,
             `sender` VARCHAR( 255 ) NOT NULL ,
@@ -498,19 +501,19 @@ class IRCScanner(StreamScannerFactory):
             `data` TEXT NOT NULL,
             key(id)
             )""")
-        self.dbh.execute(
+        dbh.execute(
             """ CREATE TABLE if not exists `irc_session` (
             `id` VARCHAR(250),
             `user` VARCHAR( 250 ) NOT NULL
             )""")
-        self.dbh.execute(
+        dbh.execute(
             """ CREATE TABLE if not exists `irc_userdetails` (
             `inode` VARCHAR(250),
             `nick` VARCHAR(250),
             `username` VARCHAR(250),
             `password` VARCHAR(250)
             )""")
-        self.dbh.execute(
+        dbh.execute(
             """ CREATE TABLE if not exists `irc_p2p` (
             `inode` VARCHAR(250),
             `session_id` INT,
@@ -527,7 +530,7 @@ class IRCScanner(StreamScannerFactory):
         combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.con_id, stream.reverse)
         ## Check to see if this is an IRC stream at all:
         fd = self.fsfd.open(inode=combined_inode)
-        irc=IRC(fd,self.dbh)
+        irc=IRC(fd)
         if not irc.identify():
             return
         

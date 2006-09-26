@@ -41,8 +41,8 @@ class MD5Scan(GenScanFactory):
 
     def __init__(self,fsfd):
         GenScanFactory.__init__(self, fsfd)
-        
-        self.dbh.execute(""" CREATE TABLE IF NOT EXISTS `md5` (
+        dbh=DB.DBO(self.case)
+        dbh.execute(""" CREATE TABLE IF NOT EXISTS `md5` (
         `inode` varchar( 250 ) NOT NULL default '',
         `md5` varchar( 35 ) NOT NULL default '',
         `binary_md5` varchar( 16 ) binary NOT NULL default '',
@@ -52,7 +52,8 @@ class MD5Scan(GenScanFactory):
 
     def reset(self, inode):
         GenScanFactory.reset(self, inode)
-        self.dbh.execute("drop table `md5`")
+        dbh=DB.DBO(self.case)
+        dbh.execute("drop table `md5`")
 
     def destroy(self):
         pass
@@ -83,8 +84,9 @@ class MD5Scan(GenScanFactory):
             dbh_flag.execute("select filename,productcode from NSRL_hashes where md5=%r limit 1",self.m.digest())
             nsrl=dbh_flag.fetch()
             if not nsrl: nsrl={}
-
-            self.dbh.execute('INSERT INTO md5 set inode=%r,md5=%r,binary_md5=%r,NSRL_productcode=%r, NSRL_filename=%r', (self.inode, self.m.hexdigest(),self.m.digest(),nsrl.get('productcode',0),nsrl.get('filename','')))
+            
+            dbh=DB.DBO(self.case)
+            dbh.execute('INSERT INTO md5 set inode=%r,md5=%r,binary_md5=%r,NSRL_productcode=%r, NSRL_filename=%r', (self.inode, self.m.hexdigest(),self.m.digest(),nsrl.get('productcode',0),nsrl.get('filename','')))
 
 class HashComparison(Reports.report):
     """ Compares MD5 hash against the NSRL database to classify files """

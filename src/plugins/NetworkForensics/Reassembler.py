@@ -48,16 +48,16 @@ class StreamFile(File):
     """
     specifier = 'S'
 
-    def __init__(self, case, fd, inode, dbh=None):
-        File.__init__(self,case, fd, inode, dbh=dbh)
+    def __init__(self, case, fd, inode):
+        File.__init__(self,case, fd, inode)
 
         self.stat_cbs.extend([ self.show_packets, self.combine_streams ])
         self.stat_names.extend([ "Show Packets", "Combined streams"])
 
-
+        dbh = DB.DBO(self.case)    
         ## Fill in some vital stats
-        self.dbh.execute("select con_id, reverse, src_ip, dest_ip, src_port, dest_port, ts_sec from `connection_details` where inode=%r limit 1", inode)
-        row=self.dbh.fetch()
+        dbh.execute("select con_id, reverse, src_ip, dest_ip, src_port, dest_port, ts_sec from `connection_details` where inode=%r limit 1", inode)
+        row=dbh.fetch()
         if row:
             self.con_id = row['con_id']
             self.src_port = row['src_port']
@@ -94,36 +94,37 @@ class StreamFile(File):
         if len(stream_ids)<2: return
         
         ## Store the new stream in the cache:
-        self.dbh.execute("insert into `connection_details` set inode=%r",
+        dbh = DB.DBO(self.case)    
+        dbh.execute("insert into `connection_details` set inode=%r",
                          (self.inode))
-        self.con_id = self.dbh.autoincrement()
-        self.dbh2 = self.dbh.clone()
+        self.con_id = dbh.autoincrement()
+        dbh2 = dbh.clone()
 
         fds = {}
         for s in stream_ids:
             try:
                 fds[int(s)] = open(FlagFramework.get_temp_path(
-                    self.dbh.case, "%s|S%s" % (self.fd.inode, s)))
+                    dbh.case, "%s|S%s" % (self.fd.inode, s)))
             except IOError:
                 fds[int(s)] = -1
 
-        out_fd = open(FlagFramework.get_temp_path(self.dbh.case,
+        out_fd = open(FlagFramework.get_temp_path(dbh.case,
                                                   self.inode),"w")
         
-        self.dbh.execute("select con_id,packet_id, length, cache_offset from `connection` where %s order by packet_id",(
+        dbh.execute("select con_id,packet_id, length, cache_offset from `connection` where %s order by packet_id",(
             " or ".join(["con_id=%r" % a for a in stream_ids])
             ))
 
-        self.dbh2.mass_insert_start("connection")
+        dbh2.mass_insert_start("connection")
         sum = 0
-        for row in self.dbh:
+        for row in dbh:
             offset = out_fd.tell()
             fd=fds[row['con_id']]
             if fd<0: continue
             
             fd.seek(row['cache_offset']) 
             out_fd.write(fd.read(row['length']))
-            self.dbh2.mass_insert(con_id=self.con_id,packet_id=row['packet_id'],
+            dbh2.mass_insert(con_id=self.con_id,packet_id=row['packet_id'],
                                   seq=sum,length=row['length'],
                                   cache_offset=offset,
                                   # This is the original id this
@@ -131,14 +132,14 @@ class StreamFile(File):
                                   original_id = row['con_id'])
             sum += row['length']
 
-        self.dbh2.mass_insert_commit()
+        dbh2.mass_insert_commit()
 
         out_fd.close()
         self.cached_fd = open(FlagFramework.get_temp_path(
-            self.dbh.case, self.inode),"r")
+            dbh.case, self.inode),"r")
 
         ## Now create the stream in the VFS:
-        fsfd = FileSystem.DBFS(self.dbh.case)
+        fsfd = FileSystem.DBFS(self.case)
         inode = self.inode[:self.inode.rfind("|")] +"|S%s" % stream_ids[0]
         pathname = fsfd.lookup(inode = inode)
         fsfd.VFSCreate(None, self.inode, pathname)
@@ -148,9 +149,10 @@ class StreamFile(File):
         if not position:
             position = self.tell()
             
-        self.dbh.execute("""select packet_id from `connection` where con_id = %r and cache_offset <= %r order by cache_offset desc, length desc limit 1""",
+        dbh = DB.DBO(self.case)        
+        dbh.execute("""select packet_id from `connection` where con_id = %r and cache_offset <= %r order by cache_offset desc, length desc limit 1""",
                          (self.con_id, position))
-        row=self.dbh.fetch()
+        row=dbh.fetch()
         return row['packet_id']
 
     def get_combined_fd(self):
@@ -163,7 +165,7 @@ class StreamFile(File):
             return self
 
         self.forward_id = self.con_id
-        fsfd = FileSystem.DBFS(self.dbh.case)
+        fsfd = FileSystem.DBFS(self.case)
         return fsfd.open(inode="%s/%s" % (self.inode,self.reverse))
 
     def combine_streams(self, query,result):
@@ -179,9 +181,10 @@ class StreamFile(File):
             limit = 0
 
         number_of_rows = 0
-        self.dbh.execute("select * from `connection` where con_id = %r order by cache_offset limit %s, %s", (combined_fd.con_id, limit, config.PAGESIZE))
+        dbh = DB.DBO(self.case)
+        dbh.execute("select * from `connection` where con_id = %r order by cache_offset limit %s, %s", (combined_fd.con_id, limit, config.PAGESIZE))
 
-        for row in self.dbh:
+        for row in dbh:
             number_of_rows += 1
             combined_fd.seek(row['cache_offset'])
             ## Get the data:
@@ -253,8 +256,8 @@ class OffsetFile(File):
     The format is offset:length
     """
     specifier = 'o'
-    def __init__(self, case, fd, inode, dbh=None):
-        File.__init__(self, case, fd, inode, dbh)
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
 
         ## We parse out the offset and length from the inode string
         tmp = inode.split('|')[-1]
@@ -303,8 +306,8 @@ import StringIO
 ## This is a memory cached version of the offset file driver - very useful for packets:
 class MemroyCachedOffset(StringIO.StringIO,File):
     specifier = 'O'
-    def __init__(self, case, fd, inode, dbh=None):
-        File.__init__(self, case, fd, inode, dbh)
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
 
         ## We parse out the offset and length from the inode string
         tmp = inode.split('|')[-1]

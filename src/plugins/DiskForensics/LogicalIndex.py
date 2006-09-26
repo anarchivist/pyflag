@@ -79,16 +79,17 @@ class IndexScan(GenScanFactory):
         ## When running in a distributed environment this is not
         ## accessible - maybe we need to pass this in the metadata?
         self.rel_offset = 0
-        self.dbh.execute("create table if not exists `LogicalIndex` (`inode` VARCHAR( 250 ) NOT NULL ,`block` INT NOT NULL auto_increment, `block_number` int not null, primary key(block))")
+        dbh=DB.DBO(self.case)
+        dbh.execute("create table if not exists `LogicalIndex` (`inode` VARCHAR( 250 ) NOT NULL ,`block` INT NOT NULL auto_increment, `block_number` int not null, primary key(block))")
         
-        self.dbh.execute("""create table if not exists `LogicalIndexOffsets` (
+        dbh.execute("""create table if not exists `LogicalIndexOffsets` (
         `id` INT NOT NULL ,
         `offset` BIGINT NOT NULL,
         `length` smallint not null
         )""")
 
         #Create a table that will hold our stats: number of occurrences of each word id we are searching for.
-        self.dbh.execute("""CREATE TABLE if not exists `LogicalIndexStats` (
+        dbh.execute("""CREATE TABLE if not exists `LogicalIndexStats` (
         `id` int NOT NULL,
         `word` VARCHAR( 250 ) binary NOT NULL,
         `class` VARCHAR( 50 ) NOT NULL,
@@ -97,8 +98,8 @@ class IndexScan(GenScanFactory):
         )""")
 
         ## The block number must be the largest that is available in the database.
-        self.dbh.execute("select max(block) as `max` from `LogicalIndex`")
-        row=self.dbh.fetch()
+        dbh.execute("select max(block) as `max` from `LogicalIndex`")
+        row=dbh.fetch()
         try:
             self.block=int(row['max'])+1
         except: self.block=0
@@ -146,20 +147,22 @@ class IndexScan(GenScanFactory):
         different dictionaries.
         """
         GenScanFactory.reset(self, inode)
-        self.dbh.execute("drop table if exists `LogicalIndex`")
-        self.dbh.execute("drop table if exists `LogicalIndexOffsets`")
+        dbh=DB.DBO(self.case)
+        dbh.execute("drop table if exists `LogicalIndex`")
+        dbh.execute("drop table if exists `LogicalIndexOffsets`")
         ## Here we reset all reports that searched this disk
-        FlagFramework.reset_all(case=self.dbh.case,report='SearchIndex', family='Keyword Indexing')
-        self.dbh.execute("drop table if exists `LogicalIndexStats`")
+        FlagFramework.reset_all(case=self.case,report='SearchIndex', family='Keyword Indexing')
+        dbh.execute("drop table if exists `LogicalIndexStats`")
         #self.dbh.execute("update inode set scanner_cache = REPLACE(scanner_cache,%r,'') ",
         #            (self.__class__.__name__))
 
     def destroy(self):
         ## Destroy our index handle which will close the file and free memory
         del self.index
-
+        
+        dbh=DB.DBO(self.case)
         ## Ensure indexes are built on the offset table:
-        self.dbh.check_index("LogicalIndexOffsets","id")
+        dbh.check_index("LogicalIndexOffsets","id")
         
     class Scan(BaseScanner):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
@@ -168,6 +171,7 @@ class IndexScan(GenScanFactory):
             self.RegexpRows = outer.RegexpRows
             self.rel_offset=0
             self.block_number = 0
+            self.dbh=DB.DBO(self.case)
             self.dbh.execute("insert into `LogicalIndex` set inode=%r,block_number=%r",(inode,self.block_number))
             ## Note the current block number
             self.block = self.dbh.autoincrement()

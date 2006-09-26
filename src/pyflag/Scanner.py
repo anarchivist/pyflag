@@ -59,7 +59,7 @@ class BaseScanner:
         self.size = 0
         self.ddfs = ddfs
 #        self.ddfs.dbh.execute("update inode set scanner_cache = concat_ws(',',scanner_cache, %r) where inode=%r", (outer.__class__.__name__, inode))
-        self.dbh=outer.dbh
+        self.case=outer.case
         self.outer=outer
         self.factories=factories
         
@@ -115,7 +115,7 @@ class GenScanFactory:
         @arg fsfd: A filesystem object for the filesystem we are about to scan.
         """
         self.fsfd = fsfd
-        self.dbh = fsfd.dbh
+        self.case = fsfd.case
 
     def prepare(self):
         """ This is called before the scanner is used.
@@ -217,7 +217,7 @@ class StoreAndScan(BaseScanner):
 
         Where $inode is the filename in the filesystem.
         """
-        return FlagFramework.get_temp_path(self.dbh.case, self.inode)
+        return FlagFramework.get_temp_path(self.case, self.inode)
 
     def finish(self):
         if not self.boring_status:
@@ -251,8 +251,9 @@ class StoreAndScanType(StoreAndScan):
         try:
             mime_type = metadata['mime']
         except KeyError:
-            self.dbh.execute("select mime from type where inode=%r limit 1",(self.inode))
-            row=self.dbh.fetch()
+            dbh = DB.DBO(self.case)
+            dbh.execute("select mime from type where inode=%r limit 1",(self.inode))
+            row=dbh.fetch()
             if row:
                 mime_type = row['mime']
             else:
@@ -333,8 +334,9 @@ def scanfile(ddfs,fd,factories):
     #by checking the inode table.  Note that we still pass the full
     #list of factories to the Scan class so that it may invoke all of
     #the scanners on new files it discovers.
-    ddfs.dbh.execute("select inode_id, scanner_cache from inode where inode=%r limit 1", fd.inode);
-    row=ddfs.dbh.fetch()
+    dbh = DB.DBO(ddfs.case)    
+    dbh.execute("select inode_id, scanner_cache from inode where inode=%r limit 1", fd.inode);
+    row=dbh.fetch()
     try:
         scanners_run =row['scanner_cache'].split(',')
     except:
@@ -416,7 +418,7 @@ def scanfile(ddfs,fd,factories):
     # Store the fact that we finished in the inode table:
     scanner_names = ','.join([ c.outer.__class__.__name__ for c in objs ])
     try:
-        ddfs.dbh.execute("update inode set scanner_cache = concat_ws(',',scanner_cache, %r) where inode=%r", (scanner_names, fd.inode))
+        dbh.execute("update inode set scanner_cache = concat_ws(',',scanner_cache, %r) where inode=%r", (scanner_names, fd.inode))
     except DB.DBError:
         pass
 

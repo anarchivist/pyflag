@@ -39,7 +39,8 @@ class RFC2822(Scanner.GenScanFactory):
     
     def __init__(self,fsfd):
         Scanner.GenScanFactory.__init__(self,fsfd)
-        self.dbh.execute("CREATE TABLE IF NOT EXISTS `email` (`inode` VARCHAR(250), `vfsinode` VARCHAR(250), `date` DATETIME, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));")
+        dbh=DB.DBO(self.case)
+        dbh.execute("CREATE TABLE IF NOT EXISTS `email` (`inode` VARCHAR(250), `vfsinode` VARCHAR(250), `date` DATETIME, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));")
 
     class Scan(Scanner.StoreAndScanType):
         types = [ 'text/x-mail.*',
@@ -74,8 +75,7 @@ class RFC2822(Scanner.GenScanFactory):
             return True
  
         def external_process(self,fd):		    
-	    count = 0
-
+            count = 0
             try:
                 a=email.message_from_file(fd)
 
@@ -85,10 +85,11 @@ class RFC2822(Scanner.GenScanFactory):
                 date = email.Utils.parsedate(a.get('Date'))
                 if not date:
                     raise Exception("No Date field in message - this is probably not an RFC2822 message at all.")
-                    
-		self.dbh.execute("INSERT INTO `email` SET `inode`=%r,`date`=from_unixtime(%r),`to`=%r,`from`=%r,`subject`=%r", (self.inode, int(time.mktime(date)), a.get('To'), a.get('From'), a.get('Subject')))
 
-		for part in a.walk():
+                dbh=DB.DBO(self.case)
+                dbh.execute("INSERT INTO `email` SET `inode`=%r,`date`=from_unixtime(%r),`to`=%r,`from`=%r,`subject`=%r", (self.inode, int(time.mktime(date)), a.get('To'), a.get('From'), a.get('Subject')))
+
+                for part in a.walk():
                     if part.get_content_maintype() == 'multipart':
                         continue
 
@@ -125,8 +126,8 @@ class RFC2822_File(File):
     """ A VFS Driver for reading mail attachments """
     specifier = 'm'
 
-    def __init__(self, case, fd, inode, dbh=None):
-        File.__init__(self, case, fd, inode, dbh)
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
         self.cache()
 
     def read(self, length=None):

@@ -41,7 +41,8 @@ class RegistryScan(GenScanFactory):
     def prepare(self):
         ## The reg table is used for storing all the values in each
         ## key
-        self.dbh.execute("""CREATE TABLE if not exists `reg` (
+        dbh=DB.DBO(self.case)
+        dbh.execute("""CREATE TABLE if not exists `reg` (
         `path` text NOT NULL,
         `offset` INT(11),
         `type` enum('REG_NONE','REG_SZ','REG_EXPAND_SZ','REG_BINARY','REG_DWORD','REG_DWORD_BIG_ENDIAN','REG_LINK','REG_MULTI_SZ','REG_RESOURCE_LIST','REG_FULL_RESOURCE_DESCRIPTOR','REG_RESOURCE_REQUIREMENTS_LIST','Unknown') NOT NULL,
@@ -50,18 +51,20 @@ class RegistryScan(GenScanFactory):
         `value` text)""")
 
         ## The regi table is used for the key navigation
-        self.dbh.execute("""create table if not exists regi (
+        dbh.execute("""create table if not exists regi (
         `dirname` TEXT NOT NULL ,`basename` TEXT NOT NULL)""")
 
     def reset(self, inode):
         GenScanFactory.reset(self, inode)
-        self.dbh.execute('drop table if exists reg')
-        self.dbh.execute('drop table if exists regi')
+        dbh=DB.DBO(self.case)
+        dbh.execute('drop table if exists reg')
+        dbh.execute('drop table if exists regi')
         
     def destroy(self):
         ## Add indexes:
-        self.dbh.check_index("reg" ,"path",250)
-        self.dbh.check_index("regi" ,"dirname",100)
+        dbh=DB.DBO(self.case)
+        dbh.check_index("reg" ,"path",250)
+        dbh.check_index("regi" ,"dirname",100)
 
 
     class Scan(StoreAndScanType):
@@ -79,8 +82,8 @@ class RegistryScan(GenScanFactory):
             
             ## One handle does the reg table, the other handle the
             ## regi table:
-            regi_handle=self.dbh.clone()
-            reg_handle = self.dbh
+            regi_handle=DB.DBO(self.case)
+            reg_handle=DB.DBO(self.case)
 
             reg_handle.mass_insert_start('reg')
             regi_handle.mass_insert_start('regi')

@@ -66,8 +66,9 @@ class DLLScan(Scanner.GenScanFactory):
 
     def destroy(self):
         ## populate the EventMessageSources table from the registry
-        self.dbh.execute("select * from reg where reg_key='EventMessageFile'")
-        for row in self.dbh:
+        dbh=DB.DBO(self.case)
+        dbh.execute("select * from reg where reg_key='EventMessageFile'")
+        for row in dbh:
             service = os.path.basename(os.path.normpath(row['path']))
             self.pydbh.execute("select * from EventMessageSources where source=%r limit 1",service)
             pyrow=self.pydbh.fetch()

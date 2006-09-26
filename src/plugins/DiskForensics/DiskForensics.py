@@ -293,8 +293,8 @@ class DBFS_file(FileSystem.File):
     """ Class for reading files within a loaded dd image, supports typical file-like operations, seek, tell, read """
     
     specifier = 'D'
-    def __init__(self, case, fd, inode, dbh=None):
-        FileSystem.File.__init__(self, case, fd, inode, dbh)
+    def __init__(self, case, fd, inode):
+        FileSystem.File.__init__(self, case, fd, inode)
 
         self.stat_names.extend(["Text"])
         self.stat_cbs.extend([self.textdump])
@@ -315,21 +315,22 @@ class DBFS_file(FileSystem.File):
             return FileSystem.File.read(self,length)
         except IOError:
             pass
-        
+
+        dbh=DB.DBO(self.case)
         ## We need to fetch the blocksize if we dont already know it:
         if not self.index:
             # fetch inode data
-            self.dbh.check_index("inode" ,"inode")
-            self.dbh.execute("select * from inode where inode=%r limit 1", (self.inode))
-            self.data = self.dbh.fetch()
+            dbh.check_index("inode" ,"inode")
+            dbh.execute("select * from inode where inode=%r limit 1", (self.inode))
+            self.data = dbh.fetch()
             if not self.data:
                 raise IOError("Could not locate inode %s"% self.inode)
 
             self.size = self.data['size']
-            self.dbh.check_index("block" ,"inode")
-            self.dbh.execute("select block,count,`index` from block where inode=%r order by `index`", (self.inode))
+            dbh.check_index("block" ,"inode")
+            dbh.execute("select block,count,`index` from block where inode=%r order by `index`", (self.inode))
             try:
-                self.blocks = [ (row['block'],row['count'],row['index']) for row in self.dbh ]
+                self.blocks = [ (row['block'],row['count'],row['index']) for row in dbh ]
             except KeyError:
                 self.blocks = None
                 
@@ -343,9 +344,9 @@ class DBFS_file(FileSystem.File):
 
         if not self.blocks:
             # now try to find blocks in the resident table
-            self.dbh.check_index("resident","inode")
-            self.dbh.execute("select data from resident where inode=%r limit 1" % (self.data['inode']));
-            row = self.dbh.fetch()
+            dbh.check_index("resident","inode")
+            dbh.execute("select data from resident where inode=%r limit 1" % (self.data['inode']));
+            row = dbh.fetch()
             if not row:
                 raise IOError("Cant find any file data")
             data = row['data'][self.readptr:length+self.readptr]
@@ -414,18 +415,17 @@ class DBFS_file(FileSystem.File):
 class MountedFS_file(FileSystem.File):
     """ access to real file in filesystem """
     specifier = 'M'
-    def __init__(self, case, fd, inode, dbh=None):
-        FileSystem.File.__init__(self, case, fd, inode, dbh)
+    def __init__(self, case, fd, inode):
+        FileSystem.File.__init__(self, case, fd, inode)
         #strategy:
         #must determine path from inode
         #we can assume this vfs will never be inside another vfs...
         #just look it up in the database i spose "where inode=inode" ??
-
+        self.case = case
         dbh = DB.DBO(case)
-        self.dbh=dbh
-        self.dbh.check_index("file" ,"inode")
+        dbh.check_index("file" ,"inode")
         dbh.execute("select path,name from file where inode=%r limit 1",(inode))
-        row=self.dbh.fetch()
+        row=dbh.fetch()
         path=row['path']+"/"+row['name']
         self.fd=open(fd.mount_point+'/'+path,'r')
     
@@ -455,12 +455,13 @@ class Unallocated_File(FileSystem.File):
     """
     specifier = 'U'
     
-    def __init__(self, case, fd, inode, dbh=None):
-        FileSystem.File.__init__(self, case, fd, inode, dbh)
+    def __init__(self, case, fd, inode):
+        FileSystem.File.__init__(self, case, fd, inode)
         self.fd=fd
-        self.dbh = DB.DBO(case)
-        self.dbh.execute("select * from unallocated where inode=%r limit 1",(inode))
-        row=self.dbh.fetch()
+        self.case = case
+        dbh = DB.DBO(case)
+        dbh.execute("select * from unallocated where inode=%r limit 1",(inode))
+        row=dbh.fetch()
         try:
             self.size=row['size']
             self.offset=row['offset']

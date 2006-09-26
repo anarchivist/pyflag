@@ -1387,7 +1387,8 @@ class MSNScanner(StreamScannerFactory):
         self.processed=RingBuffer(30)
 
     def prepare(self):
-        self.dbh.execute(
+        dbh=DB.DBO(self.case)
+        dbh.execute(
             """ CREATE TABLE if not exists `msn_session` (
             `inode` VARCHAR(50) NOT NULL,
             `packet_id` INT NOT NULL,
@@ -1399,7 +1400,7 @@ class MSNScanner(StreamScannerFactory):
             `p2p_file` VARCHAR( 250 ),
             `transaction_id`  INT
             )""")
-        self.dbh.execute(
+        dbh.execute(
             """ CREATE TABLE if not exists `msn_p2p` (
             `inode` VARCHAR(250),
             `session_id` INT,
@@ -1408,7 +1409,7 @@ class MSNScanner(StreamScannerFactory):
             `from_user` VARCHAR(250),
             `context` TEXT
             )""")
-        self.dbh.execute(
+        dbh.execute(
             """ CREATE TABLE if not exists `msn_users` (
             `inode` VARCHAR(50) NOT NULL,
             `packet_id`  INT NOT NULL,
@@ -1474,7 +1475,7 @@ class MSNScanner(StreamScannerFactory):
                 # Open the combined stream.
                 fd = self.fsfd.open(inode=combined_inode)
                 
-                m=message(self.dbh, fd, self.fsfd)
+                m=message(dbh, fd, self.fsfd)
                 while 1:
                     try:
                         result=m.parse()
@@ -1503,21 +1504,21 @@ class MSNScanner(StreamScannerFactory):
                 if m.session_id==-1:
                     logging.log(logging.VERBOSE_DEBUG,"Couldn't figure out the MSN session ID for stream S%s/%s" % (forward_stream, reverse_stream))
                 else:
-                    self.dbh.execute("update msn_session set session_id=%r where session_id=-1 and inode=%r",(m.session_id,combined_inode))
+                    dbh.execute("update msn_session set session_id=%r where session_id=-1 and inode=%r",(m.session_id,combined_inode))
                     try:
-                        self.dbh.execute("update msn_users set session_id=%r where session_id=-1 and inode=%r",(m.session_id,combined_inode))
+                        dbh.execute("update msn_users set session_id=%r where session_id=-1 and inode=%r",(m.session_id,combined_inode))
                     except Exception:
                         #We already have this identical row with a real session ID - will delete it below
                         pass
                     #We can delete everything with session id =-1 because we know we have an actual session id for this stream
-                    self.dbh.execute("delete from msn_users where session_id=-1 and inode=%r",combined_inode)
+                    dbh.execute("delete from msn_users where session_id=-1 and inode=%r",combined_inode)
 
                 #Similarly go back and fix up all the Unknown (Target) entries with the actual target name
                 if m.client_id=='Unknown':
                     logging.log(logging.VERBOSE_DEBUG,"Couldn't figure out target identity for stream S%s/%s" % (forward_stream, reverse_stream))
                 else:
-                    self.dbh.execute("update msn_session set recipient=%r where recipient='Unknown (Target)' and inode=%r",(m.client_id,combined_inode))
-                    self.dbh.execute("update msn_session set sender=%r where sender='Unknown (Target)' and inode=%r",(m.client_id,combined_inode))
+                    dbh.execute("update msn_session set recipient=%r where recipient='Unknown (Target)' and inode=%r",(m.client_id,combined_inode))
+                    dbh.execute("update msn_session set sender=%r where sender='Unknown (Target)' and inode=%r",(m.client_id,combined_inode))
 
                 self.processed.append(forward_stream)
                 self.processed.append(reverse_stream)

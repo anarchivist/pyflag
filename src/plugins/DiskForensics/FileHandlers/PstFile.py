@@ -65,23 +65,25 @@ class PstScan(GenScanFactory):
 
     def __init__(self,fsfd):
         GenScanFactory.__init__(self, fsfd)
+        dbh=DB.DBO(self.case)
         self.to_re = re.compile('^to:\s+(.*?)\n(?:\w|\n)', re.IGNORECASE|re.MULTILINE|re.DOTALL)
         self.from_re = re.compile('^from:\s+(.*?)\n(?:\w|\n)', re.IGNORECASE|re.MULTILINE|re.DOTALL)
         # create the "groupware" tables
         # these are global to the image, not the file, so other scanners may wish to use them
         # in that case this code may belong elseware
-        self.dbh.execute("CREATE TABLE IF NOT EXISTS `email` (`inode` VARCHAR(250), `date` DATETIME, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));")
-        self.dbh.execute("CREATE TABLE IF NOT EXISTS `contact` (`inode` VARCHAR(250), `name` VARCHAR(250), `email` VARCHAR(250), `address` VARCHAR(250), `phone` VARCHAR(250));")
-        self.dbh.execute("CREATE TABLE IF NOT EXISTS `appointment` (`inode` VARCHAR(250), `startdate` DATETIME, `enddate` DATETIME, `location` VARCHAR(250), `comment` VARCHAR(250));")
-        self.dbh.execute("CREATE TABLE IF NOT EXISTS `journal` (`inode` VARCHAR(250), `startdate` DATETIME, `enddate` DATETIME, `type` VARCHAR(250), `comment` VARCHAR(250));")
+        dbh.execute("CREATE TABLE IF NOT EXISTS `email` (`inode` VARCHAR(250), `date` DATETIME, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));")
+        dbh.execute("CREATE TABLE IF NOT EXISTS `contact` (`inode` VARCHAR(250), `name` VARCHAR(250), `email` VARCHAR(250), `address` VARCHAR(250), `phone` VARCHAR(250));")
+        dbh.execute("CREATE TABLE IF NOT EXISTS `appointment` (`inode` VARCHAR(250), `startdate` DATETIME, `enddate` DATETIME, `location` VARCHAR(250), `comment` VARCHAR(250));")
+        dbh.execute("CREATE TABLE IF NOT EXISTS `journal` (`inode` VARCHAR(250), `startdate` DATETIME, `enddate` DATETIME, `type` VARCHAR(250), `comment` VARCHAR(250));")
 
 
     def reset(self, inode):
         GenScanFactory.reset(self, inode)
         # reset the groupware tables, this should not be done here
         # if ever another scanner wants to use them also
+        dbh=DB.DBO(self.case)
         for name in ('email','contact','appointment','journal'):
-            self.dbh.execute("DROP TABLE if exists `%s`;", (name))
+            dbh.execute("DROP TABLE if exists `%s`;", (name))
         
     def destroy(self):
         pass
@@ -134,7 +136,8 @@ class PstScan(GenScanFactory):
                         from_addr += " (%s)" % item.outlook_sender
                     to_addr = "%s" % item.sentto_address
 
-                self.dbh.execute("INSERT INTO `email` SET `inode`=%r,`date`=from_unixtime(%s),`to`=%r,`from`=%r,`subject`=%r", (new_inode, item.arrival_date, to_addr, from_addr, item.subject.subj))
+                dbh=DB.DBO(self.case)
+                dbh.execute("INSERT INTO `email` SET `inode`=%r,`date`=from_unixtime(%s),`to`=%r,`from`=%r,`subject`=%r", (new_inode, item.arrival_date, to_addr, from_addr, item.subject.subj))
                 
                 properties = {
                     'mtime':item.arrival_date,
@@ -230,7 +233,8 @@ class PstScan(GenScanFactory):
                 elif item.business_phone2:
                     phone += ", %s(w)" % item.business_phone2
 
-                self.dbh.execute("INSERT INTO `contact` SET `inode`=%r,`name`=%r, `email`=%r, `address`=%r, `phone`=%r", (new_inode, name, email, address, phone))
+                dbh=DB.DBO(self.case)
+                dbh.execute("INSERT INTO `contact` SET `inode`=%r,`name`=%r, `email`=%r, `address`=%r, `phone`=%r", (new_inode, name, email, address, phone))
 
             def add_appointment(new_inode,name,item):
                 add_other(new_inode,name,item)
@@ -240,8 +244,9 @@ class PstScan(GenScanFactory):
                     location = item.location
                 if item.comment:
                     comment = item.comment
-                    
-                self.dbh.execute("INSERT INTO `appointment` SET `inode`=%r, `startdate`=from_unixtime(%s), `enddate`=from_unixtime(%s), `location`=%r, `comment`=%r",(new_inode, item.start, item.end, location, comment))
+
+                dbh=DB.DBO(self.case)
+                dbh.execute("INSERT INTO `appointment` SET `inode`=%r, `startdate`=from_unixtime(%s), `enddate`=from_unixtime(%s), `location`=%r, `comment`=%r",(new_inode, item.start, item.end, location, comment))
 
             def add_journal(new_inode,name,item):
                 add_other(new_inode,name,item)
@@ -251,8 +256,9 @@ class PstScan(GenScanFactory):
                     jtype = item.type
                 if item.comment:
                     comment = item.comment
-                
-                self.dbh.execute("INSERT INTO `journal` SET `inode`=%r, `startdate`=from_unixtime(%s), `enddate`=from_unixtime(%s), `type`=%r, `comment`=%r",(new_inode, item.start, item.end, jtype, comment))
+
+                dbh=DB.DBO(self.case)
+                dbh.execute("INSERT INTO `journal` SET `inode`=%r, `startdate`=from_unixtime(%s), `enddate`=from_unixtime(%s), `type`=%r, `comment`=%r",(new_inode, item.start, item.end, jtype, comment))
 
             ## Just walk over all the files
             for root, dirs, files in self.fd.pst_handle.walk():
@@ -278,8 +284,8 @@ class PstFile(File):
     specifier = 'P'
     blocks=()
     size=None
-    def __init__(self, case, fd, inode, dbh=None):
-        File.__init__(self, case, fd, inode, dbh)
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
         parts = inode.split('|')
         pstinode = '|'.join(parts[:-1])
         thispart = parts[-1]

@@ -139,7 +139,8 @@ class SMTPScanner(StreamScannerFactory):
 
         ## We open the file and scan it for emails:
         fd = self.fsfd.open(inode=combined_inode)
-        p=SMTP(fd,self.dbh,self.fsfd)
+        dbh=DB.DBO(self.case)
+        p=SMTP(fd,dbh,self.fsfd)
         
         ## Iterate over all the messages in this connection
         for f in p.parse():

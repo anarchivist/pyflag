@@ -140,7 +140,7 @@ class FileSystem:
         for part in parts:
             sofar.append(part)
             try:
-                retfd = Registry.VFS_FILES.vfslist[part[0]](self.case, retfd, '|'.join(sofar), dbh=self.dbh)
+                retfd = Registry.VFS_FILES.vfslist[part[0]](self.case, retfd, '|'.join(sofar))
             except IndexError:
                 raise IOError, "Unable to open inode: %s, no VFS" % part
 
@@ -182,7 +182,6 @@ class DBFS(FileSystem):
     def __init__(self, case):
         """ Initialise the DBFS object """
         self.case = case
-        self.dbh = DB.DBO(case)
 
     def load(self, mount_point, iosource_name):
         """ Sets up the schema for loading the filesystem.
@@ -192,8 +191,9 @@ class DBFS(FileSystem):
         """
         self.mount_point = mount_point
         scanners = [ "%r" % s.__name__ for s in Registry.SCANNERS.classes ]
-    
-        self.dbh.execute("""CREATE TABLE IF NOT EXISTS inode (
+
+        dbh=DB.DBO(self.case)
+        dbh.execute("""CREATE TABLE IF NOT EXISTS inode (
         `inode_id` int auto_increment,
         `inode` VARCHAR(250) NOT NULL,
         `status` set('unalloc','alloc'),
@@ -211,24 +211,24 @@ class DBFS(FileSystem):
         primary key (inode_id)
         )""",",".join(scanners))
 
-        self.dbh.execute("""CREATE TABLE IF NOT EXISTS file (
+        dbh.execute("""CREATE TABLE IF NOT EXISTS file (
         `inode` VARCHAR(250) NOT NULL,
         `mode` VARCHAR(3) NOT NULL,
         `status` VARCHAR(8) NOT NULL,
         `path` TEXT,
         `name` TEXT)""")
 
-        self.dbh.execute("""CREATE TABLE IF NOT EXISTS block (
+        dbh.execute("""CREATE TABLE IF NOT EXISTS block (
         `inode` VARCHAR(250) NOT NULL,
         `index` INT NOT NULL,
         `block` BIGINT NOT NULL,
         `count` INT NOT NULL)""")
 
-        self.dbh.execute("""CREATE TABLE IF NOT EXISTS resident (
+        dbh.execute("""CREATE TABLE IF NOT EXISTS resident (
         `inode` VARCHAR(250) NOT NULL,
         `data` TEXT)""")
 
-        self.dbh.execute("""CREATE TABLE IF NOT EXISTS `filesystems` (
+        dbh.execute("""CREATE TABLE IF NOT EXISTS `filesystems` (
         `iosource` VARCHAR( 50 ) NOT NULL ,
         `property` VARCHAR( 50 ) NOT NULL ,
         `value` MEDIUMTEXT NOT NULL ,
@@ -244,7 +244,7 @@ class DBFS(FileSystem):
         except ImportError:
             pass
 
-        self.dbh.execute("""CREATE TABLE if not exists `xattr` (
+        dbh.execute("""CREATE TABLE if not exists `xattr` (
                             `inode_id` INT NOT NULL ,
                             `property` ENUM( %s ) NOT NULL ,
                             `value` VARCHAR( 250 ) NOT NULL
@@ -257,7 +257,8 @@ class DBFS(FileSystem):
         self.iosource = IO.open(self.case, iosource_name)
 
     def delete(self):
-        self.dbh.MySQLHarness("%s/dbtool -t %s -m %r -d drop" %(config.FLAG_BIN,iosource, mount_point))
+        dbh=DB.DBO(self.case)
+        dbh.MySQLHarness("%s/dbtool -t %s -m %r -d drop" %(config.FLAG_BIN,iosource, mount_point))
 
     def VFSCreate(self,root_inode,inode,new_filename,directory=False ,gid=0, uid=0, mode=100777, **properties):
         ## Basically this is how this function works - if root_inode
@@ -281,17 +282,18 @@ class DBFS(FileSystem):
         ## Make sure that all intermediate dirs exist:
         dirs = os.path.dirname(new_filename).split("/")
 
+        dbh = DB.DBO(self.case)
         for d in range(1,len(dirs)):
             path = "/".join(dirs[:d])+"/"
             path = FlagFramework.normpath(path)
-            self.dbh.check_index('file','path', 200)
-            self.dbh.check_index('file','name', 200)
-            self.dbh.execute("select * from file where path=%r and name=%r and mode='d/d' limit 1",(path, dirs[d]))
-            if not self.dbh.fetch():
-                self.dbh.execute("insert into file set inode='',path=%r,name=%r,status='alloc',mode='d/d'",(path,dirs[d]))
+            dbh.check_index('file','path', 200)
+            dbh.check_index('file','name', 200)
+            dbh.execute("select * from file where path=%r and name=%r and mode='d/d' limit 1",(path, dirs[d]))
+            if not dbh.fetch():
+                dbh.execute("insert into file set inode='',path=%r,name=%r,status='alloc',mode='d/d'",(path,dirs[d]))
 
         ## Now add to the file and inode tables:
-        self.dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode=%r,inode=%r",  (
+        dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode=%r,inode=%r",  (
             FlagFramework.normpath(os.path.dirname(new_filename)+"/"),
             os.path.basename(new_filename),
             directory_string,
@@ -317,10 +319,11 @@ class DBFS(FileSystem):
         except KeyError:
             mtime = 0
 
-        self.dbh.execute("insert into inode  set status='alloc', mode=%r, links=%r , inode=%r,gid=0,uid=0,size=%r, mtime=%r, ctime=%r, atime=%r",(
+        dbh.execute("insert into inode  set status='alloc', mode=%r, links=%r , inode=%r,gid=0,uid=0,size=%r, mtime=%r, ctime=%r, atime=%r",(
             40755, 4,inode, size, mtime, ctime, atime))
 
     def longls(self,path='/', dirs = None):
+        dbh=DB.DBO(self.case)
         if self.isdir(path):
             ## If we are listing a directory, we list the files inside the directory            
             if not path.endswith('/'):
@@ -337,31 +340,36 @@ class DBFS(FileSystem):
         elif(dirs == 0):
             mode=" and mode like 'r%'"
 
-        self.dbh.execute("select path,mode,inode,name from file where %s %s", (where, mode))
+        dbh.execute("select path,mode,inode,name from file where %s %s", (where, mode))
 
+        return dbh
         ## This is done rather than return the generator to ensure that self.dbh does not get interfered with...
-        result=[dent for dent in self.dbh]
-        return result
+        ## result=[dent for dent in self.dbh]
+        ## return result
     
     def ls(self, path="/", dirs=None):
         return [ dent['name'] for dent in self.longls(path,dirs) ]
 
     def dent_walk(self, path='/'):
-        self.dbh.check_index('file','path', 200)
-        self.dbh.execute("select name, mode, status from file where path=%r order by name" % ( path))
-        for i in self.dbh:
-            yield(i)
+        dbh=DB.DBO(self.case)
+        dbh.check_index('file','path', 200)
+        dbh.execute("select name, mode, status from file where path=%r order by name" % ( path))
+        return dbh
+        #for i in self.dbh:
+        #    yield(i)
 
     def lookup_id(self, inode):
-        self.dbh.check_index('inode','inode')
-        self.dbh.execute("select inode_id from inode where inode=%r", inode)
-        res = self.dbh.fetch()
+        dbh=DB.DBO(self.case)
+        dbh.check_index('inode','inode')
+        dbh.execute("select inode_id from inode where inode=%r", inode)
+        res = dbh.fetch()
         try:
             return res["inode_id"]
         except:
             return None
 
     def lookup(self, path=None,inode=None):
+        dbh=DB.DBO(self.case)
         if path:
             dir,name = os.path.split(path)
             if not name:
@@ -369,44 +377,46 @@ class DBFS(FileSystem):
             if dir == '/':
                 dir = ''
 
-            self.dbh.check_index('file','path', 200)
-            self.dbh.check_index('file','name', 200)
-            self.dbh.execute("select inode from file where path=%r and (name=%r or name=concat(%r,'/')) and inode!='' limit 1", (dir+'/',name,name))
-            res = self.dbh.fetch()
+            dbh.check_index('file','path', 200)
+            dbh.check_index('file','name', 200)
+            dbh.execute("select inode from file where path=%r and (name=%r or name=concat(%r,'/')) and inode!='' limit 1", (dir+'/',name,name))
+            res = dbh.fetch()
             if not res:
                 return None
             return res["inode"]
         else:
-            self.dbh.check_index('file','inode')
-            self.dbh.execute("select concat(path,name) as path from file where inode=%r order by status limit 1", (inode))
-            res = self.dbh.fetch()
+            dbh.check_index('file','inode')
+            dbh.execute("select concat(path,name) as path from file where inode=%r order by status limit 1", (inode))
+            res = dbh.fetch()
             if not res:
                 return None
             return res["path"]
         
     def istat(self, path=None, inode=None):
+        dbh=DB.DBO(self.case)
         if not inode:
             inode = self.lookup(path)
         if not inode:
             return None
 
-        self.dbh.check_index('inode','inode')
-        self.dbh.execute("select inode_id, inode, status, uid, gid, mtime as mtime_epoch, from_unixtime(mtime) as `mtime`, atime as atime_epoch, from_unixtime(atime) as `atime`, ctime as ctime_epoch, from_unixtime(ctime) as `ctime`, from_unixtime(dtime) as `dtime`, mode, links, link, size from inode where inode=%r limit 1",(inode))
-        row = self.dbh.fetch()
+        dbh.check_index('inode','inode')
+        dbh.execute("select inode_id, inode, status, uid, gid, mtime as mtime_epoch, from_unixtime(mtime) as `mtime`, atime as atime_epoch, from_unixtime(atime) as `atime`, ctime as ctime_epoch, from_unixtime(ctime) as `ctime`, from_unixtime(dtime) as `dtime`, mode, links, link, size from inode where inode=%r limit 1",(inode))
+        row = dbh.fetch()
 
-        self.dbh.execute("select * from file where inode=%r order by mode limit 1", inode);
-        row.update(self.dbh.fetch())
+        dbh.execute("select * from file where inode=%r order by mode limit 1", inode);
+        row.update(dbh.fetch())
         return row
 
     def isdir(self,directory):
         directory=os.path.normpath(directory)
         if directory=='/': return 1
         
+        dbh=DB.DBO(self.case)
         dirname=FlagFramework.normpath(os.path.dirname(directory)+'/')
-        self.dbh.check_index('file','path', 200)
-        self.dbh.check_index('file','name', 200)
-        self.dbh.execute("select mode from file where path=%r and name=%r and mode like 'd%%' limit 1",(dirname,os.path.basename(directory)))
-        row=self.dbh.fetch()
+        dbh.check_index('file','path', 200)
+        dbh.check_index('file','name', 200)
+        dbh.execute("select mode from file where path=%r and name=%r and mode like 'd%%' limit 1",(dirname,os.path.basename(directory)))
+        row=dbh.fetch()
         if row:
             return 1
         else:
@@ -414,8 +424,9 @@ class DBFS(FileSystem):
         
     def exists(self,path):
         dir,file=os.path.split(path)
-        self.dbh.execute("select mode from file where path=%r and name=%r limit 1",(dir,file))
-        row=self.dbh.fetch()
+        dbh=DB.DBO(self.case)
+        dbh.execute("select mode from file where path=%r and name=%r limit 1",(dir,file))
+        row=dbh.fetch()
         if row:
             return 1
         else:
@@ -503,7 +514,7 @@ class File:
     #stat_cbs = None
     #stat_names = None
     
-    def __init__(self, case, fd, inode, dbh=None):
+    def __init__(self, case, fd, inode):
         """ The constructor for this object.
         @arg case: Case to use
         @arg fd: An already open data source, may be iosource, or another 'File'
@@ -519,10 +530,6 @@ class File:
         self.fd = fd
         self.readptr = 0
         self.inode = inode
-        if dbh:
-            self.dbh = dbh
-        else:
-            self.dbh=DB.DBO(case)
 
         ## Now we check to see if there is a cached copy of the file for us:
         self.cached_filename = self.get_temp_path()
@@ -643,14 +650,15 @@ class File:
 
     def stat(self):
         """ Returns a dict of statistics about the content of the file. """
-        self.dbh.execute("select inode, status, uid, gid, mtime as mtime_epoch, from_unixtime(mtime) as `mtime`, atime as atime_epoch, from_unixtime(atime) as `atime`, ctime as ctime_epoch, from_unixtime(ctime) as `ctime`, from_unixtime(dtime) as `dtime`, mode, links, link, size from inode where inode=%r limit 1",(self.inode))
-        stats = self.dbh.fetch()
+        dbh=DB.DBO(self.case)
+        dbh.execute("select inode, status, uid, gid, mtime as mtime_epoch, from_unixtime(mtime) as `mtime`, atime as atime_epoch, from_unixtime(atime) as `atime`, ctime as ctime_epoch, from_unixtime(ctime) as `ctime`, from_unixtime(dtime) as `dtime`, mode, links, link, size from inode where inode=%r limit 1",(self.inode))
+        stats = dbh.fetch()
 
-        self.dbh.execute("select * from file where inode=%r limit 1", self.inode)
+        dbh.execute("select * from file where inode=%r limit 1", self.inode)
         try:
-            stats.update(self.dbh.fetch())
+            stats.update(dbh.fetch())
         except:
-            stats=self.dbh.fetch()
+            stats=dbh.fetch()
             
         return stats
 
@@ -795,10 +803,11 @@ class File:
             pass
 
         #What did libextractor have to say about this file?
-        self.dbh.execute("select property,value from xattr where inode_id=%r",
+        dbh=DB.DBO(self.case)
+        dbh.execute("select property,value from xattr where inode_id=%r",
                          istat['inode_id'])
         
-        for row in self.dbh:
+        for row in dbh:
             left.row(row['property'],': ',row['value'])
 
         left.end_table()

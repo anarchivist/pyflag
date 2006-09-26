@@ -34,8 +34,9 @@ class AutoFS(DBFS):
             iosource_name, self.sk_type, mount_point,
             "foo"
             )
-                
-        self.dbh.MySQLHarness(string)
+
+        dbh=DB.DBO(self.case)
+        dbh.MySQLHarness(string)
 
         ## Now for the inodes:
         string= "%s -i %r -o %r %r -n %r -f %r -m %r -i %r" % (
@@ -46,27 +47,27 @@ class AutoFS(DBFS):
             "foo"
             )
                 
-        self.dbh.MySQLHarness(string)
+        dbh.MySQLHarness(string)
 
         return
         # now find all the 'unallocated' files
-        self.dbh.execute("drop table if exists unallocated")
-        self.dbh.execute("CREATE TABLE unallocated (`inode` VARCHAR(250) NOT NULL,`offset` BIGINT NOT NULL,`size` BIGINT NOT NULL)")
+        dbh.execute("drop table if exists unallocated")
+        dbh.execute("CREATE TABLE unallocated (`inode` VARCHAR(250) NOT NULL,`offset` BIGINT NOT NULL,`size` BIGINT NOT NULL)")
         unalloc_blocks = []
         
         ## We ask the filesystem whats the blocksize - if we dont know, we use 1
         try:
-            self.dbh.execute("select value from meta where property='block_size' limit 1");
-            blocksize = int(self.dbh.fetch()["value"])
+            dbh.execute("select value from meta where property='block_size' limit 1");
+            blocksize = int(dbh.fetch()["value"])
         except:
             blocksize = 1
 
         count=0
         ## Now we work out the unallocated blocks by looking at the blocks table:
         last = (0,0)
-        self.dbh.execute("select * from block order by block asc")
-        dbh2 = self.dbh.clone()
-        for row in self.dbh:
+        dbh.execute("select * from block order by block asc")
+        dbh2 = dbh.clone()
+        for row in dbh:
             ## We make a list of all blocks which are unallocated:
             ## This is the end of the unallocated block just before this one:
             new_block = ( last[0],row['block']-last[0])
@@ -163,8 +164,9 @@ class Mounted(DBFS):
     def load(self, mount_point, iosource_name):
         logging.log(logging.DEBUG,"Loading files from directory %s" % self.iosource.mount_point)
         
+        dbh=DB.DBO(self.case)
         ## Create the tables for the filesystem
-        self.dbh.MySQLHarness("%s -n %s -d create -m / blah" %(config.SLEUTHKIT,iosource_name))
+        dbh.MySQLHarness("%s -n %s -d create -m / blah" %(config.SLEUTHKIT,iosource_name))
 
         ## This deals with a mounted filesystem - we dont get the full
         ## forensic joy, but we can handle more filesystems than

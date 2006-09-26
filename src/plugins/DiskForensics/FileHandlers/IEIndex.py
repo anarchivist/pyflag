@@ -38,7 +38,8 @@ class IEIndex(Scanner.GenScanFactory):
     depends = ['TypeScan']
 
     def prepare(self):
-        self.dbh.execute("""CREATE TABLE IF NOT EXISTS history (
+        dbh=DB.DBO(self.case)
+        dbh.execute("""CREATE TABLE IF NOT EXISTS history (
         `path` TEXT NOT NULL,
         `type` VARCHAR(20) NOT NULL,
         `url` TEXT NOT NULL,
@@ -47,25 +48,25 @@ class IEIndex(Scanner.GenScanFactory):
         `filename` VARCHAR(250),
         `filepath` VARCHAR(250),
         `headers` TEXT)""")        
-#        self.dbh.MySQLHarness("pasco -t %s -g create " % (self.table))
 
     def reset(self, inode):
         Scanner.GenScanFactory.reset(self, inode)
-        self.dbh.execute("DROP TABLE IF EXISTS history")
-#        self.dbh.MySQLHarness("pasco -t %s -g drop " % (self.table))
+        dbh=DB.DBO(self.case)
+        dbh.execute("DROP TABLE IF EXISTS history")
         
     def destroy(self):
-        self.dbh.check_index("history" ,"url",10)
-#        self.dbh.execute('ALTER TABLE history_%s ADD INDEX(url(10))', self.table)
+        dbh=DB.DBO(self.case)
+        dbh.check_index("history" ,"url",10)
 
     class Scan(Scanner.StoreAndScanType):
         types = ['application/x-ie-index']
 
         def external_process(self,fd):
+            dbh=DB.DBO(self.case)
             history = IECache.IEHistoryFile(fd)
             for event in history:
                 if event:                    
-                    self.dbh.execute("INSERT INTO history VALUES(%r,%r,%r,%r,%r,%r,%r,%r)",(
+                    dbh.execute("INSERT INTO history VALUES(%r,%r,%r,%r,%r,%r,%r,%r)",(
                         self.ddfs.lookup(inode=self.inode),
                         event['type'],event['url'],
                         event['modified_time'],

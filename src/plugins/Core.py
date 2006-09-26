@@ -37,6 +37,7 @@ import pyflag.Reports as Reports
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import os.path
+import pyflag.DB as DB
 
 class IO_File(FileSystem.File):
     """ A VFS Driver to make the io source available.
@@ -45,18 +46,19 @@ class IO_File(FileSystem.File):
     """
     specifier = "I"
 
-    def __init__(self, case, fd, inode, dbh=None):
-        FileSystem.File.__init__(self, case, fd, inode, dbh)
+    def __init__(self, case, fd, inode):
+        FileSystem.File.__init__(self, case, fd, inode)
 
         ## The format of the inode is Iname .Where name is the name of
         ## the IO source.
         self.name = inode[1:]
         self.io = IO.open(case, self.name)
 
+        dbh = DB.DBO(self.case)
         ## IO Sources may have block_size specified:
         try:
-            self.dbh.execute("select value from filesystems where iosource=%r and property='block_size' limit 1", self.name);
-            self.block_size = int(self.dbh.fetch()["value"])
+            dbh.execute("select value from filesystems where iosource=%r and property='block_size' limit 1", self.name);
+            self.block_size = int(dbh.fetch()["value"])
         except TypeError:
             pass
 
@@ -76,8 +78,9 @@ class IO_File(FileSystem.File):
     def explain(self, result):
         tmp = result.__class__(result)
         self.io.explain(tmp)
+        dbh = DB.DBO(self.case)    
         result.row("IO Subsys %s:" % self.name, tmp, valign="top")
-        result.row("Mount point",self.dbh.get_meta("mount_point_%s" % self.name))
+        result.row("Mount point",dbh.get_meta("mount_point_%s" % self.name))
 
 class Help(Reports.report):
     """ This facility displays helpful messages """

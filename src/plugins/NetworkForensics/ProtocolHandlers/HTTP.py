@@ -42,9 +42,8 @@ def escape(uri):
 
 class HTTP:
     """ Class used to parse HTTP Protocol """
-    def __init__(self,fd,dbh,ddfs):
+    def __init__(self,fd,ddfs):
         self.fd=fd
-        self.dbh = DB.DBO(dbh.case)
         self.ddfs = ddfs
         self.request = { 'url':'/unknown_request' }
         self.response = {}
@@ -203,7 +202,8 @@ class HTTPScanner(StreamScannerFactory):
         ## url - the URL requested (This is the fully qualified url with host header included if present).
         ## response_packet - the packet where the response was seen
         ## content_type - The content type
-        self.dbh.execute(
+        dbh = DB.DBO(self.case)
+        dbh.execute(
             """CREATE TABLE if not exists `http` (
             `id` INT(11) not null auto_increment,
             `parent` INT(11) default 0 not null,
@@ -220,18 +220,19 @@ class HTTPScanner(StreamScannerFactory):
             primary key (`id`)
             )""")
 
-        self.dbh.execute(
+        dbh.execute(
             """CREATE TABLE if not exists `http_parameters` (
             `id` int(11) not null,
             `key` VARCHAR(255) not null,
             `value` text not null
             ) """)
 
-        self.dbh.check_index("http", "inode")
-        self.dbh.check_index("http", "url", 100)
+        dbh.check_index("http", "inode")
+        dbh.check_index("http", "url", 100)
         
     def reset(self, inode):
-        self.dbh.execute("drop table if exists http")
+        dbh = DB.DBO(self.case)
+        dbh.execute("drop table if exists http")
 
     def parse_date_time_string(self, s):
         try:
@@ -250,10 +251,11 @@ class HTTPScanner(StreamScannerFactory):
             return
         
         def insert_query(query):
+            dbh = DB.DBO(self.case)
             for key,value in cgi.parse_qsl(query, False):
                 ## Non printable keys are probably not keys at all.
                 if re.match("[^a-z0-9]+",key): return
-                self.dbh.insert('http_parameters',
+                dbh.insert('http_parameters',
                                 id = id,
                                 key = key,
                                 value = value)
@@ -273,7 +275,7 @@ class HTTPScanner(StreamScannerFactory):
         combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.con_id, stream.reverse)
 
         fd = self.fsfd.open(inode=combined_inode)
-        p=HTTP(fd,self.dbh,self.fsfd)
+        p=HTTP(fd,self.fsfd)
         ## Check that this is really HTTP
         if not p.identify():
             return
@@ -329,9 +331,10 @@ class HTTPScanner(StreamScannerFactory):
 
             ## Find referred page:
             parent = 0
+            dbh = DB.DBO(self.case)
             if referer:
-                self.dbh.execute("select id from http where url=%r order by id desc limit 1", referer)
-                row = self.dbh.fetch()
+                dbh.execute("select id from http where url=%r order by id desc limit 1", referer)
+                row = dbh.fetch()
 
                 ## If there is no referrer we just make a psuedo entry
                 if not row:
@@ -339,12 +342,12 @@ class HTTPScanner(StreamScannerFactory):
                     m=re.match("(http://|ftp://)([^/]+)([^\?\&\=]*)",
                                "%s" % referer)
                     host = m.group(2)
-                    self.dbh.insert("http", url=referer, host=host)
-                    parent = self.dbh.autoincrement()
+                    dbh.insert("http", url=referer, host=host)
+                    parent = dbh.autoincrement()
                 else:
                     parent = row['id']
 
-            self.dbh.insert('http',
+            dbh.insert('http',
                             inode          = new_inode,
                             request_packet = p.request.get("packet_id"),
                             method         = p.request.get("method"),
@@ -358,7 +361,7 @@ class HTTPScanner(StreamScannerFactory):
                             parent         = parent)                            
 
             ## handle the request's parameters:
-            self.handle_parameters(p.request, self.dbh.autoincrement())
+            self.handle_parameters(p.request, dbh.autoincrement())
             
             ## Scan the new file using the scanner train. 
             self.scan_as_file(new_inode, factories)
@@ -512,8 +515,8 @@ class Chunked(File):
 
         self.cached_fd.close()
         
-    def __init__(self, case, fd, inode, dbh=None):
-        File.__init__(self, case, fd, inode, dbh)
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
 
         self.filename = FlagFramework.get_temp_path(self.case,self.inode)
 

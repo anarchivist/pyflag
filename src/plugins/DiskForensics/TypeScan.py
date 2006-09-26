@@ -42,17 +42,19 @@ class TypeScan(Scanner.GenScanFactory):
     default=True
     def __init__(self,fsfd):
         Scanner.GenScanFactory.__init__(self, fsfd)
-        self.dbh.execute(""" CREATE TABLE IF NOT EXISTS `type` (
+        dbh=DB.DBO(self.case)
+        dbh.execute(""" CREATE TABLE IF NOT EXISTS `type` (
         `inode` varchar( 250 ) NOT NULL,
         `mime` tinytext NOT NULL,
         `type` tinytext NOT NULL )""")
 
         ## Create indexes on this table immediately because we need to select
-        self.dbh.check_index('type','inode')
+        dbh.check_index('type','inode')
 
     def reset(self,inode):
         Scanner.GenScanFactory.reset(self, inode)
-        self.dbh.execute("drop table if exists `type`")
+        dbh=DB.DBO(self.case)
+        dbh.execute("drop table if exists `type`")
 
     def destroy(self):
         pass
@@ -75,7 +77,8 @@ class TypeScan(Scanner.GenScanFactory):
 
         def finish(self):
             # insert type into DB
-            self.dbh.execute('INSERT INTO type VALUES(%r, %r, %r)', (self.inode, self.type_mime, self.type_str))
+            dbh=DB.DBO(self.case)
+            dbh.execute('INSERT INTO type VALUES(%r, %r, %r)', (self.inode, self.type_mime, self.type_str))
             # if we have a mime handler for this data, call it
 #            logging.log(logging.DEBUG, "Handling inode %s = %s, mime type: %s, magic: %s" % (self.inode,self.filename,self.type_mime, self.type_str))
 

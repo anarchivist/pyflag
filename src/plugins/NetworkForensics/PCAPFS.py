@@ -93,7 +93,7 @@ class PCAPFS(DBFS):
         ## The connection_details table stores information about each
         ## connection, while the connection table store all the
         ## packets belonging to each connection.
-        dbh = DB.DBO(self.dbh.case)
+        dbh = DB.DBO(self.case)
         dbh.execute("""CREATE TABLE if not exists `pcap` (
         `id` INT NOT NULL,
         `iosource` varchar(50),
@@ -162,7 +162,7 @@ class PCAPFS(DBFS):
 ##        dbh.check_index("pcap",'id')
 
         ## Open the file descriptor
-        self.fd = IO.open(self.dbh.case, iosource_name)
+        self.fd = IO.open(self.case, iosource_name)
         buffer = Buffer(fd=self.fd)
 
         ## Try to open the file as a pcap file:
@@ -296,7 +296,8 @@ class PCAPFS(DBFS):
 
     def delete(self):
         DBFS.delete(self)
-        self.dbh.MySQLHarness("%s/pcaptool -d -t pcap" % (
+        dbh = DB.DBO(self.case)    
+        dbh.MySQLHarness("%s/pcaptool -d -t pcap" % (
             config.FLAG_BIN))
 
 class PCAPFile(File):
@@ -308,18 +309,19 @@ class PCAPFile(File):
     specifier = 'p'
     ignore = True
 
-    def __init__(self, case, fd, inode, dbh=None):
+    def __init__(self, case, fd, inode):
         """ This is a top level File driver for opening pcap files.
 
         Note that pcap files are stored in their own filesystem. We expect the following initialisation:
         @arg fd: is an io source for the pcap file
         @arg inode: The inode of the pcap file in the pcap filesystem, currently ignored.
         """
-        File.__init__(self, case, fd, inode, dbh)
+        File.__init__(self, case, fd, inode)
         ## Calculates the size of this file:
+        dbh = DB.DBO(self.case)    
         self.private_dbh = dbh.clone()
-        self.dbh.execute("select max(id) as max from pcap")
-        row=self.dbh.fetch()
+        dbh.execute("select max(id) as max from pcap")
+        row=dbh.fetch()
         if row['max']:
             self.size = row['max']
         else:
