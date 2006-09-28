@@ -53,6 +53,7 @@ def log(level,message):
     
     if config.LOG_LEVEL>=level:
         print string
+        sys.stdout.flush()
         ring_buffer.append(string)
 
         if len(ring_buffer)>RING_BUFFER_SIZE:
@@ -60,3 +61,4 @@ def log(level,message):
         
     if level<=ERRORS:
         print traceback.print_tb(sys.exc_info()[2])
+        sys.stdout.flush()

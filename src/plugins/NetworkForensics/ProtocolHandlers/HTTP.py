@@ -343,9 +343,10 @@ class HTTPScanner(StreamScannerFactory):
                     ## Find out the host
                     m=re.match("(http://|ftp://)([^/]+)([^\?\&\=]*)",
                                "%s" % referer)
-                    host = m.group(2)
-                    dbh.insert("http", url=referer, host=host)
-                    parent = dbh.autoincrement()
+                    if m:
+                        host = m.group(2)
+                        dbh.insert("http", url=referer, host=host)
+                        parent = dbh.autoincrement()
                 else:
                     parent = row['id']
 

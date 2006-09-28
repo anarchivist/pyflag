@@ -261,7 +261,8 @@ class message:
             ## All commands are in upper case - if they are not we
             ## must have lost sync:
             if self.cmd != self.cmd.upper() or not self.cmd.isalpha(): return None
-        except IndexError:
+        except Exception, e:
+            logging.log(logging.ERROR, e)
             return ''
 
         self.words = self.cmdline.split()
@@ -1475,7 +1476,7 @@ class MSNScanner(StreamScannerFactory):
 
                 # Open the combined stream.
                 fd = self.fsfd.open(inode=combined_inode)
-                dbh=DB.DBO(self.case)
+                
                 m=message(dbh, fd, self.fsfd)
                 while 1:
                     try:

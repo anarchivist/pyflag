@@ -130,7 +130,7 @@ class PcapFile:
             data = buffer.__str__()
 
         ## Preserve the endianess of the file:
-        packet = PCAP.Packet(data, endianess = self.endianess)
+        packet = PCAP.Packet(data, endianess = self.parameters['endianess'])
         self.timestamp = int(packet['ts_sec'])+int(packet['ts_usec'])/1.0e6
         self.last_packet = packet
         size = packet.size()

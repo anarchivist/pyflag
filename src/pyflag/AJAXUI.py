@@ -1059,7 +1059,7 @@ class AJAXUI(HTMLUI.HTMLUI):
 
     def tooltip(self, widget, text):
         """ Inserts a tooltip on a widgetId. Mostly used from within AJAXUI """
-        self.add_to_top_ui('''<span dojoType="tooltip" connectId="%s" toggle="explode" toggleDuration="250">%s</span>\n''' % (widget, text))
+        self.add_to_top_ui('''<span dojoType="tooltip" connectId="%s" >%s</span>\n''' % (widget, text))
         
     def popup(self,callback, label,icon=None,toolbar=0, menubar=0, tooltip=None, **options):
         if not tooltip: tooltip = label

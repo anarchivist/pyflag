@@ -33,7 +33,6 @@ from pyflag.FlagFramework import query_type, get_temp_path
 from NetworkScanner import *
 import struct,re,os
 import reassembler
-from pyflag.TableObj import ColumnType, TimestampType, InodeType
 
 class StreamFile(File):
     """ A File like object to reassemble the stream from individual packets.
@@ -345,3 +344,23 @@ class OffsetFile(File):
         
         self.readptr+=len(result)
         return result
+
+import StringIO
+
+## This is a memory cached version of the offset file driver - very useful for packets:
+class MemroyCachedOffset(StringIO.StringIO,File):
+    specifier = 'O'
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
+
+        ## We parse out the offset and length from the inode string
+        tmp = inode.split('|')[-1]
+        tmp = tmp[1:].split(":")
+        fd.seek(int(tmp[0]))
+
+        try:
+            self.size=int(tmp[1])
+        except IndexError:
+            self.size=sys.maxint
+            
+        StringIO.StringIO.__init__(self, fd.read(self.size))

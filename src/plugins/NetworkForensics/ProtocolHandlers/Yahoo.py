@@ -58,7 +58,7 @@ class YahooParser:
                 result = getattr(self, m['service'].__str__())(m,dbh)
             except AttributeError,e:
                 print "No dispatcher for %s (%s)" % (m['service'],e)
-                print m
+                #print m
                 
             yield m
 
@@ -142,10 +142,10 @@ class YahooParser:
         result['data'] = "Joined Chatroom of topic: %s" % message.get_property(105)
         dbh.insert('msn_session', **result)
 
-    def YAHOO_SERVICE_CHATPING(self,message):
+    def YAHOO_SERVICE_CHATPING(self,message,dbh):
         pass
 
-    def YAHOO_SERVICE_PING(self,message):
+    def YAHOO_SERVICE_PING(self,message,dbh):
         pass
         
 class YahooScanner(StreamScannerFactory):
@@ -162,6 +162,6 @@ class YahooScanner(StreamScannerFactory):
         stream.seek(0)
         pyflaglog.log(pyflaglog.DEBUG,"Openning %s for Yahoo IM" % stream.inode)
 
-        parser = YahooParser(stream, DB.DBO(stream.case))
+        parser = YahooParser(stream)
         for action in parser.process():
             pass

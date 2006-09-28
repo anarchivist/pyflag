@@ -24,13 +24,14 @@ try:
                 )
 
             def external_process(self,fd):
+                dbh=DB.DBO(self.case)
                 meta=E.extractFromFile(fd.name)
                 for pair in meta:
-                    self.dbh.insert("xattr",
-                                    inode_id = self.fd.inode_id,
-                                    property = pair[0],
-                                    value = pair[1],
-                                    )
+                    dbh.insert("xattr",
+                               inode_id = self.fd.inode_id,
+                               property = pair[0],
+                               value = pair[1],
+                               )
 
 
     class BrowseMetadata(Reports.report):
