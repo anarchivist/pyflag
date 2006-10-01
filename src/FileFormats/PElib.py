@@ -77,6 +77,8 @@ class IMAGE_FILE_HEADER(SimpleStruct):
             [ "NumberOfSymbols", DWORD, ],
             [ "SizeOfOptionalHeader", WORD, ],
             [ "Characteristics", WORD, ],
+            [ "OptionalHeader", IMAGE_OPTIONAL_HEADER,
+              dict(no_sections = lambda x: x['NumberOfSections'].get_value()) ],
             ]
 
     def read(self):
@@ -84,12 +86,6 @@ class IMAGE_FILE_HEADER(SimpleStruct):
         if result['e_magic']!='PE\x00\x00':
             raise IOError("File does not appear to be a PE executable, magic is not correct (PE %s)" % result['e_magic'] )
 
-        self.add_element(result, "OptionalHeader",
-                         IMAGE_OPTIONAL_HEADER(
-                               self.buffer[self.offset:],
-                               no_sections=result['NumberOfSections'].get_value()
-                               ))
-        
         return result
         
 class P_IMAGE_FILE_HEADER(POINTER):
@@ -133,18 +129,9 @@ class IMAGE_OPTIONAL_HEADER(SimpleStruct):
             ["LoaderFlags",             DWORD,],
             ["NumberOfRvaAndSizes",     DWORD,],
             ["Data Directory",          IMAGE_DATA_DIRECTORY_Table,],
+            ["Sections", IMAGE_SECTION_HEADER_ARRAY,
+             dict(count = self.parameters['no_sections'])],
             ]
-
-    def read(self):
-        result = SimpleStruct.read(self)
-        NumberOfSections=self.parameters['no_sections']
-        self.add_element(result,'Sections',
-                         IMAGE_SECTION_HEADER_ARRAY(
-            self.buffer[self.calculate_struct_size(result):],
-            count=NumberOfSections),
-                         )
-
-        return result
 
 class IMAGE_SECTION_HEADER(SimpleStruct):
     """ These are headers describing each section in the file """
@@ -246,17 +233,10 @@ class RSRC(SimpleStruct):
             [ "majver",        WORD ],
             [ "minver",        WORD ],
             [ "num_dir_names", WORD],
-            [ "num_dir_ids",   WORD]
+            [ "num_dir_ids",   WORD],
+            [ "Directories" , RSRCDir_ARRAY,
+              dict(count = lambda x: x['num_dir_ids'].get_value()) ],
             ]
-
-    def read(self):
-        result = SimpleStruct.read(self)
-
-        self.add_element(result, "Directories",
-                         RSRCDir_ARRAY(self.buffer[self.offset:],
-                                         count=result['num_dir_ids'].get_value())
-                         )
-        return result
 
 class Chunk(SimpleStruct):
     """ Messages are written in chunks of messages from a certain ID to a certain ID """
@@ -275,16 +255,9 @@ class Message(SimpleStruct):
     def init(self):
         self.fields = [
             [ 'Length',  WORD],
-            [ 'Unknown', WORD]
+            [ 'Unknown', WORD],
+            [ 'Message', UCS16_STR, dict(length=lambda x: x['Length'].get_value()-4)]
             ]
-
-    def read(self):
-        result = SimpleStruct.read(self)
-        self.add_element(result, 'Message',
-                         UCS16_STR(self.buffer[self.offset:],
-                                   length=result['Length'].get_value()-4))
-
-        return result
 
 class Messages(SimpleStruct):
     def init(self):

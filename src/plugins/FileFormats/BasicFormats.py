@@ -279,7 +279,6 @@ class StructArray(SimpleStruct):
         return result
 
     def extend(self,target):
-        ## Ensure that the target has been evaluated
         self.count+=1
         self.data[self.count]=target
         
@@ -357,41 +356,6 @@ class STRING(BYTE):
     def __len__(self):
         return self.length
     
-##    def read(self,data):
-##        try:
-##            length = int(self.paralength)
-##        except ValueError,e:
-##            print 'Read ValueError %s' % e
-##            sibname = ''
-##            sibnameoffset = self.paralength.find('col.')
-##            if sibnameoffset != -1:
-##                sibnameoffset += 4
-##                while 1:
-##                    try:
-##                        if self.paralength[sibnameoffset].isalnum():
-##                            sibname += self.paralength[sibnameoffset]
-##                            sibnameoffset += 1
-##                        else:
-##                            break
-##                    except IndexError:
-##                        break
-##                print 'sibname %s' % sibname
-##                t = self.parent.data[sibname]
-##                value = t.get_value()
-##                evalexpr = self.paralength.replace('col.%s' % sibname, 'value')
-##                print 'eval expression: %s' % evalexpr
-##                length = eval(evalexpr, {'value':value})
-##                print 'length %s' % length
-##            else:
-##                length = 1
-
-            
-##        self.fmt="%ss" % length
-##        try:
-##            return struct.unpack(self.fmt,data[:self.size()].__str__())[0]
-##        except struct.error,e:
-##            raise IOError("%s"% e)
-
     def form(self,prefix, query,result):
 ##        print "\nString Form\n"
         result.textfield("String length","%slength" % prefix)

@@ -130,31 +130,22 @@ class Event(Header):
             [ 'NumStrings', WORD ],
             [ 'EventCategory', WORD ],
             [ 'Unknown', BYTE_ARRAY,{'count':26} ],
+            
+            ## Following the struct is an array of NumStrings UCS16
+            ## strings. The first 2 strings are name of service and
+            ## machine name:
+            [ 'Source', TERMINATED_UCS16],
+            [ 'Machine', TERMINATED_UCS16],
+
+            ## These are all the strings
+            [ 'Strings', TERMINATED_UCS16_Array, dict(count = lambda x: x['NumStrings'])],
             ]
 
     def read(self):
         result=SimpleStruct.read(self)
         if result['Magic']!='LfLe':
             raise IOError('LfLe record not found at location 0x%08X' % self.buffer.offset)
-        
-        ## Following the struct is an array of NumStrings UCS16
-        ## strings. The first 2 strings are name of service and
-        ## machine name:
-        NumStrings=result['NumStrings'].get_value()
 
-        ## The first string is the source name:
-        s = TERMINATED_UCS16(self.buffer[self.offset:])
-        self.offset += s.size()
-        self.add_element(result,'Source' , s)
-
-        ## The second string is the machine name:
-        s = TERMINATED_UCS16(self.buffer[self.offset:])
-        self.offset += s.size()
-        self.add_element(result,'Machine' , s)
-
-        ## The rest are the strings:
-        self.add_element(result,'Strings', TERMINATED_UCS16_Array(self.buffer[self.offset:],count=NumStrings))
-        
         return result
 
 format = re.compile("%(\d+|n|r|t)")

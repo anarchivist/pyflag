@@ -103,6 +103,9 @@ class Buffer:
 #            raise IOError("Unable to read %s bytes from %s" %(self.size,self.offset))
 
         return data
+
+    def __nonzero__(self):
+        return 1
         
 #### Start of data definitions:
 class DataType:
@@ -137,7 +140,7 @@ class DataType:
         """
         return None
 
-    def write(self):
+    def write(self,out):
         pass
 
     def __ne__(self,target):
