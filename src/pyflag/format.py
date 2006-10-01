@@ -103,7 +103,7 @@ class Buffer:
 #            raise IOError("Unable to read %s bytes from %s" %(self.size,self.offset))
 
         return data
-
+        
 #### Start of data definitions:
 class DataType:
     """ Base class that reads a data type from the file."""
@@ -113,20 +113,16 @@ class DataType:
     ## This is the SQL type which is most appropriate for storing the
     ## results of value()
     sql_type = "text"
-    
+    data=''
     def __init__(self,buffer,*args,**kwargs):
         """ This will force this class to read the data type from data at the specified offset """
         if isinstance(buffer,str):
             self.buffer=Buffer(buffer)
         else:
             self.buffer=buffer
-        self.data=None
-##        self.parameters = kwargs
-##        try:
-##            self.parent=kwargs['parent']
-##        except:
-##            pass
-        self.data=self.read()
+
+        if self.buffer:
+            self.data=self.read()
 
     def size(self):
         """ This is the size of this data type - it returns the number of bytes we consume. """
@@ -141,12 +137,18 @@ class DataType:
         """
         return None
 
+    def write(self):
+        pass
+
     def __ne__(self,target):
         return not self.__eq__(target)
 
     def get_value(self):
         """ In the general case we return ourself as the opaque data type """
         return self
+
+    def set_value(self, data):
+        self.data=data
 
     def form(self,prefix, query,result):
         pass
@@ -156,7 +158,6 @@ class DataType:
 
     def value(self):
         return self.__str__()
-        
 
 class RAW(DataType):
     """ This data type is simply a data buffer. """

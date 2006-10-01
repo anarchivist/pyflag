@@ -1,10 +1,5 @@
 # ******************************************************
-# Copyright 2004: Commonwealth of Australia.
-#
-# Developed by the Computer Network Vulnerability Team,
-# Information Security Group.
-# Department of Defence.
-#
+# Copyright 2006
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************

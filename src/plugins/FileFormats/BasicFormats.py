@@ -12,6 +12,12 @@ class BasicType(DataType):
                 self.fmt = '>'+self.fmt[1:]
         except KeyError:
             pass
+
+        try:
+            self.data = kwargs['value']
+        except KeyError:
+            pass
+        
         DataType.__init__(self,buffer,*args,**kwargs)
     
     def size(self):
@@ -24,11 +30,22 @@ class BasicType(DataType):
         except struct.error,e:
             raise IOError("%s"% e)
 
+    def write(self, output):
+        try:
+#            print "%r" % self,self.data, self.fmt
+            data = struct.pack(self.fmt, self.data)
+            output.write(data)
+        except struct.error,e:
+            raise IOError("%s" % e)
+
     def __int__(self):
         return int(self.data)
 
     def get_value(self):
         return self.data
+
+    def set_value(self,v):
+        self.data=v
 
     def __eq__(self,target):
         if isinstance(target,int):
@@ -156,11 +173,20 @@ class SimpleStruct(DataType):
             except:
                 parameters = {}
 
+            ## Evaluate ithe parameters if needed:
+            for k,v in parameters.items():
+                if callable(v):
+                    parameters[k]=v(result)
+
             result[name]=element(self.buffer[self.offset:],**parameters)
             self.offsets[name]=self.offset            
             self.offset+=result[name].size()
                 
         return result
+
+    def write(self,output):
+        for item in self.fields:
+            self.data[item[0]].write(output)
 
     def calculate_struct_size(self,struct):
         """ calculates the total size of struct by summing its individual sizes.
@@ -308,7 +334,8 @@ class STRING(BYTE):
     
     def __init__(self,buffer,*args,**kwargs):
         try:
-            self.fmt = "%ss" % kwargs['length'].__int__()
+            self.length = kwargs['length'].__int__()
+            self.fmt = "%us" % self.length
         except:
             raise SystemError("you must specify the length of a STRING")
         
@@ -321,6 +348,15 @@ class STRING(BYTE):
         """ Truncates the string at a certain point """
         self.data=self.data[start:end]
 
+    def set_value(self, value):
+        self.data = value
+        ## Update our format string to use the length:
+        self.length = len(value)
+        self.fmt = "%ss" % self.length
+
+    def __len__(self):
+        return self.length
+    
 ##    def read(self,data):
 ##        try:
 ##            length = int(self.paralength)

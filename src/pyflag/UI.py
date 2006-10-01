@@ -30,7 +30,7 @@
 
 The output within flag is abstracted such that it is possible to connect any GUI backend with any GUI Front end. This is done by use of UI objects. When a report runs, it will generate a UI object, which will be built during report execution. The report then returns the object to the calling framework which will know how to handle it. Therefore the report doesnt really know or care how the GUI is constructed """
 
-import re,cgi,types
+import re,cgi,types,os
 import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 import pyflag.conf
@@ -372,3 +372,22 @@ class GenericUI:
         #Do the query, and find out the names of all the columns
         dbh.execute(query_str)
         return dbh,new_query,names,columns,links
+
+    def fileselector(self, description, name):
+        """ Draws a file selector for files in the upload directory """
+        def file_popup(query, result):
+            result.heading(description)
+            def left(path):
+                print "Normalised path: %s" % os.path.join(config.UPLOADDIR, '/',path)
+                for d in os.listdir(os.path.join(config.UPLOADDIR, path)):
+                    if os.path.isdir(os.path.join(path,d)):
+                                     yield (d,d,'branch')
+
+            def right(path, result):
+                    result.heading(path)
+
+            result.tree(tree_cb=left, pane_cb=right)
+            
+        tmp = self.__class__(self)
+        tmp.popup(file_popup, "Click here")
+        self.row(description, tmp)
