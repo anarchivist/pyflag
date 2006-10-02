@@ -1,3 +1,26 @@
+# ******************************************************
+# Copyright 2006
+#
+# Michael Cohen <scudette@users.sourceforge.net>
+#
+# ******************************************************
+#  Version: FLAG $Version: 0.82 Date: Sat Jun 24 23:38:33 EST 2006$
+# ******************************************************
+#
+# * This program is free software; you can redistribute it and/or
+# * modify it under the terms of the GNU General Public License
+# * as published by the Free Software Foundation; either version 2
+# * of the License, or (at your option) any later version.
+# *
+# * This program is distributed in the hope that it will be useful,
+# * but WITHOUT ANY WARRANTY; without even the implied warranty of
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# * GNU General Public License for more details.
+# *
+# * You should have received a copy of the GNU General Public License
+# * along with this program; if not, write to the Free Software
+# * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# ******************************************************
 from pyflag.format import *
     
 class BasicType(DataType):
@@ -173,7 +196,7 @@ class SimpleStruct(DataType):
             except:
                 parameters = {}
 
-            ## Evaluate ithe parameters if needed:
+            ## Evaluate the parameters if needed:
             for k,v in parameters.items():
                 if callable(v):
                     parameters[k]=v(result)
@@ -333,10 +356,15 @@ class STRING(BYTE):
     
     def __init__(self,buffer,*args,**kwargs):
         try:
-            self.length = kwargs['length'].__int__()
+            self.data = kwargs['value']
+            self.length = len(self.data)
             self.fmt = "%us" % self.length
-        except:
-            raise SystemError("you must specify the length of a STRING")
+        except KeyError:
+            try:
+                self.length = kwargs['length'].__int__()
+                self.fmt = "%us" % self.length
+            except:
+                raise SystemError("you must specify the length of a STRING")
         
         BYTE.__init__(self,buffer,*args,**kwargs)
 
@@ -478,7 +506,9 @@ class CLSID(ULONG_ARRAY):
     visible = True
     
     def __init__(self,buffer,*args,**kwargs):
-        ARRAY.__init__(self,buffer,4,*args,**kwargs)
+        ## Class IDs are 4 uint_32 long
+        kwargs['length']=4
+        ARRAY.__init__(self,buffer,*args,**kwargs)
 
     def __str__(self):
         result=[]
@@ -536,14 +566,29 @@ class WIN12_FILETIME(WIN_FILETIME):
         WIN_FILETIME.init(self)
         self.fields.append(['pad',ULONG])
 
-class LPSTR(STRING):
+class LPSTR(SimpleStruct):
     """ This is a string with a size before it """
-    visible = True
-    
-    def __init__(self,buffer,*args,**kwargs):
-        BYTE.__init__(self,buffer,*args,**kwargs)
+    def __init__(self, buffer,*args,**kwargs):
+        SimpleStruct.__init__(self, buffer, *args,**kwargs)
+        try:
+            ## This initialises the LPSTR from kwargs
+            length = len(kwargs['value'])
+            new_string = STRING(kwargs['value'], length=length)
+            
+            self.data = dict(data = new_string,
+                             length = ULONG(None, value=length))
+            
+        except KeyError:
+            pass
+        
+    def init(self):
+        self.fields = [
+            [ 'length', LONG],
+            [ 'data', STRING, dict(length=lambda x: x['length']) ]
+            ]
 
-    def read(self):
-        length = LONG(self.buffer)
-        self.fmt="%ss" % length.get_value()
-        return STRING(self.buffer[length.size():], length=length)
+    def set_value(self, value):
+        """ Update our length field automatically """
+        data = self['data']
+        data.set_value(value)
+        self['length'].set_value(len(data))
