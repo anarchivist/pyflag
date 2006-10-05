@@ -41,11 +41,11 @@ import calendar
 import datetime
 
 ## Some useful display actions
-def textarea(description = None, variable= None, ui=None, **options):
+def textarea(self, description = None, variable= None, ui=None, **options):
     """ Draws a textarea as form input for input """
     ui.textarea(description,variable,rows=5,cols=40,**options)
 
-def date_selector(description = None, callback=None, variable= None, ui=None, label=None, **options):
+def date_selector(self, description = None, callback=None, variable= None, ui=None, label=None, **options):
     """ Draws a popup for selecting a date """
     tmp=ui.__class__(ui)
     try:
@@ -130,13 +130,13 @@ def draw_calendar(query,ui,target=None):
             
         ui.row(*new_week,**{'align':'right'})
             
-def popup(description = None, variable= None, ui=None, callback= None, label=None, **options):
+def popup(self, description = None, variable= None, ui=None, callback= None, label=None, **options):
     """ Open a new popup window with callback being the target """
     tmp=ui.__class__(ui)
     tmp.popup(callback,label,**options)
     ui.row(description,tmp)
 
-def const_selector(description=None, choices=None, variable=None, ui=None, **options ):
+def const_selector(self, description=None, choices=None, variable=None, ui=None, **options ):
     """ Draw a constant selector on ui
 
     @arg description: The description that should appear.
@@ -147,7 +147,23 @@ def const_selector(description=None, choices=None, variable=None, ui=None, **opt
     """
     ui.const_selector(description,variable,choices,choices,**options)
 
-## Some useful constrains
+def password(self, description=None, ui=None, variable=None, defaults=None ):
+    ## Make sure that the password does not get echoed back into the display:
+    if defaults:
+        del ui.defaults[variable]
+        ui.defaults[variable] = '********'
+    
+    ui.textfield(description,variable, type='password')
+
+def password_constraint(self,fieldname,proposed_value,query=None,id=None,result=None):
+    """ This ensures that its possible to edit the record without
+    having to change the password field. If the password field is
+    empty, we just ignore it.
+    """
+    if proposed_value=='********':
+        raise TableObj.OmitValue(None)
+
+## Some useful constraints
 def uniq(table_object,fieldname,proposed_value,query=None,id=None,result=None):
     """ Raises an exception if the field already has the proposed value.
 
@@ -162,7 +178,7 @@ def uniq(table_object,fieldname,proposed_value,query=None,id=None,result=None):
     else:
         dbh.execute("select %s from %s where %s=%r",(table_object.key, table_object.table,fieldname,proposed_value))
     row=dbh.fetch()
-    
+
     if(row):
         result = result.__class__(result)
         result.text("there is already a row (key %s) with field %s set to %s. These are the details of the existing row:" % (row[table_object.key],fieldname,proposed_value),color='red')
@@ -172,20 +188,22 @@ def uniq(table_object,fieldname,proposed_value,query=None,id=None,result=None):
 def noop(description=None, choices=None, variable=None, ui=None, **options ):
     """ A noop action """
 
-def selector_display(description=None, variable=None, ui=None, table=None, **options ):
+def selector_display(self, description=None, variable=None, ui=None, table=None, case=None, field=None, force=False, **options ):
     """ Draws a selector based on a column from a table """
-    tmp=ui.__class__(ui)
-    dbh=DB.DBO(ui.defaults['case'])
-    dbh.execute("select %s from %s group by %s", (variable,table,variable))
-    keys= [None]+[ row[variable] for row in dbh]
-    tmp.const_selector('',variable,keys,keys)
-    tmp2=ui.__class__(ui)
-    tmp3=ui.__class__(ui)
-    tmp3.textfield('','new_%s' % variable)
-    tmp2.start_table(bgcolor='lightgray')
-    tmp2.row(tmp," or type ",tmp3)
-    tmp2.end_table()
-    ui.row(description,tmp2)
+    ui.selector(description, variable, "select %s as `key`, %s as value from %s group by %s",  (field,field, table,field))
+
+##    tmp=ui.__class__(ui)
+##    dbh=DB.DBO(case)
+##    dbh.execute("select %s from %s group by %s", (field,table,field))
+##    keys= [None]+[ row[variable] for row in dbh]
+##    tmp.const_selector('',variable,keys,keys)
+##    tmp2=ui.__class__(ui)
+##    tmp3=ui.__class__(ui)
+##    tmp3.textfield('','new_%s' % variable)
+##    tmp2.start_table(bgcolor='lightgray')
+##    tmp2.row(tmp," or type ",tmp3)
+##    tmp2.end_table()
+##    ui.row(description,tmp2)
 
 def selector_constraint(table_object,fieldname,proposed_value,query=None,id=None, result=None):
     """ Checks if the user types a new value in selector_display to overrride the selector """
@@ -241,7 +259,7 @@ def selector(table=None, keys=None, values=None, variable=None, ui=None, descrip
     ui.selector(description,variable,
                 "select %s,%s from %s",( keys,values,table))
 
-def user_display(description=None,value=None,ui=None, **args):
+def user_display(self, description=None,value=None,ui=None, **args):
     """ Displays the username from a given user ID """
     import plugins.User as User
 
@@ -254,10 +272,12 @@ def user_display(description=None,value=None,ui=None, **args):
     
     ui.row(description,tmp)
 
-def foreign_key(table_object, fieldname,proposed_value,query=None,id=None, result=None, table=None):
+def foreign_key(table_object, fieldname,proposed_value,query=None,id=None, result=None, table=None, case=None, foreign_key=None):
     """ A constraint that ensures that the proposed_value exists within a table table. This is effectively enforcing a foreign key relationship. Note that table is an instance of a TableObj.
     """
-    if not proposed_value or not table[proposed_value]:
+    dbh=DB.DBO(case)
+    dbh.execute("select * from `%s` where `%s`=%r limit 1", (table, foreign_key, proposed_value))
+    if not dbh.fetch():
         result.heading("Incorrect %s specified" % table.table)
         result.text("Please ensure that a valid %s exists and is properly specified. Hit the back button and try again." % table.table)
         raise TableObj.ConstraintError(result)
@@ -353,3 +373,44 @@ def table_popup(description = None, variable= None, ui=None, callback= None, lab
     tmp.popup(callback,label,**options)
     ui.row(description,tmp)
 
+def directory_selector(description, ui, variable, root):
+    """ This allows the user to select a directory from the filesystem
+    based at the root level
+    """
+    def selector_popup(query,result):
+        def tree_cb(path):
+            path = "%s/%s" % (root,path)
+            try:
+                dirs = []
+                for d in os.listdir(path):
+                    if os.path.isdir(os.path.join(path,d)):
+                        dirs.append((d,d,'branch'))
+
+                dirs.sort()
+                return dirs
+            except OSError: return [(None,None,None)]
+
+        def pane_cb(path, result):
+            result.heading("Select %s" % path)
+
+            q = result.defaults.clone()
+            del q[variable]
+            del q['submit']
+            q[variable]=path
+            q['__opt__'] = 'main'
+            result.link("Click here to select this directory",icon="ok.png", target=q)
+
+        result.tree(tree_cb, pane_cb, ['/'])
+        
+    left = ui.__class__(ui)
+    right = ui.__class__(ui)
+    
+    #ui.textfield(description, variable)
+    left.popup(selector_popup, "Directory")
+    try:
+        right.text(ui.defaults[variable])
+        ui.hidden(variable, ui.defaults[variable])
+    except KeyError:
+        pass
+
+    ui.row(left,right)

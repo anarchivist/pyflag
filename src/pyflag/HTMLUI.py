@@ -1711,3 +1711,11 @@ class HTMLUI(UI.GenericUI):
         self.id+=1
         return self.id
 
+    def raw(self, html):
+        """ Allows the insertion of raw html into the GUI
+
+        Other UIs will just ignore this.
+
+        This should be avoided whenever possible.
+        """
+        self.result+=html

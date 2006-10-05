@@ -8,6 +8,7 @@ body {
 
 thead {
   height: 5%;
+  max-height: 2ex;
 }
 
 table.PyFlagTable tbody {

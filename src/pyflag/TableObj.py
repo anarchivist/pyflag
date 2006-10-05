@@ -48,6 +48,11 @@ class ConstraintError(Exception):
     def __str__(self):
         return self.result.__str__()
 
+class OmitValue(ConstraintError):
+    """ This exception can be thrown by constraints to indicate the
+    value should be totally ignored.
+    """
+
 class TableObj:
     """ An abstract object representing a table in the database """
     table = ""
@@ -86,7 +91,7 @@ class TableObj:
         self.case = case
 
     def _make_column_sql(self):
-        return ','.join([ "%s as %r" % (self._column_keys[i],self._column_names[i]) for i in range(len(self._column_keys)) ] + self._column_keys)
+        return ','.join([ "`%s` as %r" % (self._column_keys[i],self._column_names[i]) for i in range(len(self._column_keys)) ] + self._column_keys)
 
     def __getitem__(self,id):
         """ Emulates a table accessor.
@@ -97,23 +102,30 @@ class TableObj:
         dbh.execute("select %s from %s where %s=%r",(self._make_column_sql(),self.table,self.key,id))
         return dbh.fetch()
 
-    def edit(self,query,results):
+    def edit(self,query,ui):
         """ Updates the row with id given in query[self.table.key] to the values in query """
-        ##First we check all the fields through their constraints:
-        for k,v in self.edit_constraints.items():
-            if query.has_key(k):
-                replacement=v(self,k,query[k],id=query[self.key],query=query,result=results)
-            else:
-                replacement=v(self,k,None,id=None,query=query,result=results)
-
-            if(replacement):
-                del query[k]
-                query[k]=replacement
-
         ## Make up the SQL Statement. Note that if query is missing a
         ## parameter which we need, we simply do not update it.
         tmp = []
+        new_id = query[self.key]
+        
         for k in self._column_keys:
+            ## Check for edit constaints:
+            callback=self.edit_constraints.get(k,None)
+            if not callback:
+                callback=getattr(self.__class__,"edit_constraint_%s" % k,None)
+
+            if callback:
+                try:
+                    replacement=callback(self,k,query.get(k,None),id=new_id,query=query,result=ui)
+                    if(replacement):
+                        del query[k]
+                        query[k]=replacement
+                except OmitValue:
+                    del query[k]
+
+
+
             try:
                 tmp.append("%s=%r" % (k,query[k]))
             except KeyError:
@@ -122,72 +134,83 @@ class TableObj:
         dbh = DB.DBO(self.case)
         dbh.execute("UPDATE %s set %s where %s=%r ",(self.table,
                          ','.join(tmp),
-                         self.key, query[self.key]))
+                         self.key, new_id))
         
-        results.para("The following is the new record:")
-        self.show(query[self.key],results)
+        ui.para("The following is the new record:")
+        self.show(new_id,ui)
 
-    def add(self,query,results):
+    def add(self,query,ui):
         """ Adds a row given in query[self.table.key] to the table """
-        ##First we check all the fields through their constraints:
-        for k,v in self.add_constraints.items():
-            if query.has_key(k):
-                replacement=v(self,k,query[k],id=None,query=query,result=results)
-            else:
-                replacement=v(self,k,None,id=None,query=query,result=results)
+        dbh = DB.DBO(self.case)
+        dbh.insert(self.table, **{self._column_keys[0]: 'NULL'})
+        ## Work out what will be the next ID if it were to succeed. We
+        ## create a placeholder and then remove/replace it later.
+        new_id = dbh.autoincrement()
+        try:
+            result=[]
+            for k in self._column_keys:
+                ## Check for add constaints:
+                callback=self.add_constraints.get(k,None)
+                if not callback:
+                    callback=getattr(self.__class__,"add_constraint_%s" % k,None)
 
-            if(replacement):
-                del query[k]
-                query[k]=replacement
-        
-        ## Work out which columns need to be changed
-        result=[]
-        for k in self._column_keys:
-            try:
-                result.append("%s=%r" % (k,query[k]))
-            except KeyError:
-                pass
+                if callback:
+                    try:
+                        replacement=callback(self,k,query.get(k,None),id=new_id,query=query,result=ui)
+                        if(replacement):
+                            del query[k]
+                            query[k]=replacement
+                    except OmitValue:
+                        del query[k]
 
-        dbh = DB.DBO(self.case)                
-        dbh.execute("insert into %s set %s ",(self.table,
-                         ",".join(result),
-                         ))
+                try:
+                    result.append("%s=%r" % (k,query[k]))
+                except KeyError:
+                    pass
+        finally:
+            ## Cleanup the placeholder
+            dbh.execute("delete from %s where %s=%r", (self.table, self.key, new_id))
+                        
+        dbh.execute("insert into %s set %s=%r,%s ",(
+                self.table,
+                self.key, new_id,
+                ",".join(result),
+                ))
         
     def get_name(self,col):
         """ Returns the name description for the column specified """
         return self._column_names[self._column_keys.index(col)]
     
-    def form(self,columns,query,results,defaults=None):
+    def form(self,query,results,defaults=None):
         """ Draws a form.
 
-        @arg columns: A list of the columns specified
         @arg query: The global query object
         @arg results: The UI to draw in
         @arg defaults: A dictionary of defaults to assign into query
         """
         results.start_table()
         for k,v in zip(self._column_keys,self._column_names):
-            try:
-                ## If there is no input from the user - override the input from the database:
-                if defaults and not query.has_key(k):
-                    query[k]=defaults[k]
-
-                ## Here we check if there are special form functions to be executed:
+            ## If there is no input from the user - override the input from the database:
+            if defaults and not query.has_key(k):
                 try:
-                    if not query.has_key(k) or query[k]==None:
-                        del query[k]
-                        query[k]=''
-                    
-                    self.form_actions[k](description=v,ui=results,variable=k)
-                # If not we display a text field
+                    query[k]=defaults[k]
                 except KeyError:
-                    results.textfield(v,k,size=40)
-            except KeyError:
-                pass
+                    pass
+                
+            ## Try to get the callback from the functional
+            ## interface or the class interface:
+            cb = self.form_actions.get(k,None)
+            if not cb:
+                cb = getattr(self.__class__,"form_%s" % k, None)
+                
+            if cb:
+                cb(self,description=v,ui=results,variable=k, defaults=defaults)
+            else:
+                results.textfield(v,k,size=40)
 
     def add_form(self,query,results):
         """ Generates a form to add a new record in the current table """
-        self.form( self._column_keys ,query,results)
+        self.form(query,results)
 
     def edit_form(self,query,results):
         """ Generates an editing form for the current table """
@@ -196,7 +219,7 @@ class TableObj:
         dbh = DB.DBO(self.case)
         dbh.execute("select * from %s where %s=%r",(self.table,self.key,id))
         row=dbh.fetch()
-        self.form(self._column_keys,query,results,row)
+        self.form(query,results,row)
 
     def delete(self,id,result,commit=False):
         """ This deletes the row with specified id from the table.
@@ -222,9 +245,8 @@ class TableObj:
 
     def show(self,id,result):
         dbh = DB.DBO(self.case)
-        dbh.execute("select %s from %s where %s=%r",
-                         ( ','.join(self._column_keys),
-                           self.table,self.key,id))
+        dbh.execute("select * from %s where %s=%r",
+                         (self.table,self.key,id))
 
         row=dbh.fetch()
         if not row:
@@ -237,9 +259,12 @@ class TableObj:
         for k,v in zip(self._column_keys,self._column_names):
             ## If there are any specific display functions we let them
             ## do it here...
-            if self.display_actions.has_key(k):
-                value = row[k]
-                self.display_actions[k](description=v, variable=k, value=value, ui=result, row=row, id=id)
+            cb = self.display_actions.get(k,None)
+            if not cb:
+                cb = getattr(self.__class__,"display_%s" % k, None)
+                
+            if cb:
+                cb(self,description=v, variable=k, ui=result, defaults=row)
             else:
                 try:
                     tmp = result.__class__(result)
@@ -252,6 +277,7 @@ class DisplayItem(Reports.report):
     """ Displays an item from the table """
     name = 'Generic Display Item'
     table=TableObj
+    parameters = {}
 
     def __init__(self,flag,ui=None):
         self.table = self.table()
@@ -264,9 +290,8 @@ class DisplayItem(Reports.report):
             self.tblname = self.table.table
 
     def display(self,query,result):
-        table=self.table(query.get('case',None))
         result.heading("%s id %s" % (self.name,query[self.table.key]))
-        table.show(query[self.table.key],result)
+        self.table.show(query[self.table.key],result)
 
     def form(self,query,result):
         result.textfield("Select key %s" % (self.table.key),self.table.key)
@@ -275,6 +300,7 @@ class EditItem(DisplayItem):
     """ Edit a row from a table """
 
     def __init__(self,flag,ui=None):
+        self.parameters = {}
         self.parameters['submit']='any'
         DisplayItem.__init__(self,flag,ui)
         ## Add the required fields to the parameters list so the
@@ -294,7 +320,6 @@ class EditItem(DisplayItem):
             result.para("Press the back button and try again")
 
     def form(self,query,result):
-        print self.parameters
         self.table.case=query.get('case',None)
         try:
             self.table.edit_form(query,result)

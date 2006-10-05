@@ -18,6 +18,10 @@ function set_url(widget, url) {
 
   update_default_toolbar();
 
+  // Ensure we clear the container to stop the user from clicking
+  // multiple times while ajax requests are still executing:
+  widget.setContent("Loading... Please Wait")
+
   //  widget.setUrl(url);
   dojo.io.bind({
     url: url+"&__pane__="+widget.widgetId,
@@ -62,6 +66,10 @@ function submitForm(form_name,target) {
 
   for(var i = 0; i < inputs.length; i++) {
     var input = inputs[i];
+
+    // We only want to include those checkboxes which are filled:
+    if(input.type=='checkbox' &&  ! input.checked) continue;
+
     if(input.name.length>0)
       query.push(input.name + '=' + input.value);
   };
