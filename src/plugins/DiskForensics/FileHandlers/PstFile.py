@@ -83,7 +83,7 @@ class PstScan(GenScanFactory):
         # if ever another scanner wants to use them also
         dbh=DB.DBO(self.case)
         for name in ('email','contact','appointment','journal'):
-            dbh.execute("DROP TABLE if exists `%s`;", (name))
+            dbh.execute("delete from `%s`;", (name))
         
     def destroy(self):
         pass

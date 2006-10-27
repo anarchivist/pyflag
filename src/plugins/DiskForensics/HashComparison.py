@@ -53,7 +53,7 @@ class MD5Scan(GenScanFactory):
     def reset(self, inode):
         GenScanFactory.reset(self, inode)
         dbh=DB.DBO(self.case)
-        dbh.execute("drop table `md5`")
+        dbh.execute("delete from `md5`")
 
     def destroy(self):
         pass

@@ -138,4 +138,5 @@ class StreamScannerFactory(GenScanFactory):
         def finish(self):            
             ## Call the base classes process_stream method with the
             ## given stream.
-            self.outer.process_stream(self.fd, self.factories)
+            if not self.ignore:
+                self.outer.process_stream(self.fd, self.factories)

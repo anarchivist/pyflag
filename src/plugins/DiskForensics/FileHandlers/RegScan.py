@@ -57,8 +57,8 @@ class RegistryScan(GenScanFactory):
     def reset(self, inode):
         GenScanFactory.reset(self, inode)
         dbh=DB.DBO(self.case)
-        dbh.execute('drop table if exists reg')
-        dbh.execute('drop table if exists regi')
+        dbh.execute('delete from reg')
+        dbh.execute('delete from regi')
         
     def destroy(self):
         ## Add indexes:

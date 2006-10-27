@@ -123,7 +123,7 @@ class DataType:
             self.buffer=Buffer(buffer)
         else:
             self.buffer=buffer
-
+            
         if self.buffer:
             self.data=self.read()
         else:

@@ -42,6 +42,7 @@ import re
 import pyflag.Registry as Registry
 import pyflag.DB as DB
 import pyflag.FlagFramework as FlagFramework
+import fnmatch
 
 class BaseScanner:
     """ This is the actual scanner class that will be instanitated once for each file in the filesystem.
@@ -95,11 +96,13 @@ class BaseScanner:
         """
         pass
 
-
 class GenScanFactory:
     """ Abstract Base class for scanner Factories.
     
-    The Scanner Factory is a specialised class for producing scanner objects. It will be instantiated once per filesystem at the begining of the run, and destroyed at the end of the run. It will be expected to produce a new Scanner object for each file in the filesystem.
+    The Scanner Factory is a specialised class for producing scanner
+    objects. It will be instantiated once at the begining of the run,
+    and destroyed at the end of the run. It will be expected to
+    produce a new Scanner object for each file in the filesystem.
     """
     ## Should this scanner be on by default?
     default=False
@@ -316,6 +319,13 @@ class ScanIfType(StoreAndScanType):
 
     def finish(self):
         pass
+
+def resetfile(ddfs, inode,factories):
+    for f in factories:
+        dbh=DB.DBO(ddfs.case)
+        f.reset(inode)
+        dbh.execute("update inode set scanner_cache = REPLACE(scanner_cache,%r,'') where inode=%r",
+                                (f.__class__.__name__, inode))
     
 ### This is used to scan a file with all the requested scanner factories
 def scanfile(ddfs,fd,factories):
@@ -536,7 +546,44 @@ class Drawer:
         result.const_selector(left,
                            scan_group_name,
                            ['on','off'],['Enabled','Disabled'])
+
+## This is a global store for factories:
+import pyflag.Store as Store
+
+factories = Store.Store()
+
+def get_factories(scanners):
+    """ Scanner factories are obtained from the Store or created as
+    required. Scanners is a list in the form case:scanner
+    """
+    ## First prepare the required factories:
+    result = []
+    for key in scanners:
+        try:
+            case, scanner = key.split(":",1)
+        except:
+            raise RuntimeError("scanner not given in the correct format %s" % scanners)
         
+        try:
+            f=factories.get(key)
+        except KeyError:
+            cls=Registry.SCANNERS.dispatch(scanner)
+
+            #Instatiate it:
+            import pyflag.FileSystem as FileSystem
+
+            f=cls(FileSystem.DBFS(case))
+
+            ## Initialise it:
+            f.prepare()
+
+            ## Store it:
+            factories.put(f,key=key)
+
+        result.append(f)
+
+    return result
+
 ## This is a down side for the unified VFS model - we may well
 ## encounter any filesystem in our scan run, so we must show them
 ## all. This means that we allow users to select Network filesystems

@@ -96,11 +96,20 @@ INSERT INTO dictionary set word="secret", class="English", type="word";
 INSERT INTO dictionary set word="\\d{1,3}.\\d{1,3}.\\d{1,3}.\\d{1,3}", class="IP Addresses", type="literal";
 
 ## This has been commented out due to it being _Really_ slow. Reenable
-## if you need it.
+## if you need it. FIXME this should be done using the new index scanners regex engine.
 
 #INSERT INTO `dictionary` VALUES (NULL,'[\\w\\.]+@\\w+\\.\\w+\\.?[\\w\\.]*', 'Email','all','regex');
 #INSERT INTO `dictionary` VALUES (NULL,'(http:|https:|ftp:|mail:)[/\\w\\.]+', 'URL','all','regex');
 #INSERT INTO `dictionary` VALUES (NULL,'\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}', 'IPv4','all','regex');
+
+## This is required for the new distributed architecture
+create table jobs (
+	`id` int unsigned auto_increment, 
+	command varchar(250), 
+	arg1 varchar(250), 
+	arg2 varchar(250), 
+	key `id`(id)
+	);
 
 CREATE TABLE `registrykeys` (
 	`id` int auto_increment,

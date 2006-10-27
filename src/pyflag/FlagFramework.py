@@ -850,3 +850,8 @@ def get_temp_path(case,filename):
     """
     filename = filename.replace('/','-')
     return "%s/case_%s/%s" % (config.RESULTDIR,case,filename)
+
+def glob_to_sql(glob):
+    glob=glob.replace("*","%")
+    return glob
+

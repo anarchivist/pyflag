@@ -141,7 +141,7 @@ class StreamFile(File):
         ## Now create the stream in the VFS:
         fsfd = FileSystem.DBFS(self.case)
         inode = self.inode[:self.inode.rfind("|")] +"|S%s" % stream_ids[0]
-        pathname = fsfd.lookup(inode = inode)
+        pathname = os.path.dirname(fsfd.lookup(inode = inode))+"/combined"
         fsfd.VFSCreate(None, self.inode, pathname)
 
     def get_packet_id(self, position=None):

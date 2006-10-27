@@ -75,7 +75,7 @@ class VirScan(GenScanFactory):
     def reset(self, inode):
         GenScanFactory.reset(self, inode)
         dbh=DB.DBO(self.case)
-        dbh.execute('drop table virus')
+        dbh.execute('delete from virus')
 
     class Scan(MemoryScan):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):

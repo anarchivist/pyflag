@@ -232,7 +232,7 @@ class HTTPScanner(StreamScannerFactory):
         
     def reset(self, inode):
         dbh = DB.DBO(self.case)
-        dbh.execute("drop table if exists http")
+        dbh.execute("delete from http")
 
     def parse_date_time_string(self, s):
         try:

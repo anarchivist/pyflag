@@ -54,11 +54,12 @@ class AFTJpegScan(GenScanFactory):
         Scanner.GenScanFactory.__init__(self, fsfd)
 	        
     def prepare(self):
-        self.dbh.execute("""CREATE TABLE IF NOT EXISTS `stegjpeg` (    
+        dbh = DB.DBO(self.case)
+        dbh.execute("""CREATE TABLE IF NOT EXISTS `stegjpeg` (    
         `inode` VARCHAR(20) NOT NULL,
 	`result` VARCHAR(40) NOT NULL)""" )
 	
-        self.dbh.check_index('stegjpeg','inode')	
+        dbh.check_index('stegjpeg','inode')	
 	    
     class Scan(StoreAndScanType):
         """ If we hit a jpeg file, we just create a new Inode entry in the VFS """

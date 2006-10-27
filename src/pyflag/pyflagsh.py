@@ -166,21 +166,25 @@ def completer(text,state):
     t=text
     line = readline.get_line_buffer()
     args=shlex.split(line)
-    if line[-1] in readline.get_completer_delims():
-        text=''
-    else:
-        text=args[-1]
+##    if line[-1] in readline.get_completer_delims():
+##        text=''
+##    else:
+##        text=args[-1]
 
     # We are trying to complete the primary command:
-    commands=Registry.SHELL_COMMANDS.commands.keys()
     if not len(args) or len(args)==1 and text:
-        for i in range(state,len(commands)):
-            if commands[i].startswith(text):
-                return commands[i]
+        commands=[ x for x in Registry.SHELL_COMMANDS.commands.keys() if x.startswith(text)]
+        try:
+            return commands[state]
+        except IndexError:
+            return None
     else:
         c=Registry.SHELL_COMMANDS[args[0]](args,env)
-        result=c.complete(text,state)
-        return(escape(result[len(text)-len(t):]))
+        try:
+            result=c.complete(text,state)
+            return(escape(result[len(text)-len(t):]))
+        except Exception,e:
+            return None
 
 class Asker:
     """ Class asks the user for parameters to fill into flash scripts """
@@ -196,11 +200,12 @@ class Asker:
 def process_line(line):
     try:
         args=shlex.split(line)
+
         #Implement globbing of filenames
-        try:
-            args=parser.glob_list(args)
-        except AttributeError:
-            pass
+##        try:
+##            args=parser.glob_list(args)
+##        except AttributeError:
+##            pass
 
         if args and args[0][0]!='#':
             for result in parser.parse(args):
@@ -257,6 +262,7 @@ if __name__ == "__main__":
     atexit.register(readline.write_history_file, histfile)
     
     readline.set_completer(completer)
+    readline.set_completer_delims(' \t\n/=+\'"')
     
     env=environment()
     parser=command_parse(env)
@@ -300,11 +306,14 @@ if __name__ == "__main__":
             try:
                 input = raw_input("Flag Shell: %s>" % env.CWD)
                 process_line(input)
+            except RuntimeError,e:
+                print e
             except (EOFError, SystemExit):
                 print "Bibi Then - Have a nice day."
                 sys.exit(0)
             except KeyboardInterrupt:
                 print "\nInterrupted"
             except Exception,e:
+                print isinstance(e,ParserException)
                 print "Unknown error: %r %s" % (e,e)
                 print FlagFramework.get_bt_string(e)

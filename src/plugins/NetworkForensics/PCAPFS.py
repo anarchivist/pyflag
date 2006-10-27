@@ -141,26 +141,6 @@ class PCAPFS(DBFS):
             `cache_offset`  bigint(9) unsigned NOT NULL default '0'
             ) """)
 
-
-##        ## This populates it:
-        
-##        sql =  "%s/iowrapper -i %r -o %s -f foo -- %s/pcaptool -t pcap -i %r  -p %r foo" % (
-##            config.FLAG_BIN,
-##            self.iosource.subsystem,
-##            self.iosource.make_parameter_list(),
-##            config.FLAG_BIN, iosource_name
-##            ,max_id,
-##            )
-
-##        dbh.MySQLHarness(sql)
-
-        ## Is this all needed any more?
-##        ## Add our VFS node
-##        self.VFSCreate(None,"I%s|p0" % iosource_name,'%s/rawdata' % mount_point);
-
-##        ## Creates indexes on id:
-##        dbh.check_index("pcap",'id')
-
         ## Open the file descriptor
         self.fd = IO.open(self.case, iosource_name)
         buffer = Buffer(fd=self.fd)

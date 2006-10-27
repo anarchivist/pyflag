@@ -22,7 +22,6 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 import pyflag.pyflagsh as pyflagsh
-from pyflag.pyflagsh import ParserException
 import sys,os
 import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
@@ -33,6 +32,7 @@ import pyflag.Registry as Registry
 import pyflag.logging as logging
 import pyflag.conf
 config=pyflag.conf.ConfObject()
+import fnmatch
 import pyflag.TEXTUI as TEXTUI
 
 class load(pyflagsh.command):
@@ -55,7 +55,7 @@ class load(pyflagsh.command):
             self.environment.__class__._CASE = case
             yield "Loaded case %r" %(case)
         except Exception,e:
-            raise ParserException("Unable to open filesystem %s (%s)" %(text,e))
+            raise RuntimeError("Unable to open filesystem %s (%s)" %(text,e))
 
     def complete(self,text,state):
         """ Completes the command for the different filesystems """
@@ -74,12 +74,27 @@ class ls(pyflagsh.command):
         return "ls [dir]:  lists the files in the current directory (if dir not specified) or in dir."
 
     def execute(self):
-        args=self.args
-        if len(args)==1:
+        args=self.args[1:]
+        if len(args)==0:
             args.append(self.environment.CWD)
-                
-        for path in args[1:]:
-            return self.list(path)
+
+        print args
+        ## Glob the path if possible:
+        files = {}
+        for arg in args:
+            ## Add the implied CWD:
+            if not arg.startswith("/"): arg=FlagFramework.normpath(self.environment.CWD+"/"+arg)
+            for path in FileSystem.glob(arg, case=self.environment._CASE):
+                f=FlagFramework.joinpath(path)
+                files[f]=True
+
+        ## This is used to collate files which may appear in multiple globs
+        files = files.keys()
+        files.sort()
+
+        for path in files:
+            for f in self.list(path):
+                yield f
             
     def list(self,path):
         """ List the files in a particular path """
@@ -108,7 +123,7 @@ class ls(pyflagsh.command):
                         yield file
 
         except AttributeError:
-            raise ParserException("No Filesystem loaded, do you need to load a filesystem first?")
+            raise RuntimeError("No Filesystem loaded, do you need to load a filesystem first?")
 
     def complete(self,text,state):
         args=self.args
@@ -144,7 +159,7 @@ class cd(ls):
         if new_path!='/':
         ## Now check if the new path actually exists (There is an edge case here with / does have an inode):
             if not self.environment._FS.isdir(new_path):
-                raise ParserException("No such directory: %s" % new_path)
+                raise RuntimeError("No such directory: %s" % new_path)
         
         self.environment.CWD=new_path
         yield 'current working directory %s' % self.environment.CWD
@@ -292,7 +307,7 @@ class istat(pyflagsh.command):
             filename = self.environment._FS.lookup(inode=arg)
             status=self.environment._FS.istat(inode=arg)
             if not status:
-                raise ParserException("No status available for %s" % arg)
+                raise RuntimeError("No status available for %s" % arg)
 
             status['filename'] = filename
             yield status
@@ -346,7 +361,7 @@ class execute(pyflagsh.command):
         try:
             query['family'],query['report']=args[1].split('.')
         except:
-            raise ParserException("Unable to parse %s as a family.report" % args[1])
+            raise RuntimeError("Unable to parse %s as a family.report" % args[1])
         
         report = Registry.REPORTS.dispatch(query['family'],query['report'])
         ## Include the report and family:
@@ -356,7 +371,7 @@ class execute(pyflagsh.command):
 #                del query[arg[:arg.index('=')]]
                 query[arg[:arg.index('=')]]=arg[arg.index('=')+1:]
             except ValueError:
-                raise ParserException("Argument should be of the form key=value, got %s" % arg)
+                raise RuntimeError("Argument should be of the form key=value, got %s" % arg)
 
         ## Include environment variables in the query:
         for arg in dir(self.environment):
@@ -407,7 +422,7 @@ class execute(pyflagsh.command):
         except Exception,e:
             import traceback
             print traceback.print_tb(sys.exc_info()[2])
-            raise ParserException("%s: %s after %s sec" %  (sys.exc_info()[0],sys.exc_info()[1],time.time()-start_time))
+            raise RuntimeError("%s: %s after %s sec" %  (sys.exc_info()[0],sys.exc_info()[1],time.time()-start_time))
 
 class reset(execute):
     """ Resets the given report """
@@ -429,7 +444,7 @@ class reset(execute):
         except Exception,e:
             import traceback
             print traceback.print_tb(sys.exc_info()[2])
-            raise ParserException("%s: %s after %s sec" %  (sys.exc_info()[0],sys.exc_info()[1]),time.time()-start_time)
+            raise RuntimeError("%s: %s after %s sec" %  (sys.exc_info()[0],sys.exc_info()[1]),time.time()-start_time)
 
 class find(ls):
     """ A command to find files in the filesystem """
@@ -460,7 +475,7 @@ class find(ls):
 #                yield {'name':path, 'path':''}
 
         except AttributeError:
-            raise ParserException("No Filesystem loaded, do you need to load a filesystem first?")
+            raise RuntimeError("No Filesystem loaded, do you need to load a filesystem first?")
 
 class find_dict(find):
     """ This command returns a full dict of information for each file returned """

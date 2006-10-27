@@ -43,7 +43,7 @@ This inode therefore refers to the 14th file in the zip archive contained in ino
 
 Note that typically VFS modules go hand in hand with scanners, since scanner discover new files, calling VFSCreate on the filesystem to add them, and VFS drivers are used to read those from the Inode specifications.
 """
-import os,os.path
+import os,os.path, fnmatch
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 
@@ -404,7 +404,9 @@ class DBFS(FileSystem):
         row = dbh.fetch()
 
         dbh.execute("select * from file where inode=%r order by mode limit 1", inode);
-        row.update(dbh.fetch())
+        result = dbh.fetch()
+        if result:
+            row.update(result)
         return row
 
     def isdir(self,directory):
@@ -823,3 +825,36 @@ class File:
         else:
             result.start_table(width="100%")
             result.row(left,valign='top',align="left")
+
+def globbed_path(path_elements, depth, case=None):
+    """ A generator which yields all elements globbed by the path_elements """
+    if len(path_elements)==depth:
+        return
+    
+    ## First glob the current element:
+    dbh=DB.DBO(case)
+    dbh.execute("select name from file where path=%r and name rlike %r",
+                (FlagFramework.normpath(os.path.join('/', *path_elements[:depth])+'/'),
+                 fnmatch.translate(path_elements[depth])))
+
+    ## We try to continue globbing for every occurance of the current
+    ## depth
+    for row in dbh:
+        path = path_elements[:]
+        path[depth] = row['name']
+        yield path[:depth+1]
+
+        for paths in globbed_path(path, depth+1,case):
+            yield paths
+
+def glob(glob_str, case=None):
+    """ A top level generator to collect the results of the globbing operations """
+    glob_path = FlagFramework.splitpath(glob_str)
+    print glob_path
+    for p in globbed_path(glob_path,0,case):
+        if len(p)==len(glob_path):
+            yield p
+
+## Test:
+##for p in glob('/mnt/test/*/80*/forward'):
+##    print p

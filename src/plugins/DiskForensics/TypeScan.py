@@ -54,7 +54,7 @@ class TypeScan(Scanner.GenScanFactory):
     def reset(self,inode):
         Scanner.GenScanFactory.reset(self, inode)
         dbh=DB.DBO(self.case)
-        dbh.execute("drop table if exists `type`")
+        dbh.execute("delete from `type`")
 
     def destroy(self):
         pass
@@ -79,9 +79,6 @@ class TypeScan(Scanner.GenScanFactory):
             # insert type into DB
             dbh=DB.DBO(self.case)
             dbh.execute('INSERT INTO type VALUES(%r, %r, %r)', (self.inode, self.type_mime, self.type_str))
-            # if we have a mime handler for this data, call it
-#            logging.log(logging.DEBUG, "Handling inode %s = %s, mime type: %s, magic: %s" % (self.inode,self.filename,self.type_mime, self.type_str))
-
 
 ## A report to examine the Types of different files:
 class ViewFileTypes(Reports.report):

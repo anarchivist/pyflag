@@ -399,4 +399,8 @@ if __name__ == "__main__":
 
     Graph.Graph = Graph.Ploticus
 
+    ## Start the workers
+    import pyflag.Farm as Farm
+    Farm.start_workers()
+
     Server(HandlerClass = FlagServerHandler)

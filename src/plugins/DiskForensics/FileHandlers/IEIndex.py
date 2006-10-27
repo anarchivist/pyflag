@@ -52,7 +52,7 @@ class IEIndex(Scanner.GenScanFactory):
     def reset(self, inode):
         Scanner.GenScanFactory.reset(self, inode)
         dbh=DB.DBO(self.case)
-        dbh.execute("DROP TABLE IF EXISTS history")
+        dbh.execute("delete from history")
         
     def destroy(self):
         dbh=DB.DBO(self.case)

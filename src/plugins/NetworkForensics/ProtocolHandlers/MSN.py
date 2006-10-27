@@ -1474,7 +1474,7 @@ class MSNScanner(StreamScannerFactory):
 
                 # Open the combined stream.
                 fd = self.fsfd.open(inode=combined_inode)
-                
+                dbh=DB.DBO(self.case)
                 m=message(dbh, fd, self.fsfd)
                 while 1:
                     try:
