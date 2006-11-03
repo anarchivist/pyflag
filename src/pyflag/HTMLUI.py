@@ -769,7 +769,7 @@ class HTMLUI(UI.GenericUI):
         else:
             self.toolbar_ui.icon(icon,tooltip=text)
                 
-    def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):
+    def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},data_callbacks={},**opts):
         """ Shows the results of an SQL query in a searchable/groupable/browsable table
 
         The format of the sql statement is:
@@ -785,6 +785,16 @@ class HTMLUI(UI.GenericUI):
         ....    @return: ui based on value
         
         >>> callbacks=['deleted':function]
+
+        If the data_callbacks variable is specified, it is also a dictionary mapping names to callback functions. The callback is used to translate between the native database datatype and a more convienient display format. This is used for fields like IP addresses and timestamps. This two-way callback is preferable to using callbacks (above) as it remains searchable. It is also preferable to specifying database function in the columns field (e.g. from_unixtime(time) for time) as it allows the database to use its indexes. An example is goven below:
+
+        >>> def function(value, mode):
+        ....    if mode=0: # output/display
+        ....        return inet_ntoa(value)
+        ....    else:
+        ....        return inet_aton(value)
+
+        >>> data_callbacks=['Src IP':function]
 
         __target__ may be specified any number of times.
 
@@ -875,7 +885,7 @@ class HTMLUI(UI.GenericUI):
                     ## If we dont know about this name, we ignore it.
                     continue
 
-                condition_text = FlagFramework.make_sql_from_filter(v,having,columns[index],d[len('where_'):])
+                condition_text = FlagFramework.make_sql_from_filter(v,having,columns[index],d[len('where_'):],data_callbacks=data_callbacks)
                 
                 #create a link which deletes the current variable from
                 #the query string, allows the user to remove the
@@ -969,11 +979,15 @@ class HTMLUI(UI.GenericUI):
                 for row in dbh:
                     values.append(row['Count'])
                     count+=int(row['Count'])
-                    try:
-                        tmp_value=row[names[1]]
-                        labels.append("%s\\n (%s)" % (callbacks[names[1]](tmp_value),row['Count']))
-                    except KeyError:
-                        labels.append("%s\\n (%s)" % (row[names[1]],row['Count']))
+
+                    tmp_value=row[names[1]]
+                    if data_callbacks.has_key(names[1]):
+                        tmp_value = data_callbacks[names[1]](tmp_value, mode=0)
+
+                    if callbacks.has_key(names[1]):
+                        tmp_value = callbacks[names[1]](tmp_value)
+
+                    labels.append("%s\\n (%s)" % (tmp_value,row['Count']))
 
                 ## Insert an others entry:
                 values.append(total - count)
@@ -1053,10 +1067,10 @@ class HTMLUI(UI.GenericUI):
                         new_row={}
                         for k,v in row.items():
                             if k in hidden_columns: continue
-                            try:
+                            if data_callbacks.has_key(k):
+                                row[k]=data_callbacks[k](v)
+                            if callbacks.has_key(k):
                                 row[k]=callbacks[k](v)
-                            except (KeyError,Exception):
-                                pass
 
                         ## Escape certain characters from the rows - some
                         ## spreadsheets dont like these even though they
@@ -1174,6 +1188,9 @@ class HTMLUI(UI.GenericUI):
                 value=row_str[i]
 
                 ## Check if the user specified a callback for this column
+                if data_callbacks.has_key(names[i]):
+                    value=data_callbacks[names[i]](value, mode=0)
+
                 if callbacks.has_key(names[i]):
                     value=callbacks[names[i]](value)
                 else:

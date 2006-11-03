@@ -58,6 +58,17 @@ def save_preset(query,result, log=None):
         result.text("Please type a name for the preset.\n",color='red')
         return False
 
+from socket import inet_aton, inet_ntoa
+from struct import pack, unpack
+
+def ip_trans(data, mode):
+    """ convert between database ip format (int unsigned) and the
+    display/search format (dotted decimal) """ 
+    if(mode==0):
+        return inet_ntoa(pack("!I", int(data)))
+    if(mode==1):
+        return "%i" % unpack("!I", inet_aton(data))
+    
 class Log:
     """ This base class abstracts Loading of log files.
 
@@ -263,7 +274,7 @@ class IPType(Type):
     """ IP addresses should be stored in the database as ints, but displayed in dot notation """
     type = "int unsigned"
     sql_in= "INET_ATON(%r)"
-    sql_out= "INET_NTOA(%s)"
+    #sql_out= "INET_NTOA(%s)"
     
 types = {
     'varchar(250)': VarType,

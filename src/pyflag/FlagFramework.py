@@ -790,7 +790,7 @@ def splitpath(path):
 def joinpath(branch):
     return '/'+'/'.join(branch)
 
-def make_sql_from_filter(filter_str,having,column,name):
+def make_sql_from_filter(filter_str,having,column,name,data_callbacks={}):
     """ This function creates the SQL depending on the filter_str that was provided and its prefixes.
 
     @arg filter_str: The filter string to process.
@@ -799,18 +799,27 @@ def make_sql_from_filter(filter_str,having,column,name):
     @return: A condition text describing this condition.
     """
 
+    try:
+        cb = data_callbacks[name]
+    except KeyError:
+        cb = lambda x, mode: x
+
     def compose_simple_expression(simple_string):
         if simple_string.startswith('=') or simple_string.startswith('<') or simple_string.startswith('>'):
             ## If the input starts with =<>, we do an exact match
-            condition=simple_string[0]
-            operand=simple_string[1:]
+            if simple_string.startswith('<=') or simple_string.startswith('>='):
+                condition=simple_string[0:2]
+                operand=cb(simple_string[2:], mode=1)
+            else:
+                condition=simple_string[0]
+                operand=cb(simple_string[1:], mode=1)
         elif (simple_string.find('%')>=0) and (not simple_string.startswith('!')):
             #If the user already supplied the %, we dont add our own:
             condition="like"
             operand=simple_string
         elif simple_string.startswith('!='):
             condition="!="
-            operand=simple_string[2:]
+            operand=cb(simple_string[2:], mode=1)
         elif simple_string.startswith('!%'):
             condition="not like"
             operand=simple_string[1:]
@@ -841,7 +850,7 @@ def make_sql_from_filter(filter_str,having,column,name):
     else:
         (cond,op)=compose_simple_expression(filter_str)
         having.append("%s %s %r" % (column,cond,op))
-        condition_text=("%s %s %r" % (name,cond,op))
+        condition_text=("%s %s %r" % (name,cond,cb(op, mode=0)))
 
     return condition_text
 

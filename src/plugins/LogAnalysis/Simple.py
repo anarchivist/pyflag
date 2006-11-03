@@ -368,6 +368,7 @@ class SimpleLog(LogFile.Log):
         columns =[]
         names = []
         callbacks = {}
+        data_callbacks = {}
         links = []
         where = []
         table_name = query['logtable']+'_log'
@@ -378,6 +379,9 @@ class SimpleLog(LogFile.Log):
                 type = self.types[self.fields.index(d[0])]
                 columns.append(LogFile.types[type].sql_out % ("table_name.`%s`" % (d[0])))
                 links.append(None)
+                if type == "IP Address":
+                    # append data callback
+                    data_callbacks[d[0]] = LogFile.ip_trans
                 if type == "IP Address" and query.has_key('whois'):
                     names.append("Whois %s" % d[0])
                     columns.append("whois_%s.whois_id" % (d[0]))
@@ -399,6 +403,7 @@ class SimpleLog(LogFile.Log):
             links= links,
             table= ','.join(table),
             callbacks = callbacks,
+            data_callbacks = data_callbacks,
             where=" and ".join(where),
             case=query['case']
             )

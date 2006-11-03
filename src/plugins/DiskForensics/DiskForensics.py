@@ -236,6 +236,20 @@ class ViewFile(Reports.report):
         result.textfield('Inode','inode')
         return result
 
+import time
+
+def data_timestamp(data, mode):
+    """ a timestamp conversion utility """
+    #output (select)
+    if(mode==0):
+        return time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(int(data)))
+    #input (where)
+    if(mode==1):
+        tmp = time.mktime(time.strptime(data, "%Y-%m-%d %H:%M:%S")) - time.timezone
+        if(time.daylight):
+            tmp += 3600
+        return "%i" % tmp
+ 
 class Timeline(Reports.report):
     """ View file MAC times in a searchable table """
     name = "View File Timeline"
@@ -274,10 +288,12 @@ class Timeline(Reports.report):
         dbh = self.DBO(query['case'])
         result.heading("File Timeline for Filesystem")
         result.table(
-            columns=('from_unixtime(time)','inode','status',
+            #columns=('from_unixtime(time)','inode','status',
+            columns=('time','inode','status',
                      "if(m,'m',' ')","if(a,'a',' ')","if(c,'c',' ')","if(d,'d',' ')",'name'),
             names=('Timestamp', 'Inode','Del','m','a','c','d','Filename'),
             callbacks={'Del':FlagFramework.Curry(DeletedIcon,result=result)},
+            data_callbacks={'Timestamp':data_timestamp},
             table=('mac'),
             case=query['case'],
 #            links=[ None, None, None, None, None, None, None, FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='filename')]
