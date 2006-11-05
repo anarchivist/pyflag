@@ -27,6 +27,8 @@
    USA
 */
 
+#include <time.h>
+
 #include "fs_tools.h"
 #include "error.h"
 #include "ntfs.h"
@@ -362,6 +364,7 @@ print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
   time_t dtime = 0;
   char *link=0;
   int lsize;
+  char timestr[200];
 
   // print progress message
   inode_count++;
@@ -422,15 +425,25 @@ print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
 					       " `ctime`,`dtime`,`mode`,"
 					       " `links`,`link`,`size`) "
 					       " VALUES('I%s|D%lu-%d-%d',"
-					       "'%c','%d','%d','%lu',"
-					       "'%lu','%lu',%lu,'%lo',"
-					       "'%d','%s','%lu');\n",
+					       "'%c','%d','%d',",
 					       iosource,
 					       (ULONG) fs_inode->addr, fs_data->type, fs_data->id,
 					       (flags & FS_FLAG_META_ALLOC) ? 'a' : 'f',
-					       (int) fs_inode->uid, (int) fs_inode->gid,
-					       (ULONG) fs_inode->mtime, (ULONG) fs_inode->atime,
-					       (ULONG) fs_inode->ctime, (ULONG) dtime,
+					       (int) fs_inode->uid, (int) fs_inode->gid);
+
+                           strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", gmtime((ULONG *) &fs_inode->mtime));
+                           printf("'%s',", timestr);
+
+                           strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", gmtime((ULONG *) &fs_inode->atime));
+                           printf("'%s',", timestr);
+
+                           strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", gmtime((ULONG *) &fs_inode->ctime));
+                           printf("'%s',", timestr);
+                            
+                           strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", gmtime((ULONG *) &dtime));
+                           printf("'%s',", timestr);
+
+                           printf("'%lo','%d','%s','%lu');\n",
 					       (ULONG) fs_inode->mode, (int) fs_inode->nlink, link,
 					       (ULONG) fs_data->size);
 					
@@ -451,13 +464,24 @@ print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
 		 " `gid`,`mtime`,`atime`,"
 		 " `ctime`,`dtime`,`mode`,"
 		 " `links`,`link`,`size`) "
-		 "VALUES('I%s|D%lu','%c','%d','%d','%lu'," \
-		 "'%lu','%lu',%lu,'%lo','%d','%s','%lu');\n",
+		 "VALUES('I%s|D%lu','%c','%d','%d',",
 		 iosource,
 		 (ULONG) fs_inode->addr, (flags & FS_FLAG_META_ALLOC) ? 'a' : 'f',
-		 (int) fs_inode->uid, (int) fs_inode->gid,
-		 (ULONG) fs_inode->mtime, (ULONG) fs_inode->atime,
-		 (ULONG) fs_inode->ctime, (ULONG) dtime,
+		 (int) fs_inode->uid, (int) fs_inode->gid);
+
+      strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", gmtime((ULONG *) &fs_inode->mtime));
+      printf("'%s',", timestr);
+
+      strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", gmtime((ULONG *) &fs_inode->atime));
+      printf("'%s',", timestr);
+
+      strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", gmtime((ULONG *) &fs_inode->ctime));
+      printf("'%s',", timestr);
+      
+      strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", gmtime((ULONG *) &dtime));
+      printf("'%s',", timestr);
+
+      printf("'%lo','%d','%s','%lu');\n",
 		 (ULONG) fs_inode->mode, (int) fs_inode->nlink, link,
 		 (ULONG) fs_inode->size);
 	  
@@ -743,10 +767,10 @@ void create_tables() {
 	"	`status` INT,\n" \
 	"	`uid` INT,\n" \
 	"	`gid` INT,\n" \
-	"	`mtime` INT NOT NULL,\n" \
-	"	`atime` INT NOT NULL,\n" \
-	"	`ctime` INT NOT NULL,\n" \
-	"	`dtime` INT,\n" \
+	"	`mtime` DATETIME NOT NULL,\n" \
+	"	`atime` DATETIME NOT NULL,\n" \
+	"	`ctime` DATETIME NOT NULL,\n" \
+	"	`dtime` DATETIME,\n" \
 	"	`mode` INT,\n" \
 	"	`links` INT,\n" \
 	"	`link` TEXT,\n" \
