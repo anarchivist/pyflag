@@ -169,15 +169,13 @@ class RAW(DataType):
     def __init__(self,buffer,*args,**kwargs):
         DataType.__init__(self,buffer,*args,**kwargs)
         self.buffer.size = kwargs['count']
-
+        self.data = self.buffer.__str__()
+        
     def size(self):
-        return self.buffer.size
+        return len(self.data)
         
     def get_value(self):
         return self.buffer.clone()
-
-    def read_data(self):
-        self.data = self.buffer.__str__()
 
     def __repr__(self):
         if not self.data: self.read()
@@ -185,7 +183,6 @@ class RAW(DataType):
         return result     
 
     def __str__(self):
-        if not self.data: self.read_data()
         tmp = []
         for i in range(len(self.data)):
             char = "%s" % self.data[i]

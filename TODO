@@ -6,7 +6,9 @@ Things still to do for pyflag in no order of priority:
 
 * FTP Scanner
 * NFS Scanner
-* Windows event logs
 
-* Non port based protocol detection
 * Proper parser based search criteria in Table widget 
+
+* Rapid file viewer - view the contents of files based on their mime type with rapid next/previous button so we can quickly review many files - possibly with an autorefresh for truely automated reviewing. This is useful for reviewing html pages from cache or network traffic.
+
+* Reorganise the VFS entries for Network Forensics in a more logical way.

@@ -39,7 +39,7 @@ import pyflag.Registry as Registry
 from optparse import OptionParser
 
 ## Make sure the registry is properly initialised
-#Registry.Init()
+Registry.Init()
 
 class ParserException(Exception):
     """ Exception thrown by the parser when we cant parse the line """

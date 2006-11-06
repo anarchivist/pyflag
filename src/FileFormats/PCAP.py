@@ -109,5 +109,5 @@ if __name__ == "__main__":
     pcap = FileHeader(b)
     print pcap
     for packet in pcap:
+        #print packet['ts_sec'], packet['length'], packet.buffer.offset
         print packet
-#        print "%r" % packet['data']
