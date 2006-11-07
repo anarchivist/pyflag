@@ -115,7 +115,7 @@ class BrowseFS(Reports.report):
 
         def tabular_view(query,result):
             result.table(
-                columns=['f.inode','f.mode','concat(path,name)','f.status','size','from_unixtime(mtime)','from_unixtime(atime)','from_unixtime(ctime)'],
+                columns=['f.inode','f.mode','concat(path,name)','f.status','size','mtime','atime','ctime'],
                 names=('Inode','Mode','Filename','Del','File Size','Last Modified','Last Accessed','Created'),
                 callbacks={'Del':FlagFramework.Curry(DeletedIcon,result=result)},
                 table='file as f, inode as i',
@@ -155,7 +155,7 @@ class BrowseFS(Reports.report):
                     path=os.path.dirname(path)
 
                 tmp.table(
-                    columns=['f.inode','name','f.status','size', 'from_unixtime(mtime)','f.mode'],
+                    columns=['f.inode','name','f.status','size', 'mtime','f.mode'],
                     names=('Inode','Filename','Del','File Size','Last Modified','Mode'),
                     table='file as f, inode as i',
                     where="f.inode=i.inode and path=%r and f.mode!='d/d'" % (path+'/'),
@@ -236,20 +236,6 @@ class ViewFile(Reports.report):
         result.textfield('Inode','inode')
         return result
 
-import time
-
-def data_timestamp(data, mode):
-    """ a timestamp conversion utility """
-    #output (select)
-    if(mode==0):
-        return time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(int(data)))
-    #input (where)
-    if(mode==1):
-        tmp = time.mktime(time.strptime(data, "%Y-%m-%d %H:%M:%S")) - time.timezone
-        if(time.daylight):
-            tmp += 3600
-        return "%i" % tmp
- 
 class Timeline(Reports.report):
     """ View file MAC times in a searchable table """
     name = "View File Timeline"
@@ -271,7 +257,7 @@ class Timeline(Reports.report):
         dbh.execute("""create table if not exists mac(
         `inode` varchar(250) NOT NULL default '',
         `status` varchar(8) default '',
-        `time` int(11) default NULL,
+        `time` timestamp NULL,
         `m` int default NULL,
         `a` tinyint default NULL,
         `c` tinyint default NULL,
@@ -288,12 +274,10 @@ class Timeline(Reports.report):
         dbh = self.DBO(query['case'])
         result.heading("File Timeline for Filesystem")
         result.table(
-            #columns=('from_unixtime(time)','inode','status',
             columns=('time','inode','status',
                      "if(m,'m',' ')","if(a,'a',' ')","if(c,'c',' ')","if(d,'d',' ')",'name'),
             names=('Timestamp', 'Inode','Del','m','a','c','d','Filename'),
             callbacks={'Del':FlagFramework.Curry(DeletedIcon,result=result)},
-            data_callbacks={'Timestamp':data_timestamp},
             table=('mac'),
             case=query['case'],
 #            links=[ None, None, None, None, None, None, None, FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='filename')]

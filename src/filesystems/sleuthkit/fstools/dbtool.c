@@ -364,7 +364,6 @@ print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
   time_t dtime = 0;
   char *link=0;
   int lsize;
-  char timestr[200];
 
   // print progress message
   inode_count++;
@@ -425,25 +424,18 @@ print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
 					       " `ctime`,`dtime`,`mode`,"
 					       " `links`,`link`,`size`) "
 					       " VALUES('I%s|D%lu-%d-%d',"
-					       "'%c','%d','%d',",
+					       "'%c','%d','%d',"
+                           "from_unixtime(%lu), from_unixtime(%lu),"
+                           "from_unixtime(%lu), from_unixtime(%lu),"
+                           "'%lo','%d','%s','%lu');\n",
 					       iosource,
 					       (ULONG) fs_inode->addr, fs_data->type, fs_data->id,
 					       (flags & FS_FLAG_META_ALLOC) ? 'a' : 'f',
-					       (int) fs_inode->uid, (int) fs_inode->gid);
-
-                           strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", gmtime((ULONG *) &fs_inode->mtime));
-                           printf("'%s',", timestr);
-
-                           strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", gmtime((ULONG *) &fs_inode->atime));
-                           printf("'%s',", timestr);
-
-                           strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", gmtime((ULONG *) &fs_inode->ctime));
-                           printf("'%s',", timestr);
-                            
-                           strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", gmtime((ULONG *) &dtime));
-                           printf("'%s',", timestr);
-
-                           printf("'%lo','%d','%s','%lu');\n",
+					       (int) fs_inode->uid, (int) fs_inode->gid,
+                           (ULONG) fs_inode->mtime,
+                           (ULONG) fs_inode->atime,
+                           (ULONG) fs_inode->ctime,
+                           (ULONG) dtime,
 					       (ULONG) fs_inode->mode, (int) fs_inode->nlink, link,
 					       (ULONG) fs_data->size);
 					
@@ -464,24 +456,17 @@ print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
 		 " `gid`,`mtime`,`atime`,"
 		 " `ctime`,`dtime`,`mode`,"
 		 " `links`,`link`,`size`) "
-		 "VALUES('I%s|D%lu','%c','%d','%d',",
+		 "VALUES('I%s|D%lu','%c','%d','%d',"
+         "from_unixtime(%lu), from_unixtime(%lu),"
+         "from_unixtime(%lu), from_unixtime(%lu),"
+         "'%lo','%d','%s','%lu');\n",
 		 iosource,
 		 (ULONG) fs_inode->addr, (flags & FS_FLAG_META_ALLOC) ? 'a' : 'f',
-		 (int) fs_inode->uid, (int) fs_inode->gid);
-
-      strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", gmtime((ULONG *) &fs_inode->mtime));
-      printf("'%s',", timestr);
-
-      strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", gmtime((ULONG *) &fs_inode->atime));
-      printf("'%s',", timestr);
-
-      strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", gmtime((ULONG *) &fs_inode->ctime));
-      printf("'%s',", timestr);
-      
-      strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S", gmtime((ULONG *) &dtime));
-      printf("'%s',", timestr);
-
-      printf("'%lo','%d','%s','%lu');\n",
+		 (int) fs_inode->uid, (int) fs_inode->gid,
+         (ULONG) fs_inode->mtime,
+         (ULONG) fs_inode->atime,
+         (ULONG) fs_inode->ctime,
+         (ULONG) dtime,
 		 (ULONG) fs_inode->mode, (int) fs_inode->nlink, link,
 		 (ULONG) fs_inode->size);
 	  
@@ -763,42 +748,41 @@ main(int argc, char **argv)
 void create_tables() {
 	/* create tables */
 	printf("CREATE TABLE IF NOT EXISTS inode (\n" \
-	"	`inode` VARCHAR(250) NOT NULL,\n" \
-	"	`status` INT,\n" \
-	"	`uid` INT,\n" \
-	"	`gid` INT,\n" \
-	"	`mtime` DATETIME NOT NULL,\n" \
-	"	`atime` DATETIME NOT NULL,\n" \
-	"	`ctime` DATETIME NOT NULL,\n" \
-	"	`dtime` DATETIME,\n" \
-	"	`mode` INT,\n" \
-	"	`links` INT,\n" \
-	"	`link` TEXT,\n" \
-	"	`size` BIGINT NOT NULL);\n\n");;
+	"   `inode` VARCHAR(250) NOT NULL,\n" \
+	"   `status` INT,\n" \
+	"   `uid` INT,\n" \
+	"   `gid` INT,\n" \
+	"   `mtime` TIMESTAMP NOT NULL,\n" \
+	"   `atime` TIMESTAMP NOT NULL,\n" \
+	"   `ctime` TIMESTAMP NOT NULL,\n" \
+	"   `dtime` TIMESTAMP NOT NULL,\n" \
+	"   `mode` INT,\n" \
+	"   `links` INT,\n" \
+	"   `link` TEXT,\n" \
+	"   `size` BIGINT NOT NULL);\n\n");;
 
 	printf("CREATE TABLE IF NOT EXISTS file (\n" \
-	"	`inode` VARCHAR(250) NOT NULL,\n" \
-	"	`mode` VARCHAR(3) NOT NULL,\n" \
-	"	`status` VARCHAR(8) NOT NULL,\n" \
-	"	`path` TEXT,\n" \
-	"	`name` TEXT);\n\n");
+	"   `inode` VARCHAR(250) NOT NULL,\n" \
+	"   `mode` VARCHAR(3) NOT NULL,\n" \
+	"   `status` VARCHAR(8) NOT NULL,\n" \
+	"   `path` TEXT,\n" \
+	"   `name` TEXT);\n\n");
 
 	printf("CREATE TABLE IF NOT EXISTS block (\n" \
-	"	`inode` VARCHAR(250) NOT NULL,\n" \
-	"	`index` INT NOT NULL,\n" \
-	"	`block` BIGINT NOT NULL,\n" \
-	"	`count` INT NOT NULL);\n\n");
+	"   `inode` VARCHAR(250) NOT NULL,\n" \
+	"   `index` INT NOT NULL,\n" \
+	"   `block` BIGINT NOT NULL,\n" \
+	"   `count` INT NOT NULL);\n\n");
 
 	printf("CREATE TABLE IF NOT EXISTS resident (\n" \
-	"	`inode` VARCHAR(250) NOT NULL,\n" \
-	"	`data` TEXT);\n\n");
+	"   `inode` VARCHAR(250) NOT NULL,\n" \
+	"   `data` TEXT);\n\n");
 
-	printf("CREATE TABLE IF NOT EXISTS `filesystems` ("
-	       "`iosource` VARCHAR( 50 ) NOT NULL ,"
-	       "`property` VARCHAR( 50 ) NOT NULL ,"
-	       "`value` MEDIUMTEXT NOT NULL ,"
-	       "PRIMARY KEY ( `iosource` )"
-	       ");\n\n");
+	printf("CREATE TABLE IF NOT EXISTS `filesystems` (\n" \
+	"   `iosource` VARCHAR( 50 ) NOT NULL,\n" \
+	"   `property` VARCHAR( 50 ) NOT NULL,\n" \
+	"   `value` MEDIUMTEXT NOT NULL,\n" \
+	"   PRIMARY KEY ( `iosource` ));\n\n");
 }
 
 void drop_tables() {

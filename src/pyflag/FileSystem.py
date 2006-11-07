@@ -199,10 +199,10 @@ class DBFS(FileSystem):
         `status` set('unalloc','alloc'),
         `uid` INT,
         `gid` INT,
-        `mtime` INT NULL,
-        `atime` INT NULL,
-        `ctime` INT NULL,
-        `dtime` INT,
+        `mtime` TIMESTAMP NULL,
+        `atime` TIMESTAMP NULL,
+        `ctime` TIMESTAMP NULL,
+        `dtime` TIMESTAMP,
         `mode` INT,
         `links` INT,
         `link` TEXT,
@@ -319,7 +319,7 @@ class DBFS(FileSystem):
         except KeyError:
             mtime = 0
 
-        dbh.execute("insert into inode  set status='alloc', mode=%r, links=%r , inode=%r,gid=0,uid=0,size=%r, mtime=%r, ctime=%r, atime=%r",(
+        dbh.execute("insert into inode  set status='alloc', mode=%r, links=%r , inode=%r,gid=0,uid=0,size=%r, mtime=from_unixtime(%r), ctime=from_unixtime(%r), atime=from_unixtime(%r)",(
             40755, 4,inode, size, mtime, ctime, atime))
 
     def longls(self,path='/', dirs = None):
@@ -400,7 +400,7 @@ class DBFS(FileSystem):
             return None
 
         dbh.check_index('inode','inode')
-        dbh.execute("select inode_id, inode, status, uid, gid, mtime as mtime_epoch, from_unixtime(mtime) as `mtime`, atime as atime_epoch, from_unixtime(atime) as `atime`, ctime as ctime_epoch, from_unixtime(ctime) as `ctime`, from_unixtime(dtime) as `dtime`, mode, links, link, size from inode where inode=%r limit 1",(inode))
+        dbh.execute("select inode_id, inode, status, uid, gid, mtime, atime, ctime, dtime, mode, links, link, size from inode where inode=%r limit 1",(inode))
         row = dbh.fetch()
 
         dbh.execute("select * from file where inode=%r order by mode limit 1", inode);
@@ -653,7 +653,7 @@ class File:
     def stat(self):
         """ Returns a dict of statistics about the content of the file. """
         dbh=DB.DBO(self.case)
-        dbh.execute("select inode, status, uid, gid, mtime as mtime_epoch, from_unixtime(mtime) as `mtime`, atime as atime_epoch, from_unixtime(atime) as `atime`, ctime as ctime_epoch, from_unixtime(ctime) as `ctime`, from_unixtime(dtime) as `dtime`, mode, links, link, size from inode where inode=%r limit 1",(self.inode))
+        dbh.execute("select inode, status, uid, gid, mtime, atime, ctime, dtime, mode, links, link, size from inode where inode=%r limit 1",(self.inode))
         stats = dbh.fetch()
 
         dbh.execute("select * from file where inode=%r limit 1", self.inode)
