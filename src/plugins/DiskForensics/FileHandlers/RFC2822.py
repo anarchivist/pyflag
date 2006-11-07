@@ -40,7 +40,7 @@ class RFC2822(Scanner.GenScanFactory):
     def __init__(self,fsfd):
         Scanner.GenScanFactory.__init__(self,fsfd)
         dbh=DB.DBO(self.case)
-        dbh.execute("CREATE TABLE IF NOT EXISTS `email` (`inode` VARCHAR(250), `vfsinode` VARCHAR(250), `date` DATETIME, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));")
+        dbh.execute("CREATE TABLE IF NOT EXISTS `email` (`inode` VARCHAR(250), `vfsinode` VARCHAR(250), `date` TIMESTAMP, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));")
 
     class Scan(Scanner.StoreAndScanType):
         types = [ 'text/x-mail.*',

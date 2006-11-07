@@ -43,8 +43,8 @@ class IEIndex(Scanner.GenScanFactory):
         `path` TEXT NOT NULL,
         `type` VARCHAR(20) NOT NULL,
         `url` TEXT NOT NULL,
-        `modified` DATETIME NOT NULL,
-        `accessed` DATETIME NOT NULL,
+        `modified` TIMESTAMP NOT NULL,
+        `accessed` TIMESTAMP NOT NULL,
         `filename` VARCHAR(250),
         `filepath` VARCHAR(250),
         `headers` TEXT)""")        

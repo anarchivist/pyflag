@@ -486,8 +486,8 @@ int main( int argc, char **argv ) {
 	     "  `path` TEXT NOT NULL, \n" \
 	     "	`type` VARCHAR(20) NOT NULL,\n" \
 	     "	`url` TEXT NOT NULL,\n" \
-	     "	`modified` DATETIME NOT NULL,\n" \
-	     "	`accessed` DATETIME NOT NULL,\n" \
+	     "	`modified` TIMESTAMP NOT NULL,\n" \
+	     "	`accessed` TIMESTAMP NOT NULL,\n" \
 	     "	`filename` VARCHAR(250), \n" \
 	     "  `filepath` VARCHAR(250), \n" \
 	     "  `headers` TEXT);\n\n", tbl_name);
