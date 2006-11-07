@@ -710,8 +710,8 @@ main(int argc, char **argv)
 	  return 0;
 	};
 	
-	img = img_open("raw", 1,
-		       (const char **) &argv[optind]);
+	img = img_open("raw", 1, (const char **) &argv[optind]);
+	if(!img) RAISE(E_GENERIC,NULL,"Unable to open image");
 	
 	/* open image */
 	fs = fs_open(img,0, fstype);
