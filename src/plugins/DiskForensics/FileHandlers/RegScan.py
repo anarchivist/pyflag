@@ -46,7 +46,7 @@ class RegistryScan(GenScanFactory):
         `path` text NOT NULL,
         `offset` INT(11),
         `type` enum('REG_NONE','REG_SZ','REG_EXPAND_SZ','REG_BINARY','REG_DWORD','REG_DWORD_BIG_ENDIAN','REG_LINK','REG_MULTI_SZ','REG_RESOURCE_LIST','REG_FULL_RESOURCE_DESCRIPTOR','REG_RESOURCE_REQUIREMENTS_LIST','Unknown') NOT NULL,
-        `modified` timestamp,
+        `modified` TIMESTAMP,
         `reg_key` VARCHAR(200) NOT NULL,
         `value` text)""")
 
@@ -128,7 +128,7 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                 del new_q['mode']
                 del new_q['mark']
                 result.table(
-                    columns=['path','type','reg_key','from_unixtime(modified)','value'],
+                    columns=['path','type','reg_key','modified','value'],
                     names=['Path','Type','Key','Modified','Value'],
                     links=[ result.make_link(new_q,'open_tree',mark='target',mode='Tree View') ],
                     table='reg',
@@ -253,7 +253,7 @@ class InterestingRegKey(Reports.report):
         dbh = self.DBO(query['case'])
         pdbh=self.DBO(None)
         try:
-            dbh.execute("create table `interestingregkeys` select a.path, a.size, a.modified, a.remainder, a.type, a.reg_key, a.value, b.category, b.description from reg as a, %s.registrykeys as b where a.path LIKE concat('%%',b.path,'%%') AND a.reg_key LIKE concat('%%',b.reg_key,'%%')",(config.FLAGDB))
+            dbh.execute("create table `interestingregkeys` select a.path, a.modified, a.type, a.reg_key, a.value, b.category, b.description from reg as a, %s.registrykeys as b where a.path LIKE concat('%%',b.path,'%%') AND a.reg_key LIKE concat('%%',b.reg_key,'%%')",(config.FLAGDB))
         except DB.DBError,e:
             raise Reports.ReportError("Unable to find the registry table for the current image. Did you run the Registry Scanner?.\n Error received was %s" % e)
     
@@ -263,7 +263,7 @@ class InterestingRegKey(Reports.report):
 
         try:
             result.table(
-                columns=('Path','reg_key','Value','from_unixtime(modified)','category','Description'),
+                columns=('path','reg_key','value','modified','category','description'),
                 names=('Path','Key','Value','Last Modified','Category','Description'),
                 table='interestingregkeys ',
                 case=query['case'],
