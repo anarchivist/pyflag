@@ -103,17 +103,21 @@ class Log:
         self.dbh.execute("select * from %s limit 1",temp_table)
         columns =[]
         names = []
+        data_callbacks = {}
         for d in self.dbh.cursor.description:
             names.append(d[0])
             try:
                 type = self.types[self.fields.index(d[0])]
+                if type == "IP Address":
+                    # append data callback
+                    data_callbacks[d[0]] = ip_trans
                 columns.append(types[type].sql_out % "`%s`" % d[0])
             except ValueError:
                 columns.append(d[0])
 
         result.ruler()
         tmp_final = result.__class__(result)
-        tmp_final.table(columns=columns,names=names,links=[], table=temp_table, case=self.dbh.case, simple=True)
+        tmp_final.table(columns=columns,names=names,links=[], table=temp_table, case=self.dbh.case, simple=True, data_callbacks=data_callbacks)
         result.row(tmp_final,bgcolor='lightgray',colspan=5)
     
     def read_record(self, ignore_comment = True):
@@ -263,8 +267,8 @@ class VarType(Type):
 class IntType(Type):
     type = "int"
 
-class DateTimeType(Type):
-    type = "datetime"
+class TimeStampType(Type):
+    type = "timestamp"
 
 class TextType(Type):
     type = "text"
@@ -279,7 +283,7 @@ class IPType(Type):
 types = {
     'varchar(250)': VarType,
     'int': IntType,
-    'datetime': DateTimeType,
+    'timestamp': TimeStampType,
     'text': TextType,
     'IP Address': IPType
     }

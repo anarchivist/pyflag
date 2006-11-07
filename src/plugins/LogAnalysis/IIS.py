@@ -68,7 +68,7 @@ class IISLog(Simple.SimpleLog):
         ## MakeSQLSafe dashes turn to underscores.
         for field in self.fields:
             if field == 'time':
-                self.types.append('datetime')
+                self.types.append('timestamp')
                 self.indexes.append(True)
             elif '_ip' in field:
                 self.types.append('IP Address')

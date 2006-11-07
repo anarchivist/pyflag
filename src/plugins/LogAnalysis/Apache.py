@@ -66,7 +66,7 @@ field_codes={ 'a':['remote_ip', 'IP Address'],
               'q':['query_string', 'varchar(250)'],
               'r':['request', 'varchar(250)'],
               's':['status', 'int'],
-              't':['time', 'datetime', trans_date ], # {strftime format} (optional)
+              't':['time', 'timestamp', trans_date ], # {strftime format} (optional)
               'T':['serve_time', 'int'],
               'u':['ruser', 'varchar(250)'],
               'U':['url', 'varchar(250)'],
