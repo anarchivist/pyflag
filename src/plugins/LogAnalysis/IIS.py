@@ -22,18 +22,31 @@
 # ******************************************************
 import pyflag.LogFile as LogFile
 import plugins.LogAnalysis.Simple as Simple
+import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 
 class IISLog(Simple.SimpleLog):
     """ Log parser for IIS (W3C Extended) log files """
     name = "IIS Log"
     
-    def __init__(self, variable, query):
+    def __init__(self, case=None):
+        Simple.SimpleLog.__init__(self)
+        self.separators = []
+        self.types = []
+        self.trans = []
+        self.indexes = []
+        self.fields = []
+        self.format = ''
+        self.split_req = ''
+        self.num_fields = 1
+
+
+    def parse(self, query, datafile='datafile'):
+
+        self.datafile = query.getarray(datafile)
         # set these params, then we can just use SimpleLog's get_fields
         self.delimiter = ' '
         self.prefilters = ['PFDateFormatChange2']
-        # run Log constructor, unset var so we dont do the extra stuff
-        LogFile.Log.__init__(self,variable,query)
 
         # now for the IIS magic, the code below sets up the
         # fields, types, and indexes arrays req'd by load
@@ -85,3 +98,18 @@ class IISLog(Simple.SimpleLog):
             
     def form(self, query, result):
         result.para('NOTICE: This loader attempts to load IIS log files completely automatically by determining field names and types from the header comments, if this loader fails, please use the "Simple" loader')
+
+        def test(query,result):
+            self.parse(query)
+            print "self.fields: %s" % self.fields
+            result.text("The following is the result of importing the first few lines from the log file into the database.\nPlease check that the importation was successfull before continuing.",wrap='full')
+            self.display_test_log(result,query)
+            return True
+
+        result.wizard(
+            names = (
+            "Step 1: Select Log File",
+            "Step 4: View test result",
+            "Step 5: Save Preset"),
+            callbacks = (LogFile.get_file, test, FlagFramework.Curry(LogFile.save_preset, log=self))
+            )
