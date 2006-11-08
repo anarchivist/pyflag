@@ -24,7 +24,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.Registry as Registry
 from pyflag.Scanner import *
-import struct,sys,cStringIO
+import struct,sys,StringIO
 import pyflag.DB as DB
 import pyflag.FileSystem as FileSystem
 from pyflag.FileSystem import File
@@ -84,7 +84,8 @@ class StreamFile(File):
 
         ## We use the inode column in the connection_details table to
         ## cache this so we only have to combine the streams once.
-        self.create_new_stream(inode[1:].split("/"))
+        stream_ids = [ int(x) for x in inode[1:].split("/")]
+        self.create_new_stream(stream_ids)
 
     def create_new_stream(self,stream_ids):
         """ Creates a new stream by combining the streams given by the list stream_ids.
@@ -100,41 +101,77 @@ class StreamFile(File):
         self.con_id = dbh.autoincrement()
         dbh2 = dbh.clone()
 
-        fds = {}
+        ## These are the fds for individual streams
+        fds = []
         for s in stream_ids:
             try:
-                fds[int(s)] = open(FlagFramework.get_temp_path(
-                    dbh.case, "%s|S%s" % (self.fd.inode, s)))
+                fds.append(open(FlagFramework.get_temp_path(dbh.case,
+                                                            "%s|S%s" % (self.fd.inode, s))))
             except IOError:
-                fds[int(s)] = -1
+                fds.append(-1)
 
+        # These are the deltas to be applied to the sequence numbers of each
+        # stream to bring it into an offset in the output file.
+        deltas = [0,] * len(stream_ids)
+
+        # Flags to indicate when the streams ISN is encountered
+        initials = [ True,] * len(stream_ids)
+
+        # The output file
         out_fd = open(FlagFramework.get_temp_path(dbh.case,
                                                   self.inode),"w")
         
-        dbh.execute("select con_id,packet_id, length, cache_offset from `connection` where %s order by packet_id",(
+        dbh.execute("select con_id,seq,packet_id, length, cache_offset from `connection` where %s order by packet_id",(
             " or ".join(["con_id=%r" % a for a in stream_ids])
             ))
 
         dbh2.mass_insert_start("connection")
-        sum = 0
+
+        # This is the length of the output file
+        outfd_len = 0
         for row in dbh:
-            offset = out_fd.tell()
-            fd=fds[row['con_id']]
-            if fd<0: continue
-            
-            fd.seek(row['cache_offset']) 
-            out_fd.write(fd.read(row['length']))
-            dbh2.mass_insert(con_id=self.con_id,packet_id=row['packet_id'],
-                                  seq=sum,length=row['length'],
-                                  cache_offset=offset,
-                                  # This is the original id this
-                                  # packet came from
-                                  original_id = row['con_id'])
-            sum += row['length']
+            # This is the index for this specific stream in all the above arrays
+            index = stream_ids.index(row['con_id'])
+
+            # First time we saw this stream - the seq is the ISN
+            if initials[index]:
+                deltas[index] -= row['seq']
+                initials[index] = False
+
+            # We need to find if we grew the output file at all:
+            initial_len = outfd_len
+            outfd_position = row['seq']+deltas[index]
+            out_fd.seek(outfd_position)
+            fds[index].seek(row['cache_offset'])
+            out_fd.write(fds[index].read(row['length']))
+
+            # Maintain the length of the file
+            outfd_len = max(outfd_len, outfd_position+row['length'])
+
+            # Basically each time we write a packet to the output fd we might
+            # grow it. If we do grow it, we need to push the other streams
+            # deltas to ensure that subsequent data will be written after the
+            # newly written data. This is an approximation - but is adequate
+            # when packets are out of order in an interactive protocol.
+            for x in range(len(stream_ids)):
+                if x != index:
+                    deltas[x] += outfd_len-initial_len
+
+            dbh2.mass_insert(
+                con_id=self.con_id,
+                packet_id=row['packet_id'],
+                seq=outfd_position,
+                length=row['length'],
+                cache_offset=outfd_position,
+                
+                # This is the original id this
+                # packet came from
+                original_id = row['con_id'])
 
         dbh2.mass_insert_commit()
 
         out_fd.close()
+        
         self.cached_fd = open(FlagFramework.get_temp_path(
             dbh.case, self.inode),"r")
 
@@ -300,23 +337,3 @@ class OffsetFile(File):
         
         self.readptr+=len(result)
         return result
-
-import StringIO
-
-## This is a memory cached version of the offset file driver - very useful for packets:
-class MemroyCachedOffset(StringIO.StringIO,File):
-    specifier = 'O'
-    def __init__(self, case, fd, inode):
-        File.__init__(self, case, fd, inode)
-
-        ## We parse out the offset and length from the inode string
-        tmp = inode.split('|')[-1]
-        tmp = tmp[1:].split(":")
-        fd.seek(int(tmp[0]))
-
-        try:
-            self.size=int(tmp[1])
-        except IndexError:
-            self.size=sys.maxint
-            
-        StringIO.StringIO.__init__(self, fd.read(self.size))

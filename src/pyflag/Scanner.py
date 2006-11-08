@@ -338,6 +338,7 @@ def scanfile(ddfs,fd,factories):
     @arg factories: A list of scanner factories to use when scanning the file.
     """
     stat = fd.stat()
+    if not stat: return
 
     buffsize = 1024 * 1024
     # instantiate a scanner object from each of the factory. We only

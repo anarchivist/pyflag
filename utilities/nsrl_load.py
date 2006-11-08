@@ -57,6 +57,9 @@ parser.add_option('-r', '--reset',action="store_true", default=False,
 
 (options, args) = parser.parse_args()
 
+dbh=DB.DBO(options.db)
+dbh.cursor.ignore_warnings = True
+
 #Get a handle to our database
 if options.reset:
     print "Dropping NSRL tables"
@@ -156,8 +159,6 @@ if __name__=="__main__":
     if not args:
         print "You didn't specify any NSRL directories to operate on. Nothing to do!!!"
     else:
-        dbh=DB.DBO(options.db)
-
         dbh.execute("""CREATE TABLE if not exists `NSRL_hashes` (
           `md5` char(16) binary NOT NULL default '',
           `filename` varchar(250) NOT NULL default '',
