@@ -36,7 +36,7 @@ from pyflag.Scanner import *
 import md5
 class MD5Scan(GenScanFactory):
     """ Scan file and record file Hash (MD5Sum) """
-    default = False
+    default = True
     depends = ['TypeScan']
 
     def __init__(self,fsfd):
@@ -44,11 +44,16 @@ class MD5Scan(GenScanFactory):
         dbh=DB.DBO(self.case)
         dbh.execute(""" CREATE TABLE IF NOT EXISTS `hash` (
         `inode` varchar( 250 ) NOT NULL default '',
-        `binary_md5` varchar( 16 ) binary NOT NULL default '',
+        `md5` char( 32 ) NOT NULL default '',
+        `binary_md5` char( 16 ) binary NOT NULL default '',
         `NSRL_product` varchar(250),
         `NSRL_filename` varchar(60) not NULL default '',
         `FileType` tinytext
         )""")
+
+        dbh_flag=DB.DBO(None)
+        dbh_flag.check_index("NSRL_hashes","md5",4)
+        dbh_flag.check_index("NSRL_products","Code")
 
     class Scan(ScanIfType):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
@@ -68,16 +73,16 @@ class MD5Scan(GenScanFactory):
             if self.length<16: return
             
             dbh_flag=DB.DBO(None)
-            dbh_flag.check_index("NSRL_hashes","md5",4)
-            dbh_flag.execute("select filename,Name,Code from NSRL_hashes join NSRL_products on productcode=Code where md5=%r limit 1",self.m.digest())
+            dbh_flag.execute("select filename,Name from NSRL_hashes join NSRL_products on productcode=Code where md5=%r limit 1",self.m.digest())
             nsrl=dbh_flag.fetch()
             if not nsrl: nsrl={}
             
             dbh=DB.DBO(self.case)
             dbh.insert('hash',
                        inode = self.inode,
+                       md5 = self.m.hexdigest(),
                        binary_md5 = self.m.digest(),
-                       NSRL_product = nsrl.get('product','-'),
+                       NSRL_product = nsrl.get('Name','-'),
                        NSRL_filename = nsrl.get('filename','-'),
                        FileType = self.type,
                        )
@@ -97,8 +102,8 @@ class HashComparison(Reports.report):
 
         try:
             result.table(
-                columns=('inode','concat(path,name)', '`FileType`', '`NSRL_product`','NSRL_filename'),
-                names=('Inode','Filename','File Type','NSRL Product','NSRL Filename'),
+                columns=('inode','concat(path,name)', '`FileType`', '`NSRL_product`','NSRL_filename', 'md5'),
+                names=('Inode','Filename','File Type','NSRL Product','NSRL Filename', 'MD5'),
                 table='hash join file using (inode)',
                 case=query['case'],
                 links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',__target__='inode')]
