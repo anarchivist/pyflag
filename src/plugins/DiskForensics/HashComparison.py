@@ -87,51 +87,19 @@ class HashComparison(Reports.report):
     name = "MD5 Hash comparison"
     family = "Disk Forensics"
     description="This report will give a table for describing what the type of file this is based on the MD5 hash matches"
-    progress_dict = {}
 
     def form(self,query,result):
         result.case_selector()
 
-    def progress(self,query,result):
-        result.heading("Calculating Hash tables");
-
-    def reset(self,query):
-        dbh = self.DBO(query['case'])
-        dbh.execute('drop table hash');
-
-    def analyse(self,query):
-        dbh = self.DBO(query['case'])
-        pdbh=self.DBO(None)
-        try:
-            pdbh.check_index("NSRL_products","Code")
-        except DB.DBError,e:
-            raise Reports.ReportError("Unable to find an NSRL table in the pyflag database. Create one using the utilities/load_nstl.py script." % e)
-            
-        try:
-            dbh.check_index("type","inode")
-            dbh.execute("drop table if exists  `hash`")
-            dbh.execute("create table `hash` select a.inode as `Inode`,concat(path,b.name) as `Filename`,d.type as `File Type`,if(c.Code=0,'Unknown',c.Name) as `NSRL Product`,c.Code as `NSRL Code`,a.NSRL_filename,md5 as `MD5` from md5 as a join %s.NSRL_products as c join type as d on (a.NSRL_productcode=c.Code and d.inode=a.inode) left join file as b on (a.inode=b.inode) group by Inode,`NSRL Code`,MD5",(config.FLAGDB,))
-        except DB.DBError,e:
-            raise Reports.ReportError("Unable to find the types table for the current image. Did you run the TypeScan Scanner?.\n Error received was %s" % e)
-        
     def display(self,query,result):
         result.heading("MD5 Hash comparisons")
         dbh=self.DBO(query['case'])
 
-        def RenderNSRL(value):
-            tmp=self.ui(result)
-            if value>0:
-                tmp.icon("yes.png")
-            else:
-                tmp.icon("no.png")
-
-            return tmp
-
         try:
             result.table(
-                columns=('Inode','Filename', '`File Type`', '`NSRL Product`','NSRL_filename', '`MD5`'),
-                names=('Inode','Filename','File Type','NSRL Product','NSRLFilename','MD5'),
-                table='hash ',
+                columns=('inode','concat(path,name)', '`FileType`', '`NSRL_product`','NSRL_filename'),
+                names=('Inode','Filename','File Type','NSRL Product','NSRL Filename'),
+                table='hash join file using (inode)',
                 case=query['case'],
                 links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',__target__='inode')]
                 )
