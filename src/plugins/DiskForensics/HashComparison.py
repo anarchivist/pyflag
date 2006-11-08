@@ -42,51 +42,45 @@ class MD5Scan(GenScanFactory):
     def __init__(self,fsfd):
         GenScanFactory.__init__(self, fsfd)
         dbh=DB.DBO(self.case)
-        dbh.execute(""" CREATE TABLE IF NOT EXISTS `md5` (
+        dbh.execute(""" CREATE TABLE IF NOT EXISTS `hash` (
         `inode` varchar( 250 ) NOT NULL default '',
-        `md5` varchar( 35 ) NOT NULL default '',
         `binary_md5` varchar( 16 ) binary NOT NULL default '',
-        `NSRL_productcode` int(11) not NULL default '0',
-        `NSRL_filename` varchar(60) not NULL default ''
+        `NSRL_product` varchar(250),
+        `NSRL_filename` varchar(60) not NULL default '',
+        `FileType` tinytext
         )""")
 
-    def reset(self, inode):
-        GenScanFactory.reset(self, inode)
-        dbh=DB.DBO(self.case)
-        dbh.execute("delete from `md5`")
-
-    def destroy(self):
-        pass
-
-    class Scan(BaseScanner):
+    class Scan(ScanIfType):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
             BaseScanner.__init__(self, inode,ddfs,outer,factories, fd=fd)
             self.m = md5.new()
-
-##            # Check that we have not done this inode before
-##            self.dbh.check_index("md5","inode")
-##            self.dbh.execute("select * from md5 where inode=%r",(inode))
-##            if self.dbh.fetch():
-##                self.ignore=1
-##            else:
-##                self.ignore=0
+            self.type = None
+            self.length = 0
 
         def process(self, data,metadata=None):
+            self.boring(metadata,data)
+            self.type = metadata['magic']
             self.m.update(data)
-            if len(data)<16: self.ignore=True
+            self.length+=len(data)
 
         def finish(self):
-            if self.ignore:
-                return
+            ## Dont do short files
+            if self.length<16: return
             
             dbh_flag=DB.DBO(None)
             dbh_flag.check_index("NSRL_hashes","md5",4)
-            dbh_flag.execute("select filename,productcode from NSRL_hashes where md5=%r limit 1",self.m.digest())
+            dbh_flag.execute("select filename,Name,Code from NSRL_hashes join NSRL_products on productcode=Code where md5=%r limit 1",self.m.digest())
             nsrl=dbh_flag.fetch()
             if not nsrl: nsrl={}
             
             dbh=DB.DBO(self.case)
-            dbh.execute('INSERT INTO md5 set inode=%r,md5=%r,binary_md5=%r,NSRL_productcode=%r, NSRL_filename=%r', (self.inode, self.m.hexdigest(),self.m.digest(),nsrl.get('productcode',0),nsrl.get('filename','')))
+            dbh.insert('hash',
+                       inode = self.inode,
+                       binary_md5 = self.m.digest(),
+                       NSRL_product = nsrl.get('product','-'),
+                       NSRL_filename = nsrl.get('filename','-'),
+                       FileType = self.type,
+                       )
 
 class HashComparison(Reports.report):
     """ Compares MD5 hash against the NSRL database to classify files """

@@ -59,7 +59,6 @@ class BaseScanner:
         self.fd=fd
         self.size = 0
         self.ddfs = ddfs
-#        self.ddfs.dbh.execute("update inode set scanner_cache = concat_ws(',',scanner_cache, %r) where inode=%r", (outer.__class__.__name__, inode))
         self.case=outer.case
         self.outer=outer
         self.factories=factories
@@ -255,12 +254,15 @@ class StoreAndScanType(StoreAndScan):
             mime_type = metadata['mime']
         except KeyError:
             dbh = DB.DBO(self.case)
-            dbh.execute("select mime from type where inode=%r limit 1",(self.inode))
+            dbh.execute("select mime,type from type where inode=%r limit 1",(self.inode))
             row=dbh.fetch()
             if row:
                 mime_type = row['mime']
+                metadata['magic'] = row['type']
+                
             else:
                 metadata['mime'] = None
+                metadata['magic'] = None
                 ## The type of the file may not change once magic has
                 ## been determined, so we ignore the rest of the file:
                 self.ignore = True
