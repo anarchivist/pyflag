@@ -118,7 +118,7 @@ IOSource AdvIOSource_Con(IOSource self, IOOptions opts) {
   AdvIOSource this=(AdvIOSource) self;
   struct split_file temp;
   IOOptions t;
-  int last_max_length=0;
+  uint64_t last_max_length=0;
 
   this->number =0;
   this->buffer=CONSTRUCT(StringIO, StringIO, Con, self);
@@ -127,8 +127,11 @@ IOSource AdvIOSource_Con(IOSource self, IOOptions opts) {
       array rather than a linked list for performance reasons. 
   **/
   list_for_each_entry(t, &(opts->list), list) {
-    if(!strcmp("filename",t->name)) {
-      int i;
+    if(!strcmp("offset",t->name)) {
+      this->offset = parse_offsets(t->value);
+    }
+    else if(!strcmp("filename",t->name)) {
+      off_t i;
 
       temp.name = talloc_strdup(self,t->value);
       temp.fd = open(temp.name, O_RDONLY);
@@ -165,7 +168,11 @@ IOSource AdvIOSource_Con(IOSource self, IOOptions opts) {
 int AdvIOSource_read_random(IOSource self, char *buf, uint32_t len, uint64_t offs) {
   AdvIOSource this = (AdvIOSource) self;
   struct split_file *temp=(struct split_file *)this->buffer->data;
-  int i,total=0;
+  int i;
+  uint64_t total=0;
+
+  /** add the offset */
+  offs += this->offset;
 
   /** First check if the offset is too much: */
   if(offs>self->size) return 0;
@@ -176,9 +183,9 @@ int AdvIOSource_read_random(IOSource self, char *buf, uint32_t len, uint64_t off
   for(i=0; i<this->number && len>0; i++) {
     if(temp[i].start_offset <= offs && offs < temp[i].end_offset) {
       // The number of bytes available within this chunk
-      int available = temp[i].end_offset-offs;
+      uint64_t available = temp[i].end_offset-offs;
       // The amount of data to read - len is how much is required.:
-      int length = min(available,len);
+      uint64_t length = min(available,len);
 
       // The amount of data available from this chunk.
       lseek(temp[i].fd, offs - temp[i].start_offset, SEEK_SET);
@@ -195,6 +202,7 @@ int AdvIOSource_read_random(IOSource self, char *buf, uint32_t len, uint64_t off
 
 VIRTUAL(AdvIOSource, IOSource)
      VATTR(super.name) = "advanced";
+     VATTR(offset) = 0;
      SET_DOCSTRING("Advanced io subsystem options\n\n"
 		   "\toffset=bytes\t\tNumber of bytes to seek to in the image file. "
 		   "Useful if there is some extra data at the start of the dd image "
@@ -223,9 +231,15 @@ static int SgzipIOSource_Destructor(void *this) {
 IOSource SgzipIOSource_Con(IOSource self, IOOptions opts) {
   SgzipIOSource this = (SgzipIOSource) self;
   struct sgzip_obj *s;
+  char *offset = NULL;
 
   /** Get our base class to open the file: */
   if(!IOSource_Con(self, opts)) return NULL;
+
+  /** was an offset specified? */
+  offset = CALL(opts, get_value, "offset");
+  if(offset)
+    this->offset = parse_offsets(offset);
 
   s=talloc(self,struct sgzip_obj);
   this->_handle = s;
@@ -254,11 +268,15 @@ int SgzipIOSource_read_random(IOSource self, char *buf, uint32_t len, uint64_t o
   SgzipIOSource this = (SgzipIOSource) self;
   struct sgzip_obj *s = (struct sgzip_obj *)this->_handle;
 
+  // add offset
+  offs += this->offset;
+
   return sgzip_read_random(buf, len, offs, self->fd, this->index, s);
 };
 
 VIRTUAL(SgzipIOSource, IOSource)
      VATTR(super.name) = "sgzip";
+     VATTR(offset) = 0;
      SET_DOCSTRING("sgzip subsystem options\n\n"
 		   "\tfile=filename\t\tFilename to open\n"
 		   "\toffset=bytes\t\tNumber of bytes to seek to in the "
@@ -287,7 +305,10 @@ IOSource EWFIOSource_Con(IOSource self, IOOptions opts) {
   this->number_of_files =0;
 
   list_for_each_entry(i, &(opts->list), list) {
-    if(!strcmp(i->name,"filename")) {
+    if(!strcmp(i->name,"offset")) {
+      this->offset = parse_offsets(i->value);
+    }
+    else if(!strcmp(i->name,"filename")) {
       char *temp = talloc_strdup(self, i->value);
       CALL(this->buffer, write, (char *)&temp, sizeof(temp));
       this->number_of_files++;
@@ -322,11 +343,14 @@ int EWFIOSource_read_random(IOSource self, char *buf, uint32_t len, uint64_t off
   EWFIOSource this = (EWFIOSource) self;
   LIBEWF_HANDLE *e=(LIBEWF_HANDLE *)this->_handle;
 
+  // add offset
+  offs += this->offset;
   return libewf_read_random(e, buf, len, offs);
 };
 
 VIRTUAL(EWFIOSource, IOSource)
      VATTR(super.name) = "ewf";
+     VATTR(offset) = 0;
      SET_DOCSTRING("An Expert Witness IO subsystem\n\n"
 		   "\toffset=bytes\t\tNumber of bytes to seek to in the "
 		   "(uncompressed) image file. Useful if there is some extra data "
@@ -389,4 +413,38 @@ IOOptions iosubsys_parse_options(char *s) {
   };
 
   return result;
+};
+
+/* Parses the string for a number. Can interpret the following suffixed:
+
+  k - means 1024 bytes
+  M - Means 1024*1024 bytes
+  S - Menas 512 bytes (sector size)
+*/
+uint64_t parse_offsets(char *string) {
+  uint64_t result=0;
+  int multiplier=1;
+  int offs=0;
+  
+  result=atoll(string);
+  offs = strcspn(string,"KkMmSs");
+
+  if(offs) {
+    switch(string[offs]) {
+    case 'K':
+    case 'k':
+      multiplier=1024;
+      break;
+    case 'm':
+    case 'M':
+      multiplier=1024*1024;
+      break;
+    case 'S':
+    case 's':
+      multiplier=512;
+      break;
+    };
+  };
+
+  return(multiplier*result);
 };
