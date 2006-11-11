@@ -106,8 +106,9 @@ INSERT INTO dictionary set word="\\d{1,3}.\\d{1,3}.\\d{1,3}.\\d{1,3}", class="IP
 create table jobs (
 	`id` int unsigned auto_increment, 
 	command varchar(250), 
-	arg1 varchar(250), 
-	arg2 varchar(250), 
+	arg1 text,
+	arg2 text,
+	arg3 text,
 	key `id`(id)
 	);
 

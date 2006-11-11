@@ -85,7 +85,7 @@ class PCAPFS(DBFS):
     """
     name = 'PCAP Filesystem'
 
-    def load(self, mount_point, iosource_name):
+    def load(self, mount_point, iosource_name,scanners = None):
         DBFS.load(self, mount_point, iosource_name)
         
         ## We create the tables we need:
@@ -158,6 +158,12 @@ class PCAPFS(DBFS):
         ## Prepare the dbh for the callback
         dbh2 = DB.DBO(case)
         dbh2.mass_insert_start("connection")
+
+        if scanners:
+            scanner_string = ",".join(scanners)
+            pdbh = DB.DBO()
+            pdbh.mass_insert_start('jobs')
+
         def Callback(s):
             ## Flush the mass insert pcap:
             dbh.mass_insert_commit()
@@ -190,10 +196,11 @@ class PCAPFS(DBFS):
             if len(s['seq'])==0: return
 	    
             ## Create a new VFS node:
+            new_inode = "I%s|S%s" % (iosource_name, s['con_id'])
             if s['direction'] == "forward":
                 self.VFSCreate(
                     None,
-                    "I%s|S%s" % (iosource_name, s['con_id']) ,
+                    new_inode,
                     "%s/%s-%s/%s:%s/%s" % ( self.mount_point,
                                             IP2str(s['dest_ip']),
                                             IP2str(s['src_ip']),
@@ -205,7 +212,7 @@ class PCAPFS(DBFS):
             else:
                 self.VFSCreate(
                     None,
-                    "I%s|S%s" % (iosource_name, s['con_id']) ,
+                    new_inode,
                     "%s/%s-%s/%s:%s/%s" % ( self.mount_point,
                                             IP2str(s['src_ip']),
                                             IP2str(s['dest_ip']),
@@ -220,6 +227,15 @@ class PCAPFS(DBFS):
                     con_id = s['con_id'], packet_id = s['packets'][i],
                     seq = s['seq'][i], length = s['length'][i],
                     cache_offset = s['offset'][i],
+                    )
+
+            ## If we need to scan it, schedule the job now:
+            if scanners:
+                pdbh.mass_insert(
+                    command = 'Scan',
+                    arg1 = self.case,
+                    arg2 = new_inode,
+                    arg3= scanner_string,
                     )
 
         ## Register the callback
@@ -384,7 +400,6 @@ class ViewDissectedPacket(Reports.report):
             return previous_node,node
         
         def tree_cb(path):
-            print path
             branch = FlagFramework.splitpath(path)
             
             previous_node, node = get_node(branch)

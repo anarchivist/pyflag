@@ -286,8 +286,8 @@ class HTTPScanner(StreamScannerFactory):
             if not f: continue
 
             ## Create the VFS node:
-            path=self.fsfd.lookup(inode="I%s|S%s" % (stream.fd.name, stream.con_id))
-            path=os.path.dirname(path)
+            ##path=self.fsfd.lookup(inode="I%s|S%s" % (stream.fd.name, stream.con_id))
+            ##path=os.path.dirname(path)
             new_inode="%s|o%s" % (combined_inode,f)
 
             try:
@@ -304,7 +304,7 @@ class HTTPScanner(StreamScannerFactory):
                 pass
 
             self.fsfd.VFSCreate(None,new_inode,
-                                "%s/HTTP/%s" % (path, escape(p.request['url'])),
+                                "/HTTP/%s" % (escape(p.request['url'])),
                                 mtime=stream.ts_sec
                                 )
 

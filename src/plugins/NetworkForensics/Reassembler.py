@@ -141,6 +141,13 @@ class StreamFile(File):
             # We need to find if we grew the output file at all:
             initial_len = outfd_len
             outfd_position = row['seq']+deltas[index]
+            
+            # We only allow 64k to be written ahead - this is commonly
+            # the window length and it stops weird sequence numbers
+            # from growing the file too much
+            if outfd_position - initial_len > 65000:
+                outfd_position = initial_len
+                
             out_fd.seek(outfd_position)
             fds[index].seek(row['cache_offset'])
             out_fd.write(fds[index].read(row['length']))

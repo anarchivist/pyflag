@@ -43,6 +43,7 @@ import pyflag.Registry as Registry
 import pyflag.DB as DB
 import pyflag.FlagFramework as FlagFramework
 import fnmatch
+import ScannerUtils
 
 class BaseScanner:
     """ This is the actual scanner class that will be instanitated once for each file in the filesystem.
@@ -555,22 +556,25 @@ import pyflag.Store as Store
 
 factories = Store.Store()
 
-def get_factories(scanners):
+def get_factories(case,scanners):
     """ Scanner factories are obtained from the Store or created as
     required. Scanners is a list in the form case:scanner
     """
+    ## Ensure dependencies are satisfied
+    ScannerUtils.fill_in_dependancies(scanners)
+    
     ## First prepare the required factories:
     result = []
-    for key in scanners:
-        try:
-            case, scanner = key.split(":",1)
-        except:
-            raise RuntimeError("scanner not given in the correct format %s" % scanners)
-        
+    for scanner in scanners:
+        key = "%s:%s" % (case,scanner)
         try:
             f=factories.get(key)
         except KeyError:
-            cls=Registry.SCANNERS.dispatch(scanner)
+            try:
+                cls=Registry.SCANNERS.dispatch(scanner)
+            except:
+                print "Unable to find scanner for %s" % scanner
+                continue
 
             #Instatiate it:
             import pyflag.FileSystem as FileSystem
@@ -585,28 +589,14 @@ def get_factories(scanners):
 
         result.append(f)
 
+    ## Now sort the scanners by their specified order:
+    def cmpfunc(x,y):
+        if x.order>y.order:
+            return 1
+        elif x.order<y.order:
+            return -1
+
+        return 0
+
+    result.sort(cmpfunc)
     return result
-
-## This is a down side for the unified VFS model - we may well
-## encounter any filesystem in our scan run, so we must show them
-## all. This means that we allow users to select Network filesystems
-## when they only have a disk image loaded etc.
-
-##class FSSpecialisedDrawer(Drawer):
-##    """ A drawer which only draws the form if the current filesystem is derived from a given filesystem name """
-##    special_fs_name = ''
-
-##    def form(self,query,result):
-##        """ It only makes sense to run these scanners when the
-##        base filesystem is derived from the PCAPFS. Otherwise
-##        we just hide these options.
-##        """
-##        dbh = DB.DBO(query['case'])
-##        fstype = dbh.get_meta('fstype')
-##        fs_class = Registry.FILESYSTEMS.filesystems[fstype]
-##        if issubclass(fs_class,Registry.FILESYSTEMS.fs[self.special_fs_name]):
-##            Drawer.form(self,query,result)
-##        else:
-##            result.hidden(self.get_group_name(),'off')
-##            for i in self.contains:
-##                result.hidden("scan_%s" % i,'off')

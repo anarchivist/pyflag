@@ -187,8 +187,8 @@ def terminate_children():
         os.kill(pid, signal.SIGABRT)
 
 class Dispatcher:
-    def Scan(self,inode, scanners):
-        factories = Scanner.get_factories(scanners.split(","))
+    def Scan(self,case, inode, scanners):
+        factories = Scanner.get_factories(case, scanners.split(","))
 
         if factories:
             ddfs = factories[0].fsfd
@@ -226,6 +226,16 @@ def start_workers():
 
             ## Now do the jobs
             for row in jobs:
-                getattr(dispatcher,row['command'])(row['arg1'], row['arg2'])
+                try:
+                    method = getattr(dispatcher,row['command'])
+                except:
+                    print "Dont know how to process job %s" % row['command']
+                    continue
+
+                try:
+                    method(row['arg1'], row['arg2'], row['arg3'])
+                except Exception,e:
+                    logging.log(logging.ERRORS, "Error scanning %s" % e)
+
                 
     atexit.register(terminate_children)

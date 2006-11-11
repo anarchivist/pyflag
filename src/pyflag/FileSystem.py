@@ -76,10 +76,17 @@ class FileSystem:
     
     name = None
     
-    def load(self, mount_point, iosource_name):
+    def load(self, mount_point, iosource_name, scanners=None):
         """ This method loads the filesystem into the database.
 
-        Currently the database schema is standardised by the DBFS class, and all other filesystems just extend the load method to implement different drivers for loading the filesystem into the database. For reading and manipulating the filesystem, the DBFS methods are used.
+        Currently the database schema is standardised by the DBFS
+        class, and all other filesystems just extend the load method
+        to implement different drivers for loading the filesystem into
+        the database. For reading and manipulating the filesystem, the
+        DBFS methods are used.
+
+        scanners contains a list of scanner names which will be scheduled to run on every newly created VFS node.
+        
         """
         pass
 
@@ -183,11 +190,14 @@ class DBFS(FileSystem):
         """ Initialise the DBFS object """
         self.case = case
 
-    def load(self, mount_point, iosource_name):
+    def load(self, mount_point, iosource_name, loading_scanners = None):
         """ Sets up the schema for loading the filesystem.
 
         Note that derived classes need to actually do the loading
         after they call the base class.
+
+        loading_scanners are the scanners which need to be run on
+        every new Inode.
         """
         self.mount_point = mount_point
         scanners = [ "%r" % s.__name__ for s in Registry.SCANNERS.classes ]
