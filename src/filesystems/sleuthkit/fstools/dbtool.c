@@ -438,13 +438,11 @@ print_inode(FS_INFO *fs, FS_INODE *fs_inode, int flags,
                            (ULONG) dtime,
 					       (ULONG) fs_inode->mode, (int) fs_inode->nlink, link,
 					       (ULONG) fs_data->size);
-					if(fs_data->flags & FS_DATA_NONRES) {
-	 		            fs->file_walk(fs, fs_inode, fs_data->type, fs_data->id,
+		            fs->file_walk(fs, fs_inode, fs_data->type, fs_data->id,
 					        FS_FLAG_FILE_AONLY | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOSPARSE,
 	 	                    (FS_FILE_WALK_FN) print_addr, (char *)&ptr);
 		
-					    print_blocks(fs_inode->addr, fs_data->type, fs_data->id, &run);
-                    }
+					print_blocks(fs_inode->addr, fs_data->type, fs_data->id, &run);
 	 		    }
 			}
 			fs_data = fs_data->next;
