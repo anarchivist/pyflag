@@ -36,6 +36,7 @@ import StringIO
 import pyflag.Scanner as Scanner
 import gzip
 import plugins.DiskForensics.DiskForensics as DiskForensics
+import pyflag.Store as Store
 
 class ZipScan(GenScanFactory):
     """ Recurse into Zip Files """
@@ -177,6 +178,8 @@ class TarScan(GenScanFactory):
                 ## Scan the new file using the scanner train:
                 fd=self.ddfs.open(inode=new_inode)
                 Scanner.scanfile(self.ddfs,fd,self.factories)
+
+ZIPCACHE = Store.Store(max_size=5)
 		
 ## These are the corresponding VFS modules:
 class ZipFile(DiskForensics.DBFS_file):
@@ -258,17 +261,16 @@ class ZipFile(DiskForensics.DBFS_file):
         if self.readptr==0:
             try:
                 ## This is a performance boost - We try to cache the
-                ## zipfile object in our parent - if its not done
-                ## previously to speed up future accesses to other
-                ## files within the zip file. This will ensure we only
-                ## need to read the zip directory once instead of many
-                ## times for each zip member.
-                self.z = self.fd.zip_handle
-            except AttributeError:
+                ## zipfile object in the store to speed up future
+                ## accesses to other files within the zip file. This
+                ## will ensure we only need to read the zip directory
+                ## once instead of many times for each zip member.
+                self.z = ZIPCACHE.get(self.fd.inode)
+            except KeyError:
                 try:
                     logging.log(logging.VERBOSE_DEBUG, "Reading Zip Directory for %s" % self.fd.inode)
                     self.z = zipfile.ZipFile(self.fd,'r')
-                    self.fd.zip_handle = self.z
+                    ZIPCACHE.put(self.z, key=self.fd.inode)
                 except zipfile.BadZipfile,e:
                     raise IOError("Zip_File: (%s)" % e)
 

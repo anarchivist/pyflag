@@ -303,34 +303,28 @@ class DBFS(FileSystem):
                 dbh.execute("insert into file set inode='',path=%r,name=%r,status='alloc',mode='d/d'",(path,dirs[d]))
 
         ## Now add to the file and inode tables:
-        dbh.execute("insert into file set path=%r,name=%r,status='alloc',mode=%r,inode=%r",  (
-            FlagFramework.normpath(os.path.dirname(new_filename)+"/"),
-            os.path.basename(new_filename),
-            directory_string,
-            inode))
+        dbh.insert('file',
+                   path = FlagFramework.normpath(os.path.dirname(new_filename)+"/"),
+                   name = os.path.basename(new_filename),
+                   status = 'alloc',
+                   mode = directory_string,
+                   inode = inode,
+                   )
 
+        inode_properties = dict(status="alloc", mode=40755, links=4, inode=inode,size=0)
+        
         try:
-            size = int(properties['size'])
+            inode_properties['size'] = int(properties['size'])
         except KeyError:
-            size = 1
+            pass
 
-        try:
-            ctime = int(properties['ctime'])
-        except KeyError:
-            ctime = 0
+        for t in ['ctime','atime','mtime']:
+            try:
+                inode_properties["_"+t] = "from_unixtime(%r)" % int(properties[t])
+            except KeyError:
+                pass
 
-        try:
-            atime = int(properties['atime'])
-        except KeyError:
-            atime = 0
-
-        try:
-            mtime = int(properties['mtime'])
-        except KeyError:
-            mtime = 0
-
-        dbh.execute("insert into inode  set status='alloc', mode=%r, links=%r , inode=%r,gid=0,uid=0,size=%r, mtime=from_unixtime(%r), ctime=from_unixtime(%r), atime=from_unixtime(%r)",(
-            40755, 4,inode, size, mtime, ctime, atime))
+        dbh.insert('inode', **inode_properties)
 
     def longls(self,path='/', dirs = None):
         dbh=DB.DBO(self.case)

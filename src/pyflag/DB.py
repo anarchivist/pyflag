@@ -370,12 +370,24 @@ class DBO:
     def insert(self, table, **fields):
         """ A helper function to make inserting a little more
         readable. This is especially good for lots of fields.
+
+        Special case: Normally fields are automatically escaped using
+        %r, but if the field starts with _, it will be inserted using
+        %s and _ removed.
         """
         tmp = [table]
+        sql = []
         for k,v in fields.items():
+            if k.startswith("_"):
+                sql.append('`%s`=%s')
+                k=k[1:]
+            else:
+                sql.append('`%s`=%r')
+                
             tmp.extend([k,v])
 
-        sql = "insert into %s set " + ','.join( ['`%s`=%r'] * len(fields.keys()))
+        sql = "insert into %s set " + ','.join(sql)
+
         self.execute(sql, tmp)
                     
     def mass_insert_start(self, table):
