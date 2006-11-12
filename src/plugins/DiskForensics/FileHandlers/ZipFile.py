@@ -370,11 +370,11 @@ class Tar_file(DiskForensics.DBFS_file):
         parts = inode.split('|')
 
         try:
-            t = self.fd.tar_handle
+            t = ZIPCACHE.get(self.fd.inode)
         except AttributeError:
             try:
                 t = tarfile.TarFile(fileobj=fd)
-                self.fd.tar_handle = t
+                ZIPCACHE.put(t, key=self.fd.inode)
             except tarfile.CompressionError,e:
                 raise IOError("Tar file: %s" % e)
         

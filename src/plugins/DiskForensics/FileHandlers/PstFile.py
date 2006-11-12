@@ -40,6 +40,7 @@ import re
 from pyflag.FlagFramework import normpath
 import pyflag.FlagFramework as FlagFramework
 import pexpect
+import Store
 
 class PstScan(GenScanFactory):
     """ Recurse into Pst Files """
@@ -278,6 +279,8 @@ class PstScan(GenScanFactory):
                     elif isinstance(item, pypst2.Pstfile.Journal):
                         add_journal(new_inode,"%s%s/%s" % (root_directory,root[1],name[1]),item)
 
+PST_STORE = Store.Store(max_size=3)
+
 ## The correspoding VFS module:
 class PstFile(File):
     """ A file like object to read items from within pst files. The pst file is specified as an inode in the DBFS """
@@ -290,20 +293,23 @@ class PstFile(File):
         pstinode = '|'.join(parts[:-1])
         thispart = parts[-1]
 
-        ## Force our predecessor to be cached
-        self.fd.cache()
+        ## Force our parent to be cached because we need a file to
+        ## work from
+        fd.cache()
 
-        ## See if we can use the pst handle from our predecessor
-        ## (otherwise we need to reopen it)
         try:
-            self.pst = self.fd.pst_handle
-        except AttributeError:
+            self.pst = PST_STORE.get(self.fd.inode)
+        except KeyError:
             self.pst = pypst2.Pstfile(self.fd.cached_fd.name)
+            PST_STORE.put(self.pst, key = self.fd.inode)
             
         item = self.pst.open(thispart[1:])
         self.data = item.read()
         self.pos = 0
         self.size=len(self.data)
+
+        ## Force ourself to be cached
+        self.cache()
 
     def read(self,len=None):
         ## Call our baseclass to see if we have cached data:
