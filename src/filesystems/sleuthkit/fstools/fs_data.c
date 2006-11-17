@@ -242,9 +242,11 @@ fs_data_lookup(FS_DATA * data_head, uint32_t type, uint16_t id)
 	return NULL;
     }
 
-    while ((fs_data) && (fs_data->flags & FS_DATA_INUSE) &&
-	((fs_data->type != type) || (fs_data->id != id)))
-	fs_data = fs_data->next;
+    while (fs_data) {
+        if((fs_data->flags & FS_DATA_INUSE) && (fs_data->type == type) && (fs_data->id == id))
+            break;
+        fs_data = fs_data->next;
+    }
 
     if ((!fs_data) || (fs_data->type != type) || (fs_data->id != id)) {
 	return NULL;
@@ -280,8 +282,8 @@ fs_data_lookup_noid(FS_DATA * data_head, uint32_t type)
      * lowest id of the given type (if more than one exists) 
      */
 
-    while ((fs_data) && (fs_data->flags & FS_DATA_INUSE)) {
-	if (fs_data->type == type) {
+    while (fs_data) {
+	if ((fs_data->flags & FS_DATA_INUSE) && fs_data->type == type) {
 
 	    /* replace existing if new is lower */
 	    if ((!fs_data_ret) || (fs_data_ret->id > fs_data->id))
