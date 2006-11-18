@@ -257,7 +257,8 @@ dbh.execute("drop table if exists whois_sources")
 dbh.execute("drop table if exists whois")
 dbh.execute("drop table if exists whois_routes")
 dbh.execute("""CREATE TABLE IF NOT EXISTS whois_sources (
-`id` int auto_increment, `source` varchar(20),
+`id` int auto_increment,
+`source` varchar(20),
 `url` varchar(255),
 `updated` datetime,
 key(id))""")
@@ -277,22 +278,38 @@ key(id))""")
 dbh.execute("CREATE TABLE IF NOT EXISTS whois_routes ( `network` int(10) unsigned, `netmask` int(10) unsigned, `whois_id` int)")
 
 # add default (fallthrough) route and reserved ranges
-dbh.execute("INSERT INTO whois_sources VALUES ( 0, 'static', 'static', %r )", ':'.join(["%i"% i for i in time.localtime()[:6]]))
-dbh.execute("""INSERT INTO whois set
-`id`=0,
-`src_id`=%r,
-`start_ip`=0,
-`netname`='Default',
-numhosts=0,
-country='--',
-adminc='',
-techc='',
-descr='Default Fallthrough Route: IP INVALID OR UNASSIGNED',
-remarks='',
-status='unallocated'""", str(dbh.cursor.lastrowid))
-dbh.execute("INSERT INTO whois_routes VALUES (0,0,%s)", str(dbh.cursor.lastrowid))
+dbh.insert('whois_sources',
+           source='static',
+           url='static',
+           updated= ':'.join(["%i"% i for i in time.localtime()[:6]]))
+
+dbh.insert('whois',
+           id=0,
+           src_id=str(dbh.cursor.lastrowid),
+           start_ip=0,
+           netname='Default',
+           numhosts=0,
+           country='--',
+           adminc='',
+           techc='',
+           descr='Default Fallthrough Route: IP INVALID OR UNASSIGNED',
+           remarks='',
+           status='unallocated'
+           )
+
+dbh.insert('whois_routes',
+           network=0,
+           netmask = 0,
+           whois_id = str(dbh.cursor.lastrowid))
 
 # process files
+source_dbh = dbh.clone()
+routes_dbh = dbh.clone()
+
+source_dbh.mass_insert_start('whois_sources')
+routes_dbh.mass_insert_start('whois_routes')
+dbh.mass_insert_start('whois')
+
 for url in urls:
   db = Whois(url)
   if not db:
@@ -300,15 +317,28 @@ for url in urls:
     continue
 
   # add this source to db
-  dbh.execute("INSERT INTO whois_sources VALUES (0, %r, %r, %r);", (db.source, url, db.date))
+  source_dbh.mass_insert(
+    source = db.source,
+    url = url,
+    updated = db.date)
+  
+#  dbh.execute("INSERT INTO whois_sources VALUES (0, %r, %r, %r);", (db.source, url, db.date))
   source_id = dbh.cursor.lastrowid
   
   # process records
   for rec in db:
-    dbh.execute("INSERT INTO whois VALUES (0, %r, %r,%r, %r, %r, %r, %r, %r, %r, %r);", (
-      source_id, "%u" % rec.start_ip,
-      rec.netname,
-      rec.num_hosts, rec.country, rec.adminc, rec.techc, rec.descr, rec.remarks, rec.status))  
+    dbh.mass_insert(
+      src_id = source_id,
+      start_ip = "%u" % rec.start_ip,
+      netname = rec.netname,
+      numhosts = rec.num_hosts,
+      country = rec.country,
+      adminc = rec.adminc,
+      techc = rec.techc,
+      descr = rec.descr,
+      remarks = rec.remarks,
+      status = rec.status)  
+
     whois_id = dbh.cursor.lastrowid
 
     #now process the networks (routes)...
@@ -334,7 +364,11 @@ for url in urls:
         masks.append(masks[-1])
       else:
         # choose the largest network which is aligned and assign it
-        dbh.execute("INSERT INTO whois_routes VALUES(%s, %s, %s);" %((network & MASK32), "%u" % masks[align[0]], str(whois_id)))
+        routes_dbh.mass_insert(
+          network = network & MASK32,
+          netmask = "%u" % masks[align[0]],
+          whois_id = whois_id)
+
         # advance network address and remove this from masks
         network = network + num_hosts(masks[align[0]])
         del masks[align[0]]
