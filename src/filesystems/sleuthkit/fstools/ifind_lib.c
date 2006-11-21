@@ -99,9 +99,12 @@ fs_ifind_par(FS_INFO * fs, uint8_t lclflags, INUM_T par)
  * Find an inode given a file path
  */
 
-static char *cur_dir;
-static char *cur_attr;
-
+struct ifind_path_state {
+    char *cur_dir;
+    char *cur_attr;
+    uint8_t found;
+    INUM_T inode;
+};
 /* 
  * dent_walk for finding the inode based on path
  *
@@ -111,11 +114,12 @@ static char *cur_attr;
 static uint8_t
 ifind_path_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
 {
+    struct ifind_path_state *state = (struct ifind_path_state *)ptr;
 
     /* This crashed because cur_dir was null, but I'm not sure how
      * it got that way, so this was added
      */
-    if (cur_dir == NULL) {
+    if (state->cur_dir == NULL) {
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "ifind: cur_dir is null: Please run with '-v' and send output to developers\n");
@@ -131,19 +135,19 @@ ifind_path_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
 
     if (((fs->ftype & FSMASK) == EXTxFS_TYPE) ||
 	((fs->ftype & FSMASK) == FFS_TYPE)) {
-	if (strcmp(fs_dent->name, cur_dir) != 0) {
+	if (strcmp(fs_dent->name, state->cur_dir) != 0) {
 	    return WALK_CONT;
 	}
     }
 
     /* NTFS gets a case insensitive comparison */
     else if ((fs->ftype & FSMASK) == NTFS_TYPE) {
-	if (strcasecmp(fs_dent->name, cur_dir) != 0) {
+	if (strcasecmp(fs_dent->name, state->cur_dir) != 0) {
 	    return WALK_CONT;
 	}
 
 	/*  ensure we have the right attribute name */
-	if (cur_attr != NULL) {
+	if (state->cur_attr != NULL) {
 	    int fail = 1;
 
 	    if (fs_dent->fsi) {
@@ -151,7 +155,7 @@ ifind_path_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
 		fs_data = fs_dent->fsi->attr;
 
 		while ((fs_data) && (fs_data->flags & FS_DATA_INUSE)) {
-		    if (strcasecmp(fs_data->name, cur_attr) == 0) {
+		    if (strcasecmp(fs_data->name, state->cur_attr) == 0) {
 			fail = 0;
 			break;
 		    }
@@ -160,7 +164,7 @@ ifind_path_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
 	    }
 	    if (fail) {
 		printf("Attribute name (%s) not found in %s: %" PRIuINUM
-		    "\n", cur_attr, cur_dir, fs_dent->inode);
+		    "\n", state->cur_attr, state->cur_dir, fs_dent->inode);
 
 		return WALK_STOP;
 	    }
@@ -170,25 +174,25 @@ ifind_path_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
      * the short name 
      */
     else if ((fs->ftype & FSMASK) == FATFS_TYPE) {
-	if (strcasecmp(fs_dent->name, cur_dir) != 0) {
-	    if (strcasecmp(fs_dent->shrt_name, cur_dir) != 0) {
+	if (strcasecmp(fs_dent->name, state->cur_dir) != 0) {
+	    if (strcasecmp(fs_dent->shrt_name, state->cur_dir) != 0) {
 		return WALK_CONT;
 	    }
 	}
     }
 
     /* Get the next directory or file name */
-    cur_dir = (char *) strtok(NULL, "/");
-    cur_attr = NULL;
+    state->cur_dir = (char *) strtok(NULL, "/");
+    state->cur_attr = NULL;
 
     if (verbose)
 	fprintf(stderr, "Found it (%s), now looking for %s\n",
-	    fs_dent->name, cur_dir);
+	    fs_dent->name, state->cur_dir);
 
     /* That was the last one */
-    if (cur_dir == NULL) {
-	printf("%" PRIuINUM "\n", fs_dent->inode);
-	found = 1;
+    if (state->cur_dir == NULL) {
+    state->inode = fs_dent->inode;
+	state->found = 1;
 	return WALK_STOP;
     }
 
@@ -196,9 +200,9 @@ ifind_path_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
      * break it up 
      */
     if (((fs->ftype & FSMASK) == NTFS_TYPE) &&
-	((cur_attr = strchr(cur_dir, ':')) != NULL)) {
-	*cur_attr = '\0';
-	cur_attr++;
+	((state->cur_attr = strchr(state->cur_dir, ':')) != NULL)) {
+	*state->cur_attr = '\0';
+	state->cur_attr++;
     }
 
     /* it is a directory so we can recurse */
@@ -206,7 +210,7 @@ ifind_path_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
 
 	if (fs->dent_walk(fs, fs_dent->inode,
 		FS_FLAG_NAME_ALLOC | FS_FLAG_NAME_UNALLOC,
-		ifind_path_act, (char *) 0)) {
+		ifind_path_act, (void *) state)) {
 	    return WALK_ERROR;
 	}
     }
@@ -219,47 +223,54 @@ ifind_path_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
     return WALK_STOP;
 }
 
+INUM_T
+fs_ifind_path_ret(FS_INFO * fs, uint8_t lclflags, char *path)
+{
+    struct ifind_path_state state;
+    state.found = 0;
+    localflags = lclflags;
+
+    state.cur_dir = (char *) strtok(path, "/");
+    state.cur_attr = NULL;
+
+    /* If there is no token, then only a '/' was given */
+    if (!state.cur_dir)
+        return fs->root_inum;
+
+    /* If this is NTFS, ensure that we take out the attribute */
+    if (((fs->ftype & FSMASK) == NTFS_TYPE) &&
+	((state.cur_attr = strchr(state.cur_dir, ':')) != NULL)) {
+	*state.cur_attr = '\0';
+	state.cur_attr++;
+    }
+
+    if (verbose)
+	fprintf(stderr, "Looking for %s\n", state.cur_dir);
+
+    if (fs->dent_walk(fs, fs->root_inum,
+	    FS_FLAG_NAME_ALLOC | FS_FLAG_NAME_UNALLOC, ifind_path_act,
+	    (void *)&state)) {
+	return -1;
+    }
+
+    if (state.found)
+        return state.inode;
+
+	printf("File not found: %s\n", state.cur_dir);
+    return 0;
+}
 
 /* Return 1 for error, 0 if no error */
 uint8_t
 fs_ifind_path(FS_INFO * fs, uint8_t lclflags, char *path)
 {
-    found = 0;
-    localflags = lclflags;
+    INUM_T inode = fs_ifind_path_ret(fs, lclflags, path);
+    if(inode < 0)
+        return 1;
 
-    cur_dir = (char *) strtok(path, "/");
-    cur_attr = NULL;
-
-    /* If there is no token, then only a '/' was given */
-    if (!cur_dir) {
-	printf("%lu\n", (ULONG) fs->root_inum);
-	return 0;
-    }
-
-    /* If this is NTFS, ensure that we take out the attribute */
-    if (((fs->ftype & FSMASK) == NTFS_TYPE) &&
-	((cur_attr = strchr(cur_dir, ':')) != NULL)) {
-	*cur_attr = '\0';
-	cur_attr++;
-    }
-
-    if (verbose)
-	fprintf(stderr, "Looking for %s\n", cur_dir);
-
-    if (fs->dent_walk(fs, fs->root_inum,
-	    FS_FLAG_NAME_ALLOC | FS_FLAG_NAME_UNALLOC, ifind_path_act,
-	    NULL)) {
-	return 1;
-    }
-
-    if (0 == found) {
-	printf("File not found: %s\n", cur_dir);
-    }
+    printf("%" PRIuINUM "\n", inode);
     return 0;
 }
-
-
-
 
 
 /*******************************************************************************

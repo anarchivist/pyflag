@@ -56,6 +56,8 @@ extern "C" {
 #define IFIND_DATA	0x08
 #define IFIND_PAR       0x10
 #define IFIND_PAR_LONG	0x20
+    extern INUM_T fs_ifind_path_ret(FS_INFO * fs, uint8_t lclflags,
+	char *path);
     extern uint8_t fs_ifind_path(FS_INFO * fs, uint8_t lclflags,
 	char *path);
     extern uint8_t fs_ifind_data(FS_INFO * fs, uint8_t lclflags,
