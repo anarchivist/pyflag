@@ -6,6 +6,7 @@
 
 #include <Python.h>
 
+#include "sk.h"
 #include "list.h"
 #include "talloc.h"
 #include "fs_tools.h"
@@ -26,40 +27,29 @@ static uint8_t listdent_walk_callback(FS_INFO *fs, FS_DENT *fs_dent, int flags, 
     return WALK_CONT;
 }
 
-struct block {
-    DADDR_T addr;
-    int size;
-    char *resdata;
-    struct list_head list;
-};
-
 /* callback function for file_walk, populates a block list */
 static u_int8_t
 getblocks_walk_callback (FS_INFO *fs, DADDR_T addr, char *buf, int size, int flags, char *ptr) {
 
     struct block *b;
-    struct block *blocks = (struct block *) ptr;
+    skfile *file = (skfile *) ptr;
 
     if(size <= 0)
         return WALK_CONT;
 
-    /* create a new block entry */
-    b = talloc(blocks, struct block);
-
     if(flags & FS_FLAG_DATA_RES) {
-        // we have resident ntfs data (yuck!)
-        b->addr = 0;
-        b->size = size;
-        b->resdata = (char *)talloc_size(b, size);
-        memcpy(b->resdata, buf, size);
+        /* we have resident ntfs data */
+        file->resdata = (char *)talloc_size(NULL, size);
+        memcpy(file->resdata, buf, size);
     } else {
+        /* create a new block entry */
+        b = talloc(file->blocks, struct block);
         b->addr = addr;
         b->size = size;
-        b->resdata = NULL;
+        list_add_tail(&b->list, &file->blocks->list);
     }
 
     /* add to the list */
-    list_add_tail(&b->list, &blocks->list);
     return WALK_CONT;
 }
 
@@ -83,13 +73,6 @@ INUM_T lookup(FS_INFO *fs, char *path) {
 /*****************************************************************
  * Now for the python module stuff 
  * ***************************************************************/
-
-/* The skfs type represents a sleuthkit filesystem object */
-typedef struct {
-    PyObject_HEAD
-	IMG_INFO *img;
-	FS_INFO *fs;
-} skfs;
 
 static void
 skfs_dealloc(skfs *self) {
@@ -151,68 +134,35 @@ skfs_listdir(skfs *self, PyObject *args, PyObject *kwds) {
     return list;
 }
 
-static PyMethodDef skfs_methods[] = {
-    {"listdir", (PyCFunction)skfs_listdir, METH_VARARGS|METH_KEYWORDS,
-     "List directory contents"
-    },
-    {NULL}  /* Sentinel */
-};
+/* Open a file from the skfs */
+static PyObject *
+skfs_open(skfs *self, PyObject *args, PyObject *kwds) {
+    char *path=NULL;
+    PyObject *fileargs, *filekwds; 
+    skfile *file;
 
-static PyTypeObject skfsType = {
-    PyObject_HEAD_INIT(NULL)
-    0,                         /*ob_size*/
-    "sk.skfs",                 /*tp_name*/
-    sizeof(skfs),              /*tp_basicsize*/
-    0,                         /*tp_itemsize*/
-    (destructor)skfs_dealloc,  /*tp_dealloc*/
-    0,                         /*tp_print*/
-    0,                         /*tp_getattr*/
-    0,                         /*tp_setattr*/
-    0,                         /*tp_compare*/
-    0,                         /*tp_repr*/
-    0,                         /*tp_as_number*/
-    0,                         /*tp_as_sequence*/
-    0,                         /*tp_as_mapping*/
-    0,                         /*tp_hash */
-    0,                         /*tp_call*/
-    0,                         /*tp_str*/
-    0,                         /*tp_getattro*/
-    0,                         /*tp_setattro*/
-    0,                         /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT,        /*tp_flags*/
-    "Sleuthkit Filesystem Object",     /* tp_doc */
-    0,	                       /* tp_traverse */
-    0,                         /* tp_clear */
-    0,                         /* tp_richcompare */
-    0,                         /* tp_weaklistoffset */
-    0,                         /* tp_iter */
-    0,                         /* tp_iternext */
-    skfs_methods,              /* tp_methods */
-    0,                         /* tp_members */
-    0,                         /* tp_getset */
-    0,                         /* tp_base */
-    0,                         /* tp_dict */
-    0,                         /* tp_descr_get */
-    0,                         /* tp_descr_set */
-    0,                         /* tp_dictoffset */
-    (initproc)skfs_init,       /* tp_init */
-    0,                         /* tp_alloc */
-    0,                         /* tp_new */
-};
+    static char *kwlist[] = {"path", NULL};
 
-/* The skfile type represents a sleuthkit file object */
-typedef struct {
-    PyObject_HEAD
-    PyObject *skfs;
-    FS_INODE *fs_inode;
-    struct block *blocks;
-    long long readptr;
-} skfile;
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "s", kwlist, &path))
+        return NULL; 
+
+    /* create an skfs object to return to the caller */
+    fileargs = PyTuple_New(0);
+    filekwds = Py_BuildValue("{sOss}", "filesystem", (PyObject *)self, "filename", path);
+
+    file = PyObject_New(skfile, &skfileType);
+    skfile_init(file, fileargs, filekwds);
+    Py_DECREF(fileargs);
+    Py_DECREF(filekwds);
+    return (PyObject *)file;
+}
 
 static void
 skfile_dealloc(skfile *self) {
     Py_XDECREF(self->skfs);
     talloc_free(self->blocks);
+    if(self->resdata)
+        talloc_free(self->resdata);
     fs_inode_free(self->fs_inode);
     self->ob_type->tp_free((PyObject*)self);
 }
@@ -253,13 +203,13 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
     INIT_LIST_HEAD(&self->blocks->list);
     fs->file_walk(fs, self->fs_inode, 0, 0, 
                  (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOSPARSE),
-                 (FS_FILE_WALK_FN) getblocks_walk_callback, (void *)self->blocks);
+                 (FS_FILE_WALK_FN) getblocks_walk_callback, (void *)self);
 
+    self->resdata = NULL;
     self->readptr = 0;
     return 0;
 }
 
-/* read data from a file */
 static PyObject *
 skfile_read(skfile *self, PyObject *args) {
     char *buf;
@@ -277,6 +227,13 @@ skfile_read(skfile *self, PyObject *args) {
     /* adjust readlen if size not given or is too big */
     if(readlen < 0 || self->readptr + readlen > self->fs_inode->size)
         readlen = self->fs_inode->size - self->readptr;
+
+    /* special case for NTFS resident data */
+    if(self->resdata) {
+         retdata = PyString_FromStringAndSize(self->resdata + self->readptr, readlen);
+         self->readptr += readlen;
+         return retdata;
+    }
     
     /* allocate buf, be generous in case data straddles blocks */
     buf = (char *)malloc(readlen + (2 * fs->block_size));
@@ -287,12 +244,6 @@ skfile_read(skfile *self, PyObject *args) {
     cur = written = 0;
     list_for_each_entry(b, &self->blocks->list, list) {
 
-        /* deal with NTFS resident files */
-        if(b->resdata) {
-            memcpy(buf, b->resdata, b->size);
-            break;
-        }
-        
         /* we don't need any data in this block, skip */
         if(cur + fs->block_size <= self->readptr) {
             cur += fs->block_size;
@@ -313,57 +264,50 @@ skfile_read(skfile *self, PyObject *args) {
     retdata = PyString_FromStringAndSize(buf + (self->readptr % fs->block_size), readlen);
     free(buf);
 
+    self->readptr += readlen;
     return retdata;
 }
 
-static PyMethodDef skfile_methods[] = {
-    {"read", (PyCFunction)skfile_read, METH_VARARGS,
-     "Read data from file"
-    },
-    {NULL}  /* Sentinel */
-};
+static PyObject *
+skfile_seek(skfile *self, PyObject *args) {
+    int offset=0;
+    int whence=0;
 
-static PyTypeObject skfileType = {
-    PyObject_HEAD_INIT(NULL)
-    0,                         /*ob_size*/
-    "sk.skfile",               /*tp_name*/
-    sizeof(skfile),            /*tp_basicsize*/
-    0,                         /*tp_itemsize*/
-    (destructor)skfile_dealloc,/*tp_dealloc*/
-    0,                         /*tp_print*/
-    0,                         /*tp_getattr*/
-    0,                         /*tp_setattr*/
-    0,                         /*tp_compare*/
-    0,                         /*tp_repr*/
-    0,                         /*tp_as_number*/
-    0,                         /*tp_as_sequence*/
-    0,                         /*tp_as_mapping*/
-    0,                         /*tp_hash */
-    0,                         /*tp_call*/
-    0,                         /*tp_str*/
-    0,                         /*tp_getattro*/
-    0,                         /*tp_setattro*/
-    0,                         /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT,        /*tp_flags*/
-    "Sleuthkit File Object",   /* tp_doc */
-    0,	                       /* tp_traverse */
-    0,                         /* tp_clear */
-    0,                         /* tp_richcompare */
-    0,                         /* tp_weaklistoffset */
-    0,                         /* tp_iter */
-    0,                         /* tp_iternext */
-    skfile_methods,            /* tp_methods */
-    0,                         /* tp_members */
-    0,                         /* tp_getset */
-    0,                         /* tp_base */
-    0,                         /* tp_dict */
-    0,                         /* tp_descr_get */
-    0,                         /* tp_descr_set */
-    0,                         /* tp_dictoffset */
-    (initproc)skfile_init,     /* tp_init */
-    0,                         /* tp_alloc */
-    0,                         /* tp_new */
-};
+    if(!PyArg_ParseTuple(args, "i|i", &offset, &whence))
+        return NULL; 
+
+    switch(whence) {
+        case 0:
+            self->readptr = offset;
+            break;
+        case 1:
+            self->readptr += offset;
+            break;
+        case 2:
+            self->readptr = self->fs_inode->size + offset;
+            break;
+        default:
+            return NULL;
+    }
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *
+skfile_tell(skfile *self) {
+    return PyLong_FromLongLong(self->readptr);
+}
+
+static PyObject *
+skfile_blocks(skfile *self) {
+    struct block *b;
+    PyObject *list = PyList_New(0);
+
+    list_for_each_entry(b, &self->blocks->list, list) {
+        PyList_Append(list, PyLong_FromUnsignedLongLong(b->addr));
+    }
+    return list;
+}
 
 /* these are the module methods */
 static PyMethodDef sk_methods[] = {
