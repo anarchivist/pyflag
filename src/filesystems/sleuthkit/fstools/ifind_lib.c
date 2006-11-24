@@ -250,7 +250,7 @@ fs_ifind_path_ret(FS_INFO * fs, uint8_t lclflags, char *path)
     if (fs->dent_walk(fs, fs->root_inum,
 	    FS_FLAG_NAME_ALLOC | FS_FLAG_NAME_UNALLOC, ifind_path_act,
 	    (void *)&state)) {
-	return -1;
+	return 0;
     }
 
     if (state.found)
@@ -265,7 +265,7 @@ uint8_t
 fs_ifind_path(FS_INFO * fs, uint8_t lclflags, char *path)
 {
     INUM_T inode = fs_ifind_path_ret(fs, lclflags, path);
-    if(inode < 0)
+    if(inode == 0)
         return 1;
 
     printf("%" PRIuINUM "\n", inode);

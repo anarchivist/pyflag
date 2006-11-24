@@ -12,6 +12,20 @@
 #include "fs_tools.h"
 #include "libfstools.h"
 
+/*
+ * Suggested functions:
+ * skfs:
+ * lookup (return inode for a path)
+ * walk (same as os.walk)
+ * stat (return stat info for an path)
+ * isdir (is this a dir)
+ * islink (is this a link)
+ * isfile (is this a file)
+ * skfile:
+ * read (read from path)
+ */
+
+
 /* Here are a bunch of callbacks and helpers used to give sk a more filesystem
  * like interface */
 
@@ -41,13 +55,17 @@ getblocks_walk_callback (FS_INFO *fs, DADDR_T addr, char *buf, int size, int fla
         /* we have resident ntfs data */
         file->resdata = (char *)talloc_size(NULL, size);
         memcpy(file->resdata, buf, size);
+        file->size = size;
     } else {
         /* create a new block entry */
         b = talloc(file->blocks, struct block);
         b->addr = addr;
         b->size = size;
         list_add_tail(&b->list, &file->blocks->list);
+        file->size += size;
     }
+
+    printf("size: %d\n", size);
 
     /* add to the list */
     return WALK_CONT;
@@ -58,22 +76,15 @@ INUM_T lookup(FS_INFO *fs, char *path) {
     return fs_ifind_path_ret(fs, 0, path);
 }
 
-/*
- * Suggested functions:
- * lookup (return inode for a path)
- * ipread (read from inode)
- * istat (return stat info for an inode)
- * pread (read from path)
- * stat (return stat info for an path)
- * isdir (is this a dir)
- * islink (is this a link)
- * isfile (is this a file)
- */
-
 /*****************************************************************
  * Now for the python module stuff 
  * ***************************************************************/
 
+/* TODO: Set proper exceptions before returning on errors 
+ * Double check the types used, sk generally uses uint64_t for 
+ * inums, addresses etc */
+
+/************* SKFS ***************/
 static void
 skfs_dealloc(skfs *self) {
     if(self->fs)
@@ -138,17 +149,24 @@ skfs_listdir(skfs *self, PyObject *args, PyObject *kwds) {
 static PyObject *
 skfs_open(skfs *self, PyObject *args, PyObject *kwds) {
     char *path=NULL;
+    INUM_T inode=0;
+    int type=0, id=0;
     PyObject *fileargs, *filekwds; 
     skfile *file;
 
-    static char *kwlist[] = {"path", NULL};
+    static char *kwlist[] = {"path", "inode", "type", "id", NULL};
 
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "s", kwlist, &path))
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "|sKii", kwlist, &path, &inode, &type, &id))
         return NULL; 
+
+    /* make sure we at least have a path or inode */
+    if(path==NULL && inode==0)
+        return NULL;
 
     /* create an skfs object to return to the caller */
     fileargs = PyTuple_New(0);
-    filekwds = Py_BuildValue("{sOss}", "filesystem", (PyObject *)self, "filename", path);
+    filekwds = Py_BuildValue("{sOsssKsisi}", "filesystem", (PyObject *)self, "path", path,
+                                             "inode", inode, "type", type, "id", id);
 
     file = PyObject_New(skfile, &skfileType);
     skfile_init(file, fileargs, filekwds);
@@ -157,6 +175,7 @@ skfs_open(skfs *self, PyObject *args, PyObject *kwds) {
     return (PyObject *)file;
 }
 
+/************* SKFILE ***************/
 static void
 skfile_dealloc(skfile *self) {
     Py_XDECREF(self->skfs);
@@ -171,23 +190,28 @@ static int
 skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
     char *filename=NULL;
     INUM_T inode=0;
+    int type=0, id=0;
     PyObject *skfs_obj;
     FS_INFO *fs;
 
-    static char *kwlist[] = {"filesystem", "inode", "filename", NULL};
+    static char *kwlist[] = {"filesystem", "path", "inode", "type", "id", NULL};
 
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "O|Ks", kwlist, 
-                                    &skfs_obj, &inode, &filename))
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "O|sKii", kwlist, 
+                                    &skfs_obj, &filename, &inode, &type, &id))
         return -1; 
+
+    /* check the type of the filesystem object */
+    if(PyObject_IsInstance(skfs_obj, (PyObject *)&skfsType)==0)
+        return -1;
 
     fs = ((skfs *)skfs_obj)->fs;
 
+    /* must specify either inode or filename */
+    if(filename==NULL && inode == 0)
+        return -1;
+
     if(filename)
         inode = lookup(fs, filename);
-
-    /* must specify either inode or filename */
-    if(filename==NULL && inode <= 0)
-        return -1;
 
     /* can we lookup this inode? */
     self->fs_inode = fs->inode_lookup(fs, inode);
@@ -198,15 +222,20 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
     Py_INCREF(skfs_obj);
     self->skfs = skfs_obj;
 
-    /* perform a file run and populate the block list */
+    self->resdata = NULL;
+    self->readptr = 0;
+    self->size = 0;
+
+    /* perform a file run and populate the block list, use type and id to
+     * ensure we follow the correct attribute for NTFS (these default to 0
+     * which will give us the default data attribute). size will also be set
+     * during the walk */
     self->blocks = talloc(NULL, struct block);
     INIT_LIST_HEAD(&self->blocks->list);
-    fs->file_walk(fs, self->fs_inode, 0, 0, 
+    fs->file_walk(fs, self->fs_inode, type, id, 
                  (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOSPARSE),
                  (FS_FILE_WALK_FN) getblocks_walk_callback, (void *)self);
 
-    self->resdata = NULL;
-    self->readptr = 0;
     return 0;
 }
 
@@ -225,8 +254,8 @@ skfile_read(skfile *self, PyObject *args) {
         return NULL; 
 
     /* adjust readlen if size not given or is too big */
-    if(readlen < 0 || self->readptr + readlen > self->fs_inode->size)
-        readlen = self->fs_inode->size - self->readptr;
+    if(readlen < 0 || self->readptr + readlen > self->size)
+        readlen = self->size - self->readptr;
 
     /* special case for NTFS resident data */
     if(self->resdata) {
@@ -284,7 +313,7 @@ skfile_seek(skfile *self, PyObject *args) {
             self->readptr += offset;
             break;
         case 2:
-            self->readptr = self->fs_inode->size + offset;
+            self->readptr = self->size + offset;
             break;
         default:
             return NULL;
