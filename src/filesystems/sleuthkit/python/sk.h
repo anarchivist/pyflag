@@ -17,9 +17,13 @@ struct block {
     struct list_head list;
 };
 
-/* callback function for dent_walk, populates an file list */
+/* callback functions for dent_walk, populate a file list */
 static uint8_t
 listdent_walk_callback(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr);
+static uint8_t
+listdent_walk_callback_dirs(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr);
+static uint8_t
+listdent_walk_callback_nondirs(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr);
 
 /* callback function for file_walk, populates a block list */
 static u_int8_t
@@ -42,12 +46,15 @@ static void skfs_dealloc(skfs *self);
 static int skfs_init(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_listdir(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_open(skfs *self, PyObject *args, PyObject *kwds);
+static PyObject *skfs_walk(skfs *self, PyObject *args, PyObject *kwds);
 
 static PyMethodDef skfs_methods[] = {
     {"listdir", (PyCFunction)skfs_listdir, METH_VARARGS|METH_KEYWORDS,
      "List directory contents" },
     {"open", (PyCFunction)skfs_open, METH_VARARGS|METH_KEYWORDS,
      "Open a file" },
+    {"walk", (PyCFunction)skfs_walk, METH_VARARGS|METH_KEYWORDS,
+     "Walk filesystem from the given path" },
     {NULL}  /* Sentinel */
 };
 
@@ -89,6 +96,77 @@ static PyTypeObject skfsType = {
     0,                         /* tp_descr_set */
     0,                         /* tp_dictoffset */
     (initproc)skfs_init,       /* tp_init */
+    0,                         /* tp_alloc */
+    0,                         /* tp_new */
+};
+
+/******************************************************************
+ * SKFSWalkIter - Support the skfs.walk iterator
+ * ***************************************************************/
+
+struct walkpath {
+    char *path;
+    struct list_head list;
+};
+
+typedef struct {
+    PyObject_HEAD
+    skfs *skfs;
+    struct walkpath *paths;
+    int flags;
+} skfs_walkiter;
+
+static void skfs_walkiter_dealloc(skfs_walkiter *self);
+static int skfs_walkiter_init(skfs_walkiter *self, PyObject *args, PyObject *kwds);
+static PyObject *skfs_walkiter_iter(skfs_walkiter *self);
+static PyObject *skfs_walkiter_iternext(skfs_walkiter *self);
+
+//static PyMethodDef skfs_walkiter_methods[] = {
+//    {"listdir", (PyCFunction)skfs_listdir, METH_VARARGS|METH_KEYWORDS,
+//     "List directory contents" },
+//    {"open", (PyCFunction)skfs_open, METH_VARARGS|METH_KEYWORDS,
+//     "Open a file" },
+//    {NULL}  /* Sentinel */
+//};
+
+static PyTypeObject skfs_walkiterType = {
+    PyObject_HEAD_INIT(NULL)
+    0,                         /* ob_size */
+    "sk.skfs_walkiter",        /* tp_name */
+    sizeof(skfs_walkiter),     /* tp_basicsize */
+    0,                         /* tp_itemsize */
+    (destructor)skfs_walkiter_dealloc, /* tp_dealloc */
+    0,                         /* tp_print */
+    0,                         /* tp_getattr */
+    0,                         /* tp_setattr */
+    0,                         /* tp_compare */
+    0,                         /* tp_repr */
+    0,                         /* tp_as_number */
+    0,                         /* tp_as_sequence */
+    0,                         /* tp_as_mapping */
+    0,                         /* tp_hash */
+    0,                         /* tp_call */
+    0,                         /* tp_str */
+    0,                         /* tp_getattro */
+    0,                         /* tp_setattro */
+    0,                         /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,        /* tp_flags */
+    "Sleuthkit Filesystem Walk Iterator Object",     /* tp_doc */
+    0,	                       /* tp_traverse */
+    0,                         /* tp_clear */
+    0,                         /* tp_richcompare */
+    0,                         /* tp_weaklistoffset */
+    PyObject_SelfIter,         /* tp_iter */
+    (iternextfunc)skfs_walkiter_iternext, /* tp_iternext */
+    0, //skfs_methods,              /* tp_methods */
+    0,                         /* tp_members */
+    0,                         /* tp_getset */
+    0,                         /* tp_base */
+    0,                         /* tp_dict */
+    0,                         /* tp_descr_get */
+    0,                         /* tp_descr_set */
+    0,                         /* tp_dictoffset */
+    (initproc)skfs_walkiter_init, /* tp_init */
     0,                         /* tp_alloc */
     0,                         /* tp_new */
 };
