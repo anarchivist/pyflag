@@ -120,6 +120,7 @@ skfs_dealloc(skfs *self) {
         self->fs->close(self->fs);
     if(self->img)
         self->img->close(self->img);
+    self->ob_type->tp_free((PyObject*)self);
 }
 
 static int
@@ -235,6 +236,48 @@ skfs_walk(skfs *self, PyObject *args, PyObject *kwds) {
     Py_DECREF(fileargs);
     Py_DECREF(filekwds);
     return (PyObject *)iter;
+}
+
+/* perform a filesystem walk (like os.walk) */
+static PyObject *
+skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
+    PyObject *result;
+    PyObject *os;
+    char *path=NULL;
+    INUM_T inode=0;
+    FS_INODE *fs_inode;
+    int type=0, id=0;
+
+    static char *kwlist[] = {"path", "inode", "type", "id", NULL};
+
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "|sKii", kwlist, &path, &inode, &type, &id))
+        return NULL; 
+
+    /* make sure we at least have a path or inode */
+    if(path==NULL && inode==0)
+        return NULL;
+
+    if(path)
+        inode = lookup(self->fs, path);
+
+    /* can we lookup this inode? */
+    fs_inode = self->fs->inode_lookup(self->fs, inode);
+    if(fs_inode == NULL)
+        return NULL;
+
+    /* return a real stat_result! */
+    /* (mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime) */
+    os = PyImport_ImportModule("os");
+    result = PyObject_CallMethod(os, "stat_result", "((iiliiiiiii))", 
+                                 fs_inode->mode, fs_inode->addr, 0, fs_inode->nlink, 
+                                 fs_inode->uid, fs_inode->gid, fs_inode->size,
+                                 fs_inode->atime, fs_inode->mtime, fs_inode->ctime);
+    Py_DECREF(os);
+
+    /* release the fs_inode */
+    fs_inode_free(fs_inode);
+
+    return result;
 }
 
 /* this new object is requred to support the iterator protocol for skfs.walk
@@ -391,9 +434,14 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
      * during the walk */
     self->blocks = talloc(NULL, struct block);
     INIT_LIST_HEAD(&self->blocks->list);
-    fs->file_walk(fs, self->fs_inode, type, id, 
-                 (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOSPARSE),
-                 (FS_FILE_WALK_FN) getblocks_walk_callback, (void *)self);
+    if(id == 0)
+        fs->file_walk(fs, self->fs_inode, type, id, 
+                     (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOSPARSE | FS_FLAG_FILE_NOID),
+                     (FS_FILE_WALK_FN) getblocks_walk_callback, (void *)self);
+    else
+        fs->file_walk(fs, self->fs_inode, type, id, 
+                     (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOSPARSE),
+                     (FS_FILE_WALK_FN) getblocks_walk_callback, (void *)self);
 
     return 0;
 }
@@ -528,7 +576,7 @@ initsk(void)
         return;
 
     Py_INCREF(&skfs_walkiterType);
-    PyModule_AddObject(m, "skfs_walkiter", (PyObject *)&skfs_walkiterType);
+    //PyModule_AddObject(m, "skfs_walkiter", (PyObject *)&skfs_walkiterType);
 
     /* setup skfile type */
     skfileType.tp_new = PyType_GenericNew;

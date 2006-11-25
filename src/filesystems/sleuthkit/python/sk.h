@@ -47,6 +47,7 @@ static int skfs_init(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_listdir(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_open(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_walk(skfs *self, PyObject *args, PyObject *kwds);
+static PyObject *skfs_stat(skfs *self, PyObject *args, PyObject *kwds);
 
 static PyMethodDef skfs_methods[] = {
     {"listdir", (PyCFunction)skfs_listdir, METH_VARARGS|METH_KEYWORDS,
@@ -55,6 +56,8 @@ static PyMethodDef skfs_methods[] = {
      "Open a file" },
     {"walk", (PyCFunction)skfs_walk, METH_VARARGS|METH_KEYWORDS,
      "Walk filesystem from the given path" },
+    {"stat", (PyCFunction)skfs_stat, METH_VARARGS|METH_KEYWORDS,
+     "Stat a file" },
     {NULL}  /* Sentinel */
 };
 
