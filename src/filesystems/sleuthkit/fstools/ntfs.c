@@ -3930,6 +3930,8 @@ ntfs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype, uint8_t test)
     ntfs->loading_the_MFT = 0;
     ntfs->bmap = NULL;
     ntfs->bmap_buf = NULL;
+    ntfs->sds = NULL;
+    ntfs->sid = NULL;
 
     /* Read the boot sector */
     len = roundup(sizeof(ntfs_sb), NTFS_DEV_BSIZE);
