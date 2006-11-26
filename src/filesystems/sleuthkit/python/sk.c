@@ -142,7 +142,7 @@ skfs_init(skfs *self, PyObject *args, PyObject *kwds) {
     tsk_error_reset();
     self->img = img_open(imgtype, 1, (const char **)&imgfile);
     if(!self->img) {
-      PyErr_Format(PyExc_IOError, "Unable to open image %s.", imgfile);
+      PyErr_Format(PyExc_IOError, "Unable to open image %s: %s.", imgfile, tsk_error_str());
       return -1;
     }
 
@@ -150,7 +150,7 @@ skfs_init(skfs *self, PyObject *args, PyObject *kwds) {
     tsk_error_reset();
     self->fs = fs_open(self->img, 0, fstype);
     if(!self->fs) {
-      PyErr_Format(PyExc_RuntimeError, "Unable to parse filesystem in image %s.", imgfile);
+      PyErr_Format(PyExc_RuntimeError, "Unable to open filesystem in image %s: %s.", imgfile, tsk_error_str());
       return -1;
     }
 
@@ -176,7 +176,7 @@ skfs_listdir(skfs *self, PyObject *args, PyObject *kwds) {
     tsk_error_reset();
     inode = lookup(self->fs, path);
     if(inode < 0)
-        return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s.", path);
+        return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %s.", path, tsk_error_str());
 
     /* set flags */
     if(alloc)
@@ -189,7 +189,7 @@ skfs_listdir(skfs *self, PyObject *args, PyObject *kwds) {
     tsk_error_reset();
     self->fs->dent_walk(self->fs, inode, flags, listdent_walk_callback, (void *)list);
     if(tsk_errno) {
-      return PyErr_Format(PyExc_IOError, "Unable to list inode %s.", inode);
+      return PyErr_Format(PyExc_IOError, "Unable to list inode %lu: %s.", (ULONG)inode, tsk_error_str());
     };
 
     return list;
@@ -200,9 +200,8 @@ static PyObject *
 skfs_open(skfs *self, PyObject *args, PyObject *kwds) {
     char *path=NULL;
     INUM_T inode=0;
-    int type=0, id=0;
-    PyObject *fileargs, *filekwds; 
-    skfile *file;
+    int type=0, id=0, ret;
+    PyObject *sk, *result;
 
     static char *kwlist[] = {"path", "inode", "type", "id", NULL};
 
@@ -211,18 +210,14 @@ skfs_open(skfs *self, PyObject *args, PyObject *kwds) {
 
     /* make sure we at least have a path or inode */
     if(path==NULL && inode==0)
-        return PyErr_Format(PyExc_SyntaxError, "One of path or inode was not specified");
+        return PyErr_Format(PyExc_SyntaxError, "One of path or inode must be specified");
 
-    /* create an skfile object to return to the caller */
-    fileargs = PyTuple_New(0);
-    filekwds = Py_BuildValue("{sOsssKsisi}", "filesystem", (PyObject *)self, "path", path,
-                                             "inode", inode, "type", type, "id", id);
-
-    file = PyObject_New(skfile, &skfileType);
-    skfile_init(file, fileargs, filekwds);
-    Py_DECREF(fileargs);
-    Py_DECREF(filekwds);
-    return (PyObject *)file;
+    /* create an skfile object and return it */
+    sk = PyImport_ImportModule("sk");
+    result = PyObject_CallMethod(sk, "skfile", "(OsKii)", (PyObject *)self, 
+                                 path, inode, type, id);
+    Py_DECREF(sk);
+    return result;
 }
 
 /* perform a filesystem walk (like os.walk) */
@@ -232,6 +227,7 @@ skfs_walk(skfs *self, PyObject *args, PyObject *kwds) {
     PyObject *fileargs, *filekwds; 
     int alloc=1, unalloc=0;
     skfs_walkiter *iter;
+    int ret;
 
     static char *kwlist[] = {"path", "alloc", "unalloc", NULL};
 
@@ -244,9 +240,11 @@ skfs_walk(skfs *self, PyObject *args, PyObject *kwds) {
                                              "alloc", alloc, "unalloc", unalloc);
 
     iter = PyObject_New(skfs_walkiter, &skfs_walkiterType);
-    skfs_walkiter_init(iter, fileargs, filekwds);
+    ret = skfs_walkiter_init(iter, fileargs, filekwds);
     Py_DECREF(fileargs);
     Py_DECREF(filekwds);
+
+    if(ret == -1) return NULL;
     return (PyObject *)iter;
 }
 
@@ -267,20 +265,20 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
 
     /* make sure we at least have a path or inode */
     if(path==NULL && inode==0)
-      return PyErr_Format(PyExc_SyntaxError, "One of path or inode was not specified");
+        return PyErr_Format(PyExc_SyntaxError, "One of path or inode must be specified");
 
     if(path) {
-      tsk_error_reset();
-      inode = lookup(self->fs, path);
-      if(inode < 0)
-        return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s.", path);
+        tsk_error_reset();
+        inode = lookup(self->fs, path);
+        if(inode < 0)
+            return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %s.", path, tsk_error_str());
     };
 
     /* can we lookup this inode? */
     tsk_error_reset();
     fs_inode = self->fs->inode_lookup(self->fs, inode);
     if(fs_inode == NULL)
-        return PyErr_Format(PyExc_IOError, "Unable to find inode %s.", inode);
+        return PyErr_Format(PyExc_IOError, "Unable to find inode %lu: %s.", (ULONG)inode, tsk_error_str());
 
     /* return a real stat_result! */
     /* (mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime) */
@@ -412,6 +410,7 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
     int type=0, id=0;
     PyObject *skfs_obj;
     FS_INFO *fs;
+    int flags;
 
     static char *kwlist[] = {"filesystem", "path", "inode", "type", "id", NULL};
 
@@ -420,32 +419,34 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
         return -1; 
 
     /* check the type of the filesystem object */
-    if(PyObject_TypeCheck(skfs_obj, &skfsType)==0)
+    if(PyObject_TypeCheck(skfs_obj, &skfsType) == 0) {
+        PyErr_Format(PyExc_TypeError, "filesystem is not an skfs instance");
         return -1;
+    }
 
     fs = ((skfs *)skfs_obj)->fs;
 
     /* must specify either inode or filename */
     if(filename==NULL && inode == 0) {
-      PyErr_Format(PyExc_SyntaxError, "One of filename or inode should be specified");
-      return -1;
+        PyErr_Format(PyExc_SyntaxError, "One of filename or inode should be specified");
+        return -1;
     };
 
     if(filename) {
-      tsk_error_reset();
-      inode = lookup(fs, filename);
-      if(inode < 0) {
-        PyErr_Format(PyExc_IOError, "Unable to find inode for file %s.", filename);
-	return -1;
-      };
+        tsk_error_reset();
+        inode = lookup(fs, filename);
+        if(inode < 0) {
+            PyErr_Format(PyExc_IOError, "Unable to find inode for file %s: %s.", filename, tsk_error_str());
+            return -1;
+        };
     };
 
     /* can we lookup this inode? */
     tsk_error_reset();
     self->fs_inode = fs->inode_lookup(fs, inode);
     if(self->fs_inode == NULL) {
-      PyErr_Format(PyExc_IOError, "Unable to find inode %s.", inode);
-      return -1;
+        PyErr_Format(PyExc_IOError, "Unable to find inode: %s", tsk_error_str());
+        return -1;
     };
 
     /* store a ref to the skfs */
@@ -460,27 +461,19 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
      * ensure we follow the correct attribute for NTFS (these default to 0
      * which will give us the default data attribute). size will also be set
      * during the walk */
+
+    flags = FS_FLAG_FILE_AONLY | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOSPARSE;
+    if(id == 0)
+        flags |= FS_FLAG_FILE_NOID;
+
     self->blocks = talloc(NULL, struct block);
     INIT_LIST_HEAD(&self->blocks->list);
-    if(id == 0) {
-      tsk_error_reset();
-      fs->file_walk(fs, self->fs_inode, type, id, 
-                     (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOSPARSE | FS_FLAG_FILE_NOID),
-                     (FS_FILE_WALK_FN) getblocks_walk_callback, (void *)self);
-      if(tsk_errno) {
-	PyErr_Format(PyExc_IOError, "Error reading inode");
-	return -1;
-      };
-
-    }  else {
-      tsk_error_reset();
-      fs->file_walk(fs, self->fs_inode, type, id, 
-                     (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOSPARSE),
-                     (FS_FILE_WALK_FN) getblocks_walk_callback, (void *)self);
-      if(tsk_errno) {
-	PyErr_Format(PyExc_IOError, "Error reading inode");
-	return -1;
-      };
+    tsk_error_reset();
+    fs->file_walk(fs, self->fs_inode, type, id, flags,
+                 (FS_FILE_WALK_FN) getblocks_walk_callback, (void *)self);
+    if(tsk_errno) {
+        PyErr_Format(PyExc_IOError, "Error reading inode: %s", tsk_error_str());
+        return -1;
     };
 
     return 0;
@@ -514,7 +507,7 @@ skfile_read(skfile *self, PyObject *args) {
     /* allocate buf, be generous in case data straddles blocks */
     buf = (char *)malloc(readlen + (2 * fs->block_size));
     if(!buf)
-        return NULL;
+        return PyErr_Format(PyExc_MemoryError, "Out of Memory allocating read buffer.");
 
     /* read necessary blocks into buf */
     cur = written = 0;
@@ -563,7 +556,7 @@ skfile_seek(skfile *self, PyObject *args) {
             self->readptr = self->size + offset;
             break;
         default:
-            return NULL;
+            return PyErr_Format(PyExc_IOError, "Invalid argument (whence): %d.", whence);
     }
     Py_INCREF(Py_None);
     return Py_None;
@@ -577,8 +570,8 @@ skfile_tell(skfile *self) {
 static PyObject *
 skfile_blocks(skfile *self) {
     struct block *b;
-    PyObject *list = PyList_New(0);
 
+    PyObject *list = PyList_New(0);
     list_for_each_entry(b, &self->blocks->list, list) {
         PyList_Append(list, PyLong_FromUnsignedLongLong(b->addr));
     }
