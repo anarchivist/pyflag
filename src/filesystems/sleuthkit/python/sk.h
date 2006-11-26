@@ -124,14 +124,6 @@ static int skfs_walkiter_init(skfs_walkiter *self, PyObject *args, PyObject *kwd
 static PyObject *skfs_walkiter_iter(skfs_walkiter *self);
 static PyObject *skfs_walkiter_iternext(skfs_walkiter *self);
 
-//static PyMethodDef skfs_walkiter_methods[] = {
-//    {"listdir", (PyCFunction)skfs_listdir, METH_VARARGS|METH_KEYWORDS,
-//     "List directory contents" },
-//    {"open", (PyCFunction)skfs_open, METH_VARARGS|METH_KEYWORDS,
-//     "Open a file" },
-//    {NULL}  /* Sentinel */
-//};
-
 static PyTypeObject skfs_walkiterType = {
     PyObject_HEAD_INIT(NULL)
     0,                         /* ob_size */
@@ -154,14 +146,14 @@ static PyTypeObject skfs_walkiterType = {
     0,                         /* tp_setattro */
     0,                         /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT,        /* tp_flags */
-    "Sleuthkit Filesystem Walk Iterator Object",     /* tp_doc */
+    "Sleuthkit Filesystem Walk Iterator Object", /* tp_doc */
     0,	                       /* tp_traverse */
     0,                         /* tp_clear */
     0,                         /* tp_richcompare */
     0,                         /* tp_weaklistoffset */
     PyObject_SelfIter,         /* tp_iter */
     (iternextfunc)skfs_walkiter_iternext, /* tp_iternext */
-    0, //skfs_methods,              /* tp_methods */
+    0,                         /* tp_methods */
     0,                         /* tp_members */
     0,                         /* tp_getset */
     0,                         /* tp_base */
