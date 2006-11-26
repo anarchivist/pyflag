@@ -25,9 +25,17 @@ listdent_walk_callback_dirs(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr)
 static uint8_t
 listdent_walk_callback_nondirs(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr);
 
+/* callback functions for dent_walk, populate a inode list */
+static uint8_t
+listdent_walk_callback_inode(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr);
+static uint8_t
+listdent_walk_callback_inode_dirs(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr);
+static uint8_t
+listdent_walk_callback_inode_nondirs(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr);
+
 /* callback function for file_walk, populates a block list */
 static u_int8_t
-getblocks_walk_callback (FS_INFO *fs, DADDR_T addr, char *buf, int size, int flags, char *ptr);
+getblocks_walk_callback(FS_INFO *fs, DADDR_T addr, char *buf, int size, int flags, char *ptr);
 
 /* lookup an inode from a path */
 INUM_T lookup(FS_INFO *fs, char *path);
@@ -47,6 +55,7 @@ static int skfs_init(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_listdir(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_open(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_walk(skfs *self, PyObject *args, PyObject *kwds);
+static PyObject *skfs_iwalk(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_stat(skfs *self, PyObject *args, PyObject *kwds);
 
 static PyMethodDef skfs_methods[] = {
@@ -56,6 +65,8 @@ static PyMethodDef skfs_methods[] = {
      "Open a file" },
     {"walk", (PyCFunction)skfs_walk, METH_VARARGS|METH_KEYWORDS,
      "Walk filesystem from the given path" },
+    {"iwalk", (PyCFunction)skfs_iwalk, METH_VARARGS|METH_KEYWORDS,
+     "Walk filesystem from the given path (return inodes)" },
     {"stat", (PyCFunction)skfs_stat, METH_VARARGS|METH_KEYWORDS,
      "Stat a file" },
     {NULL}  /* Sentinel */
@@ -162,6 +173,69 @@ static PyTypeObject skfs_walkiterType = {
     0,                         /* tp_descr_set */
     0,                         /* tp_dictoffset */
     (initproc)skfs_walkiter_init, /* tp_init */
+    0,                         /* tp_alloc */
+    0,                         /* tp_new */
+};
+
+/******************************************************************
+ * SKFSWalkIter - Support the skfs.walk iterator (inode version)
+ * ***************************************************************/
+
+struct walkinode {
+    INUM_T inode;
+    struct list_head list;
+};
+
+typedef struct {
+    PyObject_HEAD
+    skfs *skfs;
+    struct walkinode *inodes;
+    int flags;
+} skfs_iwalkiter;
+
+static void skfs_iwalkiter_dealloc(skfs_iwalkiter *self);
+static int skfs_iwalkiter_init(skfs_iwalkiter *self, PyObject *args, PyObject *kwds);
+static PyObject *skfs_iwalkiter_iter(skfs_iwalkiter *self);
+static PyObject *skfs_iwalkiter_iternext(skfs_iwalkiter *self);
+
+static PyTypeObject skfs_iwalkiterType = {
+    PyObject_HEAD_INIT(NULL)
+    0,                         /* ob_size */
+    "sk.skfs_iwalkiter",        /* tp_name */
+    sizeof(skfs_iwalkiter),     /* tp_basicsize */
+    0,                         /* tp_itemsize */
+    (destructor)skfs_iwalkiter_dealloc, /* tp_dealloc */
+    0,                         /* tp_print */
+    0,                         /* tp_getattr */
+    0,                         /* tp_setattr */
+    0,                         /* tp_compare */
+    0,                         /* tp_repr */
+    0,                         /* tp_as_number */
+    0,                         /* tp_as_sequence */
+    0,                         /* tp_as_mapping */
+    0,                         /* tp_hash */
+    0,                         /* tp_call */
+    0,                         /* tp_str */
+    0,                         /* tp_getattro */
+    0,                         /* tp_setattro */
+    0,                         /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,        /* tp_flags */
+    "Sleuthkit Filesystem Walk Iterator Object", /* tp_doc */
+    0,	                       /* tp_traverse */
+    0,                         /* tp_clear */
+    0,                         /* tp_richcompare */
+    0,                         /* tp_weaklistoffset */
+    PyObject_SelfIter,         /* tp_iter */
+    (iternextfunc)skfs_iwalkiter_iternext, /* tp_iternext */
+    0,                         /* tp_methods */
+    0,                         /* tp_members */
+    0,                         /* tp_getset */
+    0,                         /* tp_base */
+    0,                         /* tp_dict */
+    0,                         /* tp_descr_get */
+    0,                         /* tp_descr_set */
+    0,                         /* tp_dictoffset */
+    (initproc)skfs_iwalkiter_init, /* tp_init */
     0,                         /* tp_alloc */
     0,                         /* tp_new */
 };

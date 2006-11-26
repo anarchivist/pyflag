@@ -67,6 +67,43 @@ static uint8_t listdent_walk_callback(FS_INFO *fs, FS_DENT *fs_dent, int flags, 
     return WALK_CONT;
 }
 
+/* callback function for dent_walk, populates an inode list (dirs only) */
+static uint8_t listdent_walk_callback_inode_dirs(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr) {
+    PyObject *list = (PyObject *)ptr;
+
+    /* we dont want to add '.' and '..' */
+    if(strcmp(fs_dent->name, ".")==0 || strcmp(fs_dent->name, "..")==0)
+        return WALK_CONT;
+
+    if(fs_dent->ent_type == FS_DENT_DIR) {
+        PyList_Append(list, PyLong_FromLongLong(fs_dent->inode));
+    }
+    return WALK_CONT;
+}
+
+/* callback function for dent_walk, populates an inode list (nondirs only) */
+static uint8_t listdent_walk_callback_inode_nondirs(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr) {
+    PyObject *list = (PyObject *)ptr;
+
+    /* we dont want to add '.' and '..' */
+    if(strcmp(fs_dent->name, ".")==0 || strcmp(fs_dent->name, "..")==0)
+        return WALK_CONT;
+
+    if(fs_dent->ent_type != FS_DENT_DIR)
+        PyList_Append(list, PyLong_FromLongLong(fs_dent->inode));
+
+    return WALK_CONT;
+}
+
+/* callback function for dent_walk, populates an inode list */
+static uint8_t listdent_walk_callback_inode(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr) {
+    listdent_walk_callback_inode_dirs(fs, fs_dent, flags, ptr);
+    listdent_walk_callback_inode_nondirs(fs, fs_dent, flags, ptr);
+    return WALK_CONT;
+}
+
+
+
 /* callback function for file_walk, populates a block list */
 static u_int8_t
 getblocks_walk_callback (FS_INFO *fs, DADDR_T addr, char *buf, int size, int flags, char *ptr) {
@@ -201,7 +238,8 @@ skfs_open(skfs *self, PyObject *args, PyObject *kwds) {
     char *path=NULL;
     INUM_T inode=0;
     int type=0, id=0, ret;
-    PyObject *sk, *result;
+    PyObject *fileargs, *filekwds;
+    skfile *file;
 
     static char *kwlist[] = {"path", "inode", "type", "id", NULL};
 
@@ -210,22 +248,33 @@ skfs_open(skfs *self, PyObject *args, PyObject *kwds) {
 
     /* make sure we at least have a path or inode */
     if(path==NULL && inode==0)
-        return PyErr_Format(PyExc_SyntaxError, "One of path or inode must be specified");
+        return PyErr_Format(PyExc_SyntaxError, "One of path or inode must be specified, inode cannot be 0");
 
     /* create an skfile object and return it */
-    sk = PyImport_ImportModule("sk");
-    result = PyObject_CallMethod(sk, "skfile", "(OsKii)", (PyObject *)self, 
-                                 path, inode, type, id);
-    Py_DECREF(sk);
-    return result;
+    fileargs = PyTuple_New(0);
+    if(path)
+        filekwds = Py_BuildValue("{sOsssKsisi}", "filesystem", (PyObject *)self, "path", path,
+                                 "inode", inode, "type", type, "id", id);
+    else
+        filekwds = Py_BuildValue("{sOsssKsisi}", "filesystem", (PyObject *)self, "path", "",
+                                 "inode", inode, "type", type, "id", id);
+
+    file = PyObject_New(skfile, &skfileType);
+    ret = skfile_init(file, fileargs, filekwds);
+    Py_DECREF(fileargs);
+    Py_DECREF(filekwds);
+
+    if(ret == -1) return NULL;
+    return (PyObject *)file;
 }
 
 /* perform a filesystem walk (like os.walk) */
 static PyObject *
 skfs_walk(skfs *self, PyObject *args, PyObject *kwds) {
     char *path=NULL;
-    PyObject *sk, *result; 
-    int alloc=1, unalloc=0;
+    int alloc=1, unalloc=0, ret;
+    PyObject *fileargs, *filekwds;
+    skfs_walkiter *iter;
 
     static char *kwlist[] = {"path", "alloc", "unalloc", NULL};
 
@@ -233,15 +282,47 @@ skfs_walk(skfs *self, PyObject *args, PyObject *kwds) {
         return NULL; 
 
     /* create an skfs_walkiter object to return to the caller */
-    sk = PyImport_ImportModule("sk");
-    result = PyObject_CallMethod(sk, "skfs_walkiter", "(Osii)", (PyObject *)self, path,
-                                 alloc, unalloc);
-    Py_DECREF(sk);
+    fileargs = PyTuple_New(0);
+    filekwds = Py_BuildValue("{sOsssisi}", "filesystem", (PyObject *)self, "path", path,
+                             "alloc", alloc, "unalloc", unalloc);
 
-    return result;
+    iter = PyObject_New(skfs_walkiter, &skfs_walkiterType);
+    ret = skfs_walkiter_init(iter, fileargs, filekwds);
+    Py_DECREF(fileargs);
+    Py_DECREF(filekwds);
+
+    if(ret == -1) return NULL;
+    return (PyObject *)iter;
 }
 
 /* perform a filesystem walk (like os.walk) */
+static PyObject *
+skfs_iwalk(skfs *self, PyObject *args, PyObject *kwds) {
+    char *path=NULL;
+    int alloc=1, unalloc=0, ret;
+    PyObject *fileargs, *filekwds;
+    skfs_iwalkiter *iter;
+
+    static char *kwlist[] = {"path", "alloc", "unalloc", NULL};
+
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "s|ii", kwlist, &path, &alloc, &unalloc))
+        return NULL; 
+
+    /* create an skfs_walkiter object to return to the caller */
+    fileargs = PyTuple_New(0);
+    filekwds = Py_BuildValue("{sOsssisi}", "filesystem", (PyObject *)self, "path", path,
+                             "alloc", alloc, "unalloc", unalloc);
+
+    iter = PyObject_New(skfs_iwalkiter, &skfs_iwalkiterType);
+    ret = skfs_iwalkiter_init(iter, fileargs, filekwds);
+    Py_DECREF(fileargs);
+    Py_DECREF(filekwds);
+
+    if(ret == -1) return NULL;
+    return (PyObject *)iter;
+}
+
+/* stat a file */
 static PyObject *
 skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
     PyObject *result;
@@ -281,10 +362,9 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
                                  fs_inode->uid, fs_inode->gid, fs_inode->size,
                                  fs_inode->atime, fs_inode->mtime, fs_inode->ctime);
     Py_DECREF(os);
-
+    
     /* release the fs_inode */
     fs_inode_free(fs_inode);
-
     return result;
 }
 
@@ -355,19 +435,34 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
     if(strcmp(path, "/")==0)
         *path = 0;
 
-    /* TODO: is this always an error? maby we need to return an empty tuple
-     * and continue? */
+    tsk_error_reset();
     inode = lookup(self->skfs->fs, path);
-    if(inode == 0)
+    if(tsk_errno)
         return NULL;
 
+    if(inode == 0) {
+        list_del(&wp->list);
+        talloc_free(wp);
+        return Py_BuildValue("(s()())", path);
+    }
+
+    tsk_error_reset();
     dirlist = PyList_New(0);
     self->skfs->fs->dent_walk(self->skfs->fs, inode, self->flags, 
                               listdent_walk_callback_dirs, (void *)dirlist);
+    if(tsk_errno) {
+        PyErr_Format(PyExc_IOError, "Walk error: %s", tsk_error_str());
+        return NULL;
+    }
 
+    tsk_error_reset();
     filelist = PyList_New(0);
     self->skfs->fs->dent_walk(self->skfs->fs, inode, self->flags, 
                               listdent_walk_callback_nondirs, (void *)filelist);
+    if(tsk_errno) {
+        PyErr_Format(PyExc_IOError, "Walk error: %s", tsk_error_str());
+        return NULL;
+    }
 
     /* add dirs to the stack */
     for(i=0; i<PyList_Size(dirlist); i++) {
@@ -381,6 +476,106 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
     /* now delete this entry from the stack */
     list_del(&wp->list);
     talloc_free(wp);
+
+    return result;
+}
+
+/* this new object is requred to support the iterator protocol for skfs.walk
+ * (inode version) */
+static void 
+skfs_iwalkiter_dealloc(skfs_iwalkiter *self) {
+    Py_XDECREF(self->skfs);
+    talloc_free(self->inodes);
+    self->ob_type->tp_free((PyObject*)self);
+}
+
+static int 
+skfs_iwalkiter_init(skfs_iwalkiter *self, PyObject *args, PyObject *kwds) {
+    char *path=NULL;
+    PyObject *skfs_obj;
+    struct walkinode *root;
+    int alloc=1, unalloc=0;
+
+    static char *kwlist[] = {"filesystem", "path", "alloc", "unalloc", NULL};
+
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "Os|ii", kwlist, &skfs_obj, 
+                                    &path, &alloc, &unalloc))
+        return -1; 
+
+    /* set flags */
+    if(alloc)
+        self->flags |= FS_FLAG_NAME_ALLOC;
+    if(unalloc)
+        self->flags |= FS_FLAG_NAME_UNALLOC;
+
+    /* incref the skfs */
+    Py_INCREF(skfs_obj);
+    self->skfs = (skfs *)skfs_obj;
+
+    /* Initialise the path stack */
+    self->inodes = talloc(NULL, struct walkinode);
+    INIT_LIST_HEAD(&self->inodes->list);
+
+    /* add the root path */
+    root = talloc(self->inodes, struct walkinode);
+    tsk_error_reset();
+    root->inode = lookup(self->skfs->fs, path);
+    list_add(&root->list, &self->inodes->list);
+
+    return 0;
+}
+
+static PyObject *skfs_iwalkiter_iternext(skfs_iwalkiter *self) {
+    PyObject *dirlist, *filelist, *result;
+    struct walkinode *wi;
+    struct walkinode *tmpwi;
+    INUM_T inode;
+    int i;
+
+    /* are we done ? */
+    if(list_empty(&self->inodes->list))
+        return NULL;
+
+    /* pop an inode from the stack */
+    list_next(wi, &self->inodes->list, list);
+    inode = wi->inode;
+
+    if(inode == 0) {
+        list_del(&wi->list);
+        talloc_free(wi);
+        return Py_BuildValue("(K()())", 0);
+    }
+
+    tsk_error_reset();
+    dirlist = PyList_New(0);
+    self->skfs->fs->dent_walk(self->skfs->fs, inode, self->flags, 
+                              listdent_walk_callback_inode_dirs, (void *)dirlist);
+    if(tsk_errno) {
+        PyErr_Format(PyExc_IOError, "Walk error: %s", tsk_error_str());
+        return NULL;
+    }
+
+    tsk_error_reset();
+    filelist = PyList_New(0);
+    self->skfs->fs->dent_walk(self->skfs->fs, inode, self->flags, 
+                              listdent_walk_callback_inode_nondirs, (void *)filelist);
+    if(tsk_errno) {
+        PyErr_Format(PyExc_IOError, "Walk error: %s", tsk_error_str());
+        return NULL;
+    }
+
+    /* add dirs to the stack */
+    for(i=0; i<PyList_Size(dirlist); i++) {
+        tmpwi = talloc(self->inodes, struct walkinode);
+        tmpwi->inode = PyLong_AsLongLong(PyList_GetItem(dirlist, i));
+        list_add(&tmpwi->list, &self->inodes->list);
+    }
+
+    result = Py_BuildValue("(KNN)", inode, dirlist, filelist);
+
+    /* now delete this entry from the stack */
+    list_del(&wi->list);
+    talloc_free(wi);
 
     return result;
 }
@@ -602,7 +797,15 @@ initsk(void)
         return;
 
     Py_INCREF(&skfs_walkiterType);
-    PyModule_AddObject(m, "skfs_walkiter", (PyObject *)&skfs_walkiterType);
+    //PyModule_AddObject(m, "skfs_walkiter", (PyObject *)&skfs_walkiterType);
+
+    /* setup skfs_iwalkiter type */
+    skfs_iwalkiterType.tp_new = PyType_GenericNew;
+    if (PyType_Ready(&skfs_iwalkiterType) < 0)
+        return;
+
+    Py_INCREF(&skfs_iwalkiterType);
+    //PyModule_AddObject(m, "skfs_walkiter", (PyObject *)&skfs_walkiterType);
 
     /* setup skfile type */
     skfileType.tp_new = PyType_GenericNew;

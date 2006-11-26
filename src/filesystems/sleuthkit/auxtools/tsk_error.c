@@ -89,8 +89,6 @@ const char *tsk_err_fs_str[TSK_ERR_FS_MAX] = {
     "General file system error"
 };
 
-
-
 /* Print the error message to hFile */
 void
 tsk_error_print(FILE * hFile)
