@@ -146,6 +146,15 @@ ifind_path_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
 	    return WALK_CONT;
 	}
 
+    /* if this is a realloc'd file, try and keep going to find an allocated
+     * file with the same name. NOTE: this will only skip the first realloc
+     * file (can there be more than one?) */
+    if(!fs_dent->fsi) {
+        state->inode = fs_dent->inode;
+	    state->found = 1;
+        return WALK_CONT;
+    }   
+
 	/*  ensure we have the right attribute name */
 	if (state->cur_attr != NULL) {
 	    int fail = 1;
