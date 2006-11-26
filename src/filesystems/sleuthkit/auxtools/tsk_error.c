@@ -37,6 +37,8 @@ char tsk_errstr2[TSK_ERRSTR_L];	/* Contains a caller-specific string
 				 * called in the first place
 				 */
 
+char tsk_errstr3[TSK_ERRSTR_L];	/* The static buffer used in tsk_error_str */
+
 const char *tsk_err_aux_str[TSK_ERR_IMG_MAX] = {
     "Insufficient memory",
     ""
@@ -93,52 +95,70 @@ const char *tsk_err_fs_str[TSK_ERR_FS_MAX] = {
 void
 tsk_error_print(FILE * hFile)
 {
+    fprintf(hFile, "%s\n", tsk_error_str());
+}
+
+/* Print the error message to the static error buffer and return it */
+char *
+tsk_error_str()
+{
+    int written = 0;
+    tsk_errstr3[0] = '\0';
+
     if (tsk_errno == 0)
-	return;
+        return tsk_errstr3;
 
     if (tsk_errno & TSK_ERR_AUX) {
 	if ((TSK_ERR_MASK & tsk_errno) < TSK_ERR_AUX_MAX)
-	    fprintf(hFile, "%s",
-		tsk_err_aux_str[tsk_errno & TSK_ERR_MASK]);
+	    written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written, "%s",
+                    		tsk_err_aux_str[tsk_errno & TSK_ERR_MASK]);
 	else
-	    fprintf(hFile, "auxtools error: %" PRIu32,
-		TSK_ERR_MASK & tsk_errno);
+	    written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written, 
+                            "auxtools error: %" PRIu32,
+		                    TSK_ERR_MASK & tsk_errno);
     }
     else if (tsk_errno & TSK_ERR_IMG) {
 	if ((TSK_ERR_MASK & tsk_errno) < TSK_ERR_IMG_MAX)
-	    fprintf(hFile, "%s",
-		tsk_err_img_str[tsk_errno & TSK_ERR_MASK]);
+	    written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written, "%s",
+		                    tsk_err_img_str[tsk_errno & TSK_ERR_MASK]);
 	else
-	    fprintf(hFile, "imgtools error: %" PRIu32,
-		TSK_ERR_MASK & tsk_errno);
+	    written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written,
+                            "imgtools error: %" PRIu32,
+                            TSK_ERR_MASK & tsk_errno);
     }
     else if (tsk_errno & TSK_ERR_MM) {
 	if ((TSK_ERR_MASK & tsk_errno) < TSK_ERR_MM_MAX)
-	    fprintf(hFile, "%s", tsk_err_mm_str[tsk_errno & TSK_ERR_MASK]);
+	    written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written, "%s",
+                            tsk_err_mm_str[tsk_errno & TSK_ERR_MASK]);
 	else
-	    fprintf(hFile, "mmtools error: %" PRIu32,
-		TSK_ERR_MASK & tsk_errno);
+	    written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written,
+                            "mmtools error: %" PRIu32,
+                    		TSK_ERR_MASK & tsk_errno);
     }
     else if (tsk_errno & TSK_ERR_FS) {
 	if ((TSK_ERR_MASK & tsk_errno) < TSK_ERR_FS_MAX)
-	    fprintf(hFile, "%s", tsk_err_fs_str[tsk_errno & TSK_ERR_MASK]);
+	    written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written,
+                            "%s", tsk_err_fs_str[tsk_errno & TSK_ERR_MASK]);
 	else
-	    fprintf(hFile, "fstools error: %" PRIu32,
-		TSK_ERR_MASK & tsk_errno);
+	    written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written,
+                            "fstools error: %" PRIu32,
+		                    TSK_ERR_MASK & tsk_errno);
     }
     else {
-	fprintf(hFile, "Error: %" PRIu32, tsk_errno);
+	written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written,
+                        "Error: %" PRIu32, tsk_errno);
     }
 
     /* Print the unique string, if it exists */
     if (tsk_errstr[0] != '\0')
-	fprintf(hFile, " (%s)", tsk_errstr);
+	written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written,
+                        " (%s)", tsk_errstr);
 
     if (tsk_errstr2[0] != '\0')
-	fprintf(hFile, " (%s)", tsk_errstr2);
+	written += snprintf(tsk_errstr3, TSK_ERRSTR_L,
+                        " (%s)", tsk_errstr2);
 
-    fprintf(hFile, "\n");
-
+    return tsk_errstr3;
 }
 
 /* Clear the error number and error message */
@@ -148,5 +168,6 @@ tsk_error_reset()
 	tsk_errno = 0;
 	tsk_errstr[0] = '\0';
 	tsk_errstr2[0] = '\0';
+	tsk_errstr3[0] = '\0';
 }
 

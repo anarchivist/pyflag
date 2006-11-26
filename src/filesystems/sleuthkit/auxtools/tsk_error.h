@@ -9,8 +9,10 @@ extern "C" {
     extern uint32_t tsk_errno;
     extern char tsk_errstr[TSK_ERRSTR_L];
     extern char tsk_errstr2[TSK_ERRSTR_L];
+    extern char tsk_errstr3[TSK_ERRSTR_L];
 
     extern void tsk_error_print(FILE *);
+    extern char *tsk_error_str();
     extern void tsk_error_reset();
 
 #define TSK_ERR_AUX	0x01000000
