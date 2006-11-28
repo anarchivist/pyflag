@@ -347,3 +347,139 @@ class AddItem(EditItem):
         self.table.case=query.get('case',None)
         result.hidden("submitted","1")
         self.table.add_form(query,result)
+
+import re,struct
+
+## The following are common column types which the parser can
+## handle. ColumnTypes can be defined as plugins by extending the
+## ColumnTypes base class.
+class ColumnType:
+    """ Base class for column type searches.
+
+    Tables are just collections of column types. These objects are
+    responsible for displaying the values from the column and are used
+    to generate SQL.
+    """
+    def __init__(self, name='', sql='', link='', callback=''):
+        self.name = name
+        self.sql = sql
+        self.link = link
+        if callback:
+            self.callback = callback
+        ## Not specified - the identity callable
+        else: self.callback=lambda x: x
+
+    ## These are the symbols which will be treated literally
+    symbols = {
+        "=":"literal",
+        "!=":"literal",
+        "<=": "literal",
+        ">=": "literal",
+        "<": "literal",
+        ">": "literal",
+        }
+
+    def operators(self):
+        """ Returns a list of operators we support """
+        ops = self.symbols.copy()
+        for m in dir(self):
+            if m.startswith("operator_"):
+                ops[m[len("operator_"):]]=1
+
+        return ops.keys()
+
+    def parse(self, column, operator, arg):
+        ## Try to find the method which handles this operator. We look
+        ## first in symbols and then in a method containing the name
+        ## requested:
+        if self.symbols.has_key(operator):
+            ## This has to succeed or there is a programming error.
+            method = getattr(self, self.symbols[operator])
+        else:
+            try:
+                method = getattr(self, "operator_"+operator)
+            except:
+                raise RuntimeError("%s is of type %s and has no operator %r. Does it make sense to use this operator on this data?" % (column, ("%s"% self.__class__).split('.')[-1], operator))
+
+        return method(column, operator, arg)
+
+    def literal(self, column,operator, arg):
+        return "%s %s %r" % (self.sql, operator, arg)
+
+    def display(self, row, result):
+        """ This method is called by the table widget to allow us to
+        translate the output from the database to the screen. Note
+        that we have access to the entire row (i.e. all the values in
+        the query if we need it).
+        """
+        ## By default just implement a simple callback:
+        value=row[self.name]
+        if self.callback:
+            value = self.callback(value)
+
+        ## The result can now be linked if needed:
+        ## Note this only makes sense if cb returns a simple string
+        if self.link and value == value.__str__():
+            result = result.__class__(result)
+            q = self.link.clone()
+            q.FillQueryTarget(value.__str__())
+            result.link(value, q)
+            return result
+        
+        return value
+    
+class TimestampType(ColumnType):
+    def operator_after(self, column, operator, arg):
+        ## FIXME Should parse arg as a date - for now pass though to mysql
+        return "%s > %r" % (self.sql, arg)
+
+    def operator_before(self,column, operator, arg):
+        ## FIXME Should parse arg as a date
+        return "%s < %r" % (self.sql, arg)
+
+class IPType(ColumnType):
+    """ Handles creating appropriate IP address ranges from a CIDR specification.
+
+    Code and ideas were borrowed from Christos TZOTZIOY Georgiouv ipv4.py:
+    http://users.forthnet.gr/ath/chrisgeorgiou/python/
+    """
+    def __init__(self, name='', column='', link='', callback=''):
+        self.column = column
+        ColumnType.__init__(self, name=name, sql="inet_ntoa(%s)" % column,
+                            link=link, callback=callback)
+        
+    # reMatchString: a re that matches string CIDR's
+    reMatchString = re.compile(
+        r'(\d+)' # first byte must always be given
+        r'(?:' # start optional parts
+            r'\.(\d+)' # second byte
+            r'(?:'#  optionally third byte
+                r'\.(\d+)'
+                r'(?:' # optionally fourth byte
+                    r'\.(\d+)'
+                r')?'
+            r')?' # fourth byte is optional
+        r')?' # third byte is optional too
+        r'(?:/(\d+))?$') # and bits possibly
+
+    # masks: a list of the masks indexed on the /network-number
+    masks = [0] + [int(-(2**(31-x))) for x in range(32)]
+
+    def operator_netmask(self, column, operator, address):
+        # Parse arg as a netmask:
+        match = self.reMatchString.match(address)
+        try:
+            if not match:
+                raise Exception
+            else:
+                    numbers = [x and int(x) or 0 for x in match.groups()]
+                    # by packing we throw errors if any byte > 255
+                    packed_address = struct.pack('4B', *numbers[:4]) # first 4 are in network order
+                    numeric_address = struct.unpack('!I', packed_address)[0]
+                    bits = numbers[4] or numbers[3] and 32 or numbers[2] and 24 or numbers[1] and 16 or 8
+                    mask = self.masks[bits]
+                    broadcast = (numeric_address & mask)|(~mask)
+        except:
+            raise ValueError("%s does not look like a CIDR netmask (e.g. 10.10.10.0/24)" % address)
+        
+        return " ( %s >= %s and %s <= %s ) " % (self.column, numeric_address, self.column, broadcast)

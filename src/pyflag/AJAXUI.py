@@ -4,7 +4,22 @@ import pyflag.conf
 import pyflag.pyflaglog as pyflaglog
 import pyflag.FlagFramework as FlagFramework
 config=pyflag.conf.ConfObject()
-import cgi,time
+import time,re
+import pyflag.TableObj as TableObj
+import pyflag.parser as parser
+
+entities = { "&nbsp;": " ", "&lt;":"<", "&gt;":">", "&amp;":"&" }
+def escape_entities(data):
+    for k,v in entities.items():
+        data = data.replace(v,k)
+
+    return data
+
+def unescape_entities(data):
+    for k,v in entities.items():
+        data = data.replace(k,v)
+
+    return data
 
 class AJAXUI(HTMLUI.HTMLUI):
     """ An AJAX driven web framework for PyFlag """
@@ -267,7 +282,273 @@ class AJAXUI(HTMLUI.HTMLUI):
 
         self.result+="</form>"
 
-    def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},**opts):        
+    def filter_string(self,filter_str):
+        ## Remove any HTML tags which may be present:
+        filter_str = re.sub("<[^>]*>",'',filter_str)
+        
+        ## Unescape any entities:
+        return unescape_entities(filter_str)
+
+    ## This is a re-implementation of the table widget.
+    def table(self,elements=[],table='',where='',groupby = None,case=None, **opts):
+        """ The Table widget.
+
+        In order to create a table, we need to accept a list of elements. The elements are objects derived from the ColumnType class:
+        result.table(
+            elements = [ ColumnType(name = 'TimeStamp',
+                                    sql = 'from_unixtime(time)',
+                                    link = query),
+                         ColumnType('Data', 'data'),
+                         ]
+            table = 'TestTable',
+            )
+        """
+        id = self.get_uniue_id()
+        
+        def table_cb(query,result):
+            ## Building up the args list in this way ensure that defaults
+            ## can be specified in _make_sql itself and not be overwritten
+            ## by our defaults.
+            try:
+                order = int(query.get('order',0))
+            except: order=0
+
+            try:    limit = int(query.get('limit',0))
+            except: limit = 0
+
+            args = dict( elements = elements, table = table, case=case,
+                         groupby = groupby, order = order, limit = limit)
+
+            if where: args['where'] = where
+
+            try:    args['filter'] = self.filter_string(query['filter'])
+            except: pass
+
+            try:    args['direction'] = query['direction']
+            except: pass
+
+            sql = self._make_sql(**args)
+            print sql
+            
+            result.result+='''<table id="Table%s" class="PyFlagTable" >
+            <thead><tr>''' % (id)
+
+            ## Make the table headers with suitable order by links:
+            for e in range(len(elements)):
+                new_query = query.clone()
+                n = elements[e].name
+
+                if order==e:
+                    if query.get('direction','1')=='1':
+                        del new_query['direction']
+                        del new_query['order']
+                        result.result+="<th id='th_%s' sort='1' onclick=\"update_container('tableContainer%s','%s&order=%s&direction=0')\" >%s<img src='/images/increment.png' /></th>\n" % (n,id, new_query,e, n)
+                    else:
+                        del new_query['direction']
+                        del new_query['order']
+                        result.result+="<th id='th_%s' sort='1' onclick=\"update_container('tableContainer%s','%s&order=%s&direction=1')\" >%s<img src='/images/decrement.png' /></th>\n" % (n,id, new_query,e,n)
+                else:
+                    del new_query['order']
+                    del new_query['direction']
+                    result.result+="<th id='th_%s' sort='1' onclick=\"update_container('tableContainer%s','%s&order=%s&direction=1')\" >%s</th>\n" % (n,id, new_query,e,n)
+                    
+
+            result.result+='''</tr></thead><tbody class="scrollContent">'''
+
+            ## Now do the rows:
+            dbh = DB.DBO(case)
+            dbh.execute(sql)
+            old_sorted = None
+            old_sorted_style = ''
+            
+            ## Total number of rows
+            row_count=0
+
+            for row in dbh:
+                row_elements = []
+                tds = ''
+                
+                ## Render each row at a time:
+                for i in range(len(elements)):
+                    ## Give the row to the column element to allow it
+                    ## to translate the output suitably:
+                    value = elements[i].display(row,self)
+
+                    ## Render the row styles so that equal values on
+                    ## the sorted column have the same style
+                    if i==order and value!=old_sorted:
+                        old_sorted=value
+                        if old_sorted_style=='':
+                            old_sorted_style='alternateRow'
+                        else:
+                            old_sorted_style=''
+
+                    ## Render the sorted column with a different style
+                    if i==order:
+                        tds+="<td class='sorted-column' column='%s' table_id='%s'>%s</td>" % (elements[i].name,id , value)
+                    else:
+                        tds+="<td column='%s'>%s</td>" % (elements[i].name, value)
+                    
+                result.result+="<tr class='%s'> %s </tr>\n" % (old_sorted_style,tds)
+                row_count += 1
+
+            result.result+="</tbody></table>"
+
+            new_id = self.get_uniue_id()
+
+            ## Now we add the paging toolbar icons
+            ## The next button allows user to page to the next page
+            if row_count<config.PAGESIZE:
+                ## We could not fill a full page - means we ran out of
+                ## rows in this table
+                next_button = "add_toolbar_disabled('/images/stock_next-page.png', 'tableContainer%(id)s', 'next_button_%(new_id)s', 'tabletoolbar%(id)s');" % (
+                    dict(id=id,
+                         new_id=new_id));
+            else:
+                next_button = "add_toolbar_link('/images/stock_next-page.png','f?limit=%(limit)s&%(query)s', 'tableContainer%(id)s', 'tableContainer%(id)s', 'next_button_%(new_id)s', 'tabletoolbar%(id)s');" % (
+                    dict(limit = limit + config.PAGESIZE,
+                         query = query,
+                         id=id,
+                         new_id=new_id));
+                result.tooltip('next_button_%s' % new_id, "Next Page (rows %s-%s)" % (limit,limit+config.PAGESIZE))
+
+            ## The previous button goes back if possible:
+            previous_limit = limit-config.PAGESIZE
+            if previous_limit<0:
+                previous_button = "add_toolbar_disabled('/images/stock_previous-page.png', 'tableContainer%(id)s', 'prev_button_%(new_id)s', 'tabletoolbar%(id)s');" % (
+                    dict(id=id,
+                         new_id=new_id));
+            else:
+                previous_button = "add_toolbar_link('/images/stock_previous-page.png','f?limit=%(limit)s&%(query)s', 'tableContainer%(id)s', 'tableContainer%(id)s', 'prev_button_%(new_id)s', 'tabletoolbar%(id)s');" % (
+                    dict(limit = previous_limit,
+                         query = query,
+                         id=id,
+                         new_id=new_id));
+                
+                result.tooltip('prev_button_%s' % new_id, "Previous Page (rows %s-%s)" % (previous_limit, previous_limit+config.PAGESIZE))
+
+            result.result+='''<script>
+            %s%s
+            </script>''' % (previous_button, next_button)
+
+            return
+
+        cb=self.store_callback(table_cb)
+        
+        self.result += '''
+        <div class="TableLayout" id="TableMain%(id)s" widgetId="TableMain%(id)s" dojoType="LayoutContainer"  cacheContent="false"
+        layoutChildPriority='top-bottom'
+        style="height: 90%%;"
+        >
+        <div dojoType="ToolbarContainer" layoutAlign="top" id="TableToolbarContainer%(id)s" widgetId="TableToolbarContainer%(id)s" layoutAlign="top">
+        <div dojoType="Toolbar" id="tabletoolbar%(id)s" widgetId="tabletoolbar%(id)s"></div>
+        </div>
+        <div class="tableContainer" widgetId="tableContainer%(id)s" id="tableContainer%(id)s"
+        dojoType="ContentPane"  cacheContent="false"
+        layoutAlign="client"
+        style="overflow-x: auto; overflow-y: hidden;"
+        executeScripts="true"
+        ></div>\n''' % {'id':id}
+
+        ## This callback will render the filter GUI popup. There is some raw
+        ## javascript in here to make life a little easier.
+        def filter_gui(query, result):
+            result.heading("Filter Table")
+            try:
+                filter_str = self.filter_string(query['filter'])
+                result.para(filter_str)
+
+                ## Check the current filter string for errors by attempting to parse it:
+                try:
+                    sql = parser.parse_to_sql(filter_str,elements)
+
+                    ## This is good if we get here - lets refresh to it now:
+                    if query.has_key('submit'):
+                        del query['submit']
+                        result.refresh(0,query,pane='parent')
+                        return
+                    
+                except Exception,e:
+                    result.text('Error parsing expression: %s' % e, color='red')
+                    result.text('\n',color='black')
+                    
+            except KeyError:
+                pass
+
+            result.start_form(query, pane="self")
+
+            result.textarea("Search Query", 'filter')
+
+            result.result += """<tr></tr>
+            <tr><td colspan=2 align=center>The following can be used to insert text rapidly into the search string</td></tr>
+            <tr><td>Column</td><td>
+            <select name=filter_column>
+            %s
+            </select> <a href=# onclick='var t=dojo.widget.manager.getWidgetById("filter"); t.execCommand("inserthtml", document.getElementsByName("filter_column")[0].value);'>Insert </a></td></tr>
+            """ % "\n".join(["<option value=' \"%s\" '>%s</option>" % (e.name,e.name) for e in elements])
+
+            ## Round up all the possible methods from all colmn types:
+            operators = {}
+            for e in elements:
+                for method in e.operators():
+                    operators[method]=1
+
+            methods = operators.keys()
+            methods.sort()
+            result.result+="""<tr><td>Operators</td><td>
+            <select name=filter_operators>
+            %s
+            </select><a href=# onclick='var t=dojo.widget.manager.getWidgetById("filter"); t.execCommand("inserthtml", document.getElementsByName("filter_operators")[0].value);'>Insert </a></td></tr>
+            """ % "\n".join(["<option value=' %s '>%s</option>" % (m,m) for m in methods])
+
+            result.end_form()
+
+        ## Add a toolbar icon for the filter:
+        self.toolbar(toolbar="tabletoolbar%s" % id,
+                     cb=filter_gui, pane='popup', icon='filter.png'
+                     )
+
+        ## Update the table with its initial view
+        self.result+='''<script>
+        _container_.addOnLoad( function() {
+            set_url("tableContainer%s","f?%s&callback_stored=%s");
+        });
+        </script>''' % (id, self.defaults,cb)
+
+    def _make_sql(self,elements=[],table='',where=1,groupby = None,case=None,
+                  filter='', order=0, direction='1', limit = 0):
+        """ Calculates the SQL for the table widget based on the query """
+        ## Calculate the SQL
+        query_str = "select "
+
+        ## The columns and their aliases:
+        query_str += ",".join([ e.sql + " as `" + e.name + "`" for e in elements ])
+
+        ## The table
+        query_str += " from %s " % table
+
+        ## Is there a filter condition?
+        if filter:
+            filter_str = parser.parse_to_sql(filter, elements)
+            if not filter_str: filter_str=1
+            
+        else: filter_str = 1
+
+        query_str += "where ((%s) and (%s)) " % (where, filter_str)
+
+        ## Now calculate the order by:
+        query_str += "order by %s " % elements[order].sql
+
+        if direction=='1':
+            query_str += "asc"
+        else: query_str+= "desc"
+
+        ## Limit conditions:
+        query_str += " limit %s, %s" % (limit, config.PAGESIZE)
+
+        return query_str
+
+    def xxxtable(self,sql="select ",columns=[],names=[],links=[],types={},table='',where='',groupby = None,case=None,callbacks={}, **opts):        
         names = list(names)
         columns = list(columns)
         id=self.get_uniue_id()
@@ -327,6 +608,16 @@ class AJAXUI(HTMLUI.HTMLUI):
             except:
                 limit = 0
 
+            ## Clean up the filter string if possible:
+            try:
+                print "cleaning out filter string %s" % query['filter']
+                filter_str = query['filter']
+                del query['filter']
+                query['filter'] = self.filter_string(filter_str)
+                print "Got %s" % query['filter']
+            except KeyError:
+                pass
+
             dbh,new_query,new_names,new_columns,new_links = self._make_sql(
                 sql=sql,
                 columns=columns,
@@ -338,6 +629,7 @@ class AJAXUI(HTMLUI.HTMLUI):
                 case=case,
                 callbacks=callbacks,
                 limit = limit,
+                types = types,
                 query=query)
 
             if not new_query.has_key('callback_stored'):
@@ -392,7 +684,7 @@ class AJAXUI(HTMLUI.HTMLUI):
                     ## Sanitise the value to make it HTML safe. Note that
                     ## callbacks are required to ensure they sanitise
                     ## their output if they need.
-                        value=cgi.escape(value)
+                        value=escape_entities(value)
 
                     ## If the value is the same as above we do not need to flip it:
                     if new_names[i]==order and value!=old_sorted:
@@ -481,6 +773,69 @@ class AJAXUI(HTMLUI.HTMLUI):
         style="overflow-x: auto; overflow-y: hidden;"
         executeScripts="true"
         ></div>\n''' % {'id':id}
+
+        ## Work out the types:
+        for n in names:
+            if not types.has_key(n):
+                types[n] = TableObj.ColumnType()
+
+        ## This callback will render the filter GUI popup. There is some raw
+        ## javascript in here to make life a little easier.
+        def filter_gui(query, result):
+            result.heading("Filter Table")
+            try:
+                filter_str = self.filter_string(query['filter'])
+                result.para(filter_str)
+
+                ## Check the current filter string for errors by attempting to parse it:
+                try:
+                    sql = parser.parse_to_sql(filter_str,types)
+
+                    ## This is good - lets refresh to it now:
+                    if query.has_key('submit'):
+                        del query['submit']
+                        result.refresh(0,query,pane='parent')
+                        return
+                    
+                except Exception,e:
+                    result.text('Error parsing expression: %s' % e, color='red')
+                    result.text('\n',color='black')
+                    
+            except KeyError:
+                pass
+
+            result.start_form(query, pane="self")
+
+            result.textarea("Search Query", 'filter', cols=60, rows=5)
+
+            result.result += """<tr></tr>
+            <tr><td colspan=2 align=center>The following can be used to insert text rapidly into the search string</td></tr>
+            <tr><td>Column</td><td>
+            <select name=filter_column>
+            %s
+            </select> <a href=# onclick='var t=dojo.widget.manager.getWidgetById("filter"); t.execCommand("inserthtml", document.getElementsByName("filter_column")[0].value);'>Insert </a></td></tr>
+            """ % "\n".join(["<option value=' \"%s\" '>%s</option>" % (n,n) for n in names])
+
+            ## Round up all the possible methods from all colmn types:
+            operators = {}
+            for t in types.values():
+                for method in t.operators():
+                    operators[method]=1
+
+            methods = operators.keys()
+            methods.sort()
+            result.result+="""<tr><td>Operators</td><td>
+            <select name=filter_operators>
+            %s
+            </select><a href=# onclick='var t=dojo.widget.manager.getWidgetById("filter"); t.execCommand("inserthtml", document.getElementsByName("filter_operators")[0].value);'>Insert </a></td></tr>
+            """ % "\n".join(["<option value=' %s '>%s</option>" % (m,m) for m in methods])
+
+            result.end_form()
+
+        ## Add a toolbar icon for the filter:
+        self.toolbar(toolbar="tabletoolbar%s" % id,
+                     cb=filter_gui, pane='popup', icon='filter.png'
+                     )
 
         self.result+='''<script>
         _container_.addOnLoad( function() {
@@ -589,8 +944,10 @@ class AJAXUI(HTMLUI.HTMLUI):
             return
         
         else:
-            base = '<a %s id="Link%s" onclick="update_container(%s, \'/f?%s\');" href="#">%s</a>' % (self.opt_to_str(options),self.id, pane, q,string)
-            
+            ## This has a valid href so that it is possible to right
+            ## click and open in new tab or save the link in a normal
+            ## bookmark
+            base = '<a %s id="Link%s" onclick="update_container(%s, \'/f?%s\'); return false;" href="/f?%s&__pane__=main">%s</a>' % (self.opt_to_str(options),self.id, pane, q, q,  string)
             if tooltip:
                 self.tooltip("Link%s" % self.id, tooltip)
 
@@ -772,21 +1129,6 @@ class AJAXUI(HTMLUI.HTMLUI):
         if self.form_parms.has_key(variable):
             del self.form_parms[variable]
 
-    def textarea(self, description, name, **options):
-        import cgi
-        try:
-            default = cgi.escape(self.defaults[name],quote=True)
-        except (KeyError,AttributeError):
-            default =''
-        
-        ## And remove if from the form
-        if self.form_parms.has_key(name):
-            del self.form_parms[name]
-
-        left = description
-        right = """<div widgetId="%s" dojoType="Editor">%s</div>""" % (name,default)
-        self.row(left,right,valign="top")
-
     def wizard(self,names=[],context="wizard",callbacks=[],title=''):
         tmp = []
         for i in range(len(names)):
@@ -806,3 +1148,52 @@ class AJAXUI(HTMLUI.HTMLUI):
             set_url("page0","f?%s&callback_stored=%s");
         });
         </script>''' % (self.defaults, cb[0])
+
+    ## FIXME: Do this properly.
+    def sanitise_data(self,data):
+        """ Return a sanitised version of data. This is mostly to
+        avoid XSS attacks etc.
+
+        Note that PyFlag currently does not have much in the way of
+        XSS protections or access controls and should not be used on
+        the open web without authentication.
+        """
+        allowed_tags = [ "b","i", "br" ]
+        tag_regex = "<([^>]+)>"
+
+        def filter_tag(tag):
+            tag = tag.group(1)
+            tmp = tag.strip().lower()
+            if tmp.startswith("/"):
+                extra="/"
+                tmp = tmp[1:]
+            else: extra =''
+
+            tmp = tmp.split(" ")[0]
+
+            for allowed in allowed_tags:
+                if tmp==allowed:
+                    return "<%s%s >" % (extra,allowed)
+            return ''
+
+        return re.sub(tag_regex, filter_tag, data)
+
+    def textarea(self,description,name, **options):
+        """ Draws a text area with the default content
+
+        This is very similar to the textfield above.
+        """
+        try:
+            default = self.sanitise_data(self.defaults[name])
+        except (KeyError,AttributeError):
+            default =''
+            
+        ## And remove if from the form
+        if self.form_parms.has_key(name):
+            del self.form_parms[name]
+        
+#        option_str = self.opt_to_str(options)
+        left = description
+        right='''<div name="%s" dojoType="RichText" widgetId="%s" height=60 focusOnLoad="true" style="border: 3px outset black;">%s</div>''' % (name, name, default)
+
+        self.row(left,right,valign="top")

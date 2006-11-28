@@ -219,6 +219,7 @@ def process_line(line):
 
     except (ParserException,getopt.GetoptError,DB.DBError,TypeError),e:
         print "Error: %s" % e
+        raise
 #        print FlagFramework.get_bt_string(e)
     except IOError,e:
         print "IOError: %s" % e
@@ -252,6 +253,10 @@ def shell_execv(*argv):
     return string
 
 if __name__ == "__main__":
+    ## Create a worker thread:
+    #import pyflag.Farm as Farm
+    #Farm.start_workers()
+
     ## Handle a history file
     histfile = os.path.join(os.environ["HOME"], ".flashhist")
     try:

@@ -36,6 +36,7 @@ class AJAX(Menu):
         dojo.require("dojo.widget.FloatingPane");
         dojo.require("dojo.widget.Tooltip");
         dojo.require("dojo.widget.DropdownDatePicker");
+        dojo.require("dojo.widget.RichText");
         dojo.require("dojo.uri.Uri");
         dojo.require("dojo.collections.Stack");
         dojo.hostenv.writeIncludes();
@@ -105,8 +106,11 @@ class AJAX(Menu):
         ## dojo environment FIXME: How do we solve the link problem? 
         ## Is it possible? The problem is that the URL is not enough
         ## to specify the state because it might include stored UIs.
-        result = '<script>\ntry { djConfig; } catch(err) { alert(err); document.location="/";  };\n</script>'
-        #print data
+        if not query.has_key('__main__'):
+            result = '<script>\ntry { djConfig; } catch(err) { document.location=document.location+"&__main__=yes";  };\n</script>'
+        else:
+            result = ''
+        print data+result
         return data+result
 
     def raw_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
@@ -115,7 +119,7 @@ class AJAX(Menu):
 
     def menu(self,flag,query):
         result=flag.ui()
-        
+
         self.menu_javascript = self.make_menu_javascript(query)
         title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version
 
@@ -124,16 +128,31 @@ class AJAX(Menu):
              '''        <div dojoType="LayoutContainer" widgetId="MainPyFlag" id="MainPyFlag"
              bindArgs="preventCache:false;"
              layoutChildPriority='top-bottom'
-             style="width: 100%; height: 100%;">''',             self.menu_javascript,
-             '''<div dojoType="ContentPane"
+             style="width: 100%; height: 100%;">''',             self.menu_javascript,))
+
+        ## If we have something to put in the main pane we put it here:'
+        del query['__main__']
+
+        result.result+= '''<div dojoType="ContentPane"
              bindArgs="preventCache:false;"
              cacheContent="false"
              id="main"
              layoutAlign="client"
              style="border: 5px; overflow-y: auto;"
-             executeScripts="true">'''))
+             executeScripts="true">'''
 
         ## Now create the initial front page:
         result.result+="<img src='images/logo.png'>" + self.footer
+
+        try:
+            result.result+='''
+            <script>
+            dojo.addOnLoad( function() {
+            set_url(%r,"f?%s");
+            });
+            </script>
+            ''' % (query['__pane__'],query)
+        except KeyError:
+            pass
 
         return result

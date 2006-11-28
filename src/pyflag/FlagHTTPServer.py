@@ -252,8 +252,14 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             self.wfile.write(result.display())
             return
 
+        # Did the user asked for a complete render of the window?
+        if query.has_key('__main__'):
+            theme=pyflag.Theme.get_theme(query)
+            result = theme.menu(flag,query)
+            result.defaults=query
+            
         #Is this a request for a saved UI?
-        if query.has_key('draw_stored'):
+        elif query.has_key('draw_stored'):
             result = flag.store.get(query['draw_stored'])
             
             ## This expires stored pictures in case pyflag is
@@ -302,7 +308,6 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
               try:
                   #Did the user request a report?
                   if not query.has_key('family') or not query.has_key('report'):
-                      query['family'] = None
                       theme=pyflag.Theme.get_theme(query)
                       result = theme.menu(flag,query)
                       result.defaults=query

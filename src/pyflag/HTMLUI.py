@@ -174,6 +174,7 @@ class HTMLUI(UI.GenericUI):
         self.result += "<h1>%s</h1>"%string
 
     def para(self,string,**options):
+        string = cgi.escape(string)
         if options.has_key('font'):
             if options['font'].lower() == "pre":
                 self.result += "<pre>%s</pre>" %string

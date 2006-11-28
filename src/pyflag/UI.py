@@ -36,6 +36,7 @@ import pyflag.DB as DB
 import pyflag.conf
 import pyflag.pyflaglog as pyflaglog
 config=pyflag.conf.ConfObject()
+import pyflag.parser as parser
 
 config.LOG_LEVEL=7
 
@@ -252,7 +253,7 @@ class GenericUI:
         """
         pyflaglog.log(pyflaglog.DEBUG, "text not implemented")
 
-    def _make_sql(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},query={},limit=0,**opts):
+    def _make_sql(self,sql="select ",columns=[],names=[],links=[],types={},table='',where='',groupby = None,case=None,callbacks={},query={},limit=0, **opts):
         """ An SQL generator for the table widget (private) """
         #in case the user forgot and gave us a tuple, we forgive them:
         names=list(names)
@@ -325,21 +326,36 @@ class GenericUI:
         #Form the table and where clause
         query_str+=" from %s " % table
 
-        #Work out the having clause.
+        ## If a filter expression was specified we use that
         having=['1']
         conditions=[]
-        for d,v in query:
-            if d.startswith('where_'):
-                #Find the column for that name
-                try:
-                    index=names.index(d[len('where_'):])
-                except ValueError:
-                    ## If we dont know about this name, we ignore it.
-                    continue
 
-                self.filter_text.append(FlagFramework.make_sql_from_filter(v,having,columns[index],d[len('where_'):]))
+        having_str = ''
+        try:
+            ## Prepare the types:
+            for k,v in types.items():
+                ## Find the column for the name in k:
+                v.column = columns[names.index(k)]
+                
+            having_str = parser.parse_to_sql(query['filter'], types)
+            print "Parsing %s returned %s " % (query['filter'], having_str)
+        except KeyError:
+            pass
 
-        having_str = " and ".join(having)
+        if not having_str:
+            #Work out the having clause.
+            for d,v in query:
+                if d.startswith('where_'):
+                    #Find the column for that name
+                    try:
+                        index=names.index(d[len('where_'):])
+                    except ValueError:
+                        ## If we dont know about this name, we ignore it.
+                        continue
+
+                    self.filter_text.append(FlagFramework.make_sql_from_filter(v,having,columns[index],d[len('where_'):]))
+
+            having_str = " and ".join(having)
 
         if where:
             query_str+= " where (%s) and (%s) " %(where,having_str)

@@ -72,8 +72,6 @@ def pane_cb(branch,result):
     result.text("You clicked on %s" % str(branch))
     print "Called back for %s" % (branch,)
 
-
-
 class TreeTest(Reports.report):
     """ A sample report.
 
@@ -265,6 +263,8 @@ class FormTest(PopUpTest):
 
     def display(self,query,result):
         result.heading("Form test")
+        result.text("I have some with html data %s" % result.sanitise_data(query['var1']))
+        result.para("And sanitised data %s" % query['var2'])
 
 class WizardTest(PopUpTest):
     """ Tests the Wizard """
@@ -288,6 +288,8 @@ class WizardTest(PopUpTest):
             callbacks = [page1_cb, page2_cb, page3_cb]
             )
 
+## This needs to be somewhere else
+from pyflag.TableObj import ColumnType,IPType
 
 class TableTest(PopUpTest):
     """ Tests the Table widget """
@@ -305,21 +307,46 @@ class TableTest(PopUpTest):
         `id` int(11) NOT NULL auto_increment,
         `time` int(11) NOT NULL default '0',
         `data` tinyblob NOT NULL,
+        `foobar` varchar(10),
+        `ip_addr` int(11) unsigned default 0,
         PRIMARY KEY  (`id`)
         )""")
         
         dbh.mass_insert_start("TestTable")
-        dbh.mass_insert(time=1147329821, data="Some Data")
-        dbh.mass_insert(time=1147329831, data="More Data")
-        dbh.mass_insert(time=1147329841, data="Some More Data")
-        dbh.mass_insert(time=1147329851, data="Another Lot of Data")
+        dbh.insert("TestTable", time=1147329821, data="Some Data",
+                        foobar="X", _ip_addr="inet_aton('192.168.1.1')")
+        dbh.insert("TestTable", time=1147329831, data="More Data",
+                        foobar="Y", _ip_addr="inet_aton('192.168.1.22')")
+        dbh.insert("TestTable", time=1147329841, data="Some More Data",
+                        foobar="Z", _ip_addr="inet_aton('192.168.1.23')")
+        dbh.insert("TestTable", time=1147329851, data="Another Lot of Data",
+                        foobar="Q",  _ip_addr="inet_aton('192.168.1.55')")
+
         for i in range(0,100):
-            dbh.mass_insert(time=1147329851+i, data="Data %s" % i)
+            dbh.mass_insert(time=1147329851+i, data="Data %s" % i, foobar=i)
 
         dbh.mass_insert_commit()
+
+        def foobar_cb(value):
+            return "foo %s" % value
         
         result.table(
-            columns = ["from_unixtime(time)", "data"],
-            names = ["TimeStamp", "Data" ],
+                         ## Can use keyword args
+            elements = [ ColumnType(name = 'TimeStamp',
+                                    sql = 'from_unixtime(time)',
+                                    ),
+                         
+                         ## Or positional args
+                         ColumnType('Data', 'data',
+                                    link = query_type(
+            family=query['family'], report='FormTest',__target__='var1')),
+                         
+                         ColumnType('Foobar', 'foobar', callback=foobar_cb),
+
+                         ## Note that here we just need to specify the
+                         ## field name in the table, the IPType will
+                         ## automatically create the translated SQL.
+                         IPType('IP Address', 'ip_addr'),
+                         ],
             table = "TestTable",
             )

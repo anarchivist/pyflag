@@ -36,7 +36,7 @@ function set_url(widget, url) {
 	  widget.href = url;
 	} else {
 	  // works best when from a live server instead of from file system 
-	  alert("Error contacting server. Is it down?");
+	  alert("Error contacting server. Is it down?\n"+ e.status +" " + e.statusText);
 	  //loading '" + url + "' (" + e.status + " "+  e.statusText + ")", "onDownloadError");
 	}
       }
@@ -56,7 +56,10 @@ function push_on_history(container, url) {
 };
 
 /** form_name: The name of the form we should get elements from
-    target: the target of this form.*/
+    target: the target of this form.
+
+    We support both input tags and RichTexts (for textareas)
+*/
 function submitForm(form_name,target) {
   /** We try to save a get version of the current form in the
       history */
@@ -71,9 +74,19 @@ function submitForm(form_name,target) {
     if(input.type=='checkbox' &&  ! input.checked) continue;
 
     if(input.name.length>0)
-      query.push(input.name + '=' + input.value);
+      query.push(encodeURIComponent(input.name) + '=' + encodeURIComponent(input.value));
   };
 
+  //Handle RichTexts
+  inputs = dojo.widget.getWidgetsByType("RichText");
+  for(var i = 0; i < inputs.length; i++) {
+    var input = inputs[i];
+
+    if(input.widgetId.length>0) {
+      query.push(encodeURIComponent(input.widgetId) + '=' + encodeURIComponent(input.getEditorContent()));
+    };
+  };
+  
   var url="f?submit=1&"+query.toArray().join("&");
 
   update_container(target,url);
