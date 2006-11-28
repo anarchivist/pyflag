@@ -24,7 +24,6 @@
 This module contains a scanner to trigger off on registry files and scan them seperately. A report is also included to allow tree viewing and table searching of registry files.
 """
 import os.path
-import pyflag.logging as logging
 from pyflag.Scanner import *
 import plugins.DiskForensics.DiskForensics as DiskForensics
 import pyflag.DB as DB

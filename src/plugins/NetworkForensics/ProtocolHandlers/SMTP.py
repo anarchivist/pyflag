@@ -30,7 +30,7 @@ import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
 import pyflag.Reports as Reports
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 
 class SMTPException(Exception):
     """ Raised if line is an invalid SMTP command """
@@ -78,12 +78,12 @@ class SMTP:
     def MAIL(self,args):
         self.mail_from = args
         self.read_response()
-        logging.log(logging.VERBOSE_DEBUG,"Set mail from to %s " % self.mail_from)
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Set mail from to %s " % self.mail_from)
 
     def RCPT(self,args):
         self.rcpt_to = args
         self.read_response()
-        logging.log(logging.VERBOSE_DEBUG, "Set RCPT to %s" % self.rcpt_to)
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Set RCPT to %s" % self.rcpt_to)
         
     def DATA(self,args):
         result=self.read_response()
@@ -97,7 +97,7 @@ class SMTP:
             end = self.fd.tell()
             length = end-start
             self.count += 1
-            logging.log(logging.DEBUG,"Message starts at %s in stream and is %s long" % (start,length))
+            pyflaglog.log(pyflaglog.DEBUG,"Message starts at %s in stream and is %s long" % (start,length))
             return (self.count,"%s:%s" % (start,length))
 
     def parse(self):
@@ -121,7 +121,7 @@ class SMTP:
             try:
                 yield(self.dispatcher[command[0].upper()](tmp[-1]))
             except KeyError:
-                logging.log(logging.DEBUG,"SMTP Command %r not implemented." % command[0])
+                pyflaglog.log(pyflaglog.DEBUG,"SMTP Command %r not implemented." % command[0])
         
 class SMTPScanner(StreamScannerFactory):
     """ Collect information about SMTP transactions.
@@ -135,7 +135,7 @@ class SMTPScanner(StreamScannerFactory):
         if not reverse_stream or not forward_stream: return
 
         combined_inode = "I%s|S%s/%s" % (stream.fd.name, forward_stream, reverse_stream)
-        logging.log(logging.DEBUG,"Openning %s for SMTP" % combined_inode)
+        pyflaglog.log(pyflaglog.DEBUG,"Openning %s for SMTP" % combined_inode)
 
         ## We open the file and scan it for emails:
         fd = self.fsfd.open(inode=combined_inode)

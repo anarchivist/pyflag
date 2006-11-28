@@ -26,7 +26,7 @@ The scanner recurses into zip files, executing the scanner factory train on file
 This feature complements the ZIP and Gzip filesystem driver to ensure that zip and gzip files are transparently viewable by the FLAG GUI.
 """
 import os.path,sys
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 from pyflag.Scanner import *
 import zipfile,gzip,tarfile, zlib
 from pyflag.FileSystem import File
@@ -54,19 +54,23 @@ class ZipScan(GenScanFactory):
 
         def external_process(self,fd):
             """ This is run on the extracted file """
-            logging.log(logging.VERBOSE_DEBUG, "Decompressing Zip File %s" % fd.name)
-            self.fd.zip_handle=zipfile.ZipFile(fd.name)
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Decompressing Zip File %s" % fd.name)
+            try:
+                z = ZIPCACHE.get(self.fd.inode)
+            except KeyError:
+                z = zipfile.ZipFile(self.fd,'r')
+                ZIPCACHE.put(self.z, key=self.fd.inode)
 
             pathname = self.ddfs.lookup(inode = self.inode)
             
             ## List all the files in the zip file:
             dircount = 0
-            namelist = self.fd.zip_handle.namelist()
+            namelist = z.namelist()
             for i in range(len(namelist)):
                 ## Add the file into the VFS
                 try:
                     ## Convert the time to a common format.
-                    t = time.mktime(list(self.fd.zip_handle.infolist()[i].date_time) +[0,0,0])
+                    t = time.mktime(list(z.infolist()[i].date_time) +[0,0,0])
                 except:
                     t=0
 
@@ -76,7 +80,7 @@ class ZipScan(GenScanFactory):
 
                 self.ddfs.VFSCreate(None,
                                     inode,pathname+"/"+namelist[i],
-                                    size=self.fd.zip_handle.infolist()[i].file_size,
+                                    size=z.infolist()[i].file_size,
                                     mtime=t)
 
                 ## Now call the scanners on this new file (FIXME limit
@@ -268,7 +272,7 @@ class ZipFile(DiskForensics.DBFS_file):
                 self.z = ZIPCACHE.get(self.fd.inode)
             except KeyError:
                 try:
-                    logging.log(logging.VERBOSE_DEBUG, "Reading Zip Directory for %s" % self.fd.inode)
+                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Reading Zip Directory for %s" % self.fd.inode)
                     self.z = zipfile.ZipFile(self.fd,'r')
                     ZIPCACHE.put(self.z, key=self.fd.inode)
                 except zipfile.BadZipfile,e:
@@ -303,7 +307,7 @@ class ZipFile(DiskForensics.DBFS_file):
             ## they better cache this file on the disk. FIXME: Should
             ## we automatically force caching here?
             if self.type == zipfile.ZIP_DEFLATED:
-                logging.log(logging.DEBUG, "Required to seek to offset %s in Zip File %s. This is inefficient, forcing disk caching." % (self.readptr, self.inode))
+                pyflaglog.log(pyflaglog.DEBUG, "Required to seek to offset %s in Zip File %s. This is inefficient, forcing disk caching." % (self.readptr, self.inode))
                 self.cache()
                 self.seek(offset, rel)
                 return
@@ -339,7 +343,7 @@ class GZ_file(DiskForensics.DBFS_file):
             except IOError,e:
                 step /= 2
                 if step<10:
-                    logging.log(logging.DEBUG, "Error reading from %s, could only get %s bytes" % (self.fd.inode, count));
+                    pyflaglog.log(pyflaglog.DEBUG, "Error reading from %s, could only get %s bytes" % (self.fd.inode, count));
                     break
                 
                 else:

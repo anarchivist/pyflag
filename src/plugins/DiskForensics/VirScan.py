@@ -30,7 +30,7 @@ import pyflag.FileSystem as FileSystem
 import pyflag.Reports as Reports
 import pyflag.DB as DB
 import os.path
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 from pyflag.Scanner import *
 
 import clamav
@@ -55,7 +55,7 @@ class VScan:
         elif ret[0] == 1:
             return ret[1]
         else:
-            logging.log(logging.WARNING, "Scanning Error: %s" % clamav.reterror(ret))
+            pyflaglog.log(pyflaglog.WARNING, "Scanning Error: %s" % clamav.reterror(ret))
 
 class VirScan(GenScanFactory):
     """ Scan file for viruses """

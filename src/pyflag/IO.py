@@ -41,7 +41,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import cPickle
 import os,re
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 
 def mmls_popup(query,result,option_str=None,subsys=None,offset=None):
     result.decoration = "naked"
@@ -59,7 +59,7 @@ def mmls_popup(query,result,option_str=None,subsys=None,offset=None):
         result.heading("Output of disktype and mmls on io source")
         result.text('------------------ disktype results ------------------',font='bold')
         option_str=option_str.strip('filename=')
-        logging.log(logging.DEBUG,"Will launch: disktype %s" % option_str)
+        pyflaglog.log(pyflaglog.DEBUG,"Will launch: disktype %s" % option_str)
         disktype_output=pexpect.spawn('/usr/bin/disktype %s' % option_str)
         disktype_output.expect(pexpect.EOF)
         result.text('',font='normal')
@@ -68,11 +68,11 @@ def mmls_popup(query,result,option_str=None,subsys=None,offset=None):
         result.text('------------------ mmls results ------------------',font='bold')
     else:
         result.heading("Output of mmls on io source")
-        logging.log(logging.DEBUG,"Disktype not run, can't be found at /usr/bin/disktype")
+        pyflaglog.log(pyflaglog.DEBUG,"Disktype not run, can't be found at /usr/bin/disktype")
         
     args = ["-i", subsys, "-o",option_str, "%s/mmls" % config.FLAG_BIN,  "-t", "dos",  "foo" ]
     
-    logging.log(logging.DEBUG,"Will launch %s %s" % (config.IOWRAPPER, args))
+    pyflaglog.log(pyflaglog.DEBUG,"Will launch %s %s" % (config.IOWRAPPER, args))
 
     s=pexpect.spawn(config.IOWRAPPER,args)
     s.expect(pexpect.EOF)

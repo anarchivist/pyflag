@@ -32,7 +32,7 @@ import MySQLdb.cursors
 import _mysql
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import time,types
 import threading
 from Queue import Queue, Full, Empty
@@ -107,7 +107,7 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
         self._last_executed = string
         
         def cancel():
-            logging.log(logging.WARNINGS, "Killing query in thread %s because it took too long" % self.connection.thread_id())
+            pyflaglog.log(pyflaglog.WARNINGS, "Killing query in thread %s because it took too long" % self.connection.thread_id())
             self.kill_connection('query')
             
         #t = threading.Timer(self.timeout, cancel)
@@ -160,15 +160,15 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
                     while 1:
                         a=self.fetchone()
                         if not a: break
-                        logging.log(logging.DEBUG,"Mysql warnings: query %r: %s" % (last_executed[:500],a))
+                        pyflaglog.log(pyflaglog.DEBUG,"Mysql warnings: query %r: %s" % (last_executed[:500],a))
                     else:
-                        logging.log(logging.DEBUG,"Mysql issued warnings but we are unable to drain result queue")
+                        pyflaglog.log(pyflaglog.DEBUG,"Mysql issued warnings but we are unable to drain result queue")
 
                 self.py_row_cache.extend(results)
                 
             except Exception,e:
                 pass
-                #logging.log(logging.DEBUG,"MYSQL warning:%s" % e)
+                #pyflaglog.log(pyflaglog.DEBUG,"MYSQL warning:%s" % e)
         pass
         #return MySQLdb.cursors.SSDictCursor._warning_check(self)
         
@@ -208,7 +208,7 @@ class Pool(Queue):
         """ Connect specified case and return a new connection handle """
         global db_connections
         db_connections +=1
-        logging.log(logging.VERBOSE_DEBUG, "New Connection to DB. We now have %s in total" % (db_connections, ))
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "New Connection to DB. We now have %s in total" % (db_connections, ))
         
         case=self.case
         try:
@@ -337,8 +337,8 @@ class DBO:
         #If anything went wrong we raise it as a DBError
         except Exception,e:
             str = "%s" % e
-            if 'Commands out of sync' in str or 'server has gone away' in str:
-                logging.log(logging.VERBOSE_DEBUG,
+            if 'Commands out of sync' in str or 'server has gone away' in str or 'Lost connection' in str:
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG,
                             "Got DB Error: %s, %s" % (str,self.dbh))
 
                 ## We terminate the current connection and reconnect
@@ -476,7 +476,7 @@ class DBO:
             else:
                 sql="(`%s`)" % (key) 
 
-            logging.log(logging.DEBUG,"Oops... No index found in table %s on field %s - Generating index, this may take a while" %(table,key))
+            pyflaglog.log(pyflaglog.DEBUG,"Oops... No index found in table %s on field %s - Generating index, this may take a while" %(table,key))
             ## Index not found, we make it here:
             self.execute("Alter table `%s` add index%s",(table,sql))
 
@@ -562,7 +562,7 @@ class DBO:
         if not client.startswith('/'):
             client = "%s/%s" % (config.FLAG_BIN, client)
             
-        logging.log(logging.DEBUG, "Will shell out to run %s " % client)
+        pyflaglog.log(pyflaglog.DEBUG, "Will shell out to run %s " % client)
 
         import os
         p_mysql=os.popen("%s -D%s" % (self.mysql_bin_string,self.case),'w')

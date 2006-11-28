@@ -22,7 +22,7 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 import os.path
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import pyflag.Scanner as Scanner
 import pyflag.Reports as Reports
 import pyflag.DB as DB
@@ -79,7 +79,7 @@ class RFC2822(Scanner.GenScanFactory):
             try:
                 a=email.message_from_file(fd)
 
-                logging.log(logging.DEBUG,"Found an email message in %s" % self.inode)
+                pyflaglog.log(pyflaglog.DEBUG,"Found an email message in %s" % self.inode)
 		
 		#Mysql is really picky about the date formatting
                 date = email.Utils.parsedate(a.get('Date'))
@@ -120,7 +120,7 @@ class RFC2822(Scanner.GenScanFactory):
                     count+=1
                     
             except Exception,e:
-                logging.log(logging.DEBUG,"RFC2822 Scan: Unable to parse inode %s as an RFC2822 message (%s)" % (self.inode,e))
+                pyflaglog.log(pyflaglog.DEBUG,"RFC2822 Scan: Unable to parse inode %s as an RFC2822 message (%s)" % (self.inode,e))
                 
 class RFC2822_File(File):
     """ A VFS Driver for reading mail attachments """

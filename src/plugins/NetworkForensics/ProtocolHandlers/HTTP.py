@@ -280,7 +280,7 @@ class HTTPScanner(StreamScannerFactory):
         if not p.identify():
             return
         
-        logging.log(logging.DEBUG,"Openning %s for HTTP" % combined_inode)
+        pyflaglog.log(pyflaglog.DEBUG,"Openning %s for HTTP" % combined_inode)
         ## Iterate over all the messages in this connection
         for f in p.parse():
             if not f: continue
@@ -505,7 +505,7 @@ class Chunked(File):
             try:
                 size = int(self.data[:end],16)
             except:
-                logging.log(logging.DEBUG, "Expecting chunked data length, found %s. Losing sync." % self.data[:end])
+                pyflaglog.log(pyflaglog.DEBUG, "Expecting chunked data length, found %s. Losing sync." % self.data[:end])
                 return
             
             if size==0: break

@@ -160,7 +160,7 @@ class YahooScanner(StreamScannerFactory):
         magic = stream.read(4)
         if magic!="YMSG": return
         stream.seek(0)
-        logging.log(logging.DEBUG,"Openning %s for Yahoo IM" % stream.inode)
+        pyflaglog.log(pyflaglog.DEBUG,"Openning %s for Yahoo IM" % stream.inode)
 
         parser = YahooParser(stream, DB.DBO(stream.case))
         for action in parser.process():

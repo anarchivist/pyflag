@@ -35,14 +35,11 @@ import pyflag.FlagFramework as FlagFramework
 import pyflag.Reports as Reports
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-
+import pyflag.pyflaglog as pyflaglog
 from pyflag.Scanner import *
 import pyflag.Scanner as Scanner
 import pyflag.DB as DB
-
 import pexpect
-
-
 
 class AFTJpegScan(GenScanFactory):
     """ Steganography inside Jpeg images """
@@ -82,7 +79,7 @@ class AFTJpegScan(GenScanFactory):
 	    
 	    args = ['-s','2.00','-t','jopifa','-n','%s' % fd.name ]
 	    stegbin = 'stegdetect'
-	    logging.log(logging.DEBUG,"Will launch %s %s %s %s %s %s %s" % (stegbin, args[0],args[1],args[2],args[3],args[4],args[5]))
+	    pyflaglog.log(pyflaglog.DEBUG,"Will launch %s %s %s %s %s %s %s" % (stegbin, args[0],args[1],args[2],args[3],args[4],args[5]))
 	    s=pexpect.spawn(stegbin, args)
 	    s.expect(pexpect.EOF)
 	    stegoutput=s.before.splitlines()[0]	

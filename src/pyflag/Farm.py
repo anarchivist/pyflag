@@ -170,7 +170,7 @@ RESULTDIR are synctonised).
 """ 
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import atexit,os,signal,time
 import pyflag.DB as DB
 import pyflag.Scanner as Scanner
@@ -235,7 +235,7 @@ def start_workers():
                 try:
                     method(row['arg1'], row['arg2'], row['arg3'])
                 except Exception,e:
-                    logging.log(logging.ERRORS, "Error scanning %s" % e)
+                    pyflaglog.log(pyflaglog.ERRORS, "Error scanning %s" % e)
 
                 
     atexit.register(terminate_children)

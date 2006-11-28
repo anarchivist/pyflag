@@ -24,7 +24,6 @@
 We use the files's magic to trigger the scanner off - so its imperative that the TypeScan scanner also be run or this will not work. We also provide a report to view the history files.
 """
 import os.path
-import pyflag.logging as logging
 import pyflag.Scanner as Scanner
 import pyflag.Reports as Reports
 import pyflag.conf

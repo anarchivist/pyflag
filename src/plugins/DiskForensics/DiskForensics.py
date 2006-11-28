@@ -34,13 +34,13 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import os,os.path,time,re, cStringIO
 import pyflag.FileSystem as FileSystem
-import pyflag.logging as logging
 import pyflag.Graph as Graph
 import pyflag.IO as IO
 import pyflag.DB as DB
 import pyflag.Scanner as Scanner
 import pyflag.ScannerUtils as ScannerUtils
 import pyflag.Registry as Registry
+import pyflag.parser as parser
 
 description = "Disk Forensics"
 order=30

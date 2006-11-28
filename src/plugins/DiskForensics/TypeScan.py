@@ -26,7 +26,6 @@ config=pyflag.conf.ConfObject()
 import pyflag.FileSystem as FileSystem
 import pyflag.DB as DB
 import os.path
-import pyflag.logging as logging
 import pyflag.Scanner as Scanner
 import pyflag.Reports as Reports
 import pyflag.Graph as Graph

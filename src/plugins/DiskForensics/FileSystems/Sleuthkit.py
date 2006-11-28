@@ -4,7 +4,7 @@ Most of the code in the this implementation is found in the dbtool executable, w
 """
 
 import pyflag.FileSystem as FileSystem
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 from pyflag.FileSystem import FileSystem,DBFS
 import pyflag.DB as DB
 import pyflag.IO as IO
@@ -151,7 +151,7 @@ class Mounted(DBFS):
     """ A class implementing the mounted filesystem option """
     name = 'Mounted'
     def load(self, mount_point, iosource_name):
-        logging.log(logging.DEBUG,"Loading files from directory %s" % self.iosource.mount_point)
+        pyflaglog.log(pyflaglog.DEBUG,"Loading files from directory %s" % self.iosource.mount_point)
         
         dbh=DB.DBO(self.case)
         ## Create the tables for the filesystem

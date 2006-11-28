@@ -30,7 +30,6 @@ Basically it creates Virutual File System (VFS) objects for each stream of unall
 This has the effect of locating zip files in unallocated space and recursively openning them, performing keyword searchs etc.
 """
 import os.path
-import pyflag.logging as logging
 from pyflag.Scanner import *
 import zipfile,gzip
 from pyflag.FileSystem import File

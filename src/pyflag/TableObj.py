@@ -31,7 +31,6 @@
 It provides simple reports for adding, deleting, and editing records
 within tables.
 """
-
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
 import pyflag.conf

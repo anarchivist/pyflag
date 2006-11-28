@@ -1,7 +1,7 @@
 import pyflag.HTMLUI as HTMLUI
 import pyflag.DB as DB
 import pyflag.conf
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import pyflag.FlagFramework as FlagFramework
 config=pyflag.conf.ConfObject()
 import cgi,time

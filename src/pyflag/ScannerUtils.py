@@ -21,7 +21,7 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 import pyflag.Registry as Registry
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import pyflag.FlagFramework as FlagFramework
 
 def scan_groups_gen():
@@ -49,7 +49,7 @@ def fill_in_dependancies(scanners):
                 d = cls.depends
             for dependancy in d:
                 if dependancy not in scanners:
-                    logging.log(logging.WARNINGS,"%s depends on %s, which was not enabled - enabling to satisfy dependancy" % (s,dependancy))
+                    pyflaglog.log(pyflaglog.WARNINGS,"%s depends on %s, which was not enabled - enabling to satisfy dependancy" % (s,dependancy))
                     scanners.append(dependancy)
                     modified = True
         if not modified: break

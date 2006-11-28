@@ -71,7 +71,7 @@ class POP:
         response=self.fd.readline()
         if response.startswith("+OK"):
             self.password=args[0]
-            logging.log(logging.DEBUG,"Login for %s successful with password %s" % (self.username,self.password))
+            pyflaglog.log(pyflaglog.DEBUG,"Login for %s successful with password %s" % (self.username,self.password))
 
     def STAT(self,args):
         """ We ignore STAT commands """
@@ -92,7 +92,7 @@ class POP:
             start = self.fd.tell()
             data = self.read_multi_response()
             length = len(data)
-            logging.log(logging.DEBUG,"Message %s starts at %s in stream and is %s long" % (args[0],start,length))
+            pyflaglog.log(pyflaglog.DEBUG,"Message %s starts at %s in stream and is %s long" % (args[0],start,length))
             self.files.append((args[0],"%s:%s" % (start,length)))
 
     def RETR(self,args):
@@ -102,7 +102,7 @@ class POP:
             start = self.fd.tell()
             data = self.read_multi_response()
             length = len(data)
-            logging.log(logging.DEBUG,"Message %s starts at %s in stream and is %s long" % (args[0],start,length))
+            pyflaglog.log(pyflaglog.DEBUG,"Message %s starts at %s in stream and is %s long" % (args[0],start,length))
             self.files.append((args[0],"%s:%s" % (start,length)))
                                                            
     def parse(self):
@@ -158,7 +158,7 @@ class POPScanner(StreamScannerFactory):
         if not reverse_stream or not forward_stream: return
 
         combined_inode = "I%s|S%s/%s" % (stream.fd.name, forward_stream,reverse_stream)
-        logging.log(logging.DEBUG,"Openning %s for POP3" % combined_inode)
+        pyflaglog.log(pyflaglog.DEBUG,"Openning %s for POP3" % combined_inode)
 
         ## We open the file and scan it for emails:
         fd = self.fsfd.open(inode=combined_inode)
@@ -168,7 +168,7 @@ class POPScanner(StreamScannerFactory):
                 if not p.parse():
                     break
             except POPException,e:
-                logging.log(logging.DEBUG,"%s" % e)
+                pyflaglog.log(pyflaglog.DEBUG,"%s" % e)
 
         for f in p.files:
             ## Add a new VFS node

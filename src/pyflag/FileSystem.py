@@ -52,7 +52,7 @@ import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
 from pyflag.FlagFramework import normpath
 import pyflag.Registry as Registry
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import time
 import math
 import bisect
@@ -443,7 +443,7 @@ class DBFS(FileSystem):
             try:
                 i.reset()
             except DB.DBError,e:
-                logging.log(logging.ERRORS,"Could not reset Scanner %s: %s" % (i,e))
+                pyflaglog.log(pyflaglog.ERRORS,"Could not reset Scanner %s: %s" % (i,e))
         
     def scanfs(self, scanners, action=None):
         ## Prepare the scanner factory for scanning:
@@ -459,14 +459,14 @@ class DBFS(FileSystem):
             # open file
             count+=1
             if not count % 100:
-                logging.log(logging.INFO,"File (%s) is inode %s (%s)" % (count,row['inode'],row['filename']))
+                pyflaglog.log(pyflaglog.INFO,"File (%s) is inode %s (%s)" % (count,row['inode'],row['filename']))
                 
             try:
                 fd = self.open(inode=row['inode'])
                 Scanner.scanfile(self,fd,scanners)
                 fd.close()
             except Exception,e:
-                logging.log(logging.ERRORS,"%r: %s" % (e,e))
+                pyflaglog.log(pyflaglog.ERRORS,"%r: %s" % (e,e))
                 continue
         
         for c in scanners:

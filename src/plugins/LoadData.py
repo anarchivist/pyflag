@@ -39,7 +39,7 @@ config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
 import pyflag.LogFile as LogFile
 import plugins.LogAnalysis.LogAnalysis as LogAnalysis
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import pyflag.ScannerUtils as ScannerUtils
 
 description = "Load Data"
@@ -124,7 +124,7 @@ class LoadPresetLog(Reports.report):
                 log.display_test_log(result,query)
             except Exception,e:
                 result.text("Error: Unable to load a test set - maybe this log file is incompatible with this log preset?",color='red',font='bold')
-                logging.log(logging.DEBUG,"Unable to load test set - error returned was %s" % e)
+                pyflaglog.log(pyflaglog.DEBUG,"Unable to load test set - error returned was %s" % e)
                 print FlagFramework.get_bt_string(e)
                 return
             
@@ -294,7 +294,7 @@ class ScanFS(Reports.report):
                 tmp  = Registry.SCANNERS.dispatch(i)
                 scanners.append(tmp(fsfd))
             except Exception,e:
-                logging.log(logging.ERRORS,"Unable to initialise scanner %s (%s)" % (i,e))
+                pyflaglog.log(pyflaglog.ERRORS,"Unable to initialise scanner %s (%s)" % (i,e))
 
         ## Now sort the scanners by their specified order:
         def cmpfunc(x,y):
@@ -307,7 +307,7 @@ class ScanFS(Reports.report):
 
         scanners.sort(cmpfunc)
 
-        logging.log(logging.DEBUG,"Will invoke the following scanners: %s" % scanners)
+        pyflaglog.log(pyflaglog.DEBUG,"Will invoke the following scanners: %s" % scanners)
         ## Prepare the scanner factories for scanning:
         for s in scanners:
             s.prepare()
@@ -326,10 +326,10 @@ class ScanFS(Reports.report):
                     fd=fsfd.open(inode=stat['inode'])
                     Scanner.scanfile(fsfd,fd,scanners)
                 except IOError,e:
-                    logging.log(logging.WARNINGS,"Unable to open file %s%s: %s" % (stat['path'],stat['name'],e))
+                    pyflaglog.log(pyflaglog.WARNINGS,"Unable to open file %s%s: %s" % (stat['path'],stat['name'],e))
                     print FlagFramework.get_bt_string(e)
                 except Exception,e:
-                    logging.log(logging.ERRORS,"Error scanning inode %s: %s" % (stat['inode'],e))
+                    pyflaglog.log(pyflaglog.ERRORS,"Error scanning inode %s: %s" % (stat['inode'],e))
                     
             ## Now recursively scan all the directories in this directory:
             for directory in directories:
@@ -349,7 +349,7 @@ class ScanFS(Reports.report):
         result.para("The following scanners are used: %s" % scanners)
         result.row("System messages:")
         tmp=result.__class__(result)
-        tmp.text('\n'.join(logging.ring_buffer),font='typewriter',color="red")
+        tmp.text('\n'.join(pyflaglog.ring_buffer),font='typewriter',color="red")
         result.row(tmp)
         
 
@@ -383,16 +383,16 @@ class ResetScanners(ScanFS):
                 tmp  = Registry.SCANNERS.dispatch(i)
                 scanners.append(tmp(fsfd))
             except Exception,e:
-                logging.log(logging.ERRORS,"Unable to initialise scanner %s (%s)" % (i,e))
+                pyflaglog.log(pyflaglog.ERRORS,"Unable to initialise scanner %s (%s)" % (i,e))
 
-        logging.log(logging.DEBUG,"Will reset the following scanners: %s" % scanners)
+        pyflaglog.log(pyflaglog.DEBUG,"Will reset the following scanners: %s" % scanners)
         ## Prepare the scanner factories for scanning:
 
         def process_directory(root):
             """ Recursive function for scanning directories """
             ## First scan all the files in the directory
             for stat in fsfd.longls(path=root,dirs=0):
-                logging.log(logging.DEBUG,"Resetting file %s%s (inode %s)" % (stat['path'],stat['name'],stat['inode']))
+                pyflaglog.log(pyflaglog.DEBUG,"Resetting file %s%s (inode %s)" % (stat['path'],stat['name'],stat['inode']))
                 for s in scanners:
                     s.reset(stat['inode'])
                     ## Remove the fact that this inode is scanned by noting that in the inode table:
@@ -519,7 +519,7 @@ class LoadFS(Reports.report):
 
             result.row("System messages:")
             tmp=result.__class__(result)
-            tmp.text('\n'.join(logging.ring_buffer),font='typewriter',color="red")
+            tmp.text('\n'.join(pyflaglog.ring_buffer),font='typewriter',color="red")
             result.row(tmp)
             ## FIXME: This is a horribly slow query...
   #          dbh.execute("select count(*) as count,value as total from inode_%s, meta_%s as m where m.name='last_inode' group by total" % (tablename, tablename))

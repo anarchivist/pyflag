@@ -39,7 +39,7 @@ When we retrieve this offset (o), we search through the db for the inode contain
 Note that if a single file is larger than the blocksize, we have multiple entries in the database assigning a number of blocks to the same inode. This is not a problem if it is taken into account when reassembling the information.
 
 """
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import pyflag.FlagFramework as FlagFramework
 import pyflag.FileSystem as FileSystem
 import pyflag.Reports as Reports
@@ -110,7 +110,7 @@ class IndexScan(GenScanFactory):
         self.index = index.indexer()
         pydbh = DB.DBO(None)
         #Do word index (literal) prep
-        logging.log(logging.DEBUG,"Index Scanner: Building index trie")
+        pyflaglog.log(pyflaglog.DEBUG,"Index Scanner: Building index trie")
         start_time=time.time()
         pydbh.execute("select word,id from dictionary where type='literal'")
         for row in pydbh:
@@ -129,14 +129,14 @@ class IndexScan(GenScanFactory):
             except UnicodeDecodeError:
                 pass
 
-        logging.log(logging.DEBUG,"Index Scanner: Done in %s seconds..." % (time.time()-start_time))
+        pyflaglog.log(pyflaglog.DEBUG,"Index Scanner: Done in %s seconds..." % (time.time()-start_time))
 
         #Do regex prep
-        logging.log(logging.DEBUG,"Index Scanner: Compiling regex")
+        pyflaglog.log(pyflaglog.DEBUG,"Index Scanner: Compiling regex")
         start_time=time.time()
         pydbh.execute("select word,id from dictionary where type='regex'")
         self.RegexpRows = [ (re.compile(row['word'],re.IGNORECASE),row['id']) for row in pydbh ]
-        logging.log(logging.DEBUG,"Index Scanner: Done in %s seconds..." % (time.time()-start_time))
+        pyflaglog.log(pyflaglog.DEBUG,"Index Scanner: Done in %s seconds..." % (time.time()-start_time))
                 
     def reset(self, inode):
         """ This deletes the index file and drops the LogicalIndex table.

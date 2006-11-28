@@ -45,7 +45,7 @@ import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
 import pyflag.Reports as Reports
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import base64
 import plugins.NetworkForensics.PCAPFS as PCAPFS
 import urllib
@@ -112,7 +112,7 @@ class message:
     def store_list(self,list,listname):
         """Store list in DB"""
         if len(list)>0:
-            #logging.log(logging.VERBOSE_DEBUG,"Inserting list: %s" % ",".join(list))
+            #pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Inserting list: %s" % ",".join(list))
             self.insert_user_data(nick="%s (Target)" % self.client_id,data_type=listname,data=",".join(list),sessionid=-99)
                     
     def add_unique_to_list(self,data,list):
@@ -124,11 +124,11 @@ class message:
         except ValueError:
             #Don't have this one, so insert it
             list.append(data)
-            #logging.log(logging.VERBOSE_DEBUG, "Appending to list:%s" % (list))
+            #pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Appending to list:%s" % (list))
 
     def del_participant(self,username):
         try:
-            #logging.log(logging.VERBOSE_DEBUG, "Removing participant:%s" % username)
+            #pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Removing participant:%s" % username)
             self.participants.remove(username)
         except:
             #name wasn't in participants for some reason, shouldn't really happen.
@@ -186,7 +186,7 @@ class message:
                            user_data=data)
         except:
             #We have duplicate user data,
-            #logging.log(logging.VERBOSE_DEBUG, "Ignoring data as duplicate:%s,%s,%s" % (nick,data_type,data))
+            #pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Ignoring data as duplicate:%s,%s,%s" % (nick,data_type,data))
             pass
 
     def store_phone_nums(self,nick,type,number):
@@ -240,7 +240,7 @@ class message:
             self.insert_user_data(nick,'msn_mobile_device',urllib.unquote(number),sessionid=-99)
             
         else:
-            logging.log(logging.VERBOSE_DEBUG, "Unknown phone type: %s" % self.cmdline.strip())
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Unknown phone type: %s" % self.cmdline.strip())
         
         
     def parse(self):
@@ -268,7 +268,7 @@ class message:
         try:
             return getattr(self,self.cmd)()
         except AttributeError,e:
-            logging.log(logging.VERBOSE_DEBUG,"Unable to handle command %r from line %s (%s)" % (self.cmd,self.cmdline,e))
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Unable to handle command %r from line %s (%s)" % (self.cmd,self.cmdline,e))
             return None
 
     def get_data(self):
@@ -283,7 +283,7 @@ class message:
             self.length = int(self.words[-1])
         except:
             #The last parameter isn't the length, so this message is stuffed
-            logging.log(logging.VERBOSE_DEBUG,"Line %s is not a valid MSG, no length in bytes" % self.cmdline)
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Line %s is not a valid MSG, no length in bytes" % self.cmdline)
             return False
         
         self.offset = self.fd.tell()
@@ -299,7 +299,7 @@ class message:
                 self.headers[header.lower()]=value.lower().strip()
             except ValueError:
                 #We don't have : separated parameters, so something is wrong.
-                logging.log(logging.VERBOSE_DEBUG, "Parse mime failed on:%s.  Headers:%s" % (line,self.headers))
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Parse mime failed on:%s.  Headers:%s" % (line,self.headers))
                 return False
 
         current_position = self.fd.tell()
@@ -349,7 +349,7 @@ class message:
 
     def USR(self):
         """
-        Target logging into switchboard server using same auth string as passed back by server in XFR
+        Target pyflaglog into switchboard server using same auth string as passed back by server in XFR
 
         Most of this info is pretty boring.  I only store stuff that has usernames in it.
         
@@ -409,7 +409,7 @@ class message:
 	"""
 	
         
-        #logging.log(logging.VERBOSE_DEBUG,  "USR:%s" % self.cmdline.strip())
+        #pyflaglog.log(pyflaglog.VERBOSE_DEBUG,  "USR:%s" % self.cmdline.strip())
         self.state = "USR"
         
         if (self.words[2]=="OK"):
@@ -506,7 +506,7 @@ class message:
                 
                 self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',self.words[2],tr_id=self.words[1])
             except Exception,e:
-                logging.log(logging.VERBOSE_DEBUG,"ANS not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"ANS not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
                 pass
 
             self.state = "ANS"
@@ -528,7 +528,7 @@ class message:
             self.add_unique_to_list(self.words[4],self.participants)                
 
         except Exception,e:
-                logging.log(logging.VERBOSE_DEBUG, "IRO not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "IRO not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
                 pass
 
     def parse_psm(self,length,trid=None):
@@ -681,7 +681,7 @@ class message:
                 self.state = "CVR"
 
             except Exception,e:
-                logging.log(logging.VERBOSE_DEBUG,  "CVR not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG,  "CVR not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
                 pass
 
     def PRP(self):
@@ -697,7 +697,7 @@ class message:
         """
         
 
-        #logging.log(logging.VERBOSE_DEBUG,  "PRP: %s" % self.cmdline)
+        #pyflaglog.log(pyflaglog.VERBOSE_DEBUG,  "PRP: %s" % self.cmdline)
         
         self.store_phone_nums(nick="%s (Target)" % self.client_id,type=self.words[1],number=self.words[2])
             
@@ -714,7 +714,7 @@ class message:
         """
         
 
-        #logging.log(logging.VERBOSE_DEBUG,  "BPR: %s" % self.cmdline)
+        #pyflaglog.log(pyflaglog.VERBOSE_DEBUG,  "BPR: %s" % self.cmdline)
 
         try:
             user=self.state.split(":")[1]
@@ -741,7 +741,7 @@ class message:
         """
         
 
-        #logging.log(logging.VERBOSE_DEBUG, "LSG: %s" % self.cmdline)
+        #pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "LSG: %s" % self.cmdline)
         try:
             if self.contact_list_groups[self.words[1]]:
                 #We already have LSG data for this list number.  Do nothing
@@ -777,7 +777,7 @@ class message:
         """
         
         
-        #logging.log(logging.VERBOSE_DEBUG, "LST: %s" % self.cmdline)
+        #pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "LST: %s" % self.cmdline)
 
         self.list_table={}
         self.list_table['forward_list']=1
@@ -790,7 +790,7 @@ class message:
             #Do a bitwise and to figure out which lists this person is in.
             if ((listvalue & int(self.words[3]))>0):
                 #add the nick to the relevant list
-                #logging.log(logging.VERBOSE_DEBUG, "Inserting %s into list %s" % (self.words[1],listtype))
+                #pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Inserting %s into list %s" % (self.words[1],listtype))
                 self.add_unique_to_list(data=self.words[1],list=self.list_lookup[listtype])
 
         self.insert_user_data(nick=self.words[1],data_type='url_enc_display_name',data=urllib.unquote(self.words[2]))
@@ -802,7 +802,7 @@ class message:
             #This LST entry did not have a 4th parameter
             pass
         except KeyError,e:
-            logging.log(logging.VERBOSE_DEBUG, "No LSG entry for group specified in LST: %s. Exception: %s" % (self.cmdline.strip(),e))
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "No LSG entry for group specified in LST: %s. Exception: %s" % (self.cmdline.strip(),e))
             
         self.state = "LST:%s" % self.words[1]
 
@@ -1126,7 +1126,7 @@ class message:
         """
         
         
-        logging.log(logging.VERBOSE_DEBUG,"ADD: %s" % self.cmdline)
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"ADD: %s" % self.cmdline)
         self.insert_user_data("%s (Target)" % self.client_id,'added_user_to_list',"list:%s,user:%s,nick:%s" % (self.words[2],self.words[3],self.words[4]),sessionid=-99)
         self.insert_session_data(sender="%s (Target)" % self.client_id,recipient="SWITCHBOARD SERVER",type="ADDED USER TO LIST",sessionid=-99)
         self.state = "ADD"
@@ -1208,7 +1208,7 @@ class message:
 
     def ignore_type(self,content_type,sender,is_server):
         #Nonexistent callback for ignored types.
-        logging.log(logging.VERBOSE_DEBUG, "Ignoring message:%s.  Headers:%s. Data:%s" % (self.cmdline.strip(),self.headers,self.data.strip()))
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Ignoring message:%s.  Headers:%s. Data:%s" % (self.cmdline.strip(),self.headers,self.data.strip()))
 
     def p2p_handler(self,content_type,sender,is_server):
         """ Handle a p2p transfer """
@@ -1290,7 +1290,7 @@ class message:
             os.lseek(fd,offset,0)
             bytes = os.write(fd,data)
             if bytes <message_size:
-                logging.log(logging.WARNINGS,  "Unable to write as much data as needed into MSN p2p file. Needed %s, write %d." %(message_size,bytes))
+                pyflaglog.log(pyflaglog.WARNINGS,  "Unable to write as much data as needed into MSN p2p file. Needed %s, write %d." %(message_size,bytes))
             os.close(fd)
             
     ct_dispatcher = {
@@ -1340,7 +1340,7 @@ class message:
                 ## If the second word is a transaction id (int) its a message from client to server.  ie. FROM target to all users in session.
                 tid = int(self.words[1])
                 sender = "%s (Target)" % self.client_id
-                #logging.log(logging.VERBOSE_DEBUG, "participants:%s" % (",".join(self.participants)))
+                #pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "participants:%s" % (",".join(self.participants)))
                 self.recipient = ",".join(self.participants)
                 server = False
             except ValueError:
@@ -1356,7 +1356,7 @@ class message:
 
             except:
                 content_type = "unknown/unknown"
-                logging.log(logging.VERBOSE_DEBUG,"Couldn't figure out MIME type for this message: %s" % self.cmdline)
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Couldn't figure out MIME type for this message: %s" % self.cmdline)
 
             ## Now dispatch the relevant handler according to the content
             ## type:
@@ -1364,7 +1364,7 @@ class message:
                 ct = content_type.split(';')[0]
                 self.ct_dispatcher[ct](self,content_type,sender,server)
             except KeyError,e:
-                logging.log(logging.VERBOSE_DEBUG, "Unable to handle content-type %s(%s) - ignoring message %s " % (content_type,e,tid))
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Unable to handle content-type %s(%s) - ignoring message %s " % (content_type,e,tid))
         self.state = "MSG"
 	
 from HTMLParser import HTMLParser
@@ -1467,7 +1467,7 @@ class MSNScanner(StreamScannerFactory):
                 #We need both streams otherwise this won't work
                 if not reverse_stream or not forward_stream: return
 
-                logging.log(logging.VERBOSE_DEBUG,"Opening Combined Stream S%s/%s for MSN" % (forward_stream, reverse_stream))
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Opening Combined Stream S%s/%s for MSN" % (forward_stream, reverse_stream))
 
                 #Create the combined inode
                 combined_inode = "I%s|S%s/%s" % (stream.fd.name, forward_stream, reverse_stream)
@@ -1479,7 +1479,7 @@ class MSNScanner(StreamScannerFactory):
                 while 1:
                     try:
                         result=m.parse()
-                        #logging.log(logging.VERBOSE_DEBUG,"Client:%s,Stream:%s,Inode:%s" % (m.client_id, m.session_id,combined_inode))
+                        #pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Client:%s,Stream:%s,Inode:%s" % (m.client_id, m.session_id,combined_inode))
                     except IOError:
 
                         break
@@ -1502,7 +1502,7 @@ class MSNScanner(StreamScannerFactory):
                     
                 #Fix up all the session IDs (=-1) that were stored before we figured out the session ID.
                 if m.session_id==-1:
-                    logging.log(logging.VERBOSE_DEBUG,"Couldn't figure out the MSN session ID for stream S%s/%s" % (forward_stream, reverse_stream))
+                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Couldn't figure out the MSN session ID for stream S%s/%s" % (forward_stream, reverse_stream))
                 else:
                     dbh.execute("update msn_session set session_id=%r where session_id=-1 and inode=%r",(m.session_id,combined_inode))
                     try:
@@ -1515,14 +1515,14 @@ class MSNScanner(StreamScannerFactory):
 
                 #Similarly go back and fix up all the Unknown (Target) entries with the actual target name
                 if m.client_id=='Unknown':
-                    logging.log(logging.VERBOSE_DEBUG,"Couldn't figure out target identity for stream S%s/%s" % (forward_stream, reverse_stream))
+                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Couldn't figure out target identity for stream S%s/%s" % (forward_stream, reverse_stream))
                 else:
                     dbh.execute("update msn_session set recipient=%r where recipient='Unknown (Target)' and inode=%r",(m.client_id,combined_inode))
                     dbh.execute("update msn_session set sender=%r where sender='Unknown (Target)' and inode=%r",(m.client_id,combined_inode))
 
                 self.processed.append(forward_stream)
                 self.processed.append(reverse_stream)
-                #logging.log(logging.VERBOSE_DEBUG, "Appending ids: %s, %s" % (forward_stream,reverse_stream))
+                #pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Appending ids: %s, %s" % (forward_stream,reverse_stream))
                 
 class MSNFile(File):
     """ VFS driver for reading the cached MSN files """

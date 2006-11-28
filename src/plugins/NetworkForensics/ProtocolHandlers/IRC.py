@@ -31,7 +31,7 @@ import pyflag.FlagFramework as FlagFramework
 from pyflag.FlagFramework import Curry
 from NetworkScanner import *
 import pyflag.Reports as Reports
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import cStringIO,re
 import plugins.NetworkForensics.PCAPFS as PCAPFS
 
@@ -429,7 +429,7 @@ class IRC:
                 ## Dispatch a command handler:
                 self.dispatch(m.group(1),m.group(2),m.group(3))
             except IndexError,e:
-                logging.log(logging.WARNINGS, "unable to parse line %s (%s)" % (line,e))
+                pyflaglog.log(pyflaglog.WARNINGS, "unable to parse line %s (%s)" % (line,e))
                 
     def identify(self):
         """ Given a small extract from the combined stream, we try to
@@ -534,7 +534,7 @@ class IRCScanner(StreamScannerFactory):
         if not irc.identify():
             return
         
-        logging.log(logging.DEBUG,"Openning %s for IRC" % combined_inode)
+        pyflaglog.log(pyflaglog.DEBUG,"Openning %s for IRC" % combined_inode)
         irc.parse()
             
 class BrowseIRCChat(Reports.report):

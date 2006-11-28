@@ -29,7 +29,7 @@ import pyflag.IO as IO
 import pyflag.FileSystem as FileSystem
 import time
 import pyflag.Registry as Registry
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import fnmatch
@@ -388,7 +388,7 @@ class execute(pyflagsh.command):
         start_time=time.time()
         report,query = self.prepare()
 
-        logging.log(logging.DEBUG, "Will execute the following query %s" % query)
+        pyflaglog.log(pyflaglog.DEBUG, "Will execute the following query %s" % query)
 
         ## Instantiate the report
         report=report(self.environment._flag)

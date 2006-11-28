@@ -33,7 +33,7 @@ import BaseHTTPServer, SimpleHTTPServer, SocketServer
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
 import pyflag.HTMLUI as HTMLUI
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import cgi,os
 import re,time,sys
 import pyflag.conf
@@ -276,7 +276,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                 cb(query,result)
                 ## If the cb raises an exception, we let the user know:
             except Exception,e:
-                logging.log(logging.ERROR,"Unable to call callback %s" % cb_key)
+                pyflaglog.log(pyflaglog.ERROR,"Unable to call callback %s" % cb_key)
                 result.clear()
                 result.heading("Error")
                 result.text("%s" % e)

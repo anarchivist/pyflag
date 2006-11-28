@@ -36,7 +36,7 @@ Scanners are actually factory classes and must be inherited from GenScanFactory.
 """
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import os,imp
 import re
 import pyflag.Registry as Registry
@@ -369,7 +369,7 @@ def scanfile(ddfs,fd,factories):
     ## scanners.
     metadata = {}
 
-    logging.log(logging.DEBUG,"Scanning file %s%s (inode %s)" % (stat['path'],stat['name'],stat['inode']))
+    pyflaglog.log(pyflaglog.DEBUG,"Scanning file %s%s (inode %s)" % (stat['path'],stat['name'],stat['inode']))
 
     while 1:
         ## If the file is too fragmented, we skip it because it might take too long... NTFS is a shocking filesystem, with some files so fragmented that it takes a really long time to read them. In our experience these files are not important for scanning so we disable them here. Maybe this should be tunable?
@@ -383,7 +383,7 @@ def scanfile(ddfs,fd,factories):
 
             ## If there are not enough blocks to do a reasonable chunk of the file, we skip them as well...
             if c>0 and c*fd.block_size<fd.size:
-                logging.log(logging.WARNING,"Skipping inode %s because there are not enough blocks %s < %s" % (fd.inode,c*fd.block_size,fd.size))
+                pyflaglog.log(pyflaglog.WARNING,"Skipping inode %s because there are not enough blocks %s < %s" % (fd.inode,c*fd.block_size,fd.size))
                 return
 
         except AttributeError:
@@ -405,7 +405,7 @@ def scanfile(ddfs,fd,factories):
         ## If none of the scanners are interested with this file, we
         ## stop right here
         if not interest:
-            logging.log(logging.DEBUG, "No interest for %s" % fd.inode)
+            pyflaglog.log(pyflaglog.DEBUG, "No interest for %s" % fd.inode)
             break
         
         for o in objs:
@@ -415,11 +415,11 @@ def scanfile(ddfs,fd,factories):
                     o.process(data,metadata=metadata)
 
             except Exception,e:
-                logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
+                pyflaglog.log(pyflaglog.ERRORS,"Scanner (%s) Error: %s" %(o,e))
                 raise
 
         if not interest:
-            logging.log(logging.DEBUG, "No interest for %s" % fd.inode)
+            pyflaglog.log(pyflaglog.DEBUG, "No interest for %s" % fd.inode)
             break
 
     # call finish method of each object
@@ -427,7 +427,7 @@ def scanfile(ddfs,fd,factories):
         try:
             o.finish()
         except Exception,e:
-            logging.log(logging.ERRORS,"Scanner (%s) Error: %s" %(o,e))
+            pyflaglog.log(pyflaglog.ERRORS,"Scanner (%s) Error: %s" %(o,e))
 
     # Store the fact that we finished in the inode table:
     scanner_names = ','.join([ c.outer.__class__.__name__ for c in objs ])

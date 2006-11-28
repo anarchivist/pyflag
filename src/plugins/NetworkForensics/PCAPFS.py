@@ -51,7 +51,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.FileSystem as FileSystem
 from pyflag.FileSystem import DBFS,File
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import pyflag.IO as IO
 import pyflag.DB as DB
 import pyflag.Scanner as Scanner
@@ -149,7 +149,7 @@ class PCAPFS(DBFS):
         pcap_file = PCAP.FileHeader(buffer)
 
         ## Build our streams:
-        logging.log(logging.DEBUG, "Reassembling streams, this might take a while")
+        pyflaglog.log(pyflaglog.DEBUG, "Reassembling streams, this might take a while")
 
         ## Where to store the reassembled stream files
         hashtbl = reassembler.init(FlagFramework.get_temp_path(dbh.case,'I%s|' % iosource_name))
@@ -265,7 +265,7 @@ class PCAPFS(DBFS):
             max_id+=1
             ## Some progress reporting
             if max_id % 10000 == 0:
-                logging.log(logging.VERBOSE_DEBUG, "processed %s packets (%s bytes)" % (max_id, p.buffer.offset))
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "processed %s packets (%s bytes)" % (max_id, p.buffer.offset))
 
             data = p.payload()
 #            print "%r" % data[:100]
@@ -275,9 +275,9 @@ class PCAPFS(DBFS):
             try:
                 reassembler.process_packet(hashtbl, d, self.fd.name)
             except RuntimeError,e:
-                logging.log(logging.VERBOSE_DEBUG, "%s" % e)
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "%s" % e)
 
-        logging.log(logging.DEBUG, "Finalising streams, nearly done")
+        pyflaglog.log(pyflaglog.DEBUG, "Finalising streams, nearly done")
         
         # Finish it up
         reassembler.clear_stream_buffers(hashtbl);

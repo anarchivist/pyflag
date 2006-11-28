@@ -29,7 +29,7 @@
 """ Module used for sanity checking of strings according to classifications """
 import pyflag.DB as DB
 import pyflag.Reports as Reports
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import os.path,os
@@ -65,7 +65,7 @@ class TypeChecker:
                 #call it
                 result=fn(self,field,query)
 #                if not result:
-#                    logging.log(logging.DEBUG,"Failed to check %s for %s of type %s" % (query,field,type))
+#                    pyflaglog.log(pyflaglog.DEBUG,"Failed to check %s for %s of type %s" % (query,field,type))
                 return result
 
         raise ReportInvalidParamter, "Type %s not recognised " % type

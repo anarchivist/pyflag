@@ -31,7 +31,7 @@ This module will extract files from an image by using their magic.
 """
 import re,types
 import pyflag.conf
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 config=pyflag.conf.ConfObject()
 
 ## This initialises the cut definition stack:
@@ -207,7 +207,7 @@ def process(case,subsys,extension=None):
         
         f=window+data
         bytes_read+=len(data)
-        logging.log(logging.INFO,"Processed %u Mb" % (bytes_read/1024/1024))
+        pyflaglog.log(pyflaglog.INFO,"Processed %u Mb" % (bytes_read/1024/1024))
         for cut in definitions:
             if extension and cut['Extension'] not in extension: continue
             pos=0

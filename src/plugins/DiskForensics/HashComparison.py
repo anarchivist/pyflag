@@ -30,7 +30,6 @@ import pyflag.FileSystem as FileSystem
 import pyflag.Reports as Reports
 import pyflag.DB as DB
 import os.path
-import pyflag.logging as logging
 from pyflag.Scanner import *
                   
 import md5

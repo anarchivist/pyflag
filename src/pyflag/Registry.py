@@ -33,7 +33,7 @@ classes in the same plugin and have them all automatically loaded.
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import os,sys,imp
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 
 class Registry:
     """ Main class to register classes derived from a given parent class. """
@@ -66,14 +66,14 @@ class Registry:
                         path = dirpath+'/'+filename
                         try:
                             if path not in self.module_paths:
-                                logging.log(logging.DEBUG,"Will attempt to load plugin '%s/%s'"
+                                pyflaglog.log(pyflaglog.DEBUG,"Will attempt to load plugin '%s/%s'"
                                             % (dirpath,filename))
                                 ## If we do not have the module in the cache, we load it now
                                 try:
                                     #open the plugin file
                                     fd = open(path ,"r")
                                 except Exception,e:
-                                    logging.log(logging.DEBUG, "Unable to open plugin file '%s': %s"
+                                    pyflaglog.log(pyflaglog.DEBUG, "Unable to open plugin file '%s': %s"
                                                 % (filename,e))
                                     continue
 
@@ -86,7 +86,7 @@ class Registry:
                                     except KeyError:
                                         module = imp.load_source(module_name,dirpath+'/'+filename,fd)
                                 except Exception,e:
-                                    logging.log(logging.ERRORS, "*** Unable to load module %s: %s"
+                                    pyflaglog.log(pyflaglog.ERRORS, "*** Unable to load module %s: %s"
                                                 % (module_name,e))
                                     continue
 
@@ -95,14 +95,14 @@ class Registry:
                                 #Is this module active?
                                 try:
                                     if module.hidden:
-                                        logging.log(logging.DEBUG, "*** Will not load Module %s: Module Hidden"% (module_name))
+                                        pyflaglog.log(pyflaglog.DEBUG, "*** Will not load Module %s: Module Hidden"% (module_name))
                                         continue
                                 except AttributeError:
                                     pass
                                 
                                 try:
                                     if not module.active:
-                                        logging.log(logging.WARNINGS, "*** Will not load Module %s: Module not active" % (module_name))
+                                        pyflaglog.log(pyflaglog.WARNINGS, "*** Will not load Module %s: Module not active" % (module_name))
                                         continue
                                 except AttributeError:
                                     pass
@@ -134,12 +134,12 @@ class Registry:
                                             self.check_class(Class)
                                         except AttributeError,e:
                                             err = "Failed to load %s '%s': %s" % (ParentClass,cls,e)
-                                            logging.log(logging.WARNINGS, err)
+                                            pyflaglog.log(pyflaglog.WARNINGS, err)
                                             continue
 
                                         if Class not in self.classes:
                                             self.classes.append(Class)
-                                        logging.log(logging.DEBUG, "Added %s '%s:%s'"
+                                        pyflaglog.log(pyflaglog.DEBUG, "Added %s '%s:%s'"
                                                     % (ParentClass,module_desc,cls))
 
                                         try:
@@ -152,7 +152,7 @@ class Registry:
                                     continue
 
                         except TypeError, e:
-                            logging.log(logging.ERRORS, "Could not compile module %s: %s"
+                            pyflaglog.log(pyflaglog.ERRORS, "Could not compile module %s: %s"
                                         % (module_name,e))
                             continue
 

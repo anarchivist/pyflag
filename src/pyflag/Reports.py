@@ -32,7 +32,7 @@ import pyflag.DB as DB
 import pyflag.Registry as Registry
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 
 class ReportError(Exception):
     """ Base class for errors in reports """
@@ -81,10 +81,10 @@ class report:
                 try:
                     username, password = token.split(':')
                     if username.lstrip().rstrip()==query.user and password.lstrip().rstrip()==query.passwd:
-                        logging.log(logging.DEBUG,"Accepted Authentication from %s" % query.user)
+                        pyflaglog.log(pyflaglog.DEBUG,"Accepted Authentication from %s" % query.user)
                         return True
                 except ValueError:
-                    logging.log(logging.WARNINGS,"Parse error in Authentication Token %r - ignoring this token " % token)
+                    pyflaglog.log(pyflaglog.WARNINGS,"Parse error in Authentication Token %r - ignoring this token " % token)
         except AttributeError,e:
             ## If config.AUTHORISE does not exist, we dont require authentication
             return True

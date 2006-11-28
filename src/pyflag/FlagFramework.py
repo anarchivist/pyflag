@@ -33,7 +33,7 @@
 import sys,os
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import pyflag.Registry as Registry
 import pyflag.Store as Store
 import textwrap
@@ -457,7 +457,7 @@ class Flag:
                 result.result += docutils.core.publish_string(textwrap.dedent(report_doc),
                                                               writer_name='html')
             except Exception,e:
-                logging.log(logging.ERROR,"Error running docutils: %s" % e)
+                pyflaglog.log(pyflaglog.ERROR,"Error running docutils: %s" % e)
                 result.heading("Help for %s" % report_name)
                 result.text(textwrap.dedent(report_doc), font='typewriter')
             
@@ -757,7 +757,7 @@ def reset_all(**query):
                     raise KeyError()
 
             ## This report should now be reset:
-            logging.log(logging.DEBUG, "Will now reset %s" % row['value'])
+            pyflaglog.log(pyflaglog.DEBUG, "Will now reset %s" % row['value'])
 
             print "Resetting %s" % query
 

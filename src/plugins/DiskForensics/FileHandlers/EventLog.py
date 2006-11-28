@@ -32,7 +32,7 @@ The description for Event ID ( xxx ) in Source ( yyy ) cannot be found. The loca
 # * along with this program; if not, write to the Free Software
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import pyflag.Scanner as Scanner
 import pyflag.Reports as Reports
 import pyflag.conf
@@ -83,7 +83,7 @@ class DLLScan(Scanner.GenScanFactory):
             filename = self.ddfs.lookup(inode=self.inode)
             b = Buffer(fd=fd)
 
-            logging.log(logging.DEBUG, "Opening %s to extract messages" % self.inode)
+            pyflaglog.log(pyflaglog.DEBUG, "Opening %s to extract messages" % self.inode)
             self.outer.pydbh.mass_insert_start('EventMessages')
             try:
                 m=PElib.get_messages(b)
@@ -95,6 +95,6 @@ class DLLScan(Scanner.GenScanFactory):
                                     )
 
             except (IndexError, IOError, AttributeError):
-                logging.log(logging.VERBOSE_DEBUG, "%s does not contain messages" % filename)
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "%s does not contain messages" % filename)
 
             self.outer.pydbh.mass_insert_commit()

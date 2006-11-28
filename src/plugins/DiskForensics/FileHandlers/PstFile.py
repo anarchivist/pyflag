@@ -26,7 +26,6 @@ There is a scanner which executs the scanner factory train on files within the p
 This feature complements the PST virtual filesystem driver to ensure that pst files are transparently viewable by the FLAG GUI.
 """
 import os.path
-import pyflag.logging as logging
 from pyflag.Scanner import *
 import pyflag.Scanner as Scanner
 import pypst2

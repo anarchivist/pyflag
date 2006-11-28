@@ -32,7 +32,7 @@ import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import pickle
 import plugins.LogAnalysis.Whois as Whois
 
@@ -167,9 +167,9 @@ class Log:
             try:
                 self.dbh.execute("INSERT INTO "+tablename+" values " + insert_str, fields)
             except DB.DBError,e:
-                logging.log(logging.WARNINGS,"DB Error: %s" % e)
+                pyflaglog.log(pyflaglog.WARNINGS,"DB Error: %s" % e)
             except TypeError,e:
-                logging.log(logging.WARNINGS,"Unable to load line into table SQL: %s Data: %s Error: %s" % (insert_str,fields,e))
+                pyflaglog.log(pyflaglog.WARNINGS,"Unable to load line into table SQL: %s Data: %s Error: %s" % (insert_str,fields,e))
                 continue
 
             yield "Uploaded %s rows" % count
