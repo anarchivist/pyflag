@@ -30,6 +30,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import FileFormats.IECache as IECache
 import pyflag.DB as DB
+from pyflag.TableObj import ColumnType, TimestampType
 
 class IEIndex(Scanner.GenScanFactory):
     """ Load in IE History files """
@@ -89,8 +90,13 @@ class IEHistory(Reports.report):
 
         try:
             result.table(
-                columns=('path','type','url','modified','accessed','concat(filepath,filename)','headers'),
-                names=('Path','Type','URL','Modified','Accessed','Filename','Headers'),
+                elements = [ ColumnType('Path','path'),
+                             ColumnType('Type','type'),
+                             ColumnType('URL','url'),
+                             TimestampType('Modified','modified'),
+                             TimestampType('Accessed','accessed'),
+                             ColumnType('Filename','concat(filepath,filename)'),
+                             ColumnType('Headers','headers') ],
                 table=('history'),
                 case=query['case']
                 )

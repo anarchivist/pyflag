@@ -98,6 +98,7 @@ class ls(pyflagsh.command):
             
     def list(self,path):
         """ List the files in a particular path """
+        print "Listing path %s" % path
         path=os.path.abspath(os.path.join(self.environment.CWD,path))
         try:
             if self.environment._FS.isdir(path):

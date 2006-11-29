@@ -372,7 +372,7 @@ class AJAXUI(HTMLUI.HTMLUI):
                 for i in range(len(elements)):
                     ## Give the row to the column element to allow it
                     ## to translate the output suitably:
-                    value = elements[i].display(row,self)
+                    value = elements[i].display(row[elements[i].name],row,self)
 
                     ## Render the row styles so that equal values on
                     ## the sorted column have the same style

@@ -49,6 +49,7 @@ import pyflag.pyflaglog as pyflaglog
 import base64
 import plugins.NetworkForensics.PCAPFS as PCAPFS
 import urllib
+from pyflag.TableObj import ColumnType, TimestampType, InodeType
 
 class RingBuffer:
     def __init__(self, size_max):

@@ -41,6 +41,7 @@ Note that if a single file is larger than the blocksize, we have multiple entrie
 """
 import pyflag.pyflaglog as pyflaglog
 import pyflag.FlagFramework as FlagFramework
+from pyflag.FlagFramework import query_type, Curry
 import pyflag.FileSystem as FileSystem
 import pyflag.Reports as Reports
 import pyflag.Registry as Registry
@@ -51,6 +52,7 @@ import index,os,time,re
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
+from pyflag.TableObj import ColumnType, TimestampType, InodeType
 
 ## This blocksize is in bits (2^20)
 BLOCKBITS=20
@@ -290,8 +292,9 @@ class BuildDictionary(Reports.report):
         table=self.ui(result)
         try:
             table.table(
-                columns=['word','class','type'],
-                names=['Word','Class','Type'],
+                elements = [ ColumnType('Word','word'),
+                             ColumnType('Class','class'),
+                             ColumnType('Type','type') ],
                 table='dictionary',
                 case=None,
                 )
@@ -368,9 +371,9 @@ class SearchIndex(Reports.report):
             q['__target__']='new_keyword'
             try:
                 result.table(
-                    columns = ['word','class','hits'],
-                    names=['Index Term','Dictionary Class','Number of Hits'],
-                    links = [ q ],
+                    elements = [ ColumnType('Index Term','word', link=q),
+                                 ColumnType('Dictionary Class','class'),
+                                 ColumnType('Number of Hits', 'hits')],
                     table='LogicalIndexStats',
                     case=query['case'],
                     )
@@ -393,7 +396,7 @@ class SearchIndex(Reports.report):
                     tmp.text("%s\n" % keyword,color='red')
                     icon = result.__class__(result)
                     icon.popup(
-                        FlagFramework.Curry(remove_word_cb,word=keyword),
+                        Curry(remove_word_cb,word=keyword),
                         "Remove Word", tooltip="Remove word", icon="no.png"
                         )
                     old=keyword
@@ -561,10 +564,12 @@ class SearchIndex(Reports.report):
             offset = int(offset)
             tmp = result.__class__(result)
 
-            tmp.link( offset, target=FlagFramework.query_type((),case=query['case'],family="Disk Forensics", report='ViewFile',mode='HexDump',inode=inode,hexlimit=max(offset-int(query['range'])/2,0),highlight=offset, length=length) )
+            tmp.link( offset, target=query_type(case=query['case'],family="Disk Forensics", report='ViewFile',mode='HexDump',inode=inode,hexlimit=max(offset-int(query['range'])/2,0),highlight=offset, length=length) )
             return tmp
         
         result.table(
+            ## FIXME - This needs to be redesigned!!! Should be a lot
+            ## easier using the new column types.
             columns = ['inode',
                        ## Data for Offset cb: inode,offset in
                        ## inode,word highlighted. e.g:
@@ -583,7 +588,7 @@ class SearchIndex(Reports.report):
             ## Note this assumes that high-low < BLOCKSIZE
             where = " low>>%s = block " % BLOCKBITS,
             callbacks = { 'Data' : SampleData, 'Offset' : offset_link_cb },
-            links = [ FlagFramework.query_type((),case=query['case'],family="Disk Forensics",report='ViewFile',__target__='inode') ],
+            links = [ query_type(case=query['case'],family="Disk Forensics",report='ViewFile',__target__='inode') ],
             case=query['case'],
             )
         
@@ -602,17 +607,17 @@ class BrowseIndexKeywords(Reports.report):
         
         try:
             result.table(
-            columns = ['word','class','hits'],
-            names=['Index Term','Dictionary Class','Number of Hits'],
+                elements = [ ColumnType('Index Term', 'word',
+                                link = query_type(case=query['case'],
+                                                  family="Keyword Indexing",
+                                                  report='SearchIndex',
+                                                  range=100,
+                                                  final=1,
+                                                  __target__='keyword')),
+                             ColumnType('Dictionary Class','class'),
+                             ColumnType('Number of Hits', 'hits')],
             table='LogicalIndexStats',
             case=query['case'],
-            links=[ FlagFramework.query_type((),
-                                             case=query['case'],
-                                             family="Keyword Indexing",
-                                             report='SearchIndex',
-                                             range=100,
-                                             final=1,
-                                             __target__='keyword')]
             )
         except DB.DBError,e:
             result.para("Unable to display index search results.  Did you run the index scanner?")

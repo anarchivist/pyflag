@@ -62,6 +62,7 @@ import dissect,reassembler, _dissect
 from NetworkScanner import *
 import FileFormats.PCAP as PCAP
 from format import Buffer
+from pyflag.TableObj import ColumnType, TimestampType, InodeType
 
 description = "Network Forensics"
 
@@ -501,8 +502,7 @@ class NetworkingSummary(Reports.report):
             #select distinct url from http group by url
             #select distinct count(inode) from http group by url
             output.table(
-                columns=['count(inode)'],
-                names=['Number of HTTP Get Requests'],
+                elements = [ ColumnType('Number of HTTP Get Requests', 'count(inode)') ],
                 table='http',
                 case=query['case']
                 )
@@ -510,8 +510,7 @@ class NetworkingSummary(Reports.report):
 
         def irc(query,output):
             output.table(
-                columns=['count(inode)'],
-                names=['Number of IRC Messages'],
+                elements = [ ColumnType('Number of IRC Messages', 'count(inode)') ],
                 table='irc_messages',
                 case=query['case']
                 )
@@ -519,8 +518,7 @@ class NetworkingSummary(Reports.report):
 
         def msn(query,output):
             output.table(
-                columns=['count(inode)'],
-                names=['Number of MSN Messages'],
+                elements = [ ColumnType('Number of MSN Messages', 'count(inode)') ],
                 table='msn_messages',
                 case=query['case']
                 )
@@ -528,8 +526,7 @@ class NetworkingSummary(Reports.report):
 
         def email(query,output):
             output.table(
-                columns=['count(inode)'],
-                names=['Number of Emails'],
+                elements = [ ColumnType('Number of Emails Messages', 'count(inode)') ],
                 table='email',
                 case=query['case']
                 )

@@ -31,6 +31,7 @@ import pyflag.FlagFramework as FlagFramework
 import pyflag.Reports as Reports
 from FileFormats.RegFile import ls_r, RegF
 from format import Buffer
+from pyflag.TableObj import ColumnType, TimestampType, InodeType
 
 class RegistryScan(GenScanFactory):
     """ Load in Windows Registry files """
@@ -126,10 +127,16 @@ class BrowseRegistry(DiskForensics.BrowseFS):
             def table_notebook_cb(query,result):
                 del new_q['mode']
                 del new_q['mark']
+                new_q['__target__']='open_tree'
+                new_q['mode'] = 'Tree View'
+                
                 result.table(
-                    columns=['path','type','reg_key','modified','value'],
-                    names=['Path','Type','Key','Modified','Value'],
-                    links=[ result.make_link(new_q,'open_tree',mark='target',mode='Tree View') ],
+                    elements = [ ColumnType('Path','path',
+                                    link = new_q),
+                                 ColumnType('Type','type'),
+                                 ColumnType('Key','reg_key'),
+                                 TimestampType('Modified','modified'),
+                                 ColumnType('Value','value') ],
                     table='reg',
                     case=query['case'],
                     )
@@ -162,12 +169,20 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                     new_q['mode'] = 'display'
                     new_q['path']=path
                     table.table(
-                        columns=['reg_key','type',"if(length(value)<50,value,concat(left(value,50),' .... '))"],
+                        elements = [ ColumnType('Key','reg_key',
+                                       link = query_type(family=query['family'],
+                                                         report='BrowseRegistryKey',
+                                                         path=path,
+                                                         __target__='key',
+                                                         case=query['case'])),
+                                     
+                                     ColumnType('Type','type'),
+                                     ## FIXME - Does this need to be a standard type?
+                                     ColumnType('Value',"if(length(value)<50,value,concat(left(value,50),' .... '))") ],
                         names=('Key','Type','Value'),
                         table='reg',
                         where="path=%r" % path,
                         case=query['case'],
-                        links=[ FlagFramework.query_type(family=query['family'],report='BrowseRegistryKey',path=path,__target__='key',case=query['case'])],
                         )
 
                 # display paths in tree
@@ -262,11 +277,15 @@ class InterestingRegKey(Reports.report):
 
         try:
             result.table(
-                columns=('path','reg_key','value','modified','category','description'),
-                names=('Path','Key','Value','Last Modified','Category','Description'),
+                elements = [ ColumnType('Path','path'),
+                             ColumnType('Key','reg_key'),
+                             ColumnType('Value','value'),
+                             TimestampType('Last Modified','modified'),
+                             ColumnType('Category','category'),
+                             ColumnType('Description','description') ],
                 table='interestingregkeys ',
                 case=query['case'],
-                #TODO make a link to view the rest of the reg info
+                #FIXME make a link to view the rest of the reg info
                 #links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='BrowseRegistryKey')]
                 )
         except DB.DBError,e:

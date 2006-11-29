@@ -110,7 +110,7 @@ class AJAX(Menu):
             result = '<script>\ntry { djConfig; } catch(err) { document.location=document.location+"&__main__=yes";  };\n</script>'
         else:
             result = ''
-        print data+result
+        #print data+result
         return data+result
 
     def raw_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):

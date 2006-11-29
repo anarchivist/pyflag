@@ -32,6 +32,7 @@
 
 
 import pyflag.FlagFramework as FlagFramework
+from pyflag.FlagFramework import query_type
 import pyflag.Reports as Reports
 import pyflag.conf
 config=pyflag.conf.ConfObject()
@@ -40,6 +41,7 @@ from pyflag.Scanner import *
 import pyflag.Scanner as Scanner
 import pyflag.DB as DB
 import pexpect
+from pyflag.TableObj import ColumnType, TimestampType, InodeType
 
 class AFTJpegScan(GenScanFactory):
     """ Steganography inside Jpeg images """
@@ -145,11 +147,15 @@ class AFTSteganography(Reports.report):
 	
 	try:
             result.table(
-                columns=('inode','Filename','Results'),
-                names=('Inode','Filename', 'Stegdetect Results'),
+                elements = [ ColumnType('Inode','inode',
+                                link = query_type(case=query['case'],
+                                                  family='Disk Forensics',
+                                                  report='ViewFile',
+                                                  __target__='inode')),
+                             ColumnType('Filename','Filename'),
+                             ColumnType('Stegdetect Results', 'Results') ],
                 table='stegjpegfull',
                 case=query['case'],
-                links=[ FlagFramework.query_type((),case=query['case'],family='Disk Forensics',report='ViewFile',__target__='inode')]
                 )
         
 	except DB.DBError,e:

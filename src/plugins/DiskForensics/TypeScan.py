@@ -31,6 +31,7 @@ import pyflag.Reports as Reports
 import pyflag.Graph as Graph
 import pyflag.IO as IO
 import pyflag.Registry as Registry
+from pyflag.TableObj import ColumnType, TimestampType, InodeType
 
 class TypeScan(Scanner.GenScanFactory):
     """ Detect File Type (magic).
@@ -123,12 +124,12 @@ class ViewFileTypes(Reports.report):
 
         try:
             result.table(
-                columns = ['a.inode','concat(path,name)','type', 'c.mtime'],
-                names = [ 'Thumbnail', 'Filename', 'Type', 'Time stamp'],
+                elements = [ InodeType('Thumbnail','a.inode', callback = thumbnail_cb),
+                             ColumnType('Filename','concat(path,name)'),
+                             ColumnType('Type','type'),
+                             TimestampType('Timestamp','c.mtime') ],
                 table = 'file as a, type as b, inode as c',
                 where = 'b.inode=c.inode and a.inode=b.inode and a.mode like "r%%" ',
-                callbacks  = { 'Thumbnail': thumbnail_cb,
-                               },
                 case = query['case']
                 )
         except DB.DBError,e:

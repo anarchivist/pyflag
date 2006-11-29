@@ -29,7 +29,7 @@
 
 """ Flag module for performing structured disk forensics """
 import pyflag.Reports as Reports
-import pyflag.FlagFramework as FlagFramework
+from pyflag.FlagFramework import Curry,query_type
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import os,os.path,time,re, cStringIO
@@ -41,23 +41,37 @@ import pyflag.Scanner as Scanner
 import pyflag.ScannerUtils as ScannerUtils
 import pyflag.Registry as Registry
 import pyflag.parser as parser
+from pyflag.TableObj import ColumnType,TimestampType,InodeType
 
 description = "Disk Forensics"
 order=30
 
 BLOCKSIZE=20
 
-def DeletedIcon(value,result):
-    """ Callback for rendering deleted items """
-    tmp=result.__class__(result)
-    if value=='alloc':
-        tmp.icon("yes.png")
-    elif value=='deleted':
-        tmp.icon("no.png")
-    else:
-        tmp.icon("question.png")
+class DeletedType(ColumnType):
+    """ This is a column type which shows deleted inodes graphically
+    """
+    ## FIXME - make the parser recognise deleted inodes
+    def display(self,value, row, result):
+        """ Callback for rendering deleted items """
+        tmp=result.__class__(result)
+        if value=='alloc':
+            tmp.icon("yes.png")
+        elif value=='deleted':
+            tmp.icon("no.png")
+        else:
+            tmp.icon("question.png")
 
-    return tmp
+        return tmp
+
+class BinaryType(ColumnType):
+    """ This type defines fields which are either true or false """
+    ## FIXME - Make parser understand binary operators.
+    def display(self,value, row,result):
+        if value:
+            return "*"
+        else:
+            return " "
 
 def make_inode_link(query,result, variable='inode'):
     """ Returns a ui based on result with links to each level of the
@@ -115,15 +129,23 @@ class BrowseFS(Reports.report):
 
         def tabular_view(query,result):
             result.table(
-                columns=['f.inode','f.mode','concat(path,name)','f.status','size','mtime','atime','ctime'],
-                names=('Inode','Mode','Filename','Del','File Size','Last Modified','Last Accessed','Created'),
-                callbacks={'Del':FlagFramework.Curry(DeletedIcon,result=result)},
+                elements = [ InodeType('Inode','f.inode',case=query['case']),
+                             ColumnType('Mode','f.mode'),
+                             ColumnType('Filename','concat(path,name)',
+                               link = query_type(case=query['case'],
+                                                 family=query['family'],
+                                                 report='Browse Filesystem',
+                                                 __target__='open_tree',open_tree="%s")),
+                             
+                             DeletedType('Del','f.status'),
+                             ColumnType('File Size','size'),
+                             TimestampType('Last Modified','mtime'),
+                             TimestampType('Last Accessed','atime'),
+                             TimestampType('Created','ctime'),
+                             ],
                 table='file as f, inode as i',
                 where="f.inode=i.inode",
                 case=query['case'],
-                links=[ FlagFramework.query_type((), case=query['case'],family=query['family'],report='ViewFile', __target__='inode', inode="%s"),
-                        None,
-                        FlagFramework.query_type((),case=query['case'],family=query['family'],report='Browse Filesystem', __target__='open_tree',open_tree="%s") ]
                 )
 
         def tree_view(query,result):
@@ -155,17 +177,20 @@ class BrowseFS(Reports.report):
                     path=os.path.dirname(path)
 
                 tmp.table(
-                    columns=['f.inode','name','f.status','size', 'mtime','f.mode'],
-                    names=('Inode','Filename','Del','File Size','Last Modified','Mode'),
+                    elements = [ InodeType('Inode','f.inode',case=query['case']),
+                                 ColumnType('Filename','name'),
+                                 DeletedType('Del','f.status'),
+                                 ColumnType('File Size','size'),
+                                 TimestampType('Last Modified','mtime'),
+                                 TimestampType('Mode','f.mode') ],
                     table='file as f, inode as i',
                     where="f.inode=i.inode and path=%r and f.mode!='d/d'" % (path+'/'),
                     case=query['case'],
-                    links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='View File Contents', __target__='inode', inode="%s")]
                     )
         
             result.tree(tree_cb = tree_cb,pane_cb = pane_cb, branch = branch )
             main_result.toolbar(text="Scan this directory",icon="examine.png",
-                    link=FlagFramework.query_type((),
+                    link=query_type((),
                       family="Load Data", report="ScanFS",
                       path=query['open_tree'],
                       case=query['case'],
@@ -223,7 +248,7 @@ class ViewFile(Reports.report):
             )
 
         result.toolbar(text="Scan this File",icon="examine.png",
-                   link=FlagFramework.query_type((),
+                   link=query_type((),
                       family="Load Data", report="ScanFS",
                       path=fsfd.lookup(inode=query['inode']),
                       case=query['case'],
@@ -274,14 +299,17 @@ class Timeline(Reports.report):
         dbh = self.DBO(query['case'])
         result.heading("File Timeline for Filesystem")
         result.table(
-            columns=('time','inode','status',
-                     "if(m,'m',' ')","if(a,'a',' ')","if(c,'c',' ')","if(d,'d',' ')",'name'),
-            names=('Timestamp', 'Inode','Del','m','a','c','d','Filename'),
-            callbacks={'Del':FlagFramework.Curry(DeletedIcon,result=result)},
-            table=('mac'),
+            elements=[ TimestampType('Timestamp','time'),
+                       InodeType('Inode','inode'),
+                       DeletedType('Del','status'),
+                       BinaryType('m',"m"),
+                       BinaryType('a',"a"),
+                       BinaryType('c',"c"),
+                       BinaryType('d',"d"),
+                       ColumnType('Filename','name'),
+                       ],
+            table='mac',
             case=query['case'],
-#            links=[ None, None, None, None, None, None, None, FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='ViewFile',__target__='filename')]
-            links=[ None, FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',__target__='inode')]
             )
 
     def reset(self, query):

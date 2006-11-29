@@ -28,12 +28,13 @@ config=pyflag.conf.ConfObject()
 from pyflag.Scanner import *
 import pyflag.DB as DB
 import pyflag.FlagFramework as FlagFramework
-from pyflag.FlagFramework import Curry
+from pyflag.FlagFramework import Curry,query_type
 from NetworkScanner import *
 import pyflag.Reports as Reports
 import pyflag.pyflaglog as pyflaglog
 import cStringIO,re
 import plugins.NetworkForensics.PCAPFS as PCAPFS
+from pyflag.TableObj import ColumnType, TimestampType, InodeType
 
 class IRC:
     """ Class to manage the IRC state """
@@ -571,22 +572,23 @@ class BrowseIRCChat(Reports.report):
             return tmp
         
         result.table(
-            columns = ['pcap.id', 'from_unixtime(pcap.ts_sec,"%Y-%m-%d")','concat(from_unixtime(pcap.ts_sec,"%H:%i:%s"),".",pcap.ts_usec)','inode','concat(left(inode,instr(inode,"|")),"p0|o",cast(packet_id as char))','command','sender','recipient', 'data'],
-            names = ['ID','Date','Time','Stream','Packet','Command','Sender Nick','Recipient','Text'],
+            elements = [ ColumnType('ID','pcap.id'),
+                         TimestampType("Timestamp","ts_sec"),
+                         InodeType("Stream","inode",
+                            link = query_type(family='Disk Forensics',
+                                              case=query['case'],
+                                              __target__='inode',
+                                              report='View File Contents',
+                                              mode="Combined streams")),
+                         ColumnType("Packet", 'packet_id',
+                            link = query_type(family="Network Forensics",
+                                              case=query['case'],
+                                              report='View Packet', 
+                                              __target__='inode')),
+                         ColumnType("Command",'command'),
+                         ColumnType("Sender Nick","sender"),
+                         ColumnType("Recipient", 'recipient'),
+                         ColumnType("Text",'data') ],
             table = "irc_messages join pcap on packet_id=pcap.id" ,
-#            callbacks = { 'Text': Curry(text_cb, wrap='full',wrap_size=80, font='typewriter'),
-#                          'Recipient': Curry(text_cb, wrap_size=20, wrap='full', font='typewriter')
-#                          },
-            links = [None, None,None,
-                     FlagFramework.query_type((),
-                        family='Disk Forensics', case=query['case'],
-                        __target__='inode',
-                        report='View File Contents', mode="Combined streams"
-                        ),
-                     FlagFramework.query_type((),
-                        family="Network Forensics", case=query['case'],
-                        report='View Packet', 
-                        __target__='inode'),
-                     ],
             case = query['case']
             )

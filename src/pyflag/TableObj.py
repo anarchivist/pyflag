@@ -406,14 +406,13 @@ class ColumnType:
     def literal(self, column,operator, arg):
         return "%s %s %r" % (self.sql, operator, arg)
 
-    def display(self, row, result):
+    def display(self, value, row, result):
         """ This method is called by the table widget to allow us to
         translate the output from the database to the screen. Note
         that we have access to the entire row (i.e. all the values in
         the query if we need it).
         """
         ## By default just implement a simple callback:
-        value=row[self.name]
         if self.callback:
             value = self.callback(value)
 
@@ -483,3 +482,14 @@ class IPType(ColumnType):
             raise ValueError("%s does not look like a CIDR netmask (e.g. 10.10.10.0/24)" % address)
         
         return " ( %s >= %s and %s <= %s ) " % (self.column, numeric_address, self.column, broadcast)
+
+class InodeType(ColumnType):
+    """ A unified view of inodes """
+    def __init__(self, name='Inode', column='inode', link=None, case=None):
+        if not link:
+            link = FlagFramework.query_type(case=case,
+                                            family='Disk Forensics',
+                                            report='ViewFile',
+                                            __target__='inode', inode="%s")
+
+        ColumnType.__init__(self,name,column,link)

@@ -29,11 +29,13 @@ import pyflag.DB as DB
 from pyflag.FileSystem import File
 import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
+from pyflag.FlagFramework import query_type
 from NetworkScanner import *
 import pyflag.Reports as Reports
 import plugins.NetworkForensics.PCAPFS as PCAPFS
 import re,time,cgi
 import TreeObj
+from pyflag.TableObj import ColumnType, TimestampType, InodeType
 
 def escape(uri):
     """ Make a filename from a URI by escaping / chars """
@@ -423,20 +425,17 @@ class BrowseHTTPRequests(Reports.report):
 
         def tabular_view(query,result):
             result.table(
-                columns = ['from_unixtime(ts_sec,"%Y-%m-%d")','concat(from_unixtime(ts_sec,"%H:%i:%s"),".",ts_usec)','request_packet','inode','method','url', 'content_type'],
-                names = [ "Date","Time",  "Request Packet", 'Inode', "Method" ,"URL", "Content Type" ],
+                elements = [ TimestampType('Date','ts_sec'),
+                             ColumnType('Request Packet','request_packet',
+                               link = query_type(family=query['family'],
+                                                 report="View Packet",
+                                                 case=query['case'],
+                                                 __target__='id')),
+                             InodeType('Inode','inode'),
+                             ColumnType('Method','method'),
+                             ColumnType('URL','url'),
+                             ColumnType('Content Type','content_type') ],
                 table=" http join pcap on request_packet=pcap.id ",
-                links = [
-                None,
-                None,
-                FlagFramework.query_type((),
-                                         family=query['family'], report="View Packet",
-                                         case=query['case'], __target__='id'),
-                FlagFramework.query_type((),
-                                         family="Disk Forensics",case=query['case'],
-                                         report="View File Contents",mode="Combined streams",
-                                         __target__="inode"),
-                ], 
                 case=query['case']
                 )
 

@@ -31,6 +31,7 @@ import pyflag.Reports as Reports
 import pyflag.DB as DB
 import os.path
 from pyflag.Scanner import *
+from pyflag.TableObj import ColumnType, TimestampType, InodeType
                   
 import md5
 class MD5Scan(GenScanFactory):
@@ -101,11 +102,14 @@ class HashComparison(Reports.report):
 
         try:
             result.table(
-                columns=('inode','concat(path,name)', '`FileType`', '`NSRL_product`','NSRL_filename', 'md5'),
-                names=('Inode','Filename','File Type','NSRL Product','NSRL Filename', 'MD5'),
+                elements = [ InodeType(),
+                             ColumnType('Filename','concat(path,name)'),
+                             ColumnType('File Type', 'FileType'),
+                             ColumnType('NSRL Product','NSRL_product'),
+                             ColumnType('NSRL Filename','NSRL_filename'),
+                             ColumnType('MD5','md5') ],
                 table='hash join file using (inode)',
                 case=query['case'],
-                links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',__target__='inode')]
                 )
         except DB.DBError,e:
             result.para("Error reading the MD5 hash table. Did you remember to run the MD5Scan scanner?")

@@ -32,6 +32,7 @@ import pyflag.DB as DB
 import os.path
 import pyflag.pyflaglog as pyflaglog
 from pyflag.Scanner import *
+from pyflag.TableObj import ColumnType, TimestampType, InodeType
 
 import clamav
 
@@ -102,11 +103,11 @@ class VirusScan(Reports.report):
         dbh=self.DBO(query['case'])
         try:
             result.table(
-                columns=('a.inode','concat(path,name)', 'virus'),
-                names=('Inode','Filename','Virus Detected'),
+                elements = [ InodeType('Inode','inode'),
+                             ColumnType('Filename','concat(path,name)'),
+                             ColumnType('Virus Detected','virus') ],
                 table='virus as a join file as b on a.inode=b.inode ',
                 case=query['case'],
-                links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],report='ViewFile',__target__='inode')]
                 )
         except DB.DBError,e:
             result.para("Unable to display Virus table, maybe you did not run the virus scanner over the filesystem?")

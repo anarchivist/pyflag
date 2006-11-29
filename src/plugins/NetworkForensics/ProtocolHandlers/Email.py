@@ -27,6 +27,7 @@ family."""
 
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
+from pyflag.TableObj import ColumnType, TimestampType, InodeType
 
 class BrowseEmail(Reports.report):
     """ Slightly modified report for displaying emails in the network forensics family """
@@ -41,14 +42,16 @@ class BrowseEmail(Reports.report):
     def display(self, query, result):
 	result.heading("Email sessions")
         result.table(
-            columns=('inode','date','`from`','`to`','subject'),
-            names=('Inode','Date','From','To','Subject'),
+            elements = [ InodeType('Inode','inode',
+                           link = query_type(family='Disk Forensics',
+                                             case=query['case'],
+                                             __target__='inode',
+                                             report='View File Contents',
+                                             mode="Text")),
+                         ColumnType('Date','date'),
+                         ColumnType('From','from'),
+                         ColumnType('To','to'),
+                         ColumnType('Subject','subject') ],
             table=('email'),
             case=query['case'],
-	    links = [FlagFramework.query_type((),
-                        family='Disk Forensics', case=query['case'],
-                        __target__='inode',
-                        report='View File Contents', mode="Text"
-                        ),
-                     ],
         )
