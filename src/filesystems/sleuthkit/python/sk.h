@@ -11,8 +11,8 @@
  * ***************************************************************/
 
 /* used in walks to determine what to return */
-#define SK_FLAGS_INODES	0x1	// inodes in result
-#define SK_FLAGS_NAMES	0x2	// names in result
+#define SK_FLAG_INODES	0x1	// inodes in result
+#define SK_FLAG_NAMES	0x2	// names in result
 
 /* structure to track block lists */
 struct block {
@@ -69,8 +69,6 @@ static PyMethodDef skfs_methods[] = {
      "Open a file" },
     {"walk", (PyCFunction)skfs_walk, METH_VARARGS|METH_KEYWORDS,
      "Walk filesystem from the given path" },
-    {"iwalk", (PyCFunction)skfs_iwalk, METH_VARARGS|METH_KEYWORDS,
-     "Walk filesystem from the given path (return inodes)" },
     {"stat", (PyCFunction)skfs_stat, METH_VARARGS|METH_KEYWORDS,
      "Stat a file" },
     {NULL}  /* Sentinel */

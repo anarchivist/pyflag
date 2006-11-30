@@ -35,7 +35,7 @@
 /* callback function for dent_walk used in skfs.walk */
 static uint8_t listdent_walk_callback_dent(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr) {
     struct dentwalk *dentlist, *p;
-    dentwalk = (struct dentwalk *)ptr;
+    dentlist = (struct dentwalk *)ptr;
 
     /* we dont want to add '.' and '..' */
     if(strcmp(fs_dent->name, ".")==0 || strcmp(fs_dent->name, "..")==0)
@@ -114,18 +114,18 @@ lookup_path_cb(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr) {
 
 /* lookup path for inode, supply an dentwalk ptr (must be a talloc context),
  * name will be filled in */
-int lookup_path(FS_INFO *fs, INUM_T inode, struct dentwalk *dent) {
+int lookup_path(FS_INFO *fs, struct dentwalk *dent) {
     int flags = FS_FLAG_NAME_RECURSE | FS_FLAG_NAME_ALLOC;
 
     /* special case, the walk won't pick this up */
-    if(inode == fs->root_inum) {
+    if(dent->inode == fs->root_inum) {
         dent->path = talloc_strdup(dent, "/");
         return 0;
     }
 
     /* there is a walk optimised for NTFS */
     if((fs->ftype & FSMASK) == NTFS_TYPE) {
-        if(ntfs_find_file(fs, inode, 0, 0, flags, lookup_path_cb, (void *)dent))
+        if(ntfs_find_file(fs, dent->inode, 0, 0, flags, lookup_path_cb, (void *)dent))
             return 1;
     } else {
         if(fs->dent_walk(fs, fs->root_inum, flags, lookup_path_cb, (void *)dent))
@@ -380,11 +380,11 @@ skfs_walkiter_init(skfs_walkiter *self, PyObject *args, PyObject *kwds) {
     self->skfs = (skfs *)skfs_obj;
 
     /* Initialise the path stack */
-    self->walklist = talloc(NULL, struct walkpath);
+    self->walklist = talloc(NULL, struct dentwalk);
     INIT_LIST_HEAD(&self->walklist->list);
 
     /* add the start path */
-    root = talloc(self->walklist, struct walkpath);
+    root = talloc(self->walklist, struct dentwalk);
 
     if(inode == 0) {
         tsk_error_reset();
@@ -396,6 +396,10 @@ skfs_walkiter_init(skfs_walkiter *self, PyObject *args, PyObject *kwds) {
         lookup_path(self->skfs->fs, root);
     } else root->path = talloc_strdup(root, path);
 
+    /* remove root path to prevent '//' in paths */
+    if(strcmp(root->path, "/") == 0)
+        *root->path = 0;
+
     list_add(&root->list, &self->walklist->list);
 
     return 0;
@@ -404,7 +408,8 @@ skfs_walkiter_init(skfs_walkiter *self, PyObject *args, PyObject *kwds) {
 static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
     PyObject *dirlist, *filelist, *result;
     struct dentwalk *dw, *dwlist;
-    struct dentwalk *dwtmp, *dmtmp2;
+    struct dentwalk *dwtmp, *dwtmp2;
+    char *tmp;
     int i;
 
     /* are we done ? */
@@ -436,30 +441,33 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
         /* process directories */
         if(dwtmp->ent_type & FS_DENT_DIR) {
 
+            /* place into dirlist */
+            if((self->myflags & SK_FLAG_INODES) && (self->myflags & SK_FLAG_NAMES))
+                PyList_Append(dirlist, Py_BuildValue("(Ks)", dwtmp->inode, dwtmp->path));
+            else if(self->myflags & SK_FLAG_INODES)
+                PyList_Append(dirlist, PyLong_FromUnsignedLongLong(dwtmp->inode));
+            else if(self->myflags & SK_FLAG_NAMES)
+                PyList_Append(dirlist, PyString_FromString(dwtmp->path));
+
             /* steal it and push onto the directory stack */
             talloc_steal(self->walklist, dwtmp);
+            tmp = dwtmp->path;
+            dwtmp->path = talloc_asprintf(dwtmp, "%s/%s", dw->path, tmp);
+            talloc_free(tmp);
             list_move(&dwtmp->list, &self->walklist->list);
 
-            /* place into dirlist */
-            if(self->myflags & (SK_FLAG_INODES | SK_FLAG_NAMES))
-                PyList_Append(dirlist, PyLong_FromUnsignedLongLong(b->addr));
-            else if(self->myflags & SK_FLAG_INODES)
-                PyList_Append(dirlist, PyLong_FromUnsignedLongLong(b->addr));
-            else if(self->myflags & SK_FLAG_NAMES)
-                PyList_Append(dirlist, PyLong_FromUnsignedLongLong(b->addr));
-
         } else {
-            /* place into dirlist */
-             if(self->myflags & (SK_FLAG_INODES | SK_FLAG_NAMES))
-                PyList_Append(filelist, PyLong_FromUnsignedLongLong(b->addr));
+            /* place into filelist */
+             if((self->myflags & SK_FLAG_INODES) && (self->myflags & SK_FLAG_NAMES))
+                PyList_Append(filelist, Py_BuildValue("(Ks)", dwtmp->inode, dwtmp->path));
             else if(self->myflags & SK_FLAG_INODES)
-                PyList_Append(filelist, PyLong_FromUnsignedLongLong(b->addr));
+                PyList_Append(filelist, PyLong_FromUnsignedLongLong(dwtmp->inode));
             else if(self->myflags & SK_FLAG_NAMES)
-                PyList_Append(filelist, PyLong_FromUnsignedLongLong(b->addr));
+                PyList_Append(filelist, PyString_FromString(dwtmp->path));
         }
     }
 
-    result = Py_BuildValue("(sNN)", path, dirlist, filelist);
+    result = Py_BuildValue("(sNN)", dw->path, dirlist, filelist);
 
     /* now delete this entry from the stack */
     list_del(&dw->list);
@@ -686,14 +694,6 @@ initsk(void)
         return;
 
     Py_INCREF(&skfs_walkiterType);
-    //PyModule_AddObject(m, "skfs_walkiter", (PyObject *)&skfs_walkiterType);
-
-    /* setup skfs_iwalkiter type */
-    skfs_iwalkiterType.tp_new = PyType_GenericNew;
-    if (PyType_Ready(&skfs_iwalkiterType) < 0)
-        return;
-
-    Py_INCREF(&skfs_iwalkiterType);
     //PyModule_AddObject(m, "skfs_walkiter", (PyObject *)&skfs_walkiterType);
 
     /* setup skfile type */
