@@ -2,8 +2,8 @@ AM_CFLAGS		= -I$(srcdir)/../auxtools -I$(srcdir)/../imgtools -I$(top_srcdir)/src
 
 bin_PROGRAMS		= dbtool fls ils icat istat
 noinst_LTLIBRARIES	= libfstools.la
-#noinst_PROGRAMS	= ils dls icat fls dcat ffind istat ifind dcalc dstat \
-#		          fsstat jls jcat
+noinst_PROGRAMS	= ils dls icat fls dcat ffind istat ifind dcalc dstat \
+		          fsstat jls jcat
 libfstools_la_SOURCES	= ext2fs.h fatfs.h ffs.h fs_data.h fs_lib.h fs_tools.h \
 			  fs_types.h fs_unicode.h iso9660.c iso9660_dent.c \
 			  libfstools.h ntfs.h iso9660.h \
@@ -19,15 +19,15 @@ libfstools_la_LIBADD	= ../auxtools/libauxtools.la ../imgtools/libimgtools.la
 dbtool_LDADD		= libfstools.la ../../../lib/libexcept.la ../../../lib/libiosubsys/libiosubsys.la  ../../../lib/libiosubsys/libio_hooker.la
 
 ils_LDADD		= libfstools.la
-#dls_LDADD		= libfstools.la
+dls_LDADD		= libfstools.la
 icat_LDADD		= libfstools.la
 fls_LDADD		= libfstools.la
-#dcat_LDADD		= libfstools.la
-#ffind_LDADD		= libfstools.la
+dcat_LDADD		= libfstools.la
+ffind_LDADD		= libfstools.la
 istat_LDADD		= libfstools.la
-#ifind_LDADD		= libfstools.la
-#dcalc_LDADD		= libfstools.la
-#dstat_LDADD		= libfstools.la
-#fsstat_LDADD		= libfstools.la
-#jls_LDADD		= libfstools.la
-#jcat_LDADD		= libfstools.la
+ifind_LDADD		= libfstools.la
+dcalc_LDADD		= libfstools.la
+dstat_LDADD		= libfstools.la
+fsstat_LDADD	= libfstools.la
+jls_LDADD		= libfstools.la
+jcat_LDADD		= libfstools.la
