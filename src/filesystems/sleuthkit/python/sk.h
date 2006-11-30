@@ -10,6 +10,10 @@
  * Helpers and SK integration stuff
  * ***************************************************************/
 
+/* used in walks to determine what to return */
+#define SK_FLAGS_INODES	0x1	// inodes in result
+#define SK_FLAGS_NAMES	0x2	// names in result
+
 /* structure to track block lists */
 struct block {
     DADDR_T addr;
@@ -118,16 +122,20 @@ static PyTypeObject skfsType = {
  * SKFSWalkIter - Support the skfs.walk iterator
  * ***************************************************************/
 
-struct walkpath {
+/* stores the major elements of FS_DENT */
+struct dentwalk {
     char *path;
+    INUM_T inode;
+    uint8_t ent_type;
     struct list_head list;
 };
 
 typedef struct {
     PyObject_HEAD
     skfs *skfs;
-    struct walkpath *paths;
+    struct dentwalk *walklist;
     int flags;
+    int myflags;
 } skfs_walkiter;
 
 static void skfs_walkiter_dealloc(skfs_walkiter *self);
@@ -173,69 +181,6 @@ static PyTypeObject skfs_walkiterType = {
     0,                         /* tp_descr_set */
     0,                         /* tp_dictoffset */
     (initproc)skfs_walkiter_init, /* tp_init */
-    0,                         /* tp_alloc */
-    0,                         /* tp_new */
-};
-
-/******************************************************************
- * SKFSWalkIter - Support the skfs.walk iterator (inode version)
- * ***************************************************************/
-
-struct walkinode {
-    INUM_T inode;
-    struct list_head list;
-};
-
-typedef struct {
-    PyObject_HEAD
-    skfs *skfs;
-    struct walkinode *inodes;
-    int flags;
-} skfs_iwalkiter;
-
-static void skfs_iwalkiter_dealloc(skfs_iwalkiter *self);
-static int skfs_iwalkiter_init(skfs_iwalkiter *self, PyObject *args, PyObject *kwds);
-static PyObject *skfs_iwalkiter_iter(skfs_iwalkiter *self);
-static PyObject *skfs_iwalkiter_iternext(skfs_iwalkiter *self);
-
-static PyTypeObject skfs_iwalkiterType = {
-    PyObject_HEAD_INIT(NULL)
-    0,                         /* ob_size */
-    "sk.skfs_iwalkiter",        /* tp_name */
-    sizeof(skfs_iwalkiter),     /* tp_basicsize */
-    0,                         /* tp_itemsize */
-    (destructor)skfs_iwalkiter_dealloc, /* tp_dealloc */
-    0,                         /* tp_print */
-    0,                         /* tp_getattr */
-    0,                         /* tp_setattr */
-    0,                         /* tp_compare */
-    0,                         /* tp_repr */
-    0,                         /* tp_as_number */
-    0,                         /* tp_as_sequence */
-    0,                         /* tp_as_mapping */
-    0,                         /* tp_hash */
-    0,                         /* tp_call */
-    0,                         /* tp_str */
-    0,                         /* tp_getattro */
-    0,                         /* tp_setattro */
-    0,                         /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,        /* tp_flags */
-    "Sleuthkit Filesystem Walk Iterator Object", /* tp_doc */
-    0,	                       /* tp_traverse */
-    0,                         /* tp_clear */
-    0,                         /* tp_richcompare */
-    0,                         /* tp_weaklistoffset */
-    PyObject_SelfIter,         /* tp_iter */
-    (iternextfunc)skfs_iwalkiter_iternext, /* tp_iternext */
-    0,                         /* tp_methods */
-    0,                         /* tp_members */
-    0,                         /* tp_getset */
-    0,                         /* tp_base */
-    0,                         /* tp_dict */
-    0,                         /* tp_descr_get */
-    0,                         /* tp_descr_set */
-    0,                         /* tp_dictoffset */
-    (initproc)skfs_iwalkiter_init, /* tp_init */
     0,                         /* tp_alloc */
     0,                         /* tp_new */
 };

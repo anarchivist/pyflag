@@ -29,80 +29,38 @@
 /* Here are a bunch of callbacks and helpers used to give sk a more filesystem
  * like interface */
 
-/* TODO: These dent_walks currently DO NOT add NTFS alternate data streams,
- * they will have to be changed (read: made much uglier) to do so */
+/* TODO: The dent_walk currently DOES NOT add NTFS alternate data streams,
+ * this will have to be changed (read: made much uglier) to do so */
 
-/* callback function for dent_walk, populates an name list (dirs only) */
-static uint8_t listdent_walk_callback_dirs(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr) {
+/* callback function for dent_walk used in skfs.walk */
+static uint8_t listdent_walk_callback_dent(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr) {
+    struct dentwalk *dentlist, *p;
+    dentwalk = (struct dentwalk *)ptr;
+
+    /* we dont want to add '.' and '..' */
+    if(strcmp(fs_dent->name, ".")==0 || strcmp(fs_dent->name, "..")==0)
+        return WALK_CONT;
+
+    p = talloc(dentlist, struct dentwalk);
+    p->path = talloc_strndup(p, fs_dent->name, fs_dent->name_max - 1);
+    p->inode = fs_dent->inode;
+    p->ent_type = fs_dent->ent_type;
+    list_add_tail(&p->list, &dentlist->list);
+
+    return WALK_CONT;
+}
+
+/* callback function for dent_walk used by listdir */
+static uint8_t listdent_walk_callback_list(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr) {
     PyObject *list = (PyObject *)ptr;
 
     /* we dont want to add '.' and '..' */
     if(strcmp(fs_dent->name, ".")==0 || strcmp(fs_dent->name, "..")==0)
         return WALK_CONT;
 
-    if(fs_dent->ent_type == FS_DENT_DIR) {
-        PyList_Append(list, PyString_FromString(fs_dent->name));
-    }
+    PyList_Append(list, PyString_FromString(fs_dent->name));
     return WALK_CONT;
 }
-
-/* callback function for dent_walk, populates an name list (nondirs only) */
-static uint8_t listdent_walk_callback_nondirs(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr) {
-    PyObject *list = (PyObject *)ptr;
-
-    /* we dont want to add '.' and '..' */
-    if(strcmp(fs_dent->name, ".")==0 || strcmp(fs_dent->name, "..")==0)
-        return WALK_CONT;
-
-    if(fs_dent->ent_type != FS_DENT_DIR)
-        PyList_Append(list, PyString_FromString(fs_dent->name));
-
-    return WALK_CONT;
-}
-
-/* callback function for dent_walk, populates an name list */
-static uint8_t listdent_walk_callback(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr) {
-    listdent_walk_callback_dirs(fs, fs_dent, flags, ptr);
-    listdent_walk_callback_nondirs(fs, fs_dent, flags, ptr);
-    return WALK_CONT;
-}
-
-/* callback function for dent_walk, populates an inode list (dirs only) */
-static uint8_t listdent_walk_callback_inode_dirs(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr) {
-    PyObject *list = (PyObject *)ptr;
-
-    /* we dont want to add '.' and '..' */
-    if(strcmp(fs_dent->name, ".")==0 || strcmp(fs_dent->name, "..")==0)
-        return WALK_CONT;
-
-    if(fs_dent->ent_type == FS_DENT_DIR) {
-        PyList_Append(list, PyLong_FromLongLong(fs_dent->inode));
-    }
-    return WALK_CONT;
-}
-
-/* callback function for dent_walk, populates an inode list (nondirs only) */
-static uint8_t listdent_walk_callback_inode_nondirs(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr) {
-    PyObject *list = (PyObject *)ptr;
-
-    /* we dont want to add '.' and '..' */
-    if(strcmp(fs_dent->name, ".")==0 || strcmp(fs_dent->name, "..")==0)
-        return WALK_CONT;
-
-    if(fs_dent->ent_type != FS_DENT_DIR)
-        PyList_Append(list, PyLong_FromLongLong(fs_dent->inode));
-
-    return WALK_CONT;
-}
-
-/* callback function for dent_walk, populates an inode list */
-static uint8_t listdent_walk_callback_inode(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr) {
-    listdent_walk_callback_inode_dirs(fs, fs_dent, flags, ptr);
-    listdent_walk_callback_inode_nondirs(fs, fs_dent, flags, ptr);
-    return WALK_CONT;
-}
-
-
 
 /* callback function for file_walk, populates a block list */
 static u_int8_t
@@ -133,7 +91,7 @@ getblocks_walk_callback (FS_INFO *fs, DADDR_T addr, char *buf, int size, int fla
 }
 
 /* lookup an inode from a path */
-INUM_T lookup(FS_INFO *fs, char *path) {
+INUM_T lookup_inode(FS_INFO *fs, char *path) {
     INUM_T ret;
     char *tmp = strdup(path);
     /* this is evil and modifies the path! */
@@ -142,13 +100,43 @@ INUM_T lookup(FS_INFO *fs, char *path) {
     return ret;
 }
 
+/* callback for lookup_path */
+static uint8_t
+lookup_path_cb(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr) {
+    struct dentwalk *dent = (struct dentwalk *)ptr;
+
+    if (fs_dent->inode == dent->inode) {
+        dent->path = talloc_asprintf(dent, "/%s%s", fs_dent->path, fs_dent->name);
+        return WALK_STOP;
+    }
+    return WALK_CONT;
+}
+
+/* lookup path for inode, supply an dentwalk ptr (must be a talloc context),
+ * name will be filled in */
+int lookup_path(FS_INFO *fs, INUM_T inode, struct dentwalk *dent) {
+    int flags = FS_FLAG_NAME_RECURSE | FS_FLAG_NAME_ALLOC;
+
+    /* special case, the walk won't pick this up */
+    if(inode == fs->root_inum) {
+        dent->path = talloc_strdup(dent, "/");
+        return 0;
+    }
+
+    /* there is a walk optimised for NTFS */
+    if((fs->ftype & FSMASK) == NTFS_TYPE) {
+        if(ntfs_find_file(fs, inode, 0, 0, flags, lookup_path_cb, (void *)dent))
+            return 1;
+    } else {
+        if(fs->dent_walk(fs, fs->root_inum, flags, lookup_path_cb, (void *)dent))
+            return 1;
+    }
+    return 0;
+}
+
 /*****************************************************************
  * Now for the python module stuff 
  * ***************************************************************/
-
-/* TODO: Set proper exceptions before returning on errors 
- * Double check the types used, sk generally uses uint64_t for 
- * inums, addresses etc */
 
 /************* SKFS ***************/
 static void
@@ -211,7 +199,7 @@ skfs_listdir(skfs *self, PyObject *args, PyObject *kwds) {
         return NULL; 
 
     tsk_error_reset();
-    inode = lookup(self->fs, path);
+    inode = lookup_inode(self->fs, path);
     if(inode == 0)
         return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %s", path, tsk_error_str());
 
@@ -224,7 +212,7 @@ skfs_listdir(skfs *self, PyObject *args, PyObject *kwds) {
     list = PyList_New(0);
 
     tsk_error_reset();
-    self->fs->dent_walk(self->fs, inode, flags, listdent_walk_callback, (void *)list);
+    self->fs->dent_walk(self->fs, inode, flags, listdent_walk_callback_list, (void *)list);
     if(tsk_errno) {
       return PyErr_Format(PyExc_IOError, "Unable to list inode %lu: %s", (ULONG)inode, tsk_error_str());
     };
@@ -251,13 +239,11 @@ skfs_open(skfs *self, PyObject *args, PyObject *kwds) {
         return PyErr_Format(PyExc_SyntaxError, "One of path or inode must be specified, inode cannot be 0");
 
     /* create an skfile object and return it */
-    fileargs = PyTuple_New(0);
+    filekwds = PyDict_New();
     if(path)
-        filekwds = Py_BuildValue("{sOsssKsisi}", "filesystem", (PyObject *)self, "path", path,
-                                 "inode", inode, "type", type, "id", id);
+        fileargs = Py_BuildValue("(OsKii)", (PyObject *)self, path, inode, type, id);
     else
-        filekwds = Py_BuildValue("{sOsssKsisi}", "filesystem", (PyObject *)self, "path", "",
-                                 "inode", inode, "type", type, "id", id);
+        fileargs = Py_BuildValue("(OsKii)", (PyObject *)self, "", inode, type, id);
 
     file = PyObject_New(skfile, &skfileType);
     ret = skfile_init(file, fileargs, filekwds);
@@ -273,48 +259,28 @@ static PyObject *
 skfs_walk(skfs *self, PyObject *args, PyObject *kwds) {
     char *path=NULL;
     int alloc=1, unalloc=0, ret;
+    int names=1, inodes=0;
     PyObject *fileargs, *filekwds;
     skfs_walkiter *iter;
+    INUM_T inode=0;
 
-    static char *kwlist[] = {"path", "alloc", "unalloc", NULL};
+    static char *kwlist[] = {"path", "inode", "alloc", "unalloc", "names", "inodes", NULL};
 
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "s|ii", kwlist, &path, &alloc, &unalloc))
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "|sKiiii", kwlist, &path, &inode, 
+                                    &alloc, &unalloc, &names, &inodes))
         return NULL; 
 
     /* create an skfs_walkiter object to return to the caller */
-    fileargs = PyTuple_New(0);
-    filekwds = Py_BuildValue("{sOsssisi}", "filesystem", (PyObject *)self, "path", path,
-                             "alloc", alloc, "unalloc", unalloc);
+    filekwds = PyDict_New();
+    if(path)
+        fileargs = Py_BuildValue("(OsKiiii)", (PyObject *)self, path,
+                                 inode, alloc, unalloc, names, inodes);
+    else
+        fileargs = Py_BuildValue("(OsKiiii)", (PyObject *)self, "",
+                                 inode, alloc, unalloc, names, inodes);
 
     iter = PyObject_New(skfs_walkiter, &skfs_walkiterType);
     ret = skfs_walkiter_init(iter, fileargs, filekwds);
-    Py_DECREF(fileargs);
-    Py_DECREF(filekwds);
-
-    if(ret == -1) return NULL;
-    return (PyObject *)iter;
-}
-
-/* perform a filesystem walk (like os.walk) */
-static PyObject *
-skfs_iwalk(skfs *self, PyObject *args, PyObject *kwds) {
-    char *path=NULL;
-    int alloc=1, unalloc=0, ret;
-    PyObject *fileargs, *filekwds;
-    skfs_iwalkiter *iter;
-
-    static char *kwlist[] = {"path", "alloc", "unalloc", NULL};
-
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "s|ii", kwlist, &path, &alloc, &unalloc))
-        return NULL; 
-
-    /* create an skfs_walkiter object to return to the caller */
-    fileargs = PyTuple_New(0);
-    filekwds = Py_BuildValue("{sOsssisi}", "filesystem", (PyObject *)self, "path", path,
-                             "alloc", alloc, "unalloc", unalloc);
-
-    iter = PyObject_New(skfs_iwalkiter, &skfs_iwalkiterType);
-    ret = skfs_iwalkiter_init(iter, fileargs, filekwds);
     Py_DECREF(fileargs);
     Py_DECREF(filekwds);
 
@@ -343,7 +309,7 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
 
     if(path) {
         tsk_error_reset();
-        inode = lookup(self->fs, path);
+        inode = lookup_inode(self->fs, path);
         if(inode == 0)
             return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %d: %s", path, (ULONG) inode, tsk_error_str());
     };
@@ -373,7 +339,7 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
 static void 
 skfs_walkiter_dealloc(skfs_walkiter *self) {
     Py_XDECREF(self->skfs);
-    talloc_free(self->paths);
+    talloc_free(self->walklist);
     self->ob_type->tp_free((PyObject*)self);
 }
 
@@ -381,201 +347,124 @@ static int
 skfs_walkiter_init(skfs_walkiter *self, PyObject *args, PyObject *kwds) {
     char *path=NULL;
     PyObject *skfs_obj;
-    struct walkpath *root;
+    struct dentwalk *root;
     int alloc=1, unalloc=0;
+    int names=1, inodes=0;
+    INUM_T inode;
 
-    static char *kwlist[] = {"filesystem", "path", "alloc", "unalloc", NULL};
+    static char *kwlist[] = {"filesystem", "path", "inode", "alloc", "unalloc", "names", "inodes", NULL};
 
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "Os|ii", kwlist, &skfs_obj, 
-                                    &path, &alloc, &unalloc))
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "O|sKiiii", kwlist, &skfs_obj, 
+                                    &path, &inode, &alloc, &unalloc, &names, &inodes))
         return -1; 
 
+    /* must have at least inode or path */
+    if(inode == 0 && path == NULL) {
+        PyErr_Format(PyExc_SyntaxError, "One of filename or inode must be specified");
+        return -1;
+    };
+
     /* set flags */
+    self->flags = self->myflags = 0;
     if(alloc)
         self->flags |= FS_FLAG_NAME_ALLOC;
     if(unalloc)
         self->flags |= FS_FLAG_NAME_UNALLOC;
+    if(names)
+        self->myflags |= SK_FLAG_NAMES;
+    if(inodes)
+        self->myflags |= SK_FLAG_INODES;
 
     /* incref the skfs */
     Py_INCREF(skfs_obj);
     self->skfs = (skfs *)skfs_obj;
 
     /* Initialise the path stack */
-    self->paths = talloc(NULL, struct walkpath);
-    INIT_LIST_HEAD(&self->paths->list);
+    self->walklist = talloc(NULL, struct walkpath);
+    INIT_LIST_HEAD(&self->walklist->list);
 
-    /* add the root path */
-    root = talloc(self->paths, struct walkpath);
-    root->path = talloc_strdup(root, path);
-    list_add(&root->list, &self->paths->list);
+    /* add the start path */
+    root = talloc(self->walklist, struct walkpath);
+
+    if(inode == 0) {
+        tsk_error_reset();
+        root->inode = lookup_inode(self->skfs->fs, path);
+    } else root->inode = inode;
+
+    if(path == NULL) {
+        tsk_error_reset();
+        lookup_path(self->skfs->fs, root);
+    } else root->path = talloc_strdup(root, path);
+
+    list_add(&root->list, &self->walklist->list);
 
     return 0;
 }
 
 static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
     PyObject *dirlist, *filelist, *result;
-    struct walkpath *wp;
-    struct walkpath *tmpwp;
-    INUM_T inode;
-    char *path;
+    struct dentwalk *dw, *dwlist;
+    struct dentwalk *dwtmp, *dmtmp2;
     int i;
 
     /* are we done ? */
-    if(list_empty(&self->paths->list))
+    if(list_empty(&self->walklist->list))
         return NULL;
 
-    /* pop a path from the stack */
-    list_next(wp, &self->paths->list, list);
-    path = wp->path;
+    /* pop an item from the stack */
+    list_next(dw, &self->walklist->list, list);
 
-    if(!path)
-        return NULL;
+    /* initialise our list for this walk */
+    dwlist = talloc(self->walklist, struct dentwalk);
+    INIT_LIST_HEAD(&dwlist->list);
 
-    /* special case to prevent '//' paths */
-    if(strcmp(path, "/")==0)
-        *path = 0;
-
+    /* walk this directory */
     tsk_error_reset();
-    inode = lookup(self->skfs->fs, path);
-    if(tsk_errno)
+    self->skfs->fs->dent_walk(self->skfs->fs, dw->inode, self->flags, 
+                              listdent_walk_callback_dent, (void *)dwlist);
+    if(tsk_errno) {
+        PyErr_Format(PyExc_IOError, "Walk error: %s", tsk_error_str());
+        talloc_free(dwlist);
         return NULL;
-
-    if(inode == 0) {
-        list_del(&wp->list);
-        talloc_free(wp);
-        return Py_BuildValue("(s()())", path);
     }
 
-    tsk_error_reset();
+    /* process the list */
     dirlist = PyList_New(0);
-    self->skfs->fs->dent_walk(self->skfs->fs, inode, self->flags, 
-                              listdent_walk_callback_dirs, (void *)dirlist);
-    if(tsk_errno) {
-        PyErr_Format(PyExc_IOError, "Walk error: %s", tsk_error_str());
-        return NULL;
-    }
-
-    tsk_error_reset();
     filelist = PyList_New(0);
-    self->skfs->fs->dent_walk(self->skfs->fs, inode, self->flags, 
-                              listdent_walk_callback_nondirs, (void *)filelist);
-    if(tsk_errno) {
-        PyErr_Format(PyExc_IOError, "Walk error: %s", tsk_error_str());
-        return NULL;
-    }
+    list_for_each_entry_safe(dwtmp, dwtmp2, &dwlist->list, list) {
 
-    /* add dirs to the stack */
-    for(i=0; i<PyList_Size(dirlist); i++) {
-        tmpwp = talloc(self->paths, struct walkpath);
-        tmpwp->path = talloc_asprintf(tmpwp, "%s/%s", path, PyString_AsString(PyList_GetItem(dirlist, i)));
-        list_add(&tmpwp->list, &self->paths->list);
+        /* process directories */
+        if(dwtmp->ent_type & FS_DENT_DIR) {
+
+            /* steal it and push onto the directory stack */
+            talloc_steal(self->walklist, dwtmp);
+            list_move(&dwtmp->list, &self->walklist->list);
+
+            /* place into dirlist */
+            if(self->myflags & (SK_FLAG_INODES | SK_FLAG_NAMES))
+                PyList_Append(dirlist, PyLong_FromUnsignedLongLong(b->addr));
+            else if(self->myflags & SK_FLAG_INODES)
+                PyList_Append(dirlist, PyLong_FromUnsignedLongLong(b->addr));
+            else if(self->myflags & SK_FLAG_NAMES)
+                PyList_Append(dirlist, PyLong_FromUnsignedLongLong(b->addr));
+
+        } else {
+            /* place into dirlist */
+             if(self->myflags & (SK_FLAG_INODES | SK_FLAG_NAMES))
+                PyList_Append(filelist, PyLong_FromUnsignedLongLong(b->addr));
+            else if(self->myflags & SK_FLAG_INODES)
+                PyList_Append(filelist, PyLong_FromUnsignedLongLong(b->addr));
+            else if(self->myflags & SK_FLAG_NAMES)
+                PyList_Append(filelist, PyLong_FromUnsignedLongLong(b->addr));
+        }
     }
 
     result = Py_BuildValue("(sNN)", path, dirlist, filelist);
 
     /* now delete this entry from the stack */
-    list_del(&wp->list);
-    talloc_free(wp);
-
-    return result;
-}
-
-/* this new object is requred to support the iterator protocol for skfs.walk
- * (inode version) */
-static void 
-skfs_iwalkiter_dealloc(skfs_iwalkiter *self) {
-    Py_XDECREF(self->skfs);
-    talloc_free(self->inodes);
-    self->ob_type->tp_free((PyObject*)self);
-}
-
-static int 
-skfs_iwalkiter_init(skfs_iwalkiter *self, PyObject *args, PyObject *kwds) {
-    char *path=NULL;
-    PyObject *skfs_obj;
-    struct walkinode *root;
-    int alloc=1, unalloc=0;
-
-    static char *kwlist[] = {"filesystem", "path", "alloc", "unalloc", NULL};
-
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "Os|ii", kwlist, &skfs_obj, 
-                                    &path, &alloc, &unalloc))
-        return -1; 
-
-    /* set flags */
-    if(alloc)
-        self->flags |= FS_FLAG_NAME_ALLOC;
-    if(unalloc)
-        self->flags |= FS_FLAG_NAME_UNALLOC;
-
-    /* incref the skfs */
-    Py_INCREF(skfs_obj);
-    self->skfs = (skfs *)skfs_obj;
-
-    /* Initialise the path stack */
-    self->inodes = talloc(NULL, struct walkinode);
-    INIT_LIST_HEAD(&self->inodes->list);
-
-    /* add the root path */
-    root = talloc(self->inodes, struct walkinode);
-    tsk_error_reset();
-    root->inode = lookup(self->skfs->fs, path);
-    list_add(&root->list, &self->inodes->list);
-
-    return 0;
-}
-
-static PyObject *skfs_iwalkiter_iternext(skfs_iwalkiter *self) {
-    PyObject *dirlist, *filelist, *result;
-    struct walkinode *wi;
-    struct walkinode *tmpwi;
-    INUM_T inode;
-    int i;
-
-    /* are we done ? */
-    if(list_empty(&self->inodes->list))
-        return NULL;
-
-    /* pop an inode from the stack */
-    list_next(wi, &self->inodes->list, list);
-    inode = wi->inode;
-
-    if(inode == 0) {
-        list_del(&wi->list);
-        talloc_free(wi);
-        return Py_BuildValue("(K()())", 0);
-    }
-
-    tsk_error_reset();
-    dirlist = PyList_New(0);
-    self->skfs->fs->dent_walk(self->skfs->fs, inode, self->flags, 
-                              listdent_walk_callback_inode_dirs, (void *)dirlist);
-    if(tsk_errno) {
-        PyErr_Format(PyExc_IOError, "Walk error: %s", tsk_error_str());
-        return NULL;
-    }
-
-    tsk_error_reset();
-    filelist = PyList_New(0);
-    self->skfs->fs->dent_walk(self->skfs->fs, inode, self->flags, 
-                              listdent_walk_callback_inode_nondirs, (void *)filelist);
-    if(tsk_errno) {
-        PyErr_Format(PyExc_IOError, "Walk error: %s", tsk_error_str());
-        return NULL;
-    }
-
-    /* add dirs to the stack */
-    for(i=0; i<PyList_Size(dirlist); i++) {
-        tmpwi = talloc(self->inodes, struct walkinode);
-        tmpwi->inode = PyLong_AsLongLong(PyList_GetItem(dirlist, i));
-        list_add(&tmpwi->list, &self->inodes->list);
-    }
-
-    result = Py_BuildValue("(KNN)", inode, dirlist, filelist);
-
-    /* now delete this entry from the stack */
-    list_del(&wi->list);
-    talloc_free(wi);
+    list_del(&dw->list);
+    talloc_free(dw);
+    talloc_free(dwlist);
 
     return result;
 }
@@ -616,13 +505,13 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
 
     /* must specify either inode or filename */
     if(filename==NULL && inode == 0) {
-        PyErr_Format(PyExc_SyntaxError, "One of filename or inode should be specified");
+        PyErr_Format(PyExc_SyntaxError, "One of filename or inode must be specified");
         return -1;
     };
 
     if(filename) {
         tsk_error_reset();
-        inode = lookup(fs, filename);
+        inode = lookup_inode(fs, filename);
         if(inode == 0) {
             PyErr_Format(PyExc_IOError, "Unable to find inode for file %s: %s", filename, tsk_error_str());
             return -1;
