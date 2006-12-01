@@ -396,17 +396,13 @@ skfs_walkiter_init(skfs_walkiter *self, PyObject *args, PyObject *kwds) {
         lookup_path(self->skfs->fs, root);
     } else root->path = talloc_strdup(root, path);
 
-    /* remove root path to prevent '//' in paths */
-    if(strcmp(root->path, "/") == 0)
-        *root->path = 0;
-
     list_add(&root->list, &self->walklist->list);
 
     return 0;
 }
 
 static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
-    PyObject *dirlist, *filelist, *result;
+    PyObject *dirlist, *filelist, *root, *result;
     struct dentwalk *dw, *dwlist;
     struct dentwalk *dwtmp, *dwtmp2;
     char *tmp;
@@ -452,7 +448,10 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
             /* steal it and push onto the directory stack */
             talloc_steal(self->walklist, dwtmp);
             tmp = dwtmp->path;
-            dwtmp->path = talloc_asprintf(dwtmp, "%s/%s", dw->path, tmp);
+            if(strcmp(dw->path, "/") == 0)
+                dwtmp->path = talloc_asprintf(dwtmp, "/%s", tmp);
+            else
+                dwtmp->path = talloc_asprintf(dwtmp, "%s/%s", dw->path, tmp);
             talloc_free(tmp);
             list_move(&dwtmp->list, &self->walklist->list);
 
@@ -467,7 +466,18 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
         }
     }
 
-    result = Py_BuildValue("(sNN)", dw->path, dirlist, filelist);
+    if((self->myflags & SK_FLAG_INODES) && (self->myflags & SK_FLAG_NAMES))
+        root = Py_BuildValue("(Ks)", dw->inode, dw->path);
+    else if(self->myflags & SK_FLAG_INODES)
+        root = PyLong_FromUnsignedLongLong(dw->inode);
+    else if(self->myflags & SK_FLAG_NAMES)
+        root = PyString_FromString(dw->path);
+    else {
+        Py_INCREF(Py_None);
+        root = Py_None;
+    }
+
+    result = Py_BuildValue("(NNN)", root, dirlist, filelist);
 
     /* now delete this entry from the stack */
     list_del(&dw->list);
