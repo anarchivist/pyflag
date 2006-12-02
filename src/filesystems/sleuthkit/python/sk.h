@@ -1,6 +1,8 @@
 /* Sleuthkit python module */
 
-#include "Python.h"
+#include <Python.h>
+#include "structmember.h"
+
 #include "list.h"
 #include "talloc.h"
 #include "fs_tools.h"
@@ -14,7 +16,18 @@
 #define SK_FLAG_INODES	0x1	// inodes in result
 #define SK_FLAG_NAMES	0x2	// names in result
 
-/* structure to track block lists */
+/* stores the major elements of FS_DENT */
+struct dentwalk {
+    char *path;
+    INUM_T inode;
+    uint8_t ent_type;
+    uint32_t type;
+    uint32_t id;
+    int flags;
+    struct list_head list;
+};
+
+/* tracks block lists */
 struct block {
     DADDR_T addr;
     int size;
@@ -23,26 +36,17 @@ struct block {
 
 /* callback functions for dent_walk, populate a file list */
 static uint8_t
-listdent_walk_callback(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr);
+listdent_walk_callback_dent(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr);
 static uint8_t
-listdent_walk_callback_dirs(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr);
-static uint8_t
-listdent_walk_callback_nondirs(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr);
-
-/* callback functions for dent_walk, populate a inode list */
-static uint8_t
-listdent_walk_callback_inode(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr);
-static uint8_t
-listdent_walk_callback_inode_dirs(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr);
-static uint8_t
-listdent_walk_callback_inode_nondirs(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr);
+listdent_walk_callback_list(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr);
 
 /* callback function for file_walk, populates a block list */
 static u_int8_t
-getblocks_walk_callback(FS_INFO *fs, DADDR_T addr, char *buf, int size, int flags, char *ptr);
+getblocks_walk_callback(FS_INFO *fs, DADDR_T addr, char *buf, int size, int flags, void *ptr);
 
 /* lookup an inode from a path */
-INUM_T lookup(FS_INFO *fs, char *path);
+INUM_T lookup_inode(FS_INFO *fs, char *path);
+int lookup_path(FS_INFO *fs, struct dentwalk *dent);
 
 /******************************************************************
  * SKFS - Sleuthkit Filesystem Python Type
@@ -59,8 +63,8 @@ static int skfs_init(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_listdir(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_open(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_walk(skfs *self, PyObject *args, PyObject *kwds);
-static PyObject *skfs_iwalk(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_stat(skfs *self, PyObject *args, PyObject *kwds);
+static PyObject *skfs_fstat(skfs *self, PyObject *args);
 
 static PyMethodDef skfs_methods[] = {
     {"listdir", (PyCFunction)skfs_listdir, METH_VARARGS|METH_KEYWORDS,
@@ -70,7 +74,9 @@ static PyMethodDef skfs_methods[] = {
     {"walk", (PyCFunction)skfs_walk, METH_VARARGS|METH_KEYWORDS,
      "Walk filesystem from the given path" },
     {"stat", (PyCFunction)skfs_stat, METH_VARARGS|METH_KEYWORDS,
-     "Stat a file" },
+     "Stat a file path" },
+    {"fstat", (PyCFunction)skfs_fstat, METH_VARARGS,
+     "Stat a skfile" },
     {NULL}  /* Sentinel */
 };
 
@@ -119,14 +125,6 @@ static PyTypeObject skfsType = {
 /******************************************************************
  * SKFSWalkIter - Support the skfs.walk iterator
  * ***************************************************************/
-
-/* stores the major elements of FS_DENT */
-struct dentwalk {
-    char *path;
-    INUM_T inode;
-    uint8_t ent_type;
-    struct list_head list;
-};
 
 typedef struct {
     PyObject_HEAD
@@ -184,6 +182,103 @@ static PyTypeObject skfs_walkiterType = {
 };
 
 /******************************************************************
+ * A very simple type to represent an inode
+ * ***************************************************************/
+
+typedef struct {
+    PyObject_HEAD
+    INUM_T inode;
+	uint32_t type;
+	uint32_t id;
+} skfs_inode;
+
+static PyMemberDef skfs_inode_members[] = {
+    {"type", T_INT, offsetof(skfs_inode, type), 0,
+     "inode attribute type"},
+    {"id", T_INT, offsetof(skfs_inode, id), 0,
+     "inode attribute id"},
+    {NULL}  /* Sentinel */
+};
+
+static int skfs_inode_init(skfs_inode *self, PyObject *args, PyObject *kwds);
+static PyObject *skfs_inode_str(skfs_inode *self);
+static PyObject *skfs_inode_long(skfs_inode *self);
+static PyObject *skfs_inode_getinode(skfs_inode *self, void *closure);
+
+static PyGetSetDef skfs_inode_getseters[] = {
+    {"inode", (getter)skfs_inode_getinode, NULL,
+     "inode number", NULL},
+    {NULL}  /* Sentinel */
+};
+
+static PyNumberMethods skfs_inode_as_number = {
+	0,                          /*nb_add*/
+	0,                          /*nb_subtract*/
+	0,                          /*nb_multiply*/
+	0,                          /*nb_divide*/
+	0,                          /*nb_remainder*/
+	0,                          /*nb_divmod*/
+	0,                          /*nb_power*/
+	0,                          /*nb_negative*/
+	0,                          /*tp_positive*/
+	0,                          /*tp_absolute*/
+	0,                          /*tp_nonzero*/
+	0,                          /*nb_invert*/
+	0,                          /*nb_lshift*/
+	0,                          /*nb_rshift*/
+	0,                          /*nb_and*/
+	0,                          /*nb_xor*/
+	0,                          /*nb_or*/
+	0,                          /*nb_coerce*/
+	(unaryfunc)	skfs_inode_long,/*nb_int*/
+	(unaryfunc)	skfs_inode_long,/*nb_long*/
+};
+
+
+static PyTypeObject skfs_inodeType = {
+    PyObject_HEAD_INIT(NULL)
+    0,                         /* ob_size */
+    "sk.skfs_inode",           /* tp_name */
+    sizeof(skfs_inode),        /* tp_basicsize */
+    0,                         /* tp_itemsize */
+    0,                         /* tp_dealloc */
+    0,                         /* tp_print */
+    0,                         /* tp_getattr */
+    0,                         /* tp_setattr */
+    0,                         /* tp_compare */
+    0,                         /* tp_repr */
+    &skfs_inode_as_number,     /* tp_as_number */
+    0,                         /* tp_as_sequence */
+    0,                         /* tp_as_mapping */
+    0,                         /* tp_hash */
+    0,                         /* tp_call */
+    (reprfunc)skfs_inode_str,  /* tp_str */
+    0,                         /* tp_getattro */
+    0,                         /* tp_setattro */
+    0,                         /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,        /* tp_flags */
+    "Sleuthkit Inode Object",  /* tp_doc */
+    0,	                       /* tp_traverse */
+    0,                         /* tp_clear */
+    0,                         /* tp_richcompare */
+    0,                         /* tp_weaklistoffset */
+    0,                         /* tp_iter */
+    0,                         /* tp_iternext */
+    0,                         /* tp_methods */
+    skfs_inode_members,        /* tp_members */
+    skfs_inode_getseters,      /* tp_getset */
+    0,                         /* tp_base */
+    0,                         /* tp_dict */
+    0,                         /* tp_descr_get */
+    0,                         /* tp_descr_set */
+    0,                         /* tp_dictoffset */
+    (initproc)skfs_inode_init, /* tp_init */
+    0,                         /* tp_alloc */
+    0,                         /* tp_new */
+};
+
+
+/******************************************************************
  * SKFILE - Sleuthkit File Python Type
  * ***************************************************************/
 
@@ -191,6 +286,8 @@ typedef struct {
     PyObject_HEAD
     PyObject *skfs;
     FS_INODE *fs_inode;
+	uint32_t type;
+	uint32_t id;
     struct block *blocks;
     char *resdata;
     long long readptr;
@@ -199,6 +296,7 @@ typedef struct {
 
 static void skfile_dealloc(skfile *self);
 static int skfile_init(skfile *self, PyObject *args, PyObject *kwds);
+static PyObject *skfile_str(skfile *self);
 static PyObject *skfile_read(skfile *self, PyObject *args);
 static PyObject *skfile_seek(skfile *self, PyObject *args);
 static PyObject *skfile_tell(skfile *self);
@@ -233,7 +331,7 @@ static PyTypeObject skfileType = {
     0,                         /* tp_as_mapping */
     0,                         /* tp_hash */
     0,                         /* tp_call */
-    0,                         /* tp_str */
+    (reprfunc)skfile_str,      /* tp_str */
     0,                         /* tp_getattro */
     0,                         /* tp_setattro */
     0,                         /* tp_as_buffer */

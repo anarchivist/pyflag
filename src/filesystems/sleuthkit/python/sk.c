@@ -11,6 +11,7 @@
 #include "talloc.h"
 #include "fs_tools.h"
 #include "libfstools.h"
+#include "ntfs.h"
  
 /*
  * Suggested functions:
@@ -29,24 +30,116 @@
 /* Here are a bunch of callbacks and helpers used to give sk a more filesystem
  * like interface */
 
-/* TODO: The dent_walk currently DOES NOT add NTFS alternate data streams,
- * this will have to be changed (read: made much uglier) to do so */
+/* add this to the list, called by the callback */
+void listdent_add_dent(FS_DENT *fs_dent, FS_DATA *fs_data, int flags, struct dentwalk *dentlist) {
+    struct dentwalk *p = talloc(dentlist, struct dentwalk);
 
-/* callback function for dent_walk used in skfs.walk */
-static uint8_t listdent_walk_callback_dent(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr) {
-    struct dentwalk *dentlist, *p;
-    dentlist = (struct dentwalk *)ptr;
-
-    /* we dont want to add '.' and '..' */
-    if(strcmp(fs_dent->name, ".")==0 || strcmp(fs_dent->name, "..")==0)
-        return WALK_CONT;
-
-    p = talloc(dentlist, struct dentwalk);
     p->path = talloc_strndup(p, fs_dent->name, fs_dent->name_max - 1);
+
+    p->type = p->id = 0;
+    if(fs_data) {
+        p->type = fs_data->type;
+        p->id = fs_data->id;
+    }
+
+    /* print the data stream name if it exists and is not the default NTFS */
+    if ((fs_data) && (((fs_data->type == NTFS_ATYPE_DATA) &&
+        (strcmp(fs_data->name, "$Data") != 0)) ||
+        ((fs_data->type == NTFS_ATYPE_IDXROOT) &&
+        (strcmp(fs_data->name, "$I30") != 0)))) {
+        p->path = talloc_asprintf_append(p->path, ":%s", fs_data->name);
+    } 
+
+    if(flags & FS_FLAG_NAME_UNALLOC)
+	    p->path = talloc_asprintf_append(p->path, " (deleted%s)", ((fs_dent->fsi) && (fs_dent->fsi->flags & FS_FLAG_META_ALLOC)) ? "-realloc" : "");
+
     p->inode = fs_dent->inode;
     p->ent_type = fs_dent->ent_type;
-    list_add_tail(&p->list, &dentlist->list);
+    p->flags = flags;
 
+    list_add_tail(&p->list, &dentlist->list);
+}
+
+/* 
+ * call back action function for dent_walk
+ * This is a based on the callback in fls_lib.c, it adds an entry for each
+ * named ADS in NTFS
+ */
+static uint8_t
+listdent_walk_callback_dent(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr) {
+    struct dentwalk *dentlist = (struct dentwalk *)ptr;
+
+	/* Make a special case for NTFS so we can identify all of the
+	 * alternate data streams!
+	 */
+    if (((fs->ftype & FSMASK) == NTFS_TYPE) && (fs_dent->fsi)) {
+
+        FS_DATA *fs_data = fs_dent->fsi->attr;
+        uint8_t printed = 0;
+
+        while ((fs_data) && (fs_data->flags & FS_DATA_INUSE)) {
+
+            if (fs_data->type == NTFS_ATYPE_DATA) {
+                mode_t mode = fs_dent->fsi->mode;
+                uint8_t ent_type = fs_dent->ent_type;
+
+                printed = 1;
+
+                /* 
+                * A directory can have a Data stream, in which
+                * case it would be printed with modes of a
+                * directory, although it is really a file
+                * So, to avoid confusion we will set the modes
+                * to a file so it is printed that way.  The
+                * entry for the directory itself will still be
+                * printed as a directory
+                */
+
+                if ((fs_dent->fsi->mode & FS_INODE_FMT) == FS_INODE_DIR) {
+
+                    /* we don't want to print the ..:blah stream if
+                    * the -a flag was not given
+                    */
+                    if ((fs_dent->name[0] == '.') && (fs_dent->name[1])
+                        && (fs_dent->name[2] == '\0')) {
+                        fs_data = fs_data->next;
+                        continue;
+                    }
+
+                    fs_dent->fsi->mode &= ~FS_INODE_FMT;
+                    fs_dent->fsi->mode |= FS_INODE_REG;
+                    fs_dent->ent_type = FS_DENT_REG;
+                }
+            
+                listdent_add_dent(fs_dent, fs_data, flags, dentlist);
+
+                fs_dent->fsi->mode = mode;
+                fs_dent->ent_type = ent_type;
+            } else if (fs_data->type == NTFS_ATYPE_IDXROOT) {
+                printed = 1;
+
+                /* If it is . or .. only print it if the flags say so,
+                 * we continue with other streams though in case the 
+                 * directory has a data stream 
+                 */
+                if (!(ISDOT(fs_dent->name))) 
+                    listdent_add_dent(fs_dent, fs_data, flags, dentlist);
+            }
+
+            fs_data = fs_data->next;
+        }
+
+	    /* A user reported that an allocated file had the standard
+	     * attributes, but no $Data.  We should print something */
+	    if (printed == 0) {
+            listdent_add_dent(fs_dent, fs_data, flags, dentlist);
+	    }
+
+    } else {
+        /* skip it if it is . or .. and we don't want them */
+        if (!(ISDOT(fs_dent->name)))
+            listdent_add_dent(fs_dent, NULL, flags, dentlist);
+    }
     return WALK_CONT;
 }
 
@@ -55,7 +148,7 @@ static uint8_t listdent_walk_callback_list(FS_INFO *fs, FS_DENT *fs_dent, int fl
     PyObject *list = (PyObject *)ptr;
 
     /* we dont want to add '.' and '..' */
-    if(strcmp(fs_dent->name, ".")==0 || strcmp(fs_dent->name, "..")==0)
+    if(ISDOT(fs_dent->name))
         return WALK_CONT;
 
     PyList_Append(list, PyString_FromString(fs_dent->name));
@@ -64,7 +157,7 @@ static uint8_t listdent_walk_callback_list(FS_INFO *fs, FS_DENT *fs_dent, int fl
 
 /* callback function for file_walk, populates a block list */
 static u_int8_t
-getblocks_walk_callback (FS_INFO *fs, DADDR_T addr, char *buf, int size, int flags, char *ptr) {
+getblocks_walk_callback(FS_INFO *fs, DADDR_T addr, char *buf, int size, int flags, void *ptr) {
 
     struct block *b;
     skfile *file = (skfile *) ptr;
@@ -132,6 +225,23 @@ int lookup_path(FS_INFO *fs, struct dentwalk *dent) {
             return 1;
     }
     return 0;
+}
+
+/* parse an inode string into inode, type, id */
+int parse_inode_str(char *str, INUM_T *inode, uint32_t *type, uint32_t *id) {
+    char *ptr;
+
+    errno = 0;
+    *inode = strtoull(str, &ptr, 10);
+    if(errno != 0)
+        return 0;
+
+    if(*ptr == '-')
+        *type = strtoul(ptr+1, &ptr, 10);
+    if(*ptr == '-')
+        *id = strtoul(ptr+1, &ptr, 10);
+
+    return 1;
 }
 
 /*****************************************************************
@@ -224,26 +334,28 @@ skfs_listdir(skfs *self, PyObject *args, PyObject *kwds) {
 static PyObject *
 skfs_open(skfs *self, PyObject *args, PyObject *kwds) {
     char *path=NULL;
-    INUM_T inode=0;
-    int type=0, id=0, ret;
+    PyObject *inode=NULL;
+    int ret;
     PyObject *fileargs, *filekwds;
     skfile *file;
 
-    static char *kwlist[] = {"path", "inode", "type", "id", NULL};
+    static char *kwlist[] = {"path", "inode", NULL};
 
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "|sKii", kwlist, &path, &inode, &type, &id))
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "|sO", kwlist, &path, &inode))
         return NULL; 
 
     /* make sure we at least have a path or inode */
-    if(path==NULL && inode==0)
-        return PyErr_Format(PyExc_SyntaxError, "One of path or inode must be specified, inode cannot be 0");
+    if(path==NULL && inode==NULL)
+        return PyErr_Format(PyExc_SyntaxError, "One of path or inode must be specified");
 
     /* create an skfile object and return it */
-    filekwds = PyDict_New();
+    fileargs = PyTuple_New(0);
     if(path)
-        fileargs = Py_BuildValue("(OsKii)", (PyObject *)self, path, inode, type, id);
+        filekwds = Py_BuildValue("{sOsssO}", "filesystem", (PyObject *)self, 
+                                 "path", path, "inode", inode);
     else
-        fileargs = Py_BuildValue("(OsKii)", (PyObject *)self, "", inode, type, id);
+        filekwds = Py_BuildValue("{sOsO}", "filesystem", (PyObject *)self, 
+                                 "inode", inode);
 
     file = PyObject_New(skfile, &skfileType);
     ret = skfile_init(file, fileargs, filekwds);
@@ -271,13 +383,13 @@ skfs_walk(skfs *self, PyObject *args, PyObject *kwds) {
         return NULL; 
 
     /* create an skfs_walkiter object to return to the caller */
-    filekwds = PyDict_New();
+    fileargs = PyTuple_New(0);
     if(path)
-        fileargs = Py_BuildValue("(OsKiiii)", (PyObject *)self, path,
-                                 inode, alloc, unalloc, names, inodes);
+        filekwds = Py_BuildValue("{sOsssKsisisisi}", "filesystem", (PyObject *)self, "path", path,
+                                 "inode", inode, "alloc", alloc, "unalloc", unalloc, "names", names, "inodes", inodes);
     else
-        fileargs = Py_BuildValue("(OsKiiii)", (PyObject *)self, "",
-                                 inode, alloc, unalloc, names, inodes);
+        filekwds = Py_BuildValue("{sOsKsisisisi}", "filesystem", (PyObject *)self, 
+                                 "inode", inode, "alloc", alloc, "unalloc", unalloc, "names", names, "inodes", inodes);
 
     iter = PyObject_New(skfs_walkiter, &skfs_walkiterType);
     ret = skfs_walkiter_init(iter, fileargs, filekwds);
@@ -292,19 +404,19 @@ skfs_walk(skfs *self, PyObject *args, PyObject *kwds) {
 static PyObject *
 skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
     PyObject *result;
-    PyObject *os;
+    PyObject *os, *inode_obj;
     char *path=NULL;
     INUM_T inode=0;
     FS_INODE *fs_inode;
     int type=0, id=0;
 
-    static char *kwlist[] = {"path", "inode", "type", "id", NULL};
+    static char *kwlist[] = {"path", "inode", NULL};
 
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "|sKii", kwlist, &path, &inode, &type, &id))
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "|sO", kwlist, &path, &inode_obj))
         return NULL; 
 
     /* make sure we at least have a path or inode */
-    if(path==NULL && inode==0)
+    if(path==NULL && inode_obj==NULL)
         return PyErr_Format(PyExc_SyntaxError, "One of path or inode must be specified");
 
     if(path) {
@@ -312,7 +424,17 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
         inode = lookup_inode(self->fs, path);
         if(inode == 0)
             return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %d: %s", path, (ULONG) inode, tsk_error_str());
-    };
+    } else {
+        /* inode can be an int or a string */
+        if(PyNumber_Check(inode_obj)) {
+            PyObject *l = PyNumber_Long(inode_obj);
+            inode = PyLong_AsUnsignedLongLong(l);
+            Py_DECREF(l);
+        } else {
+            if(!parse_inode_str(PyString_AsString(inode_obj), &inode, &type, &id))
+                return PyErr_Format(PyExc_IOError, "Inode must be a long or a string of the format \"inode[-type-id]\"");
+        }
+    }
 
     /* can we lookup this inode? */
     tsk_error_reset();
@@ -333,6 +455,34 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
     fs_inode_free(fs_inode);
     return result;
 }
+
+/* stat an already open skfile */
+static PyObject *
+skfs_fstat(skfs *self, PyObject *args) {
+    PyObject *result, *skfile_obj, *os;
+    FS_INODE *fs_inode;
+
+    if(!PyArg_ParseTuple(args, "O", &skfile_obj))
+        return NULL; 
+
+    /* check the type of the file object */
+    if(PyObject_TypeCheck(skfile_obj, &skfileType) == 0) {
+        PyErr_Format(PyExc_TypeError, "file is not an skfile instance");
+        return NULL;
+    }
+
+    fs_inode = ((skfile *)skfile_obj)->fs_inode;
+    
+    /* (mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime) */
+    os = PyImport_ImportModule("os");
+    result = PyObject_CallMethod(os, "stat_result", "((iiliiiiiii))", 
+                                 fs_inode->mode, fs_inode->addr, 0, fs_inode->nlink, 
+                                 fs_inode->uid, fs_inode->gid, fs_inode->size,
+                                 fs_inode->atime, fs_inode->mtime, fs_inode->ctime);
+    Py_DECREF(os);
+    return result;
+}
+
 
 /* this new object is requred to support the iterator protocol for skfs.walk
  * */
@@ -385,6 +535,7 @@ skfs_walkiter_init(skfs_walkiter *self, PyObject *args, PyObject *kwds) {
 
     /* add the start path */
     root = talloc(self->walklist, struct dentwalk);
+    root->type = root->id = 0;
 
     if(inode == 0) {
         tsk_error_reset();
@@ -402,7 +553,7 @@ skfs_walkiter_init(skfs_walkiter *self, PyObject *args, PyObject *kwds) {
 }
 
 static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
-    PyObject *dirlist, *filelist, *root, *result;
+    PyObject *dirlist, *filelist, *root, *result, *inode;
     struct dentwalk *dw, *dwlist;
     struct dentwalk *dwtmp, *dwtmp2;
     char *tmp;
@@ -434,42 +585,64 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
     filelist = PyList_New(0);
     list_for_each_entry_safe(dwtmp, dwtmp2, &dwlist->list, list) {
 
+        PyObject *inode_val, *name_val, *inode_name_val;
+        
+        /* build all the objects */
+        inode_val = (PyObject *)PyObject_New(skfile, &skfs_inodeType);
+        ((skfs_inode *)inode_val)->inode = dwtmp->inode;
+        ((skfs_inode *)inode_val)->type = dwtmp->type;
+        ((skfs_inode *)inode_val)->id = dwtmp->id;
+        name_val = PyString_FromString(dwtmp->path);
+        inode_name_val = Py_BuildValue("(OO)", inode_val, name_val);
+
         /* process directories */
         if(dwtmp->ent_type & FS_DENT_DIR) {
 
             /* place into dirlist */
             if((self->myflags & SK_FLAG_INODES) && (self->myflags & SK_FLAG_NAMES))
-                PyList_Append(dirlist, Py_BuildValue("(Ks)", dwtmp->inode, dwtmp->path));
+                PyList_Append(dirlist, inode_name_val);
             else if(self->myflags & SK_FLAG_INODES)
-                PyList_Append(dirlist, PyLong_FromUnsignedLongLong(dwtmp->inode));
+                PyList_Append(dirlist, inode_val);
             else if(self->myflags & SK_FLAG_NAMES)
-                PyList_Append(dirlist, PyString_FromString(dwtmp->path));
+                PyList_Append(dirlist, name_val);
 
             /* steal it and push onto the directory stack */
-            talloc_steal(self->walklist, dwtmp);
-            tmp = dwtmp->path;
-            if(strcmp(dw->path, "/") == 0)
-                dwtmp->path = talloc_asprintf(dwtmp, "/%s", tmp);
-            else
-                dwtmp->path = talloc_asprintf(dwtmp, "%s/%s", dw->path, tmp);
-            talloc_free(tmp);
-            list_move(&dwtmp->list, &self->walklist->list);
+            if(dwtmp->flags & FS_FLAG_NAME_ALLOC) {
+                talloc_steal(self->walklist, dwtmp);
+                tmp = dwtmp->path;
+                if(strcmp(dw->path, "/") == 0)
+                    dwtmp->path = talloc_asprintf(dwtmp, "/%s", tmp);
+                else
+                    dwtmp->path = talloc_asprintf(dwtmp, "%s/%s", dw->path, tmp);
+                talloc_free(tmp);
+                list_move(&dwtmp->list, &self->walklist->list);
+            }
 
         } else {
             /* place into filelist */
              if((self->myflags & SK_FLAG_INODES) && (self->myflags & SK_FLAG_NAMES))
-                PyList_Append(filelist, Py_BuildValue("(Ks)", dwtmp->inode, dwtmp->path));
+                PyList_Append(filelist, inode_name_val);
             else if(self->myflags & SK_FLAG_INODES)
-                PyList_Append(filelist, PyLong_FromUnsignedLongLong(dwtmp->inode));
+                PyList_Append(filelist, inode_val);
             else if(self->myflags & SK_FLAG_NAMES)
-                PyList_Append(filelist, PyString_FromString(dwtmp->path));
+                PyList_Append(filelist, name_val);
         }
+
+        Py_DECREF(inode_name_val);
+        Py_DECREF(name_val);
+        Py_DECREF(inode_val);
     }
 
+    /* now build root */
+    inode = (PyObject *)PyObject_New(skfile, &skfs_inodeType);
+    ((skfs_inode *)inode)->inode = dw->inode;
+    ((skfs_inode *)inode)->type = dw->type;
+    ((skfs_inode *)inode)->id = dw->id;
+
     if((self->myflags & SK_FLAG_INODES) && (self->myflags & SK_FLAG_NAMES))
-        root = Py_BuildValue("(Ks)", dw->inode, dw->path);
+        root = Py_BuildValue("(Ns)", inode, dw->path);
     else if(self->myflags & SK_FLAG_INODES)
-        root = PyLong_FromUnsignedLongLong(dw->inode);
+        root = inode;
     else if(self->myflags & SK_FLAG_NAMES)
         root = PyString_FromString(dw->path);
     else {
@@ -487,6 +660,34 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
     return result;
 }
 
+/************** SKFS_INODE **********/
+static int skfs_inode_init(skfs_inode *self, PyObject *args, PyObject *kwds) {
+    static char *kwlist[] = {"inode", "type", "id", NULL};
+
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "Kii", kwlist, 
+                                    &self->inode, &self->type, &self->id))
+        return -1; 
+    return 0;
+}
+
+static PyObject *skfs_inode_str(skfs_inode *self) {
+    PyObject *result;
+    char *str;
+    str = talloc_asprintf(NULL, "%llu-%u-%u", self->inode, self->type, self->id);
+    result = PyString_FromString(str);
+    talloc_free(str);
+    return result;
+}
+
+static PyObject *
+skfs_inode_getinode(skfs_inode *self, void *closure) {
+    return PyLong_FromUnsignedLongLong(self->inode);
+}
+
+static PyObject *skfs_inode_long(skfs_inode *self) {
+    return PyLong_FromUnsignedLongLong(self->inode);
+}
+
 /************* SKFILE ***************/
 static void
 skfile_dealloc(skfile *self) {
@@ -501,16 +702,19 @@ skfile_dealloc(skfile *self) {
 static int
 skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
     char *filename=NULL;
+    PyObject *inode_obj;
     INUM_T inode=0;
-    int type=0, id=0;
     PyObject *skfs_obj;
     FS_INFO *fs;
     int flags;
 
-    static char *kwlist[] = {"filesystem", "path", "inode", "type", "id", NULL};
+    self->type = 0;
+    self->id = 0;
 
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "O|sKii", kwlist, 
-                                    &skfs_obj, &filename, &inode, &type, &id))
+    static char *kwlist[] = {"filesystem", "path", "inode", NULL};
+
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "O|sO", kwlist, 
+                                    &skfs_obj, &filename, &inode_obj))
         return -1; 
 
     /* check the type of the filesystem object */
@@ -522,7 +726,7 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
     fs = ((skfs *)skfs_obj)->fs;
 
     /* must specify either inode or filename */
-    if(filename==NULL && inode == 0) {
+    if(filename==NULL && inode_obj==NULL) {
         PyErr_Format(PyExc_SyntaxError, "One of filename or inode must be specified");
         return -1;
     };
@@ -533,8 +737,20 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
         if(inode == 0) {
             PyErr_Format(PyExc_IOError, "Unable to find inode for file %s: %s", filename, tsk_error_str());
             return -1;
-        };
-    };
+        }
+    } else {
+        /* inode can be an int or a string */
+        if(PyNumber_Check(inode_obj)) {
+            PyObject *l = PyNumber_Long(inode_obj);
+            inode = PyLong_AsUnsignedLongLong(l);
+            Py_DECREF(l);
+        } else {
+            if(!parse_inode_str(PyString_AsString(inode_obj), &inode, &self->type, &self->id)) {
+                PyErr_Format(PyExc_IOError, "Inode must be a long or a string of the format \"inode[-type-id]\"");
+                return -1;
+            }
+        }
+    }
 
     /* can we lookup this inode? */
     tsk_error_reset();
@@ -558,13 +774,13 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
      * during the walk */
 
     flags = FS_FLAG_FILE_AONLY | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOSPARSE;
-    if(id == 0)
+    if(self->id == 0)
         flags |= FS_FLAG_FILE_NOID;
 
     self->blocks = talloc(NULL, struct block);
     INIT_LIST_HEAD(&self->blocks->list);
     tsk_error_reset();
-    fs->file_walk(fs, self->fs_inode, type, id, flags,
+    fs->file_walk(fs, self->fs_inode, self->type, self->id, flags,
                  (FS_FILE_WALK_FN) getblocks_walk_callback, (void *)self);
     if(tsk_errno) {
         PyErr_Format(PyExc_IOError, "Error reading inode: %s", tsk_error_str());
@@ -572,6 +788,16 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
     };
 
     return 0;
+}
+
+static PyObject *
+skfile_str(skfile *self) {
+    PyObject *result;
+    char *str;
+    str = talloc_asprintf(NULL, "%llu-%u-%u", self->fs_inode->addr, self->type, self->id);
+    result = PyString_FromString(str);
+    talloc_free(str);
+    return result;
 }
 
 static PyObject *
@@ -704,7 +930,14 @@ initsk(void)
         return;
 
     Py_INCREF(&skfs_walkiterType);
-    //PyModule_AddObject(m, "skfs_walkiter", (PyObject *)&skfs_walkiterType);
+
+    /* setup inode type */
+    skfs_inodeType.tp_new = PyType_GenericNew;
+    if (PyType_Ready(&skfs_inodeType) < 0)
+        return;
+
+    Py_INCREF(&skfs_inodeType);
+    PyModule_AddObject(m, "skinode", (PyObject *)&skfs_inodeType);
 
     /* setup skfile type */
     skfileType.tp_new = PyType_GenericNew;
