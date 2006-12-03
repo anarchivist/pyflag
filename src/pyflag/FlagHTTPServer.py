@@ -270,7 +270,6 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
             ## Make a new UI
             result=flag.ui(query=query)
-
             try:
                 ## Get the callback from the store
                 try:
@@ -278,6 +277,9 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                 except KeyError:
                     raise Exception("Session expired. Please try to select this report from the menu\n")
 
+                ## Note who the cb is:
+                query.callback = cb_key
+                
                 ## Use it
                 cb(query,result)
                 ## If the cb raises an exception, we let the user know:

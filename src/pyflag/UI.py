@@ -253,141 +253,174 @@ class GenericUI:
         """
         pyflaglog.log(pyflaglog.DEBUG, "text not implemented")
 
-    def _make_sql(self,sql="select ",columns=[],names=[],links=[],types={},table='',where='',groupby = None,case=None,callbacks={},query={},limit=0, **opts):
-        """ An SQL generator for the table widget (private) """
-        #in case the user forgot and gave us a tuple, we forgive them:
-        names=list(names)
-        columns = list(columns)
+    def _make_sql(self,elements=[],table='',where=1,groupby = None,case=None,
+                  filter='', order=0, direction='1', limit = 0):
+        """ Calculates the SQL for the table widget based on the query """
+        ## Calculate the SQL
+        query_str = "select "
 
-        self.filter_conditions=[]
-        self.filter_text=[]
+        ## The columns and their aliases:
+        query_str += ",".join([ e.sql + " as `" + e.name + "`" for e in elements ])
 
-        #First work out what is the query string:
-        query_str = sql;
+        ## The table
+        query_str += " from %s " % table
+
+        ## Is there a filter condition?
+        if filter:
+            filter_str = parser.parse_to_sql(filter, elements)
+            if not filter_str: filter_str=1
+            
+        else: filter_str = 1
+
+        query_str += "where ((%s) and (%s)) " % (where, filter_str)
+
+        ## Now calculate the order by:
+        query_str += "order by %s " % elements[order].sql
+
+        if direction=='1':
+            query_str += "asc"
+        else: query_str+= "desc"
+
+        ## Limit conditions:
+        query_str += " limit %s, %s" % (limit, config.PAGESIZE)
+
+        return query_str
+
+##    def _make_sql(self,sql="select ",columns=[],names=[],links=[],types={},table='',where='',groupby = None,case=None,callbacks={},query={},limit=0, **opts):
+##        """ An SQL generator for the table widget (private) """
+##        #in case the user forgot and gave us a tuple, we forgive them:
+##        names=list(names)
+##        columns = list(columns)
+
+##        self.filter_conditions=[]
+##        self.filter_text=[]
+
+##        #First work out what is the query string:
+##        query_str = sql;
         
-        #The new_query is the same one we got minus all the UI
-        #specific commands. The following section, just add UI
-        #specific commands onto the clean sheet
-        new_query = query.clone()
-        del new_query['dorder']
-        del new_query['order']
+##        #The new_query is the same one we got minus all the UI
+##        #specific commands. The following section, just add UI
+##        #specific commands onto the clean sheet
+##        new_query = query.clone()
+##        del new_query['dorder']
+##        del new_query['order']
 
-        #find the group by clause - if we get a group by clause we
-        #need to change the rest of the query so heavily that we need
-        #check the group by last.
-        if not groupby:
-            group_by_str = ",".join([ " `%s`" % d for d in query.getarray('group_by') ])
-            if group_by_str:
-                 #If we have a group by, we actually want to only show
-                 #a count and those columns that are grouped by, so we
-                 #over ride columns and names...  Mask contains those
-                 #indexes for which names array matches the group_by
-                 #clause
-                 try:
-                     mask = [ names.index(d) for d in query.getarray('group_by') ]
+##        #find the group by clause - if we get a group by clause we
+##        #need to change the rest of the query so heavily that we need
+##        #check the group by last.
+##        if not groupby:
+##            group_by_str = ",".join([ " `%s`" % d for d in query.getarray('group_by') ])
+##            if group_by_str:
+##                 #If we have a group by, we actually want to only show
+##                 #a count and those columns that are grouped by, so we
+##                 #over ride columns and names...  Mask contains those
+##                 #indexes for which names array matches the group_by
+##                 #clause
+##                 try:
+##                     mask = [ names.index(d) for d in query.getarray('group_by') ]
                      
-                     links = [None]
-                     for d in mask:
-                         q = query.clone()
-                         del q['group_by']
-                         try:
-                             del q[q['__target__']]
-                         except:
-                             pass
+##                     links = [None]
+##                     for d in mask:
+##                         q = query.clone()
+##                         del q['group_by']
+##                         try:
+##                             del q[q['__target__']]
+##                         except:
+##                             pass
                          
-                         del q['__target__']
-                         del q['order']
-                         del q['dorder']
-                         for i in q.keys():
-                             if i.startswith('where_'):
-                                 del q[i]
+##                         del q['__target__']
+##                         del q['order']
+##                         del q['dorder']
+##                         for i in q.keys():
+##                             if i.startswith('where_'):
+##                                 del q[i]
                                  
-                         q['__target__'] = "where_%s" % names[d]
-                         q["where_%s" % names[d]] = "=%s"
+##                         q['__target__'] = "where_%s" % names[d]
+##                         q["where_%s" % names[d]] = "=%s"
                          
-                         q['__targetpane__'] = "self"
+##                         q['__targetpane__'] = "self"
 
-                         links.append(q)
+##                         links.append(q)
                          
-                     names = ['Count'] + [ names[d] for d in mask ]
-                     columns = [ 'count(*)' ] +  [ columns[d] for d in mask ]
+##                     names = ['Count'] + [ names[d] for d in mask ]
+##                     columns = [ 'count(*)' ] +  [ columns[d] for d in mask ]
                         
-                 #if the user asked for a weird group by , we ignore it.
-                 except ValueError:
-                     group_by_str = None
-        else:
-            group_by_str = groupby
+##                 #if the user asked for a weird group by , we ignore it.
+##                 except ValueError:
+##                     group_by_str = None
+##        else:
+##            group_by_str = groupby
 
-        #Form the columns in the sql
-        select_clause = [ k+ " as `" +v+"`" for (k,v) in zip(columns,names) ]
+##        #Form the columns in the sql
+##        select_clause = [ k+ " as `" +v+"`" for (k,v) in zip(columns,names) ]
             
-        query_str+=",".join(select_clause) 
+##        query_str+=",".join(select_clause) 
 
-        #Form the table and where clause
-        query_str+=" from %s " % table
+##        #Form the table and where clause
+##        query_str+=" from %s " % table
 
-        ## If a filter expression was specified we use that
-        having=['1']
-        conditions=[]
+##        ## If a filter expression was specified we use that
+##        having=['1']
+##        conditions=[]
 
-        having_str = ''
-        try:
-            ## Prepare the types:
-            for k,v in types.items():
-                ## Find the column for the name in k:
-                v.column = columns[names.index(k)]
+##        having_str = ''
+##        try:
+##            ## Prepare the types:
+##            for k,v in types.items():
+##                ## Find the column for the name in k:
+##                v.column = columns[names.index(k)]
                 
-            having_str = parser.parse_to_sql(query['filter'], types)
-            print "Parsing %s returned %s " % (query['filter'], having_str)
-        except KeyError:
-            pass
+##            having_str = parser.parse_to_sql(query['filter'], types)
+##            print "Parsing %s returned %s " % (query['filter'], having_str)
+##        except KeyError:
+##            pass
 
-        if not having_str:
-            #Work out the having clause.
-            for d,v in query:
-                if d.startswith('where_'):
-                    #Find the column for that name
-                    try:
-                        index=names.index(d[len('where_'):])
-                    except ValueError:
-                        ## If we dont know about this name, we ignore it.
-                        continue
+##        if not having_str:
+##            #Work out the having clause.
+##            for d,v in query:
+##                if d.startswith('where_'):
+##                    #Find the column for that name
+##                    try:
+##                        index=names.index(d[len('where_'):])
+##                    except ValueError:
+##                        ## If we dont know about this name, we ignore it.
+##                        continue
 
-                    self.filter_text.append(FlagFramework.make_sql_from_filter(v,having,columns[index],d[len('where_'):]))
+##                    self.filter_text.append(FlagFramework.make_sql_from_filter(v,having,columns[index],d[len('where_'):]))
 
-            having_str = " and ".join(having)
+##            having_str = " and ".join(having)
 
-        if where:
-            query_str+= " where (%s) and (%s) " %(where,having_str)
-        elif having:
-            query_str+=" where %s " % having_str
+##        if where:
+##            query_str+= " where (%s) and (%s) " %(where,having_str)
+##        elif having:
+##            query_str+=" where %s " % having_str
             
-        if group_by_str:
-            query_str += " group by %s " % group_by_str
+##        if group_by_str:
+##            query_str += " group by %s " % group_by_str
 
-        #Find the order by clause
-        #Were we given a dorder param?
-        try:
-            order = " `%s` desc " % query['dorder']
-            #Remember the column number that was ordered
-            ordered_col = names.index(query['dorder'])
-        except (ValueError,KeyError):
-            #Ok then were we given an order param?
-            try:
-                order = " `%s` asc " % query['order']
-                ordered_col = names.index(query['order'])
-            except (ValueError,KeyError):
-                #If an order was not specified, we pick the first column as the order
-                order = " `%s` asc " % names[0]
-                ordered_col = 0
+##        #Find the order by clause
+##        #Were we given a dorder param?
+##        try:
+##            order = " `%s` desc " % query['dorder']
+##            #Remember the column number that was ordered
+##            ordered_col = names.index(query['dorder'])
+##        except (ValueError,KeyError):
+##            #Ok then were we given an order param?
+##            try:
+##                order = " `%s` asc " % query['order']
+##                ordered_col = names.index(query['order'])
+##            except (ValueError,KeyError):
+##                #If an order was not specified, we pick the first column as the order
+##                order = " `%s` asc " % names[0]
+##                ordered_col = 0
         
-        query_str+="order by %s limit %s, %s" % (order, limit , config.PAGESIZE)
+##        query_str+="order by %s limit %s, %s" % (order, limit , config.PAGESIZE)
 
-        dbh = DB.DBO(case)
+##        dbh = DB.DBO(case)
 
-        #Do the query, and find out the names of all the columns
-        dbh.execute(query_str)
-        return dbh,new_query,names,columns,links
+##        #Do the query, and find out the names of all the columns
+##        dbh.execute(query_str)
+##        return dbh,new_query,names,columns,links
 
     def fileselector(self, description, name):
         """ Draws a file selector for files in the upload directory """

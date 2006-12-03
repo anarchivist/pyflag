@@ -485,11 +485,11 @@ class IPType(ColumnType):
 
 class InodeType(ColumnType):
     """ A unified view of inodes """
-    def __init__(self, name='Inode', column='inode', link=None, case=None):
+    def __init__(self, name='Inode', column='inode', link=None, case=None, callback=None):
         if not link:
             link = FlagFramework.query_type(case=case,
                                             family='Disk Forensics',
                                             report='ViewFile',
                                             __target__='inode', inode="%s")
 
-        ColumnType.__init__(self,name,column,link)
+        ColumnType.__init__(self,name,column,link,callback=callback)

@@ -122,4 +122,86 @@ div.content {
   clear: both;
 }
 
+tbody.scrollContent td, thead th {
+  background:#94BEFF;
+  border-right:1px solid #999;
+  padding:2px;
+  font-weight:normal;
+  font-size:0.8em;
+}
+
+tbody.scrollContent {
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+tbody.scrollContent td, tbody.scrollContent tr td {
+  background: #FFF;
+  padding: 2px;
+}
+
+tbody.scrollContent tr.alternateRow td {
+  background: #e3edfa;
+  padding: 2px;
+}
+
+tbody.scrollContent tr.selected td {
+  background: yellow;
+  padding: 2px;
+}
+
+tbody.scrollContent tr:hover td,tbody.scrollContent tr.alternateRow:hover td.sorted-column {
+  background: #a6c2e7;
+  padding: 2px;
+}
+
+tbody.scrollContent td.sorted-column, tbody.scrollContent tr.alternateRow td.sorted-column {
+  background: pink;
+}
+
+thead th {
+ cursor: pointer;
+}
+
+all.clsMenuItemNS, .clsMenuItemIE {
+  text-decoration: none; 
+  font: bold 12px Arial; 
+  color: white; 
+  cursor: hand; 
+  z-index:100
+}
+
 /* end topmenu */
+
+/** General Page layout */
+div.PyFlagHeader { 
+  background-image: url(topfill.jpg);
+  float: left;
+  width: 100%;
+}
+
+div.Logo { 
+  float: right;
+}
+
+div.Toolbar { 
+  float: left;
+}
+
+div.PyFlagPage { 
+  max-height: 10ex;
+}
+
+/** Tables */
+table.PyFlagTable thead a, img { 
+  color: black;
+  font-size: large;
+  border: 0;
+  text-decoration: none;
+ }
+
+table.PyFlagTable { 
+  border: 10;
+  width: 100%;
+ }
+

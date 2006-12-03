@@ -8,13 +8,12 @@ import pyflag.DB as DB
 
 class Menu(Theme.BasicTheme):
     """ Class to implement the Menus theme """
-    preamble = "<form name=PseudoForm method=POST action='/post'><input type=hidden id=pseudo_post_query name=pseudo_post_query value='' /></form><script>if(!window.name) window.name='ID%s'; </script>\n<script src='/javascript/functions.js'></script>\n"
+    preamble = "<script src='/javascript/functions.js'></script>\n"
 
     hilight_bar = '''
     <script>        
         showToolbar();
 
-           
         function UpdateIt(){
         if (ie&&keepstatic&&!opr6)
         document.all["MainTable"].style.top = document.body.scrollTop;
@@ -22,16 +21,13 @@ class Menu(Theme.BasicTheme):
         }
         UpdateIt();
     </script>
-    <table cellspacing=0 cellpadding=0 width="100%%" background="/images/topfill.jpg" border=0> <tbody>
-    <tr><td align=left>%s</td>
-    <td height=25>
-    <div align="right">%s PyFlag</div>
-    </td>
     
-    </tr>
-    </tbody>
-    </table>'''
-
+    <div class=PyFlagHeader>
+      <div class=Toolbar>
+      </div><div class="Logo"> PyFlag</div>
+    </div>    
+    <div class=PyFlagPage>
+    '''
     header='''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
         <html>
         <head>
@@ -39,10 +35,6 @@ class Menu(Theme.BasicTheme):
         <title>%s</title>
         <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
         <script src="/javascript/functions.js" type="text/javascript" language="javascript"></script>
-        <style>
-        all.clsMenuItemNS, .clsMenuItemIE{text-decoration: none; font: bold 12px Arial; color: white; cursor: hand; z-index:100}
-        #MainTable A:hover {color: yellow;}
-        </style>
 
         </head>
         <body link=blue vlink=blue bgcolor="#FFFFFF">
@@ -109,14 +101,13 @@ class Menu(Theme.BasicTheme):
             toolbar_str=ui.toolbar_ui.__str__()
 
         return " ".join(
-        (self.preamble,
+        ('<link rel="stylesheet" type="text/css" href="images/pyflag.css" />',
+         self.preamble,
          "<table><tr><td>%s</td></tr></table>" % (data),
          ))
 
-    def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None,ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
-
-        self.menu_javascript = self.make_menu_javascript(query)
-        self.query=query
+    def render(self, ui=None, data='', title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
+        self.menu_javascript = self.make_menu_javascript(ui.defaults)
 
         if not ui.toolbar_ui:
             toolbar_str='&nbsp;&nbsp;'
@@ -124,15 +115,43 @@ class Menu(Theme.BasicTheme):
             toolbar_str=ui.toolbar_ui.__str__()
 
         try:
-            case = "Case %s - " % query['case']
+            case = "Case %s - " % ui.defaults['case']
         except:
             case =''
 
-        return " ".join(
-            (self.header % (title),self.menu_javascript,self.preamble,
-             meta,
-             '''&nbsp </tr></table>\n''',
-             self.hilight_bar % (toolbar_str,case),
-             data,
-#             "<table><tr><td>%s</td></tr></table>" % (data),
-             self.hilight_bar % (toolbar_str,case),self.footer))
+        result = '''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+        <html>
+          <head>
+            <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+            <title>%s</title>
+            <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
+            <script src="/javascript/functions.js" type="text/javascript" language="javascript"></script>
+          </head>
+        <body link=blue vlink=blue bgcolor="#FFFFFF">
+        <script>
+        var keepstatic=1 //specify whether menu should stay static 0=non static (works only in IE4+)
+        var menucolor="black" 
+        var submenuwidth=150
+        if(!window.name) window.name="main";
+        </script>
+        <script type="text/javascript" src="/javascript/menu.js" language="javascript"></script>''' % title
+
+        result += self.menu_javascript
+        result += '''<script>
+        if(window.name=="main") {
+           showToolbar();
+        };
+        </script>'''
+
+        result += '''<div class=PyFlagHeader>
+        <div class=Toolbar> %s
+        </div><div class="Logo"> PyFlag</div>
+        </div>    
+        <div class=PyFlagPage>
+        ''' % toolbar_str
+
+        result += data
+        result += "</div>" + self.footer
+
+#        print result
+        return result

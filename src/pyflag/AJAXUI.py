@@ -82,7 +82,7 @@ class AJAXUI(HTMLUI.HTMLUI):
         selectedTab = None
         
         for i in range(len(names)):
-            id = "PagePane%s" % self.get_uniue_id()
+            id = "PagePane%s" % self.get_unique_id()
             if selectedTab==None: selectedTab=id
             try:
                 if query['mode']==names[i]:
@@ -116,7 +116,7 @@ class AJAXUI(HTMLUI.HTMLUI):
 
         This implementation uses javascript/iframes extensively.
         """            
-        id = self.get_uniue_id()
+        id = self.get_unique_id()
 
         def right(query,result):
             result.decoration = "raw"
@@ -253,7 +253,7 @@ class AJAXUI(HTMLUI.HTMLUI):
         @arg target: A query_type object which is the target to the form. All parameters passed through this object are passed to the form's action.
         """
         self.form_parms=target.clone()
-        self.form_id=self.get_uniue_id()
+        self.form_id=self.get_unique_id()
         try:
             self.form_target = hiddens['pane']
             del hiddens['pane']
@@ -303,7 +303,7 @@ class AJAXUI(HTMLUI.HTMLUI):
             table = 'TestTable',
             )
         """
-        id = self.get_uniue_id()
+        id = self.get_unique_id()
         
         def table_cb(query,result):
             ## Building up the args list in this way ensure that defaults
@@ -394,7 +394,7 @@ class AJAXUI(HTMLUI.HTMLUI):
 
             result.result+="</tbody></table>"
 
-            new_id = self.get_uniue_id()
+            new_id = self.get_unique_id()
 
             ## Now we add the paging toolbar icons
             ## The next button allows user to page to the next page
@@ -515,50 +515,17 @@ class AJAXUI(HTMLUI.HTMLUI):
         });
         </script>''' % (id, self.defaults,cb)
 
-    def _make_sql(self,elements=[],table='',where=1,groupby = None,case=None,
-                  filter='', order=0, direction='1', limit = 0):
-        """ Calculates the SQL for the table widget based on the query """
-        ## Calculate the SQL
-        query_str = "select "
-
-        ## The columns and their aliases:
-        query_str += ",".join([ e.sql + " as `" + e.name + "`" for e in elements ])
-
-        ## The table
-        query_str += " from %s " % table
-
-        ## Is there a filter condition?
-        if filter:
-            filter_str = parser.parse_to_sql(filter, elements)
-            if not filter_str: filter_str=1
-            
-        else: filter_str = 1
-
-        query_str += "where ((%s) and (%s)) " % (where, filter_str)
-
-        ## Now calculate the order by:
-        query_str += "order by %s " % elements[order].sql
-
-        if direction=='1':
-            query_str += "asc"
-        else: query_str+= "desc"
-
-        ## Limit conditions:
-        query_str += " limit %s, %s" % (limit, config.PAGESIZE)
-
-        return query_str
-
     def xxxtable(self,sql="select ",columns=[],names=[],links=[],types={},table='',where='',groupby = None,case=None,callbacks={}, **opts):        
         names = list(names)
         columns = list(columns)
-        id=self.get_uniue_id()
+        id=self.get_unique_id()
         
         def table_cb(query,result):
             """ This callback is used to render the actual table in
             its requested pane
             """
             menus = []
-            new_id = self.get_uniue_id()
+            new_id = self.get_unique_id()
 
             ## May only offer to group by if the report does not issue
             ## its own
@@ -886,7 +853,7 @@ class AJAXUI(HTMLUI.HTMLUI):
             pane = "'main'"
 
         elif pane=='popup':
-            popup_id = self.get_uniue_id()
+            popup_id = self.get_unique_id()
             self.add_to_top_ui('''<div widgetId="float%s" dojoType="FloatingPane" style="display: none; width: 640px; height: 400px; left: 100px; top: 100px;" windowState="minimized" displayMinimizeAction = "true"  hasShadow="true"  resizable="true"  executeScripts="true"></div>''' % (popup_id))
 
             pane = "'float%s'" % (popup_id)
@@ -954,7 +921,7 @@ class AJAXUI(HTMLUI.HTMLUI):
         self.result+=base
 
     def icon(self, path, tooltip=None, **options):
-        id = self.get_uniue_id()
+        id = self.get_unique_id()
         option_str = self.opt_to_str(options)
         self.result += "<img id='img%s' border=0 src='images/%s' %s />" % (id, path, option_str)
         if tooltip:
@@ -975,7 +942,7 @@ class AJAXUI(HTMLUI.HTMLUI):
         Returns the toolbar ID which may be used as an option for
         toolbar().
         """
-        id = "Toolbar%s" % self.get_uniue_id()
+        id = "Toolbar%s" % self.get_unique_id()
         self.result+='''<div dojoType="LayoutContainer"
         cacheContent="false" layoutChildPriority="top-bottom" >'''
         self.result+='''<div dojoType="ToolbarContainer" id="container%(id)s" widgetId="container%(id)s" layoutAlign="top">
@@ -1063,16 +1030,7 @@ class AJAXUI(HTMLUI.HTMLUI):
         if interval is 0 we do it immediately.
         """
         pane = self._calculate_js_for_pane(None, query, pane)
-##        if options.has_key('parent'):
-##            del query['callback_stored']
-##            ## This is the pane we will try to refresh
-##            pane = "find_widget_type_above('ContentPane',_container_.widgetId)"
-##        ## Unless a specific pane is specified
-##        elif options.has_key('pane'):
-##            pane = "%r" % options['pane']
-##        else:
-##            pane = "_container_"
-            
+        
         ## Do we want to do this immediately?
         if interval==0:
             self.result+="""<script>
@@ -1080,7 +1038,7 @@ class AJAXUI(HTMLUI.HTMLUI):
             </script>""" % (pane, query)
         else:
             ## We mark the current container as pending an update, and
-            ## then schedule an update fo it later on. If it has been
+            ## then schedule an update to it later on. If it has been
             ## updated by some other mechanism, it will be marked as
             ## not longer pending, and we ignore it.
             self.result+="""<script>
@@ -1105,7 +1063,7 @@ class AJAXUI(HTMLUI.HTMLUI):
         
     def popup(self,callback, label,icon=None,toolbar=0, menubar=0, tooltip=None, **options):
         if not tooltip: tooltip = label
-        image_id = self.get_uniue_id()
+        image_id = self.get_unique_id()
         cb = self.store_callback(callback)
         self.add_to_top_ui('''<div widgetId="float%s" dojoType="FloatingPane" style="width: 640px; height: 400px; left: 100px; top: 100px;" windowState="minimized" displayMinimizeAction = "true"  hasShadow="true"  resizable="true"  executeScripts="true" title="%s"></div>''' % (image_id,tooltip))
         
@@ -1148,35 +1106,6 @@ class AJAXUI(HTMLUI.HTMLUI):
             set_url("page0","f?%s&callback_stored=%s");
         });
         </script>''' % (self.defaults, cb[0])
-
-    ## FIXME: Do this properly.
-    def sanitise_data(self,data):
-        """ Return a sanitised version of data. This is mostly to
-        avoid XSS attacks etc.
-
-        Note that PyFlag currently does not have much in the way of
-        XSS protections or access controls and should not be used on
-        the open web without authentication.
-        """
-        allowed_tags = [ "b","i", "br" ]
-        tag_regex = "<([^>]+)>"
-
-        def filter_tag(tag):
-            tag = tag.group(1)
-            tmp = tag.strip().lower()
-            if tmp.startswith("/"):
-                extra="/"
-                tmp = tmp[1:]
-            else: extra =''
-
-            tmp = tmp.split(" ")[0]
-
-            for allowed in allowed_tags:
-                if tmp==allowed:
-                    return "<%s%s >" % (extra,allowed)
-            return ''
-
-        return re.sub(tag_regex, filter_tag, data)
 
     def textarea(self,description,name, **options):
         """ Draws a text area with the default content

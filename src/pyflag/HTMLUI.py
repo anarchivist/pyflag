@@ -37,8 +37,9 @@ import pyflag.conf
 import pyflag.UI as UI
 config=pyflag.conf.ConfObject()
 import pyflag.Theme as Theme
-import cStringIO,csv
+import cStringIO,csv,time
 import pyflag.Registry as Registry
+import pyflag.parser as parser
 
 class HTMLException(Exception):
     """ An exception raised within the UI - should not escape from this module """
@@ -71,7 +72,7 @@ def goto_row_cb(query,result,variable='limit'):
     result.decoration = 'naked'
     result.heading("Skip directly to a row")
     result.para("You may specify the row number in hex by preceeding it with 0x")
-    result.start_form(query, refresh="parent")
+    result.start_form(query, pane="parent")
     result.start_table()
     if limit.startswith('0x'):
         limit=int(limit,16)
@@ -120,19 +121,11 @@ class HTMLUI(UI.GenericUI):
 
         if query:
             self.defaults=query
-            
+
+        self.color=None
+        self.font=None
         self.table_depth = 0
         self.type = "text/html"
-        self.previous = None
-        self.next = None
-        self.pageno = 0
-        self.meta = ''
-        self.color=None
-        self.bgcolor=None
-        self.font = None
-        self.text_var = ''
-        self.text_line_count = 0
-        self.nav_query = None
         #This specified if we should render the UI in the theme or
         #naked. Note that this only affects UIs which are drawn in a
         #window not ones which are added to other UIs:
@@ -140,28 +133,15 @@ class HTMLUI(UI.GenericUI):
         self.title=''
         
     def display(self):
-        ## If the method is post, we need to emit the pseudo post form:
-        #Make a toolbar
-        if not self.nav_query:
-            q = self.defaults.clone()
-            del q['__target__']
-            q['__target__']='limit'
-        else: q = self.nav_query
-
-        try:
-            q['family']
-        except KeyError:
-            q['family'] =''
-            
         ## Get the right theme
-        theme=Theme.get_theme(q)
+        theme=Theme.get_theme(self.defaults)
         if self.decoration=='raw':
             return theme.raw_render(data=self.__str__(), ui=self,title=self.title)
         
         if self.decoration=='naked' or self.decoration=='js':
             return theme.naked_render(data=self.__str__(), ui=self,title=self.title)
         else:
-            return theme.render(q,meta=self.meta,data=self.__str__(),next=self.next , previous=self.previous , pageno=self.pageno, ui=self)
+            return theme.render(data=self.__str__(), ui=self)
     
     def __str__(self):
         #Check to see that table tags are balanced:
@@ -266,19 +246,6 @@ class HTMLUI(UI.GenericUI):
         """ Function stores the current UI in a dict in the class method. This is required when we need to store a UI and later get the browser to retrieve it. """
         key = self.flag.store.put(ui, prefix="UI")
         return key
-
-    def svg(self,text):
-        """ Output the text as SVG
-        @arg text: Scalable Vector Graphics image
-        """
-
-        #SVG overrides all the other HTML
-        if self.defaults.has_key('draw_svg'):
-            self.result = text
-            self.display = self.__str__
-            self.type='image/svg+xml'
-        else:
-            self.result += '<object type="image/svg+xml" data=f?%s&draw_svg=yes width=100%% height=100%% > </object>' % self.defaults
     
     def start_table(self,**options):
         self.table_depth += 1
@@ -316,7 +283,33 @@ class HTMLUI(UI.GenericUI):
     def pre(self,string):
         self.result += "<pre>%s</pre>" % string
 
-    def link(self,string,target=None,options=None,icon=None,tooltip=None,**target_options):
+    def _calculate_js_for_pane(self, target=None, pane="main", **opts):
+        """ Returns the JS string required to facilitate opening in the requested pane
+
+        Modifies query to remove stored callbacks if needed.
+
+        target: The query we should link to. We will delete callbacks from it if needed.
+
+        pane: Where we want to open the link can be:
+        main (default): refresh to the main pane (default).
+        parent: refresh to the pane that contains this pane. (useful for popups etc).
+        popup: open a new popup window and draw the target in that.
+        self: refresh to the current pane (useful for internal links in popups etc).
+        """
+        if pane=="main" or pane=='self':
+#            return "window.location=%s; return false;" % target
+            return "post_link('f?%s'); return false;" % target
+
+        if pane=='popup':
+            return "window.open('f?%s','child_%s',  'width=600, height=600,scrollbars=yes'); return false;" % (target, self.get_uniue_id())
+
+        if pane=='parent':
+            if target:
+                target.poparray('callback_stored')
+
+            return "window.opener.document.location='f?%s'; window.close(); return false;" % target
+            
+    def link(self,string,target=None,options=None,icon=None,tooltip=None, pane='main', **target_options):
         ## If the user specified a URL, we just use it as is:
         try:
             self.result+="<a href='%s'>%s</a>" % (target_options['url'],string)
@@ -325,53 +318,31 @@ class HTMLUI(UI.GenericUI):
             pass
         
         if target==None:
-            target=FlagFramework.query_type(())
-        q=target.clone()
+            q=FlagFramework.query_type(())
+        else:
+            q=target.clone()
+            
         if target_options:
             for k,v in target_options.items():
                 del q[k]
                 q[k]=v
 
-        if not options:
-            options={}
-
         if icon:
             tmp = self.__class__(self)
-            tmp.icon(icon,alt=string,border=0)
+            tmp.icon(icon,alt=string,border=0, tooltip=tooltip)
             tooltip=string
             string=tmp
 
-        tmp = []
-        try:
-            tmp=target['__opt__'].split(',')
-            del q['__opt__']
-            if 'popup' in tmp:
-                options['onclick'] ="window.open('%s','client','HEIGHT=600,WIDTH=600,scrollbars=yes')" % q
-                self.result+="<a href=# %s >%s</a>" %(self.opt_to_str(options),string)
-                return
-        except KeyError:
-            pass
+        js = self._calculate_js_for_pane(target=q, pane=pane)
+        base = "<a href='f?%s' onclick=%r >%s</a>" % (q, js, string)
 
-        ## If the user right clicked, we open in a new window
-        if config.METHOD=='POST':
-            if 'parent' in tmp:
-                action = "javascript: document.PseudoForm.target=self.opener.window.name; document.getElementById(\'pseudo_post_query\').value=\'%s\';  document.PseudoForm.submit(); self.close();" % (q,)
-            else:
-                window=q.window+".name"
-                action = "javascript: if(isMiddleClick(event) || isLeftClick(event)) { if(isMiddleClick(event)){ document.PseudoForm.target='new_page';} else {document.PseudoForm.target=%s;};  document.getElementById(\'pseudo_post_query\').value=\'%s\';document.PseudoForm.method=\'POST\';  PseudoForm.submit();};" % (window,q)
-            base = '<a %s href="%s" onmousedown="%s" >%s</a>' % (self.opt_to_str(options),action,action,string)
-        else:
-            if 'parent' in tmp:
-                options['onclick']="self.opener.location=\"%s\"; self.close();" % q
-
-            base ="<a href='blah?%s' %s>%s</a>" % (q,self.opt_to_str(options),string)
-            
+        ## Add tooltip if needed:
         if tooltip:
             self.result+="<abbr title='%s'>%s</abbr>" % (tooltip,base)
         else:
             self.result+=base
 
-    def toolbar_popup(self,callback, label,icon=None,toolbar=0, menubar=0, tooltip=None, **options):
+    def popup(self,callback, label,icon=None, tooltip=None, **options):
         """ This method presents a button on the screen, which when
         clicked will open a new window and use the callback to render
         in it.
@@ -382,69 +353,14 @@ class HTMLUI(UI.GenericUI):
         if not tooltip: tooltip = label
         cb = self.store_callback(callback)
 
-        self.result+="""<script language=javascript>  var client_%s; function open_%s_window() { query = '%s&parent_window='+window.name; query += "&stored_query_%s="+escape(query); client_%s=window.open(query+'&callback_stored=%s','client_%s','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=600,scrollbars=yes');  }; </script><abbr title=%r>""" % (cb,cb,self.defaults,cb,cb,cb,cb,toolbar,menubar,tooltip)
-
         if icon:
-            self.result+="""<a href=\"javascript:open_%s_window()\" onclick=\"javascript:open_%s_window()\"><img alt=%s border=0 src=images/%s></a>""" % (cb,cb,label,icon)
+            base = "<img alt='%s' border=0 src='images/%s' onclick=\"popup('%s','%s'); return false;\" />" % (label,icon, self.defaults,cb)
         else:
-            self.result+="""<input type=button value=%r onclick=\"open_%s_window()\"> """ % (label,cb)
-
-        self.result+="</abbr>"
-
-    def popup(self,callback, label,icon=None,toolbar=0, menubar=0, tooltip=None, **options):
-        """ This method presents a button on the screen, which when clicked will open a new window and use the callback to render in it.
-
-        The new UI will be based on the current UI.
-        @arg callback: A callback function to render into the new UI
-        """
-        if not tooltip: tooltip = label
-        cb = self.store_callback(callback)
-        ## Here we have a snippet of javascript which reads the values
-        ## of all form parameters which have been filled already -
-        ## this allows the subwindow to return back to this page with
-        ## form members filled, even without submitting. Note that we
-        ## need to remove the submit parameter itself in order to
-        ## allow the engine to differentiate between a refresh to this
-        ## page with pre-filled parameters and a form which was
-        ## submitted by the user.
-
-        ## Unfortunately MS Internet Explorer is a very brain damaged
-        ## browser and it seems to truncate the GET query string at an
-        ## arbitrary location. This means we need to do some
-        ## gymnastics to get the browser to submit in POST or we risk
-        ## losing a lot of our parameters.
-        self.result+="""<script language=javascript>
-        var tmp;
-        function open_%s_window() {
-           var query='';
-           client_page = window.open('','child_window_%s','toolbar=%s,menubar=%s,HEIGHT=600,WIDTH=900,scrollbars=yes,dependent');
-           //Here we read the forms contents, so we can let the popup window know the values of currently filled in fields (Before submitting).
-           for(var i=0; i<document.pyflag_form_1.elements.length; i++) {
-              //Checkboxes should only be added if they are checked
-              if(document.pyflag_form_1.elements[i].type=='checkbox' && !document.pyflag_form_1.elements[i].checked) {
-                continue;
-              };
-              //We must leave the submit button off, so that when the popup window refreshes to its parent we know it wasnt actually submitted.
-              if(document.pyflag_form_1.elements[i].type!='submit' && document.pyflag_form_1.elements[i].name.length>0 ) {
-                 query+=document.pyflag_form_1.elements[i].name+'='+encodeURIComponent(document.pyflag_form_1.elements[i].value)+'&';
-              };
-           };
-           query+= "&parent_window="+self.name;
-           query+="&stored_query_%s="+escape(query);
-           tmp=document.getElementById('pseudo_post_query');
-           tmp.value=query+'&callback_stored=%s';
-           document.PseudoForm.target = 'child_window_%s';
-           document.PseudoForm.submit();
-        }; </script><abbr title=%r>
-        """ %(cb,cb,toolbar,menubar,cb,cb,cb,tooltip)
-        #(cb,self.defaults,cb,toolbar,menubar,tooltip)
-        
-        if icon:
-            self.result+="""<a  href=\"javascript:open_%s_window()\" onclick=\"javascript:open_%s_window()\"><img alt=%s border=0 src=images/%s></a>""" % (cb,cb,label,icon)
+            base = "<input type=button value=%r onclick=\"popup('%s','%s'); return false;\" />" % (label,self.defaults,cb)
+        if tooltip:
+            self.result += "<abbr title=%r>%s</abbr>" % (tooltip,base)
         else:
-            self.result+="""<input type=button value=%r onclick=\"open_%s_window()\"> """ % (label,cb)
-
-        self.result+="</abbr>"
+            self.result += base
 
     def radio(self,description,name,labels,**options):
         opts = self.opt_to_str(options)
@@ -495,32 +411,32 @@ class HTMLUI(UI.GenericUI):
         #Draw in a nice table format
         self.row(description,tmp)
 
-    def make_link(self,query,target,target_format = None,**options):
-        """ Makes a query_type object suitable for use in the links array of the table
+##    def make_link(self,query,target,target_format = None,**options):
+##        """ Makes a query_type object suitable for use in the links array of the table
 
-        @note: the returned object is a clone of query.
-        @note: Private ui parameters are automatically cleaned. e.g. limit, nextpage etc.
-        @arg query: Original query to base the new object on
-        @arg target: a string representing the name of the target
-        @arg target_format: An optional format string that will be used to format the target arg for each cell in the table. There must be only one format specifier.
-        """
-        q = query.clone()
-        del q[target]
-        del q['__target__']
-        del q['limit']
-        del q['order']
-        del q['dorder']
+##        @note: the returned object is a clone of query.
+##        @note: Private ui parameters are automatically cleaned. e.g. limit, nextpage etc.
+##        @arg query: Original query to base the new object on
+##        @arg target: a string representing the name of the target
+##        @arg target_format: An optional format string that will be used to format the target arg for each cell in the table. There must be only one format specifier.
+##        """
+##        q = query.clone()
+##        del q[target]
+##        del q['__target__']
+##        del q['limit']
+##        del q['order']
+##        del q['dorder']
         
-        q['__target__']=target
-        try:
-            q['__mark__']=options['mark']
-        except KeyError:
-            pass
+##        q['__target__']=target
+##        try:
+##            q['__mark__']=options['mark']
+##        except KeyError:
+##            pass
         
-        if target_format:
-            q[target]=target_format
+##        if target_format:
+##            q[target]=target_format
 
-        return q
+##        return q
 
     def tree(self, tree_cb = None, pane_cb=None, branch = None, layout=None):
         """ A tree widget.
@@ -744,7 +660,7 @@ class HTMLUI(UI.GenericUI):
         right=self.__class__(self)
 
 
-        path=FlagFramework.normpath(query['open_tree'])
+        path=FlagFramework.normpath(query.get('open_tree','/'))
         pane_cb(path,right)
         
         ## Now draw the left part
@@ -766,562 +682,199 @@ class HTMLUI(UI.GenericUI):
         if link:
             self.toolbar_ui.link(text,target=link,icon=icon,tooltip=tooltip)
         elif cb:
-            self.toolbar_ui.toolbar_popup(cb,text,icon,tooltip=tooltip)
+            self.toolbar_ui.popup(cb,text,icon=icon,tooltip=tooltip)
         else:
             self.toolbar_ui.icon(icon,tooltip=text)
-                
-    def table(self,sql="select ",columns=[],names=[],links=[],table='',where='',groupby = None,case=None,callbacks={},data_callbacks={},**opts):
-        """ Shows the results of an SQL query in a searchable/groupable/browsable table
 
-        The format of the sql statement is:
-        $sql $columns from $table where $where having $__having__ orderby $orderby
-
-        Note that the caller has no control on the having clause, it is constructed by the UI object subject to parameters passed to the UI object's `defaults` query object.
-
-        The links list specifies links to be created in place of each column (x) in the table. If links[x] is not None, we display the link. If the link contains the special element '__target__' having the value v, we check links[v] for a format specifier. if present the cell value is interpolated into it, else a new element if created with its value set to the cell value.
-
-        If the callbacks variable is specified, it is a dictionary mapping names to callback function. These callbacks will be invoked to render the result of that column and should return a UI object. For example if the names arguement contains the name 'deleted':
-
-        >>> def function(value,query=query):
-        ....    @return: ui based on value
-        
-        >>> callbacks=['deleted':function]
-
-        If the data_callbacks variable is specified, it is also a dictionary mapping names to callback functions. The callback is used to translate between the native database datatype and a more convienient display format. This is used for fields like IP addresses and timestamps. This two-way callback is preferable to using callbacks (above) as it remains searchable. It is also preferable to specifying database function in the columns field (e.g. from_unixtime(time) for time) as it allows the database to use its indexes. An example is goven below:
-
-        >>> def function(value, mode):
-        ....    if mode=0: # output/display
-        ....        return inet_ntoa(value)
-        ....    else:
-        ....        return inet_aton(value)
-
-        >>> data_callbacks=['Src IP':function]
-
-        __target__ may be specified any number of times.
-
-        @arg sql: initial part of sql statement to run. Defaults to select
-        @arg columns: array of columns to be used for select query.
-        @arg names: array of names to be used for each column.
-        @arg links: array of query_type used to link each column in the list.
-        @arg where: where clause that will be used in this query
-        @arg callbacks: A dictionary mapping names (from the names array) to callback functions.
-        @note: The user has a lot of fine control over the where clause. In the text entry boxes at the bottom of the screen, the user may enter the search term in the following convention:
-              - If the search term does not contain any wildcards (%), wildcards are added before and after the search term to match the occurance of the word anywhere in the data. This approach is generally what is wanted, but may prove too slow since indexing cant be used.
-              - If the search term has a wild card in it, no further wild cards are added. This allows the user to specify a wildcard at the end of a word, which allows indexing to be used, but will only match the start of the word.
-              - If any of the following characters (=,<,>) preceed the search term, the comparison is an exact mathematical comparison. e.g. '>5' means column>5.
-        """
-        #in case the user forgot and gave us a tuple, we forgive them:
-        names=list(names)
-        columns = list(columns)
-        for l in links:
-            try:
-                l.window="top.window"
-            except:
-                pass
-        
-        #First work out what is the query string:
-        query_str = sql;
+    def table(self,elements=[],table='',where='',groupby = None,case=None, **opts):
+        ## Building up the args list in this way ensure that defaults
+        ## can be specified in _make_sql itself and not be overwritten
+        ## by our defaults.
         query = self.defaults
         
-        #The new_query is the same one we got minus all the UI
-        #specific commands. The following section, just add UI
-        #specific commands onto the clean sheet
-        new_query = query.clone()
-        del new_query['dorder']
-        del new_query['order']
-        del new_query['limit']
-
-        select_clause=[]
-        new_names=[]
-        new_columns=[]
-        #find the group by clause. If the caller of this widget set
-        #their own group by, we cant use the users group by
-        #instructions.
-        if not groupby:
-             #If we have a group by, we actually want to only show a
-             #count and those columns that are grouped by, so we over
-             #ride columns and names... We do not however nuke the
-             #original names and columns until _after_ we calculate
-             #our where conditions.  Mask contains those indexes for
-             #which names array matches the group_by clause
-             try:
-                 mask = [ names.index(d) for d in query.getarray('group_by') ]
-                 if not mask: raise ValueError
-                 links = [None]+ [ self.make_link(query,"where_%s" % names[d],target_format="=%s") for d in mask ]
-                 for d in links:
-                     if d:
-                         #For links we dont want these variables to be there
-                         del d['group_by']
-                         del d['limit']
-
-                 group_by_str = ",".join([ " `%s`" % d for d in query.getarray('group_by') ])
-                 new_names=['Count'] +[ names[d] for d in mask ]
-                 new_columns= [ 'count(*)' ] +[ columns[d] for d in mask ]
-                 select_clause = [ k+ " as `" +v+"`" for (k,v) in zip(new_columns,new_names) ]
-             ## if the user asked for a weird group by , we ignore it.
-             except ValueError:
-                 group_by_str = None
-        else:
-            group_by_str = groupby
-
-        #Form the columns in the sql
-        if not select_clause:
-            select_clause= [ " %s as `%s` " % (k,v) for (k,v) in zip(columns,names) ]
-            
-        query_str+=",".join(select_clause) 
-
-        #Form the table clause
-        query_str+=" from %s " % table
-
-        #Work out the having clause.
-        having=['1']
-        conditions=[]
-        condition_text_array=[]
-        for d,v in query:
-            if d.startswith('where_'):
-                #Find the column for that name
-                try:
-                    index=names.index(d[len('where_'):])
-                except ValueError:
-                    ## If we dont know about this name, we ignore it.
-                    continue
-
-                condition_text = FlagFramework.make_sql_from_filter(v,having,columns[index],d[len('where_'):],data_callbacks=data_callbacks)
-                
-                #create a link which deletes the current variable from
-                #the query string, allows the user to remove the
-                #current condition:
-                tmp_query=query.clone()
-                tmp_query.remove(d,v)
-                tmp_link=self.__class__(self)
-                tmp_link.link(condition_text,target=tmp_query)
-                conditions.append(tmp_link)
-                condition_text_array.append(condition_text)
-
-        having_str = " and ".join(having)
-
-        if where:
-            where_str= " where (%s) and (%s) " %(where,having_str)
-        elif having:
-            where_str=" where %s " % having_str
-
-        query_str+=where_str
-        
-        ## At this point we can add the group by calculated above, and
-        ## replace the names and columns arrays from the group by
-        if group_by_str:
-            query_str += " group by %s " % group_by_str
-
-        if new_names:
-            names=new_names
-            columns=new_columns
-
-        #Find the order by clause
-        #Were we given a dorder param?
         try:
-            order = " `%s` desc " % query['dorder']
-            #Remember the column number that was ordered
-            ordered_col = names.index(query['dorder'])
-        except (ValueError,KeyError):
-            #Ok then were we given an order param?
-            try:
-                order = " `%s` asc " % query['order']
-                ordered_col = names.index(query['order'])
-            except (ValueError,KeyError):
-                #If an order was not specified, we pick the first column as the order
-                order = " `%s` asc " % names[0]
-                ordered_col = 0
+            order = int(query.get('order',0))
+        except: order=0
 
-        ## This is used to render things in the popups. The query
-        ## string here is naked without order by clauses
-        query_str_basic = query_str
-        query_str+= " order by %s " % order
+        try:    limit = int(query.get('limit',0))
+        except: limit = 0
 
-        #Calculate limits
-        if not query.has_key('limit'):
-            query['limit'] = "0"
+        args = dict( elements = elements, table = table, case=case,
+                     groupby = groupby, order = order, limit = limit)
 
-        ## Add next and previous button as needed:
-        previous = int(query['limit']) - config.PAGESIZE
-        next = int(query['limit']) + config.PAGESIZE
-        
-        self.pageno =  int(query['limit']) /config.PAGESIZE
-                
-        if query['limit']:
-            query_str+=" limit %u, %u" % (int(query['limit']) , config.PAGESIZE)
+        if where: args['where'] = where
 
-        dbh = DB.DBO(case)
+        try:    args['filter'] = query['filter']
+        except: pass
 
-        ## We dont want this query to take too long:
-        dbh.cursor.timeout = config.TABLE_QUERY_TIMEOUT
+        try:    args['direction'] = query['direction']
+        except: pass
 
-        #Do the query, and find out the names of all the columns
-        dbh.execute(query_str)
+        sql = self._make_sql(**args)
+        print sql
 
-        if group_by_str:
-            def table_groupby_popup(query,result):
-                result.display = result.__str__
-                result.heading("Most commonly seen %s" % query['group_by'])
-                if condition_text_array:
-                    result.start_table()
-                    result.row("The following filter conditions are enforced")
-                    for i in condition_text_array:
-                        result.row(i)
-                    result.end_table()
-                    result.start_table()
+        self.result+='''<table class="PyFlagTable" >
+        <thead><tr>'''
 
-                #Find out how many results there are all up
-                dbh.execute("select count(*) as total from %s %s" %(table, where_str))
-                total = dbh.fetch()['total']
-                dbh.execute(query_str_basic+" order by `Count` desc limit 8",())
-                values=[]
-                labels=[]
-                count=0
-                for row in dbh:
-                    values.append(row['Count'])
-                    count+=int(row['Count'])
+        ## Make the table headers with suitable order by links:
+        for e in range(len(elements)):
+            new_query = query.clone()
+            n = elements[e].name
 
-                    tmp_value=row[names[1]]
-                    if data_callbacks.has_key(names[1]):
-                        tmp_value = data_callbacks[names[1]](tmp_value, mode=0)
-
-                    if callbacks.has_key(names[1]):
-                        tmp_value = callbacks[names[1]](tmp_value)
-
-                    labels.append("%s\\n (%s)" % (tmp_value,row['Count']))
-
-                ## Insert an others entry:
-                values.append(total - count)
-                labels.append("Others (%s)" % (total-count))
-                
-                import pyflag.Graph as Graph
-                ##Create a new pie chart:
-                pie = Graph.Graph()
-                pie.pie(labels,values,explode="0.1", legend='yes')
-                result.image(pie)
-
-            ## End of table_groupby_popup
-                
-            ## Add a popup to allow the user to draw a graph
-            self.toolbar(table_groupby_popup,'Graph',icon='pie.png')
-        else: ## Not group by
-            def table_configuration_popup(query,result):
-                try:
-                    if query['refresh']:
-                        del query['refresh']
-##                        del query['callback_stored']
-                        result.refresh(0,query,parent=1)
-                except KeyError:
-                    pass
-                
-                result.decoration = 'naked'
-                result.heading("Select columns to hide:")
-                result.start_form(query, refresh="parent")
-                result.start_table()
-                for name in names:
-                    result.checkbox(name,"hide_column",name)
-                result.end_table()
-                result.end_form()
- 
-                    
-            ## End table_configuration_popup
-
-            if query.getarray('hide_column'):
-                self.toolbar(table_configuration_popup,'Some columns hidden (%s)' % ','.join(query.getarray('hide_column')),icon='spanner.png')
-            else:
-                self.toolbar(table_configuration_popup,'Configure Table View',icon='spanner.png')
-
-        ## Draw a popup to allow the user to save the entire table in CSV format:
-        def save_table(query,result):
-            dbh = DB.DBO(case)
-
-            def generate_output():
-                query_row_limit = 1024
-                data = cStringIO.StringIO()
-                hidden_columns = list(query.getarray('hide_column'))
-
-            ## FIXME - We dont usually want to save called back
-            ## columns becuase they rarely make sense (but sometimes
-            ## they do?? which should we do here???)
-                for i in callbacks.keys():
-                    if i not in hidden_columns:
-                        hidden_columns.append(i)
-                    
-                names_list = [ i for i in names if i not in hidden_columns ]
-                inittext= "#Pyflag Table widget output\n#Query was %s.\n#Fields: %s\n""" %(query," ".join(names_list))
-                if condition_text_array:
-                    inittext+= "#The following conditions are in force\n"
-                for i in condition_text_array:
-                    inittext += "# %s\n" % i
-                yield inittext
-                
-                csv_writer = csv.DictWriter(data,names_list,dialect='excel')
-                limit = 0
-                while 1:
-                    dbh.execute(query_str_basic + " order by %s limit %s,%s" %
-                                (order,limit,limit+query_row_limit))
-
-                    count = 0
-                    for row in dbh:
-                        count+=1
-                    ## If there are any callbacks we respect those now.
-                        new_row={}
-                        for k,v in row.items():
-                            if k in hidden_columns: continue
-                            if data_callbacks.has_key(k):
-                                row[k]=data_callbacks[k](v)
-                            if callbacks.has_key(k):
-                                row[k]=callbacks[k](v)
-
-                        ## Escape certain characters from the rows - some
-                        ## spreadsheets dont like these even though they
-                        ## are probably ok:
-                            tmp=str(row[k])
-                            tmp=tmp.replace("\r","\\r")
-                            tmp=tmp.replace("\n","\\n")
-
-                            new_row[k]=tmp
-
-                        csv_writer.writerow(new_row)
-                        data.seek(0)
-                        tmp=data.read()
-                        yield tmp
-                        data.truncate(0)
-
-                    if count==0: break
-                    limit+=query_row_limit
-
-            result.generator.generator = generate_output()
-            result.generator.content_type = "text/csv"
-            result.generator.headers = [("Content-Disposition","attachment; filename=%s_%s.csv" %(case,table) ),]
-
-            del query['callback_stored']
-            
-            return
-            
-            
-            
-        self.toolbar(save_table,'Save Table',icon="floppy.png")
-
-        ## Write the conditions at the top of the page:
-        if conditions:
-            self.start_table()
-            self.row("The following filter conditions are enforced")
-            for i in conditions:
-                self.row(i)
-            self.row("Click any of the above links to remove this condition")
-            self.end_table()
-            self.start_table()
-
-        tmp_links = []
-        hidden_columns = []
-        for i in range(len(names)):
-            d=names[i]
-            
-            ## Skip the hidden columns
-            if d in query.getarray('hide_column'):
-                hidden_columns.append(i)
-                continue
-            
-            #instatiate a whole lot of UI objects (based on self) for the table header
-            tmp = self.__class__(self)
-
-            #Create links to the current query as well as an ordering
-            #parameter - note the addition of parameters we get by
-            #using the new query's str method, and the addition of
-            #parameters by using named args...
-            try:
-                assert(query['dorder'] == d)
-                tmp.link(d,target=new_query,order=d)
-            except (KeyError,AssertionError):
-                tmp.link(d,target=new_query,dorder=d)
-
-            #If the current header label is the same one in
-            #ordered_col, we highlight it to show the user which
-            #column is ordered:
-            if names[ordered_col] == d:
-                tmp2=self.__class__(self)
-                tmp2.start_table()
-                tmp2.row(tmp,bgcolor=config.HILIGHT)
-                tmp = tmp2
-                
-            tmp_links.append(tmp)
-
-        #This array keeps track of each column width
-        width = [ len(names[d]) for d in range(len(names))]
-
-        #output the table header
-        if opts.has_key('headers'):
-            try:
-                h = []
-                for i in range(len(names)):
-                    if i not in hidden_columns:
-                        try:
-                            h.append(opts['headers'][names[i]])
-                        except KeyError:
-                            h.append('')
-            except KeyError:
-                pass
-
-            self.row(*h)
-
-        self.row(*tmp_links)
-
-        #This is used to keep track of the lines with a common sorting
-        #key: common = (bgcolor state, last value)
-        common = [False,0]
-        count =0
-        
-        #output the rest of the lines in a table:
-        while 1:
-            row = dbh.fetch()
-            if not row: break
-
-            #Form a row of strings
-            row_str=[]
-            for i in range(len(row)):
-                row_str.append("%s" % row[names[i]])
-                if width[i] < len(row_str[i]):
-                    width[i] = len(row_str[i])
-
-            #Work through the row and create entry uis for each of them.
-            for i in range(len(row_str)):
-                value=row_str[i]
-
-                ## Check if the user specified a callback for this column
-                if data_callbacks.has_key(names[i]):
-                    value=data_callbacks[names[i]](value, mode=0)
-
-                if callbacks.has_key(names[i]):
-                    value=callbacks[names[i]](value)
+            if order==e:
+                if query.get('direction','1')=='1':
+                    del new_query['direction']
+                    del new_query['order']
+                    self.result+="<th><a href='%s&order=%s&direction=0'>%s<img src='/images/increment.png' /></a></th>\n" % (new_query,e, n)
                 else:
-                ## Sanitise the value to make it HTML safe. Note that
-                ## callbacks are required to ensure they sanitise
-                ## their output if they need.
-                    value=cgi.escape(value)
-
-                ## Now add links if they are required
-                try:
-                    if links[i]:
-                        q = links[i]
-                        try:
-                            q=q.clone()
-                            q.FillQueryTarget(row_str[i])
-                            
-                        #No __target__ specified go straight here
-                        finally:
-                            tmp = self.__class__(self)
-                            tmp.link(value, q)
-                            value=tmp
-
-                #links array is too short
-                except IndexError:
-                    row_str[i] = value
-                    continue
-
-                row_str[i] = value
-                continue
-                            
-            #Work out the background color
-            if common[1] != row[names[ordered_col]]:
-                common[1] = row[names[ordered_col]]
-                common[0] = not common[0]
-
-            options = {}
-            if common[0]:
-                bgcolor1=config.BGCOLOR
-                bgcolor=config.BGCOLOR1
+                    del new_query['direction']
+                    del new_query['order']
+                    self.result+="<th><a href='%s&order=%s&direction=1'>%s<img src='/images/decrement.png' /></a></th>\n" % (new_query,e,n)
             else:
-                bgcolor1=config.BGCOLOR1
-                bgcolor=config.BGCOLOR
-                
-            options['bgcolor'] = bgcolor
-            try:
-                options['valign'] = opts['valign']
-            except KeyError:
-                pass
-            
-            options['onmouseover']="setPointer(this,%u,'over',%r,%r,%r);" % (count,bgcolor,config.HILIGHT,config.SELECTED)
-            options['onmouseout']="setPointer(this,%u,'out',%r,%r,%r);" % (count,bgcolor,config.HILIGHT,config.SELECTED)
-            options['onmousedown']="setPointer(this,%u,'click',%r,%r,%r);" % (count,bgcolor,config.HILIGHT,config.SELECTED)
+                del new_query['order']
+                del new_query['direction']
+                self.result+="<th><a href='%s&order=%s&direction=1'>%s</a></th>\n" % (new_query,e,n)
 
-            count += 1
-            #Add the row in
-            self.row(*[ row_str[i] for i in range(len(row_str)) if i not in hidden_columns],**options)
 
-        if opts.has_key('simple'):
-            return
-
-        if not groupby:
-            self.row("click here to group by column",colspan=50,align='center')
-
-            #Insert the group by links at the bottom of the table
-            tmp_links = []
-            for i in range(len(names)):
-                if i in hidden_columns: continue
-                d=names[i]
-                tmp = self.__class__(self)
-                tmp.link(d,target=new_query,group_by=d)
-                tmp_links.append(tmp)
-                
-            self.row(*tmp_links)
-
-        tmp = self.__class__(self)
-        tmp.link("Enter a term to filter on",tooltip="(%=wildcard,&&=AND,||=OR).",target=FlagFramework.query_type(report="Help",topic="help_search",family="Misc",__opt__='popup'))
-        #"  Valid operators are \"%,!,=,<,>,||,&&\".  For example: =Target || %jo%'"
-        self.row(tmp,colspan=50,align='center')
-
-        #Now create a row with input boxes for each parameter
-        tmp_links=[]
-        for d in range(len(names)):
-            if d in hidden_columns: continue
-            tmp = self.__class__(self)
-            #It doesnt make sense to search for columns with
-            #callbacks, so we do not need to show the form.
-            if callbacks.has_key(names[d]):
-                try:
-#                    cb_result=callbacks[names[d]](query['where_%s' % names[d]])
-                    new_q=query.clone()
-                    del new_q['where_%s' % names[d]]
-#                    tmp.link(cb_result,new_q)
-                except KeyError:
-                    pass
-            else:
-                tmp.start_form(new_query)
-                tmp.start_table()
-                tmp.textfield('','where_%s' % names[d],size=width[d],Additional=True)
-                tmp.end_table()
-                tmp.end_form('Go')
-                
-            tmp_links.append(tmp)
-
-        self.row(*tmp_links)
+        self.result+='''</tr></thead><tbody class="scrollContent">'''
         
-        self.row(*[ names[i] for i in range(len(names)) if i not in hidden_columns ])
+        ## Now do the rows:
+        dbh = DB.DBO(case)
+        dbh.execute(sql)
+        old_sorted = None
+        old_sorted_style = ''
 
-        #If our row count is smaller than the page size, then we dont
-        #have another page, set next page to None
-        if count < config.PAGESIZE:
-            next = None
+        ## Total number of rows
+        row_count=0
 
-        new_query=query.clone()
-        if previous<0 and int(query['limit'])>0:
-            previous=0
+        for row in dbh:
+            row_elements = []
+            tds = ''
+
+            ## Render each row at a time:
+            for i in range(len(elements)):
+                ## Give the row to the column element to allow it
+                ## to translate the output suitably:
+                value = elements[i].display(row[elements[i].name],row,self)
+
+                ## Render the row styles so that equal values on
+                ## the sorted column have the same style
+                if i==order and value!=old_sorted:
+                    old_sorted=value
+                    if old_sorted_style=='':
+                        old_sorted_style='alternateRow'
+                    else:
+                        old_sorted_style=''
+
+                ## Render the sorted column with a different style
+                if i==order:
+                    tds+="<td class='sorted-column'>%s</td>" % (value)
+                else:
+                    tds+="<td>%s</td>" % (value)
+
+            self.result+="<tr class='%s'> %s </tr>\n" % (old_sorted_style,tds)
+            row_count += 1
+
+        self.result+="</tbody></table>"
+
+        new_query = query.clone()
+
+        ## The previous button goes back if possible:
+        previous_limit = limit-config.PAGESIZE
+        if previous_limit<0:
+            self.toolbar(icon = 'stock_left_gray.png')
+        else:
+            del new_query['limit']
+            new_query['limit'] = previous_limit
+            self.toolbar(icon = 'stock_left.png',
+                         link = new_query,
+                         tooltip='Previous Page (Rows %s-%s)' % (previous_limit, limit))
+
+        ## Now we add the paging toolbar icons
+        ## The next button allows user to page to the next page
+        if row_count<config.PAGESIZE:
+            self.toolbar(icon = 'stock_right_gray.png')
+        else:
+            ## We could not fill a full page - means we ran out of
+            ## rows in this table
+            del new_query['limit']
+            new_query['limit'] = limit+config.PAGESIZE
+            self.toolbar(icon = 'stock_right.png',
+                         link = new_query,
+                         tooltip='Next Page (Rows %s-%s)' % (limit, limit+config.PAGESIZE))
+
+        ## FIXME: Still to do
+        ## Draw a popup to allow the user to save the entire table in CSV format:
+##        def save_table(query,result):
+##            dbh = DB.DBO(case)
+
+##            def generate_output():
+##                query_row_limit = 1024
+##                data = cStringIO.StringIO()
+##                hidden_columns = list(query.getarray('hide_column'))
+
+##            ## FIXME - We dont usually want to save called back
+##            ## columns becuase they rarely make sense (but sometimes
+##            ## they do?? which should we do here???)
+##                for i in callbacks.keys():
+##                    if i not in hidden_columns:
+##                        hidden_columns.append(i)
+                    
+##                names_list = [ i for i in names if i not in hidden_columns ]
+##                inittext= "#Pyflag Table widget output\n#Query was %s.\n#Fields: %s\n""" %(query," ".join(names_list))
+##                if condition_text_array:
+##                    inittext+= "#The following conditions are in force\n"
+##                for i in condition_text_array:
+##                    inittext += "# %s\n" % i
+##                yield inittext
+                
+##                csv_writer = csv.DictWriter(data,names_list,dialect='excel')
+##                limit = 0
+##                while 1:
+##                    dbh.execute(query_str_basic + " order by %s limit %s,%s" %
+##                                (order,limit,limit+query_row_limit))
+
+##                    count = 0
+##                    for row in dbh:
+##                        count+=1
+##                    ## If there are any callbacks we respect those now.
+##                        new_row={}
+##                        for k,v in row.items():
+##                            if k in hidden_columns: continue
+##                            if data_callbacks.has_key(k):
+##                                row[k]=data_callbacks[k](v)
+##                            if callbacks.has_key(k):
+##                                row[k]=callbacks[k](v)
+
+##                        ## Escape certain characters from the rows - some
+##                        ## spreadsheets dont like these even though they
+##                        ## are probably ok:
+##                            tmp=str(row[k])
+##                            tmp=tmp.replace("\r","\\r")
+##                            tmp=tmp.replace("\n","\\n")
+
+##                            new_row[k]=tmp
+
+##                        csv_writer.writerow(new_row)
+##                        data.seek(0)
+##                        tmp=data.read()
+##                        yield tmp
+##                        data.truncate(0)
+
+##                    if count==0: break
+##                    limit+=query_row_limit
+
+##            result.generator.generator = generate_output()
+##            result.generator.content_type = "text/csv"
+##            result.generator.headers = [("Content-Disposition","attachment; filename=%s_%s.csv" %(case,table) ),]
+
+##            del query['callback_stored']
             
-        if previous>=0:
-            del new_query['limit']
-            new_query['limit']=previous        
-            self.toolbar(text="Previous page", icon="stock_left.png", link=new_query)
-        else:
-            self.toolbar(text="Previous page", icon="stock_left_gray.png")
-
-        if next:
-            del new_query['limit']
-            new_query['limit']=next
-            self.toolbar(text="Next page", icon="stock_right.png", link=new_query)
-        else:
-            self.toolbar(text="Next page", icon="stock_right_gray.png",popup=False)
-
+##            return
+            
+            
+            
+##        self.toolbar(save_table,'Save Table',icon="floppy.png")
         ## Add a skip to row toolbar icon:
         self.toolbar(
             cb = goto_row_cb,
@@ -1329,6 +882,61 @@ class HTMLUI(UI.GenericUI):
             icon="stock_next-page.png"
             )
 
+        ## Add a possible filter condition:
+        def filter_gui(query, result):
+            result.heading("Filter Table")
+            try:
+                filter_str = query['filter']
+                result.para(filter_str)
+
+                ## Check the current filter string for errors by attempting to parse it:
+                try:
+                    sql = parser.parse_to_sql(filter_str,elements)
+
+                    ## This is good if we get here - lets refresh to it now:
+                    if query.has_key('submit'):
+                        del query['submit']
+                        result.refresh(0,query,pane='parent')
+                        return
+                    
+                except Exception,e:
+                    result.text('Error parsing expression: %s' % e, color='red')
+                    result.text('\n',color='black')
+                    
+            except KeyError:
+                pass
+
+            result.start_form(query, pane="self")
+
+            result.textarea("Search Query", 'filter', cols=60)
+
+            result.result += """<tr></tr>
+            <tr><td colspan=2 align=center>The following can be used to insert text rapidly into the search string</td></tr>
+            <tr><td>Column</td><td>
+            <select id=filter_column>
+            %s
+            </select> <a href=# onclick='document.getElementById("filter").value += document.getElementById("filter_column").value;'>Insert </a></td></tr>
+            """ % "\n".join(["<option value=' \"%s\" '>%s</option>" % (e.name,e.name) for e in elements])
+
+            ## Round up all the possible methods from all colmn types:
+            operators = {}
+            for e in elements:
+                for method in e.operators():
+                    operators[method]=1
+
+            methods = operators.keys()
+            methods.sort()
+            result.result+="""<tr><td>Operators</td><td>
+            <select id=filter_operators>
+            %s
+            </select><a href=# onclick='document.getElementById("filter").value += document.getElementById("filter_operators").value;'>Insert </a></td></tr>
+            """ % "\n".join(["<option value=' %s '>%s</option>" % (m,m) for m in methods])
+
+            result.end_form()
+
+        ## Add a toolbar icon for the filter:
+        self.toolbar(cb=filter_gui, icon='filter.png',
+                     tooltip=self.defaults.get('filter','Click here to filter table'))
 
     def text(self,*cuts,**options):
         wrap = config.WRAP
@@ -1460,30 +1068,18 @@ class HTMLUI(UI.GenericUI):
         
         option_str = self.opt_to_str(options)
         left = description
-        right = "<textarea name='%s' %s>%s</textarea>" % (name,option_str,default)
+        right = "<textarea id='%s' name='%s' %s>%s</textarea>" % (name,name,option_str,default)
         self.row(left,right,valign="top")
         
-    def tooltip(self,message):
-        """ REDUNDANT? AFAIK no report uses it,
-        Tooltips can be specified as parameters for some widgets eg. toolbar"""
-        #message = message.replace("\n"," ")
-        #self.result = "<abbr title=%r>%s</abbr>" % (message,self.result)
-        pass
-        
-    def start_form(self,target, **hiddens):
+    def start_form(self,target, pane='self', **hiddens):
         """ start a new form with a local scope for parameters.
 
         @arg target: A query_type object which is the target to the form. All parameters passed through this object are passed to the form's action.
         """
         self.form_parms=target.clone()
         self.form_id=self.get_uniue_id()
-        try:
-            ## FIXME - this should be named to something better than "refresh"
-            self.form_target = hiddens['refresh']
-            del hiddens['refresh']
-        except KeyError:
-            self.form_target = 'self'
-
+        self.form_target = pane
+        
         #Append the hidden params to the object
         for k,v in hiddens.items():
             self.form_parms[k]=v
@@ -1491,11 +1087,21 @@ class HTMLUI(UI.GenericUI):
         self.result += '<form id="pyflag_form_1" name="pyflag_form_1" method=%s action="/f" enctype="multipart/form-data">\n' % (config.METHOD)
 
     def end_form(self,value='Submit',name='submit',**opts):
+        base = ''
         for k,v in self.form_parms:
-            self.result += "<input type=hidden name='%s' value='%s'>\n" % (k,v)
+            base += "<input type=hidden name='%s' value='%s'>\n" % (k,v)
 
         if value:
-            self.result += "<input type=submit name=%s value='%s' %s>\n" % (name,value,self.opt_to_str(opts))
+            base += "<input type=submit name=%s value='%s' onclick=\"submit_form(%r,%r); return false;\" %s>\n" % (name,value,self.form_target,self.defaults.callback,self.opt_to_str(opts))
+
+        if self.table_depth>0:
+            self.row(base)
+        else:
+            self.result+=base
+
+        #Check to see that table tags are balanced:
+        while self.table_depth>0:
+            self.end_table()
 
         self.result+="</form>"
 
@@ -1532,18 +1138,21 @@ class HTMLUI(UI.GenericUI):
         else:
             self.result += "<hr />\n"
         
-    def refresh(self,interval,query,**options):
-        target_window = "'_self'"
-        target_js = 'window'
-        close = ''
+    def refresh(self,interval, query, pane='self'):
+        del query['time']
+        query['time'] = time.time()
+
+        if pane=='parent':
+            query.poparray('callback_stored')
+            
         if int(interval)>0:
-            timeout = "window.setTimeout(refresh,%s);" % (1000*int(interval))
+            base = "window.setTimeout(function() {refresh('f?%s',%r);},%s);" % (query, pane, 1000*int(interval))
         else:
-            timeout = "refresh();"
+            base = "refresh('f?%s',%r);" % (query,pane)
 
-        if not options:
-            options={}
-
+        self.result += "<script>%s</script>" % base
+        return
+    
         try:
             if options.has_key('parent'):
                 if config.METHOD=="POST":
@@ -1737,3 +1346,33 @@ class HTMLUI(UI.GenericUI):
         This should be avoided whenever possible.
         """
         self.result+=html
+
+    ## FIXME: Do this properly.
+    def sanitise_data(self,data):
+        """ Return a sanitised version of data. This is mostly to
+        avoid XSS attacks etc.
+
+        Note that PyFlag currently does not have much in the way of
+        XSS protections or access controls and should not be used on
+        the open web without authentication.
+        """
+        allowed_tags = [ "b","i", "br" ]
+        tag_regex = "<([^>]+)>"
+
+        def filter_tag(tag):
+            tag = tag.group(1)
+            tmp = tag.strip().lower()
+            if tmp.startswith("/"):
+                extra="/"
+                tmp = tmp[1:]
+            else: extra =''
+
+            tmp = tmp.split(" ")[0]
+
+            for allowed in allowed_tags:
+                if tmp==allowed:
+                    return "<%s%s >" % (extra,allowed)
+            return ''
+
+        return re.sub(tag_regex, filter_tag, data)
+

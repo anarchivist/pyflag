@@ -147,7 +147,17 @@ class PopUpTest(Refresher):
                 result.heading("A form popup test")
                 result.start_form(query, pane="parent")
                 result.textfield("Type something here","something")
+
+                def second_level_cb(query,result):
+                    result.para("Will set something to foo");
+                    del query['something']
+                    query['something'] = 'foo'
+                    result.link("Return to parent", query, pane='parent');
+
+                result.popup(second_level_cb, "Second popup")
+                
                 result.end_form()
+
 
             try:
                 result.para("Something is %s" % query['something'])
@@ -165,15 +175,17 @@ class PopUpTest(Refresher):
                     pass
 
                 del query['link']
+                new_query = query.clone()
+
                 query['link'] = "Internal link"
                 result.link("Internal popup link", target=query, pane='self')
 
-                new_query = query.clone()
                 del new_query['something']
                 new_query['something'] = "Data from popup"
                 result.link("back to parent link", target=new_query, pane='parent')
 
             try:
+                print query
                 result.para("Something is %s" % query['something'])
             except:
                 pass
@@ -209,6 +221,11 @@ class LinkTest(PopUpTest):
     def display(self, query, result):
         result.heading("Link tests")
 
+        try:
+            result.para("opened from %s"% query['from'])
+        except:
+            pass
+
         result.link("Simple link to this page!", target=query, icon="floppy.png")
         
         def popup_cb(query,result):
@@ -231,6 +248,14 @@ class LinkTest(PopUpTest):
 
             result.link("Open to main", target=query, pane='main')
 
+        target = query.clone()
+        del target['from']
+        target['from'] = "main page"
+        result.link("Open main page in a popup", target=target, pane='popup')
+
+        del target['from']
+        target['from'] = "Popup"
+        result.link("Open my parent", target=target, pane='parent')
         result.popup(popup_cb, "Open a popup")
 
         try:

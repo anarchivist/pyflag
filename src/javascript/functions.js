@@ -138,7 +138,6 @@ function SendAsPost(query) {
 function isMiddleClick(e) 
 {
   var click;
-  var e;
 
   if (e.which) click = (e.which == 2);
   else if (e.button) click = (e.button == 4);
@@ -184,4 +183,127 @@ function tree_open(left_cb, right_cb,url) {
   document.location = url + "&callback_stored="+left_cb+ "&yoffset="+y+ "&xoffset="+x;;
 
   tree_pane_open(left_cb, right_cb, url);
+};
+
+/** This function is used to sumbit the query via a post to the
+    target_window */
+function post_link(query, target_window) {
+  var form = document.createElement('form');
+  form.setAttribute('method','Post');
+  form.setAttribute('action','/post');
+
+  if(target_window)
+    form.setAttribute('target','target_window');
+  
+  input = document.createElement('input');
+  input.setAttribute('name','pseudo_post_query');
+  input.setAttribute('value',query);
+  input.setAttribute('type','hidden');
+  form.appendChild(input);
+
+  document.body.appendChild(form);
+  form.submit();
+};
+
+function xxxpopup(query, callback) {
+  var f = document.forms['pyflag_form_1'];
+  // There is a form already
+  if(f) {
+    // We just need to append the query, and force the form to be
+    // submitted to the popup:
+    var w = window.open('','popup'+callback, 'width=600, height=600, scrollbars=yes');
+    var old_target = f.target;
+    f.target = 'popup'+callback;
+
+    var input = document.createElement('input');
+    input.setAttribute('name','callback_stored');
+    input.setAttribute('value',callback);
+    input.setAttribute('type','hidden');
+    f.appendChild(input);
+    
+    f.submit();
+  } else {
+    window.open(query + "&callback_stored=" + callback,'popup', 'width=600, height=600, scrollbars=yes');
+  };
+};
+
+function refresh(query, pane) {
+  var target;
+
+  if(pane=='parent') {
+    target = window.opener;
+  } else target=window;
+
+  target.location = query;
+
+  if(pane=='parent')
+    window.close();
+};
+
+function popup(query, callback) {
+  // Derive the query string from the contents of all the form
+  // elements if available:
+  var f = document.forms['pyflag_form_1'];
+  if(f) {
+    query = 'f?';
+
+    for(var i=0; i<f.elements.length; i++) {
+      var e = f.elements[i];
+      //Checkboxes should only be added if they are checked
+      if(e.type=='checkbox' && !e.checked) {
+	continue;
+      };
+      //We must leave the submit button off, so that when the popup
+      //window refreshes to its parent we know it wasnt actually
+      //submitted.
+      if(e.type!='submit' && e.name.length>0 ) {
+	query+=e.name + '=' + encodeURIComponent(e.value)+'&';
+      };
+    };
+  };
+
+  //Now open the window:
+  w=window.open(query+"&__pane__=popup"+callback+"&callback_stored="+callback,'popup'+callback, 'width=600, height=600, scrollbars=yes');
+  w.parent = window.name;
+};
+
+
+function submit_form(pane, current_cb) {
+  var target;
+  query = 'f?';
+
+  if(pane=='parent') {
+    target = window.opener;
+  } else if(pane=='popup') {
+    target = window.open('','popup'+callback, 'width=600, height=600, scrollbars=yes');
+    query += "__pane__=popup"+callback;
+  } else target=window;
+
+  var f = document.forms['pyflag_form_1'];
+  if(f) {
+    for(var i=0; i<f.elements.length; i++) {
+      var e = f.elements[i];
+      //Checkboxes should only be added if they are checked
+      if(e.type=='checkbox' && !e.checked) {
+	continue;
+      };
+
+      // If we submit to our parent - we need to remove our cb:
+      if(pane=='parent' && e.name=='callback_stored' && e.value==current_cb)
+	continue;
+
+      //We must leave the submit button off, so that when the popup
+      //window refreshes to its parent we know it wasnt actually
+      //submitted.
+      if(e.name.length>0 ) {
+	query+=e.name + '=' + encodeURIComponent(e.value)+'&';
+      };
+    };
+
+    // Now submit into the target
+    target.location = query;
+  };
+
+  if(pane=='parent')
+    window.close();
 };
