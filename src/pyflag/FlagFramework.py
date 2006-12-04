@@ -119,6 +119,7 @@ class query_type:
         ## The window we came from (This is used by HTML to work our
         ## where we need to be drawn to.
         self.window = "window"
+        self.callback =''
         
         self.q=[]
         if isinstance(query_list,list):

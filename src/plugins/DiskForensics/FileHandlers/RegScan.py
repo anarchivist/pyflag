@@ -27,7 +27,7 @@ import os.path
 from pyflag.Scanner import *
 import plugins.DiskForensics.DiskForensics as DiskForensics
 import pyflag.DB as DB
-import pyflag.FlagFramework as FlagFramework
+from pyflag.FlagFramework import query_type,HexDump
 import pyflag.Reports as Reports
 from FileFormats.RegFile import ls_r, RegF
 from format import Buffer
@@ -226,7 +226,7 @@ class BrowseRegistryKey(BrowseRegistry):
             dbh.execute("select value from reg where path=%r and reg_key=%r limit 1",(path,key))
             row=dbh.fetch()
             if row:
-                FlagFramework.HexDump(row['value'],out).dump()
+                HexDump(row['value'],out).dump()
             return out
 
         def strings(query,out):

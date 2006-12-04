@@ -117,6 +117,9 @@ span.tabcaution {
 div.content { 
   width: 100%;
   color: red;
+  border: 10;
+  border-style: groove;
+  border-color: black;
 }
 .clearfloat { 
   clear: both;
@@ -182,26 +185,50 @@ div.PyFlagHeader {
 
 div.Logo { 
   float: right;
+  width: auto;
 }
 
 div.Toolbar { 
   float: left;
+  width: 80%;
 }
 
 div.PyFlagPage { 
-  max-height: 10ex;
+  width: 100%;
 }
 
 /** Tables */
 table.PyFlagTable thead a, img { 
   color: black;
   font-size: large;
-  border: 0;
+  border: 1;
   text-decoration: none;
  }
 
 table.PyFlagTable { 
-  border: 10;
-  width: 100%;
+  width: 90%;
+  float: left;
+  border-style: groove;
  }
 
+img.PopupIcon { 
+  cursor: pointer;
+ }
+
+div.TreeLeft { 
+  float: left;
+  width: 45%;
+  border-style: ridge;
+  height: 80%;
+  overflow: auto;
+  display: block;
+}
+
+div.TreeRight { 
+  float: left;
+  display: block;
+  border-style: ridge;
+  height: 80%;
+  overflow: auto;
+  width: 50%;
+}

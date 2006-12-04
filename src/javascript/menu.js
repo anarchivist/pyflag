@@ -35,7 +35,7 @@ function Menu()
 	HTMLstr = "";
 	HTMLstr += "<!-- MENU PANE DECLARATION BEGINS -->\n";
 	HTMLstr += "\n";
-	if (ie||ns6) HTMLstr += "<div id='MainTable' style='position:absolute;top:0;left:0;'>\n";
+	if (ie||ns6) HTMLstr += "<div id='MainTable' style='top:0;left:0;'>\n";
 //	if (n)  HTMLstr += "<layer name='MainTable'>\n";
 	HTMLstr += "<table width='100%' bgcolor='"+this.bgColor+"' border='"+this.mainPaneBorder+"'>\n";
 	HTMLstr += "<tr>";

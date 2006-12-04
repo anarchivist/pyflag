@@ -29,10 +29,11 @@ import pyflag.DB as DB
 import pyflag.FileSystem as FileSystem
 from pyflag.FileSystem import File
 import pyflag.IO as IO
-import pyflag.FlagFramework as FlagFramework
+from pyflag.FlagFramework import query_type, get_temp_path
 from NetworkScanner import *
 import struct,re,os
 import reassembler
+from pyflag.TableObj import ColumnType, TimestampType, InodeType
 
 class StreamFile(File):
     """ A File like object to reassemble the stream from individual packets.
@@ -105,7 +106,7 @@ class StreamFile(File):
         fds = []
         for s in stream_ids:
             try:
-                fds.append(open(FlagFramework.get_temp_path(dbh.case,
+                fds.append(open(get_temp_path(dbh.case,
                                                             "%s|S%s" % (self.fd.inode, s))))
             except IOError:
                 fds.append(-1)
@@ -118,8 +119,7 @@ class StreamFile(File):
         initials = [ True,] * len(stream_ids)
 
         # The output file
-        out_fd = open(FlagFramework.get_temp_path(dbh.case,
-                                                  self.inode),"w")
+        out_fd = open(get_temp_path(dbh.case, self.inode),"w")
         
         dbh.execute("select con_id,seq,packet_id, length, cache_offset from `connection` where %s order by packet_id",(
             " or ".join(["con_id=%r" % a for a in stream_ids])
@@ -179,8 +179,7 @@ class StreamFile(File):
 
         out_fd.close()
         
-        self.cached_fd = open(FlagFramework.get_temp_path(
-            dbh.case, self.inode),"r")
+        self.cached_fd = open(get_temp_path(dbh.case, self.inode),"r")
 
         ## Now create the stream in the VFS:
         fsfd = FileSystem.DBFS(self.case)
@@ -277,15 +276,17 @@ class StreamFile(File):
             return ui
 
         result.table(
-            columns = ('packet_id', 'from_unixtime(pcap.ts_sec,"%Y-%m-%d")','concat(from_unixtime(pcap.ts_sec,"%H:%i:%s"),".",pcap.ts_usec)','con.length','concat(con.cache_offset, ",", con.length)'),
-            names = ('Packet ID','Date','Time','Length',"Data"),
-            links = [ FlagFramework.query_type((),
-                                               family="Network Forensics",
-                                               report='View Packet',
-                                               case=query['case'],
-                                               open_tree ="/eth/payload/payload/data",
-                                               __target__='id'),
-                      ],
+            elements = [ ColumnType('Packet ID','packet_id',
+                                    link = query_type(family="Network Forensics",
+                                                      report='View Packet',
+                                                      case=query['case'],
+                                                      open_tree ="/eth/payload/payload/data",
+                                                      __target__='id')),
+                         TimestampType('Date','pcap.ts_sec'),
+                         ColumnType('Length','con.length'),
+                         ColumnType('Data','concat(con.cache_offset, ",", con.length)',
+                                    callback = None) ],
+            
             table= '`connection` as con , pcap',
             where = 'con_id="%s" and packet_id=id ' % combined_fd.con_id,
             callbacks = { 'Data': show_data },

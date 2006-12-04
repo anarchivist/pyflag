@@ -193,7 +193,7 @@ function post_link(query, target_window) {
   form.setAttribute('action','/post');
 
   if(target_window)
-    form.setAttribute('target','target_window');
+    form.setAttribute('target',target_window);
   
   input = document.createElement('input');
   input.setAttribute('name','pseudo_post_query');

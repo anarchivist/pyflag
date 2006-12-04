@@ -296,10 +296,12 @@ class HTMLUI(UI.GenericUI):
         popup: open a new popup window and draw the target in that.
         self: refresh to the current pane (useful for internal links in popups etc).
         """
-        if pane=="main" or pane=='self':
-#            return "window.location=%s; return false;" % target
-            return "post_link('f?%s'); return false;" % target
-
+        if pane=="main":
+            return "post_link('f?%s','_top'); return false;" % target
+        
+        if pane=='self':
+            return "post_link('f?%s','_self'); return false;" % target
+        
         if pane=='popup':
             return "window.open('f?%s','child_%s',  'width=600, height=600,scrollbars=yes'); return false;" % (target, self.get_uniue_id())
 
@@ -312,7 +314,7 @@ class HTMLUI(UI.GenericUI):
     def link(self,string,target=None,options=None,icon=None,tooltip=None, pane='main', **target_options):
         ## If the user specified a URL, we just use it as is:
         try:
-            self.result+="<a href='%s'>%s</a>" % (target_options['url'],string)
+            self.result+="<a href='%s' target=_top>%s</a>" % (target_options['url'],string)
             return
         except KeyError:
             pass
@@ -334,7 +336,7 @@ class HTMLUI(UI.GenericUI):
             string=tmp
 
         js = self._calculate_js_for_pane(target=q, pane=pane)
-        base = "<a href='f?%s' onclick=%r >%s</a>" % (q, js, string)
+        base = "<a href='f?%s' onclick=%r>%s</a>" % (q, js, string)
 
         ## Add tooltip if needed:
         if tooltip:
@@ -354,7 +356,7 @@ class HTMLUI(UI.GenericUI):
         cb = self.store_callback(callback)
 
         if icon:
-            base = "<img alt='%s' border=0 src='images/%s' onclick=\"popup('%s','%s'); return false;\" />" % (label,icon, self.defaults,cb)
+            base = "<img alt='%s' border=0 src='images/%s' onclick=\"popup('%s','%s'); return false;\" class=PopupIcon />" % (label,icon, self.defaults,cb)
         else:
             base = "<input type=button value=%r onclick=\"popup('%s','%s'); return false;\" />" % (label,self.defaults,cb)
         if tooltip:
@@ -518,7 +520,12 @@ class HTMLUI(UI.GenericUI):
 
         self.result+='<table width="100%%"  height="100%%"><tr height="400+"><td  style="overflow: auto"><iframe id="left" name="left" height="100%%" width=300 src="%s&callback_stored=%s&right_pane_cb=%s"></iframe></td><td width="40%%" height="80%%"><iframe name="right" id="right" height="100%%" width=1000 src="%s&callback_stored=%s" > </iframe></td></tr></table>' % (self.defaults,l,r,self.defaults,r)
 
-    def xtree(self,tree_cb = None, pane_cb=None, branch = ('/'), layout="horizontal"):
+    def new_toolbar(self):
+        id = "Toolbar%s" % self.get_uniue_id()
+        self.result += '''<div class="Toolbar" id="%s"></div>''' % id
+        return id
+
+    def xxtree(self,tree_cb = None, pane_cb=None, branch = None, layout="horizontal"):
         """ A tree widget.
 
         This widget works by repeatadly calling the call back function for information about entries in the current tree. The format of the callback is:
@@ -545,10 +552,6 @@ class HTMLUI(UI.GenericUI):
         if not self.defaults: raise UIException("Must have default query for tree widget")
         query = self.defaults
 
-        #This is needed if we want to have more than one tree per
-        #page. FIXME - this is not currently implemented.
-        self.tree_id += 1
-        
         #Read in the current branch that needs to be opened from the open_tree parameter
         if query.has_key('open_tree'):
             open = query['open_tree']
@@ -581,7 +584,7 @@ class HTMLUI(UI.GenericUI):
                     if found and len(tmp)>config.MAXTREESIZE:
                         tree_array += tmp
                         if len(tmp) > config.MAXTREESIZE:
-                            tree_array.append((depth,tmp[-1][1],'<img src=//images/down.png border=0> ...','special'))
+                            tree_array.append((depth,tmp[-1][1],'<img src=/images/down.png border=0> ...','special'))
                         return
 
                     #Do we find the current item in the list?
@@ -593,7 +596,7 @@ class HTMLUI(UI.GenericUI):
                             start = 0
                         else:
                             start = match_pos - config.MAXTREESIZE
-                            tree_array.append((depth,tmp[start-1][1],'<img src=//images/up.png border=0> ...','special'))
+                            tree_array.append((depth,tmp[start-1][1],'<img src=/images/up.png border=0> ...','special'))
                         
                         tree_array += tmp[start:]
                         tmp = []
@@ -612,7 +615,7 @@ class HTMLUI(UI.GenericUI):
             split =  tmp[:config.MAXTREESIZE]
             tree_array += split
             if len(split) == config.MAXTREESIZE:
-                tree_array.append( (depth,split[-1][1],'<img src=//images/down.png border=0> ...','special'))
+                tree_array.append( (depth,split[-1][1],'<img src=/images/down.png border=0> ...','special'))
 
         #### End draw_branch
 
@@ -648,7 +651,7 @@ class HTMLUI(UI.GenericUI):
             left.icon("spacer.png",width=20*depth,height=20)
             if t =='branch':
                 new_query = link
-                left.link(str(sv),tooltip=link['open_tree'],target=link, name=open_tree,icon="images/folder.png")
+                left.link(str(sv),tooltip=link['open_tree'],target=link, name=open_tree,icon="folder.png")
                 left.text("&nbsp;%s\n" % str(sv),color='black')
             elif t == 'special':
                 left.link(str(v),tooltip=link['open_tree'],target=link, name=open_tree)
@@ -662,15 +665,18 @@ class HTMLUI(UI.GenericUI):
 
         path=FlagFramework.normpath(query.get('open_tree','/'))
         pane_cb(path,right)
-        
-        ## Now draw the left part
-        if layout=="vertical":            
-            self.row(left)
-            self.row(right)
-        else:
-            self.row(left,right,valign='top')
 
-    def toolbar(self,cb=None,text=None,icon=None,popup=True,tooltip=None,link=None):
+        self.result += '''<div class="TreeLeft">%s</div><div class="TreeRight">%s</div>''' % (left,right)
+
+    
+##        ## Now draw the left part
+##        if layout=="vertical":            
+##            self.row(left)
+##            self.row(right)
+##        else:
+##            self.row(left,right,valign='top')
+
+    def toolbar(self,cb=None,text=None,icon=None,popup=True,tooltip=None,link=None, toolbar=None, pane=None):
         """ Create a toolbar button.
 
         When the user clicks on the toolbar button, a popup window is
@@ -878,7 +884,7 @@ class HTMLUI(UI.GenericUI):
         ## Add a skip to row toolbar icon:
         self.toolbar(
             cb = goto_row_cb,
-            text="Row %s" % query['limit'],
+            text="Row %s" % limit,
             icon="stock_next-page.png"
             )
 
@@ -1307,10 +1313,9 @@ class HTMLUI(UI.GenericUI):
         
         for i in names:
             q=query.clone()
-            tmplink=self.__class__()
             del q[context]
             q[context]=i
-            tmplink.link(i,q, options={'class':"tab"})
+            tmplink = '''<a class="tab" href="%s">%s</a>''' % (q,i)
 
             if(i==context_str):
 ##                out+="<td width=15>&nbsp;</td><td bgcolor=#3366cc align=center nowrap><font color=#ffffff size=-1><b>%s</b></font></td>" % i

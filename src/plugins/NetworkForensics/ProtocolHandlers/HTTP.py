@@ -431,7 +431,7 @@ class BrowseHTTPRequests(Reports.report):
                                                  report="View Packet",
                                                  case=query['case'],
                                                  __target__='id')),
-                             InodeType('Inode','inode'),
+                             InodeType('Inode','inode', case=query['case']),
                              ColumnType('Method','method'),
                              ColumnType('URL','url'),
                              ColumnType('Content Type','content_type') ],

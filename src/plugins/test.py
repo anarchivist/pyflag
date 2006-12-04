@@ -306,7 +306,7 @@ class WizardTest(PopUpTest):
 
         def page3_cb(query,result):
             result.textfield("Age",'var3')
-            result.checkbox("Finished?",'finished')
+            result.checkbox("Finished?",'finished','yes')
 
         result.wizard(
             names = ["Enter Your Name", "Birthday", "Your Age"],
