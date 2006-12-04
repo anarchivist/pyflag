@@ -31,9 +31,10 @@ import glob,bisect,sys
 import Store
 import FileFormats.PCAP as PCAP
 from format import Buffer
-import pyflag.logging as logging
+import pyflag.pyflaglog as logging
 import pyflag.conf
 config=pyflag.conf.ConfObject()
+import  FlagFramework
 
 parser = OptionParser(usage="""%prog -w Output [options] pcap_file ... pcap_file
 
@@ -52,6 +53,9 @@ to escape the * or ? to stop the shell from trying to expand them.""")
 parser.add_option("-w", "--write", default="merged.pcap",
                   help = "The output file to write. (Mandatory)")
 
+parser.add_option("-s", "--split", default=2000000000, type='int',
+                  help = "The Maximum size of the output file")
+
 parser.add_option("-v", "--verbose", default=5, type='int',
                   help = "Level of verbosity")
 
@@ -64,14 +68,13 @@ if options.glob:
     print "Globbing %s "% options.glob
     g = options.glob.replace('\\*','*')
     args.extend(glob.glob(g))
-    print "Will merge %s files" % len(args)
 
 if len(args)==0:
     print "Must specify some files to merge, try -h for help"
     sys.exit(-1)
 ## This will hold our filehandles - if this number is too large, we
 ## will run out of file handles.
-store = Store.Store(max_size=50)
+store = Store.Store(max_size=5)
 
 class PcapFile:
     """ A class to encapsulate a pcap file """
@@ -94,10 +97,10 @@ class PcapFile:
             self.endianess = header.parameters['endianess']
             
             ## Position the offset at the end of the header
-            self.offset = header.size()
+            self.offset = header.start_of_file+header.size()
 
             ## Remember the header data
-            self.header = buffer[:self.offset].__str__()
+            self.header = buffer[header.start_of_file:self.offset].__str__()
 
         buffer = buffer[self.offset:]
 
@@ -120,9 +123,9 @@ class PcapFile:
         buffer.offset = self.offset
         ## This ensures that packet does not contain references to fd
         ## - which allows it to be closed when the store is full:
-        try:
+        if buffer.size > 1600:
             data = buffer[:1600].__str__()
-        except IOError:
+        else:
             data = buffer.__str__()
 
         ## Preserve the endianess of the file:
@@ -150,12 +153,13 @@ class FileList:
         ## Initialise the timestamps of all args
         for f in args:
             try:
-                f=PcapFile(f)
+                fd=PcapFile(f)
             except IOError:
                 print "Unable to read %s, skipping" % f
                 continue
-            
-            self.put(f)
+
+            #print "Adding file %s" % f
+            self.put(fd)
 
     def put(self, f):
         """ Stores PcapFile f in sequence """
@@ -193,5 +197,25 @@ f=FileList(args)
 ## Write the file header on:
 outfile.write(f.files[0].header)
 
+try:
+    import psyco
+    psyco.log()
+    psyco.full()
+except:
+    pass
+
+length = len(f.files[0].header)
+file_number = 0
 for data in f:
+    length+=len(data)
+    if length>options.split:
+        file_number+=1
+        print "Creating a new file %s%s" % (options.write, file_number)
+        outfile = open("%s%s" % (options.write,file_number),'w')
+        
+        ## Write the file header on:
+        outfile.write(f.files[0].header)
+        length = len(f.files[0].header) + len(data)
+        
+    ## Write the packet onto the file:
     outfile.write(data)
