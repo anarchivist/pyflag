@@ -106,6 +106,11 @@ class Buffer:
 
     def __nonzero__(self):
         return 1
+
+    def search(self, bytes):
+        """ Searches the buffer for the occurance of bytes. """
+        data = self.__str__()
+        return data.find(bytes)
         
 #### Start of data definitions:
 class DataType:
