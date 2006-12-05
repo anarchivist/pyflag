@@ -45,29 +45,18 @@ class FileHeader(SimpleStruct):
     def read(self):
         ## Try to read the file with little endianess
         self.parameters['endianess']='l'
-
-        ## Try to find the little endianness magic within the first
-        ## 1000 bytes - There could be some crap at the start of the
-        ## file.
-        tmp = self.buffer[0:1000]
-        off =tmp.search(struct.pack("<L",0xa1b2c3d4)) 
-        if off>=0:
-            self.offset = off
-            self.buffer = self.buffer[off:]
-            result=SimpleStruct.read(self)
-            self.start_of_file = off
+        result=SimpleStruct.read(self)
+        if result['magic']==0xa1b2c3d4:
+            self.start_of_file = self.offset
             return result
-
-        off=tmp.search(struct.pack(">L",0xa1b2c3d4))
-        if off>=0:
+        
+        ## Its the wrong endianess, reread:
+        elif result['magic']==0xd4c3b2a1:
             self.parameters['endianess']='b'
-            self.offset = off
-            self.buffer = self.buffer[off:]
             result=SimpleStruct.read(self)
             self.start_of_file = self.offset
             return result
 
-        result=SimpleStruct.read(self)
         ## Dont know the magic
         raise IOError('This is not a pcap magic (%s) at offset 0x%08X' % (result['magic'], self.buffer.offset))
     
