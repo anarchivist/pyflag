@@ -323,11 +323,10 @@ class StreamFile(File):
                          TimestampType('Date','pcap.ts_sec'),
                          ColumnType('Length','con.length'),
                          ColumnType('Data','concat(con.cache_offset, ",", con.length)',
-                                    callback = None) ],
+                                    callback = show_data) ],
             
             table= '`connection` as con , pcap',
             where = 'con_id="%s" and packet_id=id ' % combined_fd.con_id,
-            callbacks = { 'Data': show_data },
             case=query['case']
             )
 

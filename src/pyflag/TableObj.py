@@ -406,6 +406,12 @@ class ColumnType:
     def literal(self, column,operator, arg):
         return "%s %s %r" % (self.sql, operator, arg)
 
+    def operator_contains(self, column, operator, arg):
+        return '%s like %r' % (self.sql, "%" + arg + "%")
+
+    def operator_matches(self, column, operator, arg):
+        return '%s like %r' % (self.sql, arg)
+
     def display(self, value, row, result):
         """ This method is called by the table widget to allow us to
         translate the output from the database to the screen. Note

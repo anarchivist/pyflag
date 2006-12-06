@@ -26,6 +26,7 @@ try:
             def external_process(self,fd):
                 dbh=DB.DBO(self.case)
                 meta=E.extractFromFile(fd.name)
+                dbh = DB.DBO(self.case)
                 for pair in meta:
                     dbh.insert("xattr",
                                inode_id = self.fd.lookup_id(),
