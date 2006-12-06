@@ -397,8 +397,9 @@ static PyObject *py_init(PyObject *self, PyObject *args) {
   TCPHashTable hash;
   PyObject *result;
   char *new_prefix;
+  int initial_con_id;
 
-  if(!PyArg_ParseTuple(args, "s", &new_prefix)) 
+  if(!PyArg_ParseTuple(args, "sI", &new_prefix, &initial_con_id)) 
     return NULL;
 
   if(prefix) {
@@ -407,7 +408,7 @@ static PyObject *py_init(PyObject *self, PyObject *args) {
 
   prefix = talloc_strdup(NULL, new_prefix);
 
-  hash = CONSTRUCT(TCPHashTable, TCPHashTable, Con, NULL);
+  hash = CONSTRUCT(TCPHashTable, TCPHashTable, Con, NULL, initial_con_id);
   hash->callback = callback;
   //result =  PyCObject_FromVoidPtr(hash, (void (*)(void *))talloc_free);
   result =  PyCObject_FromVoidPtr(hash, NULL);

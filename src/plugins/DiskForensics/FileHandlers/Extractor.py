@@ -28,7 +28,7 @@ try:
                 meta=E.extractFromFile(fd.name)
                 for pair in meta:
                     dbh.insert("xattr",
-                               inode_id = self.fd.inode_id,
+                               inode_id = self.fd.lookup_id(),
                                property = pair[0],
                                value = pair[1],
                                )

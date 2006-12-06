@@ -118,7 +118,9 @@ class StreamScannerFactory(GenScanFactory):
     def scan_as_file(self, inode, factories):
         """ Scans inode as a file (i.e. without any Stream scanners). """
         fd = self.fsfd.open(inode=inode)
-        factories = [ x for x in factories if not isinstance(x, StreamScannerFactory) ]
+        ## If does not matter if we use stream scanners on files
+        ## because they would ignore it anyway.
+        #factories = [ x for x in factories if not isinstance(x, StreamScannerFactory) ]
 
         Scanner.scanfile(self.fsfd,fd,factories)
         fd.close()

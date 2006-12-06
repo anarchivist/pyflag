@@ -262,7 +262,8 @@ class message:
             ## must have lost sync:
             if self.cmd != self.cmd.upper() or not self.cmd.isalpha(): return None
         except Exception, e:
-            logging.log(logging.ERROR, e)
+            print "Error parsing commandline %s" % self.cmdline
+            pyflaglog.log(pyflaglog.ERROR, e)
             return ''
 
         self.words = self.cmdline.split()

@@ -113,7 +113,7 @@ CLASS(TCPStream, Object)
      /** The total size of this stream */
      int total_size;
 
-     TCPStream METHOD(TCPStream, Con, struct tuple4 *addr);
+     TCPStream METHOD(TCPStream, Con, struct tuple4 *addr, int con_id);
 
      /** An opaque data to go with the callack */
      void *data;
@@ -136,6 +136,14 @@ CLASS(TCPHashTable, Object)
      /** This list keeps all streams in sorted order */
      TCPStream sorted;
 
+     /** This is the con_id pool that will be used. Numbers will start
+	 at this number and increment by 1 for each new
+	 connection. Our python handler needs to initialise this pool
+	 and we hope that we do not run out. The con_ids will end up
+	 in the db and might collide with other numbers.
+     */
+     int con_id;
+
      /** This is the callback which will be invoked upon processing
 	 packets
      */
@@ -143,7 +151,7 @@ CLASS(TCPHashTable, Object)
      void *data;
      int packets_processed;
 
-     TCPHashTable METHOD(TCPHashTable, Con);
+     TCPHashTable METHOD(TCPHashTable, Con, int initial_con_id);
 
      /** This method returns a valid TCPStream to match the IP packet from
 	 the hash table. 

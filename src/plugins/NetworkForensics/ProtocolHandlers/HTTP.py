@@ -47,7 +47,7 @@ class HTTP:
     def __init__(self,fd,ddfs):
         self.fd=fd
         self.ddfs = ddfs
-        self.request = { 'url':'/unknown_request' }
+        self.request = { 'url':'/unknown_request_%s' % fd.con_id }
         self.response = {}
         self.request_re = re.compile("(GET|POST|PUT|OPTIONS) +([^ ]+) +HTTP/1\..",
                                      re.IGNORECASE)
@@ -179,6 +179,11 @@ class HTTP:
             self.fd.seek(offset+m.start())
             return True
 
+        m = self.response_re.search(header)
+        if m:
+            self.fd.seek(offset+m.start())
+            return True
+            
         return False
         
 class HTTPScanner(StreamScannerFactory):
@@ -277,6 +282,7 @@ class HTTPScanner(StreamScannerFactory):
         combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.con_id, stream.reverse)
 
         fd = self.fsfd.open(inode=combined_inode)
+        
         p=HTTP(fd,self.fsfd)
         ## Check that this is really HTTP
         if not p.identify():
@@ -352,20 +358,20 @@ class HTTPScanner(StreamScannerFactory):
 
             dbh.insert('http',
                             inode          = new_inode,
-                            request_packet = p.request.get("packet_id"),
-                            method         = p.request.get("method"),
+                            request_packet = p.request.get("packet_id",0),
+                            method         = p.request.get("method","-"),
                             url            = url,
                             response_packet= p.response.get("packet_id"),
                             content_type   = p.response.get("content-type","text/html"),
                             date           = date,
                             referrer       = referer,
                             host           = host,
-                            useragent      = p.request.get('user-agent', 'NULL'),
+                            useragent      = p.request.get('user-agent', '-'),
                             parent         = parent)                            
 
             ## handle the request's parameters:
             self.handle_parameters(p.request, dbh.autoincrement())
-            
+
             ## Scan the new file using the scanner train. 
             self.scan_as_file(new_inode, factories)
         

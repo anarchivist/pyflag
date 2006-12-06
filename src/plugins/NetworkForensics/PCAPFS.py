@@ -117,7 +117,7 @@ class PCAPFS(DBFS):
         dbh.execute(
             """CREATE TABLE if not exists `connection_details` (
             `inode` varchar(250),
-            `con_id` int(11) unsigned NOT NULL auto_increment,
+            `con_id` int(11) signed NOT NULL default 0,
             `reverse` int(11) unsigned NOT NULL default '0',
             `src_ip` int(11) unsigned NOT NULL default '0',
             `src_port` int(11) unsigned NOT NULL default '0',
@@ -134,7 +134,7 @@ class PCAPFS(DBFS):
         ## streams which get created by the scanners.
         dbh.execute(
             """CREATE TABLE if not exists `connection` (
-            `con_id` int(11) unsigned NOT NULL default '0',
+            `con_id` int(11) signed NOT NULL default '0',
             `original_id` int(11) unsigned NOT NULL default '0',
             `packet_id` int(11) unsigned NOT NULL default '0',
             `seq` int(11) unsigned NOT NULL default '0',
@@ -152,13 +152,24 @@ class PCAPFS(DBFS):
         ## Build our streams:
         pyflaglog.log(pyflaglog.DEBUG, "Reassembling streams, this might take a while")
 
-        ## Where to store the reassembled stream files
-        hashtbl = reassembler.init(FlagFramework.get_temp_path(dbh.case,'I%s|' % iosource_name))
-        case = dbh.case
-
         ## Prepare the dbh for the callback
+        case = dbh.case
         dbh2 = DB.DBO(case)
         dbh2.mass_insert_start("connection")
+
+        ## We need to find a good spot to have con_ids:
+        dbh2.execute("select max(con_id) as max from connection_details")
+        row = dbh2.fetch()
+        try:
+            ## This number is designed to provide enough room for
+            ## connection ids to grow without collision. In the even
+            ## that another simulataneous load process is launched.
+            initial_con_id = row['max']+2e6
+        except:
+            initial_con_id = 0
+
+        ## Where to store the reassembled stream files
+        hashtbl = reassembler.init(FlagFramework.get_temp_path(dbh.case,'I%s|' % iosource_name),initial_con_id)
 
         if scanners:
             scanner_string = ",".join(scanners)

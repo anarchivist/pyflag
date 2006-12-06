@@ -358,6 +358,8 @@ FILE *fopen64(const char *path, const char *mode) {
   FILE *fd;
   CHECK_INIT;
 
+  printf("opening file %s",path);
+
   fd=fopen(path,mode);
   return fd;
 };

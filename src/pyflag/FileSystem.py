@@ -128,7 +128,6 @@ class FileSystem:
         if not inode:
             raise IOError('Inode not found for file')
 
-        inode_id = self.lookup_id(inode)
         ## We should be allowed to open inodes which do not exist in
         ## the filesystem proper, but the VFS may be able to do
         ## something with them -- all it means is that we cant really
@@ -151,7 +150,6 @@ class FileSystem:
             except IndexError:
                 raise IOError, "Unable to open inode: %s, no VFS" % part
 
-        retfd.inode_id = inode_id
         return retfd
 
     def istat(self, path=None, inode=None):
@@ -361,16 +359,6 @@ class DBFS(FileSystem):
         return dbh
         #for i in self.dbh:
         #    yield(i)
-
-    def lookup_id(self, inode):
-        dbh=DB.DBO(self.case)
-        dbh.check_index('inode','inode')
-        dbh.execute("select inode_id from inode where inode=%r", inode)
-        res = dbh.fetch()
-        try:
-            return res["inode_id"]
-        except:
-            return None
 
     def lookup(self, path=None,inode=None):
         dbh=DB.DBO(self.case)
@@ -599,6 +587,16 @@ class File:
         self.size = size
         self.readptr = readptr
         return size
+
+    def lookup_id(self):
+        dbh=DB.DBO(self.case)
+        dbh.check_index('inode','inode')
+        dbh.execute("select inode_id from inode where inode=%r", self.inode)
+        res = dbh.fetch()
+        try:
+            return res["inode_id"]
+        except:
+            return None
 
     def close(self):
         """ Fake close method. """

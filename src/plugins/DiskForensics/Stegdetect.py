@@ -64,7 +64,7 @@ class AFTJpegScan(GenScanFactory):
         """ If we hit a jpeg file, we just create a new Inode entry in the VFS """
         
 	types = (
-            'image/jpeg' ,
+            'image/aaaajpeg' ,
             )
 	    	    
         def external_process(self,fd):

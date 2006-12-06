@@ -346,6 +346,9 @@ class IRC:
     def __init__(self,fd):
         self.fd=fd
         self.regex = re.compile("(?::([^ ]+) )?([^ ]+)(?: (.*))?")
+        self.case = self.fd.case
+        self.dbh = DB.DBO(self.case)
+        self.dbh.mass_insert_start("irc_messages")
 
     def rewrite_reply(self,prefix,command,line):
         return line, self.command_lookup[command]+"(%s)" % command
@@ -371,14 +374,15 @@ class IRC:
         else:
             recipient = ""
 
-        self.case = self.fd.case
-        dbh = DB.DBO(self.case)
-        dbh.execute(""" insert into irc_messages set sender=%r,full_sender=%r,
-        inode=%r, packet_id=%r, data=%r, command = %r, recipient = %r""",(
-            short_name,prefix,base_stream_inode, packet_id,
-            line, command, recipient 
-            ))
-
+        self.dbh.mass_insert(
+            sender = short_name,
+            full_sender = prefix,
+            inode = base_stream_inode,
+            packet_id = packet_id,
+            data = line,
+            command = command,
+            recipient = recipient)
+        
     def NOOP(self, prefix,command,line):
         return line, command
 
@@ -391,11 +395,12 @@ class IRC:
     def NICK(self,prefix,command,line):
         """ When a user changes their nick we store it in the database """
         self.nick = line
-        dbh = DB.DBO(self.case)    
-        dbh.execute(
-            """ insert into  `irc_userdetails`  set
-            inode=%r, nick=%r, username=%r, password=%r
-            """,( self.fd.inode, self.nick, self.username, self.password))
+        self.dbh.insert("irc_userdetails",
+                        inode = self.fd.inode,
+                        nick = self.nick,
+                        username = self.username,
+                        password = self.password)
+        
         return line,command
 
     username = ''

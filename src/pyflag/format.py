@@ -31,6 +31,9 @@ This is most useful when reading data structure with a fixed format (structs, ar
 """
 import struct,time,cStringIO
 
+## This is the default size that will be read when not specified
+DEFAULT_SIZE=600*1024*1024
+
 class Buffer:
     """ This class looks very much like a string, but in fact uses a file object.
 
@@ -94,10 +97,10 @@ class Buffer:
 
     def __str__(self):
         self.fd.seek(self.offset)
-        if self.size>0:
+        if self.size>=0:
             data=self.fd.read(self.size)
         else:
-            data=self.fd.read()
+            data=self.fd.read(DEFAULT_SIZE)
             
 #        if len(data) < self.size:
 #            raise IOError("Unable to read %s bytes from %s" %(self.size,self.offset))
@@ -173,8 +176,8 @@ class RAW(DataType):
     """ This data type is simply a data buffer. """
     def __init__(self,buffer,*args,**kwargs):
         DataType.__init__(self,buffer,*args,**kwargs)
-        self.buffer.size = kwargs['count']
-        self.data = self.buffer.__str__()
+        self.buffer = buffer
+        self.data = buffer.__str__()
         
     def size(self):
         return len(self.data)

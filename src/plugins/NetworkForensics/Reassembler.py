@@ -33,6 +33,8 @@ from pyflag.FlagFramework import query_type, get_temp_path
 from NetworkScanner import *
 import struct,re,os
 import reassembler
+from pyflag.TableObj import ColumnType, TimestampType, InodeType
+import pyflag.Reports as Reports
 
 class StreamFile(File):
     """ A File like object to reassemble the stream from individual packets.
@@ -54,7 +56,16 @@ class StreamFile(File):
         self.stat_cbs.extend([ self.show_packets, self.combine_streams ])
         self.stat_names.extend([ "Show Packets", "Combined streams"])
 
-        dbh = DB.DBO(self.case)    
+        ## This is a cache of packet lists that we keep so we do not
+        ## have to hit the db all the time.
+        self.packet_list = None
+
+        dbh = DB.DBO(self.case)
+        
+        ## Ensure we have an index on this column
+        dbh.check_index("connection","con_id")
+        dbh.check_index("connection_details","inode")
+
         ## Fill in some vital stats
         dbh.execute("select con_id, reverse, src_ip, dest_ip, src_port, dest_port, ts_sec from `connection_details` where inode=%r limit 1", inode)
         row=dbh.fetch()
@@ -95,19 +106,30 @@ class StreamFile(File):
         if len(stream_ids)<2: return
         
         ## Store the new stream in the cache:
-        dbh = DB.DBO(self.case)    
-        dbh.execute("insert into `connection_details` set inode=%r",
-                         (self.inode))
-        self.con_id = dbh.autoincrement()
+        dbh = DB.DBO(self.case)
+
+        ## FIXME: This is a race we should probably lock the tables.
+        dbh.execute("select min(con_id) as min from `connection_details`")
+        row=dbh.fetch()
+        if row['min']:
+            self.con_id = row['min']-1
+        else:
+            self.con_id = -1
+
+        ## This is a placeholder to reserve our con_id
+        dbh.execute("insert into `connection_details` set inode=%r,con_id=%r",
+                         (self.inode,self.con_id))
+
         dbh2 = dbh.clone()
 
         ## These are the fds for individual streams
         fds = []
         for s in stream_ids:
             try:
-                fds.append(open(get_temp_path(dbh.case,
-                                                            "%s|S%s" % (self.fd.inode, s))))
-            except IOError:
+                filename = FlagFramework.get_temp_path(dbh.case,
+                                         "%s|S%s" % (self.fd.inode, s))
+                fds.append(open(filename))
+            except IOError,e:
                 fds.append(-1)
 
         # These are the deltas to be applied to the sequence numbers of each
@@ -128,6 +150,7 @@ class StreamFile(File):
 
         # This is the length of the output file
         outfd_len = 0
+        outfd_position = 0
         for row in dbh:
             # This is the index for this specific stream in all the above arrays
             index = stream_ids.index(row['con_id'])
@@ -139,17 +162,26 @@ class StreamFile(File):
 
             # We need to find if we grew the output file at all:
             initial_len = outfd_len
-            outfd_position = row['seq']+deltas[index]
+            if row['seq']+deltas[index]>0:
+                outfd_position = row['seq']+deltas[index]
             
             # We only allow 64k to be written ahead - this is commonly
             # the window length and it stops weird sequence numbers
             # from growing the file too much
             if outfd_position - initial_len > 65000:
                 outfd_position = initial_len
-                
-            out_fd.seek(outfd_position)
-            fds[index].seek(row['cache_offset'])
-            out_fd.write(fds[index].read(row['length']))
+
+            try:
+                out_fd.seek(outfd_position)
+            except Exception,e:
+                print FlagFramework.get_bt_string(e)
+                print outfd_position
+                raise
+
+            # Only try to write if there is a reverse file.
+            if fds[index]>0:
+                fds[index].seek(row['cache_offset'])
+                out_fd.write(fds[index].read(row['length']))
 
             # Maintain the length of the file
             outfd_len = max(outfd_len, outfd_position+row['length'])
@@ -190,13 +222,20 @@ class StreamFile(File):
         """ Gets the current packet id (where the readptr is currently at) """
         if not position:
             position = self.tell()
-            
-        dbh = DB.DBO(self.case)        
-        dbh.execute("""select packet_id from `connection` where con_id = %r and cache_offset <= %r order by cache_offset desc, length desc limit 1""",
-                         (self.con_id, position))
-        row=dbh.fetch()
-        return row['packet_id']
 
+        if self.packet_list==None:
+            dbh = DB.DBO(self.case)
+            dbh.execute("""select packet_id,cache_offset from `connection` where con_id = %r order by cache_offset desc, length desc """,
+                    (self.con_id))
+            self.packet_list = [ (row['packet_id'],row['cache_offset']) for row in dbh ]
+
+        ## Now try to find the packet_id in memory:
+        for packet_id,cache_offset in self.packet_list:
+            if cache_offset < position:
+                return packet_id
+
+        return 0
+    
     def get_combined_fd(self):
         """ Returns an fd opened to the combined stream """
         ## If we are already a combined stream, we just return ourselves

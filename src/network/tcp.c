@@ -15,7 +15,7 @@ static int con_id=1;
 */
 static int _total_streams=0;
 
-TCPStream TCPStream_Con(TCPStream self, struct tuple4 *addr) {
+TCPStream TCPStream_Con(TCPStream self, struct tuple4 *addr, int con_id) {
   memcpy(&self->addr, addr, sizeof(*addr));
 
   self->con_id = con_id;
@@ -257,8 +257,10 @@ VIRTUAL(TCPStream, Object)
      VMETHOD(add) = TCPStream_add;
 END_VIRTUAL
 
-TCPHashTable TCPHashTable_Con(TCPHashTable self) {
+TCPHashTable TCPHashTable_Con(TCPHashTable self, int initial_con_id) {
   int i;
+
+  self->con_id = initial_con_id;
   
   /** Create list heads for our hash table */
   for(i=0;i<TCP_STREAM_TABLE_SIZE; i++) {
@@ -363,7 +365,7 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
       so we need to make a forward/reverse stream pair.
   */
   /** Build a forward stream */
-  i = CONSTRUCT(TCPStream, TCPStream, Con, self, &forward);
+  i = CONSTRUCT(TCPStream, TCPStream, Con, self, &forward, self->con_id++);
   i->callback = self->callback;
   i->data = self->data;
   i->direction = TCP_FORWARD;
@@ -371,7 +373,7 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   list_add(&(i->global_list),&(self->sorted->global_list));
 
   /** Now a reverse stream */
-  j = CONSTRUCT(TCPStream, TCPStream, Con, i, &reverse);
+  j = CONSTRUCT(TCPStream, TCPStream, Con, i, &reverse, self->con_id++);
   j->callback = self->callback;
   j->data = self->data;
   j->direction = TCP_REVERSE;

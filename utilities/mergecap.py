@@ -68,6 +68,7 @@ if options.glob:
     print "Globbing %s "% options.glob
     g = options.glob.replace('\\*','*')
     args.extend(glob.glob(g))
+    print "Will merge %s files" % len(args)
 
 if len(args)==0:
     print "Must specify some files to merge, try -h for help"

@@ -72,7 +72,7 @@ class Store:
                 if k==key:
                     #self.creation_times.pop(i)
                     self.check_full()
-                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Got key %s" % key)
+                    #pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Got key %s" % key)
                     return obj
                 i+=1
 

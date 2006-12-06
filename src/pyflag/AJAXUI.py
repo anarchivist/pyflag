@@ -1126,3 +1126,4 @@ class AJAXUI(HTMLUI.HTMLUI):
         right='''<div name="%s" dojoType="RichText" widgetId="%s" height=60 focusOnLoad="true" style="border: 3px outset black;">%s</div>''' % (name, name, default)
 
         self.row(left,right,valign="top")
+

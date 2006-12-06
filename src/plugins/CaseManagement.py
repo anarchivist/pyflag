@@ -101,10 +101,17 @@ class DelCase(Reports.report):
         return result
 
     def display(self,query,result):
-        #Delete the case from the database
         dbh = self.DBO(None)
-        dbh.execute("drop database if exists %s" ,query['remove_case'])
-        dbh.execute("delete from meta where property='flag_db' and value=%r",query['remove_case'])
+
+        case = query['remove_case']
+        ## Remove any jobs that may be outstanding:
+        dbh.execute("delete from jobs where command='Scan' and arg1=%r",
+                    case)
+        
+        #Delete the case from the database
+        dbh.execute("delete from meta where property='flag_db' and value=%r",
+                    case)
+        dbh.execute("drop database if exists %s" ,case)
 
         ## Delete the temporary directory corresponding to this case and all its content
         try:
@@ -118,7 +125,7 @@ class DelCase(Reports.report):
             os.rmdir(temporary_dir)
         except:
             pass
-        
+
         result.heading("Deleted case")
         result.para("Case %s has been deleted" % query['remove_case'])
         return result

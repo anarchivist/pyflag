@@ -55,7 +55,7 @@ class FileHeader(SimpleStruct):
             self.offset = off
             self.buffer = self.buffer[off:]
             result=SimpleStruct.read(self)
-            self.start_of_file = off
+            self.start_of_file = self.offset
             return result
 
         off=tmp.search(struct.pack(">L",0xa1b2c3d4))
@@ -100,8 +100,8 @@ class Packet(SimpleStruct):
         caplen = int(result['caplen'])
         if caplen>64000:
             raise IOError("packet too large at %s, maybe PCAP file is corrupted" % caplen)
-        
-        s=RAW(self.buffer[self.offset:],count=caplen)
+
+        s=RAW(self.buffer[self.offset:self.offset+caplen])
         if s.size()!=caplen:
             raise IOError("Unable to read the last packet from the file (wanted %s, got %s). Is the file truncated?" % (result['caplen'], s.size()))
         

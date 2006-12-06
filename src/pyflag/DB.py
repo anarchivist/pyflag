@@ -269,6 +269,10 @@ class Pool(Queue):
 
         return (dbh,mysql_bin_string)
 
+## This store stores information about indexes
+import Store
+DBIndex_Cache=Store.Store()
+
 global DBH
 DBH={}
 
@@ -460,17 +464,21 @@ class DBO:
         """ This checks the database to ensure that the said table has an index on said key.
 
         If an index is missing, we create it here, so we always ensure an index exists once we return. """
-        ## We implement a local cache to ensure that we dont hit the DB all the time:
+        ## We implement a local cache to ensure that we dont hit the
+        ## DB all the time:
+        cache_key = "%s:%s" % (table,key)
         try:
-            return DBH[self.case].indexes["%s.%s" % (table,key)]
-        except KeyError:        
-##        if 1:
+            ## These should be the fields with the indexes on them:
+            fields = DBIndex_Cache.get(cache_key)
+        except KeyError:
             self.execute("show index from `%s`",table)
-            for row in self:
-                if row['Key_name'] == key:
-                    ## We found an index we are looking for
-                    return
+            fields = [ row['Key_name'] for row in self]
+            DBIndex_Cache.put(fields, key=cache_key)
 
+        ## Now fields is an array stored in the Store - we can append
+        ## to it directly because we also hold a reference here and it
+        ## will affect the next value gotten from the Store:
+        if key not in fields:
             if length:
                 sql="(`%s`(%s))" % (key,length)
             else:
@@ -481,7 +489,7 @@ class DBO:
             self.execute("Alter table `%s` add index%s",(table,sql))
 
             ## Add to cache:
-            DBH[self.case].indexes["%s.%s" % (table,key)] = True
+            fields.append(key)
         
     def get_meta(self, property, table='meta',**args):
         """ Returns the value for the given property in meta table selected database

@@ -59,7 +59,7 @@ class ZipScan(GenScanFactory):
                 z = ZIPCACHE.get(self.fd.inode)
             except KeyError:
                 z = zipfile.ZipFile(self.fd,'r')
-                ZIPCACHE.put(self.z, key=self.fd.inode)
+                ZIPCACHE.put(z, key=self.fd.inode)
 
             pathname = self.ddfs.lookup(inode = self.inode)
             
@@ -186,7 +186,7 @@ class TarScan(GenScanFactory):
 ZIPCACHE = Store.Store(max_size=5)
 		
 ## These are the corresponding VFS modules:
-class ZipFile(DiskForensics.DBFS_file):
+class ZipFile(File):
     """ A file like object to read files from within zip files. Note
     that the zip file is specified as an inode in the DBFS
 
@@ -196,7 +196,7 @@ class ZipFile(DiskForensics.DBFS_file):
     specifier = 'Z'
     
     def __init__(self, case, fd, inode):
-        DiskForensics.DBFS_file.__init__(self, case, fd, inode)
+        File.__init__(self, case, fd, inode)
 
         ## Zip file handling requires repeated access into the zip
         ## file. Caching our input fd really helps to speed things
@@ -375,7 +375,7 @@ class Tar_file(DiskForensics.DBFS_file):
 
         try:
             t = ZIPCACHE.get(self.fd.inode)
-        except AttributeError:
+        except (AttributeError, KeyError):
             try:
                 t = tarfile.TarFile(fileobj=fd)
                 ZIPCACHE.put(t, key=self.fd.inode)
