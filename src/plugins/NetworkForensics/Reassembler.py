@@ -33,7 +33,7 @@ from pyflag.FlagFramework import query_type, get_temp_path
 from NetworkScanner import *
 import struct,re,os
 import reassembler
-from pyflag.TableObj import ColumnType, TimestampType, InodeType
+from pyflag.TableObj import ColumnType, TimestampType, InodeType, IPType
 import pyflag.Reports as Reports
 
 class StreamFile(File):
@@ -402,3 +402,21 @@ class MemroyCachedOffset(StringIO.StringIO,File):
             self.size=sys.maxint
             
         StringIO.StringIO.__init__(self, fd.read(self.size))
+
+class ViewConnections(Reports.report):
+    """ View the connection table """
+    description = "View the connection table"
+    name = "View Connections"
+    family = "Network Forensics"
+
+    def display(self, query,result):
+        result.table(
+            elements = [ InodeType('Inode','inode', case=query['case']),
+                         TimestampType('TimeStamp','ts_sec'),
+                         IPType('Source','src_ip'),
+                         ColumnType('Src Port','src_port'),
+                         IPType('Destination','dest_ip'),
+                         ColumnType('Dest Port','dest_port')],
+            table = 'connection_details',
+            case = query['case'],
+            )

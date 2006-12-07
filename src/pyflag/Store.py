@@ -97,7 +97,7 @@ class Store:
                 t,key,o = self.creation_times[0]
                 if t+self.max_age < now:
                     self.creation_times.pop(0)
-                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Removed object %s because it is too old" % o)
+                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Removed object %r because it is too old" % o)
                 else:
                     break
         except IndexError:

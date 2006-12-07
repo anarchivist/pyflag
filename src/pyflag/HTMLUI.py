@@ -706,7 +706,7 @@ class HTMLUI(UI.GenericUI):
         except: limit = 0
 
         args = dict( elements = elements, table = table, case=case,
-                     groupby = groupby, order = order, limit = limit)
+                     groupby = groupby, order = order)
 
         if where: args['where'] = where
 
@@ -746,7 +746,7 @@ class HTMLUI(UI.GenericUI):
         
         ## Now do the rows:
         dbh = DB.DBO(case)
-        dbh.execute(sql)
+        dbh.cached_execute(sql,limit=limit, length=config.PAGESIZE)
         old_sorted = None
         old_sorted_style = ''
 
@@ -1005,7 +1005,7 @@ class HTMLUI(UI.GenericUI):
                             self.result+="&nbsp;" * (wrap-len(new_line))
                             self.result+="<img src='images/next_line.png'>"
                         self.result+=line_break
-                self.result+="</pre>"
+                self.result+=line_break
             else:
                 do_options(self.text_var,options)
 

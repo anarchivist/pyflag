@@ -66,9 +66,21 @@ class NewCase(Reports.report):
 
         #Get handle to the case db
         case_dbh = self.DBO(query['create_case'])
-        case_dbh.execute("Create table if not exists meta(`time` timestamp NOT NULL,property varchar(50), value text, KEY property(property), KEY joint(property,value(20)))",())
+        case_dbh.execute("""Create table if not exists meta(
+        `time` timestamp NOT NULL,
+        property varchar(50),
+        value text,
+        KEY property(property),
+        KEY joint(property,value(20)))""")
 
-        case_dbh.execute("create table if not exists bookmarks (id int(11) auto_increment, canon text, url text,  description text,  bookmark text ,  PRIMARY KEY  (id),  KEY id (id))",())
+        case_dbh.execute("""CREATE TABLE `sql_cache` (
+        `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+        `timestamp` TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL ,
+        `version` VARCHAR( 250 ) NOT NULL ,
+        `query` TINYTEXT NOT NULL,
+        `limit` INT default 0,
+        `length` INT default 100
+        )""")
 
         ## Create a directory inside RESULTDIR for this case to store its temporary files:
         try:

@@ -363,7 +363,70 @@ class DBO:
                 
             elif not str.startswith('Records'):
                 raise DBError,e
-            
+
+    def cached_execute(self, sql, limit=0, length=50):
+        """ Execute the query_str with params inside the pyflag Cache system.
+
+        PyFlag often needs to execute the same query with different
+        limit clauses - for example when paging a table in the
+        GUI. Since MySQL applies the limits after perfomring the
+        query, and the MySQL query cache is applied on the results,
+        MySQL ends up redoing the same query for each page. If the
+        query is expensive this could significantly delay paging.
+
+        This function implements a cache in the db for especially
+        complex queries.
+        """
+        ## Expire the cache if needed
+        self.execute("select * from sql_cache where timestamp < date_sub(now(), interval %r minute)", config.DBCACHEAGE)
+        tables = [ row['id'] for row in self]
+        for table_id in tables:
+            self.execute("delete from sql_cache where id = %r" , table_id)
+            self.execute("drop table if exists cache_%s" , table_id)
+
+        ## Try to find the query in the cache. We need a cache which
+        ## covers the range we are interested in:
+        self.execute("""select * from sql_cache where query = %r and `limit` <= %r and `limit` + `length` >= %r""", (sql, limit, limit + length))
+        row = self.fetch()
+        
+        if row:
+            ## Query is in cache - check that its still valid FIXME:
+
+            ## Return the query:
+            self.execute("update sql_cache set timestamp=now() where id=%r ",
+                         row['id'])
+
+            cache_limit = row['limit']
+            return self.execute("select * from cache_%s limit %s,%s",
+                                (row['id'], limit - cache_limit, length))
+
+        ## Query is not in cache - create a new cache entry: FIXME -
+        ## this could race.  We create the cache centered on the
+        ## required range - this allows quick paging forward and
+        ## backwards.
+        lower_limit = max(limit - config.DBCACHE_LENGTH/2,0)
+        
+        self.insert('sql_cache',
+                    query = sql, _timestamp='now()',
+                    limit = lower_limit,
+                    length = config.DBCACHE_LENGTH)
+
+        id = self.autoincrement()
+        
+        self.execute("create table cache_%s %s limit %s,%s",
+                     (id,sql, lower_limit, config.DBCACHE_LENGTH))
+        
+        return self.execute("select * from cache_%s limit %s,%s",
+                            (id,limit - lower_limit,length))
+
+        ## Create the new table
+
+        ## Did we take too long? If we didnt take very long, we lose
+        ## the table and mark the query as uncachable for a
+        ## while. (basically its quicker to just do the query than to
+        ## cache it).
+
+        ## Return the cursor back:
 
     def commit(self):
         self.cursor.connection.commit()

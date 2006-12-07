@@ -100,3 +100,9 @@ PYFLAG_INDEX_ENCODINGS=UTF-8,UTF-16LE
 PYFLAG_TABLE_QUERY_TIMEOUT=20
 
 PYFLAG_WORKERS=1
+
+## How long to maintain SQL caches (in minutes)
+PYFLAG_DBCACHEAGE=60
+
+## The size of the sql cache by default (in rows)
+PYFLAG_DBCACHE_LENGTH=1024

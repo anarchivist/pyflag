@@ -282,7 +282,7 @@ class GenericUI:
         else: query_str+= "desc"
 
         ## Limit conditions:
-        query_str += " limit %s, %s" % (limit, config.PAGESIZE)
+        ##query_str += " limit %s, %s" % (limit, config.PAGESIZE)
 
         return query_str
 

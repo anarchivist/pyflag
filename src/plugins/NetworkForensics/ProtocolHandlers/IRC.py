@@ -577,7 +577,7 @@ class BrowseIRCChat(Reports.report):
             return tmp
         
         result.table(
-            elements = [ ColumnType('ID','pcap.id'),
+            elements = [ ColumnType('ID','irc_messages.id'),
                          TimestampType("Timestamp","ts_sec"),
                          InodeType("Stream","inode",
                             link = query_type(family='Disk Forensics',
