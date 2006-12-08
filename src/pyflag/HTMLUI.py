@@ -518,7 +518,16 @@ class HTMLUI(UI.GenericUI):
         l = self.store_callback(left)
         r = self.store_callback(right)
 
-        self.result+='<table width="100%%"  height="100%%"><tr height="400+"><td  style="overflow: auto"><iframe id="left" name="left" height="100%%" width=300 src="%s&callback_stored=%s&right_pane_cb=%s"></iframe></td><td width="40%%" height="80%%"><iframe name="right" id="right" height="100%%" width=1000 src="%s&callback_stored=%s" > </iframe></td></tr></table>' % (self.defaults,l,r,self.defaults,r)
+        self.result+='<table width="100%%"  height="100%%" class="PyFlagTable"><tr height="400+"><td  style="overflow: auto"><iframe id="left" name="left" height="100%%" width=300 src="%s&callback_stored=%s&right_pane_cb=%s"></iframe></td><td width="40%%" height="80%%"><iframe name="right" id="right" height="100%%" width=1000 src="%s&callback_stored=%s" > </iframe></td></tr></table>' % (self.defaults,l,r,self.defaults,r)
+#        self.result+='''<frameset cols="200,*" rows="*" id="mainFrameset">
+#<frame frameborder="0" id="left" name="left" src="f?%s&callback_stored=%s&right_pane_cb=%s" />
+#<frame frameborder="0" name="right" id="right" src="f?%s&callback_stored=%s" />
+#<noframes>
+#        <body>
+#            <p>PyFlag is more friendly with a <b>frames-capable</b> browser.</p>
+#        </body>
+#</noframes>
+#</frameset>''' % (self.defaults,l,r,self.defaults,r)
 
     def new_toolbar(self):
         id = "Toolbar%s" % self.get_uniue_id()

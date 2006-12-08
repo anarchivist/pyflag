@@ -119,7 +119,13 @@ class ViewFileTypes(Reports.report):
                        family = "Disk Forensics", report = "ViewFile"),
                        tooltip=inode, border=0
                        )
-            
+
+            try:
+                tmp2.text("\n%sx%s" % (image.owidth,image.oheight))
+            except AttributeError:
+                pass
+
+            tmp2.text(" %s" % inode)
             return tmp2
 
         try:
@@ -127,6 +133,7 @@ class ViewFileTypes(Reports.report):
                 elements = [ InodeType('Thumbnail','a.inode', callback = thumbnail_cb),
                              ColumnType('Filename','concat(path,name)'),
                              ColumnType('Type','type'),
+                             ColumnType('Size','c.size'),
                              TimestampType('Timestamp','c.mtime') ],
                 table = 'file as a, type as b, inode as c',
                 where = 'b.inode=c.inode and a.inode=b.inode and a.mode like "r%%" ',

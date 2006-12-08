@@ -42,7 +42,7 @@ import struct,sys,cStringIO
 import pyflag.DB as DB
 from pyflag.FileSystem import File
 import pyflag.IO as IO
-import pyflag.FlagFramework as FlagFramework
+from pyflag.FlagFramework import query_type
 from NetworkScanner import *
 import pyflag.Reports as Reports
 import pyflag.pyflaglog as pyflaglog
@@ -1375,7 +1375,7 @@ from HTMLParser import HTMLParser
 class ContextParser(HTMLParser):
     """ This is a simple parser to parse the MSN Context line """
     def handle_starttag(self, tag, attrs):
-        self.context_meta_data = FlagFramework.query_type(attrs)
+        self.context_meta_data = query_type(attrs)
 
 class MSNScanner(StreamScannerFactory):
     """ Collect information about MSN Instant messanger traffic """
@@ -1561,7 +1561,7 @@ class BrowseMSNSessions(Reports.report):
         def draw_prox_cb(value):
             tmp = result.__class__(result)
             tmp.link('Go To Approximate Time',
-              target=FlagFramework.query_type((),
+              target=query_type((),
                 family=query['family'], report=query['report'],
                 where_Prox = ">%s" % (int(value)-60),
                 case = query['case'],
@@ -1572,44 +1572,53 @@ class BrowseMSNSessions(Reports.report):
             return tmp
 
         result.table(
+            elements = [ ColumnType('Prox','pcap.ts_sec',
+                                    callback = draw_prox_cb),
+                         TimestampType('Timestamp','pcap.ts_sec'),
+                         InodeType("Stream","inode",
+                                   link = query_type(family="Disk Forensics",
+                                                     case=query['case'],
+                                                     report='View File Contents',
+                                                     __target__='inode',
+                                                     mode="Combined streams")),
+                         ColumnType("Packet","packet_id",
+                                    link = query_type(family="Network Forensics",
+                                                      case=query['case'],
+                                                      report='View Packet',
+                                                      __target__='id')),
+                         ColumnType("Session ID","session_id",
+                                    link = query_type(family="Network Forensics",
+                                                      case=query['case'],
+                                                      report='BrowseMSNSessions', 
+                                                      __target__='filter',
+                                                      filter='"Session ID" = %s')),
+                         ColumnType("Type","type"),
+                         ColumnType("Sender","sender",
+                                    link = query_type(family="Network Forensics",
+                                                      case=query['case'],
+                                                      report='BrowseMSNUsers',
+                                                      filter='Nick = "%s"',
+                                                      __target__='filter')),
+                         ColumnType("Recipient","recipient",
+                                    link = query_type(family="Network Forensics",
+                                                      case=query['case'],
+                                                      report='BrowseMSNUsers',
+                                                      filter='Nick = "%s"',
+                                                      __target__='filter')),
+
+                         ColumnType("Data","data"),
+                         ColumnType("Transaction ID","transaction_id"),
+                         InodeType("P2P File","p2p_file", case=query['case']),
+                         ],
+            
             #TODO find a nice way to separate date and time (for exporting csv separate), but not have it as the default...
             #date: 'from_unixtime(pcap.ts_sec,"%Y-%m-%d")'
             #time: 'concat(from_unixtime(pcap.ts_sec,"%H:%i:%s"),".",pcap.ts_usec)'
 
             #We are displaying single inodes, not combined streams to make the linking work            
-            columns = ['pcap.ts_sec', 'concat(from_unixtime(pcap.ts_sec),".",pcap.ts_usec)', 'left(inode,instr(inode,"/")-1)', 'cast(packet_id as char)', 'session_id','type','sender','recipient','data','transaction_id','p2p_file'],
-            names = ['Prox','Timestamp','Stream', 'Packet', 'Session ID', 'Type','Sender','Recipient','Data','Transaction ID','P2P File'],
+#            columns = ['pcap.ts_sec', 'concat(from_unixtime(pcap.ts_sec),".",pcap.ts_usec)', 'left(inode,instr(inode,"/")-1)', 'cast(packet_id as char)', 'session_id','type','sender','recipient','data','transaction_id','p2p_file'],
+#            names = ['Prox','Timestamp','Stream', 'Packet', 'Session ID', 'Type','Sender','Recipient','Data','Transaction ID','P2P File'],
             table = "msn_session join pcap on packet_id=id",
-            callbacks = {'Prox':draw_prox_cb},
-            links = [
-	    	     None,None,
-                     FlagFramework.query_type((),
-                                              family="Disk Forensics", case=query['case'],
-                                              report='View File Contents',
-                                              __target__='inode', mode="Combined streams"),
-                     FlagFramework.query_type((),
-                                              family="Network Forensics", case=query['case'],
-                                              report='View Packet',
-                                              __target__='id'),
-                     FlagFramework.query_type((),
-                                              family="Network Forensics", case=query['case'],
-                                              report='BrowseMSNSessions', 
-                                              __target__='where_Session ID'),
-                     None,
-                     FlagFramework.query_type((),
-                                              family="Network Forensics", case=query['case'],
-                                              report='BrowseMSNUsers', 
-                                              __target__='where_Nick'),
-                     FlagFramework.query_type((),
-                                              family="Network Forensics", case=query['case'],
-                                              report='BrowseMSNUsers', 
-                                              __target__='where_Nick'),
-                     None,None,
-                     FlagFramework.query_type((),
-                                              family="Disk Forensics", case=query['case'],
-                                              report='View File Contents',
-                                              __target__='inode', mode="Statistics")
-                     ],
             case = query['case'],
             hide_columns = ['Date']
             )

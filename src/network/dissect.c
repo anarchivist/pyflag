@@ -52,7 +52,6 @@ static PyObject *dissect(PyObject *self, PyObject *args) {
     return NULL;
 
   root = CONSTRUCT(Root, Packet, super.Con, NULL, NULL);
-
   root->packet.link_type = link_type;
   root->packet.packet_id = packet_id;
 
@@ -160,7 +159,7 @@ static PyObject *get_field(PyObject *self, PyObject *args) {
       /** Ensure that we increase root's reference count, because we
 	  will try to free it after it gets gc'd
       */
-      talloc_increase_ref_count(root);
+      talloc_reference(python_talloc_context,root);
 
       return PyCObject_FromVoidPtr(root, (void (*)(void *))root->destroy);
     };
@@ -187,10 +186,12 @@ static PyObject *get_field(PyObject *self, PyObject *args) {
 	};
 
 	result = PyCObject_FromVoidPtr(node, (void (*)(void *))node->destroy);
-	/** We are about to return another reference, we need to incref
-	    talloc to ensure it does not get destroyed unexpectadly 
+	/** We are about to return another reference to python.  When
+	    python frees the reference we will call talloc free by
+	    ourselves, so we must make sure that no one will try to
+	    free this from under us.
 	*/
-	talloc_increase_ref_count(node);
+	talloc_reference(python_talloc_context,node);
 	break;
       };
 
@@ -311,6 +312,11 @@ static PyMethodDef DissectMethods[] = {
 };
 
 PyMODINIT_FUNC init_dissect(void) {
+  // This is a talloc context which is used to own any objects passed
+  // to python. This is better than assigning them to the null context
+  // because talloc_reference works.
+  python_talloc_context = talloc_strdup(NULL,"Python Owns this");
+
   (void) Py_InitModule("_dissect", DissectMethods);
   network_structs_init();
 }

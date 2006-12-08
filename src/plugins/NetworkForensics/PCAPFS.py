@@ -389,7 +389,7 @@ class ViewDissectedPacket(Reports.report):
         
         io = IO.open(query['case'], row['iosource'])
         io.seek(row['offset'])
-        packet = io.read(row['length'])
+        packet = PCAP.Packet(io.read(row['length'])).payload()
         id = int(query['id'])
         
         link_type = row['link_type']

@@ -195,6 +195,7 @@ class Thumbnailer(Image):
         self.width = 0
         self.height = 0
         ## This stores a small amount of data to determine the magic
+        self.fd.seek(0)
         self.header = self.fd.read(1000)
         self.fd.seek(0)
         ## Calculate the magic of this file:
@@ -279,6 +280,7 @@ class Thumbnailer(Image):
         
         ## Ask the imaging library to rescale us to the requested size:
         self.width, self.height = self.image.size
+        self.owidth, self.oheight = self.image.size
 
         ratio = float(self.width)/float(self.height)
 
@@ -320,3 +322,13 @@ class Thumbnailer(Image):
     def SetFormat(self,format):
         """ We only support jpeg here """
         return 'jpeg'
+
+class Preview(Thumbnailer):
+    """ This class is used to display a long detailed view of the file """
+    def __init__(self,fd):
+        Thumbnailer.__init__(self,fd,0)
+
+    def JpegHandler(self):
+        print "Handling jpeg"
+        self.thumbnail = self.fd
+        self.thumbnail.seek(0)

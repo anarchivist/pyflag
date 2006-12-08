@@ -516,8 +516,8 @@ class File:
         @note: This is not meant to be called directly, the File object must be created by a valid FileSystem object's open method.
         """
         # Install default views
-        self.stat_names = ["Statistics","HexDump","Download"]
-        self.stat_cbs=[self.stats,self.hexdump,self.download]
+        self.stat_names = ["Statistics","HexDump","Download", "Summary"]
+        self.stat_cbs=[self.stats,self.hexdump,self.download, self.summary]
 
         # each file should remember its own part of the inode
         self.case = case
@@ -698,7 +698,11 @@ class File:
         print "%s" % self.__class__.__name__
         result.row(self.__class__.__name__, self.__doc__)
 
-
+    def summary(self,query,result):
+        """ This method draws a summary of the file """
+        image = Graph.Preview(self)
+        result.image(image)
+        
     def download(self, query,result):
         """ Used for dumping the entire file into the browser """
         result.download(self)
@@ -816,7 +820,6 @@ class File:
 
         left.end_table()
 
-        self.seek(0)
         image = Graph.Thumbnailer(self,300)
         if image:
             right=result.__class__(result)

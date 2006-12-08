@@ -81,7 +81,7 @@ struct struct_property_t *get_field_by_name(Packet self, char *name) {
   list_for_each_entry(i, &(self->properties.list), list) {
     if(!i->name) break;
     if(!strcmp(i->name, name)) {
-      i=talloc_memdup(self, i, sizeof(*i));
+      //i=talloc_memdup(self, i, sizeof(*i));
       return i;
     };
   };

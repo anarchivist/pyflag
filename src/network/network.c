@@ -220,6 +220,7 @@ VIRTUAL(IP, Packet)
      NAME_ACCESS(packet, _dest, dest, FIELD_TYPE_INT);
      NAME_ACCESS(packet, header.ttl, ttl, FIELD_TYPE_CHAR);
      NAME_ACCESS(packet, header.protocol, protocol, FIELD_TYPE_CHAR);
+     NAME_ACCESS(packet, header.id, id, FIELD_TYPE_SHORT);
      NAME_ACCESS(packet, payload, payload, FIELD_TYPE_PACKET);
 
      VMETHOD(super.Read)=IP_Read;
