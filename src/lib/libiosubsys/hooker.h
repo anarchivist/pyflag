@@ -31,7 +31,7 @@
 //We call hard exit when hooking exit()
 extern void _exit(int);
 
-#define DEBUG_LEVEL 10
+#define DEBUG_LEVEL 0
 
 /* Used for Debugging messages*/
 void debug(int level, const char *message, ...)

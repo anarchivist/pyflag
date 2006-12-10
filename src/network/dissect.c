@@ -34,6 +34,8 @@
 #include "packet.h"
 #include "network.h"
 
+static char *python_talloc_context;
+
 #undef _POSIX_C_SOURCE
 
 #include "Python.h"

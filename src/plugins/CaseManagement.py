@@ -77,7 +77,7 @@ class NewCase(Reports.report):
         `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY ,
         `timestamp` TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL ,
         `version` VARCHAR( 250 ) NOT NULL ,
-        `query` TINYTEXT NOT NULL,
+        `query` MEDIUMTEXT NOT NULL,
         `limit` INT default 0,
         `length` INT default 100
         )""")

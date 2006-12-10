@@ -732,7 +732,10 @@ class HTMLUI(UI.GenericUI):
         <thead><tr>'''
 
         ## Make the table headers with suitable order by links:
+        hiddens = [ int(x) for x in query.getarray('_hidden') ]
+            
         for e in range(len(elements)):
+            if e in hiddens: continue
             new_query = query.clone()
             n = elements[e].name
 
@@ -755,6 +758,9 @@ class HTMLUI(UI.GenericUI):
         
         ## Now do the rows:
         dbh = DB.DBO(case)
+
+        ## This allows pyflag to cache the resultset, needed to speed
+        ## paging of slow queries.
         dbh.cached_execute(sql,limit=limit, length=config.PAGESIZE)
         old_sorted = None
         old_sorted_style = ''
@@ -768,6 +774,8 @@ class HTMLUI(UI.GenericUI):
 
             ## Render each row at a time:
             for i in range(len(elements)):
+                if i in hiddens: continue
+
                 ## Give the row to the column element to allow it
                 ## to translate the output suitably:
                 value = elements[i].display(row[elements[i].name],row,self)
@@ -818,78 +826,6 @@ class HTMLUI(UI.GenericUI):
                          link = new_query,
                          tooltip='Next Page (Rows %s-%s)' % (limit, limit+config.PAGESIZE))
 
-        ## FIXME: Still to do
-        ## Draw a popup to allow the user to save the entire table in CSV format:
-##        def save_table(query,result):
-##            dbh = DB.DBO(case)
-
-##            def generate_output():
-##                query_row_limit = 1024
-##                data = cStringIO.StringIO()
-##                hidden_columns = list(query.getarray('hide_column'))
-
-##            ## FIXME - We dont usually want to save called back
-##            ## columns becuase they rarely make sense (but sometimes
-##            ## they do?? which should we do here???)
-##                for i in callbacks.keys():
-##                    if i not in hidden_columns:
-##                        hidden_columns.append(i)
-                    
-##                names_list = [ i for i in names if i not in hidden_columns ]
-##                inittext= "#Pyflag Table widget output\n#Query was %s.\n#Fields: %s\n""" %(query," ".join(names_list))
-##                if condition_text_array:
-##                    inittext+= "#The following conditions are in force\n"
-##                for i in condition_text_array:
-##                    inittext += "# %s\n" % i
-##                yield inittext
-                
-##                csv_writer = csv.DictWriter(data,names_list,dialect='excel')
-##                limit = 0
-##                while 1:
-##                    dbh.execute(query_str_basic + " order by %s limit %s,%s" %
-##                                (order,limit,limit+query_row_limit))
-
-##                    count = 0
-##                    for row in dbh:
-##                        count+=1
-##                    ## If there are any callbacks we respect those now.
-##                        new_row={}
-##                        for k,v in row.items():
-##                            if k in hidden_columns: continue
-##                            if data_callbacks.has_key(k):
-##                                row[k]=data_callbacks[k](v)
-##                            if callbacks.has_key(k):
-##                                row[k]=callbacks[k](v)
-
-##                        ## Escape certain characters from the rows - some
-##                        ## spreadsheets dont like these even though they
-##                        ## are probably ok:
-##                            tmp=str(row[k])
-##                            tmp=tmp.replace("\r","\\r")
-##                            tmp=tmp.replace("\n","\\n")
-
-##                            new_row[k]=tmp
-
-##                        csv_writer.writerow(new_row)
-##                        data.seek(0)
-##                        tmp=data.read()
-##                        yield tmp
-##                        data.truncate(0)
-
-##                    if count==0: break
-##                    limit+=query_row_limit
-
-##            result.generator.generator = generate_output()
-##            result.generator.content_type = "text/csv"
-##            result.generator.headers = [("Content-Disposition","attachment; filename=%s_%s.csv" %(case,table) ),]
-
-##            del query['callback_stored']
-            
-##            return
-            
-            
-            
-##        self.toolbar(save_table,'Save Table',icon="floppy.png")
         ## Add a skip to row toolbar icon:
         self.toolbar(
             cb = goto_row_cb,
@@ -952,6 +888,83 @@ class HTMLUI(UI.GenericUI):
         ## Add a toolbar icon for the filter:
         self.toolbar(cb=filter_gui, icon='filter.png',
                      tooltip=self.defaults.get('filter','Click here to filter table'))
+
+        ## This is a toolbar popup which allows some fields to be hidden:
+        def hide_fields(query, result):
+            if query.has_key('submit'):
+                del query['submit']
+                result.refresh(0,query,pane='parent')
+                return
+            
+            result.heading("Hide Columns")
+            
+            result.start_form(query, pane='self')
+            for i in range(len(elements)):
+                result.checkbox(elements[i].name, '_hidden', "%s" % i)
+
+            result.end_form()
+
+        self.toolbar(cb=hide_fields, icon='spanner.png',
+                     tooltip="Hide columns")
+
+        ## This part allows the user to save the table in CSV format:
+        def save_table(query,result):
+            def generate_output(rows_left):
+                if rows_left==0:
+                    rows_left=sys.maxint
+                    
+                row_number = 0
+                data = cStringIO.StringIO()
+                hidden_columns = [ int(i) for i in query.getarray('_hidden')]
+
+                names_list = [ elements[i].name for i in range(len(elements)) if i not in hidden_columns ]
+                yield "#Pyflag Table widget output\n#Query was %s.\n" % query
+                try:
+                    yield "# Filter: %s\n" % query['filter']
+                except KeyError:
+                    pass
+
+                yield "#Fields: %s\n""" % ",".join(names_list)
+
+                csv_writer = csv.DictWriter(data,names_list,dialect='excel')
+
+                while rows_left>0:
+                ## Do the query now - we issue multiple queries
+                ## because we have a better chance of hitting the
+                ## cache this way.
+                    rows_to_fetch = min(rows_left,100)
+                    rows_left -= rows_to_fetch
+                    dbh.cached_execute(sql, limit=row_number, length=rows_to_fetch)
+                    count = 0
+                    for row in dbh:
+                        count += 1
+                        result = {}
+                        for i in range(len(elements)):
+                            if i in hidden_columns: continue
+
+                            ## Allow the ColumnType to translate the data to csv suitability.
+                            key = elements[i].name
+                            result[key] = elements[i].csv(row[key].__str__())
+                            
+                        csv_writer.writerow(result)
+                    if count==0: break
+                    data.seek(0)
+                    tmp=data.read()
+                    yield tmp
+                    data.truncate(0)
+
+            if query.has_key('save_length'):            
+                result.generator.generator = generate_output(int(query['save_length']))
+                result.generator.content_type = "text/csv"
+                result.generator.headers = [("Content-Disposition","attachment; filename=%s_%s.csv" %(case,table) ),]
+                return
+
+            result.heading("Save Table output")
+            result.start_form(query)
+            result.textfield("How many rows to save? (0 for all rows)", "save_length")
+            result.end_form()
+            
+        self.toolbar(save_table,'Save Table',icon="floppy.png")
 
     def text(self,*cuts,**options):
         wrap = config.WRAP

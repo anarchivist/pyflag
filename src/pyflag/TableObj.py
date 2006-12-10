@@ -360,14 +360,11 @@ class ColumnType:
     responsible for displaying the values from the column and are used
     to generate SQL.
     """
-    def __init__(self, name='', sql='', link='', callback=''):
+    def __init__(self, name='', sql='', link='', callback=None):
         self.name = name
         self.sql = sql
         self.link = link
-        if callback:
-            self.callback = callback
-        ## Not specified - the identity callable
-        else: self.callback=lambda x: x
+        self.callback = callback
 
     ## These are the symbols which will be treated literally
     symbols = {
@@ -432,7 +429,18 @@ class ColumnType:
             return result
         
         return value
-    
+
+    def csv(self, value):
+        """ This outputs data for csv output"""
+        ## We seem to need to escape this for some stupid spreadsheets
+        value.replace("\n","\\n")
+        value.replace("\r","\\r")
+
+        ## If we have a callback we cant render anything:
+        if self.callback:
+            return "-"
+        else: return value
+
 class TimestampType(ColumnType):
     def operator_after(self, column, operator, arg):
         ## FIXME Should parse arg as a date - for now pass though to mysql
