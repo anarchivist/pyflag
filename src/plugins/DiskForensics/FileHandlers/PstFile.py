@@ -138,7 +138,12 @@ class PstScan(GenScanFactory):
                     to_addr = "%s" % item.sentto_address
 
                 dbh=DB.DBO(self.case)
-                dbh.execute("INSERT INTO `email` SET `inode`=%r,`date`=from_unixtime(%s),`to`=%r,`from`=%r,`subject`=%r", (new_inode, item.arrival_date, to_addr, from_addr, item.subject.subj))
+                dbh.insert('email',
+                           inode = new_inode,
+                           _date = "from_unixtime(%s)" % item.arrival_date,
+                           to = to_addr,
+                           _from = "%r" % from_addr,
+                           subject=item.subject.subj)
                 
                 properties = {
                     'mtime':item.arrival_date,
@@ -247,7 +252,12 @@ class PstScan(GenScanFactory):
                     comment = item.comment
 
                 dbh=DB.DBO(self.case)
-                dbh.execute("INSERT INTO `appointment` SET `inode`=%r, `startdate`=from_unixtime(%s), `enddate`=from_unixtime(%s), `location`=%r, `comment`=%r",(new_inode, item.start, item.end, location, comment))
+                dbh.insert('appointment',
+                           inode = new_inode,
+                           _startdate = "from_unixtime(%s)" % item.start,
+                           _enddate = "from_unixtime(%s)" % item.end,
+                           location = location,
+                           comment = comment)
 
             def add_journal(new_inode,name,item):
                 add_other(new_inode,name,item)
@@ -259,7 +269,12 @@ class PstScan(GenScanFactory):
                     comment = item.comment
 
                 dbh=DB.DBO(self.case)
-                dbh.execute("INSERT INTO `journal` SET `inode`=%r, `startdate`=from_unixtime(%s), `enddate`=from_unixtime(%s), `type`=%r, `comment`=%r",(new_inode, item.start, item.end, jtype, comment))
+                dbh.insert("journal",
+                           inode = new_inode,
+                           _startdate = "from_unixtime(%s)" % item.start,
+                           _enddate = "from_unixtime(%s)" % item.end,
+                           type = jtype,
+                           comment = comment)
 
             ## Just walk over all the files
             for root, dirs, files in self.fd.pst_handle.walk():

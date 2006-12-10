@@ -330,7 +330,7 @@ class TableTest(PopUpTest):
         dbh.execute("drop table if exists TestTable")
         dbh.execute("""create TABLE `TestTable` (
         `id` int(11) NOT NULL auto_increment,
-        `time` int(11) NOT NULL default '0',
+        `time` TIMESTAMP,
         `data` tinyblob NOT NULL,
         `foobar` varchar(10),
         `ip_addr` int(11) unsigned default 0,
@@ -357,9 +357,9 @@ class TableTest(PopUpTest):
         
         result.table(
                          ## Can use keyword args
-            elements = [ ColumnType(name = 'TimeStamp',
-                                    sql = 'from_unixtime(time)',
-                                    ),
+            elements = [ TimestampType(name = 'TimeStamp',
+                                       column = 'time',
+                                       ),
                          
                          ## Or positional args
                          ColumnType('Data', 'data',

@@ -148,7 +148,7 @@ class HTTP:
     def parse(self):
         """ We assume that we were given the combined stream and we parse it.
 
-        We are a generator returning offset:length for HTTP messages,
+        We are a generator returning offset,length for HTTP messages,
         as well as their URLs.
         """
         while True:
@@ -164,7 +164,7 @@ class HTTP:
                 offset = self.fd.tell()
                 self.skip_body(self.response)
                 end = self.fd.tell()
-                yield "%s:%s" % (offset, end-offset)
+                yield (offset, end-offset)
 
     def identify(self):
         offset = self.fd.tell()
@@ -292,11 +292,12 @@ class HTTPScanner(StreamScannerFactory):
         ## Iterate over all the messages in this connection
         for f in p.parse():
             if not f: continue
+            offset, size = f
 
             ## Create the VFS node:
             ##path=self.fsfd.lookup(inode="I%s|S%s" % (stream.fd.name, stream.con_id))
             ##path=os.path.dirname(path)
-            new_inode="%s|o%s" % (combined_inode,f)
+            new_inode="%s|o%s:%s" % (combined_inode,offset,size)
 
             try:
                 if 'chunked' in p.response['transfer-encoding']:
@@ -313,7 +314,7 @@ class HTTPScanner(StreamScannerFactory):
 
             self.fsfd.VFSCreate(None,new_inode,
                                 "/HTTP/%s" % (escape(p.request['url'])),
-                                mtime=stream.ts_sec
+                                mtime=stream.ts_sec, size=size
                                 )
 
             ## Store information about this request in the

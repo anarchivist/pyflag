@@ -311,7 +311,8 @@ class Thumbnailer(Image):
                  }    
 
     def display(self):
-        return self.thumbnail.read()
+        ## Maximum length to read:
+        return self.thumbnail.read(2000000)
 
     def GetMagic(self):
         return self.magic

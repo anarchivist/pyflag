@@ -93,7 +93,7 @@ class POP:
             data = self.read_multi_response()
             length = len(data)
             pyflaglog.log(pyflaglog.DEBUG,"Message %s starts at %s in stream and is %s long" % (args[0],start,length))
-            self.files.append((args[0],"%s:%s" % (start,length)))
+            self.files.append((args[0],(start,length)))
 
     def RETR(self,args):
         ## Read the first line to see if it has been successful:
@@ -103,7 +103,7 @@ class POP:
             data = self.read_multi_response()
             length = len(data)
             pyflaglog.log(pyflaglog.DEBUG,"Message %s starts at %s in stream and is %s long" % (args[0],start,length))
-            self.files.append((args[0],"%s:%s" % (start,length)))
+            self.files.append((args[0],(start,length)))
                                                            
     def parse(self):
         line = self.fd.readline().strip()
@@ -174,10 +174,12 @@ class POPScanner(StreamScannerFactory):
             ## Add a new VFS node
             path=self.fsfd.lookup(inode="I%s|S%s" % (stream.fd.name, forward_stream))
             path=os.path.dirname(path)
-            new_inode="%s|o%s" % (combined_inode,f[1])
+            offset, length = f[1]
+            new_inode="%s|o%s:%s" % (combined_inode,offset, length)
             self.fsfd.VFSCreate(None,new_inode,
                                 "%s/POP/Message_%s" % (path,f[0]),
-                                mtime=stream.ts_sec
+                                mtime=stream.ts_sec,
+                                size = length
                                 )
 
             ## Scan the new file using the scanner train. If

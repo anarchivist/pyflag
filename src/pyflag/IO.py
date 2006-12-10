@@ -380,6 +380,8 @@ def open(case, iosource):
         except TypeError:
             raise IOError, "Not a valid IO Data Source: %s" % iosource
 
+        if not optstr:
+            raise IOError("IO source %s not found" % iosource)
         # unmarshal the option tuple from the database
         opts = cPickle.loads(optstr)
         io=subsystems[opts[0][1]](options=opts)

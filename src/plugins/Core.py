@@ -62,6 +62,8 @@ class IO_File(FileSystem.File):
         except TypeError:
             pass
 
+        ## This source should not be scanned directly.
+        self.ignore = True
 
     def read(self, length=None):
         return self.io.read(length)

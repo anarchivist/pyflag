@@ -98,7 +98,7 @@ class SMTP:
             length = end-start
             self.count += 1
             pyflaglog.log(pyflaglog.DEBUG,"Message starts at %s in stream and is %s long" % (start,length))
-            return (self.count,"%s:%s" % (start,length))
+            return (self.count,(start,length))
 
     def parse(self):
         while 1:
@@ -113,8 +113,7 @@ class SMTP:
             try:
                 int(line[:3])
                 continue
-            except:
-                pass
+            except:                pass
 
             tmp = line.split(":")
             command = tmp[0].split(" ")
@@ -145,14 +144,16 @@ class SMTPScanner(StreamScannerFactory):
         ## Iterate over all the messages in this connection
         for f in p.parse():
             if not f: continue
+
+            offset,length = f
             
             ## Create the VFS node:
             path=self.fsfd.lookup(inode="I%s|S%s" % (stream.fd.name, forward_stream))
             path=os.path.dirname(path)
-            new_inode="%s|o%s" % (combined_inode,f[1])
+            new_inode="%s|o%s:%s" % (combined_inode,offset,length)
             self.fsfd.VFSCreate(None, new_inode,
                                 "%s/SMTP/Message_%s" % (path,f[0]),
-                                mtime = stream.ts_sec
+                                mtime = stream.ts_sec, size=length
                                 )
             
             ## Scan the new file using the scanner train. If

@@ -216,7 +216,7 @@ class StreamFile(File):
         fsfd = FileSystem.DBFS(self.case)
         inode = self.inode[:self.inode.rfind("|")] +"|S%s" % stream_ids[0]
         pathname = os.path.dirname(fsfd.lookup(inode = inode))+"/combined"
-        fsfd.VFSCreate(None, self.inode, pathname)
+        fsfd.VFSCreate(None, self.inode, pathname, size=outfd_len)
 
     def get_packet_id(self, position=None):
         """ Gets the current packet id (where the readptr is currently at) """
@@ -352,8 +352,11 @@ class OffsetFile(File):
 
         try:
             self.size=int(tmp[1])
+            if self.size == 0: self.size=sys.maxint
         except IndexError:
             self.size=sys.maxint
+
+        self.size = min(self.size,fd.size)
 
     def seek(self,offset,whence=0):
         if whence==2:

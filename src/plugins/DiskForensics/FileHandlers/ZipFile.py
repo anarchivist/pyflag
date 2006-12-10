@@ -210,7 +210,7 @@ class ZipFile(File):
         ## Initialise our internal variables:
         self.seek(0)
 
-    def read(self,length=sys.maxint):
+    def read(self,length=None):
         ## Call our baseclass to see if we have cached data:
         try:
             return File.read(self,length)

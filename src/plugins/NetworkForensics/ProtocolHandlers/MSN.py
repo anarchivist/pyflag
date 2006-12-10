@@ -1266,13 +1266,15 @@ class message:
                     parser = ContextParser()
                     parser.feed(context)
                     filename = parser.context_meta_data['location']
-                    size=parser.context_meta_data['size']
                     if len(filename)<1: raise IOError
                 except:
                     ## If the context line is not a valid xml line, we
                     ## just make a filename off its printables.
                     filename = ''.join([ a for a in context if a in allowed_file_chars ])
-                    size=0
+
+                try:
+                    size=parser.context_meta_data['size']
+                except: size = len(data)
 
                 try:
                     mtime = self.fd.ts_sec
@@ -1633,33 +1635,35 @@ class BrowseMSNUsers(BrowseMSNSessions):
         result.heading("MSN User Information Captured")
         
         result.table(
-            columns = ['inode','session_id','concat(from_unixtime(pcap.ts_sec),".",pcap.ts_usec)','user_data_type','nick','user_data','cast(packet_id as char)','transaction_id'],
-            names = ['Stream','Session ID','Timestamp','Data Type','Nick','User Data','Packet','Transaction ID'],
+            elements = [ InodeType("Stream","inode",
+                                   link = query_type(family="Disk Forensics",
+                                                     case=query['case'],
+                                                     report='View File Contents',
+                                                     __target__='inode',
+                                                     mode="Combined streams")),
+                         ColumnType("Session ID","session_id",
+                                    link = query_type(family="Network Forensics",
+                                                      case=query['case'],
+                                                      report='BrowseMSNSessions', 
+                                                      __target__='filter',
+                                                      filter='"Session ID" = %s')),
+                         TimestampType('Timestamp','pcap.ts_sec'),
+                         ColumnType('Data Type', 'user_data_type'),
+                         ColumnType('Nick', 'nick',
+                                    link = query_type(family="Network Forensics",
+                                                      case=query['case'],
+                                                      report='BrowseMSNUsers',
+                                                      filter='Nick = "%s"',
+                                                      __target__='filter')),
+                         ColumnType("Packet","packet_id",
+                                    link = query_type(family="Network Forensics",
+                                                      case=query['case'],
+                                                      report='View Packet',
+                                                      __target__='id')),
+                         ColumnType("Transaction ID","transaction_id"),
+                         ],
             table = "msn_users join pcap on packet_id=id",
             case = query['case'],
-            links=[FlagFramework.query_type((),
-                                            family="Network Forensics", case=query['case'],
-                                            report='BrowseMSNSessions', 
-                                            __target__='where_Stream'),
-                   FlagFramework.query_type((),
-                                            family="Network Forensics", case=query['case'],
-                                            report='BrowseMSNSessions', 
-                                            __target__='where_Session ID'),
-                   None,
-                   FlagFramework.query_type((),
-                                              family="Network Forensics", case=query['case'],
-                                              report='BrowseMSNUsers', 
-                                              __target__='where_Data Type'),
-                   FlagFramework.query_type((),
-                                              family="Network Forensics", case=query['case'],
-                                              report='BrowseMSNUsers', 
-                                              __target__='where_Nick'),
-                   None,
-                   FlagFramework.query_type((),
-                                            family="Network Forensics", case=query['case'],
-                                            report='View Packet',
-                                            __target__='id')
-                   ]
             )
 
 if __name__ == "__main__":

@@ -94,6 +94,8 @@ class RFC2822(Scanner.GenScanFactory):
                         continue
 
                     filename = part.get_filename()
+                    data = part.get_payload(decode=1)
+
                     ## Sometimes the filename is specified in the
                     ## content-type header:
                     try:
@@ -108,7 +110,7 @@ class RFC2822(Scanner.GenScanFactory):
 
                     ## Create the VFS node:
                     self.ddfs.VFSCreate(self.inode,"m%s" % count, filename,
-                                        mtime = time.mktime(date)
+                                        mtime = time.mktime(date), size=len(data)
                                         )
 
                     ## Now call the scanners on new file:

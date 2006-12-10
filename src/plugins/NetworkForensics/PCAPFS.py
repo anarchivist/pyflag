@@ -206,6 +206,12 @@ class PCAPFS(DBFS):
 
             ## If the stream is empty we dont really want to record it.
             if len(s['seq'])==0: return
+
+            ## Figure out the size of the stream:
+            try:
+                size = s['seq'][-1] + s['length'][-1] - s['seq'][0]
+            except:
+                size = 0
 	    
             ## Create a new VFS node:
             new_inode = "I%s|S%s" % (iosource_name, s['con_id'])
@@ -219,7 +225,8 @@ class PCAPFS(DBFS):
                                             s['dest_port'],
                                             s['src_port'],
                                             s['direction']),
-                    mtime = mtime
+                    mtime = mtime,
+                    size=size
                     )
             else:
                 self.VFSCreate(
@@ -231,7 +238,8 @@ class PCAPFS(DBFS):
                                             s['src_port'],
                                             s['dest_port'],
                                             s['direction']),
-                    mtime = mtime
+                    mtime = mtime,
+                    size=size
                     )
                 
             for i in range(len(s['seq'])):
