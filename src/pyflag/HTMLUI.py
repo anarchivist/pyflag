@@ -48,7 +48,7 @@ class HTTPObject:
     def __init__(self):
         self.content_type=None
         self.generator=None
-        self.headers=None
+        self.headers=[]
 
 
 def goto_row_cb(query,result,variable='limit'):

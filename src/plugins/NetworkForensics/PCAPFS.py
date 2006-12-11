@@ -100,7 +100,7 @@ class PCAPFS(DBFS):
         `iosource` varchar(50),
         `offset` BIGINT NOT NULL ,
         `length` INT NOT NULL ,
-        `ts_sec` INT NOT NULL ,
+        `ts_sec` TIMESTAMP,
         `ts_usec` INT NOT NULL,
         `link_type`  TINYINT not null,
         KEY `id` (`id`)
@@ -124,7 +124,7 @@ class PCAPFS(DBFS):
             `dest_ip` int(11) unsigned NOT NULL default '0',
             `dest_port` int(11) unsigned NOT NULL default '0',
             `isn` int(100) unsigned NOT NULL default 0,
-            `ts_sec` int(100) unsigned NOT NULL default 0,
+            `ts_sec` TIMESTAMP default 0,
             KEY `con_id` (`con_id`)
             )""")
         
@@ -266,16 +266,13 @@ class PCAPFS(DBFS):
         dbh.mass_insert_start("pcap")
         link_type = int(pcap_file['linktype'])
 
-        ## A small test:
-        ##pcap_file.start_of_file = 0x7FFFF985
-        
         for p in pcap_file:
             ## Store information about this packet in the db:
             dbh.mass_insert(
                 iosource = iosource_name,
                 offset = p.buffer.offset,
                 length = p.size(),
-                ts_sec = int(p['ts_sec']),
+                _ts_sec = "from_unixtime(%s)" % p['ts_sec'],
                 ts_usec = int(p['ts_usec']),
                 link_type = link_type,
                 id = max_id

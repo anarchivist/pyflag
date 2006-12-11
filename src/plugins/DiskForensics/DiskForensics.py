@@ -300,7 +300,7 @@ class Timeline(Reports.report):
         result.heading("File Timeline for Filesystem")
         result.table(
             elements=[ TimestampType('Timestamp','time'),
-                       InodeType('Inode','inode'),
+                       InodeType('Inode','inode', case=query['case']),
                        DeletedType('Del','status'),
                        BinaryType('m',"m"),
                        BinaryType('a',"a"),

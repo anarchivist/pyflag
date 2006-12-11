@@ -699,9 +699,17 @@ class File:
         result.row(self.__class__.__name__, self.__doc__)
 
     def summary(self,query,result):
-        """ This method draws a summary of the file """
-        image = Graph.Preview(self)
-        result.image(image)
+        """ This method draws a summary of the file.
+
+        We basically hand off all processing to the ViewFile report -
+        we just store it here in an iframe.
+        """
+        new_query = FlagFramework.query_type(family ="Network Forensics",
+                                             report ="ViewFile",
+                                             case   =query['case'],
+                                             inode  =self.inode)
+        
+        result.result = "<iframe height='100%%' width='100%%' src='%s'></iframe>" % new_query
         
     def download(self, query,result):
         """ Used for dumping the entire file into the browser """

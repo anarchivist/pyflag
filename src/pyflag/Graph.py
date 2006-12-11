@@ -323,13 +323,3 @@ class Thumbnailer(Image):
     def SetFormat(self,format):
         """ We only support jpeg here """
         return 'jpeg'
-
-class Preview(Thumbnailer):
-    """ This class is used to display a long detailed view of the file """
-    def __init__(self,fd):
-        Thumbnailer.__init__(self,fd,0)
-
-    def JpegHandler(self):
-        print "Handling jpeg"
-        self.thumbnail = self.fd
-        self.thumbnail.seek(0)
