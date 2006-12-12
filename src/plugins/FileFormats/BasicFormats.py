@@ -91,6 +91,9 @@ class WORD(BasicType):
     def __str__(self):
         return "0x%X" % (self.data,)
 
+class USHORT(WORD):
+    pass
+
 class LONG(BasicType):
     fmt='=l'
     visible = True
@@ -290,7 +293,7 @@ class StructArray(SimpleStruct):
         except:
             self.count=0
 
-        self.fields = [ [i,self.target_class] for i in range(self.count)]        
+        self.fields = [ [i,self.target_class, kwargs] for i in range(self.count)]        
         SimpleStruct.__init__(self,buffer,*args,**kwargs)
 
     def __str__(self):
@@ -476,13 +479,15 @@ class BitField(BYTE):
 
 class UCS16_STR(STRING):
     visible = True
+
+    encoding = "utf_16_le"
     
     def  read(self):
         result=STRING.read(self)
 
         ## This is the common encoding for windows system:
         try:
-            return result.decode("utf_16_le")
+            return result.decode(self.encoding)
         except UnicodeDecodeError:
             if result=='\0':
                 return ''

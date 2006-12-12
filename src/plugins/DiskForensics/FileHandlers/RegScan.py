@@ -292,3 +292,12 @@ class InterestingRegKey(Reports.report):
             result.para("Error reading the registry keys table. Did you remember to run the registry scanner?")
             result.para("Error reported was:")
             result.text(e,color="red")
+
+class BrowseRegistryFile(DiskForensics.BrowseFS):
+    """ Browse a Standalone Windows Registry File"""
+    description = "Browse a Standalone Windows Registry File without needing to load it into the VFS "
+    name = "Browse Registry File"
+    parameters = {"filename":"filename"}
+
+    def form(self, query, result):
+        result.fileselector("Registry file","filename")
