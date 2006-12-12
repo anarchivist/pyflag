@@ -27,6 +27,10 @@ import pyflag.Reports as Reports
 import pyflag.Registry as Registry
 import pyflag.DB as DB
 import sys,re,string
+import HTMLParser
+import StringIO
+import re
+from FlagFramework import query_type
 
 class ViewFile(Reports.report):
     """
@@ -65,8 +69,12 @@ class ViewFile(Reports.report):
         result.generator.content_type = content_type
 
         ## Now establish the content type
-        
-        result.generator.generator=self.default_handler(fd)
+        for k,v in self.dispatcher.items():
+            if k.search(content_type):
+                result.generator.generator=v(self,fd)
+                
+        if not result.generator.generator:
+            result.generator.generator=self.default_handler(fd)
 
     def default_handler(self, fd):
         while 1:
@@ -74,216 +82,134 @@ class ViewFile(Reports.report):
             yield data
             
             if not data: break
+
+    def html_handler(self,fd):
+        """ We sanitise the html here """
+        sanitiser = HTMLSanitiser(fd.case, fd.inode)
+        while 1:
+            data = fd.read(1000000)
+            try:
+                if data:
+                    sanitiser.feed(data)
+                else:
+                    sanitiser.close()
+            except HTMLParser.HTMLParseError:
+                pass
             
+            yield sanitiser.read()
+            
+            if not data: break
+    
+    dispatcher = { re.compile("text/html"): html_handler }
 
-Allowable_tags = {	 'b' : 1,
-                         'i' : 1,
-                         'a' : 2,
-                         'img' : 2,
-                         'em' : 1,
-                         'br' : 1,
-                         'strong' : 1,
-                         'blockquote' : 1,
-                         'tt' : 1,
-                         'li' : 1,
-                         'ol' : 1,
-                         'ul' : 1,
-                         'p' : 1,
-                         'table' : 2,
-                         'td' : 2,
-                         'tr' : 2,
-                         '!--pagebreak--' : 1,
-                         'h1' : 1,
-                         'h2' : 1,
-                         'h3' : 1,
-                         'pre' : 1,
-                         'html' : 1,
-                         'font' : 2,
-                         'body' : 1,
-                         'code' : 1,
-		}
+class HTMLSanitiser(HTMLParser.HTMLParser):
+    """ This parser is used to sanitise the html and resolve any
+    references back into the case if possible.
+    """
 
-Allowable_attribs = ['COLOR', 	'BGOLOR', 'WIDTH', 'BORDER',
-			'RULES', 'CELLSPACING', 
-			'CELLPADDING', 'HEIGHT',
-			'ALIGN', 'BGCOLOR', 'ROWSPAN', 
-			'COLSPAN', 'VALIGN', 
-			'COMPACT', 'HREF', 
-			'TYPE', 'START', 'SRC']
+    ## No other tags will be allowed (especially script tags)
+    allowable_tags = [ 'b','i','a','img','em','br','strong', 'blockquote',
+                       'tt', 'li', 'ol', 'ul', 'p', 'table', 'td', 'tr',
+                       'h1', 'h2', 'h3', 'pre', 'html', 'font', 'body',
+                       'code', 'head', 'meta', 'title','style', 'form',
+                       'sup', 'input', 'span', 'label']
 
+    allowable_attributes = ['color', 'bgolor', 'width', 'border',
+                            'rules', 'cellspacing', 
+                            'cellpadding', 'height',
+                            'align', 'bgcolor', 'rowspan', 
+                            'colspan', 'valign','id', 'class','style','name', 
+                            'compact', 'type', 'start', 'rel',
+                            'http-equiv', 'content', 'value', 'checked'
+                            ]
 
-class tag_counter:
-	"Counter for tags"
-	def __init__(self):
-		self.tag_hash ={}
-	
-	def add_tag(self,in_tag):
-		tag_exists=False
-		for tag in self.tag_hash.keys():
-			if in_tag==tag:
-				tag_exists=True
-		if tag_exists:
-			self.tag_hash[in_tag]+=1
-		else:
-			self.tag_hash[in_tag]=1
-			
-	
-	def remove_tag(self,in_tag):
-		tag_exists=False
-		for tag in self.tag_hash.keys():
-			if in_tag==tag:
-				tag_exists=True
-		if tag_exists:
-			if self.tag_hash[in_tag]>=1:
-				self.tag_hash[in_tag]-=1
+    def __init__(self, case,inode):
+        HTMLParser.HTMLParser.__init__(self)
+        ## Output will be written to this
+        self.output = StringIO.StringIO()
+        self.dbh = DB.DBO(case)
+        self.inode = inode
+        self.case = case
+        self.dbh.execute("select url from http where inode=%r", self.inode)
+        row=self.dbh.fetch()
+        url = row['url']
+        m=re.search("(http|ftp)://([^/]+)/([^?]*)",url)
+        self.method = m.group(1)
+        self.host = m.group(2)
+        self.base_url = m.group(3)
+        if "/" in self.base_url:
+            self.base_url=self.base_url[:self.base_url.rfind("/")]
 
-			else:
-				#print "close tag before open"+in_tag
-				pass
-		else:
-			#print "this tag wasn't opened"
-			pass
+    def read(self):
+        """ return any data parsed so far """
+        self.output.seek(0)
+        data = self.output.read()
+        self.output.truncate(0)
+        return data
+    
+    def handle_starttag(self, tag, attrs):
+        if tag not in self.allowable_tags:
+            tag = "REMOVED style='display: hidden;' %s" % tag
 
-	def print_hash(self):
-		print self.tag_hash
-	
-	def get_closure(self):
-		close_string=''
-		tags_not_closed=('img','p','br','li','!--pagebreak--')
-		for tag in self.tag_hash.keys():
-			if self.tag_hash[tag]!=0 and \
-			   not tag in tags_not_closed:
-			   	close_string += '</' + tag + '>'
-		return close_string
-				
+        sanitised_attrs = []
+        for name,value in attrs:
+            name = name.lower()
+            if name in  self.allowable_attributes:
+                sanitised_attrs.append((name,value))
+            elif name=='href':
+                sanitised_attrs.append((name, "javascript: alert(%r)" % value))
+            elif name=='src':
+                sanitised_attrs.append((name, self.resolve_reference(value)))
+            
+        tmp = " ".join( [ "%s=%r" % (x[0],x[1]) for x in sanitised_attrs if not x[1]==None ])
+        tmp +=" "+ " ".join( [ "%s" % x[0] for x in sanitised_attrs if x[1]==None ])
+        self.output.write("<%s %s>" % (tag,tmp))
 
-# Routine to sanitize the html within a file
-def html_san(input):  
-	output=''
-	# initiate a new tag_counter
-	global tag_count
-	tag_count = tag_counter()
-	# Read the file into a variable	
+    def resolve_reference(self, reference):
+        """ This tries to find the relevant reference in the database"""
+        ## Absolute reference
+        if reference.startswith("/"):
+            reference="%s://%s%s" % (self.method, self.host,reference)
+        else:
+            reference="%s://%s/%s/%s" % (self.method, self.host, self.base_url, reference)
+        
+        self.dbh.execute("select inode from http where url=%r limit 1", reference)
+        row = self.dbh.fetch()
+        if row:
+            return "%s" % query_type(case=self.case, family="Network Forensics",
+                                     report="ViewFile", inode=row['inode'])
+        
+        return '#'
+    def handle_data(self,data):
+        self.output.write(data)
 
-	# pick out all of the tags, and attributes from the file
-	exp1 = re.compile(r'(?sm)(.*?)([<].*?[>])(.*?)')
-	# go through each tab and decide how 
-	# to put the file back together
-	values_list =[]
-	for val in exp1.finditer(input):
-		values_list.append(val.group(1))
-		values_list.append(val.group(2))
-		values_list.append(val.group(3))
+    def handle_endtag(self, tag):
+        if tag not in self.allowable_tags:
+            tag = "REMOVED %s" % tag
+        
+        self.output.write("</%s>" % tag)
 
-	for val in values_list:
-		val_new = tag_san(val)
-		output+= val_new
-	#check if we need to close any tags
-	output+=tag_count.get_closure()
-	output+='\n'
-	return output
-	
-# Routine to sanitize tags
-def tag_san(val_in):
-	# is this a tag and is it allowed?
-	return_val = ''
-	exp2 = re.compile(r'(?sm)^\s*<\s*(\/)?(\S+)\s*(.*)>$')
-	results = exp2.match(val_in)
-	if results:
-		#this is a tag		
-		#is it a tag we allow?
-		allowed=False	#flag for allowed
-		attribs=1	#flag for attribs
-		for tag in html_allowed.Allowable_tags.keys():
-			if results.group(2).lower()==tag:
-				allowed=True
-				attribs=html_allowed.Allowable_tags[tag]
-		if allowed:
-		
-			#this tag is allowed
-			#set up the start of the tag
-			return_val='<'
+    def handle_decl(self,decl):
+        self.output.write("<!%s>" % decl)
 
-			if results.group(1):
-				# is this a closing tag?
-				return_val+='/'
-				tag_count.remove_tag(results.group(2).lower())
-				
-			else:
-				tag_count.add_tag(results.group(2).lower())
-			
-			
-			if attribs==1:
-				#no attribs are allowed
-				return_val+=results.group(2).strip()  + '>'
-			else:
-				#first add the tag
-				return_val+= results.group(2).strip()
-				#we must check the attribs
-				#are there any attribs?
-				
-				if len(results.group(3))>0:
-					#we have some attribs to check
-					attribs_in = results.group(3)
-					attribs_out = attrib_san(attribs_in)
-					return_val+= attribs_out + '>'
-				else:
-					return_val+='>'
-				
-		else:
-			#this tag is not allowed
-			return_val='<REMOVED '+results.group(2)+' REMOVED>'
-	else:
-		#this is not a tag, do nothing
-		return_val=val_in
-	
-	return return_val
-	
-	
-# Routing to Sanitize attributes	
-def attrib_san(attribs_in):
-	# pick out all the attributes
-	exp3=re.compile(r'(?sm)(.*?)=([\'\"].*?[\'\"])*')
-	results=exp3.findall(attribs_in)
-	attribs_out =''
-	for attrib in results:
-		#first fix the formatting
-		this_attrib = attrib[0].upper().strip()
-		this_attrib = re.split(r'(\S+)',this_attrib)[1]
-		#is this an allowed attribute
-		for allowed_attrib in html_allowed.Allowable_attribs:
-			if this_attrib==allowed_attrib and check_href(attrib):
-				attribs_out+= ' '+ attrib[0]+'='+attrib[1] 	
-			else:
-				#not allowable, do nothing
-				pass
-	return attribs_out
-	
-	
-# Routine to check the format for href/src attributes
-def check_href(in_attrib):
-	if in_attrib[0].lower().strip()=='href' or 'src':
-		if re.findall(r'(?smi)^["\']?(ftp|http|\/)',in_attrib[1]):
-			# this attrib is good
-			return True
-		else:
-			# we don't know this so drop it
-			return False
-	#this attrib is okay
-	return True
+    def handle_comment(self,comment):
+        self.output.write("<!--%s-->" % comment)
 
+    def handle_entityref(self,entity):
+        self.output.write("&%s;" % entity)
 
-# Main function for program
-if  __name__ == "__main__":
-	if len(sys.argv) == 3:
-	# Must be operating on two files
-#	# Open the files
-		in_f = open(sys.argv[1],'r')
-		out_f = open(sys.argv[2],'w')
-		html_san(in_f,out_f)
-#
-	else:
-#	# Maybe we are reading/writing from std_in,std_out
-		html_san(sys.stdin,sys.stdout)
-
-
+## This is a fix for a bug in HTMLParser's regex:
+HTMLParser.locatestarttagend = re.compile(r"""
+  <[a-zA-Z][-.a-zA-Z0-9:_]*          # tag name
+  (?:\s+                             # whitespace before attribute name
+    (?:[a-zA-Z_][-.:a-zA-Z0-9_]*     # attribute name
+      (?:\s*=\s*                     # value indicator
+        (?:'[^']*'                   # LITA-enclosed value
+          |\"[^\"]*\"                # LIT-enclosed value
+          |[^'\">\s]+                # bare value
+         )?
+       )?
+     )
+   )*
+  \s*                                # trailing whitespace
+""", re.VERBOSE)
