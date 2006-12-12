@@ -26,6 +26,41 @@
  * read (read from path)
  */
 
+static u_int8_t
+inode_walk_callback(FS_INFO *fs, FS_INODE *fs_inode, int flags, void *ptr) {
+    PyObject *inode, *list;
+    list = (PyObject *)ptr;
+    
+    // add each ntfs data attribute
+    if (((fs->ftype & FSMASK) == NTFS_TYPE) && (fs_inode)) {
+        FS_DATA *fs_data;
+
+        for(fs_data = fs_inode->attr; fs_data; fs_data = fs_data->next) {
+            if(!(fs_data->flags & FS_DATA_INUSE))
+                continue;
+
+            if(fs_data->type == NTFS_ATYPE_DATA) {
+                inode = (PyObject *)PyObject_New(skfs_inode, &skfs_inodeType);
+                ((skfs_inode *)inode)->inode = fs_inode->addr;
+                ((skfs_inode *)inode)->type = fs_data->type;
+                ((skfs_inode *)inode)->id = fs_data->id;
+                ((skfs_inode *)inode)->alloc = (flags & FS_FLAG_META_ALLOC) ? 1 : 0;
+
+                PyList_Append(list, inode);
+            }
+        }
+    } else {
+        // regular filesystems dont have type-id, make them 0
+        inode = (PyObject *)PyObject_New(skfs_inode, &skfs_inodeType);
+        ((skfs_inode *)inode)->inode = fs_inode->addr;
+        ((skfs_inode *)inode)->type = 0;
+        ((skfs_inode *)inode)->id = 0;
+        ((skfs_inode *)inode)->alloc = (flags & FS_FLAG_META_ALLOC) ? 1 : 0;
+
+        PyList_Append(list, inode);
+    }
+	return WALK_CONT;
+}
 
 /* Here are a bunch of callbacks and helpers used to give sk a more filesystem
  * like interface */
@@ -50,8 +85,8 @@ void listdent_add_dent(FS_DENT *fs_dent, FS_DATA *fs_data, int flags, struct den
         p->path = talloc_asprintf_append(p->path, ":%s", fs_data->name);
     } 
 
-    if(flags & FS_FLAG_NAME_UNALLOC)
-	    p->path = talloc_asprintf_append(p->path, " (deleted%s)", ((fs_dent->fsi) && (fs_dent->fsi->flags & FS_FLAG_META_ALLOC)) ? "-realloc" : "");
+    //if(flags & FS_FLAG_NAME_UNALLOC)
+	//    p->path = talloc_asprintf_append(p->path, " (deleted%s)", ((fs_dent->fsi) && (fs_dent->fsi->flags & FS_FLAG_META_ALLOC)) ? "-realloc" : "");
 
     p->inode = fs_dent->inode;
     p->ent_type = fs_dent->ent_type;
@@ -400,6 +435,34 @@ skfs_walk(skfs *self, PyObject *args, PyObject *kwds) {
     return (PyObject *)iter;
 }
 
+/* perform an inode walk, return a list of inodes. This is best only used to
+ * find unallocated (deleted) inodes as it builds a list in memory and returns
+ * it (skfs.walk by contrast uses a generator). */
+static PyObject *
+skfs_iwalk(skfs *self, PyObject *args, PyObject *kwds) {
+    int alloc=0, unalloc=1, flags=0;
+    PyObject *fileargs, *filekwds;
+    PyObject *list;
+    INUM_T inode=0;
+
+    static char *kwlist[] = {"inode", "alloc", "unalloc", NULL};
+
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "K|ii", kwlist, &inode, 
+                                    &alloc, &unalloc))
+        return NULL; 
+
+    // ignore args for now and just do full walk (start->end)
+    // flags are set to find all unlinked files (alloc or unalloc)
+    // and only used inodes.
+    flags = FS_FLAG_META_UNLINK;
+        
+    list = PyList_New(0);
+    self->fs->inode_walk(self->fs, self->fs->first_inum, self->fs->last_inum, flags, 
+            (FS_INODE_WALK_FN) inode_walk_callback, (void *)list);
+
+    return list;
+}
+
 /* stat a file */
 static PyObject *
 skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
@@ -483,7 +546,6 @@ skfs_fstat(skfs *self, PyObject *args) {
     return result;
 }
 
-
 /* this new object is requred to support the iterator protocol for skfs.walk
  * */
 static void 
@@ -536,6 +598,7 @@ skfs_walkiter_init(skfs_walkiter *self, PyObject *args, PyObject *kwds) {
     /* add the start path */
     root = talloc(self->walklist, struct dentwalk);
     root->type = root->id = 0;
+    root->flags = FS_FLAG_NAME_ALLOC;
 
     if(inode == 0) {
         tsk_error_reset();
@@ -588,10 +651,12 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
         PyObject *inode_val, *name_val, *inode_name_val;
         
         /* build all the objects */
-        inode_val = (PyObject *)PyObject_New(skfile, &skfs_inodeType);
+        inode_val = (PyObject *)PyObject_New(skfs_inode, &skfs_inodeType);
         ((skfs_inode *)inode_val)->inode = dwtmp->inode;
         ((skfs_inode *)inode_val)->type = dwtmp->type;
         ((skfs_inode *)inode_val)->id = dwtmp->id;
+        ((skfs_inode *)inode_val)->alloc = (dwtmp->flags & FS_FLAG_NAME_ALLOC) ? 1 : 0;
+
         name_val = PyString_FromString(dwtmp->path);
         inode_name_val = Py_BuildValue("(OO)", inode_val, name_val);
 
@@ -634,10 +699,11 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
     }
 
     /* now build root */
-    inode = (PyObject *)PyObject_New(skfile, &skfs_inodeType);
+    inode = (PyObject *)PyObject_New(skfs_inode, &skfs_inodeType);
     ((skfs_inode *)inode)->inode = dw->inode;
     ((skfs_inode *)inode)->type = dw->type;
     ((skfs_inode *)inode)->id = dw->id;
+    ((skfs_inode *)inode)->alloc = (dw->flags & FS_FLAG_NAME_ALLOC) ? 1 : 0;
 
     if((self->myflags & SK_FLAG_INODES) && (self->myflags & SK_FLAG_NAMES))
         root = Py_BuildValue("(Ns)", inode, dw->path);
@@ -662,11 +728,13 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
 
 /************** SKFS_INODE **********/
 static int skfs_inode_init(skfs_inode *self, PyObject *args, PyObject *kwds) {
-    static char *kwlist[] = {"inode", "type", "id", NULL};
+    static char *kwlist[] = {"inode", "type", "id", "alloc", NULL};
+    int alloc;
 
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "Kii", kwlist, 
-                                    &self->inode, &self->type, &self->id))
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "KiiO", kwlist, 
+                                    &self->inode, &self->type, &self->id, alloc))
         return -1; 
+    self->alloc = alloc ? 1 : 0;
     return 0;
 }
 
@@ -682,6 +750,14 @@ static PyObject *skfs_inode_str(skfs_inode *self) {
 static PyObject *
 skfs_inode_getinode(skfs_inode *self, void *closure) {
     return PyLong_FromUnsignedLongLong(self->inode);
+}
+
+static PyObject *
+skfs_inode_getalloc(skfs_inode *self, void *closure) {
+    if(self->alloc)
+        Py_RETURN_TRUE;
+    else
+        Py_RETURN_FALSE;
 }
 
 static PyObject *skfs_inode_long(skfs_inode *self) {

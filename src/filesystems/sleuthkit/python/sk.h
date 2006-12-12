@@ -63,6 +63,7 @@ static int skfs_init(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_listdir(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_open(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_walk(skfs *self, PyObject *args, PyObject *kwds);
+static PyObject *skfs_iwalk(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_stat(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_fstat(skfs *self, PyObject *args);
 
@@ -73,6 +74,8 @@ static PyMethodDef skfs_methods[] = {
      "Open a file" },
     {"walk", (PyCFunction)skfs_walk, METH_VARARGS|METH_KEYWORDS,
      "Walk filesystem from the given path" },
+    {"iwalk", (PyCFunction)skfs_iwalk, METH_VARARGS|METH_KEYWORDS,
+     "Walk inodes" },
     {"stat", (PyCFunction)skfs_stat, METH_VARARGS|METH_KEYWORDS,
      "Stat a file path" },
     {"fstat", (PyCFunction)skfs_fstat, METH_VARARGS,
@@ -190,6 +193,7 @@ typedef struct {
     INUM_T inode;
 	uint32_t type;
 	uint32_t id;
+    char alloc;
 } skfs_inode;
 
 static PyMemberDef skfs_inode_members[] = {
@@ -204,10 +208,13 @@ static int skfs_inode_init(skfs_inode *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_inode_str(skfs_inode *self);
 static PyObject *skfs_inode_long(skfs_inode *self);
 static PyObject *skfs_inode_getinode(skfs_inode *self, void *closure);
+static PyObject *skfs_inode_getalloc(skfs_inode *self, void *closure);
 
 static PyGetSetDef skfs_inode_getseters[] = {
     {"inode", (getter)skfs_inode_getinode, NULL,
      "inode number", NULL},
+    {"alloc", (getter)skfs_inode_getalloc, NULL,
+     "allocation status", NULL},
     {NULL}  /* Sentinel */
 };
 
