@@ -28,6 +28,7 @@ libevf_la_SOURCES       = libevf.c
 libevf_la_LDFLAGS	= -lz
 
 liboo_la_SOURCES	= class.c stringio.c struct.c talloc.c packet.c misc.c
+liboo_la_CPPFLAGS 	= -DHAVE_VA_COPY
 
 libmd5_la_SOURCES	= md5c.c 
 
