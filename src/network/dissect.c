@@ -40,8 +40,6 @@ static char *python_talloc_context;
 
 #include "Python.h"
 
-static void *python_talloc_context;
-
 static PyObject *dissect(PyObject *self, PyObject *args) {
   PyObject *result;
   Root root;
