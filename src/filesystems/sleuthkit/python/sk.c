@@ -47,6 +47,7 @@ inode_walk_callback(FS_INFO *fs, FS_INODE *fs_inode, int flags, void *ptr) {
                 ((skfs_inode *)inode)->alloc = (flags & FS_FLAG_META_ALLOC) ? 1 : 0;
 
                 PyList_Append(list, inode);
+                Py_DECREF(inode);
             }
         }
     } else {
@@ -58,6 +59,7 @@ inode_walk_callback(FS_INFO *fs, FS_INODE *fs_inode, int flags, void *ptr) {
         ((skfs_inode *)inode)->alloc = (flags & FS_FLAG_META_ALLOC) ? 1 : 0;
 
         PyList_Append(list, inode);
+        Py_DECREF(inode);
     }
 	return WALK_CONT;
 }
@@ -180,13 +182,17 @@ listdent_walk_callback_dent(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *pt
 
 /* callback function for dent_walk used by listdir */
 static uint8_t listdent_walk_callback_list(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr) {
+    PyObject *tmp;
     PyObject *list = (PyObject *)ptr;
 
     /* we dont want to add '.' and '..' */
     if(ISDOT(fs_dent->name))
         return WALK_CONT;
 
-    PyList_Append(list, PyString_FromString(fs_dent->name));
+    tmp = PyString_FromString(fs_dent->name);
+    PyList_Append(list, tmp);
+    Py_DECREF(tmp);
+
     return WALK_CONT;
 }
 
@@ -370,7 +376,8 @@ skfs_listdir(skfs *self, PyObject *args, PyObject *kwds) {
     tsk_error_reset();
     self->fs->dent_walk(self->fs, inode, flags, listdent_walk_callback_list, (void *)list);
     if(tsk_errno) {
-      return PyErr_Format(PyExc_IOError, "Unable to list inode %lu: %s", (ULONG)inode, tsk_error_str());
+        Py_DECREF(list);
+        return PyErr_Format(PyExc_IOError, "Unable to list inode %lu: %s", (ULONG)inode, tsk_error_str());
     };
 
     return list;
@@ -408,7 +415,10 @@ skfs_open(skfs *self, PyObject *args, PyObject *kwds) {
     Py_DECREF(fileargs);
     Py_DECREF(filekwds);
 
-    if(ret == -1) return NULL;
+    if(ret == -1) {
+        Py_DECREF(file);
+        return NULL;
+    }
     return (PyObject *)file;
 }
 
@@ -442,7 +452,10 @@ skfs_walk(skfs *self, PyObject *args, PyObject *kwds) {
     Py_DECREF(fileargs);
     Py_DECREF(filekwds);
 
-    if(ret == -1) return NULL;
+    if(ret == -1) {
+        Py_DECREF(iter);
+        return NULL;
+    }
     return (PyObject *)iter;
 }
 
@@ -728,7 +741,7 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
     ((skfs_inode *)inode)->inode = dw->inode;
     ((skfs_inode *)inode)->type = dw->type;
     ((skfs_inode *)inode)->id = dw->id;
-    ((skfs_inode *)inode)->alloc = (dw->flags & FS_FLAG_NAME_ALLOC) ? 1 : 0;
+    ((skfs_inode *)inode)->alloc = dw->alloc; //(dw->flags & FS_FLAG_NAME_ALLOC) ? 1 : 0;
 
     if((self->myflags & SK_FLAG_INODES) && (self->myflags & SK_FLAG_NAMES))
         root = Py_BuildValue("(Ns)", inode, dw->path);
@@ -737,6 +750,7 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
     else if(self->myflags & SK_FLAG_NAMES)
         root = PyString_FromString(dw->path);
     else {
+        Py_DECREF(inode);
         Py_INCREF(Py_None);
         root = Py_None;
     }
@@ -793,10 +807,12 @@ static PyObject *skfs_inode_long(skfs_inode *self) {
 static void
 skfile_dealloc(skfile *self) {
     Py_XDECREF(self->skfs);
-    talloc_free(self->blocks);
+    if(self->blocks)
+        talloc_free(self->blocks);
     if(self->resdata)
         talloc_free(self->resdata);
-    fs_inode_free(self->fs_inode);
+    if(self->fs_inode)
+        fs_inode_free(self->fs_inode);
     self->ob_type->tp_free((PyObject*)self);
 }
 
@@ -992,10 +1008,13 @@ skfile_tell(skfile *self) {
 static PyObject *
 skfile_blocks(skfile *self) {
     struct block *b;
+    PyObject *tmp;
 
     PyObject *list = PyList_New(0);
     list_for_each_entry(b, &self->blocks->list, list) {
-        PyList_Append(list, PyLong_FromUnsignedLongLong(b->addr));
+        tmp = PyLong_FromUnsignedLongLong(b->addr);
+        PyList_Append(list, tmp);
+        Py_DECREF(tmp);
     }
     return list;
 }
