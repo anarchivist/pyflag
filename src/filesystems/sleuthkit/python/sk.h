@@ -56,6 +56,7 @@ typedef struct {
     PyObject_HEAD
 	IMG_INFO *img;
 	FS_INFO *fs;
+    PyObject *root_inum;
 } skfs;
 
 static void skfs_dealloc(skfs *self);
@@ -66,6 +67,12 @@ static PyObject *skfs_walk(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_iwalk(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_stat(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_fstat(skfs *self, PyObject *args);
+
+static PyMemberDef skfs_members[] = {
+    {"root_inum", T_OBJECT, offsetof(skfs, root_inum), 0,
+     "root inode"},
+    {NULL}  /* Sentinel */
+};
 
 static PyMethodDef skfs_methods[] = {
     {"listdir", (PyCFunction)skfs_listdir, METH_VARARGS|METH_KEYWORDS,
@@ -113,7 +120,7 @@ static PyTypeObject skfsType = {
     0,                         /* tp_iter */
     0,                         /* tp_iternext */
     skfs_methods,              /* tp_methods */
-    0,                         /* tp_members */
+    skfs_members,              /* tp_members */
     0,                         /* tp_getset */
     0,                         /* tp_base */
     0,                         /* tp_dict */

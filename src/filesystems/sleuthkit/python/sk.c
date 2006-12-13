@@ -290,12 +290,16 @@ skfs_dealloc(skfs *self) {
         self->fs->close(self->fs);
     if(self->img)
         self->img->close(self->img);
+    if(self->root_inum)
+        Py_DECREF(self->root_inum);
     self->ob_type->tp_free((PyObject*)self);
 }
 
 static int
 skfs_init(skfs *self, PyObject *args, PyObject *kwds) {
     char *imgfile=NULL, *imgtype=NULL, *fstype=NULL;
+
+    self->root_inum = NULL;
 
     static char *kwlist[] = {"imgfile", "imgtype", "fstype", NULL};
 
@@ -323,6 +327,13 @@ skfs_init(skfs *self, PyObject *args, PyObject *kwds) {
       PyErr_Format(PyExc_RuntimeError, "Unable to open filesystem in image %s: %s", imgfile, tsk_error_str());
       return -1;
     }
+
+    /* build and store the root inum */
+    self->root_inum = (PyObject *)PyObject_New(skfs_inode, &skfs_inodeType);
+    ((skfs_inode *)self->root_inum)->inode = self->fs->root_inum;
+    ((skfs_inode *)self->root_inum)->type = 0;
+    ((skfs_inode *)self->root_inum)->id = 0;
+    ((skfs_inode *)self->root_inum)->alloc = 1;
 
     return 0;
 }
@@ -447,15 +458,29 @@ skfs_iwalk(skfs *self, PyObject *args, PyObject *kwds) {
 
     static char *kwlist[] = {"inode", "alloc", "unalloc", NULL};
 
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "K|ii", kwlist, &inode, 
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "|Kii", kwlist, &inode, 
                                     &alloc, &unalloc))
         return NULL; 
 
     // ignore args for now and just do full walk (start->end)
-    // flags are set to find all unlinked files (alloc or unalloc)
-    // and only used inodes.
-    flags = FS_FLAG_META_UNLINK;
-        
+    // flags are set to find all "removed" inodes.
+    // flag setting code below comes from ils.c
+    
+    if (((self->fs->ftype & FSMASK) == NTFS_TYPE) ||
+        ((self->fs->ftype & FSMASK) == FATFS_TYPE))
+        flags |= (FS_FLAG_META_USED | FS_FLAG_META_UNALLOC);
+    else
+        flags |= (FS_FLAG_META_USED | FS_FLAG_META_UNLINK);
+
+    if ((flags & (FS_FLAG_META_ALLOC | FS_FLAG_META_UNALLOC)) == 0)
+    flags |= FS_FLAG_META_ALLOC | FS_FLAG_META_UNALLOC;
+
+    if ((flags & (FS_FLAG_META_LINK | FS_FLAG_META_UNLINK)) == 0)
+    flags |= FS_FLAG_META_LINK | FS_FLAG_META_UNLINK;
+
+    if ((flags & (FS_FLAG_META_USED | FS_FLAG_META_UNUSED)) == 0)
+    flags |= FS_FLAG_META_USED | FS_FLAG_META_UNUSED;
+
     list = PyList_New(0);
     self->fs->inode_walk(self->fs, self->fs->first_inum, self->fs->last_inum, flags, 
             (FS_INODE_WALK_FN) inode_walk_callback, (void *)list);
