@@ -87,8 +87,14 @@ void listdent_add_dent(FS_DENT *fs_dent, FS_DATA *fs_data, int flags, struct den
         p->path = talloc_asprintf_append(p->path, ":%s", fs_data->name);
     } 
 
-    //if(flags & FS_FLAG_NAME_UNALLOC)
-	//    p->path = talloc_asprintf_append(p->path, " (deleted%s)", ((fs_dent->fsi) && (fs_dent->fsi->flags & FS_FLAG_META_ALLOC)) ? "-realloc" : "");
+    p->alloc = 1; // allocated
+    if(flags & FS_FLAG_NAME_UNALLOC) {
+        if((fs_dent->fsi) && (fs_dent->fsi->flags & FS_FLAG_META_ALLOC))
+            p->alloc = 2; // realloc
+        else
+            p->alloc = 0; // unalloc
+    }
+	//p->path = talloc_asprintf_append(p->path, " (deleted%s)", ((fs_dent->fsi) && (fs_dent->fsi->flags & FS_FLAG_META_ALLOC)) ? "-realloc" : "");
 
     p->inode = fs_dent->inode;
     p->ent_type = fs_dent->ent_type;
@@ -693,7 +699,7 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
         ((skfs_inode *)inode_val)->inode = dwtmp->inode;
         ((skfs_inode *)inode_val)->type = dwtmp->type;
         ((skfs_inode *)inode_val)->id = dwtmp->id;
-        ((skfs_inode *)inode_val)->alloc = (dwtmp->flags & FS_FLAG_NAME_ALLOC) ? 1 : 0;
+        ((skfs_inode *)inode_val)->alloc = dwtmp->alloc; //(dwtmp->flags & FS_FLAG_NAME_ALLOC) ? 1 : 0;
 
         name_val = PyString_FromString(dwtmp->path);
         inode_name_val = Py_BuildValue("(OO)", inode_val, name_val);
@@ -793,10 +799,7 @@ skfs_inode_getinode(skfs_inode *self, void *closure) {
 
 static PyObject *
 skfs_inode_getalloc(skfs_inode *self, void *closure) {
-    if(self->alloc)
-        Py_RETURN_TRUE;
-    else
-        Py_RETURN_FALSE;
+    return PyInt_FromLong((long)self->alloc);
 }
 
 static PyObject *skfs_inode_long(skfs_inode *self) {

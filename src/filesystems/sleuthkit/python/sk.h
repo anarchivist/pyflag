@@ -24,6 +24,7 @@ struct dentwalk {
     uint32_t type;
     uint32_t id;
     int flags;
+    char alloc;
     struct list_head list;
 };
 
