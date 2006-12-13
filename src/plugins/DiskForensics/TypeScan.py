@@ -117,6 +117,7 @@ class ViewFileTypes(Reports.report):
                        FlagFramework.query_type((), case=query['case'],
                        inode=inode,
                        family = "Disk Forensics", report = "ViewFile"),
+                       mode = "Summary",
                        tooltip=inode, border=0
                        )
 

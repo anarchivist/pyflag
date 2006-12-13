@@ -29,8 +29,8 @@ import pyflag.DB as DB
 import sys,re,string
 import HTMLParser
 import StringIO
-import re
-from FlagFramework import query_type
+import re,os.path,cgi
+from FlagFramework import query_type,normpath
 
 class ViewFile(Reports.report):
     """
@@ -112,15 +112,18 @@ class HTMLSanitiser(HTMLParser.HTMLParser):
                        'tt', 'li', 'ol', 'ul', 'p', 'table', 'td', 'tr',
                        'h1', 'h2', 'h3', 'pre', 'html', 'font', 'body',
                        'code', 'head', 'meta', 'title','style', 'form',
-                       'sup', 'input', 'span', 'label']
+                       'sup', 'input', 'span', 'label', 'option','select',
+                       'div','span','nobr','u', 'frameset','frame','iframe',
+                       'textarea',]
 
     allowable_attributes = ['color', 'bgolor', 'width', 'border',
                             'rules', 'cellspacing', 
                             'cellpadding', 'height',
                             'align', 'bgcolor', 'rowspan', 
-                            'colspan', 'valign','id', 'class','style','name', 
+                            'colspan', 'valign','id', 'class','name', 
                             'compact', 'type', 'start', 'rel',
-                            'http-equiv', 'content', 'value', 'checked'
+                            'value', 'checked', 'rows','cols',
+                            'framespacing','frameborder',
                             ]
 
     def __init__(self, case,inode):
@@ -132,14 +135,25 @@ class HTMLSanitiser(HTMLParser.HTMLParser):
         self.case = case
         self.dbh.execute("select url from http where inode=%r", self.inode)
         row=self.dbh.fetch()
-        url = row['url']
-        m=re.search("(http|ftp)://([^/]+)/([^?]*)",url)
-        self.method = m.group(1)
-        self.host = m.group(2)
-        self.base_url = m.group(3)
-        if "/" in self.base_url:
-            self.base_url=self.base_url[:self.base_url.rfind("/")]
+        try:
+            url = row['url']
+            m=re.search("(http|ftp)://([^/]+)/([^?]*)",url)
+            self.method = m.group(1)
+            self.host = m.group(2)
+            self.base_url = os.path.dirname(m.group(3))
+            if not self.base_url.startswith("/"):
+                self.base_url = "/"+self.base_url
 
+            if self.base_url.endswith("/"):
+                self.base_url = self.base_url[:-1]
+
+        except:
+            self.method = ''
+            self.host = ''
+            self.base_url = ''
+
+        self.comment = False
+            
     def read(self):
         """ return any data parsed so far """
         self.output.seek(0)
@@ -148,10 +162,17 @@ class HTMLSanitiser(HTMLParser.HTMLParser):
         return data
     
     def handle_starttag(self, tag, attrs):
-        if tag not in self.allowable_tags:
-            tag = "REMOVED style='display: hidden;' %s" % tag
-
         sanitised_attrs = []
+        if tag=="script":
+            self.output.write("<!--")
+            self.comment = True
+        elif tag=="object":
+            tag = 'img'
+            sanitised_attrs.append(("src","images/spacer.png"))
+        elif tag not in self.allowable_tags:
+            tag = "removed original_tag=%r" % tag
+
+
         for name,value in attrs:
             name = name.lower()
             if name in  self.allowable_attributes:
@@ -167,33 +188,57 @@ class HTMLSanitiser(HTMLParser.HTMLParser):
 
     def resolve_reference(self, reference):
         """ This tries to find the relevant reference in the database"""
+        original_reference = reference
+
         ## Absolute reference
-        if reference.startswith("/"):
-            reference="%s://%s%s" % (self.method, self.host,reference)
+        if reference.startswith('http'):
+            pass
+        elif reference.startswith("/"):
+            path = normpath("%s" % (reference))
+            reference="%s://%s%s" % (self.method, self.host, path)
         else:
-            reference="%s://%s/%s/%s" % (self.method, self.host, self.base_url, reference)
+            path = normpath("/%s/%s" % (self.base_url,reference))
+            reference="%s://%s%s" % (self.method, self.host, path)
+
+        ## Try to make reference more url friendly:
+        reference = reference.replace(" ","%20")
         
-        self.dbh.execute("select inode from http where url=%r limit 1", reference)
+        self.dbh.execute("select inode from http where url=%r and not isnull(inode) limit 1", reference)
         row = self.dbh.fetch()
-        if row:
+        if row and row['inode']:
             return "%s" % query_type(case=self.case, family="Network Forensics",
                                      report="ViewFile", inode=row['inode'])
-        
-        return '#'
+
+        print original_reference, reference
+        return '#original reference=%s' % original_reference
+
     def handle_data(self,data):
+        if self.comment:
+            data=data.replace("<!--","< comment>")
+            data=data.replace("-->", "</comment>")
+            
         self.output.write(data)
 
     def handle_endtag(self, tag):
         if tag not in self.allowable_tags:
-            tag = "REMOVED %s" % tag
+            new_tag = "removed original_tag=%r" % tag
+        else: new_tag=tag
         
-        self.output.write("</%s>" % tag)
+        self.output.write("</%s>" % new_tag)
+        if tag=="script":
+            self.output.write("-->")
+            self.comment = False
 
     def handle_decl(self,decl):
         self.output.write("<!%s>" % decl)
 
     def handle_comment(self,comment):
-        self.output.write("<!--%s-->" % comment)
+        if self.comment:
+            pass
+#            self.output.write("<comment %s />" % comment)
+
+        else:
+            self.output.write("<!--%s-->" % comment)
 
     def handle_entityref(self,entity):
         self.output.write("&%s;" % entity)

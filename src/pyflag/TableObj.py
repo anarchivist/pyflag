@@ -504,6 +504,7 @@ class InodeType(ColumnType):
             link = FlagFramework.query_type(case=case,
                                             family='Disk Forensics',
                                             report='ViewFile',
+                                            mode = 'Summary',
                                             __target__='inode', inode="%s")
 
         ColumnType.__init__(self,name,column,link,callback=callback)
