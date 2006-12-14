@@ -189,8 +189,8 @@ void usage(char *myProg) {
     	printf("\t-f fstype: Image file system type\n");
 	printf("\t-m mount point: Mount point \n");
     	printf("\t-d (create|drop): Print create of drop table strings\n");
-	printf("\t-n iosource: name of iosource");
-	printf("Supported file system types:\n");
+	printf("\t-n iosource: name of iosource\n");
+	printf("\t-o imgoff: partition offset in 512 byte sectors\n");
 	fs_print_types(stderr);
 }
 
@@ -627,6 +627,7 @@ main(int argc, char **argv)
 	char ch;
 	FS_INFO 	*fs;
 	IMG_INFO *img;
+    SSIZE_T imgoff = 0;
 	char *dbaction = NULL;
 	extern int optind;	
 
@@ -636,7 +637,7 @@ main(int argc, char **argv)
 
 	i_flags |= ~0;
 
-	while ((ch = getopt(argc, argv, "im:n:f:d:s:vVz:")) > 0) {
+	while ((ch = getopt(argc, argv, "io:m:n:f:d:s:vVz:")) > 0) {
 	  switch (ch) {
 	  case '?':
 	  default: 
@@ -649,6 +650,9 @@ main(int argc, char **argv)
 	    break;
 	  case 'd':  
 	    dbaction=optarg;
+	    break;
+	  case 'o':  
+	    imgoff = 512 * atol(optarg);
 	    break;
 	  case 'm':
 	    {
@@ -716,7 +720,7 @@ main(int argc, char **argv)
 	if(!img) RAISE(E_GENERIC,NULL,"Unable to open image");
 	
 	/* open image */
-	fs = fs_open(img,0, fstype);
+	fs = fs_open(img,imgoff, fstype);
 	if(!fs) RAISE(E_GENERIC,NULL,"Unable to open file system as %s",fstype);
 	
     /* directory walk, fills in the file table
