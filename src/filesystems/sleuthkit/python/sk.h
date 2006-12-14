@@ -23,7 +23,7 @@ struct dentwalk {
     uint8_t ent_type;
     uint32_t type;
     uint32_t id;
-    int flags;
+    //int flags;
     char alloc;
     struct list_head list;
 };

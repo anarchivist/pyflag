@@ -98,7 +98,6 @@ void listdent_add_dent(FS_DENT *fs_dent, FS_DATA *fs_data, int flags, struct den
 
     p->inode = fs_dent->inode;
     p->ent_type = fs_dent->ent_type;
-    p->flags = flags;
 
     list_add_tail(&p->list, &dentlist->list);
 }
@@ -310,19 +309,22 @@ skfs_dealloc(skfs *self) {
 static int
 skfs_init(skfs *self, PyObject *args, PyObject *kwds) {
     char *imgfile=NULL, *imgtype=NULL, *fstype=NULL;
+    int imgoff=0;
 
     self->root_inum = NULL;
 
-    static char *kwlist[] = {"imgfile", "imgtype", "fstype", NULL};
+    static char *kwlist[] = {"imgfile", "imgtype", "imgoff", "fstype", NULL};
 
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "s|ss", kwlist, 
-				    &imgfile, &imgtype, &fstype))
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "s|sis", kwlist, 
+				    &imgfile, &imgtype, &imgoff, &fstype))
         return -1; 
 
     /* force raw to prevent incorrect auto-detection of another imgtype */
     if(!imgtype) {
         imgtype = "raw";
     }
+
+    imgoff *= 512;
 
     /* initialise the img and filesystem */
     tsk_error_reset();
@@ -334,7 +336,8 @@ skfs_init(skfs *self, PyObject *args, PyObject *kwds) {
 
     /* initialise the filesystem */
     tsk_error_reset();
-    self->fs = fs_open(self->img, 0, fstype);
+    printf("imgoff: %d\n", imgoff);
+    self->fs = fs_open(self->img, imgoff, fstype);
     if(!self->fs) {
       PyErr_Format(PyExc_RuntimeError, "Unable to open filesystem in image %s: %s", imgfile, tsk_error_str());
       return -1;
@@ -642,7 +645,7 @@ skfs_walkiter_init(skfs_walkiter *self, PyObject *args, PyObject *kwds) {
     /* add the start path */
     root = talloc(self->walklist, struct dentwalk);
     root->type = root->id = 0;
-    root->flags = FS_FLAG_NAME_ALLOC;
+    root->alloc = 1;
 
     if(inode == 0) {
         tsk_error_reset();
@@ -681,10 +684,12 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
     tsk_error_reset();
     self->skfs->fs->dent_walk(self->skfs->fs, dw->inode, self->flags, 
                               listdent_walk_callback_dent, (void *)dwlist);
+    /* must ignore errors and keep going or else we kill the whole walk because one dirlist failed! */
     if(tsk_errno) {
-        PyErr_Format(PyExc_IOError, "Walk error: %s", tsk_error_str());
-        talloc_free(dwlist);
-        return NULL;
+        tsk_error_reset();
+        //PyErr_Format(PyExc_IOError, "Walk error at (%d)%s: %s", dw->inode, dw->path, tsk_error_str());
+        //talloc_free(dwlist);
+        //return NULL;
     }
 
     /* process the list */
@@ -699,7 +704,7 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
         ((skfs_inode *)inode_val)->inode = dwtmp->inode;
         ((skfs_inode *)inode_val)->type = dwtmp->type;
         ((skfs_inode *)inode_val)->id = dwtmp->id;
-        ((skfs_inode *)inode_val)->alloc = dwtmp->alloc; //(dwtmp->flags & FS_FLAG_NAME_ALLOC) ? 1 : 0;
+        ((skfs_inode *)inode_val)->alloc = dwtmp->alloc;
 
         name_val = PyString_FromString(dwtmp->path);
         inode_name_val = Py_BuildValue("(OO)", inode_val, name_val);
@@ -716,7 +721,7 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
                 PyList_Append(dirlist, name_val);
 
             /* steal it and push onto the directory stack */
-            if(dwtmp->flags & FS_FLAG_NAME_ALLOC) {
+            if(dwtmp->alloc == 1) {
                 talloc_steal(self->walklist, dwtmp);
                 tmp = dwtmp->path;
                 if(strcmp(dw->path, "/") == 0)

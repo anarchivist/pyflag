@@ -217,6 +217,13 @@ class IO:
                 tmp.text(self.options[i+1][j], color="red", font="bold")
                 result.row(self.parameters[i+1][3:], tmp, valign="top")
 
+    def __getitem__(self, name):
+        """ allow dictionary style option access """
+        for k,v in self.options:
+            if k == name:
+                return v
+        raise KeyError, name
+
 class sgzip(IO):
     parameters=('subsys','io_filename','io_offset')
 

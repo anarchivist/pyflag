@@ -5,7 +5,7 @@ Most of the code in the this implementation is found in the dbtool executable, w
 
 import pyflag.FileSystem as FileSystem
 import pyflag.pyflaglog as pyflaglog
-from pyflag.FileSystem import FileSystem,DBFS
+from pyflag.FileSystem import FileSystem,DBFS,File
 import pyflag.DB as DB
 import pyflag.IO as IO
 import pyflag.FlagFramework as FlagFramework
@@ -182,4 +182,140 @@ class Mounted(DBFS):
                 insert_into_table('r/r',root,name)
 
         ## End mounted filesystem handling
+        return
+
+import sk
+
+class Sleuthkit_File(File):
+    """ access to skfile """
+    specifier = 'K'
+    def __init__(self, case, fd, inode):
+        File.__init__(self, case, fd, inode)
+
+        #FIXME: cache this somewhere so we dont reload it every time!
+        fs = sk.skfs(fd.io["filename"], imgoff=int(fd.io['offset']))
+        inode = inode[inode.find('|K')+2:]
+        self.fd = fs.open(inode=inode)
+    
+    def close(self):
+        self.fd.close()
+
+    def seek(self, offset, rel=None):
+        if rel!=None:
+            self.fd.seek(offset,rel)
+        else:
+            self.fd.seek(offset)
+
+    def read(self, length=None):
+        if length!=None:
+            return self.fd.read(length)
+        else:
+            return self.fd.read()
+
+    def tell(self):
+        return self.fd.tell()
+
+class Sleuthkit(DBFS):
+    """ A new improved Sleuthit based filesystem """
+    name = 'Sleuthkit'
+
+    def load(self, mount_point, iosource_name):
+        ## Ensure that mount point is normalised:
+        mount_point = os.path.normpath(mount_point)
+        DBFS.load(self, mount_point, iosource_name)
+
+        # open the skfs
+        fs = sk.skfs(self.iosource["filename"], imgoff=int(self.iosource['offset']))
+
+        dbh_file=DB.DBO(self.case)
+        dbh_inode=DB.DBO(self.case)
+
+        #dbh_file.mass_insert_start("file")
+        #dbh_inode.mass_insert_start("inode")
+
+        def insert(inode, type, path, name):
+            # insert the file record
+            insert_file(inode, type, path, name)
+
+            # insert inode record
+            if inode.alloc == 1:
+                insert_inode(inode)
+
+        def insert_file(inode, type, path, name):
+            # dont do anything for realloc inodes
+            if inode.alloc == 2:
+                return
+
+            inodestr = "I%s|K%s" % (iosource_name, inode)
+            pathstr = "%s%s/" % (mount_point, path)
+
+            if pathstr.startswith("//"):
+                pathstr = pathstr[1:]
+            if pathstr.endswith("//"):
+                pathstr = pathstr[:-1]
+
+            if inode.alloc:
+                allocstr = "alloc"
+            else:
+                allocstr = "deleted"
+                type = type[:-1]+'-'
+
+            # insert file entry
+            dbh_file.insert( "file",
+                inode = inodestr,
+                mode = type,
+                status = allocstr,
+                path = pathstr,
+                name = name
+                )
+
+        def insert_inode(inode):
+            # dont do anything for realloc inodes
+            if inode.alloc == 2:
+                return
+
+            inodestr = "I%s|K%s" % (iosource_name, inode)
+
+            if inode.alloc:
+                status = 'a'
+            else:
+                status = 'f'
+
+            try:
+                s = fs.stat(inode=str(inode))
+                dbh_inode.insert( "inode",
+                    inode = inodestr,
+                    status = status,
+                    uid = s.st_uid,
+                    gid = s.st_gid,
+                    _mtime = "from_unixtime(%d)" % s.st_mtime,
+                    _atime = "from_unixtime(%d)" % s.st_atime,
+                    _ctime = "from_unixtime(%d)" % s.st_ctime,
+                    dtime = 0,
+                    mode = s.st_mode,
+                    links = s.st_nlink,
+                    link = "",
+                    size = s.st_size
+                    )
+
+            except IOError:
+                pass
+
+        # insert root inode
+        insert_inode(fs.root_inum)
+
+        # walk the directory tree
+        for root, dirs, files in fs.walk('/', unalloc=True, inodes=True):
+            for d in dirs:
+                insert_file(d[0], 'd/d', root[1], d[1])
+            for f in files:
+                insert(f[0], 'r/r', root[1], f[1])
+
+        # find any unlinked inodes here
+        for s in fs.iwalk():
+            insert_inode(s)
+
+        #dbh_file.mass_insert_commit()
+        #dbh_inode.mass_insert_commit()
+
         return
