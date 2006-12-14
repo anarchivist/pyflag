@@ -52,6 +52,7 @@ static PyObject *index_buffer(PyObject *self, PyObject *args) {
       tmp = Py_BuildValue("iN",i,match_list);
       if(PyList_Append(result, tmp)<0) {
 	Py_DECREF(tmp);
+	Py_DECREF(result);
 	return NULL;
       };
 

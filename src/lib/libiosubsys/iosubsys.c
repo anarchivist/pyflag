@@ -48,6 +48,7 @@ static PyObject *Open(PyObject *dummy, PyObject *args, PyObject *kwd) {
   PyObject *opts=NULL;
   IOSource driver=NULL;
   IOOptions options = NULL;
+  PyObject *tmp;
 
   if(!PyArg_ParseTupleAndKeywords(args, kwd, "|OO", keywords,
 				  &iodriver, &opts)) {
@@ -76,8 +77,12 @@ static PyObject *Open(PyObject *dummy, PyObject *args, PyObject *kwd) {
       char *keyc, *valuec;
 
       temp = PyList_GetItem(opts,i); 
-      if(!PyList_Check(temp))
-	return PyErr_Format(PyExc_TypeError, "Element must be a list, not %s", PyString_AsString(PyObject_Str(temp)));
+      if(!PyList_Check(temp)) {
+	tmp = PyObject_Str(temp);
+	PyErr_Format(PyExc_TypeError, "Element must be a list, not %s", PyString_AsString(tmp));
+	Py_DECREF(tmp);
+	return NULL;
+      };
 
       key = PyList_GetItem(temp,0);
       if(!key) return NULL;
@@ -85,12 +90,18 @@ static PyObject *Open(PyObject *dummy, PyObject *args, PyObject *kwd) {
       value = PyList_GetItem(temp,1);
       if(!value) return NULL;
 
-      keyc = PyString_AsString(PyObject_Str(key));
-      valuec= PyString_AsString(PyObject_Str(value));
-
-      if(!keyc || !valuec) {
+      key = PyObject_Str(key);
+      keyc = PyString_AsString(key);
+      if(!keyc) {
 	talloc_free(options);
-	return PyErr_Format(PyExc_Exception, "Not a string - driver options must be encoded as strings. I had a problem with (%s: %s)", PyString_AsString(PyObject_Str(key)), PyString_AsString(PyObject_Str(value)));
+	return PyErr_Format(PyExc_Exception, "Not a string - driver options must be encoded as strings.");
+      };
+
+      value = PyObject_Str(value);
+      valuec= PyString_AsString(value);
+      if(!valuec) {
+	talloc_free(options);
+	return PyErr_Format(PyExc_Exception, "Not a string - driver options must be encoded as strings.");
       };
 
       CONSTRUCT(IOOptions, IOOptions, add,options, options, keyc, valuec);

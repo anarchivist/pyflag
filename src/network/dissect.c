@@ -93,13 +93,20 @@ static PyObject *get_range(PyObject *self, PyObject *args) {
   // If element is not supplied, we assume this refers to ourselves
   if(strlen(element)==0) {
     PyObject *list = PyList_New(0);
-    PyList_Append(list, PyLong_FromUnsignedLong(root->start));
-    PyList_Append(list, PyLong_FromUnsignedLong(-1));
+    PyObject *tmp = PyLong_FromUnsignedLong(root->start);
+    PyList_Append(list, tmp);
+    Py_DECREF(tmp);
+
+    tmp= PyLong_FromUnsignedLong(-1);
+    PyList_Append(list,tmp);
+    Py_DECREF(tmp);
+
     return list;
   };
 
   if(Find_Property(&root, &p, NAMEOF(root), element)) {
     PyObject *list = PyList_New(0);
+    PyObject *tmp;
     int size;
      
     if(!p->size) {
@@ -107,8 +114,14 @@ static PyObject *get_range(PyObject *self, PyObject *args) {
     } else 
       size=p->size;
 
-    PyList_Append(list, PyLong_FromUnsignedLong(root->start + p->item));
-    PyList_Append(list, PyLong_FromUnsignedLong(size));
+    tmp = PyLong_FromUnsignedLong(root->start + p->item);
+    PyList_Append(list, tmp);
+    Py_DECREF(tmp);
+
+    tmp = PyLong_FromUnsignedLong(size);
+    PyList_Append(list, tmp);
+    Py_DECREF(tmp);
+
     return list;
   } else {
 
@@ -132,11 +145,11 @@ static PyObject *get_field(PyObject *self, PyObject *args) {
   if(!PyArg_ParseTuple(args, "Os",  &result,&element)) 
     return NULL;
   
-  e=talloc_strdup(NULL, element);
   root = PyCObject_AsVoidPtr(result);
   if(!root) 
     return PyErr_Format(PyExc_RuntimeError, "node is not valid");
 
+  e=talloc_strdup(NULL, element);
   len=strcspn(e, ".");
   if(len == strlen(e)) {
     property=e;
@@ -277,7 +290,9 @@ static PyObject *list_fields(PyObject *self, PyObject *args) {
   pylist = PyList_New(0);
   list_for_each_entry(p, &(root->properties.list), list) {
     if(p->name) {
-      PyList_Append(pylist, PyString_FromString(p->name));
+      PyObject *tmp=PyString_FromString(p->name);
+      PyList_Append(pylist, tmp);
+      Py_DECREF(tmp);
     } else break;
   };
 

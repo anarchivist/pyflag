@@ -8,6 +8,7 @@ Generic OLE VFS - The contents of the OLE file is make available through the VFS
 """
 from libole2 import OLEFile
 from format import *
+from plugins.FileFormats.BasicFormats import *
 import sys,re
 
 prop_lookup = {
@@ -146,8 +147,8 @@ def mesg_receipt(p,file):
 class FIDAndOffset(SimpleStruct):
     def init(self):
         self.fields=[
-            [ CLSID,1,'FID'],
-            [ LONG,1,'offset']
+            [ 'FID', CLSID],
+            [ 'offset',LONG]
             ]
 
 class FIDAndOffsetArray(ARRAY):
@@ -156,19 +157,19 @@ class FIDAndOffsetArray(ARRAY):
 class PropHeader(SimpleStruct):
     def init(self):
         self.fields=[
-            [ WORD,1,'byteOrder'],
-            [ WORD,1,'Format'],
-            [ WORD,1,'OSVersion1'],
-            [ WORD,1,'OSVersion2'],
-            [ CLSID,1,'ClassID'],
-            [ LONG,1,'cSections'],
+            [ 'byteOrder',WORD],
+            [ 'Format',WORD],
+            [ 'OSVersion1',WORD],
+            [ 'OSVersion2',WORD],
+            [ 'ClassID',CLSID],
+            [ 'cSections',LONG],
         ]
 
 class DataSize(SimpleStruct):
     def init(self):
         self.fields=[
-            [ LONG,1,'cBytes'],
-            [ LONG,1,'cProps'],
+            [ 'cBytes',LONG],
+            [ 'cProps',LONG],
             ]
 
 class PropDataType(LONG_ENUM):
@@ -208,8 +209,8 @@ class PropType(LONG_ENUM):
 class Property(SimpleStruct):
     def init(self):
         self.fields=[
-            [ PropType,1,'Type'],
-            [ LONG,1,'Offset'], #This is relative to the section
+            [ 'Type',PropType],
+            [ 'Offset',LONG], #This is relative to the section
             ]
 
 class PropArray(ARRAY):
@@ -219,23 +220,21 @@ def parse_summary_info(p,file):
     ## Get the property stream
     data = file.cat(p)
     header = PropHeader(data)
-    
-    #print header
+
     ## A FIDAndOffsetArray tells us where all the property sections are
-    fids = FIDAndOffsetArray(data[header.size():],header['cSections'])
+    fids = FIDAndOffsetArray(Buffer(data[header.size():]),count=header['cSections'])
 
     for fid in fids:
         offset=fid['offset'].get_value()
+
         ## Lets grab each section:
         section_data = data[offset:]
         section=DataSize(section_data)
-
+        
         ## Now we know how many properties there are
         props = PropArray(section_data[section.size():],
-                          section['cProps'].get_value())
+                          count=section['cProps'].get_value())
         
-        #print section
-
         ## Lets grab each property
         for prop in props:
             offset=prop['Offset'].get_value()
@@ -263,11 +262,9 @@ dispatch = {
 
 if __name__ == "__main__":
     fd=open(sys.argv[1],'r')
-    data=fd.read()
-    fd.close()
-
-    a=OLEFile(data)
+    a=OLEFile(Buffer(fd=fd))
     for p in a.properties:
         for i in dispatch.keys():
-            if re.search(i,p['pps_rawname'].get_value()):
+            property_name = p['pps_rawname'].__str__()
+            if re.search(i,property_name):
                 dispatch[i](p,a)

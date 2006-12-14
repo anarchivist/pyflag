@@ -36,6 +36,7 @@ http://user.cs.tu-berlin.de/~schwartz/pmh/guide.html
 import struct,sys
 import format
 from format import *
+from plugins.FileFormats.BasicFormats import *
 
 class Tree:
     """ A simple tree implementation """
@@ -96,23 +97,23 @@ class OLEHeader(SimpleStruct):
     
     def init(self):
         self.fields =[
-            [ BYTE_ARRAY,8,"magic" ],
-            [ LONG_ARRAY,4,'clsid'],
-            [ WORD,1,'minor_version'],
-            [ WORD,1,'major_version'],
-            [ LONG,1,'endianness'],
-            [ LONG,1,'bb_shift'],
-            [ LONG,1,'sb_shift'],
-            [ BYTE_ARRAY,4,'reserved'],
-            [ LONG,1,'number_of_bbd_blocks'],
-            [ LONG,1,'dirent_start'],
-            [ LONG,1,'unknown2'],
-            [ LONG,1,'threshold'],
-            [ LONG,1,'sbd_startblock'],
-            [ LONG,1,'no_sbd'],
-            [ LONG,1,'metab_start'],
-            [ LONG,1,'number_metab'],
-            [ DepotList,1, 'bbd_list'],
+            [ "magic",               STRING, {'length':8} ],
+            [ 'clsid',               LONG_ARRAY, {'count':4} ],
+            [ 'minor_version',       WORD],
+            [ 'major_version',       WORD],
+            [ 'endianness',          LONG],
+            [ 'bb_shift',            LONG],
+            [ 'sb_shift',            LONG],
+            [ 'reserved',            BYTE_ARRAY, dict(count=4)],
+            [ 'number_of_bbd_blocks',LONG],
+            [ 'dirent_start',        LONG],
+            [ 'unknown2',            LONG],
+            [ 'threshold',           LONG],
+            [ 'sbd_startblock',      LONG],
+            [ 'no_sbd',              LONG],
+            [ 'metab_start',         LONG],
+            [ 'number_metab',        LONG],
+            [ 'bbd_list',            DepotList],
             ]
 
 class DepotList(LONG_ARRAY):
@@ -120,15 +121,16 @@ class DepotList(LONG_ARRAY):
 
     The Depot is a list of block indexes which form chains. By starting at a given offset, a chain is found by reading the next block offset from the depot. See follow_chain.
     """
-    def read(self,data):
-        result=[]
-        offset=0
+    def read(self):
+        result=StructArray.read(self)
+        self.count=0
         while 1:
-            a=LONG(data[offset:],parent=self)
-            offset+=a.size()
-            result.append(a)
-            if a.get_value()<0:
-                break
+            a=LONG(self.buffer[self.offset:])
+            if int(a)==-1: break
+
+            self.add_element(result, self.count, a)
+            self.count+=1
+            self.offset+=a.size()
 
         return result
 
@@ -136,15 +138,13 @@ class PPS_TYPE(BYTE_ENUM):
     types = { 1:'dir', 2:'file', 5:'root' }
 
 class RawString(UCS16_STR):
-    """ Unicode String based on string/length """        
-    def read(self,data):
-        size=WORD(data[0x40:]).get_value()
-        if size>0:
-            result=UCS16_STR(data,size).read(data)
-        else:
-            result=''
-            
-        return result
+    """ Unicode String based on string/length
+
+    This is stupid - the size is at the end of the string????
+    """
+    def __init__(self, buffer, *args, **kwargs):
+        length=WORD(buffer[0x40:]).get_value()
+        UCS16_STR.__init__(self, buffer, length=length)
 
     def size(self):
         ## This is a fixed size record
@@ -157,19 +157,19 @@ class PropertySet(SimpleStruct):
     """
     def init(self):
         self.fields=[
-            [ RawString,1,'pps_rawname'],
-            [ PPS_TYPE,1,'pps_type'],
-            [ BYTE,1,'pps_uk0'],
-            [ LONG,1,'pps_prev'],
-            [ LONG,1,'pps_next'],
-            [ LONG,1,'pps_dir'],
-            [ CLSID,1,'pps_clsid'],
-            [ LONG,1,'pps_flags'],
-            [ WIN_FILETIME, 1,'pps_ts1'],
-            [ WIN_FILETIME, 1,'pps_ts2'],
-            [ LONG,1,'pps_sb'],
-            [ LONG,1,'pps_size'],
-            [ LONG,1,'pad'],
+            [ 'pps_rawname', RawString, ],
+            [ 'pps_type',    PPS_TYPE],
+            [ 'pps_uk0',     BYTE],
+            [ 'pps_prev',    LONG],
+            [ 'pps_next',    LONG],
+            [ 'pps_dir',     LONG],
+            [ 'pps_clsid',   CLSID],
+            [ 'pps_flags',   LONG],
+            [ 'pps_ts1',     WIN_FILETIME],
+            [ 'pps_ts2',     WIN_FILETIME],
+            [ 'pps_sb',      LONG],
+            [ 'pps_size',    LONG],
+            [ 'pad',         LONG],
             ]
 
 class PropertySetArray(ARRAY):
@@ -186,29 +186,30 @@ class OLEFile:
     ## The index of the root property
     root_dir_index=0
     
-    def __init__(self,data):
-        self.data=data
-        self.header = OLEHeader(data)
+    def __init__(self,buffer):
+        self.buffer = buffer
+        self.header = OLEHeader(buffer)
         #Check the magic:
         if self.header['magic'] != '\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1':
             raise OLEException("File Magic is not correct %s" % self.header['magic'])
 
         ## Read the big block depot
-        self.block_list = self.read_depot(self.header['bbd_list'],data,self.blocksize)
+        self.block_list = self.read_depot(self.header['bbd_list'], self.buffer, self.blocksize)
 
         ## Build the root block chain:
         self.root_blocks = self.follow_chain(self.header['dirent_start'].get_value(), self.block_list)
 
         ## The root chain is the chain of blocks for big blocks
         self.root_chain = self.read_run(self.root_blocks,
-                                        self.data[self.header.size():],
+                                        self.buffer[self.header.size():],
                                         self.blocksize)
 
         ## Read property sets, there should be len(root_chain)/small_blocksize
         ## properties. Not all of them make sense though...
+        b=Buffer(self.root_chain)
         self.properties = PropertySetArray(
-            self.root_chain, ## Data
-            len(self.root_chain)/0x80 ## Number of elements
+            b,
+            count=len(self.root_chain)/0x80 ## Number of elements
             )
 
         self.small_chain = self.cat(self.properties[0])
@@ -226,7 +227,7 @@ class OLEFile:
             if v>=0:
                 result.extend(
                     LONG_ARRAY(data[v * self.blocksize + self.header.size():],
-                               self.blocksize/4).get_value()
+                               count=self.blocksize/4).get_value()
                     )
         return result
 
@@ -251,7 +252,7 @@ class OLEFile:
             ## Read from big blocks
 
             blocks = self.follow_chain(pps_sb, self.block_list)
-            data=self.read_run(blocks,self.data[self.blocksize:],self.blocksize)
+            data=self.read_run(blocks,self.buffer[self.blocksize:],self.blocksize)
             return data[:size]
         else:
             ## Read from small blocks - Note: small_chain contains the
@@ -286,7 +287,7 @@ class OLEFile:
 
         @arg run: A list of blocks that build this chain
         """
-        result=[ data[blocksize*(i):blocksize*(i+1)] for i in run if i>=0 ]
+        result=[ data[blocksize*(i):blocksize*(i+1)].__str__() for i in run if i>=0 ]
         result = ''.join(result)
         return result
 
@@ -312,10 +313,8 @@ class OLEFile:
 
 if __name__ == "__main__":
     fd=open(sys.argv[1],'r')
-    data=fd.read()
-    fd.close()
-    print sys.argv[1]
-    a = OLEFile(data)
+    b=Buffer(fd=fd)
+    a = OLEFile(b)
     count=0
     
     for p in a.properties:

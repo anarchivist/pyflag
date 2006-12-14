@@ -31,6 +31,8 @@ typedef void TALLOC_CTX;
 #include <sys/types.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 /*
   this uses a little trick to allow __LINE__ to be stringified

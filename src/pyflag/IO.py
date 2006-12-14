@@ -42,6 +42,7 @@ config=pyflag.conf.ConfObject()
 import cPickle
 import os,re
 import pyflag.pyflaglog as pyflaglog
+import pyflag.Store as Store
 
 def mmls_popup(query,result,option_str=None,subsys=None,offset=None):
     result.decoration = "naked"
@@ -368,7 +369,7 @@ subsystems=FlagFramework.query_type([
 del subsystems['case']
 
 ## This caches the io subsys
-IO_Cache = {}
+IO_Cache = Store.Store()
 
 def open(case, iosource):
     """ lookup iosource in database and return an IO object.
@@ -376,7 +377,7 @@ def open(case, iosource):
     This uses function memoization to speed it up.
     """
     try:
-        type, io_obj = IO_Cache[(case,iosource)]
+        type, io_obj = IO_Cache.get("%s|%s" % (case,iosource))
         io=subsystems[type](clone=io_obj)
         io.name = iosource
         return io
@@ -395,6 +396,6 @@ def open(case, iosource):
         io.name = iosource
 
         ## Cache the option string:
-        IO_Cache[(case,iosource)] = (opts[0][1], io)
+        IO_Cache.put("%s|%s" % (case,iosource), (opts[0][1], io))
         return io
  

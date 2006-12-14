@@ -72,7 +72,7 @@ IOSource IOSource_Con(IOSource self, IOOptions opts) {
   // Find out the size of the file:
   self->size = lseek(self->fd, 0, SEEK_END);
 
-  talloc_set_destructor(self,IOSource_Destructor);
+  talloc_set_destructor((void *)self,IOSource_Destructor);
   return self;
 };
 
@@ -160,7 +160,7 @@ IOSource AdvIOSource_Con(IOSource self, IOOptions opts) {
 
   // Done.
   self->size = last_max_length;
-  talloc_set_destructor(self, AdvIOSource_Destructor);
+  talloc_set_destructor((void *)self, AdvIOSource_Destructor);
   return self;
 };
 
@@ -260,7 +260,7 @@ IOSource SgzipIOSource_Con(IOSource self, IOOptions opts) {
   //Set the size of this file:
   self->size = s->header->x.max_chunks * s->header->blocksize;
 
-  talloc_set_destructor(self, SgzipIOSource_Destructor);
+  talloc_set_destructor((void *)self, SgzipIOSource_Destructor);
   return self;
 };
 
@@ -335,7 +335,7 @@ IOSource EWFIOSource_Con(IOSource self, IOOptions opts) {
 
   self->size = libewf_data_size(e);
 
-  talloc_set_destructor(self, EWFIOSource_Destructor);
+  talloc_set_destructor((void *)self, EWFIOSource_Destructor);
   return self;
 };
 
