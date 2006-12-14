@@ -44,14 +44,16 @@ class BasicType(DataType):
         DataType.__init__(self,buffer,*args,**kwargs)
     
     def size(self):
-        ## We consume 2 bytes here
         return struct.calcsize(self.fmt)
 
     def read(self):
         try:
-            return struct.unpack(self.fmt,self.buffer[:self.size()].__str__())[0]
+            length = struct.calcsize(self.fmt)
+            if length>0:
+                return struct.unpack(self.fmt,self.buffer[:length].__str__())[0]
+            return ''
         except struct.error,e:
-            raise IOError("%s"% e)
+            raise IOError("%s. Tries to use format string %s"% (e, self.fmt))
 
     def write(self, output):
         try:
@@ -512,8 +514,8 @@ class CLSID(ULONG_ARRAY):
     
     def __init__(self,buffer,*args,**kwargs):
         ## Class IDs are 4 uint_32 long
-        kwargs['length']=4
-        ARRAY.__init__(self,buffer,*args,**kwargs)
+        kwargs['count']=4
+        ULONG_ARRAY.__init__(self,buffer,*args,**kwargs)
 
     def __str__(self):
         result=[]
@@ -557,8 +559,10 @@ class WIN_FILETIME(SimpleStruct):
 
     def __str__(self):
         t = self.to_unixtime()
-        if t<0: return "Invalid Timestamp"
-        return time.strftime("%Y%m%d%H%M%S",time.localtime(t))
+        try:
+            return time.strftime("%Y%m%d%H%M%S",time.localtime(t))
+        except:
+            return "Invalid Timestamp %X:%X" % (int(self['low']),int(self['high']))
 
 #        return "%s" % (time.ctime(t))
 
@@ -597,3 +601,6 @@ class LPSTR(SimpleStruct):
         data = self['data']
         data.set_value(value)
         self['length'].set_value(len(data))
+
+    def __str__(self):
+        return self['data'].__str__()
