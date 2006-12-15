@@ -158,10 +158,15 @@ class SimpleStruct(DataType):
     ## struct. They may be terminated at any time for exmaple the
     ## array may stop after Name:
     ## ["Name","Type","Parameters","Description","Function" ]
+    fields = []
 
     def __init__(self,buffer,*args,**kwargs):
         self.buffer = buffer
         self.parameters = kwargs
+        ## Keep a reference to our original fields list
+        self._fields = self.fields
+
+        ## This may change the fields attribute
         self.init()
             
         self.data={}
@@ -170,13 +175,19 @@ class SimpleStruct(DataType):
 
     def init(self):
         pass
-##        raise AttributeError("%r: You must override this method and set self.fields in here!!!" % self)
 
     def add_element(self,result, name,element, *args):
         """ Adds an element to the dict as well as to the fields table.
 
         This function allows users to dynamically add new elements to the struct from the read() method.
         """
+        ## we are about to modify our fields attribute. We should make
+        ## a copy to ensure that we do not modify the class
+        ## attribute. This is done so that fields can be filled in the
+        ## class definition to make it more efficient.
+        if self._fields==self.fields:
+            self.fields=self.fields[:]
+        
         result[name]=element
         self.fields.append([name, element.__class__])
         self.offsets[name]=element.buffer.offset-self.buffer.offset
@@ -184,10 +195,6 @@ class SimpleStruct(DataType):
     def read(self):
         self.offset=0
         result={}
-        ## Temporarily set our data dict to be result, so that
-        ## instantiated classes can call parent['boo'] to retrieve
-        ## items already parsed.
-        #self.data=result
         
         for item in self.fields:
             try:
@@ -196,8 +203,9 @@ class SimpleStruct(DataType):
             except:
                 continue
 
+            parameters = self.parameters.copy()
             try:
-                parameters = item[2]
+                parameters.update(item[2])
             except:
                 parameters = {}
 

@@ -34,14 +34,13 @@ from format import *
 from plugins.FileFormats.BasicFormats import *
 
 class Header(SimpleStruct):
-    def init(self):
-        self.fields = [
-            [ 'Magic', STRING, {"length":0x1c}  ],
-            [ 'file_size', LONG],
-            [ 'hash_offset', LONG],
-            [ 'unknown', WORD_ARRAY,{'count':7}],
-            [ 'blocksize', LONG],
-            ]
+    fields = [
+        [ 'Magic', STRING, {"length":0x1c}  ],
+        [ 'file_size', LONG],
+        [ 'hash_offset', LONG],
+        [ 'unknown', WORD_ARRAY,{'count':7}],
+        [ 'blocksize', LONG],
+        ]
     
 ## The default blocksize
 blocksize=0x80
@@ -80,24 +79,6 @@ class Hash(LONG_ARRAY):
 class PHASH(POINTER):
     target_class = Hash
 
-class URLEntry(SimpleStruct):
-    """ URL records are stored here """
-    def init(self):
-        self.fields = [
-            [ 'type', STRING, {'length':4},],
-            [ 'size', LONG ], #In multiples of the blocksize
-            [ 'modified_time', WIN_FILETIME ],
-            [ 'accessed_time', WIN_FILETIME ],
-            [ 'unknown', LONG_ARRAY, {'count':0x7} ],
-            [ 'url', HIST_STR_PTR, dict(section_offset=self.buffer.offset)],
-            [ 'unknown', BYTE ],
-            [ 'directory_index', BYTE ],
-            [ 'unknown', WORD ],
-            [ 'filename', HIST_STR_PTR, dict(section_offset=self.buffer.offset)],
-            [ '0x00200001', LONG ],
-            [ 'content', PContent ],
-            ] 
-
 class HIST_STR_PTR(LONG):
     """ This is a pointer to a string relative to the start of the section """
     def __init__(self,buffer,*args,**kwargs):
@@ -119,19 +100,29 @@ class HIST_STR_PTR(LONG):
         result="%s" % (self.data,)
         return result.split('\0',1)[0]
 
+class ContentType(WORD_ENUM):
+    """ These are the different types available in the Content struct """
+    types={
+        0x0000: "No Data",
+        0x1F10: "Title",
+        0x1E0E: "ClsID",
+        ## Private types - not seen in the wild:
+        0xffff: "Header",
+        }
+
+
 class Content(SimpleStruct):
     """ The Data contained within the record.
 
     This is HTTP headers sometimes, but usually its the title of the page.
     We can tell which one it is by looking at the content_type.
     """
-    def init(self):
-        self.fields=[
-            [ 'Magic', LONG ], #Always seems to be 0x0020010
-            [ 'pad', LONG_ARRAY,{'count':3},],
-            [ 'length', WORD ],
-            [ 'content_type', ContentType ]
-            ]
+    fields=[
+        [ 'Magic', LONG ], #Always seems to be 0x0020010
+        [ 'pad', LONG_ARRAY,{'count':3},],
+        [ 'length', WORD ],
+        [ 'content_type', ContentType ]
+        ]
 
     def read(self):
         magic = LONG(self.buffer)
@@ -158,21 +149,28 @@ class Content(SimpleStruct):
 
         return result
 
-class ContentType(WORD_ENUM):
-    """ These are the different types available in the Content struct """
-    types={
-        0x0000: "No Data",
-        0x1F10: "Title",
-        0x1E0E: "ClsID",
-        ## Private types - not seen in the wild:
-        0xffff: "Header",
-        }
-
 class PContent(POINTER):
     """ The URLEntry points to the Content structure """
 #    target_class=TERMINATED_STRING
     target_class=Content
 
+class URLEntry(SimpleStruct):
+    """ URL records are stored here """
+    def init(self):
+        self.fields = [
+            [ 'type', STRING, {'length':4},],
+            [ 'size', LONG ], #In multiples of the blocksize
+            [ 'modified_time', WIN_FILETIME ],
+            [ 'accessed_time', WIN_FILETIME ],
+            [ 'unknown', LONG_ARRAY, {'count':0x7} ],
+            [ 'url', HIST_STR_PTR, dict(section_offset=self.buffer.offset)],
+            [ 'unknown', BYTE ],
+            [ 'directory_index', BYTE ],
+            [ 'unknown', WORD ],
+            [ 'filename', HIST_STR_PTR, dict(section_offset=self.buffer.offset)],
+            [ '0x00200001', LONG ],
+            [ 'content', PContent ],
+            ] 
 class IEHistoryFile:
     """ A Class to access the records in an IE History index.dat file.
 

@@ -31,17 +31,16 @@ import sys
 
 class FileHeader(SimpleStruct):
     """ The PCAP file header """
-    def init(self):
-        self.fields = [
-            ['magic',         ULONG, self.parameters],
-            ['version_major', WORD,  self.parameters],
-            ['version_minor', WORD,  self.parameters],
-            ['thiszone',      ULONG, self.parameters], #    /* gmt to local correction */
-            ['sigfigs',       ULONG, self.parameters], #    /* accuracy of timestamps */
-            ['snaplen',       ULONG, self.parameters], #    /* max length saved portion of each pkt */
-            ['linktype',      ULONG, self.parameters], #    /* data link type (LINKTYPE_*) */
-            ]
-        
+    fields = [
+        ['magic',         ULONG],
+        ['version_major', WORD],
+        ['version_minor', WORD],
+        ['thiszone',      ULONG, None, "gmt to local correction"],
+        ['sigfigs',       ULONG, None, "accuracy of timestamps"],
+        ['snaplen',       ULONG, None, "max length saved portion of each pkt"],
+        ['linktype',      ULONG, None, "data link type (LINKTYPE_*)"],
+        ]
+    
     def read(self):
         ## Try to read the file with little endianess
         self.parameters['endianess']='l'
@@ -87,13 +86,12 @@ class FileHeader(SimpleStruct):
         
 class Packet(SimpleStruct):
     """ Each packet is preceeded by this. """
-    def init(self):
-        self.fields = [
-            ['ts_sec',  TIMESTAMP, self.parameters],    #      /* time stamp */
-            ['ts_usec', ULONG,     self.parameters],    #      /* Time in usecs */
-            ['caplen',  ULONG,     self.parameters],    #      /* length of portion present */
-            ['length',  ULONG,     self.parameters],    #      /* length this packet (off wire) */
-            ]
+    fields = [
+        ['ts_sec',  TIMESTAMP, None, "time stamp"],
+        ['ts_usec', ULONG,     None, "Time in usecs"],
+        ['caplen',  ULONG,     None, "length of portion present"],
+        ['length',  ULONG,     None, "length this packet (off wire)"]
+        ]
 
     def read(self):
         result=SimpleStruct.read(self)

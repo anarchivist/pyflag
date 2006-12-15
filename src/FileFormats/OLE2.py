@@ -145,32 +145,29 @@ def mesg_receipt(p,file):
     pass
 
 class FIDAndOffset(SimpleStruct):
-    def init(self):
-        self.fields=[
-            [ 'FID', CLSID],
-            [ 'offset',LONG]
-            ]
+    fields=[
+        [ 'FID', CLSID],
+        [ 'offset',LONG]
+        ]
 
 class FIDAndOffsetArray(ARRAY):
     target_class=FIDAndOffset
 
 class PropHeader(SimpleStruct):
-    def init(self):
-        self.fields=[
-            [ 'byteOrder',WORD],
-            [ 'Format',WORD],
-            [ 'OSVersion1',WORD],
-            [ 'OSVersion2',WORD],
-            [ 'ClassID',CLSID],
-            [ 'cSections',LONG],
+    fields=[
+        [ 'byteOrder',WORD],
+        [ 'Format',WORD],
+        [ 'OSVersion1',WORD],
+        [ 'OSVersion2',WORD],
+        [ 'ClassID',CLSID],
+        [ 'cSections',LONG],
         ]
 
 class DataSize(SimpleStruct):
-    def init(self):
-        self.fields=[
-            [ 'cBytes',LONG],
-            [ 'cProps',LONG],
-            ]
+    fields=[
+        [ 'cBytes',LONG],
+        [ 'cProps',LONG],
+        ]
 
 class PropDataType(LONG_ENUM):
     """ These are the possible data types in properties """
@@ -207,11 +204,10 @@ class PropType(LONG_ENUM):
         }
 
 class Property(SimpleStruct):
-    def init(self):
-        self.fields=[
-            [ 'Type',PropType],
-            [ 'Offset',LONG], #This is relative to the section
-            ]
+    fields=[
+        [ 'Type',PropType],
+        [ 'Offset',LONG], #This is relative to the section
+        ]
 
 class PropArray(ARRAY):
     target_class=Property

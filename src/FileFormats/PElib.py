@@ -38,22 +38,22 @@ class IMAGE_DOS_HEADER(SimpleStruct):
     def init(self):
         self.fields = [
             [ "e_magic", STRING,{'length':2},"Magic number", ],
-            [ "e_cblp",  WORD,  {},        "Bytes on last page of file",],
-            [ "e_cp",    WORD,  {},        "Pages in file",],
-            [ "e_crlc",  WORD,  {},        "Relocations",],
-            [ "e_cparhdr",WORD, {},        "Size of header in paragraphs",],
-            [ "e_minalloc",WORD,{},        "Minimum extra paragraphs needed",],
-            [ "e_maxalloc",WORD,{},        "Maximum extra paragraphs needed",],
-            [ "e_ss",    WORD,  {},        "Initial (relative) SS value",],
-            [ "e_sp",    WORD,  {},        "Initial SP value",],
-            [ "e_csum",  WORD,  {},        "Checksum",],
-            [ "e_ip",    WORD,  {},        "Initial IP value",],
-            [ "e_cs",    WORD,  {},        "Initial (relative) CS value",],
-            [ "e_lfarlc",WORD,  {},        "File address of relocation table",],
-            [ "e_ovno",  WORD,  {},        "Overlay number",],
+            [ "e_cblp",  WORD,  None,        "Bytes on last page of file",],
+            [ "e_cp",    WORD,  None,        "Pages in file",],
+            [ "e_crlc",  WORD,  None,        "Relocations",],
+            [ "e_cparhdr",WORD, None,        "Size of header in paragraphs",],
+            [ "e_minalloc",WORD,None,        "Minimum extra paragraphs needed",],
+            [ "e_maxalloc",WORD,None,        "Maximum extra paragraphs needed",],
+            [ "e_ss",    WORD,  None,        "Initial (relative) SS value",],
+            [ "e_sp",    WORD,  None,        "Initial SP value",],
+            [ "e_csum",  WORD,  None,        "Checksum",],
+            [ "e_ip",    WORD,  None,        "Initial IP value",],
+            [ "e_cs",    WORD,  None,        "Initial (relative) CS value",],
+            [ "e_lfarlc",WORD,  None,        "File address of relocation table",],
+            [ "e_ovno",  WORD,  None,        "Overlay number",],
             [ "e_res",   WORD_ARRAY, {'count':4},"Reserved words",],
-            [ "e_oemid", WORD,  {},        "OEM identifier (for e_oeminfo)",],
-            [ "e_oeminfo",WORD, {},        "OEM information- e_oemid specific",],
+            [ "e_oemid", WORD,  None,        "OEM identifier (for e_oeminfo)",],
+            [ "e_oeminfo",WORD, None,        "OEM information- e_oemid specific",],
             [ "e_res2",  WORD_ARRAY,{'count':10},"Reserved words",],
             [ "e_lfanew",P_IMAGE_FILE_HEADER,{},"File address of new exe header",],
             ]
@@ -310,6 +310,7 @@ def get_messages(buffer):
     """ opens the PE executable in buffer and returns a Messages object containing all the event log messages within it. If there are no messages, raise an IndexError.
     """
     header = IMAGE_DOS_HEADER(buffer)
+    m=None
     
     optional_header = header['e_lfanew'].get_value()['OptionalHeader']
     for s in optional_header['Sections']:

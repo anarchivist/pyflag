@@ -96,20 +96,18 @@ class TERMINATED_UCS16(TERMINATED_STRING):
 
 class TERMINATED_UCS16_Array(ARRAY):
     target_class=TERMINATED_UCS16
-
     
 class Header(SimpleStruct):
     """ This is the header of the event file. """
-    def init(self):
-        self.fields = [
-            [ 'size',  LONG ],
-            [ 'Magic', STRING,{'length':4}],
-            [ 'RecordNumber', LONG ],
-            [ 'FirstEventID', LONG ],
-            [ 'FirstEventOffset',LONG ],
-            [ 'LastEventOffset',LONG ],
-            [ 'LastEventID',LONG ],
-            ]
+    fields = [
+        [ 'size',  LONG ],
+        [ 'Magic', STRING,{'length':4}],
+        [ 'RecordNumber', LONG ],
+        [ 'FirstEventID', LONG ],
+        [ 'FirstEventOffset',LONG ],
+        [ 'LastEventOffset',LONG ],
+        [ 'LastEventID',LONG ],
+        ]
 
     def size(self):
         """ The size of this structure is determined by the size element """
@@ -118,28 +116,27 @@ class Header(SimpleStruct):
 class Event(Header):
     """ The Event log file is a sequence of event structures followed by a list of NULL terminated UCS16 strings.
     """
-    def init(self):
-        self.fields = [
-            [ 'size' ,LONG ],
-            [ 'Magic', STRING,{'length':4}],
-            [ 'RecordNumber',LONG ],
-            [ 'TimeGenerated',TIMESTAMP ],
-            [ 'TimeWritten',TIMESTAMP ],
-            [ 'EventID',ULONG ],
-            [ 'EventType', EventType ],
-            [ 'NumStrings', WORD ],
-            [ 'EventCategory', WORD ],
-            [ 'Unknown', BYTE_ARRAY,{'count':26} ],
+    fields = [
+        [ 'size' ,LONG ],
+        [ 'Magic', STRING,{'length':4}],
+        [ 'RecordNumber',LONG ],
+        [ 'TimeGenerated',TIMESTAMP ],
+        [ 'TimeWritten',TIMESTAMP ],
+        [ 'EventID',ULONG ],
+        [ 'EventType', EventType ],
+        [ 'NumStrings', WORD ],
+        [ 'EventCategory', WORD ],
+        [ 'Unknown', BYTE_ARRAY,{'count':26} ],
             
-            ## Following the struct is an array of NumStrings UCS16
-            ## strings. The first 2 strings are name of service and
-            ## machine name:
-            [ 'Source', TERMINATED_UCS16],
-            [ 'Machine', TERMINATED_UCS16],
-
-            ## These are all the strings
-            [ 'Strings', TERMINATED_UCS16_Array, dict(count = lambda x: x['NumStrings'])],
-            ]
+        ## Following the struct is an array of NumStrings UCS16
+        ## strings. The first 2 strings are name of service and
+        ## machine name:
+        [ 'Source', TERMINATED_UCS16],
+        [ 'Machine', TERMINATED_UCS16],
+        
+        ## These are all the strings
+        [ 'Strings', TERMINATED_UCS16_Array, dict(count = lambda x: x['NumStrings'])],
+        ]
 
     def read(self):
         result=SimpleStruct.read(self)

@@ -90,32 +90,6 @@ class PropertyTree(Tree):
 class OLEException(Exception):
     """ OLE specific exception """
 
-class OLEHeader(SimpleStruct):
-    def size(self):
-        """ The OLE Header size is always fixed """
-        return 0x200
-    
-    def init(self):
-        self.fields =[
-            [ "magic",               STRING, {'length':8} ],
-            [ 'clsid',               LONG_ARRAY, {'count':4} ],
-            [ 'minor_version',       WORD],
-            [ 'major_version',       WORD],
-            [ 'endianness',          LONG],
-            [ 'bb_shift',            LONG],
-            [ 'sb_shift',            LONG],
-            [ 'reserved',            BYTE_ARRAY, dict(count=4)],
-            [ 'number_of_bbd_blocks',LONG],
-            [ 'dirent_start',        LONG],
-            [ 'unknown2',            LONG],
-            [ 'threshold',           LONG],
-            [ 'sbd_startblock',      LONG],
-            [ 'no_sbd',              LONG],
-            [ 'metab_start',         LONG],
-            [ 'number_metab',        LONG],
-            [ 'bbd_list',            DepotList],
-            ]
-
 class DepotList(LONG_ARRAY):
     """ This is an array of variable size which ends when one of the members is -1.
 
@@ -134,6 +108,31 @@ class DepotList(LONG_ARRAY):
 
         return result
 
+class OLEHeader(SimpleStruct):
+    def size(self):
+        """ The OLE Header size is always fixed """
+        return 0x200
+    
+    fields =[
+        [ "magic",               STRING, {'length':8} ],
+        [ 'clsid',               LONG_ARRAY, {'count':4} ],
+        [ 'minor_version',       WORD],
+        [ 'major_version',       WORD],
+        [ 'endianness',          LONG],
+        [ 'bb_shift',            LONG],
+        [ 'sb_shift',            LONG],
+        [ 'reserved',            BYTE_ARRAY, dict(count=4)],
+        [ 'number_of_bbd_blocks',LONG],
+        [ 'dirent_start',        LONG],
+        [ 'unknown2',            LONG],
+        [ 'threshold',           LONG],
+        [ 'sbd_startblock',      LONG],
+        [ 'no_sbd',              LONG],
+        [ 'metab_start',         LONG],
+        [ 'number_metab',        LONG],
+        [ 'bbd_list',            DepotList],
+        ]
+    
 class PPS_TYPE(BYTE_ENUM):
     types = { 1:'dir', 2:'file', 5:'root' }
 
@@ -155,22 +154,21 @@ class PropertySet(SimpleStruct):
 
     This is effectively an inode in the OLE2 filesystem. Each PropertySet belongs in the tree below its parent and next to its prev/next peers. Note that prev/next do not form a complete list (i.e. the next PropertySet might not have us as a prev link at all).
     """
-    def init(self):
-        self.fields=[
-            [ 'pps_rawname', RawString, ],
-            [ 'pps_type',    PPS_TYPE],
-            [ 'pps_uk0',     BYTE],
-            [ 'pps_prev',    LONG],
-            [ 'pps_next',    LONG],
-            [ 'pps_dir',     LONG],
-            [ 'pps_clsid',   CLSID],
-            [ 'pps_flags',   LONG],
-            [ 'pps_ts1',     WIN_FILETIME],
-            [ 'pps_ts2',     WIN_FILETIME],
-            [ 'pps_sb',      LONG],
-            [ 'pps_size',    LONG],
-            [ 'pad',         LONG],
-            ]
+    fields=[
+        [ 'pps_rawname', RawString, ],
+        [ 'pps_type',    PPS_TYPE],
+        [ 'pps_uk0',     BYTE],
+        [ 'pps_prev',    LONG],
+        [ 'pps_next',    LONG],
+        [ 'pps_dir',     LONG],
+        [ 'pps_clsid',   CLSID],
+        [ 'pps_flags',   LONG],
+        [ 'pps_ts1',     WIN_FILETIME],
+        [ 'pps_ts2',     WIN_FILETIME],
+        [ 'pps_sb',      LONG],
+        [ 'pps_size',    LONG],
+        [ 'pad',         LONG],
+        ]
 
 class PropertySetArray(ARRAY):
     target_class=PropertySet

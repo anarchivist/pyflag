@@ -120,17 +120,17 @@ class Message(SimpleStruct):
 
     This consist of some information followed by a sequence of Elements
     """
-    def init(self):
-        ## Messages are always in network order
-        opts = {'endianess':'b'}
-        self.fields = [
-            [ 'magic',   STRING,  dict(length=4) ],
-            [ 'version', ULONG,  opts],
-            [ 'pkt_len', WORD,   opts],
-            [ 'service', Services,   opts],
-            [ 'status',  Status,  opts],
-            [ 'session_id', ULONG, opts],
-            ]
+
+    ## Messages are always in network order
+    opts = {'endianess':'b'}
+    fields = [
+        [ 'magic',   STRING,  dict(length=4) ],
+        [ 'version', ULONG,  opts],
+        [ 'pkt_len', WORD,   opts],
+        [ 'service', Services,   opts],
+        [ 'status',  Status,  opts],
+        [ 'session_id', ULONG, opts],
+        ]
         
     def read(self):
         result = SimpleStruct.read(self)

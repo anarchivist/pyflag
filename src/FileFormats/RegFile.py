@@ -42,61 +42,83 @@ class NK_TYPE(WORD_ENUM):
         0x2c: 'ROOT_KEY'
         }
 
-class RegF(SimpleStruct):
-    """ This is the registry file header """
-    def __init__(self,  buffer, *args, **kwargs):
-        SimpleStruct.__init__(self, buffer, *args, **kwargs)
-        self.root_key = self['root_key_offset'].get_value()
-
-    def get_key(self, path):
-        """ Given a path, retrieve the key object stored there """
-        p = path.split("/")
-        root_key = self.root_key
-        while p:
-            root_key = root_key.key(p.pop(0))
-            
-        return root_key
-
-    def init(self):
-        self.fields = [
-            [ 'Magic',          STRING , dict(length=4) ],
-            [ 'Unknown1',       LONG_ARRAY, dict(count=2) ],
-            [ 'Last Modified',  WIN_FILETIME],
-            [ 'Unknown2',       LONG_ARRAY,{'count':4}],
-            ##Offset is relative to FIRST_PAGE_OFFSET. This offset is
-            ##to the root key's nk record.
-            [ 'root_key_offset',PNK_key],
-            [ 'filesize',       LONG],
-            [ 'Name',           RegFName,{'length':0x1fc-0x2c}],
-            [ 'checksum',       ULONG ],
-            ]
-
 class RegFName(STRING):
     """ A string which does not print NULLs """
     def __str__(self):
         result=[c for c in STRING.__str__(self) if c!='\x00' ]
         return ''.join(result)
 
+class lh_key(SimpleStruct):
+    fields = [
+        [ 'id',      STRING,{'length':2}],
+        [ 'no_keys', WORD ],
+        ]
+
+    def read(self):
+        result=SimpleStruct.read(self)
+#        if result['id']!='lh':
+#            raise IOError("lh record expected, but not found at offset 0x%08X" % self.buffer.offset)
+        
+        no_keys=result['no_keys'].get_value()
+        self.add_element(result,'hashes', LF_HashArray(self.buffer[4:],count=no_keys))
+        return result
+
+class ri_key(SimpleStruct):
+    fields = [
+        [ 'id',         STRING,{'length':2}],
+        [ 'no_pointers',WORD ],
+        ]
+
+    def read(self):
+        result=SimpleStruct.read(self)
+        if result['id']!='ri':
+            raise IOError("ri record expected, but not found at offset 0x%08X" % data.offset)
+
+class Pri_key(POINTER):
+    """ This is a pointer to the ri_key struct for a particular nk.
+
+    It is pointing relative to FIRST_PAGE_OFFSET.
+    """
+    target_class=ri_key
+
+    def calc_offset(self):
+        offset = self.data
+        if offset>0:
+            offset=offset+FIRST_PAGE_OFFSET+4
+            data=self.buffer.set_offset(offset)
+            
+            return data
+        else: return None
+
+class Plh_key(Pri_key):
+    target_class=lh_key
+
+class KEY_NAME(STRING):
+    """ The key names are a 32 bit length followed by data """
+    def __init__(self,buffer,*args,**kwargs):
+        offset = WORD(buffer)
+        kwargs['length']=offset.get_value()
+        STRING.__init__(self,buffer[4:], *args, **kwargs)
+
 class NK_key(SimpleStruct):
     """ The main key node """
-    def init(self):
-        self.fields=[
-            [ 'id',                STRING,{'length':2}],
-            [ 'Type',              NK_TYPE],
-            [ 'WriteTS',           WIN12_FILETIME],
-            [ 'parent_offset',     LONG],
-            [ 'number_of_subkeys', ULONG],
-            [ 'pad',               LONG],
-            [ 'offs_lh',           Plh_key],
-            [ 'pad',               LONG],
-            [ 'no_values',         LONG],
-            [ 'offs_vk_list',      LONG],  
-            [ 'offs_sk',           LONG],
-            [ 'offs_class_name',   LONG],
-            [ 'pad',               LONG_ARRAY,{'count':5}],
-            [ 'key_name',          KEY_NAME],
-            ]
-
+    fields=[
+        [ 'id',                STRING,{'length':2}],
+        [ 'Type',              NK_TYPE],
+        [ 'WriteTS',           WIN12_FILETIME],
+        [ 'parent_offset',     LONG],
+        [ 'number_of_subkeys', ULONG],
+        [ 'pad',               LONG],
+        [ 'offs_lh',           Plh_key],
+        [ 'pad',               LONG],
+        [ 'no_values',         LONG],
+        [ 'offs_vk_list',      LONG],  
+        [ 'offs_sk',           LONG],
+        [ 'offs_class_name',   LONG],
+        [ 'pad',               LONG_ARRAY,{'count':5}],
+        [ 'key_name',          KEY_NAME],
+        ]
+    
     def read(self):
         result=SimpleStruct.read(self)
         if result['id']!='nk':
@@ -151,43 +173,36 @@ class NK_key(SimpleStruct):
             except IOError:
                 return
 
-class ri_key(SimpleStruct):
-    def init(self):
-        self.fields = [
-            [ 'id',         STRING,{'length':2}],
-            [ 'no_pointers',WORD ],
-            ]
-
-    def read(self):
-        result=SimpleStruct.read(self)
-        if result['id']!='ri':
-            raise IOError("ri record expected, but not found at offset 0x%08X" % data.offset)
-
-class Pri_key(POINTER):
-    """ This is a pointer to the ri_key struct for a particular nk.
-
-    It is pointing relative to FIRST_PAGE_OFFSET.
-    """
-    target_class=ri_key
-
-    def calc_offset(self):
-        offset = self.data
-        if offset>0:
-            offset=offset+FIRST_PAGE_OFFSET+4
-            data=self.buffer.set_offset(offset)
-            
-            return data
-        else: return None
-
 class PNK_key(Pri_key):
     target_class=NK_key
 
-class KEY_NAME(STRING):
-    """ The key names are a 32 bit length followed by data """
-    def __init__(self,buffer,*args,**kwargs):
-        offset = WORD(buffer)
-        kwargs['length']=offset.get_value()
-        STRING.__init__(self,buffer[4:], *args, **kwargs)
+class RegF(SimpleStruct):
+    """ This is the registry file header """
+    def __init__(self,  buffer, *args, **kwargs):
+        SimpleStruct.__init__(self, buffer, *args, **kwargs)
+        self.root_key = self['root_key_offset'].get_value()
+
+    def get_key(self, path):
+        """ Given a path, retrieve the key object stored there """
+        p = path.split("/")
+        root_key = self.root_key
+        while p:
+            root_key = root_key.key(p.pop(0))
+            
+        return root_key
+
+    fields = [
+        [ 'Magic',          STRING , dict(length=4) ],
+        [ 'Unknown1',       LONG_ARRAY, dict(count=2) ],
+        [ 'Last Modified',  WIN_FILETIME],
+        [ 'Unknown2',       LONG_ARRAY,{'count':4}],
+        ##Offset is relative to FIRST_PAGE_OFFSET. This offset is
+        ##to the root key's nk record.
+        [ 'root_key_offset',PNK_key],
+        [ 'filesize',       LONG],
+        [ 'Name',           RegFName,{'length':0x1fc-0x2c}],
+        [ 'checksum',       ULONG ],
+        ]
 
 class DATA_TYPE(LONG_ENUM):
     """ Different types of data stored in the registry """
@@ -211,12 +226,11 @@ class DATA(SimpleStruct):
 
     The data is encoded using the three vectors len_data,offs_data and val_type. There are many edge cases where these change meanings. This is another example of microsoft stupidity - increasing the complexity for no reason. Most of the code below handles the weird edge cases.
     """
-    def init(self):
-        self.fields=[
-            [ 'len_data',  LONG ],
-            [ 'offs_data', LONG ],
-            [ 'val_type',  DATA_TYPE ],
-            ]
+    fields=[
+        [ 'len_data',  LONG ],
+        [ 'offs_data', LONG ],
+        [ 'val_type',  DATA_TYPE ],
+        ]
         
     def read(self):
         result=SimpleStruct.read(self)
@@ -262,14 +276,13 @@ class DATA(SimpleStruct):
         return result
 
 class vk_key(SimpleStruct):
-    def init(self):
-        self.fields = [
-            [ 'id',      STRING,{'length':2}],
-            [ 'len_name',WORD ],
-            [ 'data',    DATA ],
-            [ 'flag',    WORD ],
-            [ 'pad',     WORD ],
-            ]
+    fields = [
+        [ 'id',      STRING,{'length':2}],
+        [ 'len_name',WORD ],
+        [ 'data',    DATA ],
+        [ 'flag',    WORD ],
+        [ 'pad',     WORD ],
+        ]
 
     def read(self):
         result=SimpleStruct.read(self)
@@ -286,37 +299,17 @@ class vk_key(SimpleStruct):
         self.add_element(result,'keyname',keyname)
         return result
 
-class lf_hash(SimpleStruct):
-    def init(self):
-        self.fields = [
-            [ 'ofs_nk', PNK_key],
-            [ 'name',   STRING,{'length':4}],
-            ]
-
-class LF_HashArray(ARRAY):
-    target_class=lf_hash
-
-class lh_key(SimpleStruct):
-    def init(self):
-        self.fields = [
-            [ 'id',      STRING,{'length':2}],
-            [ 'no_keys', WORD ],
-            ]
-
-    def read(self):
-        result=SimpleStruct.read(self)
-#        if result['id']!='lh':
-#            raise IOError("lh record expected, but not found at offset 0x%08X" % self.buffer.offset)
-        
-        no_keys=result['no_keys'].get_value()
-        self.add_element(result,'hashes', LF_HashArray(self.buffer[4:],count=no_keys))
-        return result
-
-class Plh_key(Pri_key):
-    target_class=lh_key
-
 class PNK_key(Pri_key):
     target_class=NK_key
+
+class lf_hash(SimpleStruct):
+    fields = [
+        [ 'ofs_nk', PNK_key],
+        [ 'name',   STRING,{'length':4}],
+        ]
+    
+class LF_HashArray(ARRAY):
+    target_class=lf_hash
 
 class Pvk_key(Pri_key):
     target_class=vk_key
@@ -384,4 +377,4 @@ if __name__ == "__main__":
     for k in key.keys():
         print k
 
-#    ls_r(root_key)
+    ls_r(header.root_key)
