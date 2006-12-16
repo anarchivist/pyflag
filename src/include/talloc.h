@@ -30,6 +30,9 @@
 typedef void TALLOC_CTX;
 #include <sys/types.h>
 #include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <malloc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
