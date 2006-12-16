@@ -2579,14 +2579,14 @@ ntfs_load_ver(NTFS_INFO * ntfs)
  *
  * Return 1 on error and 0 on success 
  */
+static NTFS_SID_ENTRY *previous_sid_entry = NULL;
+
 static int
 ntfs_load_sid(FS_INFO * fs, ntfs_attr_sds * sds)
 {
     char *sid_str = NULL;
     // "S-"
     unsigned int sid_str_len = 2;
-    static NTFS_SID_ENTRY *previous_sid_entry = NULL;
-
     NTFS_INFO *ntfs_info = (NTFS_INFO *) fs;
 
     unsigned int owner_offset = getu32(fs, sds->self_rel_sec_desc.owner);
@@ -2891,6 +2891,11 @@ ntfs_load_secure(NTFS_INFO * ntfs)
     FS_INFO *fs = (FS_INFO *) & ntfs->fs_info;
     FS_INODE *fs_inode;
     FS_DATA *fs_data;
+
+    // This is required because previous_sid_entry is defined static
+    // for some reason so it needs to be reset upon each load
+    // operation. This should really be in NTFS_INFO.
+    previous_sid_entry = NULL;
 
     fs_inode = ntfs_inode_lookup(fs, NTFS_MFT_SECURE);
     if (!fs_inode) {

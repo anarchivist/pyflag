@@ -55,6 +55,8 @@ int lookup_path(FS_INFO *fs, struct dentwalk *dent);
 
 typedef struct {
     PyObject_HEAD
+    // The talloc context that everything is hanged from:
+        void *context;
 	IMG_INFO *img;
 	FS_INFO *fs;
     PyObject *root_inum;
@@ -299,6 +301,7 @@ static PyTypeObject skfs_inodeType = {
 
 typedef struct {
     PyObject_HEAD
+    void *context;
     PyObject *skfs;
     FS_INODE *fs_inode;
 	uint32_t type;

@@ -16,9 +16,17 @@
 extern "C" {
 #endif
 
+#include "talloc.h"
+
     /*
      * External interface.
      */
+  void *global_talloc_context;
+  #define free talloc_free
+
+  // Force sk to use mymalloc everywhere instead of malloc
+  #define malloc mymalloc
+
     extern char *mymalloc(size_t);
     extern char *myrealloc(char *, size_t);
     extern char *mystrdup(const char *);
