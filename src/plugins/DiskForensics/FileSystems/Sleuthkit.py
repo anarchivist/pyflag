@@ -225,7 +225,8 @@ class Sleuthkit(DBFS):
         DBFS.load(self, mount_point, iosource_name)
 
         # open the skfs
-        fs = sk.skfs(self.iosource["filename"], imgoff=int(self.iosource['offset']))
+        iosrc = IO.open(self.case, iosource_name)
+        fs = sk.skfs(iosrc)
 
         dbh_file=DB.DBO(self.case)
         dbh_inode=DB.DBO(self.case)

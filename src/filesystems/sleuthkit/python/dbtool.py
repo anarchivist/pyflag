@@ -5,10 +5,8 @@
 import sys
 import sk
 
-try:
-    fs = sk.skfs(sys.argv[1], imgoff=int(sys.argv[2]))
-except:
-    fs = sk.skfs(sys.argv[1])
+img = open(sys.argv[1])
+fs = sk.skfs(img)
 
 mnt = "mnt"
 ios = "Iios"

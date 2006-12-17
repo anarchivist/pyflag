@@ -347,6 +347,130 @@ int parse_inode_str(char *str, INUM_T *inode, uint32_t *type, uint32_t *id) {
     return 1;
 }
 
+/* The methods below implement an sleuthkit img interface backed by any python
+ * file-like object using the python abstract object layer, though specific 
+ * optimisations might be made if the object based on a pyflag "iosubsys", or
+ * other C-code backed interface.
+ */
+
+/* Return the size read and -1 if error */
+static SSIZE_T
+pyfile_read_random(IMG_INFO * img_info, OFF_T vol_offset, char *buf,
+                   OFF_T len, OFF_T offset) {
+
+    PyObject *res;
+    int ret, read;
+    OFF_T tot_offset;
+    char *strbuf;
+    IMG_PYFILE_INFO *pyfile_info = (IMG_PYFILE_INFO *) img_info;
+	tot_offset = offset + vol_offset;
+
+    /* seek to correct offset */
+    res = PyObject_CallMethod(pyfile_info->fileobj, "seek", "(l)", tot_offset);
+    if(res == NULL) {
+        tsk_errno = TSK_ERR_IMG_SEEK;
+        snprintf(tsk_errstr, TSK_ERRSTR_L, "pyfile_read_random - can't seek to %ul", tot_offset);
+        tsk_errstr2[0] = '\0';
+        return -1;
+    }
+    Py_DECREF(res);
+	
+    /* try the read */
+    res = PyObject_CallMethod(pyfile_info->fileobj, "read", "(l)", len);
+    if(res == NULL) {
+        tsk_errno = TSK_ERR_IMG_SEEK;
+        snprintf(tsk_errstr, TSK_ERRSTR_L, "pyfile_read_random - can't read %lu from %lu", len, tot_offset);
+        tsk_errstr2[0] = '\0';
+        return -1;
+    }
+
+    /* retrieve data */
+    if(PyString_AsStringAndSize(res, &strbuf, &read) == -1) {
+        tsk_errno = TSK_ERR_IMG_SEEK;
+        snprintf(tsk_errstr, TSK_ERRSTR_L, "pyfile_read_random - error retrieving data");
+        tsk_errstr2[0] = '\0';
+        return -1;
+    }
+
+    memcpy(buf, strbuf, read);
+    return read;
+}
+
+OFF_T
+pyfile_get_size(IMG_INFO * img_info) {
+    return img_info->size;
+}
+
+void
+pyfile_imgstat(IMG_INFO * img_info, FILE * hFile) {
+    fprintf(hFile, "IMAGE FILE INFORMATION\n");
+    fprintf(hFile, "--------------------------------------------\n");
+    fprintf(hFile, "Image Type: pyflag iosubsys\n");
+    fprintf(hFile, "\nSize in bytes: %" PRIuOFF "\n", img_info->size);
+    return;
+}
+
+void
+pyfile_close(IMG_INFO * img_info) {
+    IMG_PYFILE_INFO *pyfile_info = (IMG_PYFILE_INFO *) img_info;
+    PyObject_CallMethod(pyfile_info->fileobj, "close", "");
+    // destructor does this anyway when it frees the context...
+    //talloc_free(img_info);
+    return;
+}
+
+/* construct an IMG_PYFILE_INFO */
+IMG_INFO *
+pyfile_open(PyObject *fileobj) {
+    IMG_PYFILE_INFO *pyfile_info;
+    IMG_INFO *img_info;
+    PyObject *tmp, *tmp2;
+
+    if ((pyfile_info = (IMG_PYFILE_INFO *) mymalloc(sizeof(IMG_PYFILE_INFO))) == NULL)
+        return NULL;
+
+    memset((void *) pyfile_info, 0, sizeof(IMG_PYFILE_INFO));
+
+    /* do some checks on the object */
+    if((PyObject_CallMethod(fileobj, "read", "(i)", 0) == NULL) || 
+       (PyObject_CallMethod(fileobj, "seek", "(i)", 0) == NULL)) {
+        return NULL;
+    }
+
+    /* store the object */
+    pyfile_info->fileobj = fileobj;
+    Py_INCREF(fileobj);
+
+    /* setup the IMG_INFO struct */
+    img_info = (IMG_INFO *) pyfile_info;
+
+    img_info->itype = PYFILE_TYPE;
+    img_info->read_random = pyfile_read_random;
+    img_info->get_size = pyfile_get_size;
+    img_info->close = pyfile_close;
+    img_info->imgstat = pyfile_imgstat;
+
+    img_info->size = 0;
+    /* this block looks aweful! */
+    tmp = PyObject_CallMethod(fileobj, "seek", "(ii)", 0, 2);
+    if(tmp) {
+        Py_DECREF(tmp); tmp=NULL;
+        tmp = PyObject_CallMethod(fileobj, "tell", NULL);
+        if(tmp) {
+            tmp2 = PyNumber_Long(tmp);
+            Py_DECREF(tmp); tmp=NULL;
+            if(tmp2) {
+                img_info->size = PyLong_AsLong(tmp2);
+                Py_DECREF(tmp2);
+            }
+        }
+        PyObject_CallMethod(fileobj, "seek", "(i)", 0);
+    }
+
+    return img_info;
+}
+
+
 /*****************************************************************
  * Now for the python module stuff 
  * ***************************************************************/
@@ -369,22 +493,16 @@ skfs_dealloc(skfs *self) {
 
 static int
 skfs_init(skfs *self, PyObject *args, PyObject *kwds) {
-    char *imgfile=NULL, *imgtype=NULL, *fstype=NULL;
+    PyObject *imgfile;
+    char *fstype=NULL;
     int imgoff=0;
     self->root_inum = NULL;
 
-    static char *kwlist[] = {"imgfile", "imgtype", "imgoff", "fstype", NULL};
+    static char *kwlist[] = {"imgfile", "imgoff", "fstype", NULL};
 
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "s|sis", kwlist, 
-				    &imgfile, &imgtype, &imgoff, &fstype))
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "O|is", kwlist, 
+				    &imgfile, &imgoff, &fstype))
         return -1; 
-
-    /* force raw to prevent incorrect auto-detection of another imgtype */
-    if(!imgtype) {
-        imgtype = "raw";
-    }
-
-    imgoff *= 512;
 
     /** Create a NULL talloc context for us. Now everything will be
 	allocated against that.
@@ -394,9 +512,10 @@ skfs_init(skfs *self, PyObject *args, PyObject *kwds) {
 
     /* initialise the img and filesystem */
     tsk_error_reset();
-    self->img = img_open(imgtype, 1, (const char **)&imgfile);
+
+    self->img = pyfile_open(imgfile);
     if(!self->img) {
-      PyErr_Format(PyExc_IOError, "Unable to open image %s: %s", imgfile, tsk_error_str());
+      PyErr_Format(PyExc_IOError, "Unable to open image file: %s", tsk_error_str());
       return -1;
     }
 
@@ -404,7 +523,7 @@ skfs_init(skfs *self, PyObject *args, PyObject *kwds) {
     tsk_error_reset();
     self->fs = fs_open(self->img, imgoff, fstype);
     if(!self->fs) {
-      PyErr_Format(PyExc_RuntimeError, "Unable to open filesystem in image %s: %s", imgfile, tsk_error_str());
+      PyErr_Format(PyExc_RuntimeError, "Unable to open filesystem in image: %s", tsk_error_str());
       return -1;
     }
 
@@ -917,6 +1036,7 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
 
     self->type = 0;
     self->id = 0;
+    self->skfs = NULL;
 
     static char *kwlist[] = {"filesystem", "path", "inode", NULL};
 

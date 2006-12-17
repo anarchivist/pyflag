@@ -23,10 +23,15 @@ struct dentwalk {
     uint8_t ent_type;
     uint32_t type;
     uint32_t id;
-    //int flags;
     char alloc;
     struct list_head list;
 };
+
+/* implements an sk img subsystem */
+typedef struct {
+	IMG_INFO img_info;
+    PyObject *fileobj;
+} IMG_PYFILE_INFO;
 
 /* tracks block lists */
 struct block {

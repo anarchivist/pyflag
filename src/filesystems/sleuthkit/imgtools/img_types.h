@@ -45,6 +45,8 @@ extern "C" {
 #define EWF_TYPE		0x30
 #define EWF_EWF			0x31
 
+/* PYTHON */
+#define PYFILE_TYPE     0x40
 
 #ifdef __cplusplus
 }
