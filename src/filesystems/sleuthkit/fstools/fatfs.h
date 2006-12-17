@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2006/03/27 03:33:19 $
+** $Date: 2006/12/05 21:39:52 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -40,8 +40,9 @@ extern "C" {
 
 /* size of FAT to read into FATFS_INFO each time */
 /* This must be at least 1024 bytes or else fat12 will get messed up */
-#define FAT_CACHE_B		2048
-#define FAT_CACHE_S		4
+#define FAT_CACHE_N		4	// number of caches
+#define FAT_CACHE_B		4096
+#define FAT_CACHE_S		8	// number of sectors in cache
 
 /* MASK values for FAT entries */
 #define FATFS_12_MASK	0x00000fff
@@ -82,7 +83,7 @@ extern "C" {
     (DADDR_T)((i - 3)/(fatfs->dentry_cnt_se) + fatfs->firstdatasect)
 
 #define FATFS_INODE_2_OFF(fatfs, i)     \
-    (((i - 3) % fatfs->dentry_cnt_se) * sizeof(fatfs_dentry))
+    (unsigned int)(((i - 3) % fatfs->dentry_cnt_se) * sizeof(fatfs_dentry))
 
 
 
@@ -174,7 +175,7 @@ extern "C" {
  * cluster 
  */
 #define FATFS_DENTRY_CLUST(fsi, de)	\
-	(DADDR_T)((getu16(fsi, de->startclust)) | (getu16(fsi, de->highclust)<<16))
+	(DADDR_T)((getu16(fsi->endian, de->startclust)) | (getu16(fsi->endian, de->highclust)<<16))
 
 /* constants for first byte of name[] */
 #define FATFS_SLOT_EMPTY	0x00
@@ -280,7 +281,13 @@ extern "C" {
 /* internal FATFS_INFO structure */
     typedef struct {
 	FS_INFO fs_info;	/* super class */
-	DATA_BUF *table;	/* cached section of file allocation table */
+	//DATA_BUF *table;      /* cached section of file allocation table */
+
+	/* FAT cache */
+	char fatc_buf[FAT_CACHE_N][FAT_CACHE_B];
+	DADDR_T fatc_addr[FAT_CACHE_N];
+	uint8_t fatc_ttl[FAT_CACHE_N];	// ttl of 0 means is not in use
+
 
 	DATA_BUF *dinodes;	/* sector size buffer of inode list */
 	fatfs_sb *sb;
@@ -313,6 +320,7 @@ extern "C" {
 	uint32_t dentry_cnt_cl;	/* max number of dentries per cluster */
 
 	uint16_t ssize;		/* size of sectors in bytes */
+	uint16_t ssize_sh;	/* power of 2 for size of sectors */
 	uint8_t csize;		/* size of clusters in sectors */
 	//uint16_t      reserved;       /* number of reserved sectors */
 	uint8_t numfat;		/* number of fat tables */

@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2006/04/06 01:15:57 $
+ * $Date: 2006/11/29 22:02:16 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2006 Brian Carrier, Basis Technology.  All rights reserved
@@ -35,21 +35,21 @@ mm_read_block(MM_INFO * mm, DATA_BUF * buf, OFF_T len, DADDR_T addr)
     SSIZE_T cnt;
 
     if (len % mm->dev_bsize) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_MM_READ;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "mm_read_block: length %" PRIuOFF " not a multiple of %d",
 	    len, mm->dev_bsize);
-	tsk_errstr2[0] = '\0';
 	return -1;
     }
 
 
     if (len > buf->size) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_MM_READ;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "mm_read_block: buffer too small - %"
 	    PRIuOFF " > %Zd", len, buf->size);
-	tsk_errstr2[0] = '\0';
 	return -1;
     }
 
@@ -68,11 +68,11 @@ SSIZE_T
 mm_read_block_nobuf(MM_INFO * mm, char *buf, OFF_T len, DADDR_T addr)
 {
     if (len % mm->dev_bsize) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_MM_READ;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "mm_read_block_nobuf: length %" PRIuOFF
 	    " not a multiple of %d", len, mm->dev_bsize);
-	tsk_errstr2[0] = '\0';
 	return -1;
     }
 

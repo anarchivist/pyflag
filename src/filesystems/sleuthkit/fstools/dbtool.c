@@ -34,6 +34,8 @@
 #include "ntfs.h"
 #include "except.h"
 
+static TSK_TCHAR *progname;
+
 /* Time skew of the system in seconds */
 static int32_t sec_skew = 0;
 

@@ -2,7 +2,7 @@
 ** ext2fs_dent
 ** The Sleuth Kit 
 **
-** $Date: 2006/07/05 18:24:09 $
+** $Date: 2006/11/29 22:02:09 $
 **
 ** File name layer support for an EXT2FS image
 **
@@ -22,11 +22,11 @@
 */
 
 #include <ctype.h>
-#include "fs_tools.h"
+#include "fs_tools_i.h"
 #include "ext2fs.h"
 
-#define MAX_DEPTH   64
-#define DIR_STRSZ  2048
+#define MAX_DEPTH   128
+#define DIR_STRSZ   4096
 
 typedef struct {
     /* Recursive path stuff */
@@ -43,8 +43,8 @@ typedef struct {
 } EXT2FS_DINFO;
 
 
-static uint8_t ext2fs_dent_walk_lcl(FS_INFO *, EXT2FS_DINFO *, INUM_T, int,
-    FS_DENT_WALK_FN, void *);
+static uint8_t ext2fs_dent_walk_lcl(FS_INFO *, EXT2FS_DINFO *, TSK_LIST **,
+    INUM_T, int, FS_DENT_WALK_FN, void *);
 
 /* return 1 on error and 0 on success */
 static uint8_t
@@ -52,40 +52,42 @@ ext2fs_dent_copy(EXT2FS_INFO * ext2fs, EXT2FS_DINFO * dinfo,
     char *ext2_dent, FS_DENT * fs_dent)
 {
     FS_INFO *fs = &(ext2fs->fs_info);
+    int i;
 
     if (ext2fs->deentry_type == EXT2_DE_V1) {
 	ext2fs_dentry1 *dir = (ext2fs_dentry1 *) ext2_dent;
 
-	fs_dent->inode = getu32(fs, dir->inode);
+	fs_dent->inode = getu32(fs->endian, dir->inode);
 
 	/* ext2 does not null terminate */
-	if (getu16(fs, dir->name_len) >= fs_dent->name_max) {
+	if (getu16(fs->endian, dir->name_len) >= fs_dent->name_max) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_ARG;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"ext2fs_dent_copy: Name Space too Small %d %lu",
-		getu16(fs, dir->name_len), fs_dent->name_max);
-	    tsk_errstr2[0] = '\0';
+		getu16(fs->endian, dir->name_len), fs_dent->name_max);
 	    return 1;
 	}
 
 	/* Copy and Null Terminate */
-	strncpy(fs_dent->name, dir->name, getu16(fs, dir->name_len));
-	fs_dent->name[getu16(fs, dir->name_len)] = '\0';
+	strncpy(fs_dent->name, dir->name, getu16(fs->endian,
+		dir->name_len));
+	fs_dent->name[getu16(fs->endian, dir->name_len)] = '\0';
 
 	fs_dent->ent_type = FS_DENT_UNDEF;
     }
     else {
 	ext2fs_dentry2 *dir = (ext2fs_dentry2 *) ext2_dent;
 
-	fs_dent->inode = getu32(fs, dir->inode);
+	fs_dent->inode = getu32(fs->endian, dir->inode);
 
 	/* ext2 does not null terminate */
 	if (dir->name_len >= fs_dent->name_max) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_ARG;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"ext2_dent_copy: Name Space too Small %d %lu",
 		dir->name_len, fs_dent->name_max);
-	    tsk_errstr2[0] = '\0';
 	    return 1;
 	}
 
@@ -120,6 +122,14 @@ ext2fs_dent_copy(EXT2FS_INFO * ext2fs, EXT2FS_DINFO * dinfo,
 	    fs_dent->ent_type = FS_DENT_UNDEF;
 	    break;
 	}
+    }
+
+    /* Clean up name */
+    i = 0;
+    while (fs_dent->name[i] != '\0') {
+	if (TSK_IS_CNTRL(fs_dent->name[i]))
+	    fs_dent->name[i] = '^';
+	i++;
     }
 
     fs_dent->path = dinfo->dirs;
@@ -158,7 +168,8 @@ ext2fs_dent_copy(EXT2FS_INFO * ext2fs, EXT2FS_DINFO * dinfo,
 */
 static int
 ext2fs_dent_parse_block(EXT2FS_INFO * ext2fs, EXT2FS_DINFO * dinfo,
-    char *buf, int len, int flags, FS_DENT_WALK_FN action, void *ptr)
+    TSK_LIST ** list_seen, char *buf, int len, int flags,
+    FS_DENT_WALK_FN action, void *ptr)
 {
     FS_INFO *fs = &(ext2fs->fs_info);
 
@@ -184,15 +195,15 @@ ext2fs_dent_parse_block(EXT2FS_INFO * ext2fs, EXT2FS_DINFO * dinfo,
 
 	if (ext2fs->deentry_type == EXT2_DE_V1) {
 	    ext2fs_dentry1 *dir = (ext2fs_dentry1 *) dirPtr;
-	    inode = getu32(fs, dir->inode);
-	    namelen = getu16(fs, dir->name_len);
-	    reclen = getu16(fs, dir->rec_len);
+	    inode = getu32(fs->endian, dir->inode);
+	    namelen = getu16(fs->endian, dir->name_len);
+	    reclen = getu16(fs->endian, dir->rec_len);
 	}
 	else {
 	    ext2fs_dentry2 *dir = (ext2fs_dentry2 *) dirPtr;
-	    inode = getu32(fs, dir->inode);
+	    inode = getu32(fs->endian, dir->inode);
 	    namelen = dir->name_len;
-	    reclen = getu16(fs, dir->rec_len);
+	    reclen = getu16(fs->endian, dir->rec_len);
 	}
 
 	minreclen = EXT2FS_DIRSIZ_lcl(namelen);
@@ -286,32 +297,46 @@ ext2fs_dent_parse_block(EXT2FS_INFO * ext2fs, EXT2FS_DINFO * dinfo,
 	    (!ISDOT(fs_dent->name)) &&
 	    ((fs_dent->fsi->mode & FS_INODE_FMT) == FS_INODE_DIR)) {
 
-	    if (dinfo->depth < MAX_DEPTH) {
-		dinfo->didx[dinfo->depth] =
-		    &dinfo->dirs[strlen(dinfo->dirs)];
-		strncpy(dinfo->didx[dinfo->depth], fs_dent->name,
-		    DIR_STRSZ - strlen(dinfo->dirs));
-		strncat(dinfo->dirs, "/", DIR_STRSZ);
-	    }
-	    dinfo->depth++;
-	    if (ext2fs_dent_walk_lcl(&(ext2fs->fs_info), dinfo,
-		    fs_dent->inode, flags, action, ptr)) {
-		/* If this fails because the directory could not be 
-		 * loaded, then we still continue */
-		if (verbose) {
-		    fprintf(stderr,
-			"ffs_dent_parse_block: error reading directory: %"
-			PRIuINUM "\n", fs_dent->inode);
-		    tsk_error_print(stderr);
+	    int depth_added = 0;
+
+	    /* Make sure we do not get into an infinite loop */
+	    if (0 == tsk_list_find(*list_seen, fs_dent->inode)) {
+		if (tsk_list_add(list_seen, fs_dent->inode)) {
+		    fs_dent_free(fs_dent);
+		    return -1;
 		}
 
-		tsk_error_reset();
+
+		if ((dinfo->depth < MAX_DEPTH) &&
+		    (DIR_STRSZ >
+			strlen(dinfo->dirs) + strlen(fs_dent->name))) {
+		    dinfo->didx[dinfo->depth] =
+			&dinfo->dirs[strlen(dinfo->dirs)];
+		    strncpy(dinfo->didx[dinfo->depth], fs_dent->name,
+			DIR_STRSZ - strlen(dinfo->dirs));
+		    strncat(dinfo->dirs, "/", DIR_STRSZ);
+		    depth_added = 1;
+		}
+		dinfo->depth++;
+		if (ext2fs_dent_walk_lcl(&(ext2fs->fs_info), dinfo,
+			list_seen, fs_dent->inode, flags, action, ptr)) {
+		    /* If this fails because the directory could not be 
+		     * loaded, then we still continue */
+		    if (verbose) {
+			tsk_fprintf(stderr,
+			    "ffs_dent_parse_block: error reading directory: %"
+			    PRIuINUM "\n", fs_dent->inode);
+			tsk_error_print(stderr);
+		    }
+
+		    tsk_error_reset();
+		}
+
+
+		dinfo->depth--;
+		if (depth_added)
+		    *dinfo->didx[dinfo->depth] = '\0';
 	    }
-
-
-	    dinfo->depth--;
-	    if (dinfo->depth < MAX_DEPTH)
-		*dinfo->didx[dinfo->depth] = '\0';
 	}
     }
 
@@ -338,15 +363,32 @@ ext2fs_dent_walk(FS_INFO * fs, INUM_T inode, int flags,
     FS_DENT_WALK_FN action, void *ptr)
 {
     EXT2FS_DINFO dinfo;
+    TSK_LIST *list_seen = NULL;
+    uint8_t retval;
+
+    // clean up any error messages that are lying around
+    tsk_error_reset();
 
     memset(&dinfo, 0, sizeof(EXT2FS_DINFO));
-    return ext2fs_dent_walk_lcl(fs, &dinfo, inode, flags, action, ptr);
+    /* Sanity check on flags -- make sure at least one ALLOC is set */
+    if (((flags & FS_FLAG_NAME_ALLOC) == 0) &&
+	((flags & FS_FLAG_NAME_UNALLOC) == 0)) {
+	flags |= (FS_FLAG_NAME_ALLOC | FS_FLAG_NAME_UNALLOC);
+    }
+
+    retval =
+	ext2fs_dent_walk_lcl(fs, &dinfo, &list_seen, inode, flags, action,
+	ptr);
+    tsk_list_free(list_seen);
+    list_seen = NULL;
+    return retval;
 }
 
 /* returns 0 on success and 1 on error */
 static uint8_t
-ext2fs_dent_walk_lcl(FS_INFO * fs, EXT2FS_DINFO * dinfo, INUM_T inode,
-    int flags, FS_DENT_WALK_FN action, void *ptr)
+ext2fs_dent_walk_lcl(FS_INFO * fs, EXT2FS_DINFO * dinfo,
+    TSK_LIST ** list_seen, INUM_T inode, int flags, FS_DENT_WALK_FN action,
+    void *ptr)
 {
     FS_INODE *fs_inode;
     EXT2FS_INFO *ext2fs = (EXT2FS_INFO *) fs;
@@ -356,15 +398,15 @@ ext2fs_dent_walk_lcl(FS_INFO * fs, EXT2FS_DINFO * dinfo, INUM_T inode,
     int retval = 0;
 
     if (inode < fs->first_inum || inode > fs->last_inum) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "ext2fs_dent_walk_lcl: inode value: %" PRIuINUM "\n", inode);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "ext2fs_dent_walk_lcl: Processing directory %" PRIuINUM
 	    "\n", inode);
 
@@ -375,13 +417,13 @@ ext2fs_dent_walk_lcl(FS_INFO * fs, EXT2FS_DINFO * dinfo, INUM_T inode,
     }
 
     size = roundup(fs_inode->size, fs->block_size);
-    if ((dirbuf = mymalloc(size)) == NULL) {
+    if ((dirbuf = mymalloc((size_t) size)) == NULL) {
 	fs_inode_free(fs_inode);
 	return 1;
     }
 
     /* make a copy of the directory contents that we can process */
-    load_file.left = load_file.total = size;
+    load_file.left = load_file.total = (size_t) size;
     load_file.base = load_file.cur = dirbuf;
 
     if (fs->file_walk(fs, fs_inode, 0, 0,
@@ -399,21 +441,21 @@ ext2fs_dent_walk_lcl(FS_INFO * fs, EXT2FS_DINFO * dinfo, INUM_T inode,
     if (load_file.left > 0) {
 	free(dirbuf);
 	fs_inode_free(fs_inode);
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_FWALK;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "ext2fs_dent_walk: Error reading directory contents: %"
 	    PRIuINUM "\n", inode);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
     dirptr = dirbuf;
 
     while (size > 0) {
-	int len = (fs->block_size < size) ? fs->block_size : size;
+	int len = (fs->block_size < size) ? fs->block_size : (int) size;
 
 	retval =
-	    ext2fs_dent_parse_block(ext2fs, dinfo, dirptr, len, flags,
-	    action, ptr);
+	    ext2fs_dent_parse_block(ext2fs, dinfo, list_seen, dirptr, len,
+	    flags, action, ptr);
 
 	/* if 1, then the action wants to stop, -1 is error */
 	if ((retval == 1) || (retval == -1))

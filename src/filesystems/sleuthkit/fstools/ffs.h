@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2006/03/22 03:44:58 $
+** $Date: 2006/08/29 17:13:13 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -381,39 +381,39 @@ extern "C" {
 ** cgbase(fs, c)   ((daddr_t)((fs)->fs_cg_frag_num * (c)))
 */
 #define cgbase_lcl(fsi, fs, c)	\
-	((DADDR_T)(gets32(fsi, (fs)->cg_frag_num) * (c)))
+	((DADDR_T)(gets32(fsi->endian, (fs)->cg_frag_num) * (c)))
 
 
 /* Macros to calc the locations of structures in cyl groups */
 
 #define cgstart_lcl(fsi, fs, c)                          \
-	((DADDR_T)((getu32((fsi), (fs)->magic) == UFS2_FS_MAGIC) ? \
+	((DADDR_T)((getu32((fsi)->endian, (fs)->magic) == UFS2_FS_MAGIC) ? \
 	(cgbase_lcl(fsi, fs, c)) :  \
-	(cgbase_lcl(fsi, fs, c) + gets32((fsi), (fs)->cg_delta) * \
-	 ((c) & ~(gets32((fsi), (fs)->cg_cyc_mask)))) ))
+	(cgbase_lcl(fsi, fs, c) + gets32((fsi)->endian, (fs)->cg_delta) * \
+	 ((c) & ~(gets32((fsi)->endian, (fs)->cg_cyc_mask)))) ))
 
 /* cyl grp block */
 #define cgtod_lcl(fsi, fs, c)	\
-	((DADDR_T)(cgstart_lcl(fsi, fs, c) + gets32(fsi, (fs)->gd_off)))
+	((DADDR_T)(cgstart_lcl(fsi, fs, c) + gets32(fsi->endian, (fs)->gd_off)))
 
 /* inode block in cyl grp */
 #define cgimin_lcl(fsi, fs, c)	\
-	((DADDR_T)(cgstart_lcl(fsi, fs, c) + gets32(fsi, (fs)->ino_off)))
+	((DADDR_T)(cgstart_lcl(fsi, fs, c) + gets32(fsi->endian, (fs)->ino_off)))
 
 /* 1st data  block in cyl grp*/
 #define cgdmin_lcl(fsi, fs, c)   \
-	((DADDR_T)(cgstart_lcl(fsi, fs, c) + gets32(fsi, (fs)->dat_off)))
+	((DADDR_T)(cgstart_lcl(fsi, fs, c) + gets32(fsi->endian, (fs)->dat_off)))
 
 /* super blk in cyl grp*/
 #define cgsblock_lcl(fsi, fs, c) 	\
-	((DADDR_T)(cgstart_lcl(fsi, fs, c) + gets32(fsi, (fs)->sb_off)))
+	((DADDR_T)(cgstart_lcl(fsi, fs, c) + gets32(fsi->endian, (fs)->sb_off)))
 
 /* original:
 ** blkstofrags(fs, blks)  
 **    ((blks) << (fs)->fs_fragshift)
 */
 #define blkstofrags_lcl(fsi, fs, blks)  \
-    ((blks) << gets32(fsi, (fs)->fs_fragshift))
+    ((blks) << gets32(fsi->endian, (fs)->fs_fragshift))
 
 /* original:
 ** itod(fs, x) \
@@ -422,32 +422,32 @@ extern "C" {
 */
 #define itod_lcl(fsi, fs, x) \
       ((DADDR_T)(cgimin_lcl(fsi, fs, itog_lcl(fsi, fs, x)) + \
-      (blkstofrags_lcl(fsi, (fs), (((x)%(ULONG)gets32(fsi, (fs)->cg_inode_num))/ \
-	  (ULONG)gets32(fsi, (fs)->fs_inopb))))))
+      (blkstofrags_lcl(fsi, (fs), (((x)%(ULONG)gets32(fsi->endian, (fs)->cg_inode_num))/ \
+	  (ULONG)gets32(fsi->endian, (fs)->fs_inopb))))))
 
 /* original:
 ** itoo(fs, x) ((x) % (uint32_t)INOPB(fs))
 */
 #define itoo_lcl(fsi, fs, x) 	\
-	((x) % (uint32_t)getu32(fsi, (fs)->fs_inopb))
+	((x) % (uint32_t)getu32(fsi->endian, (fs)->fs_inopb))
 
 /* original:
 ** #define itog(fs, x)    ((x) / (fs)->fs_cg_inode_num)
 */
 #define itog_lcl(fsi, fs, x)	\
-	((x) / gets32(fsi, (fs)->cg_inode_num))
+	(FFS_GRPNUM_T)((x) / gets32(fsi->endian, (fs)->cg_inode_num))
 
 /* original:
 ** dtog(fs, d) ((d) / (fs)->fs_cg_frag_num)
 */
 #define dtog_lcl(fsi, fs, d)	\
-	((d) / gets32(fsi, (fs)->cg_frag_num))
+	(FFS_GRPNUM_T)((d) / gets32(fsi->endian, (fs)->cg_frag_num))
 
 #define cg_inosused_lcl(fsi, cgp)	\
-	((uint8_t *)((uint8_t *)(cgp) + gets32(fsi, (cgp)->cg_iusedoff)))
+	((uint8_t *)((uint8_t *)(cgp) + gets32(fsi->endian, (cgp)->cg_iusedoff)))
 
 #define cg_blksfree_lcl(fsi, cgp) \
-	((uint8_t *)((uint8_t *)(cgp) + gets32(fsi, (cgp)->cg_freeoff)))
+	((uint8_t *)((uint8_t *)(cgp) + gets32(fsi->endian, (cgp)->cg_freeoff)))
 
 
 

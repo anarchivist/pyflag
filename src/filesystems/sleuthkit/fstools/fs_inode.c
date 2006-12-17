@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2006/04/05 03:47:35 $
+ * $Date: 2006/12/05 21:39:52 $
  *
  * Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
  *
@@ -14,8 +14,8 @@
  *	Yorktown Heights, NY 10598, USA
 --*/
 
-#include "fs_tools.h"
-#include "fs_data.h"
+#include "fs_tools_i.h"
+
 
 /* fs_inode_alloc - allocate generic inode structure 
  *
@@ -93,7 +93,8 @@ fs_inode_free(FS_INODE * fs_inode)
 {
     FS_NAME *fs_name, *fs_name2;
 
-    if(!fs_inode) return;
+    if (!fs_inode)
+	return;
 
     if (fs_inode->direct_addr)
 	free((char *) fs_inode->direct_addr);

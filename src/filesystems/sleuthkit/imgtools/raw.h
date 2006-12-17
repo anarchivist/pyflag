@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2006/06/20 22:35:41 $
+ * $Date: 2006/09/06 20:40:00 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2005 Brian Carrier.  All rights reserved 
@@ -13,7 +13,7 @@
 extern "C" {
 #endif
 
-    extern IMG_INFO *raw_open(const char **, IMG_INFO *);
+    extern IMG_INFO *raw_open(const TSK_TCHAR **, IMG_INFO *);
 
     typedef struct IMG_RAW_INFO IMG_RAW_INFO;
     struct IMG_RAW_INFO {

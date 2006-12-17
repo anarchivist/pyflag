@@ -2,7 +2,7 @@
  * imgstat
  * The Sleuth Kit 
  *
- * $Date: 2006/07/10 13:26:20 $
+ * $Date: 2006/12/07 16:38:18 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2005 Brian Carrier.  All rights reserved 
@@ -13,55 +13,58 @@
  */
 #include "img_tools.h"
 
+static TSK_TCHAR *progname;
+
 static void
 usage()
 {
-    fprintf(stderr, "usage: %s [-tvV] [-i imgtype] image\n", progname);
-    fprintf(stderr, "\t-t: display type only\n");
-    fprintf(stderr,
+    TFPRINTF(stderr, _TSK_T("usage: %s [-tvV] [-i imgtype] image\n"),
+	progname);
+    tsk_fprintf(stderr, "\t-t: display type only\n");
+    tsk_fprintf(stderr,
 	"\t-i imgtype: The format of the image file (use '-i list' for list of supported types)\n");
-    fprintf(stderr, "\t-v: verbose output to stderr\n");
-    fprintf(stderr, "\t-V: Print version\n");
+    tsk_fprintf(stderr, "\t-v: verbose output to stderr\n");
+    tsk_fprintf(stderr, "\t-V: Print version\n");
 
     exit(1);
 }
 
 
 int
-main(int argc, char **argv)
+MAIN(int argc, TSK_TCHAR ** argv)
 {
     IMG_INFO *img;
-    char *imgtype = NULL;
+    TSK_TCHAR *imgtype = NULL;
     int ch;
     uint8_t type = 0;
 
     progname = argv[0];
 
-    while ((ch = getopt(argc, argv, "i:tvV")) > 0) {
+    while ((ch = getopt(argc, argv, _TSK_T("i:tvV"))) > 0) {
 	switch (ch) {
-	case '?':
+	case _TSK_T('?'):
 	default:
-	    fprintf(stderr, "Invalid argument: %s\n", argv[optind]);
+	    TFPRINTF(stderr, _TSK_T("Invalid argument: %s\n"),
+		argv[optind]);
 	    usage();
 
-	case 'i':
+	case _TSK_T('i'):
 	    imgtype = optarg;
-	    if (strcmp(imgtype, "list") == 0) {
+	    if (TSTRCMP(imgtype, _TSK_T("list")) == 0) {
 		img_print_types(stderr);
 		exit(1);
 	    }
-
 	    break;
 
-	case 't':
+	case _TSK_T('t'):
 	    type = 1;
 	    break;
 
-	case 'v':
+	case _TSK_T('v'):
 	    verbose++;
 	    break;
 
-	case 'V':
+	case _TSK_T('V'):
 	    print_version(stdout);
 	    exit(0);
 	}
@@ -69,20 +72,20 @@ main(int argc, char **argv)
 
     /* We need at least one more argument */
     if (optind >= argc) {
-	fprintf(stderr, "Missing image name\n");
+	tsk_fprintf(stderr, "Missing image name\n");
 	usage();
     }
 
     if ((img =
 	    img_open(imgtype, argc - optind,
-		(const char **) &argv[optind])) == NULL) {
+		(const TSK_TCHAR **) &argv[optind])) == NULL) {
 	tsk_error_print(stderr);
 	exit(1);
     }
 
     if (type) {
 	char *str = img_get_type(img->itype);
-	printf("%s\n", str);
+	tsk_printf("%s\n", str);
     }
     else {
 	img->imgstat(img, stdout);

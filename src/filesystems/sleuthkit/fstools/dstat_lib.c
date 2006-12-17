@@ -2,7 +2,7 @@
 ** dstat
 ** The Sleuth Kit 
 **
-** $Date: 2006/05/08 17:56:51 $
+** $Date: 2006/11/29 22:02:08 $
 **
 ** Get the details about a data unit
 **
@@ -17,7 +17,7 @@
 ** This software is distributed under the Common Public License 1.0
 **
 */
-#include "libfstools.h"
+#include "fs_tools_i.h"
 
 #include "ffs.h"
 #include "ext2fs.h"
@@ -29,44 +29,46 @@ dstat_act(FS_INFO * fs, DADDR_T addr, char *buf, int flags, void *ptr)
 {
     switch (fs->ftype & FSMASK) {
     case EXTxFS_TYPE:
-	printf("Block: %" PRIuDADDR "\n", addr);
+	tsk_printf("Block: %" PRIuDADDR "\n", addr);
 	break;
     case FFS_TYPE:
-	printf("Fragment: %" PRIuDADDR "\n", addr);
+	tsk_printf("Fragment: %" PRIuDADDR "\n", addr);
 	break;
     case FATFS_TYPE:
-	printf("Sector: %" PRIuDADDR "\n", addr);
+	tsk_printf("Sector: %" PRIuDADDR "\n", addr);
 	break;
     case NTFS_TYPE:
-	printf("Cluster: %" PRIuDADDR "\n", addr);
+	tsk_printf("Cluster: %" PRIuDADDR "\n", addr);
 	break;
     case ISO9660_TYPE:
-	printf("Block: %" PRIuDADDR "\n", addr);
+	tsk_printf("Block: %" PRIuDADDR "\n", addr);
 	break;
     default:
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "dstat_act: Unsupported File System\n");
 	return WALK_ERROR;
     }
 
-    printf("%sAllocated%s\n", (flags & FS_FLAG_DATA_ALLOC) ? "" : "Not ",
+    tsk_printf("%sAllocated%s\n",
+	(flags & FS_FLAG_DATA_ALLOC) ? "" : "Not ",
 	(flags & FS_FLAG_DATA_META) ? " (Meta)" : "");
 
     if ((fs->ftype & FSMASK) == FFS_TYPE) {
 	FFS_INFO *ffs = (FFS_INFO *) fs;
-	printf("Group: %lu\n", (ULONG) ffs->grp_num);
+	tsk_printf("Group: %lu\n", (ULONG) ffs->grp_num);
     }
     else if ((fs->ftype & FSMASK) == EXTxFS_TYPE) {
 	EXT2FS_INFO *ext2fs = (EXT2FS_INFO *) fs;
 	if (addr >= ext2fs->first_data_block)
-	    printf("Group: %lu\n", (ULONG) ext2fs->grp_num);
+	    tsk_printf("Group: %lu\n", (ULONG) ext2fs->grp_num);
     }
     else if ((fs->ftype & FSMASK) == FATFS_TYPE) {
 	FATFS_INFO *fatfs = (FATFS_INFO *) fs;
 	/* Does this have a cluster address? */
 	if (addr >= fatfs->firstclustsect) {
-	    printf("Cluster: %lu\n",
+	    tsk_printf("Cluster: %lu\n",
 		(ULONG) (2 +
 		    (addr - fatfs->firstclustsect) / fatfs->csize));
 	}

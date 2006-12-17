@@ -44,13 +44,13 @@
 #include <stdio.h>
 #endif
 
-#include "fs_tools.h"
-#include "fs_unicode.h"
+
+#include "aux_tools.h"
 
 static const int halfShift = 10;	/* used for shifting by 10 bits */
 
 static const UTF32 halfBase = 0x0010000UL;
-// Used for UTF82UTF16 static const UTF32 halfMask = 0x3FFUL;
+static const UTF32 halfMask = 0x3FFUL;
 
 #define UNI_SUR_HIGH_START  (UTF32)0xD800
 #define UNI_SUR_HIGH_END    (UTF32)0xDBFF
@@ -95,12 +95,11 @@ static const char trailingBytesForUTF8[256] = {
  * This table contains as many values as there might be trailing bytes
  * in a UTF-8 sequence.
  */
-/* Used for UTF82UTF16 
 static const UTF32 offsetsFromUTF8[6] =
     { 0x00000000UL, 0x00003080UL, 0x000E2080UL,
     0x03C82080UL, 0xFA082080UL, 0x82082080UL
 };
-*/
+
 
 /*
  * Once the bits are split out into bytes of UTF-8, this is a mask OR-ed
@@ -125,7 +124,7 @@ static const UTF8 firstByteMark[7] =
 /* --------------------------------------------------------------------- */
 
 ConversionResult
-fs_UTF16toUTF8(FS_INFO * fs, const UTF16 ** sourceStart,
+tsk_UTF16toUTF8(uint16_t endian, const UTF16 ** sourceStart,
     const UTF16 * sourceEnd, UTF8 ** targetStart,
     UTF8 * targetEnd, ConversionFlags flags)
 {
@@ -138,14 +137,14 @@ fs_UTF16toUTF8(FS_INFO * fs, const UTF16 ** sourceStart,
 	const UTF32 byteMask = 0xBF;
 	const UTF32 byteMark = 0x80;
 	const UTF16 *oldSource = source;	/* In case we have to back up because of target overflow. */
-	ch = getu16(fs, (uint8_t *) source);
+	ch = getu16(endian, (uint8_t *) source);
 	source++;
 
 	/* If we have a surrogate pair, convert to UTF32 first. */
 	if (ch >= UNI_SUR_HIGH_START && ch <= UNI_SUR_HIGH_END) {
 	    /* If the 16 bits following the high surrogate are in the source buffer... */
 	    if (source < sourceEnd) {
-		UTF32 ch2 = getu16(fs, (uint8_t *) source);
+		UTF32 ch2 = getu16(endian, (uint8_t *) source);
 		/* If it's a low surrogate, convert to UTF32. */
 		if (ch2 >= UNI_SUR_LOW_START && ch2 <= UNI_SUR_LOW_END) {
 		    ch = ((ch - UNI_SUR_HIGH_START) << halfShift)
@@ -288,7 +287,7 @@ isLegalUTF8(const UTF8 * source, int length)
  * This is not used here; it's just exported.
  */
 Boolean
-isLegalUTF8Sequence(const UTF8 * source, const UTF8 * sourceEnd)
+tsk_isLegalUTF8Sequence(const UTF8 * source, const UTF8 * sourceEnd)
 {
     int length = trailingBytesForUTF8[*source] + 1;
     if (source + length > sourceEnd) {
@@ -299,10 +298,11 @@ isLegalUTF8Sequence(const UTF8 * source, const UTF8 * sourceEnd)
 
 /* --------------------------------------------------------------------- */
 
-#if 0
-// THIS HAS NOT BEEN COVERTED FOR ENDIAN-ness yet
+
+
+// The result of this is in the local endian ordering
 ConversionResult
-fs_UTF8toUTF16(FS_INFO * fs, const UTF8 ** sourceStart,
+tsk_UTF8toUTF16(const UTF8 ** sourceStart,
     const UTF8 * sourceEnd, UTF16 ** targetStart,
     UTF16 * targetEnd, ConversionFlags flags)
 {
@@ -392,4 +392,3 @@ fs_UTF8toUTF16(FS_INFO * fs, const UTF8 ** sourceStart,
     *targetStart = target;
     return result;
 }
-#endif

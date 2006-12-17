@@ -2,7 +2,7 @@
 ** fs_data
 ** The Sleuth Kit 
 **
-** $Date: 2006/07/10 15:09:56 $
+** $Date: 2006/11/29 22:02:10 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
@@ -27,7 +27,7 @@
  * a flag identifies it as a resident stream or a non-resident run
  * They form a linked list and are added to the FS_INODE structure
  */
-#include "fs_tools.h"
+#include "fs_tools_i.h"
 #include "ntfs.h"
 
 /* 
@@ -72,6 +72,7 @@ fs_data_alloc(uint8_t type)
 	data->flags = (FS_DATA_RES | FS_DATA_INUSE);
     }
     else {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "fs_data_alloc: Invalid Type: %d\n", type);
@@ -146,7 +147,7 @@ void
 fs_data_clear_list(FS_DATA * data)
 {
     while (data) {
-	data->flags = data->size = data->type = data->id = 0;
+	data->size = data->type = data->id = data->flags = 0;
 	if (data->run) {
 	    fs_data_run_free(data->run);
 	    data->run = NULL;
@@ -172,6 +173,7 @@ fs_data_getnew_attr(FS_DATA * begin, uint8_t type)
     FS_DATA *temp = NULL, *data = begin;
 
     if ((type != FS_DATA_NONRES) && (type != FS_DATA_RES)) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "Invalid Type in fs_data_getnew_attr()");
@@ -235,6 +237,7 @@ fs_data_lookup(FS_DATA * data_head, uint32_t type, uint16_t id)
     FS_DATA *fs_data = data_head;
 
     if (!data_head) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "fs_data_lookup: Null head pointer");
@@ -243,9 +246,11 @@ fs_data_lookup(FS_DATA * data_head, uint32_t type, uint16_t id)
     }
 
     while (fs_data) {
-        if((fs_data->flags & FS_DATA_INUSE) && (fs_data->type == type) && (fs_data->id == id))
-            break;
-        fs_data = fs_data->next;
+	if ((fs_data->flags & FS_DATA_INUSE) &&
+	    (fs_data->type == type) && (fs_data->id == id))
+	    break;
+
+	fs_data = fs_data->next;
     }
 
     if ((!fs_data) || (fs_data->type != type) || (fs_data->id != id)) {
@@ -271,10 +276,10 @@ fs_data_lookup_noid(FS_DATA * data_head, uint32_t type)
     FS_DATA *fs_data_ret = NULL;
 
     if (!data_head) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "fs_data_lookup_noid: NULL head pointer");
-	tsk_errstr[0] = '\0';
 	return NULL;
     }
 
@@ -283,7 +288,7 @@ fs_data_lookup_noid(FS_DATA * data_head, uint32_t type)
      */
 
     while (fs_data) {
-	if ((fs_data->flags & FS_DATA_INUSE) && fs_data->type == type) {
+	if ((fs_data->flags & FS_DATA_INUSE) && (fs_data->type == type)) {
 
 	    /* replace existing if new is lower */
 	    if ((!fs_data_ret) || (fs_data_ret->id > fs_data->id))
@@ -393,19 +398,22 @@ FS_DATA *
 fs_data_put_run(FS_DATA * data_head,
     DADDR_T start_vcn, OFF_T runlen, FS_DATA_RUN * run,
     char *name, uint32_t type, uint16_t id, OFF_T size, uint8_t flags,
-    uint64_t compsize)
+    uint32_t compsize)
 {
-    FS_DATA *data;
+    FS_DATA *data = NULL;
     FS_DATA_RUN *data_run, *data_run_prev;
     DADDR_T cur_vcn = 0;
 
+    tsk_error_reset();
+
     /* First thing is to find the existing data attribute */
-    data = fs_data_lookup(data_head, type, id);
+    if (data_head)
+	data = fs_data_lookup(data_head, type, id);
 
     /* one does not already exist, so get a new one */
     if (!data) {
 
-	/* fs_data_lookup returns NULL both on error and if it can't 
+	/* fs_data_lookup returns NULL both on error and if it can't find 
 	 * the attribute, so check errno */
 	if (tsk_errno != 0)
 	    return NULL;
@@ -472,10 +480,10 @@ fs_data_put_run(FS_DATA * data_head,
 	     * the filler to start from VCN 0
 	     */
 	    if (cur_vcn > start_vcn) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_ARG;
 		snprintf(tsk_errstr, TSK_ERRSTR_L,
 		    "fs_data_put_run: could not add data_run");
-		tsk_errstr2[0] = '\0';
 		return NULL;
 	    }
 
@@ -573,6 +581,7 @@ fs_data_put_run(FS_DATA * data_head,
 	    return data_head;
 	}
 
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "fs_data_run: error adding aditional run: %" PRIuDADDR

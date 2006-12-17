@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2006/06/19 21:54:27 $
+ * $Date: 2006/09/06 20:40:00 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2005 Brian Carrier.  All rights reserved 
@@ -14,12 +14,16 @@
 extern "C" {
 #endif
 
-    extern IMG_INFO *split_open(int, const char **, IMG_INFO *);
+    extern IMG_INFO *split_open(int, const TSK_TCHAR **, IMG_INFO *);
 
 #define SPLIT_CACHE	15
 
     typedef struct {
+#ifdef TSK_WIN32
+	HANDLE fd;
+#else
 	int fd;
+#endif
 	int image;
 	OFF_T seek_pos;
     } IMG_SPLIT_CACHE;
@@ -29,7 +33,7 @@ extern "C" {
     struct IMG_SPLIT_INFO {
 	IMG_INFO img_info;
 	int num_img;
-	const char **images;
+	const TSK_TCHAR **images;
 	OFF_T *max_off;
 	int *cptr;		/* exists for each image - points to entry in cache */
 	IMG_SPLIT_CACHE cache[SPLIT_CACHE];	/* small number of fds for open images */

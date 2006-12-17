@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2006/07/10 13:26:20 $
+ * $Date: 2006/12/07 16:38:18 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2006 Brian Carrier, Basis Technology.  All rights reserved
@@ -17,7 +17,7 @@
 #include "mm_tools.h"
 
 
-extern char *progname;
+static TSK_TCHAR *progname;
 
 static uint8_t print_bytes = 0;
 static uint8_t recurse = 0;
@@ -28,20 +28,21 @@ static DADDR_T recurse_list[64];
 void
 usage()
 {
-    fprintf(stderr,
-	"%s [-i imgtype] [-o imgoffset] [-brvV] [-t mmtype] image [images]\n",
+    TFPRINTF(stderr,
+	_TSK_T
+	("%s [-i imgtype] [-o imgoffset] [-brvV] [-t mmtype] image [images]\n"),
 	progname);
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-t mmtype: The type of partition system (use '-t list' for list of supported types)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-i imgtype: The format of the image file (use '-i list' for list supported types)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-o imgoffset: Offset to the start of the volume that contains the partition system (in sectors)\n");
-    fprintf(stderr, "\t-b: print the rounded length in bytes\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr, "\t-b: print the rounded length in bytes\n");
+    tsk_fprintf(stderr,
 	"\t-r: recurse and look for other partition tables in partitions (DOS Only)\n");
-    fprintf(stderr, "\t-v: verbose output\n");
-    fprintf(stderr, "\t-V: print the version\n");
+    tsk_fprintf(stderr, "\t-v: verbose output\n");
+    tsk_fprintf(stderr, "\t-V: print the version\n");
     exit(1);
 }
 
@@ -51,24 +52,24 @@ usage()
  * Prints the layout information
  * */
 uint8_t
-part_act(MM_INFO * mm, PNUM_T pnum, MM_PART * part, int flag, char *ptr)
+part_act(MM_INFO * mm, PNUM_T pnum, MM_PART * part, int flag, void *ptr)
 {
     /* Neither table or slot were given */
     if ((part->table_num == -1) && (part->slot_num == -1))
-	printf("%.2" PRIuPNUM ":  -----   ", pnum);
+	tsk_printf("%.2" PRIuPNUM ":  -----   ", pnum);
 
     /* Table was not given, but slot was */
     else if ((part->table_num == -1) && (part->slot_num != -1))
-	printf("%.2" PRIuPNUM ":  %.2" PRIu8 "      ",
+	tsk_printf("%.2" PRIuPNUM ":  %.2" PRIu8 "      ",
 	    pnum, part->slot_num);
 
     /* The Table was given, but slot wasn't */
     else if ((part->table_num != -1) && (part->slot_num == -1))
-	printf("%.2" PRIuPNUM ":  -----   ", pnum);
+	tsk_printf("%.2" PRIuPNUM ":  -----   ", pnum);
 
     /* Both table and slot were given */
     else if ((part->table_num != -1) && (part->slot_num != -1))
-	printf("%.2" PRIuPNUM ":  %.2d:%.2d   ",
+	tsk_printf("%.2" PRIuPNUM ":  %.2d:%.2d   ",
 	    pnum, part->table_num, part->slot_num);
 
     if (print_bytes) {
@@ -98,7 +99,7 @@ part_act(MM_INFO * mm, PNUM_T pnum, MM_PART * part, int flag, char *ptr)
 	}
 
 	/* Print the layout */
-	printf("%.10" PRIuDADDR "   %.10" PRIuDADDR "   %.10" PRIuDADDR
+	tsk_printf("%.10" PRIuDADDR "   %.10" PRIuDADDR "   %.10" PRIuDADDR
 	    "   %.4" PRIuOFF "%c   %s\n", part->start,
 	    (DADDR_T) (part->start + part->len - 1), part->len, size, unit,
 	    part->desc);
@@ -106,7 +107,7 @@ part_act(MM_INFO * mm, PNUM_T pnum, MM_PART * part, int flag, char *ptr)
     else {
 
 	/* Print the layout */
-	printf("%.10" PRIuDADDR "   %.10" PRIuDADDR "   %.10" PRIuDADDR
+	tsk_printf("%.10" PRIuDADDR "   %.10" PRIuDADDR "   %.10" PRIuDADDR
 	    "   %s\n", part->start,
 	    (DADDR_T) (part->start + part->len - 1), part->len,
 	    part->desc);
@@ -124,84 +125,86 @@ part_act(MM_INFO * mm, PNUM_T pnum, MM_PART * part, int flag, char *ptr)
 static void
 print_header(MM_INFO * mm)
 {
-    printf("%s\n", mm->str_type);
-    printf("Offset Sector: %" PRIuDADDR "\n",
+    tsk_printf("%s\n", mm->str_type);
+    tsk_printf("Offset Sector: %" PRIuDADDR "\n",
 	(DADDR_T) (mm->offset / mm->block_size));
-    printf("Units are in %d-byte sectors\n\n", mm->block_size);
+    tsk_printf("Units are in %d-byte sectors\n\n", mm->block_size);
     if (print_bytes)
-	printf
+	tsk_printf
 	    ("     Slot    Start        End          Length       Size    Description\n");
     else
-	printf
+	tsk_printf
 	    ("     Slot    Start        End          Length       Description\n");
 }
 
 
 int
-main(int argc, char **argv)
+MAIN(int argc, TSK_TCHAR ** argv)
 {
     MM_INFO *mm;
-    char *mmtype = NULL;
+    TSK_TCHAR *mmtype = NULL;
     int ch;
     SSIZE_T imgoff = 0;
     uint8_t flags = 0;
-    char *imgtype = NULL;
+    TSK_TCHAR *imgtype = NULL;
     IMG_INFO *img;
 
     progname = argv[0];
 
-    while ((ch = getopt(argc, argv, "bi:o:rt:vV")) > 0) {
+    while ((ch = getopt(argc, argv, _TSK_T("bi:o:rt:vV"))) > 0) {
 	switch (ch) {
-	case 'b':
+	case _TSK_T('b'):
 	    print_bytes = 1;
 	    break;
-	case 'i':
+	case _TSK_T('i'):
 	    imgtype = optarg;
-	    if (strcmp(imgtype, "list") == 0) {
+	    if (TSTRCMP(imgtype, _TSK_T("list")) == 0) {
 		img_print_types(stderr);
 		exit(1);
 	    }
 
 	    break;
 
-	case 'o':
+	case _TSK_T('o'):
 	    if ((imgoff = parse_offset(optarg)) == -1) {
 		tsk_error_print(stderr);
 		exit(1);
 	    }
 	    break;
-	case 'r':
+	case _TSK_T('r'):
 	    recurse = 1;
 	    break;
-	case 't':
+	case _TSK_T('t'):
 	    mmtype = optarg;
-	    if (strcmp(mmtype, "list") == 0) {
+	    if (TSTRCMP(mmtype, _TSK_T("list")) == 0) {
 		mm_print_types(stderr);
 		exit(1);
 	    }
 
 	    break;
-	case 'v':
+	case _TSK_T('v'):
 	    verbose++;
 	    break;
-	case 'V':
+	case _TSK_T('V'):
 	    print_version(stdout);
 	    exit(0);
-	case '?':
+	case _TSK_T('?'):
 	default:
-	    fprintf(stderr, "Unknown argument\n");
+	    tsk_fprintf(stderr, "Unknown argument\n");
 	    usage();
 	}
     }
 
     /* We need at least one more argument */
     if (optind >= argc) {
-	fprintf(stderr, "Missing image name\n");
+	tsk_fprintf(stderr, "Missing image name\n");
 	usage();
     }
 
     /* open the image */
-    img = img_open(imgtype, argc - optind, (const char **) &argv[optind]);
+    img =
+	img_open(imgtype, argc - optind,
+	(const TSK_TCHAR **) &argv[optind]);
 
     if (img == NULL) {
 	tsk_error_print(stderr);
@@ -236,7 +239,7 @@ main(int argc, char **argv)
 	for (i = 0; i < recurse_cnt; i++) {
 	    mm = mm_open(img, recurse_list[i], NULL);
 	    if (mm != NULL) {
-		printf("\n\n");
+		tsk_printf("\n\n");
 		print_header(mm);
 		if (mm->part_walk(mm, mm->first_part, mm->last_part, flags,
 			part_act, NULL)) {

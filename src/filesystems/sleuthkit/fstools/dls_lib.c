@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit
 **
-** $Date: 2006/07/05 18:24:09 $
+** $Date: 2006/12/05 21:39:52 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
@@ -26,9 +26,11 @@
  *	Yorktown Heights, NY 10598, USA
  */
 
-#include "libfstools.h"
+#include "fs_tools_i.h"
 
-
+#ifdef TSK_WIN32
+#include <Winsock2.h>
+#endif
 
 /* call backs for listing details 
  *
@@ -41,13 +43,17 @@ print_list_head(FS_INFO * fs)
     time_t now;
     char unit[32];
 
+#ifndef TSK_WIN32
     if (gethostname(hostnamebuf, sizeof(hostnamebuf) - 1) < 0) {
 	if (verbose)
-	    fprintf(stderr, "dls_lib: error getting hostname: %s\n",
+	    tsk_fprintf(stderr, "dls_lib: error getting hostname: %s\n",
 		strerror(errno));
 	strcpy(hostnamebuf, "unknown");
     }
     hostnamebuf[sizeof(hostnamebuf) - 1] = 0;
+#else
+    strcpy(hostnamebuf, "unknown");
+#endif
     now = time((time_t *) 0);
 
     switch (fs->ftype & FSMASK) {
@@ -63,6 +69,7 @@ print_list_head(FS_INFO * fs)
 	strncpy(unit, "cluster", 32);
 	break;
     default:
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "dls_head: Unsupported File System");
@@ -72,17 +79,17 @@ print_list_head(FS_INFO * fs)
     /*
      * Identify table type and table origin.
      */
-    printf("class|host|image|first_time|unit\n");
-    printf("dls|%s||%lu|%s\n", hostnamebuf, (ULONG) now, unit);
+    tsk_printf("class|host|image|first_time|unit\n");
+    tsk_printf("dls|%s||%lu|%s\n", hostnamebuf, (ULONG) now, unit);
 
-    printf("addr|alloc\n");
+    tsk_printf("addr|alloc\n");
     return 0;
 }
 
 static uint8_t
 print_list(FS_INFO * fs, DADDR_T addr, char *buf, int flags, void *ptr)
 {
-    printf("%" PRIuDADDR "|%s\n", addr,
+    tsk_printf("%" PRIuDADDR "|%s\n", addr,
 	(flags & FS_FLAG_DATA_ALLOC) ? "a" : "f");
     return WALK_CONT;
 }
@@ -94,9 +101,10 @@ static uint8_t
 print_block(FS_INFO * fs, DADDR_T addr, char *buf, int flags, void *ptr)
 {
     if (verbose)
-	fprintf(stderr, "write block %" PRIuDADDR "\n", addr);
+	tsk_fprintf(stderr, "write block %" PRIuDADDR "\n", addr);
 
     if (fwrite(buf, fs->block_size, 1, stdout) != 1) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WRITE;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "dls_lib: error writing to stdout: %s", strerror(errno));
@@ -113,11 +121,11 @@ static OFF_T flen;
 
 static uint8_t
 slack_file_act(FS_INFO * fs, DADDR_T addr, char *buf,
-    unsigned int size, int flags, void *ptr)
+    size_t size, int flags, void *ptr)
 {
 
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "slack_file_act: Remaining File:  %" PRIuOFF
 	    "  Buffer: %u\n", flen, size);
 
@@ -132,7 +140,7 @@ slack_file_act(FS_INFO * fs, DADDR_T addr, char *buf,
     /* This is the last data unit and there is unused space */
     else if (flen < size) {
 	/* Clear the used space and print it */
-	memset(buf, 0, flen);
+	memset(buf, 0, (size_t) flen);
 	fwrite(buf, size, 1, stdout);
 	flen = 0;
     }
@@ -146,7 +154,7 @@ slack_inode_act(FS_INFO * fs, FS_INODE * fs_inode, int flags, void *ptr)
 {
 
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "slack_inode_act: Processing meta data: %" PRIuINUM "\n",
 	    fs_inode->addr);
 
@@ -158,7 +166,7 @@ slack_inode_act(FS_INFO * fs, FS_INODE * fs_inode, int flags, void *ptr)
 		FS_FLAG_FILE_SLACK |
 		FS_FLAG_FILE_NOID, slack_file_act, ptr)) {
 	    if (verbose)
-		fprintf(stderr,
+		tsk_fprintf(stderr,
 		    "slack_inode_act: error walking file: %" PRIuINUM,
 		    fs_inode->addr);
 	    tsk_error_reset();
@@ -167,23 +175,25 @@ slack_inode_act(FS_INFO * fs, FS_INODE * fs_inode, int flags, void *ptr)
 
     /* For NTFS we go through each non-resident attribute */
     else {
-	FS_DATA *fs_data = fs_inode->attr;
+	FS_DATA *fs_data;
 
-	while ((fs_data) && (fs_data->flags & FS_DATA_INUSE)) {
+	for (fs_data = fs_inode->attr;
+	    fs_data != NULL; fs_data = fs_data->next) {
+
+	    if ((fs_data->flags & FS_DATA_INUSE) == 0)
+		continue;
 
 	    if (fs_data->flags & FS_DATA_NONRES) {
 		flen = fs_data->size;
 		if (fs->file_walk(fs, fs_inode, fs_data->type, fs_data->id,
 			FS_FLAG_FILE_SLACK, slack_file_act, ptr)) {
 		    if (verbose)
-			fprintf(stderr,
+			tsk_fprintf(stderr,
 			    "slack_inode_act: error walking file: %"
 			    PRIuINUM, fs_inode->addr);
 		    tsk_error_reset();
 		}
 	    }
-
-	    fs_data = fs_data->next;
 	}
     }
 
@@ -200,8 +210,7 @@ fs_dls(FS_INFO * fs, uint8_t lclflags, DADDR_T bstart, DADDR_T blast,
     if (lclflags & DLS_SLACK) {
 	/* get the info on each allocated inode */
 	if (fs->inode_walk(fs, fs->first_inum, fs->last_inum,
-		(FS_FLAG_META_ALLOC | FS_FLAG_META_USED |
-		    FS_FLAG_META_LINK), slack_inode_act, NULL))
+		FS_FLAG_META_ALLOC, slack_inode_act, NULL))
 	    return 1;
     }
     else if (lclflags & DLS_LIST) {
@@ -212,6 +221,16 @@ fs_dls(FS_INFO * fs, uint8_t lclflags, DADDR_T bstart, DADDR_T blast,
 	    return 1;
     }
     else {
+#ifdef TSK_WIN32
+	if (-1 == _setmode(_fileno(stdout), _O_BINARY)) {
+	    tsk_error_reset();
+	    tsk_errno = TSK_ERR_FS_WRITE;
+	    snprintf(tsk_errstr, TSK_ERRSTR_L,
+		"dls_lib: error setting stdout to binary: %s",
+		strerror(errno));
+	    return 1;
+	}
+#endif
 	if (fs->block_walk(fs, bstart, blast, flags, print_block, NULL))
 	    return 1;
     }

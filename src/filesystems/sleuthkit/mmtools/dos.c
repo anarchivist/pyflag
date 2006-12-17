@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2006/07/05 19:16:34 $
+ * $Date: 2006/12/07 16:38:18 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2006 Brian Carrier, Basis Technology.  All rights reserved
@@ -682,7 +682,7 @@ dos_load_ext_table(MM_INFO * mm, DADDR_T sect_cur, DADDR_T sect_ext_base,
     DADDR_T max_addr = (mm->img_info->size - mm->offset) / mm->block_size;	// max sector
 
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "dos_load_ext: Table Sector: %" PRIuDADDR
 	    ", Primary Base Sector: %" PRIuDADDR "\n", sect_cur,
 	    sect_ext_base);
@@ -691,17 +691,18 @@ dos_load_ext_table(MM_INFO * mm, DADDR_T sect_cur, DADDR_T sect_ext_base,
     cnt = mm_read_block_nobuf
 	(mm, (char *) &sect, sizeof(sect), (DADDR_T) sect_cur);
     if (cnt != sizeof(sect)) {
+	if (cnt != -1) {
+	    tsk_error_reset();
+	    tsk_errno = TSK_ERR_MM_READ;
+	}
 	snprintf(tsk_errstr2, TSK_ERRSTR_L,
 	    "Extended DOS table sector %" PRIuDADDR, sect_cur);
-	if (cnt != -1) {
-	    tsk_errno = TSK_ERR_MM_READ;
-	    tsk_errstr[0] = '\0';
-	}
 	return 1;
     }
 
     /* Sanity Check */
-    if (getu16(mm, sect.magic) != DOS_MAGIC) {
+    if (getu16(mm->endian, sect.magic) != DOS_MAGIC) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_MM_MAGIC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "Extended DOS partition table in sector %"
@@ -730,11 +731,11 @@ dos_load_ext_table(MM_INFO * mm, DADDR_T sect_cur, DADDR_T sect_ext_base,
 
 	/* Get the starting sector and size, we currently
 	 * ignore CHS */
-	uint32_t part_start = getu32(mm, part->start_sec);
-	uint32_t part_size = getu32(mm, part->size_sec);
+	uint32_t part_start = getu32(mm->endian, part->start_sec);
+	uint32_t part_size = getu32(mm->endian, part->size_sec);
 
 	if (verbose)
-	    fprintf(stderr,
+	    tsk_fprintf(stderr,
 		"load_ext: %d:%d    Start: %" PRIu32 "   Size: %"
 		PRIu32 "  Type: %d\n", table, i, part_start, part_size,
 		part->ptype);
@@ -751,12 +752,12 @@ dos_load_ext_table(MM_INFO * mm, DADDR_T sect_cur, DADDR_T sect_ext_base,
 	     * extended partition) */
 
 	    if (sect_ext_base + part_start > max_addr) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_MM_BLK_NUM;
 		snprintf(tsk_errstr, TSK_ERRSTR_L,
 		    "dos_load_ext_table: Starting sector too large for image");
-		tsk_errstr2[0] = '\0';
 		if (verbose)
-		    fprintf(stderr,
+		    tsk_fprintf(stderr,
 			"Starting sector %" PRIuDADDR
 			" too large for image\n",
 			sect_ext_base + part_start);
@@ -782,12 +783,12 @@ dos_load_ext_table(MM_INFO * mm, DADDR_T sect_cur, DADDR_T sect_ext_base,
 	     * starting location */
 
 	    if (sect_cur + part_start > max_addr) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_MM_BLK_NUM;
 		snprintf(tsk_errstr, TSK_ERRSTR_L,
 		    "dos_load_ext_table: Starting sector too large for image");
-		tsk_errstr2[0] = '\0';
 		if (verbose)
-		    fprintf(stderr,
+		    tsk_fprintf(stderr,
 			"Starting sector %" PRIuDADDR
 			" too large for image\n", sect_cur + part_start);
 		return 1;
@@ -825,7 +826,7 @@ dos_load_prim_table(MM_INFO * mm, uint8_t test)
     DADDR_T max_addr = (mm->img_info->size - mm->offset) / mm->block_size;	// max sector
 
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "dos_load_prim: Table Sector: %" PRIuDADDR "\n", taddr);
 
     /* Read the table */
@@ -833,23 +834,23 @@ dos_load_prim_table(MM_INFO * mm, uint8_t test)
 	(mm, (char *) &sect, sizeof(sect), DOS_PART_SOFFSET);
 
     if (cnt != sizeof(sect)) {
+	if (cnt != -1) {
+	    tsk_error_reset();
+	    tsk_errno = TSK_ERR_MM_READ;
+	}
 	snprintf(tsk_errstr2, TSK_ERRSTR_L,
 	    "Primary DOS table sector %" PRIuDADDR, taddr);
-	if (cnt != -1) {
-	    tsk_errno = TSK_ERR_MM_READ;
-	    tsk_errstr[0] = '\0';
-	}
 	return 1;
     }
 
 
     /* Sanity Check */
     if (mm_guessu16(mm, sect.magic, DOS_MAGIC)) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_MM_MAGIC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "File is not a DOS partition (invalid primary magic) (Sector: %"
 	    PRIuDADDR ")", taddr);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
@@ -860,35 +861,35 @@ dos_load_prim_table(MM_INFO * mm, uint8_t test)
     if (test) {
 
 	if (verbose)
-	    fprintf(stderr,
+	    tsk_fprintf(stderr,
 		"dos_load_prim_table: Testing FAT/NTFS conditions\n");
 
 	if (strncmp("MSDOS", sect.oemname, 5) == 0) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_MM_MAGIC;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"dos_load_prim_table: MSDOS OEM name exists");
-	    tsk_errstr2[0] = '\0';
 	    return 1;
 	}
 	else if (strncmp("MSWIN", sect.oemname, 5) == 0) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_MM_MAGIC;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"dos_load_prim_table: MSWIN OEM name exists");
-	    tsk_errstr2[0] = '\0';
 	    return 1;
 	}
 	else if (strncmp("NTFS", sect.oemname, 4) == 0) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_MM_MAGIC;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"dos_load_prim_table: NTFS OEM name exists");
-	    tsk_errstr2[0] = '\0';
 	    return 1;
 	}
 	else if (strncmp("FAT", sect.oemname, 4) == 0) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_MM_MAGIC;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"dos_load_prim_table: FAT OEM name exists");
-	    tsk_errstr2[0] = '\0';
 	    return 1;
 	}
     }
@@ -907,11 +908,11 @@ dos_load_prim_table(MM_INFO * mm, uint8_t test)
 	dos_part *part = &sect.ptable[i];
 
 	/* We currently ignore CHS */
-	uint32_t part_start = getu32(mm, part->start_sec);
-	uint32_t part_size = getu32(mm, part->size_sec);
+	uint32_t part_start = getu32(mm->endian, part->start_sec);
+	uint32_t part_size = getu32(mm->endian, part->size_sec);
 
 	if (verbose)
-	    fprintf(stderr,
+	    tsk_fprintf(stderr,
 		"load_pri:0:%d    Start: %" PRIu32 "   Size: %" PRIu32
 		"  Type: %d\n", i, part_start, part_size, part->ptype);
 
@@ -919,13 +920,13 @@ dos_load_prim_table(MM_INFO * mm, uint8_t test)
 	    continue;
 
 	if (part_start > max_addr) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_MM_BLK_NUM;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"dos_load_prim_table: Starting sector too large for image");
-	    tsk_errstr2[0] = '\0';
 	    if (verbose)
-		fprintf(stderr,
-		    "Starting sector %" PRIuDADDR " too large for image\n",
+		tsk_fprintf(stderr,
+		    "Starting sector %" PRIu32 " too large for image\n",
 		    part_start);
 
 	    return 1;
@@ -933,10 +934,10 @@ dos_load_prim_table(MM_INFO * mm, uint8_t test)
 #if 0
 // I'm not sure if this is too strict ...
 	else if ((part_start + part_size) > max_addr) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_MM_BLK_NUM
 		snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"dos_load_prim_table: Partition ends after image");
-	    tsk_errstr2[0] = '\0';
 	    return 1;
 	}
 #endif
@@ -963,12 +964,12 @@ dos_load_prim_table(MM_INFO * mm, uint8_t test)
     }
     if (added == 0) {
 	if (verbose)
-	    fprintf(stderr, "dos_load_prim: No valid entries\n");
+	    tsk_fprintf(stderr, "dos_load_prim: No valid entries\n");
 
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_MM_MAGIC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "dos_load_prim_table: No valid entries in primary table");
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
@@ -983,23 +984,23 @@ dos_load_prim_table(MM_INFO * mm, uint8_t test)
  */
 uint8_t
 dos_part_walk(MM_INFO * mm, PNUM_T start, PNUM_T last, int flags,
-    MM_PART_WALK_FN action, char *ptr)
+    MM_PART_WALK_FN action, void *ptr)
 {
     MM_PART *part;
     PNUM_T cnt = 0;
 
     if (start < mm->first_part || start > mm->last_part) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_MM_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "dos_part_walk: Starting partition: %" PRIuPNUM "", start);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
     if (last < mm->first_part || last > mm->last_part) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_MM_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "dos_part_walk: Ending partition: %" PRIuPNUM "", last);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
@@ -1045,7 +1046,12 @@ dos_close(MM_INFO * mm)
 MM_INFO *
 dos_open(IMG_INFO * img_info, DADDR_T offset, uint8_t test)
 {
-    MM_INFO *mm = (MM_INFO *) mymalloc(sizeof(*mm));
+    MM_INFO *mm;
+
+    // clean up any errors that are lying around
+    tsk_error_reset();
+
+    mm = (MM_INFO *) mymalloc(sizeof(*mm));
     if (mm == NULL)
 	return NULL;
 

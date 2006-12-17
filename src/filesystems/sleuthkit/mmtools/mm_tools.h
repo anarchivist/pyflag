@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2006/06/20 22:35:42 $
+ * $Date: 2006/09/22 21:31:41 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -11,9 +11,6 @@
 #ifndef _MM_TOOLS_H
 #define _MM_TOOLS_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
     /*
      * External interface.
@@ -26,7 +23,8 @@ extern "C" {
 #include <sys/types.h>
 #include <string.h>
 
-#include "tsk_os.h"
+#include "img_tools.h"
+
 
 #if defined(HAVE_UNISTD)
 #include <unistd.h>
@@ -35,12 +33,9 @@ extern "C" {
 #include <sys/param.h>
 #endif
 
-#include "tsk_types.h"
-
-#include "libauxtools.h"
-#include "libimgtools.h"
-#include "mm_types.h"
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* Flags for the return value of walk actions */
 #define WALK_CONT	0x0
@@ -53,7 +48,7 @@ extern "C" {
 
 /* walk action functions */
     typedef uint8_t(*MM_PART_WALK_FN) (MM_INFO *, PNUM_T, MM_PART *, int,
-	char *);
+	void *);
 
 /* Walk flags */
 // #define MM_FLAG_UNUSED       (1<<0)          /* Fill in the unused space */
@@ -80,7 +75,7 @@ extern "C" {
 
 	/* media management type specific function pointers */
 	 uint8_t(*part_walk) (MM_INFO *, PNUM_T, PNUM_T, int,
-	    MM_PART_WALK_FN, char *);
+	    MM_PART_WALK_FN, void *);
 	void (*close) (MM_INFO *);
     };
 
@@ -117,7 +112,7 @@ extern "C" {
 /**************************************************************8
  * Generic routines.
  */
-    extern MM_INFO *mm_open(IMG_INFO *, DADDR_T, const char *);
+    extern MM_INFO *mm_open(IMG_INFO *, DADDR_T, const TSK_TCHAR *);
 //extern SSIZE_T mm_read_block(FS_INFO *, FS_BUF *, int, DADDR_T, const char *);
     extern SSIZE_T mm_read_block_nobuf(MM_INFO *, char *, OFF_T, DADDR_T);
     extern void mm_print_types(FILE *);
@@ -138,6 +133,21 @@ extern "C" {
 
 #define mm_guessu32(mm, x, mag)   \
 	guess_end_u32(&(mm->endian), (x), (mag))
+
+
+/***** TYPES *****/
+
+    extern char mm_parse_type(const TSK_TCHAR *);
+    extern char *mm_get_type(char);
+
+#define MM_UNSUPP	0x00
+#define	MM_DOS		0x01
+#define MM_BSD		0x02
+#define MM_SUN		0x03
+#define	MM_MAC		0x04
+#define MM_GPT		0x05
+
+
 
 #ifdef __cplusplus
 }

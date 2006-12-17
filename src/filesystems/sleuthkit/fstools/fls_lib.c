@@ -2,7 +2,7 @@
 ** fls
 ** The Sleuth Kit 
 **
-** $Date: 2006/04/05 03:47:35 $
+** $Date: 2006/11/29 22:02:10 $
 **
 ** Given an image and directory inode, display the file names and 
 ** directories that exist (both active and deleted)
@@ -22,8 +22,7 @@
 **
 */
 
-#include "fs_tools.h"
-#include "libfstools.h"
+#include "fs_tools_i.h"
 #include "ntfs.h"
 
 /* Time skew of the system in seconds */
@@ -49,10 +48,10 @@ printit(FS_INFO * fs, FS_DENT * fs_dent, int flags, FS_DATA * fs_data)
 
     if (!(localflags & FLS_FULL)) {
 	for (i = 0; i < fs_dent->pathdepth; i++)
-	    fprintf(stdout, "+");
+	    tsk_fprintf(stdout, "+");
 
 	if (fs_dent->pathdepth)
-	    fprintf(stdout, " ");
+	    tsk_fprintf(stdout, " ");
     }
 
 
@@ -103,7 +102,7 @@ printit(FS_INFO * fs, FS_DENT * fs_dent, int flags, FS_DATA * fs_data)
 	    fs_dent_print(stdout, fs_dent, flags, fs, fs_data);
 	    fs_dent->path = tmpptr;
 	}
-	printf("\n");
+	tsk_printf("\n");
     }
 }
 
@@ -135,7 +134,9 @@ print_dent_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
 	    FS_DATA *fs_data = fs_dent->fsi->attr;
 	    uint8_t printed = 0;
 
-	    while ((fs_data) && (fs_data->flags & FS_DATA_INUSE)) {
+	    while (fs_data) {
+		if ((fs_data->flags & FS_DATA_INUSE) == 0)
+		    continue;
 
 		if (fs_data->type == NTFS_ATYPE_DATA) {
 		    mode_t mode = fs_dent->fsi->mode;
@@ -212,12 +213,59 @@ print_dent_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
 
 /* Returns 0 on success and 1 on error */
 uint8_t
-fs_fls(FS_INFO * fs, uint8_t lclflags, INUM_T inode, int flags, char *pre,
-    int32_t skew)
+fs_fls(FS_INFO * fs, uint8_t lclflags, INUM_T inode, int flags,
+    TSK_TCHAR * tpre, int32_t skew)
 {
+
     localflags = lclflags;
-    macpre = pre;
     sec_skew = skew;
 
+#ifdef TSK_WIN32
+    {
+	char *cpre;
+	size_t clen;
+	UTF8 *ptr8;
+	UTF16 *ptr16;
+	int retval;
+
+	if (tpre != NULL) {
+	    clen = TSTRLEN(tpre) * 4;
+	    cpre = (char *) mymalloc(clen);
+	    if (cpre == NULL) {
+		return 1;
+	    }
+	    ptr8 = (UTF8 *) cpre;
+	    ptr16 = (UTF16 *) tpre;
+
+	    retval =
+		tsk_UTF16toUTF8(fs->endian, (const UTF16 **) &ptr16,
+		(UTF16 *)
+		& ptr16[TSTRLEN(tpre) + 1], &ptr8,
+		(UTF8 *) ((uintptr_t) ptr8 + clen), lenientConversion);
+	    if (retval != conversionOK) {
+		tsk_error_reset();
+		tsk_errno = TSK_ERR_FS_UNICODE;
+		snprintf(tsk_errstr, TSK_ERRSTR_L,
+		    "Error converting fls mactime pre-text to UTF-8 %d\n",
+		    retval);
+		return 1;
+	    }
+	    macpre = cpre;
+	}
+	else {
+	    macpre = NULL;
+	    cpre = NULL;
+	}
+
+	retval = fs->dent_walk(fs, inode, flags, print_dent_act, NULL);
+
+	if (cpre)
+	    free(cpre);
+
+	return retval;
+    }
+#else
+    macpre = tpre;
     return fs->dent_walk(fs, inode, flags, print_dent_act, NULL);
+#endif
 }

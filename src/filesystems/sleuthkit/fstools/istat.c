@@ -2,7 +2,7 @@
 ** istat
 ** The Sleuth Kit 
 **
-** $Date: 2006/07/10 13:26:20 $
+** $Date: 2006/09/20 20:16:01 $
 **
 ** Display all inode info about a given inode.
 **
@@ -20,49 +20,50 @@
 ** This software is distributed under the Common Public License 1.0
 **
 */
+#include <locale.h>
+#include <time.h>
+#include "fs_tools.h"
 
-#include "libfstools.h"
-
+static TSK_TCHAR *progname;
 
 /* usage - explain and terminate */
-
 static void
 usage()
 {
-    fprintf(stderr,
-	"usage: %s [-b num] [-f fstype] [-i imgtype] [-o imgoffset] [-z zone] [-s seconds] [-vV] image inum\n",
+    TFPRINTF(stderr,
+	_TSK_T
+	("usage: %s [-b num] [-f fstype] [-i imgtype] [-o imgoffset] [-z zone] [-s seconds] [-vV] image inum\n"),
 	progname);
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-b num: force the display of NUM address of block pointers\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-z zone: time zone of original machine (i.e. EST5EDT or GMT)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-s seconds: Time skew of original machine (in seconds)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-i imgtype: The format of the image file (use '-i list' for supported types)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-f fstype: File system type (use '-f list' for supported types)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-o imgoffset: The offset of the file system in the image (in sectors)\n");
-    fprintf(stderr, "\t-v: verbose output to stderr\n");
-    fprintf(stderr, "\t-V: print version\n");
+    tsk_fprintf(stderr, "\t-v: verbose output to stderr\n");
+    tsk_fprintf(stderr, "\t-V: print version\n");
     exit(1);
 }
 
 
 int
-main(int argc, char **argv)
+MAIN(int argc, TSK_TCHAR ** argv)
 {
+    TSK_TCHAR *imgtype = NULL;
+    TSK_TCHAR *fstype = NULL;
+    IMG_INFO *img;
+    FS_INFO *fs;
     INUM_T inum;
     int ch;
-    char *cp, *dash;
-    char *fstype = NULL;
-    FS_INFO *fs;
+    TSK_TCHAR *cp;
     int32_t sec_skew = 0;
-    char *imgtype = NULL;
-    IMG_INFO *img;
     SSIZE_T imgoff = 0;
-
 
     /* When > 0 this is the number of blocks to print, used for -b arg */
     DADDR_T numblock = 0;
@@ -70,76 +71,69 @@ main(int argc, char **argv)
     progname = argv[0];
     setlocale(LC_ALL, "");
 
-
-    while ((ch = getopt(argc, argv, "b:f:i:o:s:vVz:")) > 0) {
+    while ((ch = getopt(argc, argv, _TSK_T("b:f:i:o:s:vVz:"))) > 0) {
 	switch (ch) {
-	case '?':
+	case _TSK_T('?'):
 	default:
-	    fprintf(stderr, "Invalid argument: %s\n", argv[optind]);
+	    TFPRINTF(stderr, _TSK_T("Invalid argument: %s\n"),
+		argv[optind]);
 	    usage();
-	case 'b':
-	    numblock = strtoull(optarg, &cp, 0);
+	case _TSK_T('b'):
+	    numblock = TSTRTOULL(optarg, &cp, 0);
 	    if (*cp || cp == optarg || numblock < 1) {
-		fprintf(stderr,
-		    "invalid argument: block count must be positive: %s\n",
+		TFPRINTF(stderr,
+		    _TSK_T
+		    ("invalid argument: block count must be positive: %s\n"),
 		    optarg);
 		usage();
 	    }
 	    break;
-	case 'f':
+	case _TSK_T('f'):
 	    fstype = optarg;
-	    if (strcmp(fstype, "list") == 0) {
+	    if (TSTRCMP(fstype, _TSK_T("list")) == 0) {
 		fs_print_types(stderr);
 		exit(1);
 	    }
-
 	    break;
-	case 'i':
+	case _TSK_T('i'):
 	    imgtype = optarg;
-	    if (strcmp(imgtype, "list") == 0) {
+	    if (TSTRCMP(imgtype, _TSK_T("list")) == 0) {
 		img_print_types(stderr);
 		exit(1);
 	    }
-
 	    break;
-
-	case 'o':
+	case _TSK_T('o'):
 	    if ((imgoff = parse_offset(optarg)) == -1) {
 		tsk_error_print(stderr);
 		exit(1);
 	    }
 	    break;
-
-	case 's':
-	    sec_skew = atoi(optarg);
+	case _TSK_T('s'):
+	    sec_skew = TATOI(optarg);
 	    break;
-
-	case 'v':
+	case _TSK_T('v'):
 	    verbose++;
 	    break;
-
-	case 'V':
+	case _TSK_T('V'):
 	    print_version(stdout);
 	    exit(0);
-	case 'z':
+	case _TSK_T('z'):
 	    {
-		char envstr[32];
-		snprintf(envstr, 32, "TZ=%s", optarg);
-		if (0 != putenv(envstr)) {
-		    fprintf(stderr, "error setting environment");
+		TSK_TCHAR envstr[32];
+		TSNPRINTF(envstr, 32, _TSK_T("TZ=%s"), optarg);
+		if (0 != PUTENV(envstr)) {
+		    tsk_fprintf(stderr, "error setting environment");
 		    exit(1);
 		}
-
-		tzset();
+		TZSET();
 	    }
 	    break;
-
 	}
     }
 
     /* We need at least two more argument */
     if (optind + 1 >= argc) {
-	fprintf(stderr, "Missing image name and/or address\n");
+	tsk_fprintf(stderr, "Missing image name and/or address\n");
 	usage();
     }
 
@@ -148,13 +142,9 @@ main(int argc, char **argv)
      *
      * This will make scripting easier
      */
-    if ((dash = strchr(argv[argc - 1], '-')) != NULL) {
-	*dash = '\0';
-    }
-
-    inum = strtoull(argv[argc - 1], &cp, 0);
-    if (*cp || cp == argv[argc - 1]) {
-	fprintf(stderr, "bad inode number: %s", argv[argc - 1]);
+    if (parse_inum(argv[argc - 1], &inum, NULL, NULL, NULL)) {
+	TFPRINTF(stderr, _TSK_T("Invalid inode number: %s"),
+	    argv[argc - 1]);
 	usage();
     }
 
@@ -163,7 +153,7 @@ main(int argc, char **argv)
      */
     if ((img =
 	    img_open(imgtype, argc - optind - 1,
-		(const char **) &argv[optind])) == NULL) {
+		(const TSK_TCHAR **) &argv[optind])) == NULL) {
 	tsk_error_print(stderr);
 	exit(1);
     }
@@ -177,7 +167,7 @@ main(int argc, char **argv)
     }
 
     if (inum > fs->last_inum) {
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "Metadata address is too large for image (%" PRIuINUM ")\n",
 	    fs->last_inum);
 	fs->close(fs);
@@ -186,7 +176,7 @@ main(int argc, char **argv)
     }
 
     if (inum < fs->first_inum) {
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "Metadata address is too small for image (%" PRIuINUM ")\n",
 	    fs->first_inum);
 	fs->close(fs);

@@ -2,7 +2,7 @@
 ** icat 
 ** The Sleuth Kit 
 **
-** $Date: 2006/07/10 17:11:10 $
+** $Date: 2006/09/20 20:16:01 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
@@ -22,46 +22,48 @@
  *	P.O. Box 704
  *	Yorktown Heights, NY 10598, USA
  --*/
-
-#include "libfstools.h"
+#include <locale.h>
+#include "fs_tools.h"
 
 
 /* usage - explain and terminate */
 
+static TSK_TCHAR *progname;
+
 static void
 usage()
 {
-    fprintf(stderr,
-	"usage: %s [-hHsvV] [-f fstype] [-i imgtype] [-o imgoffset] image [images] inum[-typ[-id]]\n",
+    TFPRINTF(stderr,
+	_TSK_T
+	("usage: %s [-hHsvV] [-f fstype] [-i imgtype] [-o imgoffset] image [images] inum[-typ[-id]]\n"),
 	progname);
-    fprintf(stderr, "\t-h: Do not display holes in sparse files\n");
-    fprintf(stderr, "\t-r: Recover deleted file\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr, "\t-h: Do not display holes in sparse files\n");
+    tsk_fprintf(stderr, "\t-r: Recover deleted file\n");
+    tsk_fprintf(stderr,
 	"\t-R: Recover deleted file and suppress recovery errors\n");
-    fprintf(stderr, "\t-s: Display slack space at end of file\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr, "\t-s: Display slack space at end of file\n");
+    tsk_fprintf(stderr,
 	"\t-i imgtype: The format of the image file (use '-i list' for supported types)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-f fstype: File system type (use '-f list' for supported types)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-o imgoffset: The offset of the file system in the image (in sectors)\n");
-    fprintf(stderr, "\t-v: verbose to stderr\n");
-    fprintf(stderr, "\t-V: Print version\n");
+    tsk_fprintf(stderr, "\t-v: verbose to stderr\n");
+    tsk_fprintf(stderr, "\t-V: Print version\n");
 
     exit(1);
 }
 
 int
-main(int argc, char **argv)
+MAIN(int argc, TSK_TCHAR ** argv)
 {
+    TSK_TCHAR *fstype = NULL;
+    TSK_TCHAR *imgtype = NULL;
     FS_INFO *fs;
-    char *cp;
+    IMG_INFO *img;
     INUM_T inum;
     int flags = 0;
     int ch;
-    char *fstype = NULL;
-    char *imgtype = NULL, *dash;
-    IMG_INFO *img;
     uint32_t type = 0;
     uint16_t id = 0;
     int id_used = 0;
@@ -72,51 +74,50 @@ main(int argc, char **argv)
     progname = argv[0];
     setlocale(LC_ALL, "");
 
-    while ((ch = getopt(argc, argv, "f:hi:o:rRsvV")) > 0) {
+    while ((ch = getopt(argc, argv, _TSK_T("f:hi:o:rRsvV"))) > 0) {
 	switch (ch) {
-	case '?':
+	case _TSK_T('?'):
 	default:
-	    fprintf(stderr, "Invalid argument: %s\n", argv[optind]);
+	    TFPRINTF(stderr, _TSK_T("Invalid argument: %s\n"),
+		argv[optind]);
 	    usage();
-	case 'f':
+	case _TSK_T('f'):
 	    fstype = optarg;
-	    if (strcmp(fstype, "list") == 0) {
+	    if (TSTRCMP(fstype, _TSK_T("list")) == 0) {
 		fs_print_types(stderr);
 		exit(1);
 	    }
-
 	    break;
-	case 'h':
+	case _TSK_T('h'):
 	    flags |= FS_FLAG_FILE_NOSPARSE;
 	    break;
-	case 'i':
+	case _TSK_T('i'):
 	    imgtype = optarg;
-	    if (strcmp(imgtype, "list") == 0) {
+	    if (TSTRCMP(imgtype, _TSK_T("list")) == 0) {
 		img_print_types(stderr);
 		exit(1);
 	    }
-
 	    break;
-	case 'o':
+	case _TSK_T('o'):
 	    if ((imgoff = parse_offset(optarg)) == -1) {
 		tsk_error_print(stderr);
 		exit(1);
 	    }
 	    break;
-	case 'r':
+	case _TSK_T('r'):
 	    flags |= FS_FLAG_FILE_RECOVER;
 	    break;
-	case 'R':
+	case _TSK_T('R'):
 	    flags |= FS_FLAG_FILE_RECOVER;
 	    suppress_recover_error = 1;
 	    break;
-	case 's':
+	case _TSK_T('s'):
 	    flags |= FS_FLAG_FILE_SLACK;
 	    break;
-	case 'v':
+	case _TSK_T('v'):
 	    verbose++;
 	    break;
-	case 'V':
+	case _TSK_T('V'):
 	    print_version(stdout);
 	    exit(0);
 	}
@@ -124,57 +125,20 @@ main(int argc, char **argv)
 
     /* We need at least two more argument */
     if (optind + 1 >= argc) {
-	fprintf(stderr, "Missing image name and/or address\n");
+	tsk_fprintf(stderr, "Missing image name and/or address\n");
 	usage();
     }
 
     /* Get the inode address */
-    /* simple inode usage */
-    if ((dash = strchr(argv[argc - 1], '-')) == NULL) {
-	inum = strtoull(argv[argc - 1], &cp, 0);
-	if (*cp || cp == argv[argc - 1]) {
-	    fprintf(stderr, "Invalid inode address: %s\n", argv[argc - 1]);
-	    usage();
-	}
-    }
-
-    /* inum-type or inum-type-id format */
-    else {
-	char *dash2;
-	*dash = '\0';
-	dash++;
-
-	if ((dash2 = strchr(dash, '-')) == NULL) {
-	    id = 0;
-	}
-	else {
-	    *dash2 = '\0';
-	    dash2++;
-
-	    id = (uint16_t) strtoul(dash2, &cp, 0);
-	    id_used = 1;
-	    if (*cp || cp == dash2) {
-		fprintf(stderr, "Invalid id in inode\n");
-		usage();
-	    }
-	}
-
-	inum = strtoull(argv[argc - 1], &cp, 0);
-	if (*cp || cp == argv[argc - 1]) {
-	    fprintf(stderr, "Invalid inode address: %s\n", argv[argc - 1]);
-	    usage();
-	}
-
-	type = strtoul(dash, &cp, 0);
-	if (*cp || cp == dash) {
-	    fprintf(stderr, "Invalid type in inode\n");
-	    usage();
-	}
+    if (parse_inum(argv[argc - 1], &inum, &type, &id, &id_used)) {
+	TFPRINTF(stderr, _TSK_T("Invalid inode address: %s\n"),
+	    argv[argc - 1]);
+	usage();
     }
 
     if ((img =
 	    img_open(imgtype, argc - optind - 1,
-		(const char **) &argv[optind])) == NULL) {
+		(const TSK_TCHAR **) &argv[optind])) == NULL) {
 	tsk_error_print(stderr);
 	exit(1);
     }
@@ -187,7 +151,7 @@ main(int argc, char **argv)
     }
 
     if (inum > fs->last_inum) {
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "Metadata address too large for image (%" PRIuINUM ")\n",
 	    fs->last_inum);
 	fs->close(fs);
@@ -195,14 +159,13 @@ main(int argc, char **argv)
 	exit(1);
     }
     if (inum < fs->first_inum) {
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "Metadata address too small for image (%" PRIuINUM ")\n",
 	    fs->first_inum);
 	fs->close(fs);
 	img->close(img);
 	exit(1);
     }
-
 
     if (id_used)
 	retval = fs_icat(fs, 0, inum, type, id, flags);

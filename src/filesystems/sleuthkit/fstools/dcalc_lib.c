@@ -2,7 +2,7 @@
 ** dcalc
 ** The Sleuth Kit 
 **
-** $Date: 2006/07/05 18:24:09 $
+** $Date: 2006/12/05 21:39:52 $
 **
 ** Calculates the corresponding block number between 'dls' and 'dd' images
 ** when given an 'dls' block number, it determines the block number it
@@ -23,7 +23,8 @@
 ** This software is distributed under the Common Public License 1.0
 **
 */
-#include "libfstools.h"
+
+#include "fs_tools_i.h"
 
 
 static DADDR_T count;
@@ -50,7 +51,7 @@ count_dd_act(FS_INFO * fs, DADDR_T addr, char *buf, int flags, void *ptr)
 
     if (count-- == 0) {
 	if (flags & FS_FLAG_DATA_UNALLOC)
-	    printf("%" PRIuDADDR "\n", uncnt);
+	    tsk_printf("%" PRIuDADDR "\n", uncnt);
 	else
 	    printf
 		("ERROR: unit is allocated, it will not be in an dls image\n");
@@ -70,7 +71,7 @@ static uint8_t
 count_dls_act(FS_INFO * fs, DADDR_T addr, char *buf, int flags, void *ptr)
 {
     if (count-- == 0) {
-	printf("%" PRIuDADDR "\n", addr);
+	tsk_printf("%" PRIuDADDR "\n", addr);
 	found = 1;
 	return WALK_STOP;
     }
@@ -83,11 +84,11 @@ static OFF_T flen;
 
 static uint8_t
 count_slack_file_act(FS_INFO * fs, DADDR_T addr, char *buf,
-    unsigned int size, int flags, void *ptr)
+    size_t size, int flags, void *ptr)
 {
 
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "count_slack_file_act: Remaining File:  %lu  Buffer: %lu\n",
 	    (ULONG) flen, (ULONG) size);
 
@@ -98,7 +99,7 @@ count_slack_file_act(FS_INFO * fs, DADDR_T addr, char *buf,
     /* We have passed the end of the allocated space */
     else if (flen == 0) {
 	if (count-- == 0) {
-	    printf("%" PRIuDADDR "\n", addr);
+	    tsk_printf("%" PRIuDADDR "\n", addr);
 	    found = 1;
 	    return WALK_STOP;
 
@@ -107,7 +108,7 @@ count_slack_file_act(FS_INFO * fs, DADDR_T addr, char *buf,
     /* This is the last data unit and there is unused space */
     else if (flen < size) {
 	if (count-- == 0) {
-	    printf("%" PRIuDADDR "\n", addr);
+	    tsk_printf("%" PRIuDADDR "\n", addr);
 	    found = 1;
 	    return WALK_STOP;
 
@@ -124,7 +125,7 @@ count_slack_inode_act(FS_INFO * fs, FS_INODE * fs_inode,
 {
 
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "count_slack_inode_act: Processing meta data: %" PRIuINUM
 	    "\n", fs_inode->addr);
 
@@ -137,7 +138,7 @@ count_slack_inode_act(FS_INFO * fs, FS_INODE * fs_inode,
 
 	    /* ignore any errors */
 	    if (verbose)
-		fprintf(stderr, "Error walking file %" PRIuINUM,
+		tsk_fprintf(stderr, "Error walking file %" PRIuINUM,
 		    fs_inode->addr);
 	    tsk_error_reset();
 	}
@@ -145,9 +146,13 @@ count_slack_inode_act(FS_INFO * fs, FS_INODE * fs_inode,
 
     /* For NTFS we go through each non-resident attribute */
     else {
-	FS_DATA *fs_data = fs_inode->attr;
+	FS_DATA *fs_data;
 
-	while ((fs_data) && (fs_data->flags & FS_DATA_INUSE)) {
+	for (fs_data = fs_inode->attr;
+	    fs_data != NULL; fs_data = fs_data->next) {
+
+	    if ((fs_data->flags & FS_DATA_INUSE) == 0)
+		continue;
 
 	    if (fs_data->flags & FS_DATA_NONRES) {
 		flen = fs_data->size;
@@ -155,13 +160,12 @@ count_slack_inode_act(FS_INFO * fs, FS_INODE * fs_inode,
 			FS_FLAG_FILE_SLACK, count_slack_file_act, ptr)) {
 		    /* ignore any errors */
 		    if (verbose)
-			fprintf(stderr, "Error walking file %" PRIuINUM,
+			tsk_fprintf(stderr,
+			    "Error walking file %" PRIuINUM,
 			    fs_inode->addr);
 		    tsk_error_reset();
 		}
 	    }
-
-	    fs_data = fs_data->next;
 	}
     }
     return WALK_CONT;
@@ -194,13 +198,12 @@ fs_dcalc(FS_INFO * fs, uint8_t lclflags, DADDR_T cnt)
     }
     else if (lclflags == DCALC_SLACK) {
 	if (fs->inode_walk(fs, fs->first_inum, fs->last_inum,
-		(FS_FLAG_META_ALLOC | FS_FLAG_META_USED |
-		    FS_FLAG_META_LINK), count_slack_inode_act, NULL))
+		FS_FLAG_META_ALLOC, count_slack_inode_act, NULL))
 	    return -1;
     }
 
     if (found == 0) {
-	printf("Block too large\n");
+	tsk_printf("Block too large\n");
 	return 1;
     }
     else {

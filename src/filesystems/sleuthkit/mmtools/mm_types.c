@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2006/03/22 03:41:48 $
+ * $Date: 2006/09/06 20:40:02 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -36,12 +36,20 @@ MM_TYPES mm_open_table[] = {
  * Returns MM_UNSUPP if string cannot be parsed
  * */
 char
-mm_parse_type(const char *str)
+mm_parse_type(const TSK_TCHAR * str)
 {
+    char tmp[16];
+    int i;
     MM_TYPES *types;
 
+    // convert to char
+    for (i = 0; i < 15 && str[i] != '\0'; i++) {
+	tmp[i] = (char) str[i];
+    }
+    tmp[i] = '\0';
+
     for (types = mm_open_table; types->name; types++) {
-	if (strcmp(str, types->name) == 0) {
+	if (strcmp(tmp, types->name) == 0) {
 	    return types->code;
 	}
     }
@@ -52,9 +60,9 @@ void
 mm_print_types(FILE * hFile)
 {
     MM_TYPES *types;
-    fprintf(hFile, "Supported partition types:\n");
+    tsk_fprintf(hFile, "Supported partition types:\n");
     for (types = mm_open_table; types->name; types++)
-	fprintf(hFile, "\t%s (%s)\n", types->name, types->comment);
+	tsk_fprintf(hFile, "\t%s (%s)\n", types->name, types->comment);
 }
 
 

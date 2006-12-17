@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2006/07/10 17:11:10 $
+** $Date: 2006/12/05 21:39:52 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
@@ -24,7 +24,7 @@
  *	Yorktown Heights, NY 10598, USA
  --*/
 
-#include "fs_tools.h"
+#include "fs_tools_i.h"
 #include "ffs.h"
 
 
@@ -43,11 +43,11 @@ ffs_group_load(FFS_INFO * ffs, FFS_GRPNUM_T grp_num)
      * Sanity check
      */
     if (grp_num < 0 || grp_num >= ffs->groups_count) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "ffs_group_load: invalid cylinder group number: %"
 	    PRI_FFSGRP "", grp_num);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
@@ -67,8 +67,8 @@ ffs_group_load(FFS_INFO * ffs, FFS_GRPNUM_T grp_num)
 	cnt = fs_read_block(fs, ffs->grp_buf, ffs->grp_buf->size, addr);
 	if (cnt != ffs->grp_buf->size) {
 	    if (cnt != -1) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_READ;
-		tsk_errstr[0] = '\0';
 	    }
 	    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		"ffs_group_load: Group %" PRI_FFSGRP " at %" PRIuDADDR,
@@ -98,10 +98,10 @@ ffs_dinode_load(FFS_INFO * ffs, INUM_T inum)
      * Sanity check.
      */
     if (inum < fs->first_inum || inum > fs->last_inum) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_INODE_NUM;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "ffs_dinode_load: address: %" PRIuINUM, inum);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
@@ -135,7 +135,7 @@ ffs_dinode_load(FFS_INFO * ffs, INUM_T inum)
 	/* Lookup the cylinder group descriptor if it isn't
 	 * cached
 	 */
-	grp_num = itog_lcl(fs, ffs->fs.sb1, inum);
+	grp_num = (FFS_GRPNUM_T) itog_lcl(fs, ffs->fs.sb1, inum);
 	if ((ffs->grp_buf == NULL) || (grp_num != ffs->grp_num)) {
 	    if (ffs_group_load(ffs, grp_num)) {
 		return 1;
@@ -145,8 +145,9 @@ ffs_dinode_load(FFS_INFO * ffs, INUM_T inum)
 	cg2 = (ffs_cgd2 *) ffs->grp_buf->data;
 
 	/* If the inode is not init, then do not worry about it */
-	if ((inum - grp_num * getu32(fs, ffs->fs.sb2->cg_inode_num)) >=
-	    getu32(fs, cg2->cg_initediblk)) {
+	if ((inum - grp_num * getu32(fs->endian,
+		    ffs->fs.sb2->cg_inode_num)) >= getu32(fs->endian,
+		cg2->cg_initediblk)) {
 	    memset((char *) ffs->dino_buf, 0, sizeof(ffs_inode2));
 	}
 
@@ -160,8 +161,8 @@ ffs_dinode_load(FFS_INFO * ffs, INUM_T inum)
 		    (fs, ffs->itbl_buf, ffs->itbl_buf->size, addr);
 		if (cnt != ffs->itbl_buf->size) {
 		    if (cnt != -1) {
+			tsk_error_reset();
 			tsk_errno = TSK_ERR_FS_READ;
-			tsk_errstr[0] = '\0';
 		    }
 		    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 			"ffs_dinode_load: FFS2 inode table at %"
@@ -194,8 +195,8 @@ ffs_dinode_load(FFS_INFO * ffs, INUM_T inum)
 		addr);
 	    if (cnt != ffs->itbl_buf->size) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		    "ffs_dinode_load: FFS1 inode table at %"
@@ -244,15 +245,15 @@ ffs_dinode_copy(FFS_INFO * ffs, FS_INODE * fs_inode)
     if (fs->ftype == FFS_1) {
 	ffs_inode1 *in = (ffs_inode1 *) ffs->dino_buf;
 
-	fs_inode->mode = getu16(fs, in->di_mode);
-	fs_inode->nlink = gets16(fs, in->di_nlink);
-	fs_inode->size = getu64(fs, in->di_size);
-	fs_inode->uid = getu32(fs, in->di_uid);
-	fs_inode->gid = getu32(fs, in->di_gid);
+	fs_inode->mode = getu16(fs->endian, in->di_mode);
+	fs_inode->nlink = gets16(fs->endian, in->di_nlink);
+	fs_inode->size = getu64(fs->endian, in->di_size);
+	fs_inode->uid = getu32(fs->endian, in->di_uid);
+	fs_inode->gid = getu32(fs->endian, in->di_gid);
 
-	fs_inode->mtime = gets32(fs, in->di_mtime);
-	fs_inode->atime = gets32(fs, in->di_atime);
-	fs_inode->ctime = gets32(fs, in->di_ctime);
+	fs_inode->mtime = gets32(fs->endian, in->di_mtime);
+	fs_inode->atime = gets32(fs->endian, in->di_atime);
+	fs_inode->ctime = gets32(fs->endian, in->di_ctime);
 
 	if (fs_inode->direct_count != FFS_NDADDR ||
 	    fs_inode->indir_count != FFS_NIADDR) {
@@ -263,10 +264,10 @@ ffs_dinode_copy(FFS_INFO * ffs, FS_INODE * fs_inode)
 	}
 
 	for (i = 0; i < FFS_NDADDR; i++)
-	    fs_inode->direct_addr[i] = gets32(fs, in->di_db[i]);
+	    fs_inode->direct_addr[i] = gets32(fs->endian, in->di_db[i]);
 
 	for (i = 0; i < FFS_NIADDR; i++)
-	    fs_inode->indir_addr[i] = gets32(fs, in->di_ib[i]);
+	    fs_inode->indir_addr[i] = gets32(fs->endian, in->di_ib[i]);
 
 
 	/* set the link string (if the file is a link) 
@@ -275,17 +276,16 @@ ffs_dinode_copy(FFS_INFO * ffs, FS_INODE * fs_inode)
 	 */
 	if (((fs_inode->mode & FS_INODE_FMT) == FS_INODE_LNK) &&
 	    (fs_inode->size < FFS_MAXPATHLEN) && (fs_inode->size >= 0)) {
+	    int i;
 
-	    fs_inode->link = mymalloc(fs_inode->size + 1);
+	    fs_inode->link = mymalloc((size_t) fs_inode->size + 1);
 	    if (fs_inode->link == NULL) {
 		return 1;
 	    }
 
 	    count = 0;		/* index into the link array */
 
-	    /* it is located directly in the pointers  
-	     * Only the new style inode has this "fast link"
-	     */
+	    /* it is located directly in the pointers   */
 	    if (fs_inode->size < 4 * (FFS_NDADDR + FFS_NIADDR)) {
 		char *ptr;
 
@@ -331,15 +331,15 @@ ffs_dinode_copy(FFS_INFO * ffs, FS_INODE * fs_inode)
 		    /* Do we need the entire block, or just part of it? */
 		    int read_count =
 			(fs_inode->size - count <
-			fs->block_size) ? fs_inode->size -
+			fs->block_size) ? (int) fs_inode->size -
 			count : fs->block_size;
 
 		    cnt = fs_read_block(fs, data_buf, fs->block_size,
 			fs_inode->direct_addr[i]);
 		    if (cnt != fs->block_size) {
 			if (cnt != -1) {
+			    tsk_error_reset();
 			    tsk_errno = TSK_ERR_FS_READ;
-			    tsk_errstr[0] = '\0';
 			}
 			snprintf(tsk_errstr2, TSK_ERRSTR_L,
 			    "ffs_dinode_copy: FFS1A symlink dest at %"
@@ -355,6 +355,14 @@ ffs_dinode_copy(FFS_INFO * ffs, FS_INODE * fs_inode)
 		/* terminate the string */
 		*ptr = '\0';
 
+		/* Clean up name */
+		i = 0;
+		while (fs_inode->link[i] != '\0') {
+		    if (TSK_IS_CNTRL(fs_inode->link[i]))
+			fs_inode->link[i] = '^';
+		    i++;
+		}
+
 		data_buf_free(data_buf);
 	    }
 	}			/* end of symlink */
@@ -363,15 +371,15 @@ ffs_dinode_copy(FFS_INFO * ffs, FS_INODE * fs_inode)
     else if (fs->ftype == FFS_1B) {
 	ffs_inode1b *in = (ffs_inode1b *) ffs->dino_buf;
 
-	fs_inode->mode = getu16(fs, in->di_mode);
-	fs_inode->nlink = gets16(fs, in->di_nlink);
-	fs_inode->size = getu64(fs, in->di_size);
-	fs_inode->uid = getu32(fs, in->di_uid);
-	fs_inode->gid = getu32(fs, in->di_gid);
+	fs_inode->mode = getu16(fs->endian, in->di_mode);
+	fs_inode->nlink = gets16(fs->endian, in->di_nlink);
+	fs_inode->size = getu64(fs->endian, in->di_size);
+	fs_inode->uid = getu32(fs->endian, in->di_uid);
+	fs_inode->gid = getu32(fs->endian, in->di_gid);
 
-	fs_inode->mtime = gets32(fs, in->di_mtime);
-	fs_inode->atime = gets32(fs, in->di_atime);
-	fs_inode->ctime = gets32(fs, in->di_ctime);
+	fs_inode->mtime = gets32(fs->endian, in->di_mtime);
+	fs_inode->atime = gets32(fs->endian, in->di_atime);
+	fs_inode->ctime = gets32(fs->endian, in->di_ctime);
 
 	if (fs_inode->direct_count != FFS_NDADDR ||
 	    fs_inode->indir_count != FFS_NIADDR) {
@@ -382,78 +390,109 @@ ffs_dinode_copy(FFS_INFO * ffs, FS_INODE * fs_inode)
 	}
 
 	for (i = 0; i < FFS_NDADDR; i++)
-	    fs_inode->direct_addr[i] = gets32(fs, in->di_db[i]);
+	    fs_inode->direct_addr[i] = gets32(fs->endian, in->di_db[i]);
 
 	for (i = 0; i < FFS_NIADDR; i++)
-	    fs_inode->indir_addr[i] = gets32(fs, in->di_ib[i]);
+	    fs_inode->indir_addr[i] = gets32(fs->endian, in->di_ib[i]);
 
 	if (((fs_inode->mode & FS_INODE_FMT) == FS_INODE_LNK) &&
 	    (fs_inode->size < FFS_MAXPATHLEN) && (fs_inode->size >= 0)) {
 
-	    /* This inode type doesn't have fast links */
-	    DATA_BUF *data_buf;
-	    char *ptr;
-
-	    if ((data_buf = data_buf_alloc(fs->block_size)) == NULL)
-		return 1;
-
-	    fs_inode->link = ptr = mymalloc(fs_inode->size + 1);
-	    if (fs_inode->link == NULL) {
-		data_buf_free(data_buf);
-		return 1;
-	    }
-
 	    count = 0;		/* index into the link array */
 
-	    /* there is a max link length of 1000, so we should never
-	     * need the indirect blocks
-	     */
-	    for (i = 0; i < FFS_NDADDR && count < fs_inode->size; i++) {
-		SSIZE_T cnt;
+	    /* it is located directly in the pointers   */
+	    if (fs_inode->size < 4 * (FFS_NDADDR + FFS_NIADDR)) {
+		char *ptr;
 
-		/* Do we need the entire block, or just part of it? */
-		int read_count =
-		    (fs_inode->size - count <
-		    fs->block_size) ? fs_inode->size -
-		    count : fs->block_size;
+		/* Direct block pointer locations */
+		for (i = 0; i < FFS_NDADDR && count < fs_inode->size; i++) {
+		    ptr = (char *) &in->di_db[i];
+		    for (j = 0; j < 4 && count < fs_inode->size; j++)
+			fs_inode->link[count++] = ptr[j];
+		}
 
-		cnt = fs_read_block(fs, data_buf, fs->block_size,
-		    fs_inode->direct_addr[i]);
-		if (cnt != fs->block_size) {
-		    if (cnt != -1) {
-			tsk_errno = TSK_ERR_FS_READ;
-			tsk_errstr[0] = '\0';
-		    }
-		    snprintf(tsk_errstr2, TSK_ERRSTR_L,
-			"ffs_dinode_copy: FFS1B symlink dest at %"
-			PRIuDADDR, fs_inode->direct_addr[i]);
+		/* indirect block pointers */
+		for (i = 0; i < FFS_NIADDR && count < fs_inode->size; i++) {
+		    ptr = (char *) &in->di_ib[i];
+		    for (j = 0; j < 4 && count < fs_inode->size; j++)
+			fs_inode->link[count++] = ptr[j];
+		}
+
+		fs_inode->link[count] = '\0';
+
+		/* clear the values to avoid other code from reading them */
+		for (i = 0; i < FFS_NDADDR; i++)
+		    fs_inode->direct_addr[i] = 0;
+
+		for (i = 0; i < FFS_NIADDR; i++)
+		    fs_inode->indir_addr[i] = 0;
+	    }
+
+	    /* it is in blocks (the regular way) */
+	    else {
+		DATA_BUF *data_buf;
+		char *ptr;
+
+		if ((data_buf = data_buf_alloc(fs->block_size)) == NULL)
+		    return 1;
+
+		fs_inode->link = ptr =
+		    mymalloc((size_t) fs_inode->size + 1);
+		if (fs_inode->link == NULL) {
 		    data_buf_free(data_buf);
 		    return 1;
 		}
 
-		memcpy(ptr, data_buf->data, read_count);
-		count += read_count;
-		ptr = (char *) ((uintptr_t) ptr + read_count);
+		/* there is a max link length of 1000, so we should never
+		 * need the indirect blocks
+		 */
+		for (i = 0; i < FFS_NDADDR && count < fs_inode->size; i++) {
+		    SSIZE_T cnt;
+
+		    /* Do we need the entire block, or just part of it? */
+		    int read_count =
+			(fs_inode->size - count <
+			fs->block_size) ? (int) fs_inode->size -
+			count : fs->block_size;
+
+		    cnt = fs_read_block(fs, data_buf, fs->block_size,
+			fs_inode->direct_addr[i]);
+		    if (cnt != fs->block_size) {
+			if (cnt != -1) {
+			    tsk_error_reset();
+			    tsk_errno = TSK_ERR_FS_READ;
+			}
+			snprintf(tsk_errstr2, TSK_ERRSTR_L,
+			    "ffs_dinode_copy: FFS1B symlink dest at %"
+			    PRIuDADDR, fs_inode->direct_addr[i]);
+			data_buf_free(data_buf);
+			return 1;
+		    }
+
+		    memcpy(ptr, data_buf->data, read_count);
+		    count += read_count;
+		    ptr = (char *) ((uintptr_t) ptr + read_count);
+		}
+
+		/* terminate the string */
+		*ptr = '\0';
+
+		data_buf_free(data_buf);
 	    }
-
-	    /* terminate the string */
-	    *ptr = '\0';
-
-	    data_buf_free(data_buf);
 	}
     }
     else if (fs->ftype == FFS_2) {
 	ffs_inode2 *in = (ffs_inode2 *) ffs->dino_buf;
 
-	fs_inode->mode = getu16(fs, in->di_mode);
-	fs_inode->nlink = gets16(fs, in->di_nlink);
-	fs_inode->size = getu64(fs, in->di_size);
-	fs_inode->uid = getu32(fs, in->di_uid);
-	fs_inode->gid = getu32(fs, in->di_gid);
+	fs_inode->mode = getu16(fs->endian, in->di_mode);
+	fs_inode->nlink = gets16(fs->endian, in->di_nlink);
+	fs_inode->size = getu64(fs->endian, in->di_size);
+	fs_inode->uid = getu32(fs->endian, in->di_uid);
+	fs_inode->gid = getu32(fs->endian, in->di_gid);
 
-	fs_inode->mtime = (time_t) gets64(fs, in->di_mtime);
-	fs_inode->atime = (time_t) gets64(fs, in->di_atime);
-	fs_inode->ctime = (time_t) gets64(fs, in->di_ctime);
+	fs_inode->mtime = (time_t) gets64(fs->endian, in->di_mtime);
+	fs_inode->atime = (time_t) gets64(fs->endian, in->di_atime);
+	fs_inode->ctime = (time_t) gets64(fs->endian, in->di_ctime);
 
 	if (fs_inode->direct_count != FFS_NDADDR ||
 	    fs_inode->indir_count != FFS_NIADDR) {
@@ -464,10 +503,10 @@ ffs_dinode_copy(FFS_INFO * ffs, FS_INODE * fs_inode)
 	}
 
 	for (i = 0; i < FFS_NDADDR; i++)
-	    fs_inode->direct_addr[i] = gets64(fs, in->di_db[i]);
+	    fs_inode->direct_addr[i] = gets64(fs->endian, in->di_db[i]);
 
 	for (i = 0; i < FFS_NIADDR; i++)
-	    fs_inode->indir_addr[i] = gets64(fs, in->di_ib[i]);
+	    fs_inode->indir_addr[i] = gets64(fs->endian, in->di_ib[i]);
 
 
 	/* set the link string (if the file is a link) 
@@ -477,7 +516,7 @@ ffs_dinode_copy(FFS_INFO * ffs, FS_INODE * fs_inode)
 	if (((fs_inode->mode & FS_INODE_FMT) == FS_INODE_LNK) &&
 	    (fs_inode->size < FFS_MAXPATHLEN) && (fs_inode->size >= 0)) {
 
-	    fs_inode->link = mymalloc(fs_inode->size + 1);
+	    fs_inode->link = mymalloc((size_t) fs_inode->size + 1);
 	    if (fs_inode->link == NULL) {
 		return 1;
 	    }
@@ -532,15 +571,15 @@ ffs_dinode_copy(FFS_INFO * ffs, FS_INODE * fs_inode)
 		    /* Do we need the entire block, or just part of it? */
 		    int read_count =
 			(fs_inode->size - count <
-			fs->block_size) ? fs_inode->size -
+			fs->block_size) ? (int) fs_inode->size -
 			count : fs->block_size;
 
 		    cnt = fs_read_block(fs, data_buf, fs->block_size,
 			fs_inode->direct_addr[i]);
 		    if (cnt != fs->block_size) {
 			if (cnt != -1) {
+			    tsk_error_reset();
 			    tsk_errno = TSK_ERR_FS_READ;
-			    tsk_errstr[0] = '\0';
 			}
 			snprintf(tsk_errstr2, TSK_ERRSTR_L,
 			    "ffs_dinode_copy: FFS2 symlink dest at %"
@@ -561,15 +600,15 @@ ffs_dinode_copy(FFS_INFO * ffs, FS_INODE * fs_inode)
 	}			/* end of symlink */
     }
     else {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "ffs_dinode_copy: Unknown FFS Type");
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
     /* set the flags */
-    grp_num = itog_lcl(fs, ffs->fs.sb1, ffs->dino_inum);
+    grp_num = (FFS_GRPNUM_T) itog_lcl(fs, ffs->fs.sb1, ffs->dino_inum);
     if ((ffs->grp_buf == NULL) || (grp_num != ffs->grp_num)) {
 	if (ffs_group_load(ffs, grp_num))
 	    return 1;
@@ -578,15 +617,11 @@ ffs_dinode_copy(FFS_INFO * ffs, FS_INODE * fs_inode)
     cg = (ffs_cgd *) ffs->grp_buf->data;
 
     inosused = (unsigned char *) cg_inosused_lcl(fs, cg);
-    ibase = grp_num * gets32(fs, ffs->fs.sb1->cg_inode_num);
+    ibase = grp_num * gets32(fs->endian, ffs->fs.sb1->cg_inode_num);
 
     /* get the alloc flag */
     fs_inode->flags = (isset(inosused, ffs->dino_inum - ibase) ?
 	FS_FLAG_META_ALLOC : FS_FLAG_META_UNALLOC);
-
-    /* link flag */
-    fs_inode->flags |= (fs_inode->nlink ?
-	FS_FLAG_META_LINK : FS_FLAG_META_UNLINK);
 
     /* used/unused */
     fs_inode->flags |= (fs_inode->ctime ?
@@ -607,6 +642,9 @@ ffs_inode_lookup(FS_INFO * fs, INUM_T inum)
 {
     FFS_INFO *ffs = (FFS_INFO *) fs;
     FS_INODE *fs_inode;
+
+    // clean up any error messages that are lying around
+    tsk_error_reset();
 
     /* Lookup the inode and store it in ffs */
     if (ffs_dinode_load(ffs, inum))
@@ -633,11 +671,23 @@ ffs_inode_lookup(FS_INFO * fs, INUM_T inum)
  *
  **************************************************************************/
 
+
+static uint8_t
+inode_walk_dent_orphan_act(FS_INFO * fs, FS_DENT * fs_dent, int flags,
+    void *ptr)
+{
+    if ((fs_dent->fsi) && (fs_dent->fsi->flags & FS_FLAG_META_UNALLOC)) {
+	if (tsk_list_add(&fs->list_inum_named, fs_dent->fsi->addr))
+	    return WALK_STOP;
+    }
+    return WALK_CONT;
+}
+
+
 /* ffs_inode_walk - inode iterator 
  *
  * flags used: FS_FLAG_META_USED, FS_FLAG_META_UNUSED, 
- *  FS_FLAG_META_LINK, FS_FLAG_META_UNLINK, 
- *  FS_FLAG_META_ALLOC, FS_FLAG_META_UNALLOC
+ *  FS_FLAG_META_ALLOC, FS_FLAG_META_UNALLOC, FS_FLAG_META_ORPHAN
  *
  *  return 1 on error and 0 on success
  */
@@ -655,24 +705,63 @@ ffs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum, int flags,
     int myflags;
     INUM_T ibase = 0;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
 
     /*
      * Sanity checks.
      */
     if (start_inum < fs->first_inum || start_inum > fs->last_inum) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "%s: Start inode: %" PRIuINUM "", myname, start_inum);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
     else if (end_inum < fs->first_inum || end_inum > fs->last_inum
 	|| end_inum < start_inum) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "%s: End inode: %" PRIuINUM "", myname, end_inum);
-	tsk_errstr2[0] = '\0';
 	return 1;
+    }
+
+    /* If ORPHAN is wanted, then make sure that the flags are correct */
+    if (flags & FS_FLAG_META_ORPHAN) {
+	flags |= FS_FLAG_META_UNALLOC;
+	flags &= ~FS_FLAG_META_ALLOC;
+    }
+
+    else if (((flags & FS_FLAG_META_ALLOC) == 0) &&
+	((flags & FS_FLAG_META_UNALLOC) == 0)) {
+	flags |= (FS_FLAG_META_ALLOC | FS_FLAG_META_UNALLOC);
+    }
+
+    /* If neither of the USED or UNUSED flags are set, then set them
+     * both
+     */
+    if (((flags & FS_FLAG_META_USED) == 0) &&
+	((flags & FS_FLAG_META_UNUSED) == 0)) {
+	flags |= (FS_FLAG_META_USED | FS_FLAG_META_UNUSED);
+    }
+
+
+
+    /* If we are looking for orphan files and have not yet filled
+     * in the list of unalloc inodes that are pointed to, then fill
+     * in the list
+     * */
+    if ((flags & FS_FLAG_META_ORPHAN) && (fs->list_inum_named == NULL)) {
+
+	if (ffs_dent_walk(fs, fs->root_inum,
+		FS_FLAG_NAME_ALLOC | FS_FLAG_NAME_UNALLOC |
+		FS_FLAG_NAME_RECURSE, inode_walk_dent_orphan_act, NULL)) {
+	    strncat(tsk_errstr2,
+		" - ffs_inode_walk: identifying inodes allocated by file names",
+		TSK_ERRSTR_L);
+	    return 1;
+	}
     }
 
     if ((fs_inode = fs_inode_alloc(FFS_NDADDR, FFS_NIADDR)) == NULL)
@@ -700,7 +789,8 @@ ffs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum, int flags,
 	if (cg == NULL) {
 	    cg = (ffs_cgd *) ffs->grp_buf->data;
 	    inosused = (unsigned char *) cg_inosused_lcl(fs, cg);
-	    ibase = grp_num * gets32(fs, ffs->fs.sb1->cg_inode_num);
+	    ibase =
+		grp_num * gets32(fs->endian, ffs->fs.sb1->cg_inode_num);
 	}
 
 	/*
@@ -722,17 +812,9 @@ ffs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum, int flags,
 	    ffs_inode1 *in1 = (ffs_inode1 *) ffs->dino_buf;
 
 	    /*
-	     * Apply the linked/unlinked restriction.
-	     */
-	    myflags |= (gets16(fs, in1->di_nlink) ?
-		FS_FLAG_META_LINK : FS_FLAG_META_UNLINK);
-	    if ((flags & myflags) != myflags)
-		continue;
-
-	    /*
 	     * Apply the used/unused restriction.
 	     */
-	    myflags |= (gets32(fs, in1->di_ctime) ?
+	    myflags |= (gets32(fs->endian, in1->di_ctime) ?
 		FS_FLAG_META_USED : FS_FLAG_META_UNUSED);
 	    if ((flags & myflags) != myflags)
 		continue;
@@ -741,21 +823,23 @@ ffs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum, int flags,
 	    ffs_inode2 *in2 = (ffs_inode2 *) ffs->dino_buf;
 
 	    /*
-	     * Apply the linked/unlinked restriction.
-	     */
-	    myflags |= (gets16(fs, in2->di_nlink) ?
-		FS_FLAG_META_LINK : FS_FLAG_META_UNLINK);
-	    if ((flags & myflags) != myflags)
-		continue;
-
-	    /*
 	     * Apply the used/unused restriction.
 	     */
-	    myflags |= (gets64(fs, in2->di_ctime) ?
+	    myflags |= (gets64(fs->endian, in2->di_ctime) ?
 		FS_FLAG_META_USED : FS_FLAG_META_UNUSED);
 	    if ((flags & myflags) != myflags)
 		continue;
 	}
+
+	/* If we want only orphans, then check if this
+	 * inode is in the seen list
+	 */
+	if ((myflags & FS_FLAG_META_UNALLOC) &&
+	    (flags & FS_FLAG_META_ORPHAN) &&
+	    (tsk_list_find(fs->list_inum_named, inum))) {
+	    continue;
+	}
+
 
 	/*
 	 * Fill in a file system-independent inode structure and pass control
@@ -820,33 +904,43 @@ ffs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk, int flags,
     int frags;
     char *null_block = NULL;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     /*
      * Sanity checks.
      */
     if (start_blk < fs->first_block || start_blk > fs->last_block) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "%s: Start block: %" PRIuDADDR "", myname, start_blk);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
     if (end_blk < fs->first_block || end_blk > fs->last_block
 	|| end_blk < start_blk) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "%s: End block: %" PRIuDADDR "", myname, end_blk);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
     if ((flags & FS_FLAG_DATA_ALIGN) && (start_blk % ffs->ffsbsize_f) != 0) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "%s: start block is not block-aligned", myname);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
+
+    /* Sanity check on flags -- make sure at least one ALLOC is set */
+    if (((flags & FS_FLAG_DATA_ALLOC) == 0) &&
+	((flags & FS_FLAG_DATA_UNALLOC) == 0)) {
+	flags |= (FS_FLAG_DATA_ALLOC | FS_FLAG_DATA_UNALLOC);
+    }
+
 
     /*
      * Other initialization.
@@ -881,7 +975,8 @@ ffs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk, int flags,
 	 * Be sure to use the right cylinder group information.
 	 */
 	grp_num = dtog_lcl(fs, ffs->fs.sb1, addr);
-	if (cg == 0 || (unsigned int) gets32(fs, cg->cg_cgx) != grp_num) {
+	if (cg == 0
+	    || (unsigned int) gets32(fs->endian, cg->cg_cgx) != grp_num) {
 
 	    if (ffs_group_load(ffs, grp_num)) {
 		if (flags & FS_FLAG_DATA_ALIGN)
@@ -902,7 +997,7 @@ ffs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk, int flags,
 	 * Prepare for file systems that have a partial last logical block.
 	 */
 	frags = (end_blk + 1 - addr > ffs->ffsbsize_f ?
-	    ffs->ffsbsize_f : end_blk + 1 - addr);
+	    ffs->ffsbsize_f : (int) (end_blk + 1 - addr));
 
 	/*
 	 * See if this logical block contains any fragments of interest. If
@@ -936,7 +1031,7 @@ ffs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk, int flags,
 
 	    if ((verbose) && (myflags & FS_FLAG_DATA_META)
 		&& (myflags & FS_FLAG_DATA_UNALLOC))
-		fprintf(stderr,
+		tsk_fprintf(stderr,
 		    "impossible: unallocated meta block %" PRIuDADDR,
 		    faddr);
 
@@ -968,8 +1063,8 @@ ffs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk, int flags,
 			addr);
 		    if (cnt != fs->block_size * frags) {
 			if (cnt != -1) {
+			    tsk_error_reset();
 			    tsk_errno = TSK_ERR_FS_READ;
-			    tsk_errstr[0] = '\0';
 			}
 			snprintf(tsk_errstr2, TSK_ERRSTR_L,
 			    "ffs_block_walk: Block %" PRIuDADDR, addr);
@@ -1022,12 +1117,13 @@ ffs_file_walk_direct(FS_INFO * fs, DATA_BUF * buf,
     OFF_T length, DADDR_T addr, int flags,
     FS_FILE_WALK_FN action, void *ptr)
 {
-    OFF_T read_count;
+    size_t read_count;
     int myflags;
 
-    read_count = (length < buf->size ? length : buf->size);
+    read_count = (length < buf->size ? (size_t) length : buf->size);
 
     if (addr > fs->last_block) {
+	tsk_error_reset();
 	if (flags & FS_FLAG_FILE_RECOVER)
 	    tsk_errno = TSK_ERR_FS_RECOVER;
 	else
@@ -1035,7 +1131,6 @@ ffs_file_walk_direct(FS_INFO * fs, DATA_BUF * buf,
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "ffs: Invalid direct address (too large): %"
 	    PRIuDADDR "", addr);
-	tsk_errstr2[0] = '\0';
 	return -1;
     }
 
@@ -1045,16 +1140,19 @@ ffs_file_walk_direct(FS_INFO * fs, DATA_BUF * buf,
      * 
      */
     if (addr + (read_count / fs->block_size) > fs->last_block) {
-	read_count = (fs->last_block - addr + 1) * fs->block_size;
+	read_count =
+	    (unsigned int) (fs->last_block - addr + 1) * fs->block_size;
     }
 
     if (addr == 0) {
 	if (0 == (flags & FS_FLAG_FILE_NOSPARSE)) {
 	    int retval;
-	    myflags = FS_FLAG_DATA_CONT;
+	    myflags =
+		FS_FLAG_DATA_CONT | FS_FLAG_DATA_ALLOC |
+		FS_FLAG_DATA_SPARSE;
 
 	    if ((flags & FS_FLAG_FILE_AONLY) == 0)
-		memset(buf->data, 0, read_count);
+		memset(buf->data, 0, (size_t) read_count);
 
 	    retval = action(fs, addr, buf->data, read_count, myflags, ptr);
 	    if (retval == WALK_STOP)
@@ -1074,8 +1172,8 @@ ffs_file_walk_direct(FS_INFO * fs, DATA_BUF * buf,
 		addr);
 	    if (cnt != (SSIZE_T) roundup(read_count, FFS_DEV_BSIZE)) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		    "ffs_file_walk_direct: Block %" PRIuDADDR, addr);
@@ -1108,17 +1206,17 @@ ffs_file_walk_indir(FS_INFO * fs, DATA_BUF * buf[], OFF_T length,
     unsigned int n;
 
     if (verbose)
-	fprintf(stderr, "%s: level %d block %" PRIuDADDR "\n", myname,
+	tsk_fprintf(stderr, "%s: level %d block %" PRIuDADDR "\n", myname,
 	    level, addr);
 
     if (addr > fs->last_block) {
+	tsk_error_reset();
 	if (flags & FS_FLAG_FILE_RECOVER)
 	    tsk_errno = TSK_ERR_FS_RECOVER;
 	else
 	    tsk_errno = TSK_ERR_FS_INODE_INT;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "ffs: Indirect block address too large: %" PRIuDADDR "", addr);
-	tsk_errstr2[0] = '\0';
 	return -1;
     }
 
@@ -1133,8 +1231,8 @@ ffs_file_walk_indir(FS_INFO * fs, DATA_BUF * buf[], OFF_T length,
 	cnt = fs_read_block(fs, buf[level], buf[level]->size, addr);
 	if (cnt != buf[level]->size) {
 	    if (cnt != -1) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_READ;
-		tsk_errstr[0] = '\0';
 	    }
 	    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		"ffs_file_walk_indir: Block %" PRIuDADDR, addr);
@@ -1169,24 +1267,26 @@ ffs_file_walk_indir(FS_INFO * fs, DATA_BUF * buf[], OFF_T length,
 
 	    OFF_T prevcnt = todo_count;
 
-	    if (getu32(fs, (uint8_t *) & iaddr[n]) > fs->last_block) {
+	    if (getu32(fs->endian,
+		    (uint8_t *) & iaddr[n]) > fs->last_block) {
+		tsk_error_reset();
 		if (flags & FS_FLAG_FILE_RECOVER)
 		    tsk_errno = TSK_ERR_FS_RECOVER;
 		else
 		    tsk_errno = TSK_ERR_FS_INODE_INT;
 		snprintf(tsk_errstr, TSK_ERRSTR_L,
 		    "ffs: Address in indirect block too large: %"
-		    PRIu32 "", getu32(fs, (uint8_t *) & iaddr[n]));
+		    PRIu32 "", getu32(fs->endian, (uint8_t *) & iaddr[n]));
 		return -1;
 	    }
 
 	    if (level == 1)
 		todo_count -= ffs_file_walk_direct(fs, buf[0], todo_count,
-		    (DADDR_T) getu32(fs,
+		    (DADDR_T) getu32(fs->endian,
 			(uint8_t *) & iaddr[n]), flags, action, ptr);
 	    else
 		todo_count -= ffs_file_walk_indir(fs, buf, todo_count,
-		    (DADDR_T) getu32(fs,
+		    (DADDR_T) getu32(fs->endian,
 			(uint8_t
 			    *) & iaddr[n]), level - 1, flags, action, ptr);
 	    /* This occurs when 0 is returned, which means we want to stop */
@@ -1203,25 +1303,27 @@ ffs_file_walk_indir(FS_INFO * fs, DATA_BUF * buf[], OFF_T length,
 
 	    OFF_T prevcnt = todo_count;
 
-	    if (getu64(fs, (uint8_t *) & iaddr[n]) > fs->last_block) {
+	    if (getu64(fs->endian,
+		    (uint8_t *) & iaddr[n]) > fs->last_block) {
+		tsk_error_reset();
 		if (flags & FS_FLAG_FILE_RECOVER)
 		    tsk_errno = TSK_ERR_FS_RECOVER;
 		else
 		    tsk_errno = TSK_ERR_FS_INODE_INT;
 		snprintf(tsk_errstr, TSK_ERRSTR_L,
 		    "ffs: Address in indirect block too large: %"
-		    PRIuDADDR "", getu64(fs, (uint8_t *) & iaddr[n]));
-		tsk_errstr2[0] = '\0';
+		    PRIuDADDR "", getu64(fs->endian,
+			(uint8_t *) & iaddr[n]));
 		return -1;
 	    }
 
 	    if (level == 1)
 		todo_count -= ffs_file_walk_direct(fs, buf[0], todo_count,
-		    (DADDR_T) getu64(fs,
+		    (DADDR_T) getu64(fs->endian,
 			(uint8_t *) & iaddr[n]), flags, action, ptr);
 	    else
 		todo_count -= ffs_file_walk_indir(fs, buf, todo_count,
-		    (DADDR_T) getu64(fs,
+		    (DADDR_T) getu64(fs->endian,
 			(uint8_t
 			    *) & iaddr[n]), level - 1, flags, action, ptr);
 
@@ -1233,7 +1335,7 @@ ffs_file_walk_indir(FS_INFO * fs, DATA_BUF * buf[], OFF_T length,
 	}
     }
 
-    return (length - todo_count);
+    return (SSIZE_T) (length - todo_count);
 }
 
 /*  
@@ -1262,9 +1364,12 @@ ffs_file_walk(FS_INFO * fs, FS_INODE * inode, uint32_t type, uint16_t id,
     int n;
     int level;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     if (verbose)
-	fprintf(stderr, "ffs_file_walk: Processing file %" PRIuINUM "\n",
-	    inode->addr);
+	tsk_fprintf(stderr,
+	    "ffs_file_walk: Processing file %" PRIuINUM "\n", inode->addr);
 
     /*
      * Initialize a buffer for each level of indirection that is supported by
@@ -1355,10 +1460,10 @@ ffs_file_walk(FS_INFO * fs, FS_INODE * inode, uint32_t type, uint16_t id,
 static uint8_t
 ffs_fscheck(FS_INFO * fs, FILE * hFile)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L,
 	"fscheck not implemented for ffs yet");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
@@ -1379,153 +1484,157 @@ ffs_fsstat(FS_INFO * fs, FILE * hFile)
     ffs_sb2 *sb2 = ffs->fs.sb2;
     int flags;
 
-    fprintf(hFile, "FILE SYSTEM INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
+    tsk_fprintf(hFile, "FILE SYSTEM INFORMATION\n");
+    tsk_fprintf(hFile, "--------------------------------------------\n");
 
     if ((fs->ftype == FFS_1) || (fs->ftype == FFS_1B)) {
-	fprintf(hFile, "File System Type: UFS 1\n");
-	tmptime = getu32(fs, sb1->wtime);
-	fprintf(hFile, "Last Written: %s",
+	tsk_fprintf(hFile, "File System Type: UFS 1\n");
+	tmptime = getu32(fs->endian, sb1->wtime);
+	tsk_fprintf(hFile, "Last Written: %s",
 	    (tmptime > 0) ? asctime(localtime(&tmptime)) : "empty");
-	fprintf(hFile, "Last Mount Point: %s\n", sb1->last_mnt);
+	tsk_fprintf(hFile, "Last Mount Point: %s\n", sb1->last_mnt);
 
 	flags = sb1->fs_flags;
     }
     else {
-	fprintf(hFile, "File System Type: UFS 2\n");
-	tmptime = getu32(fs, sb2->wtime);
-	fprintf(hFile, "Last Written: %s",
+	tsk_fprintf(hFile, "File System Type: UFS 2\n");
+	tmptime = getu32(fs->endian, sb2->wtime);
+	tsk_fprintf(hFile, "Last Written: %s",
 	    (tmptime > 0) ? asctime(localtime(&tmptime)) : "empty");
-	fprintf(hFile, "Last Mount Point: %s\n", sb2->last_mnt);
-	fprintf(hFile, "Volume Name: %s\n", sb2->volname);
-	fprintf(hFile, "System UID: %" PRIu64 "\n",
-	    getu64(fs, sb2->swuid));
-	flags = getu32(fs, sb2->fs_flags);
+	tsk_fprintf(hFile, "Last Mount Point: %s\n", sb2->last_mnt);
+	tsk_fprintf(hFile, "Volume Name: %s\n", sb2->volname);
+	tsk_fprintf(hFile, "System UID: %" PRIu64 "\n",
+	    getu64(fs->endian, sb2->swuid));
+	flags = getu32(fs->endian, sb2->fs_flags);
     }
 
     if (flags) {
 	int cnt = 0;
 
-	fprintf(hFile, "Flags: ");
+	tsk_fprintf(hFile, "Flags: ");
 
 	if (flags & FFS_SB_FLAG_UNCLEAN)
-	    fprintf(hFile, "%s Unclean", (cnt++ == 0 ? "" : ","));
+	    tsk_fprintf(hFile, "%s Unclean", (cnt++ == 0 ? "" : ","));
 
 	if (flags & FFS_SB_FLAG_SOFTDEP)
-	    fprintf(hFile, "%s Soft Dependencies",
+	    tsk_fprintf(hFile, "%s Soft Dependencies",
 		(cnt++ == 0 ? "" : ","));
 
 	if (flags & FFS_SB_FLAG_NEEDFSCK)
-	    fprintf(hFile, "%s Needs fsck", (cnt++ == 0 ? "" : ","));
+	    tsk_fprintf(hFile, "%s Needs fsck", (cnt++ == 0 ? "" : ","));
 
 	if (flags & FFS_SB_FLAG_INDEXDIR)
-	    fprintf(hFile, "%s Index directories",
+	    tsk_fprintf(hFile, "%s Index directories",
 		(cnt++ == 0 ? "" : ","));
 
 	if (flags & FFS_SB_FLAG_ACL)
-	    fprintf(hFile, "%s ACLs", (cnt++ == 0 ? "" : ","));
+	    tsk_fprintf(hFile, "%s ACLs", (cnt++ == 0 ? "" : ","));
 
 	if (flags & FFS_SB_FLAG_MULTILABEL)
-	    fprintf(hFile, "%s TrustedBSD MAC Multi-label",
+	    tsk_fprintf(hFile, "%s TrustedBSD MAC Multi-label",
 		(cnt++ == 0 ? "" : ","));
 
 	if (flags & FFS_SB_FLAG_UPDATED)
-	    fprintf(hFile, "%s Updated Flag Location",
+	    tsk_fprintf(hFile, "%s Updated Flag Location",
 		(cnt++ == 0 ? "" : ","));
 
-	fprintf(hFile, "\n");
+	tsk_fprintf(hFile, "\n");
     }
 
 
 
-    fprintf(hFile, "\nMETADATA INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
+    tsk_fprintf(hFile, "\nMETADATA INFORMATION\n");
+    tsk_fprintf(hFile, "--------------------------------------------\n");
 
-    fprintf(hFile, "Inode Range: %" PRIuINUM " - %" PRIuINUM "\n",
+    tsk_fprintf(hFile, "Inode Range: %" PRIuINUM " - %" PRIuINUM "\n",
 	fs->first_inum, fs->last_inum);
-    fprintf(hFile, "Root Directory: %" PRIuINUM "\n", fs->root_inum);
+    tsk_fprintf(hFile, "Root Directory: %" PRIuINUM "\n", fs->root_inum);
     if ((fs->ftype == FFS_1) || (fs->ftype == FFS_1B)) {
-	fprintf(hFile, "Num of Avail Inodes: %" PRIu32 "\n",
-	    getu32(fs, sb1->cstotal.ino_free));
-	fprintf(hFile, "Num of Directories: %" PRIu32 "\n",
-	    getu32(fs, sb1->cstotal.dir_num));
+	tsk_fprintf(hFile, "Num of Avail Inodes: %" PRIu32 "\n",
+	    getu32(fs->endian, sb1->cstotal.ino_free));
+	tsk_fprintf(hFile, "Num of Directories: %" PRIu32 "\n",
+	    getu32(fs->endian, sb1->cstotal.dir_num));
     }
     else {
-	fprintf(hFile, "Num of Avail Inodes: %" PRIu64 "\n",
-	    getu64(fs, sb2->cstotal.ino_free));
-	fprintf(hFile, "Num of Directories: %" PRIu64 "\n",
-	    getu64(fs, sb2->cstotal.dir_num));
+	tsk_fprintf(hFile, "Num of Avail Inodes: %" PRIu64 "\n",
+	    getu64(fs->endian, sb2->cstotal.ino_free));
+	tsk_fprintf(hFile, "Num of Directories: %" PRIu64 "\n",
+	    getu64(fs->endian, sb2->cstotal.dir_num));
     }
 
 
-    fprintf(hFile, "\nCONTENT INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
+    tsk_fprintf(hFile, "\nCONTENT INFORMATION\n");
+    tsk_fprintf(hFile, "--------------------------------------------\n");
 
-    fprintf(hFile, "Fragment Range: %" PRIuDADDR " - %" PRIuDADDR "\n",
+    tsk_fprintf(hFile, "Fragment Range: %" PRIuDADDR " - %" PRIuDADDR "\n",
 	fs->first_block, fs->last_block);
 
-    fprintf(hFile, "Block Size: %u\n", ffs->ffsbsize_b);
-    fprintf(hFile, "Fragment Size: %u\n", fs->block_size);
+    tsk_fprintf(hFile, "Block Size: %u\n", ffs->ffsbsize_b);
+    tsk_fprintf(hFile, "Fragment Size: %u\n", fs->block_size);
 
     if ((fs->ftype == FFS_1) || (fs->ftype == FFS_1B)) {
-	fprintf(hFile, "Num of Avail Full Blocks: %" PRIu32 "\n",
-	    getu32(fs, sb1->cstotal.blk_free));
-	fprintf(hFile, "Num of Avail Fragments: %" PRIu32 "\n",
-	    getu32(fs, sb1->cstotal.frag_free));
+	tsk_fprintf(hFile, "Num of Avail Full Blocks: %" PRIu32 "\n",
+	    getu32(fs->endian, sb1->cstotal.blk_free));
+	tsk_fprintf(hFile, "Num of Avail Fragments: %" PRIu32 "\n",
+	    getu32(fs->endian, sb1->cstotal.frag_free));
     }
     else {
-	fprintf(hFile, "Num of Avail Full Blocks: %" PRIu64 "\n",
-	    getu64(fs, sb2->cstotal.blk_free));
-	fprintf(hFile, "Num of Avail Fragments: %" PRIu64 "\n",
-	    getu64(fs, sb2->cstotal.frag_free));
+	tsk_fprintf(hFile, "Num of Avail Full Blocks: %" PRIu64 "\n",
+	    getu64(fs->endian, sb2->cstotal.blk_free));
+	tsk_fprintf(hFile, "Num of Avail Fragments: %" PRIu64 "\n",
+	    getu64(fs->endian, sb2->cstotal.frag_free));
     }
 
-    fprintf(hFile, "\nCYLINDER GROUP INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
+    tsk_fprintf(hFile, "\nCYLINDER GROUP INFORMATION\n");
+    tsk_fprintf(hFile, "--------------------------------------------\n");
 
-    fprintf(hFile, "Number of Cylinder Groups: %" PRIu32 "\n",
+    tsk_fprintf(hFile, "Number of Cylinder Groups: %" PRIu32 "\n",
 	ffs->groups_count);
-    fprintf(hFile, "Inodes per group: %" PRId32 "\n",
-	gets32(fs, sb1->cg_inode_num));
-    fprintf(hFile, "Fragments per group: %" PRId32 "\n",
-	gets32(fs, sb1->cg_frag_num));
+    tsk_fprintf(hFile, "Inodes per group: %" PRId32 "\n",
+	gets32(fs->endian, sb1->cg_inode_num));
+    tsk_fprintf(hFile, "Fragments per group: %" PRId32 "\n",
+	gets32(fs->endian, sb1->cg_frag_num));
 
 
     /* UFS 1 and 2 use the same ssize field  and use the same csum1 */
-    if (getu32(fs, sb1->cg_ssize_b)) {
+    if (getu32(fs->endian, sb1->cg_ssize_b)) {
 	SSIZE_T cnt;
-	csum1 = (ffs_csum1 *) mymalloc(getu32(fs, sb1->cg_ssize_b));
+	csum1 =
+	    (ffs_csum1 *) mymalloc(getu32(fs->endian, sb1->cg_ssize_b));
 	if (csum1 == NULL)
 	    return 1;
 
 	if ((fs->ftype == FFS_1) || (fs->ftype == FFS_1B)) {
 	    cnt = fs_read_block_nobuf
-		(fs, (char *) csum1, getu32(fs, sb1->cg_ssize_b),
-		(DADDR_T) getu32(fs, sb1->cg_saddr));
+		(fs, (char *) csum1, getu32(fs->endian, sb1->cg_ssize_b),
+		(DADDR_T) getu32(fs->endian, sb1->cg_saddr));
 
-	    if (cnt != getu32(fs, sb1->cg_ssize_b)) {
+	    if (cnt != getu32(fs->endian, sb1->cg_ssize_b)) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		    "ffs_fsstat: FFS1 group descriptor at %"
-		    PRIu32, getu32(fs, sb1->cg_saddr));
+		    PRIu32, getu32(fs->endian, sb1->cg_saddr));
 		return 1;
 	    }
 	}
 	else {
 	    cnt = fs_read_block_nobuf
-		(fs, (char *) csum1, getu32(fs, sb2->cg_ssize_b),
-		(DADDR_T) getu64(fs, sb2->cg_saddr));
-	    if (cnt != getu32(fs, sb2->cg_ssize_b)) {
+		(fs, (char *) csum1, getu32(fs->endian, sb2->cg_ssize_b),
+		(DADDR_T) getu64(fs->endian, sb2->cg_saddr));
+	    if (cnt != getu32(fs->endian, sb2->cg_ssize_b)) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		    "ffs_fsstat: FFS2 group descriptor at %"
-		    PRIu64, getu64(fs, sb2->cg_saddr));
+		    PRIu64, getu64(fs->endian, sb2->cg_saddr));
 		return 1;
 	    }
 	}
@@ -1537,28 +1646,28 @@ ffs_fsstat(FS_INFO * fs, FILE * hFile)
 	    return 1;
 	cgd = (ffs_cgd *) ffs->grp_buf->data;
 
-	fprintf(hFile, "\nGroup %d:\n", i);
+	tsk_fprintf(hFile, "\nGroup %d:\n", i);
 	if (cgd) {
 	    if ((fs->ftype == FFS_1) || (fs->ftype == FFS_1B)) {
-		tmptime = getu32(fs, cgd->wtime);
+		tmptime = getu32(fs->endian, cgd->wtime);
 	    }
 	    else {
 		ffs_cgd2 *cgd2 = (ffs_cgd2 *) cgd;
-		tmptime = (uint32_t) getu64(fs, cgd2->wtime);
+		tmptime = (uint32_t) getu64(fs->endian, cgd2->wtime);
 	    }
-	    fprintf(hFile, "  Last Written: %s",
+	    tsk_fprintf(hFile, "  Last Written: %s",
 		(tmptime > 0) ? asctime(localtime(&tmptime)) : "empty");
 	}
 
-	fprintf(hFile, "  Inode Range: %" PRIu32 " - %" PRIu32 "\n",
-	    (gets32(fs, sb1->cg_inode_num) * i),
-	    ((uint32_t) ((gets32(fs, sb1->cg_inode_num) * (i + 1)) - 1)
-		<
-		fs->
-		last_inum) ? (uint32_t) ((gets32(fs, sb1->cg_inode_num) *
-		    (i + 1)) - 1) : (uint32_t) fs->last_inum);
+	tsk_fprintf(hFile, "  Inode Range: %" PRIu32 " - %" PRIu32 "\n",
+	    (gets32(fs->endian, sb1->cg_inode_num) * i),
+	    ((uint32_t) ((gets32(fs->endian,
+			    sb1->cg_inode_num) * (i + 1)) - 1)
+		< fs->last_inum) ? (uint32_t) ((gets32(fs->endian,
+			sb1->cg_inode_num) * (i + 1)) -
+		1) : (uint32_t) fs->last_inum);
 
-	fprintf(hFile,
+	tsk_fprintf(hFile,
 	    "  Fragment Range: %" PRIuDADDR " - %" PRIuDADDR "\n",
 	    cgbase_lcl(fs, sb1, i),
 	    ((cgbase_lcl(fs, sb1, i + 1) - 1) <
@@ -1570,98 +1679,105 @@ ffs_fsstat(FS_INFO * fs, FILE * hFile)
 	 * the next contains the primary Super Block 
 	 */
 	if (!i) {
-	    fprintf(hFile, "    Boot Block: 0 - %" PRIu32 "\n",
+	    tsk_fprintf(hFile, "    Boot Block: 0 - %" PRIu32 "\n",
 		(uint32_t) (15 * 512 / fs->block_size));
 
 
-	    fprintf(hFile, "    Super Block: %" PRIu32 " - %" PRIu32 "\n",
+	    tsk_fprintf(hFile,
+		"    Super Block: %" PRIu32 " - %" PRIu32 "\n",
 		(uint32_t) (16 * 512 / fs->block_size),
-		(uint32_t) ((16 * 512 / fs->block_size) +
-		    ffs->ffsbsize_f - 1));
+		(uint32_t) ((16 * 512 / fs->block_size) + ffs->ffsbsize_f -
+		    1));
 	}
 
-	fprintf(hFile,
+	tsk_fprintf(hFile,
 	    "    Super Block: %" PRIuDADDR " - %" PRIuDADDR "\n",
 	    cgsblock_lcl(fs, sb1, i),
 	    (cgsblock_lcl(fs, sb1, i) + ffs->ffsbsize_f - 1));
 
 
-	fprintf(hFile, "    Group Desc: %" PRIuDADDR " - %" PRIuDADDR "\n",
-	    cgtod_lcl(fs, sb1, i),
-	    (cgtod_lcl(fs, sb1, i) + ffs->ffsbsize_f - 1));
+	tsk_fprintf(hFile,
+	    "    Group Desc: %" PRIuDADDR " - %" PRIuDADDR "\n",
+	    cgtod_lcl(fs, sb1, i), (cgtod_lcl(fs, sb1,
+		    i) + ffs->ffsbsize_f - 1));
 
 
 	if (fs->ftype == FFS_2) {
-	    fprintf(hFile,
+	    tsk_fprintf(hFile,
 		"    Inode Table: %" PRIuDADDR " - %" PRIuDADDR "\n",
 		cgimin_lcl(fs, sb1, i),
 		(cgimin_lcl(fs, sb1, i) +
 		    ((roundup
-			    (gets32(fs,
+			    (gets32(fs->endian,
 				    sb1->cg_inode_num) *
 				sizeof(ffs_inode2), fs->block_size)
 			    / fs->block_size) - 1)));
 	}
 	else {
-	    fprintf(hFile,
+	    tsk_fprintf(hFile,
 		"    Inode Table: %" PRIuDADDR " - %" PRIuDADDR "\n",
 		cgimin_lcl(fs, sb1, i),
 		(cgimin_lcl(fs, sb1, i) +
 		    ((roundup
-			    (gets32(fs,
+			    (gets32(fs->endian,
 				    sb1->cg_inode_num) *
 				sizeof(ffs_inode1), fs->block_size)
 			    / fs->block_size) - 1)));
 	}
 
-	fprintf(hFile, "    Data Fragments: ");
+	tsk_fprintf(hFile, "    Data Fragments: ");
 
 	/* For all groups besides the first, the space before the
 	 * super block is also used for data
 	 */
 	if (i)
-	    fprintf(hFile, "%" PRIuDADDR " - %" PRIuDADDR ", ",
+	    tsk_fprintf(hFile, "%" PRIuDADDR " - %" PRIuDADDR ", ",
 		cgbase_lcl(fs, sb1, i), cgsblock_lcl(fs, sb1, i) - 1);
 
-	fprintf(hFile, "%" PRIuDADDR " - %" PRIuDADDR "\n",
+	tsk_fprintf(hFile, "%" PRIuDADDR " - %" PRIuDADDR "\n",
 	    cgdmin_lcl(fs, sb1, i),
 	    ((cgbase_lcl(fs, sb1, i + 1) - 1) < fs->last_block) ?
 	    (cgbase_lcl(fs, sb1, i + 1) - 1) : fs->last_block);
 
 
 	if ((csum1)
-	    && ((i + 1) * sizeof(ffs_csum1) < getu32(fs, sb1->cg_ssize_b))) {
-	    fprintf(hFile,
+	    && ((i + 1) * sizeof(ffs_csum1) < getu32(fs->endian,
+		    sb1->cg_ssize_b))) {
+	    tsk_fprintf(hFile,
 		"  Global Summary (from the superblock summary area):\n");
-	    fprintf(hFile, "    Num of Dirs: %" PRIu32 "\n",
-		getu32(fs, &csum1[i].dir_num));
-	    fprintf(hFile, "    Num of Avail Blocks: %" PRIu32 "\n",
-		getu32(fs, &csum1[i].blk_free));
-	    fprintf(hFile, "    Num of Avail Inodes: %" PRIu32 "\n",
-		getu32(fs, &csum1[i].ino_free));
-	    fprintf(hFile, "    Num of Avail Frags: %" PRIu32 "\n",
-		getu32(fs, &csum1[i].frag_free));
+	    tsk_fprintf(hFile, "    Num of Dirs: %" PRIu32 "\n",
+		getu32(fs->endian, &csum1[i].dir_num));
+	    tsk_fprintf(hFile, "    Num of Avail Blocks: %" PRIu32 "\n",
+		getu32(fs->endian, &csum1[i].blk_free));
+	    tsk_fprintf(hFile, "    Num of Avail Inodes: %" PRIu32 "\n",
+		getu32(fs->endian, &csum1[i].ino_free));
+	    tsk_fprintf(hFile, "    Num of Avail Frags: %" PRIu32 "\n",
+		getu32(fs->endian, &csum1[i].frag_free));
 	}
 
 	if (cgd) {
-	    fprintf(hFile,
+	    tsk_fprintf(hFile,
 		"  Local Summary (from the group descriptor):\n");
-	    fprintf(hFile, "    Num of Dirs: %" PRIu32 "\n",
-		getu32(fs, &cgd->cs.dir_num));
-	    fprintf(hFile, "    Num of Avail Blocks: %" PRIu32 "\n",
-		getu32(fs, &cgd->cs.blk_free));
-	    fprintf(hFile, "    Num of Avail Inodes: %" PRIu32 "\n",
-		getu32(fs, &cgd->cs.ino_free));
-	    fprintf(hFile, "    Num of Avail Frags: %" PRIu32 "\n",
-		getu32(fs, &cgd->cs.frag_free));
-	    fprintf(hFile, "    Last Block Allocated: %" PRIuDADDR "\n",
-		getu32(fs, &cgd->last_alloc_blk) + cgbase_lcl(fs, sb1, i));
-	    fprintf(hFile, "    Last Fragment Allocated: %" PRIuDADDR "\n",
-		getu32(fs, &cgd->last_alloc_frag) +
-		cgbase_lcl(fs, sb1, i));
-	    fprintf(hFile, "    Last Inode Allocated: %" PRIu32 "\n",
-		getu32(fs, &cgd->last_alloc_ino) +
-		(gets32(fs, sb1->cg_inode_num) * i));
+	    tsk_fprintf(hFile, "    Num of Dirs: %" PRIu32 "\n",
+		getu32(fs->endian, &cgd->cs.dir_num));
+	    tsk_fprintf(hFile, "    Num of Avail Blocks: %" PRIu32 "\n",
+		getu32(fs->endian, &cgd->cs.blk_free));
+	    tsk_fprintf(hFile, "    Num of Avail Inodes: %" PRIu32 "\n",
+		getu32(fs->endian, &cgd->cs.ino_free));
+	    tsk_fprintf(hFile, "    Num of Avail Frags: %" PRIu32 "\n",
+		getu32(fs->endian, &cgd->cs.frag_free));
+	    tsk_fprintf(hFile,
+		"    Last Block Allocated: %" PRIuDADDR "\n",
+		getu32(fs->endian, &cgd->last_alloc_blk) + cgbase_lcl(fs,
+		    sb1, i));
+	    tsk_fprintf(hFile,
+		"    Last Fragment Allocated: %" PRIuDADDR "\n",
+		getu32(fs->endian, &cgd->last_alloc_frag) + cgbase_lcl(fs,
+		    sb1, i));
+	    tsk_fprintf(hFile, "    Last Inode Allocated: %" PRIu32 "\n",
+		getu32(fs->endian,
+		    &cgd->last_alloc_ino) + (gets32(fs->endian,
+			sb1->cg_inode_num) * i));
 	}
     }
     return 0;
@@ -1684,23 +1800,24 @@ typedef struct {
 
 static uint8_t
 print_addr_act(FS_INFO * fs, DADDR_T addr, char *buf,
-    unsigned int size, int flags, void *ptr)
+    size_t size, int flags, void *ptr)
 {
     FFS_PRINT_ADDR *print = (FFS_PRINT_ADDR *) ptr;
 
     if (flags & FS_FLAG_DATA_CONT) {
-	int i, s;
+	int i;
+	size_t s;
 	/* cycle through the fragments if they exist */
 	for (i = 0, s = size; s > 0; s -= fs->block_size, i++) {
 
 	    /* sparse file */
 	    if (addr)
-		fprintf(print->hFile, "%" PRIuDADDR " ", addr + i);
+		tsk_fprintf(print->hFile, "%" PRIuDADDR " ", addr + i);
 	    else
-		fprintf(print->hFile, "0 ");
+		tsk_fprintf(print->hFile, "0 ");
 
 	    if (++(print->idx) == 8) {
-		fprintf(print->hFile, "\n");
+		tsk_fprintf(print->hFile, "\n");
 		print->idx = 0;
 	    }
 	}
@@ -1719,7 +1836,7 @@ print_addr_act(FS_INFO * fs, DADDR_T addr, char *buf,
 /* return 1 on error and 0 on success
  */
 static uint8_t
-ffs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
+ffs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, DADDR_T numblock,
     int32_t sec_skew)
 {
     FFS_INFO *ffs = (FFS_INFO *) fs;
@@ -1727,58 +1844,61 @@ ffs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
     char ls[12];
     FFS_PRINT_ADDR print;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     fs_inode = ffs_inode_lookup(fs, inum);
     if (fs_inode == NULL)
 	return 1;
 
-    fprintf(hFile, "inode: %" PRIuINUM "\n", inum);
-    fprintf(hFile, "%sAllocated\n",
+    tsk_fprintf(hFile, "inode: %" PRIuINUM "\n", inum);
+    tsk_fprintf(hFile, "%sAllocated\n",
 	(fs_inode->flags & FS_FLAG_META_ALLOC) ? "" : "Not ");
 
-    fprintf(hFile, "Group: %" PRI_FFSGRP "\n", ffs->grp_num);
+    tsk_fprintf(hFile, "Group: %" PRI_FFSGRP "\n", ffs->grp_num);
 
     if (fs_inode->link)
-	fprintf(hFile, "symbolic link to: %s\n", fs_inode->link);
+	tsk_fprintf(hFile, "symbolic link to: %s\n", fs_inode->link);
 
-    fprintf(hFile, "uid / gid: %d / %d\n",
+    tsk_fprintf(hFile, "uid / gid: %d / %d\n",
 	(int) fs_inode->uid, (int) fs_inode->gid);
 
 
     make_ls(fs_inode->mode, ls);
-    fprintf(hFile, "mode: %s\n", ls);
+    tsk_fprintf(hFile, "mode: %s\n", ls);
 
-    fprintf(hFile, "size: %" PRIuOFF "\n", fs_inode->size);
-    fprintf(hFile, "num of links: %lu\n", (ULONG) fs_inode->nlink);
+    tsk_fprintf(hFile, "size: %" PRIuOFF "\n", fs_inode->size);
+    tsk_fprintf(hFile, "num of links: %lu\n", (ULONG) fs_inode->nlink);
 
 
     if (sec_skew != 0) {
-	fprintf(hFile, "\nAdjusted Inode Times:\n");
+	tsk_fprintf(hFile, "\nAdjusted Inode Times:\n");
 	fs_inode->mtime -= sec_skew;
 	fs_inode->atime -= sec_skew;
 	fs_inode->ctime -= sec_skew;
 
-	fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
-	fprintf(hFile, "File Modified:\t%s", ctime(&fs_inode->mtime));
-	fprintf(hFile, "Inode Modified:\t%s", ctime(&fs_inode->ctime));
+	tsk_fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
+	tsk_fprintf(hFile, "File Modified:\t%s", ctime(&fs_inode->mtime));
+	tsk_fprintf(hFile, "Inode Modified:\t%s", ctime(&fs_inode->ctime));
 
 	fs_inode->mtime += sec_skew;
 	fs_inode->atime += sec_skew;
 	fs_inode->ctime += sec_skew;
 
-	fprintf(hFile, "\nOriginal Inode Times:\n");
+	tsk_fprintf(hFile, "\nOriginal Inode Times:\n");
     }
     else {
-	fprintf(hFile, "\nInode Times:\n");
+	tsk_fprintf(hFile, "\nInode Times:\n");
     }
 
-    fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
-    fprintf(hFile, "File Modified:\t%s", ctime(&fs_inode->mtime));
-    fprintf(hFile, "Inode Modified:\t%s", ctime(&fs_inode->ctime));
+    tsk_fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
+    tsk_fprintf(hFile, "File Modified:\t%s", ctime(&fs_inode->mtime));
+    tsk_fprintf(hFile, "Inode Modified:\t%s", ctime(&fs_inode->ctime));
 
     if (fs->ftype == FFS_2) {
 	ffs_inode2 *in = (ffs_inode2 *) ffs->dino_buf;
 	/* Are there extended attributes */
-	if (getu32(fs, in->di_extsize) > 0) {
+	if (getu32(fs->endian, in->di_extsize) > 0) {
 	    ffs_extattr *ea;
 	    uint32_t size;
 	    char name[257];
@@ -1789,30 +1909,31 @@ ffs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 		return 1;
 	    }
 
-	    size = getu32(fs, in->di_extsize);
-	    fprintf(hFile, "\nExtended Attributes:\n");
-	    fprintf(hFile,
+	    size = getu32(fs->endian, in->di_extsize);
+	    tsk_fprintf(hFile, "\nExtended Attributes:\n");
+	    tsk_fprintf(hFile,
 		"Size: %" PRIu32 " (%" PRIu64 ", %" PRIu64 ")\n", size,
-		getu64(fs, in->di_extb[0]), getu64(fs, in->di_extb[1]));
+		getu64(fs->endian, in->di_extb[0]), getu64(fs->endian,
+		    in->di_extb[1]));
 
 
 	    /* Process first block */
 	    // @@@ Incorporate values into this as well
-	    if ((getu64(fs, in->di_extb[0]) >= fs->first_block) &&
-		(getu64(fs, in->di_extb[0]) <= fs->last_block)) {
+	    if ((getu64(fs->endian, in->di_extb[0]) >= fs->first_block) &&
+		(getu64(fs->endian, in->di_extb[0]) <= fs->last_block)) {
 		uintptr_t end;
 		SSIZE_T cnt;
 
 		cnt = fs_read_block(fs, data_buf, ffs->ffsbsize_b,
-		    getu64(fs, in->di_extb[0]));
+		    getu64(fs->endian, in->di_extb[0]));
 		if (cnt != ffs->ffsbsize_b) {
 		    if (cnt != -1) {
+			tsk_error_reset();
 			tsk_errno = TSK_ERR_FS_READ;
-			tsk_errstr[0] = '\0';
 		    }
 		    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 			"ffs_istat: FFS2 extended attribute 0 at %"
-			PRIu64, getu64(fs, in->di_extb[0]));
+			PRIu64, getu64(fs->endian, in->di_extb[0]));
 		    fs_inode_free(fs_inode);
 		    return 1;
 		}
@@ -1831,27 +1952,27 @@ ffs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 		for (; (uintptr_t) ea < end;
 		    ea =
 		    (ffs_extattr *) ((uintptr_t) ea +
-			getu32(fs, ea->reclen))) {
+			getu32(fs->endian, ea->reclen))) {
 		    memcpy(name, ea->name, ea->nlen);
 		    name[ea->nlen] = '\0';
-		    fprintf(hFile, "%s\n", name);
+		    tsk_fprintf(hFile, "%s\n", name);
 		}
 	    }
-	    if ((getu64(fs, in->di_extb[1]) >= fs->first_block) &&
-		(getu64(fs, in->di_extb[1]) <= fs->last_block)) {
+	    if ((getu64(fs->endian, in->di_extb[1]) >= fs->first_block) &&
+		(getu64(fs->endian, in->di_extb[1]) <= fs->last_block)) {
 		uintptr_t end;
 		SSIZE_T cnt;
 
 		cnt = fs_read_block(fs, data_buf, ffs->ffsbsize_b,
-		    getu64(fs, in->di_extb[1]));
+		    getu64(fs->endian, in->di_extb[1]));
 		if (cnt != ffs->ffsbsize_b) {
 		    if (cnt != -1) {
+			tsk_error_reset();
 			tsk_errno = TSK_ERR_FS_FUNC;
-			tsk_errstr[0] = '\0';
 		    }
 		    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 			"ffs_istat: FFS2 extended attribute 1 at %"
-			PRIu64, getu64(fs, in->di_extb[1]));
+			PRIu64, getu64(fs->endian, in->di_extb[1]));
 		    fs_inode_free(fs_inode);
 		    return 1;
 		}
@@ -1866,10 +1987,10 @@ ffs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 		for (; (uintptr_t) ea < end;
 		    ea =
 		    (ffs_extattr *) ((uintptr_t) ea +
-			getu32(fs, ea->reclen))) {
+			getu32(fs->endian, ea->reclen))) {
 		    memcpy(name, ea->name, ea->nlen);
 		    name[ea->nlen] = '\0';
-		    fprintf(hFile, "%s\n", name);
+		    tsk_fprintf(hFile, "%s\n", name);
 		}
 	    }
 	}
@@ -1880,7 +2001,7 @@ ffs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
     if (numblock > 0)
 	fs_inode->size = numblock * ffs->ffsbsize_b;
 
-    fprintf(hFile, "\nDirect Blocks:\n");
+    tsk_fprintf(hFile, "\nDirect Blocks:\n");
 
 
     print.indir_idx = 0;
@@ -1890,19 +2011,19 @@ ffs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
     if (ffs_file_walk(fs, fs_inode, 0, 0,
 	    FS_FLAG_FILE_AONLY | FS_FLAG_FILE_META |
 	    FS_FLAG_FILE_NOID, print_addr_act, (void *) &print)) {
-	fprintf(hFile, "\nError reading blocks in file\n");
+	tsk_fprintf(hFile, "\nError reading blocks in file\n");
 	tsk_error_print(hFile);
 	fs_inode_free(fs_inode);
 	return 1;
     }
 
     if (print.idx != 0)
-	fprintf(hFile, "\n");
+	tsk_fprintf(hFile, "\n");
 
     /* print indirect blocks */
     if (print.indir_idx > 0) {
 	int i, printidx;
-	fprintf(hFile, "\nIndirect Blocks:\n");
+	tsk_fprintf(hFile, "\nIndirect Blocks:\n");
 
 	printidx = 0;
 
@@ -1910,15 +2031,15 @@ ffs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 	    unsigned int a;
 	    /* Cycle through the fragments in the block */
 	    for (a = 0; a < ffs->ffsbsize_f; a++) {
-		fprintf(hFile, "%" PRIuDADDR " ", print.indirl[i] + a);
+		tsk_fprintf(hFile, "%" PRIuDADDR " ", print.indirl[i] + a);
 		if (++printidx == 8) {
-		    fprintf(hFile, "\n");
+		    tsk_fprintf(hFile, "\n");
 		    printidx = 0;
 		}
 	    }
 	}
 	if (printidx != 0)
-	    fprintf(hFile, "\n");
+	    tsk_fprintf(hFile, "\n");
     }
 
     fs_inode_free(fs_inode);
@@ -1929,9 +2050,9 @@ ffs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 uint8_t
 ffs_jopen(FS_INFO * fs, INUM_T inum)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L, "UFS does not have a journal");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
@@ -1939,9 +2060,9 @@ uint8_t
 ffs_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
     void *ptr)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L, "UFS does not have a journal");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
@@ -1950,9 +2071,9 @@ uint8_t
 ffs_jblk_walk(FS_INFO * fs, DADDR_T start, DADDR_T end, int flags,
     FS_JBLK_WALK_FN action, void *ptr)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L, "UFS does not have a journal");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
@@ -1973,6 +2094,11 @@ ffs_close(FS_INFO * fs)
     if (ffs->dino_buf)
 	free(ffs->dino_buf);
 
+    if (fs->list_inum_named) {
+	tsk_list_free(fs->list_inum_named);
+	fs->list_inum_named = NULL;
+    }
+
     free((char *) ffs->fs.sb1);
     free(ffs);
 }
@@ -1988,10 +2114,13 @@ ffs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype)
     FS_INFO *fs;
     SSIZE_T cnt;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     if ((ftype & FSMASK) != FFS_TYPE) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L, "Invalid FS Type in ffs_open");
-	tsk_errstr2[0] = '\0';
 	return NULL;
     }
 
@@ -2024,8 +2153,8 @@ ffs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype)
 	(fs, (char *) ffs->fs.sb2, sizeof(ffs_sb2), (OFF_T) UFS2_SBOFF);
     if (cnt != sizeof(ffs_sb2)) {
 	if (cnt != -1) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_READ;
-	    tsk_errstr2[0] = '\0';
 	}
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "%s: Superblock at %" PRIuDADDR, myname, (OFF_T) UFS2_SBOFF);
@@ -2041,8 +2170,8 @@ ffs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype)
 	    (OFF_T) UFS2_SBOFF2);
 	if (cnt != sizeof(ffs_sb2)) {
 	    if (cnt != -1) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_READ;
-		tsk_errstr[0] = '\0';
 	    }
 	    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		"%s: Superblock at %" PRIuDADDR,
@@ -2058,8 +2187,8 @@ ffs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype)
 		(fs, (char *) ffs->fs.sb1, len, (OFF_T) UFS1_SBOFF);
 	    if (cnt != len) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		    "%s: Superblock at %" PRIuDADDR,
@@ -2071,9 +2200,9 @@ ffs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype)
 	    if (fs_guessu32(fs, ffs->fs.sb1->magic, UFS1_FS_MAGIC)) {
 		free(ffs->fs.sb1);
 		free(ffs);
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_MAGIC;
 		snprintf(tsk_errstr, TSK_ERRSTR_L, "No UFS Magic Found");
-		tsk_errstr2[0] = '\0';
 		return NULL;
 	    }
 	    else {
@@ -2095,18 +2224,18 @@ ffs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype)
      */
 
     if (fs->ftype == FFS_2) {
-	fs->block_count = gets64(fs, ffs->fs.sb2->frag_num);
-	fs->block_size = gets32(fs, ffs->fs.sb2->fsize_b);
-	ffs->ffsbsize_b = gets32(fs, ffs->fs.sb2->bsize_b);
-	ffs->ffsbsize_f = gets32(fs, ffs->fs.sb2->bsize_frag);
-	ffs->groups_count = gets32(fs, ffs->fs.sb2->cg_num);
+	fs->block_count = gets64(fs->endian, ffs->fs.sb2->frag_num);
+	fs->block_size = gets32(fs->endian, ffs->fs.sb2->fsize_b);
+	ffs->ffsbsize_b = gets32(fs->endian, ffs->fs.sb2->bsize_b);
+	ffs->ffsbsize_f = gets32(fs->endian, ffs->fs.sb2->bsize_frag);
+	ffs->groups_count = gets32(fs->endian, ffs->fs.sb2->cg_num);
     }
     else {
-	fs->block_count = gets32(fs, ffs->fs.sb1->frag_num);
-	fs->block_size = gets32(fs, ffs->fs.sb1->fsize_b);
-	ffs->ffsbsize_b = gets32(fs, ffs->fs.sb1->bsize_b);
-	ffs->ffsbsize_f = gets32(fs, ffs->fs.sb1->bsize_frag);
-	ffs->groups_count = gets32(fs, ffs->fs.sb1->cg_num);
+	fs->block_count = gets32(fs->endian, ffs->fs.sb1->frag_num);
+	fs->block_size = gets32(fs->endian, ffs->fs.sb1->fsize_b);
+	ffs->ffsbsize_b = gets32(fs->endian, ffs->fs.sb1->bsize_b);
+	ffs->ffsbsize_f = gets32(fs->endian, ffs->fs.sb1->bsize_frag);
+	ffs->groups_count = gets32(fs->endian, ffs->fs.sb1->cg_num);
     }
 
 
@@ -2118,31 +2247,33 @@ ffs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype)
     if ((fs->block_size % 512) || (ffs->ffsbsize_b % 512)) {
 	free(ffs->fs.sb1);
 	free(ffs);
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_MAGIC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "Not a UFS FS (invalid fragment or block size)");
-	tsk_errstr2[0] = '\0';
 	return NULL;
     }
 
     if ((ffs->ffsbsize_b / fs->block_size) != ffs->ffsbsize_f) {
 	free(ffs->fs.sb1);
 	free(ffs);
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_MAGIC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "Not a UFS FS (frag / block size mismatch)");
-	tsk_errstr2[0] = '\0';
 	return NULL;
     }
 
 
     if (fs->ftype == FFS_2) {
 	fs->inum_count =
-	    ffs->groups_count * gets32(fs, ffs->fs.sb2->cg_inode_num);
+	    ffs->groups_count * gets32(fs->endian,
+	    ffs->fs.sb2->cg_inode_num);
     }
     else {
 	fs->inum_count =
-	    ffs->groups_count * gets32(fs, ffs->fs.sb1->cg_inode_num);
+	    ffs->groups_count * gets32(fs->endian,
+	    ffs->fs.sb1->cg_inode_num);
     }
 
     fs->root_inum = FFS_ROOTINO;
@@ -2175,11 +2306,13 @@ ffs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype)
     fs->jopen = ffs_jopen;
     fs->journ_inum = 0;
 
+    fs->list_inum_named = NULL;
+
     /*
      * Print some stats.
      */
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "inodes %" PRIuINUM " root ino %" PRIuINUM " cyl groups %"
 	    PRId32 " blocks %" PRIuDADDR "\n", fs->inum_count,
 	    fs->root_inum, ffs->groups_count, fs->block_count);

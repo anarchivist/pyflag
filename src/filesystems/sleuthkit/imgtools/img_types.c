@@ -2,7 +2,7 @@
 ** img_types
 ** The Sleuth Kit 
 **
-** $Date: 2006/04/12 22:18:20 $
+** $Date: 2006/09/06 20:40:00 $
 **
 ** Identify the type of image file being used
 **
@@ -25,22 +25,33 @@ typedef struct {
  */
 IMG_TYPES img_open_table[] = {
     {"raw", RAW_SING, "raw (dd)"},
+#ifdef USE_LIBAFF
     {"aff", AFF_AFF, "Advanced Forensic Format"},
     {"afd", AFF_AFD, "AFF Multiple File"},
     {"afm", AFF_AFM, "AFF with external metadata"},
+#endif
+#ifdef USE_LIBEWF
     {"ewf", EWF_EWF, "Expert Witness format (encase)"},
+#endif
     {"split", RAW_SPLIT, "Split raw files"},
     {0},
 };
 
 
 uint8_t
-img_parse_type(const char *str)
+img_parse_type(const TSK_TCHAR * str)
 {
+    char tmp[16];
     IMG_TYPES *sp;
+    int i;
+    // convert to char
+    for (i = 0; i < 15 && str[i] != '\0'; i++) {
+	tmp[i] = (char) str[i];
+    }
+    tmp[i] = '\0';
 
     for (sp = img_open_table; sp->name; sp++) {
-	if (strcmp(str, sp->name) == 0) {
+	if (strcmp(tmp, sp->name) == 0) {
 	    return sp->code;
 	}
     }
@@ -53,9 +64,9 @@ void
 img_print_types(FILE * hFile)
 {
     IMG_TYPES *sp;
-    fprintf(hFile, "Supported image format types:\n");
+    tsk_fprintf(hFile, "Supported image format types:\n");
     for (sp = img_open_table; sp->name; sp++)
-	fprintf(hFile, "\t%s (%s)\n", sp->name, sp->comment);
+	tsk_fprintf(hFile, "\t%s (%s)\n", sp->name, sp->comment);
 }
 
 char *

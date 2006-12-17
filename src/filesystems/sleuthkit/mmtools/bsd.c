@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2006/06/19 22:21:28 $
+ * $Date: 2006/12/07 16:38:18 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2006 Brian Carrier, Basis Technology.  All rights reserved
@@ -99,53 +99,55 @@ bsd_load_table(MM_INFO * mm)
     DADDR_T max_addr = (mm->img_info->size - mm->offset) / mm->block_size;	// max sector
 
     if (verbose)
-	fprintf(stderr, "bsd_load_table: Table Sector: %" PRIuDADDR "\n",
-	    laddr);
+	tsk_fprintf(stderr,
+	    "bsd_load_table: Table Sector: %" PRIuDADDR "\n", laddr);
 
     /* read the block */
     cnt = mm_read_block_nobuf
 	(mm, (char *) &dlabel, sizeof(dlabel), BSD_PART_SOFFSET);
     if (cnt != sizeof(dlabel)) {
+	if (cnt != -1) {
+	    tsk_error_reset();
+	    tsk_errno = TSK_ERR_MM_READ;
+	}
 	snprintf(tsk_errstr2, TSK_ERRSTR_L,
 	    "BSD Disk Label in Sector: %" PRIuDADDR, laddr);
-	if (cnt != -1) {
-	    tsk_errno = TSK_ERR_MM_READ;
-	    tsk_errstr[0] = '\0';
-	}
 	return 1;
     }
 
     /* Check the magic  */
     if (mm_guessu32(mm, dlabel.magic, BSD_MAGIC)) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_MM_MAGIC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "BSD partition table (magic #1) (Sector: %"
-	    PRIuDADDR ") %" PRIx32, laddr, getu32(mm, dlabel.magic));
-	tsk_errstr2[0] = '\0';
+	    PRIuDADDR ") %" PRIx32, laddr, getu32(mm->endian,
+		dlabel.magic));
 	return 1;
     }
 
     /* Check the second magic value */
-    if (getu32(mm, dlabel.magic2) != BSD_MAGIC) {
+    if (getu32(mm->endian, dlabel.magic2) != BSD_MAGIC) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_MM_MAGIC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "BSD disk label (magic #2) (Sector: %"
-	    PRIuDADDR ")  %" PRIx32, laddr, getu32(mm, dlabel.magic2));
-	tsk_errstr2[0] = '\0';
+	    PRIuDADDR ")  %" PRIx32, laddr, getu32(mm->endian,
+		dlabel.magic2));
 	return 1;
     }
 
     /* Cycle through the partitions, there are either 8 or 16 */
-    for (idx = 0; idx < getu16(mm, dlabel.num_parts); idx++) {
+    for (idx = 0; idx < getu16(mm->endian, dlabel.num_parts); idx++) {
 
 	uint32_t part_start;
 	uint32_t part_size;
 
-	part_start = getu32(mm, dlabel.part[idx].start_sec);
-	part_size = getu32(mm, dlabel.part[idx].size_sec);
+	part_start = getu32(mm->endian, dlabel.part[idx].start_sec);
+	part_size = getu32(mm->endian, dlabel.part[idx].size_sec);
 
 	if (verbose)
-	    fprintf(stderr,
+	    tsk_fprintf(stderr,
 		"load_table: %" PRIu32 "  Starting Sector: %" PRIu32
 		"  Size: %" PRIu32 "  Type: %d\n", idx, part_start,
 		part_size, dlabel.part[idx].fstype);
@@ -154,10 +156,10 @@ bsd_load_table(MM_INFO * mm)
 	    continue;
 
 	if (part_start > max_addr) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_MM_BLK_NUM;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"bsd_load_table: Starting sector too large for image");
-	    tsk_errstr2[0] = '\0';
 	    return 1;
 	}
 
@@ -181,24 +183,24 @@ bsd_load_table(MM_INFO * mm)
  */
 uint8_t
 bsd_part_walk(MM_INFO * mm, PNUM_T start, PNUM_T last, int flags,
-    MM_PART_WALK_FN action, char *ptr)
+    MM_PART_WALK_FN action, void *ptr)
 {
     MM_PART *part;
     PNUM_T cnt = 0;
 
     if (start < mm->first_part || start > mm->last_part) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_MM_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "bsd_part_walk: Start partition: %" PRIuPNUM "", start);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
     if (last < mm->first_part || last > mm->last_part) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_MM_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "bsd_part_walk: End partition: %" PRIuPNUM "", last);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
@@ -240,7 +242,12 @@ bsd_close(MM_INFO * mm)
 MM_INFO *
 bsd_open(IMG_INFO * img_info, DADDR_T offset)
 {
-    MM_INFO *mm = (MM_INFO *) mymalloc(sizeof(*mm));
+    MM_INFO *mm;
+
+    // clean up any errors that are lying around
+    tsk_error_reset();
+
+    mm = (MM_INFO *) mymalloc(sizeof(*mm));
     if (mm == NULL)
 	return NULL;
 

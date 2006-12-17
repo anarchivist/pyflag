@@ -44,8 +44,7 @@
 #include <string.h>
 
 /* Utility library. */
-
-#include "split_at.h"
+#include "aux_tools.h"
 
 /* split_at - break string at first delimiter, return remainder */
 

@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2006/04/06 18:11:14 $
+ * $Date: 2006/12/07 22:03:45 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -152,12 +152,17 @@ void
 mm_part_free(MM_INFO * mm)
 {
     MM_PART *part = mm->part_list;
+    MM_PART *part2;
 
     while (part) {
 	if (part->desc)
 	    free(part->desc);
-	part = part->next;
+
+	part2 = part->next;
+	free(part);
+	part = part2;
     }
+    mm->part_list = NULL;
 
     return;
 }

@@ -57,15 +57,14 @@
 **        each copy of the program.
 */
 
-#include "fs_tools.h"
+#include "fs_tools_i.h"
 #include "iso9660.h"
-#include "mymalloc.h"
 
 static unsigned int depth = 0;
 
-#define DIR_STRSZ	2048
+#define DIR_STRSZ	4096
 static char dirs[DIR_STRSZ];
-#define MAX_DEPTH	64
+#define MAX_DEPTH	128
 static char *didx[MAX_DEPTH];
 
 /* iso9660_dent_walk - walk directory entries starting with inode 'inum'.
@@ -86,7 +85,11 @@ iso9660_dent_walk(FS_INFO * fs, INUM_T inum, int flags,
     int retval;
     SSIZE_T cnt;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     if (inum < fs->first_inum || inum > fs->last_inum) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "iso9660_dent_walk: inode value: %" PRIuINUM "\n", inum);
@@ -95,8 +98,8 @@ iso9660_dent_walk(FS_INFO * fs, INUM_T inum, int flags,
 
 
     if (verbose)
-	fprintf(stderr, "iso9660_dent_walk: Processing directory %lu\n",
-	    (ULONG) inum);
+	tsk_fprintf(stderr,
+	    "iso9660_dent_walk: Processing directory %lu\n", (ULONG) inum);
 
     if ((fs_dent = fs_dent_alloc(ISO9660_MAXNAMLEN, 0)) == NULL)
 	return 1;
@@ -106,6 +109,8 @@ iso9660_dent_walk(FS_INFO * fs, INUM_T inum, int flags,
 
     /* walking a directory */
     if ((iso->dinode->dr.flags & ISO9660_FLAG_DIR) == ISO9660_FLAG_DIR) {
+	TSK_LIST *list_seen = NULL;
+
 	/* calculate directory extent location */
 	offs =
 	    (off_t) (fs->block_size *
@@ -120,6 +125,7 @@ iso9660_dent_walk(FS_INFO * fs, INUM_T inum, int flags,
 	cnt = fs_read_random(fs, buf, length, offs);
 	if (cnt != length) {
 	    if (cnt != -1) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_READ;
 		tsk_errstr[0] = '\0';
 	    }
@@ -190,6 +196,7 @@ iso9660_dent_walk(FS_INFO * fs, INUM_T inum, int flags,
 	while (length > sizeof(iso9660_dentry)) {
 	    if (dd->length) {
 		int retval;
+		int i;
 		/* print out info on what was in extent */
 		in = iso->in;
 		while (parseu32(fs, in->inode.dr.ext_loc) !=
@@ -198,6 +205,15 @@ iso9660_dent_walk(FS_INFO * fs, INUM_T inum, int flags,
 
 		fs_dent->inode = in->inum;
 		strcpy(fs_dent->name, in->inode.fn);
+
+		/* Clean up name */
+		i = 0;
+		while (fs_dent->name[i] != '\0') {
+		    if (TSK_IS_CNTRL(fs_dent->name[i]))
+			fs_dent->name[i] = '^';
+		    i++;
+		}
+
 
 		fs_dent->path = dirs;
 		fs_dent->pathdepth = depth;
@@ -211,39 +227,59 @@ iso9660_dent_walk(FS_INFO * fs, INUM_T inum, int flags,
 		    retval = action(fs, fs_dent, myflags, ptr);
 		    if (retval == WALK_ERROR) {
 			fs_dent_free(fs_dent);
+			tsk_list_free(list_seen);
+			list_seen = NULL;
 			return 1;
 		    }
 		    else if (retval == WALK_STOP) {
 			fs_dent_free(fs_dent);
+			tsk_list_free(list_seen);
+			list_seen = NULL;
 			return 0;
 		    }
 		}
 
 		if ((dd->flags & ISO9660_FLAG_DIR)
 		    && (flags & FS_FLAG_NAME_RECURSE)) {
-		    if (depth < MAX_DEPTH) {
-			didx[depth] = &dirs[strlen(dirs)];
-			strncpy(didx[depth], fs_dent->name,
-			    DIR_STRSZ - strlen(dirs));
-			strncat(dirs, "/", DIR_STRSZ);
-		    }
-		    depth++;
-		    if (iso9660_dent_walk(fs, in->inum, flags, action,
-			    ptr)) {
-			/* If the directory could not be loaded,
-			 * then move on */
-			if (verbose) {
-			    fprintf(stderr,
-				"iso_dent_parse_block: error reading directory: %"
-				PRIuINUM "\n", in->inum);
-			    tsk_error_print(stderr);
-			}
-			tsk_error_reset();
-		    }
+		    int depth_added = 0;
 
-		    depth--;
-		    if (depth < MAX_DEPTH)
-			*didx[depth] = '\0';
+		    /* Make sure we do not get into an infinite loop */
+		    if (0 == tsk_list_find(list_seen, fs_dent->inode)) {
+			if (tsk_list_add(&list_seen, fs_dent->inode)) {
+			    fs_dent_free(fs_dent);
+			    tsk_list_free(list_seen);
+			    list_seen = NULL;
+			    return -1;
+			}
+
+
+			if ((depth < MAX_DEPTH) &&
+			    (DIR_STRSZ >
+				strlen(dirs) + strlen(fs_dent->name))) {
+			    didx[depth] = &dirs[strlen(dirs)];
+			    strncpy(didx[depth], fs_dent->name,
+				DIR_STRSZ - strlen(dirs));
+			    strncat(dirs, "/", DIR_STRSZ);
+			    depth_added = 1;
+			}
+			depth++;
+			if (iso9660_dent_walk(fs, in->inum, flags, action,
+				ptr)) {
+			    /* If the directory could not be loaded,
+			     * then move on */
+			    if (verbose) {
+				tsk_fprintf(stderr,
+				    "iso_dent_parse_block: error reading directory: %"
+				    PRIuINUM "\n", in->inum);
+				tsk_error_print(stderr);
+			    }
+			    tsk_error_reset();
+			}
+
+			depth--;
+			if (depth_added)
+			    *didx[depth] = '\0';
+		    }
 		}
 
 		length -= dd->length;
@@ -273,6 +309,8 @@ iso9660_dent_walk(FS_INFO * fs, INUM_T inum, int flags,
 	}
 
 	free(buf);
+	tsk_list_free(list_seen);
+	list_seen = NULL;
 	/* regular file */
     }
     fs_dent_free(fs_dent);

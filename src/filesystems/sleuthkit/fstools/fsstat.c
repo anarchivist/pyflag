@@ -2,7 +2,7 @@
 ** fsstat
 ** The Sleuth Kit 
 **
-** $Date: 2006/07/10 13:26:20 $
+** $Date: 2006/09/20 20:16:01 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
@@ -15,35 +15,39 @@
 ** This software is distributed under the Common Public License 1.0
 **
 */
+#include <locale.h>
 #include "fs_tools.h"
+
+static TSK_TCHAR *progname;
 
 static void
 usage()
 {
-    fprintf(stderr,
-	"usage: %s [-tvV] [-f fstype] [-i imgtype] [-o imgoffset] image\n",
+    TFPRINTF(stderr,
+	_TSK_T
+	("usage: %s [-tvV] [-f fstype] [-i imgtype] [-o imgoffset] image\n"),
 	progname);
-    fprintf(stderr, "\t-t: display type only\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr, "\t-t: display type only\n");
+    tsk_fprintf(stderr,
 	"\t-i imgtype: The format of the image file (use '-i list' for supported types)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-f fstype: File system type (use '-f list' for supported types)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-o imgoffset: The offset of the file system in the image (in sectors)\n");
-    fprintf(stderr, "\t-v: verbose output to stderr\n");
-    fprintf(stderr, "\t-V: Print version\n");
+    tsk_fprintf(stderr, "\t-v: verbose output to stderr\n");
+    tsk_fprintf(stderr, "\t-V: Print version\n");
 
     exit(1);
 }
 
 
 int
-main(int argc, char **argv)
+MAIN(int argc, TSK_TCHAR ** argv)
 {
     FS_INFO *fs;
     IMG_INFO *img;
-    char *fstype = NULL;
-    char *imgtype = NULL;
+    TSK_TCHAR *fstype = NULL;
+    TSK_TCHAR *imgtype = NULL;
     int ch;
     uint8_t type = 0;
     SSIZE_T imgoff = 0;
@@ -51,47 +55,46 @@ main(int argc, char **argv)
     progname = argv[0];
     setlocale(LC_ALL, "");
 
-    while ((ch = getopt(argc, argv, "f:i:o:tvV")) > 0) {
+    while ((ch = getopt(argc, argv, _TSK_T("f:i:o:tvV"))) > 0) {
 	switch (ch) {
-	case '?':
+	case _TSK_T('?'):
 	default:
-	    fprintf(stderr, "Invalid argument: %s\n", argv[optind]);
+	    TFPRINTF(stderr, _TSK_T("Invalid argument: %s\n"),
+		argv[optind]);
 	    usage();
 
-	case 'f':
+	case _TSK_T('f'):
 	    fstype = optarg;
-	    if (strcmp(fstype, "list") == 0) {
+	    if (TSTRCMP(fstype, _TSK_T("list")) == 0) {
 		fs_print_types(stderr);
 		exit(1);
 	    }
-
 	    break;
 
-	case 'i':
+	case _TSK_T('i'):
 	    imgtype = optarg;
-	    if (strcmp(imgtype, "list") == 0) {
+	    if (TSTRCMP(imgtype, _TSK_T("list")) == 0) {
 		img_print_types(stderr);
 		exit(1);
 	    }
-
 	    break;
 
-	case 'o':
+	case _TSK_T('o'):
 	    if ((imgoff = parse_offset(optarg)) == -1) {
 		tsk_error_print(stderr);
 		exit(1);
 	    }
 	    break;
 
-	case 't':
+	case _TSK_T('t'):
 	    type = 1;
 	    break;
 
-	case 'v':
+	case _TSK_T('v'):
 	    verbose++;
 	    break;
 
-	case 'V':
+	case _TSK_T('V'):
 	    print_version(stdout);
 	    exit(0);
 	}
@@ -99,13 +102,13 @@ main(int argc, char **argv)
 
     /* We need at least one more argument */
     if (optind >= argc) {
-	fprintf(stderr, "Missing image name\n");
+	tsk_fprintf(stderr, "Missing image name\n");
 	usage();
     }
 
     if ((img =
 	    img_open(imgtype, argc - optind,
-		(const char **) &argv[optind])) == NULL) {
+		(const TSK_TCHAR **) &argv[optind])) == NULL) {
 	tsk_error_print(stderr);
 	exit(1);
     }
@@ -118,10 +121,9 @@ main(int argc, char **argv)
 	exit(1);
     }
 
-
     if (type) {
 	char *str = fs_get_type(fs->ftype);
-	printf("%s\n", str);
+	tsk_printf("%s\n", str);
     }
     else {
 	if (fs->fsstat(fs, stdout)) {
@@ -134,6 +136,5 @@ main(int argc, char **argv)
 
     fs->close(fs);
     img->close(img);
-
     exit(0);
 }

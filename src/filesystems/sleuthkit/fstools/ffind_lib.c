@@ -2,7 +2,7 @@
 ** ffind  (file find)
 ** The Sleuth Kit 
 **
-** $Date: 2006/04/05 03:47:35 $
+** $Date: 2006/09/21 16:47:06 $
 **
 ** Find the file that uses the specified inode (including deleted files)
 ** 
@@ -20,7 +20,7 @@
 ** This software is distributed under the Common Public License 1.0
 **
 */
-#include "libfstools.h"
+#include "fs_tools_i.h"
 
 /* NTFS has an optimized version of this function */
 extern uint8_t
@@ -39,9 +39,9 @@ find_file_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
     if (fs_dent->inode == inode) {
 	found = 1;
 	if (flags & FS_FLAG_NAME_UNALLOC)
-	    printf("* ");
+	    tsk_printf("* ");
 
-	printf("/%s%s\n", fs_dent->path, fs_dent->name);
+	tsk_printf("/%s%s\n", fs_dent->path, fs_dent->name);
 
 	if (!(localflags & FFIND_ALL)) {
 	    return WALK_STOP;
@@ -56,7 +56,6 @@ uint8_t
 fs_ffind(FS_INFO * fs, uint8_t lclflags, INUM_T inode_a, uint32_t type,
     uint16_t id, int flags)
 {
-
     found = 0;
     localflags = lclflags;
     inode = inode_a;
@@ -66,7 +65,7 @@ fs_ffind(FS_INFO * fs, uint8_t lclflags, INUM_T inode_a, uint32_t type,
      */
     if (inode == fs->root_inum) {
 	if (flags & FS_FLAG_NAME_ALLOC) {
-	    printf("/\n");
+	    tsk_printf("/\n");
 	    found = 1;
 
 	    if (!(lclflags & FFIND_ALL))
@@ -93,14 +92,14 @@ fs_ffind(FS_INFO * fs, uint8_t lclflags, INUM_T inode_a, uint32_t type,
 	    FS_INODE *fs_inode = fs->inode_lookup(fs, inode);
 	    if ((fs_inode != NULL) && (fs_inode->name != NULL)) {
 		if (fs_inode->flags & FS_FLAG_NAME_UNALLOC)
-		    printf("* ");
-		printf("%s/%s\n", ORPHAN_STR, fs_inode->name->name);
+		    tsk_printf("* ");
+		tsk_printf("%s/%s\n", ORPHAN_STR, fs_inode->name->name);
 	    }
 	    if (fs_inode)
 		fs_inode_free(fs_inode);
 	}
 	else {
-	    printf("inode not currently used\n");
+	    tsk_printf("File name not found for inode\n");
 	}
     }
     return 0;

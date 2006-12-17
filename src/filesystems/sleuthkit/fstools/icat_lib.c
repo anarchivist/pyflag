@@ -2,7 +2,7 @@
 ** icat_lib 
 ** The Sleuth Kit 
 **
-** $Date: 2006/05/11 15:53:21 $
+** $Date: 2006/11/29 22:02:11 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
@@ -23,7 +23,7 @@
  *	Yorktown Heights, NY 10598, USA
  --*/
 
-#include "fs_tools.h"
+#include "fs_tools_i.h"
 
 
 
@@ -31,12 +31,13 @@
  */
 static uint8_t
 icat_action(FS_INFO * fs, DADDR_T addr, char *buf,
-    unsigned int size, int flags, void *ptr)
+    size_t size, int flags, void *ptr)
 {
     if (size == 0)
 	return WALK_CONT;
 
     if (fwrite(buf, size, 1, stdout) != 1) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WRITE;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "icat_action: error writing to stdout: %s", strerror(errno));
@@ -52,6 +53,17 @@ fs_icat(FS_INFO * fs, uint8_t lclflags, INUM_T inum, uint32_t type,
     uint16_t id, int flags)
 {
     FS_INODE *inode;
+
+#ifdef TSK_WIN32
+    if (-1 == _setmode(_fileno(stdout), _O_BINARY)) {
+	tsk_error_reset();
+	tsk_errno = TSK_ERR_FS_WRITE;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "icat_lib: error setting stdout to binary: %s",
+	    strerror(errno));
+	return 1;
+    }
+#endif
 
     inode = fs->inode_lookup(fs, inum);
     if (!inode) {

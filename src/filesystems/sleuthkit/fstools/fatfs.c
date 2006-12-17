@@ -2,7 +2,7 @@
 ** fatfs
 ** The Sleuth Kit 
 **
-** $Date: 2006/07/10 17:11:10 $
+** $Date: 2006/12/11 20:03:47 $
 **
 ** Content and meta data layer support for the FAT file system 
 **
@@ -20,11 +20,8 @@
 **
 */
 
-#include "fs_tools.h"
-#include "fs_types.h"
+#include "fs_tools_i.h"
 #include "fatfs.h"
-#include "fs_unicode.h"
-
 
 
 /*
@@ -47,6 +44,89 @@
  */
 
 
+
+
+/* TTL is 0 if the entry has not been used.  TTL of 1 means it was the
+ * most recently used, and TTL of FAT_CACHE_N means it was the least 
+ * recently used.  This function has a LRU replacement algo
+ */
+// return -1 on error, or cache index on success (0 to FAT_CACHE_N)
+
+static int
+getFATCacheIdx(FATFS_INFO * fatfs, DADDR_T sect)
+{
+    int i, cidx;
+    SSIZE_T cnt;
+    FS_INFO *fs = (FS_INFO *) & fatfs->fs_info;
+
+    // see if we already have it in the cache
+    for (i = 0; i < FAT_CACHE_N; i++) {
+	if ((fatfs->fatc_ttl[i] > 0) &&
+	    (sect >= fatfs->fatc_addr[i]) &&
+	    (sect < (fatfs->fatc_addr[i] + FAT_CACHE_S))) {
+	    int a;
+
+	    // update the TTLs to push i to the front
+	    for (a = 0; a < FAT_CACHE_N; a++) {
+		if (fatfs->fatc_ttl[a] == 0)
+		    continue;
+
+		if (fatfs->fatc_ttl[a] < fatfs->fatc_ttl[i])
+		    fatfs->fatc_ttl[a]++;
+	    }
+	    fatfs->fatc_ttl[i] = 1;
+//          fprintf(stdout, "FAT Hit: %d\n", sect);
+//          fflush(stdout);
+	    return i;
+	}
+    }
+
+//    fprintf(stdout, "FAT Miss: %d\n", (int)sect);
+//    fflush(stdout);
+
+    // Look for an unused entry or an entry with a TTL of FAT_CACHE_N
+    cidx = 0;
+    for (i = 0; i < FAT_CACHE_N; i++) {
+	if ((fatfs->fatc_ttl[i] == 0) ||
+	    (fatfs->fatc_ttl[i] >= FAT_CACHE_N)) {
+	    cidx = i;
+	}
+    }
+//    fprintf(stdout, "FAT Removing: %d\n", (int)fatfs->fatc_addr[cidx]);
+    //   fflush(stdout);
+
+    // read the data
+    cnt =
+	fs_read_random(fs, fatfs->fatc_buf[cidx], FAT_CACHE_B,
+	sect * fs->block_size);
+    if (cnt != FAT_CACHE_B) {
+	if (cnt != -1) {
+	    tsk_error_reset();
+	    tsk_errno = TSK_ERR_FS_READ;
+	}
+	snprintf(tsk_errstr2, TSK_ERRSTR_L,
+	    "getFATCacheIdx: FAT: %" PRIuDADDR, sect);
+	return -1;
+    }
+
+    // update the TTLs
+    if (fatfs->fatc_ttl[cidx] == 0)	// special case for unused entry
+	fatfs->fatc_ttl[cidx] = FAT_CACHE_N + 1;
+
+    for (i = 0; i < FAT_CACHE_N; i++) {
+	if (fatfs->fatc_ttl[i] == 0)
+	    continue;
+
+	if (fatfs->fatc_ttl[i] < fatfs->fatc_ttl[cidx])
+	    fatfs->fatc_ttl[i]++;
+    }
+
+    fatfs->fatc_ttl[cidx] = 1;
+    fatfs->fatc_addr[cidx] = sect;
+    return cidx;
+}
+
+
 /*
  * Set *value to the entry in the File Allocation Table (FAT) 
  * for the given cluster
@@ -67,11 +147,12 @@ getFAT(FATFS_INFO * fatfs, DADDR_T clust, DADDR_T * value)
     FS_INFO *fs = (FS_INFO *) & fatfs->fs_info;
     DADDR_T sect, offs;
     SSIZE_T cnt;
+    int cidx;
 
     /* Sanity Check */
     if (clust > fatfs->lastclust) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
-	tsk_errstr2[0] = '\0';
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "getFAT: invalid cluster address: %" PRIuDADDR, clust);
 	return 1;
@@ -80,61 +161,53 @@ getFAT(FATFS_INFO * fatfs, DADDR_T clust, DADDR_T * value)
     switch (fatfs->fs_info.ftype) {
     case FAT12:
 	if (clust & 0xf000) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_ARG;
-	    tsk_errstr2[0] = '\0';
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"getFAT: FAT12 Cluster %" PRIuDADDR " too large", clust);
 	    return 1;
 	}
 
 	/* id the sector in the FAT */
-	sect = fatfs->firstfatsect + (clust + clust / 2) / fatfs->ssize;
+	sect = fatfs->firstfatsect +
+	    ((clust + (clust >> 1)) >> fatfs->ssize_sh);
 
 	/* Load the FAT if we don't have it */
-	if ((sect < fatfs->table->addr) ||
-	    (sect >= (fatfs->table->addr + FAT_CACHE_S)) ||
-	    (0 == fatfs->table->used)) {
-
-	    cnt = fs_read_block(fs, fatfs->table, FAT_CACHE_B, sect);
-	    if (cnt != FAT_CACHE_B) {
-		if (cnt != -1) {
-		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
-		}
-		snprintf(tsk_errstr2, TSK_ERRSTR_L,
-		    "getFAT: FAT12 FAT: %" PRIuDADDR, sect);
-		return 1;
-	    }
-	}
+	// see if it is in the cache
+	if (-1 == (cidx = getFATCacheIdx(fatfs, sect)))
+	    return 1;
 
 	/* get the offset into the cache */
-	offs = (sect - fatfs->table->addr) * fatfs->ssize +
-	    (clust + clust / 2) % fatfs->ssize;
+	offs = ((sect - fatfs->fatc_addr[cidx]) << fatfs->ssize_sh) +
+	    (clust + (clust >> 1)) % fatfs->ssize;
 
 	/* special case when the 12-bit value goes across the cache
 	 * we load the cache to start at this sect.  The cache
 	 * size must therefore be at least 2 sectors large 
 	 */
 	if (offs == (FAT_CACHE_B - 1)) {
-	    cnt = fs_read_block(fs, fatfs->table, FAT_CACHE_B, sect);
+
+	    // read the data -- TTLs will already have been updated
+	    cnt = fs_read_random(fs, fatfs->fatc_buf[cidx], FAT_CACHE_B,
+		sect * fs->block_size);
 	    if (cnt != FAT_CACHE_B) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		    "getFAT: FAT12 FAT overlap: %" PRIuDADDR, sect);
 		return 1;
 	    }
+	    fatfs->fatc_addr[cidx] = sect;
 
-	    offs = (sect - fatfs->table->addr) * fatfs->ssize +
-		(clust + clust / 2) % fatfs->ssize;
+	    offs = (clust + (clust >> 1)) % fatfs->ssize;
 	}
 
 	/* get pointer to entry in current buffer */
-	ptr = (uint8_t *) fatfs->table->data + offs;
+	ptr = (uint8_t *) fatfs->fatc_buf[cidx] + offs;
 
-	tmp16 = getu16(fs, ptr);
+	tmp16 = getu16(fs->endian, ptr);
 
 	/* slide it over if it is one of the odd clusters */
 	if (clust & 1)
@@ -146,45 +219,31 @@ getFAT(FATFS_INFO * fatfs, DADDR_T clust, DADDR_T * value)
 	if ((*value > (fatfs->lastclust)) &&
 	    (*value < (0x0ffffff7 & FATFS_12_MASK))) {
 	    if (verbose)
-		fprintf(stderr, "getFAT: FAT12 cluster (%" PRIuDADDR
+		tsk_fprintf(stderr, "getFAT: FAT12 cluster (%" PRIuDADDR
 		    ") too large (%" PRIuDADDR ") - resetting\n",
 		    clust, *value);
 	    *value = 0;
 	}
-
 	return 0;
 
     case FAT16:
 	/* Get sector in FAT for cluster and load it if needed */
-	sect = fatfs->firstfatsect + (clust * 2) / fatfs->ssize;
-	if ((sect < fatfs->table->addr) ||
-	    (sect >= (fatfs->table->addr + FAT_CACHE_S)) ||
-	    (0 == fatfs->table->used)) {
+	sect = fatfs->firstfatsect + ((clust << 1) >> fatfs->ssize_sh);
+	if (-1 == (cidx = getFATCacheIdx(fatfs, sect)))
+	    return 1;
 
-	    cnt = fs_read_block(fs, fatfs->table, FAT_CACHE_B, sect);
-	    if (cnt != FAT_CACHE_B) {
-		if (cnt != -1) {
-		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
-		}
-		snprintf(tsk_errstr2, TSK_ERRSTR_L,
-		    "getFAT: FAT16 FAT: %" PRIuDADDR, sect);
-		return 1;
-	    }
-	}
+	/* get pointer to entry in the cache buffer */
+	ptr = (uint8_t *) fatfs->fatc_buf[cidx] +
+	    ((sect - fatfs->fatc_addr[cidx]) << fatfs->ssize_sh) +
+	    ((clust << 1) % fatfs->ssize);
 
-	/* get pointer to entry in current buffer */
-	ptr = (uint8_t *) fatfs->table->data +
-	    (sect - fatfs->table->addr) * fatfs->ssize +
-	    (clust * 2) % fatfs->ssize;
-
-	*value = getu16(fs, ptr) & FATFS_16_MASK;
+	*value = getu16(fs->endian, ptr) & FATFS_16_MASK;
 
 	/* sanity check */
 	if ((*value > (fatfs->lastclust)) &&
 	    (*value < (0x0ffffff7 & FATFS_16_MASK))) {
 	    if (verbose)
-		fprintf(stderr,
+		tsk_fprintf(stderr,
 		    "getFAT: contents of FAT16 entry %" PRIuDADDR
 		    " too large - resetting\n", clust);
 	    *value = 0;
@@ -193,46 +252,32 @@ getFAT(FATFS_INFO * fatfs, DADDR_T clust, DADDR_T * value)
 
     case FAT32:
 	/* Get sector in FAT for cluster and load if needed */
-	sect = fatfs->firstfatsect + (clust * 4) / fatfs->ssize;
-	if ((sect < fatfs->table->addr) ||
-	    (sect >= (fatfs->table->addr + FAT_CACHE_S)) ||
-	    (0 == fatfs->table->used)) {
-
-	    cnt = fs_read_block(fs, fatfs->table, FAT_CACHE_B, sect);
-	    if (cnt != FAT_CACHE_B) {
-		if (cnt != -1) {
-		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
-		}
-		snprintf(tsk_errstr2, TSK_ERRSTR_L,
-		    "getFAT: FAT32 FAT: %" PRIuDADDR, sect);
-		return 1;
-	    }
-	}
-
+	sect = fatfs->firstfatsect + ((clust << 2) >> fatfs->ssize_sh);
+	if (-1 == (cidx = getFATCacheIdx(fatfs, sect)))
+	    return 1;
 
 	/* get pointer to entry in current buffer */
-	ptr = (uint8_t *) fatfs->table->data +
-	    (sect - fatfs->table->addr) * fatfs->ssize +
-	    (clust * 4) % fatfs->ssize;
+	ptr = (uint8_t *) fatfs->fatc_buf[cidx] +
+	    ((sect - fatfs->fatc_addr[cidx]) << fatfs->ssize_sh) +
+	    (clust << 2) % fatfs->ssize;
 
-	*value = getu32(fs, ptr) & FATFS_32_MASK;
+	*value = getu32(fs->endian, ptr) & FATFS_32_MASK;
 
 	/* sanity check */
 	if ((*value > fatfs->lastclust) &&
 	    (*value < (0x0ffffff7 & FATFS_32_MASK))) {
 	    if (verbose)
-		fprintf(stderr,
+		tsk_fprintf(stderr,
 		    "getFAT: contents of entry %" PRIuDADDR
 		    " too large - resetting\n", clust);
 
 	    *value = 0;
 	}
-
 	return 0;
+
     default:
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
-	tsk_errstr2[0] = '\0';
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "getFAT: Unknown FAT type: %d", fatfs->fs_info.ftype);
 	return 1;
@@ -342,28 +387,39 @@ fatfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
     DADDR_T addr;
     int myflags, i;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     /*
      * Sanity checks.
      */
     if (start_blk < fs->first_block || start_blk > fs->last_block) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "%s: Start block: %" PRIuDADDR "", myname, start_blk);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
     if (end_blk < fs->first_block || end_blk > fs->last_block) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "%s: End block: %" PRIuDADDR "", myname, end_blk);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "fatfs_block_walk: Block Walking %" PRIuDADDR " to %"
 	    PRIuDADDR "\n", start_blk, end_blk);
+
+
+    /* Sanity check on flags -- make sure at least one ALLOC is set */
+    if (((flags & FS_FLAG_DATA_ALLOC) == 0) &&
+	((flags & FS_FLAG_DATA_UNALLOC) == 0)) {
+	flags |= (FS_FLAG_DATA_ALLOC | FS_FLAG_DATA_UNALLOC);
+    }
+
 
     /* cycle through block addresses - we will go by sections of the file system */
     addr = start_blk;
@@ -373,7 +429,7 @@ fatfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
 	&& ((flags & FS_FLAG_DATA_ALLOC) == FS_FLAG_DATA_ALLOC)) {
 
 	if (verbose)
-	    fprintf(stderr,
+	    tsk_fprintf(stderr,
 		"fatfs_block_walk: Walking non-data area (pre %"
 		PRIuDADDR "\n", fatfs->firstclustsect);
 
@@ -387,8 +443,8 @@ fatfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
 	    cnt = fs_read_block(fs, data_buf, fs->block_size * 8, addr);
 	    if (cnt != fs->block_size * 8) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		    "fatfs_block_walk: pre-data area block: %"
@@ -457,7 +513,7 @@ fatfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
     }
 
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "fatfs_block_walk: Walking data area blocks (%" PRIuDADDR
 	    " to %" PRIuDADDR ")\n", addr, end_blk);
 
@@ -483,7 +539,7 @@ fatfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
 
 	/* We want this cluster */
 	if ((flags & myflags) == myflags) {
-	    int read_size;
+	    DADDR_T read_size;
 
 	    /* The final cluster may not be full */
 	    if (end_blk - addr + 1 < fatfs->csize)
@@ -495,8 +551,8 @@ fatfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
 		(fs, data_buf, fs->block_size * read_size, addr);
 	    if (cnt != fs->block_size * read_size) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		    "fatfs_block_walk: block: %" PRIuDADDR, addr);
@@ -539,14 +595,16 @@ fatfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
 ** FAT dates are the actual date with the year relative to 1980
 ** 
 */
-static int
+static time_t
 dos2unixtime(uint16_t date, uint16_t time)
 {
     struct tm tm1;
-    int ret;
+    time_t ret;
 
     if (date == 0)
 	return 0;
+
+    memset(&tm1, 0, sizeof(struct tm));
 
     tm1.tm_sec = ((time & FATFS_SEC_MASK) >> FATFS_SEC_SHIFT) * 2;
     if ((tm1.tm_sec < 0) || (tm1.tm_sec > 60))
@@ -582,9 +640,9 @@ dos2unixtime(uint16_t date, uint16_t time)
 
     ret = mktime(&tm1);
 
-    if (-1 == ret) {
+    if (ret < 0) {
 	if (verbose)
-	    fprintf(stderr,
+	    tsk_fprintf(stderr,
 		"dos2unixtime: Error running mktime(): %d:%d:%d %d/%d/%d",
 		((time & FATFS_HOUR_MASK) >> FATFS_HOUR_SHIFT),
 		((time & FATFS_MIN_MASK) >> FATFS_MIN_SHIFT),
@@ -644,6 +702,7 @@ fatfs_dinode_copy(FATFS_INFO * fatfs, FS_INODE * fs_inode,
 {
     int dcnt;
     int retval;
+    int i;
     FS_INFO *fs = (FS_INFO *) & fatfs->fs_info;
 
     fs_inode->mode = dos2unixmode(in->attrib);
@@ -661,7 +720,7 @@ fatfs_dinode_copy(FATFS_INFO * fatfs, FS_INODE * fs_inode,
     }
     else {
 	fs_inode->nlink = (in->name[0] == FATFS_SLOT_DELETED) ? 0 : 1;
-	fs_inode->size = (OFF_T) getu32(fs, in->size);
+	fs_inode->size = (OFF_T) getu32(fs->endian, in->size);
     }
 
 
@@ -674,14 +733,15 @@ fatfs_dinode_copy(FATFS_INFO * fatfs, FS_INODE * fs_inode,
     }
     else {
 
-	if (FATFS_ISDATE(getu16(fs, in->wdate)))
-	    fs_inode->mtime = dos2unixtime(getu16(fs, in->wdate),
-		getu16(fs, in->wtime));
+	if (FATFS_ISDATE(getu16(fs->endian, in->wdate)))
+	    fs_inode->mtime = dos2unixtime(getu16(fs->endian, in->wdate),
+		getu16(fs->endian, in->wtime));
 	else
 	    fs_inode->mtime = 0;
 
-	if (FATFS_ISDATE(getu16(fs, in->adate)))
-	    fs_inode->atime = dos2unixtime(getu16(fs, in->adate), 0);
+	if (FATFS_ISDATE(getu16(fs->endian, in->adate)))
+	    fs_inode->atime =
+		dos2unixtime(getu16(fs->endian, in->adate), 0);
 	else
 	    fs_inode->atime = 0;
 
@@ -690,9 +750,10 @@ fatfs_dinode_copy(FATFS_INFO * fatfs, FS_INODE * fs_inode,
 	 * so we just put in into change and set create to 0.  The other
 	 * front-end code knows how to handle it and display it
 	 */
-	if (FATFS_ISDATE(getu16(fs, in->cdate)))
+	if (FATFS_ISDATE(getu16(fs->endian, in->cdate)))
 	    fs_inode->ctime =
-		dos2unixtime(getu16(fs, in->cdate), getu16(fs, in->ctime));
+		dos2unixtime(getu16(fs->endian, in->cdate),
+		getu16(fs->endian, in->ctime));
 	else
 	    fs_inode->ctime = 0;
     }
@@ -719,66 +780,66 @@ fatfs_dinode_copy(FATFS_INFO * fatfs, FS_INODE * fs_inode,
 	UTF8 *name8 = (UTF8 *) fs_inode->name->name;
 	UTF16 *name16 = (UTF16 *) lfn->part1;
 
-	int retVal = fs_UTF16toUTF8(fs, (const UTF16 **) &name16,
+	int retVal = tsk_UTF16toUTF8(fs->endian, (const UTF16 **) &name16,
 	    (UTF16 *) & lfn->part1[10],
 	    &name8,
 	    (UTF8 *) ((uintptr_t) fs_inode->name->name + 512),
 	    lenientConversion);
 
 	if (retVal != conversionOK) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_UNICODE;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"fatfs_dinode_copy: Error converting FAT LFN (1) to UTF8: %d",
 		retVal);
-	    tsk_errstr2[0] = '\0';
 	    *name8 = '\0';
 
 	    if (verbose)
-		fprintf(stderr,
+		tsk_fprintf(stderr,
 		    "fatfs_dinode_copy: Error converting FAT LFN (1) to UTF8: %d",
 		    retVal);
 	    return 1;
 	}
 
 	name16 = (UTF16 *) lfn->part2;
-	retVal = fs_UTF16toUTF8(fs, (const UTF16 **) &name16,
+	retVal = tsk_UTF16toUTF8(fs->endian, (const UTF16 **) &name16,
 	    (UTF16 *) & lfn->part2[12],
 	    &name8,
 	    (UTF8 *) ((uintptr_t) fs_inode->name->
 		name + 512), lenientConversion);
 
 	if (retVal != conversionOK) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_UNICODE;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"fatfs_dinode_copy: Error converting FAT LFN (2) to UTF8: %d",
 		retVal);
-	    tsk_errstr2[0] = '\0';
 	    *name8 = '\0';
 
 	    if (verbose)
-		fprintf(stderr,
+		tsk_fprintf(stderr,
 		    "fatfs_dinode_copy: Error converting FAT LFN (2) to UTF8: %d",
 		    retVal);
 	    return 1;
 	}
 
 	name16 = (UTF16 *) lfn->part3;
-	retVal = fs_UTF16toUTF8(fs, (const UTF16 **) &name16,
+	retVal = tsk_UTF16toUTF8(fs->endian, (const UTF16 **) &name16,
 	    (UTF16 *) & lfn->part3[4],
 	    &name8,
 	    (UTF8 *) ((uintptr_t) fs_inode->name->
 		name + 512), lenientConversion);
 
 	if (retVal != conversionOK) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_UNICODE;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"fatfs_dinode_copy: Error converting FAT LFN (3) to UTF8: %d",
 		retVal);
-	    tsk_errstr2[0] = '\0';
 	    *name8 = '\0';
 
 	    if (verbose)
-		fprintf(stderr,
+		tsk_fprintf(stderr,
 		    "fatfs_dinode_copy: Error converting FAT LFN (3) to UTF8: %d",
 		    retVal);
 	    return 1;
@@ -789,6 +850,15 @@ fatfs_dinode_copy(FATFS_INFO * fatfs, FS_INODE * fs_inode,
 	    fs_inode->name->name[511] = '\0';
 	else
 	    *name8 = '\0';
+
+	/* Clean up name */
+	i = 0;
+	while (fs_inode->name->name[i] != '\0') {
+	    if (TSK_IS_CNTRL(fs_inode->name->name[i]))
+		fs_inode->name->name[i] = '^';
+	    i++;
+	}
+
     }
     else if ((in->attrib & FATFS_ATTR_VOLUME) == FATFS_ATTR_VOLUME) {
 	int a, i = 0;
@@ -853,24 +923,44 @@ fatfs_dinode_copy(FATFS_INFO * fatfs, FS_INODE * fs_inode,
      */
     if ((in->attrib & FATFS_ATTR_DIRECTORY) &&
 	((in->attrib & FATFS_ATTR_LFN) != FATFS_ATTR_LFN)) {
+	TSK_LIST *list_seen = NULL;
 
 	/* count the total number of clusters in this file */
-	uint32_t clust = FATFS_DENTRY_CLUST(fs, in);
+	DADDR_T clust = FATFS_DENTRY_CLUST(fs, in);
 	int cnum = 0;
 
 	while ((clust) && (0 == FATFS_ISEOF(clust, fatfs->mask))) {
 	    DADDR_T nxt;
+
+	    /* Make sure we do not get into an infinite loop */
+	    if (tsk_list_find(list_seen, clust)) {
+		if (verbose)
+		    tsk_fprintf(stderr,
+			"Loop found while determining directory size\n");
+		break;
+	    }
+	    if (tsk_list_add(&list_seen, clust)) {
+		tsk_list_free(list_seen);
+		list_seen = NULL;
+		return 1;
+	    }
+
 	    cnum++;
+
 	    if (getFAT(fatfs, clust, &nxt))
 		break;
 	    else
 		clust = nxt;
 	}
 
+	tsk_list_free(list_seen);
+	list_seen = NULL;
+
 	/* we are going to store the sectors, not clusters so calc
 	 * that value 
 	 */
-	fs_inode->size = (OFF_T) (cnum * fatfs->csize * fatfs->ssize);
+	fs_inode->size =
+	    (OFF_T) ((cnum * fatfs->csize) << fatfs->ssize_sh);
     }
 
     /* Use the allocation status of the sector to determine if the
@@ -927,7 +1017,7 @@ fatfs_make_root(FATFS_INFO * fatfs, FS_INODE * fs_inode)
      * we will have to fake it.
      */
     if (fatfs->fs_info.ftype != FAT32) {
-	int snum;
+	DADDR_T snum;
 
 	/* Other code will have to check this as a special condition 
 	 */
@@ -937,12 +1027,13 @@ fatfs_make_root(FATFS_INFO * fatfs, FS_INODE * fs_inode)
 	snum = fatfs->firstclustsect - fatfs->firstdatasect;
 
 	/* number of bytes */
-	fs_inode->size = snum * fatfs->ssize;
+	fs_inode->size = snum << fatfs->ssize_sh;
     }
     else {
 	/* Get the number of allocated clusters */
-	int cnum;
-	uint32_t clust;
+	DADDR_T cnum;
+	DADDR_T clust;
+	TSK_LIST *list_seen = NULL;
 
 	/* base cluster */
 	clust = FATFS_SECT_2_CLUST(fatfs, fatfs->rootsect);
@@ -951,14 +1042,29 @@ fatfs_make_root(FATFS_INFO * fatfs, FS_INODE * fs_inode)
 	cnum = 0;
 	while ((clust) && (0 == FATFS_ISEOF(clust, FATFS_32_MASK))) {
 	    DADDR_T nxt;
+
+	    /* Make sure we do not get into an infinite loop */
+	    if (tsk_list_find(list_seen, clust)) {
+		if (verbose)
+		    tsk_fprintf(stderr,
+			"Loop found while determining root directory size\n");
+		break;
+	    }
+	    if (tsk_list_add(&list_seen, clust)) {
+		tsk_list_free(list_seen);
+		list_seen = NULL;
+		return 1;
+	    }
+
 	    cnum++;
 	    if (getFAT(fatfs, clust, &nxt))
 		break;
 	    else
 		clust = nxt;
 	}
-
-	fs_inode->size = cnum * fatfs->csize * fatfs->ssize;
+	tsk_list_free(list_seen);
+	list_seen = NULL;
+	fs_inode->size = (cnum * fatfs->csize) << fatfs->ssize_sh;
     }
     return 0;
 }
@@ -997,24 +1103,29 @@ fatfs_isdentry(FATFS_INFO * fatfs, fatfs_dentry * de)
 	/* The ctime, cdate, and adate fields are optional and 
 	 * therefore 0 is a valid value
 	 */
-	if ((getu16(fs, de->ctime) != 0) &&
-	    (FATFS_ISTIME(getu16(fs, de->ctime)) == 0))
+	if ((getu16(fs->endian, de->ctime) != 0) &&
+	    (FATFS_ISTIME(getu16(fs->endian, de->ctime)) == 0))
 	    return 0;
-	else if ((getu16(fs, de->wtime) != 0) &&
-	    (FATFS_ISTIME(getu16(fs, de->wtime)) == 0))
+	else if ((getu16(fs->endian, de->wtime) != 0) &&
+	    (FATFS_ISTIME(getu16(fs->endian, de->wtime)) == 0))
 	    return 0;
-	else if ((getu16(fs, de->cdate) != 0) &&
-	    (FATFS_ISDATE(getu16(fs, de->cdate)) == 0))
+	else if ((getu16(fs->endian, de->cdate) != 0) &&
+	    (FATFS_ISDATE(getu16(fs->endian, de->cdate)) == 0))
 	    return 0;
-	else if ((getu16(fs, de->adate) != 0) &&
-	    (FATFS_ISDATE(getu16(fs, de->adate)) == 0))
+	else if ((getu16(fs->endian, de->adate) != 0) &&
+	    (FATFS_ISDATE(getu16(fs->endian, de->adate)) == 0))
 	    return 0;
-	else if (FATFS_ISDATE(getu16(fs, de->wdate)) == 0)
+	else if (FATFS_ISDATE(getu16(fs->endian, de->wdate)) == 0)
 	    return 0;
 
 	/* verify the starting cluster is small enough */
 	else if ((FATFS_DENTRY_CLUST(fs, de) > (fatfs->lastclust)) &&
 	    (FATFS_ISEOF(FATFS_DENTRY_CLUST(fs, de), fatfs->mask) == 0))
+	    return 0;
+
+	/* Verify the file size is smaller than the data area */
+	else if (getu32(fs->endian, de->size) >
+	    ((fatfs->clustcnt * fatfs->csize) << fatfs->ssize_sh))
 	    return 0;
 
 	return is_83_name(de);
@@ -1032,7 +1143,7 @@ fatfs_isdentry(FATFS_INFO * fatfs, fatfs_dentry * de)
 /* Mark the sector used in the bitmap */
 static uint8_t
 inode_walk_file_act(FS_INFO * fs, DADDR_T addr, char *buf,
-    unsigned int size, int flags, void *ptr)
+    size_t size, int flags, void *ptr)
 {
     setbit((uint8_t *) ptr, addr);
     return WALK_CONT;
@@ -1056,13 +1167,26 @@ inode_walk_dent_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
     return WALK_CONT;
 }
 
+static uint8_t
+inode_walk_dent_orphan_act(FS_INFO * fs, FS_DENT * fs_dent, int flags,
+    void *ptr)
+{
+    if ((fs_dent->fsi) && (fs_dent->fsi->addr == 1031)) {
+	printf("Alloc Status: %d\n",
+	    fs_dent->fsi->flags & FS_FLAG_META_UNALLOC ? 0 : 1);
+    }
+    if ((fs_dent->fsi) && (fs_dent->fsi->flags & FS_FLAG_META_UNALLOC)) {
+	if (tsk_list_add(&fs->list_inum_named, fs_dent->fsi->addr))
+	    return WALK_STOP;
+    }
+    return WALK_CONT;
+}
+
 /*
  * walk the inodes
  *
  * Flags that are used: FS_FLAG_META_ALLOC, FS_FLAG_META_UNALLOC,
- * FS_FLAG_META_USED, FS_FLAG_META_UNUSED
- *
- * NOT: FS_FLAG_META_LINK, FS_FLAG_META_UNLINK (no notion of link)
+ * FS_FLAG_META_USED, FS_FLAG_META_UNUSED, FS_FLAG_META_ORPHAN
  *
  */
 uint8_t
@@ -1079,31 +1203,69 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
     uint8_t *sect_alloc;
     SSIZE_T cnt;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
 
     /*
      * Sanity checks.
      */
     if (start_inum < fs->first_inum || start_inum > fs->last_inum) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "%s: Start inode:  %" PRIuINUM "", myname, start_inum);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
-
     else if (end_inum < fs->first_inum || end_inum > fs->last_inum
 	|| end_inum < start_inum) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "%s: End inode: %" PRIuINUM "", myname, end_inum);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "fatfs_inode_walk: Inode Walking %" PRIuINUM " to %"
 	    PRIuINUM "\n", start_inum, end_inum);
+
+    /* If ORPHAN is wanted, then make sure that the flags are correct */
+    if (flags & FS_FLAG_META_ORPHAN) {
+	flags |= FS_FLAG_META_UNALLOC;
+	flags &= ~FS_FLAG_META_ALLOC;
+    }
+
+    else if (((flags & FS_FLAG_META_ALLOC) == 0) &&
+	((flags & FS_FLAG_META_UNALLOC) == 0)) {
+	flags |= (FS_FLAG_META_ALLOC | FS_FLAG_META_UNALLOC);
+    }
+
+    /* If neither of the USED or UNUSED flags are set, then set them 
+     * both
+     */
+    if (((flags & FS_FLAG_META_USED) == 0) &&
+	((flags & FS_FLAG_META_UNUSED) == 0)) {
+	flags |= (FS_FLAG_META_USED | FS_FLAG_META_UNUSED);
+    }
+
+
+    /* If we are looking for orphan files and have not yet filled
+     * in the list of unalloc inodes that are pointed to, then fill
+     * in the list 
+     */
+    if ((flags & FS_FLAG_META_ORPHAN) && (fs->list_inum_named == NULL)) {
+
+	if (fatfs_dent_walk(fs, fs->root_inum,
+		FS_FLAG_NAME_ALLOC | FS_FLAG_NAME_UNALLOC |
+		FS_FLAG_NAME_RECURSE, inode_walk_dent_orphan_act, NULL)) {
+	    strncat(tsk_errstr2,
+		" - fatfs_inode_walk: identifying inodes allocated by file names",
+		TSK_ERRSTR_L);
+	    return 1;
+	}
+
+    }
 
     if ((fs_inode = fs_inode_alloc(FATFS_NDADDR, FATFS_NIADDR)) == NULL)
 	return 1;
@@ -1113,7 +1275,8 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
      */
     if ((start_inum == fs->root_inum) &&
 	((FS_FLAG_META_ALLOC & flags) == FS_FLAG_META_ALLOC) &&
-	((FS_FLAG_META_USED & flags) == FS_FLAG_META_USED)) {
+	((FS_FLAG_META_USED & flags) == FS_FLAG_META_USED) &&
+	((FS_FLAG_META_ORPHAN & flags) == 0)) {
 	int retval;
 
 	int myflags = FS_FLAG_META_ALLOC | FS_FLAG_META_USED;
@@ -1124,7 +1287,6 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 	}
 
 	retval = action(fs, fs_inode, myflags, ptr);
-
 	if (retval == WALK_STOP) {
 	    fs_inode_free(fs_inode);
 	    return 0;
@@ -1148,16 +1310,33 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
      * dentries.  First, run dent_walk to find all sectors that are 
      * from allocated directories.  We'll be make sure to print those */
     if ((sect_alloc =
-	    (uint8_t *) mymalloc((fs->block_count + 7) / 8)) == NULL) {
+	    (uint8_t *) mymalloc((size_t) ((fs->block_count + 7) / 8))) ==
+	NULL) {
 	fs_inode_free(fs_inode);
 	return 1;
     }
 
-    memset((char *) sect_alloc, 0, sizeof(*sect_alloc));
+    memset((char *) sect_alloc, 0, (size_t) ((fs->block_count + 7) / 8));
 
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "fatfs_inode_walk: Walking directories to collect sector info\n");
+
+    /* We need to make a special run of the Root directory to get its sectors */
+    if (fatfs_make_root(fatfs, fs_inode)) {
+	fs_inode_free(fs_inode);
+	free(sect_alloc);
+	return 1;
+    }
+
+    if (fs->file_walk(fs, fs_inode, 0, 0,
+	    FS_FLAG_FILE_SLACK | FS_FLAG_FILE_AONLY |
+	    FS_FLAG_FILE_RECOVER, inode_walk_file_act,
+	    (void *) sect_alloc)) {
+	fs_inode_free(fs_inode);
+	free(sect_alloc);
+	return 1;
+    }
 
     if (fatfs_dent_walk(fs, fs->root_inum,
 	    FS_FLAG_NAME_ALLOC | FS_FLAG_NAME_RECURSE,
@@ -1165,8 +1344,10 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 	strncat(tsk_errstr2, " - fatfs_inode_walk: mapping directories",
 	    TSK_ERRSTR_L);
 	fs_inode_free(fs_inode);
+	free(sect_alloc);
 	return 1;
     }
+
 
 
     /* As FAT does not give numbers to the directory entries, we will make
@@ -1186,21 +1367,23 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
     lsect = FATFS_INODE_2_SECT(fatfs, end_inum);
 
     if (ssect > fs->last_block) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "fatfs_inode_walk: Starting inode in sector too big for image: %"
 	    PRIuDADDR, ssect);
-	tsk_errstr2[0] = '\0';
 	fs_inode_free(fs_inode);
+	free(sect_alloc);
 	return 1;
     }
     else if (lsect > fs->last_block) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "fatfs_inode_walk: Ending inode in sector too big for image: %"
 	    PRIuDADDR, lsect);
-	tsk_errstr2[0] = '\0';
 	fs_inode_free(fs_inode);
+	free(sect_alloc);
 	return 1;
     }
 
@@ -1211,7 +1394,8 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
      * We are going to process the image in clusters, so take care of the root
      * directory seperately.
      */
-    if (sect < fatfs->firstclustsect) {
+    if ((sect < fatfs->firstclustsect) &&
+	((flags & FS_FLAG_META_ORPHAN) == 0)) {
 
 	/* Read these as sectors - so we do them independently */
 	for (; sect <= lsect && sect < fatfs->firstclustsect; sect++) {
@@ -1220,12 +1404,13 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 	    cnt = fs_read_block(fs, fatfs->dinodes, fatfs->ssize, sect);
 	    if (cnt != fatfs->ssize) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		    "fatfs_inode_walk: sector: %" PRIuDADDR, sect);
 		fs_inode_free(fs_inode);
+		free(sect_alloc);
 		return 1;
 	    }
 
@@ -1233,7 +1418,7 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 	    inum = FATFS_SECT_2_INODE(fatfs, sect);
 
 	    if (verbose)
-		fprintf(stderr,
+		tsk_fprintf(stderr,
 		    "fatfs_inode_walk: Processing sector %" PRIuDADDR
 		    " (pre data area) starting at inode %" PRIuINUM
 		    "\n", sect, inum);
@@ -1252,6 +1437,7 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 		/* If we are done, then return  */
 		if (inum > end_inum) {
 		    fs_inode_free(fs_inode);
+		    free(sect_alloc);
 		    return 0;
 		}
 
@@ -1302,13 +1488,14 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 		    }
 		    else {
 			fs_inode_free(fs_inode);
+			free(sect_alloc);
 			return 1;
 		    }
 		}
 		fs_inode->flags = myflags;
 
 		if (verbose)
-		    fprintf(stderr,
+		    tsk_fprintf(stderr,
 			"fatfs_inode_walk: Directory Entry %" PRIuINUM
 			" (%u) at sector %" PRIuDADDR "\n", inum, didx,
 			sect);
@@ -1316,18 +1503,23 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 		retval = action(fs, fs_inode, myflags, ptr);
 		if (retval == WALK_STOP) {
 		    fs_inode_free(fs_inode);
+		    free(sect_alloc);
 		    return 0;
 		}
 		else if (retval == WALK_ERROR) {
 		    fs_inode_free(fs_inode);
+		    free(sect_alloc);
 		    return 1;
 		}
 	    }			/* dentries */
 	}
 
 	/* We are done */
-	if (sect >= lsect)
+	if (sect >= lsect) {
+	    fs_inode_free(fs_inode);
+	    free(sect_alloc);
 	    return 0;
+	}
     }
 
     /* get the base sector for the cluster in which the first inode exists */
@@ -1338,7 +1530,7 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
      * Read by cluster since they are bigger and more effecient
      */
     for (sect = base_read; sect <= lsect; sect += fatfs->csize) {
-	unsigned int read_size;
+	DADDR_T read_size;
 	int clustalloc;
 
 	/* if the cluster is not allocated, then do not go into it if we 
@@ -1348,6 +1540,7 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 	clustalloc = is_sectalloc(fatfs, sect);
 	if (clustalloc == -1) {
 	    fs_inode_free(fs_inode);
+	    free(sect_alloc);
 	    return 1;
 	}
 	else if ((clustalloc == 0)
@@ -1371,15 +1564,16 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 
 	/* read the full cluster */
 	cnt = fs_read_block
-	    (fs, fatfs->dinodes, fatfs->ssize * read_size, sect);
-	if (cnt != fatfs->ssize * read_size) {
+	    (fs, fatfs->dinodes, read_size << fatfs->ssize_sh, sect);
+	if (cnt != (read_size << fatfs->ssize_sh)) {
 	    if (cnt != -1) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_READ;
-		tsk_errstr[0] = '\0';
 	    }
 	    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		"fatfs_inode_walk: sector: %" PRIuDADDR, sect);
 	    fs_inode_free(fs_inode);
+	    free(sect_alloc);
 	    return 1;
 	}
 
@@ -1389,8 +1583,8 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 	     * then skip it */
 	    if ((isset(sect_alloc, sect) == 0) &&
 		(fatfs_isdentry(fatfs,
-			(fatfs_dentry *) & fatfs->dinodes->data[i *
-			    fatfs->ssize])
+			(fatfs_dentry *) & fatfs->dinodes->data[i <<
+			    fatfs->ssize_sh])
 		    == 0))
 		continue;
 
@@ -1402,12 +1596,13 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 	    inum = FATFS_SECT_2_INODE(fatfs, sect + i);
 
 	    if (verbose)
-		fprintf(stderr,
+		tsk_fprintf(stderr,
 		    "fatfs_inode_walk: Processing sector %" PRIuDADDR
 		    " starting at inode %" PRIuINUM "\n", sect + i, inum);
 
 	    dep =
-		(fatfs_dentry *) & fatfs->dinodes->data[i * fatfs->ssize];
+		(fatfs_dentry *) & fatfs->dinodes->data[i << fatfs->
+		ssize_sh];
 
 	    /* cycle through the directory entries */
 	    for (didx = 0; didx < fatfs->dentry_cnt_se;
@@ -1422,6 +1617,7 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 		/* If we are done, then return  */
 		if (inum > end_inum) {
 		    fs_inode_free(fs_inode);
+		    free(sect_alloc);
 		    return 0;
 		}
 
@@ -1464,6 +1660,14 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 		if ((flags & myflags) != myflags)
 		    continue;
 
+		/* If we want only orphans, then check if this
+		 * inode is in the seen list 
+		 */
+		if ((myflags & FS_FLAG_META_UNALLOC) &&
+		    (flags & FS_FLAG_META_ORPHAN) &&
+		    (tsk_list_find(fs->list_inum_named, inum))) {
+		    continue;
+		}
 
 		/* Do a final sanity check */
 		if (0 == fatfs_isdentry(fatfs, dep))
@@ -1476,13 +1680,14 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 		    }
 		    else {
 			fs_inode_free(fs_inode);
+			free(sect_alloc);
 			return 1;
 		    }
 		}
 		fs_inode->flags = myflags;
 
 		if (verbose)
-		    fprintf(stderr,
+		    tsk_fprintf(stderr,
 			"fatfs_inode_walk: Directory Entry %" PRIuINUM
 			" (%u) at sector %" PRIuDADDR "\n", inum, didx,
 			sect + i);
@@ -1490,16 +1695,19 @@ fatfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 		retval = action(fs, fs_inode, myflags, ptr);
 		if (retval == WALK_STOP) {
 		    fs_inode_free(fs_inode);
+		    free(sect_alloc);
 		    return 0;
 		}
 		else if (retval == WALK_ERROR) {
 		    fs_inode_free(fs_inode);
+		    free(sect_alloc);
 		    return 1;
 		}
 	    }
 	}			/* dentries */
     }				/* clusters */
 
+    free(sect_alloc);
     fs_inode_free(fs_inode);
     return 0;
 }				/* end of inode_walk */
@@ -1520,10 +1728,14 @@ fatfs_inode_lookup(FS_INFO * fs, INUM_T inum)
     DADDR_T sect;
     uint32_t off;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     /* 
      * Sanity check.
      */
     if (inum < fs->first_inum || inum > fs->last_inum) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_INODE_NUM;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "fatfs_inode_lookup: %" PRIuINUM " too large/small", inum);
@@ -1546,25 +1758,25 @@ fatfs_inode_lookup(FS_INFO * fs, INUM_T inum)
     off = FATFS_INODE_2_OFF(fatfs, inum);
 
     if (sect > fs->last_block) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_INODE_NUM;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "fatfs_inode_lookup: Inode %" PRIuINUM
 	    " in sector too big for image: %" PRIuDADDR, inum, sect);
-	tsk_errstr2[0] = '\0';
 	return NULL;
     }
 
 
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "fatfs_inode_lookup: reading sector %" PRIuDADDR
 	    " for inode %" PRIuINUM "\n", sect, inum);
 
     cnt = fs_read_block(fs, fatfs->dinodes, fatfs->ssize, sect);
     if (cnt != fatfs->ssize) {
 	if (cnt != -1) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_READ;
-	    tsk_errstr[0] = '\0';
 	}
 	snprintf(tsk_errstr2, TSK_ERRSTR_L,
 	    "fatfs_inode_lookup: block: %" PRIuDADDR, sect);
@@ -1575,14 +1787,16 @@ fatfs_inode_lookup(FS_INFO * fs, INUM_T inum)
     if (fatfs_isdentry(fatfs, fatfs->dep)) {
 	if (fatfs_dinode_copy(fatfs, fs_inode, fatfs->dep, sect, inum)) {
 	    /* If there was a unicode conversion error, 
-	     * then still return */
+	     * then still return the inode */
 	    if (tsk_errno != TSK_ERR_FS_UNICODE)
 		return NULL;
-
+	    else
+		tsk_error_reset();
 	}
 	return fs_inode;
     }
     else {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_INODE_NUM;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "fatfs_inode_lookup: %" PRIuINUM " is not an inode", inum);
@@ -1603,7 +1817,7 @@ fatfs_inode_lookup(FS_INFO * fs, INUM_T inum)
  * Flags: FS_FLAG_FILE_SLACK, FS_FLAG_FILE_AONLY
  * FS_FLAG_FILE_RECOVER
  *
- * no notion of SPARSE or META
+ * no notion of NOSPARSE or META
  *
  *
  * flags on action: FS_FLAG_DATA_CONT, FS_FLAG_DATA_META, 
@@ -1623,11 +1837,15 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
     DATA_BUF *data_buf;
     SSIZE_T cnt;
 
-    if ((data_buf = data_buf_alloc(fatfs->ssize * fatfs->csize)) == NULL)
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
+    if ((data_buf =
+	    data_buf_alloc(fatfs->csize << fatfs->ssize_sh)) == NULL)
 	return 1;
 
     if (flags & FS_FLAG_FILE_SLACK)
-	size = roundup(fs_inode->size, fatfs->csize * fatfs->ssize);
+	size = roundup(fs_inode->size, fatfs->csize << fatfs->ssize_sh);
     else
 	size = fs_inode->size;
 
@@ -1635,11 +1853,11 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 
     if ((clust > (fatfs->lastclust)) &&
 	(FATFS_ISEOF(clust, fatfs->mask) == 0)) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_INODE_INT;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "fatfs_file_walk: Starting cluster address too large: %"
 	    PRIuDADDR, clust);
-	tsk_errstr2[0] = '\0';
 	data_buf_free(data_buf);
 	return 1;
     }
@@ -1649,7 +1867,8 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 	DADDR_T snum = fatfs->firstclustsect - fatfs->firstdatasect;
 
 	if (verbose)
-	    fprintf(stderr, "fatfs_file_walk: Walking Root Directory\n");
+	    tsk_fprintf(stderr,
+		"fatfs_file_walk: Walking Root Directory\n");
 
 	for (i = 0; i < snum; i++) {
 	    int retval;
@@ -1660,8 +1879,8 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 		    fatfs->rootsect + i);
 		if (cnt != fatfs->ssize) {
 		    if (cnt != -1) {
+			tsk_error_reset();
 			tsk_errno = TSK_ERR_FS_READ;
-			tsk_errstr[0] = '\0';
 		    }
 		    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 			"fatfs_file_walk: Root directory block: %"
@@ -1699,7 +1918,7 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 
 
 	if (verbose)
-	    fprintf(stderr,
+	    tsk_fprintf(stderr,
 		"fatfs_file_walk: Walking deleted file %" PRIuINUM
 		" in recovery mode\n", fs_inode->addr);
 
@@ -1714,11 +1933,11 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 	sbase = FATFS_CLUST_2_SECT(fatfs, startclust);
 
 	if (sbase > fs->last_block) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_RECOVER;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"fatfs_file_walk: Starting cluster address too large (recovery): %"
 		PRIuDADDR, sbase);
-	    tsk_errstr2[0] = '\0';
 	    data_buf_free(data_buf);
 	    return 1;
 	}
@@ -1727,17 +1946,18 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 	 * recover it */
 	retval = is_clustalloc(fatfs, startclust);
 	if (retval == -1) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_RECOVER;
 	    data_buf_free(data_buf);
 	    return 1;
 	}
 	else if (retval == 1) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_RECOVER;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"Starting cluster of deleted file is allocated");
-	    tsk_errstr2[0] = '\0';
 	    if (verbose) {
-		fprintf(stderr,
+		tsk_fprintf(stderr,
 		    "Starting cluster of deleted file is allocated - aborting\n");
 	    }
 	    data_buf_free(data_buf);
@@ -1760,12 +1980,13 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 	     * that means we could not find enough unallocated clusters
 	     * for the file size */
 	    if (sbase > fs->last_block) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_RECOVER;
 		snprintf(tsk_errstr, TSK_ERRSTR_L,
 		    "Could not find enough unallocated sectors to recover with");
-		tsk_errstr2[0] = '\0';
+
 		if (verbose)
-		    fprintf(stderr,
+		    tsk_fprintf(stderr,
 			"Could not find enough unallocated sectors to recover with - aborting\n");
 
 		data_buf_free(data_buf);
@@ -1775,6 +1996,7 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 	    /* Skip allocated clusters */
 	    retval = is_clustalloc(fatfs, clust);
 	    if (retval == -1) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_RECOVER;
 		data_buf_free(data_buf);
 		return 1;
@@ -1785,7 +2007,7 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 	    }
 
 	    /* We can use this sector */
-	    size -= (fatfs->csize * fatfs->ssize);
+	    size -= (fatfs->csize << fatfs->ssize_sh);
 	    clust++;
 	}
 
@@ -1798,10 +2020,10 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 	    sbase = FATFS_CLUST_2_SECT(fatfs, clust);
 	    /* Are we past the end of the FS? */
 	    if (sbase > fs->last_block) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_RECOVER;
 		snprintf(tsk_errstr, TSK_ERRSTR_L,
 		    "Recover went past end of FS - should have been caught");
-		tsk_errstr2[0] = '\0';
 		data_buf_free(data_buf);
 		return 1;
 	    }
@@ -1809,6 +2031,7 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 	    /* Skip allocated clusters */
 	    retval = is_clustalloc(fatfs, clust);
 	    if (retval == -1) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_RECOVER;
 		data_buf_free(data_buf);
 		return 1;
@@ -1821,11 +2044,11 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 	    /* Read the cluster */
 	    if ((flags & FS_FLAG_FILE_AONLY) == 0) {
 		cnt = fs_read_block
-		    (fs, data_buf, fatfs->ssize * fatfs->csize, sbase);
-		if (cnt != (fatfs->ssize * fatfs->csize)) {
+		    (fs, data_buf, fatfs->csize << fatfs->ssize_sh, sbase);
+		if (cnt != (fatfs->csize << fatfs->ssize_sh)) {
 		    if (cnt != -1) {
+			tsk_error_reset();
 			tsk_errno = TSK_ERR_FS_READ;
-			tsk_errstr[0] = '\0';
 		    }
 		    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 			"fatfs_file_walk: block during recovery: %"
@@ -1843,17 +2066,19 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 		if (flags & FS_FLAG_FILE_SLACK)
 		    len = fatfs->ssize;
 		else
-		    len = (size < fatfs->ssize) ? size : fatfs->ssize;
+		    len =
+			(size < fatfs->ssize) ? (int) size : fatfs->ssize;
 
 		if (verbose)
-		    fprintf(stderr,
+		    tsk_fprintf(stderr,
 			"fatfs_file_walk: Processing %" PRIu32
 			" bytes of sector %" PRIuDADDR " for recovery\n",
 			len, (sbase + i));
 
 		retval =
 		    action(fs, sbase + i,
-		    &data_buf->data[i * fatfs->ssize], len, myflags, ptr);
+		    &data_buf->data[i << fatfs->ssize_sh], len, myflags,
+		    ptr);
 		if (retval == WALK_STOP) {
 		    data_buf_free(data_buf);
 		    return 0;
@@ -1870,9 +2095,10 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 
     /* Normal cluster chain walking */
     else {
+	TSK_LIST *list_seen = NULL;
 
 	if (verbose)
-	    fprintf(stderr,
+	    tsk_fprintf(stderr,
 		"fatfs_file_walk: Walking file %" PRIuINUM
 		" in normal mode\n", fs_inode->addr);
 
@@ -1887,6 +2113,7 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 
 	    if (sbase > fs->last_block) {
 		data_buf_free(data_buf);
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_INODE_INT;
 		snprintf(tsk_errstr, TSK_ERRSTR_L,
 		    "fatfs_file_walk: Invalid sector address in FAT (too large): %"
@@ -1910,11 +2137,11 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 	    /* Read the cluster */
 	    if ((flags & FS_FLAG_FILE_AONLY) == 0) {
 		cnt = fs_read_block
-		    (fs, data_buf, fatfs->ssize * fatfs->csize, sbase);
-		if (cnt != (fatfs->ssize * fatfs->csize)) {
+		    (fs, data_buf, fatfs->csize << fatfs->ssize_sh, sbase);
+		if (cnt != (fatfs->csize << fatfs->ssize_sh)) {
 		    if (cnt != -1) {
+			tsk_error_reset();
 			tsk_errno = TSK_ERR_FS_READ;
-			tsk_errstr[0] = '\0';
 		    }
 		    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 			"fatfs_file_walk: sector: %" PRIuDADDR, sbase);
@@ -1930,23 +2157,29 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 		if (flags & FS_FLAG_FILE_SLACK)
 		    len = fatfs->ssize;
 		else
-		    len = (size < fatfs->ssize) ? size : fatfs->ssize;
+		    len =
+			(size < fatfs->ssize) ? (int) size : fatfs->ssize;
 
 		if (verbose)
-		    fprintf(stderr,
+		    tsk_fprintf(stderr,
 			"fatfs_file_walk: Processing %" PRIu32
 			" bytes of sector %" PRIuDADDR "\n", len,
 			(sbase + i));
 
 		retval =
 		    action(fs, sbase + i,
-		    &data_buf->data[i * fatfs->ssize], len, myflags, ptr);
+		    &data_buf->data[i << fatfs->ssize_sh], len, myflags,
+		    ptr);
 		if (retval == WALK_STOP) {
 		    data_buf_free(data_buf);
+		    tsk_list_free(list_seen);
+		    list_seen = NULL;
 		    return 0;
 		}
 		else if (retval == WALK_ERROR) {
 		    data_buf_free(data_buf);
+		    tsk_list_free(list_seen);
+		    list_seen = NULL;
 		    return 1;
 		}
 		size -= len;
@@ -1957,11 +2190,29 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 		    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 			"file walk: Inode: %" PRIuINUM "  cluster: %"
 			PRIuDADDR, fs_inode->addr, clust);
+		    tsk_list_free(list_seen);
+		    list_seen = NULL;
 		    return 1;
 		}
 		clust = nxt;
+
+		/* Make sure we do not get into an infinite loop */
+		if (tsk_list_find(list_seen, clust)) {
+		    if (verbose)
+			tsk_fprintf(stderr,
+			    "Loop found while walking file\n");
+		    break;
+		}
+
+		if (tsk_list_add(&list_seen, clust)) {
+		    tsk_list_free(list_seen);
+		    list_seen = NULL;
+		    return 1;
+		}
 	    }
 	}
+	tsk_list_free(list_seen);
+	list_seen = NULL;
     }
 
     data_buf_free(data_buf);
@@ -1973,11 +2224,10 @@ fatfs_file_walk(FS_INFO * fs, FS_INODE * fs_inode, uint32_t type,
 static uint8_t
 fatfs_fscheck(FS_INFO * fs, FILE * hFile)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L,
 	"fscheck not implemented for FAT yet");
-    tsk_errstr2[0] = '\0';
-
     return 1;
 
     /* Check that allocated dentries point to start of allcated cluster chain */
@@ -2017,6 +2267,9 @@ fatfs_fsstat(FS_INFO * fs, FILE * hFile)
     fatfs_dentry *de;
     SSIZE_T cnt;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     if ((data_buf = data_buf_alloc(fatfs->ssize)) == NULL) {
 	return 1;
     }
@@ -2027,8 +2280,8 @@ fatfs_fsstat(FS_INFO * fs, FILE * hFile)
     cnt = fs_read_block(fs, data_buf, fatfs->ssize, fatfs->rootsect);
     if (cnt != fatfs->ssize) {
 	if (cnt != -1) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_READ;
-	    tsk_errstr[0] = '\0';
 	}
 	snprintf(tsk_errstr2, TSK_ERRSTR_L,
 	    "fatfs_fsstat: root directory: %" PRIuDADDR, fatfs->rootsect);
@@ -2051,29 +2304,29 @@ fatfs_fsstat(FS_INFO * fs, FILE * hFile)
 
     /* Print the general file system information */
 
-    fprintf(hFile, "FILE SYSTEM INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
+    tsk_fprintf(hFile, "FILE SYSTEM INFORMATION\n");
+    tsk_fprintf(hFile, "--------------------------------------------\n");
 
-    fprintf(hFile, "File System Type: FAT");
+    tsk_fprintf(hFile, "File System Type: FAT");
     if (fs->ftype == FAT12)
-	fprintf(hFile, "12\n");
+	tsk_fprintf(hFile, "12\n");
     else if (fs->ftype == FAT16)
-	fprintf(hFile, "16\n");
+	tsk_fprintf(hFile, "16\n");
     else if (fs->ftype == FAT32)
-	fprintf(hFile, "32\n");
+	tsk_fprintf(hFile, "32\n");
     else
-	fprintf(hFile, "\n");
+	tsk_fprintf(hFile, "\n");
 
-    fprintf(hFile, "\nOEM Name: %c%c%c%c%c%c%c%c\n", sb->oemname[0],
+    tsk_fprintf(hFile, "\nOEM Name: %c%c%c%c%c%c%c%c\n", sb->oemname[0],
 	sb->oemname[1], sb->oemname[2], sb->oemname[3], sb->oemname[4],
 	sb->oemname[5], sb->oemname[6], sb->oemname[7]);
 
 
     if (fatfs->fs_info.ftype != FAT32) {
-	fprintf(hFile, "Volume ID: 0x%" PRIx32 "\n",
-	    getu32(fs, sb->a.f16.vol_id));
+	tsk_fprintf(hFile, "Volume ID: 0x%" PRIx32 "\n",
+	    getu32(fs->endian, sb->a.f16.vol_id));
 
-	fprintf(hFile,
+	tsk_fprintf(hFile,
 	    "Volume Label (Boot Sector): %c%c%c%c%c%c%c%c%c%c%c\n",
 	    sb->a.f16.vol_lab[0], sb->a.f16.vol_lab[1],
 	    sb->a.f16.vol_lab[2], sb->a.f16.vol_lab[3],
@@ -2083,17 +2336,17 @@ fatfs_fsstat(FS_INFO * fs, FILE * hFile)
 	    sb->a.f16.vol_lab[10]);
 
 	if ((de) && (de->name)) {
-	    fprintf(hFile,
+	    tsk_fprintf(hFile,
 		"Volume Label (Root Directory): %c%c%c%c%c%c%c%c%c%c%c\n",
 		de->name[0], de->name[1], de->name[2], de->name[3],
 		de->name[4], de->name[5], de->name[6], de->name[7],
 		de->name[8], de->name[9], de->name[10]);
 	}
 	else {
-	    fprintf(hFile, "Volume Label (Root Directory):\n");
+	    tsk_fprintf(hFile, "Volume Label (Root Directory):\n");
 	}
 
-	fprintf(hFile, "File System Type Label: %c%c%c%c%c%c%c%c\n",
+	tsk_fprintf(hFile, "File System Type Label: %c%c%c%c%c%c%c%c\n",
 	    sb->a.f16.fs_type[0], sb->a.f16.fs_type[1],
 	    sb->a.f16.fs_type[2], sb->a.f16.fs_type[3],
 	    sb->a.f16.fs_type[4], sb->a.f16.fs_type[5],
@@ -2110,10 +2363,10 @@ fatfs_fsstat(FS_INFO * fs, FILE * hFile)
 	    return 1;
 	}
 
-	fprintf(hFile, "Volume ID: 0x%" PRIx32 "\n",
-	    getu32(fs, sb->a.f32.vol_id));
+	tsk_fprintf(hFile, "Volume ID: 0x%" PRIx32 "\n",
+	    getu32(fs->endian, sb->a.f32.vol_id));
 
-	fprintf(hFile,
+	tsk_fprintf(hFile,
 	    "Volume Label (Boot Sector): %c%c%c%c%c%c%c%c%c%c%c\n",
 	    sb->a.f32.vol_lab[0], sb->a.f32.vol_lab[1],
 	    sb->a.f32.vol_lab[2], sb->a.f32.vol_lab[3],
@@ -2123,17 +2376,17 @@ fatfs_fsstat(FS_INFO * fs, FILE * hFile)
 	    sb->a.f32.vol_lab[10]);
 
 	if ((de) && (de->name)) {
-	    fprintf(hFile,
+	    tsk_fprintf(hFile,
 		"Volume Label (Root Directory): %c%c%c%c%c%c%c%c%c%c%c\n",
 		de->name[0], de->name[1], de->name[2], de->name[3],
 		de->name[4], de->name[5], de->name[6], de->name[7],
 		de->name[8], de->name[9], de->name[10]);
 	}
 	else {
-	    fprintf(hFile, "Volume Label (Root Directory):\n");
+	    tsk_fprintf(hFile, "Volume Label (Root Directory):\n");
 	}
 
-	fprintf(hFile, "File System Type Label: %c%c%c%c%c%c%c%c\n",
+	tsk_fprintf(hFile, "File System Type Label: %c%c%c%c%c%c%c%c\n",
 	    sb->a.f32.fs_type[0], sb->a.f32.fs_type[1],
 	    sb->a.f32.fs_type[2], sb->a.f32.fs_type[3],
 	    sb->a.f32.fs_type[4], sb->a.f32.fs_type[5],
@@ -2141,18 +2394,19 @@ fatfs_fsstat(FS_INFO * fs, FILE * hFile)
 
 
 	/* Process the FS info */
-	if (getu16(fs, sb->a.f32.fsinfo)) {
+	if (getu16(fs->endian, sb->a.f32.fsinfo)) {
 	    cnt = fs_read_block(fs, fat_fsinfo_buf, sizeof(fatfs_fsinfo),
-		(DADDR_T) getu16(fs, sb->a.f32.fsinfo));
+		(DADDR_T) getu16(fs->endian, sb->a.f32.fsinfo));
 
 	    if (cnt != sizeof(fatfs_fsinfo)) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		    "fatfs_fsstat: FAT32 FSINFO block: %"
-		    PRIuDADDR, (DADDR_T) getu16(fs, sb->a.f32.fsinfo));
+		    PRIuDADDR, (DADDR_T) getu16(fs->endian,
+			sb->a.f32.fsinfo));
 		data_buf_free(data_buf);
 		data_buf_free(fat_fsinfo_buf);
 		return 1;
@@ -2160,11 +2414,14 @@ fatfs_fsstat(FS_INFO * fs, FILE * hFile)
 
 
 	    fat_info = (fatfs_fsinfo *) fat_fsinfo_buf->data;
-	    fprintf(hFile, "Next Free Sector (FS Info): %" PRIuDADDR "\n",
-		FATFS_CLUST_2_SECT(fatfs, getu32(fs, fat_info->nextfree)));
+	    tsk_fprintf(hFile,
+		"Next Free Sector (FS Info): %" PRIuDADDR "\n",
+		FATFS_CLUST_2_SECT(fatfs, getu32(fs->endian,
+			fat_info->nextfree)));
 
-	    fprintf(hFile, "Free Sector Count (FS Info): %" PRIu32 "\n",
-		(getu32(fs, fat_info->freecnt) * fatfs->csize));
+	    tsk_fprintf(hFile,
+		"Free Sector Count (FS Info): %" PRIu32 "\n",
+		(getu32(fs->endian, fat_info->freecnt) * fatfs->csize));
 
 	    data_buf_free(fat_fsinfo_buf);
 	}
@@ -2172,59 +2429,60 @@ fatfs_fsstat(FS_INFO * fs, FILE * hFile)
 
     data_buf_free(data_buf);
 
-    fprintf(hFile, "\nSectors before file system: %" PRIu32 "\n",
-	getu32(fs, sb->prevsect));
+    tsk_fprintf(hFile, "\nSectors before file system: %" PRIu32 "\n",
+	getu32(fs->endian, sb->prevsect));
 
-    fprintf(hFile, "\nFile System Layout (in sectors)\n");
+    tsk_fprintf(hFile, "\nFile System Layout (in sectors)\n");
 
-    fprintf(hFile, "Total Range: %" PRIuDADDR " - %" PRIuDADDR "\n",
+    tsk_fprintf(hFile, "Total Range: %" PRIuDADDR " - %" PRIuDADDR "\n",
 	fs->first_block, fs->last_block);
 
-    fprintf(hFile, "* Reserved: 0 - %" PRIuDADDR "\n",
+    tsk_fprintf(hFile, "* Reserved: 0 - %" PRIuDADDR "\n",
 	fatfs->firstfatsect - 1);
 
-    fprintf(hFile, "** Boot Sector: 0\n");
+    tsk_fprintf(hFile, "** Boot Sector: 0\n");
 
     if (fatfs->fs_info.ftype == FAT32) {
-	fprintf(hFile, "** FS Info Sector: %" PRIu16 "\n",
-	    getu16(fs, sb->a.f32.fsinfo));
+	tsk_fprintf(hFile, "** FS Info Sector: %" PRIu16 "\n",
+	    getu16(fs->endian, sb->a.f32.fsinfo));
 
-	fprintf(hFile, "** Backup Boot Sector: %" PRIu32 "\n",
-	    getu32(fs, sb->a.f32.bs_backup));
+	tsk_fprintf(hFile, "** Backup Boot Sector: %" PRIu32 "\n",
+	    getu32(fs->endian, sb->a.f32.bs_backup));
     }
 
     for (i = 0; i < fatfs->numfat; i++) {
 	DADDR_T base = fatfs->firstfatsect + i * (fatfs->sectperfat);
 
-	fprintf(hFile, "* FAT %d: %" PRIuDADDR " - %" PRIuDADDR "\n", i,
-	    base, (base + fatfs->sectperfat - 1));
+	tsk_fprintf(hFile, "* FAT %d: %" PRIuDADDR " - %" PRIuDADDR "\n",
+	    i, base, (base + fatfs->sectperfat - 1));
     }
 
-    fprintf(hFile, "* Data Area: %" PRIuDADDR " - %" PRIuDADDR "\n",
+    tsk_fprintf(hFile, "* Data Area: %" PRIuDADDR " - %" PRIuDADDR "\n",
 	fatfs->firstdatasect, fs->last_block);
 
     if (fatfs->fs_info.ftype != FAT32) {
-	uint32_t x = fatfs->csize * (fatfs->lastclust - 1);
+	DADDR_T x = fatfs->csize * (fatfs->lastclust - 1);
 
-	fprintf(hFile,
+	tsk_fprintf(hFile,
 	    "** Root Directory: %" PRIuDADDR " - %" PRIuDADDR "\n",
 	    fatfs->firstdatasect, fatfs->firstclustsect - 1);
 
-	fprintf(hFile,
+	tsk_fprintf(hFile,
 	    "** Cluster Area: %" PRIuDADDR " - %" PRIuDADDR "\n",
 	    fatfs->firstclustsect, (fatfs->firstclustsect + x - 1));
 
 	if ((fatfs->firstclustsect + x - 1) != fs->last_block) {
-	    fprintf(hFile,
+	    tsk_fprintf(hFile,
 		"** Non-clustered: %" PRIuDADDR " - %" PRIuDADDR "\n",
 		(fatfs->firstclustsect + x), fs->last_block);
 	}
     }
     else {
-	uint32_t x = fatfs->csize * (fatfs->lastclust - 1);
-	uint32_t clust, clust_p;
+	TSK_LIST *list_seen = NULL;
+	DADDR_T x = fatfs->csize * (fatfs->lastclust - 1);
+	DADDR_T clust, clust_p;
 
-	fprintf(hFile,
+	tsk_fprintf(hFile,
 	    "** Cluster Area: %" PRIuDADDR " - %" PRIuDADDR "\n",
 	    fatfs->firstclustsect, (fatfs->firstclustsect + x - 1));
 
@@ -2234,39 +2492,54 @@ fatfs_fsstat(FS_INFO * fs, FILE * hFile)
 	while ((clust) && (0 == FATFS_ISEOF(clust, FATFS_32_MASK))) {
 	    DADDR_T nxt;
 	    clust_p = clust;
+
+	    /* Make sure we do not get into an infinite loop */
+	    if (tsk_list_find(list_seen, clust)) {
+		if (verbose)
+		    tsk_fprintf(stderr,
+			"Loop found while determining root directory size\n");
+		break;
+	    }
+	    if (tsk_list_add(&list_seen, clust)) {
+		tsk_list_free(list_seen);
+		list_seen = NULL;
+		return 1;
+	    }
+
 	    if (getFAT(fatfs, clust, &nxt))
 		break;
 	    clust = nxt;
 	}
+	tsk_list_free(list_seen);
+	list_seen = NULL;
 
-	fprintf(hFile,
+	tsk_fprintf(hFile,
 	    "*** Root Directory: %" PRIuDADDR " - %" PRIuDADDR "\n",
 	    fatfs->rootsect, (FATFS_CLUST_2_SECT(fatfs, clust_p + 1) - 1));
 
-
 	if ((fatfs->firstclustsect + x - 1) != fs->last_block) {
-	    fprintf(hFile,
+	    tsk_fprintf(hFile,
 		"** Non-clustered: %" PRIuDADDR " - %" PRIuDADDR "\n",
 		(fatfs->firstclustsect + x), fs->last_block);
 	}
     }
 
 
-    fprintf(hFile, "\nMETADATA INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
+    tsk_fprintf(hFile, "\nMETADATA INFORMATION\n");
+    tsk_fprintf(hFile, "--------------------------------------------\n");
 
-    fprintf(hFile, "Range: %" PRIuINUM " - %" PRIuINUM "\n",
+    tsk_fprintf(hFile, "Range: %" PRIuINUM " - %" PRIuINUM "\n",
 	fs->first_inum, fs->last_inum);
-    fprintf(hFile, "Root Directory: %" PRIuINUM "\n", fs->root_inum);
+    tsk_fprintf(hFile, "Root Directory: %" PRIuINUM "\n", fs->root_inum);
 
 
-    fprintf(hFile, "\nCONTENT INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
-    fprintf(hFile, "Sector Size: %" PRIu16 "\n", fatfs->ssize);
-    fprintf(hFile, "Cluster Size: %" PRIu32 "\n",
-	(uint32_t) fatfs->csize * fatfs->ssize);
+    tsk_fprintf(hFile, "\nCONTENT INFORMATION\n");
+    tsk_fprintf(hFile, "--------------------------------------------\n");
+    tsk_fprintf(hFile, "Sector Size: %" PRIu16 "\n", fatfs->ssize);
+    tsk_fprintf(hFile, "Cluster Size: %" PRIu32 "\n",
+	(uint32_t) fatfs->csize << fatfs->ssize_sh);
 
-    fprintf(hFile, "Total Cluster Range: 2 - %" PRIuDADDR "\n",
+    tsk_fprintf(hFile, "Total Cluster Range: 2 - %" PRIuDADDR "\n",
 	fatfs->lastclust);
 
 
@@ -2287,23 +2560,23 @@ fatfs_fsstat(FS_INFO * fs, FILE * hFile)
 	}
 
 	if (cnt == 0)
-	    fprintf(hFile, "Bad Sectors: ");
+	    tsk_fprintf(hFile, "Bad Sectors: ");
 
 	sect = FATFS_CLUST_2_SECT(fatfs, i);
 	for (a = 0; a < fatfs->csize; a++) {
-	    fprintf(hFile, "%" PRIuDADDR " ", sect + a);
+	    tsk_fprintf(hFile, "%" PRIuDADDR " ", sect + a);
 	    if ((++cnt % 8) == 0)
-		fprintf(hFile, "\n");
+		tsk_fprintf(hFile, "\n");
 	}
     }
     if ((cnt > 0) && ((cnt % 8) != 0))
-	fprintf(hFile, "\n");
+	tsk_fprintf(hFile, "\n");
 
 
 
     /* Display the FAT Table */
-    fprintf(hFile, "\nFAT CONTENTS (in sectors)\n");
-    fprintf(hFile, "--------------------------------------------\n");
+    tsk_fprintf(hFile, "\nFAT CONTENTS (in sectors)\n");
+    tsk_fprintf(hFile, "--------------------------------------------\n");
 
     /* 'sstart' marks the first sector of the current run to print */
     sstart = fatfs->firstclustsect;
@@ -2332,15 +2605,15 @@ fatfs_fsstat(FS_INFO * fs, FILE * hFile)
 	 */
 	else if ((next & fatfs->mask)) {
 	    if (FATFS_ISEOF(next, fatfs->mask))
-		fprintf(hFile,
+		tsk_fprintf(hFile,
 		    "%" PRIuDADDR "-%" PRIuDADDR " (%" PRIuDADDR
 		    ") -> EOF\n", sstart, send, send - sstart + 1);
 	    else if (FATFS_ISBAD(next, fatfs->mask))
-		fprintf(hFile,
+		tsk_fprintf(hFile,
 		    "%" PRIuDADDR "-%" PRIuDADDR " (%" PRIuDADDR
 		    ") -> BAD\n", sstart, send, send - sstart + 1);
 	    else
-		fprintf(hFile,
+		tsk_fprintf(hFile,
 		    "%" PRIuDADDR "-%" PRIuDADDR " (%" PRIuDADDR
 		    ") -> %" PRIuDADDR "\n", sstart, send,
 		    send - sstart + 1, snext);
@@ -2368,14 +2641,14 @@ typedef struct {
 
 static uint8_t
 print_addr_act(FS_INFO * fs, DADDR_T addr, char *buf,
-    unsigned int size, int flags, void *ptr)
+    size_t size, int flags, void *ptr)
 {
     FATFS_PRINT_ADDR *print = (FATFS_PRINT_ADDR *) ptr;
 
-    fprintf(print->hFile, "%" PRIuDADDR " ", addr);
+    tsk_fprintf(print->hFile, "%" PRIuDADDR " ", addr);
 
     if (++(print->idx) == 8) {
-	fprintf(print->hFile, "\n");
+	tsk_fprintf(print->hFile, "\n");
 	print->idx = 0;
     }
     print->istat_seen = 1;
@@ -2386,7 +2659,7 @@ print_addr_act(FS_INFO * fs, DADDR_T addr, char *buf,
 
 /* Return 1 on error  and 0 on success */
 static uint8_t
-fatfs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
+fatfs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, DADDR_T numblock,
     int32_t sec_skew)
 {
     FS_INODE *fs_inode;
@@ -2394,79 +2667,82 @@ fatfs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
     FATFS_INFO *fatfs = (FATFS_INFO *) fs;
     FATFS_PRINT_ADDR print;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     if ((fs_inode = fatfs_inode_lookup(fs, inum)) == NULL) {
 	return 1;
     }
-    fprintf(hFile, "Directory Entry: %" PRIuINUM "\n", inum);
+    tsk_fprintf(hFile, "Directory Entry: %" PRIuINUM "\n", inum);
 
-    fprintf(hFile, "%sAllocated\n",
+    tsk_fprintf(hFile, "%sAllocated\n",
 	(fs_inode->flags & FS_FLAG_META_UNALLOC) ? "Not " : "");
 
-    fprintf(hFile, "File Attributes: ");
+    tsk_fprintf(hFile, "File Attributes: ");
 
     /* This should only be null if we have the root directory */
     if (fatfs->dep == NULL) {
 	if (inum == fs->root_inum)
-	    fprintf(hFile, "Directory\n");
+	    tsk_fprintf(hFile, "Directory\n");
 	else
-	    fprintf(hFile, "File\n");
+	    tsk_fprintf(hFile, "File\n");
     }
     else if ((fatfs->dep->attrib & FATFS_ATTR_LFN) == FATFS_ATTR_LFN) {
-	fprintf(hFile, "Long File Name\n");
+	tsk_fprintf(hFile, "Long File Name\n");
     }
     else {
 	if (fatfs->dep->attrib & FATFS_ATTR_DIRECTORY)
-	    fprintf(hFile, "Directory");
+	    tsk_fprintf(hFile, "Directory");
 	else if (fatfs->dep->attrib & FATFS_ATTR_VOLUME)
-	    fprintf(hFile, "Volume Label");
+	    tsk_fprintf(hFile, "Volume Label");
 	else
-	    fprintf(hFile, "File");
+	    tsk_fprintf(hFile, "File");
 
 	if (fatfs->dep->attrib & FATFS_ATTR_READONLY)
-	    fprintf(hFile, ", Read Only");
+	    tsk_fprintf(hFile, ", Read Only");
 	if (fatfs->dep->attrib & FATFS_ATTR_HIDDEN)
-	    fprintf(hFile, ", Hidden");
+	    tsk_fprintf(hFile, ", Hidden");
 	if (fatfs->dep->attrib & FATFS_ATTR_SYSTEM)
-	    fprintf(hFile, ", System");
+	    tsk_fprintf(hFile, ", System");
 	if (fatfs->dep->attrib & FATFS_ATTR_ARCHIVE)
-	    fprintf(hFile, ", Archive");
+	    tsk_fprintf(hFile, ", Archive");
 
-	fprintf(hFile, "\n");
+	tsk_fprintf(hFile, "\n");
     }
 
-    fprintf(hFile, "Size: %" PRIuOFF "\n", fs_inode->size);
+    tsk_fprintf(hFile, "Size: %" PRIuOFF "\n", fs_inode->size);
     /* This value is fake in FAT, so there is no point in printing it here */
-    //fprintf(hFile, "Num of links: %lu\n", (ULONG) fs_inode->nlink);
+    //tsk_fprintf(hFile, "Num of links: %lu\n", (ULONG) fs_inode->nlink);
 
     if (fs_inode->name) {
 	fs_name = fs_inode->name;
-	fprintf(hFile, "Name: %s\n", fs_name->name);
+	tsk_fprintf(hFile, "Name: %s\n", fs_name->name);
     }
 
     if (sec_skew != 0) {
-	fprintf(hFile, "\nAdjusted Directory Entry Times:\n");
+	tsk_fprintf(hFile, "\nAdjusted Directory Entry Times:\n");
 	fs_inode->mtime -= sec_skew;
 	fs_inode->atime -= sec_skew;
 	fs_inode->ctime -= sec_skew;
 
-	fprintf(hFile, "Written:\t%s", ctime(&fs_inode->mtime));
-	fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
-	fprintf(hFile, "Created:\t%s", ctime(&fs_inode->ctime));
+	tsk_fprintf(hFile, "Written:\t%s", ctime(&fs_inode->mtime));
+	tsk_fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
+	tsk_fprintf(hFile, "Created:\t%s", ctime(&fs_inode->ctime));
 
 	fs_inode->mtime += sec_skew;
 	fs_inode->atime += sec_skew;
 	fs_inode->ctime += sec_skew;
 
-	fprintf(hFile, "\nOriginal Directory Entry Times:\n");
+	tsk_fprintf(hFile, "\nOriginal Directory Entry Times:\n");
     }
     else
-	fprintf(hFile, "\nDirectory Entry Times:\n");
+	tsk_fprintf(hFile, "\nDirectory Entry Times:\n");
 
-    fprintf(hFile, "Written:\t%s", ctime(&fs_inode->mtime));
-    fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
-    fprintf(hFile, "Created:\t%s", ctime(&fs_inode->ctime));
+    tsk_fprintf(hFile, "Written:\t%s", ctime(&fs_inode->mtime));
+    tsk_fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
+    tsk_fprintf(hFile, "Created:\t%s", ctime(&fs_inode->ctime));
 
-    fprintf(hFile, "\nSectors:\n");
+    tsk_fprintf(hFile, "\nSectors:\n");
 
     /* A bad hack to force a specified number of blocks */
     if (numblock > 0)
@@ -2479,17 +2755,17 @@ fatfs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
     if (fs->file_walk(fs, fs_inode, 0, 0,
 	    (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_SLACK |
 		FS_FLAG_FILE_NOID), print_addr_act, (void *) &print)) {
-	fprintf(hFile, "\nError reading file\n");
+	tsk_fprintf(hFile, "\nError reading file\n");
 	tsk_error_print(hFile);
 	tsk_error_reset();
     }
     else if (print.idx != 0) {
-	fprintf(hFile, "\n");
+	tsk_fprintf(hFile, "\n");
     }
 
     /* Display the recovery information if we can */
     if (fs_inode->flags & FS_FLAG_META_UNALLOC) {
-	fprintf(hFile, "\nRecovery:\n");
+	tsk_fprintf(hFile, "\nRecovery:\n");
 
 
 	print.istat_seen = 0;
@@ -2499,14 +2775,15 @@ fatfs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 		    FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOID),
 		print_addr_act, (void *) &print)) {
 	    if (tsk_errno != TSK_ERR_FS_RECOVER)
-		fprintf(hFile, "\nError reading file\n");
+		tsk_fprintf(hFile, "\nError reading file\n");
+	    tsk_error_reset();
 	}
 
 	if (print.istat_seen == 0) {
-	    fprintf(hFile, "File recovery not possible\n");
+	    tsk_fprintf(hFile, "File recovery not possible\n");
 	}
 	else if (print.idx != 0)
-	    fprintf(hFile, "\n");
+	    tsk_fprintf(hFile, "\n");
 
     }
 
@@ -2519,9 +2796,9 @@ fatfs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 uint8_t
 fatfs_jopen(FS_INFO * fs, INUM_T inum)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L, "FAT does not have a journal\n");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
@@ -2530,9 +2807,9 @@ uint8_t
 fatfs_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
     void *ptr)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L, "FAT does not have a journal\n");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
@@ -2542,9 +2819,9 @@ uint8_t
 fatfs_jblk_walk(FS_INFO * fs, DADDR_T start, DADDR_T end, int flags,
     FS_JBLK_WALK_FN action, void *ptr)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L, "FAT does not have a journal\n");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
@@ -2555,7 +2832,8 @@ fatfs_close(FS_INFO * fs)
 {
     FATFS_INFO *fatfs = (FATFS_INFO *) fs;
     data_buf_free(fatfs->dinodes);
-    data_buf_free(fatfs->table);
+    tsk_list_free(fs->list_inum_named);
+    fs->list_inum_named = NULL;
     free(fatfs->sb);
     free(fs);
 }
@@ -2574,14 +2852,17 @@ fatfs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
     unsigned int len;
     FS_INFO *fs;
     fatfs_sb *fatsb;
-    uint32_t clustcnt, sectors;
+    DADDR_T sectors;
     SSIZE_T cnt;
+    int i;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
 
     if ((ftype & FSMASK) != FATFS_TYPE) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L, "%s: Invalid FS Type", myname);
-	tsk_errstr2[0] = '\0';
 	return NULL;
     }
 
@@ -2607,8 +2888,8 @@ fatfs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
     cnt = fs_read_random(fs, (char *) fatsb, len, (DADDR_T) 0);
     if (cnt != len) {
 	if (cnt != -1) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_READ;
-	    tsk_errstr[0] = '\0';
 	}
 	snprintf(tsk_errstr2, TSK_ERRSTR_L, "%s: boot sector", myname);
 	free(fatfs->sb);
@@ -2620,27 +2901,36 @@ fatfs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
     if (fs_guessu16(fs, fatsb->magic, FATFS_FS_MAGIC)) {
 	free(fatsb);
 	free(fatfs);
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_MAGIC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "Not a FATFS file system (magic)");
-	tsk_errstr2[0] = '\0';
 	return NULL;
     }
 
     fs->dev_bsize = FATFS_DEV_BSIZE;
-    fatfs->ssize = getu16(fs, fatsb->ssize);
+    fatfs->ssize = getu16(fs->endian, fatsb->ssize);
 
-    if ((fatfs->ssize % 512) ||
-	((fatfs->ssize != 512) && (fatfs->ssize != 1024) &&
-	    (fatfs->ssize != 2048) && (fatfs->ssize != 4096))) {
-
-	free(fatsb);
-	free(fatfs);
+    if (fatfs->ssize == 512) {
+	fatfs->ssize_sh = 9;
+    }
+    else if (fatfs->ssize == 1024) {
+	fatfs->ssize_sh = 10;
+    }
+    else if (fatfs->ssize == 2048) {
+	fatfs->ssize_sh = 11;
+    }
+    else if (fatfs->ssize == 4096) {
+	fatfs->ssize_sh = 12;
+    }
+    else {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_MAGIC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "Error: sector size (%d) is not a multiple of device size (%d)\nDo you have a disk image instead of a partition image?",
 	    fatfs->ssize, fs->dev_bsize);
-	tsk_errstr2[0] = '\0';
+	free(fatsb);
+	free(fatfs);
 	return NULL;
     }
 
@@ -2654,10 +2944,10 @@ fatfs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
 	(fatfs->csize != 0x40) && (fatfs->csize != 0x80)) {
 	free(fatsb);
 	free(fatfs);
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_MAGIC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "Not a FATFS file system (cluster size)");
-	tsk_errstr2[0] = '\0';
 	return NULL;
     }
 
@@ -2665,45 +2955,45 @@ fatfs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
     if ((fatfs->numfat == 0) || (fatfs->numfat > 8)) {
 	free(fatsb);
 	free(fatfs);
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_MAGIC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "Not a FATFS file system (number of FATs)");
-	tsk_errstr2[0] = '\0';
 	return NULL;
     }
 
     /* We can't do a sanity check on this b.c. FAT32 has a value of 0 */
     /* num of root entries */
-    fatfs->numroot = getu16(fs, fatsb->numroot);
+    fatfs->numroot = getu16(fs->endian, fatsb->numroot);
 
 
     /* if sectors16 is 0, then the number of sectors is stored in sectors32 */
-    if (0 == (sectors = getu16(fs, fatsb->sectors16)))
-	sectors = getu32(fs, fatsb->sectors32);
+    if (0 == (sectors = getu16(fs->endian, fatsb->sectors16)))
+	sectors = getu32(fs->endian, fatsb->sectors32);
 
     /* if secperfat16 is 0, then read sectperfat32 */
-    if (0 == (fatfs->sectperfat = getu16(fs, fatsb->sectperfat16)))
-	fatfs->sectperfat = getu32(fs, fatsb->a.f32.sectperfat32);
+    if (0 == (fatfs->sectperfat = getu16(fs->endian, fatsb->sectperfat16)))
+	fatfs->sectperfat = getu32(fs->endian, fatsb->a.f32.sectperfat32);
 
     if (fatfs->sectperfat == 0) {
 	free(fatsb);
 	free(fatfs);
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_MAGIC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "Not a FATFS file system (invalid sectors per FAT)");
-	tsk_errstr2[0] = '\0';
 	return NULL;
     }
 
-    fatfs->firstfatsect = getu16(fs, fatsb->reserved);
+    fatfs->firstfatsect = getu16(fs->endian, fatsb->reserved);
     if ((fatfs->firstfatsect == 0) || (fatfs->firstfatsect > sectors)) {
-	free(fatsb);
-	free(fatfs);
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "Not a FATFS file system (invalid first FAT sector %"
 	    PRIuDADDR ")", fatfs->firstfatsect);
-	tsk_errstr2[0] = '\0';
+	free(fatsb);
+	free(fatfs);
 	return NULL;
     }
 
@@ -2729,10 +3019,10 @@ fatfs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
 	((fatfs->numroot * 32 + fatfs->ssize - 1) / fatfs->ssize);
 
     /* total number of clusters */
-    clustcnt = (sectors - fatfs->firstclustsect) / fatfs->csize;
+    fatfs->clustcnt = (sectors - fatfs->firstclustsect) / fatfs->csize;
 
     /* the first cluster is #2, so the final cluster is: */
-    fatfs->lastclust = 1 + clustcnt;
+    fatfs->lastclust = 1 + fatfs->clustcnt;
 
 
     /* identify the FAT type by the total number of data clusters
@@ -2742,10 +3032,10 @@ fatfs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
      */
     if (ftype == FATAUTO) {
 
-	if (clustcnt < 4085) {
+	if (fatfs->clustcnt < 4085) {
 	    ftype = FAT12;
 	}
-	else if (clustcnt < 65525) {
+	else if (fatfs->clustcnt < 65525) {
 	    ftype = FAT16;
 	}
 	else {
@@ -2757,13 +3047,13 @@ fatfs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
 
     /* Some sanity checks */
     else {
-	if ((ftype == FAT12) && (clustcnt >= 4085)) {
+	if ((ftype == FAT12) && (fatfs->clustcnt >= 4085)) {
 	    free(fatsb);
 	    free(fatfs);
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_MAGIC;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"Too many sectors for FAT12: try auto-detect mode");
-	    tsk_errstr2[0] = '\0';
 	    return NULL;
 	}
     }
@@ -2771,20 +3061,20 @@ fatfs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
     if ((ftype == FAT32) && (fatfs->numroot != 0)) {
 	free(fatsb);
 	free(fatfs);
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_MAGIC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "Invalid FAT32 image (numroot != 0)");
-	tsk_errstr2[0] = '\0';
 	return NULL;
     }
 
     if ((ftype != FAT32) && (fatfs->numroot == 0)) {
 	free(fatsb);
 	free(fatfs);
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_MAGIC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "Invalid FAT image (numroot == 0, and not FAT32)");
-	tsk_errstr2[0] = '\0';
 	return NULL;
     }
 
@@ -2802,10 +3092,10 @@ fatfs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
     else {
 	free(fatsb);
 	free(fatfs);
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "Unknown FAT type in fatfs_open: %d\n", ftype);
-	tsk_errstr2[0] = '\0';
 	return NULL;
     }
 
@@ -2814,19 +3104,18 @@ fatfs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
      */
     if (ftype == FAT32)
 	fatfs->rootsect = FATFS_CLUST_2_SECT(fatfs,
-	    getu32(fs, fatsb->a.f32.rootclust));
+	    getu32(fs->endian, fatsb->a.f32.rootclust));
     else
 	fatfs->rootsect = fatfs->firstdatasect;
 
-    if ((fatfs->table = data_buf_alloc(FAT_CACHE_B)) == NULL) {
-	free(fatsb);
-	free(fatfs);
-	return NULL;
+    for (i = 0; i < FAT_CACHE_N; i++) {
+	fatfs->fatc_addr[i] = 0;
+	fatfs->fatc_ttl[i] = 0;
     }
 
     /* allocate a cluster-sized buffer for inodes */
     if ((fatfs->dinodes =
-	    data_buf_alloc(fatfs->ssize * fatfs->csize)) == NULL) {
+	    data_buf_alloc(fatfs->csize << fatfs->ssize_sh)) == NULL) {
 
 	free(fatsb);
 	free(fatfs);
@@ -2853,7 +3142,7 @@ fatfs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
 
     fs->root_inum = FATFS_ROOTINO;
     fs->first_inum = FATFS_FIRSTINO;
-    fs->inum_count = fatfs->dentry_cnt_cl * clustcnt;
+    fs->inum_count = fatfs->dentry_cnt_cl * fatfs->clustcnt;
     fs->last_inum = fs->first_inum + fs->inum_count;
 
 
@@ -2874,6 +3163,8 @@ fatfs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
     fs->jentry_walk = fatfs_jentry_walk;
     fs->jopen = fatfs_jopen;
     fs->journ_inum = 0;
+
+    fs->list_inum_named = NULL;
 
     return (fs);
 }

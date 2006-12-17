@@ -2,7 +2,7 @@
 ** jcat
 ** The Sleuth Kit 
 **
-** $Date: 2006/07/10 13:26:20 $
+** $Date: 2006/09/20 20:16:01 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
@@ -12,135 +12,104 @@
 ** This software is distributed under the Common Public License 1.0
 **
 */
-
+#include <locale.h>
 #include "fs_tools.h"
 
-
-
-/* atoinum - convert string to inode number */
-INUM_T
-atoinum(const char *str)
-{
-    char *cp, *dash;
-    INUM_T inum;
-
-    if (*str == 0)
-	return (0);
-
-    /* if we are given the inode in the inode-type-id form, then ignore
-     * the other stuff w/out giving an error 
-     *
-     * This will make scripting easier
-     */
-    if ((dash = strchr(str, '-')) != NULL) {
-	*dash = '\0';
-    }
-    inum = strtoull(str, &cp, 0);
-    if (*cp || cp == str) {
-	fprintf(stderr, "bad inode number: %s", str);
-	exit(1);
-    }
-    return (inum);
-}
-
+static TSK_TCHAR *progname;
 
 /* usage - explain and terminate */
 static void
 usage()
 {
-    fprintf(stderr,
-	"usage: %s [-f fstype] [-i imgtype] [-o imgoffset] [-vV] image [images] [inode] blk\n",
+    TFPRINTF(stderr,
+	_TSK_T
+	("usage: %s [-f fstype] [-i imgtype] [-o imgoffset] [-vV] image [images] [inode] blk\n"),
 	progname);
-    fprintf(stderr, "\tblk: The journal block to view\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr, "\tblk: The journal block to view\n");
+    tsk_fprintf(stderr,
 	"\tinode: The file system inode where the journal is located\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-i imgtype: The format of the image file (use '-i list' for supported types)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-f fstype: File system type (use '-f list' for supported types)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-o imgoffset: The offset of the file system in the image (in sectors)\n");
-    fprintf(stderr, "\t-v: verbose output to stderr\n");
-    fprintf(stderr, "\t-V: print version\n");
+    tsk_fprintf(stderr, "\t-v: verbose output to stderr\n");
+    tsk_fprintf(stderr, "\t-V: print version\n");
     exit(1);
 }
 
 
 int
-main(int argc, char **argv)
+MAIN(int argc, TSK_TCHAR ** argv)
 {
+    TSK_TCHAR *fstype = NULL;
+    TSK_TCHAR *imgtype = NULL;
+    FS_INFO *fs;
+    IMG_INFO *img;
     INUM_T inum;
     int ch;
-    char *fstype = NULL;
-    FS_INFO *fs;
     DADDR_T blk;
-    char *cp;
-    char *imgtype = NULL;
-    IMG_INFO *img;
+    TSK_TCHAR *cp;
     SSIZE_T imgoff = 0;
 
     progname = argv[0];
     setlocale(LC_ALL, "");
 
-    while ((ch = getopt(argc, argv, "f:i:o:vV")) > 0) {
+    while ((ch = getopt(argc, argv, _TSK_T("f:i:o:vV"))) > 0) {
 	switch (ch) {
-	case '?':
+	case _TSK_T('?'):
 	default:
-	    fprintf(stderr, "Invalid argument: %s\n", argv[optind]);
+	    TFPRINTF(stderr, _TSK_T("Invalid argument: %s\n"),
+		argv[optind]);
 	    usage();
-	case 'f':
+	case _TSK_T('f'):
 	    fstype = optarg;
-	    if (strcmp(fstype, "list") == 0) {
+	    if (TSTRCMP(fstype, _TSK_T("list")) == 0) {
 		fs_print_types(stderr);
 		exit(1);
 	    }
-
 	    break;
-	case 'i':
+	case _TSK_T('i'):
 	    imgtype = optarg;
-	    if (strcmp(imgtype, "list") == 0) {
+	    if (TSTRCMP(imgtype, _TSK_T("list")) == 0) {
 		img_print_types(stderr);
 		exit(1);
 	    }
-
 	    break;
-
-	case 'o':
+	case _TSK_T('o'):
 	    if ((imgoff = parse_offset(optarg)) == -1) {
 		tsk_error_print(stderr);
 		exit(1);
 	    }
 	    break;
-	case 'v':
+	case _TSK_T('v'):
 	    verbose++;
 	    break;
-	case 'V':
+	case _TSK_T('V'):
 	    print_version(stdout);
 	    exit(0);
-
 	}
     }
 
     /* We need at least two more arguments */
     if (optind + 1 >= argc) {
-	fprintf(stderr, "Missing image name and/or block address\n");
+	tsk_fprintf(stderr, "Missing image name and/or block address\n");
 	usage();
     }
 
-    blk = strtoull(argv[argc - 1], &cp, 0);
+    blk = TSTRTOULL(argv[argc - 1], &cp, 0);
     if (*cp || cp == argv[argc - 1]) {
-	fprintf(stderr, "bad block number: %s", argv[argc - 1]);
+	TFPRINTF(stderr, _TSK_T("bad block number: %s"), argv[argc - 1]);
 	exit(1);
     }
 
     /* Do we have an inode as well? */
-    inum = strtoull(argv[argc - 2], &cp, 0);
-    if (*cp || cp == argv[argc - 2]) {
+    if (parse_inum(argv[argc - 2], &inum, NULL, NULL, NULL)) {
 	/* Not a number therefore an image */
-
 	if ((img =
 		img_open(imgtype, argc - optind - 1,
-		    (const char **) &argv[optind])) == NULL) {
+		    (const TSK_TCHAR **) &argv[optind])) == NULL) {
 	    tsk_error_print(stderr);
 	    exit(1);
 	}
@@ -152,13 +121,12 @@ main(int argc, char **argv)
 	    img->close(img);
 	    exit(1);
 	}
-
 	inum = fs->journ_inum;
     }
     else {
 	if ((img =
 		img_open(imgtype, argc - optind - 2,
-		    (const char **) &argv[optind])) == NULL) {
+		    (const TSK_TCHAR **) &argv[optind])) == NULL) {
 	    tsk_error_print(stderr);
 	    exit(1);
 	}
@@ -170,11 +138,10 @@ main(int argc, char **argv)
 	    img->close(img);
 	    exit(1);
 	}
-
     }
 
     if (inum > fs->last_inum) {
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "Inode value is too large for image (%" PRIuINUM ")\n",
 	    fs->last_inum);
 	fs->close(fs);
@@ -183,7 +150,7 @@ main(int argc, char **argv)
     }
 
     if (inum < fs->first_inum) {
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "Inode value is too small for image (%" PRIuINUM ")\n",
 	    fs->first_inum);
 	fs->close(fs);
@@ -192,12 +159,21 @@ main(int argc, char **argv)
     }
 
     if (fs->jopen == NULL) {
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "Journal support does not exist for this file system\n");
 	fs->close(fs);
 	img->close(img);
 	return 1;
     }
+
+#ifdef TSK_WIN32
+    if (-1 == _setmode(_fileno(stdout), _O_BINARY)) {
+	tsk_errno = TSK_ERR_FS_WRITE;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "jcat: error setting stdout to binary: %s", strerror(errno));
+	return 1;
+    }
+#endif
 
     if (fs->jopen(fs, inum)) {
 	tsk_error_print(stderr);

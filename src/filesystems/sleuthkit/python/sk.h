@@ -6,7 +6,6 @@
 #include "list.h"
 #include "talloc.h"
 #include "fs_tools.h"
-#include "libfstools.h"
 
 /******************************************************************
  * Helpers and SK integration stuff

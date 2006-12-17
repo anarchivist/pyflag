@@ -2,7 +2,7 @@
 ** fls
 ** The Sleuth Kit 
 **
-** $Date: 2006/07/10 13:26:20 $
+** $Date: 2006/09/20 20:16:01 $
 **
 ** Given an image and directory inode, display the file names and 
 ** directories that exist (both active and deleted)
@@ -21,58 +21,63 @@
 ** This software is distributed under the Common Public License 1.0
 **
 */
+#include <locale.h>
+#include <time.h>
+#include "fs_tools.h"
 
-#include "libfstools.h"
+static TSK_TCHAR *progname;
 
 void
 usage()
 {
-    fprintf(stderr,
-	"usage: %s [-adDFlpruvV] [-f fstype] [-i imgtype] [-m dir/] [-o imgoffset] [-z ZONE] [-s seconds] image [images] [inode]\n",
+    TFPRINTF(stderr,
+	_TSK_T
+	("usage: %s [-adDFlpruvV] [-f fstype] [-i imgtype] [-m dir/] [-o imgoffset] [-z ZONE] [-s seconds] image [images] [inode]\n"),
 	progname);
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\tIf [inode] is not given, the root directory is used\n");
-    fprintf(stderr, "\t-a: Display \".\" and \"..\" entries\n");
-    fprintf(stderr, "\t-d: Display deleted entries only\n");
-    fprintf(stderr, "\t-D: Display only directories\n");
-    fprintf(stderr, "\t-F: Display only files\n");
-    fprintf(stderr, "\t-l: Display long version (like ls -l)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr, "\t-a: Display \".\" and \"..\" entries\n");
+    tsk_fprintf(stderr, "\t-d: Display deleted entries only\n");
+    tsk_fprintf(stderr, "\t-D: Display only directories\n");
+    tsk_fprintf(stderr, "\t-F: Display only files\n");
+    tsk_fprintf(stderr, "\t-l: Display long version (like ls -l)\n");
+    tsk_fprintf(stderr,
 	"\t-i imgtype: Format of image file (use '-i list' for supported types)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-f fstype: File system type (use '-f list' for supported types)\n");
-    fprintf(stderr, "\t-m: Display output in mactime input format with\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
+	"\t-m: Display output in mactime input format with\n");
+    tsk_fprintf(stderr,
 	"\t      dir/ as the actual mount point of the image\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-o imgoffset: Offset into image file (in sectors)\n");
-    fprintf(stderr, "\t-p: Display full path for each file\n");
-    fprintf(stderr, "\t-r: Recurse on directory entries\n");
-    fprintf(stderr, "\t-u: Display undeleted entries only\n");
-    fprintf(stderr, "\t-v: verbose output to stderr\n");
-    fprintf(stderr, "\t-V: Print version\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr, "\t-p: Display full path for each file\n");
+    tsk_fprintf(stderr, "\t-r: Recurse on directory entries\n");
+    tsk_fprintf(stderr, "\t-u: Display undeleted entries only\n");
+    tsk_fprintf(stderr, "\t-v: verbose output to stderr\n");
+    tsk_fprintf(stderr, "\t-V: Print version\n");
+    tsk_fprintf(stderr,
 	"\t-z: Time zone of original machine (i.e. EST5EDT or GMT) (only useful with -l)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-s seconds: Time skew of original machine (in seconds) (only useful with -l & -m)\n");
 
     exit(1);
 }
 
 int
-main(int argc, char **argv)
+MAIN(int argc, TSK_TCHAR ** argv)
 {
-    char *fstype = NULL;
+    TSK_TCHAR *fstype = NULL;
+    TSK_TCHAR *imgtype = NULL;
     INUM_T inode;
     int flags = FS_FLAG_NAME_ALLOC | FS_FLAG_NAME_UNALLOC;
     int ch;
     FS_INFO *fs;
     extern int optind;
     IMG_INFO *img;
-    char *imgtype = NULL, *cp;
     int lclflags;
     int32_t sec_skew = 0;
-    static char *macpre = NULL;
+    static TSK_TCHAR *macpre = NULL;
     SSIZE_T imgoff = 0;
 
     progname = argv[0];
@@ -80,84 +85,84 @@ main(int argc, char **argv)
 
     lclflags = FLS_DIR | FLS_FILE;
 
-    while ((ch = getopt(argc, argv, "adDf:Fi:m:lo:prs:uvVz:")) > 0) {
+    while ((ch = getopt(argc, argv, _TSK_T("adDf:Fi:m:lo:prs:uvVz:"))) > 0) {
 	switch (ch) {
-	case '?':
+	case _TSK_T('?'):
 	default:
-	    fprintf(stderr, "Invalid argument: %s\n", argv[optind]);
+	    TFPRINTF(stderr, _TSK_T("Invalid argument: %s\n"),
+		argv[optind]);
 	    usage();
-	case 'a':
+	case _TSK_T('a'):
 	    lclflags |= FLS_DOT;
 	    break;
-	case 'd':
+	case _TSK_T('d'):
 	    flags &= ~FS_FLAG_NAME_ALLOC;
 	    break;
-	case 'D':
+	case _TSK_T('D'):
 	    lclflags &= ~FLS_FILE;
 	    lclflags |= FLS_DIR;
 	    break;
-	case 'f':
+	case _TSK_T('f'):
 	    fstype = optarg;
-	    if (strcmp(fstype, "list") == 0) {
+	    if (TSTRCMP(fstype, _TSK_T("list")) == 0) {
 		fs_print_types(stderr);
 		exit(1);
 	    }
 
 	    break;
-	case 'F':
+	case _TSK_T('F'):
 	    lclflags &= ~FLS_DIR;
 	    lclflags |= FLS_FILE;
 	    break;
-	case 'i':
+	case _TSK_T('i'):
 	    imgtype = optarg;
-	    if (strcmp(imgtype, "list") == 0) {
+	    if (TSTRCMP(imgtype, _TSK_T("list")) == 0) {
 		img_print_types(stderr);
 		exit(1);
 	    }
-
 	    break;
-	case 'l':
+	case _TSK_T('l'):
 	    lclflags |= FLS_LONG;
 	    break;
-	case 'm':
+	case _TSK_T('m'):
 	    lclflags |= FLS_MAC;
 	    macpre = optarg;
 	    break;
-	case 'o':
+	case _TSK_T('o'):
 	    if ((imgoff = parse_offset(optarg)) == -1) {
 		tsk_error_print(stderr);
 		exit(1);
 	    }
 	    break;
-	case 'p':
+	case _TSK_T('p'):
 	    lclflags |= FLS_FULL;
 	    break;
-	case 'r':
+	case _TSK_T('r'):
 	    flags |= FS_FLAG_NAME_RECURSE;
 	    break;
-	case 's':
-	    sec_skew = atoi(optarg);
+	case _TSK_T('s'):
+	    sec_skew = TATOI(optarg);
 	    break;
-	case 'u':
+	case _TSK_T('u'):
 	    flags &= ~FS_FLAG_NAME_UNALLOC;
 	    break;
-	case 'v':
+	case _TSK_T('v'):
 	    verbose++;
 	    break;
-	case 'V':
+	case _TSK_T('V'):
 	    print_version(stdout);
 	    exit(0);
 	case 'z':
 	    {
-		char envstr[32];
-		snprintf(envstr, 32, "TZ=%s", optarg);
-		if (0 != putenv(envstr)) {
-		    fprintf(stderr, "error setting environment");
+		TSK_TCHAR envstr[32];
+		TSNPRINTF(envstr, 32, _TSK_T("TZ=%s"), optarg);
+		if (0 != PUTENV(envstr)) {
+		    tsk_fprintf(stderr, "error setting environment");
 		    exit(1);
 		}
 
 		/* we should be checking this somehow */
-		tzset();
+		TZSET();
 	    }
 	    break;
 
@@ -166,7 +171,7 @@ main(int argc, char **argv)
 
     /* We need at least one more argument */
     if (optind == argc) {
-	fprintf(stderr, "Missing image name\n");
+	tsk_fprintf(stderr, "Missing image name\n");
 	usage();
     }
 
@@ -191,12 +196,12 @@ main(int argc, char **argv)
      * one does not already exist
      */
     if (macpre) {
-	int len = strlen(macpre);
+	size_t len = TSTRLEN(macpre);
 	if (macpre[len - 1] != '/') {
-	    char *tmp = macpre;
-	    macpre = (char *) malloc(len + 2);
-	    strncpy(macpre, tmp, len + 1);
-	    strncat(macpre, "/", len + 2);
+	    TSK_TCHAR *tmp = macpre;
+	    macpre = (TSK_TCHAR *) malloc(len + 2 * sizeof(TSK_TCHAR));
+	    TSTRNCPY(macpre, tmp, len + 1);
+	    TSTRNCAT(macpre, _TSK_T("/"), len + 2);
 	}
     }
 
@@ -204,16 +209,14 @@ main(int argc, char **argv)
      *
      * Check the final argument and see if it is a number
      */
-    inode = strtoull(argv[argc - 1], &cp, 0);
-    if (*cp || cp == argv[argc - 1]) {
+    if (parse_inum(argv[argc - 1], &inode, NULL, NULL, NULL)) {
 	/* Not an inode at the end */
 	if ((img =
 		img_open(imgtype, argc - optind,
-		    (const char **) &argv[optind])) == NULL) {
+		    (const TSK_TCHAR **) &argv[optind])) == NULL) {
 	    tsk_error_print(stderr);
 	    exit(1);
 	}
-
 	if ((fs = fs_open(img, imgoff, fstype)) == NULL) {
 	    tsk_error_print(stderr);
 	    if (tsk_errno == TSK_ERR_FS_UNSUPTYPE)
@@ -227,7 +230,7 @@ main(int argc, char **argv)
     else {
 	if ((img =
 		img_open(imgtype, argc - optind - 1,
-		    (const char **) &argv[optind])) == NULL) {
+		    (const TSK_TCHAR **) &argv[optind])) == NULL) {
 	    tsk_error_print(stderr);
 	    exit(1);
 	}

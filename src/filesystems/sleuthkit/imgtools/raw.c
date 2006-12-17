@@ -1,5 +1,5 @@
 /*
- * $Date: 2006/07/05 18:54:16 $
+ * $Date: 2006/12/07 22:03:05 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2006 Brian Carrier, Basis Technology.  All rights reserved
@@ -16,6 +16,9 @@
 #include "img_tools.h"
 #include "raw.h"
 
+#ifdef TSK_WIN32
+#include "Winioctl.h"
+#endif
 
 /* Return the size read and -1 if error */
 static SSIZE_T
@@ -26,7 +29,7 @@ raw_read_random(IMG_INFO * img_info, OFF_T vol_offset, char *buf,
     IMG_RAW_INFO *raw_info = (IMG_RAW_INFO *) img_info;
 
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "raw_read_random: byte offset: %" PRIuOFF " len: %" PRIuOFF
 	    "\n", offset, len);
 
@@ -51,12 +54,12 @@ raw_read_random(IMG_INFO * img_info, OFF_T vol_offset, char *buf,
 		hi = (LONG) (tot_offset / max);
 		lo = (LONG) (tot_offset - max * hi);
 
-		if (FALSE == SetFilePointer(raw_info->fd, lo, &hi,
+		if (0xFFFFFFFF == SetFilePointer(raw_info->fd, lo, &hi,
 			FILE_BEGIN)) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_IMG_SEEK;
 		    snprintf(tsk_errstr, TSK_ERRSTR_L,
 			"raw_read_random - %" PRIuOFF, tot_offset);
-		    tsk_errstr2[0] = '\0';
 		    return -1;
 		}
 		raw_info->seek_pos = tot_offset;
@@ -64,11 +67,11 @@ raw_read_random(IMG_INFO * img_info, OFF_T vol_offset, char *buf,
 
 	    if (FALSE == ReadFile(raw_info->fd, buf, (DWORD) len,
 		    &nread, NULL)) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_IMG_READ;
 		snprintf(tsk_errstr, TSK_ERRSTR_L,
 		    "raw_read_random - offset: %" PRIuOFF " - len: %"
 		    PRIuOFF, tot_offset, len);
-		tsk_errstr2[0] = '\0';
 		return -1;
 	    }
 	    cnt = (SSIZE_T) nread;
@@ -76,11 +79,11 @@ raw_read_random(IMG_INFO * img_info, OFF_T vol_offset, char *buf,
 #else
 	if (raw_info->seek_pos != tot_offset) {
 	    if (lseek(raw_info->fd, tot_offset, SEEK_SET) != tot_offset) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_IMG_SEEK;
 		snprintf(tsk_errstr, TSK_ERRSTR_L,
 		    "raw_read_random - %" PRIuOFF " - %s",
 		    tot_offset, strerror(errno));
-		tsk_errstr2[0] = '\0';
 		return -1;
 	    }
 	    raw_info->seek_pos = tot_offset;
@@ -88,11 +91,11 @@ raw_read_random(IMG_INFO * img_info, OFF_T vol_offset, char *buf,
 
 	cnt = read(raw_info->fd, buf, len);
 	if (cnt == -1) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_IMG_READ;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"raw_read_random - offset: %" PRIuOFF " - len: %"
 		PRIuOFF " - %s", tot_offset, len, strerror(errno));
-	    tsk_errstr2[0] = '\0';
 	    return -1;
 	}
 #endif
@@ -110,10 +113,10 @@ raw_get_size(IMG_INFO * img_info)
 void
 raw_imgstat(IMG_INFO * img_info, FILE * hFile)
 {
-    fprintf(hFile, "IMAGE FILE INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
-    fprintf(hFile, "Image Type: raw\n");
-    fprintf(hFile, "\nSize in bytes: %" PRIuOFF "\n", img_info->size);
+    tsk_fprintf(hFile, "IMAGE FILE INFORMATION\n");
+    tsk_fprintf(hFile, "--------------------------------------------\n");
+    tsk_fprintf(hFile, "Image Type: raw\n");
+    tsk_fprintf(hFile, "\nSize in bytes: %" PRIuOFF "\n", img_info->size);
     return;
 }
 
@@ -126,6 +129,7 @@ raw_close(IMG_INFO * img_info)
 #else
     close(raw_info->fd);
 #endif
+    free(raw_info);
 }
 
 
@@ -135,7 +139,7 @@ raw_close(IMG_INFO * img_info)
  *  to test for a raw file
  */
 IMG_INFO *
-raw_open(const char **images, IMG_INFO * next)
+raw_open(const TSK_TCHAR ** images, IMG_INFO * next)
 {
     IMG_RAW_INFO *raw_info;
     IMG_INFO *img_info;
@@ -161,62 +165,106 @@ raw_open(const char **images, IMG_INFO * next)
 
     /* Open the file */
     else {
-	struct stat stat_buf;
+	struct STAT_STR stat_buf;
+	int is_winobj = 0;
 
-	/* Exit if we are given a directory */
-	if (stat(images[0], &stat_buf) == -1) {
-	    tsk_errno = TSK_ERR_IMG_STAT;
-	    snprintf(tsk_errstr, TSK_ERRSTR_L,
-		"raw_open directory check: %s", strerror(errno));
-	    tsk_errstr2[0] = '\0';
-	    return NULL;
+#ifdef TSK_WIN32
+	if ((images[0][0] == _TSK_T('\\'))
+	    && (images[0][1] == _TSK_T('\\'))
+	    && (images[0][2] == _TSK_T('.'))
+	    && (images[0][3] == _TSK_T('\\'))) {
+	    is_winobj = 1;
 	}
-	else if ((stat_buf.st_mode & S_IFMT) == S_IFDIR) {
-	    if (verbose)
-		fprintf(stderr, "raw_open: image %s is a directory\n",
-		    images[0]);
+#endif
+	if (is_winobj == 0) {
+	    /* Exit if we are given a directory */
+	    if (TSTAT(images[0], &stat_buf) == -1) {
+		tsk_error_reset();
+		tsk_errno = TSK_ERR_IMG_STAT;
+		snprintf(tsk_errstr, TSK_ERRSTR_L,
+		    "raw_open directory check: %s", strerror(errno));
+		return NULL;
+	    }
+	    else if ((stat_buf.st_mode & S_IFMT) == S_IFDIR) {
+		if (verbose)
+		    tsk_fprintf(stderr,
+			"raw_open: image %s is a directory\n", images[0]);
 
-	    tsk_errno = TSK_ERR_IMG_MAGIC;
-	    snprintf(tsk_errstr, TSK_ERRSTR_L,
-		"raw_open: Image is a directory");
-	    tsk_errstr2[0] = '\0';
-	    return NULL;
+		tsk_error_reset();
+		tsk_errno = TSK_ERR_IMG_MAGIC;
+		snprintf(tsk_errstr, TSK_ERRSTR_L,
+		    "raw_open: Image is a directory");
+		return NULL;
+	    }
 	}
 
 #ifdef TSK_WIN32
 	{
-	    /* Convert to wide chars */
-	    WCHAR img_name[1024];
-	    unsigned int i;
-	    for (i = 0; i < strlen(images[0]) && i < 1023; i++) {
-		img_name[i] = images[0][i];
-	    }
-	    img_name[i] = '\0';
+	    DWORD dwHi, dwLo;
 
-	    if ((raw_info->fd = CreateFile(img_name, GENERIC_READ,
-			0, 0, OPEN_EXISTING, 0, 0)) ==
+	    if ((raw_info->fd = CreateFile(images[0], GENERIC_READ,
+			FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0)) ==
 		INVALID_HANDLE_VALUE) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_IMG_OPEN;
 		snprintf(tsk_errstr, TSK_ERRSTR_L,
-		    "raw_open file: %s msg: %s", images[0],
-		    strerror(errno));
-		tsk_errstr2[0] = '\0';
+		    "raw_open file: %s msg: %d", images[0],
+		    GetLastError());
 		return NULL;
+	    }
+
+	    /* We need different techniques to determine the size of physical
+	     * devices versus normal files
+	     */
+	    if (is_winobj == 0) {
+		dwLo = GetFileSize(raw_info->fd, &dwHi);
+		if (dwLo == 0xffffffff) {
+		    tsk_error_reset();
+		    tsk_errno = TSK_ERR_IMG_OPEN;
+		    snprintf(tsk_errstr, TSK_ERRSTR_L,
+			"raw_open file: %s GetFileSize: %d", images[0],
+			GetLastError());
+		    return NULL;
+		}
+		img_info->size = dwLo | ((OFF_T) dwHi << 32);
+	    }
+	    else {
+		DISK_GEOMETRY pdg;
+		DWORD junk;
+
+		if (FALSE == DeviceIoControl(raw_info->fd,	// device to be queried
+			IOCTL_DISK_GET_DRIVE_GEOMETRY,	// operation to perform
+			NULL, 0, &pdg, sizeof(pdg), &junk,
+			(LPOVERLAPPED) NULL)) {
+		    tsk_error_reset();
+		    tsk_errno = TSK_ERR_IMG_OPEN;
+		    snprintf(tsk_errstr, TSK_ERRSTR_L,
+			"raw_open file: %s DeviceIoControl: %d", images[0],
+			GetLastError());
+		    return NULL;
+		}
+
+		img_info->size =
+		    pdg.Cylinders.QuadPart *
+		    (ULONG) pdg.TracksPerCylinder *
+		    (ULONG) pdg.SectorsPerTrack *
+		    (ULONG) pdg.BytesPerSector;
 	    }
 	}
 #else
 	if ((raw_info->fd = open(images[0], O_RDONLY)) < 0) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_IMG_OPEN;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L, "raw_open file: %s msg: %s",
 		images[0], strerror(errno));
-	    tsk_errstr2[0] = '\0';
 	    return NULL;
 	}
-#endif
+
 	/* We don't use the stat output because it doesn't work on raw
 	 * devices and such */
 	img_info->size = lseek(raw_info->fd, 0, SEEK_END);
 	lseek(raw_info->fd, 0, SEEK_SET);
+#endif
 	raw_info->seek_pos = 0;
     }
 

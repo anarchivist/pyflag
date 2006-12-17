@@ -2,7 +2,7 @@
 ** dstat
 ** The Sleuth Kit 
 **
-** $Date: 2006/07/10 13:26:20 $
+** $Date: 2006/09/20 20:16:01 $
 **
 ** Get the details about a data unit
 **
@@ -16,22 +16,26 @@
 ** This software is distributed under the Common Public License 1.0
 **
 */
-#include "libfstools.h"
+#include <locale.h>
+#include "fs_tools.h"
+
+static TSK_TCHAR *progname;
 
 void
 usage()
 {
-    fprintf(stderr,
-	"usage: %s [-vV] [-f fstype] [-i imgtype] [-o imgoffset] image [images] addr\n",
+    TFPRINTF(stderr,
+	_TSK_T
+	("usage: %s [-vV] [-f fstype] [-i imgtype] [-o imgoffset] image [images] addr\n"),
 	progname);
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-f fstype: File system type (use '-f list' for supported types)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-i imgtype: The format of the image file (use '-i list' for supported types)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-o imgoffset: The offset of the file system in the image (in sectors)\n");
-    fprintf(stderr, "\t-v: Verbose output to stderr\n");
-    fprintf(stderr, "\t-V: Print version\n");
+    tsk_fprintf(stderr, "\t-v: Verbose output to stderr\n");
+    tsk_fprintf(stderr, "\t-V: Print version\n");
 
     exit(1);
 }
@@ -39,77 +43,77 @@ usage()
 
 
 int
-main(int argc, char **argv)
+MAIN(int argc, TSK_TCHAR ** argv)
 {
-    char *fstype = NULL;
+    TSK_TCHAR *fstype = NULL;
+    TSK_TCHAR *imgtype = NULL;
+    FS_INFO *fs;
+    IMG_INFO *img;
     int ch;
-    char *cp;
+    TSK_TCHAR *cp;
     extern int optind;
     DADDR_T addr;
-    FS_INFO *fs;
     int flags =
 	(FS_FLAG_DATA_UNALLOC | FS_FLAG_DATA_ALLOC | FS_FLAG_DATA_META |
 	FS_FLAG_DATA_CONT);
-    char *imgtype = NULL;
-    IMG_INFO *img;
     SSIZE_T imgoff = 0;
 
     progname = argv[0];
     setlocale(LC_ALL, "");
 
-    while ((ch = getopt(argc, argv, "f:i:o:uvV")) > 0) {
+    while ((ch = getopt(argc, argv, _TSK_T("f:i:o:uvV"))) > 0) {
 	switch (ch) {
-	case 'f':
+	case _TSK_T('f'):
 	    fstype = optarg;
-	    if (strcmp(fstype, "list") == 0) {
+	    if (TSTRCMP(fstype, _TSK_T("list")) == 0) {
 		fs_print_types(stderr);
 		exit(1);
 	    }
 
 	    break;
-	case 'i':
+	case _TSK_T('i'):
 	    imgtype = optarg;
-	    if (strcmp(imgtype, "list") == 0) {
+	    if (TSTRCMP(imgtype, _TSK_T("list")) == 0) {
 		img_print_types(stderr);
 		exit(1);
 	    }
-
 	    break;
-	case 'o':
+	case _TSK_T('o'):
 	    if ((imgoff = parse_offset(optarg)) == -1) {
 		tsk_error_print(stderr);
 		exit(1);
 	    }
 	    break;
-	case 'v':
+	case _TSK_T('v'):
 	    verbose++;
 	    break;
-	case 'V':
+	case _TSK_T('V'):
 	    print_version(stdout);
 	    exit(0);
-	case '?':
+	case _TSK_T('?'):
 	default:
-	    fprintf(stderr, "Invalid argument: %s\n", argv[optind]);
+	    TFPRINTF(stderr, _TSK_T("Invalid argument: %s\n"),
+		argv[optind]);
 	    usage();
 	}
     }
 
     if (optind + 1 >= argc) {
-	fprintf(stderr, "Missing image name and/or address\n");
+	tsk_fprintf(stderr, "Missing image name and/or address\n");
 	usage();
     }
 
     /* Get the address */
-    addr = strtoull(argv[argc - 1], &cp, 0);
+    addr = TSTRTOULL(argv[argc - 1], &cp, 0);
     if (*cp || cp == argv[argc - 1]) {
-	fprintf(stderr, "Invalid address\n");
+	tsk_fprintf(stderr, "Invalid address\n");
 	usage();
     }
 
     /* open image */
     if ((img =
 	    img_open(imgtype, argc - optind - 1,
-		(const char **) &argv[optind])) == NULL) {
+		(const TSK_TCHAR **) &argv[optind])) == NULL) {
 	tsk_error_print(stderr);
 	exit(1);
     }
@@ -123,7 +127,7 @@ main(int argc, char **argv)
 
 
     if (addr > fs->last_block) {
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "Data unit address too large for image (%" PRIuDADDR ")\n",
 	    fs->last_block);
 	fs->close(fs);
@@ -131,7 +135,7 @@ main(int argc, char **argv)
 	exit(1);
     }
     if (addr < fs->first_block) {
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "Data unit address too small for image (%" PRIuDADDR ")\n",
 	    fs->first_block);
 	fs->close(fs);
@@ -144,11 +148,9 @@ main(int argc, char **argv)
 	fs->close(fs);
 	img->close(img);
 	exit(1);
-
     }
 
     fs->close(fs);
     img->close(img);
-
     exit(0);
 }

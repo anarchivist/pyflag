@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit
 **
-** $Date: 2006/07/10 13:26:20 $
+** $Date: 2006/09/21 18:23:12 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
@@ -25,31 +25,36 @@
  *	P.O. Box 704
  *	Yorktown Heights, NY 10598, USA
  */
+#include <locale.h>
+#include "fs_tools.h"
 
-#include "libfstools.h"
-
+static TSK_TCHAR *progname;
 
 /* usage - explain and terminate */
 
 static void
 usage()
 {
-    fprintf(stderr,
-	"usage: %s [-belvV] [-f fstype] [-i imgtype] [-o imgoffset] image [images] [start-stop]\n",
+    TFPRINTF(stderr,
+	_TSK_T
+	("usage: %s [-aAbelvV] [-f fstype] [-i imgtype] [-o imgoffset] image [images] [start-stop]\n"),
 	progname);
-    fprintf(stderr, "\t-b: no block padding\n");
-    fprintf(stderr, "\t-e: every block\n");
-    fprintf(stderr, "\t-l: print details in time machine list format\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr, "\t-b: no block padding\n");
+    tsk_fprintf(stderr, "\t-e: every block\n");
+    tsk_fprintf(stderr,
+	"\t-l: print details in time machine list format\n");
+    tsk_fprintf(stderr, "\t-a: Display allocated blocks\n");
+    tsk_fprintf(stderr, "\t-A: Display unallocated blocks\n");
+    tsk_fprintf(stderr,
 	"\t-f fstype: File system type (use '-f list' for supported types)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-i imgtype: The format of the image file (use '-i list' for supported types)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-o imgoffset: The offset of the file system in the image (in sectors)\n");
-    fprintf(stderr,
+    tsk_fprintf(stderr,
 	"\t-s: print slack space only (other flags are ignored\n");
-    fprintf(stderr, "\t-v: verbose to stderr\n");
-    fprintf(stderr, "\t-V: print version\n");
+    tsk_fprintf(stderr, "\t-v: verbose to stderr\n");
+    tsk_fprintf(stderr, "\t-V: print version\n");
 
     exit(1);
 }
@@ -62,68 +67,73 @@ usage()
 /* main - open file system, list block info */
 
 int
-main(int argc, char **argv)
+MAIN(int argc, TSK_TCHAR ** argv)
 {
+    TSK_TCHAR *fstype = NULL;
+    TSK_TCHAR *imgtype = NULL, *cp, *dash;
     FS_INFO *fs;
+    IMG_INFO *img;
     DADDR_T bstart = 0, blast = 0;
     int ch;
     int flags =
 	FS_FLAG_DATA_UNALLOC | FS_FLAG_DATA_ALIGN | FS_FLAG_DATA_META |
 	FS_FLAG_DATA_CONT;
-    char *fstype = NULL;
+
     char lclflags = DLS_CAT, set_bounds = 1;
-    char *imgtype = NULL, *cp, *dash;
     SSIZE_T imgoff = 0;
-    IMG_INFO *img;
 
     progname = argv[0];
     setlocale(LC_ALL, "");
 
-    while ((ch = getopt(argc, argv, "bef:i:lo:svV")) > 0) {
+    while ((ch = getopt(argc, argv, _TSK_T("aAbef:i:lo:svV"))) > 0) {
 	switch (ch) {
-	case '?':
+	case _TSK_T('?'):
 	default:
-	    fprintf(stderr, "Invalid argument: %s\n", argv[optind]);
+	    TFPRINTF(stderr, _TSK_T("Invalid argument: %s\n"),
+		argv[optind]);
 	    usage();
-	case 'b':
-	    flags &= ~FS_FLAG_DATA_ALIGN;
-	    break;
-	case 'e':
+	case _TSK_T('a'):
 	    flags |= FS_FLAG_DATA_ALLOC;
 	    break;
-	case 'f':
+	case _TSK_T('A'):
+	    flags |= FS_FLAG_DATA_UNALLOC;
+	    break;
+	case _TSK_T('b'):
+	    flags &= ~FS_FLAG_DATA_ALIGN;
+	    break;
+	case _TSK_T('e'):
+	    flags |= (FS_FLAG_DATA_ALLOC | FS_FLAG_DATA_UNALLOC);
+	    break;
+	case _TSK_T('f'):
 	    fstype = optarg;
-	    if (strcmp(fstype, "list") == 0) {
+	    if (TSTRCMP(fstype, _TSK_T("list")) == 0) {
 		fs_print_types(stderr);
 		exit(1);
 	    }
-
 	    break;
-	case 'i':
+	case _TSK_T('i'):
 	    imgtype = optarg;
-	    if (strcmp(imgtype, "list") == 0) {
+	    if (TSTRCMP(imgtype, _TSK_T("list")) == 0) {
 		img_print_types(stderr);
 		exit(1);
 	    }
-
 	    break;
-	case 'l':
+	case _TSK_T('l'):
 	    lclflags = DLS_LIST;
 	    break;
-	case 'o':
+	case _TSK_T('o'):
 	    if ((imgoff = parse_offset(optarg)) == -1) {
 		tsk_error_print(stderr);
 		exit(1);
 	    }
 	    break;
-
-	case 's':
+	case _TSK_T('s'):
 	    lclflags |= DLS_SLACK;
 	    break;
-	case 'v':
+	case _TSK_T('v'):
 	    verbose++;
 	    break;
-	case 'V':
+	case _TSK_T('V'):
 	    print_version(stdout);
 	    exit(0);
 	}
@@ -132,15 +142,14 @@ main(int argc, char **argv)
 
     /* We need at least one more argument */
     if (optind >= argc) {
-	fprintf(stderr, "Missing image name\n");
+	tsk_fprintf(stderr, "Missing image name\n");
 	usage();
     }
 
     /* Slack has only the image name */
     if (lclflags & DLS_SLACK) {
-
 	if (lclflags & DLS_LIST) {
-	    fprintf(stderr,
+	    tsk_fprintf(stderr,
 		"Other options igroned with the slack space flag, try again\n");
 	    exit(1);
 	}
@@ -148,7 +157,7 @@ main(int argc, char **argv)
 	/* There should be no other arguments */
 	img =
 	    img_open(imgtype, argc - optind,
-	    (const char **) &argv[optind]);
+	    (const TSK_TCHAR **) &argv[optind]);
 
 	if (img == NULL) {
 	    tsk_error_print(stderr);
@@ -162,36 +171,32 @@ main(int argc, char **argv)
 	    img->close(img);
 	    exit(1);
 	}
-
     }
     else {
 
-
 	/* We need to determine if the block range was given */
-	if ((dash = strchr(argv[argc - 1], '-')) == NULL) {
+	if ((dash = TSTRCHR(argv[argc - 1], _TSK_T('-'))) == NULL) {
 	    /* No dash in arg - therefore it is an image file name */
 	    if ((img =
 		    img_open(imgtype, argc - optind,
-			(const char **) &argv[optind])) == NULL) {
-
+			(const TSK_TCHAR **) &argv[optind])) == NULL) {
 		tsk_error_print(stderr);
 		exit(1);
 	    }
 
 	    set_bounds = 1;
-
 	}
 	else {
 	    /* We have a dash, but it could be part of the file name */
 	    *dash = '\0';
 
-	    bstart = strtoull(argv[argc - 1], &cp, 0);
+	    bstart = TSTRTOULL(argv[argc - 1], &cp, 0);
 	    if (*cp || cp == argv[argc - 1]) {
 		/* Not a number - consider it a file name */
-		*dash = '-';
+		*dash = _TSK_T('-');
 		if ((img =
 			img_open(imgtype, argc - optind,
-			    (const char **) &argv[optind])) == NULL) {
+			    (const TSK_TCHAR **) &argv[optind])) == NULL) {
 		    tsk_error_print(stderr);
 		    exit(1);
 		}
@@ -201,14 +206,15 @@ main(int argc, char **argv)
 	    else {
 		/* Check after the dash */
 		dash++;
-		blast = strtoull(dash, &cp, 0);
+		blast = TSTRTOULL(dash, &cp, 0);
 		if (*cp || cp == dash) {
 		    /* Not a number - consider it a file name */
 		    dash--;
-		    *dash = '-';
+		    *dash = _TSK_T('-');
 		    if ((img =
 			    img_open(imgtype, argc - optind,
-				(const char **) &argv[optind])) == NULL) {
+				(const TSK_TCHAR **) &argv[optind])) ==
+			NULL) {
 			tsk_error_print(stderr);
 			exit(1);
 		    }
@@ -221,11 +227,11 @@ main(int argc, char **argv)
 		    /* It was a block range, so do not include it in the open */
 		    if ((img =
 			    img_open(imgtype, argc - optind - 1,
-				(const char **) &argv[optind])) == NULL) {
+				(const TSK_TCHAR **) &argv[optind])) ==
+			NULL) {
 			tsk_error_print(stderr);
 			exit(1);
 		    }
-
 		}
 	    }
 	}
@@ -258,7 +264,6 @@ main(int argc, char **argv)
 	fs->close(fs);
 	img->close(img);
 	exit(1);
-
     }
 
     fs->close(fs);

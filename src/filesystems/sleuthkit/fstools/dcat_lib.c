@@ -2,7 +2,7 @@
 ** dcat
 ** The  Sleuth Kit 
 **
-** $Date: 2006/05/11 15:53:20 $
+** $Date: 2006/11/29 22:02:08 $
 **
 ** Given an image , block number, and size, display the contents
 ** of the block to stdout.
@@ -22,14 +22,14 @@
 **
 */
 
-#include "libfstools.h"
+#include "fs_tools_i.h"
 #include <ctype.h>
 
 
 static void
 stats(FS_INFO * fs)
 {
-    printf("%d: Size of Addressable Unit\n", fs->block_size);
+    tsk_printf("%d: Size of Addressable Unit\n", fs->block_size);
 }
 
 
@@ -47,26 +47,46 @@ fs_dcat(FS_INFO * fs, uint8_t lclflags, DADDR_T addr,
 	return 0;
     }
 
+#ifdef TSK_WIN32
+    if (-1 == _setmode(_fileno(stdout), _O_BINARY)) {
+	tsk_error_reset();
+	tsk_errno = TSK_ERR_FS_WRITE;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "dcat_lib: error setting stdout to binary: %s",
+	    strerror(errno));
+	return 1;
+    }
+#endif
+
     /* Multiply number of units by block size  to get size in bytes */
     read_num_bytes = read_num_units * fs->block_size;
 
     if (lclflags & DCAT_HTML) {
-	printf("<html>\n");
-	printf("<head>\n");
-	printf("<title>Unit: %" PRIuDADDR "   Size: %" PRIuOFF
+	tsk_printf("<html>\n");
+	tsk_printf("<head>\n");
+	tsk_printf("<title>Unit: %" PRIuDADDR "   Size: %" PRIuOFF
 	    " bytes</title>\n", addr, read_num_bytes);
-	printf("</head>\n");
-	printf("<body>\n");
+	tsk_printf("</head>\n");
+	tsk_printf("<body>\n");
 
     }
+    if (read_num_bytes > 0xffffffff) {
+	tsk_error_reset();
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "fs_dcat: number of bytes to read is too large -- try dls (%"
+	    PRIuOFF ")", read_num_bytes);
+	return 1;
+    }
 
-    buf = data_buf_alloc(read_num_bytes);
+    buf = data_buf_alloc((size_t) read_num_bytes);
     if (buf == NULL) {
 	return 1;
     }
 
     /* Read the data */
     if (addr > fs->last_block) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "fs_dcat: block is larger than last block in image (%"
@@ -76,8 +96,8 @@ fs_dcat(FS_INFO * fs, uint8_t lclflags, DADDR_T addr,
     cnt = fs_read_block(fs, buf, read_num_bytes, addr);
     if (cnt != (SSIZE_T) read_num_bytes) {
 	if (cnt != -1) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_READ;
-	    tsk_errstr[0] = '\0';
 	}
 	snprintf(tsk_errstr2, TSK_ERRSTR_L,
 	    "dcat: Error reading block at %" PRIuDADDR, addr);
@@ -90,59 +110,59 @@ fs_dcat(FS_INFO * fs, uint8_t lclflags, DADDR_T addr,
 	OFF_T idx1, idx2;
 
 	if (lclflags & DCAT_HTML)
-	    printf("<table border=0>\n");
+	    tsk_printf("<table border=0>\n");
 
 	for (idx1 = 0; idx1 < read_num_bytes; idx1 += 16) {
 	    if (lclflags & DCAT_HTML)
-		printf("<tr><td>%" PRIuOFF "</td>", idx1);
+		tsk_printf("<tr><td>%" PRIuOFF "</td>", idx1);
 	    else
-		printf("%" PRIuOFF "\t", idx1);
+		tsk_printf("%" PRIuOFF "\t", idx1);
 
 
 	    for (idx2 = 0; idx2 < 16; idx2++) {
 		if ((lclflags & DCAT_HTML) && (0 == (idx2 % 4)))
-		    printf("<td>");
+		    tsk_printf("<td>");
 
-		printf("%.2x", buf->data[idx2 + idx1] & 0xff);
+		tsk_printf("%.2x", buf->data[idx2 + idx1] & 0xff);
 
 		if (3 == (idx2 % 4)) {
 		    if (lclflags & DCAT_HTML)
-			printf("</td>");
+			tsk_printf("</td>");
 		    else
-			printf(" ");
+			tsk_printf(" ");
 		}
 	    }
 
-	    printf("\t");
+	    tsk_printf("\t");
 	    for (idx2 = 0; idx2 < 16; idx2++) {
 		if ((lclflags & DCAT_HTML) && (0 == (idx2 % 4)))
-		    printf("<td>");
+		    tsk_printf("<td>");
 
 		if ((isascii((int) buf->data[idx2 + idx1])) &&
 		    (!iscntrl((int) buf->data[idx2 + idx1])))
-		    printf("%c", buf->data[idx2 + idx1]);
+		    tsk_printf("%c", buf->data[idx2 + idx1]);
 		else
-		    printf(".");
+		    tsk_printf(".");
 
 		if (3 == (idx2 % 4)) {
 		    if (lclflags & DCAT_HTML)
-			printf("</td>");
+			tsk_printf("</td>");
 		    else
-			printf(" ");
+			tsk_printf(" ");
 		}
 	    }
 
 	    if (lclflags & DCAT_HTML)
-		printf("</tr>");
+		tsk_printf("</tr>");
 
-	    printf("\n");
+	    tsk_printf("\n");
 	}
 
 
 	if (lclflags & DCAT_HTML)
-	    printf("</table>\n");
+	    tsk_printf("</table>\n");
 	else
-	    printf("\n");
+	    tsk_printf("\n");
 
     }				/* end of if hexdump */
 
@@ -153,25 +173,26 @@ fs_dcat(FS_INFO * fs, uint8_t lclflags, DADDR_T addr,
 
 	    if ((isprint((int) buf->data[idx]))
 		|| (buf->data[idx] == '\t')) {
-		printf("%c", buf->data[idx]);
+		tsk_printf("%c", buf->data[idx]);
 	    }
 	    else if ((buf->data[idx] == '\n') || (buf->data[idx] == '\r')) {
 		if (lclflags & DCAT_HTML)
-		    printf("<br>");
-		printf("%c", buf->data[idx]);
+		    tsk_printf("<br>");
+		tsk_printf("%c", buf->data[idx]);
 	    }
 	    else
-		printf(".");
+		tsk_printf(".");
 	}
 	if (lclflags & DCAT_HTML)
-	    printf("<br>");
+	    tsk_printf("<br>");
 
-	printf("\n");
+	tsk_printf("\n");
     }
 
     /* print raw */
     else {
-	if (fwrite(buf->data, read_num_bytes, 1, stdout) != 1) {
+	if (fwrite(buf->data, (size_t) read_num_bytes, 1, stdout) != 1) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_WRITE;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"dcat_lib: error writing to stdout: %s", strerror(errno));
@@ -180,13 +201,13 @@ fs_dcat(FS_INFO * fs, uint8_t lclflags, DADDR_T addr,
 	}
 
 	if (lclflags & DCAT_HTML)
-	    printf("<br>\n");
+	    tsk_printf("<br>\n");
     }
 
     data_buf_free(buf);
 
     if (lclflags & DCAT_HTML)
-	printf("</body>\n</html>\n");
+	tsk_printf("</body>\n</html>\n");
 
     return 0;
 }

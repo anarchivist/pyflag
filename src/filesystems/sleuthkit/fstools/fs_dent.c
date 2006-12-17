@@ -2,7 +2,7 @@
 ** fs_dent
 ** The Sleuth Kit 
 **
-** $Date: 2006/04/05 03:47:35 $
+** $Date: 2006/12/05 21:39:52 $
 **
 ** Display and manipulate directory entries 
 ** This file contains generic functions that call the appropriate function
@@ -22,10 +22,10 @@
 ** This software is distributed under the Common Public License 1.0
 **
 */
-#include "fs_tools.h"
+#include "fs_tools_i.h"
 #include "ntfs.h"
 
-extern char *tzname[2];
+
 char fs_dent_str[FS_DENT_MAX_STR][2] =
     { "-", "p", "c", "", "d", "", "b", "", "r", "",
     "l", "", "s", "h", "w"
@@ -50,6 +50,8 @@ fs_dent_alloc(ULONG norm_namelen, ULONG shrt_namelen)
 	return NULL;
     }
     fs_dent->name_max = norm_namelen;
+
+    //fs_dent->flags = 0;
 
     fs_dent->shrt_name_max = shrt_namelen;
     if (shrt_namelen == 0) {
@@ -99,6 +101,9 @@ fs_dent_realloc(FS_DENT * fs_dent, ULONG namelen)
 void
 fs_dent_free(FS_DENT * fs_dent)
 {
+    if (!fs_dent)
+	return;
+
     if (fs_dent->fsi)
 	fs_inode_free(fs_dent->fsi);
 
@@ -183,12 +188,12 @@ void
 fs_print_time(FILE * hFile, time_t time)
 {
     if (time <= 0) {
-	fprintf(hFile, "0000.00.00 00:00:00 (UTC)");
+	tsk_fprintf(hFile, "0000.00.00 00:00:00 (UTC)");
     }
     else {
 	struct tm *tmTime = localtime(&time);
 
-	fprintf(hFile, "%.4d.%.2d.%.2d %.2d:%.2d:%.2d (%s)",
+	tsk_fprintf(hFile, "%.4d.%.2d.%.2d %.2d:%.2d:%.2d (%s)",
 	    (int) tmTime->tm_year + 1900,
 	    (int) tmTime->tm_mon + 1, (int) tmTime->tm_mday,
 	    tmTime->tm_hour,
@@ -207,12 +212,12 @@ void
 fs_print_day(FILE * hFile, time_t time)
 {
     if (time <= 0) {
-	fprintf(hFile, "0000.00.00 00:00:00 (UTC)");
+	tsk_fprintf(hFile, "0000.00.00 00:00:00 (UTC)");
     }
     else {
 	struct tm *tmTime = localtime(&time);
 
-	fprintf(hFile, "%.4d.%.2d.%.2d 00:00:00 (%s)",
+	tsk_fprintf(hFile, "%.4d.%.2d.%.2d 00:00:00 (%s)",
 	    (int) tmTime->tm_year + 1900,
 	    (int) tmTime->tm_mon + 1, (int) tmTime->tm_mday,
 	    tzname[(tmTime->tm_isdst == 0) ? 0 : 1]);
@@ -239,48 +244,48 @@ fs_dent_print(FILE * hFile, FS_DENT * fs_dent, int flags, FS_INFO * fs,
 
     /* type of file - based on dentry type */
     if ((fs_dent->ent_type & FS_DENT_MASK) < FS_DENT_MAX_STR)
-	fprintf(hFile, "%s/",
+	tsk_fprintf(hFile, "%s/",
 	    fs_dent_str[fs_dent->ent_type & FS_DENT_MASK]);
     else
-	fprintf(hFile, "-/");
+	tsk_fprintf(hFile, "-/");
 
     /* type of file - based on inode type: we want letters though for
      * regular files so we use the dent_str though */
     if (fs_inode) {
 	int typ = (fs_inode->mode & FS_INODE_FMT) >> FS_INODE_SHIFT;
 	if ((typ & FS_INODE_MASK) < FS_DENT_MAX_STR)
-	    fprintf(hFile, "%s ", fs_dent_str[typ & FS_INODE_MASK]);
+	    tsk_fprintf(hFile, "%s ", fs_dent_str[typ & FS_INODE_MASK]);
 	else
-	    fprintf(hFile, "- ");
+	    tsk_fprintf(hFile, "- ");
     }
     else {
-	fprintf(hFile, "- ");
+	tsk_fprintf(hFile, "- ");
     }
 
 
     /* print a * if it is deleted */
     if (flags & FS_FLAG_NAME_UNALLOC)
-	fprintf(hFile, "* ");
+	tsk_fprintf(hFile, "* ");
 
-    fprintf(hFile, "%" PRIuINUM "", fs_dent->inode);
+    tsk_fprintf(hFile, "%" PRIuINUM "", fs_dent->inode);
 
     /* print the id and type if we have fs_data (NTFS) */
     if (fs_data)
-	fprintf(hFile, "-%lu-%lu", (ULONG) fs_data->type,
+	tsk_fprintf(hFile, "-%lu-%lu", (ULONG) fs_data->type,
 	    (ULONG) fs_data->id);
 
-    fprintf(hFile, "%s:\t",
+    tsk_fprintf(hFile, "%s:\t",
 	((fs_inode) && (fs_inode->flags & FS_FLAG_META_ALLOC) &&
 	    (flags & FS_FLAG_NAME_UNALLOC)) ? "(realloc)" : "");
 
     if (fs_dent->path != NULL)
-	fprintf(hFile, "%s", fs_dent->path);
+	tsk_fprintf(hFile, "%s", fs_dent->path);
 
-    fprintf(hFile, "%s", fs_dent->name);
+    tsk_fprintf(hFile, "%s", fs_dent->name);
 
 /*  This will add the short name in parentheses
     if (fs_dent->shrt_name != NULL && fs_dent->shrt_name[0] != '\0')
-	fprintf(hFile, " (%s)", fs_dent->shrt_name);
+	tsk_fprintf(hFile, " (%s)", fs_dent->shrt_name);
 */
 
     /* print the data stream name if we the non-data NTFS stream */
@@ -289,7 +294,7 @@ fs_dent_print(FILE * hFile, FS_DENT * fs_dent, int flags, FS_INFO * fs,
 		(strcmp(fs_data->name, "$Data") != 0)) ||
 	    ((fs_data->type == NTFS_ATYPE_IDXROOT) &&
 		(strcmp(fs_data->name, "$I30") != 0)))
-	    fprintf(hFile, ":%s", fs_data->name);
+	    tsk_fprintf(hFile, ":%s", fs_data->name);
     }
 
     return;
@@ -312,36 +317,36 @@ fs_dent_print_long(FILE * hFile, FS_DENT * fs_dent, int flags,
 
     if ((fs == NULL) || (fs_inode == NULL)) {
 
-	fprintf(hFile, "\t0000.00.00 00:00:00 (GMT)");
-	fprintf(hFile, "\t0000.00.00 00:00:00 (GMT)");
-	fprintf(hFile, "\t0000.00.00 00:00:00 (GMT)");
+	tsk_fprintf(hFile, "\t0000.00.00 00:00:00 (GMT)");
+	tsk_fprintf(hFile, "\t0000.00.00 00:00:00 (GMT)");
+	tsk_fprintf(hFile, "\t0000.00.00 00:00:00 (GMT)");
 
-	fprintf(hFile, "\t0\t0\t0\n");
+	tsk_fprintf(hFile, "\t0\t0\t0\n");
     }
     else {
 
 	/* MAC times */
-	fprintf(hFile, "\t");
+	tsk_fprintf(hFile, "\t");
 	fs_print_time(hFile, fs_inode->mtime);
 
-	fprintf(hFile, "\t");
+	tsk_fprintf(hFile, "\t");
 	/* FAT only gives the day of last access */
 	if ((fs->ftype & FSMASK) != FATFS_TYPE)
 	    fs_print_time(hFile, fs_inode->atime);
 	else
 	    fs_print_day(hFile, fs_inode->atime);
 
-	fprintf(hFile, "\t");
+	tsk_fprintf(hFile, "\t");
 	fs_print_time(hFile, fs_inode->ctime);
 
 
 	/* use the stream size if one was given */
 	if (fs_data)
-	    fprintf(hFile, "\t%llu", (ULLONG) fs_data->size);
+	    tsk_fprintf(hFile, "\t%llu", (ULLONG) fs_data->size);
 	else
-	    fprintf(hFile, "\t%llu", (ULLONG) fs_inode->size);
+	    tsk_fprintf(hFile, "\t%llu", (ULLONG) fs_inode->size);
 
-	fprintf(hFile, "\t%lu\t%lu\n",
+	tsk_fprintf(hFile, "\t%lu\t%lu\n",
 	    (ULONG) fs_inode->gid, (ULONG) fs_inode->uid);
     }
 
@@ -381,74 +386,74 @@ fs_dent_print_mac(FILE * hFile, FS_DENT * fs_dent, int flags,
     fs_inode = fs_dent->fsi;
 
     /* md5 */
-    fprintf(hFile, "0|");
+    tsk_fprintf(hFile, "0|");
 
     /* file name */
-    fprintf(hFile, "%s%s%s", prefix, fs_dent->path, fs_dent->name);
+    tsk_fprintf(hFile, "%s%s%s", prefix, fs_dent->path, fs_dent->name);
 
     /* print the data stream name if it exists and is not the default NTFS */
     if ((fs_data) && (((fs_data->type == NTFS_ATYPE_DATA) &&
 		(strcmp(fs_data->name, "$Data") != 0)) ||
 	    ((fs_data->type == NTFS_ATYPE_IDXROOT) &&
 		(strcmp(fs_data->name, "$I30") != 0))))
-	fprintf(hFile, ":%s", fs_data->name);
+	tsk_fprintf(hFile, ":%s", fs_data->name);
 
     if ((fs_inode) && ((fs_inode->mode & FS_INODE_FMT) == FS_INODE_LNK) &&
 	(fs_inode->link)) {
-	fprintf(hFile, " -> %s", fs_inode->link);
+	tsk_fprintf(hFile, " -> %s", fs_inode->link);
     }
 
     /* if filename is deleted add a comment and if the inode is now
      * allocated, then add realloc comment */
     if (flags & FS_FLAG_NAME_UNALLOC)
-	fprintf(hFile, " (deleted%s)", ((fs_inode)
+	tsk_fprintf(hFile, " (deleted%s)", ((fs_inode)
 		&& (fs_inode->
 		    flags & FS_FLAG_META_ALLOC)) ? "-realloc" : "");
 
     /* device, inode */
-    fprintf(hFile, "|0|%" PRIuINUM "", fs_dent->inode);
+    tsk_fprintf(hFile, "|0|%" PRIuINUM "", fs_dent->inode);
     if (fs_data)
-	fprintf(hFile, "-%lu-%lu", (ULONG) fs_data->type,
+	tsk_fprintf(hFile, "-%lu-%lu", (ULONG) fs_data->type,
 	    (ULONG) fs_data->id);
 
     /* mode val */
-    fprintf(hFile, "|%lu|", (ULONG) ((fs_inode) ? fs_inode->mode : 0));
+    tsk_fprintf(hFile, "|%lu|", (ULONG) ((fs_inode) ? fs_inode->mode : 0));
 
     /* TYPE as specified in the directory entry 
      * we want '-' for a regular file, so use the inode_str array
      */
     if ((fs_dent->ent_type & FS_DENT_MASK) < FS_INODE_MAX_STR)
-	fprintf(hFile, "%s/",
+	tsk_fprintf(hFile, "%s/",
 	    fs_inode_str[fs_dent->ent_type & FS_DENT_MASK]);
     else
-	fprintf(hFile, "-/");
+	tsk_fprintf(hFile, "-/");
 
     if (!fs_inode) {
-	fprintf(hFile, "----------|0|0|0|0|0|0|0|0|");
+	tsk_fprintf(hFile, "----------|0|0|0|0|0|0|0|0|");
     }
     else {
 
 	/* mode as string */
 	make_ls(fs_inode->mode, ls);
-	fprintf(hFile, "%s|", ls);
+	tsk_fprintf(hFile, "%s|", ls);
 
 	/* num link, uid, gid, rdev */
-	fprintf(hFile, "%d|%d|%d|0|", (int) fs_inode->nlink,
+	tsk_fprintf(hFile, "%d|%d|%d|0|", (int) fs_inode->nlink,
 	    (int) fs_inode->uid, (int) fs_inode->gid);
 
 	/* size - use data stream if we have it */
 	if (fs_data)
-	    fprintf(hFile, "%" PRIuOFF "|", fs_data->size);
+	    tsk_fprintf(hFile, "%" PRIuOFF "|", fs_data->size);
 	else
-	    fprintf(hFile, "%" PRIuOFF "|", fs_inode->size);
+	    tsk_fprintf(hFile, "%" PRIuOFF "|", fs_inode->size);
 
 	/* atime, mtime, ctime */
-	fprintf(hFile, "%lu|%lu|%lu|",
-	    (ULONG) fs_inode->atime, (ULONG) fs_inode->mtime,
-	    (ULONG) fs_inode->ctime);
+	tsk_fprintf(hFile, "%" PRIu32 "|%" PRIu32 "|%" PRIu32 "|",
+	    (uint32_t) fs_inode->atime, (uint32_t) fs_inode->mtime,
+	    (uint32_t) fs_inode->ctime);
     }
 
     /* block size and num of blocks */
-    fprintf(hFile, "%u|0\n", (fs) ? fs->block_size : 0);
+    tsk_fprintf(hFile, "%u|0\n", (fs) ? fs->block_size : 0);
 
 }

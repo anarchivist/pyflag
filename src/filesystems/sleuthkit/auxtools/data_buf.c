@@ -28,10 +28,7 @@
 *--*/
 
 #include <stdlib.h>
-#include "tsk_os.h"
-#include "tsk_types.h"
-#include "data_buf.h"
-#include "mymalloc.h"
+#include "aux_tools.h"
 
 
 /* data_buf_alloc - allocate file system I/O buffer 

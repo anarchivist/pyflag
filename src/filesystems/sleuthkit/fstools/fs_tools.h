@@ -2,7 +2,10 @@
 ** fs_tools
 ** The Sleuth Kit 
 **
-** $Date: 2006/07/10 15:09:56 $
+** This header file is to be included if file system routines
+** are used from the library.  
+**
+** $Date: 2006/12/05 21:39:52 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -17,55 +20,62 @@
 #ifndef _FS_TOOLS_H
 #define _FS_TOOLS_H
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+
+#include "img_tools.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/****************  FILE SYSTEM TYPES SECTION ********************/
+    extern uint8_t fs_parse_type(const TSK_TCHAR *);
+    extern void fs_print_types(FILE *);
+    extern char *fs_get_type(uint8_t);
+
     /*
-     * External interface.
-     */
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdlib.h>
-#include <string.h>
-#include <fcntl.h>
+     * the most-sig-nibble is the file system type, which indictates which
+     * _open function to call.  The least-sig-nibble is the specific type
+     * of implementation.
+     * */
+#define FSMASK                  0xf0
+#define OSMASK                  0x0f
 
-#include <sys/types.h>
-#include <time.h>
-#include <locale.h>
-#include <errno.h>
+#define UNSUPP_FS               0x00
 
-#include "tsk_os.h"
+#define FFS_TYPE                0x10
+#define FFS_1                   0x11	/* UFS1 - FreeBSD, OpenBSD, BSDI ... */
+#define FFS_1B                  0x12	/* Solaris (no type) */
+#define FFS_2                   0x13	/* UFS2 - FreeBSD, NetBSD */
+#define FFSAUTO                 0x14
 
-#if defined (HAVE_UNISTD)
-#include <unistd.h>
-#endif
+#define EXTxFS_TYPE             0x20
+#define EXT2FS                  0x21
+#define EXT3FS                  0x22
+#define EXTAUTO                 0x23
 
-#if !defined (TSK_WIN32)
-#include <sys/fcntl.h>
-#include <sys/param.h>
-#include <sys/time.h>
-#endif
+#define FATFS_TYPE              0x30
+#define FAT12           	0x31
+#define FAT16           	0x32
+#define FAT32           	0x33
+#define FATAUTO         	0x34
 
-#include "tsk_types.h"
+#define NTFS_TYPE               0x40
+#define NTFS                    0x40
 
-#include "libauxtools.h"
-#include "libimgtools.h"
+#define SWAPFS_TYPE             0x50
+#define SWAP                    0x50
 
-#include "fs_types.h"
+#define RAWFS_TYPE              0x60
+#define RAW                     0x60
 
+#define ISO9660_TYPE            0x70
+#define ISO9660                 0x70
 
-#ifndef NBBY
-#define NBBY 8
-#endif
-
-#ifndef isset
-#define isset(a,i)	(((uint8_t *)(a))[(i)/NBBY] &  (1<<((i)%NBBY)))
-#endif
-
-#ifndef setbit
-#define setbit(a,i)     (((uint8_t *)(a))[(i)/NBBY] |= (1<<((i)%NBBY)))
-#endif
+#define HFS_TYPE                0x80
+#define HFS                     0x80
 
 
     typedef struct FS_INFO FS_INFO;
@@ -75,6 +85,7 @@ extern "C" {
     typedef struct FS_DATA_RUN FS_DATA_RUN;
     typedef struct FS_NAME FS_NAME;
     typedef struct FS_JENTRY FS_JENTRY;
+
 
 /* Flags for the return value of inode_walk, block_walk, and dent_walk
  * actions
@@ -90,25 +101,13 @@ extern "C" {
 	void *);
     typedef uint8_t(*FS_DENT_WALK_FN) (FS_INFO *, FS_DENT *, int, void *);
     typedef uint8_t(*FS_FILE_WALK_FN) (FS_INFO *, DADDR_T, char *,
-	unsigned int, int, void *);
+	size_t, int, void *);
 
     typedef uint8_t(*FS_JBLK_WALK_FN) (FS_INFO *, char *, int, void *);
     typedef uint8_t(*FS_JENTRY_WALK_FN) (FS_INFO *, FS_JENTRY *, int,
 	void *);
 
 
-
-
-/* Data structure and action to internally load a file */
-    typedef struct {
-	char *base;
-	char *cur;
-	size_t total;
-	size_t left;
-    } FS_LOAD_FILE;
-
-    extern uint8_t load_file_action(FS_INFO *, DADDR_T, char *,
-	unsigned int, int, void *);
 
 /***************************************************************
  * FS_INFO: Allocated when an image is opened
@@ -139,7 +138,10 @@ extern "C" {
 	/* endian order flag - values defined in misc/tsk_endian.h */
 	uint8_t endian;
 
-
+	TSK_LIST *list_inum_named;	/* list of unallocated inodes that
+					 * are pointed to by a file name -- 
+					 * Used to find orphans
+					 */
 	/* file system specific function pointers */
 	 uint8_t(*block_walk) (FS_INFO *, DADDR_T, DADDR_T, int,
 	    FS_BLOCK_WALK_FN, void *);
@@ -147,7 +149,7 @@ extern "C" {
 	 uint8_t(*inode_walk) (FS_INFO *, INUM_T, INUM_T, int,
 	    FS_INODE_WALK_FN, void *);
 	FS_INODE *(*inode_lookup) (FS_INFO *, INUM_T);
-	 uint8_t(*istat) (FS_INFO *, FILE *, INUM_T, int, int32_t);
+	 uint8_t(*istat) (FS_INFO *, FILE *, INUM_T, DADDR_T, int32_t);
 
 	 uint8_t(*file_walk) (FS_INFO *, FS_INODE *, uint32_t, uint16_t,
 	    int, FS_FILE_WALK_FN, void *);
@@ -178,12 +180,12 @@ extern "C" {
 #define FS_FLAG_NAME_RECURSE (1<<2)	/* recurse on directories */
 
 /* flags that are used for inode_walk and FS_INODE */
-#define FS_FLAG_META_LINK	(1<<0)	/* link count > 0 */
-#define FS_FLAG_META_UNLINK	(1<<1)	/* link count == 0 */
-#define FS_FLAG_META_ALLOC	(1<<2)	/* allocated */
-#define FS_FLAG_META_UNALLOC    (1<<3)	/* unallocated */
-#define FS_FLAG_META_USED	(1<<4)	/* used */
-#define FS_FLAG_META_UNUSED	(1<<5)	/* never used */
+#define FS_FLAG_META_ALLOC	(1<<0)	/* allocated */
+#define FS_FLAG_META_UNALLOC    (1<<1)	/* unallocated */
+#define FS_FLAG_META_USED	(1<<2)	/* used */
+#define FS_FLAG_META_UNUSED	(1<<3)	/* never used */
+#define FS_FLAG_META_ORPHAN	(1<<4)	/* Orphan Files */
+#define FS_FLAG_META_COMP	(1<<5)	/* The file contains compressed data */
 
 /* flags that are used for block_walk and any data units 
  * Including the data units in the action of file_walk */
@@ -194,6 +196,11 @@ extern "C" {
 #define FS_FLAG_DATA_BAD	(1<<4)	/* marked as bad by the FS */
 #define FS_FLAG_DATA_ALIGN	(1<<5)	/* block align (i.e. send a whole block) */
 #define FS_FLAG_DATA_RES	(1<<6)	/* This data is resident (NTFS ONLY) -- used by ntfs_data_walk */
+#define FS_FLAG_DATA_SPARSE	(1<<7)	/* Used to note that the block addr
+					 * is not be accurate since the block
+					 * is sparse (all zeros) */
+#define FS_FLAG_DATA_COMP	(1<<8)	/* This "block" was stored in compressed form */
+
 
 
 
@@ -238,7 +245,7 @@ extern "C" {
 	FS_DATA *next;
 	uint8_t flags;
 	char *name;		/* name of data (if available) */
-	unsigned int nsize;	/* number of allocated bytes for name */
+	size_t nsize;		/* number of allocated bytes for name */
 	uint32_t type;		/* type of attribute */
 	uint16_t id;		/* id of attr, used when duplicate types */
 
@@ -248,7 +255,7 @@ extern "C" {
 	FS_DATA_RUN *run;	/* a linked list of data runs */
 	OFF_T runlen;		/* number of bytes that are allocated in
 				 * original run (larger than size) */
-	uint64_t compsize;	/* size of the compression unit */
+	uint32_t compsize;	/* size of the compression unit */
 
 	/* stream data (resident) */
 	size_t buflen;		/* allocated bytes in buf */
@@ -261,6 +268,33 @@ extern "C" {
 #define	FS_DATA_ENC		0x10	// encrypted
 #define FS_DATA_COMP	0x20	// compressed
 #define FS_DATA_SPAR	0x40	// sparse
+
+
+
+    extern FS_DATA *fs_data_alloc(uint8_t);
+    extern FS_DATA_RUN *fs_data_run_alloc();
+    extern FS_DATA *fs_data_getnew_attr(FS_DATA *, uint8_t);
+    extern void fs_data_clear_list(FS_DATA *);
+
+    extern FS_DATA *fs_data_put_str(FS_DATA *, char *, uint32_t, uint16_t,
+	void *, unsigned int);
+
+    extern FS_DATA *fs_data_put_run(FS_DATA *, DADDR_T, OFF_T,
+	FS_DATA_RUN *, char *, uint32_t, uint16_t, OFF_T, uint8_t,
+	uint32_t);
+
+    extern FS_DATA *fs_data_lookup(FS_DATA *, uint32_t, uint16_t);
+    extern FS_DATA *fs_data_lookup_noid(FS_DATA *, uint32_t);
+
+    extern void fs_data_run_free(FS_DATA_RUN *);
+    extern void fs_data_free(FS_DATA *);
+
+
+
+
+
+
+
 
 
 /* Currently this is only used with NTFS & FAT systems */
@@ -332,6 +366,8 @@ extern "C" {
 	struct FS_INODE *fsi;	/* Inode structure */
 
 	uint8_t ent_type;	/* dir, file etc FS_DENT_??? */
+
+	//int flags;            /* FS_FLAG_NAME_* */
 
 	char *path;		/* prefix to name when recursing */
 	unsigned int pathdepth;	/* current depth of directories */
@@ -432,7 +468,7 @@ extern "C" {
 /**************************************************************8
  * Generic routines.
  */
-    extern FS_INFO *fs_open(IMG_INFO *, SSIZE_T, const char *);
+    extern FS_INFO *fs_open(IMG_INFO *, SSIZE_T, const TSK_TCHAR *);
 
 /* fs_io routines */
     extern SSIZE_T fs_read_block(FS_INFO *, DATA_BUF *, OFF_T, DADDR_T);
@@ -440,26 +476,88 @@ extern "C" {
 #define fs_read_random(fsi, buf, len, offs)	\
 	(fsi)->img_info->read_random((fsi)->img_info, (fsi)->offset, (buf), (len), (offs))
 
+    extern char *fs_load_file(FS_INFO *, FS_INODE *, uint32_t, uint16_t,
+	int);
 
-/* Specific file system routines */
-    extern FS_INFO *ext2fs_open(IMG_INFO *, SSIZE_T, uint8_t, uint8_t);
-    extern FS_INFO *fatfs_open(IMG_INFO *, SSIZE_T, uint8_t, uint8_t);
-    extern FS_INFO *ffs_open(IMG_INFO *, SSIZE_T, uint8_t);
-    extern FS_INFO *ntfs_open(IMG_INFO *, SSIZE_T, uint8_t, uint8_t);
-    extern FS_INFO *rawfs_open(IMG_INFO *, SSIZE_T);
-    extern FS_INFO *swapfs_open(IMG_INFO *, SSIZE_T);
-    extern FS_INFO *iso9660_open(IMG_INFO *, SSIZE_T, unsigned char,
-	uint8_t);
-    extern FS_INFO *hfs_open(IMG_INFO *, SSIZE_T, unsigned char, uint8_t);
+    extern SSIZE_T
+	fs_read_file(FS_INFO *, FS_INODE *, uint32_t, uint16_t,
+	SSIZE_T, SSIZE_T, char *);
+
+    extern SSIZE_T
+	fs_read_file_noid(FS_INFO *, FS_INODE *, SSIZE_T, SSIZE_T, char *);
 
 
-// Endian macros - actual functions in misc/
 
-#define fs_guessu16(fs, x, mag)   \
-	guess_end_u16(&(fs->endian), (x), (mag))
 
-#define fs_guessu32(fs, x, mag)   \
-	guess_end_u32(&(fs->endian), (x), (mag))
+
+
+
+/***** LIBRARY ROUTINES FOR COMMAND LINE FUNCTIONS */
+#define DCALC_DD        0x1
+#define DCALC_DLS       0x2
+#define DCALC_SLACK     0x4
+    extern int8_t fs_dcalc(FS_INFO * fs, uint8_t lclflags, DADDR_T cnt);
+
+
+#define DCAT_HEX                0x1
+#define DCAT_ASCII   0x2
+#define DCAT_HTML       0x4
+#define DCAT_STAT       0x8
+    extern uint8_t fs_dcat(FS_INFO * fs, uint8_t lclflags, DADDR_T addr,
+	DADDR_T read_num_units);
+
+
+#define DLS_CAT     0x01
+#define DLS_LIST    0x02
+#define DLS_SLACK   0x04
+    extern uint8_t fs_dls(FS_INFO * fs, uint8_t lclflags, DADDR_T bstart,
+	DADDR_T bend, int flags);
+
+    extern uint8_t fs_dstat(FS_INFO * fs, uint8_t lclflags, DADDR_T addr,
+	int flags);
+
+#define FFIND_ALL 0x1
+    extern uint8_t fs_ffind(FS_INFO * fs, uint8_t lclflags, INUM_T inode,
+	uint32_t type, uint16_t id, int flags);
+
+
+
+#define FLS_DOT         0x001
+#define FLS_LONG        0x002
+#define FLS_FILE        0x004
+#define FLS_DIR         0x008
+#define FLS_FULL        0x010
+#define FLS_MAC         0x020
+    extern uint8_t fs_fls(FS_INFO * fs, uint8_t lclflags, INUM_T inode,
+	int flags, TSK_TCHAR * pre, int32_t skew);
+
+
+    extern uint8_t fs_icat(FS_INFO * fs, uint8_t lclflags, INUM_T inum,
+	uint32_t type, uint16_t id, int flags);
+
+
+#define IFIND_ALL       0x01
+#define IFIND_PATH      0x04
+#define IFIND_DATA      0x08
+#define IFIND_PAR       0x10
+#define IFIND_PAR_LONG  0x20
+    extern int8_t fs_ifind_path(FS_INFO * fs, uint8_t lclflags,
+	TSK_TCHAR * path, INUM_T * result);
+    extern uint8_t fs_ifind_data(FS_INFO * fs, uint8_t lclflags,
+	DADDR_T blk);
+    extern uint8_t fs_ifind_par(FS_INFO * fs, uint8_t lclflags,
+	INUM_T par);
+
+
+#define ILS_OPEN        (1<<0)
+#define ILS_MAC		(1<<1)
+#define ILS_LINK	(1<<2)
+#define ILS_UNLINK	(1<<3)
+
+    extern uint8_t fs_ils(FS_INFO * fs, uint8_t lclflags, INUM_T istart,
+	INUM_T ilast, int flags, int32_t skew, TSK_TCHAR * img);
+
+
 
 #ifdef __cplusplus
 }

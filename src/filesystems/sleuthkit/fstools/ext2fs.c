@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2006/07/10 17:11:10 $
+** $Date: 2006/12/05 21:39:52 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
@@ -24,8 +24,7 @@
  *	Yorktown Heights, NY 10598, USA
  --*/
 
-#include "fs_tools.h"
-#include "fs_types.h"
+#include "fs_tools_i.h"
 #include "ext2fs.h"
 
 
@@ -45,11 +44,11 @@ ext2fs_group_load(EXT2FS_INFO * ext2fs, EXT2_GRPNUM_T grp_num)
      * Sanity check
      */
     if (grp_num < 0 || grp_num >= ext2fs->groups_count) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "ext2fs_group_load: invalid cylinder group number: %"
 	    PRI_EXT2GRP "", grp_num);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
@@ -75,8 +74,8 @@ ext2fs_group_load(EXT2FS_INFO * ext2fs, EXT2_GRPNUM_T grp_num)
 	sizeof(ext2fs_gd), offs);
     if (cnt != sizeof(ext2fs_gd)) {
 	if (cnt != -1) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_READ;
-	    tsk_errstr[0] = '\0';
 	}
 	snprintf(tsk_errstr2, TSK_ERRSTR_L,
 	    "ext2fs_group_load: Group descriptor %" PRI_EXT2GRP " at %"
@@ -87,12 +86,12 @@ ext2fs_group_load(EXT2FS_INFO * ext2fs, EXT2_GRPNUM_T grp_num)
 
     if (verbose) {
 	FS_INFO *fs = (FS_INFO *) & ext2fs->fs_info;
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "\tgroup %" PRI_EXT2GRP ": %" PRIu16 "/%" PRIu16
-	    " free blocks/inodes\n", grp_num, getu16(fs,
+	    " free blocks/inodes\n", grp_num, getu16(fs->endian,
 		gd->
 		bg_free_blocks_count),
-	    getu16(fs, gd->bg_free_inodes_count));
+	    getu16(fs->endian, gd->bg_free_inodes_count));
     }
 
     return 0;
@@ -145,34 +144,36 @@ ext2fs_bmap_load(EXT2FS_INFO * ext2fs, EXT2_GRPNUM_T grp_num)
     /*
      * Look up the block allocation bitmap.
      */
-    if (getu32(fs, ext2fs->grp_buf->bg_block_bitmap) > fs->last_block) {
+    if (getu32(fs->endian,
+	    ext2fs->grp_buf->bg_block_bitmap) > fs->last_block) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_BLK_NUM;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "ext2fs_bmap_load: Block too large for image: %" PRIu32
-	    "", getu32(fs, ext2fs->grp_buf->bg_block_bitmap));
-	tsk_errstr2[0] = '\0';
+	    "", getu32(fs->endian, ext2fs->grp_buf->bg_block_bitmap));
 	return 1;
     }
 
     cnt = fs_read_block_nobuf(fs, (char *) ext2fs->bmap_buf,
 	ext2fs->fs_info.block_size,
-	(DADDR_T) getu32(fs, ext2fs->grp_buf->bg_block_bitmap));
+	(DADDR_T) getu32(fs->endian, ext2fs->grp_buf->bg_block_bitmap));
 
     if (cnt != ext2fs->fs_info.block_size) {
 	if (cnt != -1) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_READ;
-	    tsk_errstr[0] = '\0';
 	}
 	snprintf(tsk_errstr2, TSK_ERRSTR_L,
 	    "ext2fs_bmap_load: Bitmap group %" PRI_EXT2GRP " at %"
-	    PRIu32, grp_num, getu32(fs, ext2fs->grp_buf->bg_block_bitmap));
+	    PRIu32, grp_num, getu32(fs->endian,
+		ext2fs->grp_buf->bg_block_bitmap));
     }
 
     ext2fs->bmap_grp_num = grp_num;
 
     if (verbose > 1)
 	ext2fs_print_map(ext2fs->bmap_buf,
-	    getu32(fs, ext2fs->fs->s_blocks_per_group));
+	    getu32(fs->endian, ext2fs->fs->s_blocks_per_group));
 
     return 0;
 }
@@ -211,32 +212,35 @@ ext2fs_imap_load(EXT2FS_INFO * ext2fs, EXT2_GRPNUM_T grp_num)
     /*
      * Look up the inode allocation bitmap.
      */
-    if (getu32(fs, ext2fs->grp_buf->bg_inode_bitmap) > fs->last_block) {
+    if (getu32(fs->endian,
+	    ext2fs->grp_buf->bg_inode_bitmap) > fs->last_block) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_BLK_NUM;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "ext2fs_imap_load: Block too large for image: %" PRIu32
-	    "", getu32(fs, ext2fs->grp_buf->bg_inode_bitmap));
+	    "", getu32(fs->endian, ext2fs->grp_buf->bg_inode_bitmap));
     }
 
     cnt = fs_read_block_nobuf(fs,
 	(char *) ext2fs->imap_buf,
 	ext2fs->fs_info.block_size,
-	(DADDR_T) getu32(fs, ext2fs->grp_buf->bg_inode_bitmap));
+	(DADDR_T) getu32(fs->endian, ext2fs->grp_buf->bg_inode_bitmap));
 
     if (cnt != ext2fs->fs_info.block_size) {
 	if (cnt != -1) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_READ;
-	    tsk_errstr[0] = '\0';
 	}
 	snprintf(tsk_errstr2, TSK_ERRSTR_L,
 	    "ext2fs_imap_load: Inode bitmap %" PRI_EXT2GRP " at %"
-	    PRIu32, grp_num, getu32(fs, ext2fs->grp_buf->bg_inode_bitmap));
+	    PRIu32, grp_num, getu32(fs->endian,
+		ext2fs->grp_buf->bg_inode_bitmap));
     }
 
     ext2fs->imap_grp_num = grp_num;
     if (verbose > 1)
 	ext2fs_print_map(ext2fs->imap_buf,
-	    getu32(fs, ext2fs->fs->s_inodes_per_group));
+	    getu32(fs->endian, ext2fs->fs->s_inodes_per_group));
 
     return 0;
 }
@@ -260,10 +264,10 @@ ext2fs_dinode_load(EXT2FS_INFO * ext2fs, INUM_T inum)
      * Sanity check.
      */
     if ((inum < fs->first_inum) || (inum > fs->last_inum)) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_INODE_NUM;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "ext2fs_dinode_load: address: %" PRIuINUM, inum);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
@@ -283,8 +287,8 @@ ext2fs_dinode_load(EXT2FS_INFO * ext2fs, INUM_T inum)
     /*
      * Look up the group descriptor for this inode. 
      */
-    grp_num = (inum - fs->first_inum) /
-	getu32(fs, ext2fs->fs->s_inodes_per_group);
+    grp_num = (EXT2_GRPNUM_T) ((inum - fs->first_inum) /
+	getu32(fs->endian, ext2fs->fs->s_inodes_per_group));
 
     if ((ext2fs->grp_buf == NULL) || (ext2fs->grp_num != grp_num)) {
 	if (ext2fs_group_load(ext2fs, grp_num)) {
@@ -296,16 +300,18 @@ ext2fs_dinode_load(EXT2FS_INFO * ext2fs, INUM_T inum)
      * Look up the inode table block for this inode.
      */
     rel_inum =
-	(inum - 1) - getu32(fs, ext2fs->fs->s_inodes_per_group) * grp_num;
-    addr = (OFF_T) getu32(fs,
-	ext2fs->grp_buf->bg_inode_table) *
-	(OFF_T) fs->block_size + rel_inum * (OFF_T) ext2fs->inode_size;
+	(inum - 1) - getu32(fs->endian,
+	ext2fs->fs->s_inodes_per_group) * grp_num;
+    addr =
+	(OFF_T) getu32(fs->endian,
+	ext2fs->grp_buf->bg_inode_table) * (OFF_T) fs->block_size +
+	rel_inum * (OFF_T) ext2fs->inode_size;
 
     cnt = fs_read_random(fs, (char *) dino, ext2fs->inode_size, addr);
     if (cnt != ext2fs->inode_size) {
 	if (cnt != -1) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_READ;
-	    tsk_errstr[0] = '\0';
 	}
 	snprintf(tsk_errstr2, TSK_ERRSTR_L,
 	    "ext2fs_dinode_load: Inode %" PRIuINUM
@@ -315,23 +321,22 @@ ext2fs_dinode_load(EXT2FS_INFO * ext2fs, INUM_T inum)
 
     ext2fs->dino_inum = inum;
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "%" PRIuINUM " m/l/s=%o/%d/%" PRIuOFF
 	    " u/g=%d/%d macd=%lu/%lu/%lu/%lu\n",
-	    inum, getu16(fs, dino->i_mode),
-	    getu16(fs, dino->i_nlink),
-	    (getu32(fs, dino->i_size) +
-		(getu16(fs, dino->i_mode) & EXT2_IN_REG) ? (uint64_t)
-		getu32(fs, dino->i_size_high) << 32 : 0), getu16(fs,
-		dino->
-		i_uid) +
-	    (getu16(fs, dino->i_uid_high) << 16), getu16(fs,
-		dino->i_gid) +
-	    (getu16(fs, dino->i_gid_high) << 16), (ULONG) getu32(fs,
-		dino->
-		i_mtime),
-	    (ULONG) getu32(fs, dino->i_atime), (ULONG) getu32(fs,
-		dino->i_ctime), (ULONG) getu32(fs, dino->i_dtime));
+	    inum, getu16(fs->endian, dino->i_mode),
+	    getu16(fs->endian, dino->i_nlink),
+	    (getu32(fs->endian, dino->i_size) +
+		(getu16(fs->endian,
+			dino->i_mode) & EXT2_IN_REG) ? (uint64_t)
+		getu32(fs->endian, dino->i_size_high) << 32 : 0),
+	    getu16(fs->endian, dino->i_uid) + (getu16(fs->endian,
+		    dino->i_uid_high) << 16), getu16(fs->endian,
+		dino->i_gid) + (getu16(fs->endian,
+		    dino->i_gid_high) << 16), (ULONG) getu32(fs->endian,
+		dino->i_mtime), (ULONG) getu32(fs->endian, dino->i_atime),
+	    (ULONG) getu32(fs->endian, dino->i_ctime),
+	    (ULONG) getu32(fs->endian, dino->i_dtime));
 
     return 0;
 }
@@ -351,17 +356,17 @@ ext2fs_dinode_copy(EXT2FS_INFO * ext2fs, FS_INODE * fs_inode)
     INUM_T ibase = 0;
 
     if (ext2fs->dino_buf == NULL) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "ext2fs_dinode_copy: dino_buf is NULL");
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
-    fs_inode->mode = getu16(fs, in->i_mode);
-    fs_inode->nlink = getu16(fs, in->i_nlink);
+    fs_inode->mode = getu16(fs->endian, in->i_mode);
+    fs_inode->nlink = getu16(fs->endian, in->i_nlink);
 
-    fs_inode->size = getu32(fs, in->i_size);
+    fs_inode->size = getu32(fs->endian, in->i_size);
 
     fs_inode->addr = ext2fs->dino_inum;
 
@@ -373,19 +378,22 @@ ext2fs_dinode_copy(EXT2FS_INFO * ext2fs, FS_INODE * fs_inode)
      * if there are any large files in the file system
      */
     if ((fs_inode->mode & EXT2_IN_REG) &&
-	(getu32(fs, sb->s_feature_ro_compat) &
+	(getu32(fs->endian, sb->s_feature_ro_compat) &
 	    EXT2FS_FEATURE_RO_COMPAT_LARGE_FILE)) {
-	fs_inode->size += ((uint64_t) getu32(fs, in->i_size_high) << 32);
+	fs_inode->size +=
+	    ((uint64_t) getu32(fs->endian, in->i_size_high) << 32);
     }
 
     fs_inode->uid =
-	getu16(fs, in->i_uid) + (getu16(fs, in->i_uid_high) << 16);
+	getu16(fs->endian, in->i_uid) + (getu16(fs->endian,
+	    in->i_uid_high) << 16);
     fs_inode->gid =
-	getu16(fs, in->i_gid) + (getu16(fs, in->i_gid_high) << 16);
-    fs_inode->mtime = getu32(fs, in->i_mtime);
-    fs_inode->atime = getu32(fs, in->i_atime);
-    fs_inode->ctime = getu32(fs, in->i_ctime);
-    fs_inode->dtime = getu32(fs, in->i_dtime);
+	getu16(fs->endian, in->i_gid) + (getu16(fs->endian,
+	    in->i_gid_high) << 16);
+    fs_inode->mtime = getu32(fs->endian, in->i_mtime);
+    fs_inode->atime = getu32(fs->endian, in->i_atime);
+    fs_inode->ctime = getu32(fs->endian, in->i_ctime);
+    fs_inode->dtime = getu32(fs->endian, in->i_dtime);
 
     fs_inode->seq = 0;
 
@@ -404,11 +412,11 @@ ext2fs_dinode_copy(EXT2FS_INFO * ext2fs, FS_INODE * fs_inode)
     }
 
     for (i = 0; i < EXT2FS_NDADDR; i++)
-	fs_inode->direct_addr[i] = gets32(fs, in->i_block[i]);
+	fs_inode->direct_addr[i] = gets32(fs->endian, in->i_block[i]);
 
     for (i = 0; i < EXT2FS_NIADDR; i++)
 	fs_inode->indir_addr[i] =
-	    gets32(fs, in->i_block[i + EXT2FS_NDADDR]);
+	    gets32(fs->endian, in->i_block[i + EXT2FS_NDADDR]);
 
 
     /* set the link string 
@@ -418,9 +426,10 @@ ext2fs_dinode_copy(EXT2FS_INFO * ext2fs, FS_INODE * fs_inode)
     if (((fs_inode->mode & FS_INODE_FMT) == FS_INODE_LNK) &&
 	(fs_inode->size < EXT2FS_MAXPATHLEN) && (fs_inode->size >= 0)) {
 	unsigned int count = 0;
+	int i;
 
-
-	if ((fs_inode->link = mymalloc(fs_inode->size + 1)) == NULL)
+	if ((fs_inode->link =
+		mymalloc((size_t) (fs_inode->size + 1))) == NULL)
 	    return 1;
 
 	/* it is located directly in the pointers */
@@ -459,16 +468,16 @@ ext2fs_dinode_copy(EXT2FS_INFO * ext2fs, FS_INODE * fs_inode)
 
 		int read_count =
 		    (fs_inode->size - count <
-		    fs->block_size) ? fs_inode->size -
-		    count : fs->block_size;
+		    fs->block_size) ? (int) (fs_inode->size -
+		    count) : (int) (fs->block_size);
 
 		cnt = fs_read_block(fs, data_buf, fs->block_size,
 		    fs_inode->direct_addr[i]);
 
 		if (cnt != fs->block_size) {
 		    if (cnt != -1) {
+			tsk_error_reset();
 			tsk_errno = TSK_ERR_FS_READ;
-			tsk_errstr[0] = '\0';
 		    }
 		    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 			"ext2fs_dinode_copy: symlink destination from %"
@@ -487,11 +496,18 @@ ext2fs_dinode_copy(EXT2FS_INFO * ext2fs, FS_INODE * fs_inode)
 	    data_buf_free(data_buf);
 	}
 
+	/* Clean up name */
+	i = 0;
+	while (fs_inode->link[i] != '\0') {
+	    if (TSK_IS_CNTRL(fs_inode->link[i]))
+		fs_inode->link[i] = '^';
+	    i++;
+	}
     }
 
     /* Fill in the flags value */
-    grp_num = (ext2fs->dino_inum - fs->first_inum) /
-	getu32(fs, ext2fs->fs->s_inodes_per_group);
+    grp_num = (EXT2_GRPNUM_T) ((ext2fs->dino_inum - fs->first_inum) /
+	getu32(fs->endian, ext2fs->fs->s_inodes_per_group));
 
     if (ext2fs->imap_grp_num != grp_num) {
 	if (ext2fs_imap_load(ext2fs, grp_num)) {
@@ -499,7 +515,7 @@ ext2fs_dinode_copy(EXT2FS_INFO * ext2fs, FS_INODE * fs_inode)
 	}
     }
 
-    ibase = grp_num * getu32(fs, ext2fs->fs->s_inodes_per_group) +
+    ibase = grp_num * getu32(fs->endian, ext2fs->fs->s_inodes_per_group) +
 	fs->first_inum;
 
     /*
@@ -507,9 +523,6 @@ ext2fs_dinode_copy(EXT2FS_INFO * ext2fs, FS_INODE * fs_inode)
      */
     fs_inode->flags = (isset(ext2fs->imap_buf, ext2fs->dino_inum - ibase) ?
 	FS_FLAG_META_ALLOC : FS_FLAG_META_UNALLOC);
-
-    fs_inode->flags |= (fs_inode->nlink ?
-	FS_FLAG_META_LINK : FS_FLAG_META_UNLINK);
 
     /*
      * Apply the used/unused restriction.
@@ -531,6 +544,9 @@ ext2fs_inode_lookup(FS_INFO * fs, INUM_T inum)
     EXT2FS_INFO *ext2fs = (EXT2FS_INFO *) fs;
     FS_INODE *fs_inode;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     if ((fs_inode = fs_inode_alloc(EXT2FS_NDADDR, EXT2FS_NIADDR)) == NULL)
 	return NULL;
 
@@ -547,11 +563,23 @@ ext2fs_inode_lookup(FS_INFO * fs, INUM_T inum)
     return (fs_inode);
 }
 
+
+static uint8_t
+inode_walk_dent_orphan_act(FS_INFO * fs, FS_DENT * fs_dent, int flags,
+    void *ptr)
+{
+    if ((fs_dent->fsi) && (fs_dent->fsi->flags & FS_FLAG_META_UNALLOC)) {
+	if (tsk_list_add(&fs->list_inum_named, fs_dent->fsi->addr))
+	    return WALK_STOP;
+    }
+    return WALK_CONT;
+}
+
+
 /* ext2fs_inode_walk - inode iterator 
  *
  * flags used: FS_FLAG_META_USED, FS_FLAG_META_UNUSED,
- *  FS_FLAG_META_LINK, FS_FLAG_META_UNLINK,
- *  FS_FLAG_META_ALLOC, FS_FLAG_META_UNALLOC
+ *  FS_FLAG_META_ALLOC, FS_FLAG_META_UNALLOC, FS_FLAG_META_ORPHAN
  *
  *  Return 1 on error and 0 on success
 */
@@ -569,24 +597,64 @@ ext2fs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
     int myflags;
 
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     /*
      * Sanity checks.
      */
     if (start_inum < fs->first_inum || start_inum > fs->last_inum) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "%s: start inode: %" PRIuINUM "", myname, start_inum);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
     if (end_inum < fs->first_inum || end_inum > fs->last_inum
 	|| end_inum < start_inum) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "%s: end inode: %" PRIuINUM "", myname, end_inum);
-	tsk_errstr2[0] = '\0';
 	return 1;
+    }
+
+    /* If ORPHAN is wanted, then make sure that the flags are correct */
+    if (flags & FS_FLAG_META_ORPHAN) {
+	flags |= FS_FLAG_META_UNALLOC;
+	flags &= ~FS_FLAG_META_ALLOC;
+    }
+    else if (((flags & FS_FLAG_META_ALLOC) == 0) &&
+	((flags & FS_FLAG_META_UNALLOC) == 0)) {
+	flags |= (FS_FLAG_META_ALLOC | FS_FLAG_META_UNALLOC);
+    }
+
+    /* If neither of the USED or UNUSED flags are set, then set them
+     * both
+     */
+    if (((flags & FS_FLAG_META_USED) == 0) &&
+	((flags & FS_FLAG_META_UNUSED) == 0)) {
+	flags |= (FS_FLAG_META_USED | FS_FLAG_META_UNUSED);
+    }
+
+
+
+    /* If we are looking for orphan files and have not yet filled
+     * in the list of unalloc inodes that are pointed to, then fill
+     * in the list
+     */
+    if ((flags & FS_FLAG_META_ORPHAN) && (fs->list_inum_named == NULL)) {
+
+	if (ext2fs_dent_walk(fs, fs->root_inum,
+		FS_FLAG_NAME_ALLOC | FS_FLAG_NAME_UNALLOC |
+		FS_FLAG_NAME_RECURSE, inode_walk_dent_orphan_act, NULL)) {
+	    strncat(tsk_errstr2,
+		" - ext2fs_inode_walk: identifying inodes allocated by file names",
+		TSK_ERRSTR_L);
+	    return 1;
+	}
+
     }
 
     if ((fs_inode = fs_inode_alloc(EXT2FS_NDADDR, EXT2FS_NIADDR)) == NULL)
@@ -602,20 +670,24 @@ ext2fs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 	 * Be sure to use the proper group descriptor data. XXX Linux inodes
 	 * start at 1, as in Fortran.
 	 */
-	grp_num = (inum - 1) / getu32(fs, ext2fs->fs->s_inodes_per_group);
+	grp_num =
+	    (EXT2_GRPNUM_T) ((inum - 1) / getu32(fs->endian,
+		ext2fs->fs->s_inodes_per_group));
 	if ((ext2fs->imap_buf == NULL)
 	    || (ext2fs->imap_grp_num != grp_num)) {
 	    if (ext2fs_imap_load(ext2fs, grp_num)) {
 		return 1;
 	    }
 	    ibase =
-		grp_num * getu32(fs, ext2fs->fs->s_inodes_per_group) + 1;
+		grp_num * getu32(fs->endian,
+		ext2fs->fs->s_inodes_per_group) + 1;
 	}
 
 	/* In case we didn't need to load it the bitmap */
 	else if (inum == start_inum) {
 	    ibase =
-		grp_num * getu32(fs, ext2fs->fs->s_inodes_per_group) + 1;
+		grp_num * getu32(fs->endian,
+		ext2fs->fs->s_inodes_per_group) + 1;
 	}
 
 	/*
@@ -631,24 +703,25 @@ ext2fs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 	    return 1;
 	}
 
-	/*
-	 * Apply the linked/unlinked restriction.
-	 */
-	myflags |= (getu16(fs, ext2fs->dino_buf->i_nlink) ?
-	    FS_FLAG_META_LINK : FS_FLAG_META_UNLINK);
-
-	if ((flags & myflags) != myflags)
-	    continue;
 
 	/*
 	 * Apply the used/unused restriction.
 	 */
-
-	myflags |= (getu32(fs, ext2fs->dino_buf->i_ctime) ?
+	myflags |= (getu32(fs->endian, ext2fs->dino_buf->i_ctime) ?
 	    FS_FLAG_META_USED : FS_FLAG_META_UNUSED);
 
 	if ((flags & myflags) != myflags)
 	    continue;
+
+	/* If we want only orphans, then check if this
+	 * inode is in the seen list
+	 */
+	if ((myflags & FS_FLAG_META_UNALLOC) &&
+	    (flags & FS_FLAG_META_ORPHAN) &&
+	    (tsk_list_find(fs->list_inum_named, inum))) {
+	    continue;
+	}
+
 
 	/*
 	 * Fill in a file system-independent inode structure and pass control
@@ -699,24 +772,34 @@ ext2fs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
     DADDR_T dmin = 0;		/* first block after inodes */
     int myflags;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     /*
      * Sanity checks.
      */
     if (start_blk < fs->first_block || start_blk > fs->last_block) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "%s: start block: %" PRIuDADDR, myname, start_blk);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
     if (end_blk < fs->first_block || end_blk > fs->last_block
 	|| end_blk < start_blk) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "%s: end block: %" PRIuDADDR, myname, end_blk);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
+
+    /* Sanity check on flags -- make sure at least one ALLOC is set */
+    if (((flags & FS_FLAG_DATA_ALLOC) == 0) &&
+	((flags & FS_FLAG_DATA_UNALLOC) == 0)) {
+	flags |= (FS_FLAG_DATA_ALLOC | FS_FLAG_DATA_UNALLOC);
+    }
+
 
     if ((data_buf = data_buf_alloc(fs->block_size)) == NULL) {
 	return 1;
@@ -739,7 +822,7 @@ ext2fs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
 	 * s_first_data_block field.
 	 */
 #define INODE_TABLE_SIZE(ext2fs) \
-    ((getu32(fs, ext2fs->fs->s_inodes_per_group) * ext2fs->inode_size - 1) \
+    ((getu32(fs->endian, ext2fs->fs->s_inodes_per_group) * ext2fs->inode_size - 1) \
            / fs->block_size + 1)
 
 	/* This is meta data that is not described in the groups */
@@ -752,8 +835,8 @@ ext2fs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
 
 		if (cnt != fs->block_size) {
 		    if (cnt != -1) {
+			tsk_error_reset();
 			tsk_errno = TSK_ERR_FS_READ;
-			tsk_errstr[0] = '\0';
 		    }
 		    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 			"ext2fs_block_walk: metadata block %"
@@ -786,28 +869,28 @@ ext2fs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
 	    }
 
 	    dbase = ext2_cgbase_lcl(fs, ext2fs->fs, grp_num);
-	    dmin = getu32(fs, ext2fs->grp_buf->bg_inode_table) +
+	    dmin = getu32(fs->endian, ext2fs->grp_buf->bg_inode_table) +
 		INODE_TABLE_SIZE(ext2fs);
 
 	    if (verbose)
-		fprintf(stderr,
+		tsk_fprintf(stderr,
 		    "block_walk: loading group %" PRI_EXT2GRP
 		    " dbase %" PRIuDADDR " bmap +%" PRIuDADDR
 		    " imap +%" PRIuDADDR " inos +%" PRIuDADDR "..%"
 		    PRIuDADDR "\n", grp_num, dbase,
-		    (DADDR_T) getu32(fs, ext2fs->grp_buf->bg_block_bitmap)
-		    - dbase, (DADDR_T) getu32(fs,
-			ext2fs->grp_buf->
-			bg_inode_bitmap) - dbase,
-		    (DADDR_T) getu32(fs,
-			ext2fs->grp_buf->bg_inode_table) -
-		    dbase, dmin - 1 - dbase);
+		    (DADDR_T) getu32(fs->endian,
+			ext2fs->grp_buf->bg_block_bitmap)
+		    - dbase, (DADDR_T) getu32(fs->endian,
+			ext2fs->grp_buf->bg_inode_bitmap) - dbase,
+		    (DADDR_T) getu32(fs->endian,
+			ext2fs->grp_buf->bg_inode_table) - dbase,
+		    dmin - 1 - dbase);
 
 	}
 	/* In case we didn't need to load the bmap */
 	else if ((addr == start_blk) || (addr == ext2fs->first_data_block)) {
 	    dbase = ext2_cgbase_lcl(fs, ext2fs->fs, grp_num);
-	    dmin = getu32(fs, ext2fs->grp_buf->bg_inode_table) +
+	    dmin = getu32(fs->endian, ext2fs->grp_buf->bg_inode_table) +
 		INODE_TABLE_SIZE(ext2fs);
 	}
 
@@ -833,10 +916,13 @@ ext2fs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
 	    FS_FLAG_DATA_ALLOC : FS_FLAG_DATA_UNALLOC);
 
 	if ((addr >= dbase
-		&& addr < getu32(fs, ext2fs->grp_buf->bg_block_bitmap))
-	    || (addr == getu32(fs, ext2fs->grp_buf->bg_block_bitmap))
-	    || (addr == getu32(fs, ext2fs->grp_buf->bg_inode_bitmap))
-	    || (addr >= getu32(fs, ext2fs->grp_buf->bg_inode_table)
+		&& addr < getu32(fs->endian,
+		    ext2fs->grp_buf->bg_block_bitmap))
+	    || (addr == getu32(fs->endian,
+		    ext2fs->grp_buf->bg_block_bitmap))
+	    || (addr == getu32(fs->endian,
+		    ext2fs->grp_buf->bg_inode_bitmap))
+	    || (addr >= getu32(fs->endian, ext2fs->grp_buf->bg_inode_table)
 		&& addr < dmin))
 	    myflags |= FS_FLAG_DATA_META;
 	else
@@ -857,8 +943,8 @@ ext2fs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
 
 	    if (cnt != fs->block_size) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		    "ext2fs_block_walk: block %" PRIuDADDR, addr);
@@ -901,15 +987,16 @@ ext2fs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
  */
 static SSIZE_T
 ext2fs_file_walk_direct(FS_INFO * fs, DATA_BUF * buf[],
-    OFF_T length, uint32_t addr, int flags,
+    OFF_T length, DADDR_T addr, int flags,
     FS_FILE_WALK_FN action, void *ptr)
 {
-    OFF_T read_count;
+    size_t read_count;
     int myflags;
 
-    read_count = (length < buf[0]->size ? length : buf[0]->size);
+    read_count = (length < buf[0]->size ? (size_t) length : buf[0]->size);
 
     if (addr > fs->last_block) {
+	tsk_error_reset();
 	if (flags & FS_FLAG_FILE_RECOVER)
 	    tsk_errno = TSK_ERR_FS_RECOVER;
 	else
@@ -917,7 +1004,6 @@ ext2fs_file_walk_direct(FS_INFO * fs, DATA_BUF * buf[],
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "ext2: Invalid direct address (too large): %"
 	    PRIuDADDR "", (DADDR_T) addr);
-	tsk_errstr2[0] = '\0';
 	return -1;
     }
 
@@ -929,9 +1015,12 @@ ext2fs_file_walk_direct(FS_INFO * fs, DATA_BUF * buf[],
 	    int retval;
 
 	    if ((flags & FS_FLAG_FILE_AONLY) == 0)
-		memset(buf[0]->data, 0, read_count);
+		memset(buf[0]->data, 0, (size_t) read_count);
 
-	    retval = action(fs, addr, buf[0]->data, read_count,
+	    myflags |= (FS_FLAG_DATA_SPARSE | FS_FLAG_DATA_ALLOC);
+
+	    retval =
+		action(fs, addr, buf[0]->data, (unsigned int) read_count,
 		myflags, ptr);
 	    if (retval == WALK_STOP)
 		return 0;
@@ -947,8 +1036,8 @@ ext2fs_file_walk_direct(FS_INFO * fs, DATA_BUF * buf[],
 	    cnt = fs_read_block(fs, buf[0], rounded_size, addr);
 	    if (cnt != (SSIZE_T) rounded_size) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		    "ext2fs_file_walk_direct: block %" PRIuDADDR,
@@ -957,14 +1046,16 @@ ext2fs_file_walk_direct(FS_INFO * fs, DATA_BUF * buf[],
 	    }
 	}
 
-	retval = action(fs, addr, buf[0]->data, read_count, myflags, ptr);
+	retval =
+	    action(fs, addr, buf[0]->data, (unsigned int) read_count,
+	    myflags, ptr);
 	if (retval == WALK_STOP)
 	    return 0;
 	else if (retval == WALK_ERROR)
 	    return -1;
     }
 
-    return (read_count);
+    return (SSIZE_T) (read_count);
 }
 
 
@@ -976,7 +1067,7 @@ ext2fs_file_walk_direct(FS_INFO * fs, DATA_BUF * buf[],
  */
 static SSIZE_T
 ext2fs_file_walk_indir(FS_INFO * fs, DATA_BUF * buf[], OFF_T length,
-    uint32_t addr, int level, int flags, FS_FILE_WALK_FN action, void *ptr)
+    DADDR_T addr, int level, int flags, FS_FILE_WALK_FN action, void *ptr)
 {
     char *myname = "extXfs_file_walk_indir";
     OFF_T todo_count = length;
@@ -984,10 +1075,11 @@ ext2fs_file_walk_indir(FS_INFO * fs, DATA_BUF * buf[], OFF_T length,
     unsigned int n;
 
     if (verbose)
-	fprintf(stderr, "%s: level %d block %" PRIu32 "\n", myname, level,
-	    addr);
+	tsk_fprintf(stderr, "%s: level %d block %" PRIu32 "\n", myname,
+	    level, addr);
 
     if (addr > fs->last_block) {
+	tsk_error_reset();
 	if (flags & FS_FLAG_FILE_RECOVER)
 	    tsk_errno = TSK_ERR_FS_RECOVER;
 	else
@@ -995,7 +1087,6 @@ ext2fs_file_walk_indir(FS_INFO * fs, DATA_BUF * buf[], OFF_T length,
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "ext2fs: Indirect block address too large: %"
 	    PRIuDADDR, (DADDR_T) addr);
-	tsk_errstr2[0] = '\0';
 	return -1;
 
     }
@@ -1011,8 +1102,8 @@ ext2fs_file_walk_indir(FS_INFO * fs, DATA_BUF * buf[], OFF_T length,
 	cnt = fs_read_block(fs, buf[level], buf[level]->size, addr);
 	if (cnt != buf[level]->size) {
 	    if (cnt != -1) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_READ;
-		tsk_errstr[0] = '\0';
 	    }
 	    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		"ext2fs_file_walk_indir: Block %" PRIuDADDR,
@@ -1025,8 +1116,8 @@ ext2fs_file_walk_indir(FS_INFO * fs, DATA_BUF * buf[], OFF_T length,
 	int myflags = FS_FLAG_DATA_META;
 	int retval;
 	retval =
-	    action(fs, addr, buf[level]->data, buf[level]->size, myflags,
-	    ptr);
+	    action(fs, addr, buf[level]->data,
+	    (unsigned int) buf[level]->size, myflags, ptr);
 	if (retval == WALK_STOP)
 	    return 0;
 	else if (retval == WALK_ERROR)
@@ -1042,25 +1133,26 @@ ext2fs_file_walk_indir(FS_INFO * fs, DATA_BUF * buf[], OFF_T length,
 	n++) {
 	OFF_T prevcnt = todo_count;
 
-	if (getu32(fs, (uint8_t *) & iaddr[n]) > fs->last_block) {
+	if (getu32(fs->endian, (uint8_t *) & iaddr[n]) > fs->last_block) {
+	    tsk_error_reset();
 	    if (flags & FS_FLAG_FILE_RECOVER)
 		tsk_errno = TSK_ERR_FS_RECOVER;
 	    else
 		tsk_errno = TSK_ERR_FS_INODE_INT;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"ext2fs: Address in indirect block too large: %"
-		PRIu32, getu32(fs, (uint8_t *) & iaddr[n]));
-	    tsk_errstr2[0] = '\0';
+		PRIu32, getu32(fs->endian, (uint8_t *) & iaddr[n]));
 	    return -1;
 	}
 
 
 	if (level == 1)
 	    todo_count -= ext2fs_file_walk_direct(fs, buf, todo_count,
-		getu32(fs, (uint8_t *) & iaddr[n]), flags, action, ptr);
+		getu32(fs->endian, (uint8_t *) & iaddr[n]), flags, action,
+		ptr);
 	else
 	    todo_count -= ext2fs_file_walk_indir(fs, buf, todo_count,
-		getu32(fs,
+		getu32(fs->endian,
 		    (uint8_t *) &
 		    iaddr[n]), level - 1, flags, action, ptr);
 
@@ -1071,7 +1163,7 @@ ext2fs_file_walk_indir(FS_INFO * fs, DATA_BUF * buf[], OFF_T length,
 	    return -1;
     }
 
-    return (length - todo_count);
+    return (SSIZE_T) (length - todo_count);
 }
 
 
@@ -1100,8 +1192,11 @@ ext2fs_file_walk(FS_INFO * fs, FS_INODE * inode, uint32_t type,
     SSIZE_T read_b = 0;
 
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "ext2fs_file_walk: Processing file %" PRIuINUM "\n",
 	    inode->addr);
 
@@ -1193,10 +1288,10 @@ ext2fs_file_walk(FS_INFO * fs, FS_INODE * inode, uint32_t type,
 static uint8_t
 ext2fs_fscheck(FS_INFO * fs, FILE * hFile)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L,
 	"fscheck not implemented yet for Ext3");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
@@ -1213,166 +1308,170 @@ ext2fs_fsstat(FS_INFO * fs, FILE * hFile)
     time_t tmptime;
 
 
-    fprintf(hFile, "FILE SYSTEM INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
+    // clean up any error messages that are lying around
+    tsk_error_reset();
 
-    fprintf(hFile, "File System Type: %s\n",
+    tsk_fprintf(hFile, "FILE SYSTEM INFORMATION\n");
+    tsk_fprintf(hFile, "--------------------------------------------\n");
+
+    tsk_fprintf(hFile, "File System Type: %s\n",
 	(fs->ftype == EXT3FS) ? "Ext3" : "Ext2");
-    fprintf(hFile, "Volume Name: %s\n", sb->s_volume_name);
-    fprintf(hFile, "Volume ID: %" PRIx64 "%" PRIx64 "\n",
-	getu64(fs, &sb->s_uuid[8]), getu64(fs, &sb->s_uuid[0]));
+    tsk_fprintf(hFile, "Volume Name: %s\n", sb->s_volume_name);
+    tsk_fprintf(hFile, "Volume ID: %" PRIx64 "%" PRIx64 "\n",
+	getu64(fs->endian, &sb->s_uuid[8]), getu64(fs->endian,
+	    &sb->s_uuid[0]));
 
-    tmptime = getu32(fs, sb->s_wtime);
-    fprintf(hFile, "\nLast Written at: %s",
+    tmptime = getu32(fs->endian, sb->s_wtime);
+    tsk_fprintf(hFile, "\nLast Written at: %s",
 	(tmptime > 0) ? asctime(localtime(&tmptime)) : "empty");
-    tmptime = getu32(fs, sb->s_lastcheck);
-    fprintf(hFile, "Last Checked at: %s",
+    tmptime = getu32(fs->endian, sb->s_lastcheck);
+    tsk_fprintf(hFile, "Last Checked at: %s",
 	(tmptime > 0) ? asctime(localtime(&tmptime)) : "empty");
 
-    tmptime = getu32(fs, sb->s_mtime);
-    fprintf(hFile, "\nLast Mounted at: %s",
+    tmptime = getu32(fs->endian, sb->s_mtime);
+    tsk_fprintf(hFile, "\nLast Mounted at: %s",
 	(tmptime > 0) ? asctime(localtime(&tmptime)) : "empty");
 
     /* State of the file system */
-    if (getu16(fs, sb->s_state) & EXT2FS_STATE_VALID)
-	fprintf(hFile, "Unmounted properly\n");
+    if (getu16(fs->endian, sb->s_state) & EXT2FS_STATE_VALID)
+	tsk_fprintf(hFile, "Unmounted properly\n");
     else
-	fprintf(hFile, "Unmounted Improperly\n");
+	tsk_fprintf(hFile, "Unmounted Improperly\n");
 
     if (sb->s_last_mounted != '\0')
-	fprintf(hFile, "Last mounted on: %s\n", sb->s_last_mounted);
+	tsk_fprintf(hFile, "Last mounted on: %s\n", sb->s_last_mounted);
 
-    fprintf(hFile, "\nSource OS: ");
-    switch (getu32(fs, sb->s_creator_os)) {
+    tsk_fprintf(hFile, "\nSource OS: ");
+    switch (getu32(fs->endian, sb->s_creator_os)) {
     case EXT2FS_OS_LINUX:
-	fprintf(hFile, "Linux\n");
+	tsk_fprintf(hFile, "Linux\n");
 	break;
     case EXT2FS_OS_HURD:
-	fprintf(hFile, "HURD\n");
+	tsk_fprintf(hFile, "HURD\n");
 	break;
     case EXT2FS_OS_MASIX:
-	fprintf(hFile, "MASIX\n");
+	tsk_fprintf(hFile, "MASIX\n");
 	break;
     case EXT2FS_OS_FREEBSD:
-	fprintf(hFile, "FreeBSD\n");
+	tsk_fprintf(hFile, "FreeBSD\n");
 	break;
     case EXT2FS_OS_LITES:
-	fprintf(hFile, "LITES\n");
+	tsk_fprintf(hFile, "LITES\n");
 	break;
     default:
-	fprintf(hFile, "%" PRIx32 "\n", getu32(fs, sb->s_creator_os));
+	tsk_fprintf(hFile, "%" PRIx32 "\n", getu32(fs->endian,
+		sb->s_creator_os));
 	break;
     }
 
-    if (getu32(fs, sb->s_rev_level) == EXT2FS_REV_ORIG)
-	fprintf(hFile, "Static Structure\n");
+    if (getu32(fs->endian, sb->s_rev_level) == EXT2FS_REV_ORIG)
+	tsk_fprintf(hFile, "Static Structure\n");
     else
-	fprintf(hFile, "Dynamic Structure\n");
+	tsk_fprintf(hFile, "Dynamic Structure\n");
 
 
     /* add features */
-    if (getu32(fs, sb->s_feature_compat)) {
-	fprintf(hFile, "Compat Features: ");
+    if (getu32(fs->endian, sb->s_feature_compat)) {
+	tsk_fprintf(hFile, "Compat Features: ");
 
-	if (getu32(fs, sb->s_feature_compat) &
+	if (getu32(fs->endian, sb->s_feature_compat) &
 	    EXT2FS_FEATURE_COMPAT_DIR_PREALLOC)
-	    fprintf(hFile, "Dir Prealloc, ");
-	if (getu32(fs, sb->s_feature_compat) &
+	    tsk_fprintf(hFile, "Dir Prealloc, ");
+	if (getu32(fs->endian, sb->s_feature_compat) &
 	    EXT2FS_FEATURE_COMPAT_IMAGIC_INODES)
-	    fprintf(hFile, "iMagic inodes, ");
-	if (getu32(fs, sb->s_feature_compat) &
+	    tsk_fprintf(hFile, "iMagic inodes, ");
+	if (getu32(fs->endian, sb->s_feature_compat) &
 	    EXT2FS_FEATURE_COMPAT_HAS_JOURNAL)
-	    fprintf(hFile, "Journal, ");
-	if (getu32(fs, sb->s_feature_compat) &
+	    tsk_fprintf(hFile, "Journal, ");
+	if (getu32(fs->endian, sb->s_feature_compat) &
 	    EXT2FS_FEATURE_COMPAT_EXT_ATTR)
-	    fprintf(hFile, "Ext Attributes, ");
-	if (getu32(fs, sb->s_feature_compat) &
+	    tsk_fprintf(hFile, "Ext Attributes, ");
+	if (getu32(fs->endian, sb->s_feature_compat) &
 	    EXT2FS_FEATURE_COMPAT_RESIZE_INO)
-	    fprintf(hFile, "Resize Inode, ");
-	if (getu32(fs, sb->s_feature_compat) &
+	    tsk_fprintf(hFile, "Resize Inode, ");
+	if (getu32(fs->endian, sb->s_feature_compat) &
 	    EXT2FS_FEATURE_COMPAT_DIR_INDEX)
-	    fprintf(hFile, "Dir Index");
+	    tsk_fprintf(hFile, "Dir Index");
 
-	fprintf(hFile, "\n");
+	tsk_fprintf(hFile, "\n");
     }
 
-    if (getu32(fs, sb->s_feature_incompat)) {
-	fprintf(hFile, "InCompat Features: ");
+    if (getu32(fs->endian, sb->s_feature_incompat)) {
+	tsk_fprintf(hFile, "InCompat Features: ");
 
-	if (getu32(fs, sb->s_feature_incompat) &
+	if (getu32(fs->endian, sb->s_feature_incompat) &
 	    EXT2FS_FEATURE_INCOMPAT_COMPRESSION)
-	    fprintf(hFile, "Compression, ");
-	if (getu32(fs, sb->s_feature_incompat) &
+	    tsk_fprintf(hFile, "Compression, ");
+	if (getu32(fs->endian, sb->s_feature_incompat) &
 	    EXT2FS_FEATURE_INCOMPAT_FILETYPE)
-	    fprintf(hFile, "Filetype, ");
-	if (getu32(fs, sb->s_feature_incompat) &
+	    tsk_fprintf(hFile, "Filetype, ");
+	if (getu32(fs->endian, sb->s_feature_incompat) &
 	    EXT2FS_FEATURE_INCOMPAT_RECOVER)
-	    fprintf(hFile, "Needs Recovery, ");
-	if (getu32(fs, sb->s_feature_incompat) &
+	    tsk_fprintf(hFile, "Needs Recovery, ");
+	if (getu32(fs->endian, sb->s_feature_incompat) &
 	    EXT2FS_FEATURE_INCOMPAT_JOURNAL_DEV)
-	    fprintf(hFile, "Journal Dev");
+	    tsk_fprintf(hFile, "Journal Dev");
 
-	fprintf(hFile, "\n");
+	tsk_fprintf(hFile, "\n");
     }
 
-    if (getu32(fs, sb->s_feature_ro_compat)) {
-	fprintf(hFile, "Read Only Compat Features: ");
+    if (getu32(fs->endian, sb->s_feature_ro_compat)) {
+	tsk_fprintf(hFile, "Read Only Compat Features: ");
 
-	if (getu32(fs, sb->s_feature_ro_compat) &
+	if (getu32(fs->endian, sb->s_feature_ro_compat) &
 	    EXT2FS_FEATURE_RO_COMPAT_SPARSE_SUPER)
-	    fprintf(hFile, "Sparse Super, ");
-	if (getu32(fs, sb->s_feature_ro_compat) &
+	    tsk_fprintf(hFile, "Sparse Super, ");
+	if (getu32(fs->endian, sb->s_feature_ro_compat) &
 	    EXT2FS_FEATURE_RO_COMPAT_LARGE_FILE)
-	    fprintf(hFile, "Has Large Files, ");
-	if (getu32(fs, sb->s_feature_ro_compat) &
+	    tsk_fprintf(hFile, "Has Large Files, ");
+	if (getu32(fs->endian, sb->s_feature_ro_compat) &
 	    EXT2FS_FEATURE_RO_COMPAT_BTREE_DIR)
-	    fprintf(hFile, "Btree Dir");
+	    tsk_fprintf(hFile, "Btree Dir");
 
-	fprintf(hFile, "\n");
-
+	tsk_fprintf(hFile, "\n");
     }
 
     /* Print journal information */
-    if (getu32(fs, sb->s_feature_compat) &
+    if (getu32(fs->endian, sb->s_feature_compat) &
 	EXT2FS_FEATURE_COMPAT_HAS_JOURNAL) {
 
-	fprintf(hFile, "\nJournal ID: %" PRIx64 "%" PRIx64 "\n",
-	    getu64(fs, &sb->s_journal_uuid[8]),
-	    getu64(fs, &sb->s_journal_uuid[0]));
+	tsk_fprintf(hFile, "\nJournal ID: %" PRIx64 "%" PRIx64 "\n",
+	    getu64(fs->endian, &sb->s_journal_uuid[8]),
+	    getu64(fs->endian, &sb->s_journal_uuid[0]));
 
-	if (getu32(fs, sb->s_journal_inum) != 0)
-	    fprintf(hFile, "Journal Inode: %" PRIu32 "\n",
-		getu32(fs, sb->s_journal_inum));
+	if (getu32(fs->endian, sb->s_journal_inum) != 0)
+	    tsk_fprintf(hFile, "Journal Inode: %" PRIu32 "\n",
+		getu32(fs->endian, sb->s_journal_inum));
 
-	if (getu32(fs, sb->s_journal_dev) != 0)
-	    fprintf(hFile, "Journal Device: %" PRIu32 "\n",
-		getu32(fs, sb->s_journal_dev));
+	if (getu32(fs->endian, sb->s_journal_dev) != 0)
+	    tsk_fprintf(hFile, "Journal Device: %" PRIu32 "\n",
+		getu32(fs->endian, sb->s_journal_dev));
 
 
     }
 
-    fprintf(hFile, "\nMETADATA INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
+    tsk_fprintf(hFile, "\nMETADATA INFORMATION\n");
+    tsk_fprintf(hFile, "--------------------------------------------\n");
 
-    fprintf(hFile, "Inode Range: %" PRIuINUM " - %" PRIuINUM "\n",
+    tsk_fprintf(hFile, "Inode Range: %" PRIuINUM " - %" PRIuINUM "\n",
 	fs->first_inum, fs->last_inum);
-    fprintf(hFile, "Root Directory: %" PRIuINUM "\n", fs->root_inum);
+    tsk_fprintf(hFile, "Root Directory: %" PRIuINUM "\n", fs->root_inum);
 
-    fprintf(hFile, "Free Inodes: %" PRIu32 "\n",
-	getu32(fs, sb->s_free_inode_count));
+    tsk_fprintf(hFile, "Free Inodes: %" PRIu32 "\n",
+	getu32(fs->endian, sb->s_free_inode_count));
 
 
-    if (getu32(fs, sb->s_last_orphan)) {
+    if (getu32(fs->endian, sb->s_last_orphan)) {
 	uint32_t or_in;
-	fprintf(hFile, "Orphan Inodes: ");
-	or_in = getu32(fs, sb->s_last_orphan);
+	tsk_fprintf(hFile, "Orphan Inodes: ");
+	or_in = getu32(fs->endian, sb->s_last_orphan);
 	while (or_in) {
 	    FS_INODE *fsi;
 
 	    if ((or_in > fs->last_inum) || (or_in < fs->first_inum))
 		break;
 
-	    fprintf(hFile, "%" PRIu32 ", ", or_in);
+	    tsk_fprintf(hFile, "%" PRIu32 ", ", or_in);
 
 	    /* Get the next one */
 	    fsi = ext2fs_inode_lookup(fs, or_in);
@@ -1382,43 +1481,45 @@ ext2fs_fsstat(FS_INFO * fs, FILE * hFile)
 		break;
 	    }
 
-	    or_in = fsi->dtime;
+	    or_in = (uint32_t) fsi->dtime;
 	    fs_inode_free(fsi);
 	}
-	fprintf(hFile, "\n");
+	tsk_fprintf(hFile, "\n");
     }
 
-    fprintf(hFile, "\nCONTENT INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
+    tsk_fprintf(hFile, "\nCONTENT INFORMATION\n");
+    tsk_fprintf(hFile, "--------------------------------------------\n");
 
-    fprintf(hFile, "Block Range: %" PRIuDADDR " - %" PRIuDADDR "\n",
+    tsk_fprintf(hFile, "Block Range: %" PRIuDADDR " - %" PRIuDADDR "\n",
 	fs->first_block, fs->last_block);
 
-    fprintf(hFile, "Block Size: %u\n", fs->block_size);
+    tsk_fprintf(hFile, "Block Size: %u\n", fs->block_size);
 
-    if (getu32(fs, sb->s_first_data_block))
-	fprintf(hFile,
+    if (getu32(fs->endian, sb->s_first_data_block))
+	tsk_fprintf(hFile,
 	    "Reserved Blocks Before Block Groups: %" PRIu32 "\n",
-	    getu32(fs, sb->s_first_data_block));
+	    getu32(fs->endian, sb->s_first_data_block));
 
-    fprintf(hFile, "Free Blocks: %" PRIu32 "\n",
-	getu32(fs, sb->s_free_blocks_count));
+    tsk_fprintf(hFile, "Free Blocks: %" PRIu32 "\n",
+	getu32(fs->endian, sb->s_free_blocks_count));
 
-    fprintf(hFile, "\nBLOCK GROUP INFORMATION\n");
-    fprintf(hFile, "--------------------------------------------\n");
+    tsk_fprintf(hFile, "\nBLOCK GROUP INFORMATION\n");
+    tsk_fprintf(hFile, "--------------------------------------------\n");
 
-    fprintf(hFile, "Number of Block Groups: %" PRI_EXT2GRP "\n",
+    tsk_fprintf(hFile, "Number of Block Groups: %" PRI_EXT2GRP "\n",
 	ext2fs->groups_count);
 
-    fprintf(hFile, "Inodes per group: %" PRIu32 "\n",
-	getu32(fs, sb->s_inodes_per_group));
-    fprintf(hFile, "Blocks per group: %" PRIu32 "\n",
-	getu32(fs, sb->s_blocks_per_group));
+    tsk_fprintf(hFile, "Inodes per group: %" PRIu32 "\n",
+	getu32(fs->endian, sb->s_inodes_per_group));
+    tsk_fprintf(hFile, "Blocks per group: %" PRIu32 "\n",
+	getu32(fs->endian, sb->s_blocks_per_group));
 
 
     /* number of blocks the inodes consume */
-    ibpg = (getu32(fs, sb->s_inodes_per_group) * ext2fs->inode_size +
-	fs->block_size - 1) / fs->block_size;
+    ibpg =
+	(getu32(fs->endian,
+	    sb->s_inodes_per_group) * ext2fs->inode_size + fs->block_size -
+	1) / fs->block_size;
 
     for (i = 0; i < ext2fs->groups_count; i++) {
 	DADDR_T cg_base;
@@ -1427,36 +1528,41 @@ ext2fs_fsstat(FS_INFO * fs, FILE * hFile)
 	if (ext2fs_group_load(ext2fs, i)) {
 	    return 1;
 	}
-	fprintf(hFile, "\nGroup: %d:\n", i);
+	tsk_fprintf(hFile, "\nGroup: %d:\n", i);
 
-	inum = fs->first_inum + gets32(fs, sb->s_inodes_per_group) * i;
-	fprintf(hFile, "  Inode Range: %" PRIuINUM " - ", inum);
+	inum =
+	    fs->first_inum + gets32(fs->endian,
+	    sb->s_inodes_per_group) * i;
+	tsk_fprintf(hFile, "  Inode Range: %" PRIuINUM " - ", inum);
 
-	if ((inum + gets32(fs, sb->s_inodes_per_group) - 1) <
+	if ((inum + gets32(fs->endian, sb->s_inodes_per_group) - 1) <
 	    fs->last_inum)
-	    fprintf(hFile, "%" PRIuINUM "\n",
-		inum + gets32(fs, sb->s_inodes_per_group) - 1);
+	    tsk_fprintf(hFile, "%" PRIuINUM "\n",
+		inum + gets32(fs->endian, sb->s_inodes_per_group) - 1);
 	else
-	    fprintf(hFile, "%" PRIuINUM "\n", fs->last_inum);
+	    tsk_fprintf(hFile, "%" PRIuINUM "\n", fs->last_inum);
 
 
 	cg_base = ext2_cgbase_lcl(fs, sb, i);
 
-	fprintf(hFile, "  Block Range: %" PRIuDADDR " - %" PRIuDADDR "\n",
-	    cg_base,
-	    ((ext2_cgbase_lcl(fs, sb, i + 1) - 1) < fs->last_block) ?
-	    (ext2_cgbase_lcl(fs, sb, i + 1) - 1) : fs->last_block);
+	tsk_fprintf(hFile,
+	    "  Block Range: %" PRIuDADDR " - %" PRIuDADDR "\n", cg_base,
+	    ((ext2_cgbase_lcl(fs, sb,
+			i + 1) - 1) <
+		fs->last_block) ? (ext2_cgbase_lcl(fs, sb,
+		    i + 1) - 1) : fs->last_block);
 
 
-	fprintf(hFile, "  Layout:\n");
+	tsk_fprintf(hFile, "  Layout:\n");
 
 	/* only print the super block data if we are not in a sparse
 	 * group 
 	 */
-	if (((getu32(fs, ext2fs->fs->s_feature_ro_compat) &
+	if (((getu32(fs->endian, ext2fs->fs->s_feature_ro_compat) &
 		    EXT2FS_FEATURE_RO_COMPAT_SPARSE_SUPER) &&
-		(cg_base != getu32(fs, ext2fs->grp_buf->bg_block_bitmap)))
-	    || ((getu32(fs,
+		(cg_base != getu32(fs->endian,
+			ext2fs->grp_buf->bg_block_bitmap)))
+	    || ((getu32(fs->endian,
 			ext2fs->fs->
 			s_feature_ro_compat) &
 		    EXT2FS_FEATURE_RO_COMPAT_SPARSE_SUPER) == 0)) {
@@ -1464,7 +1570,7 @@ ext2fs_fsstat(FS_INFO * fs, FILE * hFile)
 	    OFF_T boff;
 
 	    /* the super block is the first 1024 bytes */
-	    fprintf(hFile,
+	    tsk_fprintf(hFile,
 		"    Super Block: %" PRIuDADDR " - %" PRIuDADDR "\n",
 		cg_base,
 		cg_base +
@@ -1474,11 +1580,12 @@ ext2fs_fsstat(FS_INFO * fs, FILE * hFile)
 	    boff = roundup(sizeof(ext2fs_sb), fs->block_size);
 
 	    /* Group Descriptors */
-	    fprintf(hFile, "    Group Descriptor Table: %" PRIuDADDR " - ",
+	    tsk_fprintf(hFile,
+		"    Group Descriptor Table: %" PRIuDADDR " - ",
 		(cg_base + (boff + fs->block_size - 1) / fs->block_size));
 
 	    boff += (ext2fs->groups_count * sizeof(ext2fs_gd));
-	    fprintf(hFile, "%" PRIuDADDR "\n",
+	    tsk_fprintf(hFile, "%" PRIuDADDR "\n",
 		((cg_base +
 			(boff + fs->block_size - 1) / fs->block_size) -
 		    1));
@@ -1486,41 +1593,43 @@ ext2fs_fsstat(FS_INFO * fs, FILE * hFile)
 
 
 	/* The block bitmap is a full block */
-	fprintf(hFile, "    Data bitmap: %" PRIu32 " - %" PRIu32 "\n",
-	    getu32(fs, ext2fs->grp_buf->bg_block_bitmap),
-	    getu32(fs, ext2fs->grp_buf->bg_block_bitmap));
+	tsk_fprintf(hFile, "    Data bitmap: %" PRIu32 " - %" PRIu32 "\n",
+	    getu32(fs->endian, ext2fs->grp_buf->bg_block_bitmap),
+	    getu32(fs->endian, ext2fs->grp_buf->bg_block_bitmap));
 
 
 	/* The inode bitmap is a full block */
-	fprintf(hFile, "    Inode bitmap: %" PRIu32 " - %" PRIu32 "\n",
-	    getu32(fs, ext2fs->grp_buf->bg_inode_bitmap),
-	    getu32(fs, ext2fs->grp_buf->bg_inode_bitmap));
+	tsk_fprintf(hFile, "    Inode bitmap: %" PRIu32 " - %" PRIu32 "\n",
+	    getu32(fs->endian, ext2fs->grp_buf->bg_inode_bitmap),
+	    getu32(fs->endian, ext2fs->grp_buf->bg_inode_bitmap));
 
 
-	fprintf(hFile, "    Inode Table: %" PRIu32 " - %" PRIu32 "\n",
-	    getu32(fs, ext2fs->grp_buf->bg_inode_table),
-	    getu32(fs, ext2fs->grp_buf->bg_inode_table) + ibpg - 1);
+	tsk_fprintf(hFile, "    Inode Table: %" PRIu32 " - %" PRIu32 "\n",
+	    getu32(fs->endian, ext2fs->grp_buf->bg_inode_table),
+	    getu32(fs->endian,
+		ext2fs->grp_buf->bg_inode_table) + ibpg - 1);
 
 
-	fprintf(hFile, "    Data Blocks: ");
+	tsk_fprintf(hFile, "    Data Blocks: ");
 
 	/* If we are in a sparse group, display the other addresses */
-	if ((getu32(fs, ext2fs->fs->s_feature_ro_compat) &
+	if ((getu32(fs->endian, ext2fs->fs->s_feature_ro_compat) &
 		EXT2FS_FEATURE_RO_COMPAT_SPARSE_SUPER) &&
-	    (cg_base == getu32(fs, ext2fs->grp_buf->bg_block_bitmap))) {
+	    (cg_base == getu32(fs->endian,
+		    ext2fs->grp_buf->bg_block_bitmap))) {
 
 	    /* it goes from the end of the inode bitmap to before the
 	     * table
 	     *
 	     * This hard coded aspect does not scale ...
 	     */
-	    fprintf(hFile, "%" PRIu32 " - %" PRIu32 ", ",
-		getu32(fs, ext2fs->grp_buf->bg_inode_bitmap) + 1,
-		getu32(fs, ext2fs->grp_buf->bg_inode_table) - 1);
+	    tsk_fprintf(hFile, "%" PRIu32 " - %" PRIu32 ", ",
+		getu32(fs->endian, ext2fs->grp_buf->bg_inode_bitmap) + 1,
+		getu32(fs->endian, ext2fs->grp_buf->bg_inode_table) - 1);
 	}
 
-	fprintf(hFile, "%" PRIuDADDR " - %" PRIuDADDR "\n",
-	    (uint64_t) getu32(fs,
+	tsk_fprintf(hFile, "%" PRIuDADDR " - %" PRIuDADDR "\n",
+	    (uint64_t) getu32(fs->endian,
 		ext2fs->grp_buf->bg_inode_table) + ibpg,
 	    ((ext2_cgbase_lcl(fs, sb, i + 1) - 1) <
 		fs->last_block) ? (ext2_cgbase_lcl(fs, sb,
@@ -1532,50 +1641,53 @@ ext2fs_fsstat(FS_INFO * fs, FILE * hFile)
 
 	/* The last group may not have a full number of blocks */
 	if (i != (ext2fs->groups_count - 1)) {
-	    fprintf(hFile, "  Free Inodes: %" PRIu16 " (%" PRIu32 "%%)\n",
-		getu16(fs, ext2fs->grp_buf->bg_free_inodes_count),
-		(100 *
-		    getu16(fs,
+	    tsk_fprintf(hFile,
+		"  Free Inodes: %" PRIu16 " (%" PRIu32 "%%)\n",
+		getu16(fs->endian, ext2fs->grp_buf->bg_free_inodes_count),
+		(100 * getu16(fs->endian,
 			ext2fs->grp_buf->bg_free_inodes_count)) /
-		getu32(fs, sb->s_inodes_per_group));
+		getu32(fs->endian, sb->s_inodes_per_group));
 
-	    fprintf(hFile, "  Free Blocks: %" PRIu16 " (%" PRIu32 "%%)\n",
-		getu16(fs, ext2fs->grp_buf->bg_free_blocks_count),
-		(100 *
-		    getu16(fs,
+	    tsk_fprintf(hFile,
+		"  Free Blocks: %" PRIu16 " (%" PRIu32 "%%)\n",
+		getu16(fs->endian, ext2fs->grp_buf->bg_free_blocks_count),
+		(100 * getu16(fs->endian,
 			ext2fs->grp_buf->bg_free_blocks_count)) /
-		getu32(fs, sb->s_blocks_per_group));
+		getu32(fs->endian, sb->s_blocks_per_group));
 	}
 	else {
-	    int num_left;
+	    INUM_T inum_left;
+	    DADDR_T blk_left;
 
-	    num_left = fs->last_inum % gets32(fs, sb->s_inodes_per_group);
-	    if (num_left == 0)
-		num_left = getu32(fs, sb->s_inodes_per_group);
+	    inum_left =
+		fs->last_inum % gets32(fs->endian, sb->s_inodes_per_group);
+	    if (inum_left == 0)
+		inum_left = getu32(fs->endian, sb->s_inodes_per_group);
 
-	    fprintf(hFile, "  Free Inodes: %" PRIu16 " (%d%%)\n",
-		getu16(fs, ext2fs->grp_buf->bg_free_inodes_count),
+	    tsk_fprintf(hFile, "  Free Inodes: %" PRIu16 " (%d%%)\n",
+		getu16(fs->endian, ext2fs->grp_buf->bg_free_inodes_count),
 		(100 *
-		    getu16(fs,
+		    getu16(fs->endian,
 			ext2fs->grp_buf->bg_free_inodes_count)) /
-		num_left);
+		inum_left);
 
 	    /* Now blocks */
-	    num_left =
-		fs->block_count % getu32(fs, sb->s_blocks_per_group);
-	    if (num_left == 0)
-		num_left = getu32(fs, sb->s_blocks_per_group);
+	    blk_left =
+		fs->block_count % getu32(fs->endian,
+		sb->s_blocks_per_group);
+	    if (blk_left == 0)
+		blk_left = getu32(fs->endian, sb->s_blocks_per_group);
 
-	    fprintf(hFile, "  Free Blocks: %" PRIu16 " (%d%%)\n",
-		getu16(fs, ext2fs->grp_buf->bg_free_blocks_count),
+	    tsk_fprintf(hFile, "  Free Blocks: %" PRIu16 " (%d%%)\n",
+		getu16(fs->endian, ext2fs->grp_buf->bg_free_blocks_count),
 		(100 *
-		    getu16(fs,
+		    getu16(fs->endian,
 			ext2fs->grp_buf->bg_free_blocks_count)) /
-		num_left);
+		blk_left);
 	}
 
-	fprintf(hFile, "  Total Directories: %" PRIu16 "\n",
-	    getu16(fs, ext2fs->grp_buf->bg_used_dirs_count));
+	tsk_fprintf(hFile, "  Total Directories: %" PRIu16 "\n",
+	    getu16(fs->endian, ext2fs->grp_buf->bg_used_dirs_count));
     }
 
     return 0;
@@ -1628,23 +1740,24 @@ typedef struct {
 /* Callback for istat to print the block addresses */
 static uint8_t
 print_addr_act(FS_INFO * fs, DADDR_T addr, char *buf,
-    unsigned int size, int flags, void *ptr)
+    size_t size, int flags, void *ptr)
 {
     EXT2FS_PRINT_ADDR *print = (EXT2FS_PRINT_ADDR *) ptr;
 
     if (flags & FS_FLAG_DATA_CONT) {
-	int i, s;
+	int i;
+	size_t s;
 	/* cycle through the blocks if they exist */
 	for (i = 0, s = size; s > 0; s -= fs->block_size, i++) {
 
 	    /* sparse file */
 	    if (addr)
-		fprintf(print->hFile, "%" PRIuDADDR " ", addr + i);
+		tsk_fprintf(print->hFile, "%" PRIuDADDR " ", addr + i);
 	    else
-		fprintf(print->hFile, "0 ");
+		tsk_fprintf(print->hFile, "0 ");
 
 	    if (++(print->idx) == 8) {
-		fprintf(print->hFile, "\n");
+		tsk_fprintf(print->hFile, "\n");
 		print->idx = 0;
 	    }
 	}
@@ -1661,7 +1774,7 @@ print_addr_act(FS_INFO * fs, DADDR_T addr, char *buf,
 
 /* Return 1 on error and 0 on success */
 static uint8_t
-ext2fs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
+ext2fs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, DADDR_T numblock,
     int32_t sec_skew)
 {
     EXT2FS_INFO *ext2fs = (EXT2FS_INFO *) fs;
@@ -1669,74 +1782,78 @@ ext2fs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
     char ls[12];
     EXT2FS_PRINT_ADDR print;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     if ((fs_inode = ext2fs_inode_lookup(fs, inum)) == NULL) {
 	strncat(tsk_errstr2, " - istat",
 	    TSK_ERRSTR_L - strlen(tsk_errstr2));
 	return 1;
     }
-    fprintf(hFile, "inode: %" PRIuINUM "\n", inum);
-    fprintf(hFile, "%sAllocated\n",
+    tsk_fprintf(hFile, "inode: %" PRIuINUM "\n", inum);
+    tsk_fprintf(hFile, "%sAllocated\n",
 	(fs_inode->flags & FS_FLAG_META_ALLOC) ? "" : "Not ");
 
-    fprintf(hFile, "Group: %lu\n", (ULONG) ext2fs->grp_num);
-    fprintf(hFile, "Generation Id: %" PRIu32 "\n",
-	getu32(fs, ext2fs->dino_buf->i_generation));
+    tsk_fprintf(hFile, "Group: %lu\n", (ULONG) ext2fs->grp_num);
+    tsk_fprintf(hFile, "Generation Id: %" PRIu32 "\n",
+	getu32(fs->endian, ext2fs->dino_buf->i_generation));
 
     if (fs_inode->link)
-	fprintf(hFile, "symbolic link to: %s\n", fs_inode->link);
+	tsk_fprintf(hFile, "symbolic link to: %s\n", fs_inode->link);
 
-    fprintf(hFile, "uid / gid: %d / %d\n",
+    tsk_fprintf(hFile, "uid / gid: %d / %d\n",
 	(int) fs_inode->uid, (int) fs_inode->gid);
 
     make_ls(fs_inode->mode, ls);
-    fprintf(hFile, "mode: %s\n", ls);
+    tsk_fprintf(hFile, "mode: %s\n", ls);
 
     /* Print the device ids */
     if (((fs_inode->mode & FS_INODE_FMT) == FS_INODE_BLK) ||
 	((fs_inode->mode & FS_INODE_FMT) == FS_INODE_CHR)) {
-	fprintf(hFile, "Device Major: %" PRIu8 "   Minor: %" PRIu8 "\n",
+	tsk_fprintf(hFile,
+	    "Device Major: %" PRIu8 "   Minor: %" PRIu8 "\n",
 	    ext2fs->dino_buf->i_block[0][1],
 	    ext2fs->dino_buf->i_block[0][0]);
     }
 
-    if (getu32(fs, ext2fs->dino_buf->i_flags)) {
-	fprintf(hFile, "Flags: ");
-	if (getu32(fs, ext2fs->dino_buf->i_flags) & EXT2_IN_SECDEL)
-	    fprintf(hFile, "Secure Delete, ");
+    if (getu32(fs->endian, ext2fs->dino_buf->i_flags)) {
+	tsk_fprintf(hFile, "Flags: ");
+	if (getu32(fs->endian, ext2fs->dino_buf->i_flags) & EXT2_IN_SECDEL)
+	    tsk_fprintf(hFile, "Secure Delete, ");
 
-	if (getu32(fs, ext2fs->dino_buf->i_flags) & EXT2_IN_UNRM)
-	    fprintf(hFile, "Undelete, ");
+	if (getu32(fs->endian, ext2fs->dino_buf->i_flags) & EXT2_IN_UNRM)
+	    tsk_fprintf(hFile, "Undelete, ");
 
-	if (getu32(fs, ext2fs->dino_buf->i_flags) & EXT2_IN_COMP)
-	    fprintf(hFile, "Compressed, ");
+	if (getu32(fs->endian, ext2fs->dino_buf->i_flags) & EXT2_IN_COMP)
+	    tsk_fprintf(hFile, "Compressed, ");
 
-	if (getu32(fs, ext2fs->dino_buf->i_flags) & EXT2_IN_SYNC)
-	    fprintf(hFile, "Sync Updates, ");
+	if (getu32(fs->endian, ext2fs->dino_buf->i_flags) & EXT2_IN_SYNC)
+	    tsk_fprintf(hFile, "Sync Updates, ");
 
-	if (getu32(fs, ext2fs->dino_buf->i_flags) & EXT2_IN_IMM)
-	    fprintf(hFile, "Immutable, ");
+	if (getu32(fs->endian, ext2fs->dino_buf->i_flags) & EXT2_IN_IMM)
+	    tsk_fprintf(hFile, "Immutable, ");
 
-	if (getu32(fs, ext2fs->dino_buf->i_flags) & EXT2_IN_APPEND)
-	    fprintf(hFile, "Append Only, ");
+	if (getu32(fs->endian, ext2fs->dino_buf->i_flags) & EXT2_IN_APPEND)
+	    tsk_fprintf(hFile, "Append Only, ");
 
-	if (getu32(fs, ext2fs->dino_buf->i_flags) & EXT2_IN_NODUMP)
-	    fprintf(hFile, "Do Not Dump, ");
+	if (getu32(fs->endian, ext2fs->dino_buf->i_flags) & EXT2_IN_NODUMP)
+	    tsk_fprintf(hFile, "Do Not Dump, ");
 
-	if (getu32(fs, ext2fs->dino_buf->i_flags) & EXT2_IN_NOA)
-	    fprintf(hFile, "No A-Time, ");
+	if (getu32(fs->endian, ext2fs->dino_buf->i_flags) & EXT2_IN_NOA)
+	    tsk_fprintf(hFile, "No A-Time, ");
 
-	fprintf(hFile, "\n");
+	tsk_fprintf(hFile, "\n");
     }
 
-    fprintf(hFile, "size: %" PRIuOFF "\n", fs_inode->size);
-    fprintf(hFile, "num of links: %lu\n", (ULONG) fs_inode->nlink);
+    tsk_fprintf(hFile, "size: %" PRIuOFF "\n", fs_inode->size);
+    tsk_fprintf(hFile, "num of links: %lu\n", (ULONG) fs_inode->nlink);
 
     /* Ext attribute are stored in a block with a header and a list
      * of entries that are aligned to 4-byte boundaries.  The attr
      * value is stored at the end of the block.  There are 4 null bytes
      * in between the headers and values 
      */
-    if (getu32(fs, ext2fs->dino_buf->i_file_acl) != 0) {
+    if (getu32(fs->endian, ext2fs->dino_buf->i_file_acl) != 0) {
 	char *buf;
 	ext2fs_ea_header *ea_head;
 	ext2fs_ea_entry *ea_entry;
@@ -1747,27 +1864,28 @@ ext2fs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 	    return 1;
 	}
 
-	fprintf(hFile, "\nExtended Attributes  (Block: %" PRIu32 ")\n",
-	    getu32(fs, ext2fs->dino_buf->i_file_acl));
+	tsk_fprintf(hFile, "\nExtended Attributes  (Block: %" PRIu32 ")\n",
+	    getu32(fs->endian, ext2fs->dino_buf->i_file_acl));
 
 	/* Is the value too big? */
-	if (getu32(fs, ext2fs->dino_buf->i_file_acl) > fs->last_block) {
-	    fprintf(hFile,
+	if (getu32(fs->endian,
+		ext2fs->dino_buf->i_file_acl) > fs->last_block) {
+	    tsk_fprintf(hFile,
 		"Extended Attributes block is larger than file system\n");
 	    goto egress_ea;
 	}
 
 	cnt = fs_read_block_nobuf(fs, buf, fs->block_size,
-	    (DADDR_T) getu32(fs, ext2fs->dino_buf->i_file_acl));
+	    (DADDR_T) getu32(fs->endian, ext2fs->dino_buf->i_file_acl));
 
 	if (cnt != fs->block_size) {
 	    if (cnt != -1) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_READ;
-		tsk_errstr[0] = '\0';
 	    }
 	    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		"ext2fs_istat: ACL block %" PRIu32,
-		getu32(fs, ext2fs->dino_buf->i_file_acl));
+		getu32(fs->endian, ext2fs->dino_buf->i_file_acl));
 	    fs_inode_free(fs_inode);
 	    free(buf);
 	    return 1;
@@ -1776,10 +1894,10 @@ ext2fs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 
 	/* Check the header */
 	ea_head = (ext2fs_ea_header *) buf;
-	if (getu32(fs, ea_head->magic) != EXT2_EA_MAGIC) {
-	    fprintf(hFile,
+	if (getu32(fs->endian, ea_head->magic) != EXT2_EA_MAGIC) {
+	    tsk_fprintf(hFile,
 		"Incorrect extended attribute header: %" PRIx32 "\n",
-		getu32(fs, ea_head->magic));
+		getu32(fs->endian, ea_head->magic));
 	}
 
 
@@ -1796,21 +1914,21 @@ ext2fs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 
 	    /* Stop if the first four bytes are NULL */
 	    if ((ea_entry->nlen == 0) && (ea_entry->nidx == 0) &&
-		(getu16(fs, ea_entry->val_off) == 0))
+		(getu16(fs->endian, ea_entry->val_off) == 0))
 		break;
 
 	    /* The Linux src does not allow this */
-	    if (getu32(fs, ea_entry->val_blk) != 0) {
-		fprintf(hFile,
+	    if (getu32(fs->endian, ea_entry->val_blk) != 0) {
+		tsk_fprintf(hFile,
 		    "Attribute has non-zero value block - skipping\n");
 		continue;
 	    }
 
 
 	    /* Is the value location and size valid? */
-	    if ((getu32(fs, ea_entry->val_off) > fs->block_size) ||
-		((getu16(fs, ea_entry->val_off) +
-			getu32(fs,
+	    if ((getu32(fs->endian, ea_entry->val_off) > fs->block_size) ||
+		((getu16(fs->endian, ea_entry->val_off) +
+			getu32(fs->endian,
 			    ea_entry->val_size)) > fs->block_size)) {
 		continue;
 	    }
@@ -1828,20 +1946,20 @@ ext2fs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 		char val[256];
 
 		strncpy(val,
-		    &buf[getu16(fs, ea_entry->val_off)],
-		    getu32(fs,
-			ea_entry->val_size) > 256 ? 256 : getu32(fs,
-			ea_entry->val_size));
+		    &buf[getu16(fs->endian, ea_entry->val_off)],
+		    getu32(fs->endian,
+			ea_entry->val_size) >
+		    256 ? 256 : getu32(fs->endian, ea_entry->val_size));
 
-		val[getu32(fs, ea_entry->val_size) > 256 ?
-		    256 : getu32(fs, ea_entry->val_size)] = '\0';
+		val[getu32(fs->endian, ea_entry->val_size) > 256 ?
+		    256 : getu32(fs->endian, ea_entry->val_size)] = '\0';
 
 		if (ea_entry->nidx == EXT2_EA_IDX_USER)
-		    fprintf(hFile, "user.%s=%s\n", name, val);
+		    tsk_fprintf(hFile, "user.%s=%s\n", name, val);
 		else if (ea_entry->nidx == EXT2_EA_IDX_TRUSTED)
-		    fprintf(hFile, "trust.%s=%s\n", name, val);
+		    tsk_fprintf(hFile, "trust.%s=%s\n", name, val);
 		else if (ea_entry->nidx == EXT2_EA_IDX_SECURITY)
-		    fprintf(hFile, "security.%s=%s\n", name, val);
+		    tsk_fprintf(hFile, "security.%s=%s\n", name, val);
 
 	    }
 
@@ -1854,20 +1972,21 @@ ext2fs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 		ext2fs_pos_acl_head *acl_head;
 
 		if (ea_entry->nidx == EXT2_EA_IDX_POSIX_ACL_ACCESS)
-		    fprintf(hFile, "POSIX Access Control List Entries:\n");
+		    tsk_fprintf(hFile,
+			"POSIX Access Control List Entries:\n");
 		else if (ea_entry->nidx == EXT2_EA_IDX_POSIX_ACL_DEFAULT)
-		    fprintf(hFile,
+		    tsk_fprintf(hFile,
 			"POSIX Default Access Control List Entries:\n");
 
 		/* examine the header */
 		acl_head =
 		    (ext2fs_pos_acl_head *) &
-		    buf[getu16(fs, ea_entry->val_off)];
+		    buf[getu16(fs->endian, ea_entry->val_off)];
 
-		if (getu32(fs, acl_head->ver) != 1) {
-		    fprintf(hFile,
+		if (getu32(fs->endian, acl_head->ver) != 1) {
+		    tsk_fprintf(hFile,
 			"Invalid ACL Header Version: %" PRIu32 "\n",
-			getu32(fs, acl_head->ver));
+			getu32(fs->endian, acl_head->ver));
 		    continue;
 		}
 
@@ -1880,7 +1999,8 @@ ext2fs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 		/* Cycle through the values */
 		while ((uintptr_t) acl_lo <
 		    ((uintptr_t) buf +
-			getu16(fs, ea_entry->val_off) + getu32(fs,
+			getu16(fs->endian,
+			    ea_entry->val_off) + getu32(fs->endian,
 			    ea_entry->val_size))) {
 
 		    char perm[64];
@@ -1888,47 +2008,46 @@ ext2fs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 
 		    /* Make a string from the permissions */
 		    ext2fs_make_acl_str(perm, 64,
-			getu16(fs, acl_lo->perm));
+			getu16(fs->endian, acl_lo->perm));
 
-		    switch (getu16(fs, acl_lo->tag)) {
+		    switch (getu16(fs->endian, acl_lo->tag)) {
 		    case EXT2_PACL_TAG_USERO:
-
-			fprintf(hFile, "  uid: %d: %s\n",
+			tsk_fprintf(hFile, "  uid: %d: %s\n",
 			    (int) fs_inode->uid, perm);
 			len = sizeof(ext2fs_pos_acl_entry_sh);
 			break;
 
 		    case EXT2_PACL_TAG_GRPO:
-			fprintf(hFile, "  gid: %d: %s\n",
+			tsk_fprintf(hFile, "  gid: %d: %s\n",
 			    (int) fs_inode->gid, perm);
 			len = sizeof(ext2fs_pos_acl_entry_sh);
 			break;
 		    case EXT2_PACL_TAG_OTHER:
-			fprintf(hFile, "  other: %s\n", perm);
+			tsk_fprintf(hFile, "  other: %s\n", perm);
 			len = sizeof(ext2fs_pos_acl_entry_sh);
 			break;
 		    case EXT2_PACL_TAG_MASK:
-			fprintf(hFile, "  mask: %s\n", perm);
+			tsk_fprintf(hFile, "  mask: %s\n", perm);
 			len = sizeof(ext2fs_pos_acl_entry_sh);
 			break;
 
 
 		    case EXT2_PACL_TAG_GRP:
-			fprintf(hFile, "  gid: %" PRIu32 ": %s\n",
-			    getu32(fs, acl_lo->id), perm);
+			tsk_fprintf(hFile, "  gid: %" PRIu32 ": %s\n",
+			    getu32(fs->endian, acl_lo->id), perm);
 			len = sizeof(ext2fs_pos_acl_entry_lo);
 			break;
 
 		    case EXT2_PACL_TAG_USER:
-			fprintf(hFile, "  uid: %" PRIu32 ": %s\n",
-			    getu32(fs, acl_lo->id), perm);
+			tsk_fprintf(hFile, "  uid: %" PRIu32 ": %s\n",
+			    getu32(fs->endian, acl_lo->id), perm);
 
 			len = sizeof(ext2fs_pos_acl_entry_lo);
 			break;
 
 		    default:
-			fprintf(hFile, "Unknown ACL tag: %d\n",
-			    getu16(fs, acl_lo->tag));
+			tsk_fprintf(hFile, "Unknown ACL tag: %d\n",
+			    getu16(fs->endian, acl_lo->tag));
 			len = sizeof(ext2fs_pos_acl_entry_sh);
 			break;
 		    }
@@ -1938,7 +2057,7 @@ ext2fs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 		}
 	    }
 	    else {
-		fprintf(hFile, "Unsupported Extended Attr Type: %d\n",
+		tsk_fprintf(hFile, "Unsupported Extended Attr Type: %d\n",
 		    ea_entry->nidx);
 	    }
 	}
@@ -1948,18 +2067,18 @@ ext2fs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
     }
 
     if (sec_skew != 0) {
-	fprintf(hFile, "\nAdjusted Inode Times:\n");
+	tsk_fprintf(hFile, "\nAdjusted Inode Times:\n");
 	fs_inode->mtime -= sec_skew;
 	fs_inode->atime -= sec_skew;
 	fs_inode->ctime -= sec_skew;
 
-	fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
-	fprintf(hFile, "File Modified:\t%s", ctime(&fs_inode->mtime));
-	fprintf(hFile, "Inode Modified:\t%s", ctime(&fs_inode->ctime));
+	tsk_fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
+	tsk_fprintf(hFile, "File Modified:\t%s", ctime(&fs_inode->mtime));
+	tsk_fprintf(hFile, "Inode Modified:\t%s", ctime(&fs_inode->ctime));
 
 	if (fs_inode->dtime) {
 	    fs_inode->dtime -= sec_skew;
-	    fprintf(hFile, "Deleted:\t%s", ctime(&fs_inode->dtime));
+	    tsk_fprintf(hFile, "Deleted:\t%s", ctime(&fs_inode->dtime));
 	    fs_inode->dtime += sec_skew;
 	}
 
@@ -1967,23 +2086,23 @@ ext2fs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 	fs_inode->atime += sec_skew;
 	fs_inode->ctime += sec_skew;
 
-	fprintf(hFile, "\nOriginal Inode Times:\n");
+	tsk_fprintf(hFile, "\nOriginal Inode Times:\n");
     }
     else {
-	fprintf(hFile, "\nInode Times:\n");
+	tsk_fprintf(hFile, "\nInode Times:\n");
     }
 
-    fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
-    fprintf(hFile, "File Modified:\t%s", ctime(&fs_inode->mtime));
-    fprintf(hFile, "Inode Modified:\t%s", ctime(&fs_inode->ctime));
+    tsk_fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
+    tsk_fprintf(hFile, "File Modified:\t%s", ctime(&fs_inode->mtime));
+    tsk_fprintf(hFile, "Inode Modified:\t%s", ctime(&fs_inode->ctime));
 
     if (fs_inode->dtime)
-	fprintf(hFile, "Deleted:\t%s", ctime(&fs_inode->dtime));
+	tsk_fprintf(hFile, "Deleted:\t%s", ctime(&fs_inode->dtime));
 
     if (numblock > 0)
 	fs_inode->size = numblock * fs->block_size;
 
-    fprintf(hFile, "\nDirect Blocks:\n");
+    tsk_fprintf(hFile, "\nDirect Blocks:\n");
 
     print.indir_idx = 0;
     print.idx = 0;
@@ -1992,31 +2111,31 @@ ext2fs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
     if (fs->file_walk(fs, fs_inode, 0, 0,
 	    (FS_FLAG_FILE_AONLY | FS_FLAG_FILE_META |
 		FS_FLAG_FILE_NOID), print_addr_act, (void *) &print)) {
-	fprintf(hFile, "\nError reading file:  ");
+	tsk_fprintf(hFile, "\nError reading file:  ");
 	tsk_error_print(hFile);
 	tsk_error_reset();
     }
     else {
 
 	if (print.idx != 0)
-	    fprintf(hFile, "\n");
+	    tsk_fprintf(hFile, "\n");
 
 	/* print indirect blocks */
 	if (print.indir_idx > 0) {
 	    int i, printidx;
-	    fprintf(hFile, "\nIndirect Blocks:\n");
+	    tsk_fprintf(hFile, "\nIndirect Blocks:\n");
 
 	    printidx = 0;
 
 	    for (i = 0; i < print.indir_idx; i++) {
-		fprintf(hFile, "%" PRIuDADDR " ", print.indirl[i]);
+		tsk_fprintf(hFile, "%" PRIuDADDR " ", print.indirl[i]);
 		if (++printidx == 8) {
-		    fprintf(hFile, "\n");
+		    tsk_fprintf(hFile, "\n");
 		    printidx = 0;
 		}
 	    }
 	    if (printidx != 0)
-		fprintf(hFile, "\n");
+		tsk_fprintf(hFile, "\n");
 	}
     }
 
@@ -2045,6 +2164,11 @@ ext2fs_close(FS_INFO * fs)
     if (ext2fs->imap_buf != NULL)
 	free((char *) ext2fs->imap_buf);
 
+    if (fs->list_inum_named) {
+	tsk_list_free(fs->list_inum_named);
+	fs->list_inum_named = NULL;
+    }
+
     free(ext2fs);
 }
 
@@ -2062,11 +2186,14 @@ ext2fs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
     FS_INFO *fs;
     SSIZE_T cnt;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     if ((ftype & FSMASK) != EXTxFS_TYPE) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "Invalid FS Type in ext2fs_open");
-	tsk_errstr2[0] = '\0';
 	return NULL;
     }
 
@@ -2093,8 +2220,8 @@ ext2fs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
 	fs_read_random(fs, (char *) ext2fs->fs, len, (OFF_T) EXT2FS_SBOFF);
     if (cnt != len) {
 	if (cnt != -1) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_READ;
-	    tsk_errstr[0] = '\0';
 	}
 	snprintf(tsk_errstr2, TSK_ERRSTR_L, "ext2fs_open: superblock");
 	free(ext2fs->fs);
@@ -2108,25 +2235,25 @@ ext2fs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
     if (fs_guessu16(fs, ext2fs->fs->s_magic, EXT2FS_FS_MAGIC)) {
 	free(ext2fs->fs);
 	free(ext2fs);
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_MAGIC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "not an EXTxFS file system (magic)");
-	tsk_errstr2[0] = '\0';
 	return NULL;
     }
 
     if (verbose) {
-	if (getu32(fs, ext2fs->fs->s_feature_ro_compat) &
+	if (getu32(fs->endian, ext2fs->fs->s_feature_ro_compat) &
 	    EXT2FS_FEATURE_RO_COMPAT_SPARSE_SUPER)
-	    fprintf(stderr, "File system has sparse super blocks\n");
+	    tsk_fprintf(stderr, "File system has sparse super blocks\n");
 
-	fprintf(stderr, "First data block is %" PRIu32 "\n",
-	    getu32(fs, ext2fs->fs->s_first_data_block));
+	tsk_fprintf(stderr, "First data block is %" PRIu32 "\n",
+	    getu32(fs->endian, ext2fs->fs->s_first_data_block));
     }
 
     /* If autodetect was given, look for the journal */
     if (ftype == EXTAUTO) {
-	if (getu32(fs, ext2fs->fs->s_feature_compat) &
+	if (getu32(fs->endian, ext2fs->fs->s_feature_compat) &
 	    EXT2FS_FEATURE_COMPAT_HAS_JOURNAL)
 	    fs->ftype = EXT3FS;
 	else
@@ -2135,7 +2262,7 @@ ext2fs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
 
 
     /* we need to figure out if dentries are v1 or v2 */
-    if (getu32(fs, ext2fs->fs->s_feature_incompat) &
+    if (getu32(fs->endian, ext2fs->fs->s_feature_incompat) &
 	EXT2FS_FEATURE_INCOMPAT_FILETYPE)
 	ext2fs->deentry_type = EXT2_DE_V2;
     else
@@ -2145,7 +2272,7 @@ ext2fs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
     /*
      * Translate some filesystem-specific information to generic form.
      */
-    fs->inum_count = getu32(fs, ext2fs->fs->s_inodes_count);
+    fs->inum_count = getu32(fs->endian, ext2fs->fs->s_inodes_count);
     fs->last_inum = fs->inum_count;
     fs->first_inum = EXT2FS_FIRSTINO;
     fs->root_inum = EXT2FS_ROOTINO;
@@ -2153,44 +2280,47 @@ ext2fs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
     if (fs->inum_count < 10) {
 	free(ext2fs->fs);
 	free(ext2fs);
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_MAGIC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "Not an EXTxFS file system (inum count)");
-	tsk_errstr2[0] = '\0';
 	return NULL;
     }
 
 
     /* Set the size of the inode, but default to our data structure
      * size if it is larger */
-    ext2fs->inode_size = getu16(fs, ext2fs->fs->s_inode_size);
+    ext2fs->inode_size = getu16(fs->endian, ext2fs->fs->s_inode_size);
     if (ext2fs->inode_size < sizeof(ext2fs_inode)) {
 	ext2fs->inode_size = sizeof(ext2fs_inode);
 	if (verbose)
-	    fprintf(stderr, "SB inode size is too small, using default");
+	    tsk_fprintf(stderr,
+		"SB inode size is too small, using default");
     }
 
 
     fs->dev_bsize = EXT2FS_DEV_BSIZE;
-    fs->block_count = getu32(fs, ext2fs->fs->s_blocks_count);
+    fs->block_count = getu32(fs->endian, ext2fs->fs->s_blocks_count);
     fs->first_block = 0;
     fs->last_block = fs->block_count - 1;
-    ext2fs->first_data_block = getu32(fs, ext2fs->fs->s_first_data_block);
+    ext2fs->first_data_block =
+	getu32(fs->endian, ext2fs->fs->s_first_data_block);
 
 
-    if (getu32(fs, ext2fs->fs->s_log_block_size) !=
-	getu32(fs, ext2fs->fs->s_log_frag_size)) {
+    if (getu32(fs->endian, ext2fs->fs->s_log_block_size) !=
+	getu32(fs->endian, ext2fs->fs->s_log_frag_size)) {
 	free(ext2fs->fs);
 	free(ext2fs);
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_FUNC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "This file system has fragments that are a different size than blocks, which is not currently supported\nContact brian with details of the system that created this image");
-	tsk_errstr2[0] = '\0';
 	return NULL;
     }
 
     fs->block_size =
-	EXT2FS_MIN_BLOCK_SIZE << getu32(fs, ext2fs->fs->s_log_block_size);
+	EXT2FS_MIN_BLOCK_SIZE << getu32(fs->endian,
+	ext2fs->fs->s_log_block_size);
 
     /* The group descriptors are located in the block following the 
      * super block
@@ -2199,11 +2329,12 @@ ext2fs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
     ext2fs->groups_offset =
 	roundup((EXT2FS_SBOFF + sizeof(ext2fs_sb)), fs->block_size);
 
-    ext2fs->groups_count = (getu32(fs, ext2fs->fs->s_blocks_count) -
-	ext2fs->first_data_block +
-	getu32(fs,
-	    ext2fs->fs->s_blocks_per_group) -
-	1) / getu32(fs, ext2fs->fs->s_blocks_per_group);
+    ext2fs->groups_count =
+	(EXT2_GRPNUM_T) ((getu32(fs->endian,
+		ext2fs->fs->s_blocks_count) - ext2fs->first_data_block +
+	    getu32(fs->endian,
+		ext2fs->fs->s_blocks_per_group) - 1) / getu32(fs->endian,
+	    ext2fs->fs->s_blocks_per_group));
 
     /* callbacks */
     fs->inode_walk = ext2fs_inode_walk;
@@ -2218,7 +2349,7 @@ ext2fs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
 
 
     /* Journal */
-    fs->journ_inum = getu32(fs, ext2fs->fs->s_journal_inum);
+    fs->journ_inum = getu32(fs->endian, ext2fs->fs->s_journal_inum);
     fs->jblk_walk = ext2fs_jblk_walk;
     fs->jentry_walk = ext2fs_jentry_walk;
     fs->jopen = ext2fs_jopen;
@@ -2241,18 +2372,19 @@ ext2fs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
     ext2fs->grp_buf = NULL;
     ext2fs->grp_num = 0xffffffff;
 
+    fs->list_inum_named = NULL;
 
     /*
      * Print some stats.
      */
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "inodes %" PRIu32 " root ino %" PRIuINUM " blocks %" PRIu32
-	    " blocks/group %" PRIu32 "\n", getu32(fs,
+	    " blocks/group %" PRIu32 "\n", getu32(fs->endian,
 		ext2fs->fs->
 		s_inodes_count),
-	    fs->root_inum, getu32(fs, ext2fs->fs->s_blocks_count),
-	    getu32(fs, ext2fs->fs->s_blocks_per_group));
+	    fs->root_inum, getu32(fs->endian, ext2fs->fs->s_blocks_count),
+	    getu32(fs->endian, ext2fs->fs->s_blocks_per_group));
 
     return (fs);
 }

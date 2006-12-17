@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit
 **
-** $Date: 2006/06/29 10:11:57 $
+** $Date: 2006/11/07 19:57:22 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -435,7 +435,7 @@ extern "C" {
  * 8 bytes of the structure 
  */
 #define GET_IDXENTRY_SUB(fs, e)	\
-	(getu64(fs, (int)e + getu16(fs, e->idxlen) - 8))
+	(getu64(fs->endian, (int)e + getu16(fs->endian, e->idxlen) - 8))
 
 
 
@@ -512,7 +512,7 @@ extern "C" {
  */
     typedef struct {
 	char *buffer;
-	unsigned int size;
+	size_t size;
     } NTFS_SXX_BUFFER;
 
 
@@ -658,11 +658,12 @@ extern "C" {
 	FS_DATA_RUN *bmap;	/* Run of bitmap for clusters (linked list) */
 	DATA_BUF *bmap_buf;	/* buffer to hold cached copy of bitmap */
 	DADDR_T bmap_buf_off;	/* offset cluster in cached bitmap */
-	ntfs_attrdef *attrdef;
+	ntfs_attrdef *attrdef;	// buffer of attrdef file contents
+	SSIZE_T attrdef_len;	// length of addrdef buffer
 
 	NTFS_SDS_ENTRY *sds;	/* Data run of ntfs_attr_sds */
-	NTFS_SDH_ENTRY *sdh;	/* Data run of ntfs_attr_sdh */
-	NTFS_SII_ENTRY *sii;	/* Data run of ntfs_attr_sii */
+	//NTFS_SDH_ENTRY *sdh;  /* Data run of ntfs_attr_sdh */
+	//NTFS_SII_ENTRY *sii;  /* Data run of ntfs_attr_sii */
 	NTFS_SID_ENTRY *sid;	/* Data run of ntfs_sid */
     } NTFS_INFO;
 

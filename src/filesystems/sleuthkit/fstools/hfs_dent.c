@@ -57,7 +57,7 @@
 **        each copy of the program.
 */
 
-#include "fs_tools.h"
+#include "fs_tools_i.h"
 #include "hfs.h"
 #include "fs_data.h"
 #include "hfs.h"

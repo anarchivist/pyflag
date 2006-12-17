@@ -2,7 +2,7 @@
 ** ifind (inode find)
 ** The Sleuth Kit
 **
-** $Date: 2006/07/05 18:24:09 $
+** $Date: 2006/12/05 21:39:52 $
 **
 ** Given an image  and block number, identify which inode it is used by
 ** 
@@ -21,7 +21,7 @@
 **
 */
 
-#include "libfstools.h"
+#include "fs_tools_i.h"
 
 
 static uint8_t localflags;
@@ -29,7 +29,7 @@ static uint8_t found;
 
 
 /*******************************************************************************
- * Find an NTFS MFT entry based on its parent directory
+ * Find an unallocated NTFS MFT entry based on its parent directory
  */
 
 static FS_DENT *fs_dent = NULL;
@@ -46,7 +46,7 @@ ifind_par_act(FS_INFO * fs, FS_INODE * fs_inode, int flags, void *ptr)
     fs_name = fs_inode->name;
     while (fs_name) {
 	if (fs_name->par_inode == parinode) {
-	    /* Fill in teh basics of the fs_dent entry */
+	    /* Fill in the basics of the fs_dent entry */
 	    fs_dent->fsi = fs_inode;
 	    fs_dent->inode = fs_inode->addr;
 	    strncpy(fs_dent->name, fs_name->name, fs_dent->name_max);
@@ -57,7 +57,7 @@ ifind_par_act(FS_INFO * fs, FS_INODE * fs_inode, int flags, void *ptr)
 	    else {
 		fs_dent_print(stdout, fs_dent, FS_FLAG_NAME_UNALLOC, fs,
 		    NULL);
-		printf("\n");
+		tsk_printf("\n");
 	    }
 	    fs_dent->fsi = NULL;
 	    found = 1;
@@ -81,10 +81,9 @@ fs_ifind_par(FS_INFO * fs, uint8_t lclflags, INUM_T par)
     if (fs_dent == NULL)
 	return 1;
 
+    /* Walk unallocated MFT entries */
     if (fs->inode_walk(fs, fs->first_inum, fs->last_inum,
-	    FS_FLAG_META_LINK | FS_FLAG_META_UNLINK |
-	    FS_FLAG_META_UNALLOC | FS_FLAG_META_USED, ifind_par_act,
-	    NULL)) {
+	    FS_FLAG_META_UNALLOC, ifind_par_act, NULL)) {
 	fs_dent_free(fs_dent);
 	return 1;
     }
@@ -99,12 +98,16 @@ fs_ifind_par(FS_INFO * fs, uint8_t lclflags, INUM_T par)
  * Find an inode given a file path
  */
 
-struct ifind_path_state {
+#define IFIND_PATH_DATA_ID	0x00886644
+typedef struct {
+    int id;
     char *cur_dir;
     char *cur_attr;
     uint8_t found;
-    INUM_T inode;
-};
+    uint8_t badpath;
+    INUM_T addr;		// "Inode" address for file name
+} IFIND_PATH_DATA;
+
 /* 
  * dent_walk for finding the inode based on path
  *
@@ -114,12 +117,21 @@ struct ifind_path_state {
 static uint8_t
 ifind_path_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
 {
-    struct ifind_path_state *state = (struct ifind_path_state *)ptr;
+    IFIND_PATH_DATA *ipd = (IFIND_PATH_DATA *) ptr;
+
+    if ((!ipd) || (ipd->id != IFIND_PATH_DATA_ID)) {
+	tsk_error_reset();
+	tsk_errno = TSK_ERR_FS_ARG;
+	snprintf(tsk_errstr, TSK_ERRSTR_L,
+	    "ifind_path_act: callback pointer is not IFIND_DATA_ID\n");
+	return WALK_ERROR;
+    }
 
     /* This crashed because cur_dir was null, but I'm not sure how
      * it got that way, so this was added
      */
-    if (state->cur_dir == NULL) {
+    if (ipd->cur_dir == NULL) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "ifind: cur_dir is null: Please run with '-v' and send output to developers\n");
@@ -132,48 +144,42 @@ ifind_path_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
      *
      * All non-matches will return from these checks
      */
-
     if (((fs->ftype & FSMASK) == EXTxFS_TYPE) ||
 	((fs->ftype & FSMASK) == FFS_TYPE)) {
-	if (strcmp(fs_dent->name, state->cur_dir) != 0) {
+	if (strcmp(fs_dent->name, ipd->cur_dir) != 0) {
 	    return WALK_CONT;
 	}
     }
 
     /* NTFS gets a case insensitive comparison */
     else if ((fs->ftype & FSMASK) == NTFS_TYPE) {
-	if (strcasecmp(fs_dent->name, state->cur_dir) != 0) {
+	if (strcasecmp(fs_dent->name, ipd->cur_dir) != 0) {
 	    return WALK_CONT;
 	}
 
-    /* if this is a realloc'd file, try and keep going to find an allocated
-     * file with the same name. NOTE: this will only skip the first realloc
-     * file (can there be more than one?) */
-    if(!fs_dent->fsi) {
-        state->inode = fs_dent->inode;
-	    state->found = 1;
-        return WALK_CONT;
-    }   
-
 	/*  ensure we have the right attribute name */
-	if (state->cur_attr != NULL) {
+	if (ipd->cur_attr != NULL) {
 	    int fail = 1;
 
 	    if (fs_dent->fsi) {
 		FS_DATA *fs_data;
-		fs_data = fs_dent->fsi->attr;
 
-		while ((fs_data) && (fs_data->flags & FS_DATA_INUSE)) {
-		    if (strcasecmp(fs_data->name, state->cur_attr) == 0) {
+		for (fs_data = fs_dent->fsi->attr;
+		    fs_data != NULL; fs_data = fs_data->next) {
+
+		    if ((fs_data->flags & FS_DATA_INUSE) == 0)
+			continue;
+
+		    if (strcasecmp(fs_data->name, ipd->cur_attr) == 0) {
 			fail = 0;
 			break;
 		    }
-		    fs_data = fs_data->next;
 		}
 	    }
 	    if (fail) {
-		printf("Attribute name (%s) not found in %s: %" PRIuINUM
-		    "\n", state->cur_attr, state->cur_dir, fs_dent->inode);
+		tsk_printf("Attribute name (%s) not found in %s: %"
+		    PRIuINUM "\n", ipd->cur_attr, ipd->cur_dir,
+		    fs_dent->inode);
 
 		return WALK_STOP;
 	    }
@@ -183,35 +189,42 @@ ifind_path_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
      * the short name 
      */
     else if ((fs->ftype & FSMASK) == FATFS_TYPE) {
-	if (strcasecmp(fs_dent->name, state->cur_dir) != 0) {
-	    if (strcasecmp(fs_dent->shrt_name, state->cur_dir) != 0) {
+	if (strcasecmp(fs_dent->name, ipd->cur_dir) != 0) {
+	    if (strcasecmp(fs_dent->shrt_name, ipd->cur_dir) != 0) {
 		return WALK_CONT;
 	    }
 	}
     }
 
     /* Get the next directory or file name */
-    state->cur_dir = (char *) strtok(NULL, "/");
-    state->cur_attr = NULL;
+    ipd->cur_dir = (char *) strtok(NULL, "/");
+    ipd->cur_attr = NULL;
 
     if (verbose)
-	fprintf(stderr, "Found it (%s), now looking for %s\n",
-	    fs_dent->name, state->cur_dir);
+	tsk_fprintf(stderr, "Found it (%s), now looking for %s\n",
+	    fs_dent->name, ipd->cur_dir);
 
-    /* That was the last one */
-    if (state->cur_dir == NULL) {
-    state->inode = fs_dent->inode;
-	state->found = 1;
-	return WALK_STOP;
+    /* That was the last name in the path -- we found the file */
+    if (ipd->cur_dir == NULL) {
+	//tsk_printf("%" PRIuINUM "\n", fs_dent->inode);
+	ipd->found = 1;
+	ipd->addr = fs_dent->inode;
+
+	// if our only hit is an unallocated entry 
+	// then keep on looking -- this commonly happens with NTFS
+	if (flags & FS_FLAG_NAME_UNALLOC)
+	    return WALK_CONT;
+	else
+	    return WALK_STOP;
     }
 
     /* if it is an NTFS image with an ADS in the name, then
      * break it up 
      */
     if (((fs->ftype & FSMASK) == NTFS_TYPE) &&
-	((state->cur_attr = strchr(state->cur_dir, ':')) != NULL)) {
-	*state->cur_attr = '\0';
-	state->cur_attr++;
+	((ipd->cur_attr = strchr(ipd->cur_dir, ':')) != NULL)) {
+	*(ipd->cur_attr) = '\0';
+	ipd->cur_attr++;
     }
 
     /* it is a directory so we can recurse */
@@ -219,67 +232,125 @@ ifind_path_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
 
 	if (fs->dent_walk(fs, fs_dent->inode,
 		FS_FLAG_NAME_ALLOC | FS_FLAG_NAME_UNALLOC,
-		ifind_path_act, (void *) state)) {
+		ifind_path_act, (void *) ipd)) {
 	    return WALK_ERROR;
 	}
     }
 
     /* The name was correct, but it was not a directory */
     else {
-	printf("Invalid path (%s is a file)\n", fs_dent->name);
+	ipd->badpath = 1;
     }
 
     return WALK_STOP;
 }
 
-INUM_T
-fs_ifind_path_ret(FS_INFO * fs, uint8_t lclflags, char *path)
+
+/* Return -1 for error, 0 if found, and 1 if not found */
+int8_t
+fs_ifind_path(FS_INFO * fs, uint8_t lclflags, TSK_TCHAR * tpath,
+    INUM_T * result)
 {
-    struct ifind_path_state state;
-    state.found = 0;
+    char *cpath;
+    IFIND_PATH_DATA ipd;
+
+
     localflags = lclflags;
 
-    state.cur_dir = (char *) strtok(path, "/");
-    state.cur_attr = NULL;
+
+#ifdef TSK_WIN32
+    {
+	size_t clen;
+	UTF8 *ptr8;
+	UTF16 *ptr16;
+	int retval;
+
+	clen = TSTRLEN(tpath) * 4;
+	cpath = (char *) mymalloc(clen);
+	if (cpath == NULL) {
+	    return -1;
+	}
+	ptr8 = (UTF8 *) cpath;
+	ptr16 = (UTF16 *) tpath;
+
+	retval =
+	    tsk_UTF16toUTF8(fs->endian, (const UTF16 **) &ptr16, (UTF16 *)
+	    & ptr16[TSTRLEN(tpath) + 1], &ptr8,
+	    (UTF8 *) ((uintptr_t) ptr8 + clen), lenientConversion);
+	if (retval != conversionOK) {
+	    tsk_error_reset();
+	    tsk_errno = TSK_ERR_FS_UNICODE;
+	    snprintf(tsk_errstr, TSK_ERRSTR_L,
+		"fs_ifind_path: Error converting path to UTF-8: %d",
+		retval);
+	    free(cpath);
+	    return -1;
+	}
+    }
+#else
+    cpath = tpath;
+#endif
+
+    ipd.id = IFIND_PATH_DATA_ID;
+    ipd.found = 0;
+    ipd.badpath = 0;
+    ipd.cur_dir = (char *) strtok(cpath, "/");
+    ipd.cur_attr = NULL;
 
     /* If there is no token, then only a '/' was given */
-    if (!state.cur_dir)
-        return fs->root_inum;
-
-    /* If this is NTFS, ensure that we take out the attribute */
-    if (((fs->ftype & FSMASK) == NTFS_TYPE) &&
-	((state.cur_attr = strchr(state.cur_dir, ':')) != NULL)) {
-	*state.cur_attr = '\0';
-	state.cur_attr++;
-    }
-
-    if (verbose)
-	fprintf(stderr, "Looking for %s\n", state.cur_dir);
-
-    if (fs->dent_walk(fs, fs->root_inum,
-	    FS_FLAG_NAME_ALLOC | FS_FLAG_NAME_UNALLOC, ifind_path_act,
-	    (void *)&state)) {
+    if (!(ipd.cur_dir)) {
+	tsk_printf("%lu\n", (ULONG) fs->root_inum);
+#ifdef TSK_WIN32
+	free(cpath);
+#endif
+    *result = fs->root_inum;
 	return 0;
     }
 
-    if (state.found)
-        return state.inode;
+    /* If this is NTFS, ensure that we take out the attribute */
+    if (((fs->ftype & FSMASK) == NTFS_TYPE) &&
+	((ipd.cur_attr = strchr(ipd.cur_dir, ':')) != NULL)) {
+	*(ipd.cur_attr) = '\0';
+	ipd.cur_attr++;
+    }
 
-	printf("File not found: %s\n", state.cur_dir);
+    if (verbose)
+	tsk_fprintf(stderr, "Looking for %s\n", ipd.cur_dir);
+
+    if (fs->dent_walk(fs, fs->root_inum,
+	    FS_FLAG_NAME_ALLOC | FS_FLAG_NAME_UNALLOC, ifind_path_act,
+	    (void *) &ipd)) {
+#ifdef TSK_WIN32
+	free(cpath);
+#endif
+	return -1;
+    }
+
+
+#ifdef TSK_WIN32
+    free(cpath);
+#endif
+
+    if (1 == ipd.badpath) {
+	if (verbose)
+	    tsk_fprintf(stderr, "Invalid path (%s is a file)\n",
+		fs_dent->name);
+	*result = 0;
+	return 1;
+    }
+    else if (0 == ipd.found) {
+	if (verbose)
+	    tsk_printf("File not found: %s\n", ipd.cur_dir);
+	*result = 0;
+	return 1;
+    }
+
+    *result = ipd.addr;
     return 0;
 }
 
-/* Return 1 for error, 0 if no error */
-uint8_t
-fs_ifind_path(FS_INFO * fs, uint8_t lclflags, char *path)
-{
-    INUM_T inode = fs_ifind_path_ret(fs, lclflags, path);
-    if(inode == 0)
-        return 1;
 
-    printf("%" PRIuINUM "\n", inode);
-    return 0;
-}
+
 
 
 /*******************************************************************************
@@ -297,7 +368,7 @@ static uint16_t curid;
  */
 static uint8_t
 ifind_data_file_act(FS_INFO * fs, DADDR_T addr, char *buf,
-    unsigned int size, int flags, void *ptr)
+    size_t size, int flags, void *ptr)
 {
     /* Drop references to block zero (sparse)
      * This becomes an issue with fragments and looking for fragments
@@ -309,7 +380,7 @@ ifind_data_file_act(FS_INFO * fs, DADDR_T addr, char *buf,
 
     if ((block >= addr) &&
 	(block < (addr + (size + fs->block_size - 1) / fs->block_size))) {
-	printf("%" PRIuINUM "\n", curinode);
+	tsk_printf("%" PRIuINUM "\n", curinode);
 
 	if (!(localflags & IFIND_ALL)) {
 	    fs->close(fs);
@@ -327,10 +398,10 @@ ifind_data_file_act(FS_INFO * fs, DADDR_T addr, char *buf,
  */
 static uint8_t
 ifind_data_file_ntfs_act(FS_INFO * fs, DADDR_T addr, char *buf,
-    unsigned int size, int flags, void *ptr)
+    size_t size, int flags, void *ptr)
 {
     if (addr == block) {
-	printf("%" PRIuINUM "-%" PRIu32 "-%" PRIu16 "\n", curinode,
+	tsk_printf("%" PRIuINUM "-%" PRIu32 "-%" PRIu16 "\n", curinode,
 	    curtype, curid);
 
 	if (!(localflags & IFIND_ALL)) {
@@ -362,23 +433,29 @@ ifind_data_act(FS_INFO * fs, FS_INODE * fs_inode, int flags, void *ptr)
 
     /* NT Specific Stuff: search all ADS */
     if ((fs->ftype & FSMASK) == NTFS_TYPE) {
-	FS_DATA *data = fs_inode->attr;
+	FS_DATA *data;
+
 
 	file_flags |= FS_FLAG_FILE_SLACK;
-	while ((data) && (data->flags & FS_DATA_INUSE)) {
+	for (data = fs_inode->attr; data != NULL; data = data->next) {
+
+	    if ((data->flags & FS_DATA_INUSE) == 0)
+		continue;
+
 	    curtype = data->type;
 	    curid = data->id;
 	    if (data->flags & FS_DATA_NONRES) {
 		if (fs->file_walk(fs, fs_inode, data->type, data->id,
 			file_flags, ifind_data_file_ntfs_act, ptr)) {
 		    if (verbose)
-			fprintf(stderr, "Error walking file %" PRIuINUM,
+			tsk_fprintf(stderr,
+			    "Error walking file %" PRIuINUM,
 			    fs_inode->addr);
-/* Ignore these errors */
+
+		    /* Ignore these errors */
 		    tsk_error_reset();
 		}
 	    }
-	    data = data->next;
 	}
 	return WALK_CONT;
     }
@@ -387,9 +464,10 @@ ifind_data_act(FS_INFO * fs, FS_INODE * fs_inode, int flags, void *ptr)
 	if (fs->file_walk(fs, fs_inode, 0, 0, file_flags,
 		ifind_data_file_act, ptr)) {
 	    if (verbose)
-		fprintf(stderr, "Error walking file %" PRIuINUM,
+		tsk_fprintf(stderr, "Error walking file %" PRIuINUM,
 		    fs_inode->addr);
-/* Ignore these errors */
+
+	    /* Ignore these errors */
 	    tsk_error_reset();
 	}
     }
@@ -404,9 +482,10 @@ ifind_data_act(FS_INFO * fs, FS_INODE * fs_inode, int flags, void *ptr)
 	if (fs->file_walk(fs, fs_inode, 0, 0, file_flags,
 		ifind_data_file_act, ptr)) {
 	    if (verbose)
-		fprintf(stderr, "Error walking file %" PRIuINUM,
+		tsk_fprintf(stderr, "Error walking file %" PRIuINUM,
 		    fs_inode->addr);
-/* Ignore these errors */
+
+	    /* Ignore these errors */
 	    tsk_error_reset();
 	}
     }
@@ -424,7 +503,7 @@ ifind_data_block_act(FS_INFO * fs, DADDR_T addr, char *buf, int flags,
     void *ptr)
 {
     if (flags & FS_FLAG_DATA_META) {
-	printf("Meta Data\n");
+	tsk_printf("Meta Data\n");
 	found = 1;
     }
 
@@ -432,7 +511,9 @@ ifind_data_block_act(FS_INFO * fs, DADDR_T addr, char *buf, int flags,
 }
 
 
-/* Return 1 on error, 0 if no error */
+/* 
+ * Find the inode that has allocated block blk
+ * Return 1 on error, 0 if no error */
 uint8_t
 fs_ifind_data(FS_INFO * fs, uint8_t lclflags, DADDR_T blk)
 {
@@ -441,10 +522,8 @@ fs_ifind_data(FS_INFO * fs, uint8_t lclflags, DADDR_T blk)
     block = blk;
 
     if (fs->inode_walk(fs, fs->first_inum, fs->last_inum,
-	    FS_FLAG_META_LINK | FS_FLAG_META_UNLINK |
-	    FS_FLAG_META_ALLOC | FS_FLAG_META_UNALLOC |
-	    FS_FLAG_META_USED | FS_FLAG_META_UNUSED, ifind_data_act,
-	    NULL)) {
+	    FS_FLAG_META_ALLOC | FS_FLAG_META_UNALLOC,
+	    ifind_data_act, NULL)) {
 	return 1;
     }
 
@@ -461,7 +540,7 @@ fs_ifind_data(FS_INFO * fs, uint8_t lclflags, DADDR_T blk)
 	}
     }
     if (0 == found) {
-	printf("Inode not found\n");
+	tsk_printf("Inode not found\n");
     }
     return 0;
 }

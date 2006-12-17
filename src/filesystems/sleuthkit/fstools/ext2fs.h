@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2006/05/11 15:53:20 $
+** $Date: 2006/08/17 17:12:51 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -134,14 +134,14 @@ extern "C" {
 
 /* data address to group number */
 #define ext2_dtog_lcl(fsi, fs, d)	\
-	(EXT2_GRPNUM_T)(((d) - getu32(fsi, fs->s_first_data_block)) / \
-	getu32(fsi, fs->s_blocks_per_group))
+	(EXT2_GRPNUM_T)(((d) - getu32(fsi->endian, fs->s_first_data_block)) / \
+	getu32(fsi->endian, fs->s_blocks_per_group))
 
 
 /* first fragment of group */
 #define ext2_cgbase_lcl(fsi, fs, c)	\
-	((DADDR_T)((getu32(fsi, fs->s_blocks_per_group) * (c)) + \
-	getu32(fsi, fs->s_first_data_block)))
+	((DADDR_T)((getu32(fsi->endian, fs->s_blocks_per_group) * (c)) + \
+	getu32(fsi->endian, fs->s_first_data_block)))
 
 
 /*

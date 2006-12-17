@@ -54,16 +54,12 @@
 **     b) a copy of the IBM Public License ver. 1.0 must be included with 
 **        each copy of the program.
 */
-#include "fs_tools.h"
-#include "fs_types.h"
+#include "fs_tools_i.h"
 #include "iso9660.h"
-#include "mymalloc.h"
-#include "fs_data.h"
 #include <ctype.h>
 #if !defined (_WIN32)
 #include <netinet/in.h>
 #endif
-#include "fs_unicode.h"
 
 /* free all memory used by inode linked list */
 void
@@ -101,7 +97,7 @@ parse_rockridge(FS_INFO * fs, char *buf, int count)
     char *end = buf + count - 1;
 
     if (verbose)
-	fprintf(stderr, "parse_rockridge: count is: %d\n", count);
+	tsk_fprintf(stderr, "parse_rockridge: count is: %d\n", count);
 
     rr = (rockridge_ext *) mymalloc(sizeof(rockridge_ext));
     if (rr == NULL) {
@@ -194,7 +190,7 @@ iso9660_get_dentrys(FS_INFO * fs, OFF_T offs, int count, int type,
     char *file_ver;
 
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "iso9660_get_dentrys: fs: %lu offs: %lu"
 	    " count: %d type: %d fn: %lu\n",
 	    (ULONG) fs, (ULONG) offs, count, type, (ULONG) fn);
@@ -209,8 +205,8 @@ iso9660_get_dentrys(FS_INFO * fs, OFF_T offs, int count, int type,
 	sizeof(iso9660_dentry), offs);
     if (cnt != sizeof(iso9660_dentry)) {
 	if (cnt != -1) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_READ;
-	    tsk_errstr[0] = '\0';
 	}
 	snprintf(tsk_errstr2, TSK_ERRSTR_L, "iso_get_dentries");
 	return -1;
@@ -242,8 +238,8 @@ iso9660_get_dentrys(FS_INFO * fs, OFF_T offs, int count, int type,
 	cnt = fs_read_random(fs, buf, dentry_bytes, offs);
 	if (cnt != dentry_bytes) {
 	    if (cnt != -1) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_READ;
-		tsk_errstr[0] = '\0';
 	    }
 	    snprintf(tsk_errstr2, TSK_ERRSTR_L, "iso_get_dentries");
 	    return -1;
@@ -313,8 +309,8 @@ iso9660_get_dentrys(FS_INFO * fs, OFF_T offs, int count, int type,
 	    fs_read_random(fs, (char *) &dd, sizeof(iso9660_dentry), offs);
 	if (cnt != sizeof(iso9660_dentry)) {
 	    if (cnt != -1) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_READ;
-		tsk_errstr[0] = '\0';
 	    }
 	    snprintf(tsk_errstr2, TSK_ERRSTR_L, "iso_get_dentries");
 	    return -1;
@@ -337,8 +333,8 @@ iso9660_get_dentrys(FS_INFO * fs, OFF_T offs, int count, int type,
 		cnt = fs_read_random(fs, (char *) uni_buf, dd.len, offs);
 		if (cnt != dd.len) {
 		    if (cnt != -1) {
+			tsk_error_reset();
 			tsk_errno = TSK_ERR_FS_READ;
-			tsk_errstr[0] = '\0';
 		    }
 		    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 			"iso_get_dentries");
@@ -358,14 +354,14 @@ iso9660_get_dentrys(FS_INFO * fs, OFF_T offs, int count, int type,
 		name16 = (UTF16 *) uni_buf;
 		name8 = (UTF8 *) iso->dinode->fn;
 
-		retVal = fs_UTF16toUTF8(fs, (const UTF16 **) &name16,
-		    (UTF16 *) ((uintptr_t) name16 +
-			dd.len), &name8,
+		retVal =
+		    tsk_UTF16toUTF8(fs->endian, (const UTF16 **) &name16,
+		    (UTF16 *) ((uintptr_t) name16 + dd.len), &name8,
 		    (UTF8 *) ((uintptr_t) name8 + dd.len / 2),
 		    lenientConversion);
 		if (retVal != conversionOK) {
 		    if (verbose)
-			fprintf(stderr,
+			tsk_fprintf(stderr,
 			    "fsstat: Error converting Joliet name to UTF8: %d",
 			    retVal);
 		    iso->dinode->fn[0] = '\0';
@@ -381,8 +377,8 @@ iso9660_get_dentrys(FS_INFO * fs, OFF_T offs, int count, int type,
 		cnt = fs_read_random(fs, in->inode.fn, dd.len, offs);
 		if (cnt != dd.len) {
 		    if (cnt != -1) {
+			tsk_error_reset();
 			tsk_errno = TSK_ERR_FS_READ;
-			tsk_errstr[0] = '\0';
 		    }
 		    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 			"iso_get_dentries");
@@ -421,8 +417,8 @@ iso9660_get_dentrys(FS_INFO * fs, OFF_T offs, int count, int type,
 		cnt = fs_read_random(fs, buf, dentry_bytes, offs);
 		if (cnt != dentry_bytes) {
 		    if (cnt != -1) {
+			tsk_error_reset();
 			tsk_errno = TSK_ERR_FS_READ;
-			tsk_errstr[0] = '\0';
 		    }
 		    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 			"iso_get_dentries");
@@ -524,7 +520,8 @@ iso9660_find_inodes(ISO_INFO * iso)
     char *file_ver;
 
     if (verbose)
-	fprintf(stderr, "iso9660_find_inodes: iso: %lu\n", (ULONG) iso);
+	tsk_fprintf(stderr, "iso9660_find_inodes: iso: %lu\n",
+	    (ULONG) iso);
 
     /* initialize in case repeatedly called */
     iso9660_inode_list_free(fs);
@@ -539,9 +536,13 @@ iso9660_find_inodes(ISO_INFO * iso)
     while (s) {
 
 	if (fs->endian & TSK_LIT_ENDIAN)
-	    offs = (off_t) (getu32(fs, s->svd.loc_l) * fs->block_size);
+	    offs =
+		(off_t) (getu32(fs->endian,
+		    s->svd.loc_l) * fs->block_size);
 	else
-	    offs = (off_t) (getu32(fs, s->svd.loc_m) * fs->block_size);
+	    offs =
+		(off_t) (getu32(fs->endian,
+		    s->svd.loc_m) * fs->block_size);
 
 	pt_bytes = parseu32(fs, s->svd.path_size);
 
@@ -552,8 +553,8 @@ iso9660_find_inodes(ISO_INFO * iso)
 		fs_read_random(fs, (char *) &dir, (int) sizeof(dir), offs);
 	    if (cnt != sizeof(dir)) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L, "iso_find_inodes");
 		return -1;
@@ -565,8 +566,8 @@ iso9660_find_inodes(ISO_INFO * iso)
 	    cnt = fs_read_random(fs, (char *) uni_buf, dir.len_di, offs);
 	    if (cnt != sizeof(dir)) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L, "iso_find_inodes");
 		return -1;
@@ -587,14 +588,14 @@ iso9660_find_inodes(ISO_INFO * iso)
 	    name16 = (UTF16 *) uni_buf;
 	    name8 = (UTF8 *) iso->dinode->fn;
 
-	    retVal = fs_UTF16toUTF8(fs, (const UTF16 **) &name16,
+	    retVal = tsk_UTF16toUTF8(fs->endian, (const UTF16 **) &name16,
 		(UTF16 *) ((uintptr_t) name16 +
 		    dir.len_di), &name8,
 		(UTF8 *) ((uintptr_t) name8 + dir.len_di / 2),
 		lenientConversion);
 	    if (retVal != conversionOK) {
 		if (verbose)
-		    fprintf(stderr,
+		    tsk_fprintf(stderr,
 			"fsstat: Error converting Joliet name to UTF8: %d",
 			retVal);
 		iso->dinode->fn[0] = '\0';
@@ -630,9 +631,13 @@ iso9660_find_inodes(ISO_INFO * iso)
     while (p) {
 
 	if (fs->endian & TSK_LIT_ENDIAN)
-	    offs = (off_t) (getu32(fs, p->pvd.loc_l) * fs->block_size);
+	    offs =
+		(off_t) (getu32(fs->endian,
+		    p->pvd.loc_l) * fs->block_size);
 	else
-	    offs = (off_t) (getu32(fs, p->pvd.loc_m) * fs->block_size);
+	    offs =
+		(off_t) (getu32(fs->endian,
+		    p->pvd.loc_m) * fs->block_size);
 
 	pt_bytes = parseu32(fs, p->pvd.path_size);
 
@@ -642,8 +647,8 @@ iso9660_find_inodes(ISO_INFO * iso)
 	    cnt = fs_read_random(fs, (char *) &dir, sizeof(dir), offs);
 	    if (cnt != sizeof(dir)) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L, "iso_find_inodes");
 		return -1;
@@ -655,8 +660,8 @@ iso9660_find_inodes(ISO_INFO * iso)
 	    cnt = fs_read_random(fs, fn, dir.len_di, offs);
 	    if (cnt != dir.len_di) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L, "iso_find_inodes");
 		return -1;
@@ -700,7 +705,7 @@ iso9660_dinode_load(ISO_INFO * iso, INUM_T inum)
     in_node *n;
 
     if (verbose)
-	fprintf(stderr, "iso9660_dinode_load: iso: %lu"
+	tsk_fprintf(stderr, "iso9660_dinode_load: iso: %lu"
 	    " inum: %" PRIuINUM "\n", (ULONG) iso, inum);
 
     n = iso->in;
@@ -725,7 +730,7 @@ iso9660_dinode_copy(ISO_INFO * iso, FS_INODE * fs_inode)
     struct tm t;
 
     if (verbose)
-	fprintf(stderr, "iso9660_dinode_copy: iso: %lu"
+	tsk_fprintf(stderr, "iso9660_dinode_copy: iso: %lu"
 	    " inode: %lu\n", (ULONG) iso, (ULONG) fs_inode);
 
     fs_inode->addr = iso->dinum;
@@ -741,9 +746,9 @@ iso9660_dinode_copy(ISO_INFO * iso, FS_INODE * fs_inode)
     fs_inode->mtime = fs_inode->atime = fs_inode->ctime = mktime(&t);
 
     if (iso->dinode->ea) {
-	fs_inode->uid = getu32(fs, iso->dinode->ea->uid);
-	fs_inode->gid = getu32(fs, iso->dinode->ea->gid);
-	fs_inode->mode = getu16(fs, iso->dinode->ea->mode);
+	fs_inode->uid = getu32(fs->endian, iso->dinode->ea->uid);
+	fs_inode->gid = getu32(fs->endian, iso->dinode->ea->gid);
+	fs_inode->mode = getu16(fs->endian, iso->dinode->ea->mode);
 	fs_inode->nlink = 1;
     }
     else {
@@ -770,12 +775,15 @@ iso9660_inode_lookup(FS_INFO * fs, INUM_T inum)
     ISO_INFO *iso = (ISO_INFO *) fs;
     FS_INODE *fs_inode;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     if ((fs_inode =
 	    fs_inode_alloc(ISO9660_NDADDR, ISO9660_NIADDR)) == NULL)
 	return NULL;
 
     if (verbose)
-	fprintf(stderr, "iso9660_inode_lookup: iso: %lu"
+	tsk_fprintf(stderr, "iso9660_inode_lookup: iso: %lu"
 	    " inum: %" PRIuINUM "\n", (ULONG) iso, inum);
 
     if (iso9660_dinode_load(iso, inum)) {
@@ -798,35 +806,58 @@ iso9660_inode_walk(FS_INFO * fs, INUM_T start, INUM_T last, int flags,
     FS_INODE *fs_inode;
     int myflags;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     if ((fs_inode =
 	    fs_inode_alloc(ISO9660_NDADDR, ISO9660_NIADDR)) == NULL)
 	return 1;
 
     if (verbose)
-	fprintf(stderr, "iso9660_inode_walk: iso: %lu"
+	tsk_fprintf(stderr, "iso9660_inode_walk: iso: %lu"
 	    " start: %" PRIuINUM " last: %" PRIuINUM " flags: %d"
 	    " action: %lu ptr: %lu\n",
 	    (ULONG) fs, start, last, flags, (ULONG) action, (ULONG) ptr);
 
-    myflags = FS_FLAG_META_LINK | FS_FLAG_META_USED | FS_FLAG_META_ALLOC;
+    myflags = FS_FLAG_META_ALLOC;
 
     /*
      * Sanity checks.
      */
     if (start < fs->first_inum || start > fs->last_inum) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "%s: Start inode:  %" PRIuINUM "", myname, start);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
     if (last < fs->first_inum || last > fs->last_inum || last < start) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "%s: End inode: %" PRIuINUM "", myname, last);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
+
+    // @@@@ it does not seem that ISO would have any orphans..
+    if (flags & FS_FLAG_META_ORPHAN) {
+	return 0;
+    }
+    else if (((flags & FS_FLAG_META_ALLOC) == 0) &&
+	((flags & FS_FLAG_META_UNALLOC) == 0)) {
+	flags |= (FS_FLAG_META_ALLOC | FS_FLAG_META_UNALLOC);
+    }
+
+    /* If neither of the USED or UNUSED flags are set, then set them
+     * both
+     */
+    if (((flags & FS_FLAG_META_USED) == 0) &&
+	((flags & FS_FLAG_META_UNUSED) == 0)) {
+	flags |= (FS_FLAG_META_USED | FS_FLAG_META_UNUSED);
+    }
+
+
+
     /*
      * Iterate.
      */
@@ -870,7 +901,7 @@ iso9660_is_block_alloc(FS_INFO * fs, DADDR_T blk_num)
     DADDR_T file_size = 0;
 
     if (verbose)
-	fprintf(stderr, "iso9660_is_block_alloc: fs: %lu"
+	tsk_fprintf(stderr, "iso9660_is_block_alloc: fs: %lu"
 	    " blk_num: %" PRIuDADDR "\n", (ULONG) fs, blk_num);
 
     while (in) {
@@ -903,8 +934,11 @@ iso9660_block_walk(FS_INFO * fs, DADDR_T start, DADDR_T last, int flags,
     int myflags = 0;
     SSIZE_T cnt;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     if (verbose)
-	fprintf(stderr, "iso9660_block_walk: fs: %lu"
+	tsk_fprintf(stderr, "iso9660_block_walk: fs: %lu"
 	    " start: %" PRIuDADDR " last: %" PRIuDADDR " flags: %d"
 	    " action: %lu ptr: %lu\n",
 	    (ULONG) fs, start, last, flags, (ULONG) action, (ULONG) ptr);
@@ -913,26 +947,33 @@ iso9660_block_walk(FS_INFO * fs, DADDR_T start, DADDR_T last, int flags,
      * Sanity checks.
      */
     if (start < fs->first_block || start > fs->last_block) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "%s: Start block: %" PRIuDADDR "", myname, start);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
     if (last < fs->first_block || last > fs->last_block) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "%s: End block: %" PRIuDADDR "", myname, last);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
+
+    /* Sanity check on flags -- make sure at least one ALLOC is set */
+    if (((flags & FS_FLAG_DATA_ALLOC) == 0) &&
+	((flags & FS_FLAG_DATA_UNALLOC) == 0)) {
+	flags |= (FS_FLAG_DATA_ALLOC | FS_FLAG_DATA_UNALLOC);
+    }
+
 
     if ((data_buf = data_buf_alloc(fs->block_size)) == NULL) {
 	return 1;
     }
 
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "isofs_block_walk: Block Walking %lu to %lu\n",
 	    (ULONG) start, (ULONG) last);
 
@@ -946,8 +987,8 @@ iso9660_block_walk(FS_INFO * fs, DADDR_T start, DADDR_T last, int flags,
 	    cnt = fs_read_block(fs, data_buf, fs->block_size, addr);
 	    if (cnt != fs->block_size) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L, "iso_block_walk");
 		return 1;
@@ -982,11 +1023,14 @@ iso9660_file_walk(FS_INFO * fs, FS_INODE * inode, uint32_t type,
     size_t length, size;
     int myflags;
     OFF_T offs;
-    int bytes_read;
+    size_t bytes_read;
     DADDR_T addr;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     if (verbose)
-	fprintf(stderr,
+	tsk_fprintf(stderr,
 	    "iso9660_file_walk: inode: %" PRIuINUM " type: %" PRIu32
 	    " id: %" PRIu16 " flags: %X\n", inode->addr, type, id, flags);
 
@@ -999,9 +1043,9 @@ iso9660_file_walk(FS_INFO * fs, FS_INODE * inode, uint32_t type,
 
     /* examine data at end of last file sector */
     if (flags & FS_FLAG_FILE_SLACK)
-	length = roundup(inode->size, 2048);
+	length = roundup((size_t) inode->size, 2048);
     else
-	length = inode->size;
+	length = (size_t) inode->size;
 
     /* Get start of extent */
     addr = inode->direct_addr[0];
@@ -1019,8 +1063,8 @@ iso9660_file_walk(FS_INFO * fs, FS_INODE * inode, uint32_t type,
 	    bytes_read = fs_read_random(fs, data_buf, size, offs);
 	    if (bytes_read != size) {
 		if (bytes_read != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		    "iso9660_file_walk: Error reading block: %"
@@ -1052,10 +1096,10 @@ iso9660_file_walk(FS_INFO * fs, FS_INODE * inode, uint32_t type,
 static uint8_t
 iso9660_fscheck(FS_INFO * fs, FILE * hFile)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L,
 	"fscheck not implemented for iso9660 yet");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
@@ -1073,21 +1117,25 @@ iso9660_fsstat(FS_INFO * fs, FILE * hFile)
     pvd_node *p = iso->pvd;
     svd_node *s = iso->svd;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     if (verbose)
-	fprintf(stderr, "iso9660_fsstat: fs: %lu \
+	tsk_fprintf(stderr, "iso9660_fsstat: fs: %lu \
 			hFile: %lu\n", (ULONG) fs, (ULONG) hFile);
 
     i = 0;
 
     while (p != NULL) {
 	i++;
-	fprintf(hFile, "\nPRIMARY VOLUME DESCRIPTOR %d\n", i);
-	fprintf(hFile, "\nFILE SYSTEM INFORMATION\n");
-	fprintf(hFile, "--------------------------------------------\n");
-	fprintf(hFile, "Read from Primary Volume Descriptor\n");
-	fprintf(hFile, "File System Type: ISO9660\n");
-	fprintf(hFile, "Volume Name: %s\n", p->pvd.vol_id);
-	fprintf(hFile, "Volume Set Size: %d\n",
+	tsk_fprintf(hFile, "\nPRIMARY VOLUME DESCRIPTOR %d\n", i);
+	tsk_fprintf(hFile, "\nFILE SYSTEM INFORMATION\n");
+	tsk_fprintf(hFile,
+	    "--------------------------------------------\n");
+	tsk_fprintf(hFile, "Read from Primary Volume Descriptor\n");
+	tsk_fprintf(hFile, "File System Type: ISO9660\n");
+	tsk_fprintf(hFile, "Volume Name: %s\n", p->pvd.vol_id);
+	tsk_fprintf(hFile, "Volume Set Size: %d\n",
 	    parseu16(fs, p->pvd.vol_set));
 
 	/* print publisher */
@@ -1102,7 +1150,7 @@ iso9660_fsstat(FS_INFO * fs, FILE * hFile)
 	while ((!isprint(*cp) || isspace(*cp)) && (cp != str))
 	    cp--;
 	*++cp = '\0';
-	fprintf(hFile, "Publisher: %s\n", str);
+	tsk_fprintf(hFile, "Publisher: %s\n", str);
 	memset(str, ' ', 128);
 
 
@@ -1117,7 +1165,7 @@ iso9660_fsstat(FS_INFO * fs, FILE * hFile)
 	while ((!isprint(*cp) || isspace(*cp)) && (cp != str))
 	    cp--;
 	*++cp = '\0';
-	fprintf(hFile, "Data Preparer: %s\n", str);
+	tsk_fprintf(hFile, "Data Preparer: %s\n", str);
 	memset(str, ' ', 128);
 
 
@@ -1131,7 +1179,7 @@ iso9660_fsstat(FS_INFO * fs, FILE * hFile)
 	while ((!isprint(*cp) || isspace(*cp)) && (cp != str))
 	    cp--;
 	*++cp = '\0';
-	fprintf(hFile, "Recording Application: %s\n", str);
+	tsk_fprintf(hFile, "Recording Application: %s\n", str);
 	memset(str, ' ', 128);
 
 
@@ -1145,28 +1193,31 @@ iso9660_fsstat(FS_INFO * fs, FILE * hFile)
 	while ((!isprint(*cp) || isspace(*cp)) && (cp != str))
 	    cp--;
 	*++cp = '\0';
-	fprintf(hFile, "Copyright: %s\n", str);
+	tsk_fprintf(hFile, "Copyright: %s\n", str);
 	memset(str, ' ', 37);
 
-	fprintf(hFile, "\nMETADATA INFORMATION\n");
-	fprintf(hFile, "--------------------------------------------\n");
-	fprintf(hFile, "Path Table is at block: %" PRIu32 "\n",
-	    (fs->endian & TSK_LIT_ENDIAN) ?
-	    getu32(fs, p->pvd.loc_l) : getu32(fs, p->pvd.loc_m));
+	tsk_fprintf(hFile, "\nMETADATA INFORMATION\n");
+	tsk_fprintf(hFile,
+	    "--------------------------------------------\n");
+	tsk_fprintf(hFile, "Path Table is at block: %" PRIu32 "\n",
+	    (fs->endian & TSK_LIT_ENDIAN) ? getu32(fs->endian,
+		p->pvd.loc_l) : getu32(fs->endian, p->pvd.loc_m));
 
-	fprintf(hFile, "Range: %" PRIuINUM " - %" PRIuINUM "\n",
+	tsk_fprintf(hFile, "Range: %" PRIuINUM " - %" PRIuINUM "\n",
 	    fs->first_inum, fs->last_inum);
 
-	fprintf(hFile, "\nCONTENT INFORMATION\n");
-	fprintf(hFile, "--------------------------------------------\n");
-	fprintf(hFile, "Sector Size: %d\n", ISO9660_SSIZE_B);
-	fprintf(hFile, "Block Size: %d\n", parseu16(fs, p->pvd.blk_sz));
+	tsk_fprintf(hFile, "\nCONTENT INFORMATION\n");
+	tsk_fprintf(hFile,
+	    "--------------------------------------------\n");
+	tsk_fprintf(hFile, "Sector Size: %d\n", ISO9660_SSIZE_B);
+	tsk_fprintf(hFile, "Block Size: %d\n", parseu16(fs,
+		p->pvd.blk_sz));
 
-	fprintf(hFile, "Total Sector Range: 0 - %d\n",
+	tsk_fprintf(hFile, "Total Sector Range: 0 - %d\n",
 	    (int) ((fs->block_size / ISO9660_SSIZE_B) *
 		(fs->block_count - 1)));
 	/* get image slack, ignore how big the image claims itself to be */
-	fprintf(hFile, "Total Block Range: 0 - %d\n",
+	tsk_fprintf(hFile, "Total Block Range: 0 - %d\n",
 	    (int) fs->block_count - 1);
 
 	p = p->next;
@@ -1176,13 +1227,14 @@ iso9660_fsstat(FS_INFO * fs, FILE * hFile)
 
     while (s != NULL) {
 	i++;
-	fprintf(hFile, "\nSUPPLEMENTARY VOLUME DESCRIPTOR %d\n", i);
-	fprintf(hFile, "\nFILE SYSTEM INFORMATION\n");
-	fprintf(hFile, "--------------------------------------------\n");
-	fprintf(hFile, "Read from Supplementary Volume Descriptor\n");
-	fprintf(hFile, "File System Type: ISO9660\n");
-	fprintf(hFile, "Volume Name: %s\n", s->svd.vol_id);
-	fprintf(hFile, "Volume Set Size: %d\n",
+	tsk_fprintf(hFile, "\nSUPPLEMENTARY VOLUME DESCRIPTOR %d\n", i);
+	tsk_fprintf(hFile, "\nFILE SYSTEM INFORMATION\n");
+	tsk_fprintf(hFile,
+	    "--------------------------------------------\n");
+	tsk_fprintf(hFile, "Read from Supplementary Volume Descriptor\n");
+	tsk_fprintf(hFile, "File System Type: ISO9660\n");
+	tsk_fprintf(hFile, "Volume Name: %s\n", s->svd.vol_id);
+	tsk_fprintf(hFile, "Volume Set Size: %d\n",
 	    parseu16(fs, s->svd.vol_set));
 
 
@@ -1198,7 +1250,7 @@ iso9660_fsstat(FS_INFO * fs, FILE * hFile)
 	while ((!isprint(*cp) || isspace(*cp)) && (cp != str))
 	    cp--;
 	*++cp = '\0';
-	fprintf(hFile, "Publisher: %s\n", str);
+	tsk_fprintf(hFile, "Publisher: %s\n", str);
 	memset(str, ' ', 128);
 
 
@@ -1213,7 +1265,7 @@ iso9660_fsstat(FS_INFO * fs, FILE * hFile)
 	while ((!isprint(*cp) || isspace(*cp)) && (cp != str))
 	    cp--;
 	*++cp = '\0';
-	fprintf(hFile, "Data Preparer: %s\n", str);
+	tsk_fprintf(hFile, "Data Preparer: %s\n", str);
 	memset(str, ' ', 128);
 
 
@@ -1227,7 +1279,7 @@ iso9660_fsstat(FS_INFO * fs, FILE * hFile)
 	while ((!isprint(*cp) || isspace(*cp)) && (cp != str))
 	    cp--;
 	*++cp = '\0';
-	fprintf(hFile, "Recording Application: %s\n", str);
+	tsk_fprintf(hFile, "Recording Application: %s\n", str);
 	memset(str, ' ', 128);
 
 
@@ -1241,36 +1293,38 @@ iso9660_fsstat(FS_INFO * fs, FILE * hFile)
 	while ((!isprint(*cp) || isspace(*cp)) && (cp != str))
 	    cp--;
 	*++cp = '\0';
-	fprintf(hFile, "Copyright: %s\n", str);
+	tsk_fprintf(hFile, "Copyright: %s\n", str);
 	memset(str, ' ', 37);
 
-	fprintf(hFile, "\nMETADATA INFORMATION\n");
-	fprintf(hFile, "--------------------------------------------\n");
-	fprintf(hFile, "Path Table is at block: %" PRIu32 "\n",
-	    (fs->endian & TSK_LIT_ENDIAN) ?
-	    getu32(fs, s->svd.loc_l) : getu32(fs, s->svd.loc_m));
+	tsk_fprintf(hFile, "\nMETADATA INFORMATION\n");
+	tsk_fprintf(hFile,
+	    "--------------------------------------------\n");
+	tsk_fprintf(hFile, "Path Table is at block: %" PRIu32 "\n",
+	    (fs->endian & TSK_LIT_ENDIAN) ? getu32(fs->endian,
+		s->svd.loc_l) : getu32(fs->endian, s->svd.loc_m));
 
 	/* learn joliet level (1-3) */
 	if (!strncmp((char *) s->svd.esc_seq, "%/E", 3))
-	    fprintf(hFile, "Joliet Name Encoding: UCS-2 Level 3\n");
+	    tsk_fprintf(hFile, "Joliet Name Encoding: UCS-2 Level 3\n");
 	if (!strncmp((char *) s->svd.esc_seq, "%/C", 3))
-	    fprintf(hFile, "Joliet Name Encoding: UCS-2 Level 2\n");
+	    tsk_fprintf(hFile, "Joliet Name Encoding: UCS-2 Level 2\n");
 	if (!strncmp((char *) s->svd.esc_seq, "%/@", 3))
-	    fprintf(hFile, "Joliet Name Encoding: UCS-2 Level 1\n");
+	    tsk_fprintf(hFile, "Joliet Name Encoding: UCS-2 Level 1\n");
 	if (iso->rr_found)
-	    fprintf(hFile, "RockRidge Extensions present\n");
+	    tsk_fprintf(hFile, "RockRidge Extensions present\n");
 
 
-	fprintf(hFile, "\nCONTENT INFORMATION\n");
-	fprintf(hFile, "--------------------------------------------\n");
-	fprintf(hFile, "Sector Size: %d\n", ISO9660_SSIZE_B);
-	fprintf(hFile, "Block Size: %d\n", fs->block_size);
+	tsk_fprintf(hFile, "\nCONTENT INFORMATION\n");
+	tsk_fprintf(hFile,
+	    "--------------------------------------------\n");
+	tsk_fprintf(hFile, "Sector Size: %d\n", ISO9660_SSIZE_B);
+	tsk_fprintf(hFile, "Block Size: %d\n", fs->block_size);
 
-	fprintf(hFile, "Total Sector Range: 0 - %d\n",
+	tsk_fprintf(hFile, "Total Sector Range: 0 - %d\n",
 	    (int) ((fs->block_size / ISO9660_SSIZE_B) *
 		(fs->block_count - 1)));
 	/* get image slack, ignore how big the image claims itself to be */
-	fprintf(hFile, "Total Block Range: 0 - %d\n",
+	tsk_fprintf(hFile, "Total Block Range: 0 - %d\n",
 	    (int) fs->block_count - 1);
 
 	s = s->next;
@@ -1286,7 +1340,7 @@ make_unix_perm(FS_INFO * fs, iso9660_dentry * dd)
     ISO_INFO *iso = (ISO_INFO *) fs;
 
     if (verbose)
-	fprintf(stderr, "make_unix_perm: fs: %lu"
+	tsk_fprintf(stderr, "make_unix_perm: fs: %lu"
 	    " dd: %lu\n", (ULONG) fs, (ULONG) dd);
 
     perm[10] = '\0';
@@ -1297,22 +1351,22 @@ make_unix_perm(FS_INFO * fs, iso9660_dentry * dd)
 	perm[0] = 'd';
 
     if (iso->dinode->ea) {
-	if (getu16(fs, iso->dinode->ea->mode) & ISO9660_BIT_UR)
+	if (getu16(fs->endian, iso->dinode->ea->mode) & ISO9660_BIT_UR)
 	    perm[1] = 'r';
 
-	if (getu16(fs, iso->dinode->ea->mode) & ISO9660_BIT_UX)
+	if (getu16(fs->endian, iso->dinode->ea->mode) & ISO9660_BIT_UX)
 	    perm[3] = 'x';
 
-	if (getu16(fs, iso->dinode->ea->mode) & ISO9660_BIT_GR)
+	if (getu16(fs->endian, iso->dinode->ea->mode) & ISO9660_BIT_GR)
 	    perm[4] = 'r';
 
-	if (getu16(fs, iso->dinode->ea->mode) & ISO9660_BIT_GX)
+	if (getu16(fs->endian, iso->dinode->ea->mode) & ISO9660_BIT_GX)
 	    perm[6] = 'x';
 
-	if (getu16(fs, iso->dinode->ea->mode) & ISO9660_BIT_AR)
+	if (getu16(fs->endian, iso->dinode->ea->mode) & ISO9660_BIT_AR)
 	    perm[7] = 'r';
 
-	if (getu16(fs, iso->dinode->ea->mode) & ISO9660_BIT_AX)
+	if (getu16(fs->endian, iso->dinode->ea->mode) & ISO9660_BIT_AX)
 	    perm[9] = 'x';
     }
     else {
@@ -1327,15 +1381,15 @@ iso9660_print_rockridge(FILE * hFile, rockridge_ext * rr)
 {
     char mode_buf[11];
 
-    fprintf(hFile, "\nROCKRIDGE EXTENSIONS\n");
+    tsk_fprintf(hFile, "\nROCKRIDGE EXTENSIONS\n");
 
-    fprintf(hFile, "Owner-ID: ");
-    fprintf(hFile, "%d\t", (int) rr->uid);
+    tsk_fprintf(hFile, "Owner-ID: ");
+    tsk_fprintf(hFile, "%d\t", (int) rr->uid);
 
-    fprintf(hFile, "Group-ID: ");
-    fprintf(hFile, "%d\n", (int) rr->gid);
+    tsk_fprintf(hFile, "Group-ID: ");
+    tsk_fprintf(hFile, "%d\n", (int) rr->gid);
 
-    fprintf(hFile, "Mode: ");
+    tsk_fprintf(hFile, "Mode: ");
     memset(mode_buf, '-', 11);
     mode_buf[10] = '\0';
 
@@ -1393,124 +1447,127 @@ iso9660_print_rockridge(FILE * hFile, rockridge_ext * rr)
     else if (rr->mode & MODE_ISVTX)
 	mode_buf[9] = 'T';
 
-    fprintf(hFile, "%s\n", mode_buf);
-    fprintf(hFile, "Number links: %" PRIu32 "\n", rr->nlink);
+    tsk_fprintf(hFile, "%s\n", mode_buf);
+    tsk_fprintf(hFile, "Number links: %" PRIu32 "\n", rr->nlink);
 
-    fprintf(hFile, "Alternate name: %s\n", rr->fn);
-    fprintf(hFile, "\n");
+    tsk_fprintf(hFile, "Alternate name: %s\n", rr->fn);
+    tsk_fprintf(hFile, "\n");
 }
 
 static uint8_t
-iso9660_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
+iso9660_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, DADDR_T numblock,
     int32_t sec_skew)
 {
     ISO_INFO *iso = (ISO_INFO *) fs;
     FS_INODE *fs_inode;
     iso9660_dentry dd;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     fs_inode = iso9660_inode_lookup(fs, inum);
 
-    fprintf(hFile, "Entry: %lu\n", (ULONG) inum);
+    tsk_fprintf(hFile, "Entry: %lu\n", (ULONG) inum);
 
     iso9660_dinode_load(iso, inum);
     memcpy(&dd, &iso->dinode->dr, sizeof(iso9660_dentry));
 
-    fprintf(hFile, "Type: ");
+    tsk_fprintf(hFile, "Type: ");
     if (dd.flags & ISO9660_FLAG_DIR)
-	fprintf(hFile, "Directory\n");
+	tsk_fprintf(hFile, "Directory\n");
     else
-	fprintf(hFile, "File\n");
+	tsk_fprintf(hFile, "File\n");
 
-    fprintf(hFile, "Links: %lu\n", (ULONG) fs_inode->nlink);
+    tsk_fprintf(hFile, "Links: %lu\n", (ULONG) fs_inode->nlink);
 
-    fprintf(hFile, "Flags: ");
+    tsk_fprintf(hFile, "Flags: ");
 
     if (dd.flags & ISO9660_FLAG_HIDE)
-	fprintf(hFile, "Hidden, ");
+	tsk_fprintf(hFile, "Hidden, ");
 
     if (dd.flags & ISO9660_FLAG_ASSOC)
-	fprintf(hFile, "Associated, ");
+	tsk_fprintf(hFile, "Associated, ");
 
     if (dd.flags & ISO9660_FLAG_RECORD)
-	fprintf(hFile, "Record Format, ");
+	tsk_fprintf(hFile, "Record Format, ");
 
     if (dd.flags & ISO9660_FLAG_PROT)
-	fprintf(hFile, "Protected,  ");
+	tsk_fprintf(hFile, "Protected,  ");
 
     /* check if reserved bits are set, be suspicious */
     if (dd.flags & ISO9660_FLAG_RES1)
-	fprintf(hFile, "Reserved1, ");
+	tsk_fprintf(hFile, "Reserved1, ");
 
     if (dd.flags & ISO9660_FLAG_RES2)
-	fprintf(hFile, "Reserved2, ");
+	tsk_fprintf(hFile, "Reserved2, ");
 
     if (dd.flags & ISO9660_FLAG_MULT)
-	fprintf(hFile, "Non-final multi-extent entry");
+	tsk_fprintf(hFile, "Non-final multi-extent entry");
     putchar('\n');
 
-    fprintf(hFile, "Name: %s\n", iso->dinode->fn);
-    fprintf(hFile, "Size: %" PRIu32 "\n", parseu32(fs,
+    tsk_fprintf(hFile, "Name: %s\n", iso->dinode->fn);
+    tsk_fprintf(hFile, "Size: %" PRIu32 "\n", parseu32(fs,
 	    iso->dinode->dr.data_len));
 
     if (iso->dinode->ea) {
-	fprintf(hFile, "\nEXTENDED ATTRIBUTE INFO\n");
-	fprintf(hFile, "Owner-ID: %" PRIu32 "\n", getu32(fs,
+	tsk_fprintf(hFile, "\nEXTENDED ATTRIBUTE INFO\n");
+	tsk_fprintf(hFile, "Owner-ID: %" PRIu32 "\n", getu32(fs->endian,
 		iso->dinode->ea->uid));
-	fprintf(hFile, "Group-ID: %" PRIu32 "\n", getu32(fs,
+	tsk_fprintf(hFile, "Group-ID: %" PRIu32 "\n", getu32(fs->endian,
 		iso->dinode->ea->gid));
-	fprintf(hFile, "Mode: %s\n", make_unix_perm(fs, &dd));
+	tsk_fprintf(hFile, "Mode: %s\n", make_unix_perm(fs, &dd));
     }
     else if (iso->dinode->rr) {
 	iso9660_print_rockridge(hFile, iso->dinode->rr);
     }
     else {
-	fprintf(hFile, "Owner-ID: 0\n");
-	fprintf(hFile, "Group-ID: 0\n");
-	fprintf(hFile, "Mode: %s\n", make_unix_perm(fs, &dd));
+	tsk_fprintf(hFile, "Owner-ID: 0\n");
+	tsk_fprintf(hFile, "Group-ID: 0\n");
+	tsk_fprintf(hFile, "Mode: %s\n", make_unix_perm(fs, &dd));
     }
 
     if (sec_skew != 0) {
-	fprintf(hFile, "\nAdjusted File Times:\n");
+	tsk_fprintf(hFile, "\nAdjusted File Times:\n");
 	fs_inode->mtime -= sec_skew;
 	fs_inode->atime -= sec_skew;
 	fs_inode->ctime -= sec_skew;
 
-	fprintf(hFile, "Written:\t%s", ctime(&fs_inode->mtime));
-	fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
-	fprintf(hFile, "Created:\t%s", ctime(&fs_inode->ctime));
+	tsk_fprintf(hFile, "Written:\t%s", ctime(&fs_inode->mtime));
+	tsk_fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
+	tsk_fprintf(hFile, "Created:\t%s", ctime(&fs_inode->ctime));
 
 	fs_inode->mtime += sec_skew;
 	fs_inode->atime += sec_skew;
 	fs_inode->ctime += sec_skew;
 
-	fprintf(hFile, "\nOriginal File Times:\n");
+	tsk_fprintf(hFile, "\nOriginal File Times:\n");
     }
     else {
-	fprintf(hFile, "\nFile Times:\n");
+	tsk_fprintf(hFile, "\nFile Times:\n");
     }
 
-    fprintf(hFile, "Created:\t%s", ctime(&fs_inode->ctime));
-    fprintf(hFile, "File Modified:\t%s", ctime(&fs_inode->mtime));
-    fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
+    tsk_fprintf(hFile, "Created:\t%s", ctime(&fs_inode->ctime));
+    tsk_fprintf(hFile, "File Modified:\t%s", ctime(&fs_inode->mtime));
+    tsk_fprintf(hFile, "Accessed:\t%s", ctime(&fs_inode->atime));
 
 
-    fprintf(hFile, "\nSectors:\n");
+    tsk_fprintf(hFile, "\nSectors:\n");
     /* since blocks are all contiguous, print them here to simplify file_walk */
     {
 	int block = parseu32(fs, iso->dinode->dr.ext_loc);
-	int size = fs_inode->size;
+	OFF_T size = fs_inode->size;
 	int rowcount = 0;
 
 	while (size > 0) {
-	    fprintf(hFile, "%d ", block++);
+	    tsk_fprintf(hFile, "%d ", block++);
 	    size -= fs->block_size;
 	    rowcount++;
 	    if (rowcount == 8) {
 		rowcount = 0;
-		fprintf(hFile, "\n");
+		tsk_fprintf(hFile, "\n");
 	    }
 	}
-	fprintf(hFile, "\n");
+	tsk_fprintf(hFile, "\n");
     }
     return 0;
 }
@@ -1521,9 +1578,9 @@ iso9660_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 uint8_t
 iso9660_jopen(FS_INFO * fs, INUM_T inum)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L, "ISO9660 does not have a journal");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
@@ -1531,9 +1588,9 @@ uint8_t
 iso9660_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
     void *ptr)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L, "ISO9660 does not have a journal");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
@@ -1541,9 +1598,9 @@ uint8_t
 iso9660_jblk_walk(FS_INFO * fs, DADDR_T start, DADDR_T end, int flags,
     FS_JBLK_WALK_FN action, void *ptr)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L, "ISO9660 does not have a journal");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
@@ -1568,6 +1625,11 @@ iso9660_close(FS_INFO * fs)
 
     free((char *) iso->dinode);
 
+    if (fs->list_inum_named) {
+	tsk_list_free(fs->list_inum_named);
+	fs->list_inum_named = NULL;
+    }
+
     free(fs);
 }
 
@@ -1591,13 +1653,9 @@ get_vol_desc(FS_INFO * fs)
     svd_node *s, *stmp;
     iso_bootrec *b;
     off_t offs;
-    char *myname = "get_vol_desc";
+    char *myname = "iso_get_vol_desc";
     SSIZE_T cnt;
 
-    b = (iso_bootrec *) mymalloc(sizeof(iso_bootrec));
-    if (b == NULL) {
-	return -1;
-    }
 
     iso->pvd = NULL;
     iso->svd = NULL;
@@ -1607,8 +1665,8 @@ get_vol_desc(FS_INFO * fs)
     cnt = fs_read_random(fs, (char *) &vd, sizeof(iso_vd), ISO9660_SBOFF);
     if (cnt != sizeof(iso_vd)) {
 	if (cnt != -1) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_READ;
-	    tsk_errstr[0] = '\0';
 	}
 	snprintf(tsk_errstr2, TSK_ERRSTR_L,
 	    "iso_get_vol_desc: Error reading");
@@ -1617,8 +1675,13 @@ get_vol_desc(FS_INFO * fs)
 
     if (strncmp(vd.magic, ISO9660_MAGIC, 5)) {
 	if (verbose)
-	    fprintf(stderr, "%s Bad volume descriptor: \
-			         Magic number is not CD001", myname);
+	    tsk_fprintf(stderr, "%s: Bad volume descriptor: \
+			         Magic number is not CD001\n", myname);
+	return -1;
+    }
+
+    b = (iso_bootrec *) mymalloc(sizeof(iso_bootrec));
+    if (b == NULL) {
 	return -1;
     }
 
@@ -1632,6 +1695,7 @@ get_vol_desc(FS_INFO * fs)
 
 	    p = (pvd_node *) mymalloc(sizeof(pvd_node));
 	    if (p == NULL) {
+		free(b);
 		return -1;
 	    }
 
@@ -1640,11 +1704,12 @@ get_vol_desc(FS_INFO * fs)
 		offs);
 	    if (cnt != sizeof(iso_pvd)) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		    "iso_get_vol_desc: Error reading");
+		free(b);
 		return -1;
 	    }
 
@@ -1680,6 +1745,7 @@ get_vol_desc(FS_INFO * fs)
 
 	    s = (svd_node *) mymalloc(sizeof(svd_node));
 	    if (s == NULL) {
+		free(b);
 		return -1;
 	    }
 
@@ -1688,11 +1754,12 @@ get_vol_desc(FS_INFO * fs)
 		offs);
 	    if (cnt != sizeof(iso_svd)) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		    "iso_get_vol_desc: Error reading");
+		free(b);
 		return -1;
 	    }
 
@@ -1731,11 +1798,12 @@ get_vol_desc(FS_INFO * fs)
 		fs_read_random(fs, (char *) b, sizeof(iso_bootrec), offs);
 	    if (cnt != sizeof(iso_bootrec)) {
 		if (cnt != -1) {
+		    tsk_error_reset();
 		    tsk_errno = TSK_ERR_FS_READ;
-		    tsk_errstr[0] = '\0';
 		}
 		snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		    "iso_get_vol_desc: Error reading");
+		free(b);
 		return -1;
 	    }
 
@@ -1746,18 +1814,20 @@ get_vol_desc(FS_INFO * fs)
 	cnt = fs_read_random(fs, (char *) &vd, sizeof(iso_vd), offs);
 	if (cnt != sizeof(iso_vd)) {
 	    if (cnt != -1) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_READ;
-		tsk_errstr[0] = '\0';
 	    }
 	    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		"iso_get_vol_desc: Error reading");
+	    free(b);
 	    return -1;
 	}
 
 	if (strncmp(vd.magic, ISO9660_MAGIC, 5)) {
 	    if (verbose)
-		fprintf(stderr, "%s Bad volume descriptor: \
+		tsk_fprintf(stderr, "%s: Bad volume descriptor: \
 				         Magic number is not CD001", myname);
+	    free(b);
 	    return -1;
 	}
     }
@@ -1795,10 +1865,10 @@ get_vol_desc(FS_INFO * fs)
     }
 
     if ((iso->pvd == NULL) && (iso->svd == NULL)) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_MAGIC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "get_vol_desc: primary and secondary volume descriptors null");
-	tsk_errstr2[0] = '\0';
 	return -1;
     }
 
@@ -1824,7 +1894,7 @@ find_block_sizes(FS_INFO * fs)
 	}
 	else if (size != parseu16(fs, p->pvd.blk_sz)) {
 	    if (verbose)
-		fprintf(stderr,
+		tsk_fprintf(stderr,
 		    "Warning: Expected ISO9660 block size: %d got %d\n",
 		    size, parseu16(fs, p->pvd.blk_sz));
 	}
@@ -1839,7 +1909,7 @@ find_block_sizes(FS_INFO * fs)
 	}
 	else if (size != parseu16(fs, s->svd.blk_sz)) {
 	    if (verbose)
-		fprintf(stderr,
+		tsk_fprintf(stderr,
 		    "Warning: Expected ISO9660 block size: %d got %d\n",
 		    size, parseu16(fs, s->svd.blk_sz));
 	}
@@ -1864,7 +1934,7 @@ iso9660_open(IMG_INFO * img_info, SSIZE_T offset, unsigned char ftype,
     int len;
 
     if (verbose) {
-	fprintf(stderr, "iso9660_open img_info: %lu"
+	tsk_fprintf(stderr, "iso9660_open img_info: %lu"
 	    " ftype: %" PRIu8 " test: %" PRIu8 "\n", (ULONG) img_info,
 	    ftype, test);
     }
@@ -1878,6 +1948,7 @@ iso9660_open(IMG_INFO * img_info, SSIZE_T offset, unsigned char ftype,
     iso->rr_found = 0;
 
     if ((ftype & FSMASK) != ISO9660_TYPE) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "Invalid FS type in iso9660_open");
@@ -1904,6 +1975,7 @@ iso9660_open(IMG_INFO * img_info, SSIZE_T offset, unsigned char ftype,
 	if (test)
 	    return NULL;
 	else {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_MAGIC;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L,
 		"Invalid FS type in iso9660_open");
@@ -1914,6 +1986,7 @@ iso9660_open(IMG_INFO * img_info, SSIZE_T offset, unsigned char ftype,
     fs->dev_bsize = 512;
     fs->block_size = find_block_sizes(fs);
     if (fs->block_size == 0) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_MAGIC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L, "Block size not found");
 	return NULL;
@@ -1959,6 +2032,8 @@ iso9660_open(IMG_INFO * img_info, SSIZE_T offset, unsigned char ftype,
 	return NULL;
     }
     iso->dinum = -1;
+
+    fs->list_inum_named = NULL;
 
     return fs;
 }

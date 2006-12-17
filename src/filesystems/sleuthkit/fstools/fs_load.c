@@ -1,7 +1,7 @@
 /* 
  * The Sleuth Kit
  *
- * $Date: 2006/03/27 03:33:19 $
+ * $Date: 2006/08/30 21:09:00 $
  * 
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2005 Brian Carrier.  All rights reserved
@@ -10,7 +10,7 @@
  *
  */
 
-#include "fs_tools.h"
+#include "fs_tools_i.h"
 
 
 /* File Walk Action to load the journal 
@@ -18,7 +18,7 @@
 */
 
 uint8_t
-load_file_action(FS_INFO * fs, DADDR_T addr, char *buf, unsigned int size,
+load_file_action(FS_INFO * fs, DADDR_T addr, char *buf, size_t size,
     int flags, void *ptr)
 {
     FS_LOAD_FILE *buf1 = (FS_LOAD_FILE *) ptr;

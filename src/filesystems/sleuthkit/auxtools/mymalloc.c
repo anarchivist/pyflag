@@ -53,6 +53,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include "aux_tools.h"
 #if defined (HAVE_UNISTD)
 #include <unistd.h>
 #endif
@@ -62,10 +63,8 @@
 #include <string.h>
 #include <errno.h>
 
-#include "tsk_os.h"
-#include "tsk_types.h"
-#include "tsk_error.h"
-#include "mymalloc.h"
+#include "talloc.h"
+
 
 /* mymalloc - allocate memory and set error values on error
  */
@@ -77,6 +76,7 @@ mymalloc(size_t len)
     char *ptr;
 
     if ((ptr = (char *) talloc_size(global_talloc_context, len)) == 0) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_AUX_MALLOC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L, "mymalloc: %s",
 	    strerror(errno));
@@ -88,7 +88,8 @@ mymalloc(size_t len)
 char *
 myrealloc(char *ptr, size_t len)
 {
-  if ((ptr = (char *) talloc_realloc_size(global_talloc_context, ptr, len)) == 0) {
+    if ((ptr = (char *) talloc_realloc_size(global_talloc_context, ptr, len)) == 0) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_AUX_MALLOC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L, "myrealloc: %s",
 	    strerror(errno));

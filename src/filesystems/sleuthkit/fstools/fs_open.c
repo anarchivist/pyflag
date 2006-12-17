@@ -2,7 +2,7 @@
 ** fs_open
 ** The Sleuth Kit 
 **
-** $Date: 2006/07/05 21:12:59 $
+** $Date: 2006/11/29 22:02:11 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
@@ -26,7 +26,7 @@
  *	Yorktown Heights, NY 10598, USA
  --*/
 
-#include "fs_tools.h"
+#include "fs_tools_i.h"
 
 /* 
  * fs_open - open a file system 
@@ -36,9 +36,8 @@
  */
 
 FS_INFO *
-fs_open(IMG_INFO * img_info, SSIZE_T offset, const char *type)
+fs_open(IMG_INFO * img_info, SSIZE_T offset, const TSK_TCHAR * type)
 {
-
 
     /* We will try different file systems ... 
      * We need to try all of them in case more than one matches
@@ -48,8 +47,8 @@ fs_open(IMG_INFO * img_info, SSIZE_T offset, const char *type)
 	char *set = NULL;
 
 	if (verbose)
-	    fprintf(stderr,
-		"fsopen: Auto detection mode at offset %" PRIuOFF "\n",
+	    tsk_fprintf(stderr,
+		"fsopen: Auto detection mode at offset %" PRIuSSIZE "\n",
 		offset);
 
 	if ((fs_info = ntfs_open(img_info, offset, NTFS, 1)) != NULL) {
@@ -68,9 +67,9 @@ fs_open(IMG_INFO * img_info, SSIZE_T offset, const char *type)
 	    else {
 		fs_set->close(fs_set);
 		fs_info->close(fs_info);
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_UNKTYPE;
 		snprintf(tsk_errstr, TSK_ERRSTR_L, "FAT or %s", set);
-		tsk_errstr2[0] = '\0';
 		return NULL;
 	    }
 	}
@@ -86,9 +85,9 @@ fs_open(IMG_INFO * img_info, SSIZE_T offset, const char *type)
 	    else {
 		fs_set->close(fs_set);
 		fs_info->close(fs_info);
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_UNKTYPE;
 		snprintf(tsk_errstr, TSK_ERRSTR_L, "EXT2/3 or %s", set);
-		tsk_errstr2[0] = '\0';
 		return NULL;
 	    }
 	}
@@ -104,9 +103,9 @@ fs_open(IMG_INFO * img_info, SSIZE_T offset, const char *type)
 	    else {
 		fs_set->close(fs_set);
 		fs_info->close(fs_info);
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_UNKTYPE;
 		snprintf(tsk_errstr, TSK_ERRSTR_L, "UFS or %s", set);
-		tsk_errstr2[0] = '\0';
 		return NULL;
 	    }
 	}
@@ -123,21 +122,24 @@ fs_open(IMG_INFO * img_info, SSIZE_T offset, const char *type)
 	   else {
 	   fs_set->close(fs_set);
 	   fs_info->close(fs_info);
+	   tsk_error_reset();
 	   tsk_errno = TSK_ERR_FS_UNKTYPE;
 	   snprintf(tsk_errstr, TSK_ERRSTR_L,
 	   "HFS or %s", set);
-	   tsk_errstr2[0] = '\0';
 	   return NULL;
 	   }
+	   }
+	   else {
+	   tsk_error_reset();
 	   }
 	 */
 	if ((fs_info = iso9660_open(img_info, offset, ISO9660, 1)) != NULL) {
 	    if (set != NULL) {
 		fs_set->close(fs_set);
 		fs_info->close(fs_info);
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_UNKTYPE;
 		snprintf(tsk_errstr, TSK_ERRSTR_L, "ISO9660 or %s", set);
-		tsk_errstr2[0] = '\0';
 		return NULL;
 	    }
 	    fs_set = fs_info;
@@ -148,6 +150,7 @@ fs_open(IMG_INFO * img_info, SSIZE_T offset, const char *type)
 
 
 	if (fs_set == NULL) {
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_UNKTYPE;
 	    tsk_errstr[0] = '\0';
 	    tsk_errstr2[0] = '\0';
@@ -180,9 +183,9 @@ fs_open(IMG_INFO * img_info, SSIZE_T offset, const char *type)
 	    return swapfs_open(img_info, offset);
 	case UNSUPP_FS:
 	default:
+	    tsk_error_reset();
 	    tsk_errno = TSK_ERR_FS_UNSUPTYPE;
 	    snprintf(tsk_errstr, TSK_ERRSTR_L, "%s", type);
-	    tsk_errstr2[0] = '\0';
 	    return NULL;
 	}
     }

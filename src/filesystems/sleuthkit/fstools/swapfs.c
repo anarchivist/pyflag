@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2006/06/19 22:21:07 $
+** $Date: 2006/12/05 21:39:53 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
@@ -12,7 +12,7 @@
 **
 */
 
-#include "fs_tools.h"
+#include "fs_tools_i.h"
 
 
 /**************************************************************************
@@ -29,20 +29,20 @@ uint8_t
 swapfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
     int flags, FS_INODE_WALK_FN action, void *ptr)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L,
 	"Illegal analysis method for swap space data");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
 static FS_INODE *
 swapfs_inode_lookup(FS_INFO * fs, INUM_T inum)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L,
 	"Illegal analysis method for swap space data");
-    tsk_errstr2[0] = '\0';
     return NULL;
 }
 
@@ -67,24 +67,27 @@ swapfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
     DATA_BUF *data_buf;
     DADDR_T addr;
 
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
     /*
      * Sanity checks.
      */
     if (start_blk < fs->first_block || start_blk > fs->last_block) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "swapfs_block_walk: Start block number: %" PRIuDADDR,
 	    start_blk);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
     if (end_blk < fs->first_block || end_blk > fs->last_block
 	|| end_blk < start_blk) {
+	tsk_error_reset();
 	tsk_errno = TSK_ERR_FS_WALK_RNG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "swapfs_block_walk: Last block number: %" PRIuDADDR, end_blk);
-	tsk_errstr2[0] = '\0';
 	return 1;
     }
 
@@ -104,8 +107,8 @@ swapfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
 	cnt = fs_read_block(fs, data_buf, fs->block_size, addr);
 	if (cnt != fs->block_size) {
 	    if (cnt != -1) {
+		tsk_error_reset();
 		tsk_errno = TSK_ERR_FS_READ;
-		tsk_errstr[0] = '\0';
 	    }
 	    snprintf(tsk_errstr2, TSK_ERRSTR_L,
 		"swapfs_block_walk: Block %" PRIuDADDR, addr);
@@ -147,10 +150,10 @@ uint8_t
 swapfs_file_walk(FS_INFO * fs, FS_INODE * inode, uint32_t type,
     uint16_t id, int flags, FS_FILE_WALK_FN action, void *ptr)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L,
 	"Illegal analysis method for swap space data");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
@@ -161,10 +164,10 @@ uint8_t
 swapfs_dent_walk(FS_INFO * fs, INUM_T inode, int flags,
     FS_DENT_WALK_FN action, void *ptr)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L,
 	"Illegal analysis method for swap space data");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
@@ -175,9 +178,9 @@ swapfs_dent_walk(FS_INFO * fs, INUM_T inode, int flags,
 static uint8_t
 swapfs_fsstat(FS_INFO * fs, FILE * hFile)
 {
-    fprintf(hFile, "Swap Space\n");
-    fprintf(hFile, "Page Size: %d\n", fs->block_size);
-    fprintf(hFile, "Page Range: 0 - %" PRIuDADDR "\n", fs->last_block);
+    tsk_fprintf(hFile, "Swap Space\n");
+    tsk_fprintf(hFile, "Page Size: %d\n", fs->block_size);
+    tsk_fprintf(hFile, "Page Range: 0 - %" PRIuDADDR "\n", fs->last_block);
     return 0;
 }
 
@@ -186,13 +189,13 @@ swapfs_fsstat(FS_INFO * fs, FILE * hFile)
 
 /* Return 1 on error and 0 on success */
 static uint8_t
-swapfs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
+swapfs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, DADDR_T numblock,
     int32_t sec_skew)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L,
 	"Illegal analysis method for swap space data");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
@@ -201,9 +204,9 @@ swapfs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, int numblock,
 uint8_t
 swapfs_jopen(FS_INFO * fs, INUM_T inum)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L, "SWAP does not have a journal\n");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
@@ -212,9 +215,9 @@ uint8_t
 swapfs_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
     void *ptr)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L, "SWAP does not have a journal\n");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
@@ -224,9 +227,9 @@ uint8_t
 swapfs_jblk_walk(FS_INFO * fs, INUM_T start, INUM_T end, int flags,
     FS_JBLK_WALK_FN action, void *ptr)
 {
+    tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L, "SWAP does not have a journal\n");
-    tsk_errstr2[0] = '\0';
     return 1;
 }
 
@@ -248,7 +251,12 @@ FS_INFO *
 swapfs_open(IMG_INFO * img_info, SSIZE_T offset)
 {
     OFF_T len;
-    FS_INFO *fs = (FS_INFO *) mymalloc(sizeof(*fs));
+    FS_INFO *fs;
+
+    // clean up any error messages that are lying around
+    tsk_error_reset();
+
+    fs = (FS_INFO *) mymalloc(sizeof(*fs));
     if (fs == NULL)
 	return NULL;
 

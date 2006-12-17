@@ -1,14 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-#include "tsk_os.h"
+#include "aux_tools.h"
 
 #if defined (HAVE_UNISTD)
 #include <unistd.h>
 #endif
 
-#include "tsk_types.h"
-#include "tsk_error.h"
 
 /* Global variables that fit here as well as anywhere */
 char *progname = "unknown";
@@ -37,7 +36,7 @@ char tsk_errstr2[TSK_ERRSTR_L];	/* Contains a caller-specific string
 				 * called in the first place
 				 */
 
-char tsk_errstr3[TSK_ERRSTR_L];	/* The static buffer used in tsk_error_str */
+char tsk_errstr_print[TSK_ERRSTR_PR_L];
 
 const char *tsk_err_aux_str[TSK_ERR_IMG_MAX] = {
     "Insufficient memory",
@@ -84,88 +83,104 @@ const char *tsk_err_fs_str[TSK_ERR_FS_MAX] = {
     "Invalid magic value",
     "Error extracting file from image",
     "Error writing data",
-    "Error converting Unicode", 
+    "Error converting Unicode",
     "Error recovering deleted file",
-    "General file system error"
+    "General file system error",
+    "File system is corrupt"
 };
+
+
+/* return a string with the current error message 
+ * return NULL if there is no error
+ * this will reset the error number and messages
+ */
+char *
+tsk_error_get()
+{
+    size_t pidx = 0;
+
+    if (tsk_errno == 0)
+	return NULL;
+
+    memset(tsk_errstr_print, 0, TSK_ERRSTR_PR_L);
+    if (tsk_errno & TSK_ERR_AUX) {
+	if ((TSK_ERR_MASK & tsk_errno) < TSK_ERR_AUX_MAX)
+	    snprintf(&tsk_errstr_print[pidx], TSK_ERRSTR_PR_L - pidx,
+		"%s", tsk_err_aux_str[tsk_errno & TSK_ERR_MASK]);
+	else
+	    snprintf(&tsk_errstr_print[pidx], TSK_ERRSTR_PR_L - pidx,
+		"auxtools error: %" PRIu32, TSK_ERR_MASK & tsk_errno);
+    }
+    else if (tsk_errno & TSK_ERR_IMG) {
+	if ((TSK_ERR_MASK & tsk_errno) < TSK_ERR_IMG_MAX)
+	    snprintf(&tsk_errstr_print[pidx], TSK_ERRSTR_PR_L - pidx,
+		"%s", tsk_err_img_str[tsk_errno & TSK_ERR_MASK]);
+	else
+	    snprintf(&tsk_errstr_print[pidx], TSK_ERRSTR_PR_L - pidx,
+		"imgtools error: %" PRIu32, TSK_ERR_MASK & tsk_errno);
+    }
+    else if (tsk_errno & TSK_ERR_MM) {
+	if ((TSK_ERR_MASK & tsk_errno) < TSK_ERR_MM_MAX)
+	    snprintf(&tsk_errstr_print[pidx], TSK_ERRSTR_PR_L - pidx,
+		"%s", tsk_err_mm_str[tsk_errno & TSK_ERR_MASK]);
+	else
+	    snprintf(&tsk_errstr_print[pidx], TSK_ERRSTR_PR_L - pidx,
+		"mmtools error: %" PRIu32, TSK_ERR_MASK & tsk_errno);
+    }
+    else if (tsk_errno & TSK_ERR_FS) {
+	if ((TSK_ERR_MASK & tsk_errno) < TSK_ERR_FS_MAX)
+	    snprintf(&tsk_errstr_print[pidx], TSK_ERRSTR_PR_L - pidx,
+		"%s", tsk_err_fs_str[tsk_errno & TSK_ERR_MASK]);
+	else
+	    snprintf(&tsk_errstr_print[pidx], TSK_ERRSTR_PR_L - pidx,
+		"fstools error: %" PRIu32, TSK_ERR_MASK & tsk_errno);
+    }
+    else {
+	snprintf(&tsk_errstr_print[pidx], TSK_ERRSTR_PR_L - pidx,
+	    "Error: %" PRIu32, tsk_errno);
+    }
+    pidx = strlen(tsk_errstr_print);
+
+    /* Print the unique string, if it exists */
+    if (tsk_errstr[0] != '\0') {
+	snprintf(&tsk_errstr_print[pidx], TSK_ERRSTR_PR_L - pidx,
+	    " (%s)", tsk_errstr);
+	pidx = strlen(tsk_errstr_print);
+    }
+
+    if (tsk_errstr2[0] != '\0') {
+	snprintf(&tsk_errstr_print[pidx], TSK_ERRSTR_PR_L - pidx,
+	    " (%s)", tsk_errstr2);
+	pidx = strlen(tsk_errstr_print);
+    }
+
+    snprintf(&tsk_errstr_print[pidx], TSK_ERRSTR_PR_L - pidx, "\n");
+    tsk_error_reset();
+    return (char *) &tsk_errstr_print[0];
+}
 
 /* Print the error message to hFile */
 void
 tsk_error_print(FILE * hFile)
 {
-    fprintf(hFile, "%s\n", tsk_error_str());
-}
-
-/* Print the error message to the static error buffer and return it */
-char *
-tsk_error_str()
-{
-    int written = 0;
-    tsk_errstr3[0] = '\0';
-
+    char *str;
     if (tsk_errno == 0)
-        return tsk_errstr3;
+	return;
 
-    if (tsk_errno & TSK_ERR_AUX) {
-	if ((TSK_ERR_MASK & tsk_errno) < TSK_ERR_AUX_MAX)
-	    written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written, "%s",
-                    		tsk_err_aux_str[tsk_errno & TSK_ERR_MASK]);
-	else
-	    written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written, 
-                            "auxtools error: %" PRIu32,
-		                    TSK_ERR_MASK & tsk_errno);
-    }
-    else if (tsk_errno & TSK_ERR_IMG) {
-	if ((TSK_ERR_MASK & tsk_errno) < TSK_ERR_IMG_MAX)
-	    written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written, "%s",
-		                    tsk_err_img_str[tsk_errno & TSK_ERR_MASK]);
-	else
-	    written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written,
-                            "imgtools error: %" PRIu32,
-                            TSK_ERR_MASK & tsk_errno);
-    }
-    else if (tsk_errno & TSK_ERR_MM) {
-	if ((TSK_ERR_MASK & tsk_errno) < TSK_ERR_MM_MAX)
-	    written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written, "%s",
-                            tsk_err_mm_str[tsk_errno & TSK_ERR_MASK]);
-	else
-	    written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written,
-                            "mmtools error: %" PRIu32,
-                    		TSK_ERR_MASK & tsk_errno);
-    }
-    else if (tsk_errno & TSK_ERR_FS) {
-	if ((TSK_ERR_MASK & tsk_errno) < TSK_ERR_FS_MAX)
-	    written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written,
-                            "%s", tsk_err_fs_str[tsk_errno & TSK_ERR_MASK]);
-	else
-	    written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written,
-                            "fstools error: %" PRIu32,
-		                    TSK_ERR_MASK & tsk_errno);
+    str = tsk_error_get();
+    if (str != NULL) {
+	tsk_fprintf(hFile, "%s", str);
     }
     else {
-	written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written,
-                        "Error: %" PRIu32, tsk_errno);
+	tsk_fprintf(hFile, "Error Creating Error String");
     }
-
-    /* Print the unique string, if it exists */
-    if (tsk_errstr[0] != '\0')
-	written += snprintf(tsk_errstr3, TSK_ERRSTR_L - written,
-                        " (%s)", tsk_errstr);
-
-    if (tsk_errstr2[0] != '\0')
-	written += snprintf(tsk_errstr3, TSK_ERRSTR_L,
-                        " (%s)", tsk_errstr2);
-
-    return tsk_errstr3;
 }
 
 /* Clear the error number and error message */
 void
 tsk_error_reset()
 {
-	tsk_errno = 0;
-	tsk_errstr[0] = '\0';
-	tsk_errstr2[0] = '\0';
-	tsk_errstr3[0] = '\0';
+    tsk_errno = 0;
+    tsk_errstr[0] = '\0';
+    tsk_errstr2[0] = '\0';
 }
-

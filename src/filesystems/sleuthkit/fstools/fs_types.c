@@ -2,7 +2,7 @@
 ** fs_types
 ** The Sleuth Kit 
 **
-** $Date: 2006/04/07 18:12:00 $
+** $Date: 2006/09/06 20:39:56 $
 **
 ** Identify the type of file system being used
 **
@@ -18,7 +18,7 @@
 **
 */
 
-#include "fs_tools.h"
+#include "fs_tools_i.h"
 
 /* Based on fs_open.c in TCT-1.07 */
 
@@ -89,12 +89,20 @@ FS_TYPES fs_usage_table[] = {
 
 
 uint8_t
-fs_parse_type(const char *str)
+fs_parse_type(const TSK_TCHAR * str)
 {
     FS_TYPES *sp;
+    char tmp[16];
+    int i;
+
+    // convert to char
+    for (i = 0; i < 15 && str[i] != '\0'; i++) {
+	tmp[i] = (char) str[i];
+    }
+    tmp[i] = '\0';
 
     for (sp = fs_open_table; sp->name; sp++) {
-	if (strcmp(str, sp->name) == 0) {
+	if (strcmp(tmp, sp->name) == 0) {
 	    return sp->code;
 	}
     }
@@ -107,9 +115,9 @@ void
 fs_print_types(FILE * hFile)
 {
     FS_TYPES *sp;
-    fprintf(hFile, "Supported file system types:\n");
+    tsk_fprintf(hFile, "Supported file system types:\n");
     for (sp = fs_usage_table; sp->name; sp++)
-	fprintf(hFile, "\t%s (%s)\n", sp->name, sp->comment);
+	tsk_fprintf(hFile, "\t%s (%s)\n", sp->name, sp->comment);
 }
 
 char *
