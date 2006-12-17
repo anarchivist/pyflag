@@ -185,15 +185,22 @@ class Mounted(DBFS):
         return
 
 import sk
+import Store
+
+SKCACHE = Store.Store()
 
 class Sleuthkit_File(File):
     """ access to skfile """
     specifier = 'K'
     def __init__(self, case, fd, inode):
         File.__init__(self, case, fd, inode)
+ 
+        try:
+            fs = SKCACHE.get(fd.inode)
+        except KeyError:
+            fs = sk.skfs(fd)
+            SKCACHE.put(fs, key=fd.inode)
 
-        #FIXME: cache this somewhere so we dont reload it every time!
-        fs = sk.skfs(fd.io["filename"], imgoff=int(fd.io['offset']))
         inode = inode[inode.find('|K')+2:]
         self.fd = fs.open(inode=inode)
     
