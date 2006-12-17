@@ -669,7 +669,7 @@ skfs_walk(skfs *self, PyObject *args, PyObject *kwds) {
 static PyObject *
 skfs_iwalk(skfs *self, PyObject *args, PyObject *kwds) {
     int alloc=0, unalloc=1;
-    int flags=FS_FLAG_META_UNALLOC;
+    int flags=FS_FLAG_META_UNALLOC | FS_FLAG_META_USED;
     PyObject *fileargs, *filekwds;
     PyObject *list;
     INUM_T inode=0;
