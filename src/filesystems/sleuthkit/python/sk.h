@@ -149,6 +149,7 @@ typedef struct {
     struct dentwalk *walklist;
     int flags;
     int myflags;
+    void *context;
 } skfs_walkiter;
 
 static void skfs_walkiter_dealloc(skfs_walkiter *self);

@@ -1369,12 +1369,10 @@ ntfs_data_walk(NTFS_INFO * ntfs, INUM_T inum,
      */
     if (fs_data->flags & FS_DATA_RES) {
 	char *buf = NULL;
-	if ((flags & FS_FLAG_FILE_AONLY) == 0) {
-	    if ((buf = mymalloc((size_t) fs_data->size)) == NULL) {
-		return 1;
-	    }
-	    memcpy(buf, fs_data->buf, (size_t) fs_data->size);
-	}
+	if ((buf = mymalloc((size_t) fs_data->size)) == NULL) {
+        return 1;
+    }
+	memcpy(buf, fs_data->buf, (size_t) fs_data->size);
 
 	myflags =
 	    FS_FLAG_DATA_CONT | FS_FLAG_DATA_ALLOC | FS_FLAG_DATA_RES;
@@ -1382,16 +1380,13 @@ ntfs_data_walk(NTFS_INFO * ntfs, INUM_T inum,
 	    action(fs, ntfs->root_mft_addr, buf,
 	    (unsigned int) fs_data->size, myflags, ptr);
 	if (retval == WALK_STOP) {
-	    if ((flags & FS_FLAG_FILE_AONLY) == 0)
 		free(buf);
 	    return 0;
 	}
 	else if (retval == WALK_ERROR) {
-	    if ((flags & FS_FLAG_FILE_AONLY) == 0)
 		free(buf);
 	    return 1;
 	}
-	if ((flags & FS_FLAG_FILE_AONLY) == 0)
 	    free(buf);
     }
     /* Process the compressed buffer */

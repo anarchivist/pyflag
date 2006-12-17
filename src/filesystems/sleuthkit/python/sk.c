@@ -269,7 +269,7 @@ getblocks_walk_callback(FS_INFO *fs, DADDR_T addr, char *buf, int size, int flag
 
     if(flags & FS_FLAG_DATA_RES) {
         /* we have resident ntfs data */
-        file->resdata = (char *)talloc_size(file, size);
+        file->resdata = (char *)talloc_size(file->blocks, size);
         memcpy(file->resdata, buf, size);
         file->size = size;
     } else {
@@ -413,8 +413,8 @@ void
 pyfile_close(IMG_INFO * img_info) {
     IMG_PYFILE_INFO *pyfile_info = (IMG_PYFILE_INFO *) img_info;
     PyObject_CallMethod(pyfile_info->fileobj, "close", "");
-    // destructor does this anyway when it frees the context...
-    //talloc_free(img_info);
+    if(img_info)
+        talloc_free(img_info);
     return;
 }
 
@@ -425,7 +425,9 @@ pyfile_open(PyObject *fileobj) {
     IMG_INFO *img_info;
     PyObject *tmp, *tmp2;
 
-    if ((pyfile_info = (IMG_PYFILE_INFO *) mymalloc(sizeof(IMG_PYFILE_INFO))) == NULL)
+    //if ((pyfile_info = (IMG_PYFILE_INFO *) mymalloc(sizeof(IMG_PYFILE_INFO))) == NULL)
+    pyfile_info = talloc(NULL, IMG_PYFILE_INFO);
+    if(pyfile_info == NULL)
         return NULL;
 
     memset((void *) pyfile_info, 0, sizeof(IMG_PYFILE_INFO));
@@ -611,8 +613,6 @@ skfs_open(skfs *self, PyObject *args, PyObject *kwds) {
 
     if(!filekwds) return NULL;
 
-    // FIXME: Do we need to ensure that skfs remains live while file
-    // instances are alive?
     file = PyObject_New(skfile, &skfileType);
     file->context = talloc_size(NULL,1);
     ret = skfile_init(file, fileargs, filekwds);
@@ -680,6 +680,7 @@ skfs_iwalk(skfs *self, PyObject *args, PyObject *kwds) {
                                     &alloc, &unalloc))
         return NULL; 
 
+    global_talloc_context = self->context;
     // ignore args for now and just do full walk (start->end)
     list = PyList_New(0);
     self->fs->inode_walk(self->fs, self->fs->first_inum, self->fs->last_inum, flags, 
@@ -706,6 +707,8 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
     /* make sure we at least have a path or inode */
     if(path==NULL && inode_obj==NULL)
         return PyErr_Format(PyExc_SyntaxError, "One of path or inode must be specified");
+
+    global_talloc_context = self->context;
 
     if(path) {
         tsk_error_reset();
@@ -777,6 +780,7 @@ static void
 skfs_walkiter_dealloc(skfs_walkiter *self) {
     Py_XDECREF(self->skfs);
     talloc_free(self->walklist);
+    talloc_free(self->context);
     self->ob_type->tp_free((PyObject*)self);
 }
 
@@ -800,6 +804,10 @@ skfs_walkiter_init(skfs_walkiter *self, PyObject *args, PyObject *kwds) {
         PyErr_Format(PyExc_SyntaxError, "One of filename or inode must be specified");
         return -1;
     };
+
+    /* setup the talloc context */
+    self->context = talloc_size(NULL, 1);
+    global_talloc_context = self->context;
 
     /* set flags */
     self->flags = self->myflags = 0;
@@ -846,6 +854,8 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
     struct dentwalk *dwtmp, *dwtmp2;
     char *tmp;
     int i;
+
+    global_talloc_context = self->context;
 
     /* are we done ? */
     if(list_empty(&self->walklist->list))
@@ -1137,7 +1147,8 @@ skfile_read(skfile *self, PyObject *args) {
     }
     
     /* allocate buf, be generous in case data straddles blocks */
-    buf = (char *)mymalloc(readlen + (2 * fs->block_size));
+    //buf = (char *)mymalloc(readlen + (2 * fs->block_size));
+    buf = (char *)talloc_size(NULL, readlen + (2 * fs->block_size));
     if(!buf)
         return PyErr_Format(PyExc_MemoryError, "Out of Memory allocating read buffer.");
 

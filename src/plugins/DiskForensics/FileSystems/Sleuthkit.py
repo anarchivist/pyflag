@@ -285,9 +285,9 @@ class Sleuthkit(DBFS):
             inodestr = "I%s|K%s" % (iosource_name, inode)
 
             if inode.alloc:
-                status = 'a'
+                status = 'alloc'
             else:
-                status = 'f'
+                status = 'unalloc'
 
             try:
                 s = fs.stat(inode=str(inode))
