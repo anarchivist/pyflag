@@ -751,7 +751,7 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
     /* return a real stat_result! */
     /* (mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime) */
     os = PyImport_ImportModule("os");
-    result = PyObject_CallMethod(os, "stat_result", "((iiliiiiiii))", 
+    result = PyObject_CallMethod(os, "stat_result", "((iKiiiiKlll))", 
                                  fs_inode->mode, fs_inode->addr, 0, fs_inode->nlink, 
                                  fs_inode->uid, fs_inode->gid, fs_inode->size,
                                  fs_inode->atime, fs_inode->mtime, fs_inode->ctime);
