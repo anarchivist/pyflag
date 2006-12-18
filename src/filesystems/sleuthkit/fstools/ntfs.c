@@ -743,7 +743,7 @@ ntfs_uncompress_setup(FS_INFO * fs, NTFS_COMP_INFO * comp,
     uint32_t compunit_size_c)
 {
     comp->uncomp_size_b = fs->block_size * compunit_size_c;
-    comp->uncomp_buf = talloc_size(comp, comp->uncomp_size_b);
+    comp->uncomp_buf = talloc_size(fs, comp->uncomp_size_b);
     if (comp->uncomp_buf == NULL) {
 	comp->uncomp_size_b = 0;
 	return 1;
