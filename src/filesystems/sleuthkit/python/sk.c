@@ -346,6 +346,10 @@ int parse_inode_str(char *str, INUM_T *inode, uint32_t *type, uint32_t *id) {
     return 1;
 }
 
+void print_current_exception() {
+  PyErr_WriteUnraisable(PyErr_Occurred());
+};
+
 /* The methods below implement an sleuthkit img interface backed by any python
  * file-like object using the python abstract object layer, though specific 
  * optimisations might be made if the object based on a pyflag "iosubsys", or
@@ -357,26 +361,28 @@ static SSIZE_T
 pyfile_read_random(IMG_INFO * img_info, OFF_T vol_offset, char *buf,
                    OFF_T len, OFF_T offset) {
 
-    PyObject *res;
+  PyObject *res;
     int ret, read;
-    OFF_T tot_offset;
+    unsigned  long long int tot_offset;
     char *strbuf;
     IMG_PYFILE_INFO *pyfile_info = (IMG_PYFILE_INFO *) img_info;
-	tot_offset = offset + vol_offset;
+    tot_offset = offset + vol_offset;
 
     /* seek to correct offset */
-    res = PyObject_CallMethod(pyfile_info->fileobj, "seek", "(l)", tot_offset);
+    res = PyObject_CallMethod(pyfile_info->fileobj, "seek", "(k)", tot_offset);
     if(res == NULL) {
+      print_current_exception();
         tsk_errno = TSK_ERR_IMG_SEEK;
         snprintf(tsk_errstr, TSK_ERRSTR_L, "pyfile_read_random - can't seek to %ul", tot_offset);
         tsk_errstr2[0] = '\0';
         return -1;
     }
-    Py_DECREF(res);
+    Py_XDECREF(res);
 	
     /* try the read */
-    res = PyObject_CallMethod(pyfile_info->fileobj, "read", "(l)", len);
+    res = PyObject_CallMethod(pyfile_info->fileobj, "read", "(k)", len);
     if(res == NULL) {
+      print_current_exception();
         tsk_errno = TSK_ERR_IMG_SEEK;
         snprintf(tsk_errstr, TSK_ERRSTR_L, "pyfile_read_random - can't read %lu from %lu", len, tot_offset);
         tsk_errstr2[0] = '\0';
@@ -394,7 +400,11 @@ pyfile_read_random(IMG_INFO * img_info, OFF_T vol_offset, char *buf,
 
     memcpy(buf, strbuf, read);
 
-    Py_DECREF(res);
+    if(read < len) {
+      printf("Tried to read %u, only got %u\n", len, read);
+    };
+
+    Py_XDECREF(res);
     return read;
 }
 
@@ -435,11 +445,12 @@ pyfile_open(PyObject *fileobj) {
 
     memset((void *) pyfile_info, 0, sizeof(IMG_PYFILE_INFO));
 
-    /* do some checks on the object */
+    /* do some checks on the object 
     if((PyObject_CallMethod(fileobj, "read", "(i)", 0) == NULL) || 
        (PyObject_CallMethod(fileobj, "seek", "(i)", 0) == NULL)) {
         return NULL;
     }
+    */
 
     /* store the object */
     pyfile_info->fileobj = fileobj;
@@ -461,12 +472,8 @@ pyfile_open(PyObject *fileobj) {
         Py_DECREF(tmp); tmp=NULL;
         tmp = PyObject_CallMethod(fileobj, "tell", NULL);
         if(tmp) {
-            tmp2 = PyNumber_Long(tmp);
-            Py_DECREF(tmp); tmp=NULL;
-            if(tmp2) {
-                img_info->size = PyLong_AsLong(tmp2);
-                Py_DECREF(tmp2);
-            }
+	  img_info->size = PyLong_AsUnsignedLongLong(tmp);
+	  Py_DECREF(tmp);
         }
         PyObject_CallMethod(fileobj, "seek", "(i)", 0);
     }
