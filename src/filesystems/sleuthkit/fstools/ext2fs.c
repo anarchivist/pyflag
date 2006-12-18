@@ -55,7 +55,8 @@ ext2fs_group_load(EXT2FS_INFO * ext2fs, EXT2_GRPNUM_T grp_num)
 
     if (ext2fs->grp_buf == NULL) {
 	if ((ext2fs->grp_buf =
-		(ext2fs_gd *) mymalloc(sizeof(ext2fs_gd))) == NULL) {
+	     (ext2fs_gd *) talloc_size(ext2fs, sizeof(ext2fs_gd))) == NULL) {
+	  //(ext2fs_gd *) mymalloc(sizeof(ext2fs_gd))) == NULL) {
 	    return 1;
 	}
     }
@@ -134,7 +135,7 @@ ext2fs_bmap_load(EXT2FS_INFO * ext2fs, EXT2_GRPNUM_T grp_num)
 
     if (ext2fs->bmap_buf == NULL) {
 	if ((ext2fs->bmap_buf =
-		(unsigned char *) mymalloc(fs->block_size)) == NULL) {
+	     (unsigned char *) talloc_size(ext2fs, fs->block_size)) == NULL) {
 	    return 1;
 	}
     }
@@ -201,7 +202,7 @@ ext2fs_imap_load(EXT2FS_INFO * ext2fs, EXT2_GRPNUM_T grp_num)
     /* Allocate the cache buffer and exit if map is already loaded */
     if (ext2fs->imap_buf == NULL) {
 	if ((ext2fs->imap_buf =
-		(UCHAR *) mymalloc(fs->block_size)) == NULL) {
+	     (UCHAR *) talloc_size(ext2fs, fs->block_size)) == NULL) {
 	    return 1;
 	}
     }
@@ -274,7 +275,7 @@ ext2fs_dinode_load(EXT2FS_INFO * ext2fs, INUM_T inum)
     /* Allocate the buffer or return if already loaded */
     if (ext2fs->dino_buf == NULL) {
 	if ((ext2fs->dino_buf =
-		(ext2fs_inode *) mymalloc(ext2fs->inode_size)) == NULL) {
+	     (ext2fs_inode *) talloc_size(ext2fs, ext2fs->inode_size)) == NULL) {
 	    return 1;
 	}
     }
@@ -429,7 +430,7 @@ ext2fs_dinode_copy(EXT2FS_INFO * ext2fs, FS_INODE * fs_inode)
 	int i;
 
 	if ((fs_inode->link =
-		mymalloc((size_t) (fs_inode->size + 1))) == NULL)
+	     talloc_size(fs_inode, (size_t) (fs_inode->size + 1))) == NULL)
 	    return 1;
 
 	/* it is located directly in the pointers */
@@ -2211,7 +2212,7 @@ ext2fs_open(IMG_INFO * img_info, SSIZE_T offset, uint8_t ftype,
     fs->img_info = img_info;
     fs->offset = offset;
     len = sizeof(ext2fs_sb);
-    if ((ext2fs->fs = (ext2fs_sb *) mymalloc(len)) == NULL) {
+    if ((ext2fs->fs = (ext2fs_sb *) talloc_size(ext2fs, len)) == NULL) {
 	free(ext2fs);
 	return NULL;
     }

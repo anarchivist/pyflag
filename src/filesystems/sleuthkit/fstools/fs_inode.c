@@ -32,13 +32,14 @@ fs_inode_alloc(int direct_count, int indir_count)
 
     fs_inode->direct_count = direct_count;
     fs_inode->direct_addr =
-	(DADDR_T *) mymalloc(direct_count * sizeof(DADDR_T));
+       (DADDR_T *) mymalloc(direct_count * sizeof(DADDR_T));
     if (fs_inode->direct_addr == NULL)
 	return NULL;
 
     fs_inode->indir_count = indir_count;
     fs_inode->indir_addr =
-	(DADDR_T *) mymalloc(indir_count * sizeof(DADDR_T));
+       (DADDR_T *) mymalloc(indir_count * sizeof(DADDR_T));
+      
     if (fs_inode->indir_addr == NULL)
 	return NULL;
 

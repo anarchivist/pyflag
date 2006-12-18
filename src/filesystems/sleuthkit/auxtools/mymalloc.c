@@ -75,7 +75,7 @@ mymalloc(size_t len)
 {
     char *ptr;
 
-    if ((ptr = (char *) talloc_size(global_talloc_context, len)) == 0) {
+    if ((ptr = (char *) talloc_zero_size(global_talloc_context, len)) == 0) {
 	tsk_error_reset();
 	tsk_errno = TSK_ERR_AUX_MALLOC;
 	snprintf(tsk_errstr, TSK_ERRSTR_L, "mymalloc: %s",

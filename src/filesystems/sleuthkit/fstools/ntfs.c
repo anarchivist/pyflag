@@ -743,7 +743,7 @@ ntfs_uncompress_setup(FS_INFO * fs, NTFS_COMP_INFO * comp,
     uint32_t compunit_size_c)
 {
     comp->uncomp_size_b = fs->block_size * compunit_size_c;
-    comp->uncomp_buf = mymalloc(comp->uncomp_size_b);
+    comp->uncomp_buf = talloc_size(comp, comp->uncomp_size_b);
     if (comp->uncomp_buf == NULL) {
 	comp->uncomp_size_b = 0;
 	return 1;
@@ -1947,7 +1947,7 @@ ntfs_proc_attrseq(NTFS_INFO * ntfs,
 		}
 
 		/* add to the end of the existing list */
-		fs_name->next = (FS_NAME *) mymalloc(sizeof(FS_NAME));
+		fs_name->next = (FS_NAME *) talloc_size(fs_name, sizeof(FS_NAME));
 		if (fs_name->next == NULL) {
 		    return 1;
 		}
@@ -1957,7 +1957,7 @@ ntfs_proc_attrseq(NTFS_INFO * ntfs,
 	    else {
 		/* First name, so we start a list */
 		fs_inode->name = fs_name =
-		    (FS_NAME *) mymalloc(sizeof(FS_NAME));
+		  (FS_NAME *) talloc_size(fs_inode, sizeof(FS_NAME));
 		if (fs_name == NULL) {
 		    return 1;
 		}
@@ -2748,7 +2748,7 @@ ntfs_load_sid(FS_INFO * fs, ntfs_attr_sds * sds)
 	// malloc size of ntfs_sid plus extra for each sub_auth_count above 1 because
 	// 1 is already expected as a minimum in the ntfs_sid struct.
 	if ((sid_entry->data =
-		(ntfs_sid *) mymalloc(sizeof(ntfs_sid) +
+	     (ntfs_sid *) talloc_size(sid_entry, sizeof(ntfs_sid) +
 		    ((int) sid->sub_auth_count -
 			1) * (sizeof(uint32_t) * 10))) == NULL) {
 	    free(sid_str);
@@ -2819,7 +2819,7 @@ ntfs_proc_sds(FS_INFO * fs, NTFS_SXX_BUFFER * sds_buffer)
 		NULL) {
 		return 1;
 	    }
-	    if ((sds_entry->data = (uint8_t *) mymalloc(offset)) == NULL) {
+	    if ((sds_entry->data = (uint8_t *) talloc_size(sds_entry, offset)) == NULL) {
 		free(sds_entry);
 		return 1;
 	    }
@@ -2893,7 +2893,7 @@ ntfs_load_sii(FS_INFO * fs, NTFS_SXX_BUFFER * sii_buffer)
 	    }
 
 	    if ((sii_entry->data =
-		    (ntfs_attr_sii *) mymalloc(sizeof(ntfs_attr_sii))) ==
+		 (ntfs_attr_sii *) talloc_size(sii_entry, sizeof(ntfs_attr_sii))) ==
 		NULL) {
 		free(sii_entry);
 		return 1;

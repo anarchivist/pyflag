@@ -388,10 +388,13 @@ pyfile_read_random(IMG_INFO * img_info, OFF_T vol_offset, char *buf,
         tsk_errno = TSK_ERR_IMG_SEEK;
         snprintf(tsk_errstr, TSK_ERRSTR_L, "pyfile_read_random - error retrieving data");
         tsk_errstr2[0] = '\0';
+	Py_DECREF(res);
         return -1;
     }
 
     memcpy(buf, strbuf, read);
+
+    Py_DECREF(res);
     return read;
 }
 
@@ -479,7 +482,9 @@ pyfile_open(PyObject *fileobj) {
 /************* SKFS ***************/
 static void
 skfs_dealloc(skfs *self) {
-    if(self->fs)
+  global_talloc_context = self->context;
+
+  if(self->fs)
         self->fs->close(self->fs);
     if(self->img)
         self->img->close(self->img);
@@ -638,6 +643,8 @@ skfs_walk(skfs *self, PyObject *args, PyObject *kwds) {
 
     static char *kwlist[] = {"path", "inode", "alloc", "unalloc", "names", "inodes", NULL};
 
+    global_talloc_context = self->context;
+
     if(!PyArg_ParseTupleAndKeywords(args, kwds, "|sKiiii", kwlist, &path, &inode, 
                                     &alloc, &unalloc, &names, &inodes))
         return NULL; 
@@ -652,6 +659,7 @@ skfs_walk(skfs *self, PyObject *args, PyObject *kwds) {
                                  "inode", inode, "alloc", alloc, "unalloc", unalloc, "names", names, "inodes", inodes);
 
     iter = PyObject_New(skfs_walkiter, &skfs_walkiterType);
+
     ret = skfs_walkiter_init(iter, fileargs, filekwds);
     Py_DECREF(fileargs);
     Py_DECREF(filekwds);
@@ -778,8 +786,9 @@ skfs_fstat(skfs *self, PyObject *args) {
  * */
 static void 
 skfs_walkiter_dealloc(skfs_walkiter *self) {
-    Py_XDECREF(self->skfs);
-    talloc_free(self->walklist);
+  global_talloc_context = self->context;
+
+    Py_DECREF(self->skfs);
     talloc_free(self->context);
     self->ob_type->tp_free((PyObject*)self);
 }
@@ -825,7 +834,7 @@ skfs_walkiter_init(skfs_walkiter *self, PyObject *args, PyObject *kwds) {
     self->skfs = (skfs *)skfs_obj;
 
     /* Initialise the path stack */
-    self->walklist = talloc(NULL, struct dentwalk);
+    self->walklist = talloc(self->context, struct dentwalk);
     INIT_LIST_HEAD(&self->walklist->list);
 
     /* add the start path */
@@ -1096,7 +1105,7 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
     if(self->id == 0)
         flags |= FS_FLAG_FILE_NOID;
 
-    self->blocks = talloc(NULL, struct block);
+    self->blocks = talloc(self->context, struct block);
     INIT_LIST_HEAD(&self->blocks->list);
     tsk_error_reset();
     fs->file_walk(fs, self->fs_inode, self->type, self->id, flags,
