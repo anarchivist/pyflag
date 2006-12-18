@@ -60,7 +60,7 @@ int lookup_path(FS_INFO *fs, struct dentwalk *dent);
 typedef struct {
     PyObject_HEAD
     // The talloc context that everything is hanged from:
-        void *context;
+    void *context;
 	IMG_INFO *img;
 	FS_INFO *fs;
     PyObject *root_inum;

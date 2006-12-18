@@ -394,7 +394,7 @@ pyfile_read_random(IMG_INFO * img_info, OFF_T vol_offset, char *buf,
         tsk_errno = TSK_ERR_IMG_SEEK;
         snprintf(tsk_errstr, TSK_ERRSTR_L, "pyfile_read_random - error retrieving data");
         tsk_errstr2[0] = '\0';
-	Py_DECREF(res);
+        Py_DECREF(res);
         return -1;
     }
 
@@ -472,8 +472,12 @@ pyfile_open(PyObject *fileobj) {
         Py_DECREF(tmp); tmp=NULL;
         tmp = PyObject_CallMethod(fileobj, "tell", NULL);
         if(tmp) {
-	  img_info->size = PyLong_AsUnsignedLongLong(tmp);
-	  Py_DECREF(tmp);
+            tmp2 = PyNumber_Long(tmp);
+            if(tmp2) {
+                Py_DECREF(tmp);
+                img_info->size = PyLong_AsUnsignedLongLong(tmp2);
+                Py_DECREF(tmp2);
+            }
         }
         PyObject_CallMethod(fileobj, "seek", "(i)", 0);
     }
@@ -489,9 +493,9 @@ pyfile_open(PyObject *fileobj) {
 /************* SKFS ***************/
 static void
 skfs_dealloc(skfs *self) {
-  global_talloc_context = self->context;
+    global_talloc_context = self->context;
 
-  if(self->fs)
+    if(self->fs)
         self->fs->close(self->fs);
     if(self->img)
         self->img->close(self->img);
@@ -793,7 +797,7 @@ skfs_fstat(skfs *self, PyObject *args) {
  * */
 static void 
 skfs_walkiter_dealloc(skfs_walkiter *self) {
-  global_talloc_context = self->context;
+    global_talloc_context = self->context;
 
     Py_DECREF(self->skfs);
     talloc_free(self->context);
