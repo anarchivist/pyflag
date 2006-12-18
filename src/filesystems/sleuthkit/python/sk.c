@@ -1166,8 +1166,21 @@ skfile_read(skfile *self, PyObject *args) {
          return retdata;
     }
     
+    buf = (char *)talloc_size(NULL, readlen);
+    if(!buf)
+        return PyErr_Format(PyExc_MemoryError, "Out of Memory allocating read buffer.");
+
+    if(self->type == 0 && self->id == 0)
+        written = fs_read_file_noid(fs, self->fs_inode, self->readptr, readlen, buf);
+    else
+        written = fs_read_file(fs, self->fs_inode, self->type, self->id, self->readptr, readlen, buf);
+
+    retdata = PyString_FromStringAndSize(buf, written);
+    talloc_free(buf);
+
+#if 0 // direct block IO version, doesnt work with compressed files etc
+
     /* allocate buf, be generous in case data straddles blocks */
-    //buf = (char *)mymalloc(readlen + (2 * fs->block_size));
     buf = (char *)talloc_size(NULL, readlen + (2 * fs->block_size));
     if(!buf)
         return PyErr_Format(PyExc_MemoryError, "Out of Memory allocating read buffer.");
@@ -1195,6 +1208,8 @@ skfile_read(skfile *self, PyObject *args) {
     /* copy what we want into the return string */
     retdata = PyString_FromStringAndSize(buf + (self->readptr % fs->block_size), readlen);
     talloc_free(buf);
+
+#endif
 
     self->readptr += readlen;
     return retdata;
