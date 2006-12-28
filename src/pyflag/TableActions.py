@@ -35,7 +35,6 @@ after appropriately being curried.
 import pyflag.FlagFramework as FlagFramework
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import pyflag.TableObj as TableObj
 import pyflag.DB as DB
 import calendar
 import datetime
@@ -161,6 +160,7 @@ def password_constraint(self,fieldname,proposed_value,query=None,id=None,result=
     empty, we just ignore it.
     """
     if proposed_value=='********':
+        import pyflag.TableObj as TableObj
         raise TableObj.OmitValue(None)
 
 ## Some useful constraints
@@ -183,27 +183,28 @@ def uniq(table_object,fieldname,proposed_value,query=None,id=None,result=None):
         result = result.__class__(result)
         result.text("there is already a row (key %s) with field %s set to %s. These are the details of the existing row:" % (row[table_object.key],fieldname,proposed_value),color='red')
         table_object.show(row[table_object.key],result)
+        import pyflag.TableObj as TableObj
         raise TableObj.ConstraintError(result)
 
 def noop(description=None, choices=None, variable=None, ui=None, **options ):
     """ A noop action """
 
-def selector_display(self, description=None, variable=None, ui=None, table=None, case=None, field=None, force=False, **options ):
+def selector_display(self, description=None, variable=None, ui=None, table=None, case=None, field=None, force=False, default=None, **options ):
     """ Draws a selector based on a column from a table """
-    ui.selector(description, variable, "select %s as `key`, %s as value from %s group by %s",  (field,field, table,field))
+##    ui.selector(description, variable, "select %s as `key`, %s as value from %s group by %s",  (field,field, table,field))
 
-##    tmp=ui.__class__(ui)
-##    dbh=DB.DBO(case)
-##    dbh.execute("select %s from %s group by %s", (field,table,field))
-##    keys= [None]+[ row[variable] for row in dbh]
-##    tmp.const_selector('',variable,keys,keys)
-##    tmp2=ui.__class__(ui)
-##    tmp3=ui.__class__(ui)
-##    tmp3.textfield('','new_%s' % variable)
-##    tmp2.start_table(bgcolor='lightgray')
-##    tmp2.row(tmp," or type ",tmp3)
-##    tmp2.end_table()
-##    ui.row(description,tmp2)
+    tmp=ui.__class__(ui)
+    dbh=DB.DBO(case)
+    dbh.execute("select %s from %s group by %s order by %s", (field,table,field,field))
+    keys= [ row[variable] for row in dbh]
+    tmp.const_selector('',variable,[default]+keys,['default']+keys)
+    tmp2=ui.__class__(ui)
+    tmp3=ui.__class__(ui)
+    tmp3.textfield('','new_%s' % variable)
+    tmp2.start_table(bgcolor='lightgray')
+    tmp2.row(tmp," or type ",tmp3)
+    tmp2.end_table()
+    ui.row(description,tmp2)
 
 def selector_constraint(table_object,fieldname,proposed_value,query=None,id=None, result=None):
     """ Checks if the user types a new value in selector_display to overrride the selector """
@@ -280,6 +281,7 @@ def foreign_key(table_object, fieldname,proposed_value,query=None,id=None, resul
     if not dbh.fetch():
         result.heading("Incorrect %s specified" % table.table)
         result.text("Please ensure that a valid %s exists and is properly specified. Hit the back button and try again." % table.table)
+        import pyflag.TableObj as TableObj
         raise TableObj.ConstraintError(result)
 
 def not_empty_constraint(table_object, fieldname,proposed_value,query=None,id=None, result=None):
@@ -287,6 +289,7 @@ def not_empty_constraint(table_object, fieldname,proposed_value,query=None,id=No
     if not proposed_value or proposed_value == "None":
         result.heading("Unspecified %s value" % table_object.get_name(fieldname))
         result.text("Please ensure that %s is filled in" % table_object.get_name(fieldname))
+        import pyflag.TableObj as TableObj
         raise TableObj.ConstraintError(result)
 
 def combine_constraints(table_object, fieldname,proposed_value,query=None,id=None, result=None, constraints=()):

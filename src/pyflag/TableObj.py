@@ -33,6 +33,7 @@ within tables.
 """
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
+from pyflag.FlagFramework import Curry, query_type
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
@@ -90,7 +91,7 @@ class TableObj:
         self.case = case
 
     def _make_column_sql(self):
-        return ','.join([ "`%s` as %r" % (self._column_keys[i],self._column_names[i]) for i in range(len(self._column_keys)) ] + self._column_keys)
+        return self.key+','+','.join([ "`%s` as %r" % (self._column_keys[i],self._column_names[i]) for i in range(len(self._column_keys)) ] + self._column_keys)
 
     def __getitem__(self,id):
         """ Emulates a table accessor.
@@ -101,12 +102,19 @@ class TableObj:
         dbh.execute("select %s from %s where %s=%r",(self._make_column_sql(),self.table,self.key,id))
         return dbh.fetch()
 
+    def select(self, **kwargs):
+        sql = " and ".join(["%s=%r" % (k,v) for k,v in kwargs.items()])
+        dbh =DB.DBO(self.case)
+        dbh.execute("select %s from %s where %s",(self._make_column_sql(),self.table,sql))
+        return dbh.fetch()
+
     def edit(self,query,ui):
         """ Updates the row with id given in query[self.table.key] to the values in query """
         ## Make up the SQL Statement. Note that if query is missing a
         ## parameter which we need, we simply do not update it.
         tmp = []
         new_id = query[self.key]
+        fields = {}
         
         for k in self._column_keys:
             ## Check for edit constaints:
@@ -123,20 +131,16 @@ class TableObj:
                 except OmitValue:
                     del query[k]
 
-
-
             try:
-                tmp.append("%s=%r" % (k,query[k]))
+                fields[k]=query[k]
             except KeyError:
                 pass
 
         dbh = DB.DBO(self.case)
-        dbh.execute("UPDATE %s set %s where %s=%r ",(self.table,
-                         ','.join(tmp),
-                         self.key, new_id))
-        
-        ui.para("The following is the new record:")
-        self.show(new_id,ui)
+        dbh.update(self.table, where = "%s=%r" % (self.key, new_id),
+                   **fields)
+
+        return new_id
 
     def add(self,query,ui):
         """ Adds a row given in query[self.table.key] to the table """
@@ -146,7 +150,7 @@ class TableObj:
         ## create a placeholder and then remove/replace it later.
         new_id = dbh.autoincrement()
         try:
-            result=[]
+            result = {self.key:new_id}
             for k in self._column_keys:
                 ## Check for add constaints:
                 callback=self.add_constraints.get(k,None)
@@ -163,18 +167,16 @@ class TableObj:
                         del query[k]
 
                 try:
-                    result.append("%s=%r" % (k,query[k]))
+                    result[k]=query[k]
                 except KeyError:
                     pass
         finally:
             ## Cleanup the placeholder
-            dbh.execute("delete from %s where %s=%r", (self.table, self.key, new_id))
-                        
-        dbh.execute("insert into %s set %s=%r,%s ",(
-                self.table,
-                self.key, new_id,
-                ",".join(result),
-                ))
+            dbh.delete(self.table, "%s=%r" % (self.key, int(new_id)))
+            
+        dbh.insert(self.table, **result)
+
+        return new_id
         
     def get_name(self,col):
         """ Returns the name description for the column specified """
@@ -239,8 +241,7 @@ class TableObj:
 
         if commit:
             dbh = DB.DBO(self.case)
-            dbh.execute("delete from %s where %s=%r",
-                             ( self.table,self.key,id))
+            dbh.delete(self.table, "%s=%r" %( self.key,id))
 
     def show(self,id,result):
         dbh = DB.DBO(self.case)
@@ -409,6 +410,9 @@ class ColumnType:
     def operator_matches(self, column, operator, arg):
         return '%s like %r' % (self.sql, arg)
 
+    def operator_regex(self,column,operator,arg):
+        return '%s rlike %r' % (self.sql, arg)
+    
     def display(self, value, row, result):
         """ This method is called by the table widget to allow us to
         translate the output from the database to the screen. Note
@@ -497,14 +501,108 @@ class IPType(ColumnType):
         
         return " ( %s >= %s and %s <= %s ) " % (self.column, numeric_address, self.column, broadcast)
 
+## This is an example of using the table object to manage a DB table
+import TableActions
+
+class AnnotionObj(TableObj):
+    table = "annotate"
+    columns = (
+        'inode', 'Inode', 
+        'note','Notes', 
+        'category', 'category',
+        )
+
+    add_constraints = {
+        'category': TableActions.selector_constraint,
+        }
+
+    edit_constraints = {
+        'category': TableActions.selector_constraint,
+        }
+
+    def __init__(self, case=None, id=None):
+        self.form_actions = {
+            'note': TableActions.textarea,
+            'category': Curry(TableActions.selector_display,
+                              table='annotate', field='category', case=case),
+            }
+
+        TableObj.__init__(self,case,id)
+
 class InodeType(ColumnType):
     """ A unified view of inodes """
     def __init__(self, name='Inode', column='inode', link=None, case=None, callback=None):
-        if not link:
-            link = FlagFramework.query_type(case=case,
-                                            family='Disk Forensics',
-                                            report='ViewFile',
-                                            mode = 'Summary',
-                                            __target__='inode', inode="%s")
-
+        self.case = case
         ColumnType.__init__(self,name,column,link,callback=callback)
+
+    def display(self, value, row, result):
+        result = result.__class__(result)
+        link = FlagFramework.query_type(case=self.case,
+                                        family='Disk Forensics',
+                                        report='ViewFile',
+                                        mode = 'Summary',
+                                        inode = value)
+        ## This is the table object which is responsible for the
+        ## annotate table:
+        annotate = AnnotionObj(case=self.case)
+        original_query = result.defaults
+
+        def annotate_cb(query, result):
+            ## We are dealing with this inode
+            del query['inode']
+            query['inode'] = value
+            ## does a row already exist?
+            row = annotate.select(inode=value)
+            if row:
+                query['id'] = row['id']
+
+            ## We got submitted - actually try to do the deed:
+            if 'Annotate' in query.getarray('submit'):
+                result.start_table()
+                if row:
+                    new_id=annotate.edit(query,result)
+                else:
+                    new_id=annotate.add(query,result)
+
+                result.para("The following is the new annotated record:")
+                annotate.show(new_id,result)
+                
+                result.end_table()
+                result.link("Close this window", target=original_query, pane='parent')
+                return result
+
+            ## Present the user with the form:
+            result.start_form(query, pane='self')
+            result.heading("Inode %s" % value)
+            if row:
+                annotate.edit_form(query,result)
+            else:
+                annotate.add_form(query,result)            
+
+            result.end_form(value='Annotate')
+
+        row = annotate.select(inode=value)
+        if row:
+            result.popup(annotate_cb, row['note'], icon="balloon.png")
+        else:
+            result.popup(annotate_cb, "Annotate", icon="pen.png")
+
+        result.link(value, target=link)
+        return result
+
+class FilenameType(ColumnType):
+    def __init__(self, name='Filename', filename='name', path='path', case=None):
+        link = query_type(case=case,
+                          family='Disk Forensics',
+                          report='Browse Filesystem',
+                          __target__='open_tree',open_tree="%s")
+        
+        ColumnType.__init__(self,name, "concat(`%s`,`%s`)" % (path,filename),
+                            link=link)
+
+    ## FIXME: implement filename globbing operators - this should be
+    ## much faster than regex or match operators because in marches,
+    ## the SQL translates to 'where concat(path,name) like "..."'. With
+    ## a globbing operator it should be possible to split the glob
+    ## into directory components and therefore create SQL specifically
+    ## using path and name.

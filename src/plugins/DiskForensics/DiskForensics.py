@@ -41,7 +41,7 @@ import pyflag.Scanner as Scanner
 import pyflag.ScannerUtils as ScannerUtils
 import pyflag.Registry as Registry
 import pyflag.parser as parser
-from pyflag.TableObj import ColumnType,TimestampType,InodeType
+from pyflag.TableObj import ColumnType,TimestampType,InodeType,FilenameType
 
 description = "Disk Forensics"
 order=30
@@ -131,12 +131,7 @@ class BrowseFS(Reports.report):
             result.table(
                 elements = [ InodeType('Inode','f.inode',case=query['case']),
                              ColumnType('Mode','f.mode'),
-                             ColumnType('Filename','concat(path,name)',
-                               link = query_type(case=query['case'],
-                                                 family=query['family'],
-                                                 report='Browse Filesystem',
-                                                 __target__='open_tree',open_tree="%s")),
-                             
+                             FilenameType(case=query['case']),
                              DeletedType('Del','f.status'),
                              ColumnType('File Size','size'),
                              TimestampType('Last Modified','mtime'),

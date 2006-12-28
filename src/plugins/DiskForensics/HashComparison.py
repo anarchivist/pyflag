@@ -31,7 +31,7 @@ import pyflag.Reports as Reports
 import pyflag.DB as DB
 import os.path
 from pyflag.Scanner import *
-from pyflag.TableObj import ColumnType, TimestampType, InodeType
+from pyflag.TableObj import ColumnType, TimestampType, InodeType, FilenameType
                   
 import md5
 class MD5Scan(GenScanFactory):
@@ -102,8 +102,8 @@ class HashComparison(Reports.report):
 
         try:
             result.table(
-                elements = [ InodeType(),
-                             ColumnType('Filename','concat(path,name)'),
+                elements = [ InodeType(case=query['case']),
+                             FilenameType(case=query['case']),
                              ColumnType('File Type', 'FileType'),
                              ColumnType('NSRL Product','NSRL_product'),
                              ColumnType('NSRL Filename','NSRL_filename'),

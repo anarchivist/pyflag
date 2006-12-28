@@ -284,7 +284,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                 cb(query,result)
                 ## If the cb raises an exception, we let the user know:
             except Exception,e:
-                pyflaglog.log(pyflaglog.ERROR,"Unable to call callback %s" % cb_key)
+                pyflaglog.log(pyflaglog.ERROR,"Unable to call callback %s: %s" % (cb_key,e))
                 result.clear()
                 result.heading("Error")
                 result.text("%s" % e)

@@ -148,30 +148,19 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
         
         ## We have warnings to show
         if self._warnings:
-            try:
-                #FIXME mic:
-                #Keep getting 'PyFlagCursor' object has no attribute '_last_executed' when creating an Apache log preset
-                #I wrapped it in a try, but don't know why this is happening.
-                last_executed = self._last_executed
-            
-                results = list(self._fetch_row(1000))
-                if len(results)<1000:
-                    self.execute("SHOW WARNINGS")
-                    while 1:
-                        a=self.fetchone()
-                        if not a: break
-                        pyflaglog.log(pyflaglog.DEBUG,"Mysql warnings: query %r: %s" % (last_executed[:500],a))
-                    else:
-                        pyflaglog.log(pyflaglog.DEBUG,"Mysql issued warnings but we are unable to drain result queue")
+            last_executed = self._last_executed
 
-                self.py_row_cache.extend(results)
-                
-            except Exception,e:
-                pass
-                #pyflaglog.log(pyflaglog.DEBUG,"MYSQL warning:%s" % e)
-        pass
-        #return MySQLdb.cursors.SSDictCursor._warning_check(self)
-        
+            results = list(self._fetch_row(1000))
+            if len(results)<1000:
+                self.execute("SHOW WARNINGS")
+                while 1:
+                    a=self.fetchone()
+                    if not a: break
+                    pyflaglog.log(pyflaglog.DEBUG,"Mysql warnings: query %r: %s" % (last_executed[:500],a))
+                else:
+                    pyflaglog.log(pyflaglog.DEBUG,"Mysql issued warnings but we are unable to drain result queue")
+
+            self.py_row_cache.extend(results)
 
 class Pool(Queue):
     """ Pyflag needs to maintain multiple simulataneous connections to
@@ -389,9 +378,7 @@ class DBO:
         self.execute("""select * from sql_cache where query = %r and `limit` <= %r and `limit` + `length` >= %r""", (sql, limit, limit + length))
         row = self.fetch()
         
-        if row:
-            ## Query is in cache - check that its still valid FIXME:
-
+        if row:            
             ## Return the query:
             self.execute("update sql_cache set timestamp=now() where id=%r ",
                          row['id'])
@@ -405,9 +392,14 @@ class DBO:
         ## required range - this allows quick paging forward and
         ## backwards.
         lower_limit = max(limit - config.DBCACHE_LENGTH/2,0)
+
+        ## Determine which tables are involved:
+        self.execute("explain %s", sql)
+        tables = [ row['table'] for row in self ]
         
         self.insert('sql_cache',
                     query = sql, _timestamp='now()',
+                    tables = ",%s," % ','.join(tables),
                     limit = lower_limit,
                     length = config.DBCACHE_LENGTH)
 
@@ -434,15 +426,17 @@ class DBO:
     def __iter__(self):
         return self
 
-    def insert(self, table, **fields):
-        """ A helper function to make inserting a little more
-        readable. This is especially good for lots of fields.
+    def invalidate(self,table):
+        """ Invalidate all copies of the cache which relate to this table """
+        self.execute("select id from sql_cache where tables like '%%,%s,%%'",table)
+        ids = [row['id'] for row in self]
+        for id in ids:
+            self.execute("drop table if exists cache_%s", id)
+            self.execute("delete from sql_cache where id=%r", id)
 
-        Special case: Normally fields are automatically escaped using
-        %r, but if the field starts with _, it will be inserted using
-        %s and _ removed.
-        """
-        tmp = [table]
+    def _calculate_set(self, **fields):
+        """ Calculates the required set clause from the fields provided """
+        tmp = []
         sql = []
         for k,v in fields.items():
             if k.startswith("_"):
@@ -452,15 +446,48 @@ class DBO:
                 sql.append('`%s`=%r')
                 
             tmp.extend([k,v])
+            
+        return (','.join(sql), tmp)
 
-        sql = "insert into %s set " + ','.join(sql)
+    def update(self, table, where='1', __fast=False, **fields):
+        sql , args = self._calculate_set(**fields)
+        sql = "update %s set " + sql + " where %s "
+        ## We are about to invalidate the table:
+        if not __fast:
+            self.invalidate(table)
+        self.execute(sql, [table,] + args + [where,])
 
-        self.execute(sql, tmp)
+    def delete(self, table, where):
+        sql = "delete from %s where %s"
+        ## We are about to invalidate the table:
+        self.invalidate(table)
+        self.execute(sql, (table, where))        
+
+    def insert(self, table, __fast=False, **fields):
+        """ A helper function to make inserting a little more
+        readable. This is especially good for lots of fields.
+
+        Special case: Normally fields are automatically escaped using
+        %r, but if the field starts with _, it will be inserted using
+        %s and _ removed.
+
+        Note that since the introduction of the cached_execute
+        functionality it is mandatory to use the insert, mass_insert
+        or update methods to ensure the cache is properly invalidated
+        rather than use raw SQL.
+        """
+        sql , args = self._calculate_set(**fields)
+        sql = "insert into %s set " + sql
+        ## We are about to invalidate the table:
+        if not __fast:
+            self.invalidate(table)
+        self.execute(sql, [table,]+args)
                     
-    def mass_insert_start(self, table):
+    def mass_insert_start(self, table, __fast=False):
         self.mass_insert_cache = {}
         self.mass_insert_table = table
         self.mass_insert_row_count = 0
+        self.mass_insert_fast = __fast
     
     def mass_insert(self, **columns):
         """ Starts a mass insert operation. When done adding rows, call commit_mass_insert to finalise the insert.
@@ -499,10 +526,13 @@ class DBO:
         sql = "insert ignore into `%s` (%s) values (%s)" % (self.mass_insert_table,
                                                    ','.join(["`%s`" % c for c in keys]),
                                                    "),(".join(values))
+        if not self.mass_insert_fast:
+            self.invalidate(self.mass_insert_table)
+            
         self.execute(sql,args)
 
         ## Ensure the cache is now empty:
-        self.mass_insert_start(self.mass_insert_table)
+        self.mass_insert_start(self.mass_insert_table, __fast=self.mass_insert_fast)
 
     def autoincrement(self):
         """ Returns the value of the last autoincremented key """

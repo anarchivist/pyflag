@@ -30,7 +30,7 @@
 
 The output within flag is abstracted such that it is possible to connect any GUI backend with any GUI Front end. This is done by use of UI objects. When a report runs, it will generate a UI object, which will be built during report execution. The report then returns the object to the calling framework which will know how to handle it. Therefore the report doesnt really know or care how the GUI is constructed """
 
-import re,cgi,types,textwrap
+import re,cgi,types,textwrap,sys
 import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 import pyflag.conf
@@ -726,7 +726,6 @@ class HTMLUI(UI.GenericUI):
         except: pass
 
         sql = self._make_sql(**args)
-        print sql
 
         self.result+='''<table class="PyFlagTable" >
         <thead><tr>'''
@@ -910,9 +909,6 @@ class HTMLUI(UI.GenericUI):
         ## This part allows the user to save the table in CSV format:
         def save_table(query,result):
             def generate_output(rows_left):
-                if rows_left==0:
-                    rows_left=sys.maxint
-                    
                 row_number = 0
                 data = cStringIO.StringIO()
                 hidden_columns = [ int(i) for i in query.getarray('_hidden')]
@@ -938,6 +934,7 @@ class HTMLUI(UI.GenericUI):
                     count = 0
                     for row in dbh:
                         count += 1
+                        row_number+=1
                         result = {}
                         for i in range(len(elements)):
                             if i in hidden_columns: continue
@@ -947,6 +944,7 @@ class HTMLUI(UI.GenericUI):
                             result[key] = elements[i].csv(row[key].__str__())
                             
                         csv_writer.writerow(result)
+
                     if count==0: break
                     data.seek(0)
                     tmp=data.read()
@@ -954,7 +952,11 @@ class HTMLUI(UI.GenericUI):
                     data.truncate(0)
 
             if query.has_key('save_length'):            
-                result.generator.generator = generate_output(int(query['save_length']))
+                rows_required = int(query['save_length'])
+                if rows_required==0:
+                    rows_required = sys.maxint
+                
+                result.generator.generator = generate_output(rows_required)
                 result.generator.content_type = "text/csv"
                 result.generator.headers = [("Content-Disposition","attachment; filename=%s_%s.csv" %(case,table) ),]
                 return

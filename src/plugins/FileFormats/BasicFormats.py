@@ -40,7 +40,8 @@ class BasicType(DataType):
             self.data = kwargs['value']
         except KeyError:
             pass
-        
+
+        self.parameters = kwargs
         DataType.__init__(self,buffer,*args,**kwargs)
     
     def size(self):
@@ -53,7 +54,7 @@ class BasicType(DataType):
                 return struct.unpack(self.fmt,self.buffer[:length].__str__())[0]
             return ''
         except struct.error,e:
-            raise IOError("%s. Tries to use format string %s"% (e, self.fmt))
+            raise IOError("%s. Tried to use format string %s"% (e, self.fmt))
 
     def write(self, output):
         try:
@@ -107,6 +108,24 @@ class ULONG(BasicType):
     def __str__(self):
         return "%s (0x%X)" % (self.data,self.data)
 
+class ULONG_CONSTANT(ULONG):
+    """ This class enforces a condition raising an error otherwise """
+    def read(self):
+        result = ULONG.read(self)
+        if not result==self.parameters['expected']:
+            raise RuntimeError("Expected value 0x%X, got 0x%X" %( self.parameters['expected'], result))
+
+        return result
+
+class USHORT_CONSTANT(USHORT):
+    """ This class enforces a condition raising an error otherwise """
+    def read(self):
+        result = USHORT.read(self)
+        if not result==self.parameters['expected']:
+            raise RuntimeError("Expected value 0x%X, got 0x%X" %( self.parameters['expected'], result))
+        
+        return result
+
 class LEWORD(WORD):
     fmt = "<H"
 
@@ -143,6 +162,15 @@ class BYTE(BasicType):
     def __str__(self):
         ## This is done to remove deprecation warnings:
         return "%02x" % (self.data,)
+
+class BYTE_CONSTANT(BYTE):
+    """ This class enforces a condition raising an error otherwise """
+    def read(self):
+        result = BYTE.read(self)
+        if not result==self.parameters['expected']:
+            raise RuntimeError("Expected value 0x%X, got 0x%X" %( self.parameters['expected'], result))
+        
+        return result
 
 class UBYTE(BasicType):
     fmt='=B'
@@ -214,9 +242,23 @@ class SimpleStruct(DataType):
                 if callable(v):
                     parameters[k]=v(result)
 
-            result[name]=element(self.buffer[self.offset:],**parameters)
+            ## Handle offset specially:
+            if parameters.has_key('offset'):
+                self.offset = parameters['offset']
+                ## Consume the offset to prevent it from propegating
+                ## to the element (in case its a SimpleStruct too).
+                del parameters['offset']
+
+            try:
+                result[name]=element(self.buffer[self.offset:],**parameters)
+            except Exception,e:
+                raise
+                raise e.__class__("When parsing field %r of %s, %s" % (name, self.__class__,e))
+
             self.offsets[name]=self.offset            
             self.offset+=result[name].size()
+
+            if self.offset >= self.buffer.size: break
                 
         return result
 
@@ -251,7 +293,10 @@ class SimpleStruct(DataType):
             except:
                 desc = item[0]
 
-            element=self.data[item[0]]
+            try:
+                element=self.data[item[0]]
+            except KeyError: continue
+            
             tmp = "\n   ".join((element.__str__()).splitlines())
             result+="%04X - %s: %s\n" % (
                 element.buffer.offset,
@@ -300,10 +345,14 @@ class StructArray(SimpleStruct):
     def __init__(self,buffer,*args,**kwargs):
         try:
             self.count=int(kwargs['count'])
+#            print self.count
         except:
             self.count=0
 
         self.fields = [ [i,self.target_class, kwargs] for i in range(self.count)]        
+#        if buffer:
+#            print "offset %X %s" % (buffer.offset, buffer.size)
+
         SimpleStruct.__init__(self,buffer,*args,**kwargs)
 
     def __str__(self):
@@ -315,8 +364,8 @@ class StructArray(SimpleStruct):
         return result
 
     def extend(self,target):
-        self.count+=1
         self.data[self.count]=target
+        self.count+=1
         
     def __eq__(self,target):
         for x in range(self.count):
@@ -345,7 +394,7 @@ class StructArray(SimpleStruct):
             
 class ARRAY(StructArray):
     def __str__(self):
-        result = ','.join([self.data[a].__str__() for a in range(self.count)])
+        result = ','.join([self.data[a].__str__() for a in range(self.count) if self.data.has_key(a)])
         return result
 
 class BYTE_ARRAY(ARRAY):
@@ -449,17 +498,16 @@ class TERMINATED_STRING(DataType):
         return self.data==target
 
     def __getitem__(self,x):
-##        print "x is %s" % x
         return self.data[x]
         
-class BYTE_ENUM(BYTE):
+class BYTE_ENUM(UBYTE):
     types={}
 
     def __str__(self):
         try:
             return "%s" % (self.types[self.data])
         except KeyError:
-            return "Unknown (%s)" % self.data
+            return "Unknown (0x%02X)" % self.data
     
     def __eq__(self,target):
         try:    

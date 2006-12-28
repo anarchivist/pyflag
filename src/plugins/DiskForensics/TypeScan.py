@@ -31,7 +31,7 @@ import pyflag.Reports as Reports
 import pyflag.Graph as Graph
 import pyflag.IO as IO
 import pyflag.Registry as Registry
-from pyflag.TableObj import ColumnType, TimestampType, InodeType
+from pyflag.TableObj import ColumnType, TimestampType, InodeType, FilenameType
 
 class TypeScan(Scanner.GenScanFactory):
     """ Detect File Type (magic).
@@ -78,7 +78,10 @@ class TypeScan(Scanner.GenScanFactory):
         def finish(self):
             # insert type into DB
             dbh=DB.DBO(self.case)
-            dbh.execute('INSERT INTO type VALUES(%r, %r, %r)', (self.inode, self.type_mime, self.type_str))
+            dbh.insert('type',
+                       inode = self.inode,
+                       mime = self.type_mime,
+                       type = self.type_str)
 
 ## A report to examine the Types of different files:
 class ViewFileTypes(Reports.report):
@@ -131,8 +134,9 @@ class ViewFileTypes(Reports.report):
 
         try:
             result.table(
-                elements = [ InodeType('Thumbnail','a.inode', callback = thumbnail_cb),
-                             ColumnType('Filename','concat(path,name)'),
+                elements = [ InodeType('Thumbnail','a.inode', callback = thumbnail_cb,
+                                       case=query['case']),
+                             FilenameType(case=query['case']),
                              ColumnType('Type','type'),
                              ColumnType('Size','c.size'),
                              TimestampType('Timestamp','c.mtime') ],

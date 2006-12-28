@@ -219,7 +219,7 @@ class PCAPFS(DBFS):
                 self.VFSCreate(
                     None,
                     new_inode,
-                    "%s/%s-%s/%s:%s/%s" % ( self.mount_point,
+                    "%s/streams/%s-%s/%s:%s/%s" % ( self.mount_point,
                                             IP2str(s['dest_ip']),
                                             IP2str(s['src_ip']),
                                             s['dest_port'],
@@ -232,7 +232,7 @@ class PCAPFS(DBFS):
                 self.VFSCreate(
                     None,
                     new_inode,
-                    "%s/%s-%s/%s:%s/%s" % ( self.mount_point,
+                    "%s/streams/%s-%s/%s:%s/%s" % ( self.mount_point,
                                             IP2str(s['src_ip']),
                                             IP2str(s['dest_ip']),
                                             s['src_port'],

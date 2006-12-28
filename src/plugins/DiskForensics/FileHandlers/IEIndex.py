@@ -30,7 +30,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import FileFormats.IECache as IECache
 import pyflag.DB as DB
-from pyflag.TableObj import ColumnType, TimestampType
+from pyflag.TableObj import ColumnType, TimestampType, FilenameType
 
 class IEIndex(Scanner.GenScanFactory):
     """ Load in IE History files """
@@ -65,16 +65,16 @@ class IEIndex(Scanner.GenScanFactory):
             dbh=DB.DBO(self.case)
             history = IECache.IEHistoryFile(fd)
             for event in history:
-                if event:                    
-                    dbh.execute("INSERT INTO history VALUES(%r,%r,%r,%r,%r,%r,%r,%r)",(
-                        self.ddfs.lookup(inode=self.inode),
-                        event['type'],event['url'],
-                        event['modified_time'],
-                        event['accessed_time'],
-                        event['filename'],
-                        '',event['data']
-                        )
-                                     )
+                if event:
+                    dbh.insert('history',
+                               path=self.ddfs.lookup(inode=self.inode),
+                               type = event['type'],
+                               url = event['url'],
+                               modified = event['modified_time'],
+                               accessed = event['accessed_time'],
+                               filename = event['filename'],
+                               filepath = '',
+                               headers = event['data'])
 
 class IEHistory(Reports.report):
     """ View IE browsing history with pasco"""
@@ -95,7 +95,7 @@ class IEHistory(Reports.report):
                              ColumnType('URL','url'),
                              TimestampType('Modified','modified'),
                              TimestampType('Accessed','accessed'),
-                             ColumnType('Filename','concat(filepath,filename)'),
+                             FilenameType(filename='filename', path='filepath', case=query['case']),
                              ColumnType('Headers','headers') ],
                 table=('history'),
                 case=query['case']

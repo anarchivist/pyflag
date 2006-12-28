@@ -32,7 +32,7 @@ Files will be written to the current directory one file per stream.
 from optparse import OptionParser
 import FileFormats.PCAP as PCAP
 from format import Buffer
-import pyflag.logging as logging
+import pyflag.pyflaglog as pyflaglog
 import reassembler, _dissect
 import socket, struct
 import pyflag.conf
@@ -56,7 +56,7 @@ parser.add_option("-v", "--verbose", default=5, type='int',
 (options, args) = parser.parse_args()
 
 ## Hush up a bit
-logging.config.LOG_LEVEL=options.verbose
+pyflaglog.config.LOG_LEVEL=options.verbose
 if options.stats:
     stats_fd = open(options.stats,'w')
     stats_fd.write("""## Stats for streams in the following format:
@@ -81,7 +81,7 @@ def tcp_callback(s):
 
         stats_fd.write("%s\n" % ','.join(tmp))
 
-hashtbl = reassembler.init(options.prefix)
+hashtbl = reassembler.init(options.prefix,0)
 reassembler.set_tcp_callback(hashtbl, tcp_callback)
 
 count = 0
@@ -96,7 +96,7 @@ for f in args:
         try:
             reassembler.process_packet(hashtbl, d)
         except Exception,e:
-            logging.log(logging.DEBUG, "%s" % e)
+            pyflaglog.log(pyflaglog.DEBUG, "%s" % e)
 
 # Finish it up
 reassembler.clear_stream_buffers(hashtbl);

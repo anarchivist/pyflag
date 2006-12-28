@@ -87,7 +87,12 @@ class RFC2822(Scanner.GenScanFactory):
                     raise Exception("No Date field in message - this is probably not an RFC2822 message at all.")
 
                 dbh=DB.DBO(self.case)
-                dbh.execute("INSERT INTO `email` SET `inode`=%r,`date`=from_unixtime(%r),`to`=%r,`from`=%r,`subject`=%r", (self.inode, int(time.mktime(date)), a.get('To'), a.get('From'), a.get('Subject')))
+                dbh.insert('email',
+                           inode = self.inode,
+                           date =  int(time.mktime(date)),
+                           to = a.get('To'),
+                           from = a.get('From'),
+                           subject = a.get('Subject'))
 
                 for part in a.walk():
                     if part.get_content_maintype() == 'multipart':

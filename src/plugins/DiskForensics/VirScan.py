@@ -32,7 +32,7 @@ import pyflag.DB as DB
 import os.path
 import pyflag.pyflaglog as pyflaglog
 from pyflag.Scanner import *
-from pyflag.TableObj import ColumnType, TimestampType, InodeType
+from pyflag.TableObj import ColumnType, TimestampType, InodeType, FilenameType
 
 import clamav
 
@@ -90,7 +90,9 @@ class VirScan(GenScanFactory):
         def finish(self):
             dbh=DB.DBO(self.case)
             if self.virus:
-                dbh.execute("INSERT INTO virus VALUES(%r,%r)", (self.inode, self.virus))
+                dbh.insert('virus',
+                           inode=self.inode,
+                           virus=self.virus)
 
 class VirusScan(Reports.report):
     """ Scan Filesystem for Viruses using clamav"""
@@ -103,10 +105,11 @@ class VirusScan(Reports.report):
         dbh=self.DBO(query['case'])
         try:
             result.table(
-                elements = [ InodeType('Inode','inode'),
-                             ColumnType('Filename','concat(path,name)'),
+                elements = [ InodeType('Inode','virus.inode',
+                                       case=query['case']),
+                             FilenameType(case=query['case']),
                              ColumnType('Virus Detected','virus') ],
-                table='virus as a join file as b on a.inode=b.inode ',
+                table='virus join file on virus.inode=file.inode ',
                 case=query['case'],
                 )
         except DB.DBError,e:

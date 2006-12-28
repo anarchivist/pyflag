@@ -240,8 +240,13 @@ class PstScan(GenScanFactory):
                     phone += ", %s(w)" % item.business_phone2
 
                 dbh=DB.DBO(self.case)
-                dbh.execute("INSERT INTO `contact` SET `inode`=%r,`name`=%r, `email`=%r, `address`=%r, `phone`=%r", (new_inode, name, email, address, phone))
-
+                dbh.insert("contact",
+                           inode=new_inode,
+                           name=name,
+                           email=email,
+                           address=address,
+                           phone=phone)
+                
             def add_appointment(new_inode,name,item):
                 add_other(new_inode,name,item)
                 location = ''

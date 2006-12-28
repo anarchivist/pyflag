@@ -34,6 +34,7 @@ import pyflag.DB as DB
 import os
 import pyflag.conf
 config=pyflag.conf.ConfObject()
+from pyflag.TableObj import ColumnType,TimestampType,InodeType,FilenameType
 
 from os.path import join
 
@@ -62,7 +63,9 @@ class NewCase(Reports.report):
         dbh.execute("Create database if not exists %s",(query['create_case']))
         dbh.execute("select * from meta where property='flag_db' and value=%r",query['create_case'])
         if not dbh.fetch():
-            dbh.execute("Insert into meta set property='flag_db',value=%r",query['create_case'])
+            dbh.insert('meta',
+                       property='flag_db',
+                       value=query['create_case'])
 
         #Get handle to the case db
         case_dbh = self.DBO(query['create_case'])
@@ -76,11 +79,19 @@ class NewCase(Reports.report):
         case_dbh.execute("""CREATE TABLE `sql_cache` (
         `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY ,
         `timestamp` TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL ,
-        `version` VARCHAR( 250 ) NOT NULL ,
+        `tables` VARCHAR( 250 ) NOT NULL ,
         `query` MEDIUMTEXT NOT NULL,
         `limit` INT default 0,
         `length` INT default 100
         )""")
+
+        case_dbh.execute("""CREATE TABLE `annotate` (
+        `id` INT(11) not null auto_increment,
+        `inode` VARCHAR(250) NOT NULL,
+        `note` TEXT,
+        `category` VARCHAR( 250 ) NOT NULL default 'Note',
+        PRIMARY KEY(`id`)
+        )""")        
 
         ## Create a directory inside RESULTDIR for this case to store its temporary files:
         try:
@@ -117,12 +128,10 @@ class DelCase(Reports.report):
 
         case = query['remove_case']
         ## Remove any jobs that may be outstanding:
-        dbh.execute("delete from jobs where command='Scan' and arg1=%r",
-                    case)
-        
+        dbh.delete('jobs',"command='Scan' and arg1=%r" % case)
+
         #Delete the case from the database
-        dbh.execute("delete from meta where property='flag_db' and value=%r",
-                    case)
+        dbh.delete('meta',"property='flag_db' and value=%r" % case)
         dbh.execute("drop database if exists %s" ,case)
 
         ## Delete the temporary directory corresponding to this case and all its content
@@ -170,3 +179,21 @@ class ResetCase(Reports.report):
         report.display(query,tmp)
 
         result.para("Case %s has been reset" % query['reset_case'])
+
+class ViewAnnotation(Reports.report):
+    """ View the annotated Inodes """
+    name = "View Annotations"
+    family = "Case Management"
+
+    def display(self, query,result):
+        result.heading("Annotated Inodes for case %s" % query['case'])
+        result.table(
+            elements = [ InodeType('Inode', 'annotate.inode', case=query['case']),
+                         FilenameType(case=query['case']),
+                         ColumnType('Category','category'),
+                         ColumnType('Note','note'),
+                         ],
+            table = 'annotate join file on file.inode=annotate.inode',
+            case = query['case'],
+            )
+                                    

@@ -107,7 +107,7 @@ class GenericUI:
         """
         pyflaglog.log(pyflaglog.DEBUG, "display not implemented")
 
-    def selector(self,description,name,sql,parms, key='key',
+    def selector(self,description,name,sql,parms=None, key='key',
                  value='value', **options):
         """ Present a listbox selector based on sql. name is the target of the selector
         Note that the sql must produce two columns named key and value.
