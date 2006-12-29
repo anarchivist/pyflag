@@ -117,7 +117,7 @@ span.tabcaution {
 div.content { 
   width: 100%;
   color: red;
-  border: 10;
+  border: 4px;
   border-style: groove;
   border-color: black;
 }
@@ -125,10 +125,13 @@ div.content {
   clear: both;
 }
 
-tbody.scrollContent td, thead th {
+tbody.scrollContent td.table-cell, thead th {
   background:#94BEFF;
   border-right:1px solid #999;
   padding:2px;
+}
+
+tbody.scrollContent td, thead th {
   font-weight:normal;
   font-size:0.8em;
 }
@@ -138,27 +141,27 @@ tbody.scrollContent {
   overflow-y: auto;
 }
 
-tbody.scrollContent td, tbody.scrollContent tr td {
+tbody.scrollContent td.table-cell, tbody.scrollContent tr td.table-cell {
   background: #FFF;
   padding: 2px;
 }
 
-tbody.scrollContent tr.alternateRow td {
+tbody.scrollContent tr.alternateRow td.table-cell {
   background: #e3edfa;
   padding: 2px;
 }
 
-tbody.scrollContent tr.selected td {
+tbody.scrollContent tr.selected td.table-cell {
   background: yellow;
   padding: 2px;
 }
 
-tbody.scrollContent tr:hover td,tbody.scrollContent tr.alternateRow:hover td.sorted-column {
+tbody.scrollContent tr:hover td.table-cell,tbody.scrollContent tr.alternateRow:hover td.sorted-column, 
+tbody.scrollContent tr:hover td.sorted-column {
   background: #a6c2e7;
-  padding: 2px;
 }
 
-tbody.scrollContent td.sorted-column, tbody.scrollContent tr.alternateRow td.sorted-column {
+tbody.scrollContent td.sorted-column, tbody.scrollContent tr td.sorted-column {
   background: pink;
 }
 
@@ -170,7 +173,7 @@ all.clsMenuItemNS, .clsMenuItemIE {
   text-decoration: none; 
   font: bold 12px Arial; 
   color: white; 
-  cursor: hand; 
+  cursor: pointer; 
   z-index:100
 }
 
@@ -201,7 +204,7 @@ div.PyFlagPage {
 table.PyFlagTable thead a, img { 
   color: black;
   font-size: large;
-  border: 1;
+  border: 1px;
   text-decoration: none;
  }
 
@@ -231,4 +234,28 @@ div.TreeRight {
   height: 80%;
   overflow: auto;
   width: 50%;
+}
+
+span.PyFlagTreeRow { 
+  font-size: small;
+  display: block;
+}
+
+img.PyFlagTreeSpacer, img.PyFlagTreeVerticalLine, img.PyFlagTreeNode, img.PyFlagTreeNodeEnd { 
+  width: 18px; 
+  height: 2.0ex; 
+  vertical-align: middle; 
+  display: inline; 
+}
+
+img.PyFlagTreeVerticalLine { 
+  background-image: url(/images/treenode_grid_v.gif);
+}
+
+img.PyFlagTreeNode { 
+  background-image: url(/images/treenode_grid_t.gif);
+}
+
+img.PyFlagTreeNodeEnd { 
+  background-image: url(/images/treenode_grid_l.gif);
 }

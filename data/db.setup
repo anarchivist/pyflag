@@ -271,3 +271,12 @@ INSERT INTO `registrykeys` VALUES (143, 'SOFTWARE/Microsoft/Windows/CurrentVersi
 INSERT INTO `registrykeys` VALUES (144, 'SYSTEM/CurrentControlSet/Control/FileSystem', 'NtfsDisableLastAccessUpdate', 'Misc', 'Misc');
 INSERT INTO `registrykeys` VALUES (145, 'System/CurrentControlSet/Control/Session Manager', 'KnownDLLs', 'Misc', 'Misc');
 INSERT INTO `registrykeys` VALUES (146, 'Software/Microsoft/Windows NT/CurrentVersion/Winlogon', 'ParseAuotExec', 'Misc', 'Misc');
+
+CREATE TABLE `sql_cache` (
+        `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+        `timestamp` TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL ,
+        `tables` VARCHAR( 250 ) NOT NULL ,
+        `query` MEDIUMTEXT NOT NULL,
+        `limit` INT default 0,
+        `length` INT default 100
+        );

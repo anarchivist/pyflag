@@ -1,3 +1,11 @@
+var n;
+var ie;
+var ns6;
+var fShow;
+var fHide;
+var opr6;
+var rightX;
+
 if (document.all)    {n=0;ie=1;ns6=0;fShow="visible";fHide="hidden";}
 if (document.getElementById&&!document.all)    {n=0;ie=0;ns6=1;fShow="visible";fHide="hidden";}
 if (document.layers) {n=1;ie=0;ns6=0;fShow="show";fHide="hide";}
@@ -78,7 +86,7 @@ function addItem(idItem, text, hint, location, altLocation)
 	if (ie||ns6)
 	{
 		MENUitem += "<td>\n";
-		MENUitem += "<div id='"+idItem+"' style='position:relative; font: "+this.menuFont+";'>\n";
+		MENUitem += "<div id='"+idItem+"' style='position:relative;'>\n";
 		MENUitem += "<a ";
 		MENUitem += "class=clsMenuItemIE ";
 //		MENUitem += "style='text-decoration: none; font: "+this.menuFont+"; color: "+this.fontColor+"; cursor: hand;' ";
@@ -136,7 +144,7 @@ function addSubItem(idParent, text, hint, location, linktarget)
 		if (ie||ns6)
 		{
 			MENUitem += "\n";
-			MENUitem += "<div id='"+idParent+"submenu' onmouseout=operahide() style='position:absolute; visibility: hidden; z-index:100; width: "+this.subMenuPaneWidth+"; font: "+this.menuFont+"; top: -300;'>\n";
+			MENUitem += "<div id='"+idParent+"submenu' onmouseout=operahide() style='position:absolute; visibility: hidden; z-index:100; width: "+this.subMenuPaneWidth+"; top: -300;'>\n";
 			MENUitem += "<table border='"+this.subMenuPaneBorder+"' bgcolor='"+this.bgColor+"' width="+this.subMenuPaneWidth+">\n";
 			MENUitem += "<!-- NEXT ITEM OF SUB MENU "+ idParent +" -->\n";
 			MENUitem += "</table>\n";

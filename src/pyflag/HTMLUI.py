@@ -31,6 +31,7 @@
 The output within flag is abstracted such that it is possible to connect any GUI backend with any GUI Front end. This is done by use of UI objects. When a report runs, it will generate a UI object, which will be built during report execution. The report then returns the object to the calling framework which will know how to handle it. Therefore the report doesnt really know or care how the GUI is constructed """
 
 import re,cgi,types,textwrap,sys
+from urllib import quote
 import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 import pyflag.conf
@@ -88,7 +89,7 @@ class HTMLUI(UI.GenericUI):
 
     @cvar name: Name of the class may be queried by reports to find out what UI they are running under. Warning- use very sparingly, since UIs are supposed to automatically produce the same output regardless what the input is, you dont need this. Use only when you want to disable certain viewes on certain UI's because they dont make sense (e.g. htmlview on non html uis)
     """
-
+    callback = None
     name = "HTMLUI"
     tree_id = 0
     ## This is used as a unique count of ids
@@ -303,11 +304,16 @@ class HTMLUI(UI.GenericUI):
             return "post_link('f?%s','_self'); return false;" % target
         
         if pane=='popup':
-            return "window.open('f?%s','child_%s',  'width=600, height=600,scrollbars=yes'); return false;" % (target, self.get_uniue_id())
+            return "window.open('f?%s','child_%s',  'width=600, height=600,scrollbars=yes'); return false;" % (target, self.get_unique_id())
 
         if pane=='parent':
             if target:
-                target.poparray('callback_stored')
+                ## Try to remove the callback which we are generated from:
+                try:
+                    target.remove('callback_stored', self.callback)
+                except:
+                    pass
+                #target.poparray('callback_stored')
 
             return "window.opener.document.location='f?%s'; window.close(); return false;" % target
             
@@ -445,7 +451,8 @@ class HTMLUI(UI.GenericUI):
 
         This implementation uses javascript/iframes extensively.
         """
-        def draw_branch(depth,query, result):
+        def draw_branch(depth,preamble,query):
+            result = ''
             try:
             ## Get the right part:
                 branch=FlagFramework.splitpath(query['open_tree'])
@@ -453,36 +460,106 @@ class HTMLUI(UI.GenericUI):
                 branch=['']
 
             path = FlagFramework.joinpath(branch[:depth])
-            for name,value,state in tree_cb(path):
+
+            ## This function returns the html for a single row.
+            def render_row(name, value, state, preamble):
+                result = ''
                 ## Must have a name and value
-                if not name or not value: continue
-                result.result+="<tr><td>"
-                result.icon("spacer.png", width=20*(depth+1), height=20)
+                if not name or not value: return ''
+                result+="<span class='PyFlagTreeRow'>" + preamble
+                #result+="<img class='PyFlagTreeVerticalLine' src='/images/treenode_blank.gif'>" * (depth)
+
                 link = query.clone()
                 del link['open_tree']
                 del link['yoffset']
                 del link['xoffset']
-                cb = link['callback_stored']
-                del link['callback_stored']
+                cb = link.poparray('callback_stored')
                 
                 link['open_tree'] = FlagFramework.normpath("/".join(branch[:depth] + [name]))
                 open_tree = FlagFramework.urlencode(link['open_tree'])
                 sv=value.__str__().replace(' ','&nbsp;')
-                
-                if state=="branch":
-                    result.result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img border=0 src=\"/images/folder.png\"></a>" % (cb,query['right_pane_cb'],link)
-                else:
-                    result.result+="<a href=\"javascript:tree_pane_open('%s','%s','f?%s')\"><img border=0 src=\"/images/corner.png\"></a>" % (cb,query['right_pane_cb'],link)
-                    
-                result.result+="&nbsp;%s</td></tr>\n" % str(sv)
-                result.result+="\n"
 
-                try:
+                ## Mark the currently opened branch especially
+                img_class = 'PyFlagTreeNode'
+                img_src = '/images/treenode_blank.gif'
+                
+                if 'branch' in state:
+                    if depth < len(branch) and name == branch[depth]:
+                        img_src = '/javascript/src/widget/templates/images/Tree/treenode_expand_minus.gif'
+                    else:
+                        img_src = '/javascript/src/widget/templates/images/Tree/treenode_expand_plus.gif'
+                elif 'up' in state:
+                    img_src = '/images/up.png'
+                elif 'down' in state:
+                    img_src = '/images/down.png'
+
+                ## We ensure to not draw vertical lines past the end
+                ## of the tree
+                if 'end' in state:
+                    img_class = 'PyFlagTreeNodeEnd'
+                    preamble += "<img class='PyFlagTreeSpacer' src='/images/treenode_blank.gif'>"
+                else:
+                    preamble += "<img class='PyFlagTreeVerticalLine' src='/images/treenode_blank.gif'>"
+
+                result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img class=%r src='%s'></a>" % (cb,query['right_pane_cb'],quote(link.__str__()), img_class, img_src)
+                    
+                result+="&nbsp;%s</span>\n" % str(sv)
+                result+="\n"
+                
                 ## Draw any opened branches
-                    if name == branch[depth]:
-                        draw_branch(depth+1,query, result)
-                except IndexError:
-                    pass
+                if len(branch)>depth and name == branch[depth]:
+                    result += draw_branch(depth+1,preamble, query)
+
+                return result
+
+            ## We need to implement a sliding window of rows to render
+            ## about the point where name == branch[depth]
+            initial_rows = []
+            window = []
+            found = False
+            for name,value,state in tree_cb(path):
+                ## This is the initial MAXTREESIZE rows. If we cant
+                ## find branch[depth] here, we just use this:
+                if len(initial_rows) < config.MAXTREESIZE * 2:
+                    initial_rows.append((name,value,[state,]))
+
+                ## This is a sliding window
+                if len(window) >= config.MAXTREESIZE * 2:
+                    window = window[-config.MAXTREESIZE *2:]
+                    
+                window.append((name,value,[state,]))
+
+                ## We need to center about this one - we discard the first few:
+                if len(branch)>depth and name==branch[depth]:
+                    found = True
+                    l = len(window)
+                    window = window[-config.MAXTREESIZE:]
+                    
+                    if l > config.MAXTREESIZE:
+                        window[0][2].append("up")
+
+                ## Are we too full?
+                if found and len(window)==config.MAXTREESIZE *2:
+                    break
+
+            if found:
+                displayed_rows = window
+            else:
+                displayed_rows = initial_rows
+
+            ## Our displayed rows are full - we must assume there are
+            ## more rows to go
+            if len(displayed_rows)==config.MAXTREESIZE *2:
+                displayed_rows[-1][2].append('down')
+            else:
+                try:
+                    displayed_rows[-1][2].append('end')
+                except: pass
+                
+            for name,value,state in displayed_rows:
+                result+=render_row(name, value, state,preamble)
+
+            return result
 
         def left(query,result):
             result.decoration = "js"
@@ -490,18 +567,16 @@ class HTMLUI(UI.GenericUI):
 
             #The first item in the tree is the first one provided in branch
             link = query.clone()
-            del link['callback_stored']
-            result.result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img border=0 src=\"/images/folder.png\"></a>" % (query['callback_stored'],query['right_pane_cb'],link)
-            result.result+="&nbsp;/<br>\n"
+            link.poparray('callback_stored')
 
-            result.result+="<table width=100%>"
-            draw_branch(0,query, result)
+            result.result+="<div class='PyFlagTree' >"
+            result.result+=draw_branch(0,'',query)
             try:
                 result.result+="<script>document.body.scrollTop = %s; document.body.scrollLeft = %s;</script>\n" % (query['yoffset'], query['xoffset'])
             except:
                 pass
 
-            result.result+="</table>"
+            result.result+="</div>"
             
         def right(query,result):
             result.decoration = "js"
@@ -519,18 +594,9 @@ class HTMLUI(UI.GenericUI):
         r = self.store_callback(right)
 
         self.result+='<table width="100%%"  height="100%%" class="PyFlagTable"><tr height="400+"><td  style="overflow: auto"><iframe id="left" name="left" height="100%%" width=300 src="%s&callback_stored=%s&right_pane_cb=%s"></iframe></td><td width="40%%" height="80%%"><iframe name="right" id="right" height="100%%" width=1000 src="%s&callback_stored=%s" > </iframe></td></tr></table>' % (self.defaults,l,r,self.defaults,r)
-#        self.result+='''<frameset cols="200,*" rows="*" id="mainFrameset">
-#<frame frameborder="0" id="left" name="left" src="f?%s&callback_stored=%s&right_pane_cb=%s" />
-#<frame frameborder="0" name="right" id="right" src="f?%s&callback_stored=%s" />
-#<noframes>
-#        <body>
-#            <p>PyFlag is more friendly with a <b>frames-capable</b> browser.</p>
-#        </body>
-#</noframes>
-#</frameset>''' % (self.defaults,l,r,self.defaults,r)
 
     def new_toolbar(self):
-        id = "Toolbar%s" % self.get_uniue_id()
+        id = "Toolbar%s" % self.get_unique_id()
         self.result += '''<div class="Toolbar" id="%s"></div>''' % id
         return id
 
@@ -792,7 +858,7 @@ class HTMLUI(UI.GenericUI):
                 if i==order:
                     tds+="<td class='sorted-column'>%s</td>" % (value)
                 else:
-                    tds+="<td>%s</td>" % (value)
+                    tds+="<td class='table-cell'>%s</td>" % (value)
 
             self.result+="<tr class='%s'> %s </tr>\n" % (old_sorted_style,tds)
             row_count += 1
@@ -1107,7 +1173,7 @@ class HTMLUI(UI.GenericUI):
         @arg target: A query_type object which is the target to the form. All parameters passed through this object are passed to the form's action.
         """
         self.form_parms=target.clone()
-        self.form_id=self.get_uniue_id()
+        self.form_id=self.get_unique_id()
         self.form_target = pane
         
         #Append the hidden params to the object
@@ -1122,7 +1188,7 @@ class HTMLUI(UI.GenericUI):
             base += "<input type=hidden name='%s' value='%s'>\n" % (k,v)
 
         if value:
-            base += "<input type=submit name=%s value='%s' onclick=\"submit_form(%r,%r); return false;\" %s>\n" % (name,value,self.form_target,self.defaults.callback,self.opt_to_str(opts))
+            base += "<input type=submit name=%s value='%s' onclick=\"submit_form(%r,%r); return false;\" %s>\n" % (name,value,self.form_target,self.callback,self.opt_to_str(opts))
 
         if self.table_depth>0:
             self.row(base)
@@ -1363,7 +1429,7 @@ class HTMLUI(UI.GenericUI):
         out+="</div><div class='clearfloat'></div><div class='content'>%s</div>\n" % result
         self.result+=out
 
-    def get_uniue_id(self):
+    def get_unique_id(self):
         self.id+=1
         return self.id
 

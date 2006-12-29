@@ -59,8 +59,7 @@ def tree_cb(path):
         files.sort()
         dirs.sort()
         
-        ## Just for testing we limit the number of nodes
-        return dirs[:10] + files[:10]
+        return dirs + files
     except OSError: return [(None,None,None)]
 
 def pane_cb(branch,result):
@@ -157,7 +156,6 @@ class PopUpTest(Refresher):
                 result.popup(second_level_cb, "Second popup")
                 
                 result.end_form()
-
 
             try:
                 result.para("Something is %s" % query['something'])

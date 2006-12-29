@@ -148,7 +148,6 @@ function isMiddleClick(e)
 function isLeftClick(e) 
 {
   var click;
-  var e;
 
   if (e.which) click = (e.which == 1);
   else if (e.button) click = (e.button == 1);
@@ -195,7 +194,7 @@ function post_link(query, target_window) {
   if(target_window)
     form.setAttribute('target',target_window);
   
-  input = document.createElement('input');
+  var input = document.createElement('input');
   input.setAttribute('name','pseudo_post_query');
   input.setAttribute('value',query);
   input.setAttribute('type','hidden');

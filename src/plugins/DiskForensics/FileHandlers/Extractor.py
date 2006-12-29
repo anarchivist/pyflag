@@ -55,7 +55,7 @@ try:
 
         def display(self, query, result):
             result.table(
-                elements = [ InodeType(),
+                elements = [ InodeType(case=query['case']),
                              ColumnType('Property','property'),
                              ColumnType('Value','value')],
                 table = 'xattr,inode',

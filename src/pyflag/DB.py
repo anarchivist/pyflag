@@ -449,11 +449,11 @@ class DBO:
             
         return (','.join(sql), tmp)
 
-    def update(self, table, where='1', __fast=False, **fields):
+    def update(self, table, where='1', _fast=False, **fields):
         sql , args = self._calculate_set(**fields)
         sql = "update %s set " + sql + " where %s "
         ## We are about to invalidate the table:
-        if not __fast:
+        if not _fast:
             self.invalidate(table)
         self.execute(sql, [table,] + args + [where,])
 
@@ -463,7 +463,7 @@ class DBO:
         self.invalidate(table)
         self.execute(sql, (table, where))        
 
-    def insert(self, table, __fast=False, **fields):
+    def insert(self, table, _fast=False, **fields):
         """ A helper function to make inserting a little more
         readable. This is especially good for lots of fields.
 
@@ -479,15 +479,15 @@ class DBO:
         sql , args = self._calculate_set(**fields)
         sql = "insert into %s set " + sql
         ## We are about to invalidate the table:
-        if not __fast:
+        if not _fast:
             self.invalidate(table)
         self.execute(sql, [table,]+args)
                     
-    def mass_insert_start(self, table, __fast=False):
+    def mass_insert_start(self, table, _fast=False):
         self.mass_insert_cache = {}
         self.mass_insert_table = table
         self.mass_insert_row_count = 0
-        self.mass_insert_fast = __fast
+        self.mass_insert_fast = _fast
     
     def mass_insert(self, **columns):
         """ Starts a mass insert operation. When done adding rows, call commit_mass_insert to finalise the insert.
@@ -501,7 +501,7 @@ class DBO:
         self.mass_insert_row_count+=1
         if self.mass_insert_row_count > 100:
             self.mass_insert_commit()
-            self.mass_insert_start(self.mass_insert_table)
+            self.mass_insert_start(self.mass_insert_table, _fast=self.mass_insert_fast)
 
     def mass_insert_commit(self):
         try:
@@ -532,7 +532,8 @@ class DBO:
         self.execute(sql,args)
 
         ## Ensure the cache is now empty:
-        self.mass_insert_start(self.mass_insert_table, __fast=self.mass_insert_fast)
+        self.mass_insert_start(self.mass_insert_table,
+                               _fast=self.mass_insert_fast)
 
     def autoincrement(self):
         """ Returns the value of the last autoincremented key """

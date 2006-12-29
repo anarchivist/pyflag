@@ -549,6 +549,7 @@ class InodeType(ColumnType):
 
         def annotate_cb(query, result):
             ## We are dealing with this inode
+            print "Callback query is %s " % query
             del query['inode']
             query['inode'] = value
             ## does a row already exist?
@@ -582,12 +583,15 @@ class InodeType(ColumnType):
             result.end_form(value='Annotate')
 
         row = annotate.select(inode=value)
+        tmp1 = result.__class__(result)
+        tmp2 = result.__class__(result)
         if row:
-            result.popup(annotate_cb, row['note'], icon="balloon.png")
+            tmp1.popup(annotate_cb, row['note'], icon="balloon.png")
         else:
-            result.popup(annotate_cb, "Annotate", icon="pen.png")
+            tmp1.popup(annotate_cb, "Annotate", icon="pen.png")
 
-        result.link(value, target=link)
+        tmp2.link(value, target=link)
+        result.row(tmp1,tmp2)
         return result
 
 class FilenameType(ColumnType):

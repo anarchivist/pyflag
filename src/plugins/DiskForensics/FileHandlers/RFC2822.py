@@ -91,7 +91,7 @@ class RFC2822(Scanner.GenScanFactory):
                            inode = self.inode,
                            date =  int(time.mktime(date)),
                            to = a.get('To'),
-                           from = a.get('From'),
+                           _from = "%r" % a.get('From'),
                            subject = a.get('Subject'))
 
                 for part in a.walk():

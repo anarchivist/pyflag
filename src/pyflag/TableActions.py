@@ -202,13 +202,12 @@ def selector_display(self, description=None, variable=None, ui=None, table=None,
     tmp3=ui.__class__(ui)
     tmp3.textfield('','new_%s' % variable)
     tmp2.start_table(bgcolor='lightgray')
-    tmp2.row(tmp," or type ",tmp3)
+    tmp2.row(tmp," or ",tmp3)
     tmp2.end_table()
     ui.row(description,tmp2)
 
 def selector_constraint(table_object,fieldname,proposed_value,query=None,id=None, result=None):
     """ Checks if the user types a new value in selector_display to overrride the selector """
-    print "About to check %s in %s" %(fieldname,query)
     try:
         tmp=query["new_%s" % fieldname]
         del query["new_%s" % fieldname]
