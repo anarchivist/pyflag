@@ -23,7 +23,7 @@ class Menu(Theme.BasicTheme):
     </script>
     
     <div class=PyFlagHeader>
-      <div class=Toolbar>
+      <div class=Toolbar onmouseover="hideSubMenus()">
       </div><div class="Logo"> PyFlag</div>
     </div>    
     <div class=PyFlagPage>
@@ -43,39 +43,34 @@ class Menu(Theme.BasicTheme):
         var menucolor="black" 
         var submenuwidth=150
         </script>
-        <script type="text/javascript" src="/javascript/menu.js" language="javascript"></script>'''
+        <script type="text/javascript" src="/javascript/functions.js" language="javascript"></script>'''
 
     def make_menu_javascript(self,query):
         """ Creates the javascript function required to generate the menu """
-        result = '''<script language="javascript">
-        function showToolbar() {
-        menu = new Menu();'''
+        result = '''<table class=MenuBar><tr>'''
+        submenus = ''
         
         ## Find all families:
         module_list = Registry.REPORTS.get_families()
         Theme.order_families(module_list)
 
         for k in module_list:
-            submenu_text = ''
+            items = 0
+            submenu_text = '\n<table class=PopupMenu id="PopupMenu%s">' % k
             ## Add the reports in the family:
             report_list = Registry.REPORTS.family[k]
             for r in report_list:
                 if r.hidden: continue
-                ## Only propegate if we stay within the same family:
-                try:
-                    if query['family']==k:
-                        submenu_text+='menu.addSubItem("%s", "%s","%s","f?%s","");' % (k,r.name,r.name,Theme.propegate(query,FlagFramework.query_type((),family=k,report=r.name)))
-                        continue
-                except KeyError:
-                    pass
-                
-                submenu_text+='menu.addSubItem("%s", "%s","%s","f?%s","");' % (k,r.name,r.name,FlagFramework.query_type((),family=k,report=r.name))
+                submenu_text+="<tr class='MenuItem' onclick='SelectMenuItem(\"f?report=%s&family=%s\")'><td>%s</td></tr>\n" % (r.name, k, r.name)
+                items += 1
+                continue
 
-            if len(submenu_text)>0:
-                result+='menu.addItem("%s","%s","%s",null,null);\n' % (k,k,k) + submenu_text
+            if items > 0:
+                result += "\n<td class=MenuBarItem id='MenuBarItem%s' onmouseover='displaySubMenu(\"%s\")'>%s</td>" % (k,k,k)
+                submenus += submenu_text + "</table>"
 
-        return result+"menu.showMenu(); }</script>"
-
+        return result + "</tr></table>" + submenus
+    
     def menu(self,flag,query):
         """ We just draw the main page for the database here """
         result=flag.ui()
@@ -93,19 +88,19 @@ class Menu(Theme.BasicTheme):
     def raw_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
         return data
 
-    def naked_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
+    def naked_render(self,data='',ui=None,title=None):
         """ Render the ui with minimal interventions """
-        if not ui.toolbar_ui:
-            toolbar_str='&nbsp;&nbsp;'
-        else:
-            toolbar_str=ui.toolbar_ui.__str__()
+        result = '''<html>
+        <head>
+        <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
+        </head>
+        <body style="overflow: auto;">
+        <script src="/javascript/functions.js" type="text/javascript" language="javascript"></script>
+        %s
+        </body>''' % data
 
-        return " ".join(
-        ('<link rel="stylesheet" type="text/css" href="images/pyflag.css" />',
-         self.preamble,
-         "<table><tr><td>%s</td></tr></table>" % (data),
-         ))
-
+        return result
+    
     def render(self, ui=None, data='', title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
         self.menu_javascript = self.make_menu_javascript(ui.defaults)
 
@@ -114,10 +109,8 @@ class Menu(Theme.BasicTheme):
         else:
             toolbar_str=ui.toolbar_ui.__str__()
 
-        try:
-            case = "Case %s - " % ui.defaults['case']
-        except:
-            case =''
+        case_selector = ui.__class__(ui)
+        case_selector.case_selector()
 
         result = '''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
         <html>
@@ -127,31 +120,18 @@ class Menu(Theme.BasicTheme):
             <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
             <script src="/javascript/functions.js" type="text/javascript" language="javascript"></script>
           </head>
-        <body link=blue vlink=blue bgcolor="#FFFFFF">
-        <script>
-        var keepstatic=1 //specify whether menu should stay static 0=non static (works only in IE4+)
-        var menucolor="black" 
-        var submenuwidth=150
-        if(!window.name) window.name="main";
-        </script>
-        <script type="text/javascript" src="/javascript/menu.js" language="javascript"></script>''' % title
+        <body>\n''' % title
 
         result += self.menu_javascript
-        result += '''<script>
-        if(window.name=="main") {
-           showToolbar();
-        };
-        </script>'''
 
         result += '''<div class=PyFlagHeader>
-        <div class=Toolbar> %s
-        </div><div class="Logo"> PyFlag</div>
-        </div>    
-        <div class=PyFlagPage>
-        ''' % toolbar_str
+        <div class=Toolbar> %s </div><div class="CaseSelector"><form id=CaseSelector>%s</form></div>
+        </div>
+        <div class="PyFlagPage" id="PyFlagPage" onmouseover="hideSubMenus()">
+        ''' % (toolbar_str,case_selector)
 
         result += data
-        result += "</div>" + self.footer
+        result += "</div><script>AdjustHeightToPageSize('PyFlagPage'); </script>" + self.footer
 
 #        print result
         return result

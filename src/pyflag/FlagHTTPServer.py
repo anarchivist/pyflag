@@ -270,6 +270,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
             ## Make a new UI
             result=flag.ui(query=query)
+            result.decoration = 'naked'
             try:
                 ## Get the callback from the store
                 try:

@@ -250,7 +250,7 @@ class HTMLUI(UI.GenericUI):
     
     def start_table(self,**options):
         self.table_depth += 1
-        self.result += "<table %s style='border: 0;'>\n" % self.opt_to_str(options)
+        self.result += "<table %s>\n" % self.opt_to_str(options)
 
     def row(self,*columns, **options):
         #Sort through all the options for the ones that should go to the td html element
@@ -593,7 +593,13 @@ class HTMLUI(UI.GenericUI):
         l = self.store_callback(left)
         r = self.store_callback(right)
 
-        self.result+='<table width="100%%"  height="100%%" class="PyFlagTable"><tr height="400+"><td  style="overflow: auto"><iframe id="left" name="left" height="100%%" width=300 src="%s&callback_stored=%s&right_pane_cb=%s"></iframe></td><td width="40%%" height="80%%"><iframe name="right" id="right" height="100%%" width=1000 src="%s&callback_stored=%s" > </iframe></td></tr></table>' % (self.defaults,l,r,self.defaults,r)
+##      FIXME: Framesets provide for an adjustable boundary but must be on a document of their own.
+##        self.result += """<iframe><frameset id=frames rows='*' cols='400,75%%'>
+##        <frame name='left' src='%s&callback_stored=%s&right_pane_cb=%s'></frame>
+##        <frame name='right' src='%s&callback_stored=%s'></frame>
+##        </frameset></iframe>
+##        """ % (self.defaults, l, r, self.defaults, r)
+        self.result+='<iframe id="left" name="left" height="100%%" width=300 src="%s&callback_stored=%s&right_pane_cb=%s"></iframe><iframe name="right" id="right" src="%s&callback_stored=%s" ></iframe>' % (self.defaults,l,r,self.defaults,r)
 
     def new_toolbar(self):
         id = "Toolbar%s" % self.get_unique_id()
@@ -1398,24 +1404,31 @@ class HTMLUI(UI.GenericUI):
             context_str=names[0]
             index=0
 
-#        out='\n<table border=0 cellspacing=0 cellpadding=0 width="100%"><tr><td colspan=50><img height=20 width=1 alt=""></td></tr><tr>'
-        out='\n<div id="notebook"><ul id="topmenu">'
-        
+        out = '\n<div class="NotebookContainer"><div class=Tablist>'
         for i in names:
             q=query.clone()
             del q[context]
             q[context]=i
-            tmplink = '''<a class="tab" href="%s">%s</a>''' % (q,i)
 
             if(i==context_str):
-##                out+="<td width=15>&nbsp;</td><td bgcolor=#3366cc align=center nowrap><font color=#ffffff size=-1><b>%s</b></font></td>" % i
-                out+="<li><a class='tabactive'>%s</a></li>\n" % i
+                out+="<div class='TabActive'><span>%s</span></div>\n" % i
             else:
-##                out+='<td width=15>&nbsp;</td><td id=1 bgcolor=#efefef align=center nowrap><font size=-1>%s</font></td>' % (tmplink)
-                out+="<li>%s</li>\n" % tmplink
+                out+="<div class='Tab' onclick='document.location=\"f?%s\"'><span>%s</span></div>\n" % (q,i)
+        
+##        out='\n<div id="notebook"><ul id="topmenu">'
+        
+##        for i in names:
+##            q=query.clone()
+##            del q[context]
+##            q[context]=i
+##            tmplink = '''<a class="tab" href="%s">%s</a>''' % (q,i)
 
-        out+="</ul>"
-##        out+="<td colspan=50>&nbsp;</td></tr><tr><td colspan=50 bgcolor=#3366cc><img width=1 height=1 alt=""></td></tr>"
+##            if(i==context_str):
+##                out+="<li><a class='tabactive'>%s</a></li>\n" % i
+##            else:
+##                out+="<li>%s</li>\n" % tmplink
+
+##        out+="</ul>"
         
         #Now draw the results of the callback:
         result=self.__class__(self)
@@ -1424,10 +1437,11 @@ class HTMLUI(UI.GenericUI):
             cbfunc(query,result, option)
         except IndexError:
             cbfunc(query,result)
-            
-##        out+="<tr><td colspan=50><table border=1 width=\"100%%\"><tr><td>%s</td></tr></table></td></tr></table>" % result
-        out+="</div><div class='clearfloat'></div><div class='content'>%s</div>\n" % result
-        self.result+=out
+
+        id=self.get_unique_id()
+        
+        out+="</div>\n<div class='TabContent' id='Notebook%s'>%s</div></div>\n" % (id,result)
+        self.result+=out + "<script>AdjustHeightToPageSize('Notebook%s');</script>" % id
 
     def get_unique_id(self):
         self.id+=1

@@ -1,130 +1,4 @@
-a.tab:hover,
-a.tabcaution:hover,
-.tabactive,
-.tabactive:hover {
-    margin:             0;
-    padding:            0.2em 0.4em 0.2em 0.4em;
-    text-decoration:    none;
-}
-
-a.tab:hover,
-.tabactive {
-    background-color:   #D5D5D5;
-}
-
-#notebook li {
-  font-size: small;
-  margin-bottom: 0.3em;
-}
-
-/* topmenu */
-div#notebook {
-  font-weight:        bold;
-  list-style-type:    none;
-  margin:             0;
-  padding:            0;
-  width: 500%;
-}
-
-ul#topmenu li {
-    float:              left;
-    margin:             0;
-    padding:            1;
-    vertical-align:     middle;
-  list-style: none;
-}
-
-#topmenu img {
-    vertical-align:     middle;
-    margin-right:       0.1em;
-}
-
-/* default tab styles */
-.tab, .tabcaution, .tabactive {
-    display:            block;
-    margin:             0.2em 0.2em 0 0.2em;
-    padding:            0.2em 0.2em 0 0.2em;
-    white-space:        nowrap;
-    text-decoration:    none;
-}
-
-/* default tab styles */
-.tab, .tabcaution, .tabactive {
-    display:            block;
-    margin:             0.2em 0.2em 0 0.2em;
-    padding:            0.2em 0.2em 0 0.2em;
-    white-space:        nowrap;
-}
-
-/* disabled tabs */
-span.tab {
-    color:              #666666;
-}
-
-/* disabled drop/empty tabs */
-span.tabcaution {
-    color:              #ff6666;
-}
-
-/* enabled drop/empty tabs */
-a.tabcaution {
-    color:              #FF0000;
-}
-a.tabcaution:hover {
-    color: #FFFFFF;
-    background-color:   #FF0000;
-}
-
-#topmenu {
-    margin-top:         0.5em;
-    padding:            0.1em 0.3em 0.1em 0.3em;
-}
-
-ul#topmenu li {
-    border-bottom:      1pt solid black;
-}
-
-/* default tab styles */
-.tab, .tabcaution, .tabactive {
-    background-color:   #E5E5E5;
-    border:             1pt solid #D5D5D5;
-    border-bottom:      0;
-    -moz-border-radius-topleft: 0.4em;
-    -moz-border-radius-topright: 0.4em;
-}
-
-/* enabled hover/active tabs */
-a.tab:hover,
-a.tabcaution:hover,
-.tabactive,
-.tabactive:hover {
-    margin:             0;
-    padding:            0.2em 0.4em 0.2em 0.4em;
-    text-decoration:    none;
-}
-
-a.tab:hover,
-.tabactive {
-    background-color:   #D5D5D5;
-}
-
-/* disabled drop/empty tabs */
-span.tab,
-span.tabcaution {
-    cursor:             url(../themes/original/img/error.ico), default;
-}
-
-div.content { 
-  width: 100%;
-  color: red;
-  border: 4px;
-  border-style: groove;
-  border-color: black;
-}
-.clearfloat { 
-  clear: both;
-}
-
+/** Stuff related to table implementation */
 tbody.scrollContent td.table-cell, thead th {
   background:#94BEFF;
   border-right:1px solid #999;
@@ -156,7 +30,7 @@ tbody.scrollContent tr.selected td.table-cell {
   padding: 2px;
 }
 
-tbody.scrollContent tr:hover td.table-cell,tbody.scrollContent tr.alternateRow:hover td.sorted-column, 
+tbody.scrollContent tr:hover td.table-cell,tbody.scrollContent tr.alternateRow:hover td.sorted-column,
 tbody.scrollContent tr:hover td.sorted-column {
   background: #a6c2e7;
 }
@@ -169,35 +43,28 @@ thead th {
  cursor: pointer;
 }
 
-all.clsMenuItemNS, .clsMenuItemIE {
-  text-decoration: none; 
-  font: bold 12px Arial; 
-  color: white; 
-  cursor: pointer; 
-  z-index:100
-}
-
-/* end topmenu */
-
 /** General Page layout */
 div.PyFlagHeader { 
-  background-image: url(topfill.jpg);
-  float: left;
+  background-image: url(/images/toolbar-bg.gif);
   width: 100%;
-}
-
-div.Logo { 
-  float: right;
-  width: auto;
+  height: 32px;
 }
 
 div.Toolbar { 
   float: left;
   width: 80%;
+  padding-top: 3px;
+}
+
+div.CaseSelector { 
+  float: right;
+  height: 24px;
 }
 
 div.PyFlagPage { 
   width: 100%;
+  overflow-y: auto;
+  height: 80%;
 }
 
 /** Tables */
@@ -258,4 +125,114 @@ img.PyFlagTreeNode {
 
 img.PyFlagTreeNodeEnd { 
   background-image: url(/images/treenode_grid_l.gif);
+}
+
+/** Menu bar classes: */
+html, body { 
+  width: 100%;	/* make the body expand to fill the visible window */
+  height: 100%;
+  overflow: hidden;	/* erase window level scrollbars */
+  padding: 0 0 0 0;
+  margin: 0 0 0 0;
+}
+
+table.MenuBar, table.PopupMenu { 
+  cursor: pointer;
+  z-index: 2;
+  position: relative;
+  font-family: "Sans";
+  font-size: 13px;
+}
+
+table.MenuBar { 
+  background-color:	#A9CCFE;
+  background-image: url(/images/soriaMenuBg.gif);
+  width: 100%;
+  height: 29px;
+  vertical-align: middle;
+}
+
+table.PopupMenu { 
+  visibility: hidden;
+  position: absolute;
+  background-color: #A9CCFE;
+  padding-bottom: 5px;
+  padding-top: 5px;
+  -moz-border-radius: 15px;
+}
+
+tr.MenuItem td { 
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+tr.MenuItem:hover { 
+  background-color: white;
+}
+
+td.MenuBarItem { 
+  display:	inline;
+  padding-left: 8px;
+  padding-right: 8px;
+ }
+
+/** Notebook implementation */
+div.Tablist { 
+  font-weight:        bold;
+  float: left;
+}
+
+div.TabContent { 
+  border-width: 2px;
+  border-style: solid;
+  clear: both;
+ }
+
+.Tab, .TabActive { 
+  float : left;
+  margin-bottom : 0px;
+  padding-left : 9px;
+  border-bottom : 1px solid #6290d2;
+  background : url(/images/tab_left.gif) no-repeat left top;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.Tab span, .TabActive span {
+  top : 0px;
+  left : 0px;
+  overflow : visible;
+  margin-bottom : -1px;
+  z-index: 3;
+  display : block;
+  padding : 4px 15px 4px 6px;
+  background : url(/images/tab_top_right.gif) no-repeat right top;
+  color : #333;
+  font-size : 90%;
+}
+
+.TabActive span { 
+  background-position: right -150px;
+ }
+
+.TabActive { 
+  background-position: left -150px;
+ }
+
+/** This is related to the tree widget */
+iframe#left { 
+  border: 3px;
+  float: left;
+  width: 30%;
+  margin-right: -10px;
+  height: 95%;
+  border-style: none;
+  border-right-style: ridge;
+}
+
+iframe#right { 
+  border: 1px;
+  float: right;
+  width: 70%;
+  height: 95%;
 }

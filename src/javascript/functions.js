@@ -179,7 +179,7 @@ function tree_open(left_cb, right_cb,url) {
       y = document.body.scrollTop;
     }
 
-  document.location = url + "&callback_stored="+left_cb+ "&yoffset="+y+ "&xoffset="+x;;
+  document.location.href = url + "&callback_stored="+left_cb+ "&yoffset="+y+ "&xoffset="+x;;
 
   tree_pane_open(left_cb, right_cb, url);
 };
@@ -306,3 +306,72 @@ function submit_form(pane, current_cb) {
   if(pane=='parent')
     window.close();
 };
+
+function getAbsolutePosition(element) {
+  var r = { x: element.offsetLeft, y: element.offsetTop };
+  if (element.offsetParent) {
+    var tmp = getAbsolutePosition(element.offsetParent);
+    r.x += tmp.x;
+    r.y += tmp.y;
+  }
+  return r;
+};
+
+var currently_active_menupopup = 0;
+var currently_active_menuitem = 0;
+
+function displaySubMenu(submenu) {
+  var popup = document.getElementById("PopupMenu"+submenu);
+  var menuitem = document.getElementById('MenuBarItem'+submenu);
+  if(!popup || !menuitem) {
+    alert("Unable to find element PopupMenu"+submenu);
+    return;
+  };
+
+  // Hide the old menu
+  if(currently_active_menupopup)
+    currently_active_menupopup.style.visibility = 'hidden';
+
+  if(currently_active_menuitem)
+    currently_active_menuitem.style.backgroundColor = 'transparent';
+  
+  currently_active_menupopup = popup;
+  currently_active_menuitem = menuitem;
+
+  // Show the current menu
+  currently_active_menupopup.style.visibility = 'visible';
+  currently_active_menuitem.style.backgroundColor = '#D2E4FD';
+
+  var position = getAbsolutePosition(currently_active_menuitem);
+
+  currently_active_menupopup.style.left = position.x;
+  currently_active_menupopup.style.top = position.y + currently_active_menuitem.offsetHeight;
+};
+
+function hideSubMenus() {
+  if(currently_active_menupopup)
+    currently_active_menupopup.style.visibility = 'hidden';
+  
+  if(currently_active_menuitem)
+    currently_active_menuitem.style.backgroundColor = 'transparent';
+};
+
+if(!window.name) window.name="main";
+
+function SelectMenuItem(url) {
+  var form = document.getElementById('CaseSelector');
+  document.location = url + "&case=" + form.elements[0].value;
+};
+
+// We would really like to specify the height of the PyFlagPage as
+// 100%-24px-32px. Is there a way to do this in css?
+function AdjustHeightToPageSize(element_id) {
+  var element = document.getElementById(element_id);
+
+  if(!element) return;
+
+  var position = getAbsolutePosition(element);
+
+  element.style.height = window.innerHeight - position.y -1 + "px";
+  element.style.overflowY = 'auto';
+}
