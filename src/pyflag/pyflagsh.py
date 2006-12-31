@@ -37,9 +37,8 @@ import pyflag.FlagFramework as FlagFramework
 import pyflag.UI as UI
 import pyflag.Registry as Registry
 from optparse import OptionParser
-
-## Make sure the registry is properly initialised
-Registry.Init()
+import pyflag.conf
+config = pyflag.conf.ConfObject()
 
 class ParserException(Exception):
     """ Exception thrown by the parser when we cant parse the line """
@@ -253,10 +252,20 @@ def shell_execv(*argv):
     return string
 
 if __name__ == "__main__":
-    ## Create a worker thread:
-    #import pyflag.Farm as Farm
-    #Farm.start_workers()
+    # Parse commandline args:
+    clparser = OptionParser(version=config.VERSION)
+    clparser.add_option("-c", "--commands", dest="filename",
+                  help="execute flash script from FILE", metavar="FILE")
 
+    clparser.add_option("-p", "--params", dest="params", 
+                      help="comma seperated list of KEY:VALUE for flash scripts",
+                      metavar="PARAMS")
+
+    (options, args) = pyflag.conf.parse_command_line(parser=clparser)
+
+    ## Make sure the registry is properly initialised
+    Registry.Init()
+    
     ## Handle a history file
     histfile = os.path.join(os.environ["HOME"], ".flashhist")
     try:
@@ -273,16 +282,9 @@ if __name__ == "__main__":
     parser=command_parse(env)
     print "Welcome to the Flag shell. Type help for help"
     
-    # Parse commandline args:
-    clparser = OptionParser()
-    clparser.add_option("-c", "--config", dest="filename",
-                  help="execute flash script from FILE", metavar="FILE")
-
-    clparser.add_option("-p", "--params", dest="params", 
-                      help="comma seperated list of KEY:VALUE for flash scripts",
-                      metavar="PARAMS")
-
-    (options, args) = clparser.parse_args()
+    ## Create a worker thread:
+    import pyflag.Farm as Farm
+    Farm.start_workers()
 
     if options.filename != None:
       asker=Asker()

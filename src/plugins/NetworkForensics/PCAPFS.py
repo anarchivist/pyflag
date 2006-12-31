@@ -187,7 +187,7 @@ class PCAPFS(DBFS):
                 row = dbh2.fetch()
                 mtime = row['ts_sec']
             except IndexError,e:
-                mtime = 0
+                mtime = "0000-00-00"
 
             ## Add the stream to the connection details table: (Note
             ## here that dbh.insert and dbh.mass_insert do not
@@ -272,7 +272,7 @@ class PCAPFS(DBFS):
                 iosource = iosource_name,
                 offset = p.buffer.offset,
                 length = p.size(),
-                _ts_sec = "from_unixtime(%s)" % p['ts_sec'],
+                ts_sec =  p['ts_sec'],
                 ts_usec = int(p['ts_usec']),
                 link_type = link_type,
                 id = max_id

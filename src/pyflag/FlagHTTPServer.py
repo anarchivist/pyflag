@@ -375,14 +375,7 @@ class FlagHTTPServer( SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
 
 def Server(HandlerClass = FlagServerHandler,
            ServerClass = FlagHTTPServer, protocol="HTTP/1.0"):
-
-    ## FIXME: This needs to be properly parsed
-    if sys.argv[1:]:
-        port = int(sys.argv[1])
-    else:
-        port = 8000
-
-    server_address = ('',port)
+    server_address = (config.HTTPSERVER_BINDIF,config.HTTPSERVER_PORT)
 
     HandlerClass.protocol_version = protocol
     httpd = ServerClass(server_address, HandlerClass)
@@ -392,6 +385,9 @@ def Server(HandlerClass = FlagServerHandler,
     httpd.serve_forever()
 
 if __name__ == "__main__":
+    ## Parse the command line args:
+    pyflag.conf.parse_command_line("The main PyFlag HTTP Server.")
+    
     flag = FlagFramework.Flag()
     FlagFramework.GLOBAL_FLAG_OBJ =flag
     #Set the UI module to produce HTML
@@ -402,9 +398,7 @@ if __name__ == "__main__":
         import pyflag.HTMLUI as HTMLUI
         flag.ui = HTMLUI.HTMLUI
 
-    #Set the default graphing module to produce SVG using ploticus
     import pyflag.Graph as Graph
-
     Graph.Graph = Graph.Ploticus
 
     ## Start the workers

@@ -1,3 +1,6 @@
+h1, table { 
+  cursor: default;
+}
 /** Stuff related to table implementation */
 tbody.scrollContent td.table-cell, thead th {
   background:#94BEFF;
@@ -194,8 +197,11 @@ div.TabContent {
   padding-left : 9px;
   border-bottom : 1px solid #6290d2;
   background : url(/images/tab_left.gif) no-repeat left top;
-  cursor: pointer;
   white-space: nowrap;
+}
+
+.Tab { 
+  cursor: pointer;
 }
 
 .Tab span, .TabActive span {
@@ -217,6 +223,7 @@ div.TabContent {
 
 .TabActive { 
   background-position: left -150px;
+  cursor: default;
  }
 
 /** This is related to the tree widget */

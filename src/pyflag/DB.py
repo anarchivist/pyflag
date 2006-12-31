@@ -105,18 +105,18 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
         self.py_row_cache = []
         self.py_cache_size = 10
         self._last_executed = string
-        
+
         def cancel():
             pyflaglog.log(pyflaglog.WARNINGS, "Killing query in thread %s because it took too long" % self.connection.thread_id())
             self.kill_connection('query')
             
-        #t = threading.Timer(self.timeout, cancel)
-        #t.start()
+        t = threading.Timer(self.timeout, cancel)
+        t.start()
         try:
             MySQLdb.cursors.SSDictCursor.execute(self,string)
         finally:
-            #t.cancel()
-            #t.join()
+            t.cancel()
+            t.join()
             pass
 
     def fetchone(self):
@@ -367,7 +367,7 @@ class DBO:
         complex queries.
         """
         ## Expire the cache if needed
-        self.execute("select * from sql_cache where timestamp < date_sub(now(), interval %r minute)", config.DBCACHEAGE)
+        self.execute("select * from sql_cache where timestamp < date_sub(now(), interval %r minute)", config.DBCACHE_AGE)
         tables = [ row['id'] for row in self]
         for table_id in tables:
             self.execute("delete from sql_cache where id = %r" , table_id)
@@ -401,8 +401,11 @@ class DBO:
                     query = sql, _timestamp='now()',
                     tables = ",%s," % ','.join(tables),
                     limit = lower_limit,
-                    length = config.DBCACHE_LENGTH)
+                    length = config.DBCACHE_LENGTH,
+                    _fast = True
+                    )
 
+        ## Create the new table
         id = self.autoincrement()
         
         self.execute("create table cache_%s %s limit %s,%s",
@@ -410,8 +413,6 @@ class DBO:
         
         return self.execute("select * from cache_%s limit %s,%s",
                             (id,limit - lower_limit,length))
-
-        ## Create the new table
 
         ## Did we take too long? If we didnt take very long, we lose
         ## the table and mark the query as uncachable for a
@@ -457,6 +458,10 @@ class DBO:
             self.invalidate(table)
         self.execute(sql, [table,] + args + [where,])
 
+    def drop(self, table):
+        self.invalidate(table)
+        self.execute("drop table if exists %s", table)
+
     def delete(self, table, where):
         sql = "delete from %s where %s"
         ## We are about to invalidate the table:
@@ -493,6 +498,12 @@ class DBO:
         """ Starts a mass insert operation. When done adding rows, call commit_mass_insert to finalise the insert.
         """
         for k,v in columns.items():
+            ## _field means to pass the field 
+            if k.startswith('_'):
+                k=k[1:]
+            else:
+                v="'%s'" % escape(v.__str__())
+                
             try:
                 self.mass_insert_cache[k][self.mass_insert_row_count]=v
             except:
@@ -521,7 +532,7 @@ class DBO:
                 except KeyError:
                     args.append('NULL')
 
-            values.append(",".join(["%r"] * len(keys)))
+            values.append(",".join(["%s"] * len(keys)))
 
         sql = "insert ignore into `%s` (%s) values (%s)" % (self.mass_insert_table,
                                                    ','.join(["`%s`" % c for c in keys]),
@@ -643,8 +654,9 @@ class DBO:
     def __del__(self):
         """ Destructor that gets called when this object is gced """
         try:
+            self.cursor.ignore_warnings = True
             for i in self.temp_tables:
-                self.execute('drop table if exists %s' % i)
+                self.drop(i)
 
             ## Ensure that our mass insert case is comitted in case
             ## users forgot to flush it:
@@ -680,3 +692,111 @@ class DBO:
         if not p_mysql.close():
             pass
     #        raise IOError("MySQL client exited with an error")
+
+if __name__=='__main__':
+    import unittest
+
+    class DBOTest(unittest.TestCase):
+        def testvalidinstall(self):
+            """ Test to make sure we can locate the pyflag default database """
+            dbh = DBO(None)
+            dbh.execute("show tables")
+            tables = [ row.values()[0] for row in dbh ]
+            self.assert_( 'meta' in tables)
+            
+        def testTemporaryTables(self):
+            """ Test to make sure DBO temporary tables get cleaned up after handle gc """
+            dbh = DBO(None)
+            tablename = dbh.get_temp()
+            dbh.execute("create table %s(field1 text)", tablename)
+            dbh.execute("select * from %s", tablename)
+            result = [ row['field1'] for row in dbh ]
+            self.assertEqual(result, [])
+
+            dbh2 = DBO(None)
+            tablename2 = dbh2.get_temp()
+            self.assert_(tablename2 != tablename)
+
+            del dbh
+            def ExceptionTest():
+                dbh = DBO(None)
+                dbh.execute("select * from %s", tablename)
+
+            self.assertRaises(DBError, ExceptionTest)
+
+        def createTestTable(self, dbh):
+            tablename = dbh.get_temp()
+            dbh.execute("create table %s(field1 int)", tablename)
+
+            for i in range(0,10):
+                dbh.insert(tablename, field1=i)
+
+            return tablename
+        
+        def testServerSideReconnect(self):
+            """ Test to ensure that dbhs reconnect after an aborted server side connection """
+            dbh = DBO(None)
+            tablename = self.createTestTable(dbh)
+            
+            dbh.execute("select * from %s", tablename)
+            result = [ row['field1'] for row in dbh if row['field1'] < 5 ]
+            self.assertEqual(result, range(0,5))
+
+        def testSlowQueryAbort(self):
+            """ Test to make sure slow queries are aborted """
+            dbh = DBO(None)
+            
+            #Make the timeout 1 second for testing
+            dbh.cursor.timeout = 1
+
+            dbh.execute("select sleep(2) as sleep")
+            result = dbh.fetch()['sleep']
+            self.assertEqual(result, 1)
+
+        def testMassInsert(self):
+            """ Test the mass insert mechanism """
+            dbh = DBO(None)
+            tablename = dbh.get_temp()
+            dbh.execute("create table %s(field1 int)", tablename)
+
+            dbh.mass_insert_start(tablename)
+            ## Escaped variables:
+            dbh.mass_insert(field1 = 1)
+
+            ## Non-escaped insert
+            dbh.mass_insert(_field1 = "1+1")
+            
+            dbh.mass_insert_commit()
+            dbh.execute("select * from %s" , tablename)
+            
+            result = [ row['field1'] for row in dbh ]
+            self.assertEqual(result, [1,2])
+
+        def testCachedExecute(self):
+            """ Test that query caching works properly """
+            dbh=DBO()
+            tablename = self.createTestTable(dbh)
+
+            ## Do a cached select:
+            dbh.cached_execute("select * from %s" % tablename)
+            result = [ row['field1'] for row in dbh ]
+            self.assertEqual(result, range(0,10))
+
+            ## Make sure we came from the cache:
+            cached_sql = dbh.cursor._last_executed
+            self.assert_('cache_' in cached_sql)
+
+            ## Update the underlying table:
+            dbh.insert(tablename, field1=1)
+
+            ## query the cache again:
+            dbh.cached_execute("select * from %s" % tablename)
+            result2 = [ row['field1'] for row in dbh ]
+
+            self.assertEqual(result2, result + [1,])
+
+            ## Make sure we have a different cache entry
+            self.assert_(cached_sql != dbh.cursor._last_executed)
+
+    suite = unittest.makeSuite(DBOTest)
+    unittest.TextTestRunner(verbosity=2).run(suite)

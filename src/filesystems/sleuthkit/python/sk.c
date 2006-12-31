@@ -369,11 +369,11 @@ pyfile_read_random(IMG_INFO * img_info, OFF_T vol_offset, char *buf,
     tot_offset = offset + vol_offset;
 
     /* seek to correct offset */
-    res = PyObject_CallMethod(pyfile_info->fileobj, "seek", "(k)", tot_offset);
+    res = PyObject_CallMethod(pyfile_info->fileobj, "seek", "(K)", tot_offset);
     if(res == NULL) {
       print_current_exception();
         tsk_errno = TSK_ERR_IMG_SEEK;
-        snprintf(tsk_errstr, TSK_ERRSTR_L, "pyfile_read_random - can't seek to %ul", tot_offset);
+        snprintf(tsk_errstr, TSK_ERRSTR_L, "pyfile_read_random - can't seek to %llu", tot_offset);
         tsk_errstr2[0] = '\0';
         return -1;
     }
@@ -384,7 +384,7 @@ pyfile_read_random(IMG_INFO * img_info, OFF_T vol_offset, char *buf,
     if(res == NULL) {
       print_current_exception();
         tsk_errno = TSK_ERR_IMG_SEEK;
-        snprintf(tsk_errstr, TSK_ERRSTR_L, "pyfile_read_random - can't read %lu from %lu", len, tot_offset);
+        snprintf(tsk_errstr, TSK_ERRSTR_L, "pyfile_read_random - can't read %llu from %llu", (uint64_t)len, (uint64_t)tot_offset);
         tsk_errstr2[0] = '\0';
         return -1;
     }
@@ -401,7 +401,7 @@ pyfile_read_random(IMG_INFO * img_info, OFF_T vol_offset, char *buf,
     memcpy(buf, strbuf, read);
 
     if(read < len) {
-      printf("Tried to read %u, only got %u\n", len, read);
+      printf("Tried to read %llu, only got %llu\n", (uint64_t)len, (uint64_t)read);
     };
 
     Py_XDECREF(res);
@@ -733,7 +733,7 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
         tsk_error_reset();
         inode = lookup_inode(self->fs, path);
         if(inode == 0)
-            return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %d: %s", path, (ULONG) inode, tsk_error_get());
+            return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %lu: %s", path, (ULONG) inode, tsk_error_get());
     } else {
         /* inode can be an int or a string */
         if(PyNumber_Check(inode_obj)) {

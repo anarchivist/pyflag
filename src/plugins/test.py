@@ -312,7 +312,7 @@ class WizardTest(PopUpTest):
             )
 
 ## This needs to be somewhere else
-from pyflag.TableObj import ColumnType,IPType
+from pyflag.TableObj import ColumnType,IPType, TimestampType
 
 class TableTest(PopUpTest):
     """ Tests the Table widget """
@@ -336,17 +336,17 @@ class TableTest(PopUpTest):
         )""")
         
         dbh.mass_insert_start("TestTable")
-        dbh.insert("TestTable", time=1147329821, data="Some Data",
+        dbh.insert("TestTable", _time="from_unixtime(1147329821)", data="Some Data",
                         foobar="X", _ip_addr="inet_aton('192.168.1.1')")
-        dbh.insert("TestTable", time=1147329831, data="More Data",
+        dbh.insert("TestTable", _time="from_unixtime(1147329831)", data="More Data",
                         foobar="Y", _ip_addr="inet_aton('192.168.1.22')")
-        dbh.insert("TestTable", time=1147329841, data="Some More Data",
+        dbh.insert("TestTable", _time="from_unixtime(1147329841)", data="Some More Data",
                         foobar="Z", _ip_addr="inet_aton('192.168.1.23')")
-        dbh.insert("TestTable", time=1147329851, data="Another Lot of Data",
+        dbh.insert("TestTable", _time="from_unixtime(1147329851)", data="Another Lot of Data",
                         foobar="Q",  _ip_addr="inet_aton('192.168.1.55')")
 
         for i in range(0,100):
-            dbh.mass_insert(time=1147329851+i, data="Data %s" % i, foobar=i)
+            dbh.mass_insert(_time="from_unixtime(%s)" % (1147329851+i), data="Data %s" % i, foobar=i)
 
         dbh.mass_insert_commit()
 
@@ -356,7 +356,7 @@ class TableTest(PopUpTest):
         result.table(
                          ## Can use keyword args
             elements = [ TimestampType(name = 'TimeStamp',
-                                       column = 'time',
+                                       sql = 'time',
                                        ),
                          
                          ## Or positional args

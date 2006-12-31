@@ -237,6 +237,8 @@ class Sleuthkit(DBFS):
 
         dbh_file=DB.DBO(self.case)
         dbh_inode=DB.DBO(self.case)
+        dbh_file.cursor.ignore_warnings = True
+        dbh_inode.cursor.ignore_warnings = True
 
         #dbh_file.mass_insert_start("file")
         #dbh_inode.mass_insert_start("inode")
