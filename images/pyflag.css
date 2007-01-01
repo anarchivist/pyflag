@@ -243,3 +243,7 @@ iframe#right {
   width: 70%;
   height: 95%;
 }
+
+.hilight { 
+  background-color: pink;
+ }

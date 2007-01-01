@@ -189,7 +189,7 @@ class LoadIOSource(Reports.report):
         except (KeyError, RuntimeError):
             pass
         except IOError, e:
-            result.row("Error: %s" % e, bgcolor=config.HILIGHT)
+            result.row("Error: %s" % e, **{'class':'highlight'})
 
     def analyse(self,query):
         # cache serialised io options in the case mata table
@@ -459,7 +459,7 @@ class LoadFS(Reports.report):
                 magic = FlagFramework.Magic()
                 result.ruler()
                 sig = magic.buffer(fd.read(10240))
-                result.row("Magic identifies this file as: %s" % sig,colspan=50,bgcolor=config.HILIGHT)
+                result.row("Magic identifies this file as: %s" % sig,**{'colspan':50,'class':'hilight'})
                 fd.close()
 
                 get_default_fs_driver(result.defaults,sig)
@@ -544,19 +544,14 @@ import pyflag.pyflagsh as pyflagsh
 
 class LoadDataTests(unittest.TestCase):
     test_case = "PyFlagTestCase"
-    def setUp(self):
+    def test01CaseCreation(self):
+        """ Test that basic tables have been added to new cases """
         pyflagsh.shell_execv(command="execute",
                              argv=["Case Management.Remove case",'remove_case=%s' % self.test_case])
 
         pyflagsh.shell_execv(command="execute",
                              argv=["Case Management.Create new case",'create_case=%s' % self.test_case])
 
-#    def tearDown(self):
-#        pyflagsh.shell_execv(command="execute",
-#                             argv=["Case Management.Remove case",'remove_case=%s' % self.test_case])
-
-    def test01CaseCreation(self):
-        """ Test that basic tables have been added to new cases """
         dbh = DB.DBO(self.test_case)
         dbh.execute("show tables")
         tables = [ row.values()[0] for row in dbh ]

@@ -400,7 +400,9 @@ class DBO:
         ## Determine which tables are involved:
         self.execute("explain %s", sql)
         tables = [ row['table'] for row in self ]
-        
+        if not tables or tables[0]==None:
+            return self.execute(sql)
+
         self.insert('sql_cache',
                     query = sql, _timestamp='now()',
                     tables = ",%s," % ','.join(tables),

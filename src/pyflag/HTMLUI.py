@@ -485,9 +485,9 @@ class HTMLUI(UI.GenericUI):
                 
                 if 'branch' in state:
                     if depth < len(branch) and name == branch[depth]:
-                        img_src = '/javascript/src/widget/templates/images/Tree/treenode_expand_minus.gif'
+                        img_src = '/images/treenode_expand_minus.gif'
                     else:
-                        img_src = '/javascript/src/widget/templates/images/Tree/treenode_expand_plus.gif'
+                        img_src = '/images/treenode_expand_plus.gif'
                 elif 'up' in state:
                     img_src = '/images/up.png'
                 elif 'down' in state:
@@ -568,9 +568,13 @@ class HTMLUI(UI.GenericUI):
             #The first item in the tree is the first one provided in branch
             link = query.clone()
             link.poparray('callback_stored')
+            del link['open_tree']
 
+            left_cb = query.getarray('callback_stored')[-1]
+            right_pane_cb = query['right_pane_cb']
             result.result+="<div class='PyFlagTree' >"
-            result.result+=draw_branch(0,'',query)
+            result.result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img class=PyFlagTreeNodeEnd src='/images/treenode_expand_plus.gif'></a>/" % (left_cb,query['right_pane_cb'],link.__str__())
+            result.result+=draw_branch(0,"<img class='PyFlagTreeSpacer' src='/images/treenode_blank.gif'>",query)
             try:
                 result.result+="<script>document.body.scrollTop = %s; document.body.scrollLeft = %s;</script>\n" % (query['yoffset'], query['xoffset'])
             except:
@@ -586,7 +590,7 @@ class HTMLUI(UI.GenericUI):
             ## Get the right part:
                 path=FlagFramework.normpath(query['open_tree'])
             except KeyError:
-                path='/'
+                path=''
 
             pane_cb(path,result)
 
@@ -1186,7 +1190,7 @@ class HTMLUI(UI.GenericUI):
         for k,v in hiddens.items():
             self.form_parms[k]=v
 
-        self.result += '<form id="pyflag_form_1" name="pyflag_form_1" method=%s action="/f" enctype="multipart/form-data">\n' % (config.METHOD)
+        self.result += '<form id="pyflag_form_1" name="pyflag_form_1" method=POST action="/f" enctype="multipart/form-data">\n'
 
     def end_form(self,value='Submit',name='submit',**opts):
         base = ''
@@ -1253,55 +1257,6 @@ class HTMLUI(UI.GenericUI):
             base = "refresh('f?%s',%r);" % (query,pane)
 
         self.result += "<script>%s</script>" % base
-        return
-    
-        try:
-            if options.has_key('parent'):
-                if config.METHOD=="POST":
-                    ## This is required because some browsers forget
-                    ## which window opened this one so self.opener
-                    ## does not work. We therefore try to pass this
-                    ## information in the query to ensure that the
-                    ## correct parent is opened.
-                    try:
-                        if options['parent'].startswith("ID"):
-                            target_window = "%r" % options['parent']
-                        else:
-                            raise AttributeError
-                    except AttributeError:
-                        try:
-                            ## Pop off the parent_window and the
-                            ## stored_query information from the
-                            ## query:
-                            callback_stored = query.poparray('callback_stored')
-                            stored_query = query['stored_query_%s' % callback_stored]
-                            stored_query = FlagFramework.query_type(cgi.parse_qsl(stored_query))
-                            del query['stored_query_%s' % callback_stored]
-                            target_window =  "%r"%stored_query['parent_window']
-                        except KeyError:
-                            target_window = "self.opener.window.name"
-                        
-                    close = "self.close();"
-                else:
-                    target_js = 'self.opener'
-
-        except KeyError:
-            pass
-
-        ## We do both javascript refresh as well as meta refresh to
-        ## ensure that the browser supports either method
-        if config.METHOD=="POST":
-            self.result+="""<script language=javascript>
-            function refresh() {
-            document.PseudoForm.target=%s;
-            document.getElementById(\'pseudo_post_query\').value=\'%s\';
-            document.PseudoForm.submit(); %s
-            };
-            %s
-            </script>""" % (target_window,query,close,timeout)
-        else:
-            self.result+=""" <script>function refresh() {%s.location="%s";}; setTimeout("refresh()",%s) </script>""" % (target_js,query,int(interval)*1000)
-            self.meta += "<META HTTP-EQUIV=Refresh Content=\"%s; URL=%s\">" % (interval,query)
 
     def icon(self, path, tooltip=None, **options):
         """ This allows the insertion of a small static icon picture. The image should reside in the images directory."""
