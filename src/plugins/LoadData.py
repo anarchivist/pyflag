@@ -543,6 +543,7 @@ import unittest
 import pyflag.pyflagsh as pyflagsh
 
 class LoadDataTests(unittest.TestCase):
+    order = 1
     test_case = "PyFlagTestCase"
     def test01CaseCreation(self):
         """ Test that basic tables have been added to new cases """
@@ -576,7 +577,3 @@ class LoadDataTests(unittest.TestCase):
         dbh = DB.DBO(self.test_case)
         dbh.execute("select count(*) as count from inode")
         self.assertEqual(dbh.fetch()['count'],16)
-
-    def test03ScanFilesystem(self):
-        """ Try to scan the filesystem """
-        

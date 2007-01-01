@@ -110,7 +110,9 @@ class Menu(Theme.BasicTheme):
             toolbar_str=ui.toolbar_ui.__str__()
 
         case_selector = ui.__class__(ui)
-        case_selector.case_selector()
+        try:
+            case_selector.case_selector()
+        except:pass
 
         result = '''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
         <html>

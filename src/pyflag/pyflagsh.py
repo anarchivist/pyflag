@@ -52,8 +52,9 @@ class environment:
     _IOSOURCE = None
     _CASE = None
     
-    def __init__(self):
-        environment.CWD='/'
+    def __init__(self, case=None):
+        self.CWD='/'
+        self._CASE = case
         if not environment._flag:
             environment._flag=FlagFramework.Flag()
             environment._DBO=DB.DBO
@@ -244,7 +245,7 @@ def shell_execv_iter(env=None,command=None, argv=[]):
     except:
         raise RuntimeError("Command %s not found in registry" % command)
     
-    command = command([command,] + argv, environment=env)
+    command = command(argv, environment=env)
         
     return command.execute()
 

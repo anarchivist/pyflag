@@ -175,7 +175,6 @@ import atexit,os,signal,time
 import pyflag.DB as DB
 import pyflag.Scanner as Scanner
 
-
 ## This stores the pids of working threads - we kill those when the
 ## main thread exits
 children = []
@@ -210,32 +209,58 @@ def start_workers():
          ## These are all the methods we support
          methods = [ "command=%r" % x for x in dir(dispatcher) if not x.startswith('_')]
          dbh=DB.DBO()
+         jobs = []
 
          while 1:
-            ## Check for new tasks:
-            dbh.execute("select * from jobs where %s limit 10", " or ".join(methods))
-            jobs = [ row for row in dbh ]
+             ## Check for new tasks:
+             if not jobs:
+                 time.sleep(10)
+             try:
+                 dbh.execute("lock tables jobs write") 
+                 dbh.execute("select * from jobs where %s and state='pending' limit 10", " or ".join(methods))
+                 jobs = [ row for row in dbh ]
+                 
+                 if not jobs:
+                     continue
+                 
+                 ## Ensure the jobs are marked as processing so other jobs dont touch them:
+                 for row in jobs:
+                     dbh.execute("update jobs set state='processing' where id=%r", row['id'])
+             finally:
+                 dbh.execute("unlock tables")
+                
+             ## Now do the jobs
+             for row in jobs:
+                 try:
+                     try:
+                         method = getattr(dispatcher,row['command'])
+                     except:
+                         print "Dont know how to process job %s" % row['command']
+                         continue
 
-            if not jobs:
-                time.sleep(10)
-                continue
+                     try:
+                         method(row['arg1'], row['arg2'], row['arg3'])
+                     except Exception,e:
+                         pyflaglog.log(pyflaglog.ERRORS, "Error scanning %s" % e)
 
-            ## Ensure the jobs are deleted so other threads dont take them:
-            for row in jobs:
-                dbh.execute("delete from jobs where id=%r", row['id'])
-
-            ## Now do the jobs
-            for row in jobs:
-                try:
-                    method = getattr(dispatcher,row['command'])
-                except:
-                    print "Dont know how to process job %s" % row['command']
-                    continue
-
-                try:
-                    method(row['arg1'], row['arg2'], row['arg3'])
-                except Exception,e:
-                    pyflaglog.log(pyflaglog.ERRORS, "Error scanning %s" % e)
-
+                 finally:
+                     dbh.execute("delete from jobs where id=%r", row['id'])
                 
     atexit.register(terminate_children)
+
+def handler(sig, frame):
+    print "Got woken up"
+
+## Is this a dangerous thing to do? If a signal comes when we dont
+## expect it we may lose sync with the db. Seems to work for now, but
+## Im dubious.
+## FIXME: Use select on unix domain sockets instead of time.sleep
+signal.signal(signal.SIGUSR1, handler)
+
+def wake_workers():
+    """ Try to wake workers if possible. If we fail we must wait until
+    the worker polls next, so its not a big deal.
+    """
+    ## A Signal should interrupt the children's sleep
+    for pid in children:
+        os.kill(pid, signal.SIGUSR1)

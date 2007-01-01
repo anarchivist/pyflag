@@ -30,16 +30,8 @@ AC_PYTHON_MODULE(PIL, REQUIRED)
 AC_PROG_SWIG(1.3)
 SWIG_PYTHON
 
-# check for stuff which uses pkg-config
-PKG_CHECK_MODULES(libclamav, libclamav)
-
 # check for binaries
 AC_PATH_PROG([MYSQL], mysql)
-AC_PATH_PROG([PLOTICUS], ploticus)
-if test -z "$PLOTICUS"; then
-	AC_MSG_WARN([You should install ploticus to get graphs])
-	PLOTICUS=["\"echo You need to install ploticus to view graphs\""]
-fi
 
 # try to find magic files
 AC_ARG_WITH(magic, AC_HELP_STRING([--with-magic], [specify a colon-separated list of system magic files, default autodetect]),,[magic=$(file -v | tail -1 | awk '{print $4}')])

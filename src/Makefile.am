@@ -1,4 +1,4 @@
-SUBDIRS = lib mailtools indextools_ng network regtools virustools filesystems include
+SUBDIRS = lib mailtools indextools_ng network regtools filesystems include
 
 my_javascript		=       $(shell find javascript -not -name .\*)
 nobase_pkgdata_DATA	=	$(my_javascript)

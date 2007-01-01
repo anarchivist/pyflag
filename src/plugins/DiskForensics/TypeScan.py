@@ -148,3 +148,26 @@ class ViewFileTypes(Reports.report):
             result.para("Error reading the type table. Did you remember to run the TypeScan scanner?")
             result.para("Error reported was:")
             result.text(e,color="red")
+
+## UnitTests:
+import unittest
+import pyflag.pyflagsh as pyflagsh
+
+class TypeTest(unittest.TestCase):
+    test_case = "PyFlagTestCase"
+    def test_type_scan(self):
+        """ Check the type scanner works """
+        dbh = DB.DBO(self.test_case)
+        dbh.execute("select count(*) as count from inode")
+        count = dbh.fetch()['count']
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env, command="scan",
+                             argv=["*",'TypeScan'])
+
+        dbh.execute("select count(*) as count from type")
+        
+        ## Make sure the extra magic is being used properly.
+        dbh.execute('select count(*) as count from type where type like "%Outlook%"')
+        count = dbh.fetch()['count']
+        self.failIf(count==0, "Unable to locate an Outlook PST file - maybe we are not using our custom magic file?")
+        

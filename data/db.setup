@@ -109,6 +109,7 @@ create table jobs (
 	arg1 text,
 	arg2 text,
 	arg3 text,
+	state enum('pending','processing') default 'pending',
 	key `id`(id)
 	);
 

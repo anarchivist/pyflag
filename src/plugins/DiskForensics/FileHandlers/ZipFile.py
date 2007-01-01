@@ -406,3 +406,23 @@ class Tar_file(DiskForensics.DBFS_file):
 
     def close(self):
         pass
+
+## UnitTests:
+import unittest
+import pyflag.pyflagsh as pyflagsh
+
+class ZipScanTest(unittest.TestCase):
+    test_case = "PyFlagTestCase"
+    order = 15
+    def test_type_scan(self):
+        """ Check the Zip scanner works """
+        dbh = DB.DBO(self.test_case)
+
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env, command="scan",
+                             argv=["*",'ZipScan'])
+
+        dbh.execute("select count(*) as count from inode where inode like '%|Z%'")
+        count = dbh.fetch()['count']
+        self.failIf(count==0, "Could not find any zip files?")
+        

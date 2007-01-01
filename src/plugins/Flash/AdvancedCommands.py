@@ -34,10 +34,10 @@ class scan(pyflagsh.command):
             return
 
         ## Try to glob the inode list:
-        self.dbh.execute("select inode from inode where inode rlike %r",fnmatch.translate(self.args[1]))
+        self.dbh.execute("select inode from inode where inode rlike %r",fnmatch.translate(self.args[0]))
         dbh = DB.DBO()
         dbh.mass_insert_start('jobs')
-        scanners = [ x for x in fnmatch.filter(Registry.SCANNERS.scanners, self.args[2]) ]
+        scanners = [ x for x in fnmatch.filter(Registry.SCANNERS.scanners, self.args[1]) ]
         
         for row in self.dbh:
             inode = row['inode']
@@ -49,6 +49,10 @@ class scan(pyflagsh.command):
                 )
 
         dbh.mass_insert_commit()
+
+        ## Often this process owns a worker as well. In that case we can wake it up:
+        import pyflag.Farm as Farm
+        Farm.wake_workers()
         
         ## Wait until there are no more jobs left. FIXME: this is a
         ## short cut, we should probably only wait for our own jobs to

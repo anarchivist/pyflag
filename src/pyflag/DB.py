@@ -703,14 +703,14 @@ class DBO:
 import unittest
 
 class DBOTest(unittest.TestCase):
-    def testvalidinstall(self):
+    def test01validinstall(self):
         """ Test to make sure we can locate the pyflag default database """
         dbh = DBO(None)
         dbh.execute("show tables")
         tables = [ row.values()[0] for row in dbh ]
         self.assert_( 'meta' in tables)
 
-    def testTemporaryTables(self):
+    def test02TemporaryTables(self):
         """ Test to make sure DBO temporary tables get cleaned up after handle gc """
         dbh = DBO(None)
         tablename = dbh.get_temp()
@@ -739,7 +739,7 @@ class DBOTest(unittest.TestCase):
 
         return tablename
 
-    def testServerSideReconnect(self):
+    def test03ServerSideReconnect(self):
         """ Test to ensure that dbhs reconnect after an aborted server side connection """
         dbh = DBO(None)
         tablename = self.createTestTable(dbh)
@@ -748,7 +748,7 @@ class DBOTest(unittest.TestCase):
         result = [ row['field1'] for row in dbh if row['field1'] < 5 ]
         self.assertEqual(result, range(0,5))
 
-    def testSlowQueryAbort(self):
+    def test04SlowQueryAbort(self):
         """ Test to make sure slow queries are aborted """
         dbh = DBO(None)
 
@@ -759,7 +759,7 @@ class DBOTest(unittest.TestCase):
         result = dbh.fetch()['sleep']
         self.assertEqual(result, 1)
 
-    def testMassInsert(self):
+    def test05MassInsert(self):
         """ Test the mass insert mechanism """
         dbh = DBO(None)
         tablename = dbh.get_temp()
@@ -778,7 +778,7 @@ class DBOTest(unittest.TestCase):
         result = [ row['field1'] for row in dbh ]
         self.assertEqual(result, [1,2])
 
-    def testCachedExecute(self):
+    def test06CachedExecute(self):
         """ Test that query caching works properly """
         dbh=DBO()
         tablename = self.createTestTable(dbh)

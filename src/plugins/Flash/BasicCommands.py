@@ -360,14 +360,14 @@ class execute(pyflagsh.command):
         query=FlagFramework.query_type(())
  
         try:
-            query['family'],query['report']=args[1].split('.')
+            query['family'],query['report']=args[0].split('.')
         except:
-            raise RuntimeError("Unable to parse %s as a family.report" % args[1])
+            raise RuntimeError("Unable to parse %s as a family.report" % args[0])
         
         report = Registry.REPORTS.dispatch(query['family'],query['report'])
         ## Include the report and family:
 
-        for arg in args[2:]:
+        for arg in args[1:]:
             try:
 #                del query[arg[:arg.index('=')]]
                 query[arg[:arg.index('=')]]=arg[arg.index('=')+1:]

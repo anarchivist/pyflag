@@ -248,8 +248,14 @@ class ScannerRegistry(Registry):
         Registry.__init__(self,ParentClass)
         ## Sort all reports in all families:
         def sort_function(x,y):
-            a=x.order
-            b=y.order
+            try:
+                a=x.order
+            except: a=10
+
+            try:
+                b=y.order
+            except: b=10
+            
             if a<b:
                 return -1
             elif a==b: return 0
@@ -339,7 +345,7 @@ class FileFormatRegistry(Registry):
             self.formats[("%s" % cls).split('.')[-1]] = cls
 
 import unittest
-class TestsRegistry(Registry):
+class TestsRegistry(ScannerRegistry):
     pass
 
 LOCK = 0

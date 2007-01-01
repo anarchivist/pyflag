@@ -34,29 +34,21 @@ import pyflag.pyflaglog as pyflaglog
 from pyflag.Scanner import *
 from pyflag.TableObj import ColumnType, TimestampType, InodeType, FilenameType
 
-import clamav
-
 class VScan:
     """ Singleton class to manage virus scanner access """
     ## May need to do locking in future, if libclamav is not reentrant.
-    scanner = None
-
-    def __init__(self):
-        if not VScan.scanner:
-            VScan.scanner=clamav.loaddbdir(clamav.retdbdir(), None, None)
-            VScan.scanner=clamav.loaddbdir(config.CLAMDIR, None, VScan.scanner)
-            if not VScan.scanner or clamav.buildtrie(VScan.scanner) != 0:
-                raise IOError("Could not load virus scanner")
-
     def scan(self,buf):
         """ Scan the given buffer, and return a virus name or 'None'"""
-        ret = clamav.scanbuff(buf, VScan.scanner)
-        if ret == 0:
-            return None
-        elif ret[0] == 1:
-            return ret[1]
-        else:
-            pyflaglog.log(pyflaglog.WARNING, "Scanning Error: %s" % clamav.reterror(ret))
+        import pyclamav
+        
+        try:
+            ret = pyclamav.scanthis(buf)
+            if ret == 0:
+                return None
+            elif ret[0] == 1:
+                return ret[1]
+        except Exception,e:
+            pyflaglog.log(pyflaglog.WARNING, "Scanning Error: %s" % e)
 
 class VirScan(GenScanFactory):
     """ Scan file for viruses """
@@ -116,3 +108,24 @@ class VirusScan(Reports.report):
             result.para("Unable to display Virus table, maybe you did not run the virus scanner over the filesystem?")
             result.para("The error I got was %s"%e)
             
+## UnitTests:
+import unittest
+import pyflag.pyflagsh as pyflagsh
+
+class VirusScanTest(unittest.TestCase):
+    test_case = "PyFlagTestCase"
+    order = 20
+    def test_scanner(self):
+        """ Check the virus scanner works """
+        dbh = DB.DBO(self.test_case)
+
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env, command="scan",
+                             argv=["*",'VirScan'])
+
+        dbh.execute("select *from virus")
+        row = dbh.fetch()
+
+        ## We expect to pick this rootkit:
+        self.assertEqual(row['inode'], "Itest|K15-0-0|Z46", "Unable to locate an Outlook PST file - maybe we are not using our custom magic file?")
+        

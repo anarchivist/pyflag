@@ -39,6 +39,10 @@ options,args = pyflag.conf.parse_command_line("Generic Test harness for running 
 
 Registry.Init()
 
+## Start up some workers:
+import pyflag.Farm as Farm
+Farm.start_workers()
+
 test_registry = Registry.InitTests()
 if not options.match:
     classes = test_registry.classes
