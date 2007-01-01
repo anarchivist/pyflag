@@ -198,65 +198,7 @@ class DBFS(FileSystem):
         every new Inode.
         """
         self.mount_point = mount_point
-        scanners = [ "%r" % s.__name__ for s in Registry.SCANNERS.classes ]
-
         dbh=DB.DBO(self.case)
-        dbh.execute("""CREATE TABLE IF NOT EXISTS inode (
-        `inode_id` int auto_increment,
-        `inode` VARCHAR(250) NOT NULL,
-        `status` set('unalloc','alloc'),
-        `uid` INT,
-        `gid` INT,
-        `mtime` TIMESTAMP NULL,
-        `atime` TIMESTAMP NULL,
-        `ctime` TIMESTAMP NULL,
-        `dtime` TIMESTAMP,
-        `mode` INT,
-        `links` INT,
-        `link` TEXT,
-        `size` BIGINT NOT NULL,
-        `scanner_cache` set('',%s),
-        primary key (inode_id)
-        )""",",".join(scanners))
-
-        dbh.execute("""CREATE TABLE IF NOT EXISTS file (
-        `inode` VARCHAR(250) NOT NULL,
-        `mode` VARCHAR(3) NOT NULL,
-        `status` VARCHAR(8) NOT NULL,
-        `path` TEXT,
-        `name` TEXT)""")
-
-        dbh.execute("""CREATE TABLE IF NOT EXISTS block (
-        `inode` VARCHAR(250) NOT NULL,
-        `index` INT NOT NULL,
-        `block` BIGINT NOT NULL,
-        `count` INT NOT NULL)""")
-
-        dbh.execute("""CREATE TABLE IF NOT EXISTS resident (
-        `inode` VARCHAR(250) NOT NULL,
-        `data` TEXT)""")
-
-        dbh.execute("""CREATE TABLE IF NOT EXISTS `filesystems` (
-        `iosource` VARCHAR( 50 ) NOT NULL ,
-        `property` VARCHAR( 50 ) NOT NULL ,
-        `value` MEDIUMTEXT NOT NULL ,
-        KEY ( `iosource` )
-        )""")
-
-        ## Create the xattr table by interrogating libextractor:
-        types = ['Magic']
-        try:
-            import extractor
-            e = extractor.Extractor()
-            types.extend(e.keywordTypes())
-        except ImportError:
-            pass
-
-        dbh.execute("""CREATE TABLE if not exists `xattr` (
-                            `inode_id` INT NOT NULL ,
-                            `property` ENUM( %s ) NOT NULL ,
-                            `value` VARCHAR( 250 ) NOT NULL
-                            ) """ % ','.join([ "%r" % x for x in types]))
         
         ## Ensure the VFS contains the mount point:
         self.VFSCreate(None, "I%s" % iosource_name, mount_point, directory=True)

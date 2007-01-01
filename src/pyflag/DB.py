@@ -160,6 +160,10 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
                 else:
                     pyflaglog.log(pyflaglog.DEBUG,"Mysql issued warnings but we are unable to drain result queue")
 
+            ## If we have strict SQL we abort on warnings:
+            if config.STRICTSQL:
+                raise DBError(a)
+
             self.py_row_cache.extend(results)
 
 class Pool(Queue):
@@ -693,110 +697,111 @@ class DBO:
             pass
     #        raise IOError("MySQL client exited with an error")
 
+## Unit Tests
+import unittest
+
+class DBOTest(unittest.TestCase):
+    def testvalidinstall(self):
+        """ Test to make sure we can locate the pyflag default database """
+        dbh = DBO(None)
+        dbh.execute("show tables")
+        tables = [ row.values()[0] for row in dbh ]
+        self.assert_( 'meta' in tables)
+
+    def testTemporaryTables(self):
+        """ Test to make sure DBO temporary tables get cleaned up after handle gc """
+        dbh = DBO(None)
+        tablename = dbh.get_temp()
+        dbh.execute("create table %s(field1 text)", tablename)
+        dbh.execute("select * from %s", tablename)
+        result = [ row['field1'] for row in dbh ]
+        self.assertEqual(result, [])
+
+        dbh2 = DBO(None)
+        tablename2 = dbh2.get_temp()
+        self.assert_(tablename2 != tablename)
+
+        del dbh
+        def ExceptionTest():
+            dbh = DBO(None)
+            dbh.execute("select * from %s", tablename)
+
+        self.assertRaises(DBError, ExceptionTest)
+
+    def createTestTable(self, dbh):
+        tablename = dbh.get_temp()
+        dbh.execute("create table %s(field1 int)", tablename)
+
+        for i in range(0,10):
+            dbh.insert(tablename, field1=i)
+
+        return tablename
+
+    def testServerSideReconnect(self):
+        """ Test to ensure that dbhs reconnect after an aborted server side connection """
+        dbh = DBO(None)
+        tablename = self.createTestTable(dbh)
+
+        dbh.execute("select * from %s", tablename)
+        result = [ row['field1'] for row in dbh if row['field1'] < 5 ]
+        self.assertEqual(result, range(0,5))
+
+    def testSlowQueryAbort(self):
+        """ Test to make sure slow queries are aborted """
+        dbh = DBO(None)
+
+        #Make the timeout 1 second for testing
+        dbh.cursor.timeout = 1
+
+        dbh.execute("select sleep(2) as sleep")
+        result = dbh.fetch()['sleep']
+        self.assertEqual(result, 1)
+
+    def testMassInsert(self):
+        """ Test the mass insert mechanism """
+        dbh = DBO(None)
+        tablename = dbh.get_temp()
+        dbh.execute("create table %s(field1 int)", tablename)
+
+        dbh.mass_insert_start(tablename)
+        ## Escaped variables:
+        dbh.mass_insert(field1 = 1)
+
+        ## Non-escaped insert
+        dbh.mass_insert(_field1 = "1+1")
+
+        dbh.mass_insert_commit()
+        dbh.execute("select * from %s" , tablename)
+
+        result = [ row['field1'] for row in dbh ]
+        self.assertEqual(result, [1,2])
+
+    def testCachedExecute(self):
+        """ Test that query caching works properly """
+        dbh=DBO()
+        tablename = self.createTestTable(dbh)
+
+        ## Do a cached select:
+        dbh.cached_execute("select * from %s" % tablename)
+        result = [ row['field1'] for row in dbh ]
+        self.assertEqual(result, range(0,10))
+
+        ## Make sure we came from the cache:
+        cached_sql = dbh.cursor._last_executed
+        self.assert_('cache_' in cached_sql)
+
+        ## Update the underlying table:
+        dbh.insert(tablename, field1=1)
+
+        ## query the cache again:
+        dbh.cached_execute("select * from %s" % tablename)
+        result2 = [ row['field1'] for row in dbh ]
+
+        self.assertEqual(result2, result + [1,])
+
+        ## Make sure we have a different cache entry
+        self.assert_(cached_sql != dbh.cursor._last_executed)
+
 if __name__=='__main__':
-    import unittest
-
-    class DBOTest(unittest.TestCase):
-        def testvalidinstall(self):
-            """ Test to make sure we can locate the pyflag default database """
-            dbh = DBO(None)
-            dbh.execute("show tables")
-            tables = [ row.values()[0] for row in dbh ]
-            self.assert_( 'meta' in tables)
-            
-        def testTemporaryTables(self):
-            """ Test to make sure DBO temporary tables get cleaned up after handle gc """
-            dbh = DBO(None)
-            tablename = dbh.get_temp()
-            dbh.execute("create table %s(field1 text)", tablename)
-            dbh.execute("select * from %s", tablename)
-            result = [ row['field1'] for row in dbh ]
-            self.assertEqual(result, [])
-
-            dbh2 = DBO(None)
-            tablename2 = dbh2.get_temp()
-            self.assert_(tablename2 != tablename)
-
-            del dbh
-            def ExceptionTest():
-                dbh = DBO(None)
-                dbh.execute("select * from %s", tablename)
-
-            self.assertRaises(DBError, ExceptionTest)
-
-        def createTestTable(self, dbh):
-            tablename = dbh.get_temp()
-            dbh.execute("create table %s(field1 int)", tablename)
-
-            for i in range(0,10):
-                dbh.insert(tablename, field1=i)
-
-            return tablename
-        
-        def testServerSideReconnect(self):
-            """ Test to ensure that dbhs reconnect after an aborted server side connection """
-            dbh = DBO(None)
-            tablename = self.createTestTable(dbh)
-            
-            dbh.execute("select * from %s", tablename)
-            result = [ row['field1'] for row in dbh if row['field1'] < 5 ]
-            self.assertEqual(result, range(0,5))
-
-        def testSlowQueryAbort(self):
-            """ Test to make sure slow queries are aborted """
-            dbh = DBO(None)
-            
-            #Make the timeout 1 second for testing
-            dbh.cursor.timeout = 1
-
-            dbh.execute("select sleep(2) as sleep")
-            result = dbh.fetch()['sleep']
-            self.assertEqual(result, 1)
-
-        def testMassInsert(self):
-            """ Test the mass insert mechanism """
-            dbh = DBO(None)
-            tablename = dbh.get_temp()
-            dbh.execute("create table %s(field1 int)", tablename)
-
-            dbh.mass_insert_start(tablename)
-            ## Escaped variables:
-            dbh.mass_insert(field1 = 1)
-
-            ## Non-escaped insert
-            dbh.mass_insert(_field1 = "1+1")
-            
-            dbh.mass_insert_commit()
-            dbh.execute("select * from %s" , tablename)
-            
-            result = [ row['field1'] for row in dbh ]
-            self.assertEqual(result, [1,2])
-
-        def testCachedExecute(self):
-            """ Test that query caching works properly """
-            dbh=DBO()
-            tablename = self.createTestTable(dbh)
-
-            ## Do a cached select:
-            dbh.cached_execute("select * from %s" % tablename)
-            result = [ row['field1'] for row in dbh ]
-            self.assertEqual(result, range(0,10))
-
-            ## Make sure we came from the cache:
-            cached_sql = dbh.cursor._last_executed
-            self.assert_('cache_' in cached_sql)
-
-            ## Update the underlying table:
-            dbh.insert(tablename, field1=1)
-
-            ## query the cache again:
-            dbh.cached_execute("select * from %s" % tablename)
-            result2 = [ row['field1'] for row in dbh ]
-
-            self.assertEqual(result2, result + [1,])
-
-            ## Make sure we have a different cache entry
-            self.assert_(cached_sql != dbh.cursor._last_executed)
-
     suite = unittest.makeSuite(DBOTest)
     unittest.TextTestRunner(verbosity=2).run(suite)

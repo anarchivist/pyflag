@@ -389,20 +389,16 @@ class execute(pyflagsh.command):
         start_time=time.time()
         report,query = self.prepare()
 
-        pyflaglog.log(pyflaglog.DEBUG, "Will execute the following query %s" % query)
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Will execute the following query %s" % query)
 
         ## Instantiate the report
         report=report(self.environment._flag)
         if self.environment._flag.is_cached(query):
-            print query
-            
             ## Run the display method
             result=TEXTUI.TEXTUI(query=query)
-            report.display(query,result)           
-            print result
-#            yield "Report previously run... You need to reset it first."
+            yield report.display(query,result)           
             return
-            
+        
         ## Execute the report:
         try:
             report.analyse(query)
@@ -418,7 +414,7 @@ class execute(pyflagsh.command):
             ## does something in the display
             result=TEXTUI.TEXTUI(query=query)
             report.display(query,result)
-            print result.display()
+            yield result.display()
             yield "Execution of %s successful in %s sec" % (self.args[1],time.time()-start_time)
         except Exception,e:
             import traceback

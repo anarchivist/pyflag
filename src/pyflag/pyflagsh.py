@@ -229,20 +229,29 @@ def process_line(line):
     except Exception,e:
         raise
 
-def shell_execv_iter(*argv):
+def shell_execv_iter(env=None,command=None, argv=[]):
     """ A helper routine to execute a shell command.
 
     This command will usually yield its results. Often the result will be a dict.
     """
+    if not command: raise RuntimeError("No command provided")
+    if not env: env=environment()
+    
     ## This ensures the registry was initialised
     Registry.Init()
-    command = Registry.SHELL_COMMANDS[argv[0]](argv)
+    try:
+        command = Registry.SHELL_COMMANDS[command]
+    except:
+        raise RuntimeError("Command %s not found in registry" % command)
+    
+    command = command([command,] + argv, environment=env)
+        
     return command.execute()
 
-def shell_execv(*argv):
+def shell_execv(env=None,command=None, argv=[]):
     """ returns the data returned by the iterator in one object """
     string = None
-    for i in shell_execv_iter(*argv):
+    for i in shell_execv_iter(env=env, command=command, argv=argv):
         if i:
             if string == None:
                 string = i

@@ -35,6 +35,7 @@ import os
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 from pyflag.TableObj import ColumnType,TimestampType,InodeType,FilenameType
+import pyflag.Registry as Registry
 
 from os.path import join
 
@@ -54,12 +55,10 @@ class NewCase(Reports.report):
         result.textfield("Please enter a new case name:","create_case")
         return result
 
-    def analyse(self,query):
-        print "analysising"
-        
     def display(self,query,result):
         #Get handle to flag db
         dbh = self.DBO(None)
+        dbh.cursor.ignore_warnings = True
         dbh.execute("Create database if not exists %s",(query['create_case']))
         dbh.execute("select * from meta where property='flag_db' and value=%r",query['create_case'])
         if not dbh.fetch():
@@ -69,6 +68,7 @@ class NewCase(Reports.report):
 
         #Get handle to the case db
         case_dbh = self.DBO(query['create_case'])
+        case_dbh.cursor.ignore_warnings = True
         case_dbh.execute("""Create table if not exists meta(
         `time` timestamp NOT NULL,
         property varchar(50),
@@ -76,7 +76,7 @@ class NewCase(Reports.report):
         KEY property(property),
         KEY joint(property,value(20)))""")
 
-        case_dbh.execute("""CREATE TABLE `sql_cache` (
+        case_dbh.execute("""CREATE TABLE if not exists `sql_cache` (
         `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY ,
         `timestamp` TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL ,
         `tables` VARCHAR( 250 ) NOT NULL ,
@@ -85,7 +85,7 @@ class NewCase(Reports.report):
         `length` INT default 100
         )""")
 
-        case_dbh.execute("""CREATE TABLE `annotate` (
+        case_dbh.execute("""CREATE TABLE if not exists `annotate` (
         `id` INT(11) not null auto_increment,
         `inode` VARCHAR(250) NOT NULL,
         `note` TEXT,
@@ -98,6 +98,64 @@ class NewCase(Reports.report):
             os.mkdir("%s/case_%s" % (config.RESULTDIR,query['create_case']))
         except OSError:
             pass
+
+        scanners = [ "%r" % s.__name__ for s in Registry.SCANNERS.classes ]
+        case_dbh.execute("""CREATE TABLE IF NOT EXISTS inode (
+        `inode_id` int auto_increment,
+        `inode` VARCHAR(250) NOT NULL,
+        `status` set('unalloc','alloc'),
+        `uid` INT,
+        `gid` INT,
+        `mtime` TIMESTAMP NULL,
+        `atime` TIMESTAMP NULL,
+        `ctime` TIMESTAMP NULL,
+        `dtime` TIMESTAMP,
+        `mode` INT,
+        `links` INT,
+        `link` TEXT,
+        `size` BIGINT NOT NULL,
+        `scanner_cache` set('',%s),
+        primary key (inode_id)
+        )""",",".join(scanners))
+
+        case_dbh.execute("""CREATE TABLE IF NOT EXISTS file (
+        `inode` VARCHAR(250) NOT NULL,
+        `mode` VARCHAR(3) NOT NULL,
+        `status` VARCHAR(8) NOT NULL,
+        `path` TEXT,
+        `name` TEXT)""")
+
+        case_dbh.execute("""CREATE TABLE IF NOT EXISTS block (
+        `inode` VARCHAR(250) NOT NULL,
+        `index` INT NOT NULL,
+        `block` BIGINT NOT NULL,
+        `count` INT NOT NULL)""")
+
+        case_dbh.execute("""CREATE TABLE IF NOT EXISTS resident (
+        `inode` VARCHAR(250) NOT NULL,
+        `data` TEXT)""")
+
+        case_dbh.execute("""CREATE TABLE IF NOT EXISTS `filesystems` (
+        `iosource` VARCHAR( 50 ) NOT NULL ,
+        `property` VARCHAR( 50 ) NOT NULL ,
+        `value` MEDIUMTEXT NOT NULL ,
+        KEY ( `iosource` )
+        )""")
+
+        ## Create the xattr table by interrogating libextractor:
+        types = ['Magic']
+        try:
+            import extractor
+            e = extractor.Extractor()
+            types.extend(e.keywordTypes())
+        except ImportError:
+            pass
+
+        case_dbh.execute("""CREATE TABLE if not exists `xattr` (
+                            `inode_id` INT NOT NULL ,
+                            `property` ENUM( %s ) NOT NULL ,
+                            `value` VARCHAR( 250 ) NOT NULL
+                            ) """ % ','.join([ "%r" % x for x in types]))
 
         result.heading("Case Created")
         result.para("\n\nThe database for case %s has been created" %query['create_case'])

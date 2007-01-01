@@ -219,6 +219,8 @@ class ScanFS(Reports.report):
     - The same file can not be scanned twice by the same scanner.
     - If an enabled scanner depends on another scanner to execute, that scanner will be enabled in order to satisfy the dependancy.
 
+    FIXME: implement this
+    Note that 'path' is a filesystem glob specifying a set of directories to be scanner recursively.
     """
     parameters = {'path':'any', 'final':'string'}
     name = "Scan Filesystem"
@@ -534,3 +536,52 @@ class LoadFS(Reports.report):
         tablename = dbh.MakeSQLSafe(query['iosource'])
         fsobj=Registry.FILESYSTEMS.filesystems[query['fstype']](query['case'],tablename,query['iosource'])
         fsobj.delete()
+
+
+## Unit Tests:
+import unittest
+import pyflag.pyflagsh as pyflagsh
+
+class LoadDataTests(unittest.TestCase):
+    test_case = "PyFlagTestCase"
+    def setUp(self):
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Case Management.Remove case",'remove_case=%s' % self.test_case])
+
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Case Management.Create new case",'create_case=%s' % self.test_case])
+
+#    def tearDown(self):
+#        pyflagsh.shell_execv(command="execute",
+#                             argv=["Case Management.Remove case",'remove_case=%s' % self.test_case])
+
+    def test01CaseCreation(self):
+        """ Test that basic tables have been added to new cases """
+        dbh = DB.DBO(self.test_case)
+        dbh.execute("show tables")
+        tables = [ row.values()[0] for row in dbh ]
+        ## At a minimum these tables must exist:
+        for required in ['annotate', 'block', 'file', 'filesystems',
+                         'inode', 'meta', 'resident', 'sql_cache', 'xattr']:
+            self.assert_(required in tables)
+
+    def test02LoadFilesystem(self):
+        """ Test that basic filesystems load """
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
+                                   "iosource=test",
+                                   "subsys=advanced",
+                                   "io_filename=%s/pyflag_stdimage_0.1" % config.UPLOADDIR,
+                                   ])
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,
+                                   "iosource=test",
+                                   "fstype=Sleuthkit",
+                                   "mount_point=/"])
+        dbh = DB.DBO(self.test_case)
+        dbh.execute("select count(*) as count from inode")
+        self.assertEqual(dbh.fetch()['count'],16)
+
+    def test03ScanFilesystem(self):
+        """ Try to scan the filesystem """
+        

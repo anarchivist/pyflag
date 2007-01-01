@@ -338,6 +338,10 @@ class FileFormatRegistry(Registry):
             ## The name of the class is the command name
             self.formats[("%s" % cls).split('.')[-1]] = cls
 
+import unittest
+class TestsRegistry(Registry):
+    pass
+
 LOCK = 0
 REPORTS = None
 SCANNERS = None
@@ -395,6 +399,9 @@ def Init():
     import pyflag.format as format
     global FILEFORMATS
     FILEFORMATS = FileFormatRegistry(format.DataType)
+
+def InitTests():
+    return TestsRegistry(unittest.TestCase)
 
 def import_module(name,load_as=None):
     Init()
