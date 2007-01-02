@@ -58,15 +58,19 @@ class ViewFile(Reports.report):
         result.textfield("Inode to view",'inode')
 
     def display(self,query,result):
+        result.decoration = 'naked'
+
         dbh = DB.DBO(query['case'])
-        dbh.execute("select mime from type where inode=%r",query['inode'])
-        row = dbh.fetch()
-        content_type = row['mime']
+        try:
+            dbh.execute("select mime from type where inode=%r",query['inode'])
+            row = dbh.fetch()
+            content_type = row['mime']
+        except DB.DBError:
+            content_type = 'application/octet-stream'
 
         fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])
         
         fd = fsfd.open(inode=query['inode'])
-        result.decoration = 'naked'
 
         ## Now establish the content type
         for k,v in self.dispatcher.items():

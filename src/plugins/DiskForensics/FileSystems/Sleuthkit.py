@@ -329,3 +329,57 @@ class Sleuthkit(DBFS):
         #dbh_inode.mass_insert_commit()
 
         return
+
+## Unit Tests:
+import unittest, md5
+import pyflag.pyflagsh as pyflagsh
+
+class NTFSTests(unittest.TestCase):
+    """ Testing Sleuthkit NTFS Support """
+    order = 1
+    test_case = "PyFlagNTFSTestCase"
+    def test01LoadNTFSFileSystem(self):
+        """ Test Loading of NTFS Filesystem """
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Case Management.Remove case",'remove_case=%s' % self.test_case])
+
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Case Management.Create new case",'create_case=%s' % self.test_case])
+
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
+                                   "iosource=test",
+                                   "subsys=ewf",
+                                   "io_filename=%s/ntfs_image.e01" % config.UPLOADDIR,
+                                   ])
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,
+                                   "iosource=test",
+                                   "fstype=Sleuthkit",
+                                   "mount_point=/"])
+        
+        dbh = DB.DBO(self.test_case)
+        dbh.execute("select count(*) as count from inode")
+        row = dbh.fetch()
+        self.assertEqual(row['count'],53)
+        dbh.execute("select count(*) as count from file")
+        row = dbh.fetch()
+        self.assertEqual(row['count'],63)
+
+    def test02ReadNTFSFile(self):
+        """ Test reading a regular NTFS file """
+        self.fsfd = DBFS(self.test_case)
+        ## This file is Images/250px-Holmes_by_Paget.jpg
+        fd = self.fsfd.open(inode='Itest|K33-128-4')
+        data = fd.read()
+        m = md5.new()
+        m.update(data)
+        self.assertEqual(m.hexdigest(),'f9c4ea83dfcdcf5eb441e130359f4a0d')
+        
+    def test03ReadNTFSCompressed(self):
+        """ Test reading a compressed NTFS file """
+        self.fsfd = DBFS(self.test_case)
+        fd = self.fsfd.open("/Books/80day11.txt")
+        m = md5.new()
+        m.update(fd.read())
+        self.assertEqual(m.hexdigest(),'f5b394b5d0ca8c9ce206353e71d1d1f2')
