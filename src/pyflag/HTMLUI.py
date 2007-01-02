@@ -215,9 +215,7 @@ class HTMLUI(UI.GenericUI):
         
         #Create a new UI for the graph:
         tmp = self.__class__(self)
-        ## Negotiate a prefered format with the graph
-        format = image.SetFormat(config.GRAPHFORMAT)
-        
+
         #Ask the image whats its ct:
         tmp.result = image.display()
         tmp.type = image.GetContentType()
@@ -1080,7 +1078,7 @@ class HTMLUI(UI.GenericUI):
                     d = d.replace("\t","    ")
 
             if options.has_key('highlight') and options['highlight']:
-                self.result += "%s<span style='background-color:yellow'>%s</span>" % (format,d)
+                self.result += "%s<span class='hilight'>%s</span>" % (format,d)
             else:
                 self.result += "%s%s" % (format,d)
 

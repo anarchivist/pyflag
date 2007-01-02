@@ -37,7 +37,11 @@ class scan(pyflagsh.command):
         self.dbh.execute("select inode from inode where inode rlike %r",fnmatch.translate(self.args[0]))
         dbh = DB.DBO()
         dbh.mass_insert_start('jobs')
-        scanners = [ x for x in fnmatch.filter(Registry.SCANNERS.scanners, self.args[1]) ]
+        scanners = []
+        for i in range(1,len(self.args)):
+            scanners.extend(fnmatch.filter(Registry.SCANNERS.scanners, self.args[i]))
+
+        print scanners, self.args
         
         for row in self.dbh:
             inode = row['inode']

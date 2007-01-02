@@ -29,7 +29,7 @@ import pyflag.DB as DB
 import sys,re,string
 import HTMLParser
 import StringIO
-import re,os.path,cgi
+import re,os.path,cgi, textwrap
 from FlagFramework import query_type,normpath
 
 class ViewFile(Reports.report):
@@ -66,41 +66,82 @@ class ViewFile(Reports.report):
         fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])
         
         fd = fsfd.open(inode=query['inode'])
-        result.generator.content_type = content_type
+        result.decoration = 'naked'
 
         ## Now establish the content type
         for k,v in self.dispatcher.items():
             if k.search(content_type):
-                result.generator.generator=v(self,fd)
+                return v(self,fd, result)
                 
-        if not result.generator.generator:
-            result.generator.generator=self.default_handler(fd)
+        return self.default_handler(fd, result)
 
-    def default_handler(self, fd):
-        while 1:
-            data = fd.read(1000000)
-            yield data
-            
-            if not data: break
+    def default_handler(self, fd, ui):
+        ui.generator.content_type = "text/plain"
 
-    def html_handler(self,fd):
+        def default_generator():
+            size=0
+            ## Cap the maximum text size so we dont kill the browser:
+            while size<1000000:
+                data = fd.read(1000)
+                if not data: break
+
+                a = []
+                for c in data:
+                    if c.isspace() or c.isalnum() \
+                       or c in '\r\n!@#$%^&*()_+-=[]\{}|[]\\;\':\",./<>?':
+                        a.append(c)
+
+                size += len(a)
+                for line in ''.join(a).splitlines():
+                    yield textwrap.fill(line)+"\n"
+                
+        ui.generator.generator = default_generator()
+
+    def image_handler(self,fd, ui):
+        def generator():
+            while 1:
+                data = fd.read(1000000)
+                if not data: break
+
+                yield data
+
+        ui.generator.generator = generator()
+        
+    def html_handler(self,fd, ui):
         """ We sanitise the html here """
-        sanitiser = HTMLSanitiser(fd.case, fd.inode)
-        while 1:
-            data = fd.read(1000000)
-            try:
-                if data:
-                    sanitiser.feed(data)
-                else:
-                    sanitiser.close()
-            except HTMLParser.HTMLParseError:
-                pass
-            
-            yield sanitiser.read()
-            
-            if not data: break
-    
-    dispatcher = { re.compile("text/html"): html_handler }
+        def generator():
+            sanitiser = HTMLSanitiser(fd.case, fd.inode)
+            while 1:
+                data = fd.read(1000000)
+                try:
+                    if data:
+                        sanitiser.feed(data)
+                    else:
+                        sanitiser.close()
+                except HTMLParser.HTMLParseError:
+                    pass
+
+                yield sanitiser.read()
+
+                if not data: break
+
+        ui.generator.generator = generator()
+        
+    def zip_handler(self, fd, ui):
+        ## Show the file listing in the zip file:
+        import zipfile
+        z = zipfile.ZipFile(fd,'r')
+        ## This is a bit of cheating...
+        ui.start_table(**{'class':'PyFlagTable'})
+        ui.row("File Name", "Modified    ", "Size", **{'class':'hilight'})
+        for zinfo in z.filelist:
+            date = "%d-%02d-%02d %02d:%02d:%02d" % zinfo.date_time
+            ui.row(zinfo.filename, date, zinfo.file_size)
+
+    dispatcher = { re.compile("text/html"): html_handler,
+                   re.compile("image.*"): image_handler,
+                   re.compile("application/x-zip"): zip_handler
+                   }
 
 class HTMLSanitiser(HTMLParser.HTMLParser):
     """ This parser is used to sanitise the html and resolve any

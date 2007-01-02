@@ -123,9 +123,9 @@ class VirusScanTest(unittest.TestCase):
         pyflagsh.shell_execv(env=env, command="scan",
                              argv=["*",'VirScan'])
 
-        dbh.execute("select *from virus")
+        dbh.execute("select * from virus")
         row = dbh.fetch()
 
         ## We expect to pick this rootkit:
-        self.assertEqual(row['inode'], "Itest|K15-0-0|Z46", "Unable to locate an Outlook PST file - maybe we are not using our custom magic file?")
+        self.assertEqual(row['inode'], "Itest|K15-0-0|Z46", "Unable to find Trojan.NTRootKit.044")
         

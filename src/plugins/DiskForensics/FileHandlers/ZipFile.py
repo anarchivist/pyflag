@@ -420,9 +420,17 @@ class ZipScanTest(unittest.TestCase):
 
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env, command="scan",
-                             argv=["*",'ZipScan'])
+                             argv=["*",'ZipScan','GZScan','TarScan'])
 
         dbh.execute("select count(*) as count from inode where inode like '%|Z%'")
         count = dbh.fetch()['count']
         self.failIf(count==0, "Could not find any zip files?")
         
+        dbh.execute("select count(*) as count from inode where inode like '%|G0'")
+        count = dbh.fetch()['count']
+        self.failIf(count==0, "Could not find any gzip files?")
+
+        ## FIXME: No tar files in the test image
+        #dbh.execute("select count(*) as count from inode where inode like '%|T%'")
+        #count = dbh.fetch()['count']
+        #self.failIf(count==0, "Could not find any tar files?")

@@ -460,8 +460,8 @@ class File:
         @note: This is not meant to be called directly, the File object must be created by a valid FileSystem object's open method.
         """
         # Install default views
-        self.stat_names = ["Statistics","HexDump","Download", "Summary"]
-        self.stat_cbs=[self.stats,self.hexdump,self.download, self.summary]
+        self.stat_names = ["Statistics","HexDump", "TextDump", "Download","Summary"]
+        self.stat_cbs=[self.stats,self.hexdump,self.textdump, self.download, self.summary]
 
         # each file should remember its own part of the inode
         self.case = case
@@ -658,6 +658,14 @@ class File:
     def download(self, query,result):
         """ Used for dumping the entire file into the browser """
         result.download(self)
+
+    def textdump(self, query,result):
+        max=config.MAX_DATA_DUMP_SIZE
+
+        def textdumper(offset, data,result):
+            result.text(data, font='typewriter', sanitise='full', wrap='full', color='red')
+        
+        return self.display_data(query,result, max, textdumper)
 
     def hexdump(self, query,result):
         """ Show the hexdump for the file."""
