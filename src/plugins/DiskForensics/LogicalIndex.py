@@ -52,7 +52,7 @@ import index,os,time,re
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
-from pyflag.TableObj import ColumnType, TimestampType, InodeType
+from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType
 
 ## This blocksize is in bits (2^20)
 BLOCKBITS=20
@@ -231,12 +231,6 @@ class BuildDictionary(Reports.report):
     family="Keyword Indexing"
     description = "Builds a dictionary for indexing "
 
-    def form(self,query,result):
-        pass
-
-    def analyse(self,query):
-        pass
-
     def display(self,query,result):
         ## The dictionary is site wide and lives in the FlagDB
         dbh=self.DBO(None)
@@ -264,10 +258,14 @@ class BuildDictionary(Reports.report):
                 dbh.execute("select * from dictionary where word=%r limit 1",(query['word']))
                 row = dbh.fetch()
                 if not row:
-                    dbh.execute("insert into dictionary set word=%r,class=%r,type=%r",(query['word'],query['class'],query['type']))
+                    dbh.insert("dictionary",
+                               **{'word': query['word'],
+                                  'class': query['class'],
+                                  'type': query['type']})
                     
             elif query['action']=='delete':
-                dbh.execute("delete from dictionary where word=%r and type=%r",(query['word'],query['type']))
+                dbh.delete("dictionary",
+                           where="word=%r and type=%r" % (query['word'],query['type']))
                                 
         except KeyError:
             pass
@@ -292,9 +290,9 @@ class BuildDictionary(Reports.report):
         table=self.ui(result)
         try:
             table.table(
-                elements = [ ColumnType('Word','word'),
-                             ColumnType('Class','class'),
-                             ColumnType('Type','type') ],
+                elements = [ StringType('Word','word'),
+                             StringType('Class','class'),
+                             StringType('Type','type') ],
                 table='dictionary',
                 case=None,
                 )
@@ -371,9 +369,9 @@ class SearchIndex(Reports.report):
             q['__target__']='new_keyword'
             try:
                 result.table(
-                    elements = [ ColumnType('Index Term','word', link=q),
-                                 ColumnType('Dictionary Class','class'),
-                                 ColumnType('Number of Hits', 'hits')],
+                    elements = [ StringType('Index Term','word', link=q),
+                                 StringType('Dictionary Class','class'),
+                                 IntegerType('Number of Hits', 'hits')],
                     table='LogicalIndexStats',
                     case=query['case'],
                     )
@@ -491,7 +489,7 @@ class SearchIndex(Reports.report):
             old_temp_table=temp_table
 
         ## Create a new cache table and populate it:
-        dbh.execute("insert into `LogicalIndexCache_reference` set query=%r",(canonicalised_query))
+        dbh.insert("LogicalIndexCache_reference", query=canonicalised_query)
         cache_id = dbh.autoincrement()
         
         dbh.execute("create table LogicalIndexCache_%s select * from %s",(cache_id,temp_table))
@@ -607,15 +605,15 @@ class BrowseIndexKeywords(Reports.report):
         
         try:
             result.table(
-                elements = [ ColumnType('Index Term', 'word',
+                elements = [ StringType('Index Term', 'word',
                                 link = query_type(case=query['case'],
                                                   family="Keyword Indexing",
                                                   report='SearchIndex',
                                                   range=100,
                                                   final=1,
                                                   __target__='keyword')),
-                             ColumnType('Dictionary Class','class'),
-                             ColumnType('Number of Hits', 'hits')],
+                             StringType('Dictionary Class','class'),
+                             IntegerType('Number of Hits', 'hits')],
             table='LogicalIndexStats',
             case=query['case'],
             )

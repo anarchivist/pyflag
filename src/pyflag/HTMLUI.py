@@ -759,7 +759,7 @@ class HTMLUI(UI.GenericUI):
 ##        else:
 ##            self.row(left,right,valign='top')
 
-    def toolbar(self,cb=None,text=None,icon=None,popup=True,tooltip=None,link=None, toolbar=None, pane=None):
+    def toolbar(self,cb=None,text=None,icon=None,popup=True,tooltip=None,link=None, toolbar=None, pane='self'):
         """ Create a toolbar button.
 
         When the user clicks on the toolbar button, a popup window is
@@ -769,9 +769,9 @@ class HTMLUI(UI.GenericUI):
             self.toolbar_ui=self.__class__(self)
 
         if link:
-            self.toolbar_ui.link(text,target=link,icon=icon,tooltip=tooltip)
+            self.toolbar_ui.link(text,target=link,icon=icon,tooltip=tooltip, pane=pane)
         elif cb:
-            self.toolbar_ui.popup(cb,text,icon=icon,tooltip=tooltip)
+            self.toolbar_ui.popup(cb,text,icon=icon,tooltip=tooltip, pane=pane)
         else:
             self.toolbar_ui.icon(icon,tooltip=text)
 
@@ -906,6 +906,33 @@ class HTMLUI(UI.GenericUI):
             icon="stock_next-page.png"
             )
 
+        def filter_help(query,result):
+            """ Print help for all operators available """
+            result.heading("Available operators")
+            result.para("Filter expressions consist of the syntax: column_name operator argument")
+            result.para("following is the list of all the operators supported by all the columns in this table:")
+            result.start_table( **{'class':'GeneralTable'})
+            result.row("Column Name","Operator","Description", **{'class':'hilight'})
+            for e in elements:
+                tmp = result.__class__(result)
+                tmp.text(e.name,color='red', font='bold')
+                result.row(tmp,'','')
+                for name,method_name in e.operators().items():
+                    try:
+                        method = getattr(e,method_name)
+                        doc = method.__doc__
+                    except:
+                        pass
+                    if not doc:
+                        try:
+                            ## This allows for late initialisation of
+                            ## doc strings
+                            doc = e.docs[method_name]
+                        except:
+                            doc=''
+                    
+                    result.row('',name, doc)
+
         ## Add a possible filter condition:
         def filter_gui(query, result):
             result.heading("Filter Table")
@@ -945,8 +972,8 @@ class HTMLUI(UI.GenericUI):
             ## Round up all the possible methods from all colmn types:
             operators = {}
             for e in elements:
-                for method in e.operators():
-                    operators[method]=1
+                for k,v in e.operators().items():
+                    operators[k]=v
 
             methods = operators.keys()
             methods.sort()
@@ -957,6 +984,8 @@ class HTMLUI(UI.GenericUI):
             """ % "\n".join(["<option value=' %s '>%s</option>" % (m,m) for m in methods])
 
             result.end_form()
+
+            result.toolbar(cb=filter_help, text="Click here for operator help", icon='help.png')
 
         ## Add a toolbar icon for the filter:
         self.toolbar(cb=filter_gui, icon='filter.png',
@@ -1037,6 +1066,11 @@ class HTMLUI(UI.GenericUI):
 
             result.heading("Save Table output")
             result.start_form(query)
+            try:
+                result.defaults['save_length']
+            except:
+                result.defaults['save_length'] = 0
+                
             result.textfield("How many rows to save? (0 for all rows)", "save_length")
             result.end_form()
             

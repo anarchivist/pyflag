@@ -369,12 +369,6 @@ class ColumnType:
 
     ## These are the symbols which will be treated literally
     symbols = {
-        "=":"literal",
-        "!=":"literal",
-        "<=": "literal",
-        ">=": "literal",
-        "<": "literal",
-        ">": "literal",
         }
 
     def operators(self):
@@ -382,9 +376,9 @@ class ColumnType:
         ops = self.symbols.copy()
         for m in dir(self):
             if m.startswith("operator_"):
-                ops[m[len("operator_"):]]=1
+                ops[m[len("operator_"):]]=m
 
-        return ops.keys()
+        return ops
 
     def parse(self, column, operator, arg):
         ## Try to find the method which handles this operator. We look
@@ -403,15 +397,6 @@ class ColumnType:
 
     def literal(self, column,operator, arg):
         return "%s %s %r" % (self.sql, operator, arg)
-
-    def operator_contains(self, column, operator, arg):
-        return '%s like %r' % (self.sql, "%" + arg + "%")
-
-    def operator_matches(self, column, operator, arg):
-        return '%s like %r' % (self.sql, arg)
-
-    def operator_regex(self,column,operator,arg):
-        return '%s rlike %r' % (self.sql, arg)
     
     def display(self, value, row, result):
         """ This method is called by the table widget to allow us to
@@ -445,12 +430,62 @@ class ColumnType:
             return "-"
         else: return value
 
-class TimestampType(ColumnType):
+class StateType(ColumnType):
+    ## This is a list of states that we can take on. Keys are args,
+    ## values are sql types.
+    states = {}
+    symbols = {
+        '=': 'operator_is'
+        }
+
+    def __init__(self, name='', sql='', link='', callback=None):
+        ColumnType.__init__(self, name=name, sql=sql, link=link, callback=callback)
+        self.docs = {'operator_is': """ Matches when the column is of the specified state. Supported states are %s""" % self.states.keys()}
+        
+    def operator_is(self, column, operator, state):
+        for k,v in self.states.items():
+            if state.lower()==k:
+                return "%s = %r" % (self.sql, v)
+
+        raise RuntimeError("Dont understand state %r. Valid states are %s" % (state,self.states.keys()))
+
+class IntegerType(ColumnType):
+    symbols = {
+        "=":"literal",
+        "!=":"literal",
+        "<=": "literal",
+        ">=": "literal",
+        "<": "literal",
+        ">": "literal",
+        }
+
+class StringType(ColumnType):
+    symbols = {
+        "=":"literal",
+        "!=":"literal",
+        }
+
+    def operator_contains(self, column, operator, arg):
+        """ Matches when the column contains the pattern anywhere. Its the same as placing wildcards before and after the pattern. """
+        return '%s like %r' % (self.sql, "%" + arg + "%")
+
+    def operator_matches(self, column, operator, arg):
+        """ This matches the pattern to the column. Wild cards (%) can be placed anywhere, but if you place it in front of the pattern it could be slower. """
+        return '%s like %r' % (self.sql, arg)
+
+    def operator_regex(self,column,operator,arg):
+        """ This applies the regular expression to the column (Can be slow for large tables) """
+        return '%s rlike %r' % (self.sql, arg)
+
+
+class TimestampType(IntegerType):
     def operator_after(self, column, operator, arg):
+        """ Matches times after the specified time. The time arguement must be given in the format 'YYYY-MM-DD HH:MM:SS' (i.e. Year, Month, Day, Hour, Minute, Second). """
         ## FIXME Should parse arg as a date - for now pass though to mysql
         return "%s > %r" % (self.sql, arg)
 
     def operator_before(self,column, operator, arg):
+        """ Matches times before the specified time. The time arguement must be as described for 'after'."""
         ## FIXME Should parse arg as a date
         return "%s < %r" % (self.sql, arg)
 
@@ -482,7 +517,16 @@ class IPType(ColumnType):
     # masks: a list of the masks indexed on the /network-number
     masks = [0] + [int(-(2**(31-x))) for x in range(32)]
 
+    symbols = {
+        '=': 'operator_netmask',
+        }
+
+    def operator_matches(self, column, operator, address):
+        """ Matches the IP address specified exactly """
+        return self.operator_netmask(column, operator,address)
+
     def operator_netmask(self, column, operator, address):
+        """ Matches IP addresses that fall within the specified netmask. Netmask must be provided in CIDR notation or as an IP address (e.g. 192.168.1.1/24)."""
         # Parse arg as a netmask:
         match = self.reMatchString.match(address)
         try:
@@ -529,11 +573,11 @@ class AnnotionObj(TableObj):
 
         TableObj.__init__(self,case,id)
 
-class InodeType(ColumnType):
+class InodeType(StringType):
     """ A unified view of inodes """
-    def __init__(self, name='Inode', column='inode', link=None, case=None, callback=None):
+    def __init__(self, name='Inode', sql='inode', link=None, case=None, callback=None):
         self.case = case
-        ColumnType.__init__(self,name,column,link,callback=callback)
+        ColumnType.__init__(self,name,sql,link,callback=callback)
 
     def display(self, value, row, result):
         result = result.__class__(result)
@@ -594,7 +638,11 @@ class InodeType(ColumnType):
         result.row(tmp1,tmp2)
         return result
 
-class FilenameType(ColumnType):
+    def operator_annotated(self, column, operator, pattern):
+        """ This operator selects those inodes with pattern matching their annotation """
+        return '%s=(select annotate.inode from annotate where note like "%%%s%%")' % (self.sql, pattern)
+
+class FilenameType(StringType):
     def __init__(self, name='Filename', filename='name', path='path', case=None):
         link = query_type(case=case,
                           family='Disk Forensics',
@@ -610,3 +658,8 @@ class FilenameType(ColumnType):
     ## a globbing operator it should be possible to split the glob
     ## into directory components and therefore create SQL specifically
     ## using path and name.
+    ## def operator_glob(self, column, operator, pattern):
+    ##    directory,filename = os.path.split(pattern)
+    ##    sql = ''
+    ##    if directory:
+    ##        sql += "%s rlike %r" % (self.path, glob_re(

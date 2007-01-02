@@ -31,7 +31,7 @@ import pyflag.Reports as Reports
 import pyflag.DB as DB
 import os.path
 from pyflag.Scanner import *
-from pyflag.TableObj import ColumnType, TimestampType, InodeType, FilenameType
+from pyflag.TableObj import StringType, TimestampType, InodeType, FilenameType, ColumnType
                   
 import md5
 class MD5Scan(GenScanFactory):
@@ -104,9 +104,10 @@ class HashComparison(Reports.report):
             result.table(
                 elements = [ InodeType(case=query['case']),
                              FilenameType(case=query['case']),
-                             ColumnType('File Type', 'FileType'),
-                             ColumnType('NSRL Product','NSRL_product'),
-                             ColumnType('NSRL Filename','NSRL_filename'),
+                             StringType('File Type', 'FileType'),
+                             StringType('NSRL Product','NSRL_product'),
+                             StringType('NSRL Filename','NSRL_filename'),
+                             ## We dont want to have any operators on this
                              ColumnType('MD5','md5') ],
                 table='hash join file using (inode)',
                 case=query['case'],

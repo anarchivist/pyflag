@@ -34,7 +34,7 @@ import pyflag.DB as DB
 import os
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-from pyflag.TableObj import ColumnType,TimestampType,InodeType,FilenameType
+from pyflag.TableObj import StringType,TimestampType,InodeType,FilenameType
 import pyflag.Registry as Registry
 
 from os.path import join
@@ -248,8 +248,8 @@ class ViewAnnotation(Reports.report):
         result.table(
             elements = [ InodeType('Inode', 'annotate.inode', case=query['case']),
                          FilenameType(case=query['case']),
-                         ColumnType('Category','category'),
-                         ColumnType('Note','note'),
+                         StringType('Category','category'),
+                         StringType('Note','note'),
                          ],
             table = 'annotate join file on file.inode=annotate.inode',
             case = query['case'],

@@ -468,7 +468,7 @@ class DBO:
         self.invalidate(table)
         self.execute("drop table if exists %s", table)
 
-    def delete(self, table, where):
+    def delete(self, table, where='0'):
         sql = "delete from %s where %s"
         ## We are about to invalidate the table:
         self.invalidate(table)

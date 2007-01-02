@@ -360,11 +360,11 @@ class TableTest(PopUpTest):
                                        ),
                          
                          ## Or positional args
-                         ColumnType('Data', 'data',
+                         StringType('Data', 'data',
                                     link = query_type(
             family=query['family'], report='FormTest',__target__='var1')),
                          
-                         ColumnType('Foobar', 'foobar', callback=foobar_cb),
+                         StringType('Foobar', 'foobar', callback=foobar_cb),
 
                          ## Note that here we just need to specify the
                          ## field name in the table, the IPType will

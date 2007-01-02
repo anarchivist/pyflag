@@ -41,7 +41,7 @@ from pyflag.Scanner import *
 import pyflag.Scanner as Scanner
 import pyflag.DB as DB
 import pexpect
-from pyflag.TableObj import ColumnType, TimestampType, InodeType
+from pyflag.TableObj import StringType, TimestampType, InodeType
 
 class AFTJpegScan(GenScanFactory):
     """ Steganography inside Jpeg images """
@@ -147,13 +147,13 @@ class AFTSteganography(Reports.report):
 	
 	try:
             result.table(
-                elements = [ ColumnType('Inode','inode',
+                elements = [ InodeType('Inode','inode',
                                 link = query_type(case=query['case'],
                                                   family='Disk Forensics',
                                                   report='ViewFile',
                                                   __target__='inode')),
-                             ColumnType('Filename','Filename'),
-                             ColumnType('Stegdetect Results', 'Results') ],
+                             StringType('Filename','Filename'),
+                             StringType('Stegdetect Results', 'Results') ],
                 table='stegjpegfull',
                 case=query['case'],
                 )

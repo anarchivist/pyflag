@@ -1,44 +1,65 @@
 h1, table { 
   cursor: default;
 }
+
 /** Stuff related to table implementation */
-tbody.scrollContent td.table-cell, thead th {
+table.PyFlagTable td.table-cell, thead th {
   background:#94BEFF;
   border-right:1px solid #999;
   padding:2px;
 }
 
-tbody.scrollContent td, thead th {
+table.PyFlagTable td, thead th {
   font-weight:normal;
   font-size:0.8em;
 }
 
-tbody.scrollContent {
+table.PyFlagTable {
   overflow-x: auto;
   overflow-y: auto;
 }
 
-tbody.scrollContent td.table-cell, tbody.scrollContent tr td.table-cell {
+table.GeneralTable { 
+  border-width: 4px;
+  border-style: groove;
+ }
+
+table.GeneralTable tr td { 
+  background-color: #e3edfa;
+  padding: 2px;
+  font-weight:normal;
+  font-size:0.8em;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+table.GeneralTable tr.hilight td { 
+  background-color: pink;
+  font-weight: bold;
+  border-bottom: 3px ridge black;
+}
+
+table.PyFlagTable td.table-cell, table.PyFlagTable tr td.table-cell {
   background: #FFF;
   padding: 2px;
 }
 
-tbody.scrollContent tr.alternateRow td.table-cell {
+table.PyFlagTable tr.alternateRow td.table-cell {
   background: #e3edfa;
   padding: 2px;
 }
 
-tbody.scrollContent tr.selected td.table-cell {
+table.PyFlagTable tr.selected td.table-cell {
   background: yellow;
   padding: 2px;
 }
 
-tbody.scrollContent tr:hover td.table-cell,tbody.scrollContent tr.alternateRow:hover td.sorted-column,
-tbody.scrollContent tr:hover td.sorted-column {
+table.PyFlagTable tr:hover td.table-cell,table.PyFlagTable tr.alternateRow:hover td.sorted-column,
+table.PyFlagTable tr:hover td.sorted-column {
   background: #a6c2e7;
 }
 
-tbody.scrollContent td.sorted-column, tbody.scrollContent tr td.sorted-column {
+table.PyFlagTable td.sorted-column, table.PyFlagTable tr td.sorted-column {
   background: pink;
 }
 
@@ -246,4 +267,4 @@ iframe#right {
 
 .hilight { 
   background-color: pink;
- }
+}

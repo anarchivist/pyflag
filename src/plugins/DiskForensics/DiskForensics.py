@@ -41,17 +41,18 @@ import pyflag.Scanner as Scanner
 import pyflag.ScannerUtils as ScannerUtils
 import pyflag.Registry as Registry
 import pyflag.parser as parser
-from pyflag.TableObj import ColumnType,TimestampType,InodeType,FilenameType
+from pyflag.TableObj import IntegerType,TimestampType,InodeType,FilenameType, StringType, StateType
 
 description = "Disk Forensics"
 order=30
 
 BLOCKSIZE=20
 
-class DeletedType(ColumnType):
+class DeletedType(StateType):
     """ This is a column type which shows deleted inodes graphically
     """
-    ## FIXME - make the parser recognise deleted inodes
+    states = {'deleted':'deleted', 'allocated':'alloc'}
+              
     def display(self,value, row, result):
         """ Callback for rendering deleted items """
         tmp=result.__class__(result)
@@ -64,9 +65,9 @@ class DeletedType(ColumnType):
 
         return tmp
 
-class BinaryType(ColumnType):
+class BinaryType(StateType):
     """ This type defines fields which are either true or false """
-    ## FIXME - Make parser understand binary operators.
+    states = {'true':'1', 'false':'0', 'set': 1, 'unset':0 }
     def display(self,value, row,result):
         if value:
             return "*"
@@ -130,10 +131,10 @@ class BrowseFS(Reports.report):
         def tabular_view(query,result):
             result.table(
                 elements = [ InodeType('Inode','f.inode',case=query['case']),
-                             ColumnType('Mode','f.mode'),
+                             StringType('Mode','f.mode'),
                              FilenameType(case=query['case']),
                              DeletedType('Del','f.status'),
-                             ColumnType('File Size','size'),
+                             IntegerType('File Size','size'),
                              TimestampType('Last Modified','mtime'),
                              TimestampType('Last Accessed','atime'),
                              TimestampType('Created','ctime'),
@@ -173,9 +174,9 @@ class BrowseFS(Reports.report):
 
                 tmp.table(
                     elements = [ InodeType('Inode','f.inode',case=query['case']),
-                                 ColumnType('Filename','name'),
+                                 StringType('Filename','name'),
                                  DeletedType('Del','f.status'),
-                                 ColumnType('File Size','size'),
+                                 IntegerType('File Size','size'),
                                  TimestampType('Last Modified','mtime'),
                                  TimestampType('Mode','f.mode') ],
                     table='file as f, inode as i',
@@ -301,7 +302,7 @@ class Timeline(Reports.report):
                        BinaryType('a',"a"),
                        BinaryType('c',"c"),
                        BinaryType('d',"d"),
-                       ColumnType('Filename','name'),
+                       StringType('Filename','name'),
                        ],
             table='mac',
             case=query['case'],

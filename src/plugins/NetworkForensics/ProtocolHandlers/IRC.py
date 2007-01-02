@@ -34,7 +34,7 @@ import pyflag.Reports as Reports
 import pyflag.pyflaglog as pyflaglog
 import cStringIO,re
 import plugins.NetworkForensics.PCAPFS as PCAPFS
-from pyflag.TableObj import ColumnType, TimestampType, InodeType
+from pyflag.TableObj import StringType, IntegerType, TimestampType, InodeType
 
 class IRC:
     """ Class to manage the IRC state """
@@ -577,7 +577,7 @@ class BrowseIRCChat(Reports.report):
             return tmp
         
         result.table(
-            elements = [ ColumnType('ID','irc_messages.id'),
+            elements = [ IntegerType('ID','irc_messages.id'),
                          TimestampType("Timestamp","ts_sec"),
                          InodeType("Stream","inode",
                             link = query_type(family='Disk Forensics',
@@ -585,15 +585,15 @@ class BrowseIRCChat(Reports.report):
                                               __target__='inode',
                                               report='View File Contents',
                                               mode="Combined streams")),
-                         ColumnType("Packet", 'packet_id',
+                         IntegerType("Packet", 'packet_id',
                             link = query_type(family="Network Forensics",
                                               case=query['case'],
                                               report='View Packet', 
                                               __target__='inode')),
-                         ColumnType("Command",'command'),
-                         ColumnType("Sender Nick","sender"),
-                         ColumnType("Recipient", 'recipient'),
-                         ColumnType("Text",'data') ],
+                         StringType("Command",'command'),
+                         StringType("Sender Nick","sender"),
+                         StringType("Recipient", 'recipient'),
+                         StringType("Text",'data') ],
             table = "irc_messages join pcap on packet_id=pcap.id" ,
             case = query['case']
             )

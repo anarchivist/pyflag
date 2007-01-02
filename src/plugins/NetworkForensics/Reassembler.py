@@ -33,7 +33,7 @@ from pyflag.FlagFramework import query_type, get_temp_path
 from NetworkScanner import *
 import struct,re,os
 import reassembler
-from pyflag.TableObj import ColumnType, TimestampType, InodeType, IPType
+from pyflag.TableObj import StringType, IntegerType, TimestampType, InodeType, IPType
 import pyflag.Reports as Reports
 
 class StreamFile(File):
@@ -314,15 +314,15 @@ class StreamFile(File):
             return ui
 
         result.table(
-            elements = [ ColumnType('Packet ID','packet_id',
+            elements = [ IntegerType('Packet ID','packet_id',
                                     link = query_type(family="Network Forensics",
                                                       report='View Packet',
                                                       case=query['case'],
                                                       open_tree ="/eth/payload/payload/data",
                                                       __target__='id')),
                          TimestampType('Date','pcap.ts_sec'),
-                         ColumnType('Length','con.length'),
-                         ColumnType('Data','concat(con.cache_offset, ",", con.length)',
+                         IntegerType('Length','con.length'),
+                         StringType('Data','concat(con.cache_offset, ",", con.length)',
                                     callback = show_data) ],
             
             table= '`connection` as con , pcap',
@@ -417,9 +417,9 @@ class ViewConnections(Reports.report):
             elements = [ InodeType('Inode','inode', case=query['case']),
                          TimestampType('TimeStamp','ts_sec'),
                          IPType('Source','src_ip'),
-                         ColumnType('Src Port','src_port'),
+                         IntegerType('Src Port','src_port'),
                          IPType('Destination','dest_ip'),
-                         ColumnType('Dest Port','dest_port')],
+                         IntegerType('Dest Port','dest_port')],
             table = 'connection_details',
             case = query['case'],
             )

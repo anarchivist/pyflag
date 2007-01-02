@@ -32,7 +32,7 @@ import pyflag.DB as DB
 import os.path
 import pyflag.pyflaglog as pyflaglog
 from pyflag.Scanner import *
-from pyflag.TableObj import ColumnType, TimestampType, InodeType, FilenameType
+from pyflag.TableObj import StringType, TimestampType, InodeType, FilenameType
 
 class VScan:
     """ Singleton class to manage virus scanner access """
@@ -100,7 +100,7 @@ class VirusScan(Reports.report):
                 elements = [ InodeType('Inode','virus.inode',
                                        case=query['case']),
                              FilenameType(case=query['case']),
-                             ColumnType('Virus Detected','virus') ],
+                             StringType('Virus Detected','virus') ],
                 table='virus join file on virus.inode=file.inode ',
                 case=query['case'],
                 )

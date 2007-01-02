@@ -40,7 +40,7 @@ from pyflag.FlagFramework import normpath, query_type
 import pyflag.FlagFramework as FlagFramework
 import pexpect
 import Store
-from pyflag.TableObj import ColumnType, TimestampType, InodeType
+from pyflag.TableObj import StringType, TimestampType, InodeType
 
 class PstScan(GenScanFactory):
     """ Recurse into Pst Files """
@@ -392,9 +392,9 @@ class PstExplorer(Reports.report):
                                                          __target__='inode',
                                                          inode="%s:0")),
                              TimestampType('Arrival Date','date'),
-                             ColumnType('From','from'),
-                             ColumnType('To', 'to'),
-                             ColumnType('Subject', 'subject') ],
+                             StringType('From','from'),
+                             StringType('To', 'to'),
+                             StringType('Subject', 'subject') ],
                 table=('email'),
                 case=query['case']
                 )
@@ -403,10 +403,10 @@ class PstExplorer(Reports.report):
         def contacts(query,output):
             output.table(
                 elements = [ InodeType('Inode','inode'),
-                             ColumnType('Name','name'),
-                             ColumnType('Email','email'),
-                             ColumnType('Address','address'),
-                             ColumnType('Phone','phone') ],
+                             StringType('Name','name'),
+                             StringType('Email','email'),
+                             StringType('Address','address'),
+                             StringType('Phone','phone') ],
                 table=('contact'),
                 case=query['case']
                 )
@@ -417,8 +417,8 @@ class PstExplorer(Reports.report):
                 elements = [ InodeType('Inode','inode'),
                              TimestampType('Start Date','startdate'),
                              TimestampType('End Date','enddate'),
-                             ColumnType('Location','location'),
-                             ColumnType('Comment','comment') ],
+                             StringType('Location','location'),
+                             StringType('Comment','comment') ],
                 table=('appointment'),
                 case=query['case']
                 )
@@ -429,8 +429,8 @@ class PstExplorer(Reports.report):
                 elements = [ InodeType('Inode','inode'),
                              TimestampType('Start Date','startdate'),
                              TimestampType('End Date','enddate'),
-                             ColumnType('Type','type'),
-                             ColumnType('Comment','comment') ],
+                             StringType('Type','type'),
+                             StringType('Comment','comment') ],
                 table=('journal'),
                 case=query['case']
                 )

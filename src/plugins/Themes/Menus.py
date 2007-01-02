@@ -8,43 +8,6 @@ import pyflag.DB as DB
 
 class Menu(Theme.BasicTheme):
     """ Class to implement the Menus theme """
-    preamble = "<script src='/javascript/functions.js'></script>\n"
-
-    hilight_bar = '''
-    <script>        
-        showToolbar();
-
-        function UpdateIt(){
-        if (ie&&keepstatic&&!opr6)
-        document.all["MainTable"].style.top = document.body.scrollTop;
-        setTimeout("UpdateIt()", 200);
-        }
-        UpdateIt();
-    </script>
-    
-    <div class=PyFlagHeader>
-      <div class=Toolbar onmouseover="hideSubMenus()">
-      </div><div class="Logo"> PyFlag</div>
-    </div>    
-    <div class=PyFlagPage>
-    '''
-    header='''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-        <html>
-        <head>
-        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-        <title>%s</title>
-        <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
-        <script src="/javascript/functions.js" type="text/javascript" language="javascript"></script>
-
-        </head>
-        <body link=blue vlink=blue bgcolor="#FFFFFF">
-        <script>
-        var keepstatic=1 //specify whether menu should stay static 0=non static (works only in IE4+)
-        var menucolor="black" 
-        var submenuwidth=150
-        </script>
-        <script type="text/javascript" src="/javascript/functions.js" language="javascript"></script>'''
-
     def make_menu_javascript(self,query):
         """ Creates the javascript function required to generate the menu """
         result = '''<table class=MenuBar><tr>'''
@@ -89,15 +52,33 @@ class Menu(Theme.BasicTheme):
         return data
 
     def naked_render(self,data='',ui=None,title=None):
-        """ Render the ui with minimal interventions """
+        """ Render the ui with minimal interventions.
+
+        We put a toolbar here only if we need it. We will only need it
+        if some of our UIs need to draw a toolbar icon - otherwise it
+        would be lost.
+        """
+        if ui.toolbar_ui:
+            toolbar_str = ui.toolbar_ui.__str__ ()
+        else:
+            toolbar_str = ''
+
         result = '''<html>
         <head>
         <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
         </head>
         <body style="overflow: auto;">
-        <script src="/javascript/functions.js" type="text/javascript" language="javascript"></script>
-        %s
-        </body>''' % data
+        <script src="/javascript/functions.js" type="text/javascript" language="javascript"></script>'''
+        if toolbar_str:
+            result += '''<div class=PyFlagHeader>
+            <div class=Toolbar> %s </div>
+            </div>
+            <div class="PyFlagPage" id="PyFlagPage" onmouseover="hideSubMenus()">
+            ''' % (toolbar_str)
+            
+        result += data
+        
+        result +="</div><script>AdjustHeightToPageSize('PyFlagPage'); </script></body>"
 
         return result
     

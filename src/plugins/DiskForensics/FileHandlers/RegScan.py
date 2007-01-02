@@ -31,7 +31,7 @@ from pyflag.FlagFramework import query_type,HexDump
 import pyflag.Reports as Reports
 from FileFormats.RegFile import ls_r, RegF
 from format import Buffer
-from pyflag.TableObj import ColumnType, TimestampType, InodeType
+from pyflag.TableObj import StringType, TimestampType, InodeType
 
 class RegistryScan(GenScanFactory):
     """ Load in Windows Registry files """
@@ -131,12 +131,12 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                 new_q['mode'] = 'Tree View'
                 
                 result.table(
-                    elements = [ ColumnType('Path','path',
+                    elements = [ StringType('Path','path',
                                     link = new_q),
-                                 ColumnType('Type','type'),
-                                 ColumnType('Key','reg_key'),
+                                 StringType('Type','type'),
+                                 StringType('Key','reg_key'),
                                  TimestampType('Modified','modified'),
-                                 ColumnType('Value','value') ],
+                                 StringType('Value','value') ],
                     table='reg',
                     case=query['case'],
                     )
@@ -169,16 +169,16 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                     new_q['mode'] = 'display'
                     new_q['path']=path
                     table.table(
-                        elements = [ ColumnType('Key','reg_key',
+                        elements = [ StringType('Key','reg_key',
                                        link = query_type(family=query['family'],
                                                          report='BrowseRegistryKey',
                                                          path=path,
                                                          __target__='key',
                                                          case=query['case'])),
                                      
-                                     ColumnType('Type','type'),
+                                     StringType('Type','type'),
                                      ## FIXME - Does this need to be a standard type?
-                                     ColumnType('Value',"if(length(value)<50,value,concat(left(value,50),' .... '))") ],
+                                     StringType('Value',"if(length(value)<50,value,concat(left(value,50),' .... '))") ],
                         names=('Key','Type','Value'),
                         table='reg',
                         where="path=%r" % path,
@@ -277,12 +277,12 @@ class InterestingRegKey(Reports.report):
 
         try:
             result.table(
-                elements = [ ColumnType('Path','path'),
-                             ColumnType('Key','reg_key'),
-                             ColumnType('Value','value'),
+                elements = [ StringType('Path','path'),
+                             StringType('Key','reg_key'),
+                             StringType('Value','value'),
                              TimestampType('Last Modified','modified'),
-                             ColumnType('Category','category'),
-                             ColumnType('Description','description') ],
+                             StringType('Category','category'),
+                             StringType('Description','description') ],
                 table='interestingregkeys ',
                 case=query['case'],
                 #FIXME make a link to view the rest of the reg info
