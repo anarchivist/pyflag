@@ -417,33 +417,6 @@ class HTMLUI(UI.GenericUI):
         #Draw in a nice table format
         self.row(description,tmp)
 
-##    def make_link(self,query,target,target_format = None,**options):
-##        """ Makes a query_type object suitable for use in the links array of the table
-
-##        @note: the returned object is a clone of query.
-##        @note: Private ui parameters are automatically cleaned. e.g. limit, nextpage etc.
-##        @arg query: Original query to base the new object on
-##        @arg target: a string representing the name of the target
-##        @arg target_format: An optional format string that will be used to format the target arg for each cell in the table. There must be only one format specifier.
-##        """
-##        q = query.clone()
-##        del q[target]
-##        del q['__target__']
-##        del q['limit']
-##        del q['order']
-##        del q['dorder']
-        
-##        q['__target__']=target
-##        try:
-##            q['__mark__']=options['mark']
-##        except KeyError:
-##            pass
-        
-##        if target_format:
-##            q[target]=target_format
-
-##        return q
-
     def tree(self, tree_cb = None, pane_cb=None, branch = None, layout=None):
         """ A tree widget.
 
@@ -465,7 +438,6 @@ class HTMLUI(UI.GenericUI):
                 ## Must have a name and value
                 if not name or not value: return ''
                 result+="<span class='PyFlagTreeRow'>" + preamble
-                #result+="<img class='PyFlagTreeVerticalLine' src='/images/treenode_blank.gif'>" * (depth)
 
                 link = query.clone()
                 del link['open_tree']
@@ -500,8 +472,12 @@ class HTMLUI(UI.GenericUI):
                     preamble += "<img class='PyFlagTreeVerticalLine' src='/images/treenode_blank.gif'>"
 
                 result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img class=%r src='%s'></a>" % (cb,query['right_pane_cb'],quote(link.__str__()), img_class, img_src)
+
+                if len(branch)-1==depth and name == branch[depth]:
+                    result+="&nbsp;<span class='PyFlagTreeSelected'>%s</span></span>\n" % str(sv)
+                else:
+                    result+="&nbsp;%s</span>\n" % str(sv)
                     
-                result+="&nbsp;%s</span>\n" % str(sv)
                 result+="\n"
                 
                 ## Draw any opened branches

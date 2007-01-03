@@ -156,6 +156,10 @@ img.PyFlagTreeNodeEnd {
   background-image: url(/images/treenode_grid_l.gif);
 }
 
+span.PyFlagTreeSelected { 
+  background-color: #e3edfa;
+}
+
 /** Menu bar classes: */
 html, body { 
   width: 100%;	/* make the body expand to fill the visible window */
