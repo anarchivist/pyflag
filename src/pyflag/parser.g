@@ -24,7 +24,7 @@ type of the columns presented.
 # ******************************************************
 
 def eval_expression(elements, name, operator, arg):
-    print "Evaluating %s.%s(%r)" % (name,operator,arg)
+#    print "Evaluating %s.%s(%r)" % (name,operator,arg)
     ## Try and find the element with the specified name:
     element = None
     for e in elements:
@@ -45,7 +45,7 @@ parser SearchParser:
     token END: "$"
     token STR: r'"([^\\"]+|\\.)*"'
     token STR2: r"'([^\\']+|\\.)*'"
-    token WORD: '[-+*/!@$%^&=\<\>.a-zA-Z0-9_]+'
+    token WORD: '[-:+*/!@$%^&=\<\>.a-zA-Z0-9_]+'
     token LOGICAL_OPERATOR: "(and|or)"
 
     rule goal<<types>>: clause<<types>>  END {{ return clause }}

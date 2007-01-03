@@ -58,7 +58,7 @@ class Store:
         finally:
             self.mutex.release()
 
-        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Stored key %s" % key)
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Stored key %s: %r" % (key,object))
         return key
 
     def get(self, key):
@@ -72,11 +72,12 @@ class Store:
                 if k==key:
                     #self.creation_times.pop(i)
                     self.check_full()
-                    #pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Got key %s" % key)
+                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Got key %s: %s" % (key, obj))
                     return obj
                 i+=1
 
             ## If we are here we could not find the key:
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Key %s not found" % (key))
             raise KeyError("Key not found %s" % key)
 
         finally:

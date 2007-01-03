@@ -539,10 +539,12 @@ class LoadFS(Reports.report):
 
 
 ## Unit Tests:
-import unittest
+import unittest, md5
 import pyflag.pyflagsh as pyflagsh
+from pyflag.FileSystem import DBFS
 
 class LoadDataTests(unittest.TestCase):
+    """ Forensic Image Loading Tests """
     order = 1
     test_case = "PyFlagTestCase"
     def test01CaseCreation(self):
@@ -565,15 +567,42 @@ class LoadDataTests(unittest.TestCase):
         """ Test that basic filesystems load """
         pyflagsh.shell_execv(command="execute",
                              argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
-                                   "iosource=test",
+                                   "iosource=first_image",
                                    "subsys=advanced",
                                    "io_filename=%s/pyflag_stdimage_0.1" % config.UPLOADDIR,
                                    ])
         pyflagsh.shell_execv(command="execute",
                              argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,
-                                   "iosource=test",
+                                   "iosource=first_image",
                                    "fstype=Sleuthkit",
-                                   "mount_point=/"])
+                                   "mount_point=/stdimage/"])
         dbh = DB.DBO(self.test_case)
         dbh.execute("select count(*) as count from inode")
         self.assertEqual(dbh.fetch()['count'],16)
+
+    def test03MultipleSources(self):
+        """ Test that multiple images can be loaded on the same VFS """
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
+                                   "iosource=second_image",
+                                   "subsys=ewf",
+                                   "io_filename=%s/ntfs_image.e01" % config.UPLOADDIR,
+                                   ])
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,
+                                   "iosource=second_image",
+                                   "fstype=Sleuthkit",
+                                   "mount_point=/ntfsimage/"])
+
+        ## Try to read a file from the first source:
+        fsfd = DBFS(self.test_case)
+        fd = fsfd.open("/stdimage/dscf1081.jpg")
+        m = md5.new()
+        m.update(fd.read())
+        self.assertEqual(m.hexdigest(),'11bec410aebe0c22c14f3eaaae306f46')
+
+        ## Try to read a file from the second source:
+        fd = fsfd.open("/ntfsimage/Books/80day11.txt")
+        m = md5.new()
+        m.update(fd.read())
+        self.assertEqual(m.hexdigest(),'f5b394b5d0ca8c9ce206353e71d1d1f2')

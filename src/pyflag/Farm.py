@@ -249,7 +249,8 @@ def start_workers():
     atexit.register(terminate_children)
 
 def handler(sig, frame):
-    print "Got woken up"
+    #print "Got woken up"
+    pass
 
 ## Is this a dangerous thing to do? If a signal comes when we dont
 ## expect it we may lose sync with the db. Seems to work for now, but

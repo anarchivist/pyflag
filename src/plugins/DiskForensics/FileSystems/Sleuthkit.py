@@ -194,12 +194,13 @@ class Sleuthkit_File(File):
     specifier = 'K'
     def __init__(self, case, fd, inode):
         File.__init__(self, case, fd, inode)
- 
+
+        cache_key = "%s:%s" % (case, fd.inode)
         try:
-            fs = SKCACHE.get(fd.inode)
+            fs = SKCACHE.get(cache_key)
         except KeyError:
             fs = sk.skfs(fd)
-            SKCACHE.put(fs, key=fd.inode)
+            SKCACHE.put(fs, key=cache_key)
 
         inode = inode[inode.find('|K')+2:]
         self.fd = fs.open(inode=inode)
@@ -301,7 +302,6 @@ class Sleuthkit(DBFS):
                     _mtime = "from_unixtime(%d)" % s.st_mtime,
                     _atime = "from_unixtime(%d)" % s.st_atime,
                     _ctime = "from_unixtime(%d)" % s.st_ctime,
-                    dtime = 0,
                     mode = s.st_mode,
                     links = s.st_nlink,
                     link = "",
@@ -335,7 +335,7 @@ import unittest, md5
 import pyflag.pyflagsh as pyflagsh
 
 class NTFSTests(unittest.TestCase):
-    """ Testing Sleuthkit NTFS Support """
+    """ Sleuthkit NTFS Support """
     order = 1
     test_case = "PyFlagNTFSTestCase"
     def test01LoadNTFSFileSystem(self):
@@ -361,10 +361,10 @@ class NTFSTests(unittest.TestCase):
         dbh = DB.DBO(self.test_case)
         dbh.execute("select count(*) as count from inode")
         row = dbh.fetch()
-        self.assertEqual(row['count'],53)
+        self.assertEqual(row['count'],55)
         dbh.execute("select count(*) as count from file")
         row = dbh.fetch()
-        self.assertEqual(row['count'],63)
+        self.assertEqual(row['count'],65)
 
     def test02ReadNTFSFile(self):
         """ Test reading a regular NTFS file """
@@ -383,3 +383,16 @@ class NTFSTests(unittest.TestCase):
         m = md5.new()
         m.update(fd.read())
         self.assertEqual(m.hexdigest(),'f5b394b5d0ca8c9ce206353e71d1d1f2')
+
+    def test04LocatingNTFS_ADS(self):
+        """ Test for finding ADS files """
+        ## Do type scanning:
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env, command="scan",
+                             argv=["*",'TypeScan'])
+
+        dbh = DB.DBO(self.test_case)
+        dbh.execute('select * from type where type like "%executable%" and inode like "%33-128-7%"')
+        row = dbh.fetch()
+
+        self.assert_(row, "Executable within ADS was not found???")

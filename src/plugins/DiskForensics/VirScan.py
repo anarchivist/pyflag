@@ -56,7 +56,7 @@ class VirScan(GenScanFactory):
         GenScanFactory.__init__(self, fsfd)        
         dbh=DB.DBO(self.case)
         dbh.execute(""" CREATE TABLE IF NOT EXISTS `virus` (
-        `inode` varchar( 20 ) NOT NULL,
+        `inode` varchar( 255 ) NOT NULL,
         `virus` tinytext NOT NULL )""")
 
         self.scanner=VScan()
@@ -113,6 +113,7 @@ import unittest
 import pyflag.pyflagsh as pyflagsh
 
 class VirusScanTest(unittest.TestCase):
+    """ Virus Scanner Tests """
     test_case = "PyFlagTestCase"
     order = 20
     def test_scanner(self):
@@ -121,11 +122,11 @@ class VirusScanTest(unittest.TestCase):
 
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env, command="scan",
-                             argv=["*",'VirScan'])
+                             argv=["Ifirst**",'VirScan'])
 
         dbh.execute("select * from virus")
         row = dbh.fetch()
 
         ## We expect to pick this rootkit:
-        self.assertEqual(row['inode'], "Itest|K15-0-0|Z46", "Unable to find Trojan.NTRootKit.044")
+        self.assert_("K15-0-0|Z46" in row['inode'] , "Unable to find Trojan.NTRootKit.044")
         

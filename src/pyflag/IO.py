@@ -396,6 +396,6 @@ def open(case, iosource):
         io.name = iosource
 
         ## Cache the option string:
-        IO_Cache.put("%s|%s" % (case,iosource), (opts[0][1], io))
+        IO_Cache.put((opts[0][1], io),key = "%s|%s" % (case,iosource))
         return io
  

@@ -41,8 +41,6 @@ class scan(pyflagsh.command):
         for i in range(1,len(self.args)):
             scanners.extend(fnmatch.filter(Registry.SCANNERS.scanners, self.args[i]))
 
-        print scanners, self.args
-        
         for row in self.dbh:
             inode = row['inode']
             dbh.mass_insert(

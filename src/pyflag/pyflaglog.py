@@ -30,9 +30,9 @@ import sys,traceback
 ## These are predefined logging levels:
 ERRORS=1
 ERROR=1
-WARNINGS=2
-WARNING=2
-INFO=3
+WARNINGS=3
+WARNING=3
+INFO=5
 DEBUG=7
 VERBOSE_DEBUG=12
 RING_BUFFER_SIZE=20

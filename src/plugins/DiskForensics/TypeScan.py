@@ -154,6 +154,7 @@ import unittest
 import pyflag.pyflagsh as pyflagsh
 
 class TypeTest(unittest.TestCase):
+    """ Magic related Scanner """
     test_case = "PyFlagTestCase"
     def test_type_scan(self):
         """ Check the type scanner works """
@@ -164,8 +165,6 @@ class TypeTest(unittest.TestCase):
         pyflagsh.shell_execv(env=env, command="scan",
                              argv=["*",'TypeScan'])
 
-        dbh.execute("select count(*) as count from type")
-        
         ## Make sure the extra magic is being used properly.
         dbh.execute('select count(*) as count from type where type like "%Outlook%"')
         count = dbh.fetch()['count']

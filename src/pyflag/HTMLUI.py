@@ -595,13 +595,30 @@ class HTMLUI(UI.GenericUI):
         l = self.store_callback(left)
         r = self.store_callback(right)
 
+        ## This is a hack to make the tree boundary adjustable:
+        def tree_frame_cb(query,result):
+            result.decoration = 'raw'
+            result.result = '''<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+            <HTML>            
+            <FRAMESET FRAMEBORDER=1 FRAMESPACING=1 COLS="340,*">
+            <FRAME SRC="%s&callback_stored=%s&right_pane_cb=%s" name=left id=left scrolling=auto>
+            <FRAME SRC="%s&callback_stored=%s" name=right id=right scrolling=auto>
+            </FRAMESET>
+            </HTML>''' % (self.defaults,l,r,self.defaults,r)
+
+        tfcb = self.store_callback(tree_frame_cb)
+        id = self.get_unique_id()
+        self.result += """<iframe id='TreeFrame%s' class=TreeFrame src='/f?callback_stored=%s'></iframe>
+        <script>AdjustHeightToPageSize('TreeFrame%s');</script>
+        """ % (id,tfcb, id)
+
 ##      FIXME: Framesets provide for an adjustable boundary but must be on a document of their own.
 ##        self.result += """<iframe><frameset id=frames rows='*' cols='400,75%%'>
 ##        <frame name='left' src='%s&callback_stored=%s&right_pane_cb=%s'></frame>
 ##        <frame name='right' src='%s&callback_stored=%s'></frame>
 ##        </frameset></iframe>
 ##        """ % (self.defaults, l, r, self.defaults, r)
-        self.result+='<iframe id="left" name="left" height="100%%" width=300 src="%s&callback_stored=%s&right_pane_cb=%s"></iframe><iframe name="right" id="right" src="%s&callback_stored=%s" ></iframe>' % (self.defaults,l,r,self.defaults,r)
+##        self.result+='<iframe id="left" name="left" height="100%%" width=300 src="%s&callback_stored=%s&right_pane_cb=%s"></iframe><iframe name="right" id="right" src="%s&callback_stored=%s" ></iframe>' % (self.defaults,l,r,self.defaults,r)
 
     def new_toolbar(self):
         id = "Toolbar%s" % self.get_unique_id()

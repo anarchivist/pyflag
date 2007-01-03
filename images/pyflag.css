@@ -109,6 +109,11 @@ img.PopupIcon {
   cursor: pointer;
  }
 
+iframe.TreeFrame { 
+  width: 99%;
+  height: 80%;
+}
+
 div.TreeLeft { 
   float: left;
   width: 45%;

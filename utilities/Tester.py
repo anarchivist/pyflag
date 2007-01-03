@@ -50,8 +50,14 @@ else:
     classes = [ x for x in test_registry.classes if re.search(options.match,"%s" % x)]
 
 for test_class in classes:
+    try:
+        doc = test_class.__doc__
+    except: pass
+    if not doc:
+        doc = test_class
+        
     print "---------------------------------------"
-    print "Running tests in %s" % test_class
+    print "Running tests in %s" % doc
     print "---------------------------------------"
     suite = unittest.makeSuite(test_class)
     unittest.TextTestRunner(verbosity=2).run(suite)

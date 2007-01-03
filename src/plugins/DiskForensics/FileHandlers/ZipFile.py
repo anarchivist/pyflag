@@ -55,11 +55,12 @@ class ZipScan(GenScanFactory):
         def external_process(self,fd):
             """ This is run on the extracted file """
             pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Decompressing Zip File %s" % fd.name)
+            cache_key = "%s:%s" % (self.case , self.fd.inode)
             try:
-                z = ZIPCACHE.get(self.fd.inode)
+                z = ZIPCACHE.get(cache_key)
             except KeyError:
                 z = zipfile.ZipFile(self.fd,'r')
-                ZIPCACHE.put(z, key=self.fd.inode)
+                ZIPCACHE.put(z, key=cache_key)
 
             pathname = self.ddfs.lookup(inode = self.inode)
             
@@ -412,6 +413,7 @@ import unittest
 import pyflag.pyflagsh as pyflagsh
 
 class ZipScanTest(unittest.TestCase):
+    """ Zip File handling Tests """
     test_case = "PyFlagTestCase"
     order = 15
     def test_type_scan(self):
@@ -420,7 +422,7 @@ class ZipScanTest(unittest.TestCase):
 
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env, command="scan",
-                             argv=["*",'ZipScan','GZScan','TarScan'])
+                             argv=["Ifirst_image*",'ZipScan','GZScan','TarScan'])
 
         dbh.execute("select count(*) as count from inode where inode like '%|Z%'")
         count = dbh.fetch()['count']

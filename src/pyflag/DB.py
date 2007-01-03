@@ -577,7 +577,7 @@ class DBO:
         If an index is missing, we create it here, so we always ensure an index exists once we return. """
         ## We implement a local cache to ensure that we dont hit the
         ## DB all the time:
-        cache_key = "%s:%s" % (table,key)
+        cache_key = "%s:%s" % (self.case,table)
         try:
             ## These should be the fields with the indexes on them:
             fields = DBIndex_Cache.get(cache_key)
@@ -703,6 +703,7 @@ class DBO:
 import unittest
 
 class DBOTest(unittest.TestCase):
+    """ Database Class Tests """
     def test01validinstall(self):
         """ Test to make sure we can locate the pyflag default database """
         dbh = DBO(None)

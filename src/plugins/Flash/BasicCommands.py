@@ -78,7 +78,6 @@ class ls(pyflagsh.command):
         if len(args)==0:
             args.append(self.environment.CWD)
 
-        print args
         ## Glob the path if possible:
         files = {}
         for arg in args:

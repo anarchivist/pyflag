@@ -24,7 +24,7 @@ type of the columns presented.
 # ******************************************************
 
 def eval_expression(elements, name, operator, arg):
-    print "Evaluating %s.%s(%r)" % (name,operator,arg)
+#    print "Evaluating %s.%s(%r)" % (name,operator,arg)
     ## Try and find the element with the specified name:
     element = None
     for e in elements:
@@ -51,7 +51,7 @@ class SearchParserScanner(runtime.Scanner):
         ('END', re.compile('$')),
         ('STR', re.compile('"([^\\\\"]+|\\\\.)*"')),
         ('STR2', re.compile("'([^\\\\']+|\\\\.)*'")),
-        ('WORD', re.compile('[-+*/!@$%^&=\\<\\>.a-zA-Z0-9_]+')),
+        ('WORD', re.compile('[-:+*/!@$%^&=\\<\\>.a-zA-Z0-9_]+')),
         ('LOGICAL_OPERATOR', re.compile('(and|or)')),
     ]
     def __init__(self, str,*args,**kw):
