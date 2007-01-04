@@ -372,3 +372,34 @@ def open(case, iosource):
         IO_Cache.put((opts[0][1], io),key = "%s|%s" % (case,iosource))
         return io
  
+## IO subsystem unit tests:
+import unittest
+import md5
+
+class IOSubsystemTests(unittest.TestCase):
+    """ IO Subsystem tests """
+    def test01LowerLevelSGZIP(self):
+        """ Test lower level access to sgzip files """
+        io = iosubsys.Open('sgzip',[['filename','%s/pyflag_stdimage_0.1.sgz' % config.UPLOADDIR],])
+        m = md5.new()
+        m.update(iosubsys.read_random(io,1000000,0))
+        self.assertEqual(m.hexdigest(),'cd40564565f522f1a9fc3a8623f83687')
+
+    def test02HandlingErrors(self):
+        """ test Handling of errors correctly """
+        ## Tests errors in reading file:
+        self.assertRaises(IOError, lambda : iosubsys.Open('sgzip',[['filename','/dev/null'],]))
+        self.assertRaises(IOError, lambda : iosubsys.Open('sgzip',[['filename','/tmp/fgggsddfssdg'],]))
+        
+        ## Test failour to open a file:
+        self.assertRaises(IOError, lambda : iosubsys.Open('sgzip',[['filename','%s/pyflag_stdimage_0.1' % config.UPLOADDIR],]))
+        self.assertRaises(IOError, lambda : iosubsys.Open('ewf',[['filename','%s/pyflag_stdimage_0.1' % config.UPLOADDIR],]))
+
+        ## Test weird parameters:
+        self.assertRaises(IOError, lambda : iosubsys.Open('raid',[['filename','%s/pyflag_stdimage_0.1' % config.UPLOADDIR],]))
+        
+        ## Test weird values:
+        self.assertRaises(RuntimeError, lambda : iosubsys.Open('standard',[['filename','/etc/passwd'],['offset',100]]))
+        io=iosubsys.Open('advanced',[['filename','/etc/passwd'],['offset',-100]])
+        data = iosubsys.read_random(io,100,0)
+        print "%r" % data

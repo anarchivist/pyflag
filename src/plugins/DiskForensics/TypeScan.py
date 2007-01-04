@@ -83,6 +83,47 @@ class TypeScan(Scanner.GenScanFactory):
                        mime = self.type_mime,
                        type = self.type_str)
 
+class ThumbnailType(InodeType):
+    def __init__(self, name='Inode', sql='inode', fsfd=None):
+        InodeType.__init__(self,name=name,sql=sql, case=fsfd.case)
+        self.fsfd = fsfd
+
+    ## We dont want any operations on the thumbnail
+    def operators(self):
+        return {}
+        
+    def display(self, inode, row, result):
+        tmp = result.__class__(result)
+        try:
+            fd = self.fsfd.open(inode=inode)
+            image = Graph.Thumbnailer(fd,200)
+        except IOError:
+            tmp.icon("broken.png")
+            return
+
+        if image.height>0:
+            tmp.image(image,width=image.width,height=image.height)
+        else:
+            tmp.image(image,width=image.width)
+
+        tmp2 = result.__class__(result)
+        tmp2.decoration="raw"
+        tmp2.link( tmp, target = 
+                   FlagFramework.query_type((), case=self.case,
+                   inode=inode,
+                   family = "Disk Forensics", report = "ViewFile"),
+                   mode = "Summary",
+                   tooltip=inode, border=0
+                   )
+
+        try:
+            tmp2.text("\n%sx%s" % (image.owidth,image.oheight))
+        except AttributeError:
+            pass
+
+        tmp2.text(" %s" % inode)
+        return tmp2
+
 ## A report to examine the Types of different files:
 class ViewFileTypes(Reports.report):
     """ Browse the file types discovered.
@@ -98,44 +139,10 @@ class ViewFileTypes(Reports.report):
         result.case_selector()
         
     def display(self,query,result):
-        fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])
-        
-        def thumbnail_cb(inode):
-            tmp = result.__class__(result)
-            try:
-                fd = fsfd.open(inode=inode)
-                image = Graph.Thumbnailer(fd,200)
-            except IOError:
-                tmp.icon("broken.png")
-                return
-                
-            if image.height>0:
-                tmp.image(image,width=image.width,height=image.height)
-            else:
-                tmp.image(image,width=image.width)
-
-            tmp2 = result.__class__(result)
-            tmp2.decoration="raw"
-            tmp2.link( tmp, target = 
-                       FlagFramework.query_type((), case=query['case'],
-                       inode=inode,
-                       family = "Disk Forensics", report = "ViewFile"),
-                       mode = "Summary",
-                       tooltip=inode, border=0
-                       )
-
-            try:
-                tmp2.text("\n%sx%s" % (image.owidth,image.oheight))
-            except AttributeError:
-                pass
-
-            tmp2.text(" %s" % inode)
-            return tmp2
-
+        fsfd = FileSystem.DBFS(query["case"])
         try:
             result.table(
-                elements = [ InodeType('Thumbnail','a.inode', callback = thumbnail_cb,
-                                       case=query['case']),
+                elements = [ ThumbnailType('Thumbnail','a.inode', fsfd = fsfd),
                              FilenameType(case=query['case']),
                              StringType('Type','type'),
                              IntegerType('Size','c.size'),

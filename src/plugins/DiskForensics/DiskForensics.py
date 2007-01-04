@@ -182,6 +182,7 @@ class BrowseFS(Reports.report):
                     table='file as f, inode as i',
                     where="f.inode=i.inode and path=%r and f.mode!='d/d'" % (path+'/'),
                     case=query['case'],
+                    pagesize=10,
                     )
         
             result.tree(tree_cb = tree_cb,pane_cb = pane_cb, branch = branch )

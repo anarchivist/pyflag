@@ -137,6 +137,11 @@ span.PyFlagTreeRow {
   display: block;
 }
 
+span.PyFlagTreeRow a { 
+  color: black;
+  text-decoration: none;
+}
+
 img.PyFlagTreeSpacer, img.PyFlagTreeVerticalLine, img.PyFlagTreeNode, img.PyFlagTreeNodeEnd { 
   width: 18px; 
   height: 2.0ex; 
@@ -277,3 +282,8 @@ iframe#right {
 .hilight { 
   background-color: pink;
 }
+
+h1 { 
+  font-size: 1.5em;
+  font-weight: bold;
+ }

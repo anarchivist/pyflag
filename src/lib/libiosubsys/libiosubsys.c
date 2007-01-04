@@ -23,11 +23,19 @@ IOOptions IOOptions_add(IOOptions self, IOOptions list, char *name, char *value)
   return self;
 };
 
+/** We remove used options from the list so we can tell if we used up
+    all the options 
+*/
 char *IOOptions_get_value(IOOptions self, char *name) {
-  IOOptions i;
+  IOOptions i,j;
 
-  list_for_each_entry(i, &(self->list), list) {
-    if(!strcmp(name, i->name)) return i->value;
+  list_for_each_entry_safe(i,j, &(self->list), list) {
+    if(!strcmp(name, i->name)) {
+      // We wont bother freeing it here because talloc will do it when
+      // we free the whole list.
+      list_del(&i->list);
+      return i->value;
+    };
   };
 
   return NULL;
@@ -117,7 +125,7 @@ int AdvIOSource_Destructor(void *this) {
 IOSource AdvIOSource_Con(IOSource self, IOOptions opts) {
   AdvIOSource this=(AdvIOSource) self;
   struct split_file temp;
-  IOOptions t;
+  IOOptions t,tt;
   uint64_t last_max_length=0;
 
   this->number =0;
@@ -126,13 +134,16 @@ IOSource AdvIOSource_Con(IOSource self, IOOptions opts) {
   /** Use the opts to build our internal list of offsets. This is an
       array rather than a linked list for performance reasons. 
   **/
-  list_for_each_entry(t, &(opts->list), list) {
+  list_for_each_entry_safe(t,tt, &(opts->list), list) {
     if(!strcmp("offset",t->name)) {
+      // Delete items as we consume them
+      list_del(&t->list);
       this->offset = parse_offsets(t->value);
     }
     else if(!strcmp("filename",t->name)) {
       off_t i;
 
+      list_del(&t->list);
       temp.name = talloc_strdup(self,t->value);
       temp.fd = open(temp.name, O_RDONLY);
       if(temp.fd<0) {
@@ -246,7 +257,8 @@ IOSource SgzipIOSource_Con(IOSource self, IOOptions opts) {
   s->header = sgzip_read_header(self->fd);
   if(!s->header) {
     talloc_free(self);
-    return raise_errors(EIOError, "%s is not an sgz file", self->filename);
+    raise_errors(EIOError, "%s is not an sgz file", self->filename);
+    return NULL;
   };
 
   this->index=sgzip_read_index(self->fd,s);
@@ -261,7 +273,8 @@ IOSource SgzipIOSource_Con(IOSource self, IOOptions opts) {
   self->size = s->header->x.max_chunks * s->header->blocksize;
 
   talloc_set_destructor((void *)self, SgzipIOSource_Destructor);
-  return self;
+ 
+  return (self);
 };
 
 int SgzipIOSource_read_random(IOSource self, char *buf, uint32_t len, uint64_t offs) {

@@ -471,12 +471,12 @@ class HTMLUI(UI.GenericUI):
                 else:
                     preamble += "<img class='PyFlagTreeVerticalLine' src='/images/treenode_blank.gif'>"
 
-                result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img class=%r src='%s'></a>" % (cb,query['right_pane_cb'],quote(link.__str__()), img_class, img_src)
+                result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img class=%r src='%s'>" % (cb,query['right_pane_cb'],quote(link.__str__()), img_class, img_src)
 
                 if len(branch)-1==depth and name == branch[depth]:
-                    result+="&nbsp;<span class='PyFlagTreeSelected'>%s</span></span>\n" % str(sv)
+                    result+="&nbsp;<span class='PyFlagTreeSelected'>%s</span></a></span>\n" % str(sv)
                 else:
-                    result+="&nbsp;%s</span>\n" % str(sv)
+                    result+="&nbsp;%s</a></span>\n" % str(sv)
                     
                 result+="\n"
                 
@@ -773,6 +773,10 @@ class HTMLUI(UI.GenericUI):
         ## can be specified in _make_sql itself and not be overwritten
         ## by our defaults.
         query = self.defaults
+        try:
+            pagesize = opts['pagesize']
+        except:
+            pagesize = config.PAGESIZE
         
         try:
             order = int(query.get('order',0))
@@ -827,7 +831,7 @@ class HTMLUI(UI.GenericUI):
 
         ## This allows pyflag to cache the resultset, needed to speed
         ## paging of slow queries.
-        dbh.cached_execute(sql,limit=limit, length=config.PAGESIZE)
+        dbh.cached_execute(sql,limit=limit, length=pagesize)
         old_sorted = None
         old_sorted_style = ''
 
@@ -869,7 +873,7 @@ class HTMLUI(UI.GenericUI):
         new_query = query.clone()
 
         ## The previous button goes back if possible:
-        previous_limit = limit-config.PAGESIZE
+        previous_limit = limit-pagesize
         if previous_limit<0:
             self.toolbar(icon = 'stock_left_gray.png')
         else:
@@ -881,16 +885,16 @@ class HTMLUI(UI.GenericUI):
 
         ## Now we add the paging toolbar icons
         ## The next button allows user to page to the next page
-        if row_count<config.PAGESIZE:
+        if row_count<pagesize:
             self.toolbar(icon = 'stock_right_gray.png')
         else:
             ## We could not fill a full page - means we ran out of
             ## rows in this table
             del new_query['limit']
-            new_query['limit'] = limit+config.PAGESIZE
+            new_query['limit'] = limit+pagesize
             self.toolbar(icon = 'stock_right.png',
                          link = new_query,
-                         tooltip='Next Page (Rows %s-%s)' % (limit, limit+config.PAGESIZE))
+                         tooltip='Next Page (Rows %s-%s)' % (limit, limit+pagesize))
 
         ## Add a skip to row toolbar icon:
         self.toolbar(
@@ -960,7 +964,7 @@ class HTMLUI(UI.GenericUI):
             <select id=filter_column>
             %s
             </select> <a href=# onclick='document.getElementById("filter").value += document.getElementById("filter_column").value;'>Insert </a></td></tr>
-            """ % "\n".join(["<option value=' \"%s\" '>%s</option>" % (e.name,e.name) for e in elements])
+            """ % "\n".join(["<option value=' \"%s\" '>%s</option>" % (e.name,e.name) for e in elements if e.operators()])
 
             ## Round up all the possible methods from all colmn types:
             operators = {}

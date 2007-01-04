@@ -27,8 +27,22 @@ This is the python binding for the io subsystem.
 #include "libiosubsys.h"
 #include "except.h"
 
-PyObject *map_exceptions_for_python(enum _error_type e) {
+PyObject *map_exceptions_for_python(enum _exception e) {
   switch(e) {
+  case E_OVERFLOW:
+    return(PyExc_OverflowError);
+  case E_IOERROR:
+    return(PyExc_IOError);
+    case E_NOMEMORY:
+      return(PyExc_MemoryError);
+  case E_GENERIC:
+  default:
+    return (PyExc_Exception);
+  };
+};
+
+PyObject *map_errors_for_python() {
+  switch(_global_error) {
   case EOverflow:
     return(PyExc_OverflowError);
   case EIOError:
@@ -108,12 +122,28 @@ static PyObject *Open(PyObject *dummy, PyObject *args, PyObject *kwd) {
     };
   };
 
-  driver = iosubsys_Open(drivername, options);
+  TRY {
+    driver = iosubsys_Open(drivername, options);
+  } EXCEPT(E_ANY) {
+    talloc_free(options);
+    return PyErr_Format(map_exceptions_for_python(__EXCEPT__), "Unable to open iosource");
+  };
 
   // We failed to instantiate this driver
   if(!driver) {
     talloc_free(options);
-    return PyErr_Format(PyExc_RuntimeError, "Internal Error: %s", _error_buff);
+    return PyErr_Format(map_errors_for_python(), "%s", _error_buff);
+  };
+
+  //Check that all the options have been consumed:
+  if(!list_empty(&options->list)) {
+    IOOptions first;
+    list_next(first, &options->list, list);
+
+    PyErr_Format(PyExc_RuntimeError, "Subsystem %s does not accept parameter %s", drivername,
+		 first->name);
+    talloc_free(options);
+    return NULL;
   };
 
   //Now ensure that the options are stolen to the iosource:

@@ -365,6 +365,7 @@ enum _error_type {
 };
 
 extern char _error_buff[];
+extern enum _error_type _global_error;
 
 void *raise_errors(enum _error_type t, char *string,  ...);
 
