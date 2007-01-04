@@ -14,7 +14,7 @@ libfstools_la_SOURCES	= ext2fs.h fatfs.h ffs.h fs_tools.h fs_tools_i.h iso9660.h
 
 # fscheck.c hfs.h hfs.c hfs_dent.c hfs_journal.c
 
-libfstools_la_LIBADD	= ../auxtools/libauxtools.la ../imgtools/libimgtools.la ../../../lib/liboo.la
+libfstools_la_LIBADD	= ../auxtools/libauxtools.la ../imgtools/libimgtools.la ../mmtools/libmmtools.la ../../../lib/liboo.la
 dbtool_LDADD		= libfstools.la ../../../lib/libexcept.la ../../../lib/libiosubsys/libiosubsys.la  ../../../lib/libiosubsys/libio_hooker.la
 
 ils_LDADD		= libfstools.la

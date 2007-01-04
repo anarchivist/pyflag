@@ -1,4 +1,4 @@
-AM_CFLAGS		= -I$(srcdir)/../auxtools -I$(srcdir)/../imgtools -I$(srcdir)/../fstools -I$(top_srcdir)/src/include -DLINUX2 -include config.h 
+AM_CFLAGS		= -I$(srcdir)/../auxtools -I$(srcdir)/../imgtools -I$(srcdir)/../mmtools -I$(srcdir)/../fstools -I$(top_srcdir)/src/include -DLINUX2 -include config.h 
 
 # This is for the sleuthkit python module
 pkgpyexec_LTLIBRARIES 	= sk.la

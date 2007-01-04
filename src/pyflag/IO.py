@@ -44,69 +44,41 @@ import os,re
 import pyflag.pyflaglog as pyflaglog
 import pyflag.Store as Store
 
-def mmls_popup(query,result,option_str=None,subsys=None,offset=None):
+import sk
+
+def mmls_popup(query,result,orig_query=None, subsys=None, offset=None):
     result.decoration = "naked"
+
     try:
         if query['update']:
             query[offset]=query['update']
             del query['update']
 
-            result.refresh(0,query,parent=1)
+            result.refresh(0, query, pane="parent")
     except KeyError:
         pass
 
-    if os.path.exists('/usr/bin/disktype'):
-        #You have disktype install so we will give you some extra info
-        result.heading("Output of disktype and mmls on io source")
-        result.text('------------------ disktype results ------------------',font='bold')
-        option_str=option_str.strip('filename=')
-        pyflaglog.log(pyflaglog.DEBUG,"Will launch: disktype %s" % option_str)
-        disktype_output=pexpect.spawn('/usr/bin/disktype %s' % option_str)
-        disktype_output.expect(pexpect.EOF)
-        result.text('',font='normal')
-        result.text(disktype_output.before,font='typewriter')
-        result.text('',font='normal')
-        result.text('------------------ mmls results ------------------',font='bold')
-    else:
-        result.heading("Output of mmls on io source")
-        pyflaglog.log(pyflaglog.DEBUG,"Disktype not run, can't be found at /usr/bin/disktype")
-        
-    args = ["-i", subsys, "-o",option_str, "%s/mmls" % config.FLAG_BIN,  "-t", "dos",  "foo" ]
-    
-    pyflaglog.log(pyflaglog.DEBUG,"Will launch %s %s" % (config.IOWRAPPER, args))
-
-    s=pexpect.spawn(config.IOWRAPPER,args)
-    s.expect(pexpect.EOF)
-    ## There is an error in the output
-    if "Exception" in s.before:
-        result.text("\nError occured reading the partition table.",color='red',font='bold')
-        result.text("\nPossible reasons include:\n\n - Do you have the correct driver set for this IO Source?\n - Could the image be an image of a partition not a disk image?\n - Could the image have a non-dos partition type?\n\n",font='normal')
-        result.text("These are the errors returned by mmls:\n")
-        result.text(s.before,color="red",font='typewriter')
-        return
-    
+    del orig_query['io_offset']
+    io = IOFactory(orig_query)
     try:
-        output = s.before.splitlines()
-        result.start_table()
-        result.text('\n'+output[0]+'\n')
-        result.text(output[1]+'\n')
-        columns = output[3].split()
-        result.row(" ",*columns)
-        del query[offset]
-        for row in output:
-            m = re.match("^(\S+:)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)",row)
-            if m:
-                row = list(m.groups())
-                tmp = result.__class__(result)
-                del query['update']
-                query['update']="%ss" % row[2]
-                tmp.link(row[2],query)
-                row[2]=tmp
-                result.row(*row)
-    except IndexError:
-        pass
-    result.end_table()
+        parts = sk.mmls(io)
+    except IOError, e:
+        result.heading("No Partitions found")
+        result.text("Sleuthkit returned: %s" % e)
+        return
 
+    result.heading("Possible IO Sources")
+    result.start_table(border=True)
+    result.row("Chunk", "Start", "End", "Size", "Description")
+    del query[offset]
+    for i in range(len(parts)):
+        tmp = result.__class__(result)
+        del query['update']
+        query['update'] = "%ds" % parts[i][0]
+        tmp.link("%010d" % parts[i][0], query)
+        result.row(i, tmp, "%010d" % (parts[i][0] + parts[i][1]), "%010d" % parts[i][1] , parts[i][2])
+    result.end_table()
+        
 class IO:
     """ class for IO subsystem, provides basic contructor and read/seek functions
 
@@ -170,7 +142,11 @@ class IO:
                 self.subsystem=self.options[0][1]
 
             #Try and make the subsystem based on the args
-            self.io=iosubsys.Open(self.subsystem,options)
+            try:
+                self.io=iosubsys.Open(self.subsystem,options)
+            except IOError, e:
+                print "ERROR: %s" % e
+
             self.readptr = 0
             
         except (KeyError, IOError, RuntimeError):
@@ -236,9 +212,8 @@ class sgzip(IO):
         result.row("Select SGZ image:", tmp)
         tmp = result.__class__(result)
         tmp2 = result.__class__(result)
-        option_str="filename=%s" % query['io_filename']
         tmp2.popup(
-            FlagFramework.Curry(mmls_popup,option_str=option_str,subsys="sgzip",offset="io_offset"),
+            FlagFramework.Curry(mmls_popup,orig_query=query,subsys="sgzip",offset="io_offset"),
             "Survey the partition table",
             icon="examine.png")
         
@@ -278,9 +253,8 @@ class advanced(IO):
         result.row("Select image(s):", tmp)
         tmp = result.__class__(result)
         tmp2 = result.__class__(result)
-        option_str=','.join(["filename=%s" % x for x in query.getarray('io_filename')])
         tmp2.popup(
-            FlagFramework.Curry(mmls_popup,option_str=option_str,subsys="advanced",offset="io_offset"),
+            FlagFramework.Curry(mmls_popup,orig_query=query,subsys="advanced",offset="io_offset"),
             "Survey the partition table",
             icon="examine.png")
         
@@ -312,9 +286,8 @@ class ewf(IO):
         result.row("Select EWF image(s):",tmp)
         tmp = result.__class__(result)
         tmp2 = result.__class__(result)
-        option_str=','.join(["filename=%s" % x for x in query.getarray('io_filename')])
         tmp2.popup(
-            FlagFramework.Curry(mmls_popup,option_str=option_str,subsys="ewf",offset="io_offset"),
+            FlagFramework.Curry(mmls_popup,orig_query=query,subsys="ewf",offset="io_offset"),
             "Survey the partition table",
             icon="examine.png")
         

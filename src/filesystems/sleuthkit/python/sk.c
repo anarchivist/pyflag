@@ -10,6 +10,7 @@
 #include "list.h"
 #include "talloc.h"
 #include "fs_tools.h"
+#include "mm_tools.h"
 #include "ntfs.h"
  
 /*
@@ -425,7 +426,8 @@ pyfile_imgstat(IMG_INFO * img_info, FILE * hFile) {
 void
 pyfile_close(IMG_INFO * img_info) {
     IMG_PYFILE_INFO *pyfile_info = (IMG_PYFILE_INFO *) img_info;
-    PyObject_CallMethod(pyfile_info->fileobj, "close", "");
+    //EDIT davec: Its not our job to close the file, we didnt open it!
+    //PyObject_CallMethod(pyfile_info->fileobj, "close", "");
     if(img_info)
         talloc_free(img_info);
     return;
@@ -1261,9 +1263,86 @@ skfile_blocks(skfile *self) {
     return list;
 }
 
+/* This is a thin wrapper around mmls. It returns a tuple of four-tuples
+ * containing (start, len, desc, type) for each partition. Note that type is
+ * NOT partition type (!) but is actually defined as:
+ #define MM_TYPE_DESC    0x01
+ #define MM_TYPE_VOL     0x02
+*/
+
+static uint8_t mmls_callback(MM_INFO *mminfo, PNUM_T num, MM_PART *part, int flag, void *ptr) {
+    PyObject *partlist = (PyObject *)ptr;
+    PyObject *thispart;
+
+    thispart = Py_BuildValue("(KKsi)", part->start, part->len, part->desc, part->type);
+    PyList_Append(partlist, thispart);
+    Py_DECREF(thispart);
+    return WALK_CONT;
+}
+
+static PyObject *mmls(PyObject *self, PyObject *args, PyObject *kwds) {
+    PyObject *imgfile;
+    PyObject *partlist;
+    char *mmtype=NULL;
+    int imgoff=0;
+    IMG_INFO *img;
+    MM_INFO *mm;
+
+    static char *kwlist[] = {"imgfile", "imgoff", "mmtype", NULL};
+
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "O|is", kwlist, 
+				    &imgfile, &imgoff, &mmtype))
+        return NULL; 
+
+    /** Create a NULL talloc context for us. Now everything will be
+	allocated against that.  */
+    global_talloc_context = talloc_size(NULL,1);
+
+    /* initialise the img */
+    tsk_error_reset();
+    img = pyfile_open(imgfile);
+    if(!img) {
+        PyErr_Format(PyExc_IOError, "Unable to open image file: %s", tsk_error_get());
+        return NULL;
+    }
+
+    /* initialise the mm layer */
+    tsk_error_reset();
+    mm = mm_open(img, imgoff, mmtype);
+    if(!mm) {
+        PyErr_Format(PyExc_IOError, "Unable to read partition table: %s", tsk_error_get());
+        img->close(img);
+        talloc_free(global_talloc_context); global_talloc_context = NULL;
+        return NULL;
+    }
+
+    /* walk primary partition table */
+    partlist = PyList_New(0);
+    tsk_error_reset();
+    if(mm->part_walk(mm, mm->first_part, mm->last_part, 0, mmls_callback, (void *)partlist)) {
+        PyErr_Format(PyExc_IOError, "Partition walk failed: %s", tsk_error_get());
+        Py_DECREF(partlist);
+        mm->close(mm);
+        img->close(img);
+        talloc_free(global_talloc_context); global_talloc_context = NULL;
+        return NULL;
+    }
+
+    /* now, what to do about extended partitions??? */
+
+    /* cleanup */
+    mm->close(mm);
+    img->close(img);
+    talloc_free(global_talloc_context); global_talloc_context = NULL;
+
+    return partlist;
+}
+
 /* these are the module methods */
 static PyMethodDef sk_methods[] = {
-    {NULL}  /* Sentinel */
+    {"mmls", (PyCFunction)mmls, METH_VARARGS|METH_KEYWORDS,
+     "Read Partition TablRead Partition Table" },
+    {NULL, NULL, 0, NULL}  /* Sentinel */
 };
 
 #ifndef PyMODINIT_FUNC	/* declarations for DLL import/export */
