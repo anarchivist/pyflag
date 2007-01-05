@@ -56,27 +56,20 @@ PyObject *map_errors_for_python() {
 };
 
 static PyObject *Open(PyObject *dummy, PyObject *args, PyObject *kwd) {
-  char *keywords[] = { "iodriver","opts", NULL};
-  PyObject *iodriver=NULL;
+  char *keywords[] = { "opts", NULL};
   char *drivername;
   PyObject *opts=NULL;
   IOSource driver=NULL;
   IOOptions options = NULL;
   PyObject *tmp;
 
-  if(!PyArg_ParseTupleAndKeywords(args, kwd, "|OO", keywords,
-				  &iodriver, &opts)) {
+  if(!PyArg_ParseTupleAndKeywords(args, kwd, "|O", keywords,
+				  &opts)) {
     return NULL;
   };
 
   if(!PyList_Check(opts))
     return PyErr_Format(PyExc_TypeError, "Options must be a list of tuples");
-
-  if(!iodriver) {
-    return PyErr_Format(PyExc_TypeError, "No iodriver specified");
-  } else {
-    drivername = PyString_AsString(iodriver);
-  };
 
   if(!opts) {
     return PyErr_Format(PyExc_Exception, "No options provided to driver");
@@ -120,6 +113,11 @@ static PyObject *Open(PyObject *dummy, PyObject *args, PyObject *kwd) {
 
       CONSTRUCT(IOOptions, IOOptions, add,options, options, keyc, valuec);
     };
+  };
+
+  drivername = CALL(options, get_value, "subsys");
+  if(!drivername) {
+    return PyErr_Format(PyExc_TypeError, "No iodriver specified");
   };
 
   TRY {
