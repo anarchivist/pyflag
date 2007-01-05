@@ -68,7 +68,7 @@ CLASS(AdvIOSource, IOSource)
      StringIO buffer;
 
      // User supplied offset into image
-     uint64_t offset;
+     int64_t offset;
 
      // Number of individual chunks
      int number;
@@ -78,14 +78,14 @@ CLASS(SgzipIOSource, IOSource)
 //     struct sgzip_obj sgzip;
      void *_handle;
      uint64_t *index;
-     uint64_t offset;
+     int64_t offset;
 END_CLASS
 
 CLASS(EWFIOSource, IOSource)
      StringIO buffer;
      int number_of_files;
      void *_handle;
-     uint64_t offset;
+     int64_t offset;
      //     LIBEWF_HANDLE *handle;
 END_CLASS
 
@@ -96,4 +96,4 @@ IOSource iosubsys_Open(char *name, IOOptions opts);
 IOOptions iosubsys_parse_options(char *s);
 
 // A parser for offset strings
-uint64_t parse_offsets(char *string);
+int64_t parse_offsets(char *string);

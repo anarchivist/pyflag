@@ -374,8 +374,27 @@ def open(case, iosource):
  
 ## IO subsystem unit tests:
 import unittest
-import md5
+import md5,random,time
 
+def test_read_random(io1,io2, size, sample_size, number):
+    """ Tests if both ios return the same data for random input """
+    for i in range(0,number):
+        offset = long(random.random()*size)
+        length = long(random.random()*sample_size)
+        data1 = iosubsys.read_random(io1, length,offset)
+        data2 = iosubsys.read_random(io2, length,offset)
+
+        if data1!=data2:
+            data1 = iosubsys.read_random(io1, length,offset)
+            data2 = iosubsys.read_random(io2, length,offset)
+            for i in range(len(data1)):
+                if data1[i]!=data2[i]:
+                    print "Error is at position %s" % i
+                    
+            raise IOError("Data read does not match. Offset %s. length %s iteration %s " % (offset,length,i))
+
+        #print "Offset %s. length %s iteration %s " % (offset,length,i)
+        
 class IOSubsystemTests(unittest.TestCase):
     """ IO Subsystem tests """
     def test01LowerLevelSGZIP(self):
@@ -383,7 +402,7 @@ class IOSubsystemTests(unittest.TestCase):
         io = iosubsys.Open('sgzip',[['filename','%s/pyflag_stdimage_0.1.sgz' % config.UPLOADDIR],])
         m = md5.new()
         m.update(iosubsys.read_random(io,1000000,0))
-        self.assertEqual(m.hexdigest(),'cd40564565f522f1a9fc3a8623f83687')
+        self.assertEqual(m.hexdigest(),'740f23b50a2812dcdd96f1b4434bf242')
 
     def test02HandlingErrors(self):
         """ test Handling of errors correctly """
@@ -400,6 +419,20 @@ class IOSubsystemTests(unittest.TestCase):
         
         ## Test weird values:
         self.assertRaises(RuntimeError, lambda : iosubsys.Open('standard',[['filename','/etc/passwd'],['offset',100]]))
-        io=iosubsys.Open('advanced',[['filename','/etc/passwd'],['offset',-100]])
-        data = iosubsys.read_random(io,100,0)
-        print "%r" % data
+        ## Negative Offsets:
+        self.assertRaises(IOError, lambda : iosubsys.Open('advanced',[['filename','/etc/passwd'],['offset',-100]]))
+        self.assertRaises(IOError, lambda : iosubsys.Open('sgzip',[['filename','%s/pyflag_stdimage_0.1' % config.UPLOADDIR],['offset',-100]]))
+        self.assertRaises(IOError, lambda : iosubsys.Open('ewf',[['filename','%s/ntfs_image.e01' % config.UPLOADDIR],['offset',-100]]))
+
+    def test03DataReadAccuracy(self):
+        """ Test data accuracy in image decompression (takes a while) """
+        io1 = iosubsys.Open('advanced',[['filename','%s/pyflag_stdimage_0.1' % config.UPLOADDIR]])
+        io2 = iosubsys.Open('sgzip',[['filename','%s/pyflag_stdimage_0.1.sgz' % config.UPLOADDIR]])
+        io3 = iosubsys.Open('ewf',[['filename','%s/pyflag_stdimage_0.1.e01' % config.UPLOADDIR]])
+
+        t = time.time()
+        test_read_random(io1,io2, iosubsys.size(io1), 1000000, 2000)
+        print "Sgzip vs advanced took %s sec" % (time.time()-t)
+        t = time.time()
+        test_read_random(io1,io3, iosubsys.size(io1), 1000000, 2000)
+        print "EWF vs advanced took %s sec" % (time.time()-t)

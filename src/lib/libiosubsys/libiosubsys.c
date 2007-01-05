@@ -139,6 +139,10 @@ IOSource AdvIOSource_Con(IOSource self, IOOptions opts) {
       // Delete items as we consume them
       list_del(&t->list);
       this->offset = parse_offsets(t->value);
+      if(this->offset<0) {
+	talloc_free(self);
+	return raise_errors(EIOError, "Invalid argument");
+      };
     }
     else if(!strcmp("filename",t->name)) {
       off_t i;
@@ -311,18 +315,24 @@ int EWFIOSource_Destructor(void *self) {
 
 IOSource EWFIOSource_Con(IOSource self, IOOptions opts) {
   EWFIOSource this = (EWFIOSource)self;
-  IOOptions i;
+  IOOptions i,j;
   LIBEWF_HANDLE *e;
   
   this->buffer = CONSTRUCT(StringIO, StringIO, Con, self);
   this->number_of_files =0;
 
-  list_for_each_entry(i, &(opts->list), list) {
+  list_for_each_entry_safe(i,j, &(opts->list), list) {
     if(!strcmp(i->name,"offset")) {
+      list_del(&i->list);
       this->offset = parse_offsets(i->value);
+      if(this->offset<0) {
+	talloc_free(self);
+	return raise_errors(EIOError, "Invalid argument");
+      };
     }
     else if(!strcmp(i->name,"filename")) {
       char *temp = talloc_strdup(self, i->value);
+      list_del(&i->list);
       CALL(this->buffer, write, (char *)&temp, sizeof(temp));
       this->number_of_files++;
     };
@@ -434,7 +444,7 @@ IOOptions iosubsys_parse_options(char *s) {
   M - Means 1024*1024 bytes
   S - Menas 512 bytes (sector size)
 */
-uint64_t parse_offsets(char *string) {
+int64_t parse_offsets(char *string) {
   uint64_t result=0;
   int multiplier=1;
   int offs=0;
