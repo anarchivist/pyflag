@@ -280,6 +280,28 @@ class Sleuthkit(DBFS):
                 name = name
                 )
 
+        def runs(blocks):
+            # converts an ordered list e.g. [1,2,3,4,7,8,9] into a list of
+            # 'runs'; tuples of (start, length) e.g. [(1,4),(7,3)]
+            if len(blocks) == 0:
+                return
+
+            index = 0
+            start = None
+            length = 1
+            for i in blocks:
+                if start==None:
+                    start = i
+                elif i==start+length:
+                    length+=1
+                else:
+                    yield index,start,length
+                    index += 1
+                    start = i
+                    length = 1
+
+            yield index,start,length
+
         def insert_inode(inode):
             # dont do anything for realloc inodes
             if inode.alloc == 2:
@@ -293,7 +315,8 @@ class Sleuthkit(DBFS):
                 status = 'unalloc'
 
             try:
-                s = fs.stat(inode=str(inode))
+                f = fs.open(inode=str(inode))
+                s = fs.fstat(f)
                 dbh_inode.insert( "inode",
                     inode = inodestr,
                     status = status,
@@ -307,6 +330,17 @@ class Sleuthkit(DBFS):
                     link = "",
                     size = s.st_size
                     )
+                
+                #insert block runs
+                index = 0
+                for (index, start, count) in runs(f.blocks()):
+                    dbh_inode.insert("block", 
+                        inode = inodestr,
+                        index = index,
+                        block = start,
+                        count = count
+                    )
+                f.close()
 
             except IOError:
                 pass
