@@ -263,7 +263,7 @@ function submit_form(pane, current_cb) {
     query += "__pyflag_parent=" + window.__pyflag_name + "&__pyflag_name=popup" + callback +"&";
   } else {
     target=window;
-    query += "&__pyflag_parent=" + target.__pyflag_parent + "&__pyflag_name=" + target.__pyflag_name;
+    query += "&__pyflag_parent=" + target.__pyflag_parent + "&__pyflag_name=" + target.__pyflag_name+"&";
   };
 
   var f = document.forms['pyflag_form_1'];

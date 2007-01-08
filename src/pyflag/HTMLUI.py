@@ -478,7 +478,8 @@ class HTMLUI(UI.GenericUI):
                         img_src = '/images/treenode_expand_minus.gif'
                     else:
                         img_src = '/images/treenode_expand_plus.gif'
-                elif 'up' in state:
+
+                if 'up' in state:
                     img_src = '/images/up.png'
                 elif 'down' in state:
                     img_src = '/images/down.png'
@@ -963,7 +964,8 @@ class HTMLUI(UI.GenericUI):
                     result.text('Error parsing expression: %s' % e, color='red')
                     result.text('\n',color='black')
                     
-            except KeyError:
+            except KeyError,e:
+                print e
                 pass
 
             result.start_form(query, pane="self")

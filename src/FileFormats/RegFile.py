@@ -137,13 +137,18 @@ class NK_key(SimpleStruct):
 
     def keys(self):
         """ A generator which yields the keys under this node """
-        lh_key=self['offs_lh'].get_value()
+        try:
+            lh_key=self['offs_lh'].get_value()
+        except: return
 
         if not lh_key: return 
 
         for lh in lh_key['hashes']:
-            nk_key = lh['ofs_nk'].get_value()
-            yield nk_key
+            try:
+                nk_key = lh['ofs_nk'].get_value()
+                yield nk_key
+            except:
+                pass
 
     def key(self,name):
         """ Find the named child of this node """
@@ -187,7 +192,9 @@ class RegF(SimpleStruct):
         p = path.split("/")
         root_key = self.root_key
         while p:
-            root_key = root_key.key(p.pop(0))
+            key = p.pop(0)
+            if key:
+                root_key = root_key.key(key)
             
         return root_key
 

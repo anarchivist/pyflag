@@ -340,7 +340,7 @@ class Sleuthkit(DBFS):
                         block = start,
                         count = count
                     )
-                f.close()
+                #f.close()
 
             except IOError:
                 pass

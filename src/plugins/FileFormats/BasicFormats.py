@@ -616,7 +616,7 @@ class WIN_FILETIME(SimpleStruct):
     def __str__(self):
         t = self.to_unixtime()
         try:
-            return time.strftime("%Y%m%d%H%M%S",time.localtime(t))
+            return time.strftime("%Y/%m/%d %H:%M:%S",time.localtime(t))
         except:
             return "Invalid Timestamp %X:%X" % (int(self['low']),int(self['high']))
 

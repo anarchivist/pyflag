@@ -198,7 +198,7 @@ class RAW(DataType):
         tmp = []
         for i in range(len(self.data)):
             char = "%s" % self.data[i]
-            if char.isalnum() or char in '!@#$%^&*()_+-=;\'[]\,./<>? ':
+            if char.isalnum() or char in '!@#$%^&*()_+-=[]\\{}|;\':",./<>?':
                 tmp.append(char)
             else:
                 tmp.append('.')
