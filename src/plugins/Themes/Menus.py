@@ -78,7 +78,7 @@ class Menu(Theme.BasicTheme):
             
         result += data
         
-        result +="</div><script>AdjustHeightToPageSize('PyFlagPage'); </script></body>"
+        result +="</div><script>AdjustHeightToPageSize('PyFlagPage'); bug_check();</script></body>"
 
         return result
     
@@ -102,6 +102,7 @@ class Menu(Theme.BasicTheme):
             <title>%s</title>
             <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
             <script src="/javascript/functions.js" type="text/javascript" language="javascript"></script>
+            <script> window.__pyflag_parent = "main"; window.__pyflag_name = "main"; </script>
           </head>
         <body>\n''' % title
 

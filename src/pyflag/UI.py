@@ -30,7 +30,7 @@
 
 The output within flag is abstracted such that it is possible to connect any GUI backend with any GUI Front end. This is done by use of UI objects. When a report runs, it will generate a UI object, which will be built during report execution. The report then returns the object to the calling framework which will know how to handle it. Therefore the report doesnt really know or care how the GUI is constructed """
 
-import re,cgi,types,os
+import re,cgi,types,os,time
 import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 import pyflag.conf
@@ -292,16 +292,37 @@ class GenericUI:
         def file_popup(query, result):
             result.heading(description)
             def left(path):
-                print "Normalised path: %s" % os.path.join(config.UPLOADDIR, '/',path)
-                for d in os.listdir(os.path.join(config.UPLOADDIR, path)):
-                    if os.path.isdir(os.path.join(path,d)):
-                                     yield (d,d,'branch')
-
+                if os.path.basename(path)=='.': return
+                path=os.path.normpath(config.UPLOADDIR + '/' +path)
+                try:
+                    for d in os.listdir(path):
+                        if os.path.isdir(os.path.join(path,d)):
+                                         yield (d,d,'branch')
+                except OSError,e:
+                    yield ('.', e,'leaf')
+                
             def right(path, result):
-                    result.heading(path)
+                result.start_table(**{'class':'GeneralTable'})
+                path=os.path.normpath(config.UPLOADDIR + '/' +path)
+                ## List all the files in the directory:
+                try:
+                    for d in os.listdir(path):
+                        filename = os.path.join(path,d)
+                        if not os.path.isdir(filename):
+                            s = os.stat(filename)
+                            tmp = result.__class__(result)
+                            new_query = query.clone()
+                            new_query[name] = "%s/%s" % ( path,d)
+                            tmp.link(d, target = new_query, pane='parent')
+                            result.row(s.st_size,
+                                       time.strftime("%Y/%m/%d %H:%M:%S",time.localtime(s.st_mtime)),
+                                       tmp)
+                        
+                except OSError,e:
+                    result.row(e)
 
             result.tree(tree_cb=left, pane_cb=right)
             
         tmp = self.__class__(self)
-        tmp.popup(file_popup, "Click here")
+        tmp.popup(file_popup, "Click here", width=800, height=500)
         self.row(description, tmp)

@@ -69,7 +69,8 @@ def pane_cb(branch,result):
     @arg result: A UI object to draw on
     """
     result.text("You clicked on %s" % str(branch))
-    print "Called back for %s" % (branch,)
+    result.link("Return to parent", result.defaults, pane='parent');
+#    result.result += "<script> alert(window.opener)</script>"
 
 class TreeTest(Reports.report):
     """ A sample report.
@@ -372,3 +373,16 @@ class TableTest(PopUpTest):
                          ],
             table = "TestTable",
             )
+
+class FileSelectorTest(PopUpTest):
+    """ Test the file selector widget """
+    name = "File Selector"
+    parameters = {'file':'filename' }
+
+    def form(self, query, result):
+        result.fileselector("Select file:",'file')
+
+    def display(self,query,result):
+        result.heading("You have selected the following files:")
+        for f in query.getarray('file'):
+            result.row(f)

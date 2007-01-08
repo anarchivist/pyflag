@@ -95,9 +95,6 @@ class HTMLUI(UI.GenericUI):
     ## This is used as a unique count of ids
     id=0
     def __init__(self,default = None,query=None):
-        
-        HTMLUI.id+=1
-        
         self.result = ''
 
         import pyflag.FlagFramework as FlagFramework
@@ -127,18 +124,35 @@ class HTMLUI(UI.GenericUI):
         self.font=None
         self.table_depth = 0
         self.type = "text/html"
-        #This specified if we should render the UI in the theme or
+        #This specifies if we should render the UI in the theme or
         #naked. Note that this only affects UIs which are drawn in a
         #window not ones which are added to other UIs:
         self.decoration='full'
         self.title=''
-        
+
+## The __pyflag_parent, __pyflag_name are variables set in js window
+## object to refer back to the logical parent of each pyflag
+## window. The problem is that with regular JS each frame, and iframe
+## is a seperate window object with different window.parent or window.opener
+## properties. From Pyflags point of view, they are all a part of the
+## same window (for example in a tree you have an iframe and 2 frames
+## all belonging to the same logical window - but in different js
+## windows). So we need to propagate the logical pyflag window and
+## parent properties to each js window object blonging to it. This way
+## when a pyflag link, refresh or submit need to go back to their
+## parent they will know the correct js window to go to.        
     def display(self):
         ## Get the right theme
         theme=Theme.get_theme(self.defaults)
         if self.decoration=='raw':
             return theme.raw_render(data=self.__str__(), ui=self,title=self.title)
-        
+
+        ## Try to prpegate __pyflag_parent, __pyflag_name if present
+        try:
+            self.result = "<script> window.__pyflag_parent = %r; window.__pyflag_name = %r; </script>" % (self.defaults['__pyflag_parent'], self.defaults['__pyflag_name']) + self.result
+        except Exception,e:
+            pass
+
         if self.decoration=='naked' or self.decoration=='js':
             return theme.naked_render(data=self.__str__(), ui=self,title=self.title)
         else:
@@ -271,6 +285,12 @@ class HTMLUI(UI.GenericUI):
                         
         self.result+="<tr %s>\n" % self.opt_to_str(options)
         for column in columns:
+            try:
+                column = long(column)
+                td_opts['class'] = 'Integer'
+            except:
+                td_opts['class'] = ''
+                
             self.result += "<%s %s>%s</%s>" % (type,self.opt_to_str(td_opts),column,type)
 
         self.result+="</tr>\n"
@@ -295,26 +315,26 @@ class HTMLUI(UI.GenericUI):
         popup: open a new popup window and draw the target in that.
         self: refresh to the current pane (useful for internal links in popups etc).
         """
-        if pane=="main":
-            return "post_link('f?%s','_top'); return false;" % target
-        
         if pane=='self':
-            return "post_link('f?%s','_self'); return false;" % target
+            return "post_link('f?%s',window.__pyflag_name); return false;" % target
         
         if pane=='popup':
-            return "window.open('f?%s','child_%s',  'width=600, height=600,scrollbars=yes'); return false;" % (target, self.get_unique_id())
+            id=self.get_unique_id()
+            return "window.open('f?%s&__pyflag_parent='+window.__pyflag_name+'&__pyflag_name=child_%s','child_%s',  'width=600, height=600,scrollbars=yes'); return false;" % (target, id,id)
+
+        if target:
+            ## Try to remove the callback which we are generated from:
+            try:
+                target.remove('callback_stored', self.callback)
+            except:
+                pass
 
         if pane=='parent':
-            if target:
-                ## Try to remove the callback which we are generated from:
-                try:
-                    target.remove('callback_stored', self.callback)
-                except:
-                    pass
-                #target.poparray('callback_stored')
+            return "link_to_parent(\"%s\", window.__pyflag_parent); return false;" % target
 
-            return "window.opener.document.location='f?%s'; window.close(); return false;" % target
-            
+        if pane=="main":
+            return "post_link('f?%s','main'); find_window_by_name(window.__pyflag_name).close(); return false;" % target
+    
     def link(self,string,target=None,options=None,icon=None,tooltip=None, pane='main', **target_options):
         ## If the user specified a URL, we just use it as is:
         try:
@@ -348,7 +368,7 @@ class HTMLUI(UI.GenericUI):
         else:
             self.result+=base
 
-    def popup(self,callback, label,icon=None, tooltip=None, **options):
+    def popup(self,callback, label,icon=None, tooltip=None, width=600, height=600, **options):
         """ This method presents a button on the screen, which when
         clicked will open a new window and use the callback to render
         in it.
@@ -360,9 +380,9 @@ class HTMLUI(UI.GenericUI):
         cb = self.store_callback(callback)
 
         if icon:
-            base = "<img alt='%s' border=0 src='images/%s' onclick=\"popup('%s','%s'); return false;\" class=PopupIcon />" % (label,icon, self.defaults,cb)
+            base = "<img alt='%s' border=0 src='images/%s' onclick=\"popup('%s','%s',%r,%r); return false;\" class=PopupIcon />" % (label,icon, self.defaults,cb, width, height)
         else:
-            base = "<input type=button value=%r onclick=\"popup('%s','%s'); return false;\" />" % (label,self.defaults,cb)
+            base = "<input type=button value=%r onclick=\"popup('%s','%s',%r,%r); return false;\" />" % (label,self.defaults,cb,width,height)
         if tooltip:
             self.result += "<abbr title=%r>%s</abbr>" % (tooltip,base)
         else:
@@ -559,7 +579,7 @@ class HTMLUI(UI.GenericUI):
         def right(query,result):
             result.decoration = "js"
             result.content_type = "text/html"
-#            result.result += "<script>window.onunload = function() { if(document != top) top.location = window.document.location; }; </script>\n"
+
             try:
             ## Get the right part:
                 path=FlagFramework.normpath(query['open_tree'])
@@ -574,28 +594,30 @@ class HTMLUI(UI.GenericUI):
         ## This is a hack to make the tree boundary adjustable:
         def tree_frame_cb(query,result):
             result.decoration = 'raw'
+
+            try:
+                self.defaults.remove("callback_stored", self.callback)
+            except:
+                pass
+            
+            left_url = "%s&callback_stored=%s&right_pane_cb=%s&__pyflag_parent=%s&__pyflag_name=%s" % (self.defaults,l,r,query['__pyflag_parent'], query['__pyflag_name'])
+            right_url ="%s&callback_stored=%s&__pyflag_parent=%s&__pyflag_name=%s" % ( self.defaults, r, query['__pyflag_parent'], query['__pyflag_name'])
+                
             result.result = '''<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
-            <HTML>            
+            <HTML>
+            <script> window.__pyflag_name = "%s"; window.__pyflag_parent="%s";</script>
             <FRAMESET FRAMEBORDER=1 FRAMESPACING=1 COLS="340,*">
-            <FRAME SRC="%s&callback_stored=%s&right_pane_cb=%s" name=left id=left scrolling=auto>
-            <FRAME SRC="%s&callback_stored=%s" name=right id=right scrolling=auto>
+            <FRAME SRC="%s" name=left id=left scrolling=auto>
+            <FRAME SRC="%s" name=right id=right scrolling=auto>
             </FRAMESET>
-            </HTML>''' % (self.defaults,l,r,self.defaults,r)
+            </HTML>''' % (query['__pyflag_name'], query['__pyflag_parent'], left_url, right_url)
 
         tfcb = self.store_callback(tree_frame_cb)
         id = self.get_unique_id()
-        self.result += """<iframe id='TreeFrame%s' class=TreeFrame src='/f?callback_stored=%s'></iframe>
-        <script>AdjustHeightToPageSize('TreeFrame%s');</script>
-        """ % (id,tfcb, id)
-
-##      FIXME: Framesets provide for an adjustable boundary but must be on a document of their own.
-##        self.result += """<iframe><frameset id=frames rows='*' cols='400,75%%'>
-##        <frame name='left' src='%s&callback_stored=%s&right_pane_cb=%s'></frame>
-##        <frame name='right' src='%s&callback_stored=%s'></frame>
-##        </frameset></iframe>
-##        """ % (self.defaults, l, r, self.defaults, r)
-##        self.result+='<iframe id="left" name="left" height="100%%" width=300 src="%s&callback_stored=%s&right_pane_cb=%s"></iframe><iframe name="right" id="right" src="%s&callback_stored=%s" ></iframe>' % (self.defaults,l,r,self.defaults,r)
-
+        self.result += """<iframe id='TreeFrame%s' class=TreeFrame></iframe>
+        <script>AdjustHeightToPageSize('TreeFrame%s');document.getElementById('TreeFrame%s').src='/f?callback_stored=%s&__pyflag_parent=' + window.__pyflag_parent + '&__pyflag_name=' + window.__pyflag_name;</script>
+        """ % (id,id,id,tfcb)
+        
     def new_toolbar(self):
         id = "Toolbar%s" % self.get_unique_id()
         self.result += '''<div class="Toolbar" id="%s"></div>''' % id
@@ -737,20 +759,10 @@ class HTMLUI(UI.GenericUI):
                 left.text("&nbsp;%s\n" % str(sv),color='black')
 
         right=self.__class__(self)
-
-
         path=FlagFramework.normpath(query.get('open_tree','/'))
         pane_cb(path,right)
 
         self.result += '''<div class="TreeLeft">%s</div><div class="TreeRight">%s</div>''' % (left,right)
-
-    
-##        ## Now draw the left part
-##        if layout=="vertical":            
-##            self.row(left)
-##            self.row(right)
-##        else:
-##            self.row(left,right,valign='top')
 
     def toolbar(self,cb=None,text=None,icon=None,popup=True,tooltip=None,link=None, toolbar=None, pane='self'):
         """ Create a toolbar button.
@@ -1223,8 +1235,11 @@ class HTMLUI(UI.GenericUI):
 
     def end_form(self,value='Submit',name='submit',**opts):
         base = ''
+
+        ## Do not propagate __ parameters:
         for k,v in self.form_parms:
-            base += "<input type=hidden name='%s' value='%s'>\n" % (k,v)
+            if not k.startswith("__"):
+                base += "<input type=hidden name='%s' value='%s'>\n" % (k,v)
 
         if value:
             base += "<input type=submit name=%s value='%s' onclick=\"submit_form(%r,%r); return false;\" %s>\n" % (name,value,self.form_target,self.callback,self.opt_to_str(opts))

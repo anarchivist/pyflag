@@ -156,7 +156,9 @@ function isLeftClick(e)
 };
 
 function tree_pane_open(left_cb,right_cb, url) {
-  parent.frames['right'].location.href =url +  "&callback_stored="+ right_cb;
+  var w = parent.frames['right'];
+
+  w.location.href =url +  "&callback_stored="+ right_cb+"&__pyflag_parent=" + w.__pyflag_parent + "&__pyflag_name=" + w.__pyflag_name;;
 }
 
 function tree_open(left_cb, right_cb,url) {
@@ -179,22 +181,24 @@ function tree_open(left_cb, right_cb,url) {
       y = document.body.scrollTop;
     }
 
-  document.location.href = url + "&callback_stored="+left_cb+ "&yoffset="+y+ "&xoffset="+x;;
+  document.location.href = url + "&callback_stored="+left_cb+ "&yoffset="+y+ "&xoffset="+x + "&__pyflag_parent=" + window.__pyflag_parent + "&__pyflag_name=" + window.__pyflag_name;
 
   tree_pane_open(left_cb, right_cb, url);
 };
 
 /** This function is used to sumbit the query via a post to the
     target_window */
-function post_link(query, target_window) {
+function post_link(query, target_name) {
+  var target_window = find_window_by_name(target_name);
   var form = document.createElement('form');
   form.setAttribute('method','Post');
   form.setAttribute('action','/post');
+  form.setAttribute('target',target_name);
 
-  if(target_window)
-    form.setAttribute('target',target_window);
-  
   var input = document.createElement('input');
+
+  //Ensure the new window preserves its __pyflag_parent, __pyflag_name:
+  query += "&__pyflag_parent=" + target_window.__pyflag_parent + "&__pyflag_name=" + target_window.__pyflag_name;
   input.setAttribute('name','pseudo_post_query');
   input.setAttribute('value',query);
   input.setAttribute('type','hidden');
@@ -204,42 +208,22 @@ function post_link(query, target_window) {
   form.submit();
 };
 
-function xxxpopup(query, callback) {
-  var f = document.forms['pyflag_form_1'];
-  // There is a form already
-  if(f) {
-    // We just need to append the query, and force the form to be
-    // submitted to the popup:
-    var w = window.open('','popup'+callback, 'width=600, height=600, scrollbars=yes');
-    var old_target = f.target;
-    f.target = 'popup'+callback;
-
-    var input = document.createElement('input');
-    input.setAttribute('name','callback_stored');
-    input.setAttribute('value',callback);
-    input.setAttribute('type','hidden');
-    f.appendChild(input);
-    
-    f.submit();
-  } else {
-    window.open(query + "&callback_stored=" + callback,'popup', 'width=600, height=600, scrollbars=yes');
-  };
-};
-
 function refresh(query, pane) {
   var target;
 
   if(pane=='parent') {
-    target = window.opener;
+    target = find_window_by_name(window.__pyflag_parent);
   } else target=window;
 
-  target.location = query;
+  target.location = query + "&__pyflag_parent=" + target.__pyflag_parent + "&__pyflag_name=" + target.__pyflag_name;
 
-  if(pane=='parent')
-    window.close();
+  if(pane=='parent') {
+    var w = find_window_by_name(window.__pyflag_name);
+    w.close();
+  };
 };
 
-function popup(query, callback) {
+function popup(query, callback, width, height) {
   // Derive the query string from the contents of all the form
   // elements if available:
   var f = document.forms['pyflag_form_1'];
@@ -262,21 +246,25 @@ function popup(query, callback) {
   };
 
   //Now open the window:
-  w=window.open(query+"&__pane__=popup"+callback+"&callback_stored="+callback,'popup'+callback, 'width=600, height=600, scrollbars=yes');
+  var w=window.open(query+"&callback_stored="+callback + "&__pyflag_parent=" + window.__pyflag_name+"&__pyflag_name=popup" + callback,'popup'+callback, 'width='+width+', height='+height+', scrollbars=yes');
   w.parent = window.name;
 };
 
 
 function submit_form(pane, current_cb) {
   var target;
-  query = 'f?';
+  var query = 'f?';
 
   if(pane=='parent') {
-    target = window.opener;
-  } else if(pane=='popup') {
+    target = find_window_by_name(window.__pyflag_parent);
+    query += "__pyflag_parent=" + target.__pyflag_parent + "&__pyflag_name=" + target.__pyflag_name +"&";
+ } else if(pane=='popup') {
     target = window.open('','popup'+callback, 'width=600, height=600, scrollbars=yes');
-    query += "__pane__=popup"+callback;
-  } else target=window;
+    query += "__pyflag_parent=" + window.__pyflag_name + "&__pyflag_name=popup" + callback +"&";
+  } else {
+    target=window;
+    query += "&__pyflag_parent=" + target.__pyflag_parent + "&__pyflag_name=" + target.__pyflag_name;
+  };
 
   var f = document.forms['pyflag_form_1'];
   if(f) {
@@ -303,8 +291,10 @@ function submit_form(pane, current_cb) {
     target.location = query;
   };
 
-  if(pane=='parent')
-    window.close();
+  if(pane=='parent') {
+    var w = find_window_by_name(window.__pyflag_name);
+    w.close();
+  };
 };
 
 function getAbsolutePosition(element) {
@@ -375,3 +365,60 @@ function AdjustHeightToPageSize(element_id) {
   element.style.height = window.innerHeight - position.y -1 + "px";
   element.style.overflowY = 'auto';
 }
+
+/** This searches the heirarchy of windows for a window of the given
+ name.  Note that JS windows are not the same as pyflag windows. A
+ Pyflag window may contain several js windows (which all have the same
+ __pyflag_name and __pyflag_parent values). We return the highest
+ level js window object with the specified name.
+*/
+function find_window_by_name(name) {
+  var w=window;
+  var new_w;
+  var target=0;
+
+  while(1) {
+    if(w.__pyflag_name == name) { target=w;};
+
+    //Top level window has the same name as its parent
+    if(w.__pyflag_parent==w.__pyflag_name) 
+      break;
+
+    // Find the parent of this window
+    new_w = w.opener;
+    if(!new_w) new_w=w.parent;
+
+    // Top level js window - this should not happen
+    if(w==new_w)
+      break;
+
+    w = new_w;
+    if(!w) {
+      alert("No opener?");
+      break;
+    };
+  }
+
+  return target;
+};
+
+function link_to_parent(url, name) {
+  var w = 0;
+
+  if(!w) w=find_window_by_name(name);
+  if(!w) w=window.opener;
+  if(!w) w=window.parent;
+
+  //Ensure that the target maintains its __pyflag_name, __pyflag_parent.
+  w.document.location = url + "&__pyflag_parent=" + w.__pyflag_parent + "&__pyflag_name=" + w.__pyflag_name;
+
+  // Close ourselves:
+  w = find_window_by_name(window.__pyflag_name);
+  if(w) w.close();
+};
+
+// This function checks that certain properties have been set:
+function bug_check() {
+  if(!window.__pyflag_name) alert("You didnt set __pyflag_name");
+  if(!window.__pyflag_parent) alert("You didnt set __pyflag_parent");
+};

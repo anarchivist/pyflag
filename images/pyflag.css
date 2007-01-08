@@ -20,8 +20,7 @@ table.PyFlagTable {
 }
 
 table.GeneralTable { 
-  border-width: 4px;
-  border-style: groove;
+  width: 100%;
  }
 
 table.GeneralTable tr td { 
@@ -286,4 +285,14 @@ iframe#right {
 h1 { 
   font-size: 1.5em;
   font-weight: bold;
+ }
+
+/** Table alignment */
+table.PyFlagTable td.Integer { 
+  text-align: right;
+ }
+
+table.PyFlagTable { 
+  width: 100%;
+  overflow: auto;
  }
