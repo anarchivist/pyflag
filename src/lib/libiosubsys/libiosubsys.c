@@ -62,19 +62,17 @@ IOSource IOSource_Con(IOSource self, IOOptions opts) {
 
   // If we dont get a filename, we assume the first option is it
   if(!name) {
-    list_next(opts, &(opts->list), list);
-    if(opts) name = opts->name;
+    talloc_free(self);
+    return raise_errors(EIOError, "No filename specified!");
   };
 
-  if(name) {
-    self->filename = talloc_strdup(self,name);
-    self->fd = open(name,O_RDONLY);
+  self->filename = talloc_strdup(self,name);
+  self->fd = open(name,O_RDONLY);
 
-    /** We failed to open the file */
-    if(self->fd<0) {
-      talloc_free(self);
-      return raise_errors(EIOError, "Unable to open file %s\n", name);
-    };
+  /** We failed to open the file */
+  if(self->fd<0) {
+    talloc_free(self);
+    return raise_errors(EIOError, "Unable to open file %s\n", name);
   };
 
   // Find out the size of the file:
@@ -92,6 +90,7 @@ int IOSource_read_random(IOSource self, char *buf, uint32_t len, uint64_t offs) 
 
 VIRTUAL(IOSource, Object)
      VATTR(name) = "standard";
+     VATTR(fd) = -1;
      SET_DOCSTRING("Standard IO Source:\n\n"
 		   "This is basically a pass through driver.\n\n"
 		   "filename - The filename to open (just 1)\n");
@@ -171,6 +170,11 @@ IOSource AdvIOSource_Con(IOSource self, IOOptions opts) {
       CALL(this->buffer, write, (char *)&temp, sizeof(temp));
       this->number++;
     };
+  };
+
+  if(this->buffer->size == 0 ) {
+    talloc_free(self);
+    return raise_errors(EGeneric, "No files specified");
   };
 
   // Done.

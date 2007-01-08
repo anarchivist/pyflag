@@ -238,11 +238,14 @@ class Sleuthkit(DBFS):
 
         dbh_file=DB.DBO(self.case)
         dbh_inode=DB.DBO(self.case)
+        dbh_block=DB.DBO(self.case)
         dbh_file.cursor.ignore_warnings = True
         dbh_inode.cursor.ignore_warnings = True
+        dbh_block.cursor.ignore_warnings = True
 
-        #dbh_file.mass_insert_start("file")
-        #dbh_inode.mass_insert_start("inode")
+        dbh_file.mass_insert_start("file")
+        dbh_inode.mass_insert_start("inode")
+        dbh_block.mass_insert_start("block")
 
         def insert(inode, type, path, name):
             # insert the file record
@@ -272,7 +275,7 @@ class Sleuthkit(DBFS):
                 type = type[:-1]+'-'
 
             # insert file entry
-            dbh_file.insert( "file",
+            dbh_file.mass_insert(
                 inode = inodestr,
                 mode = type,
                 status = allocstr,
@@ -317,7 +320,7 @@ class Sleuthkit(DBFS):
             try:
                 f = fs.open(inode=str(inode))
                 s = fs.fstat(f)
-                dbh_inode.insert( "inode",
+                dbh_inode.mass_insert(
                     inode = inodestr,
                     status = status,
                     uid = s.st_uid,
@@ -334,7 +337,7 @@ class Sleuthkit(DBFS):
                 #insert block runs
                 index = 0
                 for (index, start, count) in runs(f.blocks()):
-                    dbh_inode.insert("block", 
+                    dbh_block.mass_insert(
                         inode = inodestr,
                         index = index,
                         block = start,

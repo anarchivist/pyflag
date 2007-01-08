@@ -1243,8 +1243,11 @@ class HTMLUI(UI.GenericUI):
             if not k.startswith("__"):
                 base += "<input type=hidden name='%s' value='%s'>\n" % (k,v)
 
-        if value:
-            base += "<input type=submit name=%s value='%s' onclick=\"submit_form(%r,%r); return false;\" %s>\n" % (name,value,self.form_target,self.callback,self.opt_to_str(opts))
+        if self.callback:
+            callback = self.callback
+        else: callback = 'None'
+        
+        base += "<input type=submit name=%s value='%s' onclick=\"submit_form(%r,%r); return false;\" %s>\n" % (name,value,self.form_target,callback,self.opt_to_str(opts))
 
         if self.table_depth>0:
             self.row(base)

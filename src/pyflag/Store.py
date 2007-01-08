@@ -33,6 +33,9 @@ class Store:
         self.max_size = max_size
         self.max_age = age
         self.mutex = thread.allocate_lock()
+
+        ## creation_times is an array of (time, key, object). The time
+        ## is ordered in oldest first and newest last time order.
         self.creation_times = []
         self.id = 0
 
@@ -70,7 +73,13 @@ class Store:
             i=0
             for t, k, obj in self.creation_times:
                 if k==key:
-                    #self.creation_times.pop(i)
+                    ## Remove the object from the store:
+                    t, k, obj = self.creation_times.pop(i)
+
+                    ## Reinsert it into the cache at the most recent
+                    ## time:
+                    self.creation_times.append([time.time(), k, obj])
+                    
                     self.check_full()
                     pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Got key %s: %s" % (key, obj))
                     return obj
@@ -103,3 +112,34 @@ class Store:
                     break
         except IndexError:
             pass
+
+## Store unit tests:
+import unittest
+import random, time
+
+class StoreTests(unittest.TestCase):
+    """ Store tests """
+    def test01StoreExpiration(self):
+        """ Testing store removes objects when full """
+        s = Store(max_size = 5)
+        keys = []
+        for i in range(0,100):
+            keys.append(s.put(i))
+
+        self.assertRaises(KeyError, lambda : s.get(keys[0]))
+
+        ## This should not raise
+        s.get(keys[-1])
+
+    def test02StoreRefresh(self):
+        """ Test that store keeps recently gotten objects fresh """
+        s = Store(max_size = 5)
+        keys = []
+        for i in range(0,5):
+            keys.append(s.put(i))
+
+        ## This should not raise because keys[0] should be refreshed
+        ## each time its gotten
+        for i in range(0,1000):
+            s.get(keys[0])
+            s.put(i)

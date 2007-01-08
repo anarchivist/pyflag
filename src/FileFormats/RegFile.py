@@ -278,7 +278,8 @@ class DATA(SimpleStruct):
         elif val_type=='REG_DWORD':
             result="0x08%X" % ULONG(self.raw_data).get_value()
         else:
-            result="%r" % "%s" % self.raw_data
+            ## FIXME: This needs to be a hexdump view:
+            result="%r" % ("%s" % self.raw_data)
             
         return result
 

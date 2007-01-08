@@ -138,7 +138,8 @@ class IO:
             try:
                 self.io=iosubsys.Open(options)
             except IOError, e:
-                print "ERROR: %s" % e
+                pass
+#                print "ERROR: %s" % e
 
             self.readptr = 0
             
@@ -405,6 +406,7 @@ class IOSubsystemTests(unittest.TestCase):
                                                            ['filename','/dev/null'],]))
         self.assertRaises(IOError, lambda : iosubsys.Open([['subsys','sgzip'],
                                                            ['filename','/tmp/fgggsddfssdg'],]))
+        self.assertRaises(IOError, lambda : iosubsys.Open([['subsys','sgzip'],]))
         
         ## Test failour to open a file:
         self.assertRaises(IOError, lambda : iosubsys.Open([['subsys','sgzip'],

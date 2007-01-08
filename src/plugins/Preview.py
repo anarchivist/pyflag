@@ -73,7 +73,7 @@ class RegistryBrowser(Reports.report):
                     try:
                         name = "%s"%  v['keyname']
                         result.heading("%s" % name)
-                        result.text("%s" % v)
+                        result.text("%s" % v, font='typewriter', wrap='full')
                     except: pass
 
             result.toolbar(cb = details, text = "Examine Details", icon = "examine.png")
