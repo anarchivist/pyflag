@@ -174,7 +174,7 @@ IOSource AdvIOSource_Con(IOSource self, IOOptions opts) {
 
   if(this->buffer->size == 0 ) {
     talloc_free(self);
-    return raise_errors(EGeneric, "No files specified");
+    return raise_errors(EIOError, "No files specified");
   };
 
   // Done.

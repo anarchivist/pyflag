@@ -355,7 +355,7 @@ class DBO:
                 return self.cursor.execute(string.decode('latin1'))
                 
             elif not str.startswith('Records'):
-                raise DBError,e
+                raise DBError(e)
 
     def cached_execute(self, sql, limit=0, length=50):
         """ Execute the query_str with params inside the pyflag Cache system.
@@ -670,7 +670,7 @@ class DBO:
             self.cursor.ignore_warnings = False
 
             DBH[self.case].put((self.dbh, self.mysql_bin_string))
-        except (TypeError,AssertionError):
+        except (TypeError,AssertionError,AttributeError):
             pass
 
     def MySQLHarness(self,client):

@@ -350,8 +350,15 @@ class ScanFS(Reports.report):
         
         result.para("The following scanners are used: %s" % scanners)
         result.row("System messages:")
+        dbh = DB.DBO()
+        dbh.execute("select count(*) as size from logs")
+        size = dbh.fetch()['size']
+
+        pagesize=20
+        dbh.execute("select timestamp,level,message from logs limit %s, %s", (size-pagesize, pagesize))
+        data = '\n'.join(["%(timestamp)s(%(level)s): %(message)s" % row for row in dbh])
         tmp=result.__class__(result)
-        tmp.text('\n'.join(pyflaglog.ring_buffer),font='typewriter',color="red")
+        tmp.text(data,font='typewriter',color="red")
         result.row(tmp)
         
 

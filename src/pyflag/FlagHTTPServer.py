@@ -367,6 +367,12 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         self.wfile.write(result.display())
         return
 
+    def log_message(self, format, *args):
+        pyflaglog.log(pyflaglog.INFO, "%s - - [%s] %s\n" %
+                      (self.address_string(),
+                       self.log_date_time_string(),
+                       format%args))
+        
 class FlagHTTPServer( SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
     pass
 

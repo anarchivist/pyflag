@@ -43,16 +43,11 @@ class load(pyflagsh.command):
         args=self.args
         text=''
         try:
-            case=args[1]
-            dbh = self.environment._DBO(case)
-##            try:
-##                case=text[:text.index(".")]
-##                dbh = self.environment._DBO(case)
-##            except ValueError:
-##                raise ParserException("Load has the following format: case.tag")
+            case=args[0]
+            dbh = DB.DBO(case)
 
-            self.environment.__class__._FS=Registry.FILESYSTEMS.fs['DBFS'](case)
-            self.environment.__class__._CASE = case
+            self.environment._FS=Registry.FILESYSTEMS.fs['DBFS'](case)
+            self.environment._CASE = case
             yield "Loaded case %r" %(case)
         except Exception,e:
             raise RuntimeError("Unable to open filesystem %s (%s)" %(text,e))
@@ -60,7 +55,7 @@ class load(pyflagsh.command):
     def complete(self,text,state):
         """ Completes the command for the different filesystems """
         args=self.args
-        dbh=self.environment._DBO(None)
+        dbh=DB.DBO()
         dbh.execute("select value from meta where property=%r","flag_db")
         cases=[ row['value'] for row in dbh ]
         for i in range(state,len(cases)):
@@ -74,7 +69,7 @@ class ls(pyflagsh.command):
         return "ls [dir]:  lists the files in the current directory (if dir not specified) or in dir."
 
     def execute(self):
-        args=self.args[1:]
+        args=self.args
         if len(args)==0:
             args.append(self.environment.CWD)
 
@@ -84,8 +79,7 @@ class ls(pyflagsh.command):
             ## Add the implied CWD:
             if not arg.startswith("/"): arg=FlagFramework.normpath(self.environment.CWD+"/"+arg)
             for path in FileSystem.glob(arg, case=self.environment._CASE):
-                f=FlagFramework.joinpath(path)
-                files[f]=True
+                files[path]=True
 
         ## This is used to collate files which may appear in multiple globs
         files = files.keys()
@@ -97,7 +91,6 @@ class ls(pyflagsh.command):
             
     def list(self,path):
         """ List the files in a particular path """
-        print "Listing path %s" % path
         path=os.path.abspath(os.path.join(self.environment.CWD,path))
         try:
             if self.environment._FS.isdir(path):
@@ -106,14 +99,25 @@ class ls(pyflagsh.command):
 
             if self.opts.has_key('-l'):
                 for dir in self.environment._FS.longls(path=path):
-                    yield "%s %s %s" % (dir['mode'],dir['inode'],dir['name'])
+                    if dir['name']:
+                        yield "%s\t%s\t%s" % (dir['mode'],dir['inode'],dir['name'])
 
             else:
                 for dir in self.environment._FS.ls(path=path,dirs=1):
-                    yield "[%s]"%dir
+                    ## Remove the current dir from path:
+                    if path.startswith(self.environment.CWD):
+                        new_path=path[len(self.environment.CWD):]
+                    else: new_path=path
+                    
+                    if dir:
+                        yield "[%s%s]" % (new_path,dir)
 
                 for file in self.environment._FS.ls(path=path,dirs=0):
-                    yield " %s " % file
+                    if path.startswith(self.environment.CWD):
+                        new_path=path[len(self.environment.CWD):]
+                    else: new_path=path
+                    if file:
+                        yield " %s%s " % (new_path,file)
 
             ## Do we need to recurse?
             if self.opts.has_key('-R'):
@@ -147,7 +151,7 @@ class cd(ls):
     def execute(self):
         args=self.args
         try:
-            path=args[1]
+            path=args[0]
         except IndexError:
             path="/"
 
@@ -181,7 +185,7 @@ class cd(ls):
 class cat(ls):
     """ Dumps the content of the file """
     def execute(self):
-        for arg in self.args[1:]:
+        for arg in self.args:
             path=os.path.abspath(os.path.join(self.environment.CWD,arg))
             fd=self.environment._FS.open(path)
             while 1:
@@ -323,10 +327,6 @@ class execute(pyflagsh.command):
         Note that environment values are automatically included into the set of args. So you may use set to set args that are commonly used.
         Note also that command line completion is enabled for this, and so may be used liberally to assist with both the selection of reports and the args needed
         """
-    def __init__(self,args,environment):
-        self.args=args
-        self.environment=environment
-
     def complete(self,text,state):
         args=self.args
 
@@ -482,7 +482,7 @@ class find_dict(find):
 class file(ls):
     """ Returns the file magic of args """
     def execute(self):
-        dbh=self.environment._DBO(self.environment._CASE)
+        dbh=DB.DBO(self.environment._CASE)
         #Find the inode of the file:
         
         for path in self.args[1:]:
@@ -490,3 +490,36 @@ class file(ls):
             dbh.execute("select mime,type from type where inode =%r",(inode))
             yield dbh.fetch()
 
+## Unit tests:
+import unittest
+import pyflag.pyflagsh as pyflagsh
+
+class BasicCommandTests(unittest.TestCase):
+    """ Test PyFlash commands """
+    test_case = "PyFlagTestCase"
+
+    def test01ls(self):
+        """ Test the ls command """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env, command="load",
+                             argv=[self.test_case,])
+
+        ## Check we can list default directory
+        lines = [ l for l in pyflagsh.shell_execv_iter(env=env, command="ls",
+                                                       argv=[])]
+        self.assertEqual(len(lines),2)
+
+        ## Check we can list directories
+        lines = [ l for l in pyflagsh.shell_execv_iter(env=env, command="ls",
+                                                       argv=["stdimage"])]
+        self.assertEqual(len(lines),18)
+
+        ## Check that we can glob files:
+        lines = [ l for l in pyflagsh.shell_execv_iter(env=env, command="ls",
+                                                       argv=["stdimage/*.jpg"])]
+        self.assertEqual(len(lines),6)
+        
+        ## Check that we can glob directories:
+        lines = [ l for l in pyflagsh.shell_execv_iter(env=env, command="ls",
+                                                       argv=["*image"])]
+        self.assertEqual(len(lines),36)

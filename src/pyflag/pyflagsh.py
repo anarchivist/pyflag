@@ -46,29 +46,22 @@ class ParserException(Exception):
 
 class environment:
     """ A class representing the environment """
-    _flag=None
-    _DBO=None
-    _FS = None
-    _IOSOURCE = None
-    _CASE = None
-    
     def __init__(self, case=None):
+        self._flag=None
+        self._FS = None
         self.CWD='/'
         self._CASE = case
-        if not environment._flag:
-            environment._flag=FlagFramework.Flag()
-            environment._DBO=DB.DBO
-            environment._flag.ui=UI.GenericUI
+        self.ui=UI.GenericUI
 
 class command:
     """ Base class for each command """
     optlist=""
     long_opts = []
-    def __init__(self,args,e=None):
+    def __init__(self,args,env=None):
         """ Constructor uses args as an initialiser. Parses args uses self.getopts """
         self.parse(args)
-        if e:
-            self.environment=e
+        if env:
+            self.environment=env
         else:
             self.environment=environment()
 
@@ -91,63 +84,13 @@ class command:
         """ Executes the command. This generator yields each line of output """
 
 class command_parse:
-    def glob_list(self,args):
-        """ Implement globbing of the args array to produce a new args array.
-        This implementation is based on the standard library's glob module
-        """
-        newargs=[]
-        for pathname in args:
-            newargs.extend(self.glob(pathname))
-        return newargs
-
-    def glob(self,pathname):
-        """ Globs the pathname against the image by recursively resolving glob directories """
-        if not self.has_magic(pathname):
-            return [pathname]
-
-        dirname, basename = os.path.split(pathname)
-        if not dirname:
-            return self.glob1(self.environment.CWD, basename)
-        elif self.has_magic(dirname):
-            list = glob(dirname)
-        else:
-            list = [dirname]
-        if not self.has_magic(basename):
-            result = []
-            for dirname in list:
-                if basename or self.environment._FS.isdir(dirname):
-                    name = os.path.join(dirname, basename)
-                    if self.environment._FS.exists(name):
-                        result.append(name)
-        else:
-            result = []
-            for dirname in list:
-                sublist = self.glob1(dirname, basename)
-                for name in sublist:
-                    result.append(os.path.join(dirname, name))
-        return result
-
-    def glob1(self,dirname, pattern):
-        if not dirname: dirname = self.environment.CWD
-        try:
-            names = self.environment._FS.ls(dirname)
-        except os.error:
-            return []
-        if pattern[0]!='.':
-            names=filter(lambda x: x[0]!='.',names)
-        return fnmatch.filter(names,pattern)
-
-    magic_check = re.compile('[*?[]')
-    def has_magic(self,s):
-        return self.magic_check.search(s) is not None
-
     def __init__(self,environment):
         self.environment=environment
 
     def parse(self,args):
         try:
             ## Create an instance of this command:
-            command=Registry.SHELL_COMMANDS[args[0]](args,self.environment)
+            command=Registry.SHELL_COMMANDS[args[0]](args[1:],env=self.environment)
             return command.execute()
         except KeyError:
             raise ParserException("No such command %s" % args[0])
@@ -201,13 +144,8 @@ def process_line(line):
     try:
         args=shlex.split(line)
 
-        #Implement globbing of filenames
-##        try:
-##            args=parser.glob_list(args)
-##        except AttributeError:
-##            pass
-
         if args and args[0][0]!='#':
+            lines = []
             for result in parser.parse(args):
                 ## If we get a dict we enumerate it nicely
                 try:
@@ -215,18 +153,25 @@ def process_line(line):
                         print "%s : %s" % (k,v)
                     print "-------------"
                 except AttributeError:
-                    print result
+                    lines.append(result)
+
+            ## If the output is short enough to fit on the screen,
+            ## just print it there, otherwise pipe it to less.
+            if len(lines)<20:
+                print "\n".join(lines)
+            else:
+                ## FIXME: we should set a config parameter for pager.
+                pipe=os.popen("less","w")
+                pipe.write("\n".join(lines))
+                pipe.close()
 
     except (ParserException,getopt.GetoptError,DB.DBError,TypeError),e:
         print "Error: %s" % e
         raise
-#        print FlagFramework.get_bt_string(e)
     except IOError,e:
         print "IOError: %s" % e
-#        print FlagFramework.get_bt_string(e)
     except ValueError,e:
         print "ValueError: %s" %e
-#        print FlagFramework.get_bt_string(e)
     except Exception,e:
         raise
 
@@ -245,7 +190,7 @@ def shell_execv_iter(env=None,command=None, argv=[]):
     except:
         raise RuntimeError("Command %s not found in registry" % command)
     
-    command = command(argv, environment=env)
+    command = command(argv, env=env)
         
     return command.execute()
 

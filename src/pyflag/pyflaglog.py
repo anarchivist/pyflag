@@ -25,7 +25,7 @@ logging verbosity is controlled through the configuration variable LOG_LEVEL
 """
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import sys,traceback
+import sys,traceback,time
 
 ## These are predefined logging levels:
 ERRORS=1
@@ -47,19 +47,36 @@ lookup = {
     VERBOSE_DEBUG: "Debug++",
     }
 
+from Queue import Queue, Full, Empty
+
+LOG_QUEUE = Queue(100)
+
+def insert_log_messages():
+    import pyflag.DB as DB
+
+    dbh = DB.DBO(None)
+    while 1:
+        try:
+            level, message = LOG_QUEUE.get(block=True)
+            dbh.insert("logs", level=level, message=message)
+        except:
+            time.sleep(10)
+
+import thread
+thread.start_new_thread(insert_log_messages,())
+
 def log(level,message):
     """ Prints the message out only if the configured verbosity is higher than the message's level."""
-    global ring_buffer
     string = "%s: %s" % (lookup[level],message)
-    
+
     if config.LOG_LEVEL>=level:
+        ## Pass the message to the logger queue:
+        LOG_QUEUE.put((level,message))
+        
         print string
         sys.stdout.flush()
-        ring_buffer.append(string)
-
-        if len(ring_buffer)>RING_BUFFER_SIZE:
-            ring_buffer=ring_buffer[-RING_BUFFER_SIZE:]
         
     if level<=ERRORS:
+        print string
         print traceback.print_tb(sys.exc_info()[2])
         sys.stdout.flush()

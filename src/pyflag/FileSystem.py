@@ -53,7 +53,7 @@ import pyflag.FlagFramework as FlagFramework
 from pyflag.FlagFramework import normpath
 import pyflag.Registry as Registry
 import pyflag.pyflaglog as pyflaglog
-import time
+import time,re
 import math
 import bisect
 import zipfile
@@ -791,35 +791,79 @@ class File:
             result.start_table(width="100%")
             result.row(left,valign='top',align="left")
 
-def globbed_path(path_elements, depth, case=None):
-    """ A generator which yields all elements globbed by the path_elements """
-    if len(path_elements)==depth:
-        return
+def translate(pat):
+    """Translate a shell PATTERN to a regular expression.
+
+    There is no way to quote meta-characters.
+    This is a derivative of fnmatch with some minor modifications.
+    """
+    i, n = 0, len(pat)
+    res = ''
+    while i < n:
+        c = pat[i]
+        i = i+1
+        if c == '*':
+            res = res + '[^/]*'
+        elif c == '?':
+            res = res + '[^/]'
+        elif c == '[':
+            j = i
+            if j < n and pat[j] == '!':
+                j = j+1
+            if j < n and pat[j] == ']':
+                j = j+1
+            while j < n and pat[j] != ']':
+                j = j+1
+            if j >= n:
+                res = res + '\\['
+            else:
+                stuff = pat[i:j].replace('\\','\\\\')
+                i = j+1
+                if stuff[0] == '!':
+                    stuff = '^' + stuff[1:]
+                elif stuff[0] == '^':
+                    stuff = '\\' + stuff
+                res = '%s[%s]' % (res, stuff)
+        else:
+            res = res + re.escape(c)
+    return res
+
+## This tells us if the pattern has a glob in it
+globbing_re = re.compile("[*+?\[\]]")
+
+def glob_sql(pattern):
+    path,name = os.path.split(pattern)
+
+
+    if globbing_re.search(path):
+        path_sql = "path rlike '^%s/?$'" % translate(path)
+    else:
+        ## Ensure that path has a / at the end:
+        if not path.endswith("/"): path=path+'/'
+        
+        path_sql = "path='%s'" % path
+
+    if globbing_re.search(name):
+        name_sql = "name rlike '^%s$'" % translate(name)
+    else:
+        name_sql = "name=%r" % name
     
-    ## First glob the current element:
-    dbh=DB.DBO(case)
-    dbh.execute("select name from file where path=%r and name rlike %r",
-                (FlagFramework.normpath(os.path.join('/', *path_elements[:depth])+'/'),
-                 fnmatch.translate(path_elements[depth])))
+    if name and path:
+        sql = "select concat(path,name) as path from file where %s and %s group by file.path,file.name" % (path_sql,name_sql)
+    elif name:
+        sql = "select concat(path,name) as path from file where %s group by file.path,file.name" % name_sql
+    elif path:
+        #sql = "%s and name=''" % path_sql
+        sql = "select path from file where %s group by file.path" % path_sql
+    else:
+        ## Dont return anything for an empty glob
+        sql = "select * from file where 1=0"
 
-    ## We try to continue globbing for every occurance of the current
-    ## depth
+    return sql
+    
+def glob(pattern, case=None):
+    dbh = DB.DBO(case)
+    dbh.execute(glob_sql(pattern))
     for row in dbh:
-        path = path_elements[:]
-        path[depth] = row['name']
-        yield path[:depth+1]
-
-        for paths in globbed_path(path, depth+1,case):
-            yield paths
-
-def glob(glob_str, case=None):
-    """ A top level generator to collect the results of the globbing operations """
-    glob_path = FlagFramework.splitpath(glob_str)
-    print glob_path
-    for p in globbed_path(glob_path,0,case):
-        if len(p)==len(glob_path):
-            yield p
-
-## Test:
-##for p in glob('/mnt/test/*/80*/forward'):
-##    print p
+        if row['path']:
+            yield row['path']

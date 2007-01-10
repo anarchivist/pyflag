@@ -99,7 +99,7 @@ class report:
             for k,v in self.executing.items():
                 for x,y in v.items():
                     if canonical_query in y:
-                        print "found thread %s" % k
+                        #print "found thread %s" % k
                         return k
         except TypeError:
             pass

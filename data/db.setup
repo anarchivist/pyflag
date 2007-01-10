@@ -281,3 +281,9 @@ CREATE TABLE `sql_cache` (
         `limit` INT default 0,
         `length` INT default 100
         );
+
+CREATE TABLE `logs` (
+`timestamp` TIMESTAMP NOT NULL ,
+`level` TINYINT NOT NULL ,
+`message` VARCHAR( 250 ) NOT NULL
+) ;

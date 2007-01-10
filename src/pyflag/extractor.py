@@ -100,7 +100,7 @@ class Extractor(object):
     """
     
     def __init__(self, defaults=True, libraries=None, lang=None, languages=None, hash=None, use_filename=False, split_keywords=False):
-	"""
+        """
 	Initialize Extractor's instance
 	
 	@param extractors: list of strings that contains extractor's name (supported types)
@@ -150,11 +150,11 @@ class Extractor(object):
 	True
 
 	"""
-	self._libraries = {}
-	self.extractors = None
-	if defaults:
-	    self.extractors = libextractor.EXTRACTOR_loadDefaultLibraries()
-	    self._libraries = dict([(library, None) for library in DEFAULT_LIBRARIES])
+        self._libraries = {}
+        self.extractors = None
+        if defaults:
+            self.extractors = libextractor.EXTRACTOR_loadDefaultLibraries()
+            self._libraries = dict([(library, None) for library in DEFAULT_LIBRARIES])
 	if use_filename:
 	    self.addLibrary("libextractor_filename")
 	if libraries:
