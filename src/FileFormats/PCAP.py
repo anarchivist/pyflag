@@ -54,7 +54,8 @@ class FileHeader(SimpleStruct):
             self.offset = off
             self.buffer = self.buffer[off:]
             result=SimpleStruct.read(self)
-            self.start_of_file = self.offset
+            self.start_of_file = off
+            self.start_of_data = self.offset
             return result
 
         off=tmp.search(struct.pack(">L",0xa1b2c3d4))
@@ -63,7 +64,8 @@ class FileHeader(SimpleStruct):
             self.offset = off
             self.buffer = self.buffer[off:]
             result=SimpleStruct.read(self)
-            self.start_of_file = self.offset
+            self.start_of_file = off
+            self.start_of_data = self.offset
             return result
 
         result=SimpleStruct.read(self)
@@ -71,7 +73,7 @@ class FileHeader(SimpleStruct):
         raise IOError('This is not a pcap magic (%s) at offset 0x%08X' % (result['magic'], self.buffer.offset))
     
     def __iter__(self):
-        self.offset = self.start_of_file
+        self.offset = self.start_of_data
         return self
 
     def next(self):
