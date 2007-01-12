@@ -338,6 +338,8 @@ class DBFS(FileSystem):
         dbh.check_index('inode','inode')
         dbh.execute("select inode_id, inode, status, uid, gid, mtime, atime, ctime, dtime, mode, links, link, size from inode where inode=%r limit 1",(inode))
         row = dbh.fetch()
+        if not row:
+            raise IOError("Inode %s not found" % inode)
 
         dbh.execute("select * from file where inode=%r order by mode limit 1", inode);
         result = dbh.fetch()
@@ -833,7 +835,6 @@ globbing_re = re.compile("[*+?\[\]]")
 
 def glob_sql(pattern):
     path,name = os.path.split(pattern)
-
 
     if globbing_re.search(path):
         path_sql = "path rlike '^%s/?$'" % translate(path)

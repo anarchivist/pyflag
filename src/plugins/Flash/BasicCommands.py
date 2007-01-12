@@ -73,19 +73,7 @@ class ls(pyflagsh.command):
         if len(args)==0:
             args.append(self.environment.CWD)
 
-        ## Glob the path if possible:
-        files = {}
-        for arg in args:
-            ## Add the implied CWD:
-            if not arg.startswith("/"): arg=FlagFramework.normpath(self.environment.CWD+"/"+arg)
-            for path in FileSystem.glob(arg, case=self.environment._CASE):
-                files[path]=True
-
-        ## This is used to collate files which may appear in multiple globs
-        files = files.keys()
-        files.sort()
-
-        for path in files:
+        for path in self.glob_files(args):
             for f in self.list(path):
                 yield f
             
@@ -185,9 +173,10 @@ class cd(ls):
 class cat(ls):
     """ Dumps the content of the file """
     def execute(self):
-        for arg in self.args:
-            path=os.path.abspath(os.path.join(self.environment.CWD,arg))
-            fd=self.environment._FS.open(path)
+        args = self.args
+        
+        for arg in self.glob_files(args):
+            fd=self.environment._FS.open(arg)
             while 1:
                 f=fd.read(1000000)
                 if len(f)>0:
@@ -201,15 +190,16 @@ class less(ls):
         
         def execute(self):
             args=self.args
-            for arg in args[1:]:
-                path=os.path.abspath(os.path.join(self.environment.CWD,arg))
-                fd=self.environment._FS.open(path)
-                f=fd.read()
-                fd.close()
+            for arg in self.glob_files(args):
+                fd=self.environment._FS.open(arg)
                 pipe=os.popen("less","w")
-                pipe.write(f)
+                while 1:
+                    data=fd.read(10000)
+                    if not data: break
+                    pipe.write(data)
+                    
                 pipe.close()
-                yield 'Viewing of %s with less successful' % path
+                yield 'Viewing of %s with less successful' % arg
 
 class cp(ls):
     """ Copies files from the filesystem to the directory specified as the last arg """
@@ -222,22 +212,22 @@ class cp(ls):
         #Check to see if the target is a valid directory:
         if not os.path.isdir(target):
             raise IOError("Target %s is not a directory. (Note: Target must exist on the host filesystem)")
-        for file in args[1:-1]:
-            path=os.path.abspath(os.path.join(self.environment.CWD,file))
-            target_path=os.path.abspath(os.path.join(target,file))
+        
+        for arg in self.glob_files(args[:-1]):
+            ## FIXME: implement a -R switch
+            #target_path=target + '/' + arg[len(self.environment.CWD):]
+            target_path=target + '/' + os.path.basename(arg)
             outfd=open(target_path,"w")
             try:
-                fd=self.environment._FS.open(path)
+                fd=self.environment._FS.open(arg)
                 while 1:
                     f=fd.read(1000000)
                     if not f: break
                     outfd.write(f)
 
-                fd.close()
-                outfd.close()
-                yield "Copied %s in image to %s on host" % (path,target_path)
+                yield "Copied %s in image to %s on host" % (arg,target_path)
             except IOError,e:
-                yield "Unable to copy %s: %s" %(path,e)
+                yield "Unable to copy %s: %s" %(arg,e)
 
 class help(pyflagsh.command):
     def help(self):
@@ -253,10 +243,10 @@ class help(pyflagsh.command):
             
     def execute(self):
         args=self.args
-        if len(args)==1:
+        if len(args)==0:
             args.append('help')
 
-        for i in args[1:]:
+        for i in args:
             command=Registry.SHELL_COMMANDS[i]([],self.environment)
             try:
                 yield(command.help())
@@ -277,7 +267,7 @@ class set(pyflagsh.command):
             
     def execute(self):
         args=self.args
-        if len(args)==1:
+        if len(args)==0:
             for i in dir(self.environment):
                 if not i.startswith('_'):
                     try:
@@ -285,7 +275,7 @@ class set(pyflagsh.command):
                     except KeyError:
                         pass
         else:
-            for i in args[1:]:
+            for i in args:
                 try:
                     index=i.index("=")
                     self.environment.__dict__[i[:index]]=i[index+1:]
@@ -303,19 +293,48 @@ class exit(pyflagsh.command):
 class istat(pyflagsh.command):
     """ stats an inode in the filesystem """
     def help(self):
-        return "istat: Stats an inode in the file system returning statistics"
+        return "istat: Stats an inode in the file system returning statistics. Arg can be a regex which will match inodes (e.g. /Itest|K0.*/)"
 
     def execute(self):
         args=self.args
-        for arg in args[1:]:
-            filename = self.environment._FS.lookup(inode=arg)
-            status=self.environment._FS.istat(inode=arg)
-            if not status:
-                raise RuntimeError("No status available for %s" % arg)
+        for arg in args:
+            ## Glob the inodes:
+            dbh = DB.DBO(self.environment._CASE)
+            print arg
+            if arg[0]=='/':
+                dbh.execute("select inode from inode where inode rlike %r", arg[1:-1])
+            else:
+                dbh.execute("select inode from inode where inode like %r", arg)
 
-            status['filename'] = filename
-            yield status
+            for row in dbh:
+                inode = row['inode']                
+                filename = self.environment._FS.lookup(inode=inode)
+                status=self.environment._FS.istat(inode=inode)
+                if not status:
+                    raise RuntimeError("No status available for %s" % arg)
+                
+                status['filename'] = filename
+                yield status
 
+class stat(ls):
+    """ stats a list of files in the filesystem """
+    def help(self):
+        return "stat: Stats a list of files in the file system. Files can consist of any glob pattern"
+
+    def execute(self):
+        args=self.args
+        for arg in self.glob_files(args):
+            try:
+                inode = self.environment._FS.lookup(arg)
+                status=self.environment._FS.istat(inode=inode)
+                if not status:
+                    raise RuntimeError("No status available for %s" % arg)
+
+                status['filename'] = arg
+                yield status
+            except IOError:
+                pass
+            
 class execute(pyflagsh.command):
     """ Executes a report's analysis method with the required parameters """
     def help(self):
@@ -436,7 +455,7 @@ class reset(execute):
         ## Execute the report:
         try:
             report.do_reset(query)
-            yield "Resetting of %s successful in %s sec" % (self.args[1],time.time()-start_time)            
+            yield "Resetting of %s successful in %s sec" % (self.args[0],time.time()-start_time)            
         except Exception,e:
             import traceback
             print traceback.print_tb(sys.exc_info()[2])
@@ -447,7 +466,7 @@ class find(ls):
     long_opts = [ "name=", "type=" ]
     
     def execute(self):
-        for path in self.args[1:]:
+        for path in self.args:
             for file in self.list(path):
                 yield os.path.normpath( "/////%s/%s" % (file['path'],file['name']))
         
@@ -485,13 +504,15 @@ class file(ls):
         dbh=DB.DBO(self.environment._CASE)
         #Find the inode of the file:
         
-        for path in self.args[1:]:
+        for path in self.glob_files(self.args):
             inode = self.environment._FS.lookup(path=path)
-            dbh.execute("select mime,type from type where inode =%r",(inode))
-            yield dbh.fetch()
+            dbh.execute("select type.inode,name, mime,type from type,file where file.inode =%r and file.inode=type.inode",(inode))
+            row = dbh.fetch()
+            if row:
+                yield row
 
 ## Unit tests:
-import unittest
+import unittest,md5
 import pyflag.pyflagsh as pyflagsh
 
 class BasicCommandTests(unittest.TestCase):
@@ -500,26 +521,80 @@ class BasicCommandTests(unittest.TestCase):
 
     def test01ls(self):
         """ Test the ls command """
-        env = pyflagsh.environment(case=self.test_case)
-        pyflagsh.shell_execv(env=env, command="load",
+        self.env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=self.env, command="load",
                              argv=[self.test_case,])
 
         ## Check we can list default directory
-        lines = [ l for l in pyflagsh.shell_execv_iter(env=env, command="ls",
+        lines = [ l for l in pyflagsh.shell_execv_iter(env=self.env, command="ls",
                                                        argv=[])]
         self.assertEqual(len(lines),2)
 
         ## Check we can list directories
-        lines = [ l for l in pyflagsh.shell_execv_iter(env=env, command="ls",
+        lines = [ l for l in pyflagsh.shell_execv_iter(env=self.env, command="ls",
                                                        argv=["stdimage"])]
-        self.assertEqual(len(lines),18)
+        self.assert_(len(lines)>=15)
 
         ## Check that we can glob files:
-        lines = [ l for l in pyflagsh.shell_execv_iter(env=env, command="ls",
+        lines = [ l for l in pyflagsh.shell_execv_iter(env=self.env, command="ls",
                                                        argv=["stdimage/*.jpg"])]
         self.assertEqual(len(lines),6)
         
         ## Check that we can glob directories:
-        lines = [ l for l in pyflagsh.shell_execv_iter(env=env, command="ls",
+        lines = [ l for l in pyflagsh.shell_execv_iter(env=self.env, command="ls",
                                                        argv=["*image"])]
-        self.assertEqual(len(lines),36)
+        self.assert_(len(lines)>32)
+
+    def test02catTests(self):
+        """ Test the cat command """
+        self.env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=self.env, command="load",
+                             argv=[self.test_case,])
+
+        self.fsfd = FileSystem.DBFS(self.test_case)
+        fd = self.fsfd.open("/stdimage/dscf1080.jpg")
+        data1=fd.read()        
+        fd = self.fsfd.open("/stdimage/dscf1081.jpg")
+        data2=fd.read()
+        fd = self.fsfd.open("/stdimage/dscf1082.jpg")
+        data3=fd.read()
+
+        result = ''
+        for l in pyflagsh.shell_execv_iter(env=self.env, command="cat",
+                                           argv=["/stdimage/dscf1081.jpg"]):
+            result+=l
+        self.assertEqual(result,data2)
+
+        result = ''
+        for l in pyflagsh.shell_execv_iter(env=self.env, command="cat",
+                                           argv=["/stdimage/dscf108*"]):
+            result+=l
+
+        self.assertEqual(len(result),len(data1)+len(data2)+len(data3))
+        self.assert_(result==data1+data2+data3)
+
+    def test03cpTests(self):
+        """ Test the cp (copy) command """
+        self.env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=self.env, command="load",
+                             argv=[self.test_case,])
+
+        ## Make a directory for the files:
+        tmpname = os.tmpnam()
+        os.mkdir(tmpname)
+
+        pyflagsh.shell_execv(env=self.env, command="cp",
+                             argv=["/stdimage/dscf108*", tmpname])
+
+        ## Now verify the copy worked:
+        fd = open(tmpname+"/dscf1080.jpg",'r')
+        data = fd.read()
+        md5sum = md5.new()
+        md5sum.update(data)
+        self.assertEqual(md5sum.hexdigest(),'9e03e022404a945575b813ffb56fd841')
+
+        ## Clean up:
+        for file in os.listdir(tmpname):
+            os.unlink(tmpname+'/'+file)
+            
+        os.rmdir(tmpname)

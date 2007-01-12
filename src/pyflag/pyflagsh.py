@@ -39,6 +39,7 @@ import pyflag.Registry as Registry
 from optparse import OptionParser
 import pyflag.conf
 config = pyflag.conf.ConfObject()
+import pyflag.FileSystem as FileSystem
 
 class ParserException(Exception):
     """ Exception thrown by the parser when we cant parse the line """
@@ -47,7 +48,7 @@ class ParserException(Exception):
 class environment:
     """ A class representing the environment """
     def __init__(self, case=None):
-        self._flag=None
+        self._flag=FlagFramework.Flag(UI.GenericUI)
         self._FS = None
         self.CWD='/'
         self._CASE = case
@@ -64,6 +65,21 @@ class command:
             self.environment=env
         else:
             self.environment=environment()
+
+    def glob_files(self, args):
+        ## Glob the path if possible:
+        files = {}
+        for arg in args:
+            ## Add the implied CWD:
+            if not arg.startswith("/"): arg=FlagFramework.normpath(self.environment.CWD+"/"+arg)
+            for path in FileSystem.glob(arg, case=self.environment._CASE):
+                files[path]=True
+
+        ## This is used to collate files which may appear in multiple globs
+        files = files.keys()
+        files.sort()
+
+        return files
 
     def help(self):
         """ Help function to print when the user asked for help """
@@ -150,10 +166,10 @@ def process_line(line):
                 ## If we get a dict we enumerate it nicely
                 try:
                     for k,v in result.items():
-                        print "%s : %s" % (k,v)
-                    print "-------------"
+                        lines.append( "%s : %s" % (k,v))
+                    lines.append("-------------")
                 except AttributeError:
-                    lines.append(result)
+                    lines.extend(result.splitlines())
 
             ## If the output is short enough to fit on the screen,
             ## just print it there, otherwise pipe it to less.
