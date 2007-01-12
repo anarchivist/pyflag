@@ -34,7 +34,6 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.pyflaglog as pyflaglog
 import time,types
-import threading
 from Queue import Queue, Full, Empty
 from MySQLdb.constants import FIELD_TYPE
 import threading
@@ -109,15 +108,18 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
         def cancel():
             pyflaglog.log(pyflaglog.WARNINGS, "Killing query in thread %s because it took too long" % self.connection.thread_id())
             self.kill_connection('query')
-            
-        t = threading.Timer(self.timeout, cancel)
-        t.start()
-        try:
+
+        if self.timeout:
+            t = threading.Timer(self.timeout, cancel)
+            t.start()
+            try:
+                MySQLdb.cursors.SSDictCursor.execute(self,string)
+            finally:
+                t.cancel()
+                t.join()
+                pass
+        else:
             MySQLdb.cursors.SSDictCursor.execute(self,string)
-        finally:
-            t.cancel()
-            t.join()
-            pass
 
     def fetchone(self):
         """ Updates the row cache if needed otherwise returns a single
@@ -265,9 +267,7 @@ class Pool(Queue):
 ## This store stores information about indexes
 import Store
 DBIndex_Cache=Store.Store()
-
-global DBH
-DBH={}
+DBH=Store.Store()
 
 class DBO:
     """ Class controlling access to DB handles
@@ -288,11 +288,12 @@ class DBO:
         if not case:
             case = config.FLAGDB
 
+        key = "%s/%s" % (case, threading.currentThread().getName())
         try:
-            self.dbh,self.mysql_bin_string=DBH[case].get()
+            self.dbh,self.mysql_bin_string=DBH.get(key).get()
         except KeyError:
-            DBH[case] = Pool(case)
-            self.dbh,self.mysql_bin_string=DBH[case].get()
+            DBH.put(Pool(case), key=key)
+            self.dbh,self.mysql_bin_string=DBH.get(key).get()
             
         self.temp_tables = []
         self.case = case
@@ -346,7 +347,8 @@ class DBO:
                 global db_connections
                 db_connections -=1
 
-                self.dbh,self.mysql_bin_string=DBH[self.case].connect()
+                key = "%s/%s" % (self.case, threading.currentThread().getName())        
+                self.dbh,self.mysql_bin_string=DBH.get(key).connect()
                 self.cursor = self.dbh.cursor()
 
                 ## Redo the query with the new connection - if we fail
@@ -663,13 +665,13 @@ class DBO:
             self.cursor.ignore_warnings = True
             for i in self.temp_tables:
                 self.drop(i)
-
             ## Ensure that our mass insert case is comitted in case
             ## users forgot to flush it:
             self.mass_insert_commit()
             self.cursor.ignore_warnings = False
 
-            DBH[self.case].put((self.dbh, self.mysql_bin_string))
+            key = "%s/%s" % (self.case, threading.currentThread().getName())
+            DBH.get(key).put((self.dbh, self.mysql_bin_string))
         except (TypeError,AssertionError,AttributeError):
             pass
 

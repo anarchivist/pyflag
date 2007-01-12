@@ -203,9 +203,11 @@ def start_workers():
          children.append(pid)
        else:   
          atexit.register(child_exist)
-
          dispatcher = Dispatcher()
          
+         ## Start the logging thread for each worker:
+         pyflaglog.start_log_thread()
+
          ## These are all the methods we support
          methods = [ "command=%r" % x for x in dir(dispatcher) if not x.startswith('_')]
          dbh=DB.DBO()

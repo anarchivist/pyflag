@@ -102,7 +102,7 @@ class Registry:
                                 
                                 try:
                                     if not module.active:
-                                        pyflaglog.log(pyflaglog.WARNINGS, "*** Will not load Module %s: Module not active" % (module_name))
+                                        pyflaglog.log(pyflaglog.DEBUG, "*** Will not load Module %s: Module not active" % (module_name))
                                         continue
                                 except AttributeError:
                                     pass

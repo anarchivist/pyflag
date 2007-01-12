@@ -49,7 +49,7 @@ def fill_in_dependancies(scanners):
                 d = cls.depends
             for dependancy in d:
                 if dependancy not in scanners:
-                    pyflaglog.log(pyflaglog.WARNINGS,"%s depends on %s, which was not enabled - enabling to satisfy dependancy" % (s,dependancy))
+                    pyflaglog.log(pyflaglog.DEBUG,"%s depends on %s, which was not enabled - enabling to satisfy dependancy" % (s,dependancy))
                     scanners.append(dependancy)
                     modified = True
         if not modified: break
