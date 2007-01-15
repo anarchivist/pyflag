@@ -57,7 +57,7 @@ import pyflag.DB as DB
 import pyflag.Scanner as Scanner
 import pyflag.ScannerUtils as ScannerUtils
 import pyflag.Registry as Registry
-import os,sys
+import os,sys,time
 import dissect,reassembler, _dissect
 from NetworkScanner import *
 import FileFormats.PCAP as PCAP
@@ -175,6 +175,7 @@ class PCAPFS(DBFS):
             scanner_string = ",".join(scanners)
             pdbh = DB.DBO()
             pdbh.mass_insert_start('jobs')
+            cookie = int(time.time())
 
         def Callback(s):
             ## Flush the mass insert pcap:
@@ -256,6 +257,7 @@ class PCAPFS(DBFS):
                     arg1 = self.case,
                     arg2 = new_inode,
                     arg3= scanner_string,
+                    cookie=cookie,
                     )
 
         ## Register the callback

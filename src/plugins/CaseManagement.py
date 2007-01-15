@@ -32,6 +32,7 @@ import pyflag.FlagFramework as FlagFramework
 import pyflag.FileSystem as FileSystem
 import pyflag.DB as DB
 import os
+import pyflag.IO as IO
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 from pyflag.TableObj import StringType,TimestampType,InodeType,FilenameType
@@ -204,6 +205,12 @@ class DelCase(Reports.report):
             os.rmdir(temporary_dir)
         except:
             pass
+
+        ## Expire any caches we have relating to this case:
+        key_re = "%s[/|]?.*" % query['remove_case']
+        IO.IO_Cache.expire(key_re)
+        DB.DBH.expire(key_re)
+        DB.DBIndex_Cache.expire(key_re)
 
         result.heading("Deleted case")
         result.para("Case %s has been deleted" % query['remove_case'])

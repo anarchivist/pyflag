@@ -33,6 +33,9 @@ class scan(pyflagsh.command):
         dbh.execute("select inode from inode where inode rlike %r",fnmatch.translate(self.args[0]))
         pdbh = DB.DBO()
         pdbh.mass_insert_start('jobs')
+        ## This is a cookie used to identify our requests so that we
+        ## can check they have been done later.
+        cookie = int(time.time())
         scanners = []
         for i in range(1,len(self.args)):
             scanners.extend(fnmatch.filter(Registry.SCANNERS.scanners, self.args[i]))
@@ -43,7 +46,8 @@ class scan(pyflagsh.command):
                 command = 'Scan',
                 arg1 = self.environment._CASE,
                 arg2 = row['inode'],
-                arg3 = ','.join(scanners)
+                arg3 = ','.join(scanners),
+                cookie=cookie,
                 )
 
         pdbh.mass_insert_commit()
@@ -57,7 +61,8 @@ class scan(pyflagsh.command):
         ## finish. Maybe we need to add a cookie field to the jobs
         ## table so we can easily find our own jobs only.
         while 1:
-            pdbh.execute("select count(*) as total from jobs where arg1=%r", self.environment._CASE)
+            pdbh.execute("select count(*) as total from jobs where cookie=%r and arg1=%r", (cookie,
+                         self.environment._CASE))
             row = pdbh.fetch()
             if row['total']==0: break
 
@@ -65,6 +70,7 @@ class scan(pyflagsh.command):
             
         yield "Scanning complete"
 
+## There is little point in distributing this because its very quick anyway.
 class scanner_reset(scan):
     def help(self):
         return "reset inode [list of scanners]: Resets the inodes with the scanners specified"

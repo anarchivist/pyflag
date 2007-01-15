@@ -13,7 +13,7 @@ The store is also thread safe as a single thread is allowed to access
 the store at any one time.
 """
 
-import thread,time
+import thread,time,re
 import pyflag.pyflaglog as pyflaglog
 
 class Store:
@@ -113,6 +113,16 @@ class Store:
         except IndexError:
             pass
 
+    def expire(self, regex):
+        """ Automatially expire all objects with keys matching the regex """
+        self.mutex.acquire()
+
+        try:
+            self.creation_times = [ x for x in self.creation_times if not re.search(regex, x[1])]
+        finally:
+            self.mutex.release()
+
+
 ## Store unit tests:
 import unittest
 import random, time
@@ -143,3 +153,16 @@ class StoreTests(unittest.TestCase):
         for i in range(0,1000):
             s.get(keys[0])
             s.put(i)
+
+    def test03Expire(self):
+        """ Tests the expire mechanism """
+        s = Store(max_size = 100)
+        for i in range(0,5):
+            s.put(i, key="test%s" % i)
+
+        for i in range(0,5):
+            s.put(i, key="tests%s" % i)
+
+        s.expire("test\d+")
+        ## Should have 5 "testsxxx" left
+        self.assertEqual(len(s.creation_times),5)

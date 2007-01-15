@@ -41,6 +41,7 @@ import pyflag.LogFile as LogFile
 import plugins.LogAnalysis.LogAnalysis as LogAnalysis
 import pyflag.pyflaglog as pyflaglog
 import pyflag.ScannerUtils as ScannerUtils
+import time
 
 description = "Load Data"
 
@@ -219,8 +220,7 @@ class ScanFS(Reports.report):
     - The same file can not be scanned twice by the same scanner.
     - If an enabled scanner depends on another scanner to execute, that scanner will be enabled in order to satisfy the dependancy.
 
-    FIXME: implement this
-    Note that 'path' is a filesystem glob specifying a set of directories to be scanner recursively.
+    Note that 'path' is a filesystem glob specifying a set of directories to be scanned recursively.
     """
     parameters = {'path':'any', 'final':'string'}
     name = "Scan Filesystem"
@@ -250,7 +250,7 @@ class ScanFS(Reports.report):
         try:
             result.case_selector()
             if query['case']!=config.FLAGDB:
-               result.textfield('Scan under directory','path',size=50)
+               result.textfield('Scan files','path',size=50)
 
                ## Draw the form for each scan group:
                for cls in ScannerUtils.scan_groups_gen():
@@ -289,30 +289,15 @@ class ScanFS(Reports.report):
         fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'])
 
         scanner_names = self.calculate_scanners(query)
+
+        ## Schedule the scanners to run in the jobs table:
+        pdbh = DB.DBO()
+        pdbh.mass_insert_start('jobs')
+
+        ## The cookie is used to identify our own requests.
+        cookie = int(time.time())
         
-        scanners = [ ]
-        for i in scanner_names:
-            try:
-                tmp  = Registry.SCANNERS.dispatch(i)
-                scanners.append(tmp(fsfd))
-            except Exception,e:
-                pyflaglog.log(pyflaglog.ERRORS,"Unable to initialise scanner %s (%s)" % (i,e))
-
-        ## Now sort the scanners by their specified order:
-        def cmpfunc(x,y):
-            if x.order>y.order:
-                return 1
-            elif x.order<y.order:
-                return -1
-
-            return 0
-
-        scanners.sort(cmpfunc)
-
-        pyflaglog.log(pyflaglog.DEBUG,"Will invoke the following scanners: %s" % scanners)
-        ## Prepare the scanner factories for scanning:
-        for s in scanners:
-            s.prepare()
+        pyflaglog.log(pyflaglog.DEBUG,"Will invoke the following scanners: %s" % scanner_names)
 
         def process_directory(root):
             """ Recursive function for scanning directories """
@@ -324,25 +309,31 @@ class ScanFS(Reports.report):
             
             ## First scan all the files in the directory
             for stat in files:
-                try:
-                    fd=fsfd.open(inode=stat['inode'])
-                    Scanner.scanfile(fsfd,fd,scanners)
-                except IOError,e:
-                    pyflaglog.log(pyflaglog.WARNINGS,"Unable to open file %s%s: %s" % (stat['path'],stat['name'],e))
-                    print FlagFramework.get_bt_string(e)
-                except Exception,e:
-                    pyflaglog.log(pyflaglog.ERRORS,"Error scanning inode %s: %s" % (stat['inode'],e))
-                    
+                pdbh.mass_insert(
+                    command = 'Scan',
+                    arg1 = query['case'],
+                    arg2 = stat['inode'],
+                    arg3 = ','.join(scanner_names),
+                    cookie=cookie
+                    )
+    
             ## Now recursively scan all the directories in this directory:
             for directory in directories:
                 new_path = "%s%s/" % (root,directory)
                 process_directory(new_path)
-                    
-        process_directory(query['path'])
 
-        ## Destroy the scanner factories:
-        for s in scanners:
-            s.destroy()
+        ## Glob the files specified in path:
+        for f in FileSystem.glob(query['path'], case=query['case']):
+            process_directory(query['path'])
+
+        ## Wait untill all the files have been done:
+        while 1:
+            pdbh.execute("select count(*) as total from jobs where cookie=%r and arg1=%r",
+                         (cookie,query['case']))
+            row = pdbh.fetch()
+            if row['total']==0: break
+
+            time.sleep(1)
 
     def progress(self,query,result):
         result.heading("Scanning path %s" % (query['path']))
@@ -458,6 +449,7 @@ class LoadFS(Reports.report):
             # initialise/open the subsystem
             fd=IO.open(query['case'],query['iosource'])
 
+            ## FIXME: make this order definable
             fs_types = Registry.FILESYSTEMS.filesystems.keys()
             fs_types.sort()
             

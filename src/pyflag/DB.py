@@ -267,7 +267,7 @@ class Pool(Queue):
 ## This store stores information about indexes
 import Store
 DBIndex_Cache=Store.Store()
-DBH=Store.Store()
+DBH=Store.Store(max_size=10)
 
 class DBO:
     """ Class controlling access to DB handles
@@ -288,7 +288,8 @@ class DBO:
         if not case:
             case = config.FLAGDB
 
-        key = "%s/%s" % (case, threading.currentThread().getName())
+##        key = "%s/%s" % (case, threading.currentThread().getName())
+        key = "%s" % (case)
         try:
             self.dbh,self.mysql_bin_string=DBH.get(key).get()
         except KeyError:
@@ -347,7 +348,8 @@ class DBO:
                 global db_connections
                 db_connections -=1
 
-                key = "%s/%s" % (self.case, threading.currentThread().getName())        
+##                key = "%s/%s" % (self.case, threading.currentThread().getName())
+                key = "%s" % (self.case)        
                 self.dbh,self.mysql_bin_string=DBH.get(key).connect()
                 self.cursor = self.dbh.cursor()
 
@@ -579,7 +581,7 @@ class DBO:
         If an index is missing, we create it here, so we always ensure an index exists once we return. """
         ## We implement a local cache to ensure that we dont hit the
         ## DB all the time:
-        cache_key = "%s:%s" % (self.case,table)
+        cache_key = "%s/%s" % (self.case,table)
         try:
             ## These should be the fields with the indexes on them:
             fields = DBIndex_Cache.get(cache_key)
@@ -670,9 +672,10 @@ class DBO:
             self.mass_insert_commit()
             self.cursor.ignore_warnings = False
 
-            key = "%s/%s" % (self.case, threading.currentThread().getName())
+            ##key = "%s/%s" % (self.case, threading.currentThread().getName())
+            key = "%s" % (self.case)
             DBH.get(key).put((self.dbh, self.mysql_bin_string))
-        except (TypeError,AssertionError,AttributeError):
+        except (TypeError,AssertionError,AttributeError, KeyError):
             pass
 
     def MySQLHarness(self,client):

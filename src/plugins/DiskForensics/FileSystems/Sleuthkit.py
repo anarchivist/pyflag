@@ -228,7 +228,7 @@ class Sleuthkit(DBFS):
     """ A new improved Sleuthit based filesystem """
     name = 'Sleuthkit'
 
-    def load(self, mount_point, iosource_name):
+    def load(self, mount_point, iosource_name, scanners = None):
         ## Ensure that mount point is normalised:
         mount_point = os.path.normpath(mount_point)
         DBFS.load(self, mount_point, iosource_name)
@@ -240,6 +240,12 @@ class Sleuthkit(DBFS):
         dbh_file=DB.DBO(self.case)
         dbh_inode=DB.DBO(self.case)
         dbh_block=DB.DBO(self.case)
+        if scanners:
+            scanner_string = ",".join(scanners)
+            pdbh = DB.DBO()
+            pdbh.mass_insert_start('jobs')
+            cookie = int(time.time())
+        
         dbh_file.cursor.ignore_warnings = True
         dbh_inode.cursor.ignore_warnings = True
         dbh_block.cursor.ignore_warnings = True
@@ -349,6 +355,16 @@ class Sleuthkit(DBFS):
             except IOError:
                 pass
 
+            ## If needed schedule inode for scanning:
+            if scanners:
+                pdbh.mass_insert(
+                    command = 'Scan',
+                    arg1 = self.case,
+                    arg2 = inode,
+                    arg3= scanner_string,
+                    cookie=cookie,
+                    )
+
         # insert root inode
         insert_inode(fs.root_inum)
 
@@ -362,11 +378,6 @@ class Sleuthkit(DBFS):
         # find any unlinked inodes here
         for s in fs.iwalk():
             insert_inode(s)
-
-        #dbh_file.mass_insert_commit()
-        #dbh_inode.mass_insert_commit()
-
-        return
 
 ## Unit Tests:
 import unittest, md5
