@@ -361,11 +361,12 @@ class ColumnType:
     responsible for displaying the values from the column and are used
     to generate SQL.
     """
-    def __init__(self, name='', sql='', link='', callback=None):
+    def __init__(self, name='', sql='', link='', callback=None, link_pane='self'):
         self.name = name
         self.sql = sql
         self.link = link
         self.callback = callback
+        self.link_pane = link_pane
 
     ## These are the symbols which will be treated literally
     symbols = {
@@ -407,14 +408,11 @@ class ColumnType:
         ## By default just implement a simple callback:
         if self.callback:
             value = self.callback(value)
-
-        ## The result can now be linked if needed:
-        ## Note this only makes sense if cb returns a simple string
-        if self.link and value == value.__str__():
+        elif self.link:
             result = result.__class__(result)
             q = self.link.clone()
             q.FillQueryTarget(value.__str__())
-            result.link(value, q)
+            result.link(value, q, pane=self.link_pane)
             return result
         
         return value
@@ -593,7 +591,6 @@ class InodeType(StringType):
 
         def annotate_cb(query, result):
             ## We are dealing with this inode
-            print "Callback query is %s " % query
             del query['inode']
             query['inode'] = value
             ## does a row already exist?

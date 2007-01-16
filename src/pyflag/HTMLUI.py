@@ -33,6 +33,7 @@ The output within flag is abstracted such that it is possible to connect any GUI
 import re,cgi,types,textwrap,sys
 from urllib import quote
 import pyflag.FlagFramework as FlagFramework
+from pyflag.FlagFramework import urlencode
 import pyflag.DB as DB
 import pyflag.conf
 import pyflag.UI as UI
@@ -41,6 +42,7 @@ import pyflag.Theme as Theme
 import cStringIO,csv,time
 import pyflag.Registry as Registry
 import pyflag.parser as parser
+import pyflag.TableObj as TableObj
 
 class HTMLException(Exception):
     """ An exception raised within the UI - should not escape from this module """
@@ -108,6 +110,10 @@ class HTMLUI(UI.GenericUI):
             self.generator=default.generator
             self.depth = default.depth+1
             self.parent = default
+            try:
+                self.callback = default.callback
+            except: pass
+
         else:
             self.form_parms =FlagFramework.query_type(())
             self.form_target = None
@@ -270,11 +276,9 @@ class HTMLUI(UI.GenericUI):
         type = "td"
         
         if options:
-            if options.has_key('colspan'):
-                td_opts['colspan'] = options['colspan']
-
-            if options.has_key('width'):
-                td_opts['width'] = options['width']
+            for opt in ['colspan','width','align']:
+                if options.has_key(opt):
+                    td_opts[opt] = options[opt]
 
             if options.has_key('type') and options['type'] == 'heading':
                 type="th"
@@ -798,53 +802,76 @@ class HTMLUI(UI.GenericUI):
         try:    limit = int(query.get('limit',0))
         except: limit = 0
 
-        args = dict( elements = elements, table = table, case=case,
+        filter_expression = query.get('filter','')
+
+        if groupby:
+            for e in elements:
+                if e.name==groupby:
+                    new_query = query.clone()
+                    filter_expression = filter_expression.strip()
+                    if filter_expression: filter_expression += " and "
+                    filter_expression += "'%s'='%%s'" % e.name
+                    new_query.set('filter',filter_expression)
+                    new_query['__target__'] = 'filter'
+                    e.link = new_query
+                    e.link_pane = 'parent'
+                    elements = [ e,
+                                 TableObj.IntegerType(name='Count', sql='count(*)'),
+                                 ]
+                    break
+            
+        args = dict( elements = elements, filter_elements = elements,
+                     table = table, case=case, filter=query.get('filter',''),
                      groupby = groupby, order = order)
 
         if where: args['where'] = where
 
-        try:    args['filter'] = query['filter']
-        except: pass
-
         try:    args['direction'] = query['direction']
         except: pass
 
-        sql = self._make_sql(**args)
-
-        self.result+='''<table class="PyFlagTable" >
-        <thead><tr>'''
-
-        ## Make the table headers with suitable order by links:
-        hiddens = [ int(x) for x in query.getarray('_hidden') ]
-            
-        for e in range(len(elements)):
-            if e in hiddens: continue
-            new_query = query.clone()
-            n = elements[e].name
-
-            if order==e:
-                if query.get('direction','1')=='1':
-                    del new_query['direction']
-                    del new_query['order']
-                    self.result+="<th><a href='%s&order=%s&direction=0'>%s<img src='/images/increment.png' /></a></th>\n" % (new_query,e, n)
-                else:
-                    del new_query['direction']
-                    del new_query['order']
-                    self.result+="<th><a href='%s&order=%s&direction=1'>%s<img src='/images/decrement.png' /></a></th>\n" % (new_query,e,n)
-            else:
-                del new_query['order']
-                del new_query['direction']
-                self.result+="<th><a href='%s&order=%s&direction=1'>%s</a></th>\n" % (new_query,e,n)
-
-
-        self.result+='''</tr></thead><tbody class="scrollContent">'''
-        
+        sql = self._make_sql(**args)        
         ## Now do the rows:
         dbh = DB.DBO(case)
 
         ## This allows pyflag to cache the resultset, needed to speed
         ## paging of slow queries.
         dbh.cached_execute(sql,limit=limit, length=pagesize)
+
+        self.result+='''<table class="PyFlagTable" >
+        <thead><tr>'''
+
+        ## Make the table headers with suitable order by links:
+        hiddens = [ int(x) for x in query.getarray('_hidden') ]
+
+        column_names = []
+        for e in range(len(elements)):
+            if e in hiddens: continue
+            new_query = query.clone()
+            n = elements[e].name
+            column_names.append(n)
+            
+            if order==e:
+                if query.get('direction','1')=='1':
+                    tmp = self.__class__(self)
+                    new_query.set('order', e)
+                    new_query.set('direction',0)
+                    tmp.link("%s<img src='/images/increment.png'>" % n, target= new_query, pane='self')
+                    self.result+="<th>%s</th>" % tmp
+                else:
+                    tmp = self.__class__(self)
+                    new_query.set('order', e)
+                    new_query.set('direction',1)
+                    tmp.link("%s<img src='/images/decrement.png'>" % n, target= new_query, pane='self')
+                    self.result+="<th>%s</th>" % tmp
+            else:
+                tmp = self.__class__(self)
+                new_query.set('order', e)
+                new_query.set('direction',1)
+                tmp.link(n, target= new_query, pane='self')
+                self.result+="<th>%s</th>" % tmp
+
+        self.result+='''</tr></thead><tbody class="scrollContent">'''
+
         old_sorted = None
         old_sorted_style = ''
 
@@ -955,8 +982,8 @@ class HTMLUI(UI.GenericUI):
                     sql = parser.parse_to_sql(filter_str,elements)
 
                     ## This is good if we get here - lets refresh to it now:
-                    if query.has_key('submit'):
-                        del query['submit']
+                    if query.has_key('__submit__'):
+                        del query['__submit__']
                         result.refresh(0,query,pane='parent')
                         return
                     
@@ -1004,8 +1031,8 @@ class HTMLUI(UI.GenericUI):
 
         ## This is a toolbar popup which allows some fields to be hidden:
         def hide_fields(query, result):
-            if query.has_key('submit'):
-                del query['submit']
+            if query.has_key('__submit__'):
+                del query['__submit__']
                 result.refresh(0,query,pane='parent')
                 return
             
@@ -1086,6 +1113,22 @@ class HTMLUI(UI.GenericUI):
             result.end_form()
             
         self.toolbar(save_table,'Save Table',icon="floppy.png")
+
+        def group_by_cb(query,result):
+            try:
+                result.table(
+                    elements=elements,
+                    table = table,
+                    where = where,
+                    groupby = query['groupby'],
+                    case = case)
+            except: pass
+
+            result.start_form(query)
+            result.const_selector("Group by", "groupby", column_names, column_names)
+            result.end_form()
+            
+        self.toolbar(group_by_cb, "Group By A column",icon="group.png")
 
     def text(self,*cuts,**options):
         wrap = config.WRAP
@@ -1235,13 +1278,13 @@ class HTMLUI(UI.GenericUI):
 
         self.result += '<form id="pyflag_form_1" name="pyflag_form_1" method=POST action="/f" enctype="multipart/form-data">\n'
 
-    def end_form(self,value='Submit',name='submit',**opts):
+    def end_form(self,value='Submit',name='__submit__',**opts):
         base = ''
 
         ## Do not propagate __ parameters:
         for k,v in self.form_parms:
             if not k.startswith("__"):
-                base += "<input type=hidden name='%s' value='%s'>\n" % (k,v)
+                base += "<input type=hidden name='%s' value='%s'>\n" % (k,urlencode(v))
 
         if self.callback:
             callback = self.callback
@@ -1315,6 +1358,7 @@ class HTMLUI(UI.GenericUI):
             data = "<abbr title='%s'>%s</abbr>" % (tooltip,data)
         self.result += data
 
+    ## FIXME: Not really completed
     def wizard(self,names=[],context="wizard",callbacks=[],title=''):
         """ This implements a wizard.
         
@@ -1340,7 +1384,7 @@ class HTMLUI(UI.GenericUI):
             result.heading(names[page])
             new_query=query.clone()
             del new_query[context]
-            del new_query['submit']
+            del new_query['__submit__']
             
             result.start_form(new_query)
             result.start_table()
@@ -1348,11 +1392,11 @@ class HTMLUI(UI.GenericUI):
             ## Ask the cb to draw on us: (We do not want the cb to stuff
             ## with our form_parms so we create an empty ui)
             tmp=result.__class__(query=query)
-            if query.has_key('submit'):
+            if query.has_key('__submit__'):
                 if callbacks[page](new_query,tmp):
                     page+=1
             ## This is the last page and it was ok - we just go to our parent page
-                    if query['submit']=='Finish':
+                    if query['__submit__']=='Finish':
                         del new_query['callback_stored']
                         result.refresh(0,new_query,parent=1)
                         return

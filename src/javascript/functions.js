@@ -240,7 +240,8 @@ function popup(query, callback, width, height) {
       //window refreshes to its parent we know it wasnt actually
       //submitted.
       if(e.type!='submit' && e.name.length>0 ) {
-	query+=e.name + '=' + encodeURIComponent(e.value)+'&';
+	//	query+=e.name + '=' + encodeURIComponent(e.value)+'&';
+	query+=e.name + '=' + e.value + '&';
       };
     };
   };
@@ -283,7 +284,8 @@ function submit_form(pane, current_cb) {
       //window refreshes to its parent we know it wasnt actually
       //submitted.
       if(e.name.length>0 ) {
-	query+=e.name + '=' + encodeURIComponent(e.value)+'&';
+	//	query+=e.name + '=' + encodeURIComponent(e.value)+'&';
+	query+=e.name + '=' + e.value+'&';
       };
     };
 

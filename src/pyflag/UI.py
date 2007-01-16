@@ -37,6 +37,7 @@ import pyflag.conf
 import pyflag.pyflaglog as pyflaglog
 config=pyflag.conf.ConfObject()
 import pyflag.parser as parser
+from pyflag.TableObj import IntegerType, TimestampType, StringType
 
 config.LOG_LEVEL=7
 
@@ -253,7 +254,7 @@ class GenericUI:
         """
         pyflaglog.log(pyflaglog.DEBUG, "text not implemented")
 
-    def _make_sql(self,elements=[],table='',where=1,groupby = None,case=None,
+    def _make_sql(self,elements=[],filter_elements=[], table='',where=1,groupby = None,case=None,
                   filter='', order=0, direction='1', limit = 0):
         """ Calculates the SQL for the table widget based on the query """
         ## Calculate the SQL
@@ -267,15 +268,18 @@ class GenericUI:
 
         ## Is there a filter condition?
         if filter:
-            filter_str = parser.parse_to_sql(filter, elements)
+            filter_str = parser.parse_to_sql(filter, filter_elements)
             if not filter_str: filter_str=1
             
         else: filter_str = 1
 
         query_str += "where ((%s) and (%s)) " % (where, filter_str)
 
+        if groupby:
+            query_str += "group by `%s` " % groupby
+
         ## Now calculate the order by:
-        query_str += "order by %s " % elements[order].sql
+        query_str += "order by %s " % filter_elements[order].sql
 
         if direction=='1':
             query_str += "asc"
@@ -302,27 +306,84 @@ class GenericUI:
                     yield ('.', e,'leaf')
                 
             def right(path, result):
-                result.start_table(**{'class':'GeneralTable'})
+                if result.defaults.has_key('select_all'):
+                    del result.defaults['select_all']
+                    result.refresh(0,result.defaults, pane='parent')
+
+                case = self.defaults.get('case',None)
+                dbh = DB.DBO(case)
+                tablename = dbh.get_temp()
+                dbh.execute("""create table %s (
+                `filename` varchar(250) NOT NULL default '.',
+                `timestamp` timestamp NOT NULL,
+                `size` bigint(11) not null
+                )""", tablename)
+
+                ## populate the table:
                 path=os.path.normpath(config.UPLOADDIR + '/' +path)
+                dbh.mass_insert_start(tablename)
                 ## List all the files in the directory:
                 try:
                     for d in os.listdir(path):
                         filename = os.path.join(path,d)
                         if not os.path.isdir(filename):
                             s = os.stat(filename)
-                            tmp = result.__class__(result)
-                            new_query = query.clone()
-                            new_query[name] = "%s/%s" % ( path,d)
-                            tmp.link(d, target = new_query, pane='parent')
-                            result.row(s.st_size,
-                                       time.strftime("%Y/%m/%d %H:%M:%S",time.localtime(s.st_mtime)),
-                                       tmp)
-                        
+                            dbh.mass_insert(filename = filename,
+                                            _timestamp = "from_unixtime(%d)" % s.st_mtime,
+                                            size = s.st_size)
+                    dbh.mass_insert_commit()
                 except OSError,e:
-                    result.row(e)
+                    pass
+
+                new_query=self.defaults.clone()
+                print new_query
+                new_query['__target__'] = name
+                new_query['__target_type__'] = 'append'
+
+                elements = [ IntegerType(name='Size', sql='size'),
+                             TimestampType(name='Timestamp', sql='timestamp'),
+                             StringType(name='Filename', sql='filename',
+                                        link = new_query, link_pane='parent'
+                                        )
+                             ]
+
+                ## Now display the table widget:
+                result.table(
+                    elements = elements,
+                    table = tablename,
+                    case = case
+                    )
+
+                ## Submit all the nodes in the display:
+                def submit_all(query,result):
+                    sql = result._make_sql(elements = elements, filter_elements = elements,
+                                           table = tablename, case=case, filter=query.get('filter',''),
+                                           order = query.get('order',0))
+
+                    dbh.execute(sql)
+                    new_query = query.clone()
+#                    new_query.remove('callback_stored',self.callback)
+                    del new_query[name]
+                    new_query['select_all']=1
+                    for row in dbh:
+                        new_query[name] = row['Filename']
+
+                    result.refresh(0,new_query, pane='parent')
+
+                result.toolbar(cb=submit_all, text="Submit all", icon='yes.png')
 
             result.tree(tree_cb=left, pane_cb=right)
             
+        files=self.defaults.getarray(name)
+        if files:
+            self.row('Currently Selected files',colspan=2)
+            for f in files:
+                new_query = self.defaults.clone()
+                new_query.remove(name,f)
+                tmp = self.__class__(self)
+                tmp.link("Remove", target=new_query, icon='delete.png', align='left')
+                self.row(tmp,f)
+
         tmp = self.__class__(self)
-        tmp.popup(file_popup, "Click here", width=800, height=500)
+        tmp.popup(file_popup, "Click here", width=1024, height=600)
         self.row(description, tmp)

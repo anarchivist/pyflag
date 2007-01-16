@@ -279,7 +279,7 @@ class DateSelectorTest(PopUpTest):
 class FormTest(PopUpTest):
     """ Test the various form widgets """
     name = "FormTest"
-    parameters = { "var1": "any", "var2":"any"}
+    parameters = { "var1": "any", "var2":"any", "__submit__":"any"}
 
     def form(self,query,result):
         result.textarea("Enter value 1","var1")
@@ -289,6 +289,7 @@ class FormTest(PopUpTest):
         result.heading("Form test")
         result.text("I have some with html data %s" % result.sanitise_data(query['var1']))
         result.para("And sanitised data %s" % query['var2'])
+        result.link("Try this again",target=query)
 
 class WizardTest(PopUpTest):
     """ Tests the Wizard """
@@ -377,10 +378,11 @@ class TableTest(PopUpTest):
 class FileSelectorTest(PopUpTest):
     """ Test the file selector widget """
     name = "File Selector"
-    parameters = {'file':'filename' }
+    parameters = {'file':'filename', 'text':'any', '__submit__':'any' }
 
     def form(self, query, result):
         result.fileselector("Select file:",'file')
+        result.textfield("Enter text",'text')
 
     def display(self,query,result):
         result.heading("You have selected the following files:")

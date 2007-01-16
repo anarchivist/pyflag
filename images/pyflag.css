@@ -296,3 +296,7 @@ table.PyFlagTable {
   width: 100%;
   overflow: auto;
  }
+
+form { 
+  clear: left;
+ }

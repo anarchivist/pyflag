@@ -168,6 +168,10 @@ class query_type:
             except ValueError:
                 pass
 
+    def set(self, key, value):
+        del self[key]
+        self[key]=value
+
     def remove(self,key,value):
         """ Removes the specific instance of key,value from the query.
         @note: Normally you can just do del query['key'], but this will delete all keys,value pairs with the same keys. This is a more finer level method allowing to delete just a single element from the array.
@@ -275,10 +279,12 @@ class query_type:
         """
         for target in self.getarray('__target__'):
             try:
-            ## Replace the target arg with the new one (note we cant just add one because that will append it to the end of a cgi array)
-                tmp = str(self.__getitem__(target)) % dest
-                self.__delitem__(target)
-                self.__setitem__(target,tmp)
+                ## Do we need to append it:
+                if self.has_key('__target_type__') and self['__target_type__'] == 'append':
+                    self[target] = dest
+                else:
+                    tmp = str(self.__getitem__(target)) % dest
+                    self.set(target,tmp)                    
             
             ## No q[target]
             except (KeyError,TypeError):

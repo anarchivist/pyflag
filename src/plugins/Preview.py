@@ -50,7 +50,7 @@ class RegistryBrowser(Reports.report):
                 try:
                     name = k['key_name'].get_value()
                 except:
-                    pass
+                    name = None
                 yield (name,name,'branch')
 
         def pane_cb(path, result):
