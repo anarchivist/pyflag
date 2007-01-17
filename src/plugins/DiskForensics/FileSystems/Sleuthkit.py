@@ -381,7 +381,7 @@ class Sleuthkit(DBFS):
         # walk the directory tree
         for root, dirs, files in fs.walk(root_dir, unalloc=True, inodes=True):
             dbh_file.mass_insert(inode = '', mode = 'd/d',
-                                 status = 'alloc', path=root_dir,
+                                 status = 'alloc', path=root[1],
                                  name = '')
             for d in dirs:
                 insert_file(d[0], 'd/d', root[1], d[1])
@@ -391,9 +391,12 @@ class Sleuthkit(DBFS):
                 break
             
         if root_dir=='/':
-            # find any unlinked inodes here
+            insert_file(sk.skinode(0, 0, 0, 1), 'd/d', '/', '__deleted__')
+            # find any unlinked inodes here. Note that in some filesystems, a
+            # 'deleted' directory may have been found and added in the walk above.
             for s in fs.iwalk():
                 insert_inode(s)
+                insert_file(s, '-/-', '/__deleted__', "%s" % s)
 
 ## Unit Tests:
 import unittest, md5
