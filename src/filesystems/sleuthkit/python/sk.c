@@ -710,6 +710,24 @@ skfs_iwalk(skfs *self, PyObject *args, PyObject *kwds) {
     return list;
 }
 
+PyObject *build_stat_result(FS_INODE *fs_inode) {
+  PyObject *result,*os;
+  
+  /* return a real stat_result! */
+  /* (mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime) */
+  os = PyImport_ImportModule("os");
+  result = PyObject_CallMethod(os, "stat_result", "((iKiiiiKlll))", 
+			       (int)fs_inode->mode, (unsigned PY_LONG_LONG)fs_inode->addr, 
+			       (int)0, (int)fs_inode->nlink, 
+			       (int)fs_inode->uid, (int)fs_inode->gid, 
+			       (unsigned PY_LONG_LONG)fs_inode->size,
+			       (long int)fs_inode->atime, (long int)fs_inode->mtime, 
+			       (long int)fs_inode->ctime);
+  Py_DECREF(os);
+  
+  return result;
+};
+
 /* stat a file */
 static PyObject *
 skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
@@ -754,15 +772,8 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
     if(fs_inode == NULL)
         return PyErr_Format(PyExc_IOError, "Unable to find inode %lu: %s", (ULONG)inode, tsk_error_get());
 
-    /* return a real stat_result! */
-    /* (mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime) */
-    os = PyImport_ImportModule("os");
-    result = PyObject_CallMethod(os, "stat_result", "((iKiiiiKlll))", 
-                                 fs_inode->mode, fs_inode->addr, 0, fs_inode->nlink, 
-                                 fs_inode->uid, fs_inode->gid, fs_inode->size,
-                                 fs_inode->atime, fs_inode->mtime, fs_inode->ctime);
-    Py_DECREF(os);
-    
+    result = build_stat_result(fs_inode);
+
     /* release the fs_inode */
     fs_inode_free(fs_inode);
     return result;
@@ -785,13 +796,7 @@ skfs_fstat(skfs *self, PyObject *args) {
 
     fs_inode = ((skfile *)skfile_obj)->fs_inode;
     
-    /* (mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime) */
-    os = PyImport_ImportModule("os");
-    result = PyObject_CallMethod(os, "stat_result", "((iiliiiiiii))", 
-                                 fs_inode->mode, fs_inode->addr, 0, fs_inode->nlink, 
-                                 fs_inode->uid, fs_inode->gid, fs_inode->size,
-                                 fs_inode->atime, fs_inode->mtime, fs_inode->ctime);
-    Py_DECREF(os);
+    result = build_stat_result(fs_inode);
     return result;
 }
 
