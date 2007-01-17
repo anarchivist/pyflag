@@ -228,7 +228,12 @@ class Sleuthkit(DBFS):
     """ A new improved Sleuthit based filesystem """
     name = 'Sleuthkit'
 
-    def load(self, mount_point, iosource_name, scanners = None):
+    def load(self, mount_point, iosource_name, scanners = None, directory=None):
+        """ Loads the filesystem on mount point from iosource_name. If
+        scanners are specified - generate jobs for workers as soon as
+        the inodes are added. If directory is specified we only load
+        the specified directory.
+        """
         ## Ensure that mount point is normalised:
         mount_point = os.path.normpath(mount_point)
         DBFS.load(self, mount_point, iosource_name)
@@ -368,16 +373,27 @@ class Sleuthkit(DBFS):
         # insert root inode
         insert_inode(fs.root_inum)
 
+        if directory:
+            root_dir = directory
+        else:
+            root_dir = '/'
+
         # walk the directory tree
-        for root, dirs, files in fs.walk('/', unalloc=True, inodes=True):
+        for root, dirs, files in fs.walk(root_dir, unalloc=True, inodes=True):
+            dbh_file.mass_insert(inode = '', mode = 'd/d',
+                                 status = 'alloc', path=root_dir,
+                                 name = '')
             for d in dirs:
                 insert_file(d[0], 'd/d', root[1], d[1])
             for f in files:
                 insert(f[0], 'r/r', root[1], f[1])
-
-        # find any unlinked inodes here
-        for s in fs.iwalk():
-            insert_inode(s)
+            if directory and root != root_dir:
+                break
+            
+        if root_dir=='/':
+            # find any unlinked inodes here
+            for s in fs.iwalk():
+                insert_inode(s)
 
 ## Unit Tests:
 import unittest, md5

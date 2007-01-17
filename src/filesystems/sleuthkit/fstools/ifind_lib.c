@@ -135,7 +135,10 @@ ifind_path_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
 	tsk_errno = TSK_ERR_FS_ARG;
 	snprintf(tsk_errstr, TSK_ERRSTR_L,
 	    "ifind: cur_dir is null: Please run with '-v' and send output to developers\n");
-	return WALK_ERROR;
+	if(ipd->found)
+	  return WALK_STOP;
+	else
+	  return WALK_ERROR;
     }
 
     /* 
@@ -233,6 +236,9 @@ ifind_path_act(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr)
 	if (fs->dent_walk(fs, fs_dent->inode,
 		FS_FLAG_NAME_ALLOC | FS_FLAG_NAME_UNALLOC,
 		ifind_path_act, (void *) ipd)) {
+	  if(ipd->found)
+	    return WALK_STOP;
+	  else
 	    return WALK_ERROR;
 	}
     }

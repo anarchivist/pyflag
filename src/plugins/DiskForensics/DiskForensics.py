@@ -42,37 +42,12 @@ import pyflag.ScannerUtils as ScannerUtils
 import pyflag.Registry as Registry
 import pyflag.parser as parser
 from pyflag.TableObj import IntegerType,TimestampType,InodeType,FilenameType, StringType, StateType
+from pyflag.TableObj import DeletedType, BinaryType
 
 description = "Disk Forensics"
 order=30
 
 BLOCKSIZE=20
-
-class DeletedType(StateType):
-    """ This is a column type which shows deleted inodes graphically
-    """
-    states = {'deleted':'deleted', 'allocated':'alloc'}
-              
-    def display(self,value, row, result):
-        """ Callback for rendering deleted items """
-        tmp=result.__class__(result)
-        if value=='alloc':
-            tmp.icon("yes.png")
-        elif value=='deleted':
-            tmp.icon("no.png")
-        else:
-            tmp.icon("question.png")
-
-        return tmp
-
-class BinaryType(StateType):
-    """ This type defines fields which are either true or false """
-    states = {'true':'1', 'false':'0', 'set': 1, 'unset':0 }
-    def display(self,value, row,result):
-        if value:
-            return "*"
-        else:
-            return " "
 
 def make_inode_link(query,result, variable='inode'):
     """ Returns a ui based on result with links to each level of the
@@ -173,14 +148,14 @@ class BrowseFS(Reports.report):
                     path=os.path.dirname(path)
 
                 tmp.table(
-                    elements = [ InodeType('Inode','f.inode',case=query['case']),
+                    elements = [ InodeType('Inode','file.inode',case=query['case']),
                                  StringType('Filename','name'),
-                                 DeletedType('Del','f.status'),
+                                 DeletedType('Del','file.status'),
                                  IntegerType('File Size','size'),
                                  TimestampType('Last Modified','mtime'),
-                                 TimestampType('Mode','f.mode') ],
-                    table='file as f, inode as i',
-                    where="f.inode=i.inode and path=%r and f.mode!='d/d'" % (path+'/'),
+                                 TimestampType('Mode','file.mode') ],
+                    table='file, inode',
+                    where="file.inode=inode.inode and path=%r and file.mode!='d/d'" % (path+'/'),
                     case=query['case'],
                     pagesize=10,
                     )

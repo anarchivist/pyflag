@@ -660,3 +660,29 @@ class FilenameType(StringType):
     ##    sql = ''
     ##    if directory:
     ##        sql += "%s rlike %r" % (self.path, glob_re(
+
+class DeletedType(StateType):
+    """ This is a column type which shows deleted inodes graphically
+    """
+    states = {'deleted':'deleted', 'allocated':'alloc'}
+              
+    def display(self,value, row, result):
+        """ Callback for rendering deleted items """
+        tmp=result.__class__(result)
+        if value=='alloc':
+            tmp.icon("yes.png")
+        elif value=='deleted':
+            tmp.icon("no.png")
+        else:
+            tmp.icon("question.png")
+
+        return tmp
+
+class BinaryType(StateType):
+    """ This type defines fields which are either true or false """
+    states = {'true':'1', 'false':'0', 'set': 1, 'unset':0 }
+    def display(self,value, row,result):
+        if value:
+            return "*"
+        else:
+            return " "

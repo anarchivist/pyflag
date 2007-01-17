@@ -592,7 +592,7 @@ skfs_listdir(skfs *self, PyObject *args, PyObject *kwds) {
     self->fs->dent_walk(self->fs, inode, flags, listdent_walk_callback_list, (void *)list);
     if(tsk_errno) {
         Py_DECREF(list);
-        return PyErr_Format(PyExc_IOError, "Unable to list inode %lu: %s", (ULONG)inode, tsk_error_get());
+        return PyErr_Format(PyExc_IOError, "Unable to list inode %u: %s", (ULONG)inode, tsk_error_get());
     };
 
     return list;
