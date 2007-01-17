@@ -996,8 +996,8 @@ static int skfs_inode_init(skfs_inode *self, PyObject *args, PyObject *kwds) {
     static char *kwlist[] = {"inode", "type", "id", "alloc", NULL};
     int alloc;
 
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "KiiO", kwlist, 
-                                    &self->inode, &self->type, &self->id, alloc))
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "Kiii", kwlist, 
+                                    &self->inode, &self->type, &self->id, &alloc))
         return -1; 
     self->alloc = alloc ? 1 : 0;
     return 0;
