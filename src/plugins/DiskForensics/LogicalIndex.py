@@ -109,14 +109,14 @@ class IndexScan(GenScanFactory):
     def prepare(self):
         ## Create new index trie - This takes a serious amount of time
         ## for large dictionaries (about 2 sec for 70000 words):
-        self.index = index.indexer()
+        self.index = index.Index()
         pydbh = DB.DBO(None)
         #Do word index (literal) prep
         pyflaglog.log(pyflaglog.DEBUG,"Index Scanner: Building index trie")
         start_time=time.time()
         pydbh.execute("select word,id from dictionary where type='literal'")
         for row in pydbh:
-            index.add_word(self.index,row['word'],row['id'], 0)
+            self.index.add_word(row['word'],row['id'], 0)
 
         # load words in a number of alternate character sets. The ones
         # we care about atm are utf-8 and utf-16/UCS-2 which is used
@@ -127,7 +127,7 @@ class IndexScan(GenScanFactory):
             try:
                 word = row['word'].decode("UTF-8")
                 for e in config.INDEX_ENCODINGS:
-                    index.add_word(self.index, word.encode(e),row['id'], 0)
+                    self.index.add_word(word.encode(e),row['id'], 0)
             except UnicodeDecodeError:
                 pass
 
@@ -183,7 +183,7 @@ class IndexScan(GenScanFactory):
             
         def process(self,data,metadata=None):            
             # Store indexing results in the dbase
-            for offset, matches in index.index_buffer(self.index, data):
+            for offset, matches in self.index.index_buffer(data):
                 for id, length in matches:
                     try:
                         self.stats_count[id]+=1
