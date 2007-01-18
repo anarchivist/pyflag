@@ -127,18 +127,26 @@ static TrieNode add_unique_to_peer_list(struct list_head *l, TrieNode n,
 // normalise them. This is not unicode aware but is very fast.
 char cmap[] = { ['A' ... 'Z']='a'-'A' };
 
+int Compare_literal_nodes_with_case(TrieNode a, TrieNode b) {
+  if(!ISSUBCLASS(a,LiteralNode) || !ISSUBCLASS(b,LiteralNode)) 
+    return False;
+
+  char left=((LiteralNode)a)->value;
+  char right= ((LiteralNode)b)->value;
+  return (left+cmap[left]==right+cmap[right]);
+};
+
+
 int Compare_literal_nodes(TrieNode a, TrieNode b) {
   if(!ISSUBCLASS(a,LiteralNode) || !ISSUBCLASS(b,LiteralNode)) 
     return False;
 
   char left=((LiteralNode)a)->value;
   char right= ((LiteralNode)b)->value;
-  // FIXME: This case comparison will not do with foreign languages
-  return (left+cmap[left]==right+cmap[right]);
+  return (left==right);
 };
 
 TrieNode TrieNode_Con(TrieNode self) {
-
   INIT_LIST_HEAD(&(self->peers));
 
   return self;
@@ -158,13 +166,6 @@ int TrieNode_compare(TrieNode self, char **buffer, int *len) {
 static TrieNode MakeNextNode(TrieNode self, char **word, int *len, 
 			     long int data, enum word_types type) {
   TrieNode n=NULL;
-  
-  /** This is the final node in the chain. We need to add a DataNode */
-  if(*len==0) {
-    n=(TrieNode)CONSTRUCT(DataNode, DataNode, Con, self, data);
-    
-    return n;
-  };
 
   /** Look for \ escapes */
   if(**word == '\\') {
@@ -209,8 +210,25 @@ static TrieNode MakeNextNode(TrieNode self, char **word, int *len,
 void TrieNode_AddWord(TrieNode self, char **word, int *len, long int data, 
 		      enum word_types type) {
   int i = 0x0F & **word;
-  TrieNode n=MakeNextNode(self, word, len, data, type);
+  TrieNode n;
+  int (*comparison_function)(TrieNode a, TrieNode b) = Compare_literal_nodes;
   
+  /** This is the final node in the chain. We need to add a DataNode */
+  if(*len==0) {
+    n=(TrieNode)CONSTRUCT(DataNode, DataNode, Con, self, data);
+  } else if(type==WORD_ENGLISH) {
+       n = (TrieNode)CONSTRUCT(LiteralNode, LiteralNode, Con, self, word, len); 
+       if(!n) return;
+
+       comparison_function = Compare_literal_nodes_with_case;
+       n->compare = LiteralNode_casecompare;
+  } else if(type==WORD_EXTENDED) {
+    n=MakeNextNode(self, word, len, data, type); 
+  } else {
+    n = (TrieNode)CONSTRUCT(LiteralNode, LiteralNode, Con, self, word, len);   
+  };
+
+  // We failed to add a node?
   if(!n) return;
 
   /** If the node is a literal node, we can store it in our hash
@@ -222,14 +240,14 @@ void TrieNode_AddWord(TrieNode self, char **word, int *len, long int data,
     };
     
     n=add_unique_to_peer_list(&(self->hash_table[i]->peers), n, 
-			      &Compare_literal_nodes);
+			      comparison_function);
   } else {
     /** Otherwise Add the node to our children list */
     if(!self->child) 
       self->child = CONSTRUCT(TrieNode, TrieNode, Con, self);
 
     n=add_unique_to_peer_list(&(self->child->peers),n,
-			      &Compare_literal_nodes);
+			      comparison_function);
   }
 
   /** Now ask n to add the rest of the word */  
@@ -299,7 +317,8 @@ END_VIRTUAL
 
 LiteralNode LiteralNode_Con(LiteralNode self, char **value, int *len) {
   // Lowercase the value.
-  self->value = **value+cmap[**value];
+  //  self->value = **value+cmap[**value];
+  self->value = **value;
 
 #ifdef __DEBUG_V_
   talloc_set_name(self, "%s: %c", NAMEOF(self),**value);
@@ -313,9 +332,21 @@ LiteralNode LiteralNode_Con(LiteralNode self, char **value, int *len) {
   return self;
 };
 
-int LiteralNode_compare(TrieNode self, char **buffer, int *len) {
+// A variation of the compare method with case insensitive comparisons
+int LiteralNode_casecompare(TrieNode self, char **buffer, int *len) {
   LiteralNode this = (LiteralNode)self;
   int result = **buffer+cmap[**buffer]==this->value;
+
+  if(result)
+    (*buffer)++; (*len)--;
+
+  return result;
+};
+
+int LiteralNode_compare(TrieNode self, char **buffer, int *len) {
+  LiteralNode this = (LiteralNode)self;
+  //int result = **buffer+cmap[**buffer]==this->value;
+  int result = **buffer==this->value;
 
   if(result)
     (*buffer)++; (*len)--;

@@ -116,7 +116,7 @@ class IndexScan(GenScanFactory):
         start_time=time.time()
         pydbh.execute("select word,id from dictionary where type='literal'")
         for row in pydbh:
-            self.index.add_word(row['word'],row['id'], 0)
+            self.index.add_word(row['word'],row['id'], index.WORD_ENGLISH)
 
         # load words in a number of alternate character sets. The ones
         # we care about atm are utf-8 and utf-16/UCS-2 which is used
@@ -620,3 +620,63 @@ class BrowseIndexKeywords(Reports.report):
         except DB.DBError,e:
             result.para("Unable to display index search results.  Did you run the index scanner?")
             result.para("The error I got was %s"%e)
+
+
+## Unit tests
+import unittest
+import pyflag.mspst
+
+class LogicalIndexTests(unittest.TestCase):
+    """ Logical Index Tests """
+
+    def build_idx(self, dictionary):
+        ## build an indexer:
+        idx = index.Index()
+
+        for k,v in dictionary.items():
+            idx.add_word(v, k, index.WORD_ENGLISH)
+
+        return idx
+    
+    def test01SimpleIndexTests(self):
+        """ Test indexing engine - simple words """
+        dictionary = { 5:"hello", 10:"world", 15:"hell" }
+        idx = self.build_idx(dictionary)
+        
+        ## This is the buffer we will be testing (note the capital match):
+        line = "Hello cruel world, hello..."
+
+        matching_words = []
+        for offset, matches in idx.index_buffer(line):
+            for id , length in matches:
+                word = dictionary[id]
+                matched = line[offset:offset+length]
+                #print word, matched
+                self.assertEqual(word.lower(), matched.lower())
+                matching_words.append(matched)
+
+        self.assert_("Hello" in matching_words)
+
+    def test02UCS16Indexing(self):
+        """ Test UCS-16 indexing - simple words """
+        dictionary = { 5: u"hello", 10:u"world" }
+        ## These are the encodings which will be tested:
+        encodings = ["utf-16_le", "utf-16_be", "rot-13", "ms-pst"]
+        line = u"Hello cruel world, hello..."
+
+        print
+        for encoding in encodings:
+            print "Testing encoding %s" % encoding
+            idx = index.Index()
+            for k,v in dictionary.items():
+                idx.add_word(v.encode(encoding), k, index.WORD_LITERAL)
+
+            data = line.encode(encoding)
+            for offset, matches in idx.index_buffer(data):
+                for id , length in matches:
+                    word = dictionary[id]
+                    matched = data[offset:offset+length]
+                    print "word: %s" % word, "matched: %r" % matched
+                    self.assertEqual(word.lower(), matched.decode(encoding).lower())
+
+            

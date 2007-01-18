@@ -93,4 +93,7 @@ CLASS(CharacterClassNode, TrieNode)
 			       char **word, int *len, char *map);
 END_CLASS
 
+// Some useful prototypes:
+int LiteralNode_casecompare(TrieNode self, char **buffer, int *len);
+
 #endif
