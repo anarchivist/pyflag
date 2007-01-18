@@ -75,16 +75,6 @@ static PyObject *trie_index_index_buffer(trie_index *self, PyObject *args) {
     return(result);
 }
 
-static PyMemberDef trie_index_members[] = {
-    {"WORD_LITERAL", T_INT, WORD_LITERAL, 0,
-     "literal word type"},
-    {"WORD_EXTENDED", T_INT, WORD_EXTENDED, 0,
-     "extended (regex) word type"},
-    {"WORD_ENGLISH", T_INT, WORD_ENGLISH, 0,
-     "english word type"},
-    {NULL}  /* Sentinel */
-};
-
 static PyMethodDef trie_index_methods[] = {
     {"add_word", (PyCFunction)trie_index_add_word, METH_VARARGS,
      "Add a word to the trie" },
@@ -123,7 +113,7 @@ static PyTypeObject trie_indexType = {
     0,                         /* tp_iter */
     0,                         /* tp_iternext */
     trie_index_methods,        /* tp_methods */
-    trie_index_members,        /* tp_members */
+    0,                         /* tp_members */
     0,                         /* tp_getset */
     0,                         /* tp_base */
     0,                         /* tp_dict */
@@ -139,14 +129,22 @@ static PyMethodDef IndexMethods[] = {
     {NULL, NULL, 0, NULL}
 };
 
+#define SET_ENUM_CONSTANT(dict, name)   \
+    PyDict_SetItemString(dict, #name, PyInt_FromLong(name))
+
 PyMODINIT_FUNC initindex(void) {
 
-    PyObject *m;
+    PyObject *m, *d;
 #ifdef __DEBUG_V_
     talloc_enable_leak_report_full();
 #endif
 
     m = Py_InitModule("index", IndexMethods);
+    d = PyModule_GetDict(m);
+
+    SET_ENUM_CONSTANT(d, WORD_ENGLISH);
+    SET_ENUM_CONSTANT(d, WORD_LITERAL);
+    SET_ENUM_CONSTANT(d, WORD_EXTENDED);
 
     /* setup skfs type */
     trie_indexType.tp_new = PyType_GenericNew;
