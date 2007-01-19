@@ -168,7 +168,14 @@ class LoadPresetLog(Reports.report):
 import pyflag.IO as IO
 
 class LoadIOSource(Reports.report):
-    """ Initialises and caches an IO Subsystem datasource into the database for
+    """
+    Load IO Source
+    ==============
+    This report loads a new IO source for use within PyFlag. All input to PyFlag is done through IO source. IO Sources group the different file types that PyFlag supports into a single abstract entity which can be later refered to by name.
+
+    For example, the 
+    
+    Initialises and caches an IO Subsystem datasource into the database for
     subsequent use by other reports (eg. LoadFS and exgrep) """
     parameters = {"iosource":"sqlsafe","subsys":"iosubsystem"}
     name = "Load IO Data Source"

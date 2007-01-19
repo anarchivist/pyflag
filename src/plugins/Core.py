@@ -53,6 +53,7 @@ class IO_File(FileSystem.File):
         ## the IO source.
         self.name = inode[1:]
         self.io = IO.open(case, self.name)
+        self.size = self.io.size
 
         dbh = DB.DBO(self.case)
         ## IO Sources may have block_size specified:
@@ -73,6 +74,8 @@ class IO_File(FileSystem.File):
             return self.io.seek(offset)
         elif rel==1:
             return self.io.seek(offset + self.tell())
+        elif rel==2:
+            return self.io.seek(offset + self.size)
 
     def tell(self):
         return self.io.tell()
@@ -179,3 +182,35 @@ class Help(Reports.report):
         fd=open("%s/%s.html" % (config.DATADIR, os.path.normpath(query['topic'])))
         result.result+=fd.read()
         result.decoration='naked'
+
+## IO subsystem unit tests:
+import unittest
+import md5,random,time
+import pyflag.tests as tests
+from pyflag.FileSystem import DBFS
+
+class IOSubsysTests(tests.FDTest):
+    """ Testing IO Subsystem handling """
+    def setUp(self):
+        self.fd = IO_File('PyFlagNTFSTestCase', None, 'Itest')
+
+class OffsetFileTests(tests.FDTest):
+    """ Testing OffsetFile handling """
+    test_case = "PyFlagNTFSTestCase"
+    test_inode = "Itest|o1000:1000"
+    
+    def testMisc(self):
+        """ Test OffsetFile specific features """
+        ## Make sure we are the right size
+        self.assertEqual(self.fd.size, 1000)
+        
+        fd2 = IO_File('PyFlagNTFSTestCase', None, 'Itest')
+        fd2.seek(1000)
+        data=fd2.read(1000)
+
+        self.fd.seek(0)
+        data2 = self.fd.read()
+
+        ## Make sure that we are reading the same data with and
+        ## without the offset:
+        self.assertEqual(data2, data)

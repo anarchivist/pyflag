@@ -1,0 +1,69 @@
+# Michael Cohen <scudette@users.sourceforge.net>
+#
+# ******************************************************
+#  Version: FLAG $Version: 0.82 Date: Sat Jun 24 23:38:33 EST 2006$
+# ******************************************************
+#
+# * This program is free software; you can redistribute it and/or
+# * modify it under the terms of the GNU General Public License
+# * as published by the Free Software Foundation; either version 2
+# * of the License, or (at your option) any later version.
+# *
+# * This program is distributed in the hope that it will be useful,
+# * but WITHOUT ANY WARRANTY; without even the implied warranty of
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# * GNU General Public License for more details.
+# *
+# * You should have received a copy of the GNU General Public License
+# * along with this program; if not, write to the Free Software
+# * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# ******************************************************
+""" This file defines a variety of things related to tests """
+import unittest
+from pyflag.FileSystem import DBFS
+
+class FDTest(unittest.TestCase):
+    ## These must be overridden with a file which is at least 100
+    ## bytes long
+    test_case = ""
+    test_inode = ""
+    
+    def setUp(self):
+        self.fs = DBFS(self.test_case)
+        self.fd = self.fs.open(inode=self.test_inode)
+
+    def test01HaveValidSize(self):
+        """ Test for valid size """
+        self.assert_(self.fd,"No fd found")
+        size=self.fd.size
+        ## Go to the end:
+        self.fd.seek(0,2)
+        self.assert_(size != 0, "Size is zero")
+        self.assertEqual(self.fd.tell(),size,"Seek to end of file does not agree with size")
+
+    def test02ReadingTests(self):
+        """ Test reading ranges """
+        ## Note we assume the file is at least 100 bytes long...
+        data = self.fd.read(100)
+        self.assertEqual(len(data),100, "Data length read does not agree with read - or file too short?")
+        self.assertEqual(self.fd.tell(),100, "Seek after read does not agree")
+
+        ## Check seeking and reading:
+        self.fd.seek(50,0)
+        self.assertEqual(data[50:], self.fd.read(50), "Seek and read does not agree")
+
+    def test03SeekingTests(self):
+        """ Test seeking """
+        self.fd.seek(50)
+        self.assertEqual(self.fd.tell(),50,"Absolute Seek does not agree with tell")
+
+        ## Relative seeking:
+        self.fd.seek(50,1)
+        self.assertEqual(self.fd.tell(),100,"Relative seek does not agree")
+
+        ## Seeking before the start of file should raise
+        self.assertRaises(IOError, lambda : self.fd.seek(-5000,1))
+        
+        ## Check that a read at the end returns zero:
+        self.fd.seek(0,2)
+        self.assertEqual(self.fd.read(),'', "Read data past end of file")

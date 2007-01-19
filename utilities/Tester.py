@@ -47,7 +47,7 @@ test_registry = Registry.InitTests()
 if not options.match:
     classes = test_registry.classes
 else:
-    classes = [ x for x in test_registry.classes if re.search(options.match,"%s" % x)]
+    classes = [ x for x in test_registry.classes if re.search(options.match,"%s" % x.__doc__)]
 
 for test_class in classes:
     try:

@@ -120,6 +120,7 @@ class IO:
         if clone:
             self.options = clone.options
             self.io = clone.io
+            self.size = clone.size
             
             return
         
@@ -137,6 +138,7 @@ class IO:
             #Try and make the subsystem based on the args
             try:
                 self.io=iosubsys.Open(options)
+                self.size = iosubsys.size(self.io)
             except IOError, e:
                 pass
 #                print "ERROR: %s" % e
@@ -154,11 +156,15 @@ class IO:
     def seek(self, offset, whence=0):
         """ fake seeking routine """
         if whence==0:
-            self.readptr = offset
+            readptr = offset
         elif whence==1:
-            self.readptr+=offset
+            readptr+=offset
         elif whence==2:
-            self.readptr = iosubsys.size(self.io)
+            readptr = self.size
+
+        if readptr<0:
+            raise IOError("Seek before start of file")
+        self.readptr = readptr
 
     def tell(self):
         """ return current read pointer """
@@ -201,59 +207,36 @@ class sgzip(IO):
     def form(self,query,result):
         if not query.has_key('io_offset'):
             query['io_offset']='0'
-        tmp = result.__class__(result)
-        tmp.filebox(target="io_filename")
-        result.row("Select SGZ image:", tmp)
+        result.fileselector("Select %s image:" % self.__class__.__name__.split(".")[-1], name="io_filename")
+
         tmp = result.__class__(result)
         tmp2 = result.__class__(result)
         tmp2.popup(
-            FlagFramework.Curry(mmls_popup,orig_query=query,subsys="sgzip",offset="io_offset"),
+            FlagFramework.Curry(mmls_popup,orig_query=query,
+                                subsys=query['subsys'],
+                                offset="io_offset"),
             "Survey the partition table",
             icon="examine.png")
-        
-        tmp.row("Enter partition offset in file:",tmp2)
+
+        tmp.row(tmp2,"Enter partition offset:")
         result.textfield(tmp,'io_offset')
   
-class standard(IO):
+class standard(sgzip):
     parameters=('subsys','io_filename')
 
-    def form(self,query,result):
-        tmp = result.__class__(result)
-        tmp.filebox(target="io_filename")
-        result.row("Select DD Image:",tmp)
-
-class raid(IO):
+class raid(sgzip):
     """ Subsystem used to access raid devices """
     parameters=('subsys','io_filename','io_blocksize','io_slots','io_map','io_offset')
 
     def form(self,query,result):
-        tmp = result.__class__(result)
-        tmp.filebox(target="file",multiple="multiple")
-        result.row("Select image(s):", tmp)
+        sgzip.form(self,query,result)
         result.textfield("Blocksize:",'blocksize')
         result.textfield("Numberr of slots:",'slots')
         result.para("The map is given as a set series of logical blocks delimited with . and with P for the parity block (e.g. 0.1.2.3.4.5.P.P.6.7.8.9.10.11.17.P.12.13.14.15.16.22.23.P.18.19.20.21.27.28.29.P.24.25.26.32.33.34.35.P.30.31.37.38.39.40.41.P.36)")
         result.textfield("map:",'map')
 
-class advanced(IO):
+class advanced(sgzip):
     parameters=('subsys','io_filename','io_offset')
-
-    def form(self,query,result):
-        if not query.has_key('io_offset'):
-            query['io_offset']='0'
-
-        tmp = result.__class__(result)
-        tmp.filebox(target="io_filename",multiple="multiple")
-        result.row("Select image(s):", tmp)
-        tmp = result.__class__(result)
-        tmp2 = result.__class__(result)
-        tmp2.popup(
-            FlagFramework.Curry(mmls_popup,orig_query=query,subsys="advanced",offset="io_offset"),
-            "Survey the partition table",
-            icon="examine.png")
-        
-        tmp.row("Enter partition offset in file:",tmp2)
-        result.textfield(tmp,'io_offset')
 
 class remote(IO):
     parameters=('subsys','io_host','io_user','io_server_path','io_device')
@@ -268,26 +251,9 @@ class remote(IO):
         result.textfield("Remote device:",'io_device')
         
 
-class ewf(IO):
+class ewf(sgzip):
     parameters=('subsys','io_filename','io_offset')
     
-    def form(self,query,result):
-        if not query.has_key('io_offset'):
-            query['io_offset']='0'
-
-        tmp = result.__class__(result)
-        tmp.filebox(target="io_filename",multiple="multiple")
-        result.row("Select EWF image(s):",tmp)
-        tmp = result.__class__(result)
-        tmp2 = result.__class__(result)
-        tmp2.popup(
-            FlagFramework.Curry(mmls_popup,orig_query=query,subsys="ewf",offset="io_offset"),
-            "Survey the partition table",
-            icon="examine.png")
-        
-        tmp.row("Enter partition offset in file:",tmp2)
-        result.textfield(tmp,'io_offset')
-
 class mounted(IO):
     parameters=('subsys','io_directory')
 

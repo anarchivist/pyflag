@@ -376,14 +376,18 @@ class GenericUI:
             
         files=self.defaults.getarray(name)
         if files:
-            self.row('Currently Selected files',colspan=2)
+            tmp = self.__class__(self)
             for f in files:
                 new_query = self.defaults.clone()
                 new_query.remove(name,f)
-                tmp = self.__class__(self)
-                tmp.link("Remove", target=new_query, icon='delete.png', align='left')
-                self.row(tmp,f)
+                tmp2 = self.__class__(self)
+                tmp2.link("Remove", target=new_query, icon='delete.png')
+                tmp.row("%s %s" % (tmp2,f))
+
+            self.row('Currently Selected files',tmp)
 
         tmp = self.__class__(self)
-        tmp.popup(file_popup, "Click here", width=1024, height=600)
+        tmp.popup(file_popup, "Add Files",
+                  icon="file-selection.png",
+                  width=1024, height=600)
         self.row(description, tmp)

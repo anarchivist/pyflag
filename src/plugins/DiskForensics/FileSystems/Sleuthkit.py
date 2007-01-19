@@ -205,6 +205,9 @@ class Sleuthkit_File(File):
 
         inode = inode[inode.find('|K')+2:]
         self.fd = fs.open(inode=inode)
+        self.fd.seek(0,2)
+        self.size = self.fd.tell()
+        self.fd.seek(0)
     
     def close(self):
         self.fd.close()
@@ -214,6 +217,8 @@ class Sleuthkit_File(File):
             self.fd.seek(offset,rel)
         else:
             self.fd.seek(offset)
+
+        if self.fd.tell()<0: raise IOError("Seek before start of file")
 
     def read(self, length=None):
         if length!=None:
@@ -387,6 +392,7 @@ class Sleuthkit(DBFS):
                 insert_file(d[0], 'd/d', root[1], d[1])
             for f in files:
                 insert(f[0], 'r/r', root[1], f[1])
+                
             if directory and root != root_dir:
                 break
             
@@ -433,6 +439,7 @@ class Sleuthkit(DBFS):
 ## Unit Tests:
 import unittest, md5
 import pyflag.pyflagsh as pyflagsh
+import pyflag.tests as tests
 
 class NTFSTests(unittest.TestCase):
     """ Sleuthkit NTFS Support """
@@ -496,3 +503,17 @@ class NTFSTests(unittest.TestCase):
         row = dbh.fetch()
 
         self.assert_(row, "Executable within ADS was not found???")
+
+class SKFSTests(tests.FDTest):
+    """ Tests Sleuthkit file like object """
+    test_case = "PyFlagNTFSTestCase"
+    test_inode = "Itest|K33-128-4"
+
+class SKFSTests2(tests.FDTest):
+    """ Test Sleuthkit file like object for compressed files """
+    test_case = "PyFlagNTFSTestCase"
+    test_file = "/Books/80day11.txt"
+
+    def setUp(self):
+        self.fs = DBFS(self.test_case)
+        self.fd = self.fs.open(self.test_file)

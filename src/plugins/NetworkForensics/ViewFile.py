@@ -85,8 +85,8 @@ class ViewFile(Reports.report):
         def default_generator():
             size=0
             ## Cap the maximum text size so we dont kill the browser:
-            while size<1000000:
-                data = fd.read(1000)
+            while size<100000:
+                data = fd.read(10000)
                 if not data: break
 
                 a = []
@@ -95,7 +95,7 @@ class ViewFile(Reports.report):
                        or c in '\r\n!@#$%^&*()_+-=[]\{}|[]\\;\':\",./<>?':
                         a.append(c)
 
-                size += len(a)
+                size += len(data)
                 for line in ''.join(a).splitlines():
                     yield textwrap.fill(line)+"\n"
                 

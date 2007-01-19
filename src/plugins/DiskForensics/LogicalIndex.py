@@ -657,7 +657,7 @@ class LogicalIndexTests(unittest.TestCase):
         self.assert_("Hello" in matching_words)
 
     def test02UCS16Indexing(self):
-        """ Test UCS-16 indexing - simple words """
+        """ Test unicode indexing - simple words """
         dictionary = { 5: u"hello", 10:u"world" }
         ## These are the encodings which will be tested:
         encodings = ["utf-16_le", "utf-16_be", "rot-13", "ms-pst"]
