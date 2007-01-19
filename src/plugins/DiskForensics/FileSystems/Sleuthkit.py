@@ -391,12 +391,44 @@ class Sleuthkit(DBFS):
                 break
             
         if root_dir=='/':
-            insert_file(sk.skinode(0, 0, 0, 1), 'd/d', '/', '__deleted__')
             # find any unlinked inodes here. Note that in some filesystems, a
             # 'deleted' directory may have been found and added in the walk above.
+            insert_file(sk.skinode(0, 0, 0, 1), 'd/d', '/', '_deleted_')
             for s in fs.iwalk():
                 insert_inode(s)
-                insert_file(s, '-/-', '/__deleted__', "%s" % s)
+                insert_file(s, '-/-', '/_deleted_', "%s" % s)
+
+            # add contiguous unallocated blocks here as 'unallocated' files.
+            # the offset driver over the iosource should work for this
+            unalloc_blocks = []
+            count=0
+            last = (0,0)
+            dbh_unalloc = DB.DBO(self.case)
+            dbh_unalloc.execute("select * from block order by block asc")
+            for row in dbh_unalloc:
+                ## We make a list of all blocks which are unallocated:
+                ## This is the end of the unallocated block just before this one:
+                new_block = ( last[0],row['block']-last[0])
+                if new_block[1]>0:
+                    ## Add the offset into the db table:
+                    offset = new_block[0] * fs.blocksize
+                    size = new_block[1] * fs.blocksize
+                    
+                    ## Add a new VFS node:
+                    self.VFSCreate("I%s" % iosource_name,'o%s:%s' % (offset, size),
+                                   "/_unallocated_/o%08d" % count, size=size)
+                    count+=1
+                    unalloc_blocks.append(new_block)
+                    
+                last=(row['block']+row['count'],0,row['inode'])
+    
+            ## Now we need to add the last unalloced block. This starts at
+            ## the last allocated block, and finished at the end of the IO
+            ## source. The size of -1 makes the VFS driver keep reading till the end.
+            offset = last[0] * fs.blocksize
+            self.VFSCreate("I%s" % iosource_name, 'o%s:%s' % (offset, 0),
+                           "/_unallocated_/o%08d" % count)
+    
 
 ## Unit Tests:
 import unittest, md5

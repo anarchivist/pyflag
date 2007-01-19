@@ -63,6 +63,7 @@ typedef struct {
     void *context;
 	IMG_INFO *img;
 	FS_INFO *fs;
+    int blocksize;
     PyObject *root_inum;
 } skfs;
 
@@ -78,6 +79,8 @@ static PyObject *skfs_fstat(skfs *self, PyObject *args);
 static PyMemberDef skfs_members[] = {
     {"root_inum", T_OBJECT, offsetof(skfs, root_inum), 0,
      "root inode"},
+    {"blocksize", T_INT, offsetof(skfs, blocksize), 0,
+     "filesystem blocksize"},
     {NULL}  /* Sentinel */
 };
 

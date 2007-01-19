@@ -553,6 +553,7 @@ skfs_init(skfs *self, PyObject *args, PyObject *kwds) {
     ((skfs_inode *)self->root_inum)->id = 0;
     ((skfs_inode *)self->root_inum)->alloc = 1;
 
+    self->blocksize = self->fs->block_size;
     return 0;
 }
 

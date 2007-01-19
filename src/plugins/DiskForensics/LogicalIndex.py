@@ -589,7 +589,6 @@ class SearchIndex(Reports.report):
             links = [ query_type(case=query['case'],family="Disk Forensics",report='ViewFile',__target__='inode') ],
             case=query['case'],
             )
-        
 
 class BrowseIndexKeywords(Reports.report):
     """ Show a summary of the results of the index keywords search.  The search indexed keywords report can then be used to view the results."""

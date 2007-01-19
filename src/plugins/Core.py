@@ -84,6 +84,87 @@ class IO_File(FileSystem.File):
         result.row("IO Subsys %s:" % self.name, tmp, valign="top")
         result.row("Mount point",dbh.get_meta("mount_point_%s" % self.name))
 
+import sys
+
+class OffsetFile(FileSystem.File):
+    """ A simple offset:length file driver.
+
+    The inode name specifies an offset and a length into our parent Inode.
+    The format is offset:length
+    """
+    specifier = 'o'
+    def __init__(self, case, fd, inode):
+        FileSystem.File.__init__(self, case, fd, inode)
+
+        ## We parse out the offset and length from the inode string
+        tmp = inode.split('|')[-1]
+        tmp = tmp[1:].split(":")
+        self.offset = int(tmp[0])
+        self.readptr=0
+
+        ## Seek our parent file to its initial position
+        self.fd.seek(self.offset)
+
+        try:
+            self.size=int(tmp[1])
+            if self.size == 0: self.size=sys.maxint
+        except IndexError:
+            self.size=sys.maxint
+
+        # crop size if it overflows IOsource
+        # some iosources report size as 0 though, we must check or size will
+        # always be zero
+        if fd.size != 0 and self.size + self.offset > fd.size:
+            self.size = fd.size - self.offset
+
+    def seek(self,offset,whence=0):
+        if whence==2:
+            self.readptr=self.size+offset
+        elif whence==1:
+            self.readptr+=offset
+        else:
+            self.readptr=offset
+
+        self.fd.seek(self.offset + self.readptr)
+
+    def tell(self):
+        return self.readptr
+    
+    def read(self,length=None):
+        available = self.size - self.readptr
+        if length==None:
+            length=available
+        else:
+            if length > available:
+                length = available
+
+        if(length<0): return ''
+
+        result=self.fd.read(length)
+        
+        self.readptr+=len(result)
+        return result
+
+import StringIO
+
+## This is a memory cached version of the offset file driver - very useful for packets:
+class MemoryCachedOffset(StringIO.StringIO, FileSystem.File):
+    specifier = 'O'
+    def __init__(self, case, fd, inode):
+        FileSystem.File.__init__(self, case, fd, inode)
+
+        ## We parse out the offset and length from the inode string
+        tmp = inode.split('|')[-1]
+        tmp = tmp[1:].split(":")
+        fd.seek(int(tmp[0]))
+
+        try:
+            self.size=int(tmp[1])
+        except IndexError:
+            self.size=sys.maxint
+            
+        StringIO.StringIO.__init__(self, fd.read(self.size))
+
 class Help(Reports.report):
     """ This facility displays helpful messages """
     hidden = True
