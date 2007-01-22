@@ -61,7 +61,9 @@ class Store:
         finally:
             self.mutex.release()
 
-        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Stored key %s: %r" % (key,object))
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG,
+                      "Stored key %s: %s" % (key,
+                                             ("%r" % (object,))[:100]))
         return key
 
     def get(self, key):
@@ -81,7 +83,9 @@ class Store:
                     self.creation_times.append([time.time(), k, obj])
                     
                     self.check_full()
-                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Got key %s: %s" % (key, obj))
+                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG,
+                                  "Got key %s: %s" % (key,
+                                                      ("%r" % (obj,))[:100]))
                     return obj
                 i+=1
 

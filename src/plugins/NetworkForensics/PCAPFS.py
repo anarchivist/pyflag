@@ -216,16 +216,23 @@ class PCAPFS(DBFS):
 	    
             ## Create a new VFS node:
             new_inode = "I%s|S%s" % (iosource_name, s['con_id'])
+            
+            ## Seperate the streams into days to make handling huge
+            ## files in the gui a little eaiser.
+            date_str = mtime.split(" ")[0]
+            
             if s['direction'] == "forward":
                 self.VFSCreate(
                     None,
                     new_inode,
-                    "%s/streams/%s-%s/%s:%s/%s" % ( self.mount_point,
-                                            IP2str(s['dest_ip']),
-                                            IP2str(s['src_ip']),
-                                            s['dest_port'],
-                                            s['src_port'],
-                                            s['direction']),
+                    "%s/streams/%s/%s-%s/%s:%s/%s" % (
+                    self.mount_point,
+                    date_str,
+                    IP2str(s['dest_ip']),
+                    IP2str(s['src_ip']),
+                    s['dest_port'],
+                    s['src_port'],
+                    s['direction']),
                     mtime = mtime,
                     size=size
                     )
@@ -233,12 +240,14 @@ class PCAPFS(DBFS):
                 self.VFSCreate(
                     None,
                     new_inode,
-                    "%s/streams/%s-%s/%s:%s/%s" % ( self.mount_point,
-                                            IP2str(s['src_ip']),
-                                            IP2str(s['dest_ip']),
-                                            s['src_port'],
-                                            s['dest_port'],
-                                            s['direction']),
+                    "%s/streams/%s/%s-%s/%s:%s/%s" % (
+                    self.mount_point,
+                    date_str,
+                    IP2str(s['src_ip']),
+                    IP2str(s['dest_ip']),
+                    s['src_port'],
+                    s['dest_port'],
+                    s['direction']),
                     mtime = mtime,
                     size=size
                     )

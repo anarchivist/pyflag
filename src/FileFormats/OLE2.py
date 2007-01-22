@@ -4,12 +4,13 @@ We currently implement support for the following file formats:
 outlook .msg files - These get extracted into the normal vfs - we also collect stats on the file
 MS Office - We collect metadata in a special report.
 
-Generic OLE VFS - The contents of the OLE file is make available through the VFS
+Generic OLE VFS - The contents of the OLE file is made available through the VFS
 """
 from libole2 import OLEFile
 from format import *
 from plugins.FileFormats.BasicFormats import *
 import sys,re
+from plugins.FileFormats.BasicFormats import *
 
 prop_lookup = {
     '001A': 'Message class',

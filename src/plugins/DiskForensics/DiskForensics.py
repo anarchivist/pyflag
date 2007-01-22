@@ -288,7 +288,9 @@ class Timeline(Reports.report):
         dbh = self.DBO(query['case'])
         dbh.execute("drop table mac")
 
-## Standard file objects:
+## FIXME - This is deprecated. Sleuthkit files are read using the K
+## driver now. There may be some use for this kind of driver though (a
+## file which is completely specified by a sequence of blocks).
 class DBFS_file(FileSystem.File):
     """ Class for reading files within a loaded dd image, supports typical file-like operations, seek, tell, read """
     
@@ -412,6 +414,7 @@ class DBFS_file(FileSystem.File):
 
         return self.display_data(query,result,max, textdumper)
 
+## FIXME: Write tests for this...
 class MountedFS_file(FileSystem.File):
     """ access to real file in filesystem """
     specifier = 'M'
@@ -446,3 +449,4 @@ class MountedFS_file(FileSystem.File):
 
     def tell(self):
         return self.fd.tell()
+

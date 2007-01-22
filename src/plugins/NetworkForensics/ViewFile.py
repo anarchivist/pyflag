@@ -65,7 +65,7 @@ class ViewFile(Reports.report):
             dbh.execute("select mime from type where inode=%r",query['inode'])
             row = dbh.fetch()
             content_type = row['mime']
-        except DB.DBError:
+        except (DB.DBError,TypeError):
             content_type = 'application/octet-stream'
 
         fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])

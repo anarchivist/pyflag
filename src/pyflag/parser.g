@@ -33,7 +33,7 @@ def eval_expression(elements, name, operator, arg):
             break
     
     if not element:
-        raise RuntimeError("Column %s not known" % column)
+        raise RuntimeError("Column %s not known" % name)
 
     ## Use the element to parse:
     return element.parse(name, operator, arg)

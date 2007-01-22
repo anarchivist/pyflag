@@ -69,14 +69,6 @@ class PstScan(GenScanFactory):
         dbh=DB.DBO(self.case)
         self.to_re = re.compile('^to:\s+(.*?)\n(?:\w|\n)', re.IGNORECASE|re.MULTILINE|re.DOTALL)
         self.from_re = re.compile('^from:\s+(.*?)\n(?:\w|\n)', re.IGNORECASE|re.MULTILINE|re.DOTALL)
-        # create the "groupware" tables
-        # these are global to the image, not the file, so other scanners may wish to use them
-        # in that case this code may belong elseware
-        dbh.execute("CREATE TABLE IF NOT EXISTS `email` (`inode` VARCHAR(250), `date` TIMESTAMP, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));")
-        dbh.execute("CREATE TABLE IF NOT EXISTS `contact` (`inode` VARCHAR(250), `name` VARCHAR(250), `email` VARCHAR(250), `address` VARCHAR(250), `phone` VARCHAR(250));")
-        dbh.execute("CREATE TABLE IF NOT EXISTS `appointment` (`inode` VARCHAR(250), `startdate` TIMESTAMP, `enddate` TIMESTAMP, `location` VARCHAR(250), `comment` VARCHAR(250));")
-        dbh.execute("CREATE TABLE IF NOT EXISTS `journal` (`inode` VARCHAR(250), `startdate` TIMESTAMP, `enddate` TIMESTAMP, `type` VARCHAR(250), `comment` VARCHAR(250));")
-
 
     def reset(self, inode):
         GenScanFactory.reset(self, inode)

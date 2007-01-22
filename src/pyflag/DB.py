@@ -342,6 +342,8 @@ class DBO:
 
                 ## We terminate the current connection and reconnect
                 ## to the DB
+                pyflaglog.log(pyflaglog.DEBUG, "Killing connection because %s. Last query was %s" % (e,self.cursor._last_executed))
+                                
                 self.cursor.kill_connection()
                 del self.dbh
                 
@@ -373,17 +375,25 @@ class DBO:
 
         This function implements a cache in the db for especially
         complex queries.
+
+        Note that races are controlled here by using a tranactional
+        table to achieve row level locks.
         """
         ## Expire the cache if needed
-        self.execute("select * from sql_cache where timestamp < date_sub(now(), interval %r minute)", config.DBCACHE_AGE)
+        self.execute("start transaction")
+        self.execute("select * from sql_cache where timestamp < date_sub(now(), interval %r minute) for update", config.DBCACHE_AGE)
         tables = [ row['id'] for row in self]
         for table_id in tables:
             self.execute("delete from sql_cache where id = %r" , table_id)
             self.execute("drop table if exists cache_%s" , table_id)
 
+        self.execute("commit")
+
         ## Try to find the query in the cache. We need a cache which
-        ## covers the range we are interested in:
-        self.execute("""select * from sql_cache where query = %r and `limit` <= %r and `limit` + `length` >= %r""", (sql, limit, limit + length))
+        ## covers the range we are interested in: This will lock the
+        ## row while we generate its underlying cache table:
+        self.execute("start transaction")
+        self.execute("""select * from sql_cache where query = %r and `limit` <= %r and `limit` + `length` >= %r for update""", (sql, limit, limit + length))
         row = self.fetch()
         
         if row:            
@@ -392,13 +402,17 @@ class DBO:
                          row['id'])
 
             cache_limit = row['limit']
+
+            ## This releases the lock and allows other threads to have
+            ## a go
+            self.execute("commit")
+
             return self.execute("select * from cache_%s limit %s,%s",
                                 (row['id'], limit - cache_limit, length))
 
-        ## Query is not in cache - create a new cache entry: FIXME -
-        ## this could race.  We create the cache centered on the
-        ## required range - this allows quick paging forward and
-        ## backwards.
+        ## Query is not in cache - create a new cache entry: We create
+        ## the cache centered on the required range - this allows
+        ## quick paging forward and backwards.
         lower_limit = max(limit - config.DBCACHE_LENGTH/2,0)
 
         ## Determine which tables are involved:
@@ -418,8 +432,26 @@ class DBO:
         ## Create the new table
         id = self.autoincrement()
         
-        self.execute("create table cache_%s %s limit %s,%s",
-                     (id,sql, lower_limit, config.DBCACHE_LENGTH))
+        ## Lock the new row - this avoids the race above because other
+        ## threads are forced to wait until we finish here:
+        self.execute("select * from sql_cache where id=%r  limit 1 for update", id)
+
+        ## This is needed to flush the SS buffer (we do not want to go
+        ## out of sync here..)
+        self.fetch()
+        
+        ## This could take a little while on a loaded db:
+        try:
+            self.execute("create table cache_%s %s limit %s,%s",
+                         (id,sql, lower_limit, config.DBCACHE_LENGTH))
+        except:
+            ## Oops the table already exists (should not happen)
+            self.execute("drop table cache_%s",id )
+            self.execute("create table cache_%s %s limit %s,%s",
+                         (id,sql, lower_limit, config.DBCACHE_LENGTH))
+            
+        ## Now release the lock.
+        self.execute("commit")
         
         return self.execute("select * from cache_%s limit %s,%s",
                             (id,limit - lower_limit,length))
@@ -439,11 +471,14 @@ class DBO:
 
     def invalidate(self,table):
         """ Invalidate all copies of the cache which relate to this table """
-        self.execute("select id from sql_cache where tables like '%%,%s,%%'",table)
+        self.execute("start transaction")
+        self.execute("select id from sql_cache where tables like '%%,%s,%%' for update",table)
         ids = [row['id'] for row in self]
         for id in ids:
             self.execute("drop table if exists cache_%s", id)
             self.execute("delete from sql_cache where id=%r", id)
+
+        self.execute("commit")
 
     def _calculate_set(self, **fields):
         """ Calculates the required set clause from the fields provided """
@@ -665,8 +700,15 @@ class DBO:
         """ Destructor that gets called when this object is gced """
         try:
             self.cursor.ignore_warnings = True
-            for i in self.temp_tables:
-                self.drop(i)
+            try:
+                for i in self.temp_tables:
+                    self.drop(i)
+            except: pass
+
+#            try:
+#                self.execute("rollback")
+#            except: pass
+
             ## Ensure that our mass insert case is comitted in case
             ## users forgot to flush it:
             self.mass_insert_commit()

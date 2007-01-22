@@ -43,6 +43,11 @@ import cStringIO,csv,time
 import pyflag.Registry as Registry
 import pyflag.parser as parser
 import pyflag.TableObj as TableObj
+import pyflag.pyflaglog as pyflaglog
+
+def quote_quotes(string):
+    """ Replaces \' with \" for insertion into html """
+    return string.replace('\'',"\"")
 
 class HTMLException(Exception):
     """ An exception raised within the UI - should not escape from this module """
@@ -219,9 +224,12 @@ class HTMLUI(UI.GenericUI):
         data=file.read(1000)
         self.generator.content_type=magic.buffer(data)
         try:
-            self.generator.headers=[("Content-Disposition","attachment; filename=%s" % file.inode),]
+            name = file.name
         except AttributeError:
-            self.generator.headers=[("Content-Disposition","attachment; filename=%s" % file.name),]
+            name = file.inode.replace("|",'_')
+            name = name.replace("/","-")
+
+        self.generator.headers=[("Content-Disposition","attachment; filename=%s" % name)]
 
         file.seek(0)
         self.generator.generator=file
@@ -368,7 +376,7 @@ class HTMLUI(UI.GenericUI):
 
         ## Add tooltip if needed:
         if tooltip:
-            self.result+="<abbr title='%s'>%s</abbr>" % (tooltip,base)
+            self.result+="<abbr title=%r>%s</abbr>" % (quote_quotes(tooltip),base)
         else:
             self.result+=base
 
@@ -388,7 +396,7 @@ class HTMLUI(UI.GenericUI):
         else:
             base = "<input type=button value=%r onclick=\"popup('%s','%s',%r,%r); return false;\" />" % (label,self.defaults,cb,width,height)
         if tooltip:
-            self.result += "<abbr title=%r>%s</abbr>" % (tooltip,base)
+            self.result += "<abbr title=%r>%s</abbr>" % (quote_quotes(tooltip),base)
         else:
             self.result += base
 
@@ -785,7 +793,8 @@ class HTMLUI(UI.GenericUI):
         else:
             self.toolbar_ui.icon(icon,tooltip=text)
 
-    def table(self,elements=[],table='',where='',groupby = None,case=None, **opts):
+    def table(self,elements=[],table='',where='',groupby = None,case=None,
+              **opts):
         ## Building up the args list in this way ensure that defaults
         ## can be specified in _make_sql itself and not be overwritten
         ## by our defaults.
@@ -804,6 +813,10 @@ class HTMLUI(UI.GenericUI):
 
         filter_expression = query.get('filter','')
 
+        ## Remember our original filter elements (The list of elements
+        ## which filtering will be applied to:
+        filter_elements = elements
+
         if groupby:
             for e in elements:
                 if e.name==groupby:
@@ -820,7 +833,7 @@ class HTMLUI(UI.GenericUI):
                                  ]
                     break
             
-        args = dict( elements = elements, filter_elements = elements,
+        args = dict( elements = elements, filter_elements = filter_elements,
                      table = table, case=case, filter=query.get('filter',''),
                      groupby = groupby, order = order)
 
@@ -1122,8 +1135,10 @@ class HTMLUI(UI.GenericUI):
                     where = where,
                     groupby = query['groupby'],
                     case = case)
-            except: pass
-
+            except Exception,e:
+                pyflaglog.log(pyflaglog.ERROR,e)
+                pass
+            
             result.start_form(query)
             result.const_selector("Group by", "groupby", column_names, column_names)
             result.end_form()
@@ -1355,7 +1370,7 @@ class HTMLUI(UI.GenericUI):
         option_str = self.opt_to_str(options)
         data = "<img border=0 src='images/%s' %s />" % (path, option_str)
         if tooltip:
-            data = "<abbr title='%s'>%s</abbr>" % (tooltip,data)
+            data = "<abbr title=%r>%s</abbr>" % (quote_quotes(tooltip),data)
         self.result += data
 
     ## FIXME: Not really completed

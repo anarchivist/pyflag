@@ -77,14 +77,16 @@ class NewCase(Reports.report):
         KEY property(property),
         KEY joint(property,value(20)))""")
 
+        ## This is a transactional table for managing the cache
         case_dbh.execute("""CREATE TABLE if not exists `sql_cache` (
         `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY ,
         `timestamp` TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL ,
         `tables` VARCHAR( 250 ) NOT NULL ,
         `query` MEDIUMTEXT NOT NULL,
         `limit` INT default 0,
-        `length` INT default 100
-        )""")
+        `length` INT default 100,
+        PRIMARY KEY  (`id`)
+        ) ENGINE=InnoDB DEFAULT""")
 
         case_dbh.execute("""CREATE TABLE if not exists `annotate` (
         `id` INT(11) not null auto_increment,
@@ -93,6 +95,12 @@ class NewCase(Reports.report):
         `category` VARCHAR( 250 ) NOT NULL default 'Note',
         PRIMARY KEY(`id`)
         )""")        
+
+        # create the "groupware" tables
+        case_dbh.execute("CREATE TABLE IF NOT EXISTS `email` (`inode` VARCHAR(250), `date` TIMESTAMP, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));")
+        case_dbh.execute("CREATE TABLE IF NOT EXISTS `contact` (`inode` VARCHAR(250), `name` VARCHAR(250), `email` VARCHAR(250), `address` VARCHAR(250), `phone` VARCHAR(250));")
+        case_dbh.execute("CREATE TABLE IF NOT EXISTS `appointment` (`inode` VARCHAR(250), `startdate` TIMESTAMP, `enddate` TIMESTAMP, `location` VARCHAR(250), `comment` VARCHAR(250));")
+        case_dbh.execute("CREATE TABLE IF NOT EXISTS `journal` (`inode` VARCHAR(250), `startdate` TIMESTAMP, `enddate` TIMESTAMP, `type` VARCHAR(250), `comment` VARCHAR(250));")
 
         ## Create a directory inside RESULTDIR for this case to store its temporary files:
         try:
@@ -189,9 +197,12 @@ class DelCase(Reports.report):
         ## Remove any jobs that may be outstanding:
         dbh.delete('jobs',"command='Scan' and arg1=%r" % case)
 
-        #Delete the case from the database
-        dbh.delete('meta',"property='flag_db' and value=%r" % case)
-        dbh.execute("drop database if exists %s" ,case)
+        try:
+          #Delete the case from the database
+          dbh.delete('meta',"property='flag_db' and value=%r" % case)
+          dbh.execute("drop database if exists %s" ,case)
+        except DB.DBError:
+            pass
 
         ## Delete the temporary directory corresponding to this case and all its content
         try:

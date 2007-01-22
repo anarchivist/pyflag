@@ -279,11 +279,14 @@ class GenericUI:
             query_str += "group by `%s` " % groupby
 
         ## Now calculate the order by:
-        query_str += "order by %s " % filter_elements[order].sql
-
-        if direction=='1':
-            query_str += "asc"
-        else: query_str+= "desc"
+        try:
+            query_str += "order by %s " % elements[order].sql
+            if direction=='1':
+                query_str += "asc"
+            else: query_str+= "desc"
+        except:
+            pass
+        
 
         ## No longer needed as limits are handled by dbh.cached_execute()
         ## Limit conditions:

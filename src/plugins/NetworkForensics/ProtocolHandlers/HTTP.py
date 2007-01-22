@@ -221,7 +221,7 @@ class HTTPScanner(StreamScannerFactory):
             `response_packet` int null,
             `content_type` VARCHAR( 255 ) NULL,
             `referrer` text NULL,
-            `date` int,
+            `date` timestamp,
             `host` VARCHAR(255),
             `useragent` VARCHAR(255),
             primary key (`id`)
@@ -312,8 +312,12 @@ class HTTPScanner(StreamScannerFactory):
             except KeyError:
                 pass
 
+            ## stream.ts_sec is already formatted in DB format
+            date_str = stream.ts_sec.split(" ")[0]
+
             self.fsfd.VFSCreate(None,new_inode,
-                                "/HTTP/%s" % (escape(p.request['url'])),
+                                "/HTTP/%s/%s" % (date_str,
+                                                 escape(p.request['url'])),
                                 mtime=stream.ts_sec, size=size
                                 )
 
@@ -364,7 +368,7 @@ class HTTPScanner(StreamScannerFactory):
                             url            = url,
                             response_packet= p.response.get("packet_id"),
                             content_type   = p.response.get("content-type","text/html"),
-                            date           = date,
+                            _date           = "from_unixtime(%r)" % date,
                             referrer       = referer,
                             host           = host,
                             useragent      = p.request.get('user-agent', '-'),

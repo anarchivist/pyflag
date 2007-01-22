@@ -114,11 +114,23 @@ class load_and_scan(pyflagsh.command):
             yield self.help()
             return
 
-        iosource,mnt_point,filesystem = self.args
+        iosource=self.args[0]
+        mnt_point=self.args[1]
+        filesystem=self.args[2]
 
         dbh = DB.DBO()
         dbh.mass_insert_start('jobs')
-        scanners = [ x for x in fnmatch.filter(Registry.SCANNERS.scanners, self.args[3]) ]
+        ## This works out all the scanners that were specified:
+        tmp = []
+        for i in range(3,len(self.args)):
+            tmp.extend([x for x in fnmatch.filter(
+                Registry.SCANNERS.scanners, self.args[i]) ])
+
+
+        scanners = [ ]
+        for item in tmp:
+            if item not in scanners:
+                scanners.append(item)
 
         ## Load the filesystem:
         try:
@@ -127,7 +139,7 @@ class load_and_scan(pyflagsh.command):
             yield "Unable to find a filesystem of %s" % filesystem
             return
 
-        fs=fs(self.case)
+        fs=fs(self.environment._CASE)
         fs.load(mnt_point, iosource, scanners)
 
         yield "Loading complete"

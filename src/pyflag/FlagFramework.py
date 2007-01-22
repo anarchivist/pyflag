@@ -572,7 +572,8 @@ class Flag:
         if not report:
             try:
                 dbh=DB.DBO(None)
-                dbh.execute("desc meta");
+                dbh.execute("select * from meta limit 1");
+                dbh.fetch()
             except Exception,e:
                 print "DB Error was %s" % e
                 if "Access denied" in str(e):

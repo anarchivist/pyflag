@@ -1280,10 +1280,14 @@ class message:
                     mtime = self.fd.ts_sec
                 except:
                     mtime = 0
+
+                date_str = mtime.split(" ")[0]
                 
                 ## The filename and size is given in the context
-                self.ddfs.VFSCreate(self.fd.inode, new_inode, "MSN/%s" %
-                                    (filename) , mtime=mtime,
+                self.ddfs.VFSCreate(self.fd.inode,
+                                    new_inode,
+                                    "MSN/%s/%s" % (date_str, filename),
+                                    mtime=mtime,
                                     size=size)
 
                 self.inodes.append(new_inode)
