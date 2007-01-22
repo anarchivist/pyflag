@@ -268,19 +268,15 @@ getblocks_walk_callback(FS_INFO *fs, DADDR_T addr, char *buf, int size, int flag
     if(size <= 0)
         return WALK_CONT;
 
-    if(flags & FS_FLAG_DATA_RES) {
-        /* we have resident ntfs data */
-        file->resdata = (char *)talloc_size(file->blocks, size);
-        memcpy(file->resdata, buf, size);
-        file->size = size;
-    } else {
+    if(!(flags & FS_FLAG_DATA_RES)) {
         /* create a new block entry */
         b = talloc(file->blocks, struct block);
         b->addr = addr;
         b->size = size;
         list_add_tail(&b->list, &file->blocks->list);
-        file->size += size;
     }
+
+    file->size += size;
 
     /* add to the list */
     return WALK_CONT;
@@ -797,6 +793,8 @@ skfs_fstat(skfs *self, PyObject *args) {
 
     fs_inode = ((skfile *)skfile_obj)->fs_inode;
     
+    //FIXME should we set size to be skfile->size? It is not the same as
+    //fs_inode->size when we have the non-default attribute open.
     result = build_stat_result(fs_inode);
     return result;
 }
@@ -1035,8 +1033,6 @@ skfile_dealloc(skfile *self) {
     /* Not really needed now
     if(self->blocks)
         talloc_free(self->blocks);
-    if(self->resdata)
-        talloc_free(self->resdata);
     if(self->fs_inode)
         fs_inode_free(self->fs_inode);
     */
@@ -1111,7 +1107,6 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
     Py_INCREF(skfs_obj);
     self->skfs = skfs_obj;
 
-    self->resdata = NULL;
     self->readptr = 0;
     self->size = 0;
 
@@ -1148,32 +1143,39 @@ skfile_str(skfile *self) {
 }
 
 static PyObject *
-skfile_read(skfile *self, PyObject *args) {
+skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
     char *buf;
     int cur, written;
     PyObject *retdata;
     FS_INFO *fs;
     struct block *b;
     int readlen=-1;
+    int slack = 0;
+    int maxsize;
 
     global_talloc_context = self->context;
 
     fs = ((skfs *)self->skfs)->fs;
 
-    if(!PyArg_ParseTuple(args, "|i", &readlen))
+    static char *kwlist[] = {"size", "slack", NULL};
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "|ii", kwlist, 
+                                    &readlen, &slack))
         return NULL; 
 
-    /* adjust readlen if size not given or is too big */
-    if(readlen < 0 || self->readptr + readlen > self->size)
-        readlen = self->size - self->readptr;
+    /* return slack? It is hard to calculate slack length correctly. You cannot
+     * simply set it to blocksize * numblocks. Consider a compressed NTFS file.
+     * It may have 2 blocks allocated, but filesize > 2 * blocksize before
+     * slack is considered at all. In this case we can't really return slack at
+     * all so dont bother. */
+    if(slack)
+        maxsize = max(self->size, list_count(&self->blocks->list) * fs->blocksize);
+    else
+        maxsize = self->size;
 
-    /* special case for NTFS resident data */
-    if(self->resdata) {
-         retdata = PyString_FromStringAndSize(self->resdata + self->readptr, readlen);
-         self->readptr += readlen;
-         return retdata;
-    }
-    
+    /* adjust readlen if size not given or is too big */
+    if(readlen < 0 || self->readptr + readlen > maxsize)
+        readlen = maxsize - self->readptr;
+
     buf = (char *)talloc_size(NULL, readlen);
     if(!buf)
         return PyErr_Format(PyExc_MemoryError, "Out of Memory allocating read buffer.");
@@ -1185,39 +1187,6 @@ skfile_read(skfile *self, PyObject *args) {
 
     retdata = PyString_FromStringAndSize(buf, written);
     talloc_free(buf);
-
-#if 0 // direct block IO version, doesnt work with compressed files etc
-
-    /* allocate buf, be generous in case data straddles blocks */
-    buf = (char *)talloc_size(NULL, readlen + (2 * fs->block_size));
-    if(!buf)
-        return PyErr_Format(PyExc_MemoryError, "Out of Memory allocating read buffer.");
-
-    /* read necessary blocks into buf */
-    cur = written = 0;
-    list_for_each_entry(b, &self->blocks->list, list) {
-
-        /* we don't need any data in this block, skip */
-        if(cur + fs->block_size <= self->readptr) {
-            cur += fs->block_size;
-            continue;
-        }
-
-        /* read block into buf */
-        fs_read_block_nobuf(fs, buf+written, fs->block_size, b->addr);
-        cur += fs->block_size;
-        written += fs->block_size;
-
-        /* are we done yet? */
-        if(cur >= self->readptr + readlen)
-            break;
-    }
-
-    /* copy what we want into the return string */
-    retdata = PyString_FromStringAndSize(buf + (self->readptr % fs->block_size), readlen);
-    talloc_free(buf);
-
-#endif
 
     self->readptr += readlen;
     return retdata;

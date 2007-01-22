@@ -315,7 +315,6 @@ typedef struct {
 	uint32_t type;
 	uint32_t id;
     struct block *blocks;
-    char *resdata;
     long long readptr;
     long long size;
 } skfile;
