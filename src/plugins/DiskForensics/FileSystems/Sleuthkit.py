@@ -389,13 +389,19 @@ class Sleuthkit(DBFS):
                                  status = 'alloc', path=root[1],
                                  name = '')
             for d in dirs:
-                insert_file(d[0], 'd/d', root[1], d[1])
+                #insert_file(d[0], 'd/d', root[1], d[1])
+                insert(d[0], 'd/d', root[1], d[1])
             for f in files:
                 insert(f[0], 'r/r', root[1], f[1])
                 
             if directory and root != root_dir:
                 break
-            
+
+        # have to commit now, because the next bit uses the blocks table
+        dbh_file.mass_insert_commit()
+        dbh_inode.mass_insert_commit()
+        dbh_block.mass_insert_commit()
+
         if root_dir=='/':
             # find any unlinked inodes here. Note that in some filesystems, a
             # 'deleted' directory may have been found and added in the walk above.
@@ -417,8 +423,8 @@ class Sleuthkit(DBFS):
                 new_block = ( last[0],row['block']-last[0])
                 if new_block[1]>0:
                     ## Add the offset into the db table:
-                    offset = new_block[0] * fs.blocksize
-                    size = new_block[1] * fs.blocksize
+                    offset = new_block[0] * fs.block_size
+                    size = new_block[1] * fs.block_size
                     
                     ## Add a new VFS node:
                     self.VFSCreate("I%s" % iosource_name,'o%s:%s' % (offset, size),
@@ -431,7 +437,7 @@ class Sleuthkit(DBFS):
             ## Now we need to add the last unalloced block. This starts at
             ## the last allocated block, and finished at the end of the IO
             ## source. The size of -1 makes the VFS driver keep reading till the end.
-            offset = last[0] * fs.blocksize
+            offset = last[0] * fs.block_size
             self.VFSCreate("I%s" % iosource_name, 'o%s:%s' % (offset, 0),
                            "/_unallocated_/o%08d" % count)
     

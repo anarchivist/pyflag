@@ -70,6 +70,9 @@ char *format_alloc(int x, ...);
 
 #undef min
 #define min(X, Y)  ((X) < (Y) ? (X) : (Y))
+#undef max
+#define max(X, Y)  ((X) > (Y) ? (X) : (Y))
+
 
 #define BUFF_SIZE 1024
 

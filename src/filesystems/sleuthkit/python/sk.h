@@ -63,7 +63,9 @@ typedef struct {
     void *context;
 	IMG_INFO *img;
 	FS_INFO *fs;
-    int blocksize;
+    int block_size;
+    unsigned long long first_block;
+    unsigned long long last_block;
     PyObject *root_inum;
 } skfs;
 
@@ -79,8 +81,12 @@ static PyObject *skfs_fstat(skfs *self, PyObject *args);
 static PyMemberDef skfs_members[] = {
     {"root_inum", T_OBJECT, offsetof(skfs, root_inum), 0,
      "root inode"},
-    {"blocksize", T_INT, offsetof(skfs, blocksize), 0,
+    {"block_size", T_INT, offsetof(skfs, block_size), 0,
      "filesystem blocksize"},
+    {"first_block", T_ULONG, offsetof(skfs, first_block), 0,
+     "first block"},
+    {"last_block", T_ULONG, offsetof(skfs, last_block), 0,
+     "last block"},
     {NULL}  /* Sentinel */
 };
 
@@ -322,13 +328,13 @@ typedef struct {
 static void skfile_dealloc(skfile *self);
 static int skfile_init(skfile *self, PyObject *args, PyObject *kwds);
 static PyObject *skfile_str(skfile *self);
-static PyObject *skfile_read(skfile *self, PyObject *args);
+static PyObject *skfile_read(skfile *self, PyObject *args, PyObject *kwds);
 static PyObject *skfile_seek(skfile *self, PyObject *args);
 static PyObject *skfile_tell(skfile *self);
 static PyObject *skfile_blocks(skfile *self);
 
 static PyMethodDef skfile_methods[] = {
-    {"read", (PyCFunction)skfile_read, METH_VARARGS,
+    {"read", (PyCFunction)skfile_read, METH_VARARGS|METH_KEYWORDS,
      "Read data from file" },
     {"seek", (PyCFunction)skfile_seek, METH_VARARGS,
      "Seek within a file" },

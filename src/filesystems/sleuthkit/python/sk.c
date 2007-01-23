@@ -8,6 +8,7 @@
 
 #include "sk.h"
 #include "list.h"
+#include "misc.h"
 #include "talloc.h"
 #include "fs_tools.h"
 #include "mm_tools.h"
@@ -549,7 +550,9 @@ skfs_init(skfs *self, PyObject *args, PyObject *kwds) {
     ((skfs_inode *)self->root_inum)->id = 0;
     ((skfs_inode *)self->root_inum)->alloc = 1;
 
-    self->blocksize = self->fs->block_size;
+    self->block_size = self->fs->block_size;
+    self->first_block = self->fs->first_block;
+    self->last_block = self->fs->last_block;
     return 0;
 }
 
@@ -1168,7 +1171,7 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
      * slack is considered at all. In this case we can't really return slack at
      * all so dont bother. */
     if(slack)
-        maxsize = max(self->size, list_count(&self->blocks->list) * fs->blocksize);
+        maxsize = max(self->size, list_count(&self->blocks->list) * fs->block_size);
     else
         maxsize = self->size;
 
