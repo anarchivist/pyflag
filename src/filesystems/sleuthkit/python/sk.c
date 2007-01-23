@@ -1184,9 +1184,15 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
         return PyErr_Format(PyExc_MemoryError, "Out of Memory allocating read buffer.");
 
     if(self->type == 0 && self->id == 0)
-        written = fs_read_file_noid(fs, self->fs_inode, self->readptr, readlen, buf);
+        if(slack)
+            written = fs_read_file_noid_slack(fs, self->fs_inode, self->readptr, readlen, buf);
+        else
+            written = fs_read_file_noid(fs, self->fs_inode, self->readptr, readlen, buf);
     else
-        written = fs_read_file(fs, self->fs_inode, self->type, self->id, self->readptr, readlen, buf);
+        if(slack)
+            written = fs_read_file_slack(fs, self->fs_inode, self->type, self->id, self->readptr, readlen, buf);
+        else
+            written = fs_read_file(fs, self->fs_inode, self->type, self->id, self->readptr, readlen, buf);
 
     retdata = PyString_FromStringAndSize(buf, written);
     talloc_free(buf);
@@ -1243,7 +1249,7 @@ skfile_blocks(skfile *self) {
 
 /* This is a thin wrapper around mmls. It returns a tuple of four-tuples
  * containing (start, len, desc, type) for each partition. Note that type is
- * NOT partition type (!) but is actually defined as:
+ * NOT partition type but is actually defined as:
  #define MM_TYPE_DESC    0x01
  #define MM_TYPE_VOL     0x02
 */

@@ -484,9 +484,14 @@ extern "C" {
 	SSIZE_T, SSIZE_T, char *);
 
     extern SSIZE_T
+	fs_read_file_slack(FS_INFO *, FS_INODE *, uint32_t, uint16_t,
+	SSIZE_T, SSIZE_T, char *);
+
+    extern SSIZE_T
 	fs_read_file_noid(FS_INFO *, FS_INODE *, SSIZE_T, SSIZE_T, char *);
 
-
+    extern SSIZE_T
+	fs_read_file_noid_slack(FS_INFO *, FS_INODE *, SSIZE_T, SSIZE_T, char *);
 
 
 

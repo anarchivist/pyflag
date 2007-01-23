@@ -334,6 +334,14 @@ fs_read_file_noid(FS_INFO * fs, FS_INODE * fsi,
 	FS_FLAG_FILE_NOID);
 }
 
+SSIZE_T
+fs_read_file_noid_slack(FS_INFO * fs, FS_INODE * fsi,
+    SSIZE_T offset, SSIZE_T size, char *buf)
+{
+    return fs_read_file_int(fs, fsi, 0, 0, offset, size, buf,
+	FS_FLAG_FILE_NOID|FS_FLAG_FILE_SLACK);
+}
+
 /* return -1 on error or else the size of the data read
  */
 SSIZE_T
@@ -341,4 +349,10 @@ fs_read_file(FS_INFO * fs, FS_INODE * fsi, uint32_t type, uint16_t id,
     SSIZE_T offset, SSIZE_T size, char *buf)
 {
     return fs_read_file_int(fs, fsi, type, id, offset, size, buf, 0);
+}
+SSIZE_T
+fs_read_file_slack(FS_INFO * fs, FS_INODE * fsi, uint32_t type, uint16_t id,
+    SSIZE_T offset, SSIZE_T size, char *buf)
+{
+    return fs_read_file_int(fs, fsi, type, id, offset, size, buf, FS_FLAG_FILE_SLACK);
 }
