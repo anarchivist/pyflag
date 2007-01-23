@@ -599,7 +599,7 @@ class InodeType(StringType):
                 query['id'] = row['id']
 
             ## We got submitted - actually try to do the deed:
-            if 'Annotate' in query.getarray('submit'):
+            if 'Annotate' in query.getarray('__submit__'):
                 result.start_table()
                 if row:
                     new_id=annotate.edit(query,result)

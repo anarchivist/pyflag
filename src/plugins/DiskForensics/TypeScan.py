@@ -117,11 +117,11 @@ class ThumbnailType(InodeType):
                    )
 
         try:
-            tmp2.text("\n%sx%s" % (image.owidth,image.oheight))
+            tmp2.text("\n%sx%s\n" % (image.owidth,image.oheight))
         except AttributeError:
             pass
 
-        tmp2.text(" %s" % inode)
+        tmp2.raw(InodeType.display(self,inode,row, tmp2))
         return tmp2
 
 ## A report to examine the Types of different files:

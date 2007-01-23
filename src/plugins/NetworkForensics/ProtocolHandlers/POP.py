@@ -176,8 +176,12 @@ class POPScanner(StreamScannerFactory):
             path=os.path.dirname(path)
             offset, length = f[1]
             new_inode="%s|o%s:%s" % (combined_inode,offset, length)
+            date_str = stream.ts_sec.split(" ")[0]
+            
             self.fsfd.VFSCreate(None,new_inode,
-                                "%s/POP/Message_%s" % (path,f[0]),
+                                "%s/POP/%s/Message_%s" % (path,
+                                                          date_str,
+                                                          f[0]),
                                 mtime=stream.ts_sec,
                                 size = length
                                 )

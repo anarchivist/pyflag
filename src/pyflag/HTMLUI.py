@@ -1517,7 +1517,7 @@ class HTMLUI(UI.GenericUI):
 
         This should be avoided whenever possible.
         """
-        self.result+=html
+        self.result += "%s" % html
 
     ## FIXME: Do this properly.
     def sanitise_data(self,data):

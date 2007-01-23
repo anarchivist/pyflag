@@ -151,7 +151,7 @@ class SMTPScanner(StreamScannerFactory):
             path=self.fsfd.lookup(inode="I%s|S%s" % (stream.fd.name, forward_stream))
             path=os.path.dirname(path)
             new_inode="%s|o%s:%s" % (combined_inode,offset,length)
-            date_str = mtime.split(" ")[0]
+            date_str = stream.ts_sec.split(" ")[0]
 
             self.fsfd.VFSCreate(None, new_inode,
                                 "%s/SMTP/%s/Message_%s" % (path,

@@ -84,9 +84,8 @@ class NewCase(Reports.report):
         `tables` VARCHAR( 250 ) NOT NULL ,
         `query` MEDIUMTEXT NOT NULL,
         `limit` INT default 0,
-        `length` INT default 100,
-        PRIMARY KEY  (`id`)
-        ) ENGINE=InnoDB DEFAULT""")
+        `length` INT default 100
+        ) ENGINE=InnoDB""")
 
         case_dbh.execute("""CREATE TABLE if not exists `annotate` (
         `id` INT(11) not null auto_increment,
