@@ -24,8 +24,15 @@ This is the python binding for the io subsystem.
 */
 
 #include <Python.h>
+#include "structmember.h"
 #include "libiosubsys.h"
 #include "except.h"
+
+typedef struct {
+    PyObject_HEAD
+    IOSource driver;
+    unsigned long long size;
+} iosource;
 
 PyObject *map_exceptions_for_python(enum _exception e) {
   switch(e) {
@@ -55,24 +62,32 @@ PyObject *map_errors_for_python() {
   };
 };
 
-static PyObject *Open(PyObject *dummy, PyObject *args, PyObject *kwd) {
+static void iosource_dealloc(iosource *self) {
+    if(self->driver)
+        talloc_free(self->driver);
+    self->ob_type->tp_free((PyObject*)self);
+}
+
+static int iosource_init(iosource *self, PyObject *args, PyObject *kwds) {
   char *keywords[] = { "opts", NULL};
   char *drivername;
-  PyObject *opts=NULL;
-  IOSource driver=NULL;
+  PyObject *opts = NULL;
   IOOptions options = NULL;
   PyObject *tmp;
 
-  if(!PyArg_ParseTupleAndKeywords(args, kwd, "|O", keywords,
+  if(!PyArg_ParseTupleAndKeywords(args, kwds, "|O", keywords,
 				  &opts)) {
-    return NULL;
+    return -1;
   };
 
-  if(!PyList_Check(opts))
-    return PyErr_Format(PyExc_TypeError, "Options must be a list of tuples");
+  if(!PyList_Check(opts)) {
+    PyErr_Format(PyExc_TypeError, "Options must be a list of tuples");
+    return -1;
+  };
 
   if(!opts) {
-    return PyErr_Format(PyExc_Exception, "No options provided to driver");
+    PyErr_Format(PyExc_Exception, "No options provided to driver");
+    return -1;
   };
 
   options = CONSTRUCT(IOOptions, IOOptions, add, NULL, NULL, NULL, NULL);
@@ -88,27 +103,29 @@ static PyObject *Open(PyObject *dummy, PyObject *args, PyObject *kwd) {
 	tmp = PyObject_Str(temp);
 	PyErr_Format(PyExc_TypeError, "Element must be a list, not %s", PyString_AsString(tmp));
 	Py_DECREF(tmp);
-	return NULL;
+	return -1;
       };
 
       key = PyList_GetItem(temp,0);
-      if(!key) return NULL;
+      if(!key) return -1;
 
       value = PyList_GetItem(temp,1);
-      if(!value) return NULL;
+      if(!value) return -1;
 
       key = PyObject_Str(key);
       keyc = PyString_AsString(key);
       if(!keyc) {
 	talloc_free(options);
-	return PyErr_Format(PyExc_Exception, "Not a string - driver options must be encoded as strings.");
+	PyErr_Format(PyExc_Exception, "Not a string - driver options must be encoded as strings.");
+    return -1;
       };
 
       value = PyObject_Str(value);
       valuec= PyString_AsString(value);
       if(!valuec) {
 	talloc_free(options);
-	return PyErr_Format(PyExc_Exception, "Not a string - driver options must be encoded as strings.");
+	PyErr_Format(PyExc_Exception, "Not a string - driver options must be encoded as strings.");
+    return -1;
       };
 
       CONSTRUCT(IOOptions, IOOptions, add,options, options, keyc, valuec);
@@ -117,20 +134,23 @@ static PyObject *Open(PyObject *dummy, PyObject *args, PyObject *kwd) {
 
   drivername = CALL(options, get_value, "subsys");
   if(!drivername) {
-    return PyErr_Format(PyExc_TypeError, "No iodriver specified");
+    PyErr_Format(PyExc_TypeError, "No iodriver specified");
+    return -1;
   };
 
   TRY {
-    driver = iosubsys_Open(drivername, options);
+    self->driver = iosubsys_Open(drivername, options);
   } EXCEPT(E_ANY) {
     talloc_free(options);
-    return PyErr_Format(map_exceptions_for_python(__EXCEPT__), "Unable to open iosource");
+    PyErr_Format(map_exceptions_for_python(__EXCEPT__), "Unable to open iosource");
+    return -1;
   };
 
   // We failed to instantiate this driver
-  if(!driver) {
+  if(!self->driver) {
     talloc_free(options);
-    return PyErr_Format(map_errors_for_python(), "%s", _error_buff);
+    PyErr_Format(map_errors_for_python(), "%s", _error_buff);
+    return -1;
   };
 
   //Check that all the options have been consumed:
@@ -141,39 +161,31 @@ static PyObject *Open(PyObject *dummy, PyObject *args, PyObject *kwd) {
     PyErr_Format(PyExc_RuntimeError, "Subsystem %s does not accept parameter %s", drivername,
 		 first->name);
     talloc_free(options);
-    return NULL;
+    return -1;
   };
 
   //Now ensure that the options are stolen to the iosource:
-  talloc_steal(driver, options);
+  talloc_steal(self->driver, options);
+  self->size = self->driver->size;
 
-  // Ensure that when the iosource is gced the memeory is freed properly:
-  return PyCObject_FromVoidPtr(driver, (void (*)(void *))talloc_free);
+  return 0;
 };
 
-static PyObject *py_read_random(PyObject *dummy, PyObject *args) {
+static PyObject *iosource_read_random(iosource *self, PyObject *args) {
   uint32_t len;
   uint64_t offs;
-  PyObject *py_driver;
-  IOSource driver;
   PyObject *result;
   int length;
 
-  if(!PyArg_ParseTuple(args, "OlL", &py_driver, &len, &offs)) 
+  if(!PyArg_ParseTuple(args, "lL", &len, &offs)) 
     return NULL;
-
-  // Check that what we got is actually an iosource driver:
-  driver = (IOSource)PyCObject_AsVoidPtr(py_driver);
-  if(!driver || !ISSUBCLASS(driver, IOSource)) {
-    return PyErr_Format(PyExc_RuntimeError, "This is not an iosource driver");
-  };
 
   // Allocate some space for the request:
   result=PyString_FromStringAndSize(NULL, len);
   if(!result) return NULL;
 
   TRY {
-    length=driver->read_random(driver, PyString_AsString(result), len, offs);
+    length=self->driver->read_random(self->driver, PyString_AsString(result), len, offs);
   } EXCEPT(E_ANY) {
     Py_DECREF(result);
     return PyErr_Format(PyExc_IOError, "%s",except_str);
@@ -188,34 +200,74 @@ static PyObject *py_read_random(PyObject *dummy, PyObject *args) {
   return result;
 };
 
-static PyObject *size(PyObject *dummy, PyObject *args) {
-  PyObject *py_driver;
-  IOSource driver;
-  if(!PyArg_ParseTuple(args, "O", &py_driver)) 
-    return NULL;
+static PyMemberDef iosource_members[] = {
+    {"size", T_ULONG, offsetof(iosource, size), 0,
+     "iosource size"},
+    {NULL}  /* Sentinel */
+};
 
-  // Check that what we got is actually an iosource driver:
-  driver = (IOSource)PyCObject_AsVoidPtr(py_driver);
-  if(!driver)     
-    return PyErr_Format(PyExc_RuntimeError, "This is not an iosource driver");
+static PyMethodDef iosource_methods[] = {
+    {"read_random", (PyCFunction)iosource_read_random, METH_VARARGS,
+     "read data from given offset" },
+    {NULL}  /* Sentinel */
+};
 
-  if(!ISSUBCLASS(driver, IOSource)) {
-    return PyErr_Format(PyExc_RuntimeError, "This is not an iosource driver - it is a %s", NAMEOF(driver));
-  };
-
-  return PyLong_FromUnsignedLongLong(driver->size);
+static PyTypeObject iosourceType = {
+    PyObject_HEAD_INIT(NULL)
+    0,                         /* ob_size */
+    "iosubsys.iosource",       /* tp_name */
+    sizeof(iosource),          /* tp_basicsize */
+    0,                         /* tp_itemsize */
+    (destructor)iosource_dealloc, /* tp_dealloc */
+    0,                         /* tp_print */
+    0,                         /* tp_getattr */
+    0,                         /* tp_setattr */
+    0,                         /* tp_compare */
+    0,                         /* tp_repr */
+    0,                         /* tp_as_number */
+    0,                         /* tp_as_sequence */
+    0,                         /* tp_as_mapping */
+    0,                         /* tp_hash */
+    0,                         /* tp_call */
+    0,                         /* tp_str */
+    0,                         /* tp_getattro */
+    0,                         /* tp_setattro */
+    0,                         /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,        /* tp_flags */
+    "IOSource Object",         /* tp_doc */
+    0,	                       /* tp_traverse */
+    0,                         /* tp_clear */
+    0,                         /* tp_richcompare */
+    0,                         /* tp_weaklistoffset */
+    0,                         /* tp_iter */
+    0,                         /* tp_iternext */
+    iosource_methods,          /* tp_methods */
+    iosource_members,          /* tp_members */
+    0,                         /* tp_getset */
+    0,                         /* tp_base */
+    0,                         /* tp_dict */
+    0,                         /* tp_descr_get */
+    0,                         /* tp_descr_set */
+    0,                         /* tp_dictoffset */
+    (initproc)iosource_init,   /* tp_init */
+    0,                         /* tp_alloc */
+    0,                         /* tp_new */
 };
 
 static PyMethodDef IOMethods[] = {
-  {"Open",  (PyCFunction)Open, METH_VARARGS|METH_KEYWORDS,
-   "Create and initialise a new IO Source handle"},
-  {"read_random",  (PyCFunction)py_read_random, METH_VARARGS, 
-   "Read a random range of memory"},
-  {"size",(PyCFunction)size, METH_VARARGS,
-   "Get the total size of the source"},
   {NULL, NULL, 0, NULL}
 };
 
 PyMODINIT_FUNC initiosubsys(void) {
-  (void) Py_InitModule("iosubsys", IOMethods);
+    PyObject *m;
+
+    m = Py_InitModule("iosubsys", IOMethods);
+
+    /* setup skfs type */
+    iosourceType.tp_new = PyType_GenericNew;
+    if (PyType_Ready(&iosourceType) < 0)
+        return;
+
+    Py_INCREF(&iosourceType);
+    PyModule_AddObject(m, "iosource", (PyObject *)&iosourceType);
 }

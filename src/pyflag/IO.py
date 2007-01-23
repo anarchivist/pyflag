@@ -137,8 +137,8 @@ class IO:
 
             #Try and make the subsystem based on the args
             try:
-                self.io=iosubsys.Open(options)
-                self.size = iosubsys.size(self.io)
+                self.io=iosubsys.iosource(options)
+                self.size = self.io.size
             except IOError, e:
                 pass
 #                print "ERROR: %s" % e
@@ -174,7 +174,7 @@ class IO:
         """ read length bytes from subsystem starting at readptr """            
         if length==None:
             return ""
-        buf = iosubsys.read_random(self.io,length,self.readptr)
+        buf = self.io.read_random(length,self.readptr)
         self.readptr += len(buf)
         return buf
 
@@ -182,8 +182,8 @@ class IO:
         """ close subsystem """
         pass
       
-    def set_options(self,key,value):
-        iosubsys.parse_options(self.io,"%s=%s" % (key[3:],value))
+#    def set_options(self,key,value):
+#        iosubsys.parse_options(self.io,"%s=%s" % (key[3:],value))
 
     def explain(self,result):
         """ Give some information about our IO Source """
@@ -341,12 +341,12 @@ def test_read_random(io1,io2, size, sample_size, number):
     for i in range(0,number):
         offset = long(random.random()*size)
         length = long(random.random()*sample_size)
-        data1 = iosubsys.read_random(io1, length,offset)
-        data2 = iosubsys.read_random(io2, length,offset)
+        data1 = io1.read_random(length,offset)
+        data2 = io2.read_random(length,offset)
 
         if data1!=data2:
-            data1 = iosubsys.read_random(io1, length,offset)
-            data2 = iosubsys.read_random(io2, length,offset)
+            data1 = io1.read_random(length,offset)
+            data2 = io2.read_random(length,offset)
             for i in range(len(data1)):
                 if data1[i]!=data2[i]:
                     print "Error is at position %s" % i
@@ -359,54 +359,54 @@ class IOSubsystemTests(unittest.TestCase):
     """ IO Subsystem tests """
     def test01LowerLevelSGZIP(self):
         """ Test lower level access to sgzip files """
-        io = iosubsys.Open([['subsys','sgzip'],
+        io = iosubsys.iosource([['subsys','sgzip'],
                             ['filename','%s/pyflag_stdimage_0.1.sgz' % config.UPLOADDIR]])
         m = md5.new()
-        m.update(iosubsys.read_random(io,1000000,0))
+        m.update(io.read_random(1000000,0))
         self.assertEqual(m.hexdigest(),'740f23b50a2812dcdd96f1b4434bf242')
 
     def test02HandlingErrors(self):
         """ test Handling of errors correctly """
         ## Tests errors in reading file:
-        self.assertRaises(IOError, lambda : iosubsys.Open([['subsys','sgzip'],
+        self.assertRaises(IOError, lambda : iosubsys.iosource([['subsys','sgzip'],
                                                            ['filename','/dev/null'],]))
-        self.assertRaises(IOError, lambda : iosubsys.Open([['subsys','sgzip'],
+        self.assertRaises(IOError, lambda : iosubsys.iosource([['subsys','sgzip'],
                                                            ['filename','/tmp/fgggsddfssdg'],]))
-        self.assertRaises(IOError, lambda : iosubsys.Open([['subsys','sgzip'],]))
+        self.assertRaises(IOError, lambda : iosubsys.iosource([['subsys','sgzip'],]))
         
         ## Test failour to open a file:
-        self.assertRaises(IOError, lambda : iosubsys.Open([['subsys','sgzip'],
+        self.assertRaises(IOError, lambda : iosubsys.iosource([['subsys','sgzip'],
                                                            ['filename','%s/pyflag_stdimage_0.1' % config.UPLOADDIR],]))
-        self.assertRaises(IOError, lambda : iosubsys.Open([['subsys','ewf'],
+        self.assertRaises(IOError, lambda : iosubsys.iosource([['subsys','ewf'],
                                                            ['filename','%s/pyflag_stdimage_0.1' % config.UPLOADDIR],]))
 
         ## Test weird parameters:
-        self.assertRaises(IOError, lambda : iosubsys.Open([['subsys','raid'],
+        self.assertRaises(IOError, lambda : iosubsys.iosource([['subsys','raid'],
                                                            ['filename','%s/pyflag_stdimage_0.1' % config.UPLOADDIR],]))
         
         ## Test weird values:
-        self.assertRaises(RuntimeError, lambda : iosubsys.Open([['subsys','standard'],
+        self.assertRaises(RuntimeError, lambda : iosubsys.iosource([['subsys','standard'],
                                                                 ['filename','/etc/passwd'],['offset',100]]))
         ## Negative Offsets:
-        self.assertRaises(IOError, lambda : iosubsys.Open([['subsys','advanced'],
+        self.assertRaises(IOError, lambda : iosubsys.iosource([['subsys','advanced'],
                                                            ['filename','/etc/passwd'],['offset',-100]]))
-        self.assertRaises(IOError, lambda : iosubsys.Open([['subsys','sgzip'],
+        self.assertRaises(IOError, lambda : iosubsys.iosource([['subsys','sgzip'],
                                                            ['filename','%s/pyflag_stdimage_0.1' % config.UPLOADDIR],['offset',-100]]))
-        self.assertRaises(IOError, lambda : iosubsys.Open([['subsys','ewf'],
+        self.assertRaises(IOError, lambda : iosubsys.iosource([['subsys','ewf'],
                                                            ['filename','%s/ntfs_image.e01' % config.UPLOADDIR],['offset',-100]]))
 
     def test03DataReadAccuracy(self):
         """ Test data accuracy in image decompression (takes a while) """
-        io1 = iosubsys.Open([['subsys','advanced'],
+        io1 = iosubsys.iosource([['subsys','advanced'],
                              ['filename','%s/pyflag_stdimage_0.1' % config.UPLOADDIR]])
-        io2 = iosubsys.Open([['subsys','sgzip'],
+        io2 = iosubsys.iosource([['subsys','sgzip'],
                              ['filename','%s/pyflag_stdimage_0.1.sgz' % config.UPLOADDIR]])
-        io3 = iosubsys.Open([['subsys','ewf'],
+        io3 = iosubsys.iosource([['subsys','ewf'],
                              ['filename','%s/pyflag_stdimage_0.1.e01' % config.UPLOADDIR]])
 
         t = time.time()
-        test_read_random(io1,io2, iosubsys.size(io1), 1000000, 200)
+        test_read_random(io1,io2, io1.size, 1000000, 200)
         print "Sgzip vs advanced took %s sec" % (time.time()-t)
         t = time.time()
-        test_read_random(io1,io3, iosubsys.size(io1), 1000000, 200)
+        test_read_random(io1,io3, io1.size, 1000000, 200)
         print "EWF vs advanced took %s sec" % (time.time()-t)
