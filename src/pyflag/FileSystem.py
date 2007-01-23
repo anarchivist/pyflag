@@ -397,6 +397,13 @@ class DBFS(FileSystem):
                 
             try:
                 fd = self.open(inode=row['inode'])
+
+                # try to access slack space if possible
+                #try:
+                #    fd.slack = True
+                #except AttributeError:
+                #    pass
+
                 Scanner.scanfile(self,fd,scanners)
                 fd.close()
             except Exception,e:
@@ -470,6 +477,9 @@ class File:
         self.fd = fd
         self.readptr = 0
         self.inode = inode
+
+        # should reads return slack space? not all drivers implement this
+        self.slack = False
 
         ## Now we check to see if there is a cached copy of the file for us:
         self.cached_filename = self.get_temp_path()

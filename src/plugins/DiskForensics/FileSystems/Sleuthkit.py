@@ -222,9 +222,9 @@ class Sleuthkit_File(File):
 
     def read(self, length=None):
         if length!=None:
-            return self.fd.read(length)
+            return self.fd.read(length, slack=self.slack)
         else:
-            return self.fd.read()
+            return self.fd.read(slack=self.slack)
 
     def tell(self):
         return self.fd.tell()

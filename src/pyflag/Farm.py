@@ -192,6 +192,12 @@ class Dispatcher:
         if factories:
             ddfs = factories[0].fsfd
             fd = ddfs.open(inode = inode)
+
+            # access slack if possible
+            #try:
+            #    fd.slack = True
+            #except AttributeError:
+            #    pass
             
             Scanner.scanfile(ddfs, fd, factories)
         
