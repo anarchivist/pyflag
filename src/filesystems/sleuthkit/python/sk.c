@@ -1247,6 +1247,12 @@ skfile_blocks(skfile *self) {
     return list;
 }
 
+static PyObject *
+skfile_close(skfile *self) {
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
 /* This is a thin wrapper around mmls. It returns a tuple of four-tuples
  * containing (start, len, desc, type) for each partition. Note that type is
  * NOT partition type but is actually defined as:

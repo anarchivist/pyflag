@@ -332,6 +332,7 @@ static PyObject *skfile_read(skfile *self, PyObject *args, PyObject *kwds);
 static PyObject *skfile_seek(skfile *self, PyObject *args);
 static PyObject *skfile_tell(skfile *self);
 static PyObject *skfile_blocks(skfile *self);
+static PyObject *skfile_close(skfile *self);
 
 static PyMethodDef skfile_methods[] = {
     {"read", (PyCFunction)skfile_read, METH_VARARGS|METH_KEYWORDS,
@@ -342,6 +343,8 @@ static PyMethodDef skfile_methods[] = {
      "Return possition within file" },
     {"blocks", (PyCFunction)skfile_blocks, METH_NOARGS,
      "Return a list of blocks which the file occupies" },
+    {"close", (PyCFunction)skfile_close, METH_NOARGS,
+     "Close the file" },
     {NULL}  /* Sentinel */
 };
 
