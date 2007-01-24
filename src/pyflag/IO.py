@@ -48,16 +48,7 @@ import sk
 
 def mmls_popup(query,result,orig_query=None, subsys=None, offset=None):
     result.decoration = "naked"
-
-    try:
-        if query['update']:
-            query[offset]=query['update']
-            del query['update']
-
-            result.refresh(0, query, pane="parent")
-    except KeyError:
-        pass
-
+    
     del orig_query['io_offset']
     io = IOFactory(orig_query)
     try:
@@ -72,10 +63,10 @@ def mmls_popup(query,result,orig_query=None, subsys=None, offset=None):
     result.row("Chunk", "Start", "End", "Size", "Description")
     del query[offset]
     for i in range(len(parts)):
+        new_query = query.clone()
         tmp = result.__class__(result)
-        del query['update']
-        query['update'] = "%ds" % parts[i][0]
-        tmp.link("%010d" % parts[i][0], query)
+        new_query[offset] = "%ds" % parts[i][0]
+        tmp.link("%010d" % parts[i][0], new_query, pane='parent')
         result.row(i, tmp, "%010d" % (parts[i][0] + parts[i][1]), "%010d" % parts[i][1] , parts[i][2])
     result.end_table()
         

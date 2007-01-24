@@ -21,6 +21,9 @@
 """ This file defines a variety of things related to tests """
 import unittest
 from pyflag.FileSystem import DBFS
+import pyflag.pyflagsh as pyflagsh
+import pyflag.conf
+config=pyflag.conf.ConfObject()
 
 class FDTest(unittest.TestCase):
     ## These must be overridden with a file which is at least 100
@@ -67,3 +70,30 @@ class FDTest(unittest.TestCase):
         ## Check that a read at the end returns zero:
         self.fd.seek(0,2)
         self.assertEqual(self.fd.read(),'', "Read data past end of file")
+
+## This is a generic test framework for scanners - we load a new test
+## case from scratch and execute the scanners.
+class ScannerTest(unittest.TestCase):
+    ## Must be overridden
+    test_case = ""
+    test_file = ""
+    subsystem = "ewf"
+    fstype = "Sleuthkit"
+    def test00preLoadCase(self):
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Case Management.Remove case",'remove_case=%s' % self.test_case])
+
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Case Management.Create new case",'create_case=%s' % self.test_case])
+
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
+                                   "iosource=test",
+                                   "subsys=%s" % self.subsystem,
+                                   "io_filename=%s/%s" % (config.UPLOADDIR, self.test_file),
+                                   ])
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,
+                                   "iosource=test",
+                                   "fstype=%s" % self.fstype,
+                                   "mount_point=/"])

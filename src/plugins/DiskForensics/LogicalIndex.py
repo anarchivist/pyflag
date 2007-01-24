@@ -326,6 +326,9 @@ def resolve_inode(dbh, encoded_offset):
     row=dbh.fetch()
     return row['inode']
 
+class OffsetType(IntegerType):
+    pass
+
 class SearchIndex(Reports.report):
     """ Search for indexed keywords """
     description = "Search for words that were indexed during filesystem load. Words must be in dictionary to be indexed. "
