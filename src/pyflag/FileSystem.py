@@ -397,13 +397,6 @@ class DBFS(FileSystem):
                 
             try:
                 fd = self.open(inode=row['inode'])
-
-                # try to access slack space if possible
-                #try:
-                #    fd.slack = True
-                #except AttributeError:
-                #    pass
-
                 Scanner.scanfile(self,fd,scanners)
                 fd.close()
             except Exception,e:

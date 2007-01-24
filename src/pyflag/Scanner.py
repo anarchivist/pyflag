@@ -89,6 +89,13 @@ class BaseScanner:
         """
         pass
 
+    def slack(self, data, metadata={}):
+        """ process file slack space.
+
+        This function is called with file slack data once all regular file data has been processed (by the 'process' method) and before finish is called. By default, this method is a noop, many scanners will not use it (e.g. MD5 scanner does not care about slack). Those that do want to see slack (e.g. the index scanner) can simply provide this method.
+        """
+        pass
+
     def finish(self):
         """ all data has been provided to process, finish up.
 
@@ -421,6 +428,19 @@ def scanfile(ddfs,fd,factories):
         if not interest:
             pyflaglog.log(pyflaglog.DEBUG, "No interest for %s" % fd.inode)
             break
+
+    # call slack method of each object. fd.slack must be reset after the call
+    # because the scanners actually have a copy of fd and some of them actually
+    # use it and get confused if it returns slack.
+    fd.slack=True
+    data = fd.read()
+    fd.slack=False
+    if data:
+        for o in objs:
+            try:
+                o.slack(data, metadata=metadata)
+            except Exception,e:
+                pyflaglog.log(pyflaglog.ERRORS,"Scanner (%s) Error: %s" %(o,e))
 
     # call finish method of each object
     for o in objs:

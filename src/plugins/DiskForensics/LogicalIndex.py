@@ -209,6 +209,10 @@ class IndexScan(GenScanFactory):
                                           length = length)
                 
             self.rel_offset += len(data)
+
+        def slack(self,data,metadata=None):
+            """ deal with slack space the same as any other data """
+            return self.process(data, metadata)
                 
         def finish(self):
             #Store the stats table with the hits for the search
