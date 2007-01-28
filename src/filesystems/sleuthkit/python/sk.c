@@ -1153,16 +1153,16 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
     FS_INFO *fs;
     struct block *b;
     int readlen=-1;
-    int slack = 0;
+    int slack=0, overread=0;
     int maxsize;
 
     global_talloc_context = self->context;
 
     fs = ((skfs *)self->skfs)->fs;
 
-    static char *kwlist[] = {"size", "slack", NULL};
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "|ii", kwlist, 
-                                    &readlen, &slack))
+    static char *kwlist[] = {"size", "slack", "overread", NULL};
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "|iii", kwlist, 
+                                    &readlen, &slack, &overread))
         return NULL; 
 
     /* return slack? It is hard to calculate slack length correctly. You cannot
@@ -1174,6 +1174,18 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
         maxsize = max(self->size, list_count(&self->blocks->list) * fs->block_size);
     else
         maxsize = self->size;
+
+    /* overread file? If set, the read operation will read past the end of the
+     * file into the next block on the filesystem. Overread can be set to True
+     * (represented in python as the integer 1) in which case it will overread
+     * by 256 bytes, alternatively if overread is set to any other possitive
+     * value, overread will read up to that value past the end of the file.
+     * This option allows searching tools to look for signatures which occur in
+     * an overlap between file slack and the next filesystem block */
+    if(slack && overread) {
+        if(overread == 1) overread = 256;
+        maxsize += overread;
+    }
 
     /* adjust readlen if size not given or is too big */
     if(readlen < 0 || self->readptr + readlen > maxsize)
@@ -1194,7 +1206,36 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
         else
             written = fs_read_file(fs, self->fs_inode, self->type, self->id, self->readptr, readlen, buf);
 
-    retdata = PyString_FromStringAndSize(buf, written);
+    /* perform overread if necessary have to use direct block IO for this */
+    if(slack && overread) {
+        DADDR_T last_block = 0;
+        struct block *b;
+        DATA_BUF *blockbuf;
+        int len;
+
+        list_for_each_entry(b, &self->blocks->list, list) {
+            last_block = b->addr;
+        }
+
+        /* increment to get the next block after the file */
+        last_block++;
+
+        /* do a direct block read from the filesystem */
+        blockbuf = data_buf_alloc(fs->block_size);
+        len = fs_read_block(fs, blockbuf, fs->block_size, last_block);
+        if(len > readlen-written) {
+            memcpy(buf+written, blockbuf->data, readlen-written);
+            written = readlen;
+        }
+        data_buf_free(blockbuf);
+    }
+
+    if(readlen != written) {
+        talloc_free(buf);
+        return PyErr_Format(PyExc_IOError, "Failed to read all data: wanted %d, got %d", readlen, written);
+    }
+
+    retdata = PyString_FromStringAndSize(buf, readlen);
     talloc_free(buf);
 
     self->readptr += readlen;
