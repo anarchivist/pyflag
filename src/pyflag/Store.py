@@ -102,7 +102,7 @@ class Store:
         ## objects first:
         while len(self.creation_times)>self.max_size:
             t, key, o = self.creation_times.pop(0)
-            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Removed object %r because store is full" % o)
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Removed object %r because store is full" % (o,))
 
         ## Now ensure that objects are not too old:
         now = time.time()
@@ -111,7 +111,7 @@ class Store:
                 t,key,o = self.creation_times[0]
                 if t+self.max_age < now:
                     self.creation_times.pop(0)
-                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Removed object %r because it is too old" % o)
+                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Removed object %r because it is too old" % (o,))
                 else:
                     break
         except IndexError:
