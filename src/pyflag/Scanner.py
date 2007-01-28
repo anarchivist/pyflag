@@ -364,6 +364,8 @@ def scanfile(ddfs,fd,factories):
         ## This is not a valid inode, we skip it:
         scanners_run = []
 
+    fd.inode_id = row['inode_id']
+
     objs = []
     for c in factories:
         if c.__class__.__name__ not in scanners_run:

@@ -45,7 +45,8 @@ conv = {
     FIELD_TYPE.LONG: long,
     FIELD_TYPE.INT24: long,
     FIELD_TYPE.LONGLONG: long,
-    FIELD_TYPE.TINY: int
+    FIELD_TYPE.TINY: int,
+    FIELD_TYPE.SHORT: int,
     }
 
 def escape(string):
@@ -191,10 +192,16 @@ class Pool(Queue):
         self.indexes = {}
         Queue.__init__(self, poolsize)
 
+    def put(self, dbh):
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Returning dbh to pool %s" % self)
+        Queue.put(self,dbh)
+
     def get(self, block=1):
         """Get an object from the pool or a new one if empty."""
         try:
             result=self.empty() and self.connect() or Queue.get(self, block)
+
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Getting dbh from pool %s" % self)
             return result
         except Empty:
             return self.connect()
@@ -279,6 +286,7 @@ class DBO:
     @ivar temp_tables: A variable that keeps track of temporary tables so they may be dropped when this object gets gc'ed
     """
     temp_tables = []
+    transaction = False
     
     def __init__(self,case=None):
         """ Constructor for DB access. Note that this object implements database connection caching and so should be instantiated whenever needed. If case is None, the handler returned is for the default flag DB
@@ -299,6 +307,11 @@ class DBO:
         self.temp_tables = []
         self.case = case
         self.cursor = self.dbh.cursor()
+        self.tranaction = False
+
+    def start_transaction(self):
+        self.execute("start transaction")
+        self.tranaction = True
                 
     def clone(self):
         """ Returns a new database object for the same case database """
@@ -361,6 +374,7 @@ class DBO:
                 return self.cursor.execute(string.decode('latin1'))
                 
             elif not str.startswith('Records'):
+                print e
                 raise DBError(e)
 
     def cached_execute(self, sql, limit=0, length=50):
@@ -380,7 +394,7 @@ class DBO:
         table to achieve row level locks.
         """
         ## Expire the cache if needed
-        self.execute("start transaction")
+        self.start_transaction()
         self.execute("select * from sql_cache where timestamp < date_sub(now(), interval %r minute) for update", config.DBCACHE_AGE)
         tables = [ row['id'] for row in self]
         for table_id in tables:
@@ -392,7 +406,7 @@ class DBO:
         ## Try to find the query in the cache. We need a cache which
         ## covers the range we are interested in: This will lock the
         ## row while we generate its underlying cache table:
-        self.execute("start transaction")
+        self.start_transaction()
         self.execute("""select * from sql_cache where query = %r and `limit` <= %r and `limit` + `length` >= %r for update""", (sql, limit, limit + length))
         row = self.fetch()
         
@@ -698,16 +712,17 @@ class DBO:
 
     def __del__(self):
         """ Destructor that gets called when this object is gced """
+        global DBH
+        
         try:
-            self.cursor.ignore_warnings = True
             try:
+                self.cursor.ignore_warnings = True
                 for i in self.temp_tables:
                     self.drop(i)
             except: pass
 
-#            try:
-#                self.execute("rollback")
-#            except: pass
+            if self.transaction:
+                self.execute("commit")
 
             ## Ensure that our mass insert case is comitted in case
             ## users forgot to flush it:
@@ -716,8 +731,10 @@ class DBO:
 
             ##key = "%s/%s" % (self.case, threading.currentThread().getName())
             key = "%s" % (self.case)
-            DBH.get(key).put((self.dbh, self.mysql_bin_string))
-        except (TypeError,AssertionError,AttributeError, KeyError):
+            pool = DBH.get(key)
+            pool.put((self.dbh, self.mysql_bin_string))
+        except (TypeError,AssertionError,AttributeError, KeyError),e:
+            print e
             pass
 
     def MySQLHarness(self,client):
@@ -851,6 +868,31 @@ class DBOTest(unittest.TestCase):
 
         ## Make sure we have a different cache entry
         self.assert_(cached_sql != dbh.cursor._last_executed)
+
+    def test07CaseExecuteRace(self):
+        """ Test for race conditions in cache creation """
+        results = []
+        dbh = DBO()
+        dbh.execute("delete from meta where property = 'test row'")
+        dbh.insert("meta", property="test row", value=1)
+        dbh.invalidate("meta")
+        
+        def execute_long_query(results):
+            dbh = DBO()
+            dbh.cached_execute("select value from meta where property='test row' and sleep(2)=0")
+            ## If we get here we are ok:
+            row = dbh.fetch()
+            self.assertEqual(row['value'],'1')
+            results.append(row['value'])
+            
+        t=threading.Thread(target=execute_long_query, args=(results,))
+        t.start()
+        time.sleep(0.2)
+        execute_long_query(results)
+
+        time.sleep(1)
+        ## Wait for both threads to finish
+        self.assertEqual(results,['1','1'])
 
 if __name__=='__main__':
     suite = unittest.makeSuite(DBOTest)

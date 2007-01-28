@@ -38,6 +38,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
 import pyflag.TypeCheck as TypeCheck
+import pyflag.FileSystem as FileSystem
 
 class ConstraintError(Exception):
     """ This exception is thrown when a contraint failed when adding or updating a row in the db.
@@ -546,7 +547,7 @@ class IPType(ColumnType):
 ## This is an example of using the table object to manage a DB table
 import TableActions
 
-class AnnotionObj(TableObj):
+class AnnotationObj(TableObj):
     table = "annotate"
     columns = (
         'inode', 'Inode', 
@@ -586,10 +587,10 @@ class InodeType(StringType):
                                         inode = value)
         ## This is the table object which is responsible for the
         ## annotate table:
-        annotate = AnnotionObj(case=self.case)
         original_query = result.defaults
 
         def annotate_cb(query, result):
+            annotate = AnnotationObj(case=self.case)
             ## We are dealing with this inode
             del query['inode']
             query['inode'] = value
@@ -623,6 +624,7 @@ class InodeType(StringType):
 
             result.end_form(value='Annotate')
 
+        annotate = AnnotationObj(case=self.case)
         row = annotate.select(inode=value)
         tmp1 = result.__class__(result)
         tmp2 = result.__class__(result)
@@ -638,6 +640,12 @@ class InodeType(StringType):
     def operator_annotated(self, column, operator, pattern):
         """ This operator selects those inodes with pattern matching their annotation """
         return '%s=(select annotate.inode from annotate where note like "%%%s%%")' % (self.sql, pattern)
+
+class InodeIDType(InodeType):
+    def display(self, value, row, result):
+        fsfd = FileSystem.DBFS(self.case)
+        inode = fsfd.lookup(inode_id=value)
+        return InodeType.display(self,inode,row,result)
 
 class FilenameType(StringType):
     def __init__(self, name='Filename', filename='name', path='path', case=None):

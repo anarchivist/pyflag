@@ -793,7 +793,7 @@ class HTMLUI(UI.GenericUI):
         else:
             self.toolbar_ui.icon(icon,tooltip=text)
 
-    def table(self,elements=[],table='',where='',groupby = None,case=None,
+    def table(self,elements=[],table='',where='',groupby = None, _groupby=None, case=None,
               **opts):
         ## Building up the args list in this way ensure that defaults
         ## can be specified in _make_sql itself and not be overwritten
@@ -817,7 +817,7 @@ class HTMLUI(UI.GenericUI):
         ## which filtering will be applied to:
         filter_elements = elements
 
-        if groupby:
+        if groupby or _groupby:
             for e in elements:
                 if e.name==groupby:
                     new_query = query.clone()
@@ -835,7 +835,7 @@ class HTMLUI(UI.GenericUI):
             
         args = dict( elements = elements, filter_elements = filter_elements,
                      table = table, case=case, filter=query.get('filter',''),
-                     groupby = groupby, order = order)
+                     groupby = groupby, _groupby=_groupby, order = order)
 
         if where: args['where'] = where
 
@@ -1063,6 +1063,7 @@ class HTMLUI(UI.GenericUI):
         ## This part allows the user to save the table in CSV format:
         def save_table(query,result):
             def generate_output(rows_left):
+                dbh = DB.DBO(case)
                 row_number = 0
                 data = cStringIO.StringIO()
                 hidden_columns = [ int(i) for i in query.getarray('_hidden')]

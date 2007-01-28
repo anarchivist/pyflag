@@ -116,15 +116,17 @@ class FileSystem:
         """return the inode number for the given path, or else the path for the given inode number. """
         pass
 
-    def open(self, path=None, inode=None):
+    def open(self, path=None, inode=None, inode_id=None):
         """ Opens the specified path or Inode providing a file like object.
 
         This object can then be used to read data from the specified file.
         @note: Only files may be opened, not directories."""
 
-        if not inode:
-            inode = self.lookup(path)
-
+        if path:
+            inode = self.lookup(path=path)
+        elif inode_id:
+            inode = self.lookup(inode_id=inode_id)
+            
         if not inode:
             raise IOError('Inode not found for file')
 
@@ -304,7 +306,7 @@ class DBFS(FileSystem):
         #for i in self.dbh:
         #    yield(i)
 
-    def lookup(self, path=None,inode=None):
+    def lookup(self, path=None,inode=None, inode_id=None):
         dbh=DB.DBO(self.case)
         if path:
             dir,name = os.path.split(path)
@@ -320,6 +322,11 @@ class DBFS(FileSystem):
             if not res:
                 return None
             return res["inode"]
+        elif inode_id:
+            dbh.check_index('inode','inode_id')
+            dbh.execute("select inode from inode where inode_id=%r order by status limit 1", (inode_id))
+            res = dbh.fetch()
+            return res['inode']
         else:
             dbh.check_index('file','inode')
             dbh.execute("select concat(path,name) as path from file where inode=%r order by status limit 1", (inode))

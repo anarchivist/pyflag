@@ -52,14 +52,7 @@ import index,os,time,re
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
-from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType
-
-## This blocksize is in bits (2^20)
-BLOCKBITS=20
-BLOCKSIZE=pow(2,BLOCKBITS)
-
-def escape(string):
-    return ("%r" % string)[1:-1]
+from pyflag.TableObj import StringType, TimestampType, InodeIDType, IntegerType
 
 class IndexScan(GenScanFactory):
     """ Keyword Index files """
@@ -77,35 +70,21 @@ class IndexScan(GenScanFactory):
         """ This creates the LogicalIndex table and initialise the index file """
         GenScanFactory.__init__(self, fsfd)
         
-        ## These keep the current offset in the logical image. FIXME:
-        ## When running in a distributed environment this is not
-        ## accessible - maybe we need to pass this in the metadata?
-        self.rel_offset = 0
         dbh=DB.DBO(self.case)
-        dbh.execute("create table if not exists `LogicalIndex` (`inode` VARCHAR( 250 ) NOT NULL ,`block` INT NOT NULL auto_increment, `block_number` int not null, primary key(block))")
-        
+
         dbh.execute("""create table if not exists `LogicalIndexOffsets` (
-        `id` INT NOT NULL ,
+        `inode_id` INT NOT NULL,
+        `word_id` INT NOT NULL ,
         `offset` BIGINT NOT NULL,
         `length` smallint not null
         )""")
 
-        #Create a table that will hold our stats: number of occurrences of each word id we are searching for.
         dbh.execute("""CREATE TABLE if not exists `LogicalIndexStats` (
         `id` int NOT NULL,
-        `word` VARCHAR( 250 ) binary NOT NULL,
-        `class` VARCHAR( 50 ) NOT NULL,
         `hits` INT NOT NULL,
         PRIMARY KEY  (`id`)
         )""")
-
-        ## The block number must be the largest that is available in the database.
-        dbh.execute("select max(block) as `max` from `LogicalIndex`")
-        row=dbh.fetch()
-        try:
-            self.block=int(row['max'])+1
-        except: self.block=0
-
+        
     def prepare(self):
         ## Create new index trie - This takes a serious amount of time
         ## for large dictionaries (about 2 sec for 70000 words):
@@ -116,7 +95,11 @@ class IndexScan(GenScanFactory):
         start_time=time.time()
         pydbh.execute("select word,id from dictionary where type='literal'")
         for row in pydbh:
-            self.index.add_word(row['word'],row['id'], index.WORD_ENGLISH)
+            self.index.add_word(row['word'],row['id'], index.WORD_LITERAL)
+
+        pydbh.execute("select word,id from dictionary where type='regex'")
+        for row in pydbh:
+            self.index.add_word(row['word'],row['id'], index.WORD_REGEX)
 
         # load words in a number of alternate character sets. The ones
         # we care about atm are utf-8 and utf-16/UCS-2 which is used
@@ -127,17 +110,10 @@ class IndexScan(GenScanFactory):
             try:
                 word = row['word'].decode("UTF-8")
                 for e in config.INDEX_ENCODINGS:
-                    self.index.add_word(word.encode(e),row['id'], 0)
+                    self.index.add_word(word.encode(e),row['id'], index.WORD_ENGLISH)
             except UnicodeDecodeError:
                 pass
 
-        pyflaglog.log(pyflaglog.DEBUG,"Index Scanner: Done in %s seconds..." % (time.time()-start_time))
-
-        #Do regex prep
-        pyflaglog.log(pyflaglog.DEBUG,"Index Scanner: Compiling regex")
-        start_time=time.time()
-        pydbh.execute("select word,id from dictionary where type='regex'")
-        self.RegexpRows = [ (re.compile(row['word'],re.IGNORECASE),row['id']) for row in pydbh ]
         pyflaglog.log(pyflaglog.DEBUG,"Index Scanner: Done in %s seconds..." % (time.time()-start_time))
                 
     def reset(self, inode):
@@ -155,8 +131,6 @@ class IndexScan(GenScanFactory):
         ## Here we reset all reports that searched this disk
         FlagFramework.reset_all(case=self.case,report='SearchIndex', family='Keyword Indexing')
         dbh.execute("delete from `LogicalIndexStats`")
-        #self.dbh.execute("update inode set scanner_cache = REPLACE(scanner_cache,%r,'') ",
-        #            (self.__class__.__name__))
 
     def destroy(self):
         ## Destroy our index handle which will close the file and free memory
@@ -164,41 +138,31 @@ class IndexScan(GenScanFactory):
         
         dbh=DB.DBO(self.case)
         ## Ensure indexes are built on the offset table:
-        dbh.check_index("LogicalIndexOffsets","id")
+        dbh.check_index("LogicalIndexOffsets","word_id")
         
-    class Scan(BaseScanner):
+    class Scan(MemoryScan):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
-            BaseScanner.__init__(self, inode,ddfs,outer,factories,fd=fd)
-            self.index = outer.index
-            self.RegexpRows = outer.RegexpRows
-            self.rel_offset=0
-            self.block_number = 0
-            self.dbh=DB.DBO(self.case)
-            self.dbh.execute("insert into `LogicalIndex` set inode=%r,block_number=%r",(inode,self.block_number))
-            ## Note the current block number
-            self.block = self.dbh.autoincrement()
-            #A dictionary for counting hit stats
-            self.stats_count={}
-            self.dbh.mass_insert_start("LogicalIndexOffsets")
+            MemoryScan.__init__(self, inode,ddfs,outer,factories,fd=fd)
+            self.dbh = DB.DBO(fd.case)
+            self.dbh.mass_insert_start('LogicalIndexOffsets')
+            self.inode_id = fd.inode_id
+            self.stats = {}
             
-        def process(self,data,metadata=None):            
+        def process_buffer(self,buff):
             # Store indexing results in the dbase
-            for offset, matches in self.index.index_buffer(data):
+            for offset, matches in self.outer.index.index_buffer(buff):
                 for id, length in matches:
                     try:
-                        self.stats_count[id]+=1
-                    except KeyError:
-                        #Must be a new id for the dictionary
-                        self.stats_count[id]=1
-
-                    ## If the file is longer than a block, we create a new
-                    ## block, and adjust the relative offset
-                    if self.rel_offset+offset > BLOCKSIZE:
-                        self.block_number+=1
-                        self.rel_offset -= BLOCKSIZE
-                        self.dbh.execute("insert into LogicalIndex set inode=%r,block_number=%r",(self.inode,self.block_number))
-                        #block is the current block number we are looking at
-                        self.block = self.dbh.autoincrement()
+                        self.stats[id] += 1
+                    except:
+                        self.stats[id] = 1
+                        
+                    self.dbh.mass_insert(
+                        inode_id = self.inode_id,
+                        word_id = id,
+                        offset = offset+self.offset,
+                        length = length,
+                        )
 
                     #Final result ie. absolute offset is (current block
                     #number * blocksize) + (offset from start of data
@@ -209,23 +173,13 @@ class IndexScan(GenScanFactory):
                                           length = length)
                 
             self.rel_offset += len(data)
-
-        def slack(self,data,metadata=None):
-            """ deal with slack space the same as any other data """
-            return self.process(data, metadata)
                 
         def finish(self):
-            #Store the stats table with the hits for the search
             self.dbh.mass_insert_commit()
-            pydbh = DB.DBO(None)
-            for row in self.stats_count.iteritems():
-                pydbh.execute("select word,class from dictionary where id=%s limit 1",row[0])
-                class_hit=pydbh.fetch()
-                try:
-                    self.dbh.execute("insert into LogicalIndexStats set id=%r,word=%r,class=%r,hits=%r",(row[0],class_hit['word'],class_hit['class'],row[1]))
-                except DB.DBError:
-                    #Maybe we already ran a search so I should just update the stats
-                     self.dbh.execute("update LogicalIndexStats set hits=hits+%r where id=%r",(row[1],row[0]))
+##            for k,v in self.stats.items():
+##                self.dbh.execute("select 1 from LogicalIndexStats where id=%r", k)
+##                if self.dbh.fetch():
+##                    self.dbh.update('LogicalIndexStats', where="id=%r" % k, _hits = 
  
 ## These reports allow the management of the Index Dictionary:
 class BuildDictionary(Reports.report):
@@ -237,8 +191,7 @@ class BuildDictionary(Reports.report):
 
     def display(self,query,result):
         ## The dictionary is site wide and lives in the FlagDB
-        dbh=self.DBO(None)
-
+        dbh=DB.DBO()
         ## class_override the class variable:
         try:
             if len(query['class_override'])>3:
@@ -315,23 +268,24 @@ class BuildDictionary(Reports.report):
             
         result.row(table,form,valign='top')
 
-def resolve_offset(dbh, encoded_offset):
-    """ Converts the encoded_offset to an offset within its Inode.
-
-    As mentioned above the encoded offset includes a bit mask with block number. This makes the encoded offset unique within the entire image.
-    """
-    dbh.execute("select (block_number <<%s) + (%r & ((1<<%s)-1)) as `Offset` from LogicalIndex where ( %r >>%s = block ) limit 1",(BLOCKBITS,encoded_offset,BLOCKBITS,encoded_offset, BLOCKBITS))
-    row=dbh.fetch()
-    return row['Offset']
-
-def resolve_inode(dbh, encoded_offset):
-    """ Converts the encoded_offset to an Inode """
-    dbh.execute("select inode from LogicalIndex where block=%r>>%s limit 1",(encoded_offset, BLOCKBITS))
-    row=dbh.fetch()
-    return row['inode']
-
 class OffsetType(IntegerType):
-    pass
+    def __init__(self, name='', sql='', fsfd=None):
+        self.fsfd = fsfd
+        IntegerType.__init__(self, name,sql)
+        
+    def display(self, offset, row, result):
+        result = result.__class__(result)
+        inode = self.fsfd.lookup(inode_id=row['Inode'])
+        
+        query = query_type(case=self.fsfd.case,
+                           family="Disk Forensics",
+                           report='ViewFile',
+                           mode='HexDump',
+                           inode=inode,
+                           hexlimit=max(offset-50,0),
+                           highlight=offset, length=row['Length'])
+        result.link(offset, target=query)
+        return result
 
 class DataPreview(OffsetType):
     ## Cant search on this data type at all.
@@ -344,7 +298,7 @@ class DataPreview(OffsetType):
     def display(self, length, row, result):
         low = max(0,row['Offset']-50)
         high = row['Offset'] + 50 + length
-        fd = self.fsfd.open(inode = row['Inode'])
+        fd = self.fsfd.open(inode_id = row['Inode'])
         fd.seek(low)
 
         result = result.__class__(result)
@@ -354,10 +308,11 @@ class DataPreview(OffsetType):
 
         return result
 
-class SearchIndex(Reports.report):
+class SearchIndexxxx(Reports.report):
     """ Search for indexed keywords """
     description = "Search for words that were indexed during filesystem load. Words must be in dictionary to be indexed. "
     name = "Search Indexed Keywords"
+    hidden = True
     family = "Keyword Indexing"
     parameters={'keyword':'any',
                 'range':'numeric','final':'any'}
@@ -377,6 +332,7 @@ class SearchIndex(Reports.report):
         def remove_word_cb(query,result,word):
             """ Removes word from the query string """
             result.decoration = 'naked'
+
             del query['new_keyword']
             keys = [ k for k in query.getarray('keyword') if k != word ]
             del query['keyword']
@@ -392,41 +348,41 @@ class SearchIndex(Reports.report):
             result.decoration = 'naked'
             result.heading("Add a word to search terms")
             q=query.clone()
-            q['__target__']='new_keyword'
+            q['__target__']='keyword'
+            q['__target_type__'] = 'append'
             try:
                 result.table(
                     elements = [ StringType('Index Term','word', link=q, link_pane='parent'),
                                  StringType('Dictionary Class','class'),
-                                 IntegerType('Number of Hits', 'hits')],
-                    table='LogicalIndexStats',
+                                 IntegerType('Number of Hits', 'count(*)')
+                                 ],
+                    table='LogicalIndexOffsets join %s.dictionary on word_id=id ' % config.FLAGDB,
+                    groupby = 'word_id',
                     case=query['case'],
                     )
             except KeyError:
                 pass
+
         try:
             result.case_selector()
 
             words = list(query.getarray('keyword'))
             del result.form_parms['keyword']
 
-            group = result.__class__(result)
-            
             ## Make sure that words are unique
             words.sort()
             old=None
+            group = result.__class__(result)
+
             for keyword in words:
                 if keyword!=old:
-                    tmp = result.__class__(result)
-                    tmp.text("%s\n" % keyword,color='red')
-                    icon = result.__class__(result)
-                    icon.popup(
-                        Curry(remove_word_cb,word=keyword),
-                        "Remove Word", tooltip="Remove word", icon="no.png"
-                        )
+                    new_query = query.clone()
+                    new_query.remove('keyword',keyword)
+                    group.link(keyword, target=new_query, icon='no.png')
+                    group.text("%s\n" % keyword,color='red')
+                    result.hidden('keyword', keyword)
                     old=keyword
-                    result.hidden('keyword',keyword)
-                    group.row(icon,tmp)
-
+                    
             tmp = result.__class__(result)
             tmp.popup(add_word_cb, "Add word", tooltip = "Add word",icon="red-plus.png")
             result.toolbar(cb=add_word_cb, text="Add word", tooltip = "Add word",icon="red-plus.png")
@@ -492,7 +448,7 @@ class SearchIndex(Reports.report):
 
         ## We start off by isolating offset ranges of interest
         for word in query.getarray('keyword'):
-            temp_table = dbh.get_temp()
+            temp_table = dbh.get_temp()+word
             pyflag_dbh.execute("select id from dictionary where word=%r limit 1",(word))
             row=pyflag_dbh.fetch()
             word_id = row['id']
@@ -501,16 +457,16 @@ class SearchIndex(Reports.report):
             if not old_temp_table:
                 offset_columns.append("offset_%s" % word_id)
                 try:
-                    dbh.execute("create temporary table %s select greatest(offset-%s , ((offset)>>20)<<20) as low,offset+%s as high, offset as offset_%s, length from LogicalIndexOffsets where id=%r",(temp_table,range,range,word_id,word_id))
+                    dbh.execute("create temporary table %s select inode_id, greatest(offset-%s , 0) as low,offset+%s as high, offset as offset_%s, length from LogicalIndexOffsets where word_id=%r",(temp_table,range,range,word_id,word_id))
                 except DB.DBError,e:
                     raise Reports.ReportError("Unable to find a LogicalIndexOffsets table for current image. Did you run the LogicalIndex Scanner?.\n Error received was %s" % e)
                 
             else:
-                dbh.execute("create temporary table %s select least(offset-%s,low) as low, greatest(offset+%s,high) as high, %s, offset as offset_%s from %s, LogicalIndexOffsets, length where id=%r and offset<high and offset>low",
+                dbh.execute("create temporary table %s select LogicalIndexOffsets.inode_id, least(offset-%s,low) as low, greatest(offset+%s,high) as high, %s, offset as offset_%s, LogicalIndexOffsets.length from %s, LogicalIndexOffsets where word_id=%r and offset<high and offset>low and LogicalIndexOffsets.inode_id=%s.inode_id",
                             (temp_table,range,range,
                              ','.join(offset_columns),word_id,
                              old_temp_table,
-                             word_id))
+                             word_id, old_temp_table))
 
             old_temp_table=temp_table
 
@@ -538,29 +494,38 @@ class SearchIndex(Reports.report):
         
         ## Find the offset columns:
         dbh.execute("desc LogicalIndexCache_%s" % cache_id)
-        offset_columns =[ row['Field'] for row in dbh if row['Field'].startswith('offset_') ]
-
-        ## Relate the offsets to actual words
-        pydbh = DB.DBO(None)
-
-        words = []
-        for word in offset_columns:
-            pydbh.execute("select word,id from dictionary where id=%r limit 1" % word[len("offset_"):])
-            row=pydbh.fetch()
-            words.append(row['word'])
+        offset_columns =[ IntegerTyperow['Field'] for row in dbh if row['Field'].startswith('offset_') ]
 
         case = query['case']        
         result.table(
-            elements = [ InodeType(case=case),
-                         OffsetType(sql='(block_number <<%s) + (%s & ((1<<%s)-1))' \
-                                    % (BLOCKBITS,offset_columns[0], BLOCKBITS),
-                                    name='Offset'),
+            elements = [ InodeIDType(case=case, sql='inode_id'),
+                         IntegerType(sql='offset_%s', name='Offset'),
                          DataPreview(sql='length', name='Preview', fsfd=fsfd),
                          ],
-            table = 'LogicalIndexCache_%s, LogicalIndex ' % (cache_id,),
-            where = " low>>%s = block " % BLOCKBITS,
+            table = 'LogicalIndexCache_%s ' % (cache_id,),
             case =case,
             )
+
+class SearchIndex(Reports.report):
+    """ Search for indexed keywords """
+    description = "Search for words that were indexed during filesystem load. Words must be in dictionary to be indexed. "
+    name = "Search Indexed Keywords"
+    family = "Keyword Indexing"
+
+    def display(self,query,result):
+        case=query['case']
+        fsfd = FileSystem.DBFS(case)
+        result.table(
+            elements = [ InodeIDType(case=case, sql='inode_id'),
+                         StringType(sql='word', name='Word'),
+                         OffsetType(sql='offset', name='Offset', fsfd=fsfd),
+                         IntegerType(sql='length', name='Length'),
+                         DataPreview(sql='length', name='Preview', fsfd=fsfd),
+                         ],
+            table = 'LogicalIndexOffsets join pyflag.dictionary on word_id=id',
+            case =case,
+            )
+
 
 class BrowseIndexKeywords(Reports.report):
     """ Show a summary of the results of the index keywords search.  The search indexed keywords report can then be used to view the results."""
@@ -696,13 +661,12 @@ class LogicalIndexScannerTest(ScannerTest):
         dbh2 = DB.DBO(self.test_case)
         pdbh = DB.DBO()
         fsfd = DBFS(self.test_case)
-        dbh.execute("select word,offset,length from LogicalIndexOffsets join %s.dictionary on LogicalIndexOffsets.id=pyflag.dictionary.id", config.FLAGDB)
+        dbh.execute("select inode_id, word,offset,length from LogicalIndexOffsets join %s.dictionary on LogicalIndexOffsets.word_id=pyflag.dictionary.id", config.FLAGDB)
         for row in dbh:
-            inode = resolve_inode(dbh2,row['offset'])
-            offset = resolve_offset(dbh2,row['offset'])
-            fd = fsfd.open(inode = inode)
-            fd.seek(offset)
+            inode = fsfd.lookup(inode_id = row['inode_id'])
+            fd = fsfd.open(inode=inode)
+            fd.seek(row['offset'])
             data = fd.read(row['length'])
             print "Looking for %s: Found in %s at offset %s length %s %r" % (
-                row['word'], inode, offset, row['length'],data)
-            self.assertEqual(data, row['word'])
+                row['word'], inode, row['offset'], row['length'],data)
+            self.assertEqual(data.lower(), row['word'].lower())

@@ -254,8 +254,8 @@ class GenericUI:
         """
         pyflaglog.log(pyflaglog.DEBUG, "text not implemented")
 
-    def _make_sql(self,elements=[],filter_elements=[], table='',where=1,groupby = None,case=None,
-                  filter='', order=0, direction='1', limit = 0):
+    def _make_sql(self,elements=[],filter_elements=[], table='',where=1,groupby = None, _groupby=None,
+                  case=None, filter='', order=0, direction='1', limit = 0):
         """ Calculates the SQL for the table widget based on the query """
         ## Calculate the SQL
         query_str = "select "
@@ -277,7 +277,9 @@ class GenericUI:
 
         if groupby:
             query_str += "group by `%s` " % groupby
-
+        elif _groupby:
+            query_str += "group by %s " % groupby
+            
         ## Now calculate the order by:
         try:
             query_str += "order by %s " % elements[order].sql

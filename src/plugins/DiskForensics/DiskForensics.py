@@ -132,7 +132,7 @@ class BrowseFS(Reports.report):
                 
                 ## We need a local copy of the filesystem factory so
                 ## as not to affect other instances!!!
-                fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])
+                fsfd = FileSystem.DBFS( query["case"])
 
                 for i in fsfd.dent_walk(path): 
                     if i['mode']=="d/d" and i['status']=='alloc':
@@ -143,7 +143,7 @@ class BrowseFS(Reports.report):
 
                 ## If we are asked to show a file, we will show the
                 ## contents of the directory the file is in:
-                fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])
+                fsfd = FileSystem.DBFS( query["case"])
                 if not fsfd.isdir(path):
                     path=os.path.dirname(path)
 
