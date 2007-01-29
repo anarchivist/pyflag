@@ -302,7 +302,7 @@ class EditItem(DisplayItem):
 
     def __init__(self,flag,ui=None):
         self.parameters = {}
-        self.parameters['submit']='any'
+        self.parameters['__submit__']='any'
         DisplayItem.__init__(self,flag,ui)
         ## Add the required fields to the parameters list so the
         ## framework can ensure that they are all satisfied.

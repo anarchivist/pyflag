@@ -421,8 +421,14 @@ class DBO:
             ## a go
             self.execute("commit")
 
-            return self.execute("select * from cache_%s limit %s,%s",
-                                (row['id'], limit - cache_limit, length))
+            ## If we fail to return the table (probably because the
+            ## cache table disappeared) we simply continue on to make
+            ## a new one:
+            try:
+                return self.execute("select * from cache_%s limit %s,%s",
+                                    (row['id'], limit - cache_limit, length))
+            except DBError:
+                pass
 
         ## Query is not in cache - create a new cache entry: We create
         ## the cache centered on the required range - this allows

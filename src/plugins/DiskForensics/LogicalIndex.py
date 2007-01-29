@@ -164,16 +164,10 @@ class IndexScan(GenScanFactory):
                         length = length,
                         )
 
-                    #Final result ie. absolute offset is (current block
-                    #number * blocksize) + (offset from start of data
-                    #chunk where we found the term + offset of the data
-                    #block)
-                    self.dbh.mass_insert( id=id,
-                                          offset = (self.block<<BLOCKBITS)+offset+self.rel_offset,
-                                          length = length)
-                
-            self.rel_offset += len(data)
-                
+        def slack(self,data,metadata=None):
+            """ deal with slack space the same as any other data """
+            return self.process(data, metadata)
+
         def finish(self):
             self.dbh.mass_insert_commit()
 ##            for k,v in self.stats.items():
