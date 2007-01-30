@@ -261,7 +261,7 @@ class GenericUI:
         query_str = "select "
 
         ## The columns and their aliases:
-        query_str += ",".join([ e.sql + " as `" + e.name + "`" for e in elements ])
+        query_str += ",".join([ e.select() + " as `" + e.name + "`" for e in elements ])
 
         ## The table
         query_str += " from %s " % table
@@ -282,7 +282,7 @@ class GenericUI:
             
         ## Now calculate the order by:
         try:
-            query_str += "order by %s " % elements[order].sql
+            query_str += "order by %s " % elements[order].select()
             if direction=='1':
                 query_str += "asc"
             else: query_str+= "desc"
@@ -345,9 +345,9 @@ class GenericUI:
                 new_query['__target__'] = name
                 new_query['__target_type__'] = 'append'
 
-                elements = [ IntegerType(name='Size', sql='size'),
-                             TimestampType(name='Timestamp', sql='timestamp'),
-                             StringType(name='Filename', sql='filename',
+                elements = [ IntegerType(name='Size', column='size'),
+                             TimestampType(name='Timestamp', column='timestamp'),
+                             StringType(name='Filename', column='filename',
                                         link = new_query, link_pane='parent'
                                         )
                              ]

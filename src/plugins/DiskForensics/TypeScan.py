@@ -84,8 +84,8 @@ class TypeScan(Scanner.GenScanFactory):
                        type = self.type_str)
 
 class ThumbnailType(InodeType):
-    def __init__(self, name='Inode', sql='inode', fsfd=None):
-        InodeType.__init__(self,name=name,sql=sql, case=fsfd.case)
+    def __init__(self, name='Inode', column='inode', fsfd=None):
+        InodeType.__init__(self,name=name,column=column, case=fsfd.case)
         self.fsfd = fsfd
 
     ## We dont want any operations on the thumbnail

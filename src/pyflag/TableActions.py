@@ -189,9 +189,9 @@ def uniq(table_object,fieldname,proposed_value,query=None,id=None,result=None):
 def noop(description=None, choices=None, variable=None, ui=None, **options ):
     """ A noop action """
 
-def selector_display(self, description=None, variable=None, ui=None, table=None, case=None, field=None, force=False, default=None, **options ):
+def selector_display(self, description=None, variable=None, result=None, table=None, case=None, field=None, force=False, **options ):
     """ Draws a selector based on a column from a table """
-##    ui.selector(description, variable, "select %s as `key`, %s as value from %s group by %s",  (field,field, table,field))
+    result.selector(description, variable, "select %s as `key`, %s as value from %s group by %s",  (field,field, table,field), case=self.case)
 
     tmp=ui.__class__(ui)
     dbh=DB.DBO(case)

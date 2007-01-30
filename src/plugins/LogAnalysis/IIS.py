@@ -24,6 +24,7 @@ import pyflag.LogFile as LogFile
 import plugins.LogAnalysis.Simple as Simple
 import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
+from pyflag.TableObj import TimestampType, IntegerType, StringType, IPType
 
 class IISLog(Simple.SimpleLog):
     """ Log parser for IIS (W3C Extended) log files """
@@ -57,12 +58,12 @@ class IISLog(Simple.SimpleLog):
         for row in self.read_record(ignore_comment = False):
             count+=1
             if row.startswith('#Fields: '):
-                dbh=DB.DBO(None)
-                self.fields = [ dbh.MakeSQLSafe(i) for i in row.split()[1:] ]
+                dbh=DB.DBO()
+                fields = [ dbh.MakeSQLSafe(i) for i in row.split()[1:] ]
                 # Coallesc the date and time field together:
                 try:
-                    i = self.fields.index('date')
-                    del self.fields[i]
+                    i = fields.index('date')
+                    del fields[i]
                 except ValueError:
                     pass
 
@@ -74,28 +75,28 @@ class IISLog(Simple.SimpleLog):
         
         # try to guess types based on known field-names, not perfect...
         # automatically index the non-varchar fields, leave the rest
-        self.types=[]
-        self.indexes=[]
-
-        ## Note the original log file has -ip, -status etc, but afterm
+        self.fields = []
+        
+        ## Note the original log file has -ip, -status etc, but after
         ## MakeSQLSafe dashes turn to underscores.
-        for field in self.fields:
+        for field in fields:
             if field == 'time':
-                self.types.append('timestamp')
-                self.indexes.append(True)
+                tmp = TimestampType('Timetamp', 'timestamp')
+                tmp.index = True
+                self.fields.append(tmp)
             elif '_ip' in field:
-                self.types.append('IP Address')
-                self.indexes.append(True)
-            elif '_status' in field:
-                self.types.append('int')
-                self.indexes.append(True)
-            elif '_bytes' in field:
-                self.types.append('int')
-                self.indexes.append(True)
+                tmp = IPType('IP Address','IP Address')
+                tmp.index = True
+                self.fields.append(tmp)
+            elif '_status' in field or '_bytes' in field:
+                tmp = IntegerType(field,field)
+                tmp.index = True
+                self.fields.append(tmp)
             else:
-                self.types.append('varchar(250)')
-                self.indexes.append(False)
-            
+                tmp = StringType(field,field)
+                tmp.index = True
+                self.fields.append(tmp)
+                
     def form(self, query, result):
         result.para('NOTICE: This loader attempts to load IIS log files completely automatically by determining field names and types from the header comments, if this loader fails, please use the "Simple" loader')
 
@@ -103,13 +104,19 @@ class IISLog(Simple.SimpleLog):
             self.parse(query)
             print "self.fields: %s" % self.fields
             result.text("The following is the result of importing the first few lines from the log file into the database.\nPlease check that the importation was successfull before continuing.",wrap='full')
-            self.display_test_log(result,query)
+            self.display_test_log(result)
             return True
 
         result.wizard(
             names = (
             "Step 1: Select Log File",
-            "Step 4: View test result",
-            "Step 5: Save Preset"),
-            callbacks = (LogFile.get_file, test, FlagFramework.Curry(LogFile.save_preset, log=self))
-            )
+            "Step 2: View test result",
+            "Step 3: Save Preset",
+            "Step 4: End",
+            ),
+            callbacks = (
+            LogFile.get_file,
+            test,
+            FlagFramework.Curry(LogFile.save_preset, log=self),
+            LogFile.end,
+            ))

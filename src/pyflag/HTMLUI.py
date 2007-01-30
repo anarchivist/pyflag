@@ -188,29 +188,24 @@ class HTMLUI(UI.GenericUI):
             
         self.result += "\n\n<p>%s</p>\n\n" % string
 
-    def opt_to_str(self,*args,**options):
-        """ Converts a list of options into a string.
-
-        May accept arbitrary number of parameters as a list or named parameters. Eg:
-
-        >>> opt_to_str(\"a=1\",\"b=2\",c=3,d=4)
-        \" a=1  b=2  c='3'  d='4' \"
+    def opt_to_str(self,opts={}, **options):
+        """ Converts options into a html attribute string. """
+        result = []
+        options.update(opts)
+        try:
+            if options['autosubmit']:
+                result.append("onchange=\"submit_form(%r,%r,%r,%r); return false;\"" % ('self',
+                                                                                      'None',
+                                                                                      '',''
+                                                                                      ))
+                del options['autosubmit']
+        except:
+            pass
         
-        """
-        
-        if options:
-            #Tuple concatenation
-            args = args + (options,)
-            
-        option_str = ''
-        for arg in args:
-            if isinstance(arg,str):
-                option_str += " "+arg+" "
-            elif isinstance(arg,dict):
-                for items in arg.items():
-                    option_str += " %s=%r "% (items)
+        for items in options.items():
+            result.append("%s=%r"% (items))
 
-        return option_str
+        return ' '.join(result)
 
     table_depth = 0
 
@@ -627,9 +622,12 @@ class HTMLUI(UI.GenericUI):
 
         tfcb = self.store_callback(tree_frame_cb)
         id = self.get_unique_id()
-        self.result += """<iframe id='TreeFrame%s' class=TreeFrame></iframe>
-        <script>AdjustHeightToPageSize('TreeFrame%s');document.getElementById('TreeFrame%s').src='/f?callback_stored=%s&__pyflag_parent=' + window.__pyflag_parent + '&__pyflag_name=' + window.__pyflag_name;</script>
-        """ % (id,id,id,tfcb)
+        self.iframe("TreeFrame%s" % id, tfcb)
+        
+    def iframe(self, target, callback):
+        self.result += """<iframe id='%s' name='%s' class=TreeFrame></iframe>
+        <script>AdjustHeightToPageSize('%s');document.getElementById('%s').src='/f?callback_stored=%s&__pyflag_parent=' + window.__pyflag_parent + '&__pyflag_name=' + window.__pyflag_name;</script>
+        """ % (target,target,target,target,callback)
         
     def new_toolbar(self):
         id = "Toolbar%s" % self.get_unique_id()
@@ -1294,6 +1292,14 @@ class HTMLUI(UI.GenericUI):
 
         self.result += '<form id="pyflag_form_1" name="pyflag_form_1" method=POST action="/f" enctype="multipart/form-data">\n'
 
+    def submit(self, value='Submit',name='__submit__', target='self', **opts):
+        """ Put submit buttons """
+        if self.callback:
+            callback = self.callback
+        else: callback = 'None'
+
+        return "<input type=submit name=%s value='%s' onclick=\"submit_form(%r,%r,%r,%r); return false;\" %s>\n" % (name,value,target,callback,name,value,self.opt_to_str(opts))
+
     def end_form(self,value='Submit',name='__submit__',**opts):
         base = ''
 
@@ -1302,11 +1308,7 @@ class HTMLUI(UI.GenericUI):
             if not k.startswith("__"):
                 base += "<input type=hidden name='%s' value='%s'>\n" % (k,urlencode(v))
 
-        if self.callback:
-            callback = self.callback
-        else: callback = 'None'
-        
-        base += "<input type=submit name=%s value='%s' onclick=\"submit_form(%r,%r); return false;\" %s>\n" % (name,value,self.form_target,callback,self.opt_to_str(opts))
+        base += self.submit(value,name, target=self.form_target, **opts)
 
         if self.table_depth>0:
             self.row(base)
@@ -1374,7 +1376,6 @@ class HTMLUI(UI.GenericUI):
             data = "<abbr title=%r>%s</abbr>" % (quote_quotes(tooltip),data)
         self.result += data
 
-    ## FIXME: Not really completed
     def wizard(self,names=[],context="wizard",callbacks=[],title=''):
         """ This implements a wizard.
         
@@ -1396,53 +1397,58 @@ class HTMLUI(UI.GenericUI):
                 page=int(query[context])
             except:
                 page=0
-                
+
+            try:
+                if query['__submit__']=='Next' or query['__submit__']=='Finish':
+                    query.set(context,page+1)
+                    result.refresh(0, query)
+                elif query['__submit__']=="Back":
+                    query.set(context,page-1)
+                    result.refresh(0,query)
+                    
+            except:
+                pass
+
             result.heading(names[page])
-            new_query=query.clone()
-            del new_query[context]
-            del new_query['__submit__']
-            
-            result.start_form(new_query)
+            result.start_form(query)
             result.start_table()
 
-            ## Ask the cb to draw on us: (We do not want the cb to stuff
-            ## with our form_parms so we create an empty ui)
-            tmp=result.__class__(query=query)
-            if query.has_key('__submit__'):
-                if callbacks[page](new_query,tmp):
-                    page+=1
-            ## This is the last page and it was ok - we just go to our parent page
-                    if query['__submit__']=='Finish':
-                        del new_query['callback_stored']
-                        result.refresh(0,new_query,parent=1)
-                        return
-                else:
-                    self.text("There was an error with the form:",color="red")
+            ## Ask the callback to draw on us:
+            tmp = result.__class__(result)
+            try:
+                callbacks[page](query,tmp)
+                error = False
+            except Exception,e:
+                pyflaglog.log(pyflaglog.ERROR, "Error running wizard CB: %s" % e)
+                tmp = result.__class__(result)
+                tmp.heading("Error")
+                tmp.para("%s" % e)
+                error = True
 
-            ## This time we want to properly display the form
-            tmp=result.__class__(result)
-            tmp.defaults=query
-            callbacks[page](new_query,tmp)
-            result.row(tmp)
+            result.raw(tmp)
 
-            ## Add the form elements as hidden parameters:
-            result.hidden(context,page)
-            for k,v in result.form_parms:
-                result.result += "<input type=hidden name='%s' id='%s' value='%s'>\n" % (k,k,v)
-
-            result.end_table()
             if page>0:
-                result.result+="<input type=button value=Previous onclick=\"window.location=\'%s&%s=%s\';\" />" % (new_query,context,page-1)
-            ## Make the update button
-            result.result += "<input type=submit value='Update'>"
+                result.result += result.submit(value="Back")
+                
+            if not error:
+                if page < len(callbacks)-1:
+                    result.result += result.submit(value="Update")
+                    result.end_form("Next")
+                else:
+                    result.result += result.submit(value="Update")            
+                    result.end_form("Finish")
+            else:
+                result.end_form("Update")
 
-            if page<len(names)-1:
-                result.result += "<input type=button value='Next' onclick=\"document.getElementById(\'%s\').value=\'%s\'; document.pyflag_form_1.submit();\" >\n" % (context, page+1)
-            elif page==len(names)-1:
-                result.result += "<input type=submit value='Finish' name=submit>\n"
+            return
 
-            result.decoration='naked'
-
+        cb = self.store_callback(wizard_cb)
+        id = self.get_unique_id()
+        self.iframe("Wizard%s" % id, cb)
+        
+        #self.popup(wizard_cb, "Click here to launch the wizard")
+        return
+    
         cb = self.store_callback(wizard_cb)
         self.result+="""<script language=javascript>var client; function open_wizard_window() {window.open('%s&%s=0&callback_stored=%s','client','toolbar=0,menubar=0,HEIGHT=600,WIDTH=800,scrollbars=yes')}; open_wizard_window(); </script><abbr title=\"If your browser blocks popups, click here to popup a wizard\"><a onclick=\"open_wizard_window()\">Click here to launch wizard</a></abbr>""" % (self.defaults,context,cb)
         raise FlagFramework.DontDraw()

@@ -23,7 +23,9 @@
 import pyflag.LogFile as LogFile
 import pyflag.DB as DB
 import pyflag.FlagFramework as FlagFramework
+from pyflag.FlagFramework import query_type
 import re
+import pyflag.Registry as Registry
 
 delimiters = {'Space':' ', 'Comma':',', 'Colon':':', 'Semi-Colon':';', 'Hyphen':'-'}
 
@@ -36,9 +38,6 @@ def pre_selector(result):
         y.append(f[i][1])
         
     result.const_selector("pre-filter(s) to use on the data:",'prefilter',x,y,size=4,multiple="multiple")
-
-def type_selector(result, name):
-    result.const_selector('',name, LogFile.types.keys(), LogFile.types.keys())
 
 class prefilter:
     """ This class defines all the prefilters that are appropriate for importing log files.
@@ -166,40 +165,10 @@ class prefilter:
         return self.transform(self.res['PFRemoveChars'],string)
 
 class SimpleLog(LogFile.Log):
-    """ A log processor to perform simple delimiter dissection
+    """ A log processor to perform simple delimiter dissection. 
     """
-    name = "Simple"    
-
-    def set_fields(self, query):
-        """ set the field names from the query, order is important """
-        self.fields=[]
-        for i in range(0,self.num_fields):
-            try:
-                assert(len(query['field%u'%i])>0)
-                self.fields.append(query['field%u'%i])
-            except (KeyError,AssertionError):
-                query['field%u' % i ] = 'ignore'
-                self.fields.append('ignore')
-
-    def set_types(self,query):
-        """ set the field types from the query, order is important """
-        self.types=[]
-        for i in range(0,self.num_fields):
-            try:
-                self.types.append(query['type%u'%i])
-            except KeyError:
-                query['type%u' % i ] = 'varchar(250)'
-                self.types.append('varchar(250)')
-
-    def set_indexes(self,query):
-        """ which fields require indexes """
-        self.indexes=[]
-        for i in range(0,self.num_fields):
-            if query.has_key('index%u'%i):
-                self.indexes.append(True)
-            else:
-                self.indexes.append(False)
-
+    name = "Simple"
+    
     def prefilter_record(self,string):
         """ Prefilters the record (string) and returns a new string which is the filtered record.
         """
@@ -220,46 +189,52 @@ class SimpleLog(LogFile.Log):
             yield row.split(self.delimiter)
 
     def parse(self, query, datafile='datafile'):
+        """ This function parses the query string into the appropriate fields array """
         LogFile.Log.parse(self,query, datafile)
         
         self.datafile = query.getarray(datafile)
         self.prefilters = query.getarray('prefilter')
 
-        self.num_fields = 0
-        ## If this object was called with an unknown number of fields
-        ## we work it out. Note that we may not have all the
-        ## consecutive fields defined:
+        num_fields = 0
+        ## Count the fields presented:
         for k in query.keys():
             if k.startswith('field'):
                 number=int(k[len('field'):])
-                if number>self.num_fields:
-                    self.num_fields=number
+                if number>num_fields:
+                    num_fields=number
                     
-        self.num_fields+=1
+        num_fields+=1
+        print "Found %s fields" % num_fields
+        ## Initialise the fields array:
+        self.fields = [ None ] * num_fields
+        self.num_fields = num_fields
 
-        self.set_fields(query)
-        self.set_types(query)
-        self.set_indexes(query)
+        ## Now parse them:
+        for i in range(0,num_fields):
+            try:
+                field_cls = Registry.COLUMN_TYPES.dispatch(query['type%u' % i])
+                ## This is what the field will be called:
+                name = query['field%u' % i]
+                self.fields[i] = field_cls(name=name, column=name)
+
+                ## Do we need to index it?
+                if query.has_key('index%u' % i):
+                    self.fields[i].index = True
+                    
+            except Exception,e:
+                pass
   
         try:
             self.delimiter=query['delimiter']
         except KeyError:
             self.delimiter=delimiters.values()[0]
             query['delimiter']=self.delimiter
-
-        if not query.has_key('delimiter'):
-            query['delimiter'] = delimiters.values()[0]
-
-
+                    
     def form(self,query,result):
         """ This draws the form required to fulfill all the parameters for this report
         """
-        def configure(query, result):            
+        def configure_filters(query, result):            
             self.parse(query)
-            result.start_table(hstretch=False)
-            result.const_selector("Simple Field Separator:",'delimiter',delimiters.values(), delimiters.keys())
-
-            result.end_table()
             result.start_table()
             result.row("Unprocessed text from file")
             sample = []
@@ -289,21 +264,36 @@ class SimpleLog(LogFile.Log):
             [result.row(s,bgcolor='lightgray') for s in sample]
             result.end_table()
 
+        def configure_seperators(query,result):
+            self.parse(query)
+            result.start_table(hstretch=False)
+            result.const_selector("Simple Field Separator:",'delimiter',delimiters.values(), delimiters.keys(), autosubmit=True)
+
+            result.end_table()
+
             self.draw_type_selector(result)
 
         def test(query,result):
             self.parse(query)
-            result.text("The following is the result of importing the first few lines from the log file into the database.\nPlease check that the importation was successfull before continuing.",wrap='full')
-            self.display_test_log(result,query)
+            result.text("The following is the result of importing the first few lines from the log file into the database.\nPlease check that the importation was successfull before continuing.")
+            self.display_test_log(result)
             return True
 
         result.wizard(
-            names = (
-            "Step 1: Select Log File",
-            "Step 2: Configure Log processor",
-            "Step 3: View test result",
-            "Step 4: Save Preset"),
-            callbacks = (LogFile.get_file, configure, test, FlagFramework.Curry(LogFile.save_preset, log=self))
+            names = [ "Step 1: Select Log File",
+                      "Step 2: Configure preprocessors",
+                      "Step 3: Configure Columns",
+                      "Step 4: View test result",
+                      "Step 5: Save Preset",
+                      "Step 6: End"],
+            callbacks = [LogFile.get_file,
+                         configure_filters,
+                         configure_seperators,
+                         test,
+                         FlagFramework.Curry(LogFile.save_preset, log=self),
+                         LogFile.end
+                         ],
+            
             )
     
     def draw_type_selector(self,result):
@@ -336,13 +326,13 @@ class SimpleLog(LogFile.Log):
         type = []
         index = []
         ## Now we create the input elements:
-        for i in range(len(fields)):
+        for i in range(self.num_fields):
             field_ui = result.__class__(result)
             type_ui = result.__class__(result)
             index_ui =  result.__class__(result)
             
             field_ui.textfield('','field%u' % i)
-            type_selector(type_ui,"type%u" % i)
+            type_ui.const_selector('',"type%u" % i, Registry.COLUMN_TYPES.class_names, Registry.COLUMN_TYPES.class_names)
             index_ui.checkbox('Add Index?','index%u'%i,'yes')
             field.append(field_ui)
             type.append(type_ui)
@@ -352,7 +342,7 @@ class SimpleLog(LogFile.Log):
         result.row(*type)
         result.row(*index)
 
-    def display(self,query,result):
+    def displayxxx(self,query,result):
         if 'IP Address' in self.types and not query.has_key('group_by'):
             new_query=query.clone()
             if query.has_key('whois'):

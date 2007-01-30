@@ -206,7 +206,7 @@ class TableObj:
                 cb = getattr(self.__class__,"form_%s" % k, None)
                 
             if cb:
-                cb(self,description=v,ui=results,variable=k, defaults=defaults)
+                cb(self,description=v,result=results,variable=k, defaults=defaults)
             else:
                 results.textfield(v,k,size=40)
 
@@ -362,12 +362,15 @@ class ColumnType:
     responsible for displaying the values from the column and are used
     to generate SQL.
     """
-    def __init__(self, name='', sql='', link='', callback=None, link_pane='self'):
+    sql = None
+    
+    def __init__(self, name='', column='', sql=None, link='', callback=None, link_pane='self'):
         self.name = name
-        self.sql = sql
+        self.column = column
         self.link = link
         self.callback = callback
         self.link_pane = link_pane
+        self.sql = sql
 
     ## These are the symbols which will be treated literally
     symbols = {
@@ -398,7 +401,7 @@ class ColumnType:
         return method(column, operator, arg)
 
     def literal(self, column,operator, arg):
-        return "%s %s %r" % (self.sql, operator, arg)
+        return "%s %s %r" % (self.column, operator, arg)
     
     def display(self, value, row, result):
         """ This method is called by the table widget to allow us to
@@ -429,6 +432,34 @@ class ColumnType:
             return "-"
         else: return value
 
+    def create(self):
+        """ This needs to generate a create clause for creating this
+        table. It is used when we wish to make a table with this
+        column type.
+        """
+
+    def insert(self, value):
+        """ This function returns the sql required to set the name of
+        the column to value.
+
+        @returns: (column name, value)
+
+        Note that column name must be preceeded with _ if value needs to be taken literally (not escaped).
+
+        WARNING: It is up to the column type to enforce adequate
+        escaping if _ is used. This may be a potential vulnerability
+        when loading untrusted log files.
+
+        If None is returned, the value is not inserted into this
+        column position, and the columns default value will be used.
+        """
+        return self.column, value
+
+    def select(self):
+        """ Returns the SQL required for selecting from the table. """
+        return self.sql or '.'.join(["`%s`" % x for x in self.column.split('.')])
+
+### Some common basic ColumnTypes:
 class StateType(ColumnType):
     ## This is a list of states that we can take on. Keys are args,
     ## values are sql types.
@@ -437,16 +468,19 @@ class StateType(ColumnType):
         '=': 'operator_is'
         }
 
-    def __init__(self, name='', sql='', link='', callback=None):
-        ColumnType.__init__(self, name=name, sql=sql, link=link, callback=callback)
+    def __init__(self, name='', column='', link='', callback=None):
+        ColumnType.__init__(self, name=name, column=column, link=link, callback=callback)
         self.docs = {'operator_is': """ Matches when the column is of the specified state. Supported states are %s""" % self.states.keys()}
         
     def operator_is(self, column, operator, state):
         for k,v in self.states.items():
             if state.lower()==k:
-                return "%s = %r" % (self.sql, v)
+                return "%s = %r" % (self.column, v)
 
         raise RuntimeError("Dont understand state %r. Valid states are %s" % (state,self.states.keys()))
+
+    def create(self):
+        return "`%s` enum(%s) default NULL" % (self.column, ','.join(["%r"% x for x in states.keys()]))
 
 class IntegerType(ColumnType):
     symbols = {
@@ -458,35 +492,44 @@ class IntegerType(ColumnType):
         ">": "literal",
         }
 
+    def create(self):
+        return "`%s` int(11) default 0" % self.column
+
 class StringType(ColumnType):
     symbols = {
         "=":"literal",
         "!=":"literal",
         }
 
+    def create(self):
+        return "`%s` VARCHAR(255) default NULL" % self.column
+
     def operator_contains(self, column, operator, arg):
         """ Matches when the column contains the pattern anywhere. Its the same as placing wildcards before and after the pattern. """
-        return '%s like %r' % (self.sql, "%" + arg + "%")
+        return '%s like %r' % (self.column, "%" + arg + "%")
 
     def operator_matches(self, column, operator, arg):
         """ This matches the pattern to the column. Wild cards (%) can be placed anywhere, but if you place it in front of the pattern it could be slower. """
-        return '%s like %r' % (self.sql, arg)
+        return '%s like %r' % (self.column, arg)
 
     def operator_regex(self,column,operator,arg):
         """ This applies the regular expression to the column (Can be slow for large tables) """
-        return '%s rlike %r' % (self.sql, arg)
+        return '%s rlike %r' % (self.column, arg)
 
 
 class TimestampType(IntegerType):
+    def create(self):
+        return "`%s` TIMESTAMP" % self.column
+    
     def operator_after(self, column, operator, arg):
         """ Matches times after the specified time. The time arguement must be given in the format 'YYYY-MM-DD HH:MM:SS' (i.e. Year, Month, Day, Hour, Minute, Second). """
         ## FIXME Should parse arg as a date - for now pass though to mysql
-        return "%s > %r" % (self.sql, arg)
+        return "%s > %r" % (self.column, arg)
 
     def operator_before(self,column, operator, arg):
         """ Matches times before the specified time. The time arguement must be as described for 'after'."""
         ## FIXME Should parse arg as a date
-        return "%s < %r" % (self.sql, arg)
+        return "%s < %r" % (self.column, arg)
 
 class IPType(ColumnType):
     """ Handles creating appropriate IP address ranges from a CIDR specification.
@@ -495,8 +538,7 @@ class IPType(ColumnType):
     http://users.forthnet.gr/ath/chrisgeorgiou/python/
     """
     def __init__(self, name='', column='', link='', callback=''):
-        self.column = column
-        ColumnType.__init__(self, name=name, sql="inet_ntoa(%s)" % column,
+        ColumnType.__init__(self, name=name, column=column,
                             link=link, callback=callback)
         
     # reMatchString: a re that matches string CIDR's
@@ -542,41 +584,25 @@ class IPType(ColumnType):
         except:
             raise ValueError("%s does not look like a CIDR netmask (e.g. 10.10.10.0/24)" % address)
         
-        return " ( %s >= %s and %s <= %s ) " % (self.column, numeric_address, self.column, broadcast)
+        return " ( `%s` >= %s and `%s` <= %s ) " % (self.column, numeric_address, self.column, broadcast)
 
-## This is an example of using the table object to manage a DB table
-import TableActions
+    def create(self):
+        ## IP addresses are stored as 32 bit integers 
+        return "`%s` int(11) default 0" % self.column
 
-class AnnotationObj(TableObj):
-    table = "annotate"
-    columns = (
-        'inode', 'Inode', 
-        'note','Notes', 
-        'category', 'category',
-        )
+    def select(self):
+        ## Upon selection they will be converted to strings:
+        return "inet_ntoa(`%s`)" % self.column
 
-    add_constraints = {
-        'category': TableActions.selector_constraint,
-        }
-
-    edit_constraints = {
-        'category': TableActions.selector_constraint,
-        }
-
-    def __init__(self, case=None, id=None):
-        self.form_actions = {
-            'note': TableActions.textarea,
-            'category': Curry(TableActions.selector_display,
-                              table='annotate', field='category', case=case),
-            }
-
-        TableObj.__init__(self,case,id)
+    def insert(self,value):
+        ### When inserted we need to convert them from string to ints
+        return "_"+self.column, "inet_aton(%r)" % value
 
 class InodeType(StringType):
     """ A unified view of inodes """
-    def __init__(self, name='Inode', sql='inode', link=None, case=None, callback=None):
+    def __init__(self, name='Inode', column='inode', link=None, case=None, callback=None):
         self.case = case
-        ColumnType.__init__(self,name,sql,link,callback=callback)
+        ColumnType.__init__(self,name,column,link,callback=callback)
 
     def display(self, value, row, result):
         result = result.__class__(result)
@@ -639,7 +665,35 @@ class InodeType(StringType):
 
     def operator_annotated(self, column, operator, pattern):
         """ This operator selects those inodes with pattern matching their annotation """
-        return '%s=(select annotate.inode from annotate where note like "%%%s%%")' % (self.sql, pattern)
+        return '%s=(select annotate.inode from annotate where note like "%%%s%%")' % (self.column, pattern)
+
+## This is an example of using the table object to manage a DB table
+import TableActions
+
+class AnnotationObj(TableObj):
+    table = "annotate"
+    columns = (
+        'inode', 'Inode', 
+        'note','Notes', 
+        'category', 'category',
+        )
+
+    add_constraints = {
+        'category': TableActions.selector_constraint,
+        }
+
+    edit_constraints = {
+        'category': TableActions.selector_constraint,
+        }
+
+    def __init__(self, case=None, id=None):
+        self.form_actions = {
+            'note': TableActions.textarea,
+            'category': Curry(TableActions.selector_display,
+                              table='annotate', field='category', case=case),
+            }
+
+        TableObj.__init__(self,case,id)
 
 class InodeIDType(InodeType):
     def display(self, value, row, result):
@@ -653,10 +707,14 @@ class FilenameType(StringType):
                           family='Disk Forensics',
                           report='Browse Filesystem',
                           __target__='open_tree',open_tree="%s")
-        
-        ColumnType.__init__(self,name, "concat(`%s`,`%s`)" % (path,filename),
+        self.path = path
+        self.filename = filename
+        ColumnType.__init__(self,name, None,
                             link=link)
 
+    def select(self):
+        return "concat(`%s`,`%s`)" % (self.path,self.filename)
+    
     ## FIXME: implement filename globbing operators - this should be
     ## much faster than regex or match operators because in marches,
     ## the SQL translates to 'where concat(path,name) like "..."'. With

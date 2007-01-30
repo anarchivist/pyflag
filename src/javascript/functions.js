@@ -252,7 +252,7 @@ function popup(query, callback, width, height) {
 };
 
 
-function submit_form(pane, current_cb) {
+function submit_form(pane, current_cb, name, value) {
   var target;
   var query = 'f?';
 
@@ -267,6 +267,8 @@ function submit_form(pane, current_cb) {
     query += "&__pyflag_parent=" + target.__pyflag_parent + "&__pyflag_name=" + target.__pyflag_name+"&";
   };
 
+  query+=name+"="+value+"&";
+
   var f = document.forms['pyflag_form_1'];
   if(f) {
     for(var i=0; i<f.elements.length; i++) {
@@ -276,13 +278,12 @@ function submit_form(pane, current_cb) {
 	continue;
       };
 
+      if(e.type=='submit') continue;
+
       // If we submit to our parent - we need to remove our cb:
       if(pane=='parent' && e.name=='callback_stored' && e.value==current_cb)
 	continue;
 
-      //We must leave the submit button off, so that when the popup
-      //window refreshes to its parent we know it wasnt actually
-      //submitted.
       if(e.name.length>0 ) {
 	//	query+=e.name + '=' + encodeURIComponent(e.value)+'&';
 	query+=e.name + '=' + e.value+'&';
@@ -383,8 +384,8 @@ function find_window_by_name(name) {
     if(w.__pyflag_name == name) { target=w;};
 
     //Top level window has the same name as its parent
-    if(w.__pyflag_parent==w.__pyflag_name) 
-      break;
+    //if(w.__pyflag_parent==w.__pyflag_name) 
+    //   break;
 
     // Find the parent of this window
     new_w = w.opener;

@@ -129,7 +129,7 @@ class Registry:
                                 try:
                                     Class = module.__dict__[cls]
                                     if issubclass(Class,ParentClass) and Class!=ParentClass:
-                                        ## Check the class for consitency
+                                        ## Check the class for consitancy
                                         try:
                                             self.check_class(Class)
                                         except AttributeError,e:
@@ -137,15 +137,8 @@ class Registry:
                                             pyflaglog.log(pyflaglog.WARNINGS, err)
                                             continue
 
-                                        if Class not in self.classes:
-                                            self.classes.append(Class)
-                                        pyflaglog.log(pyflaglog.DEBUG, "Added %s '%s:%s'"
-                                                    % (ParentClass,module_desc,cls))
-
-                                        try:
-                                            self.order.append(Class.order)
-                                        except:
-                                            self.order.append(10)
+                                        ## Add the class to ourselves:
+                                        self.add_class(ParentClass, module_desc, cls, Class)
                                             
                                 # Oops: it isnt a class...
                                 except (TypeError, NameError) , e:
@@ -155,6 +148,20 @@ class Registry:
                             pyflaglog.log(pyflaglog.ERRORS, "Could not compile module %s: %s"
                                         % (module_name,e))
                             continue
+
+    def add_class(self, ParentClass, module_desc, cls, Class):
+        """ Adds the class provided to our self. This is here to be
+        possibly over ridden by derived classes.
+        """
+        if Class not in self.classes:
+            self.classes.append(Class)
+            try:
+                self.order.append(Class.order)
+            except:
+                self.order.append(10)
+
+            pyflaglog.log(pyflaglog.DEBUG, "Added %s '%s:%s'"
+                          % (ParentClass,module_desc,cls))
 
     def check_class(self,Class):
         """ Run a set of tests on the class to ensure its ok to use.
@@ -262,7 +269,8 @@ class ScannerRegistry(Registry):
             return 1
 
         self.classes.sort(sort_function)
-        self.scanners = [ ("%s" % i).split(".")[-1] for i in self.classes ]
+        self.class_names = [ ("%s" % i).split(".")[-1] for i in self.classes ]
+        self.scanners = self.class_names
 
     def dispatch(self,scanner_name):
         return self.classes[self.scanners.index(scanner_name)]
@@ -348,6 +356,9 @@ import unittest
 class TestsRegistry(ScannerRegistry):
     pass
 
+class ColumnTypeRegistry(ScannerRegistry):
+    pass
+
 LOCK = 0
 REPORTS = None
 SCANNERS = None
@@ -405,6 +416,11 @@ def Init():
     import pyflag.format as format
     global FILEFORMATS
     FILEFORMATS = FileFormatRegistry(format.DataType)
+
+    ## Register Column Types:
+    import pyflag.TableObj as TableObj
+    global COLUMN_TYPES
+    COLUMN_TYPES = ColumnTypeRegistry(TableObj.ColumnType)
 
 def InitTests():
     return TestsRegistry(unittest.TestCase)

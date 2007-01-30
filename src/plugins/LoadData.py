@@ -51,7 +51,7 @@ class LoadPresetLog(Reports.report):
 ##    parameters = {"table":"any", "new_table":"any",
 ##                  "datafile":"filename", "log_preset":"sqlsafe", "final":"alphanum"}
     parameters = {"table":"sqlsafe", "datafile":"filename",
-                  "log_preset":"sqlsafe", "final":"alphanum"}
+                  "log_preset":"any", "final":"alphanum"}
     name="Load Preset Log File"
     family="Load Data"
     description="Load Data from log file into Database using Preset"
@@ -91,7 +91,7 @@ class LoadPresetLog(Reports.report):
         try:
             result.start_table()
             result.case_selector()
-            result.meta_selector(config.FLAGDB,'Select preset type','log_preset',onclick="this.form.submit();")
+            result.meta_selector(config.FLAGDB,'Select preset type','log_preset',autosubmit=True)
             ## FIXME: This is a nice idea but it stuffs up the framework's idea of whats cached and what isnt... this needs more work!!!
             # get existing tables
 ##            dbh = self.DBO(query['case'])
@@ -107,7 +107,7 @@ class LoadPresetLog(Reports.report):
             tmp.filebox()
             result.row("Select file to load:",tmp)
             if query.getarray('datafile'):
-                log = LogFile.get_loader(dbh, query['log_preset'],query.getarray('datafile'))
+                log = LogFile.get_loader(query['case'], query['log_preset'],query.getarray('datafile'))
             else:
                 return result
 
@@ -121,8 +121,7 @@ class LoadPresetLog(Reports.report):
                     pass
 
                 # retrieve and display the temp table
-                dbh.execute("select * from %s limit 1",temp_table)
-                log.display_test_log(result,query)
+                log.display_test_log(result)
             except Exception,e:
                 result.text("Error: Unable to load a test set - maybe this log file is incompatible with this log preset?",color='red',font='bold')
                 pyflaglog.log(pyflaglog.DEBUG,"Unable to load test set - error returned was %s" % e)
@@ -138,8 +137,8 @@ class LoadPresetLog(Reports.report):
 
     def analyse(self, query):
         """ Load the log file into the table """
-        dbh = self.DBO(query['case'])
-        log = LogFile.get_loader(dbh, query['log_preset'],query.getarray('datafile'))
+        dbh = DB.DBO(query['case'])
+        log = LogFile.get_loader(query['case'], query['log_preset'],query.getarray('datafile'))
         
         ## Check to make sure that this table is not used by some other preset:
         dbh.execute("select * from meta where property='log_preset_%s' and value!='%s' limit 1" ,
@@ -148,7 +147,7 @@ class LoadPresetLog(Reports.report):
         if row:
             raise Reports.ReportError("Table %s already exists with a conflicting preset (%s) - you can only append to the same table with the same preset." % (query['table'],row['value']))
         
-        for progress in log.load('%s_log'%query['table']):
+        for progress in log.load('%s_log' % query['table']):
             self.progress_str = progress
             
         dbh.execute("INSERT INTO meta set property='logtable', value='%s'" ,(query['table']))

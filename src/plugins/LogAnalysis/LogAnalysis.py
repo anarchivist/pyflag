@@ -57,19 +57,19 @@ class ListLogFile(Reports.report):
 
     def display(self,query,result):
         result.heading("Log File in Table %s" % query['logtable'])            
-        dbh = self.DBO(query['case'])
+        dbh = DB.DBO(query['case'])
         dbh.execute("select value from meta where property = 'log_preset_%s' limit 1",(query['logtable']))
         row=dbh.fetch()
         try:
-            log = LogFile.get_loader(dbh,row['value'],None)
+            log = LogFile.get_loader(query['case'],row['value'],None)
         except KeyError:
             raise Reports.ReportError("Unable to load the preset %s for table %s " % (row['value'],query['logtable']))
 
-        log.display(query,result);
+        log.display(query['logtable']+"_log",result);
 
 class CreateLogPreset(Reports.report):
     """ Creates a new type of log file in the database, so that they can be loaded using the Load Log File report """
-    parameters = {"log_preset":"sqlsafe", "finished":"any"}
+    parameters = {"log_preset":"sqlsafe", "final":"any"}
     name="Create Log Preset"
     family = "Log Analysis"
     description="Create new preset log type"
@@ -87,14 +87,12 @@ class CreateLogPreset(Reports.report):
 
     def form(self,query,result):
         try:
-            result.const_selector("Select Log Processor", 'driver',
-                                  Registry.LOG_DRIVERS.drivers.keys() , Registry.LOG_DRIVERS.drivers.keys()
-                                  )
             log=Registry.LOG_DRIVERS.drivers[query['driver']]()
             log.form(query,result)
         except KeyError,e:
-            print e
-            pass
+            result.const_selector("Select Log Processor", 'driver',
+                                  Registry.LOG_DRIVERS.drivers.keys() , Registry.LOG_DRIVERS.drivers.keys()
+                                  )
         
 class BandWidth(Reports.report):
     """ Calculates the approximate bandwidth requirements by adding the size of each log entry within time period """

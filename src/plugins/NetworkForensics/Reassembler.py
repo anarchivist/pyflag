@@ -322,7 +322,7 @@ class StreamFile(File):
                                                       __target__='id')),
                          TimestampType('Date','pcap.ts_sec'),
                          IntegerType('Length','con.length'),
-                         StringType('Data','concat(con.cache_offset, ",", con.length)',
+                         StringType('Data',sql='concat(con.cache_offset, ",", con.length)',
                                     callback = show_data) ],
             
             table= '`connection` as con , pcap',

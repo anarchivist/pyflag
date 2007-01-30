@@ -263,9 +263,9 @@ class BuildDictionary(Reports.report):
         result.row(table,form,valign='top')
 
 class OffsetType(IntegerType):
-    def __init__(self, name='', sql='', fsfd=None):
+    def __init__(self, name='', column='', fsfd=None):
         self.fsfd = fsfd
-        IntegerType.__init__(self, name,sql)
+        IntegerType.__init__(self, name,column)
         
     def display(self, offset, row, result):
         result = result.__class__(result)
@@ -284,9 +284,9 @@ class OffsetType(IntegerType):
 class DataPreview(OffsetType):
     ## Cant search on this data type at all.
     symbols = {}
-    def __init__(self, name='', sql='', fsfd=None):
+    def __init__(self, name='', column='', fsfd=None):
         self.name = name
-        self.sql = sql
+        self.column = column
         self.fsfd = fsfd
 
     def display(self, length, row, result):
@@ -492,9 +492,9 @@ class SearchIndexxxx(Reports.report):
 
         case = query['case']        
         result.table(
-            elements = [ InodeIDType(case=case, sql='inode_id'),
-                         IntegerType(sql='offset_%s', name='Offset'),
-                         DataPreview(sql='length', name='Preview', fsfd=fsfd),
+            elements = [ InodeIDType(case=case, column='inode_id'),
+                         IntegerType(column='offset_%s', name='Offset'),
+                         DataPreview(column='length', name='Preview', fsfd=fsfd),
                          ],
             table = 'LogicalIndexCache_%s ' % (cache_id,),
             case =case,
@@ -510,11 +510,11 @@ class SearchIndex(Reports.report):
         case=query['case']
         fsfd = FileSystem.DBFS(case)
         result.table(
-            elements = [ InodeIDType(case=case, sql='inode_id'),
-                         StringType(sql='word', name='Word'),
-                         OffsetType(sql='offset', name='Offset', fsfd=fsfd),
-                         IntegerType(sql='length', name='Length'),
-                         DataPreview(sql='length', name='Preview', fsfd=fsfd),
+            elements = [ InodeIDType(case=case, column='inode_id'),
+                         StringType(column='word', name='Word'),
+                         OffsetType(column='offset', name='Offset', fsfd=fsfd),
+                         IntegerType(column='length', name='Length'),
+                         DataPreview(column='length', name='Preview', fsfd=fsfd),
                          ],
             table = 'LogicalIndexOffsets join pyflag.dictionary on word_id=id',
             case =case,

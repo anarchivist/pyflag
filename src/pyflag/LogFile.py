@@ -29,6 +29,7 @@
 """ Module for handling Log Files """
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
+from pyflag.FlagFramework import query_type
 import pyflag.DB as DB
 import pyflag.conf
 config=pyflag.conf.ConfObject()
@@ -58,17 +59,6 @@ def save_preset(query,result, log=None):
         result.text("Please type a name for the preset.\n",color='red')
         return False
 
-from socket import inet_aton, inet_ntoa
-from struct import pack, unpack
-
-def ip_trans(data, mode):
-    """ convert between database ip format (int unsigned) and the
-    display/search format (dotted decimal) """ 
-    if(mode==0):
-        return inet_ntoa(pack("!I", int(data)))
-    if(mode==1):
-        return "%i" % unpack("!I", inet_aton(data))
-    
 class Log:
     """ This base class abstracts Loading of log files.
 
@@ -85,7 +75,7 @@ class Log:
         """
         
     def __init__(self, case=None):
-        self.dbh = DB.DBO(case)
+        self.case = case
         
     def form(self,query,result):
         """ This method will be called when the user wants to configure a new instance of us. IE a new preset """
@@ -93,38 +83,25 @@ class Log:
     def reset(self, query):
         """ This is called to reset the log tables this log driver has created """
 
-    def display_test_log(self,result,query):
+    def display_test_log(self,result):
         # try to load and display as a final test
-        temp_table = self.dbh.get_temp()
+        dbh = DB.DBO(self.case)
+        temp_table = dbh.get_temp()
 
         for a in self.load(temp_table,rows= 3):
             pass
 
-        self.dbh.execute("select * from %s limit 1",temp_table)
-        columns =[]
-        names = []
-        data_callbacks = {}
-        for d in self.dbh.cursor.description:
-            names.append(d[0])
-            try:
-                type = self.types[self.fields.index(d[0])]
-                if type == "IP Address":
-                    # append data callback
-                    data_callbacks[d[0]] = ip_trans
-                columns.append(types[type].sql_out % "`%s`" % d[0])
-            except ValueError:
-                columns.append(d[0])
-
-        result.ruler()
-        tmp_final = result.__class__(result)
-        tmp_final.table(columns=columns,names=names,links=[], table=temp_table, case=self.dbh.case, simple=True, data_callbacks=data_callbacks)
-        result.row(tmp_final,bgcolor='lightgray',colspan=5)
+        ## Display the new table
+        self.display(temp_table, result)
     
     def read_record(self, ignore_comment = True):
         """ Generates records.
 
         This can handle multiple files as provided in the constructor.
         """
+        if not self.datafile:
+            raise IOError("Datafile is not set!!!")
+        
         for file in self.datafile:
             fd=open(file,'r')
             for line in fd:
@@ -139,83 +116,52 @@ class Log:
         @arg table_name: A table name to use
         @arg rows: number of rows to upload - if None , we upload them all
         @return: A generator that represents the current progress indication.
-        """
-        ## First we create the table:
-        cols = []
-        insert_sql = []
-        field_indexes = []
-        row_cache = []
-        cached_count = 0
-        count=0
-        
-        for i in range(len(self.fields)):
-            if self.fields[i]!='' and self.fields[i] != 'ignore':
-                field_indexes.append(i)
-                type = types[self.types[i]]()
-                cols.append("`%s` %s" % (self.fields[i], type.type ))
-                insert_sql.append(type.sql_in)
+        """        
+        ## First we create the table. We do this by asking all the
+        ## column types for their create clause:
+        dbh = DB.DBO(self.case)
+        dbh.cursor.ignore_warnings = True
 
-        self.dbh.execute("CREATE TABLE IF NOT EXISTS %s (id int auto_increment,%s,key(id))" % (tablename,",".join(cols)))
+        fields = [ x for x in self.fields if x]
+        if len(fields)==0:
+            raise RuntimeError("No Columns were selected.")
         
-        ## prepare the insert string
-        insert_str = "(Null,"+','.join(insert_sql)+")"
-        #insert_str = ','.join(insert_sql)+")"
-        
+        dbh.execute("create table if not exists %s (%s)", (
+            tablename,
+            ',\n'.join([ x.create() for x in fields])
+            ))
+
+        ##  Now insert into the table:
+        count = 0
         for fields in self.get_fields():
             count += 1
-            fields = [ fields[i] for i in range(len(fields)) if i in field_indexes ]
-            try:
-                self.dbh.execute("INSERT INTO "+tablename+" values " + insert_str, fields)
-            except DB.DBError,e:
-                pyflaglog.log(pyflaglog.WARNINGS,"DB Error: %s" % e)
-            except TypeError,e:
-                pyflaglog.log(pyflaglog.WARNINGS,"Unable to load line into table SQL: %s Data: %s Error: %s" % (insert_str,fields,e))
-                continue
 
-            yield "Uploaded %s rows" % count
-
+            args = dict(_fast=True)
+            for i in range(len(self.fields)):
+                try:
+                    key, value = self.fields[i].insert(fields[i])
+                    args[key] = value
+                except AttributeError:
+                    pass
+                
+            if args:
+                dbh.insert(tablename, **args)
+            
             if rows and count > rows:
                 break
-            
-        ## Now create indexes on the required fields
-        for field_number in range(len(self.fields)):
-            index = types[self.types[field_number]].index
-            if self.indexes[field_number] and index:
-                ## interpolate the column name into the index declaration
-                index = index % self.fields[field_number]
-                self.dbh.execute("Alter table %s add index(`%s`)" % (tablename,index))
-                yield "Created index on %s " % index
-                
-        ## Add the IP addresses to the whois table if required:
-        self.dbh.execute("create table if not exists `whois` (`IP` INT UNSIGNED NOT NULL ,`country` VARCHAR( 4 ) NOT NULL ,`NetName` VARCHAR( 50 ) NOT NULL ,`whois_id` INT NOT NULL ,PRIMARY KEY ( `IP` )) COMMENT = 'A local case specific collection of whois information'")
 
-        for field_number in range(len(self.fields)):
-            if self.types[field_number] == 'IP Address':
-                ## FIXME: Resolving whois lookups is too
-                ## expensive. This needs to be moved to a different
-                ## report!!!. For now it disabled
-                continue
-                dbh2=self.dbh.clone()
-                #Handle for the pyflag db
-                dbh_pyflag = DB.DBO(None)
-                yield "Doing Whois lookup of column %s" % self.fields[field_number]
-                
-                self.dbh.execute("select `%s` as IP from %s group by `%s`", (
-                    self.fields[field_number],
-                    tablename,
-                    self.fields[field_number]))
-                for row in self.dbh:
-                    whois_id = Whois.lookup_whois(row['IP'])
-                    dbh_pyflag.execute("select * from whois where id=%r limit 1",(whois_id))
-                    row2=dbh_pyflag.fetch()
-                    try:
-                        dbh2.execute("insert into whois set IP=%r,country=%r,NetName=%r,whois_id=%r",(
-                            row['IP'],
-                            row2['country'],
-                            row2['netname'],
-                            whois_id))
-                    except DB.DBError:
-                        pass
+            if count % 1000:
+                yield "Loaded %s rows" % count
+
+        ## Now create indexes on the required fields
+        for i in self.fields:
+            try:
+                if i.index:
+                    dbh.check_index(tablename, i.sql)
+            except AttributeError:
+                pass
+
+        return
 
     def store(self, name):
         """ Stores the configured driver in the db.
@@ -227,19 +173,28 @@ class Log:
         """
         ## Clear stuff that is not relevant
         self.datafile = None
-        tmp=self.dbh
-        self.dbh=None
+        self.case=None
         data=pickle.dumps(self)
-        self.dbh=tmp
-        self.dbh.set_meta("log_preset", name,force_create=True)
-        self.dbh.set_meta("log_preset_%s" % name, data)
+        dbh = DB.DBO(self.case)
+        dbh.set_meta("log_preset", name,force_create=True)
+        dbh.set_meta("log_preset_%s" % name, data)
 
-    def display(self,query,result):
+    def display(self,table_name, result):
         """ This method is called to display the contents of the log
         file after it has been loaded
         """
+        ## Display the table if possible:
+        result.table(
+            ## We can calculate the elements directly from our field
+            ## list:
+            elements = [ f for f in self.fields if f ],
+            table = table_name,
+            case = self.case
+            )
 
-def get_loader(dbh,name,datafile="datafile"):
+        return result
+
+def get_loader(case ,name,datafile="datafile"):
     """ lookup and unpickle log object from the database, return loader object
 
     We also initialise the object to the datafile list of filenames to use.
@@ -247,46 +202,9 @@ def get_loader(dbh,name,datafile="datafile"):
     pydbh = DB.DBO(None)
     log=pickle.loads(pydbh.get_meta('log_preset_%s' % name))
     log.datafile = datafile
-    log.dbh = dbh
+    log.case = case
     return log
-    
-class Type:
-    """ This class represents translations between the way a column is stored in the database and the way it is displayed.
 
-    This is used by the log driver to store the data in the most efficient format in the database.
-    @cvar type: The database type this column should be created with.
-    """
-    type = None
-    sql_in="%r"
-    sql_out = "%s"
-    index = "%s"
-    
-class VarType(Type):
-    type = "varchar(250)"
-
-class IntType(Type):
-    type = "int"
-
-class TimeStampType(Type):
-    type = "timestamp"
-
-class TextType(Type):
-    type = "text"
-    index=None
-
-class IPType(Type):
-    """ IP addresses should be stored in the database as ints, but displayed in dot notation """
-    type = "int unsigned"
-    sql_in= "INET_ATON(%r)"
-    #sql_out= "INET_NTOA(%s)"
-    
-types = {
-    'varchar(250)': VarType,
-    'int': IntType,
-    'timestamp': TimeStampType,
-    'text': TextType,
-    'IP Address': IPType
-    }
-
-def render_whois_info(string,result=None):
-    return Whois.identify_network(string)
+def end(query,result):
+    query['log_preset'] = 'test'
+    result.refresh(0, query_type(log_preset=query['log_preset'], report="Load Preset Log File", family="Load Data"), pane='parent')

@@ -166,7 +166,7 @@ class MemoryScan(BaseScanner):
         buf = self.window + data
         self.process_buffer(buf)
         self.window = buf[-self.windowsize:]
-        self.offset+=len(data)-self.windowsize
+        self.offset += len(data) - len(self.window)
 
     def process_buffer(self,buf):
         """ This abstract method should implement the actual scanner.
