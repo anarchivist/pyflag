@@ -388,3 +388,14 @@ class FileSelectorTest(PopUpTest):
         result.heading("You have selected the following files:")
         for f in query.getarray('file'):
             result.row(f)
+
+from pyflag.FlagFramework import HexDump
+
+class HexDumpTest(Refresher):
+    """ Test the hexdumper widget """
+    name = "HexDump Test"
+    def display(self,query,result):
+        data = "this is a long test string. the quick brown fox jumped over the lazy cat. " * 3
+        h = HexDump(data, result)
+        result.heading("HexDump test")
+        h.dump(highlight=[[30,80,'highlight'], [40,50,'match']])

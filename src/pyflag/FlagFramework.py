@@ -618,13 +618,16 @@ class HexDump:
         self.data = data
         self.ui = ui
 
-    def dump(self,offset=0,limit=10240,base_offset=0,highlight=0,length=0):
+    def dump(self,offset=0,limit=10240,base_offset=0,highlight=[]):
         """ Dumps out the data.
 
         If a UI was specified in the constructor, we use it to display the data.
 
         @arg offset: The initial offset to use as the start of the data. Note that this is used to seek within the data given.
         @arg base_offset: An offset that will be added to the offset labels, but otherwise has no effect. Useful when data represents a chunk from a larger data set.
+
+        @arg highlight: This is a list of lists denoting highlighting regions. Each region is a list consisting of [offset, length, color]. 
+        
         @return: A string having the hex dump in it.
         """
         result = ''
@@ -633,6 +636,18 @@ class HexDump:
         char_format = "%02x "
         text_format = "   %s"
         initial_offset=offset
+
+        def find_highlights(off):
+            """ Searches the highlight list and returns the color
+            which offset should be rendered in. Returns None if no
+            color is needed.
+            """
+            result = None
+            for offset, length, color in highlight:
+                if off > offset and offset + length > off:
+                    result = color
+                    
+            return result
 
         #Do the headers:
         result += ' ' * len(offset_format % 0)
@@ -653,10 +668,13 @@ class HexDump:
 
             for offset in range(tmp_offset,tmp_offset+self.width):
                 try:
-                    if offset>=highlight and offset<highlight+length:
-                        ui.text(char_format % ord(self.data[offset]),color='black',font='typewriter',highlight=1)  
+                    color = find_highlights(offset)
+                    if color:
+                        ui.text(char_format % ord(self.data[offset]),
+                                color='black',font='typewriter',highlight=color)  
                     else:
-                        ui.text(char_format % ord(self.data[offset]),color='black',font='typewriter')  
+                        ui.text(char_format % ord(self.data[offset]),color='black',font='typewriter')
+                        
                     result += char_format % ord(self.data[offset])
                 except IndexError:
                     ui.text("   ")
@@ -664,17 +682,17 @@ class HexDump:
                     finished = 1
 
             for offset in range(tmp_offset,tmp_offset+self.width):
-                if offset>=highlight and offset<highlight+length:
-                    highlight_flag=1
-                else:
-                    highlight_flag=0
+                args = dict(font='typewriter',sanitise='full',color='red')
+                color = find_highlights(offset)
+                if offset:
+                    args['highlight'] = color
                     
                 try:
                     if 32 < ord(self.data[offset]) < 127:
-                        ui.text(self.data[offset],color='red',font='typewriter',sanitise='full',highlight=highlight_flag)
+                        ui.text(self.data[offset],**args)
                         result+=self.data[offset]
                     else:
-                        ui.text('.',color='red',font='typewriter',sanitise='full',highlight=highlight_flag)
+                        ui.text('.',**args)
                         result+='.'
                 except IndexError:
                     finished = 1

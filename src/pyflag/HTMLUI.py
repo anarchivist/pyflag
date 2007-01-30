@@ -1180,7 +1180,7 @@ class HTMLUI(UI.GenericUI):
                     d = d.replace("\t","    ")
 
             if options.has_key('highlight') and options['highlight']:
-                self.result += "%s<span class='hilight'>%s</span>" % (format,d)
+                self.result += "%s<span class='%s'>%s</span>" % (format,options['highlight'],d)
             else:
                 self.result += "%s%s" % (format,d)
 

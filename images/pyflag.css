@@ -277,8 +277,14 @@ iframe#right {
   height: 95%;
 }
 
-.hilight { 
+/** General purpose highlighting */
+.hilight, .highlight { 
   background-color: pink;
+}
+
+/** Matches are highlighted here */
+.match { 
+  background-color: yellow;
 }
 
 h1 { 
