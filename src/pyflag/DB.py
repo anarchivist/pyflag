@@ -575,7 +575,7 @@ class DBO:
                 self.mass_insert_cache[k]={ self.mass_insert_row_count: v}
 
         self.mass_insert_row_count+=1
-        if self.mass_insert_row_count > 100:
+        if self.mass_insert_row_count > config.MASS_INSERT_THRESHOLD:
             self.mass_insert_commit()
             self.mass_insert_start(self.mass_insert_table, _fast=self.mass_insert_fast)
 

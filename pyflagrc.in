@@ -11,6 +11,9 @@ PYFLAG_DBPORT=3306
 PYFLAG_DBUNIXSOCKET=/var/run/mysqld/mysqld.sock  
 PYFLAG_STRICTSQL=0
 
+## This is the number of rows where the mass insert buffer will be flushed.
+PYFLAG_MASS_INSERT_THRESHOLD=300
+
 #Default flag database
 PYFLAG_FLAGDB=pyflag
 

@@ -77,7 +77,7 @@ class LoadPresetLog(Reports.report):
             pass
 
         if not self.progress_str:
-            dbh = self.DBO(query['case'])
+            dbh = DB.DBO(query['case'])
             dbh.execute("select count(*) as count from %s_log", (query['table']))
             tmp = dbh.fetch()
             try:
@@ -102,7 +102,7 @@ class LoadPresetLog(Reports.report):
 ##            result.textfield("OR Enter New table name:","new_table")
             result.textfield("Table name:","table")
 
-            dbh = self.DBO(query['case'])
+            dbh = DB.DBO(query['case'])
             tmp = self.ui(result)
             tmp.filebox()
             result.row("Select file to load:",tmp)
@@ -150,11 +150,11 @@ class LoadPresetLog(Reports.report):
         for progress in log.load('%s_log' % query['table']):
             self.progress_str = progress
             
-        dbh.execute("INSERT INTO meta set property='logtable', value='%s'" ,(query['table']))
-        dbh.execute("INSERT INTO meta set property='log_preset_%s', value='%s'",(query['table'],query['log_preset']))
+        dbh.insert("meta", property='logtable', value=query['table'])
+        dbh.insert("meta", property='log_preset_%s' % query['table'], value=query['log_preset'])
 
     def reset(self, query):
-        dbh = self.DBO(query['case'])
+        dbh = DB.DBO(query['case'])
         # decide on table name
         if query.has_key('new_table'):
             del query['table']
@@ -201,9 +201,9 @@ class LoadIOSource(Reports.report):
     def analyse(self,query):
         # cache serialised io options in the case mata table
         fd=IO.IOFactory(query)
-        dbh = self.DBO(query['case'])
-        dbh.execute("insert into meta set property=%r,value=%r", ('iosource',query['iosource']))
-        dbh.execute("insert into meta set property=%r,value=%r",(query['iosource'],fd.get_options()))
+        dbh = DB.DBO(query['case'])
+        dbh.insert("meta", property='iosource', value=query['iosource'])
+        dbh.insert("meta", property=query['iosource'],value=fd.get_options())
 
     def display(self,query,result):
         result.refresh(0, FlagFramework.query_type((), case=query['case'], family="Load Data", report="LoadFS", iosource=query['iosource']))
@@ -483,7 +483,7 @@ class LoadFS(Reports.report):
 
     def analyse(self,query):
         """ load the filesystem image data into the database """
-        dbh = self.DBO(query['case'])
+        dbh = DB.DBO(query['case'])
         self.progress_str=None
 
         # call on FileSystem to load data
@@ -511,7 +511,7 @@ class LoadFS(Reports.report):
                        
     def progress(self,query,result):
         result.heading("Uploading filesystem image to case %s" % query['case'])
-        dbh = self.DBO(query['case'])
+        dbh = DB.DBO(query['case'])
         tablename=dbh.MakeSQLSafe(query['iosource'])
         if self.progress_str:
             result.text(self.progress_str)
@@ -537,7 +537,7 @@ class LoadFS(Reports.report):
             pass
 
     def reset(self,query):
-        dbh = self.DBO(query['case'])
+        dbh = DB.DBO(query['case'])
         tablename = dbh.MakeSQLSafe(query['iosource'])
         fsobj=Registry.FILESYSTEMS.filesystems[query['fstype']](query['case'],tablename,query['iosource'])
         fsobj.delete()

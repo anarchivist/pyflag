@@ -287,6 +287,7 @@ class DataPreview(OffsetType):
     def __init__(self, name='', column='', fsfd=None):
         self.name = name
         self.column = column
+        self.sql = column
         self.fsfd = fsfd
 
     def display(self, length, row, result):

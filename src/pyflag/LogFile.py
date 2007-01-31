@@ -121,6 +121,7 @@ class Log:
         ## column types for their create clause:
         dbh = DB.DBO(self.case)
         dbh.cursor.ignore_warnings = True
+        dbh.mass_insert_start(tablename, _fast=True)
 
         fields = [ x for x in self.fields if x]
         if len(fields)==0:
@@ -136,23 +137,24 @@ class Log:
         for fields in self.get_fields():
             count += 1
 
-            args = dict(_fast=True)
+            args = dict()
             for i in range(len(self.fields)):
                 try:
                     key, value = self.fields[i].insert(fields[i])
                     args[key] = value
-                except AttributeError:
+                except (IndexError,AttributeError):
                     pass
                 
             if args:
-                dbh.insert(tablename, **args)
+                dbh.mass_insert( **args)
             
             if rows and count > rows:
                 break
 
-            if count % 1000:
+            if not count % 1000:
                 yield "Loaded %s rows" % count
 
+        dbh.mass_insert_commit()
         ## Now create indexes on the required fields
         for i in self.fields:
             try:
@@ -205,6 +207,9 @@ def get_loader(case ,name,datafile="datafile"):
     log.case = case
     return log
 
+## Some common callbacks which log drivers might need:
 def end(query,result):
+    """ This is typically the last wizard callback - we just refresh
+    into the load preset log file report"""
     query['log_preset'] = 'test'
     result.refresh(0, query_type(log_preset=query['log_preset'], report="Load Preset Log File", family="Load Data"), pane='parent')

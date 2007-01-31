@@ -26,22 +26,22 @@ import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 from pyflag.TableObj import TimestampType, IntegerType, StringType, IPType
 import pyflag.Reports as Reports
+import pyflag.conf
+config=pyflag.conf.ConfObject()
 
 class IISLog(Simple.SimpleLog):
     """ Log parser for IIS (W3C Extended) log files """
     name = "IIS Log"
     
     def __init__(self, case=None):
-        Simple.SimpleLog.__init__(self)
+        Simple.SimpleLog.__init__(self, case)
         self.separators = []
         self.types = []
         self.trans = []
-        self.indexes = []
         self.fields = []
         self.format = ''
         self.split_req = ''
         self.num_fields = 1
-
 
     def parse(self, query, datafile='datafile'):
 
@@ -121,3 +121,31 @@ class IISLog(Simple.SimpleLog):
             FlagFramework.Curry(LogFile.save_preset, log=self),
             LogFile.end,
             ))
+
+### Some unit tests for IIS loader:
+import unittest, time
+from pyflag.FlagFramework import query_type
+
+class IISLogTest(unittest.TestCase):
+    """ IIS Log file processing """
+    test_case = "PyFlagTestCase"
+    test_table = "TestTable"
+
+    def test01LoadFile(self):
+        """ Test that IIS Log files can be loaded """
+        dbh = DB.DBO(self.test_case)
+        dbh.drop(self.test_table)
+        log = IISLog(case=self.test_case)
+        log.parse(query_type( datafile = "%s/pyflag_iis_standard_log" % config.UPLOADDIR))
+        t = time.time()
+        ## Load the data:
+        for a in log.load(self.test_table):
+            #print a
+            pass
+
+        print "Took %s seconds to load log" % (time.time()-t)
+
+        ## Check that all rows were uploaded:
+        dbh.execute("select count(*) as c from %s", self.test_table)
+        row = dbh.fetch()
+        self.assertEqual(row['c'], 8334)

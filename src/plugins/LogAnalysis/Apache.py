@@ -25,6 +25,9 @@ import plugins.LogAnalysis.Simple as Simple
 import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 import re
+from pyflag.TableObj import IPType, TimestampType, StringType, IntegerType
+import pyflag.conf
+config=pyflag.conf.ConfObject()
 
 def trans_date(time):
     """ convert time from apache ([01/Oct/2001:04:09:20 -0400]) to mysql (2001/10/01:04:09:20) """
@@ -46,37 +49,38 @@ formats = { 'debian_full':"%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Ag
             'debian_agent':"%{User-agent}i"}
 
 # The apache field codes, taken from apache2 documentation
-field_codes={ 'a':['remote_ip', 'IP Address'],
-              'A':['local_ip', 'IP Address'],
-              'B':['rsize', 'int'],
-              'b':['rsize_inc_headers', 'int'],
-              'C':['cookie', 'varchar(250)'], # proceeded by {Foobar}
-              'D':['srv_time', 'int'],
-              'e':['env', 'varchar(250)'], # proceeded by {Foobar}
-              'f':['filename', 'varchar(250)'],
-              'h':['rhost', 'IP Address'],
-              'H':['rprotocol', 'varchar(250)'],
-              'i':['header', 'varchar(250)'],
-              'l':['rlogname', 'varchar(250)'],
-              'm':['rmethod', 'varchar(250)'],
-              'n':['modnote', 'varchar(250)'], # proceeded by {Foobar}
-              'o':['reheader', 'varchar(250)'], # proceeded by {Foobar}
-              'p':['sport', 'int'],
-              'P':['child_pid', 'int'], # {pid|tid}
-              'q':['query_string', 'varchar(250)'],
-              'r':['request', 'varchar(250)'],
-              's':['status', 'int'],
-              't':['time', 'timestamp', trans_date ], # {strftime format} (optional)
-              'T':['serve_time', 'int'],
-              'u':['ruser', 'varchar(250)'],
-              'U':['url', 'varchar(250)'],
-              'v':['server_name', 'varchar(250)'],
-              'V':['server_name_config', 'varchar(250)'],
-              'X':['conn_aborted', 'varchar(250)'],
-              '+':['conn_keptalive', 'varchar(250)'],
-              '-':['conn_closedection', 'varchar(250)'],
-              'I':['rbytes', 'int'],
-              'O':['sbytes', 'int']}
+## Format of each list: [column name, ColumnType class, translation function, index (true/false)]
+field_codes={ 'a':['remote_ip', IPType, None, True],
+              'A':['local_ip', IPType],
+              'B':['rsize', IntegerType],
+              'b':['rsize_inc_headers', IntegerType],
+              'C':['cookie', StringType], # proceeded by {Foobar}
+              'D':['srv_time', IntegerType],
+              'e':['env', StringType], # proceeded by {Foobar}
+              'f':['filename', StringType, None, True],
+              'h':['rhost', IPType, None, True],
+              'H':['rprotocol', StringType],
+              'i':['header', StringType],
+              'l':['rlogname', StringType],
+              'm':['rmethod', StringType, None, True],
+              'n':['modnote', StringType], # proceeded by {Foobar}
+              'o':['reheader', StringType], # proceeded by {Foobar}
+              'p':['sport', IntegerType],
+              'P':['child_pid', IntegerType], # {pid|tid}
+              'q':['query_string', StringType, None, True],
+              'r':['request', StringType],
+              's':['status', IntegerType, None, True],
+              't':['time', TimestampType, trans_date , True], # {strftime format} (optional)
+              'T':['serve_time', IntegerType],
+              'u':['ruser', StringType],
+              'U':['url', StringType, None, True],
+              'v':['server_name', StringType],
+              'V':['server_name_config', StringType],
+              'X':['conn_aborted', StringType],
+              '+':['conn_keptalive', StringType],
+              '-':['conn_closedection', StringType],
+              'I':['rbytes', IntegerType],
+              'O':['sbytes', IntegerType]}
 
 # most fields can also have modifiers, these are either:
 # 1. optional "!" (meaning NOT) followed by a comma separated list of status codes for which the field will be logged (else log entry will just be '-')
@@ -105,14 +109,10 @@ def legend(query, result):
 class ApacheLog(Simple.SimpleLog):
     """ Log parser for apache log files """
     name = "Apache Log"
-
-
+    
     def __init__(self, case=None):
-        Simple.SimpleLog.__init__(self)
+        Simple.SimpleLog.__init__(self,case)
         self.separators = []
-        self.types = []
-        self.trans = []
-        self.indexes = []
         self.fields = []
         self.format = ''
         self.split_req = ''
@@ -140,28 +140,13 @@ class ApacheLog(Simple.SimpleLog):
                 self.format = newformat
         
         self.num_fields = 1
-        ## If this object was called with an unknown number of fields
-        ## we work it out. Note that we may not have all the
-        ## consecutive fields defined:
-        for k in query.keys():
-            if k.startswith('field'):
-                number=int(k[len('field'):])
-                if number>self.num_fields:
-                    #We need to set all this stuff
-                    self.num_fields=number
-                    
-        self.separators = []
-        self.types = []
-        self.trans = []
-        self.indexes = []
-        self.fields = []
+        self.fields = [ ] 
 
         done = 0
         while 1:
             idx = self.format.find('%', done)
             if idx == -1:
                 # at end now
-                #self.separators.append(
                 break
             idx += 1
 
@@ -180,17 +165,25 @@ class ApacheLog(Simple.SimpleLog):
             for f in field_codes:
                 if self.format[idx] == f:
                     try:
-                        self.fields.append("%s_%s" % (varname.lower(), field_codes[f][0]))
-                        del varname
+                        name = "%s_%s" % (varname.lower(), field_codes[f][0])
                     except UnboundLocalError:
-                        self.fields.append(field_codes[f][0])
+                        name = field_codes[f][0]
 
-                    self.types.append(field_codes[f][1])
-                    self.indexes.append(True)
+                    field = field_codes[f][1](name=name, column=name)
+
+                    ## Install translation function:
                     try:
-                        self.trans.append(field_codes[f][2])
+                        field.trans = field_codes[f][2]
                     except IndexError:
-                        self.trans.append('')
+                        field.trans = None
+
+                    ## Install indexes if needed:
+                    try:
+                        field.index = field_codes[f][3]
+                    except IndexError:
+                        field.index = False
+
+                    self.fields.append(field)
                     break
 
             # skip up to the next '%'
@@ -198,19 +191,29 @@ class ApacheLog(Simple.SimpleLog):
             if done == -1:
                 self.separators.append(self.format[idx+1:])
             else:
-                            self.separators.append(self.format[idx+1:done])
+                self.separators.append(self.format[idx+1:done])
+
+        ## Now check that the right number of fields are provided:
+        row_size=0
+        count = 0
+        for row in self.get_fields():
+            if row_size < len(row):
+                row_size = len(row)
+            count +=1
+            if count>10:
+                break
+
+        ## And truncate the fields list to match the input file
+        self.fields = self.fields[:row_size]
 
         self.set_ignore_fields(query)
 
     def set_ignore_fields(self,query):
-
         # should any fields be ignored?
         for n in range(len(self.fields)):
             try:
                 if query['ignore%s' % n] == 'true':
-                    print "ignoring"
-                    self.fields[n] = 'ignore'
-                    self.indexes[n] = False
+                    self.fields[n] = None
             except KeyError:
                 pass
         
@@ -225,23 +228,26 @@ class ApacheLog(Simple.SimpleLog):
             for sep in self.separators:
                 idx2 = row.find(sep, idx)
                 # the last sep will be ''
-                if idx2 == idx:
-                    idx2 = len(row)
-                f = row[idx:idx2]
+                if idx2<0:
+                    arr.append(row[idx:])
+                    break
+                
+                arr.append(row[idx:idx2])
                 idx = idx2 + len(sep)
-                arr.append(f)
-            for i in range(len(arr)):
-                if self.trans[i] != '':
-                    arr[i] = self.trans[i](arr[i])
-            yield arr
 
-    
+            ## Do we require translation?
+            for i in range(len(arr)):
+                try:
+                    arr[i] = self.fields[i].trans(arr[i])
+                except:
+                    pass
+                    
+            yield arr
 
     def form(self,query,result):
         """ This draws the form required to fulfill all the parameters for this report
         """
         def configure(query, result):
-            
             result.start_table(hstretch=False)
             result.const_selector("Choose Format String", 'format', formats.values(), formats.keys())
             result.ruler()
@@ -267,18 +273,18 @@ class ApacheLog(Simple.SimpleLog):
             result.start_table()
             result.heading("Select Options:")
             result.row("Select Fields to ignore:")
-            print "self.fields: %s" % self.fields
             for i in range(len(self.fields)):
-                result.checkbox(self.fields[i], 'ignore%s' % i, 'true') 
+                try:
+                    result.checkbox(self.fields[i].name, 'ignore%s' % i, 'true')
+                except: pass
             result.end_table()
 
             #self.draw_type_selector(result)
 
         def test(query,result):
             self.parse(query)
-            print "self.fields: %s" % self.fields
-            result.text("The following is the result of importing the first few lines from the log file into the database.\nPlease check that the importation was successfull before continuing.",wrap='full')
-            self.display_test_log(result,query)
+            result.text("The following is the result of importing the first few lines from the log file into the database.\nPlease check that the importation was successfull before continuing.")
+            self.display_test_log(result)
             return True
 
         result.wizard(
@@ -287,7 +293,42 @@ class ApacheLog(Simple.SimpleLog):
             "Step 2: Select Format String",
             "Step 3: Select Options",
             "Step 4: View test result",
-            "Step 5: Save Preset"),
-            callbacks = (LogFile.get_file, configure, extra_options, test, FlagFramework.Curry(LogFile.save_preset, log=self))
-            )
+            "Step 5: Save Preset",
+            "Step 6: End",
+            ),
+            callbacks = (
+            LogFile.get_file,
+            configure,
+            extra_options,
+            test,
+            FlagFramework.Curry(LogFile.save_preset, log=self),
+            LogFile.end,
+            ))
 
+### Some unit tests for IIS loader:
+import unittest, time
+from pyflag.FlagFramework import query_type
+
+class ApacheLogTest(unittest.TestCase):
+    """ Apache Log file processing """
+    test_case = "PyFlagTestCase"
+    test_table = "TestTable"
+
+    def test01LoadFile(self):
+        """ Test that Apache Log files can be loaded """
+        dbh = DB.DBO(self.test_case)
+        dbh.drop(self.test_table)
+        log = ApacheLog(case=self.test_case)
+        log.parse(query_type(formats['debian_common'],
+                             datafile = "%s/pyflag_apache_standard_log" % config.UPLOADDIR))
+        t = time.time()
+        ## Load the data:
+        for a in log.load(self.test_table):
+            print a
+
+        print "Took %s seconds to load log" % (time.time()-t)
+
+        ## Check that all rows were uploaded:
+        dbh.execute("select count(*) as c from %s", self.test_table)
+        row = dbh.fetch()
+        self.assertEqual(row['c'], 10000)
