@@ -1,30 +1,3 @@
-""" Implements a Pyflag filesystem driver for processing of pcap files.
-
-When a pcap file is loaded into a case, we create a virtual file in
-the VFS called '/rawdata' at the root directory. This file will be
-scanned by the scanners. The scanners will use the PCAPFile object to
-read this file. We use an inode driver specifier of 'p' for this
-special file.
-
-The PCAPFile driver is a little unusual:
-
-- seek(offset). Offset is interpreted as a packet id, seeking to that packet will cause read to return it. Note that packet ids are incremental integers.
-
-- read(length): Causes the current packet to be read. Note that we only return a single packet, even if we return a short read.
-
-The effect of this interface is that you can not assume:
-
-fd.seek(x)
-y=fd.read(1000)
-fd.tell != x+y != x+1000
-
-Further (fd.read(length)<length) does not indicate the end of
-file. The end of file is always indicated by fd.read(length)==0. This
-is a common misconception that is fueled by the fact that regular file
-reads never return less data than is available and requested. However
-this is common on sockets, so code should always be testing for a zero
-return.
-"""
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
@@ -45,6 +18,13 @@ return.
 # * along with this program; if not, write to the Free Software
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
+""" Implements a Pyflag filesystem driver for processing of pcap files.
+
+When a pcap file is loaded into a case, the reassembler creates
+virtual inodes for each stream. These streams are then scanned by
+protocol handlers to create more virtual inodes for each
+protocol. (e.g. HTTP objects, Emails etc).
+"""
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
 import pyflag.conf
@@ -566,3 +546,34 @@ class NetworkingSummary(Reports.report):
                 )
         except DB.DBError,args:
             result.para("No networking tables found, you probably haven't run the correct scanners: %s" % args)
+
+
+## UnitTests:
+import unittest
+import pyflag.pyflagsh as pyflagsh
+from pyflag.FileSystem import DBFS
+
+class NetworkForensicTests(unittest.TestCase):
+    """ Tests network forensics """
+    test_case = "PyFlagNetworkTestCase"
+    def test01LoadFilesystem(self):
+        """ Test that pcap files can be loaded """
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Case Management.Remove case",'remove_case=%s' % self.test_case])
+        
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Case Management.Create new case",'create_case=%s' % self.test_case])
+
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
+                                   "iosource=pcap",
+                                   "subsys=advanced",
+                                   "io_filename=%s/stdcapture_0.2.pcap" % config.UPLOADDIR,
+                                   ])
+        
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,
+                                   "iosource=pcap",
+                                   "fstype=PCAP Filesystem",
+                                   "mount_point=/stdcapture/"])
+

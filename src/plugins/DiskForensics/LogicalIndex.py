@@ -270,7 +270,7 @@ class OffsetType(IntegerType):
     def display(self, offset, row, result):
         result = result.__class__(result)
         inode = self.fsfd.lookup(inode_id=row['Inode'])
-        
+
         query = query_type(case=self.fsfd.case,
                            family="Disk Forensics",
                            report='ViewFile',

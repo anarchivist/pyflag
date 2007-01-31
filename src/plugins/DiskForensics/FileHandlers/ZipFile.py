@@ -204,10 +204,6 @@ class ZipFile(File):
         ## up... This causes our input fd to be disk cached
         fd.cache()
 
-        ## If we are already cached on disk, we dont need to
-        ## decompress anything
-        if self.cached_fd: return
-
         ## Initialise our internal variables:
         self.seek(0)
 

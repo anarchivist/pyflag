@@ -644,7 +644,7 @@ class HexDump:
             """
             result = None
             for offset, length, color in highlight:
-                if off > offset and offset + length > off:
+                if off >= offset and offset + length > off:
                     result = color
                     
             return result

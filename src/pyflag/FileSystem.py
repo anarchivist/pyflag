@@ -681,10 +681,10 @@ class File:
 
     def hexdump(self, query,result):
         """ Show the hexdump for the file."""
-        highlight=0
+        match=0
         length=0
         try:
-            highlight=int(query['highlight'])
+            match=int(query['highlight'])
             length=int(query['length'])
         except:
             pass
@@ -693,7 +693,8 @@ class File:
 
         def hexdumper(offset,data,result):
             dump = FlagFramework.HexDump(data,result)
-            dump.dump(base_offset=offset,limit=max,highlight=highlight-offset,length=length)
+            highlight = [[match-offset, length, 'match'],]
+            dump.dump(base_offset=offset,limit=max,highlight=highlight)
 
         return self.display_data(query,result, max, hexdumper)
 
