@@ -535,7 +535,10 @@ class IRCScanner(StreamScannerFactory):
         
         combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.con_id, stream.reverse)
         ## Check to see if this is an IRC stream at all:
-        fd = self.fsfd.open(inode=combined_inode)
+        try:
+            fd = self.fsfd.open(inode=combined_inode)
+        except IOError: return
+        
         irc=IRC(fd)
         if not irc.identify():
             return
@@ -597,3 +600,22 @@ class BrowseIRCChat(Reports.report):
             table = "irc_messages join pcap on packet_id=pcap.id" ,
             case = query['case']
             )
+
+
+## UnitTests:
+import unittest
+import pyflag.pyflagsh as pyflagsh
+from pyflag.FileSystem import DBFS
+
+class IRCTests(unittest.TestCase):
+    """ Tests IRC Scanner """
+    test_case = "PyFlagNetworkTestCase"
+    order = 21
+    def test01IRCScanner(self):
+        """ Test IRC Scanner """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env,
+                             command="scan",
+                             argv=["*",                   ## Inodes (All)
+                                   "IRCScanner",
+                                   ])                   ## List of Scanners

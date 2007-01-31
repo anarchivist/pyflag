@@ -395,83 +395,89 @@ class DBO:
         """
         ## Expire the cache if needed
         self.start_transaction()
-        self.execute("select * from sql_cache where timestamp < date_sub(now(), interval %r minute) for update", config.DBCACHE_AGE)
-        tables = [ row['id'] for row in self]
-        for table_id in tables:
-            self.execute("delete from sql_cache where id = %r" , table_id)
-            self.execute("drop table if exists cache_%s" , table_id)
-
-        self.execute("commit")
+        try:
+            self.execute("select * from sql_cache where timestamp < date_sub(now(), interval %r minute) for update", config.DBCACHE_AGE)
+            tables = [ row['id'] for row in self]
+            for table_id in tables:
+                self.execute("delete from sql_cache where id = %r" , table_id)
+                self.execute("drop table if exists cache_%s" , table_id)
+                
+        finally:
+            self.execute("commit")
 
         ## Try to find the query in the cache. We need a cache which
         ## covers the range we are interested in: This will lock the
         ## row while we generate its underlying cache table:
         self.start_transaction()
-        self.execute("""select * from sql_cache where query = %r and `limit` <= %r and `limit` + `length` >= %r for update""", (sql, limit, limit + length))
-        row = self.fetch()
-        
-        if row:            
-            ## Return the query:
-            self.execute("update sql_cache set timestamp=now() where id=%r ",
-                         row['id'])
-
-            cache_limit = row['limit']
-
-            ## This releases the lock and allows other threads to have
-            ## a go
-            self.execute("commit")
-
-            ## If we fail to return the table (probably because the
-            ## cache table disappeared) we simply continue on to make
-            ## a new one:
-            try:
-                return self.execute("select * from cache_%s limit %s,%s",
-                                    (row['id'], limit - cache_limit, length))
-            except DBError:
-                pass
-
-        ## Query is not in cache - create a new cache entry: We create
-        ## the cache centered on the required range - this allows
-        ## quick paging forward and backwards.
-        lower_limit = max(limit - config.DBCACHE_LENGTH/2,0)
-
-        ## Determine which tables are involved:
-        self.execute("explain %s", sql)
-        tables = [ row['table'] for row in self ]
-        if not tables or tables[0]==None:
-            return self.execute(sql)
-
-        self.insert('sql_cache',
-                    query = sql, _timestamp='now()',
-                    tables = ",%s," % ','.join(tables),
-                    limit = lower_limit,
-                    length = config.DBCACHE_LENGTH,
-                    _fast = True
-                    )
-
-        ## Create the new table
-        id = self.autoincrement()
-        
-        ## Lock the new row - this avoids the race above because other
-        ## threads are forced to wait until we finish here:
-        self.execute("select * from sql_cache where id=%r  limit 1 for update", id)
-
-        ## This is needed to flush the SS buffer (we do not want to go
-        ## out of sync here..)
-        self.fetch()
-        
-        ## This could take a little while on a loaded db:
         try:
-            self.execute("create table cache_%s %s limit %s,%s",
-                         (id,sql, lower_limit, config.DBCACHE_LENGTH))
-        except:
-            ## Oops the table already exists (should not happen)
-            self.execute("drop table cache_%s",id )
-            self.execute("create table cache_%s %s limit %s,%s",
-                         (id,sql, lower_limit, config.DBCACHE_LENGTH))
+            self.execute("""select * from sql_cache where query = %r and `limit` <= %r and `limit` + `length` >= %r for update""", (sql, limit, limit + length))
+            row = self.fetch()
+
+            if row:            
+                ## Return the query:
+                self.execute("update sql_cache set timestamp=now() where id=%r ",
+                             row['id'])
+
+                cache_limit = row['limit']
+
+                ## This releases the lock and allows other threads to have
+                ## a go
+                self.execute("commit")
+
+                ## If we fail to return the table (probably because the
+                ## cache table disappeared) we simply continue on to make
+                ## a new one:
+                try:
+                    return self.execute("select * from cache_%s limit %s,%s",
+                                        (row['id'], limit - cache_limit, length))
+                except DBError:
+                    pass
+
+            ## Query is not in cache - create a new cache entry: We create
+            ## the cache centered on the required range - this allows
+            ## quick paging forward and backwards.
+            lower_limit = max(limit - config.DBCACHE_LENGTH/2,0)
+
+            ## Determine which tables are involved:
+            self.execute("explain %s", sql)
+            tables = [ row['table'] for row in self ]
+            if not tables or tables[0]==None:
+                self.execute(sql)
+                return 
+                
+            self.insert('sql_cache',
+                        query = sql, _timestamp='now()',
+                        tables = ",%s," % ','.join(tables),
+                        limit = lower_limit,
+                        length = config.DBCACHE_LENGTH,
+                        _fast = True
+                        )
+
+            ## Create the new table
+            id = self.autoincrement()
+
+            ## Lock the new row - this avoids the race above because other
+            ## threads are forced to wait until we finish here:
+            self.execute("select * from sql_cache where id=%r  limit 1 for update", id)
             
-        ## Now release the lock.
-        self.execute("commit")
+            ## This is needed to flush the SS buffer (we do not want to go
+            ## out of sync here..)
+            self.fetch()
+
+            ## This could take a little while on a loaded db:
+            try:
+                self.execute("create table cache_%s %s limit %s,%s",
+                             (id,sql, lower_limit, config.DBCACHE_LENGTH))
+            except:
+                ## Oops the table already exists (should not happen)
+                self.execute("drop table cache_%s",id )
+                self.execute("create table cache_%s %s limit %s,%s",
+                             (id,sql, lower_limit, config.DBCACHE_LENGTH))
+
+        except:
+        ## Make sure the lock is released if we raise
+            self.execute("commit")
+            raise
         
         return self.execute("select * from cache_%s limit %s,%s",
                             (id,limit - lower_limit,length))

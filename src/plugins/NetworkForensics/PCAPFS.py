@@ -524,8 +524,8 @@ class NetworkingSummary(Reports.report):
 
         def msn(query,output):
             output.table(
-                elements = [ IntegerType('Number of MSN Messages', 'count(inode)') ],
-                table='msn_messages',
+                elements = [ IntegerType('Number of MSN Messages', sql='count(inode)') ],
+                table='msn_session',
                 case=query['case']
                 )
             return output
