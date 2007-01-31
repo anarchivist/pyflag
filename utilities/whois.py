@@ -31,8 +31,6 @@ import plugins.LogAnalysis.Whois as Whois
 import pyflag.DB as DB
 import textwrap
 
-pyflaglog.start_log_thread()
-
 parser = OptionParser(usage = """%prog [options] [ip_address]
 
 This will resolve the ip address against the internal offline database loaded into pyflag.
@@ -42,6 +40,7 @@ parser.add_option("-f", "--file", default=None,
                   help = "A file to read addresses from (one per line)")
 
 (options, args) = parser.parse_args()
+pyflaglog.start_log_thread()
 
 dbh = DB.DBO()
 def print_address(address):

@@ -336,11 +336,10 @@ for url in urls:
 
   whois_sources_id+=1
   
-#  dbh.execute("INSERT INTO whois_sources VALUES (0, %r, %r, %r);", (db.source, url, db.date))
-#  source_id = dbh.cursor.lastrowid
-  
   # process records
   for rec in db:
+    ## Get a new whois_id number:
+    whois_id += 1
     dbh.mass_insert(
       src_id = whois_sources_id,
       start_ip = "%u" % rec.start_ip,
@@ -353,8 +352,6 @@ for url in urls:
       descr = rec.descr,
       remarks = rec.remarks,
       status = rec.status)  
-
-    whois_id += 1
 
     #now process the networks (routes)...
     # split into networks on bit boundaries

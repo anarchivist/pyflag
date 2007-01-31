@@ -138,3 +138,30 @@ class LookupWhoisID(LookupIP):
         result.heading("Whois Search Results")
         self.display_whois(query,result,int(query['id']))
 
+### Some unit tests for Whois:
+import unittest
+
+## These are some test ip addresses - were confirmed using the on-line
+## whois tool. More can be added in the following format:
+## [ Domain, IP, NETNAME ]
+test_ips = [
+    ## These come from APNIC (Asia Pacific):
+    ["www.msn.com.au",       '202.58.56.1', "HOSTWORKS"], 
+    ["www.microsoft.com.au", "202.139.232.157", "WEBCENTRAL"],
+
+    ## These come from RIPE (Europe)
+    ["www.microsoft.co.uk", "217.64.231.177", "microsoft-com"],
+    ["www.germnews.de",     "217.10.9.47",    "IN-ULM-NET2"],
+    ]
+
+class WhoisTest(unittest.TestCase):
+    """ Whois tests (Requires Whois DB to be loaded) """
+    def test01TestCommonWhoisQueries(self):
+        """ Test some well known IP addresses """
+        dbh = DB.DBO()
+        dbh.delete("whois_cache", where=1)
+        for domain, ip, netname in test_ips:
+            id = lookup_whois(ip)
+            dbh.execute("select netname from whois where id=%r", id)
+            row = dbh.fetch()
+            self.assertEqual(netname, row['netname'])
