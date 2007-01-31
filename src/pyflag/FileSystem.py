@@ -700,9 +700,9 @@ class File:
             highlight = [[match-offset, length, 'match'],]
             dump.dump(base_offset=offset,limit=max,highlight=highlight)
 
-        return self.display_data(query,result, max, hexdumper)
+        return self.display_data(query,result, max, hexdumper, slack=True)
 
-    def display_data(self, query,result,max,cb):
+    def display_data(self, query,result,max,cb, slack=False):
         """ Displays the data.
         
         The callback takes care of paging the data from self. The callback cb is used to actually render the data:
@@ -717,8 +717,13 @@ class File:
         except KeyError:
             limit=0
 
+        oldslack = self.slack
+        self.slack = slack
+
         self.seek(limit)
         data = self.read(max+1)
+
+        self.slack = oldslack
 
         ## We try to use our own private toolbar if possible:
         toolbar_id = result.new_toolbar()
