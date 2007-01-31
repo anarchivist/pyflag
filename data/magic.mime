@@ -15,5 +15,6 @@
 0       string          \037\213        	 application/x-gzip; foobar
 
 # A better RFC2822 detector
-20    regex/c       ^MIME-Version:          message/rfc822      
-20    regex/c      ^From:.+<.+@.+>                    message/rfc822
+20    regex/c       ^MIME-Version:     		message/rfc822      
+20    regex/c      ^From:.+<.+@.+>              message/rfc822
+

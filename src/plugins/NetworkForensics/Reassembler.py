@@ -104,6 +104,11 @@ class StreamFile(File):
         @return the new stream id.
         """
         if len(stream_ids)<2: return
+
+        ## If any stream_ids are negative they are already combined:
+        for x in stream_ids:
+            if x<0:
+                raise IOError("Stream %s is already combined")
         
         ## Store the new stream in the cache:
         dbh = DB.DBO(self.case)

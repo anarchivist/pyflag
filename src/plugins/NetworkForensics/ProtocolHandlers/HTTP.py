@@ -278,10 +278,14 @@ class HTTPScanner(StreamScannerFactory):
         """
         ## We only want to process the combined stream once:
         if stream.con_id>stream.reverse: return
-        
-        combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.con_id, stream.reverse)
 
-        fd = self.fsfd.open(inode=combined_inode)
+        combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.con_id, stream.reverse)
+        try:
+            fd = self.fsfd.open(inode=combined_inode)
+        ## If we cant open the combined stream, we quit (This could
+        ## happen if we are trying to operate on a combined stream
+        ## already
+        except IOError: return
         
         p=HTTP(fd,self.fsfd)
         ## Check that this is really HTTP
@@ -314,10 +318,12 @@ class HTTPScanner(StreamScannerFactory):
 
             ## stream.ts_sec is already formatted in DB format
             date_str = stream.ts_sec.split(" ")[0]
+            path=self.fsfd.lookup(inode=combined_inode)
+            path=os.path.normpath(path+"/../../../../../")
 
             self.fsfd.VFSCreate(None,new_inode,
-                                "/HTTP/%s/%s" % (date_str,
-                                                 escape(p.request['url'])),
+                                "%s/HTTP/%s/%s" % (path,date_str,
+                                                   escape(p.request['url'])),
                                 mtime=stream.ts_sec, size=size
                                 )
 
@@ -490,6 +496,11 @@ class BrowseHTTPRequests(Reports.report):
 
             result.tree(tree_cb=tree_cb, pane_cb=pane_cb)
 
+        tabular_view(query,result)
+        return
+
+        ## FIXME: The HTTP Sessions stuff takes way too long -
+        ## disabled for now
         result.notebook(
             names=['HTTP Requests','HTTP Sessions'],
             callbacks = [tabular_view, tree_view]
@@ -556,3 +567,22 @@ class HTTPTree(TreeObj.TreeObj):
     tree which causes more pages to be downloaded.
     """
     node_name = "id"
+
+
+## UnitTests:
+import unittest
+import pyflag.pyflagsh as pyflagsh
+from pyflag.FileSystem import DBFS
+
+class HTTPTests(unittest.TestCase):
+    """ Tests HTTP Scanner """
+    test_case = "PyFlagNetworkTestCase"
+    order = 21
+    def test01HTTPScanner(self):
+        """ Test HTTP Scanner """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env,
+                             command="scan",
+                             argv=["*",                   ## Inodes (All)
+                                   "HTTPScanner",
+                                   ])                   ## List of Scanners

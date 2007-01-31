@@ -52,6 +52,13 @@ class scan(pyflagsh.command):
 
         pdbh.mass_insert_commit()
 
+        ## Wait for the scanners to finish:
+        self.wait_for_scan(cookie)            
+        yield "Scanning complete"
+
+    def wait_for_scan(self, cookie):
+        """ Waits for scanners to complete """
+        pdbh = DB.DBO()
         ## Often this process owns a worker as well. In that case we can wake it up:
         import pyflag.Farm as Farm
         Farm.wake_workers()
@@ -67,8 +74,6 @@ class scan(pyflagsh.command):
             if row['total']==0: break
 
             time.sleep(1)
-            
-        yield "Scanning complete"
 
 ## There is little point in distributing this because its very quick anyway.
 class scanner_reset(scan):
@@ -80,18 +85,25 @@ class scanner_reset(scan):
             yield self.help()
             return
 
-        ## Try to glob the inode list:
-        self.dbh.execute("select inode from inode where inode rlike %r",fnmatch.translate(self.args[1]))
-        scanners = ["%s:%s" % (self.case,x) for x in fnmatch.filter(Registry.SCANNERS.scanners,self.args[2])]
-        factories = Scanner.get_factories(scanners)
+        scanners = []
+        for i in range(1,len(self.args)):
+            scanners.extend(fnmatch.filter(Registry.SCANNERS.scanners, self.args[i]))
 
-        for row in self.dbh:
+        factories = Scanner.get_factories(self.environment._CASE, scanners)
+
+        ddfs = FileSystem.DBFS(self.environment._CASE)
+
+        ## Try to glob the inode list:
+        dbh = DB.DBO(self.environment._CASE)
+        dbh.execute("select inode from inode where inode rlike %r",fnmatch.translate(self.args[0]))
+
+        for row in dbh:
             inode = row['inode']
-            Scanner.resetfile(self.ddfs, inode, factories)
+            Scanner.resetfile(ddfs, inode, factories)
 
         yield "Resetting complete"
     
-class load_and_scan(pyflagsh.command):
+class load_and_scan(scan):
     def help(self):
         return "load_and_scan iosource fstype mount_point [list of scanners]: Loads the iosource into the right mount point and scans all new inodes using the scanner list. This allows scanning to start as soon as VFS inodes are produced and before the VFS is fully populated."
 
@@ -140,6 +152,10 @@ class load_and_scan(pyflagsh.command):
             return
 
         fs=fs(self.environment._CASE)
+        fs.cookie = int(time.time())
         fs.load(mnt_point, iosource, scanners)
 
+        ## Wait for all the scanners to finish
+        self.wait_for_scan(fs.cookie)
+        
         yield "Loading complete"

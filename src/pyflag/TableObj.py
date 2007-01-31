@@ -362,7 +362,7 @@ class ColumnType:
     responsible for displaying the values from the column and are used
     to generate SQL.
     """
-    def __init__(self, name='', column='', sql=None, link='', callback=None, link_pane='self'):
+    def __init__(self, name='', column='', link='', sql=None, callback=None, link_pane='self'):
         self.name = name
         self.column = column
         self.link = link

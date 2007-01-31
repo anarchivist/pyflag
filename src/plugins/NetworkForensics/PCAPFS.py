@@ -155,7 +155,6 @@ class PCAPFS(DBFS):
             scanner_string = ",".join(scanners)
             pdbh = DB.DBO()
             pdbh.mass_insert_start('jobs')
-            cookie = int(time.time())
 
         def Callback(s):
             ## Flush the mass insert pcap:
@@ -246,7 +245,7 @@ class PCAPFS(DBFS):
                     arg1 = self.case,
                     arg2 = new_inode,
                     arg3= scanner_string,
-                    cookie=cookie,
+                    cookie=self.cookie,
                     )
 
         ## Register the callback
@@ -437,7 +436,7 @@ class ViewDissectedPacket(Reports.report):
                 result.text("%s" % node.name, font='bold')
                 result.text('',color='black', font='normal')
                 start,length = node.get_range()
-                h.dump(highlight=start,length=length)
+                h.dump(highlight=[[start,length,'highlight'],])
                 
             except AttributeError:
                 result.text("%s.%s\n" % (previous_node.name,
@@ -454,7 +453,7 @@ class ViewDissectedPacket(Reports.report):
 
                 try:
                     start,length = previous_node.get_range(branch[-1])
-                    h.dump(highlight=start,length=length)
+                    h.dump(highlight=[[start,length,'highlight'],])
                 except KeyError:
                     pass
 
@@ -556,6 +555,7 @@ from pyflag.FileSystem import DBFS
 class NetworkForensicTests(unittest.TestCase):
     """ Tests network forensics """
     test_case = "PyFlagNetworkTestCase"
+    order = 20
     def test01LoadFilesystem(self):
         """ Test that pcap files can be loaded """
         pyflagsh.shell_execv(command="execute",
@@ -568,12 +568,15 @@ class NetworkForensicTests(unittest.TestCase):
                              argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
                                    "iosource=pcap",
                                    "subsys=advanced",
-                                   "io_filename=%s/stdcapture_0.2.pcap" % config.UPLOADDIR,
+                                   "io_filename=%s/stdcapture_0.3.pcap" % config.UPLOADDIR,
                                    ])
         
-        pyflagsh.shell_execv(command="execute",
-                             argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,
-                                   "iosource=pcap",
-                                   "fstype=PCAP Filesystem",
-                                   "mount_point=/stdcapture/"])
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env,
+                             command="load_and_scan",
+                             argv=["pcap",                   ## IOSource
+                                   "/stdcapture/",           ## Mount point
+                                   "PCAPFS",                 ## FS type
+                                   ""])                     ## List of Scanners (None)
 
+        

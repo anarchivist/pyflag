@@ -88,7 +88,7 @@ class RFC2822(Scanner.GenScanFactory):
                 dbh=DB.DBO(self.case)
                 dbh.insert('email',
                            inode = self.inode,
-                           date =  int(time.mktime(date)),
+                           _date =  "from_unixtime(%r)" % int(time.mktime(date)),
                            to = a.get('To'),
                            _from = "%r" % a.get('From'),
                            subject = a.get('Subject'))

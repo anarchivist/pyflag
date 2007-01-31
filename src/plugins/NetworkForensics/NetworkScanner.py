@@ -102,10 +102,6 @@ class StreamScannerFactory(GenScanFactory):
         if stream.dest_port in dissect.fix_ports(protocol):
             forward_stream = stream.con_id
             reverse_stream = stream.reverse
-            
-##        elif stream.src_port in dissect.fix_ports(protocol):
-##            reverse_stream = stream.con_id
-##            forward_stream = stream.reverse
         else:
             return None, None
 

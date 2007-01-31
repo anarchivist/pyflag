@@ -98,7 +98,7 @@ class SMTP:
             length = end-start
             self.count += 1
             pyflaglog.log(pyflaglog.DEBUG,"Message starts at %s in stream and is %s long" % (start,length))
-            return (self.count,(start,length))
+            return self.count, start, length
 
     def parse(self):
         while 1:
@@ -131,7 +131,7 @@ class SMTPScanner(StreamScannerFactory):
 
     def process_stream(self, stream, factories):
         forward_stream, reverse_stream = self.stream_to_server(stream, "SMTP")
-        if not reverse_stream or not forward_stream: return
+        if reverse_stream==None or forward_stream==None: return
 
         combined_inode = "I%s|S%s/%s" % (stream.fd.name, forward_stream, reverse_stream)
         pyflaglog.log(pyflaglog.DEBUG,"Openning %s for SMTP" % combined_inode)
@@ -145,18 +145,19 @@ class SMTPScanner(StreamScannerFactory):
         for f in p.parse():
             if not f: continue
 
-            offset,length = f
+            ## message number and its offset:
+            count, offset, length = f
             
             ## Create the VFS node:
-            path=self.fsfd.lookup(inode="I%s|S%s" % (stream.fd.name, forward_stream))
-            path=os.path.dirname(path)
+            path=self.fsfd.lookup(inode=combined_inode)
+            path=os.path.normpath(path+"/../../../../../")
             new_inode="%s|o%s:%s" % (combined_inode,offset,length)
             date_str = stream.ts_sec.split(" ")[0]
 
             self.fsfd.VFSCreate(None, new_inode,
                                 "%s/SMTP/%s/Message_%s" % (path,
                                                            date_str,
-                                                           f[0]),
+                                                           count),
                                 mtime = stream.ts_sec, size=length
                                 )
             
@@ -164,3 +165,21 @@ class SMTPScanner(StreamScannerFactory):
             ## the user chose the RFC2822 scanner, we will be
             ## able to understand this:
             self.scan_as_file(new_inode, factories)
+
+## UnitTests:
+import unittest
+import pyflag.pyflagsh as pyflagsh
+from pyflag.FileSystem import DBFS
+
+class SMTPTests(unittest.TestCase):
+    """ Tests SMTP Scanner """
+    test_case = "PyFlagNetworkTestCase"
+    order = 21
+    def test01SMTPScanner(self):
+        """ Test SMTP Scanner """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env,
+                             command="scan",
+                             argv=["*",                   ## Inodes (All)
+                                   "SMTPScanner", "RFC2822", "TypeScan"
+                                   ])                   ## List of Scanners

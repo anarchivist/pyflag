@@ -48,8 +48,8 @@ import pyflag.Reports as Reports
 import pyflag.pyflaglog as pyflaglog
 import base64
 import plugins.NetworkForensics.PCAPFS as PCAPFS
-import urllib
-from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType
+import urllib,os,time,datetime
+from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType, ColumnType
 
 class RingBuffer:
     def __init__(self, size_max):
@@ -85,7 +85,7 @@ def get_temp_path(case,inode):
     result= "%s/case_%s/%s" % (config.RESULTDIR,case,filename)
     return result
 
-class message:
+class Message:
     """ A class representing the message """
     def __init__(self,dbh,fd,ddfs):
         self.dbh=dbh
@@ -352,7 +352,7 @@ class message:
 
     def USR(self):
         """
-        Target pyflaglog into switchboard server using same auth string as passed back by server in XFR
+        Target logging into switchboard server using same auth string as passed back by server in XFR
 
         Most of this info is pretty boring.  I only store stuff that has usernames in it.
         
@@ -1256,8 +1256,10 @@ class message:
                                 )
                 
                 ## Add a VFS entry for this file:
-                new_inode = "CMSN%s-%s" % (headers['sessionid'],
-                                           self.session_id)
+                new_inode = "%s|CMSN%s-%s" % (
+                    self.fd.inode,
+                    headers['sessionid'],
+                    self.session_id)
                 
                 self.insert_session_data(sender=strip_username(headers['from']),recipient=strip_username(headers['to']),type="P2P FILE TRANSFER",p2pfile="%s|%s" % (self.fd.inode, new_inode))
                 
@@ -1282,11 +1284,13 @@ class message:
                     mtime = 0
 
                 date_str = mtime.split(" ")[0]
-                
+                path=self.fsfd.lookup(inode=self.fd.inode)
+                path=os.path.normpath(path+"/../../../../../")
+
                 ## The filename and size is given in the context
-                self.ddfs.VFSCreate(self.fd.inode,
+                self.ddfs.VFSCreate(None,
                                     new_inode,
-                                    "MSN/%s/%s" % (date_str, filename),
+                                    "%s/MSN/%s/%s" % (path, date_str, filename),
                                     mtime=mtime,
                                     size=size)
 
@@ -1462,76 +1466,63 @@ class MSNScanner(StreamScannerFactory):
         self.msn_connections = {}
 
     def process_stream(self, stream, factories):
-        ports = dissect.fix_ports("MSN")
-        
-        if stream.src_port in ports or stream.dest_port in ports:
-            #Keep track of the streams we have combined so we don't process reverse again
-            #self.processed is a ring buffer so it doesn't get too big
-            if not self.processed.has_key(stream.con_id):
-                #Haven't processed this one.
-                #print "Processed:%s" % self.processed.data
-                #This returns the forward and reverse stream associated with the MSN port (uses port numbers in .pyflagrc).
-                forward_stream, reverse_stream = self.stream_to_server(stream, "MSN")
+        forward_stream, reverse_stream = self.stream_to_server(stream, "MSN")
                 
-                #We need both streams otherwise this won't work
-                if not reverse_stream or not forward_stream: return
+        #We need both streams otherwise this won't work
+        if reverse_stream==None or forward_stream==None: return
 
-                pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Opening Combined Stream S%s/%s for MSN" % (forward_stream, reverse_stream))
+        pyflaglog.log(pyflaglog.DEBUG,"Opening Combined Stream S%s/%s for MSN" % (forward_stream, reverse_stream))
 
-                #Create the combined inode
-                combined_inode = "I%s|S%s/%s" % (stream.fd.name, forward_stream, reverse_stream)
+        #Create the combined inode
+        combined_inode = "I%s|S%s/%s" % (stream.fd.name, forward_stream, reverse_stream)
 
-                # Open the combined stream.
-                fd = self.fsfd.open(inode=combined_inode)
-                dbh=DB.DBO(stream.case)
-                m=message(dbh, fd, self.fsfd)
-                while 1:
-                    try:
-                        result=m.parse()
-                        #pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Client:%s,Stream:%s,Inode:%s" % (m.client_id, m.session_id,combined_inode))
-                    except IOError:
+        # Open the combined stream.
+        fd = self.fsfd.open(inode=combined_inode)
+        dbh=DB.DBO(stream.case)
 
-                        break
+        m = Message(dbh, fd, self.fsfd)
+        while 1:
+            try:
+                result=m.parse()
+            except IOError:
+                break
 
-                #Scan p2p files we found
-                for inode in m.inodes:
-                    self.scan_as_file("%s|%s" % (combined_inode, inode), factories)
+        #Scan p2p files we found
+        for inode in m.inodes:
+            self.scan_as_file("%s|%s" % (combined_inode, inode), factories)
+            
+        #### Post Processing ####
 
-                #### Post Processing ####
-
-                #Store each of fl,bl,al etc.
-                for (thislistname,thislist) in m.list_lookup.items():
-                    m.store_list(list=thislist,listname=thislistname)
-
-                #Flatten contact list groups and store as one entry
-                finallist=[]
-                for (thislistname,thislist) in m.contact_list_groups.items():
-                    finallist.append(thislistname+":"+",".join(thislist))
-                m.store_list(list=finallist,listname='contact_list_groups')
+        #Store each of fl,bl,al etc.
+        for (thislistname,thislist) in m.list_lookup.items():
+            m.store_list(list=thislist,listname=thislistname)
+            
+        #Flatten contact list groups and store as one entry
+        finallist=[]
+        for (thislistname,thislist) in m.contact_list_groups.items():
+            finallist.append(thislistname+":"+",".join(thislist))
+            m.store_list(list=finallist,listname='contact_list_groups')
                     
-                #Fix up all the session IDs (=-1) that were stored before we figured out the session ID.
-                if m.session_id==-1:
-                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Couldn't figure out the MSN session ID for stream S%s/%s" % (forward_stream, reverse_stream))
-                else:
-                    dbh.execute("update msn_session set session_id=%r where session_id=-1 and inode=%r",(m.session_id,combined_inode))
-                    try:
-                        dbh.execute("update msn_users set session_id=%r where session_id=-1 and inode=%r",(m.session_id,combined_inode))
-                    except Exception:
-                        #We already have this identical row with a real session ID - will delete it below
-                        pass
-                    #We can delete everything with session id =-1 because we know we have an actual session id for this stream
-                    dbh.execute("delete from msn_users where session_id=-1 and inode=%r",combined_inode)
+        #Fix up all the session IDs (=-1) that were stored before we figured out the session ID.
+        if m.session_id==-1:
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Couldn't figure out the MSN session ID for stream S%s/%s" % (forward_stream, reverse_stream))
+        else:
+            dbh.execute("update msn_session set session_id=%r where session_id=-1 and inode=%r",(m.session_id,combined_inode))
+        try:
+            dbh.execute("update msn_users set session_id=%r where session_id=-1 and inode=%r",(m.session_id,combined_inode))
+        except Exception:
+            #We already have this identical row with a real session ID - will delete it below
+            pass
 
-                #Similarly go back and fix up all the Unknown (Target) entries with the actual target name
-                if m.client_id=='Unknown':
-                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Couldn't figure out target identity for stream S%s/%s" % (forward_stream, reverse_stream))
-                else:
-                    dbh.execute("update msn_session set recipient=%r where recipient='Unknown (Target)' and inode=%r",(m.client_id,combined_inode))
-                    dbh.execute("update msn_session set sender=%r where sender='Unknown (Target)' and inode=%r",(m.client_id,combined_inode))
-
-                self.processed.append(forward_stream)
-                self.processed.append(reverse_stream)
-                #pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Appending ids: %s, %s" % (forward_stream,reverse_stream))
+        #We can delete everything with session id =-1 because we know we have an actual session id for this stream
+        dbh.execute("delete from msn_users where session_id=-1 and inode=%r",combined_inode)
+        
+        #Similarly go back and fix up all the Unknown (Target) entries with the actual target name
+        if m.client_id=='Unknown':
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Couldn't figure out target identity for stream S%s/%s" % (forward_stream, reverse_stream))
+        else:
+            dbh.execute("update msn_session set recipient=%r where recipient='Unknown (Target)' and inode=%r",(m.client_id,combined_inode))
+            dbh.execute("update msn_session set sender=%r where sender='Unknown (Target)' and inode=%r",(m.client_id,combined_inode))
                 
 class MSNFile(File):
     """ VFS driver for reading the cached MSN files """
@@ -1566,10 +1557,14 @@ class BrowseMSNSessions(Reports.report):
 
         def draw_prox_cb(value):
             tmp = result.__class__(result)
+            ## Calculate time to go to: (This is so complex - is there a better way?)
+            a=datetime.datetime(*time.strptime(value,"%Y-%m-%d %H:%M:%S")[:7]) +  datetime.timedelta(0,-60)
+            new_value = a.strftime("%Y-%m-%d %H:%M:%S")
+            
             tmp.link('Go To Approximate Time',
               target=query_type((),
                 family=query['family'], report=query['report'],
-                where_Prox = ">%s" % (int(value)-60),
+                filter = "Timestamp after '%s'" % new_value,
                 case = query['case'],
               ),
               icon = "stock_down-with-subpoints.png",
@@ -1578,7 +1573,7 @@ class BrowseMSNSessions(Reports.report):
             return tmp
 
         result.table(
-            elements = [ TimestampType('Prox','pcap.ts_sec',
+            elements = [ ColumnType('Prox','pcap.ts_sec',
                                     callback = draw_prox_cb),
                          TimestampType('Timestamp','pcap.ts_sec'),
                          InodeType("Stream","inode",
@@ -1674,3 +1669,22 @@ if __name__ == "__main__":
     fd = open("/tmp/case_demo/S93-94")
     data = fd.read()
     parse_msg(data)
+
+
+## UnitTests:
+import unittest
+import pyflag.pyflagsh as pyflagsh
+from pyflag.FileSystem import DBFS
+
+class MSNTests(unittest.TestCase):
+    """ Tests MSN Scanner """
+    test_case = "PyFlagNetworkTestCase"
+    order = 21
+    def test01MSNScanner(self):
+        """ Test MSN Scanner """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env,
+                             command="scan",
+                             argv=["*",                   ## Inodes (All)
+                                   "MSNScanner", "TypeScan"
+                                   ])                   ## List of Scanners

@@ -66,6 +66,10 @@ class FileSystem:
 
     @cvar name: The name of the filesystem to show in the loadfs dialog
     """
+    ## This is the cookie which will be used to identify scanning jobs
+    ## from this FS:
+    cookie = 0
+    
     def __init__(self, case):
         """ Constructor for creating an new filesystem object
 

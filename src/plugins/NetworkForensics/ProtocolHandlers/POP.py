@@ -172,15 +172,14 @@ class POPScanner(StreamScannerFactory):
 
         for f in p.files:
             ## Add a new VFS node
-            path=self.fsfd.lookup(inode="I%s|S%s" % (stream.fd.name, forward_stream))
-            path=os.path.dirname(path)
             offset, length = f[1]
             new_inode="%s|o%s:%s" % (combined_inode,offset, length)
             date_str = stream.ts_sec.split(" ")[0]
-            
+            path=self.fsfd.lookup(inode=combined_inode)
+            path=os.path.normpath(path+"/../../../../../")
+
             self.fsfd.VFSCreate(None,new_inode,
-                                "%s/POP/%s/Message_%s" % (path,
-                                                          date_str,
+                                "%s/POP/%s/Message_%s" % (path, date_str,
                                                           f[0]),
                                 mtime=stream.ts_sec,
                                 size = length
@@ -198,3 +197,20 @@ class POPScanner(StreamScannerFactory):
             dbh.execute("insert into passwords set inode='S%s',username=%r,password=%r,type='POP3'",(
                 forward_stream,p.username,p.password))
 
+## UnitTests:
+import unittest
+import pyflag.pyflagsh as pyflagsh
+from pyflag.FileSystem import DBFS
+
+class POPTests(unittest.TestCase):
+    """ Tests POP Scanner """
+    test_case = "PyFlagNetworkTestCase"
+    order = 21
+    def test01SMTPScanner(self):
+        """ Test POP Scanner """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env,
+                             command="scan",
+                             argv=["*",                   ## Inodes (All)
+                                   "POPScanner", "RFC2822", "TypeScan"
+                                   ])                   ## List of Scanners
