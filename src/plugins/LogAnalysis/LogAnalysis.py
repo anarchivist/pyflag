@@ -30,6 +30,7 @@
 """ Module for analysing Log files """
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
+from pyflag.FlagFramework import query_type
 import pyflag.LogFile as LogFile
 import pyflag.DB as DB
 import pyflag.conf
@@ -37,6 +38,7 @@ config=pyflag.conf.ConfObject()
 import re
 import plugins.LogAnalysis.Whois as Whois
 import pyflag.Registry as Registry
+from pyflag.TableObj import ColumnType, StringType
 
 description = "Log Analysis"
 order = 35
@@ -69,7 +71,7 @@ class ListLogFile(Reports.report):
 
 class CreateLogPreset(Reports.report):
     """ Creates a new type of log file in the database, so that they can be loaded using the Load Log File report """
-    parameters = {"log_preset":"sqlsafe", "final":"any"}
+    parameters = {"log_preset":"any", "final":"any"}
     name="Create Log Preset"
     family = "Log Analysis"
     description="Create new preset log type"
@@ -77,8 +79,8 @@ class CreateLogPreset(Reports.report):
 
     def reset(self,query):
         dbh = self.DBO(None)
-        dbh.execute("delete from meta where property='log_preset' and value=%r",query['log_preset'])
-        dbh.execute("delete from meta where property='log_preset_%s'",query['log_preset'])
+        dbh.delete("meta", where= "property='log_preset' and value=%r" % query['log_preset'])
+        dbh.delete("meta", where= "property='log_preset_%s'" % query['log_preset'])
 
     def display(self,query,result):
         result.heading("New log file preset %s created" % query['log_preset'])
@@ -187,7 +189,7 @@ class RemoveLogPreset(Reports.report):
     hidden=True
     family = "Log Analysis"
     description = "Removes a preset"
-    parameters= {"log_preset":"sqlsafe", "confirm":"sqlsafe"}
+    parameters= {"log_preset":"any", "confirm":"sqlsafe"}
 
     def find_tables(self,preset):
         """ Yields the tables which were created by a given preset.
@@ -235,12 +237,12 @@ class RemoveLogPreset(Reports.report):
         ## Find all the cases we know about:
         dbh.execute("select value from meta where property='flag_db'")
         for row in dbh:
-            FlagFramework.reset_all(family='Load Data',report='LoadPresetLog',log_preset=preset,case=row['value'])
+            FlagFramework.reset_all(family='Load Data',report='Load Preset Log File',log_preset=preset,case=row['value'])
 
             ## Now lose the preset itself
             FlagFramework.reset_all(log_preset=preset,family=query['family'],report='Create Log Preset',case=None)
-        dbh.execute("delete from meta where property='log_preset' and value=%r",query['log_preset'])
-        dbh.execute("delete from meta where property='log_preset_%s'",query['log_preset'])
+        dbh.delete("meta", where= "property='log_preset' and value=%r" % query['log_preset'])
+        dbh.delete("meta", where= "property='log_preset_%s'" % query['log_preset'])
         
         result.heading("Deleted preset %s from the database" % query['log_preset'])
         
@@ -259,21 +261,23 @@ class ManageLogPresets(Reports.report):
         result.toolbar(text="Add a new Preset",icon="new_preset.png",link=link,tooltip="Create a new Preset")
         def DeleteIcon(value):
             tmp=result.__class__(result)
-            tmp.icon("no.png",border=0,alt="Click here to delete %s preset" % value)
+            tmp.link("Delete", icon="no.png", target=query_type(family=query['family'],report='RemoveLogPreset',__target__='log_preset'))
             return tmp
 
         def Describe(value):
             try:
                 log = LogFile.get_loader(dbh, value)
                 return( "%s" % log.__class__)
-            except KeyError:
+            except (KeyError, TypeError):
                 return "Unknown"
         
         result.table(
-            columns = ( 'value','value','value' ),
-            names = ( "Delete?","Log Preset","Type"),
-            links = [ FlagFramework.query_type((),family=query['family'],report='RemoveLogPreset',__target__='log_preset'),],
-            callbacks = { 'Delete?':DeleteIcon, 'Type':Describe },
+            elements = [ ColumnType("Delete?",'value',
+                                    callback = DeleteIcon),
+                         StringType("Log Preset",'value'),
+                         ColumnType("Type", "value",
+                                    callback = Describe),
+                         ],
             where = 'property="log_preset"',
             table="meta",
             case=None

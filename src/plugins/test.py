@@ -398,4 +398,5 @@ class HexDumpTest(Refresher):
         data = "this is a long test string. the quick brown fox jumped over the lazy cat. " * 3
         h = HexDump(data, result)
         result.heading("HexDump test")
+        ## highlight and match are styles defined in the css file.
         h.dump(highlight=[[30,80,'highlight'], [40,50,'match']])

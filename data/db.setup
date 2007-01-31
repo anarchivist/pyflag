@@ -2,31 +2,26 @@
 -- Table structure for table `whois`
 -- 
 CREATE TABLE `whois` (
-  `id` int(11) NOT NULL auto_increment,
+  `id` int(11) NOT NULL,
   `src_id` int(11) default NULL,
   `start_ip` int(10) unsigned default NULL,
   `netname` varchar(50) default NULL,
   `numhosts` int(11) default NULL,
   `country` char(2) default NULL,
   `descr` varchar(255) default NULL,
-  `status` enum('assigned','allocated','reserved','unallocated') default NULL,
-  KEY `id` (`id`),
-  KEY `src_id` (`src_id`)
-) TYPE=MyISAM;
+  `status` enum('assigned','allocated','reserved','unallocated') default NULL
+) engine=MyISAM;
 
 -- --------------------------------------------------------
 
 -- 
 -- Table structure for table `whois_routes`
 -- 
-
 CREATE TABLE `whois_routes` (
-  `network` int(10) unsigned default NULL,
-  `netmask` int(10) unsigned default NULL,
-  `whois_id` int(11) default NULL,
-  KEY `whois_id` (`whois_id`),
-  KEY `network` (`network`)
-) TYPE=MyISAM;
+  `network` int(10) unsigned NOT NULL default '0',
+  `netmask` int(10) unsigned NOT NULL default '0',
+  `whois_id` int(11) NOT NULL default '0'
+) ENGINE=MyISAM;
 
 insert into whois_routes values(0,0,1);
 insert into whois values(1,1,0,0,0,'--','Default Fallthrough Route: IP INVALID OR UNASSIGNED','unallocated');
@@ -37,12 +32,16 @@ insert into whois values(1,1,0,0,0,'--','Default Fallthrough Route: IP INVALID O
 -- 
 
 CREATE TABLE `whois_sources` (
-  `id` int(11) NOT NULL auto_increment,
+  `id` int(11) NOT NULL,
   `source` varchar(20) default NULL,
   `url` varchar(255) default NULL,
-  `updated` datetime default NULL,
-  KEY `id` (`id`)
-) TYPE=MyISAM;
+  `updated` datetime default NULL
+) engine=MyISAM;
+
+create table whois_cache (
+	`id` int unsigned not NULL,
+	`ip` int unsigned not NULL
+) engine=MyISAM;
 
 #
 # Table structure for table `NSRL_hashes`
@@ -53,7 +52,7 @@ CREATE TABLE `NSRL_hashes` (
   `filename` varchar(60) NOT NULL default '',
   `productcode` int(11) NOT NULL default '0',
   `oscode` varchar(60) NOT NULL default ''
-) TYPE=MyISAM;
+) engine=MyISAM;
 
 # Remember to add indexes to this table after uploading the NSRL. Use the nsrl_load.py script.
 
@@ -69,7 +68,7 @@ CREATE TABLE `NSRL_products` (
   `Version` varchar(20) NOT NULL default '',
   `OpSystemCode` varchar(20) NOT NULL default '',
   `ApplicationType` varchar(250) NOT NULL default ''
-) TYPE=MyISAM COMMENT='Stores NSRL Products';
+) engine=MyISAM COMMENT='Stores NSRL Products';
 
 INSERT INTO NSRL_products VALUES (0,'Unknown','','','');
 
@@ -80,7 +79,7 @@ INSERT INTO NSRL_products VALUES (0,'Unknown','','','');
 CREATE TABLE meta (
   property varchar(50) default NULL,
   value text default NULL
-) TYPE=MyISAM;
+) engine=MyISAM;
 
 
 CREATE TABLE `dictionary` (

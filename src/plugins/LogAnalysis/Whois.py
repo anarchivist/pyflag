@@ -52,12 +52,18 @@ def lookup_whois(ip):
         ip=str(ip)
     except TypeError:
         ip = "inet_aton(%r)" % ip
+
+    ## First check the cache:
+    dbh.check_index("whois_cache", "ip")
+    dbh.execute("select id from whois_cache where ip=%s limit 1" , ip)
+    row = dbh.fetch()
+    if row:
+        return row['id']
         
     netmask = 0
     while 1:
         dbh.check_index("whois_routes","netmask")
         dbh.execute("select whois_id from whois_routes where ( %s & inet_aton('255.255.255.255') & ~%r ) = network and (inet_aton('255.255.255.255') & ~%r) = netmask limit 1 " , (ip,netmask,netmask))
-#        dbh.execute("select whois_id from whois_routes where ( %s & ~(pow(2,%r) -1)) = network and ~(pow(2,%r)-1) = netmask limit 1 " , (ip,netmask,netmask))
         row=dbh.fetch()
         ## If we found it, we return that, else we increase the
         ## netmask one more step and keep trying. Worst case we should
@@ -69,6 +75,8 @@ def lookup_whois(ip):
 
         netmask = netmask * 2 + 1
 
+    ## Cache it:
+    dbh.execute("insert into whois_cache set ip=%s, id=%r" , (ip, row['whois_id']))
     return row['whois_id']
 
 def identify_network(whois_id):
@@ -117,10 +125,16 @@ class LookupWhoisID(LookupIP):
     """ A report to show the IP by netname """
     parameters = {'id':'numeric'}
     hidden=True
-    name="Lookup Whois by ID"
+    name="WhoisID"
     family = "Log Analysis"
 
     def display(self,query,result):
+        try:
+            if query['__pyflag_name']!='main':
+                result.decoration='naked'
+        except:
+            pass
+        
         result.heading("Whois Search Results")
         self.display_whois(query,result,int(query['id']))
 

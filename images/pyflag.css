@@ -305,3 +305,7 @@ table.PyFlagTable {
 form { 
   clear: left;
  }
+
+.Row { 
+  clear: left;
+ }

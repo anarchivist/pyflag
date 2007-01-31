@@ -160,9 +160,9 @@ class LoadPresetLog(Reports.report):
             del query['table']
             query['table'] = query['new_table']
 
-        dbh.execute("DROP TABLE if exists %s_log" % query['table'])
-        dbh.execute("delete from meta where property='logtable' and value='%s'" , (query['table']))
-        dbh.execute("delete from meta where property='log_preset_%s'" , (query['table']))
+        dbh.drop("%s_log" % query['table'])
+        dbh.delete("meta", where= "property='logtable' and value='%s'" % (query['table']))
+        dbh.delete("meta", where=" property='log_preset_%s'" % (query['table']))
 
 import pyflag.IO as IO
 

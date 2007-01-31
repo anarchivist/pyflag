@@ -271,7 +271,7 @@ class HTMLUI(UI.GenericUI):
     
     def start_table(self,**options):
         self.table_depth += 1
-        self.result += "<table %s>\n" % self.opt_to_str(options)
+        self.result += "<table class=Row %s>\n" % self.opt_to_str(options)
 
     def row(self,*columns, **options):
         #Sort through all the options for the ones that should go to the td html element
@@ -792,6 +792,7 @@ class HTMLUI(UI.GenericUI):
             self.toolbar_ui.icon(icon,tooltip=text)
 
     def table(self,elements=[],table='',where='',groupby = None, _groupby=None, case=None,
+              limit_context='limit',
               **opts):
         ## Building up the args list in this way ensure that defaults
         ## can be specified in _make_sql itself and not be overwritten
@@ -806,7 +807,7 @@ class HTMLUI(UI.GenericUI):
             order = int(query.get('order',0))
         except: order=0
 
-        try:    limit = int(query.get('limit',0))
+        try:    limit = int(query.get(limit_context,0))
         except: limit = 0
 
         filter_expression = query.get('filter','')
@@ -928,8 +929,8 @@ class HTMLUI(UI.GenericUI):
         if previous_limit<0:
             self.toolbar(icon = 'stock_left_gray.png')
         else:
-            del new_query['limit']
-            new_query['limit'] = previous_limit
+            del new_query[limit_context]
+            new_query[limit_context] = previous_limit
             self.toolbar(icon = 'stock_left.png',
                          link = new_query,
                          tooltip='Previous Page (Rows %s-%s)' % (previous_limit, limit))
@@ -941,8 +942,8 @@ class HTMLUI(UI.GenericUI):
         else:
             ## We could not fill a full page - means we ran out of
             ## rows in this table
-            del new_query['limit']
-            new_query['limit'] = limit+pagesize
+            del new_query[limit_context]
+            new_query[limit_context] = limit+pagesize
             self.toolbar(icon = 'stock_right.png',
                          link = new_query,
                          tooltip='Next Page (Rows %s-%s)' % (limit, limit+pagesize))
@@ -1133,9 +1134,10 @@ class HTMLUI(UI.GenericUI):
                     table = table,
                     where = where,
                     groupby = query['groupby'],
+                    limit_context="limit%s" % query['groupby'],
                     case = case)
             except Exception,e:
-                pyflaglog.log(pyflaglog.ERROR,e)
+                #pyflaglog.log(pyflaglog.ERROR,e)
                 pass
             
             result.start_form(query)

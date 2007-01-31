@@ -362,15 +362,16 @@ class ColumnType:
     responsible for displaying the values from the column and are used
     to generate SQL.
     """
-    sql = None
-    
     def __init__(self, name='', column='', sql=None, link='', callback=None, link_pane='self'):
         self.name = name
         self.column = column
         self.link = link
         self.callback = callback
         self.link_pane = link_pane
-        self.sql = sql
+        if sql:
+            self.sql = sql
+        else:
+            self.sql = column
 
     ## These are the symbols which will be treated literally
     symbols = {
@@ -531,6 +532,8 @@ class TimestampType(IntegerType):
         ## FIXME Should parse arg as a date
         return "%s < %r" % (self.column, arg)
 
+import plugins.LogAnalysis.Whois as Whois
+
 class IPType(ColumnType):
     """ Handles creating appropriate IP address ranges from a CIDR specification.
 
@@ -588,7 +591,7 @@ class IPType(ColumnType):
 
     def create(self):
         ## IP addresses are stored as 32 bit integers 
-        return "`%s` int(11) default 0" % self.column
+        return "`%s` int(11) unsigned default 0" % self.column
 
     def select(self):
         ## Upon selection they will be converted to strings:
@@ -597,6 +600,16 @@ class IPType(ColumnType):
     def insert(self,value):
         ### When inserted we need to convert them from string to ints
         return "_"+self.column, "inet_aton(%r)" % value
+
+    def display(self, value, row, result):
+        ## We try to show a whois if possible
+        id = Whois.lookup_whois(value)
+        result = result.__class__(result)
+        result.link(Whois.identify_network(id),
+                    target=query_type(family="Log Analysis", report="WhoisID", id=id),
+                    pane='popup')
+        result.text("\n%s" %value)
+        return result
 
 class InodeType(StringType):
     """ A unified view of inodes """

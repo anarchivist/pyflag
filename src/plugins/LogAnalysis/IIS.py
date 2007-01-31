@@ -25,6 +25,7 @@ import plugins.LogAnalysis.Simple as Simple
 import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 from pyflag.TableObj import TimestampType, IntegerType, StringType, IPType
+import pyflag.Reports as Reports
 
 class IISLog(Simple.SimpleLog):
     """ Log parser for IIS (W3C Extended) log files """
@@ -103,7 +104,7 @@ class IISLog(Simple.SimpleLog):
         def test(query,result):
             self.parse(query)
             print "self.fields: %s" % self.fields
-            result.text("The following is the result of importing the first few lines from the log file into the database.\nPlease check that the importation was successfull before continuing.",wrap='full')
+            result.text("The following is the result of importing the first few lines from the log file into the database.\nPlease check that the importation was successfull before continuing.")
             self.display_test_log(result)
             return True
 

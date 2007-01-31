@@ -256,14 +256,17 @@ dbh = DB.DBO(None)
 dbh.execute("drop table if exists whois_sources")
 dbh.execute("drop table if exists whois")
 dbh.execute("drop table if exists whois_routes")
+dbh.execute("drop table if exists whois_cache")
 dbh.execute("""CREATE TABLE IF NOT EXISTS whois_sources (
-`id` int auto_increment,
+`id` int,
 `source` varchar(20),
 `url` varchar(255),
-`updated` datetime,
-key(id))""")
+`updated` datetime)""")
+
+whois_sources_id = 0
+
 dbh.execute("""CREATE TABLE IF NOT EXISTS whois (
-`id` int auto_increment,
+`id` int,
 `src_id` int,
 `start_ip` int(10) unsigned,
 `netname` varchar(250),
@@ -273,18 +276,26 @@ dbh.execute("""CREATE TABLE IF NOT EXISTS whois (
 `techc` varchar(50),
 `descr` text,
 `remarks` text,
-`status` enum('assigned','allocated','reserved','unallocated'),
-key(id))""")
+`status` enum('assigned','allocated','reserved','unallocated'))""")
+
+whois_id = 0
+
 dbh.execute("CREATE TABLE IF NOT EXISTS whois_routes ( `network` int(10) unsigned, `netmask` int(10) unsigned, `whois_id` int)")
+
+dbh.execute("""create table whois_cache (
+`id` int not NULL,
+`ip` int not NULL
+) engine=MyISAM""")
 
 # add default (fallthrough) route and reserved ranges
 dbh.insert('whois_sources',
            source='static',
+           id = whois_sources_id,
            url='static',
            updated= ':'.join(["%i"% i for i in time.localtime()[:6]]))
 
 dbh.insert('whois',
-           id=0,
+           id=whois_id,
            src_id=str(dbh.cursor.lastrowid),
            start_ip=0,
            netname='Default',
@@ -300,7 +311,7 @@ dbh.insert('whois',
 dbh.insert('whois_routes',
            network=0,
            netmask = 0,
-           whois_id = str(dbh.cursor.lastrowid))
+           whois_id = whois_id)
 
 # process files
 source_dbh = dbh.clone()
@@ -320,26 +331,30 @@ for url in urls:
   source_dbh.mass_insert(
     source = db.source,
     url = url,
+    id = whois_sources_id,
     updated = db.date)
+
+  whois_sources_id+=1
   
 #  dbh.execute("INSERT INTO whois_sources VALUES (0, %r, %r, %r);", (db.source, url, db.date))
-  source_id = dbh.cursor.lastrowid
+#  source_id = dbh.cursor.lastrowid
   
   # process records
   for rec in db:
     dbh.mass_insert(
-      src_id = source_id,
+      src_id = whois_sources_id,
       start_ip = "%u" % rec.start_ip,
       netname = rec.netname,
       numhosts = rec.num_hosts,
       country = rec.country,
       adminc = rec.adminc,
       techc = rec.techc,
+      id = whois_id,
       descr = rec.descr,
       remarks = rec.remarks,
       status = rec.status)  
 
-    whois_id = dbh.cursor.lastrowid
+    whois_id += 1
 
     #now process the networks (routes)...
     # split into networks on bit boundaries
@@ -374,6 +389,6 @@ for url in urls:
         del masks[align[0]]
 
 # add indexes
-dbh.execute("ALTER TABLE whois ADD index(src_id)")
-dbh.execute("ALTER TABLE whois ADD index(netname)")
-dbh.execute("ALTER TABLE whois_routes ADD index(network)")
+dbh.check_index("whois_routes","network")
+dbh.check_index("whois_routes","netmask")
+dbh.check_index("whois","id")
