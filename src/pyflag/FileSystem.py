@@ -44,6 +44,7 @@ This inode therefore refers to the 14th file in the zip archive contained in ino
 Note that typically VFS modules go hand in hand with scanners, since scanner discover new files, calling VFSCreate on the filesystem to add them, and VFS drivers are used to read those from the Inode specifications.
 """
 import os,os.path, fnmatch
+import sys
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 
@@ -482,8 +483,10 @@ class File:
         self.readptr = 0
         self.inode = inode
 
-        # should reads return slack space? not all drivers implement this
+        # should reads return slack space or overread into the next block? 
+        # NOTE: not all drivers implement this (only really Sleuthkit)
         self.slack = False
+        self.overread = False
 
         ## Now we check to see if there is a cached copy of the file for us:
         self.cached_filename = self.get_temp_path()
@@ -697,12 +700,25 @@ class File:
 
         def hexdumper(offset,data,result):
             dump = FlagFramework.HexDump(data,result)
-            highlight = [[match-offset, length, 'match'],]
+            # highlighting (default highlight)
+            highlight = [[0, sys.maxint, 'alloc'],]
+            # if we know size, highlight slack/overread
+            if self.size:
+                highlight.append([self.size-offset, sys.maxint, 'slack'])
+                try:
+                    slacksize = self.size % self.block_size
+                    if(slacksize):
+                        slacksize = self.block_size - slacksize
+                    highlight.append([self.size + slacksize - offset, sys.maxint, 'overread'])
+                except AttributeError:
+                    pass
+            # now highlight any matches
+            highlight.append([match-offset, length, 'match'])
             dump.dump(base_offset=offset,limit=max,highlight=highlight)
 
-        return self.display_data(query,result, max, hexdumper, slack=True)
+        return self.display_data(query,result, max, hexdumper, slack=True, overread=True)
 
-    def display_data(self, query,result,max,cb, slack=False):
+    def display_data(self, query,result,max,cb, slack=False, overread=False):
         """ Displays the data.
         
         The callback takes care of paging the data from self. The callback cb is used to actually render the data:
@@ -718,12 +734,15 @@ class File:
             limit=0
 
         oldslack = self.slack
+        oldoverread = self.overread
         self.slack = slack
+        self.overread = overread
 
         self.seek(limit)
         data = self.read(max+1)
 
         self.slack = oldslack
+        self.overread = oldoverread
 
         ## We try to use our own private toolbar if possible:
         toolbar_id = result.new_toolbar()

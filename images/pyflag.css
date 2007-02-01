@@ -282,9 +282,24 @@ iframe#right {
   background-color: pink;
 }
 
+/** Regular data highlighted here */
+.alloc { 
+  background-color: lightgrey;
+}
+
 /** Matches are highlighted here */
 .match { 
   background-color: yellow;
+}
+
+/** Slack is highlighted here */
+.slack { 
+  background-color: #ffac5e;
+}
+
+/** Overread is highlighted here */
+.overread { 
+  background-color: red;
 }
 
 h1 { 

@@ -208,6 +208,7 @@ class Sleuthkit_File(File):
         self.fd.seek(0,2)
         self.size = self.fd.tell()
         self.fd.seek(0)
+        self.block_size = fs.block_size
     
     def close(self):
         self.fd.close()
@@ -222,9 +223,9 @@ class Sleuthkit_File(File):
 
     def read(self, length=None):
         if length!=None:
-            return self.fd.read(length, slack=self.slack)
+            return self.fd.read(length, slack=self.slack, overread=self.overread)
         else:
-            return self.fd.read(slack=self.slack)
+            return self.fd.read(slack=self.slack, overread=self.overread)
 
     def tell(self):
         return self.fd.tell()
