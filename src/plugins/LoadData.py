@@ -583,7 +583,7 @@ class LoadDataTests(unittest.TestCase):
                                    "mount_point=/stdimage/"])
         dbh = DB.DBO(self.test_case)
         dbh.execute("select count(*) as count from inode")
-        self.assertEqual(dbh.fetch()['count'],16)
+        self.assertEqual(dbh.fetch()['count'],55)
 
     def test03MultipleSources(self):
         """ Test that multiple images can be loaded on the same VFS """

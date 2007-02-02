@@ -150,20 +150,29 @@ class NewCase(Reports.report):
         KEY ( `iosource` )
         )""")
 
-        ## Create the xattr table by interrogating libextractor:
-        types = ['Magic']
-        try:
-            import extractor
-            e = extractor.Extractor()
-            types.extend(e.keywordTypes())
-        except ImportError:
-            pass
+        ## This is a nice idea, but its just not flexible enough... We
+        ## use VARCHAR for now...
+        
+##        ## Create the xattr table by interrogating libextractor:
+##        types = ['Magic']
+##        try:
+##            import extractor
+##            e = extractor.Extractor()
+##            types.extend(e.keywordTypes())
+##        except ImportError:
+##            pass
+
+##        case_dbh.execute("""CREATE TABLE if not exists `xattr` (
+##                            `inode_id` INT NOT NULL ,
+##                            `property` ENUM( %s ) NOT NULL ,
+##                            `value` VARCHAR( 250 ) NOT NULL
+##                            ) """ % ','.join([ "%r" % x for x in types]))
 
         case_dbh.execute("""CREATE TABLE if not exists `xattr` (
                             `inode_id` INT NOT NULL ,
-                            `property` ENUM( %s ) NOT NULL ,
-                            `value` VARCHAR( 250 ) NOT NULL
-                            ) """ % ','.join([ "%r" % x for x in types]))
+                            `property` VARCHAR(250) NOT NULL ,
+                            `value` VARCHAR(250) NOT NULL
+                            ) """)
 
         result.heading("Case Created")
         result.para("\n\nThe database for case %s has been created" %query['create_case'])

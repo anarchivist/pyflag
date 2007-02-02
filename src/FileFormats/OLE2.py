@@ -138,18 +138,19 @@ def mesg_property(p,file):
         
     data=file.cat(p)
 
+    ## Convert to utf-8 if possible
     try:
         data = data.decode("utf-16").encode('utf-8')
     except Exception,e:
         pass
     
-    print "%s: %s" % (property_name, data)
+    yield property_name, data
 
 def mesg_attach(p,file):
-    pass
+    yield ('','')
 
 def mesg_receipt(p,file):
-    pass
+    yield ('','')
 
 class FIDAndOffset(SimpleStruct):
     fields=[
@@ -250,7 +251,7 @@ def parse_summary_info(p,file):
                 if issubclass(cls,DataType):
                     v=cls(section_data[offset+value.size():])
                     ## Print the data according to its data type
-                    print "%s: '%s'" % (prop['Type'],v)
+                    yield (prop['Type'],v)
             except (TypeError,KeyError),e:
                 #print "Cant handle property type %s for %s" % (cls,prop['Type'])
                 pass
@@ -270,4 +271,5 @@ if __name__ == "__main__":
         for i in dispatch.keys():
             property_name = p['pps_rawname'].__str__()
             if re.search(i,property_name):
-                dispatch[i](p,a)
+                for prop,value in dispatch[i](p,a):
+                    print "%s: %s" % (prop,value)
