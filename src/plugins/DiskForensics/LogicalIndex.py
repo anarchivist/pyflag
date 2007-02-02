@@ -556,7 +556,7 @@ class BrowseIndexKeywords(Reports.report):
 ## Unit tests
 import unittest
 import pyflag.mspst
-from pyflag.tests import ScannerTest
+import pyflag.tests
 
 class LogicalIndexTests(unittest.TestCase):
     """ Logical Index Tests """
@@ -641,7 +641,7 @@ class LogicalIndexTests(unittest.TestCase):
 import pyflag.pyflagsh as pyflagsh
 from pyflag.FileSystem import DBFS
 
-class LogicalIndexScannerTest(ScannerTest):
+class LogicalIndexScannerTest(pyflag.tests.ScannerTest):
     """ Test Logical Index Scanner """
     test_case = "PyFlagIndexTestCase"
     test_file = "ntfs_image.e01"

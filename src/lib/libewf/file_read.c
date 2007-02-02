@@ -886,7 +886,7 @@ int64_t libewf_read_random( LIBEWF_HANDLE *handle, void *buffer, uint64_t size, 
 
 	if( chunk >= handle->offset_table->amount )
 	{
-		LIBEWF_FATAL_PRINT( "libewf_read_random: Attempting to read past the end of the file.");
+		//LIBEWF_FATAL_PRINT( "libewf_read_random: Attempting to read past the end of the file.");
 	}
 	/* Offset within the decompressed buffer
 	 */

@@ -9,3 +9,5 @@ class Time(TimestampType):
     def create(self):
         return "`%s` TIME " % self.column
 
+## Import the unit tests so they are picked up by the registry:
+from pyflag.TableObj import ColumnTypeTests

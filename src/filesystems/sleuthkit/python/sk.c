@@ -399,7 +399,7 @@ pyfile_read_random(IMG_INFO * img_info, OFF_T vol_offset, char *buf,
     memcpy(buf, strbuf, read);
 
     if(read < len) {
-      printf("Tried to read %llu, only got %llu\n", (uint64_t)len, (uint64_t)read);
+      //printf("Tried to read %llu, only got %llu\n", (uint64_t)len, (uint64_t)read);
     };
 
     Py_XDECREF(res);

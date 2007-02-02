@@ -481,7 +481,7 @@ class StateType(ColumnType):
         raise RuntimeError("Dont understand state %r. Valid states are %s" % (state,self.states.keys()))
 
     def create(self):
-        return "`%s` enum(%s) default NULL" % (self.column, ','.join(["%r"% x for x in states.keys()]))
+        return "`%s` enum(%s) default NULL" % (self.column, ','.join(["%r"% x for x in self.states.keys()]))
 
 class IntegerType(ColumnType):
     symbols = {
@@ -734,11 +734,13 @@ class FilenameType(StringType):
     ## a globbing operator it should be possible to split the glob
     ## into directory components and therefore create SQL specifically
     ## using path and name.
-    ## def operator_glob(self, column, operator, pattern):
-    ##    directory,filename = os.path.split(pattern)
-    ##    sql = ''
-    ##    if directory:
-    ##        sql += "%s rlike %r" % (self.path, glob_re(
+    def operator_glob(self, column, operator, pattern):
+        """ Performs a glob operation on the Virtual file system. Wildcards are * and ?"""
+        directory,filename = os.path.split(pattern)
+        sql = ''
+        if directory:
+            pass
+#            sql += "%s rlike %r" % (self.path, glob_re(
 
 class DeletedType(StateType):
     """ This is a column type which shows deleted inodes graphically
@@ -765,3 +767,75 @@ class BinaryType(StateType):
             return "*"
         else:
             return " "
+
+
+## Unit tests for the column types.
+import unittest,re
+
+class ColumnTypeTests(unittest.TestCase):
+    """ Column Types """
+    def setUp(self):
+        import pyflag.UI as UI
+        
+        self.ui = UI.GenericUI()
+
+        self.elements = [ IntegerType('IntegerType',column='table.integer_type'),
+                          StringType('StringType',column='foobar.string_type'),
+                          DeletedType('DeletedType', column='deleted'),
+                          TimestampType('TimestampType','timestamp'),
+                          IPType('IPType','source_ip'),
+                          InodeType('InodeType','inode'),
+                          FilenameType('FilenameType'),
+                          ]
+        self.tablename = 'dummy'
+
+    def generate_sql(self, filter):
+        sql = self.ui._make_sql(elements = self.elements, filter_elements=self.elements,
+                                 table = self.tablename, case=None, filter = filter)
+        ## We are only interested in the where clause:
+        match = re.search("where \((.*)\) order", sql)
+        return match.group(1)
+        
+    def test05FilteringTest(self):
+        """ Test filters on columns """
+        self.assertEqual(self.generate_sql("'IntegerType' > 10"),
+                         "(1) and (table.integer_type > '10')")
+        
+        self.assertEqual(self.generate_sql("'StringType' contains 'Key Word'"),
+                         "(1) and (foobar.string_type like '%Key Word%')")
+
+        self.assertEqual(self.generate_sql("'StringType' matches 'Key Word'"),
+                         "(1) and (foobar.string_type like 'Key Word')")
+
+        self.assertEqual(self.generate_sql("'StringType' regex '[a-z]*'"),
+                         "(1) and (foobar.string_type rlike '[a-z]*')")
+
+        self.assertEqual(self.generate_sql("'DeletedType' is allocated"),
+                         "(1) and (deleted = 'alloc')")
+
+        self.assertRaises(RuntimeError, self.generate_sql, ("'DeletedType' is foobar")),
+        self.assertEqual(self.generate_sql("'TimestampType' after 2005-10-10"),
+                         "(1) and (timestamp > '2005-10-10')")
+
+        self.assertEqual(self.generate_sql("'IPType' netmask 10.10.10.1/24"),
+                         "(1) and ( ( `source_ip` >= 168430081 and `source_ip` <= 168430335 ) )")
+        
+        self.assertEqual(self.generate_sql("'InodeType' annotated FooBar"),
+                         '(1) and (inode=(select annotate.inode from annotate where note like "%FooBar%"))')
+
+        ## Joined filters:
+        self.assertEqual(self.generate_sql("InodeType contains 'Z|' and TimestampType after 2005-10-10"),
+                         "(1) and (inode like '%Z|%' and timestamp > '2005-10-10')")
+        self.assertEqual(self.generate_sql("InodeType contains 'Z|' or TimestampType after 2005-10-10 and IntegerType > 5"),
+                         "(1) and (inode like '%Z|%' or timestamp > '2005-10-10' and table.integer_type > '5')")
+        self.assertEqual(self.generate_sql("(InodeType contains 'Z|' or TimestampType after 2005-10-10) and IntegerType > 5"),
+                         "(1) and (( inode like '%Z|%' or timestamp > '2005-10-10' ) and table.integer_type > '5')")
+
+    def test10CreateTable(self):
+        """ Test table creation """
+        dbh = DB.DBO()
+        
+        ## Check to see if the table create code is valid sql:
+        dbh.execute("create temporary table foobar_001 (%s)", (
+            ',\n'.join([ x.create() for x in self.elements])
+            ))
