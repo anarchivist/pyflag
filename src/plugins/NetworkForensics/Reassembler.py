@@ -276,9 +276,9 @@ class StreamFile(File):
             ## Get the data:
             data=combined_fd.read(row['length'])
             if row['original_id']==self.forward_id:
-                result.text(data,color="blue",font='typewriter',sanitise='full',wrap='full')
+                result.text(data,style="blue",font='typewriter',sanitise='full',wrap='full')
             else:
-                result.text(data,color="red",font='typewriter',sanitise='full',wrap='full')    
+                result.text(data,style="red",font='typewriter',sanitise='full',wrap='full')    
 
         ## Make the paging buttons
         if limit > 0:

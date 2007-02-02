@@ -63,7 +63,7 @@ class RegistryBrowser(Reports.report):
             b = Buffer(fd = open(query['file'],'r'))
             header = RegFile.RegF(b)
             key = header.get_key(path)
-            result.text("Timestamp: %s" % key['WriteTS'], color='red')
+            result.text("Timestamp: %s" % key['WriteTS'], style='red')
             result.start_table(**{'class':'GeneralTable'})
 
             ## We dont want to reference the keys because we

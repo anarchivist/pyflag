@@ -410,7 +410,7 @@ class DBFS_file(FileSystem.File):
         max=config.MAX_DATA_DUMP_SIZE
         def textdumper(offset,data,result):
             result.text(data,sanitise='full',font='typewriter',
-                        color="red",wrap="full")
+                        style="red",wrap="full")
 
         return self.display_data(query,result,max, textdumper)
 

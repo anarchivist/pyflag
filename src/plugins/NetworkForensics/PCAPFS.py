@@ -434,13 +434,13 @@ class ViewDissectedPacket(Reports.report):
             
             try:
                 result.text("%s" % node.name, font='bold')
-                result.text('',color='black', font='normal')
+                result.text('',style='black', font='normal')
                 start,length = node.get_range()
                 h.dump(highlight=[[start,length,'highlight'],])
                 
             except AttributeError:
                 result.text("%s.%s\n" % (previous_node.name,
-                                          branch[-1]), color='black',
+                                          branch[-1]), style='black',
                             font='bold'
                                )
                 try:
@@ -448,8 +448,8 @@ class ViewDissectedPacket(Reports.report):
                 except:
                     pass
                 
-                result.text("%s\n" % node, color='red', wrap='full', font='typewriter', sanitise='full')
-                result.text('',color='black', font='normal')
+                result.text("%s\n" % node, style='red', wrap='full', font='typewriter', sanitise='full')
+                result.text('',style='black', font='normal')
 
                 try:
                     start,length = previous_node.get_range(branch[-1])

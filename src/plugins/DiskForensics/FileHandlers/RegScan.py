@@ -160,7 +160,7 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                     row=dbh.fetch()
 
                     try:
-                        tmp.text("Last modified %s " % row['time'],color='red')
+                        tmp.text("Last modified %s " % row['time'],style='red')
                         table.row(tmp)
                     except TypeError:
                         pass
@@ -198,7 +198,7 @@ class BrowseRegistry(DiskForensics.BrowseFS):
             result.heading("Error occured")
             result.text('It appears that no registry tables are available. Did you remember to run the RegistryScan scanner?')
             result.para('The Error returned by the database is:')
-            result.text(e,color='red')
+            result.text(e,style='red')
             
     def reset(self,query):
         dbh = self.DBO(query['case'])
@@ -218,7 +218,7 @@ class BrowseRegistryKey(BrowseRegistry):
         path=query['path']
         key=query['key']
         result.heading("Registry Key Contents")
-        result.text("Key %s/%s:" % (path,key),color='red',font='typewriter')
+        result.text("Key %s/%s:" % (path,key),style='red',font='typewriter')
         dbh=DB.DBO(query['case'])
 
         def hexdump(query,out):
@@ -291,7 +291,7 @@ class InterestingRegKey(Reports.report):
         except DB.DBError,e:
             result.para("Error reading the registry keys table. Did you remember to run the registry scanner?")
             result.para("Error reported was:")
-            result.text(e,color="red")
+            result.text(e,style="red")
 
 class BrowseRegistryFile(DiskForensics.BrowseFS):
     """ Browse a Standalone Windows Registry File"""

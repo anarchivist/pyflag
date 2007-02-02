@@ -221,8 +221,8 @@ class BuildDictionary(Reports.report):
         except KeyError:
             pass
         except DB.DBError,e:
-            result.text("Error: %s" % e,color='red')
-            result.text("",color='black')
+            result.text("Error: %s" % e,style='red')
+            result.text("",style='black')
             
         result.heading("Building Dictionary")
 
@@ -297,9 +297,9 @@ class DataPreview(OffsetType):
         fd.seek(low)
 
         result = result.__class__(result)
-        result.text(fd.read(50), font='typewriter', color='black', sanitise='full')
-        result.text(fd.read(length), font='typewriter',  color='red',sanitise='full')
-        result.text(fd.read(50), font='typewriter', color='black',sanitise='full')
+        result.text(fd.read(50), font='typewriter', style='black', sanitise='full')
+        result.text(fd.read(length), font='typewriter',  style='red',sanitise='full')
+        result.text(fd.read(50), font='typewriter', style='black',sanitise='full')
 
         return result
 
@@ -374,7 +374,7 @@ class SearchIndexxxx(Reports.report):
                     new_query = query.clone()
                     new_query.remove('keyword',keyword)
                     group.link(keyword, target=new_query, icon='no.png')
-                    group.text("%s\n" % keyword,color='red')
+                    group.text("%s\n" % keyword,style='red')
                     result.hidden('keyword', keyword)
                     old=keyword
                     

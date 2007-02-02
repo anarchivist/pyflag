@@ -215,8 +215,8 @@ class RemoveLogPreset(Reports.report):
             tmp.row("The following will also be dropped:",'')
             left=result.__class__(result)
             right=result.__class__(result)
-            left.text("Case",font='bold',color='red')
-            right.text("Table",font='bold',color='red')
+            left.text("Case",font='bold',style='red')
+            right.text("Table",font='bold',style='red')
             tmp.row(left,right)
             for a in self.find_tables(query['log_preset']):
                 found=1

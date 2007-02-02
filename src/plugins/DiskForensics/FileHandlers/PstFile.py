@@ -364,7 +364,7 @@ class PstExplorer(Reports.report):
             except DB.DBError,e:
                 result.para("Error reading the email table. Did you remember to run the PstExplorer scanner?")
                 result.para("Error reported was:")
-                result.text(e,color="red")
+                result.text(e,style="red")
                 
             
         except KeyError:

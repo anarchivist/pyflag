@@ -123,7 +123,7 @@ class LoadPresetLog(Reports.report):
                 # retrieve and display the temp table
                 log.display_test_log(result)
             except Exception,e:
-                result.text("Error: Unable to load a test set - maybe this log file is incompatible with this log preset?",color='red',font='bold')
+                result.text("Error: Unable to load a test set - maybe this log file is incompatible with this log preset?",style='red',font='bold')
                 pyflaglog.log(pyflaglog.DEBUG,"Unable to load test set - error returned was %s" % e)
                 print FlagFramework.get_bt_string(e)
                 return
@@ -355,7 +355,7 @@ class ScanFS(Reports.report):
         dbh.execute("select timestamp,level,message from logs limit %s, %s", (size-pagesize, pagesize))
         data = '\n'.join(["%(timestamp)s(%(level)s): %(message)s" % row for row in dbh])
         tmp=result.__class__(result)
-        tmp.text(data,font='typewriter',color="red")
+        tmp.text(data,font='typewriter',style="red")
         result.row(tmp)
         
 
@@ -475,7 +475,7 @@ class LoadFS(Reports.report):
             except FlagFramework.FlagException,e:
                 result.hidden('fstype','Mounted')
         except IOError,e:
-            result.text("IOError %s" % e,color='red')
+            result.text("IOError %s" % e,style='red')
         except (KeyError,TypeError),e:
 #            print e
 #            FlagFramework.get_traceback(e,result)
@@ -526,7 +526,7 @@ class LoadFS(Reports.report):
 
             result.row("System messages:")
             tmp=result.__class__(result)
-            tmp.text('\n'.join(pyflaglog.ring_buffer),font='typewriter',color="red")
+            tmp.text('\n'.join(pyflaglog.ring_buffer),font='typewriter',style="red")
             result.row(tmp)
             ## FIXME: This is a horribly slow query...
   #          dbh.execute("select count(*) as count,value as total from inode_%s, meta_%s as m where m.name='last_inode' group by total" % (tablename, tablename))

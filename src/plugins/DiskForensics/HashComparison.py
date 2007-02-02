@@ -115,5 +115,5 @@ class HashComparison(Reports.report):
         except DB.DBError,e:
             result.para("Error reading the MD5 hash table. Did you remember to run the MD5Scan scanner?")
             result.para("Error reported was:")
-            result.text(e,color="red")
+            result.text(e,style="red")
          

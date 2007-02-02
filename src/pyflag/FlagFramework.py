@@ -654,7 +654,7 @@ class HexDump:
         ui.text( ' ' * len(offset_format % 0),font='typewriter')
         for i in range(self.width):
             result += char_format % i
-            ui.text(char_format % i,color = 'blue',font='typewriter')
+            ui.text(char_format % i,style = 'blue',font='typewriter')
 
         ui.text("\n",font='typewriter')
         result+="\n"
@@ -662,7 +662,7 @@ class HexDump:
         
         while not finished and initial_offset+limit>offset:
             tmp_offset=offset
-            ui.text(offset_format % (offset+base_offset), color='blue',font='typewriter')
+            ui.text(offset_format % (offset+base_offset), style='blue',font='typewriter')
             result += offset_format % offset
             text = ''
 
@@ -671,9 +671,10 @@ class HexDump:
                     color = find_highlights(offset)
                     if color:
                         ui.text(char_format % ord(self.data[offset]),
-                                color='black',font='typewriter',highlight=color)  
+                                font='typewriter',style=color)  
                     else:
-                        ui.text(char_format % ord(self.data[offset]),color='black',font='typewriter')
+                        ui.text(char_format % ord(self.data[offset]),style='black',
+                                font='typewriter')
                         
                     result += char_format % ord(self.data[offset])
                 except IndexError:
@@ -682,10 +683,10 @@ class HexDump:
                     finished = 1
 
             for offset in range(tmp_offset,tmp_offset+self.width):
-                args = dict(font='typewriter',sanitise='full',color='red')
+                args = dict(font='typewriter',sanitise='full',style='red')
                 color = find_highlights(offset)
-                if offset:
-                    args['highlight'] = color
+                if color:
+                    args['style'] = color
                     
                 try:
                     if 32 < ord(self.data[offset]) < 127:

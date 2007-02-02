@@ -131,7 +131,7 @@ class HTMLUI(UI.GenericUI):
         if query:
             self.defaults=query
 
-        self.color=None
+        self.style=None
         self.font=None
         self.table_depth = 0
         self.type = "text/html"
@@ -761,13 +761,13 @@ class HTMLUI(UI.GenericUI):
             if t =='branch':
                 new_query = link
                 left.link(str(sv),tooltip=link['open_tree'],target=link, name=open_tree,icon="folder.png")
-                left.text("&nbsp;%s\n" % str(sv),color='black')
+                left.text("&nbsp;%s\n" % str(sv),style='black')
             elif t == 'special':
                 left.link(str(v),tooltip=link['open_tree'],target=link, name=open_tree)
                 left.text("\n")
             else:
                 left.link(str(sv),tooltip=link['open_tree'],target=link, name=open_tree,icon="corner.png")
-                left.text("&nbsp;%s\n" % str(sv),color='black')
+                left.text("&nbsp;%s\n" % str(sv),style='black')
 
         right=self.__class__(self)
         path=FlagFramework.normpath(query.get('open_tree','/'))
@@ -964,7 +964,7 @@ class HTMLUI(UI.GenericUI):
             result.row("Column Name","Operator","Description", **{'class':'hilight'})
             for e in elements:
                 tmp = result.__class__(result)
-                tmp.text(e.name,color='red', font='bold')
+                tmp.text(e.name,style='red', font='bold')
                 result.row(tmp,'','')
                 for name,method_name in e.operators().items():
                     try:
@@ -1000,8 +1000,8 @@ class HTMLUI(UI.GenericUI):
                         return
                     
                 except Exception,e:
-                    result.text('Error parsing expression: %s' % e, color='red')
-                    result.text('\n',color='black')
+                    result.text('Error parsing expression: %s' % e, style='red')
+                    result.text('\n',style='black')
                     
             except KeyError,e:
                 print e
@@ -1159,9 +1159,9 @@ class HTMLUI(UI.GenericUI):
         def do_options(d,options):
             """ Process options """
             format = ''
-            if (options.has_key('color') and options['color'] != self.color):
-                format += "</font><font color=%r>" %(options['color'])
-                self.color = options['color']
+            if (options.has_key('style') and options['style'] != self.style):
+                format += "</span><span class=%r>" %(options['style'])
+                self.style = options['style']
 
             if options.has_key('font') and options['font'] != self.font:
 ##            if options.has_key('font'):

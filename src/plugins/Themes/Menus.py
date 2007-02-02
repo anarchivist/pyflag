@@ -43,7 +43,7 @@ class Menu(Theme.BasicTheme):
         tmp.icon("logo.png")
         left.link(tmp,url="http://pyflag.sourceforge.net/")
         right = result.__class__(result)
-        right.text("PyFlag is a GPL Project maintained at http://pyflag.sourceforge.net/ . \nThis is %s" % FlagFramework.flag_version ,color="red",font="bold")
+        right.text("PyFlag is a GPL Project maintained at http://pyflag.sourceforge.net/ . \nThis is %s" % FlagFramework.flag_version ,style="red",font="bold")
         result.row(tmp,right,align="center")
 
         return result

@@ -66,7 +66,7 @@ class InitDB(Reports.report):
     def form(self,query, result):
         result.para("Pyflag is able to connect to the database server (so credentials seem ok), but we receive the following error when trying to use the pyflag database.")
 
-        result.text("%s\n\n" % query['error'], color='red')
+        result.text("%s\n\n" % query['error'], style='red')
         
         result.text("This may be because the pyflag database (%s) is not properly initialised. Tick the button below to allow Pyflag to attempt to re-create and initialise the database.\n\n" % config.FLAGDB, color="black")
 

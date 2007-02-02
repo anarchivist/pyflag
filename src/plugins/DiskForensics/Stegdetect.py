@@ -43,6 +43,8 @@ import pyflag.DB as DB
 import pexpect
 from pyflag.TableObj import StringType, TimestampType, InodeType
 
+disabled = True
+
 class AFTJpegScan(GenScanFactory):
     """ Steganography inside Jpeg images """
     order=99
@@ -139,7 +141,7 @@ class AFTSteganography(Reports.report):
 	     tmp = result.__class__(result)
 	     tmp.para("Unable to find Stegdetect Jpeg table for the current image. Did you run Stegdetect Jpeg Scanner?.")
 	     tmp.para("IError received was %s" % e)
-	     tmp.text("Remember: Stegdetect Scanner will save every Jpeg image it finds inside the Forensic Workstation Hard Disk.", color="red")
+	     tmp.text("Remember: Stegdetect Scanner will save every Jpeg image it finds inside the Forensic Workstation Hard Disk.", style="red")
 	     tmp.text(" This could require a big amount of free space available.")
 	     raise Reports.ReportError(tmp)
 
@@ -161,5 +163,5 @@ class AFTSteganography(Reports.report):
 	except DB.DBError,e:
             result.para("Error reading the Jpeg Steg Found table. Did you remember to run the AFT Jpegs  scanner? (not really)")
             result.para("Error reported was:")
-            result.text(e,color="red")		
+            result.text(e,style="red")		
 

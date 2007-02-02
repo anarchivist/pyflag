@@ -282,9 +282,22 @@ iframe#right {
   background-color: pink;
 }
 
+/** Some common color effects: */
+.blue { 
+  color: blue;
+}
+
+.red { 
+  color: red;
+}
+
+.black { 
+  color: black;
+ }
+
 /** Regular data highlighted here */
 .alloc { 
-  background-color: lightgrey;
+  background-color: #f8f8f8;
 }
 
 /** Matches are highlighted here */

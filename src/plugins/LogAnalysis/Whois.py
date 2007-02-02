@@ -117,8 +117,8 @@ class LookupIP(Reports.report):
         for name in res.keys():
             tmp=result.__class__(result)
             tmp2=result.__class__(result)
-            tmp.text("%s:" % name, color='red',font='typewriter')
-            tmp2.text("%s" % (res[name]),color='black',font='typewriter')
+            tmp.text("%s:" % name, style='red',font='typewriter')
+            tmp2.text("%s" % (res[name]),style='black',font='typewriter')
             result.row(tmp,tmp2,valign="top")
 
 class LookupWhoisID(LookupIP):

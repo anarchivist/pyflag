@@ -103,4 +103,4 @@ class IEHistory(Reports.report):
         except DB.DBError,e:
             result.para("Error reading the history table. Did you remember to run the IEHistory scanner?")
             result.para("Error reported was:")
-            result.text(e,color="red")
+            result.text(e,style="red")
