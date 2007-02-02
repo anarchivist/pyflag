@@ -426,9 +426,7 @@ def goto_page_cb(query,result,variable):
         limit='0'
 
     try:
-        if query['submit']:
-            del query['submit']
-
+        if query['__submit__']:
             ## Accept hex representation for limits
             if limit.startswith('0x'):
                 del query[variable]

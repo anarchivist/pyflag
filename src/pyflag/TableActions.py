@@ -397,7 +397,6 @@ def directory_selector(description, ui, variable, root):
 
             q = result.defaults.clone()
             del q[variable]
-            del q['submit']
             q[variable]=path
             q['__opt__'] = 'main'
             result.link("Click here to select this directory",icon="ok.png", target=q)

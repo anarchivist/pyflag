@@ -137,7 +137,13 @@ def mesg_property(p,file):
         property_name="Unknown property ID %s" % prop_id
         
     data=file.cat(p)
-    print "%s: %s" % (property_name,data)
+
+    try:
+        data = data.decode("utf-16").encode('utf-8')
+    except Exception,e:
+        pass
+    
+    print "%s: %s" % (property_name, data)
 
 def mesg_attach(p,file):
     pass

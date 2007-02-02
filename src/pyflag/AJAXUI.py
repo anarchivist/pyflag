@@ -463,8 +463,7 @@ class AJAXUI(HTMLUI.HTMLUI):
                     sql = parser.parse_to_sql(filter_str,elements)
 
                     ## This is good if we get here - lets refresh to it now:
-                    if query.has_key('submit'):
-                        del query['submit']
+                    if query.has_key('__submit__'):
                         result.refresh(0,query,pane='parent')
                         return
                     
@@ -759,8 +758,7 @@ class AJAXUI(HTMLUI.HTMLUI):
                     sql = parser.parse_to_sql(filter_str,types)
 
                     ## This is good - lets refresh to it now:
-                    if query.has_key('submit'):
-                        del query['submit']
+                    if query.has_key('__submit__'):
                         result.refresh(0,query,pane='parent')
                         return
                     

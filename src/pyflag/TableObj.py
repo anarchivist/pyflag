@@ -507,7 +507,7 @@ class StringType(ColumnType):
 
     def operator_contains(self, column, operator, arg):
         """ Matches when the column contains the pattern anywhere. Its the same as placing wildcards before and after the pattern. """
-        return '%s like %r' % (self.column, "%" + arg + "%")
+        return '%s like %r' % (self.select(), "%" + arg + "%")
 
     def operator_matches(self, column, operator, arg):
         """ This matches the pattern to the column. Wild cards (%) can be placed anywhere, but if you place it in front of the pattern it could be slower. """
