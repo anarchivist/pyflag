@@ -95,5 +95,5 @@ END_CLASS
 
 // Some useful prototypes:
 int LiteralNode_casecompare(TrieNode self, char **buffer, int *len);
-
+int CharacterClass_wildcard_compare(TrieNode self, char **buffer, int *len);
 #endif

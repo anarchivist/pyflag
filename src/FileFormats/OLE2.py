@@ -191,24 +191,24 @@ class PropType(LONG_ENUM):
     This list is not exhaustive.
     """
     types = {
-        0x02:'PID_TITLE',
-        0x03:'PID_SUBJECT',
-        0x04:'PID_AUTHOR',
-        0x05:'PID_KEYWORDS',
-        0x06:'PID_COMMENTS',
-        0x07:'PID_TEMPLATE',
-        0x08:'PID_LASTAUTHOR',
-        0x09:'PID_REVNUMBER',
-        0x12:'PID_APPNAME',
-        0x0A:'PID_TOTAL_EDITTIME',
-        0x0B:'PID_LASTPRINTED',
-        0x0C:'PID_CREATED',
-        0x0D:'PID_LASTSAVED',
-        0x0E:'PID_PAGECOUNT',
-        0x0F:'PID_WORDCOUNT',
-        0x10:'PID_CHARCOUNT',
-        0x13:'PID_SECURITY',
-        0x11:'PID_THUMBNAIL'
+        0x02:'Title',
+        0x03:'Subject',
+        0x04:'Author',
+        0x05:'Keywords',
+        0x06:'Comments',
+        0x07:'Template',
+        0x08:'Lastauthor',
+        0x09:'Revnumber',
+        0x12:'Appname',
+        0x0A:'Total_edittime',
+        0x0B:'Lastprinted',
+        0x0C:'Created',
+        0x0D:'Lastsaved',
+        0x0E:'Pagecount',
+        0x0F:'Wordcount',
+        0x10:'Charcount',
+        0x13:'Security',
+        0x11:'Thumbnail'
         }
 
 class Property(SimpleStruct):
@@ -251,7 +251,7 @@ def parse_summary_info(p,file):
                 if issubclass(cls,DataType):
                     v=cls(section_data[offset+value.size():])
                     ## Print the data according to its data type
-                    yield (prop['Type'],v)
+                    yield (prop['Type'].get_value(),v)
             except (TypeError,KeyError),e:
                 #print "Cant handle property type %s for %s" % (cls,prop['Type'])
                 pass

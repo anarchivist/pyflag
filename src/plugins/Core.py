@@ -148,26 +148,6 @@ class OffsetFile(FileSystem.File):
         self.readptr+=len(result)
         return result
 
-import StringIO
-
-#### This is a memory cached version of the offset file driver - very useful for packets:
-##class MemoryCachedOffset(StringIO.StringIO, FileSystem.File):
-##    specifier = 'O'
-##    def __init__(self, case, fd, inode):
-##        FileSystem.File.__init__(self, case, fd, inode)
-
-##        ## We parse out the offset and length from the inode string
-##        tmp = inode.split('|')[-1]
-##        tmp = tmp[1:].split(":")
-##        fd.seek(int(tmp[0]))
-
-##        try:
-##            self.size=int(tmp[1])
-##        except IndexError:
-##            self.size=sys.maxint
-            
-##        StringIO.StringIO.__init__(self, fd.read(self.size))
-
 class Help(Reports.report):
     """ This facility displays helpful messages """
     hidden = True

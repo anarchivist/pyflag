@@ -287,3 +287,5 @@ CREATE TABLE `logs` (
 `level` TINYINT NOT NULL ,
 `message` VARCHAR( 250 ) NOT NULL
 ) ;
+
+-- These are regexs for the Carver - we use the indexer to automatically carve

@@ -99,7 +99,7 @@ class IndexScan(GenScanFactory):
 
         pydbh.execute("select word,id from dictionary where type='regex'")
         for row in pydbh:
-            self.index.add_word(row['word'],row['id'], index.WORD_REGEX)
+            self.index.add_word(row['word'],row['id'], index.WORD_EXTENDED)
 
         # load words in a number of alternate character sets. The ones
         # we care about atm are utf-8 and utf-16/UCS-2 which is used
@@ -615,12 +615,40 @@ class LogicalIndexTests(unittest.TestCase):
         """ Test Regex indexing """
         dictionary = {
             ## Test for IP Addresses
-            5: "\d+.\d+.\d+.\d+",
-
+            5: r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}",
+            7: r"2.\.",
+            
             ## Test character classes
-            10: "[abcd]+",
-            11: "[1-9]+",
-            12: "[a-zA-Z]+"
+            10: r"[abcd]+",
+            11: r"[1-9]+",
+            12: r"[19268]{4,99}",
+            15: r"[a-zA-Z]+",
+
+            ## . matches everything:
+            20: r"A.d.e.s.s",
+
+            ## Hex representation of characters:
+            30: r"I\x50\x20",
+            31: r"A\x64+",
+
+            ## Character classes in character classes (Note the . is
+            ## literal here):
+            40: r"s[ \d.]+",
+            }
+
+        ## This documents some of the expected results (There will be
+        ## more than that but we test that at least these were found.
+        expected = {
+            5: ['10.10.10.1', '192.168.30.1', '0.10.10.1'],
+            7: ['22.', '23.'],
+            10: ['dd', 'd' ],
+            11: ['19922', '1666888', '66888'],
+            12: ['19922', '1666888', '66888'],
+            15: ['Addresses', 'Some', 'resses'],
+            20: ['Addresses'],
+            30: ['IP '],
+            31: ["Add"],
+            40: ["s 10.10.10.1"],
             }
 
         data = """
@@ -636,8 +664,15 @@ class LogicalIndexTests(unittest.TestCase):
             for id , length in matches:
                 word = dictionary[id]
                 matched = data[offset:offset+length]
-                print "word: %s" % word, "matched: %r" % matched
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "word: %r matched %r" % (word,matched))
+                try:
+                    del expected[id][expected[id].index(matched)]
+                except ValueError:
+                    pass
 
+        for id,v in expected.items():
+            self.assertEqual(v,[],"Some terms were not found. Expected %s to find %s" % (dictionary[id],v))
+            
 import pyflag.pyflagsh as pyflagsh
 from pyflag.FileSystem import DBFS
 

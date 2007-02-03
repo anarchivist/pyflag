@@ -51,7 +51,7 @@ class OLEScan(Scanner.GenScanFactory):
             return OLE2.mesg_receipt(property,file)
 
         def parse_summary_info(self, property, file):
-            return OLE2.parse_summary_info(self, property, file)
+            return OLE2.parse_summary_info(property, file)
 
         dispatch = {
             "__substg1.0": mesg_property,
@@ -62,8 +62,11 @@ class OLEScan(Scanner.GenScanFactory):
 
         def store_file(self, metadata):
             """ Creates the VFS node and scans it """
+            try:
+                data = metadata['Attachment data']
+            except KeyError: return
+
             path = self.ddfs.lookup(inode = self.fd.inode)
-            data = metadata['Attachment data']
             new_inode = "%s|O%s" % (self.fd.inode, self.count)
             self.count+=1
             filename = metadata.get('Attach filename', metadata.get('Attach long filenm','Attachment'))
@@ -109,9 +112,11 @@ class OLEScan(Scanner.GenScanFactory):
                             else:
                                 ## Not Attachment: Store the metadata
                                 ## in the xattr table:
-                                dbh.mass_insert(inode_id = self.fd.inode_id,
-                                                property = prop,
-                                                value = value)
+                                value = value.__str__().strip()
+                                if len(value)>1:
+                                    dbh.mass_insert(inode_id = self.fd.inode_id,
+                                                    property = prop,
+                                                    value = value)
                                 metadata[prop] = value
 
             ## Finalise the attachments

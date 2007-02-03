@@ -1,7 +1,7 @@
 #include "trie.h"
 #include "misc.h"
 
-/** This function reads the wildcards and ranges:
+/** This function reads and interprets the ranges:
 
 * Means zero or more occurances,
 + Means one or more occurances,
@@ -10,15 +10,15 @@
 The values are set in the lower,upper if they were found. buffer and
 len are suitably adjusted.
 */
-void check_for_wildcards(unsigned char *lower, unsigned char *upper, 
+void check_for_repeat(unsigned char *lower, unsigned char *upper, 
 			 char **buffer, int *len) {
   switch(**buffer) {
   case '*':
     *lower=0;
-    goto wildcards_return;
+    goto repeat_return;
   case '+':
     *lower=1;
-    goto wildcards_return;
+    goto repeat_return;
   case '{':
     {
       int l,u;
@@ -42,7 +42,7 @@ void check_for_wildcards(unsigned char *lower, unsigned char *upper,
     return;
   };
 
- wildcards_return:
+ repeat_return:
   *upper=MAX_MATCH_LENGTH;
   (*buffer)++; (*len)--;
   return;
@@ -58,11 +58,12 @@ char *build_character_class(char **buffer, int *len) {
   int inverted = False;
   char *map;
 
+  // We expect to be called on a [
   if(**buffer == '[') {
     (*buffer)++; (*len)--;
   } else return NULL;
 
-  map = talloc_size(NULL, 256);
+  map = talloc_size(NULL, 258);
   memset(map, 0, 256);
   
   if(**buffer == '^') {
@@ -70,7 +71,7 @@ char *build_character_class(char **buffer, int *len) {
     (*buffer)++; (*len)--;
   };
 
-  while(**buffer != ']') {
+  while(**buffer != ']' && *len>1) {
     //Range specified:
     if(**buffer=='-') {
       int i;
@@ -79,11 +80,39 @@ char *build_character_class(char **buffer, int *len) {
 	map[i] = True;
       };
 
-      (*buffer)++; (*len)--;
-    } else     
-      map[(int)*(unsigned char *)*buffer] = True;
+    } else if(**buffer=='\\') {
+      // We try to parse out the \\ character class.
+      CharacterClassNode n = CONSTRUCT(CharacterClassNode, CharacterClassNode, 
+					 Con, NULL, buffer, len);
 
-    (*buffer)++; (*len)--;
+      // This can produce either a LiteralNode or a true CharacterClassNode:
+      if(!n) {
+	continue;
+      };
+
+      if(ISINSTANCE(n, LiteralNode)) {
+	LiteralNode this=(LiteralNode)n;
+
+	// Set the literal node's value in the map
+	map[(unsigned int)(unsigned char)(this->value)] = True;
+      } else if(ISINSTANCE(n, CharacterClassNode)) {
+	int i;
+
+	// Merge the character maps together
+	for(i=0;i<256; i++) {
+	  map[i] |= n->map[i];
+	};
+      };
+
+      talloc_free(n);
+      // We do not need to advance buffer because
+      // CharacterClassNode_Con has done so.
+      continue; 
+    } else {
+      map[(int)*(unsigned char *)*buffer] = True;
+    };
+    
+    (*buffer)++, (*len)--;
   };
 
   if(inverted) {
@@ -133,7 +162,7 @@ int Compare_literal_nodes_with_case(TrieNode a, TrieNode b) {
 
   char left=((LiteralNode)a)->value;
   char right= ((LiteralNode)b)->value;
-  return (left+cmap[left]==right+cmap[right]);
+  return (left+cmap[(unsigned int)left]==right+cmap[(unsigned int)right]);
 };
 
 
@@ -169,15 +198,9 @@ static TrieNode MakeNextNode(TrieNode self, char **word, int *len,
 
   /** Look for \ escapes */
   if(**word == '\\') {
-    *word=*word+1;
-    *len=*len-1;
-    
-    /** Two \\ in a row will be replaced by one \ */
-    if(**word != '\\') {
-      /** CharacterClassNode accounds for things like \d \w etc */
-      n=(TrieNode)CONSTRUCT(CharacterClassNode, CharacterClassNode, 
-			    Con, self, word, len);
-    };
+    /** CharacterClassNode accounds for things like \d \w etc */
+    n=(TrieNode)CONSTRUCT(CharacterClassNode, CharacterClassNode, 
+			  Con, self, word, len);
 
     /** Look for explicit character classes [0-2] etc */
   } else if (**word == '[') {
@@ -188,8 +211,19 @@ static TrieNode MakeNextNode(TrieNode self, char **word, int *len,
 			    Con_with_map, self, word,len, map);
       
       /** Steal this map: */
-      talloc_steal(n, map);
+      if(n)
+	talloc_steal(n, map);
     };
+
+    /** Look for a wildcard specifier (matches everything) */
+  } else if(**word == '.') {
+    n=(TrieNode)CONSTRUCT(CharacterClassNode, CharacterClassNode,
+			  Con_with_map, self, word,len, NULL);
+    
+    if(n)
+      n->compare = CharacterClass_wildcard_compare;
+
+    (*word)++; (*len)--;
   };
 
   /** Otherwise we just add a literal node */
@@ -198,9 +232,9 @@ static TrieNode MakeNextNode(TrieNode self, char **word, int *len,
     n=(TrieNode)CONSTRUCT(LiteralNode, LiteralNode, Con, self, word, len);    
   };
 
-  /** Now check for wildcards and ranges e.g. {1,4} */
+  /** Now check for ranges e.g. {1,4} */
   if(*len > 0) {
-    check_for_wildcards(&(n->lower_limit), &(n->upper_limit), word, len);
+    check_for_repeat(&(n->lower_limit), &(n->upper_limit), word, len);
   };
 
   return n;
@@ -209,7 +243,7 @@ static TrieNode MakeNextNode(TrieNode self, char **word, int *len,
 /** This adds the chain representing word into self as a parent */
 void TrieNode_AddWord(TrieNode self, char **word, int *len, long int data, 
 		      enum word_types type) {
-  int i = 0x0F & **word;
+  int i;
   TrieNode n;
   int (*comparison_function)(TrieNode a, TrieNode b) = Compare_literal_nodes;
   
@@ -235,6 +269,12 @@ void TrieNode_AddWord(TrieNode self, char **word, int *len, long int data,
       table: 
   */
   if(ISINSTANCE(n, LiteralNode)) {
+    LiteralNode this = (LiteralNode)n;
+
+    // Calculate the hash value of the literal node
+    i = 0x0F & this->value;
+
+    // Make sure there is a list head ready
     if(!self->hash_table[i]) {
       self->hash_table[i] = CONSTRUCT(TrieNode, TrieNode, Con, self);
     };
@@ -335,7 +375,7 @@ LiteralNode LiteralNode_Con(LiteralNode self, char **value, int *len) {
 // A variation of the compare method with case insensitive comparisons
 int LiteralNode_casecompare(TrieNode self, char **buffer, int *len) {
   LiteralNode this = (LiteralNode)self;
-  int result = **buffer+cmap[**buffer]==this->value;
+  int result = **buffer+cmap[(unsigned int)**buffer]==this->value;
 
   if(result)
     (*buffer)++; (*len)--;
@@ -345,7 +385,6 @@ int LiteralNode_casecompare(TrieNode self, char **buffer, int *len) {
 
 int LiteralNode_compare(TrieNode self, char **buffer, int *len) {
   LiteralNode this = (LiteralNode)self;
-  //int result = **buffer+cmap[**buffer]==this->value;
   int result = **buffer==this->value;
 
   if(result)
@@ -432,6 +471,15 @@ CharacterClassNode CharacterClassNode_Con(CharacterClassNode self,
   talloc_set_name(self, "%s: %c", NAMEOF(self),**word);
 #endif
 
+  // We expect to be called on a \\ character:
+  if(**word != '\\') {
+    printf("Error CharacterClassNode not constructed on \\\n");
+    talloc_free(self);
+    return NULL;
+  };
+  
+  (*word)++; (*len)--;
+
   switch(**word) {
   case 'd':
     this->map = char_map_digits;
@@ -439,6 +487,32 @@ CharacterClassNode CharacterClassNode_Con(CharacterClassNode self,
   case 'w':
     this->map = char_map_word;
     break;
+
+    // This is a hex value literal (e.g. \xff):
+  case 'x':
+    {
+      // Make a dummy LiteralNode and set its value
+      LiteralNode result = CONSTRUCT(LiteralNode, LiteralNode, Con,
+				     self, word, len);
+
+      unsigned int x;
+      if(sscanf(*word, "%02x", &x) < 1) {
+	char tmp[10];
+	strncpy(tmp, *word, 9);
+	tmp[10]=0;
+
+	printf("Unable to understand hex character %s\n", tmp);
+	return NULL;
+      } else {
+	(*word)+=2;
+	(*len)-=2;
+      };
+
+      result->value = x;
+      return (CharacterClassNode)result;
+    };
+    break;
+
   default:
     // Unknown character class- just use a literal:
     return (CharacterClassNode)CONSTRUCT(LiteralNode, LiteralNode, Con,
@@ -461,6 +535,12 @@ int CharacterClassNode_compare(TrieNode self, char **buffer, int *len) {
   };
 
   return False;
+};
+
+/** This is used to make a wildcard comparison - always matches anything */
+int CharacterClass_wildcard_compare(TrieNode self, char **buffer, int *len) {
+  (*buffer)++; (*len)--;
+  return 1;
 };
 
 VIRTUAL(CharacterClassNode, TrieNode)
