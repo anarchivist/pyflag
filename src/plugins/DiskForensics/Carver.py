@@ -35,6 +35,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
 import pyflag.Scanner as Scanner
+import PIL.Image
 
 class Carver:
     """ A carver is a class which knows about how to extract specific
@@ -47,16 +48,25 @@ class Carver:
     def __init__(self, fsfd):
         self.fsfd = fsfd
 
+    def get_length(self, fd,offset):
+        """ Returns the length of the carved image from the inode
+        fd. fd should already be seeked to the right place.
+        """
+        length = min(fd.size-offset, self.length)
+        return length
+    
     def add_inode(self, fd, offset, factories):
         """ This is called to allow the Carver to add VFS inodes. """
-        new_inode = "%s|o%s:%s" % (fd.inode, offset, self.length)
+        ## Calculate the length of the new file
+        length = self.get_length(fd,offset)
+        new_inode = "%s|o%s:%s" % (fd.inode, offset, length)
         pathname = self.fsfd.lookup(inode = fd.inode)
                     
         ## By default we just add a VFS Inode for it.
         self.fsfd.VFSCreate(None,
                             new_inode,
                             pathname + "/%s.%s" % (offset, self.extension),
-                            size = self.length,
+                            size = length,
                             )
 
         ## Scan the new inodes:
@@ -65,7 +75,7 @@ class Carver:
             
 class JpegCarver(Carver):
     regexs = ["\xff\xd8....JFIF", "\xff\xd8....EXIF"]
-    extension = '.jpg'
+    extension = 'jpg'        
     
 class CarveScan(Scanner.GenScanFactory):
     """ Carve out files """
@@ -108,7 +118,7 @@ class CarveScan(Scanner.GenScanFactory):
             dbh.execute("select word_id,offset from LogicalIndexOffsets where offset>0 and inode_id = %r and (%s)",
                         (self.fd.inode_id, sql))
             for row in dbh:
-                print "Adding carved inode to %s at offset %s " % (self.fd.inode, row['offset'])
+                #print "Adding carved inode to %s at offset %s " % (self.fd.inode, row['offset'])
                 ## Allow the carver to work with the offset:
                 self.outer.ids[row['word_id']].add_inode(self.fd, row['offset'], self.factories)
 
@@ -129,3 +139,13 @@ class CarverTest(pyflag.tests.ScannerTest):
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env, command="scan",
                              argv=["*",'CarveScan', 'IndexScan','TypeScan'])
+
+        ## See if we found the two images from within the word
+        ## document:
+        expected = [ "Itest|K24-0-0|o150712:87368", "Itest|K24-0-0|o96317:141763"]
+        
+        dbh = DB.DBO(self.test_case)
+        for inode in expected:
+            dbh.execute("select inode from inode where inode=%r limit 1", inode)
+            row = dbh.fetch()
+            self.assert_(row != None)

@@ -68,7 +68,7 @@ class RFC2822(Scanner.GenScanFactory):
                 except:
                     pass
 
-                print "RFC2822 thought %s is boring despite the magic" % line
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "RFC2822 thought %s is boring despite the magic" % line)
 
             self.ignore = True
             return True

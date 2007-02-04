@@ -321,8 +321,8 @@ typedef struct {
 	uint32_t type;
 	uint32_t id;
     struct block *blocks;
-    long long readptr;
-    long long size;
+    uint64_t readptr;
+    uint64_t size;
 } skfile;
 
 static void skfile_dealloc(skfile *self);

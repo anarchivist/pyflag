@@ -375,7 +375,7 @@ LiteralNode LiteralNode_Con(LiteralNode self, char **value, int *len) {
 // A variation of the compare method with case insensitive comparisons
 int LiteralNode_casecompare(TrieNode self, char **buffer, int *len) {
   LiteralNode this = (LiteralNode)self;
-  int result = **buffer+cmap[(unsigned int)**buffer]==this->value;
+  int result = **buffer+cmap[(unsigned int)**(unsigned char **)buffer]==this->value;
 
   if(result)
     (*buffer)++; (*len)--;

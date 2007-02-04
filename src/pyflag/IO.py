@@ -341,8 +341,7 @@ def test_read_random(io1,io2, size, sample_size, number):
             for i in range(len(data1)):
                 if data1[i]!=data2[i]:
                     print "Error is at position %s" % i
-                    
-            raise IOError("Data read does not match. Offset %s. length %s iteration %s " % (offset,length,i))
+                    raise IOError("Data read does not match. Offset %s. length %s iteration %s " % (offset,length,i))
 
         #print "Offset %s. length %s iteration %s " % (offset,length,i)
         

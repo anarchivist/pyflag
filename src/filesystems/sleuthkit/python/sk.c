@@ -1244,12 +1244,12 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
 
 static PyObject *
 skfile_seek(skfile *self, PyObject *args) {
-    int offset=0;
+    int64_t offset=0;
     int whence=0;
 
     global_talloc_context = self->context;
 
-    if(!PyArg_ParseTuple(args, "i|i", &offset, &whence))
+    if(!PyArg_ParseTuple(args, "L|i", &offset, &whence))
         return NULL; 
 
     switch(whence) {
