@@ -63,7 +63,7 @@ class IndexScan(GenScanFactory):
     class Drawer(Scanner.Drawer):
         description = "General Forensics"
         name = "General Forensics"
-        contains = ['RegExpScan','IndexScan','MD5Scan','VirScan']
+        contains = ['RegExpScan','IndexScan','MD5Scan','VirScan','CarveScan']
         default = True
     
     def __init__(self,fsfd):
@@ -679,7 +679,9 @@ from pyflag.FileSystem import DBFS
 class LogicalIndexScannerTest(pyflag.tests.ScannerTest):
     """ Test Logical Index Scanner """
     test_case = "PyFlagIndexTestCase"
-    test_file = "ntfs_image.e01"
+    test_file = "pyflag_stdimage_0.1.sgz"
+    subsystem = 'sgzip'
+    order = 20
 
     def test01RunScanners(self):
         """ Running Logical Index Scanner """
