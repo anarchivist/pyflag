@@ -92,7 +92,16 @@ class BaseScanner:
     def slack(self, data, metadata={}):
         """ process file slack space.
 
-        This function is called with file slack data once all regular file data has been processed (by the 'process' method) and before finish is called. By default, this method is a noop, many scanners will not use it (e.g. MD5 scanner does not care about slack). Those that do want to see slack (e.g. the index scanner) can simply provide this method.
+        This function is called with file slack data once all regular file
+        data has been processed (by the 'process' method) and before finish is
+        called. By default, this method is a noop, many scanners will not use
+        it (e.g. MD5 scanner does not care about slack). Those that do want to
+        see slack (e.g. the index scanner) can simply provide this method.
+        UPDATE: The slack method is also passed a small amount of data (200
+        bytes) from the next contiguous block in the filesystem in order to
+        detect signatures which cross the boundary from slack into unallocated
+        space. This can happen (for example) when a file is deleted and a new
+        (smaller) one allocated in its place.
         """
         pass
 
@@ -433,10 +442,12 @@ def scanfile(ddfs,fd,factories):
 
     # call slack method of each object. fd.slack must be reset after the call
     # because the scanners actually have a copy of fd and some of them actually
-    # use it and get confused if it returns slack.
+    # use it and get confused if it returns slack. Also pass overread.
     fd.slack=True
+    fd.overread=True
     data = fd.read()
     fd.slack=False
+    fd.overread=False
     if data:
         for o in objs:
             try:

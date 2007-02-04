@@ -294,6 +294,8 @@ class DataPreview(OffsetType):
         low = max(0,row['Offset']-50)
         high = row['Offset'] + 50 + length
         fd = self.fsfd.open(inode_id = row['Inode'])
+        fd.slack = True
+        fd.overread = True
         fd.seek(low)
 
         result = result.__class__(result)

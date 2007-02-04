@@ -1154,7 +1154,7 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
     struct block *b;
     int readlen=-1;
     int slack=0, overread=0;
-    int maxsize;
+    off_t maxsize;
 
     global_talloc_context = self->context;
 
@@ -1190,6 +1190,8 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
     /* adjust readlen if size not given or is too big */
     if(readlen < 0 || self->readptr + readlen > maxsize)
         readlen = maxsize - self->readptr;
+
+    if(readlen < 0) readlen = 0;
 
     buf = (char *)talloc_size(NULL, readlen);
     if(!buf)
