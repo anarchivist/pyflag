@@ -1245,14 +1245,43 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
 }
 
 static PyObject *
-skfile_seek(skfile *self, PyObject *args) {
+skfile_seek(skfile *self, PyObject *args, PyObject *kwds) {
     int64_t offset=0;
     int whence=0;
+    int slack=0, overread=0;
+    off_t maxsize;
+    FS_INFO *fs;
 
     global_talloc_context = self->context;
 
-    if(!PyArg_ParseTuple(args, "L|i", &offset, &whence))
+    fs = ((skfs *)self->skfs)->fs;
+
+    static char *kwlist[] = {"offset", "whence", "slack", "overread", NULL};
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "L|iii", kwlist, 
+                                    &offset, &whence, &slack, &overread))
         return NULL; 
+
+    /* return slack? It is hard to calculate slack length correctly. You cannot
+     * simply set it to blocksize * numblocks. Consider a compressed NTFS file.
+     * It may have 2 blocks allocated, but filesize > 2 * blocksize before
+     * slack is considered at all. In this case we can't really return slack at
+     * all so dont bother. */
+    if(slack)
+        maxsize = max(self->size, list_count(&self->blocks->list) * fs->block_size);
+    else
+        maxsize = self->size;
+
+    /* overread file? If set, the read operation will read past the end of the
+     * file into the next block on the filesystem. Overread can be set to True
+     * (represented in python as the integer 1) in which case it will overread
+     * by 256 bytes, alternatively if overread is set to any other possitive
+     * value, overread will read up to that value past the end of the file.
+     * This option allows searching tools to look for signatures which occur in
+     * an overlap between file slack and the next filesystem block */
+    if(slack && overread) {
+        if(overread == 1) overread = 256;
+        maxsize += overread;
+    }
 
     switch(whence) {
         case 0:
@@ -1262,7 +1291,7 @@ skfile_seek(skfile *self, PyObject *args) {
             self->readptr += offset;
             break;
         case 2:
-            self->readptr = self->size + offset;
+            self->readptr = maxsize + offset;
             break;
         default:
             return PyErr_Format(PyExc_IOError, "Invalid argument (whence): %d", whence);

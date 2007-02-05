@@ -329,7 +329,7 @@ static void skfile_dealloc(skfile *self);
 static int skfile_init(skfile *self, PyObject *args, PyObject *kwds);
 static PyObject *skfile_str(skfile *self);
 static PyObject *skfile_read(skfile *self, PyObject *args, PyObject *kwds);
-static PyObject *skfile_seek(skfile *self, PyObject *args);
+static PyObject *skfile_seek(skfile *self, PyObject *args, PyObject *kwds);
 static PyObject *skfile_tell(skfile *self);
 static PyObject *skfile_blocks(skfile *self);
 static PyObject *skfile_close(skfile *self);
@@ -337,7 +337,7 @@ static PyObject *skfile_close(skfile *self);
 static PyMethodDef skfile_methods[] = {
     {"read", (PyCFunction)skfile_read, METH_VARARGS|METH_KEYWORDS,
      "Read data from file" },
-    {"seek", (PyCFunction)skfile_seek, METH_VARARGS,
+    {"seek", (PyCFunction)skfile_seek, METH_VARARGS|METH_KEYWORDS,
      "Seek within a file" },
     {"tell", (PyCFunction)skfile_tell, METH_NOARGS,
      "Return possition within file" },

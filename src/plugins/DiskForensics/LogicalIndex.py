@@ -147,16 +147,29 @@ class IndexScan(GenScanFactory):
             self.dbh.mass_insert_start('LogicalIndexOffsets')
             self.inode_id = fd.inode_id
             self.stats = {}
+
+            # try to set size. It is helpful to know the correct file size so
+            # we can ignore matches which begin after the end of the file+slack
+            # space.
+            try:
+                fd.seek(0, 2, slack=True, overread=False)
+                self.size = fd.tell()
+                fd.seek(0, 0)
+            except:
+                pass
             
         def process_buffer(self,buff):
             # Store indexing results in the dbase
             for offset, matches in self.outer.index.index_buffer(buff):
+                # skip matches not starting in this file
+                if self.size > 0 and offset+self.offset > self.size:
+                    continue
                 for id, length in matches:
                     try:
                         self.stats[id] += 1
                     except:
                         self.stats[id] = 1
-                        
+                   
                     self.dbh.mass_insert(
                         inode_id = self.inode_id,
                         word_id = id,
