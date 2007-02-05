@@ -760,9 +760,15 @@ class File:
             else:
                 previous=None
 
+        if previous != None:        
+            new_query.set('hexlimit',0)
+            result.toolbar(text="Start", icon="stock_first.png",
+                           link = new_query, toolbar=toolbar_id , pane="self")
+        else:
+            result.toolbar(text="Start", icon="stock_first_gray.png", toolbar=toolbar_id, pane="self")
+            
         if previous != None:
-            del new_query['hexlimit']
-            new_query['hexlimit']=previous
+            new_query.set('hexlimit',previous)
             result.toolbar(text="Previous page", icon="stock_left.png",
                            link = new_query, toolbar=toolbar_id , pane="self")
         else:
@@ -772,12 +778,18 @@ class File:
         ## If we did not read a full page, we do not display
         ## the next arrow:
         if len(data)>=max:
-            del new_query['hexlimit']
-            new_query['hexlimit']=next
+            new_query.set('hexlimit',next)
             result.toolbar(text="Next page", icon="stock_right.png",
                            link = new_query , toolbar=toolbar_id, pane="self")
         else:
             result.toolbar(text="Next page", icon="stock_right_gray.png", toolbar=toolbar_id, pane="self")
+
+        if len(data)>=max:                           
+            new_query.set('hexlimit',self.size - self.size % 1024)
+            result.toolbar(text="End", icon="stock_last.png",
+                           link = new_query , toolbar=toolbar_id, pane="self")
+        else:
+            result.toolbar(text="End", icon="stock_last_gray.png", toolbar=toolbar_id, pane="self")
 
         ## Allow the user to skip to a certain page directly:
         result.toolbar(
