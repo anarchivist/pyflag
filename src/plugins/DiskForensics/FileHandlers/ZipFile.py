@@ -432,3 +432,17 @@ class ZipScanTest(unittest.TestCase):
         #dbh.execute("select count(*) as count from inode where inode like '%|T%'")
         #count = dbh.fetch()['count']
         #self.failIf(count==0, "Could not find any tar files?")
+
+import pyflag.tests
+
+class ZipScanTest2(pyflag.tests.ScannerTest):
+    """ Test handling of zip bombs """
+    test_case = "PyFlagZipCase"
+    test_file = "zip_test.iso.sgz"
+    subsystem = 'sgzip'
+
+    def test01RunScanner(self):
+        """ Test Zip scanner handling of very large zip files """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env, command="scan",
+                             argv=["*",'ZipScan', 'TypeScan'])

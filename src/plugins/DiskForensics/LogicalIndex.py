@@ -52,7 +52,7 @@ import index,os,time,re
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
-from pyflag.TableObj import StringType, TimestampType, InodeIDType, IntegerType
+from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType
 
 class IndexScan(GenScanFactory):
     """ Keyword Index files """
@@ -157,7 +157,7 @@ class IndexScan(GenScanFactory):
                 self.size = fd.tell()
                 fd.seek(0, 0)
                 fd.slack=False
-                print "size is: %d" % self.size
+                #print "size is: %d" % self.size
             except:
                 pass
             
@@ -166,7 +166,7 @@ class IndexScan(GenScanFactory):
             for offset, matches in self.outer.index.index_buffer(buff):
                 # skip matches not starting in this file
                 if self.size > 0 and offset+self.offset > self.size:
-                    print "skipping a match in %s" % self.inode_id
+                    #print "skipping a match in %s" % self.inode_id
                     continue
                 for id, length in matches:
                     try:
@@ -286,7 +286,7 @@ class OffsetType(IntegerType):
         
     def display(self, offset, row, result):
         result = result.__class__(result)
-        inode = self.fsfd.lookup(inode_id=row['Inode'])
+        inode = row['Inode']
 
         query = query_type(case=self.fsfd.case,
                            family="Disk Forensics",
@@ -310,7 +310,7 @@ class DataPreview(OffsetType):
     def display(self, length, row, result):
         low = max(0,row['Offset']-50)
         high = row['Offset'] + 50 + length
-        fd = self.fsfd.open(inode_id = row['Inode'])
+        fd = self.fsfd.open(inode = row['Inode'])
         fd.slack = True
         fd.overread = True
         fd.seek(low)
@@ -512,11 +512,11 @@ class SearchIndexxxx(Reports.report):
 
         case = query['case']        
         result.table(
-            elements = [ InodeIDType(case=case, column='inode_id'),
+            elements = [ InodeType(case=case, column='inode.inode'),
                          IntegerType(column='offset_%s', name='Offset'),
                          DataPreview(column='length', name='Preview', fsfd=fsfd),
                          ],
-            table = 'LogicalIndexCache_%s ' % (cache_id,),
+            table = 'LogicalIndexCache_%s join inode on inode.inode_id = LogicalIndexCache_%s.inode_id ' % (cache_id, cache_id,),
             case =case,
             )
 
@@ -530,13 +530,13 @@ class SearchIndex(Reports.report):
         case=query['case']
         fsfd = FileSystem.DBFS(case)
         result.table(
-            elements = [ InodeIDType(case=case, column='inode_id'),
+            elements = [ InodeType(case=case, column='inode'),
                          StringType(column='word', name='Word'),
                          OffsetType(column='offset', name='Offset', fsfd=fsfd),
                          IntegerType(column='length', name='Length'),
                          DataPreview(column='length', name='Preview', fsfd=fsfd),
                          ],
-            table = 'LogicalIndexOffsets join pyflag.dictionary on word_id=id',
+            table = 'LogicalIndexOffsets join pyflag.dictionary on word_id=id join inode on inode.inode_id = LogicalIndexOffsets.inode_id',
             case =case,
             )
 
@@ -698,9 +698,10 @@ from pyflag.FileSystem import DBFS
 class LogicalIndexScannerTest(pyflag.tests.ScannerTest):
     """ Test Logical Index Scanner """
     test_case = "PyFlagIndexTestCase"
-    test_file = "pyflag_stdimage_0.1.sgz"
+    test_file = "pyflag_stdimage_0.2.sgz"
     subsystem = 'sgzip'
     order = 20
+    offset = "16128s"
 
     def test01RunScanners(self):
         """ Running Logical Index Scanner """
@@ -712,10 +713,12 @@ class LogicalIndexScannerTest(pyflag.tests.ScannerTest):
         dbh2 = DB.DBO(self.test_case)
         pdbh = DB.DBO()
         fsfd = DBFS(self.test_case)
-        dbh.execute("select inode_id, word,offset,length from LogicalIndexOffsets join %s.dictionary on LogicalIndexOffsets.word_id=pyflag.dictionary.id", config.FLAGDB)
+        dbh.execute("select inode_id, word,offset,length from LogicalIndexOffsets join %s.dictionary on LogicalIndexOffsets.word_id=pyflag.dictionary.id where word='secret'", config.FLAGDB)
         for row in dbh:
             inode = fsfd.lookup(inode_id = row['inode_id'])
             fd = fsfd.open(inode=inode)
+            fd.overread = True
+            fd.slack = True
             fd.seek(row['offset'])
             data = fd.read(row['length'])
             print "Looking for %s: Found in %s at offset %s length %s %r" % (

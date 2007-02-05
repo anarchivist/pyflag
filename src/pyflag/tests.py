@@ -79,6 +79,8 @@ class ScannerTest(unittest.TestCase):
     test_file = ""
     subsystem = "ewf"
     fstype = "Sleuthkit"
+    offset = 0
+
     def test00preLoadCase(self):
         pyflagsh.shell_execv(command="execute",
                              argv=["Case Management.Remove case",'remove_case=%s' % self.test_case])
@@ -91,6 +93,7 @@ class ScannerTest(unittest.TestCase):
                                    "iosource=test",
                                    "subsys=%s" % self.subsystem,
                                    "io_filename=%s/%s" % (config.UPLOADDIR, self.test_file),
+                                   "io_offset=%s"%self.offset,
                                    ])
         pyflagsh.shell_execv(command="execute",
                              argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,

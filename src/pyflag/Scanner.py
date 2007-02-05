@@ -174,8 +174,9 @@ class MemoryScan(BaseScanner):
     def process(self, data,metadata=None):
         buf = self.window + data
         self.process_buffer(buf)
+        self.offset += len(buf)
         self.window = buf[-self.windowsize:]
-        self.offset += len(data) - len(self.window)
+        self.offset -= len(self.window)
 
     def process_buffer(self,buf):
         """ This abstract method should implement the actual scanner.
@@ -460,7 +461,7 @@ def scanfile(ddfs,fd,factories):
         try:
             o.finish()
         except Exception,e:
-            pyflaglog.log(pyflaglog.ERRORS,"Scanner (%s) Error: %s" %(o,e))
+            pyflaglog.log(pyflaglog.ERRORS,"Scanner (%s) on Inode %s Error: %s" %(o,fd.inode,e))
 
     # Store the fact that we finished in the inode table:
     scanner_names = ','.join([ c.outer.__class__.__name__ for c in objs ])
