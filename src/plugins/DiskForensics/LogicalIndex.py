@@ -152,9 +152,12 @@ class IndexScan(GenScanFactory):
             # we can ignore matches which begin after the end of the file+slack
             # space.
             try:
-                fd.seek(0, 2, slack=True, overread=False)
+                fd.slack = True
+                fd.seek(0, 2)
                 self.size = fd.tell()
                 fd.seek(0, 0)
+                fd.slack=False
+                print "size is: %d" % self.size
             except:
                 pass
             
@@ -163,6 +166,7 @@ class IndexScan(GenScanFactory):
             for offset, matches in self.outer.index.index_buffer(buff):
                 # skip matches not starting in this file
                 if self.size > 0 and offset+self.offset > self.size:
+                    print "skipping a match in %s" % self.inode_id
                     continue
                 for id, length in matches:
                     try:

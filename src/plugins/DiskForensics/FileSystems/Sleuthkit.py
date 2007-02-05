@@ -215,9 +215,9 @@ class Sleuthkit_File(File):
 
     def seek(self, offset, rel=None):
         if rel!=None:
-            self.fd.seek(offset,rel)
+            self.fd.seek(offset,rel, slack=self.slack, overread=self.overread)
         else:
-            self.fd.seek(offset)
+            self.fd.seek(offset, slack=self.slack, overread=self.overread)
 
         if self.fd.tell()<0: raise IOError("Seek before start of file")
 
