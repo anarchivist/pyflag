@@ -634,3 +634,40 @@ def get_factories(case,scanners):
 
     result.sort(cmpfunc)
     return result
+
+## These are carvers:
+class Carver:
+    """ A carver is a class which knows about how to extract specific
+    file types.
+    """
+    regexs = []
+    length = 600000
+    extension = ''
+    
+    def __init__(self, fsfd):
+        self.fsfd = fsfd
+
+    def get_length(self, fd,offset):
+        """ Returns the length of the carved image from the inode
+        fd. fd should already be seeked to the right place.
+        """
+        length = min(fd.size-offset, self.length)
+        return length
+    
+    def add_inode(self, fd, offset, factories):
+        """ This is called to allow the Carver to add VFS inodes. """
+        ## Calculate the length of the new file
+        length = self.get_length(fd,offset)
+        new_inode = "%s|o%s:%s" % (fd.inode, offset, length)
+        pathname = self.fsfd.lookup(inode = fd.inode)
+                    
+        ## By default we just add a VFS Inode for it.
+        self.fsfd.VFSCreate(None,
+                            new_inode,
+                            pathname + "/%s.%s" % (offset, self.extension),
+                            size = length,
+                            )
+
+        ## Scan the new inodes:
+        new_fd = self.fsfd.open(inode = new_inode)
+        scanfile(self.fsfd, new_fd, factories)

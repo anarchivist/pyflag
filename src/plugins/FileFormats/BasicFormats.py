@@ -30,9 +30,16 @@ class BasicType(DataType):
     def __init__(self,buffer,*args,**kwargs):
         try:
             if kwargs['endianess'].startswith('l'):
-                self.fmt = '<'+self.fmt[1:]
+                direction = "<"
             elif kwargs['endianess'].startswith('b'):
-                self.fmt = '>'+self.fmt[1:]
+                direction = ">"
+
+            ## Enforce the endianess
+            if self.fmt[0] in '<>=@':
+                self.fmt = direction+self.fmt[1:]
+            else:
+                self.fmt = direction+self.fmt
+
         except KeyError:
             pass
 
@@ -161,7 +168,9 @@ class BYTE(BasicType):
         
     def __str__(self):
         ## This is done to remove deprecation warnings:
-        return "%02x" % (self.data,)
+        try:
+            return "%0x" % (self.data,)
+        except: return self.data
 
 class BYTE_CONSTANT(BYTE):
     """ This class enforces a condition raising an error otherwise """
@@ -252,7 +261,7 @@ class SimpleStruct(DataType):
             try:
                 result[name]=element(self.buffer[self.offset:],**parameters)
             except Exception,e:
-                raise
+                #raise
                 raise e.__class__("When parsing field %r of %s, %s" % (name, self.__class__,e))
 
             self.offsets[name]=self.offset            
@@ -414,7 +423,6 @@ class ULONG_ARRAY(ARRAY):
 
 class STRING(BYTE):
     visible = True
-    sql_type="text"
     
     def __init__(self,buffer,*args,**kwargs):
         try:
@@ -427,7 +435,7 @@ class STRING(BYTE):
                 self.fmt = "%us" % self.length
             except:
                 raise SystemError("you must specify the length of a STRING")
-        
+
         BYTE.__init__(self,buffer,*args,**kwargs)
 
     def __str__(self):

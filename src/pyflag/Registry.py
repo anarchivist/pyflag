@@ -362,6 +362,9 @@ class ColumnTypeRegistry(ScannerRegistry):
 class TaskRegistry(ScannerRegistry):
     pass
 
+class CarverRegistry(ScannerRegistry):
+    pass
+
 LOCK = 0
 REPORTS = None
 SCANNERS = None
@@ -372,6 +375,7 @@ FILESYSTEMS = None
 THEMES = None
 FILEFORMATS = None
 TASKS = None
+CARVERS = None
 
 ## This is required for late initialisation to avoid dependency nightmare.
 def Init():
@@ -430,6 +434,10 @@ def Init():
     import pyflag.Farm as Farm
     global TASKS
     TASKS = TaskRegistry(Farm.Task)
+
+    ## Register carvers:
+    global CARVERS
+    CARVERS = CarverRegistry(Scanner.Carver)
 
 def InitTests():
     return TestsRegistry(unittest.TestCase)

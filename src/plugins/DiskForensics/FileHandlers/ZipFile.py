@@ -37,6 +37,7 @@ import pyflag.Scanner as Scanner
 import gzip
 import plugins.DiskForensics.DiskForensics as DiskForensics
 import pyflag.Store as Store
+import FileFormats.Zip as Zip
 
 class ZipScan(GenScanFactory):
     """ Recurse into Zip Files """
@@ -56,11 +57,9 @@ class ZipScan(GenScanFactory):
             """ This is run on the extracted file """
             pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Decompressing Zip File %s" % fd.name)
             cache_key = "%s:%s" % (self.case , self.fd.inode)
-            try:
-                z = ZIPCACHE.get(cache_key)
-            except KeyError:
-                z = zipfile.ZipFile(self.fd,'r')
-                ZIPCACHE.put(z, key=cache_key)
+
+            ## Try to read the fd as a zip file
+            z = zipfile.ZipFile(fd,'r')
 
             pathname = self.ddfs.lookup(inode = self.inode)
             
@@ -77,17 +76,19 @@ class ZipScan(GenScanFactory):
 
                 ## If the entry corresponds to just a directory we ignore it.
                 if not os.path.basename(namelist[i]): continue
-                inode = "%s|Z%s" % (self.inode,i)
+
+                info = z.infolist()[i]
+                inode = "%s|Z%s" % (self.inode,info.header_offset)
 
                 self.ddfs.VFSCreate(None,
                                     inode,pathname+"/"+namelist[i],
-                                    size=z.infolist()[i].file_size,
+                                    size=info.file_size,
                                     mtime=t)
 
                 ## Now call the scanners on this new file (FIXME limit
                 ## the recursion level here)
-                fd = ZipFile(self.case, self.fd, inode)
-#                fd = self.ddfs.open(inode = inode)
+                #fd = ZipFile(self.case, self.fd, inode)
+                fd = self.ddfs.open(inode = inode)
                 Scanner.scanfile(self.ddfs,fd,self.factories)
 
 class GZScan(ZipScan):
@@ -140,7 +141,6 @@ class GZScan(ZipScan):
                 ## Scan the new file using the scanner train:
                 fd=self.ddfs.open(inode=new_inode)
                 Scanner.scanfile(self.ddfs,fd,self.factories)
-                fd.close()            
 
 class TarScan(GenScanFactory):
     """ Recurse into Tar Files """
@@ -188,8 +188,7 @@ ZIPCACHE = Store.Store(max_size=5)
 		
 ## These are the corresponding VFS modules:
 class ZipFile(File):
-    """ A file like object to read files from within zip files. Note
-    that the zip file is specified as an inode in the DBFS
+    """ A file like object to read files from within zip files.
 
     We essentially decompress the file on the disk because the file
     may be exceptionally large.
@@ -199,15 +198,31 @@ class ZipFile(File):
     def __init__(self, case, fd, inode):
         File.__init__(self, case, fd, inode)
 
-        ## Zip file handling requires repeated access into the zip
-        ## file. Caching our input fd really helps to speed things
-        ## up... This causes our input fd to be disk cached
-        fd.cache()
+        ## Parse out inode
+        parts = inode.split('|')
+        offset = int(parts[-1][1:])
 
-        ## Initialise our internal variables:
-        self.seek(0)
+        ## Ensure that we can read the file header:
+        b = Zip.Buffer(fd=fd)[offset:]
+        self.header = Zip.ZipFileHeader(b)
+        self.size = int(self.header['uncompr_size'])
+        self.compressed_length = int(self.header['compr_size'])
+        self.type = int(self.header['compression_method'])
 
+        ## Where does the data start?
+        offset = self.header['data'].buffer.offset
+
+        self.d = zlib.decompressobj(-15)
+        self.left_over = ''
+        self.blocksize = 1024*10
+
+        ## Seek our fd to there:
+        fd.seek(offset)
+        
     def read(self,length=None):
+        if length==None:
+            length = self.size
+            
         ## Call our baseclass to see if we have cached data:
         try:
             return File.read(self,length)
@@ -227,13 +242,13 @@ class ZipFile(File):
             while len(result)<length and self.compressed_length>0:
                 ## Read up to 1k of the file:
                 available_clength = min(self.blocksize,self.compressed_length)
-                cdata = self.z.fp.read(available_clength)
+                cdata = self.fd.read(available_clength)
                 self.compressed_length -= available_clength
 
-                if self.type == zipfile.ZIP_DEFLATED:
+                if self.type == Zip.ZIP_DEFLATED:
                     ## Now Decompress that:
                     ddata = self.d.decompress(cdata)
-                elif self.type == zipfile.ZIP_STORED:
+                elif self.type == Zip.ZIP_STORED:
                     ddata = cdata
                 else:
                     raise RuntimeError("Compression method %s is not supported" % self.type)
@@ -259,58 +274,12 @@ class ZipFile(File):
         if self.cached_fd: return
 
         ## We want to reinitialise the file pointer:
-        if self.readptr==0:
-            try:
-                ## This is a performance boost - We try to cache the
-                ## zipfile object in the store to speed up future
-                ## accesses to other files within the zip file. This
-                ## will ensure we only need to read the zip directory
-                ## once instead of many times for each zip member.
-                self.z = ZIPCACHE.get(self.fd.inode)
-            except KeyError:
-                try:
-                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Reading Zip Directory for %s" % self.fd.inode)
-                    self.z = zipfile.ZipFile(self.fd,'r')
-                    ZIPCACHE.put(self.z, key=self.fd.inode)
-                except zipfile.BadZipfile,e:
-                    raise IOError("Zip_File: (%s)" % e)
-
-            parts = self.inode.split('|')
-            index = int(parts[-1][1:])
-            self.zinfo = self.z.filelist[index]
-
-            ## Prepare our parent's readptr to be at the right place
-            self.z.fp.seek(self.zinfo.file_offset,0)
-
-            ## The decompressor we are going to use
-            self.d = zlib.decompressobj(-15)
-            self.compressed_length = self.zinfo.compress_size
-            self.type = self.zinfo.compress_type
-
-            ## We try to choose sensible buffer sizes
-            if self.type == zipfile.ZIP_STORED:
-                self.blocksize = 1024*1024
-            else:
-                self.blocksize = 1024
-
-            ## This stores the extra data which was decompressed, but not
-            ## consumed by previous reads.
-            self.left_over=''
-        else:
-            ## We need to seek to somewhere in the middle of the zip
-            ## file. This is bad because we need to essentially
-            ## decompress all the data in that file until the desired
-            ## point. If this happens we need to warn the user that
-            ## they better cache this file on the disk. FIXME: Should
-            ## we automatically force caching here?
-            if self.type == zipfile.ZIP_DEFLATED:
-                pyflaglog.log(pyflaglog.DEBUG, "Required to seek to offset %s in Zip File %s. This is inefficient, forcing disk caching." % (self.readptr, self.inode))
-                self.cache()
-                self.seek(offset, rel)
-                return
+        if self.readptr!=0 and self.type == Zip.ZIP_DEFLATED:
+            pyflaglog.log(pyflaglog.DEBUG, "Required to seek to offset %s in Zip File %s. This is inefficient, forcing disk caching." % (self.readptr, self.inode))
+            self.cache()
             
-            self.seek(0,0)
-            self.read(self.readptr)
+            self.seek(offset, rel)
+            return
 
     def close(self):
         pass
@@ -407,18 +376,22 @@ class Tar_file(DiskForensics.DBFS_file):
 ## UnitTests:
 import unittest
 import pyflag.pyflagsh as pyflagsh
+import pyflag.tests
 
-class ZipScanTest(unittest.TestCase):
+class ZipScanTest(pyflag.tests.ScannerTest):
     """ Zip File handling Tests """
     test_case = "PyFlagTestCase"
-    order = 15
+    test_file = "pyflag_stdimage_0.2.sgz"
+    subsystem = 'sgzip'
+    offset = "16128s"
+
     def test_type_scan(self):
         """ Check the Zip scanner works """
         dbh = DB.DBO(self.test_case)
 
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env, command="scan",
-                             argv=["Ifirst_image*",'ZipScan','GZScan','TarScan'])
+                             argv=["*",'ZipScan','GZScan','TarScan','TypeScan'])
 
         dbh.execute("select count(*) as count from inode where inode like '%|Z%'")
         count = dbh.fetch()['count']
