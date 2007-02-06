@@ -173,7 +173,7 @@ config=pyflag.conf.ConfObject()
 import pyflag.pyflaglog as pyflaglog
 import atexit,os,signal,time
 import pyflag.DB as DB
-import pyflag.Scanner as Scanner
+import pyflag.Registry as Registry
 
 ## This stores the pids of working threads - we kill those when the
 ## main thread exits
@@ -185,15 +185,8 @@ def terminate_children():
     for pid in children:
         os.kill(pid, signal.SIGABRT)
 
-class Dispatcher:
-    def Scan(self,case, inode, scanners):
-        factories = Scanner.get_factories(case, scanners.split(","))
-
-        if factories:
-            ddfs = factories[0].fsfd
-            fd = ddfs.open(inode = inode)
-            Scanner.scanfile(ddfs, fd, factories)
-            fd.close()
+class Task:
+    """ All distributed tasks need to extend this subclass """
         
 def start_workers():
     for i in range(config.WORKERS):
@@ -203,13 +196,11 @@ def start_workers():
          children.append(pid)
        else:   
          atexit.register(child_exist)
-         dispatcher = Dispatcher()
          
          ## Start the logging thread for each worker:
          pyflaglog.start_log_thread()
 
          ## These are all the methods we support
-         methods = [ "command=%r" % x for x in dir(dispatcher) if not x.startswith('_')]
          dbh=DB.DBO()
          jobs = []
 
@@ -218,8 +209,9 @@ def start_workers():
              if not jobs:
                  time.sleep(10)
              try:
-                 dbh.execute("lock tables jobs write") 
-                 dbh.execute("select * from jobs where %s and state='pending' limit 10", " or ".join(methods))
+                 dbh.execute("lock tables jobs write")
+                 sql = [ "command=%r" % x for x in Registry.TASKS.class_names ]
+                 dbh.execute("select * from jobs where %s and state='pending' limit 10", " or ".join(sql))
                  jobs = [ row for row in dbh ]
                  
                  if not jobs:
@@ -235,13 +227,14 @@ def start_workers():
              for row in jobs:
                  try:
                      try:
-                         method = getattr(dispatcher,row['command'])
+                         task = Registry.TASKS.dispatch(row['command'])
                      except:
                          print "Dont know how to process job %s" % row['command']
                          continue
 
                      try:
-                         method(row['arg1'], row['arg2'], row['arg3'])
+                         task = task()
+                         task.run(row['arg1'], row['arg2'], row['arg3'])
                      except Exception,e:
                          pyflaglog.log(pyflaglog.ERRORS, "Error scanning %s" % e)
 

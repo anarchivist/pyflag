@@ -38,6 +38,8 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import os.path
 import pyflag.DB as DB
+import pyflag.Farm as Farm
+import pyflag.Scanner as Scanner
 
 class IO_File(FileSystem.File):
     """ A VFS Driver to make the io source available.
@@ -194,3 +196,14 @@ class OffsetFileTests(tests.FDTest):
         ## Make sure that we are reading the same data with and
         ## without the offset:
         self.assertEqual(data2, data)
+
+class Scan(Farm.Task):
+    """ A task to distribute scanning among all workers """
+    def run(self,case, inode, scanners):
+        factories = Scanner.get_factories(case, scanners.split(","))
+
+        if factories:
+            ddfs = factories[0].fsfd
+            fd = ddfs.open(inode = inode)
+            Scanner.scanfile(ddfs, fd, factories)
+            fd.close()

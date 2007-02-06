@@ -359,6 +359,9 @@ class TestsRegistry(ScannerRegistry):
 class ColumnTypeRegistry(ScannerRegistry):
     pass
 
+class TaskRegistry(ScannerRegistry):
+    pass
+
 LOCK = 0
 REPORTS = None
 SCANNERS = None
@@ -368,6 +371,7 @@ SHELL_COMMANDS = None
 FILESYSTEMS = None
 THEMES = None
 FILEFORMATS = None
+TASKS = None
 
 ## This is required for late initialisation to avoid dependency nightmare.
 def Init():
@@ -421,6 +425,11 @@ def Init():
     import pyflag.TableObj as TableObj
     global COLUMN_TYPES
     COLUMN_TYPES = ColumnTypeRegistry(TableObj.ColumnType)
+
+    ## Register worker tasks
+    import pyflag.Farm as Farm
+    global TASKS
+    TASKS = TaskRegistry(Farm.Task)
 
 def InitTests():
     return TestsRegistry(unittest.TestCase)
