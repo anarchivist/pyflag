@@ -48,7 +48,7 @@ scan.
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.82 Date: Sat Jun 24 23:38:33 EST 2006$
+#  Version: FLAG $Version: 0.84RC1 Date: Fri Feb  9 08:24:23 EST 2007$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or

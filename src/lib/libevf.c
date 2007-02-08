@@ -2,7 +2,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.82 Date: Sat Jun 24 23:38:33 EST 2006$
+#  Version: FLAG $Version: 0.84RC1 Date: Fri Feb  9 08:22:13 EST 2007$
 # ******************************************************
 
 This library was relicensed on the 5th March 2006 to the modified BSD

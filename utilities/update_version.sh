@@ -1,8 +1,8 @@
 #!/bin/bash
 ##This little utility function is used to update the version information in all files:
 
-DIRS="src"
-NEWVERSION=0.82
+DIRS="src utilities"
+NEWVERSION=0.84RC1
 
 exp="s/\\\$Version:.*\\\$/\\\$Version: $NEWVERSION Date: "`date`"\\\$/"
 
