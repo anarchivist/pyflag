@@ -3,15 +3,11 @@
 pyflag \- python Forensic Log Analysis GUI
 .SH SYNOPSIS
 .B pyflag [
-.I port_number
+.I options
 .B ] 
 .SH DESCRIPTION
 .B pyflag
-starts the python Forensic Log Analysis GUI on 
-.I port_number
-serving HTTP on the local host.  If 
-.I port_number
-is not given, 8000 is used by default.
+starts the python Forensic Log Analysis GUI serving HTTP on the local host.  Use the --help option to list the options available (This may vary from version to version).
 
 The first time python is run, a config file
 .I .pyflagrc
@@ -21,36 +17,28 @@ and entering the details as prompted by pyFLAG (see below for details).  This pr
 .I .pyflagrc
 file in the users home directory in the correct format.  pyFLAG must then be restarted.
 
-.SH CONFIGURATION FILE PARAMETERS
-The
-.I uploaddir
-path must be set in 
-.I .pyflagrc
-to tell pyFLAG where to look for case data to be uploaded and analysed.  It is possible to specify other
-options in the
-.I .pyflagrc
-that override the default settings in
-.I /usr/share/pyflag/pyflag/pyflagrc.
-See
-.I /usr/share/pyflag/pyflag/pyflagrc
-for a complete list of options.
+.SH FILES AND DIRECTORIES
+PyFLAG will read its settings from the following files in this order:
+.IP \fI${prefix}/etc/pyflagrc\fP
+System wide configuration file - this file contains all the required default settings.
+.PP
+.IP \fI~/.pyflagrc\fP
+The users individual pyflagrc file - will override the system default. This file typically contains database connection credentials.
+.PP
+.IP "Command line options"\fP
+The command line options override all other parameters.
 
 .SH EXAMPLE
-$ pyflag 9000
+$ pyflag ----httpserver_port=9000
 .SH "SEE ALSO"
 .BR python (1),
-.BR mysql (1),
-.BR magic (1)
+.BR mysql (1)
 .SH REQUIREMENTS
 The python Forensic Log Analysis GUI requires
 .B python
 and associated MySQL interface,
 .B MySQL
-database,
-.B libmagic
-File type-determination library,
-.B libclamav
-Unix anti-virus utility library.
+database
 
 .SH LICENSE
 .na

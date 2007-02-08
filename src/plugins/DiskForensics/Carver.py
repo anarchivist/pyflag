@@ -46,7 +46,7 @@ class CarveScan(Scanner.GenScanFactory):
     """ Carve out files """
     ## We must run after the Index scanner
     order = 300
-    default = True
+    default = False
     depends = 'IndexScan'
 
     def __init__(self,fsfd):
@@ -81,10 +81,13 @@ class CarveScan(Scanner.GenScanFactory):
             dbh.execute("select word_id,offset from LogicalIndexOffsets where offset>0 and inode_id = %r and (%s)",
                         (self.fd.inode_id, sql))
             for row in dbh:
-                #print "Adding carved inode to %s at offset %s " % (self.fd.inode, row['offset'])
+                ## Ignore matches which occur within the length of the
+                ## previously found file:
+                #if row['offset']<offset: continue
+                offset = row['offset']
                 ## Allow the carver to work with the offset:
-                self.outer.ids[row['word_id']].add_inode(self.fd, row['offset'], self.factories)
-
+                self.outer.ids[row['word_id']].add_inode(self.fd, offset, self.factories)
+                
 ## Unit tests:
 import unittest
 import pyflag.pyflagsh as pyflagsh
@@ -93,10 +96,11 @@ import pyflag.tests
 class CarverTest(pyflag.tests.ScannerTest):
     """ Carving Tests """
     test_case = "PyFlagIndexTestCase"
-    test_file = "pyflag_stdimage_0.1.sgz"
-    subsystem = 'sgzip'
+    test_file = "pyflag_stdimage_0.2"
+    subsystem = 'advanced'
     order = 30
-
+    offset = "16128s"
+    
     def test01CarveImage(self):
         """ Carving from Image """
         env = pyflagsh.environment(case=self.test_case)
@@ -105,7 +109,7 @@ class CarverTest(pyflag.tests.ScannerTest):
 
         ## See if we found the two images from within the word
         ## document:
-        expected = [ "Itest|K24-0-0|o150712:87368", "Itest|K24-0-0|o96317:141763"]
+        expected = [ "Itest|K1289-0-0|o150712:87368", "Itest|K1289-0-0|o96317:141763"]
         
         dbh = DB.DBO(self.test_case)
         for inode in expected:

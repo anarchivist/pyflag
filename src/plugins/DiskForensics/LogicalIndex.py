@@ -500,8 +500,9 @@ from pyflag.FileSystem import DBFS
 class LogicalIndexScannerTest(pyflag.tests.ScannerTest):
     """ Test Logical Index Scanner """
     test_case = "PyFlagIndexTestCase"
-    test_file = "pyflag_stdimage_0.2.sgz"
-    subsystem = 'sgzip'
+    test_file = "pyflag_stdimage_0.2"
+    #subsystem = 'sgzip'
+    subsystem = 'advanced'
     order = 20
     offset = "16128s"
 

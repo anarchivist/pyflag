@@ -8,17 +8,20 @@ import sys, zlib
 
 ## We dont bother checking the CRC here at all because we might lose
 ## sync sometime through the file
+def decompress_data(data):
+    dc = zlib.decompressobj(-15)
+    bytes = dc.decompress(data)
+    ex = dc.decompress('Z') + dc.flush()
+    if ex:
+        bytes += ex
+        
+    return bytes
+
 class ZipPayload(STRING):
     def read(self):
         data = STRING.read(self)
-        dc = zlib.decompressobj(-15)
-        bytes = dc.decompress(data)
-        ex = dc.decompress('Z') + dc.flush()
-        if ex:
-            bytes += ex
-
-        return bytes
-
+        return decompress_data(data)
+    
 class ZipFileHeader(SimpleStruct):
     fields = [
         ['magic', ULONG_CONSTANT, dict(expected = 0x04034b50) ],
@@ -37,7 +40,7 @@ class ZipFileHeader(SimpleStruct):
         ## This is only a byte so we can find out its offet. We want
         ## to decompress the data in chunks rather than read it all at
         ## once to ensure that we dont overflow.
-        ['data' , BYTE ],
+        ['data' , STRING, dict(length=5) ],
         #['data' , ZipPayload, dict(length = lambda x: int(x['compr_size']))],
         ]
 
@@ -52,11 +55,19 @@ if __name__ == "__main__":
         data = fd.read(1024)
         if len(data)==0: sys.exit(0)
         pos = data.find("\x50\x4B\x03\x04")
-        if pos > 0:
+        if pos >= 0:
             b = Buffer(fd=fd)[offset + pos:]
             break
 
         offset+=len(data)
 
     ## Now we read the buffer:
-    print ZipFileHeader(b, endianess='little')
+    h = ZipFileHeader(b, endianess='little')
+    print h
+    offset = h['data'].buffer.offset
+    print hex(offset)
+    fd.seek(offset)
+    data = fd.read(100)
+    print "%r" % data
+    print "%r" % decompress_data(data)
+    

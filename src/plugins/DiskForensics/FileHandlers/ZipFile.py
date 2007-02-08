@@ -23,7 +23,11 @@
 
 The scanner recurses into zip files, executing the scanner factory train on files within the ZIP file.
 
-This feature complements the ZIP and Gzip filesystem driver to ensure that zip and gzip files are transparently viewable by the FLAG GUI.
+Note that the scanner reads the central directory to recover
+compressed file offsets with in the zip file. The carver does not and
+finds zip file contents where ever they appear within the zip -
+hopefull the both return the same thing, but in the case of a multi
+file zip file the carver will work better than the scanner.
 """
 import os.path,sys
 import pyflag.pyflaglog as pyflaglog
@@ -275,9 +279,9 @@ class ZipFile(File):
 
         ## We want to reinitialise the file pointer:
         if self.readptr!=0 and self.type == Zip.ZIP_DEFLATED:
-            pyflaglog.log(pyflaglog.DEBUG, "Required to seek to offset %s in Zip File %s. This is inefficient, forcing disk caching." % (self.readptr, self.inode))
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Required to seek to offset %s in Zip File %s (%s,%s). This is inefficient, forcing disk caching." % (self.readptr, self.inode, offset,rel))
             self.cache()
-            
+
             self.seek(offset, rel)
             return
 
@@ -372,6 +376,26 @@ class Tar_file(DiskForensics.DBFS_file):
 
     def close(self):
         pass
+
+class ZipFileCarver(Scanner.Carver):
+    """ This is a special carver for zip files """
+    regexs = ['PK\x03\x04']
+
+    def add_inode(self, fd, offset, factories):
+        """ We think we have a zip file here. """
+        b = Zip.Buffer(fd=fd)[offset:]
+        try:
+            header = Zip.ZipFileHeader(b)
+            size = int(header['uncompr_size'])
+            compressed_length = int(header['compr_size'])
+            name = header['zip_path'].get_value()
+            header_offset = header['data'].buffer.offset
+        except:
+            return
+
+        new_inode = "%s|Z%s" % (fd.inode, offset)
+        self._add_inode(new_inode, size, name, fd, factories)
+        return size
 
 ## UnitTests:
 import unittest

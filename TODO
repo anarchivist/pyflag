@@ -1,14 +1,3 @@
-Things still to do for pyflag in no order of priority:
+Todo items are kept in the wiki on:
 
-* Write a vfs driver test suite:
-  - read(0), read(-10), read(maxint)
-  - seek(0), seek(maxint), seek(100), seek(0,1), seek(10,1), seek(-10,1), seek(0,2), seek(10,2), seek(-10,2)
-
-* FTP Scanner
-* NFS Scanner
-
-* Proper parser based search criteria in Table widget 
-
-* Rapid file viewer - view the contents of files based on their mime type with rapid next/previous button so we can quickly review many files - possibly with an autorefresh for truely automated reviewing. This is useful for reviewing html pages from cache or network traffic.
-
-* Reorganise the VFS entries for Network Forensics in a more logical way.
+http://www.pyflag.org/PyFlagWiki/ToDo

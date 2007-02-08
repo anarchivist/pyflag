@@ -201,6 +201,7 @@ class less(ls):
                 pipe.close()
                 yield 'Viewing of %s with less successful' % arg
 
+
 class cp(ls):
     """ Copies files from the filesystem to the directory specified as the last arg """
     def help(self):
@@ -315,6 +316,51 @@ class istat(pyflagsh.command):
                 
                 status['filename'] = filename
                 yield status
+
+class iless(istat):
+    """ Pipes the content of an inode to less """
+    def help(self):
+        return "Pipe inodes to less pager "
+        
+    def execute(self):
+        for inode in self.args:
+            fd=self.environment._FS.open(inode=inode)
+            pipe=os.popen("less","w")
+            while 1:
+                data=fd.read(10000)
+                if not data: break
+                pipe.write(data)
+                
+            pipe.close()
+            yield 'Viewing of %s with less successful' % inode
+
+class icp(iless):
+    """ Copy Inodes from the VFS to the file system """
+    def execute(self):
+        print self.args
+        ## check that last arg is a dir
+        mode = "file"
+        if len(self.args)>2 and not os.isdir(self.args[-1]):
+            raise RuntimeError("Last argument must be a directory for multiple files")
+        else:
+            mode = "directory"
+        
+        for inode in self.args[:-1]:
+            print inode
+            fd=self.environment._FS.open(inode=inode)
+            if mode =='directory':
+                outfd = open(self.args[-1]+"/"+inode,'w')
+            else:
+                outfd = open(self.args[-1],'w')
+                
+            while 1:
+                data=fd.read(10000)
+                if not data: break
+                outfd.write(data)
+                    
+            outfd.close()
+            yield 'Copying of %s into %s successful' % (inode,self.args[-1])
+
 
 class stat(ls):
     """ stats a list of files in the filesystem """

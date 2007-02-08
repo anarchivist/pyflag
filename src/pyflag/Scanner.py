@@ -655,19 +655,33 @@ class Carver:
         return length
     
     def add_inode(self, fd, offset, factories):
-        """ This is called to allow the Carver to add VFS inodes. """
+        """ This is called to allow the Carver to add VFS inodes.
+
+        Returns the prospective length of the file. This does not have
+        to be the same as the length returned by get_length() - it
+        just directs the CarveScan to ignore matches which fall within
+        this range within our parent.
+        """
         ## Calculate the length of the new file
         length = self.get_length(fd,offset)
         new_inode = "%s|o%s:%s" % (fd.inode, offset, length)
+
+        self._add_inode(new_inode, length, "%s.%s" % (offset, self.extension),
+                        fd, factories)
+        return length
+
+    def _add_inode(self, new_inode, length, name, fd, factories):
         pathname = self.fsfd.lookup(inode = fd.inode)
-                    
         ## By default we just add a VFS Inode for it.
         self.fsfd.VFSCreate(None,
                             new_inode,
-                            pathname + "/%s.%s" % (offset, self.extension),
+                            pathname + "/" +name,
                             size = length,
                             )
 
         ## Scan the new inodes:
         new_fd = self.fsfd.open(inode = new_inode)
+
+        ## dont carve the resultant file (or we could get recursive carves)
+        factories = [ f for f in factories if "Carv" not in f.__class__.__name__]
         scanfile(self.fsfd, new_fd, factories)

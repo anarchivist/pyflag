@@ -60,7 +60,9 @@ Run PyFlag
 
 Run pyflag with:
 
-  pyflag [port number]
+  pyflag 
+
+(For help on command line parameters try pyflag --help)
 
 Run the pyflag shell (pyflash) with:
 
@@ -73,19 +75,21 @@ Optional Features
 The following steps are recommended to do prior to using Flag.
 
 1) Flag may use the NSRL when loading new filesystems. If you have the
-    NSRL ISOs, you can mount them somewhere and then use the
-    utilities/NSRL_load.sh script to load the NSRL into the database.
+   NSRL ISOs, you can mount them somewhere and then use the
+   utilities/NSRL_load.sh script to load the NSRL into the database.
 
-2) Flag can download the whois databases for use when importing log
-   files. By Downloading the whois databases its possible to do very
-   fast whois lookups on every IP in imported logs and then see the
-   contact details for each network owner.
+2) Flag can download the whois databases for use when displaying IP addresses.
+   By Downloading the whois databases its possible to do very fast whois lookups
+   on every IP in imported logs and then see the contact details for each network
+   owner.
 
 =================
 Debug/Development
 =================
 
-If you want to tinker with the source you should probably install to a different location (so you don't need root to edit files).  The scripts in the test directory are set-up to work with this install process:
+If you want to tinker with the source you should probably install to a
+different location (so you don't need to be root to edit files).  The scripts
+in the test directory are set-up to work with this install process:
 
 ./autogen.sh
 ./configure --prefix=/var/tmp/build/pyflag
