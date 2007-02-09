@@ -1,6 +1,6 @@
 AM_CFLAGS		= -I$(srcdir)/../auxtools -I$(srcdir)/../imgtools -I$(top_srcdir)/src/include -DLINUX2 -include config.h 
 
-bin_PROGRAMS		= dbtool fls ils icat istat
+bin_PROGRAMS		= dbtool
 noinst_LTLIBRARIES	= libfstools.la
 noinst_PROGRAMS	= ils dls icat fls dcat ffind istat ifind dcalc dstat \
 		          fsstat jls jcat

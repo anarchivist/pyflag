@@ -320,7 +320,7 @@ int EWFIOSource_Destructor(void *self) {
 IOSource EWFIOSource_Con(IOSource self, IOOptions opts) {
   EWFIOSource this = (EWFIOSource)self;
   IOOptions i,j;
-  LIBEWF_HANDLE *e;
+  LIBEWF_HANDLE *e=NULL;
   
   this->buffer = CONSTRUCT(StringIO, StringIO, Con, self);
   this->number_of_files =0;

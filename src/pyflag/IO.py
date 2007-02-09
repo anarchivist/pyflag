@@ -127,11 +127,11 @@ class IO:
             self.options = options
 
             #Try and make the subsystem based on the args
-            try:
-                self.io=iosubsys.iosource(options)
-                self.size = self.io.size
-            except IOError, e:
-                pass
+            self.io=iosubsys.iosource(options)
+            self.size = self.io.size
+
+            if not self.io:
+                raise IOError("Unable to open iosource")
 #                print "ERROR: %s" % e
 
             self.readptr = 0

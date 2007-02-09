@@ -212,7 +212,7 @@ static void callback(TCPStream self, IP ip) {
       TCPStream *tmp = talloc_size(self,sizeof(void *));
 
       *tmp = self;
-      talloc_set_destructor(tmp, free_data);
+      talloc_set_destructor((void *)tmp, free_data);
     };
     break;
   case PYTCP_DATA:

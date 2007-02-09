@@ -219,7 +219,7 @@ void pad_data(TCPStream self) {
 };
 
 /** Flush all the queues into the callback */
-int TCPStream_flush(void * this) {
+int TCPStream_flush(void *this) {
   TCPStream self=(TCPStream)this;
 
   if(self->direction!=TCP_FORWARD) 
@@ -385,7 +385,7 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   j->reverse = i;
 
   /** When the streams are destroyed we flush them */
-  talloc_set_destructor(i, TCPStream_flush);
+  talloc_set_destructor((void *)i, TCPStream_flush);
 
   return i;
 };
@@ -515,7 +515,7 @@ DiskStreamIO DiskStreamIO_Con(DiskStreamIO self, char *filename) {
   self->filename = talloc_strdup(self, filename);
 
   /** Ensure that we get flushed out when we get destroyed */
-  talloc_set_destructor(self, DiskStreamIO_flush);
+  talloc_set_destructor((void *)self, DiskStreamIO_flush);
 
   return self;
 };
