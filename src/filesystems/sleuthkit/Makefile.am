@@ -1,1 +1,1 @@
-SUBDIRS	= auxtools imgtools fstools python
+SUBDIRS	= auxtools imgtools mmtools fstools python

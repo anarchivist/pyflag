@@ -1,6 +1,6 @@
 AM_CFLAGS		= -I$(srcdir)/../auxtools -I$(srcdir)/../imgtools -I$(top_srcdir)/src/include -DLINUX2 -include config.h 
 
-bin_PROGRAMS			= mmls mmstat
+#bin_PROGRAMS			= mmls mmstat
 noinst_LTLIBRARIES		= libmmtools.la
 
 libmmtools_la_SOURCES	= dos.h gpt.h mac.h mm_tools.h sun.h bsd.h bsd.c \
