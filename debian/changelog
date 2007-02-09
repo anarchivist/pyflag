@@ -1,3 +1,9 @@
+pyflag (0.84RC1) unstable; urgency=low
+
+  * Package updated to work with new build system.  Much nicer now :)
+
+ -- scudette <scudette@users.sourceforge.net>  Thu,  9 Feb 2007 10:59:00 +1100
+
 pyflag (0.80.1) unstable; urgency=low
 
   * Package updated to work with new build system.  Much nicer now :)

@@ -389,3 +389,7 @@ static PyTypeObject skfileType = {
     0,                         /* tp_alloc */
     0,                         /* tp_new */
 };
+
+// This is not in sleuthkit header
+uint8_t ntfs_find_file(FS_INFO * fs, INUM_T inode_toid, uint32_t type_toid,
+		       uint16_t id_toid, int flags, FS_DENT_WALK_FN action, void *ptr);

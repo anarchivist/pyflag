@@ -360,7 +360,7 @@ pyfile_read_random(IMG_INFO * img_info, OFF_T vol_offset, char *buf,
                    OFF_T len, OFF_T offset) {
 
   PyObject *res;
-    int ret, read;
+    int read;
     unsigned  long long int tot_offset;
     char *strbuf;
     IMG_PYFILE_INFO *pyfile_info = (IMG_PYFILE_INFO *) img_info;
@@ -422,12 +422,9 @@ pyfile_imgstat(IMG_INFO * img_info, FILE * hFile) {
 
 void
 pyfile_close(IMG_INFO * img_info) {
-    IMG_PYFILE_INFO *pyfile_info = (IMG_PYFILE_INFO *) img_info;
-    //EDIT davec: Its not our job to close the file, we didnt open it!
-    //PyObject_CallMethod(pyfile_info->fileobj, "close", "");
-    if(img_info)
-        talloc_free(img_info);
-    return;
+  if(img_info)
+    talloc_free(img_info);
+  return;
 }
 
 /* construct an IMG_PYFILE_INFO */
@@ -592,7 +589,7 @@ skfs_listdir(skfs *self, PyObject *args, PyObject *kwds) {
     self->fs->dent_walk(self->fs, inode, flags, listdent_walk_callback_list, (void *)list);
     if(tsk_errno) {
         Py_DECREF(list);
-        return PyErr_Format(PyExc_IOError, "Unable to list inode %u: %s", (ULONG)inode, tsk_error_get());
+        return PyErr_Format(PyExc_IOError, "Unable to list inode %lu: %s", (ULONG)inode, tsk_error_get());
     };
 
     return list;
@@ -691,7 +688,6 @@ static PyObject *
 skfs_iwalk(skfs *self, PyObject *args, PyObject *kwds) {
     int alloc=0, unalloc=1;
     int flags=FS_FLAG_META_UNALLOC | FS_FLAG_META_USED;
-    PyObject *fileargs, *filekwds;
     PyObject *list;
     INUM_T inode=0;
 
@@ -732,7 +728,7 @@ PyObject *build_stat_result(FS_INODE *fs_inode) {
 static PyObject *
 skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
     PyObject *result;
-    PyObject *os, *inode_obj;
+    PyObject *inode_obj;
     char *path=NULL;
     INUM_T inode=0;
     FS_INODE *fs_inode;
@@ -782,7 +778,7 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
 /* stat an already open skfile */
 static PyObject *
 skfs_fstat(skfs *self, PyObject *args) {
-    PyObject *result, *skfile_obj, *os;
+    PyObject *result, *skfile_obj;
     FS_INODE *fs_inode;
 
     if(!PyArg_ParseTuple(args, "O", &skfile_obj))
@@ -882,7 +878,6 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
     struct dentwalk *dw, *dwlist;
     struct dentwalk *dwtmp, *dwtmp2;
     char *tmp;
-    int i;
 
     global_talloc_context = self->context;
 
@@ -1148,10 +1143,9 @@ skfile_str(skfile *self) {
 static PyObject *
 skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
     char *buf;
-    int cur, written;
+    int written;
     PyObject *retdata;
     FS_INFO *fs;
-    struct block *b;
     int readlen=-1;
     int slack=0, overread=0;
     off_t maxsize;
