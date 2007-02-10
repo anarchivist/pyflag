@@ -82,7 +82,7 @@ class ZipScan(GenScanFactory):
                 if not os.path.basename(namelist[i]): continue
 
                 info = z.infolist()[i]
-                inode = "%s|Z%s" % (self.inode,info.header_offset)
+                inode = "%s|Z%s:%s" % (self.inode,info.header_offset, info.compress_size)
 
                 self.ddfs.VFSCreate(None,
                                     inode,pathname+"/"+namelist[i],
@@ -202,15 +202,29 @@ class ZipFile(File):
     def __init__(self, case, fd, inode):
         File.__init__(self, case, fd, inode)
 
-        ## Parse out inode
+        ## Parse out inode - if we got the compressed length provided,
+        ## we use that, otherwise we calculate it from the zipfile
+        ## header
         parts = inode.split('|')
-        offset = int(parts[-1][1:])
+        ourpart = parts[-1][1:]
+        try:
+            offset, size = ourpart.split(":")
+            self.compressed_length = int(size)
+            offset = int(offset)
+        except:
+            offset = int(ourpart)
 
         ## Ensure that we can read the file header:
         b = Zip.Buffer(fd=fd)[offset:]
         self.header = Zip.ZipFileHeader(b)
+
+        ## This is sometimes invalid and set to zero - should we query
+        ## the db?
         self.size = int(self.header['uncompr_size'])
-        self.compressed_length = int(self.header['compr_size'])
+        
+        if not self.compressed_length:
+            self.compressed_length = int(self.header['compr_size'])
+            
         self.type = int(self.header['compression_method'])
 
         ## Where does the data start?
@@ -224,15 +238,16 @@ class ZipFile(File):
         fd.seek(offset)
         
     def read(self,length=None):
-        if length==None:
-            length = self.size
-            
         ## Call our baseclass to see if we have cached data:
         try:
             return File.read(self,length)
         except IOError:
             pass
 
+        ## Read as much as possible
+        if length==None:
+            length = sys.maxint
+            
         ## This is done in order to decompress the file in small
         ## chunks. We try to return as much data as was required
         ## and not much more
@@ -294,22 +309,27 @@ class GZ_file(DiskForensics.DBFS_file):
     
     def __init__(self, case, fd, inode):
         File.__init__(self, case, fd, inode)
+        self.gz = None
 
-        self.cache()
-        
-    def force_cache(self):
-        cached_filename = self.get_temp_path()
-        fd = open(cached_filename, 'w')
-        self.fd.cache()
-        gz = gzip.GzipFile(fileobj=self.fd, mode='r')
+    def read(self, length=None):
+        try:
+            return File.read(self,length)
+        except IOError:
+            pass
+
+        if not self.gz:
+            self.gz = gzip.GzipFile(fileobj=self.fd, mode='r')
+            
         count = 0
         step = 1024
+
+        result = ''
         
         ## Copy ourself into the file - This is in case we have errors
         ## in the file, we try to read as much as possible:
         while 1:
             try:
-                data=gz.read(step)
+                data=self.gz.read(step)
             except IOError,e:
                 step /= 2
                 if step<10:
@@ -321,10 +341,21 @@ class GZ_file(DiskForensics.DBFS_file):
             
             count += len(data)
             if len(data)==0: break
-            fd.write(data)
+            result+=data
 
-        self.cached_fd =  open(cached_filename, 'r')
-        return count
+        return result
+
+    def seek(self,offset,rel=None):
+        File.seek(self,offset,rel)
+
+        if self.cached_fd: return
+
+        ## If we were asked to seek in a gzip file:
+        if self.readptr!=0:
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Asked to seek to %s in gzip file %s. This is expensive, caching on disk." % (self.readptr, self.inode))
+            self.cache()
+
+            self.seek(offset,rel)
 
 class Tar_file(DiskForensics.DBFS_file):
     """ A file like object to read files from within tar files. Note that the tar file is specified as an inode in the DBFS """
@@ -388,12 +419,19 @@ class ZipFileCarver(Scanner.Carver):
             header = Zip.ZipFileHeader(b)
             size = int(header['uncompr_size'])
             compressed_length = int(header['compr_size'])
+
+            ## Some zip programs seem to leave this at 0 - because its
+            ## already in the central directory. Unfortunately the
+            ## carver currently does not look at the central directory
+            ## - so we just make it a reasonable value
+            if compressed_length==0:
+                compressed_length = 100*1024
             name = header['zip_path'].get_value()
             header_offset = header['data'].buffer.offset
         except:
             return
 
-        new_inode = "%s|Z%s" % (fd.inode, offset)
+        new_inode = "%s|Z%s:%s" % (fd.inode, offset, compressed_length)
         self._add_inode(new_inode, size, name, fd, factories)
         return size
 

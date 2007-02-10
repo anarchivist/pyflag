@@ -126,7 +126,6 @@ class IndexScan(GenScanFactory):
         """
         GenScanFactory.reset(self, inode)
         dbh=DB.DBO(self.case)
-        dbh.execute("delete from `LogicalIndex`")
         dbh.execute("delete from `LogicalIndexOffsets`")
         ## Here we reset all reports that searched this disk
         FlagFramework.reset_all(case=self.case,report='SearchIndex', family='Keyword Indexing')

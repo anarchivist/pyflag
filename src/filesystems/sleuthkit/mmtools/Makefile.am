@@ -7,8 +7,9 @@ libmmtools_la_SOURCES	= dos.h gpt.h mac.h mm_tools.h sun.h bsd.h bsd.c \
 						  dos.c gpt.c mac.c mm_io.c mm_open.c mm_part.c \
 						  mm_types.c sun.c
 
-mmstat_SOURCES			= mmstat.c
-mmstat_LDADD			= libmmtools.la ../auxtools/libauxtools.la ../imgtools/libimgtools.la ../../../lib/liboo.la
-
-mmls_SOURCES			= mmls.c
-mmls_LDADD				= libmmtools.la ../auxtools/libauxtools.la ../imgtools/libimgtools.la ../../../lib/liboo.la
+#mmstat_SOURCES			= mmstat.c
+#mmstat_LDADD			= libmmtools.la ../auxtools/libauxtools.la ../imgtools/libimgtools.la ../../../lib/liboo.la
+#
+#mmls_SOURCES			= mmls.c
+#mmls_LDADD				= libmmtools.la ../auxtools/libauxtools.la ../imgtools/libimgtools.la ../../../lib/liboo.la
+#
