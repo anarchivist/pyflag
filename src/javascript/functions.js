@@ -189,11 +189,18 @@ function tree_open(left_cb, right_cb,url) {
 /** This function is used to sumbit the query via a post to the
     target_window */
 function post_link(query, target_name) {
-  var target_window = find_window_by_name(target_name);
+  var target_window;
+
+  if(target_name) {
+    target_window = find_window_by_name(target_name);
+  } else {
+    target_window = window;
+  }
+
   var form = document.createElement('form');
   form.setAttribute('method','Post');
   form.setAttribute('action','/post');
-  form.setAttribute('target',target_name);
+  form.setAttribute('target',target_window.name);
 
   var input = document.createElement('input');
 

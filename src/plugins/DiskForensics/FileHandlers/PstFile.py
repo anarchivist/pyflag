@@ -38,7 +38,6 @@ import StringIO
 import re
 from pyflag.FlagFramework import normpath, query_type
 import pyflag.FlagFramework as FlagFramework
-import pexpect
 import Store
 from pyflag.TableObj import StringType, TimestampType, InodeType
 
@@ -54,15 +53,6 @@ class PstScan(GenScanFactory):
         contains = [ 'PstScan','IEIndex', 'RegistryScan', 'TypeScan', 'DLLScan',
                      'ExtractorScan' ]
         default = True
-
-        # Let's check if this external tool exists into the PATH and then add it to the Drawer
-        try: 
-              s=pexpect.spawn('stegdetect -V')
-              s.expect(pexpect.EOF)
-              if "Stegdetect Version" in s.before :
-                     contains.append('AFTJpegScan')
-        except pexpect.ExceptionPexpect,e:
-              pass
 
     def __init__(self,fsfd):
         GenScanFactory.__init__(self, fsfd)

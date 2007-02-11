@@ -444,9 +444,9 @@ class DBO:
             self.execute("explain %s", sql)
             tables = [ row['table'] for row in self ]
             if not tables or tables[0]==None:
-                self.execute(sql)
                 ## Release the lock on the row
                 self.execute("commit")
+                self.execute(sql)
                 return 
                 
             self.insert('sql_cache',
@@ -928,6 +928,7 @@ def print_stats():
     print "Usage statistics for DB"
     for time, key, pool in DBH.creation_times:
         print "%s - I have %s handles, the database has %s handles" % (key,pool.qsize(), connections[key])
-    
-import atexit
-atexit.register(print_stats)
+
+if config.LOG_LEVEL >= pyflaglog.VERBOSE_DEBUG:
+    import atexit
+    atexit.register(print_stats)

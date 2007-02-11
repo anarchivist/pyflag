@@ -321,9 +321,13 @@ class HTMLUI(UI.GenericUI):
         parent: refresh to the pane that contains this pane. (useful for popups etc).
         popup: open a new popup window and draw the target in that.
         self: refresh to the current pane (useful for internal links in popups etc).
+        pane: The current javascript pane - this is useful for paging in trees etc.
         """
         if pane=='self':
             return "post_link('f?%s',window.__pyflag_name); return false;" % target
+
+        if pane=='pane':
+            return "post_link('f?%s',0); return false;" % target
         
         if pane=='popup':
             id=self.get_unique_id()
@@ -932,7 +936,7 @@ class HTMLUI(UI.GenericUI):
             del new_query[limit_context]
             new_query[limit_context] = previous_limit
             self.toolbar(icon = 'stock_left.png',
-                         link = new_query,
+                         link = new_query, pane='pane',
                          tooltip='Previous Page (Rows %s-%s)' % (previous_limit, limit))
 
         ## Now we add the paging toolbar icons
@@ -945,14 +949,14 @@ class HTMLUI(UI.GenericUI):
             del new_query[limit_context]
             new_query[limit_context] = limit+pagesize
             self.toolbar(icon = 'stock_right.png',
-                         link = new_query,
+                         link = new_query, pane='pane',
                          tooltip='Next Page (Rows %s-%s)' % (limit, limit+pagesize))
 
         ## Add a skip to row toolbar icon:
         self.toolbar(
             cb = goto_row_cb,
             text="Row %s" % limit,
-            icon="stock_next-page.png"
+            icon="stock_next-page.png", pane='pane',
             )
 
         def filter_help(query,result):
