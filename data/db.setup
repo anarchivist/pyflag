@@ -108,7 +108,7 @@ create table jobs (
 	arg1 text,
 	arg2 text,
 	arg3 text,
-	state enum('pending','processing') default 'pending',
+	state enum('broadcast','pending','processing') default 'pending',
 	`cookie` INT(11) not null,
 	key `id`(id)
 	);

@@ -37,6 +37,7 @@ import pyflag.DB as DB
 import pyflag.Scanner as Scanner
 import PIL.Image
 import pyflag.Registry as Registry
+import pyflag.FileSystem as FileSystem
             
 class JpegCarver(Scanner.Carver):
     regexs = ["\xff\xd8....JFIF", "\xff\xd8....EXIF"]
@@ -51,14 +52,13 @@ class CarveScan(Scanner.GenScanFactory):
 
     def __init__(self,fsfd):
         Scanner.GenScanFactory.__init__(self, fsfd)
-        
+
         dbh = DB.DBO()
-        carvers = [ c(fsfd) for c in Registry.CARVERS.classes ]
         self.ids = {}
-        
+        self.case = fsfd.case
         ## We need to ensure that the scanner regexs are in the
         ## dictionary:
-        for c in carvers:
+        for c in Registry.CARVERS.classes:
             for expression in c.regexs:
                 dbh.execute("select id from dictionary where word=%r limit 1", expression)
                 row = dbh.fetch()
@@ -86,7 +86,9 @@ class CarveScan(Scanner.GenScanFactory):
                 #if row['offset']<offset: continue
                 offset = row['offset']
                 ## Allow the carver to work with the offset:
-                self.outer.ids[row['word_id']].add_inode(self.fd, offset, self.factories)
+                fsfd = FileSystem.DBFS(self.case)
+                carver = self.outer.ids[row['word_id']](fsfd)
+                carver.add_inode(self.fd, offset, self.factories)
                 
 ## Unit tests:
 import unittest

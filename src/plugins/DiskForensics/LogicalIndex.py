@@ -186,6 +186,7 @@ class IndexScan(GenScanFactory):
 
         def finish(self):
             self.dbh.mass_insert_commit()
+            del self.dbh
 ##            for k,v in self.stats.items():
 ##                self.dbh.execute("select 1 from LogicalIndexStats where id=%r", k)
 ##                if self.dbh.fetch():

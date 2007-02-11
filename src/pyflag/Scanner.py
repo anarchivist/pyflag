@@ -431,6 +431,7 @@ def scanfile(ddfs,fd,factories):
             try:
                 if not o.ignore:
                     interest+=1
+                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Processing with %s" % o)
                     o.process(data,metadata=metadata)
 
             except Exception,e:

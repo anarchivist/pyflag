@@ -10,6 +10,9 @@ PYFLAG_DBHOST=127.0.0.1
 PYFLAG_DBPORT=3306
 PYFLAG_DBUNIXSOCKET=/var/run/mysqld/mysqld.sock  
 PYFLAG_STRICTSQL=0
+PYFLAG_SCHEMA_VERSION=1
+PYFLAG_FLUSH=0
+PYFLAG_JOB_QUEUE=10
 
 ## This is the number of rows where the mass insert buffer will be flushed.
 PYFLAG_MASS_INSERT_THRESHOLD=300

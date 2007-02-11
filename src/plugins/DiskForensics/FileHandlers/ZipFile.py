@@ -228,14 +228,17 @@ class ZipFile(File):
         self.type = int(self.header['compression_method'])
 
         ## Where does the data start?
-        offset = self.header['data'].buffer.offset
+        self.init()
 
+    def init(self):
         self.d = zlib.decompressobj(-15)
         self.left_over = ''
         self.blocksize = 1024*10
 
+        offset = self.header['data'].buffer.offset
+        
         ## Seek our fd to there:
-        fd.seek(offset)
+        self.fd.seek(offset)
         
     def read(self,length=None):
         ## Call our baseclass to see if we have cached data:
@@ -295,13 +298,11 @@ class ZipFile(File):
         ## We want to reinitialise the file pointer:
         if self.readptr!=0 and self.type == Zip.ZIP_DEFLATED:
             pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Required to seek to offset %s in Zip File %s (%s,%s). This is inefficient, forcing disk caching." % (self.readptr, self.inode, offset,rel))
+            self.init()
             self.cache()
 
             self.seek(offset, rel)
             return
-
-    def close(self):
-        pass
 
 class GZ_file(DiskForensics.DBFS_file):
     """ A file like object to read gzipped files. """

@@ -193,24 +193,28 @@ class Pool(Queue):
         Queue.__init__(self, poolsize)
 
     def put(self, dbh):
-        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Returning dbh to pool %s" % self)
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Returning dbh to pool %s" % self.case)
         Queue.put(self,dbh)
 
     def get(self, block=1):
         """Get an object from the pool or a new one if empty."""
         try:
-            result=self.empty() and self.connect() or Queue.get(self, block)
+            try:
+                result=self.empty() and self.connect() or Queue.get(self, block)
 
-            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Getting dbh from pool %s" % self)
-            return result
-        except Empty:
-            return self.connect()
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Getting dbh from pool %s" % self.case)
+                return result
+            except Empty:
+                return self.connect()
+        except Exception,e:
+            raise DBError("Unable to connect - does the DB Exist?")
 
     def connect(self):
         """ Connect specified case and return a new connection handle """
         global db_connections
         db_connections +=1
-        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "New Connection to DB. We now have %s in total" % (db_connections, ))
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "New Connection to DB %s. We now have %s in total" % (self.case,
+                                                                                                     db_connections, ))
         
         case=self.case
         try:
@@ -241,7 +245,6 @@ class Pool(Queue):
                 
             mysql_bin_string = "%s -f -u %r -p%r -h%s -P%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBHOST,config.DBPORT)
         except Exception,e:
-            print e
             ## or maybe over the socket?
             ##  The following is used for debugging to ensure we dont
             ##  have any SQL errors:
@@ -374,7 +377,6 @@ class DBO:
                 return self.cursor.execute(string.decode('latin1'))
                 
             elif not str.startswith('Records'):
-                print e
                 raise DBError(e)
 
     def cached_execute(self, sql, limit=0, length=50):
@@ -533,10 +535,11 @@ class DBO:
         self.invalidate(table)
         self.execute("drop table if exists %s", table)
 
-    def delete(self, table, where='0'):
+    def delete(self, table, where='0', _fast=False):
         sql = "delete from %s where %s"
         ## We are about to invalidate the table:
-        self.invalidate(table)
+        if not _fast:
+            self.invalidate(table)
         self.execute(sql, (table, where))        
 
     def insert(self, table, _fast=False, **fields):
@@ -745,10 +748,12 @@ class DBO:
 
             ##key = "%s/%s" % (self.case, threading.currentThread().getName())
             key = "%s" % (self.case)
-            pool = DBH.get(key)
-            pool.put((self.dbh, self.mysql_bin_string))
+            if DBH:
+                pool = DBH.get(key)
+                pool.put((self.dbh, self.mysql_bin_string))
+                
         except (TypeError,AssertionError,AttributeError, KeyError),e:
-            print e
+            print "dbh desctrucr: %s " % e
             pass
 
     def MySQLHarness(self,client):
@@ -908,6 +913,19 @@ class DBOTest(unittest.TestCase):
         ## Wait for both threads to finish
         self.assertEqual(results,['1','1'])
 
-if __name__=='__main__':
-    suite = unittest.makeSuite(DBOTest)
-    unittest.TextTestRunner(verbosity=2).run(suite)
+def print_stats():
+    dbh = DBO("mysql")
+    dbh.execute("show processlist")
+    connections = {}
+    for row in dbh:
+        try:
+            connections[row['db']]+=1
+        except:
+            connections[row['db']] =1
+            
+    print "Usage statistics for DB"
+    for time, key, pool in DBH.creation_times:
+        print "%s - I have %s handles, the database has %s handles" % (key,pool.qsize(), connections[key])
+    
+import atexit
+atexit.register(print_stats)

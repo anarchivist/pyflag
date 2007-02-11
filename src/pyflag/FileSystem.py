@@ -221,6 +221,7 @@ class DBFS(FileSystem):
         ## Basically this is how this function works - if root_inode
         ## is provided we make the new inode inherit the root inodes
         ## path and inode string.
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Creating new VFS node %s at %s" % (inode, new_filename))
         if root_inode:
             try:
                 new_filename = self.lookup(inode=root_inode) + "/" + new_filename
@@ -295,7 +296,7 @@ class DBFS(FileSystem):
 
         dbh.execute("select path,mode,inode,name from file where %s %s", (where, mode))
 
-        return dbh
+        return [ dent for dent in dbh ]
         ## This is done rather than return the generator to ensure that self.dbh does not get interfered with...
         ## result=[dent for dent in self.dbh]
         ## return result
@@ -307,7 +308,7 @@ class DBFS(FileSystem):
         dbh=DB.DBO(self.case)
         dbh.check_index('file','path', 200)
         dbh.execute("select name, mode, status from file where path=%r order by name" % ( path))
-        return dbh
+        return [ row for row in dbh ]
         #for i in self.dbh:
         #    yield(i)
 
@@ -914,6 +915,7 @@ def glob_sql(pattern):
 def glob(pattern, case=None):
     dbh = DB.DBO(case)
     dbh.execute(glob_sql(pattern))
-    for row in dbh:
-        if row['path']:
-            yield row['path']
+    return [ row['path'] for row in dbh if row['path'] ]
+##    for row in dbh:
+##        if row['path']:
+##            yield row['path']

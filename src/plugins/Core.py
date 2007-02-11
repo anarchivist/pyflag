@@ -40,6 +40,7 @@ import os.path
 import pyflag.DB as DB
 import pyflag.Farm as Farm
 import pyflag.Scanner as Scanner
+import pyflag.pyflaglog as pyflaglog
 
 class IO_File(FileSystem.File):
     """ A VFS Driver to make the io source available.
@@ -57,13 +58,13 @@ class IO_File(FileSystem.File):
         self.io = IO.open(case, self.name)
         self.size = self.io.size
 
-        dbh = DB.DBO(self.case)
-        ## IO Sources may have block_size specified:
-        try:
-            dbh.execute("select value from filesystems where iosource=%r and property='block_size' limit 1", self.name);
-            self.block_size = int(dbh.fetch()["value"])
-        except TypeError:
-            pass
+##        dbh = DB.DBO(self.case)
+##        ## IO Sources may have block_size specified:
+##        try:
+##            dbh.execute("select value from filesystems where iosource=%r and property='block_size' limit 1", self.name);
+##            self.block_size = int(dbh.fetch()["value"])
+##        except TypeError:
+##            pass
 
         ## This source should not be scanned directly.
         self.ignore = True
@@ -199,7 +200,7 @@ class OffsetFileTests(tests.FDTest):
 
 class Scan(Farm.Task):
     """ A task to distribute scanning among all workers """
-    def run(self,case, inode, scanners):
+    def run(self,case, inode, scanners, *args):
         factories = Scanner.get_factories(case, scanners.split(","))
 
         if factories:
@@ -207,3 +208,16 @@ class Scan(Farm.Task):
             fd = ddfs.open(inode = inode)
             Scanner.scanfile(ddfs, fd, factories)
             fd.close()
+
+class DropCase(Farm.Task):
+    """ This class is responsible for cleaning up cached data
+    structures related to the case
+    """
+    def run(self, case, *args):
+        ## Expire any caches we have relating to this case:
+        pyflaglog.log(pyflaglog.INFO, "Resetting case %s in worker" % case)
+        key_re = "%s[/|]?.*" % case
+        IO.IO_Cache.expire(key_re)
+        DB.DBH.expire(key_re)
+        DB.DBIndex_Cache.expire(key_re)
+        Scanner.factories.expire(key_re)

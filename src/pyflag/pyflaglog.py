@@ -94,7 +94,7 @@ def start_log_thread():
 def log(level,message):
     """ Prints the message out only if the configured verbosity is higher than the message's level."""
     try:
-        string = "%s: %s" % (lookup[level],message)
+        string = "%s(%s): %s" % (os.getpid(),lookup[level],message)
     except:
         string = message
 

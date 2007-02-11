@@ -548,7 +548,10 @@ import unittest, md5
 import pyflag.pyflagsh as pyflagsh
 from pyflag.FileSystem import DBFS
 
-class LoadDataTests(unittest.TestCase):
+## Is this even needed any more? Surely it should be enough with all
+## the scanner tests?
+#class LoadDataTests(unittest.TestCase):
+class LoadDataTests:
     """ Forensic Image Loading Tests """
     order = 1
     test_case = "PyFlagTestCase"

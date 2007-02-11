@@ -187,7 +187,19 @@ def terminate_children():
 
 class Task:
     """ All distributed tasks need to extend this subclass """
-        
+
+## There are two types of messages we listen for, the pending messages
+## and broadcast messages. Pending jobs are those which we take
+## ownership of (i.e. we guarantee that no one else is doing the same
+## job at the same time). A broadcast job is sent to all workers at
+## once - and should be responded to by all workers. Note that there
+## is no guaratees on when a worker will get around to responding to
+## the broadcast, so the Task handling the broadcast needs to check
+## that its still relevant.
+
+## Typically pending jobs are things like scanning inodes, cracking
+## keys etc. While broadcasts are drop case messages, which require
+## all workers to free resources allocated to the case.
 def start_workers():
     for i in range(config.WORKERS):
        pid = os.fork()
@@ -204,6 +216,12 @@ def start_workers():
          dbh=DB.DBO()
          jobs = []
 
+         ## This is the last broadcast message we handled. We will
+         ## only handle broadcasts newer than this.
+         dbh.execute("select max(id) as max from jobs")
+         row = dbh.fetch()
+         broadcast_id = row['max'];
+
          while 1:
              ## Check for new tasks:
              if not jobs:
@@ -211,7 +229,7 @@ def start_workers():
              try:
                  dbh.execute("lock tables jobs write")
                  sql = [ "command=%r" % x for x in Registry.TASKS.class_names ]
-                 dbh.execute("select * from jobs where %s and state='pending' limit 10", " or ".join(sql))
+                 dbh.execute("select * from jobs where ((%s) and state='pending') or (state='broadcast' and id>%r) limit %s", (" or ".join(sql), broadcast_id, config.JOB_QUEUE))
                  jobs = [ row for row in dbh ]
                  
                  if not jobs:
@@ -219,7 +237,10 @@ def start_workers():
                  
                  ## Ensure the jobs are marked as processing so other jobs dont touch them:
                  for row in jobs:
-                     dbh.execute("update jobs set state='processing' where id=%r", row['id'])
+                     if row['state'] == 'pending':
+                         dbh.execute("update jobs set state='processing' where id=%r", row['id'])
+                     elif row['state'] == 'broadcast':
+                         broadcast_id = row['id']
              finally:
                  dbh.execute("unlock tables")
                 
@@ -239,7 +260,8 @@ def start_workers():
                          pyflaglog.log(pyflaglog.ERRORS, "Error scanning %s" % e)
 
                  finally:
-                     dbh.execute("delete from jobs where id=%r", row['id'])
+                     if row['state'] != 'broadcast':
+                         dbh.execute("delete from jobs where id=%r", row['id'])
                 
     atexit.register(terminate_children)
 
@@ -260,3 +282,9 @@ def wake_workers():
     ## A Signal should interrupt the children's sleep
     for pid in children:
         os.kill(pid, signal.SIGUSR1)
+
+
+## This flag tells us that there are no workers currently processing.
+if config.FLUSH:
+    dbh = DB.DBO()
+    dbh.execute("delete from jobs where state='broadcast' or state='processing'")

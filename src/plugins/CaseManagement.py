@@ -37,8 +37,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 from pyflag.TableObj import StringType,TimestampType,InodeType,FilenameType
 import pyflag.Registry as Registry
-
-from os.path import join
+import time
 
 description = "Case management"
 order = 10
@@ -199,38 +198,7 @@ class DelCase(Reports.report):
         return result
 
     def display(self,query,result):
-        dbh = self.DBO(None)
-
-        case = query['remove_case']
-        ## Remove any jobs that may be outstanding:
-        dbh.delete('jobs',"command='Scan' and arg1=%r" % case)
-
-        try:
-          #Delete the case from the database
-          dbh.delete('meta',"property='flag_db' and value=%r" % case)
-          dbh.execute("drop database if exists %s" ,case)
-        except DB.DBError:
-            pass
-
-        ## Delete the temporary directory corresponding to this case and all its content
-        try:
-            temporary_dir = "%s/case_%s" % (config.RESULTDIR,query['remove_case'])
-            for root, dirs, files in os.walk(temporary_dir,topdown=False):
-                for name in files:
-                    os.remove(join(root, name))
-                for name in dirs:
-                    os.rmdir(join(root, name))
-
-            os.rmdir(temporary_dir)
-        except:
-            pass
-
-        ## Expire any caches we have relating to this case:
-        key_re = "%s[/|]?.*" % query['remove_case']
-        IO.IO_Cache.expire(key_re)
-        DB.DBH.expire(key_re)
-        DB.DBIndex_Cache.expire(key_re)
-
+        FlagFramework.delete_case(query['remove_case'])
         result.heading("Deleted case")
         result.para("Case %s has been deleted" % query['remove_case'])
         return result

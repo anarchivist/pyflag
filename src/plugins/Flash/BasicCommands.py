@@ -560,10 +560,14 @@ class file(ls):
 ## Unit tests:
 import unittest,md5
 import pyflag.pyflagsh as pyflagsh
+import pyflag.tests
 
-class BasicCommandTests(unittest.TestCase):
+class BasicCommandTests(pyflag.tests.ScannerTest):
     """ Test PyFlash commands """
     test_case = "PyFlagTestCase"
+    test_file = "pyflag_stdimage_0.2.sgz"
+    subsystem = 'sgzip'
+    offset = "16128s"
 
     def test01ls(self):
         """ Test the ls command """

@@ -133,11 +133,15 @@ class OLEFile(FileSystem.File):
 import unittest
 import pyflag.pyflagsh as pyflagsh
 from pyflag.FileSystem import DBFS
+import pyflag.tests
 
-class OLETests(unittest.TestCase):
+class OLETests(pyflag.tests.ScannerTest):
     """ Tests OLE Scanner """
     test_case = "PyFlagTestCase"
-    order = 21
+    test_file = "pyflag_stdimage_0.2.sgz"
+    subsystem = 'sgzip'
+    offset = "16128s"
+
     def test01OLEScanner(self):
         """ Test OLE Scanner """
         env = pyflagsh.environment(case=self.test_case)

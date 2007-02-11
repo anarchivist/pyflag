@@ -88,7 +88,7 @@ def get_temp_path(case,inode):
 class Message:
     """ A class representing the message """
     def __init__(self,dbh,fd,ddfs):
-        self.dbh=dbh
+        self.case=dbh.case
         self.fd=fd
         self.ddfs = ddfs
         self.client_id='Unknown'
@@ -153,7 +153,8 @@ class Message:
         if not sessionid:
             sessionid=self.session_id
 
-        self.dbh.insert("msn_session",
+        dbh=DB.DBO(self.case)
+        dbh.insert("msn_session",
                         inode=self.fd.inode,
                         packet_id=self.get_packet_id(),
                         sender=sender,
@@ -177,7 +178,8 @@ class Message:
             sessionid=self.session_id
 
         try:
-            self.dbh.insert("msn_users",
+            dbh = DB.DBO(self.case)
+            dbh.insert("msn_users",
                            inode=self.fd.inode,
                            packet_id=self.get_packet_id(),
                            transaction_id=tr_id,
@@ -1247,7 +1249,8 @@ class Message:
 
                 context = safe_base64_decode(headers['context'])
 
-                self.dbh.insert("msn_p2p",
+                dbh=DB.DBO(self.case)
+                dbh.insert("msn_p2p",
                                 session_id = self.session_id,
                                 channel_id = headers['sessionid'],
                                 to_user= headers['to'],
@@ -1298,7 +1301,8 @@ class Message:
                 
         ## We have a real channel id so this is an actual file:
         else:
-            filename = get_temp_path(self.dbh.case,"%s|CMSN%s-%s" % (self.fd.inode, channel_sid,self.session_id))
+            dbh=DB.DBO(self.case)
+            filename = get_temp_path(dbh.case,"%s|CMSN%s-%s" % (self.fd.inode, channel_sid,self.session_id))
             fd=os.open(filename,os.O_RDWR | os.O_CREAT)
             os.lseek(fd,offset,0)
             bytes = os.write(fd,data)

@@ -39,7 +39,6 @@ class SMTP:
     """ Class managing the SMTP State """
     def __init__(self,fd,dbh,ddfs):
         self.fd=fd
-        self.dbh = dbh
         self.ddfs = ddfs
         self.dispatcher = {
             'EHLO': self.NOOP,

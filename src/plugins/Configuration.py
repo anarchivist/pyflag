@@ -2,8 +2,10 @@ import pyflag.Reports as Reports
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import os
-import DB
+import pyflag.DB as DB
 import stat
+import pyflag.pyflaglog as pyflaglog
+import pyflag.FlagFramework as FlagFramework
 
 class Configure(Reports.report):
     """ Configures pyflag """
@@ -56,37 +58,71 @@ class Configure(Reports.report):
         result.para("Done. You may edit your personalised configuration by overriding the system configuration at %s/pyflagrc" % config.SYSCONF)
         result.refresh(5,query.__class__())
 
+class HigherVersion(Reports.report):
+    """ A Higher version was encountered """
+    name = "Higher Version"
+    family = 'Configuration'
+    hidden = True
+    version = 0
+
+    parameters = {}
+
+    def display(self, query,result):
+        result.heading("Version error")
+        result.para("This is PyFlag version %s, which can only handle schema version %s. However, the default database %s has version %s." % (config.VERSION, config.SCHEMA_VERSION, config.FLAGDB, self.version))
+        result.para("You can force me to try and use the more advanced schema by using the --schema_version parameter. But all bets are off in that case...")
+        result.para("Alternatively, you can set a new default database name (using --flagdb) and I will create the correct schema version on it")
+        result.para("A better solution is to upgrade to the current version of pyflag.")
+
 class InitDB(Reports.report):
     """ Initialises the database """
     name = "Initialise Database"
     family = "Configuration"
     hidden = True
-    parameters = {'final':'any'}
+    parameters = {'upgrade':'any'}
+    version = 0
 
     def form(self,query, result):
-        result.para("Pyflag is able to connect to the database server (so credentials seem ok), but we receive the following error when trying to use the pyflag database.")
+        try:
+            dbh = DB.DBO()
+            if not self.version or self.version < config.SCHEMA_VERSION:
+                result.para("PyFlag detected that the this installation is using an old database schema version (%s) but the current version is (%s). There are a number of options:" % (self.version,config.SCHEMA_VERSION))
+                result.row("1", "Upgrade the schema (This will delete all the currently loaded cases - and the whois and nsrl databases)")
+                result.row("2", "Set a different default database name using the command line option --flagdb. This will still allow you to run the old version concurrently")
+                result.end_table()
+        except DB.DBError,e:
+            result.para("PyFlag detected no default database %r. Would you like to create it?" % config.FLAGDB)
 
-        result.text("%s\n\n" % query['error'], style='red')
-        
-        result.text("This may be because the pyflag database (%s) is not properly initialised. Tick the button below to allow Pyflag to attempt to re-create and initialise the database.\n\n" % config.FLAGDB, color="black")
-
-        result.text("Note that doing this will delete all data in pyflag. Initialising Pyflag should only need to be done after initial installation.", color='red', font='bold')
-            
-        result.checkbox("Attempt to create database", 'final','ok')
+        result.checkbox("Upgrade the database?",'upgrade','yes')
 
     def display(self,query,result):
+        ## Try to delete the old cases:
+        try:
+            dbh = DB.DBO()
+            dbh.execute("select * from meta where property='flag_db'")
+            for row in dbh:
+                pyflaglog.log(pyflaglog.INFO, "Deleting case %s due to an upgrade" % row['value'])
+                FlagFramework.delete_case(row['value'])
+        except DB.DBError,e:
+            pass
+        
         ## Connect to the mysql database
         dbh = DB.DBO('mysql')
-        dbh.execute("create database if not exists %s" % config.FLAGDB)
+
+        ## Make sure we start with a clean slate
+        dbh.execute("drop database if exists %s" % config.FLAGDB)
+        dbh.execute("create database %s" % config.FLAGDB)
         
         dbh = DB.DBO(None)
         dbh.MySQLHarness("/bin/cat %s/db.setup" % config.DATADIR)
+        dbh.set_meta('schema_version',config.SCHEMA_VERSION)
 
         try:
-            dbh.execute("desc meta")
+            version = dbh.get_meta("schema_version")
+            assert(int(version) == config.SCHEMA_VERSION)
         except:
             result.heading("Failed")
-            result.para("Unable to create database properly. Try to create it manually")
+            result.para("Unable to create database properly. Try to create it manually from %s/db.setup" % config.DATADIR)
             return
 
         result.heading("Success")

@@ -39,6 +39,7 @@ import pyflag.Store as Store
 import textwrap
 
 flag_version = config.VERSION
+config_checked = False
 
 class DontDraw(Exception):
     """ Exception raised by a UI to let the server know not to draw it.
@@ -72,7 +73,7 @@ class AuthError(Exception):
     def __init__(self,result):
         self.result=result
 
-def get_bt_string(e):
+def get_bt_string(e=None):
     import sys
     import traceback
     import cStringIO
@@ -542,14 +543,17 @@ class Flag:
 
         return result
 
-    config_checked = False
     def check_config(self,result,query):
         """ Checks the configuration for empty entries.
 
         Queries the user for those entries and creates a new configuration file in the users home directory
         @return: 1 if some of the configuration parameters are missing, 0 if all is well.
         """
-        if self.config_checked: return
+        ## This stores if the config has already been checked - we
+        ## dont want to do this for every request.
+        global config_checked
+        
+        if config_checked: return
         report = None
 
         ## First check for missing parameters:
@@ -572,8 +576,22 @@ class Flag:
         if not report:
             try:
                 dbh=DB.DBO(None)
-                dbh.execute("select * from meta limit 1");
-                dbh.fetch()
+                version = dbh.get_meta("schema_version")
+                ## The version is an integer
+                try: version = int(version)
+                except: version = 0
+                
+                if not version or version < config.SCHEMA_VERSION:
+                    report = Registry.REPORTS.dispatch("Configuration",
+                                                       "Initialise Database")
+                    report.version = version
+                elif version > config.SCHEMA_VERSION:
+                    report = Registry.REPORTS.dispatch("Configuration",
+                                                       "HigherVersion")
+                    report.version = version
+                else:
+                    config_checked = True
+                    
             except Exception,e:
                 print "DB Error was %s" % e
                 if "Access denied" in str(e):
@@ -581,6 +599,7 @@ class Flag:
                                                        "Configure")
                 else:
                     query['error'] = str(e)
+                    print e
                     report = Registry.REPORTS.dispatch("Configuration",
                                                        "Initialise Database")
 
@@ -598,10 +617,9 @@ class Flag:
                 report.form(query,result)
                 result.end_table()
                 result.end_form('Submit')
-
             return True
 
-        self.config_checked = True
+        config_checked = True
         return False
                 
 class HexDump:
@@ -887,7 +905,70 @@ def get_temp_path(case,filename):
     filename = filename.replace('/','-')
     return "%s/case_%s/%s" % (config.RESULTDIR,case,filename)
 
+from os.path import join
+import time
+
 def glob_to_sql(glob):
     glob=glob.replace("*","%")
     return glob
 
+def delete_case(case):
+    """ A helper function which deletes the case """
+    dbh = DB.DBO(None)    
+    ## Broadcast that the case is about to be dropped:
+    ## Ensure you can broadcast
+    dbh.execute("ALTER TABLE `jobs` CHANGE `state` `state` ENUM( 'pending', 'processing', 'broadcast' ) NULL DEFAULT 'pending'")
+
+    dbh.insert('jobs',command = "DropCase", state='broadcast', arg1=case, cookie=0, _fast = True)
+
+    ## Remove any jobs that may be outstanding (dont touch the
+    ## currently processing jobs)
+    dbh.delete('jobs',"arg1=%r and state='pending' " % case, _fast= True)
+
+    ## Now wait until there are no more processing jobs:
+    total_time = 0
+    while 1:
+        dbh.execute("select * from jobs where arg1=%r and state='processing' limit 1", case)
+        row = dbh.fetch()
+        if row:
+            time.sleep(2)
+            total_time += 2
+            if total_time > 20:
+                pyflaglog.log(pyflaglog.WARNING,"Outstanding jobs remain in %s. Removing the case anyway." % case)
+                dbh.execute("delete from jobs where arg1=%r and state='processing'",case)
+                break
+            pyflaglog.log(pyflaglog.INFO, "Waiting for outstanding jobs in case %r to be completed" % case)
+        else:
+            break
+
+    try:
+      #Delete the case from the database
+      dbh.delete('meta',"property='flag_db' and value=%r" % case, _fast=True)
+      dbh.execute("drop database if exists `%s`" ,case)
+    except DB.DBError:
+        pass
+
+    ## Delete the temporary directory corresponding to this case and all its content
+    try:
+        temporary_dir = "%s/case_%s" % (config.RESULTDIR,case)
+        for root, dirs, files in os.walk(temporary_dir,topdown=False):
+            for name in files:
+                os.remove(join(root, name))
+            for name in dirs:
+                os.rmdir(join(root, name))
+
+        os.rmdir(temporary_dir)
+    except Exception,e:
+        print e
+
+    ## Expire any caches we have relating to this case:
+    key_re = "%s[/|]?.*" % case
+
+    import pyflag.IO as IO
+    import pyflag.Scanner as Scanner
+
+    IO.IO_Cache.expire(key_re)
+    DB.DBH.expire(key_re)
+    DB.DBIndex_Cache.expire(key_re)
+    try: Scanner.factories.expire(key_re)
+    except: pass

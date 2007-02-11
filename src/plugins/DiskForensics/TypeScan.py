@@ -159,21 +159,23 @@ class ViewFileTypes(Reports.report):
 ## UnitTests:
 import unittest
 import pyflag.pyflagsh as pyflagsh
+import pyflag.tests
 
-class TypeTest(unittest.TestCase):
-    """ Magic related Scanner """
+class TypeTest(pyflag.tests.ScannerTest):
+    """Magic related Scanner """
     test_case = "PyFlagTestCase"
-    def test_type_scan(self):
+    test_file = "pyflag_stdimage_0.2.sgz"
+    subsystem = 'sgzip'
+    offset = "16128s"
+
+    def test01TypeScan(self):
         """ Check the type scanner works """
-        dbh = DB.DBO(self.test_case)
-        dbh.execute("select count(*) as count from inode")
-        count = dbh.fetch()['count']
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env, command="scan",
                              argv=["*",'TypeScan'])
 
         ## Make sure the extra magic is being used properly.
+        dbh = DB.DBO(self.test_case)
         dbh.execute('select count(*) as count from type where type like "%Outlook%"')
         count = dbh.fetch()['count']
         self.failIf(count==0, "Unable to locate an Outlook PST file - maybe we are not using our custom magic file?")
-        

@@ -111,10 +111,14 @@ class VirusScan(Reports.report):
 ## UnitTests:
 import unittest
 import pyflag.pyflagsh as pyflagsh
+import pyflag.tests
 
-class VirusScanTest(unittest.TestCase):
+class VirusScanTest(pyflag.tests.ScannerTest):
     """ Virus Scanner Tests """
     test_case = "PyFlagTestCase"
+    test_file = "pyflag_stdimage_0.1"
+    subsystem = 'standard'
+    
     order = 20
     def test_scanner(self):
         """ Check the virus scanner works """
@@ -122,11 +126,11 @@ class VirusScanTest(unittest.TestCase):
 
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env, command="scan",
-                             argv=["Ifirst**",'VirScan'])
+                             argv=["*",'VirScan','ZipScan','TypeScan'])
 
-        dbh.execute("select * from virus")
+        dbh.execute("select * from virus limit 1")
         row = dbh.fetch()
 
         ## We expect to pick this rootkit:
-        self.assert_("K15-0-0|Z46" in row['inode'] , "Unable to find Trojan.NTRootKit.044")
+        self.assert_("K15-0-0|Z" in row['inode'] , "Unable to find Trojan.NTRootKit.044")
         

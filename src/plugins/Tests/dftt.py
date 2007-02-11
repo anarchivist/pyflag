@@ -34,7 +34,7 @@ class JpegSearchTest(pyflag.tests.ScannerTest):
         return row
 
     def test01RunScanner(self):
-        """ Loading Case """
+        """ Running scanners """
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env, command="scan",
                              argv=["*",'CarveScan', 'ZipScan', 'TarScan', 'GZScan', 'TypeScan', 'IndexScan'])

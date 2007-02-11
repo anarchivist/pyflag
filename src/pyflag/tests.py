@@ -82,6 +82,7 @@ class ScannerTest(unittest.TestCase):
     offset = 0
 
     def test00preLoadCase(self):
+        """ Load test Case"""
         pyflagsh.shell_execv(command="execute",
                              argv=["Case Management.Remove case",'remove_case=%s' % self.test_case])
 
