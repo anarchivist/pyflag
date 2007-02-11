@@ -487,13 +487,9 @@ class IRC:
         ## Ensure we do not upset the seek position of the file.
         finally:
             self.fd.seek(offset)
-            
-class IRCScanner(StreamScannerFactory):
-    """ Collect information about IRC traffic """
-    default = True
-    
-    def prepare(self):
-        dbh = DB.DBO(self.case)    
+
+class IRCTables(FlagFramework.EventHander):
+    def create(self, dbh,case):
         dbh.execute(
             """CREATE TABLE if not exists `irc_messages` (
             `id` int auto_increment,
@@ -529,6 +525,11 @@ class IRCScanner(StreamScannerFactory):
             `context` VARCHAR(250)
             )""")
 
+            
+class IRCScanner(StreamScannerFactory):
+    """ Collect information about IRC traffic """
+    default = True
+    
     def process_stream(self, stream, factories):
         ## We only want to process the combined stream once:
         if stream.con_id>stream.reverse: return

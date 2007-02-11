@@ -445,6 +445,8 @@ class DBO:
             tables = [ row['table'] for row in self ]
             if not tables or tables[0]==None:
                 self.execute(sql)
+                ## Release the lock on the row
+                self.execute("commit")
                 return 
                 
             self.insert('sql_cache',
@@ -753,7 +755,7 @@ class DBO:
                 pool.put((self.dbh, self.mysql_bin_string))
                 
         except (TypeError,AssertionError,AttributeError, KeyError),e:
-            print "dbh desctrucr: %s " % e
+            #print "dbh desctrucr: %s " % e
             pass
 
     def MySQLHarness(self,client):

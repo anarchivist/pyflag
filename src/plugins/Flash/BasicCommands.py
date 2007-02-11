@@ -557,6 +557,33 @@ class file(ls):
             if row:
                 yield row
 
+class delete_case(load):
+    def execute(self):
+        try:
+            case=self.args[0]
+            dbh = DB.DBO(case)
+            FlagFramework.delete_case(case)
+            yield "Deleted case %r" %(case)
+        except Exception,e:
+            raise RuntimeError("Unable to delete case %s (%s)" %(case,e))
+
+class create_case(load):
+    def execute(self):
+        dbh = DB.DBO(None)
+        case = self.args[0]
+        dbh.cursor.ignore_warnings = True
+        dbh.execute("Create database if not exists %s",(case))
+        dbh.execute("select * from meta where property='flag_db' and value=%r",case)
+        if not dbh.fetch():
+            dbh.insert('meta',
+                       property='flag_db',
+                       value=case)
+
+        ## Post the create event on the case
+        FlagFramework.post_event('create', case)
+
+        yield "Created Case %s" % case
+        
 ## Unit tests:
 import unittest,md5
 import pyflag.pyflagsh as pyflagsh

@@ -124,6 +124,17 @@ class POP:
 
         return line
 
+class EmailTables(FlagFramework.EventHander):
+    def create(self, dbh, case):
+        ## This table stores common usernames/passwords:
+        dbh.execute(
+            """ CREATE TABLE if not exists `passwords` (
+            `inode` VARCHAR(255) NOT NULL,
+            `username` VARCHAR(255) NOT NULL,
+            `password` VARCHAR(255) NOT NULL,
+            `type` VARCHAR(255) NOT NULL
+            ) """)        
+
 class POPScanner(StreamScannerFactory):
     """ Collect information about POP transactions.
 
@@ -138,16 +149,6 @@ class POPScanner(StreamScannerFactory):
         ## streams which are not on port 110, we need to tell ethereal
         ## this via its config file.
         self.pop_connections = {}
-        
-        dbh = DB.DBO(self.case)
-        ## This table stores common usernames/passwords:
-        dbh.execute(
-            """ CREATE TABLE if not exists `passwords` (
-            `inode` VARCHAR(255) NOT NULL,
-            `username` VARCHAR(255) NOT NULL,
-            `password` VARCHAR(255) NOT NULL,
-            `type` VARCHAR(255) NOT NULL
-            ) """)
             
     def reset(self, inode):
         dbh = DB.DBO(self.case)    

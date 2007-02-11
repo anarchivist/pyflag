@@ -185,23 +185,9 @@ class HTTP:
             return True
             
         return False
-        
-class HTTPScanner(StreamScannerFactory):
-    """ Collect information about HTTP Transactions.
-    """
-    default = True
-    
-    class Drawer(Scanner.Drawer):
-        description = "Network Scanners"
-        name = "NetworkScanners"
-        contains = [ "IRCScanner", "MSNScanner", "HTTPScanner", "POPScanner",
-                     "SMTPScanner","RFC2822", "YahooScanner" ]
-        default = True
-        special_fs_name = 'PCAPFS'
 
-
-    def prepare(self):
-        self.http_inodes = {}
+class HTTPTables(FlagFramework.EventHander):
+    def create(self, dbh, case):
         ## This is the information we store about each http request:
         ## inode - the inode which represents the response to this request
         ## request_packet - the packet id the request was sent in
@@ -209,7 +195,7 @@ class HTTPScanner(StreamScannerFactory):
         ## url - the URL requested (This is the fully qualified url with host header included if present).
         ## response_packet - the packet where the response was seen
         ## content_type - The content type
-        dbh = DB.DBO(self.case)
+        
         dbh.execute(
             """CREATE TABLE if not exists `http` (
             `id` INT(11) not null auto_increment,
@@ -237,6 +223,23 @@ class HTTPScanner(StreamScannerFactory):
         dbh.check_index("http", "inode")
         dbh.check_index("http", "url", 100)
         
+class HTTPScanner(StreamScannerFactory):
+    """ Collect information about HTTP Transactions.
+    """
+    default = True
+    
+    class Drawer(Scanner.Drawer):
+        description = "Network Scanners"
+        name = "NetworkScanners"
+        contains = [ "IRCScanner", "MSNScanner", "HTTPScanner", "POPScanner",
+                     "SMTPScanner","RFC2822", "YahooScanner" ]
+        default = True
+        special_fs_name = 'PCAPFS'
+
+
+    def prepare(self):
+        self.http_inodes = {}
+
     def reset(self, inode):
         dbh = DB.DBO(self.case)
         dbh.execute("delete from http")

@@ -34,14 +34,8 @@ from pyflag.Scanner import *
 from pyflag.TableObj import StringType, TimestampType, InodeType, FilenameType, ColumnType
                   
 import md5
-class MD5Scan(GenScanFactory):
-    """ Scan file and record file Hash (MD5Sum) """
-    default = True
-    depends = ['TypeScan']
-
-    def __init__(self,fsfd):
-        GenScanFactory.__init__(self, fsfd)
-        dbh=DB.DBO(self.case)
+class HashTables(FlagFramework.EventHander):
+    def create(self, dbh,case):
         dbh.execute(""" CREATE TABLE IF NOT EXISTS `hash` (
         `inode` varchar( 250 ) NOT NULL default '',
         `md5` char( 32 ) NOT NULL default '',
@@ -49,8 +43,17 @@ class MD5Scan(GenScanFactory):
         `NSRL_product` varchar(250),
         `NSRL_filename` varchar(60) not NULL default '',
         `FileType` tinytext
-        )""")
+        )""")        
 
+class MD5Scan(GenScanFactory):
+    """ Scan file and record file Hash (MD5Sum) """
+    default = True
+    depends = ['TypeScan']
+
+    def __init__(self,fsfd):
+        GenScanFactory.__init__(self, fsfd)
+        
+        ## Make sure we have indexes on the NSRL tables:
         dbh_flag=DB.DBO(None)
         dbh_flag.check_index("NSRL_hashes","md5",4)
         dbh_flag.check_index("NSRL_products","Code")

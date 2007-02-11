@@ -376,6 +376,7 @@ THEMES = None
 FILEFORMATS = None
 TASKS = None
 CARVERS = None
+EVENT_HANDLERS = None
 
 ## This is required for late initialisation to avoid dependency nightmare.
 def Init():
@@ -433,11 +434,16 @@ def Init():
     ## Register worker tasks
     import pyflag.Farm as Farm
     global TASKS
-    TASKS = TaskRegistry(Farm.Task)
+    TASKS = ScannerRegistry(Farm.Task)
 
     ## Register carvers:
     global CARVERS
-    CARVERS = CarverRegistry(Scanner.Carver)
+    CARVERS = ScannerRegistry(Scanner.Carver)
+
+    ## Register SQL handlers
+    import pyflag.FlagFramework as FlagFramework
+    global EVENT_HANDLERS
+    EVENT_HANDLERS = ScannerRegistry(FlagFramework.EventHander)
 
 def InitTests():
     return TestsRegistry(unittest.TestCase)
@@ -445,7 +451,6 @@ def InitTests():
 def import_module(name,load_as=None):
     Init()
     REPORTS.import_module(name,load_as)
-
 
 import gc
 gc.set_debug(gc.DEBUG_UNCOLLECTABLE | gc.DEBUG_INSTANCES)

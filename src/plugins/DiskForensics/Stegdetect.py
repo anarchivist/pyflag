@@ -43,7 +43,7 @@ import pyflag.DB as DB
 import pexpect
 from pyflag.TableObj import StringType, TimestampType, InodeType
 
-disabled = True
+active = False
 
 class AFTJpegScan(GenScanFactory):
     """ Steganography inside Jpeg images """

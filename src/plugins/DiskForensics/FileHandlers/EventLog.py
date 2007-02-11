@@ -41,16 +41,12 @@ import FileFormats.PElib as PElib
 from format import *
 import os
 import pyflag.DB as DB
+import pyflag.FlagFramework as FlagFramework
 
-class DLLScan(Scanner.GenScanFactory):
-    """ Extract EventLog Messages from DLLs """
-    default = True
-    depends = [ 'TypeScan', 'RegistryScan']
-
-    def prepare(self):
-        ## We are dealing with the default DB - not case specific
-        self.pydbh = DB.DBO()
-        self.pydbh.execute("""CREATE TABLE if not exists `EventMessages` (
+class DLLInitDB(FlagFramework.EventHander):
+    ## This will be used to init the default db
+    def init_default_db(self, dbh, case):
+        dbh.execute("""CREATE TABLE if not exists `EventMessages` (
         `filename` VARCHAR( 50 ) NOT NULL ,
         `message_id` INT unsigned NOT NULL ,
         `message` TEXT NOT NULL ,
@@ -58,11 +54,16 @@ class DLLScan(Scanner.GenScanFactory):
         UNIQUE KEY `filename,message_id` (`filename`,`message_id`)
         ) """)
 
-        self.pydbh.execute("""CREATE TABLE if not exists `EventMessageSources` (
+        dbh.execute("""CREATE TABLE if not exists `EventMessageSources` (
         `filename` VARCHAR( 50 ) NOT NULL ,
         `source` VARCHAR(250),
         UNIQUE KEY `filename` (`filename`)
         ) """)
+        
+class DLLScan(Scanner.GenScanFactory):
+    """ Extract EventLog Messages from DLLs """
+    default = True
+    depends = [ 'TypeScan', 'RegistryScan']
 
     def destroy(self):
         ## populate the EventMessageSources table from the registry
@@ -98,3 +99,5 @@ class DLLScan(Scanner.GenScanFactory):
                 pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "%s does not contain messages" % filename)
 
             self.outer.pydbh.mass_insert_commit()
+
+## FIXME: This is not finished yet - need to finish the log viewer

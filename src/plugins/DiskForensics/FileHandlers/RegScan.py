@@ -28,32 +28,40 @@ from pyflag.Scanner import *
 import plugins.DiskForensics.DiskForensics as DiskForensics
 import pyflag.DB as DB
 from pyflag.FlagFramework import query_type,HexDump
+import pyflag.FlagFramework as FlagFramework
 import pyflag.Reports as Reports
 from FileFormats.RegFile import ls_r, RegF
 from format import Buffer
 from pyflag.TableObj import StringType, TimestampType, InodeType
 
-class RegistryScan(GenScanFactory):
-    """ Load in Windows Registry files """
-    default = True
-    depends = ['TypeScan']
-    
-    def prepare(self):
-        ## The reg table is used for storing all the values in each
-        ## key
-        dbh=DB.DBO(self.case)
+class RegEventHandler(FlagFramework.EventHander):
+    def create(self, dbh, case):
         dbh.execute("""CREATE TABLE if not exists `reg` (
         `path` text NOT NULL,
         `offset` INT(11),
-        `type` enum('REG_NONE','REG_SZ','REG_EXPAND_SZ','REG_BINARY','REG_DWORD','REG_DWORD_BIG_ENDIAN','REG_LINK','REG_MULTI_SZ','REG_RESOURCE_LIST','REG_FULL_RESOURCE_DESCRIPTOR','REG_RESOURCE_REQUIREMENTS_LIST','Unknown') NOT NULL,
+        `type` enum('REG_NONE','REG_SZ','REG_EXPAND_SZ','REG_BINARY','REG_DWORD',\
+          'REG_DWORD_BIG_ENDIAN','REG_LINK','REG_MULTI_SZ','REG_RESOURCE_LIST',\
+          'REG_FULL_RESOURCE_DESCRIPTOR','REG_RESOURCE_REQUIREMENTS_LIST',\
+          'Unknown') NOT NULL,
         `modified` TIMESTAMP,
         `reg_key` VARCHAR(200) NOT NULL,
-        `value` text)""")
+        `value` text)""")        
 
         ## The regi table is used for the key navigation
         dbh.execute("""create table if not exists regi (
         `dirname` TEXT NOT NULL ,`basename` TEXT NOT NULL)""")
 
+        ## These collect interesting keys:
+        dbh.execute("""create table `interestingregkeys` select a.path, a.modified, a.type,\
+        a.reg_key, a.value, b.category, b.description from reg as a, %s.registrykeys as b\
+        where a.path LIKE concat('%%',b.path,'%%') AND a.reg_key LIKE\
+        concat('%%',b.reg_key,'%%')""",(config.FLAGDB))
+            
+class RegistryScan(GenScanFactory):
+    """ Load in Windows Registry files """
+    default = True
+    depends = ['TypeScan']
+    
     def reset(self, inode):
         GenScanFactory.reset(self, inode)
         dbh=DB.DBO(self.case)
@@ -244,7 +252,6 @@ class BrowseRegistryKey(BrowseRegistry):
             callbacks=[hexdump,strings,stats],
             context="display_mode"
             )
-         
 
 class InterestingRegKey(Reports.report):
     """ Displays values of interesting registry keys, grouped into categories """
@@ -263,14 +270,6 @@ class InterestingRegKey(Reports.report):
         dbh = self.DBO(query['case'])
         dbh.execute('drop table interestingregkeys');
 
-    def analyse(self,query):
-        dbh = self.DBO(query['case'])
-        pdbh=self.DBO(None)
-        try:
-            dbh.execute("create table `interestingregkeys` select a.path, a.modified, a.type, a.reg_key, a.value, b.category, b.description from reg as a, %s.registrykeys as b where a.path LIKE concat('%%',b.path,'%%') AND a.reg_key LIKE concat('%%',b.reg_key,'%%')",(config.FLAGDB))
-        except DB.DBError,e:
-            raise Reports.ReportError("Unable to find the registry table for the current image. Did you run the Registry Scanner?.\n Error received was %s" % e)
-    
     def display(self,query,result):
         result.heading("Interesting Registry Keys")
         dbh=self.DBO(query['case'])

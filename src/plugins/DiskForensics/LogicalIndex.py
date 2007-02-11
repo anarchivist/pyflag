@@ -54,6 +54,21 @@ config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
 from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType
 
+class IndexTables(FlagFramework.EventHander):
+    def create(self, dbh, case):
+        dbh.execute("""create table if not exists `LogicalIndexOffsets` (
+        `inode_id` INT NOT NULL,
+        `word_id` INT NOT NULL ,
+        `offset` BIGINT NOT NULL,
+        `length` smallint not null
+        )""")
+
+        dbh.execute("""CREATE TABLE if not exists `LogicalIndexStats` (
+        `id` int NOT NULL,
+        `hits` INT NOT NULL,
+        PRIMARY KEY  (`id`)
+        )""")        
+
 class IndexScan(GenScanFactory):
     """ Keyword Index files """
     ## Indexing must occur after all scanners have run.
@@ -66,25 +81,6 @@ class IndexScan(GenScanFactory):
         contains = ['RegExpScan','IndexScan','MD5Scan','VirScan','CarveScan']
         default = True
     
-    def __init__(self,fsfd):
-        """ This creates the LogicalIndex table and initialise the index file """
-        GenScanFactory.__init__(self, fsfd)
-        
-        dbh=DB.DBO(self.case)
-
-        dbh.execute("""create table if not exists `LogicalIndexOffsets` (
-        `inode_id` INT NOT NULL,
-        `word_id` INT NOT NULL ,
-        `offset` BIGINT NOT NULL,
-        `length` smallint not null
-        )""")
-
-        dbh.execute("""CREATE TABLE if not exists `LogicalIndexStats` (
-        `id` int NOT NULL,
-        `hits` INT NOT NULL,
-        PRIMARY KEY  (`id`)
-        )""")
-        
     def prepare(self):
         ## Create new index trie - This takes a serious amount of time
         ## for large dictionaries (about 2 sec for 70000 words):

@@ -50,15 +50,16 @@ class VScan:
         except Exception,e:
             pyflaglog.log(pyflaglog.WARNING, "Scanning Error: %s" % e)
 
-class VirScan(GenScanFactory):
-    """ Scan file for viruses """
-    def __init__(self,fsfd):
-        GenScanFactory.__init__(self, fsfd)        
-        dbh=DB.DBO(self.case)
+class VirusTables(FlagFramework.EventHander):
+    def create(self, dbh, case):
         dbh.execute(""" CREATE TABLE IF NOT EXISTS `virus` (
         `inode` varchar( 255 ) NOT NULL,
         `virus` tinytext NOT NULL )""")
 
+class VirScan(GenScanFactory):
+    """ Scan file for viruses """
+    def __init__(self,fsfd):
+        GenScanFactory.__init__(self, fsfd)        
         self.scanner=VScan()
 
     def destroy(self):

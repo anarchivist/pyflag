@@ -41,6 +41,9 @@ import pyflag.DB as DB
 import pyflag.Farm as Farm
 import pyflag.Scanner as Scanner
 import pyflag.pyflaglog as pyflaglog
+import os
+import pyflag.FlagFramework as FlagFramework
+import pyflag.Registry as Registry
 
 class IO_File(FileSystem.File):
     """ A VFS Driver to make the io source available.
@@ -221,3 +224,126 @@ class DropCase(Farm.Task):
         DB.DBH.expire(key_re)
         DB.DBIndex_Cache.expire(key_re)
         Scanner.factories.expire(key_re)
+
+class CaseDBInit(FlagFramework.EventHander):
+    """ A handler for creating common case tables """
+    def create(self,case_dbh,case):
+        case_dbh.execute("""Create table if not exists meta(
+        `time` timestamp NOT NULL,
+        property varchar(50),
+        value text,
+        KEY property(property),
+        KEY joint(property,value(20)))""")
+        
+        ## This is a transactional table for managing the cache
+        case_dbh.execute("""CREATE TABLE if not exists `sql_cache` (
+        `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+        `timestamp` TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL ,
+        `tables` VARCHAR( 250 ) NOT NULL ,
+        `query` MEDIUMTEXT NOT NULL,
+        `limit` INT default 0,
+        `length` INT default 100
+        ) ENGINE=InnoDB""")
+        
+        case_dbh.execute("""CREATE TABLE if not exists `annotate` (
+        `id` INT(11) not null auto_increment,
+        `inode` VARCHAR(250) NOT NULL,
+        `note` TEXT,
+        `category` VARCHAR( 250 ) NOT NULL default 'Note',
+        PRIMARY KEY(`id`)
+        )""")        
+
+        # create the "groupware" tables
+        case_dbh.execute("CREATE TABLE IF NOT EXISTS `email` (`inode` VARCHAR(250), `date` TIMESTAMP, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));")
+        case_dbh.execute("CREATE TABLE IF NOT EXISTS `contact` (`inode` VARCHAR(250), `name` VARCHAR(250), `email` VARCHAR(250), `address` VARCHAR(250), `phone` VARCHAR(250));")
+        case_dbh.execute("CREATE TABLE IF NOT EXISTS `appointment` (`inode` VARCHAR(250), `startdate` TIMESTAMP, `enddate` TIMESTAMP, `location` VARCHAR(250), `comment` VARCHAR(250));")
+        case_dbh.execute("CREATE TABLE IF NOT EXISTS `journal` (`inode` VARCHAR(250), `startdate` TIMESTAMP, `enddate` TIMESTAMP, `type` VARCHAR(250), `comment` VARCHAR(250));")
+
+        ## Create a directory inside RESULTDIR for this case to store its temporary files:
+        try:
+            os.mkdir("%s/case_%s" % (config.RESULTDIR,case))
+        except OSError:
+            pass
+
+        ## Create an enum for the scanners in the inode table
+        scanners = [ "%r" % s.__name__ for s in Registry.SCANNERS.classes ]
+        case_dbh.execute("""CREATE TABLE IF NOT EXISTS inode (
+        `inode_id` int auto_increment,
+        `inode` VARCHAR(250) NOT NULL,
+        `status` set('unalloc','alloc'),
+        `uid` INT,
+        `gid` INT,
+        `mtime` TIMESTAMP NULL,
+        `atime` TIMESTAMP NULL,
+        `ctime` TIMESTAMP NULL,
+        `dtime` TIMESTAMP,
+        `mode` INT,
+        `links` INT,
+        `link` TEXT,
+        `size` BIGINT NOT NULL,
+        `scanner_cache` set('',%s),
+        primary key (inode_id)
+        )""",",".join(scanners))
+
+        case_dbh.execute("""CREATE TABLE IF NOT EXISTS file (
+        `inode` VARCHAR(250) NOT NULL,
+        `mode` VARCHAR(3) NOT NULL,
+        `status` VARCHAR(8) NOT NULL,
+        `path` TEXT,
+        `name` TEXT)""")
+
+        case_dbh.execute("""CREATE TABLE IF NOT EXISTS block (
+        `inode` VARCHAR(250) NOT NULL,
+        `index` INT NOT NULL,
+        `block` BIGINT NOT NULL,
+        `count` INT NOT NULL)""")
+
+        case_dbh.execute("""CREATE TABLE IF NOT EXISTS resident (
+        `inode` VARCHAR(250) NOT NULL,
+        `data` TEXT)""")
+
+        case_dbh.execute("""CREATE TABLE IF NOT EXISTS `filesystems` (
+        `iosource` VARCHAR( 50 ) NOT NULL ,
+        `property` VARCHAR( 50 ) NOT NULL ,
+        `value` MEDIUMTEXT NOT NULL ,
+        KEY ( `iosource` )
+        )""")
+
+        ## This is a nice idea, but its just not flexible enough... We
+        ## use VARCHAR for now...
+        
+##        ## Create the xattr table by interrogating libextractor:
+##        types = ['Magic']
+##        try:
+##            import extractor
+##            e = extractor.Extractor()
+##            types.extend(e.keywordTypes())
+##        except ImportError:
+##            pass
+
+##        case_dbh.execute("""CREATE TABLE if not exists `xattr` (
+##                            `inode_id` INT NOT NULL ,
+##                            `property` ENUM( %s ) NOT NULL ,
+##                            `value` VARCHAR( 250 ) NOT NULL
+##                            ) """ % ','.join([ "%r" % x for x in types]))
+
+        case_dbh.execute("""CREATE TABLE if not exists `xattr` (
+                            `inode_id` INT NOT NULL ,
+                            `property` VARCHAR(250) NOT NULL ,
+                            `value` VARCHAR(250) NOT NULL
+                            ) """)
+        
+    def init_default_db(self, dbh, case):
+        ## Connect to the mysql database
+        tdbh = DB.DBO('mysql')
+
+        ## Make sure we start with a clean slate
+        tdbh.execute("drop database if exists %s" % config.FLAGDB)
+        tdbh.execute("create database %s" % config.FLAGDB)
+
+        ## Source the initial database script.
+        dbh.MySQLHarness("/bin/cat %s/db.setup" % config.DATADIR)
+
+        ## Update the schema version.
+        dbh.set_meta('schema_version',config.SCHEMA_VERSION)
+

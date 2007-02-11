@@ -31,14 +31,10 @@ config=pyflag.conf.ConfObject()
 import FileFormats.IECache as IECache
 import pyflag.DB as DB
 from pyflag.TableObj import StringType, TimestampType, FilenameType
+import pyflag.FlagFramework as FlagFramework
 
-class IEIndex(Scanner.GenScanFactory):
-    """ Load in IE History files """
-    default = True
-    depends = ['TypeScan']
-
-    def prepare(self):
-        dbh=DB.DBO(self.case)
+class IEIndexEventHandler(FlagFramework.EventHander):
+    def create(self, dbh, case):
         dbh.execute("""CREATE TABLE IF NOT EXISTS history (
         `path` TEXT NOT NULL,
         `type` VARCHAR(20) NOT NULL,
@@ -47,7 +43,12 @@ class IEIndex(Scanner.GenScanFactory):
         `accessed` TIMESTAMP DEFAULT 0,
         `filename` VARCHAR(250),
         `filepath` VARCHAR(250),
-        `headers` TEXT)""")        
+        `headers` TEXT)""")                
+
+class IEIndex(Scanner.GenScanFactory):
+    """ Load in IE History files """
+    default = True
+    depends = ['TypeScan']
 
     def reset(self, inode):
         Scanner.GenScanFactory.reset(self, inode)

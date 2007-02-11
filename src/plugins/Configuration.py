@@ -105,18 +105,11 @@ class InitDB(Reports.report):
                 FlagFramework.delete_case(row['value'])
         except DB.DBError,e:
             pass
-        
-        ## Connect to the mysql database
-        dbh = DB.DBO('mysql')
 
-        ## Make sure we start with a clean slate
-        dbh.execute("drop database if exists %s" % config.FLAGDB)
-        dbh.execute("create database %s" % config.FLAGDB)
-        
+        ## Initialise the default database: We post an initialise
+        ## event to allow plugins to contribute
         dbh = DB.DBO(None)
-        dbh.MySQLHarness("/bin/cat %s/db.setup" % config.DATADIR)
-        dbh.set_meta('schema_version',config.SCHEMA_VERSION)
-
+        FlagFramework.post_event('init_default_db', dbh.case)
         try:
             version = dbh.get_meta("schema_version")
             assert(int(version) == config.SCHEMA_VERSION)

@@ -43,6 +43,7 @@ import pyflag.DB as DB
 from pyflag.FileSystem import File
 import pyflag.IO as IO
 from pyflag.FlagFramework import query_type
+import pyflag.FlagFramework as FlagFramework
 from NetworkScanner import *
 import pyflag.Reports as Reports
 import pyflag.pyflaglog as pyflaglog
@@ -1391,20 +1392,8 @@ class ContextParser(HTMLParser):
     def handle_starttag(self, tag, attrs):
         self.context_meta_data = query_type(attrs)
 
-class MSNScanner(StreamScannerFactory):
-    """ Collect information about MSN Instant messanger traffic """
-    default = True
-
-    def __init__(self,fsfd):
-        StreamScannerFactory.__init__(self,fsfd)
-
-        #Should hit the reverse stream within 30 streams (usually it
-        #is the very next one)
-        
-        self.processed=RingBuffer(30)
-
-    def prepare(self):
-        dbh=DB.DBO(self.case)
+class MSNTables(FlagFramework.EventHander):
+    def create(self, dbh,case):
         dbh.execute(
             """ CREATE TABLE if not exists `msn_session` (
             `inode` VARCHAR(50) NOT NULL,
@@ -1467,6 +1456,20 @@ class MSNScanner(StreamScannerFactory):
             `user_data` TEXT NOT NULL,
             PRIMARY KEY (`inode`,`session_id`,`user_data_type`,`nick`)
             )""")
+
+class MSNScanner(StreamScannerFactory):
+    """ Collect information about MSN Instant messanger traffic """
+    default = True
+
+    def __init__(self,fsfd):
+        StreamScannerFactory.__init__(self,fsfd)
+
+        #Should hit the reverse stream within 30 streams (usually it
+        #is the very next one)
+        
+        self.processed=RingBuffer(30)
+
+    def prepare(self):
         self.msn_connections = {}
 
     def process_stream(self, stream, factories):

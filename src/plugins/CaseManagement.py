@@ -38,6 +38,7 @@ config=pyflag.conf.ConfObject()
 from pyflag.TableObj import StringType,TimestampType,InodeType,FilenameType
 import pyflag.Registry as Registry
 import time
+import pyflag.pyflagsh as pyflagsh
 
 description = "Case management"
 order = 10
@@ -56,123 +57,11 @@ class NewCase(Reports.report):
         return result
 
     def display(self,query,result):
+        ## Use the shell to do the heavy lifting.
+        pyflagsh.shell_execv(command='create_case',
+                             argv=[ query['create_case'],])
+
         #Get handle to flag db
-        dbh = self.DBO(None)
-        dbh.cursor.ignore_warnings = True
-        dbh.execute("Create database if not exists %s",(query['create_case']))
-        dbh.execute("select * from meta where property='flag_db' and value=%r",query['create_case'])
-        if not dbh.fetch():
-            dbh.insert('meta',
-                       property='flag_db',
-                       value=query['create_case'])
-
-        #Get handle to the case db
-        case_dbh = self.DBO(query['create_case'])
-        case_dbh.cursor.ignore_warnings = True
-        case_dbh.execute("""Create table if not exists meta(
-        `time` timestamp NOT NULL,
-        property varchar(50),
-        value text,
-        KEY property(property),
-        KEY joint(property,value(20)))""")
-
-        ## This is a transactional table for managing the cache
-        case_dbh.execute("""CREATE TABLE if not exists `sql_cache` (
-        `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY ,
-        `timestamp` TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL ,
-        `tables` VARCHAR( 250 ) NOT NULL ,
-        `query` MEDIUMTEXT NOT NULL,
-        `limit` INT default 0,
-        `length` INT default 100
-        ) ENGINE=InnoDB""")
-
-        case_dbh.execute("""CREATE TABLE if not exists `annotate` (
-        `id` INT(11) not null auto_increment,
-        `inode` VARCHAR(250) NOT NULL,
-        `note` TEXT,
-        `category` VARCHAR( 250 ) NOT NULL default 'Note',
-        PRIMARY KEY(`id`)
-        )""")        
-
-        # create the "groupware" tables
-        case_dbh.execute("CREATE TABLE IF NOT EXISTS `email` (`inode` VARCHAR(250), `date` TIMESTAMP, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));")
-        case_dbh.execute("CREATE TABLE IF NOT EXISTS `contact` (`inode` VARCHAR(250), `name` VARCHAR(250), `email` VARCHAR(250), `address` VARCHAR(250), `phone` VARCHAR(250));")
-        case_dbh.execute("CREATE TABLE IF NOT EXISTS `appointment` (`inode` VARCHAR(250), `startdate` TIMESTAMP, `enddate` TIMESTAMP, `location` VARCHAR(250), `comment` VARCHAR(250));")
-        case_dbh.execute("CREATE TABLE IF NOT EXISTS `journal` (`inode` VARCHAR(250), `startdate` TIMESTAMP, `enddate` TIMESTAMP, `type` VARCHAR(250), `comment` VARCHAR(250));")
-
-        ## Create a directory inside RESULTDIR for this case to store its temporary files:
-        try:
-            os.mkdir("%s/case_%s" % (config.RESULTDIR,query['create_case']))
-        except OSError:
-            pass
-
-        scanners = [ "%r" % s.__name__ for s in Registry.SCANNERS.classes ]
-        case_dbh.execute("""CREATE TABLE IF NOT EXISTS inode (
-        `inode_id` int auto_increment,
-        `inode` VARCHAR(250) NOT NULL,
-        `status` set('unalloc','alloc'),
-        `uid` INT,
-        `gid` INT,
-        `mtime` TIMESTAMP NULL,
-        `atime` TIMESTAMP NULL,
-        `ctime` TIMESTAMP NULL,
-        `dtime` TIMESTAMP,
-        `mode` INT,
-        `links` INT,
-        `link` TEXT,
-        `size` BIGINT NOT NULL,
-        `scanner_cache` set('',%s),
-        primary key (inode_id)
-        )""",",".join(scanners))
-
-        case_dbh.execute("""CREATE TABLE IF NOT EXISTS file (
-        `inode` VARCHAR(250) NOT NULL,
-        `mode` VARCHAR(3) NOT NULL,
-        `status` VARCHAR(8) NOT NULL,
-        `path` TEXT,
-        `name` TEXT)""")
-
-        case_dbh.execute("""CREATE TABLE IF NOT EXISTS block (
-        `inode` VARCHAR(250) NOT NULL,
-        `index` INT NOT NULL,
-        `block` BIGINT NOT NULL,
-        `count` INT NOT NULL)""")
-
-        case_dbh.execute("""CREATE TABLE IF NOT EXISTS resident (
-        `inode` VARCHAR(250) NOT NULL,
-        `data` TEXT)""")
-
-        case_dbh.execute("""CREATE TABLE IF NOT EXISTS `filesystems` (
-        `iosource` VARCHAR( 50 ) NOT NULL ,
-        `property` VARCHAR( 50 ) NOT NULL ,
-        `value` MEDIUMTEXT NOT NULL ,
-        KEY ( `iosource` )
-        )""")
-
-        ## This is a nice idea, but its just not flexible enough... We
-        ## use VARCHAR for now...
-        
-##        ## Create the xattr table by interrogating libextractor:
-##        types = ['Magic']
-##        try:
-##            import extractor
-##            e = extractor.Extractor()
-##            types.extend(e.keywordTypes())
-##        except ImportError:
-##            pass
-
-##        case_dbh.execute("""CREATE TABLE if not exists `xattr` (
-##                            `inode_id` INT NOT NULL ,
-##                            `property` ENUM( %s ) NOT NULL ,
-##                            `value` VARCHAR( 250 ) NOT NULL
-##                            ) """ % ','.join([ "%r" % x for x in types]))
-
-        case_dbh.execute("""CREATE TABLE if not exists `xattr` (
-                            `inode_id` INT NOT NULL ,
-                            `property` VARCHAR(250) NOT NULL ,
-                            `value` VARCHAR(250) NOT NULL
-                            ) """)
-
         result.heading("Case Created")
         result.para("\n\nThe database for case %s has been created" %query['create_case'])
         result.link("Load a Disk Image", FlagFramework.query_type((), case=query['create_case'], family="Load Data", report="Load IO Data Source"))

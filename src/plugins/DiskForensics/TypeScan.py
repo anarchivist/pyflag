@@ -33,6 +33,16 @@ import pyflag.IO as IO
 import pyflag.Registry as Registry
 from pyflag.TableObj import StringType, TimestampType, InodeType, FilenameType, IntegerType
 
+class TypeTables(FlagFramework.EventHander):
+    def create(self, dbh, case):
+        dbh.execute(""" CREATE TABLE IF NOT EXISTS `type` (
+        `inode` varchar( 250 ) NOT NULL,
+        `mime` tinytext NOT NULL,
+        `type` tinytext NOT NULL )""")
+        
+        ## Create indexes on this table immediately because we need to select
+        dbh.check_index('type','inode')
+        
 class TypeScan(Scanner.GenScanFactory):
     """ Detect File Type (magic).
 
@@ -40,17 +50,6 @@ class TypeScan(Scanner.GenScanFactory):
     an action based on the mime type of the file"""
     order=5
     default=True
-    def __init__(self,fsfd):
-        Scanner.GenScanFactory.__init__(self, fsfd)
-        dbh=DB.DBO(self.case)
-        dbh.execute(""" CREATE TABLE IF NOT EXISTS `type` (
-        `inode` varchar( 250 ) NOT NULL,
-        `mime` tinytext NOT NULL,
-        `type` tinytext NOT NULL )""")
-
-        ## Create indexes on this table immediately because we need to select
-        dbh.check_index('type','inode')
-
     def reset(self,inode):
         Scanner.GenScanFactory.reset(self, inode)
         dbh=DB.DBO(self.case)

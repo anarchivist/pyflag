@@ -972,3 +972,25 @@ def delete_case(case):
     DB.DBIndex_Cache.expire(key_re)
     try: Scanner.factories.expire(key_re)
     except: pass
+
+class EventHander:
+    """ This is the base class for SQL which needs to be run on various events.
+
+    This base class should be extended when plugins needs to respond to some events.
+    """
+    def create(self,dbh,case):
+        """ This method will be called when a new case is created """
+
+    def init_default_db(self, dbh, case):
+        """ This is called on the default database upon first
+        installation of pyflag or upgrade of schema.
+        """
+
+def post_event(event, case):
+    """ A function to post the specifed event to all event handlers """
+    dbh = DB.DBO(case)
+    for cls in Registry.EVENT_HANDLERS.classes:
+        event_handler = cls()
+        
+        ## Post the event:
+        getattr(event_handler, event)(dbh,case)
