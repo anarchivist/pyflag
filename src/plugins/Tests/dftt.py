@@ -11,6 +11,84 @@ import pyflag.pyflagsh as pyflagsh
 import pyflag.tests
 import pyflag.DB as DB
 import pyflag.FileSystem as FileSystem
+import pyflag.conf
+config=pyflag.conf.ConfObject()
+
+class KeyWordSearchTest(pyflag.tests.ScannerTest):
+    """ Test DFTT image 2: FAT Keyword Test """
+    test_case = 'dftt'
+    test_file = "2-kwsrch-fat/fat-img-kw.dd"
+    subsystem = 'standard'
+
+    ## Copied from DFTT page - id,string, sector, offset, file, note
+    case_sensitive_keywords = [
+	[1,'first',	 271,	 167,	'/file1.dat','in file'],
+	[2,'SECOND',	 272,	288,	'/file2.dat','in file'],
+ 	[2,'SECOND',	 239,	480,	None,	    'in dentry - file name'],
+	[3,'1cross1',	 271,	508,	'/file1.dat','crosses two allocated files'],
+	[4,'2cross2',	 273,	508,	'/file3.dat','crosses consecutive sectors in a file'],
+	[5,'3cross3',	 282,	1020,	'/_unallocated_/o00000002',	    'crosses in unalloc'],
+	[6,'1slack1',	 272,	396,	'/file2.dat','crosses a file into slack'],
+        ## This was change to measure the offset from the start of the file:
+	[7,'2slack2',	 273,	1020,	'/file3.dat','crosses slack into a file'],
+	[8,'3slack3',	 276,	897,	'/file4.dat','in slack'],
+	[9,'1fragment1', 275,	507,	'/file4.dat','crosses fragmented sectors'],
+	[10,'2fragment sentence2',	278,	502,	'/file6.dat',	'crosses fragmented sectors on ' ''],
+        ## We seem to find this twice:
+	[11,'deleted',	 276,	230,	'/_unallocated_/o00000001',	'deleted file'],
+        [11,'deleted',	 276,	230,	'/_ILE5.DAT',	'deleted file'],
+	[12,'a?b\c*d$e#f[g^',279,	160,	'/file7.dat',	'regexp values'],
+        ]
+    
+    case_insesitive_keywords = []
+    regex_keywords = []
+
+    def find_expected_output(self, word, id, filename, offset, array):
+        for i in range(len(array)):
+            row = array[i]
+            if id==row[0] and filename==row[4] and offset==row[3]:
+                array.pop(i)
+                return 
+
+        #self.fail("Unable to find a match for %s" % word)
+        print "Unable to find a match for %s" % word
+
+    def test01RunScanner(self):
+        """ Running scanners """
+        ## Populate the key words into the dictionary:
+        dbh = DB.DBO()
+        for row in self.case_sensitive_keywords:
+            id = row[0]
+            w = row[1]
+            dbh.delete('dictionary','id=%r' % (id+1000), _fast=True)
+            dbh.insert('dictionary',
+                       **{'id':id+1000, 'class':"DFTT",
+                          'type': 'literal', 'word':w})
+                       
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env, command="scan",
+                             argv=["*",'IndexScan'])
+
+    def test02TestOutput(self):
+        """ Testing output """
+        dbh = DB.DBO(self.test_case)
+        fsfd = FileSystem.DBFS(self.test_case)
+        dbh.execute("select inode_id, word_id, word,offset,length from LogicalIndexOffsets join %s.dictionary on LogicalIndexOffsets.word_id=pyflag.dictionary.id where id>1000 and id<1020", config.FLAGDB)
+        for row in dbh:
+            inode = fsfd.lookup(inode_id = row['inode_id'])
+            fd = fsfd.open(inode=inode)
+            fd.overread = True
+            fd.slack = True
+            fd.seek(row['offset'])
+            data = fd.read(row['length'])
+            filename = fsfd.lookup(inode = inode)
+            print "Looking for %s: Found in %s (%s) at offset %s length %s %r" % (
+                row['word'], filename, inode, row['offset'], row['length'],data)
+            self.assertEqual(data.lower(), row['word'].lower())
+            self.find_expected_output(row['word'], row['word_id']-1000, filename,
+                                      row['offset'], self.case_sensitive_keywords)
+
+        print "Left over %s" % self.case_sensitive_keywords
 
 class JpegSearchTest(pyflag.tests.ScannerTest):
     """ Test DFTT image 8: Jpeg image search #1 """

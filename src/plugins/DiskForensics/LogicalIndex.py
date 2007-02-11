@@ -91,11 +91,13 @@ class IndexScan(GenScanFactory):
         start_time=time.time()
         pydbh.execute("select word,id from dictionary where type='literal'")
         for row in pydbh:
-            self.index.add_word(row['word'],row['id'], index.WORD_LITERAL)
+            if len(row['word'])>3:
+                self.index.add_word(row['word'],row['id'], index.WORD_LITERAL)
 
         pydbh.execute("select word,id from dictionary where type='regex'")
         for row in pydbh:
-            self.index.add_word(row['word'],row['id'], index.WORD_EXTENDED)
+            if len(row['word'])>3:
+                self.index.add_word(row['word'],row['id'], index.WORD_EXTENDED)
 
         # load words in a number of alternate character sets. The ones
         # we care about atm are utf-8 and utf-16/UCS-2 which is used
@@ -106,7 +108,9 @@ class IndexScan(GenScanFactory):
             try:
                 word = row['word'].decode("UTF-8")
                 for e in config.INDEX_ENCODINGS:
-                    self.index.add_word(word.encode(e),row['id'], index.WORD_ENGLISH)
+                    w = word.encode(e)
+                    if len(w)>3:
+                        self.index.add_word(w,row['id'], index.WORD_ENGLISH)
             except UnicodeDecodeError:
                 pass
 
