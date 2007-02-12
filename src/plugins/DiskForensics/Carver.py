@@ -38,10 +38,85 @@ import pyflag.Scanner as Scanner
 import PIL.Image
 import pyflag.Registry as Registry
 import pyflag.FileSystem as FileSystem
+import pyflag.format as format
+import plugins.FileFormats.BasicFormats as BasicFormats
+import plugins.FileFormats.DAFTFormats as DAFTFormats
+
+## This is a basic file format which reads in jpeg files. Its mostly
+## used to work out how long a jpeg is for the carver.
+class JPEG(BasicFormats.SimpleStruct):
+    fields = [
+        [ 'magic', BasicFormats.USHORT_CONSTANT, dict(expected = 0xFFD8, endianess='big') ],
+        ]
+
+    error = False
+    
+    def read(self):
+        result = BasicFormats.SimpleStruct.read(self)
+        while 1:
+            #print "0x%08X" % self.offset,
+            marker = BasicFormats.USHORT(self.buffer[self.offset:], endianess='big')
+            self.offset += marker.size()
+            #print marker,
+            
+            if (0xFF00 & int(marker)) != 0xFF00:
+                #print  "Incorrect marker at %X, stopping prematurely\n" % self.offset
+                self.error = True
+                break
+
+            if marker==0xFFD9:
+                return result
+
+            if marker==0xFF01 or marker==0xFFFF:
+                #print "Found lengthless section"
+                continue
+
+            if marker==0xFFDA:
+                def cmp(data, offset):
+                    if data[offset+1]=='\x00':
+                        return False
+
+                    code = ord(data[offset+1])
+                    if code >= 0xD0 and code <= 0xD7:
+                        return False
+
+                    return True
+                
+                #print "Looking for end marker (Which is a sequence 0xFFxx but not 0xFF00 or 0xFFDx)"
+                marker = DAFTFormats.SearchFor(self.buffer[self.offset:],
+                                               search="\xff", within=2000000,
+                                               cmp = cmp)
+                self.offset+=marker.size()
+            else:        
+                size = BasicFormats.USHORT(self.buffer[self.offset:], endianess='big')
+                #print size
+                if int(size)<2:
+                    #print "Section size is out of bounds"
+                    self.error = True
+                    break
+
+                self.offset+=int(size)
+
+        return result
+
+    def size(self):
+        return self.offset
             
 class JpegCarver(Scanner.Carver):
     regexs = ["\xff\xd8....JFIF", "\xff\xd8....EXIF"]
     extension = 'jpg'        
+
+    def get_length(self, fd, offset):
+        """ Returns the length of the JPEG by reading the blocks.
+        Algorithm taken from Samuel Tardieu <sam@rfc1149.net>
+        * http://www.rfc1149.net/devel/recoverjpeg
+        """
+        buf = format.Buffer(fd=fd)[offset:]
+        j = JPEG(buf)
+        if j.error:
+            return self.length
+        else:
+            return j.size()
     
 class CarveScan(Scanner.GenScanFactory):
     """ Carve out files """
@@ -118,3 +193,11 @@ class CarverTest(pyflag.tests.ScannerTest):
             dbh.execute("select inode from inode where inode=%r limit 1", inode)
             row = dbh.fetch()
             self.assert_(row != None)
+
+
+if __name__ == '__main__':
+    import sys
+    fd = open(sys.argv[1])
+    b = format.Buffer(fd=fd)
+    h = JPEG(b)
+    print "Size of jpeg is %s" % h.size()

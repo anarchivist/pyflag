@@ -13,6 +13,11 @@ len are suitably adjusted.
 void check_for_repeat(unsigned char *lower, unsigned char *upper, 
 			 char **buffer, int *len) {
   switch(**buffer) {
+  case '?':
+    *lower=0;
+    *upper=1;
+    goto repeat_return;
+
   case '*':
     *lower=0;
     goto repeat_return;
@@ -451,6 +456,7 @@ END_VIRTUAL
     edited for UTF8?? */
 static char char_map_digits[256] = { ['0' ... '9'] = 1 };
 static char char_map_word[256]   = { ['a' ... 'z'] = 1, ['A' ... 'Z'] = 1};
+static char char_space_word[256] = { ['\n']=1, ['\r']=1, [' ']=1, ['\t']=1 };
 
 CharacterClassNode CharacterClassNode_Con_with_map(CharacterClassNode self,
 						   char **word, int *len, 
@@ -484,8 +490,13 @@ CharacterClassNode CharacterClassNode_Con(CharacterClassNode self,
   case 'd':
     this->map = char_map_digits;
     break;
+
   case 'w':
     this->map = char_map_word;
+    break;
+
+  case 's':
+    this->map = char_space_word;
     break;
 
     // This is a hex value literal (e.g. \xff):

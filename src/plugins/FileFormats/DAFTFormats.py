@@ -75,38 +75,43 @@ class Offset(format.DataType):
         return "(0x%08X)" % self.buffer.offset
 
 class SearchFor(format.DataType):
-
     visible = True
     max_blocksize=1024*1024
     initial_blocksize=1024
 
-    def __init__(self, buffer, parameters, *args, **kwargs):
-        self.buffer = buffer
-        self.parameters = parameters
-        self.data = None
-
-    def read(self,data):
+    def read(self):
         try:
-            blocksize=numeric(self.parameters['within'])
+            blocksize=int(self.parameters['within'])
         except KeyError:
             blocksize=1024
             
-        tmp=''
-        tmp=data[0:blocksize].__str__()
-        search = eval("'"+self.parameters['search']+"'")
-        offset=tmp.find(search)
+        tmp=self.buffer[0:blocksize].__str__()
+        start = 0
+        search = self.parameters['search']
+        while 1:
+            offset=tmp.find(search,start)
 
-        if offset == -1:
-            self.raw_size = blocksize
-        else:
+            ## Not found:
+            if offset == -1:
+                self.raw_size = start
+                break
+
+            ## Allow the user to have a comparison function:
+            try:
+                #print "Calling cmp with offset = %s" % offset
+                ## Not found... continue
+                if not self.parameters['cmp'](tmp, offset):
+                    start = offset+1
+                    continue
+            except KeyError:
+                pass
+
             self.raw_size = offset
+            break
 
-        return data[0:self.raw_size]
+        return self.buffer[0:self.raw_size]
 
     def size(self):
-        if not self.data:
-            self.initialise()
-            
         return self.raw_size
 
     def __str__(self):

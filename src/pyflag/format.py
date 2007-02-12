@@ -131,15 +131,14 @@ class DataType:
             self.buffer=Buffer(buffer)
         else:
             self.buffer=buffer
-            
+
+        self.parameters = kwargs
+
         if self.buffer:
             self.data=self.read()
         else:
             self.buffer=Buffer('')
 
-#        print "building %s" % self.__class__
-#        if kwargs.has_key('offset'):
-#            self.buffer = buffer[kwargs['offset']:]
 
     def size(self):
         """ This is the size of this data type - it returns the number of bytes we consume. """

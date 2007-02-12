@@ -48,7 +48,6 @@ class BasicType(DataType):
         except KeyError:
             pass
 
-        self.parameters = kwargs
         DataType.__init__(self,buffer,*args,**kwargs)
     
     def size(self):
