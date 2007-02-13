@@ -85,12 +85,11 @@ class DLLScan(Scanner.GenScanFactory):
             b = Buffer(fd=fd)
 
             pyflaglog.log(pyflaglog.DEBUG, "Opening %s to extract messages" % self.inode)
-            pydbh = DB.DBO()
-            pydbh.mass_insert_start('EventMessages')
+            self.outer.pydbh.mass_insert_start('EventMessages')
             try:
                 m=PElib.get_messages(b)
                 for k,v in m.messages.items():
-                    pydbh.mass_insert(filename = os.path.basename(filename),
+                    self.outer.pydbh.mass_insert(filename = os.path.basename(filename),
                                     message_id = k,
                                     message = v['Message'],
                                     offset = v.buffer.offset,
@@ -98,5 +97,7 @@ class DLLScan(Scanner.GenScanFactory):
 
             except (IndexError, IOError, AttributeError):
                 pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "%s does not contain messages" % filename)
+
+            self.outer.pydbh.mass_insert_commit()
 
 ## FIXME: This is not finished yet - need to finish the log viewer

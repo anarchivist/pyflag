@@ -323,10 +323,6 @@ typedef struct {
     struct block *blocks;
     uint64_t readptr;
     uint64_t size;
-  // This is used if we need to store the file in memory for some
-  // reason (in that case the blocks list is empty). This occurs for
-  // example if the file is resident.
-  char *data;
 } skfile;
 
 static void skfile_dealloc(skfile *self);

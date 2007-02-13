@@ -309,36 +309,9 @@ class OLEFile:
             c=node.add_child(np)
             self.add_to_tree(np,c)
 
-class Tracker:
-    """ This is a file like object which keeps track of the maximum length of data read """
-    def __init__(self, fd):
-        """ Takes a fd and shadows it """
-        self.fd = fd
-        self.max_offset = 0
-
-    def seek(self, offset, rel=0):
-        self.fd.seek(offset,rel)
-
-    def tell(self):
-        return self.fd.tell()
-
-    def read(self,length=None):
-        if length:
-            data = self.fd.read(length)
-        else:
-            data = self.fd.read()
-
-        offset = self.fd.tell()
-        if offset > self.max_offset:
-            self.max_offset = offset
-
-        return data
-
 if __name__ == "__main__":
     fd=open(sys.argv[1],'r')
-    shadow = Tracker(fd)
-    
-    b=Buffer(fd=shadow)
+    b=Buffer(fd=fd)
     a = OLEFile(b)
     count=0
     
@@ -358,7 +331,3 @@ if __name__ == "__main__":
             print_dir(file,prefix+"  ")
 
     print_dir(a.root(),'')
-
-    ## Now report the size of the file:
-
-    print "File size is %s" % shadow.max_offset
