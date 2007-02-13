@@ -275,7 +275,11 @@ getblocks_walk_callback(FS_INFO *fs, DADDR_T addr, char *buf, int size, int flag
         b->addr = addr;
         b->size = size;
         list_add_tail(&b->list, &file->blocks->list);
-    }
+    } else {
+      file->data = talloc_memdup(file->context, buf, size);
+      file->size = size;
+      return WALK_STOP;
+    };
 
     file->size += size;
 
@@ -1158,6 +1162,15 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
     if(!PyArg_ParseTupleAndKeywords(args, kwds, "|iii", kwlist, 
                                     &readlen, &slack, &overread))
         return NULL; 
+
+    /** Are we resident? If so return the read out of our data buffers */
+    if(self->size > 0 && list_empty(&self->blocks->list)) {
+      int length = min(readlen, (self->size - self->readptr));
+
+      retdata = PyString_FromStringAndSize(self->data + self->readptr, length);
+      self->readptr += length;
+      return retdata;
+    };
 
     /* return slack? It is hard to calculate slack length correctly. You cannot
      * simply set it to blocksize * numblocks. Consider a compressed NTFS file.
