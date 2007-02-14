@@ -1371,8 +1371,8 @@ ntfs_data_walk(NTFS_INFO * ntfs, INUM_T inum,
     if (fs_data->flags & FS_DATA_RES) {
 	char *buf = NULL;
 	if ((buf = mymalloc((size_t) fs_data->size)) == NULL) {
-        return 1;
-    }
+	  return 1;
+	}
 	memcpy(buf, fs_data->buf, (size_t) fs_data->size);
 
 	myflags =
@@ -1770,6 +1770,8 @@ ntfs_proc_attrseq(NTFS_INFO * ntfs,
 		    PRIuINUM " Type: %" PRIu32 " Id: %"
 		    PRIu16 " Name: %s\n", ntfs->mnum,
 		    type, getu16(fs->endian, attr->id), name);
+
+	    fs_inode->flags |= FS_FLAG_DATA_RES;
 
 	    /* Add this resident stream to the fs_inode->attr list */
 	    fs_inode->attr =

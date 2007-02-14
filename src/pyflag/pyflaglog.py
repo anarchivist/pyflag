@@ -67,8 +67,8 @@ class LoggingThread(threading.Thread):
                 ## Terminate the thread
                 if level==0:
                     break
-                dbh.mass_insert(level=level, message=message)
-    #            dbh.insert('logs', level=level, message=message)
+                ## dbh.mass_insert(level=level, message=message)
+                dbh.insert('logs', level=level, message=message)
             except Exception,e:
                 sys.stdout.write( "Logging service: %s" % e)
                 sys.stdout.flush()

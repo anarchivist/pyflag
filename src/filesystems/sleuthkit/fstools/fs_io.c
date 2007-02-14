@@ -305,7 +305,7 @@ fs_read_file_int(FS_INFO * fs, FS_INODE * fsi, uint32_t type, uint16_t id,
      * files, we can simply do an AONLY walk and then read only the blocks 
      * that we need
      */
-    if (fsi->flags & FS_FLAG_META_COMP) {
+    if (fsi->flags & FS_FLAG_META_COMP || fsi->flags & FS_FLAG_DATA_RES) {
 	if (fs->file_walk(fs, fsi, type, id, flags, fs_read_file_act,
 		(void *) &lf)) {
 	    strncat(tsk_errstr2, " - fs_read_file",
