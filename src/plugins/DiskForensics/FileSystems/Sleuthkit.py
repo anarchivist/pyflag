@@ -294,10 +294,12 @@ class Sleuthkit(DBFS):
 
             # add contiguous unallocated blocks here as 'unallocated' files.
             # the offset driver over the iosource should work for this
-            unalloc_blocks = []
+            #unalloc_blocks = []
             count=0
             last = (0,0)
             dbh_unalloc = DB.DBO(self.case)
+            ## Make sure the table is sorted here:
+            dbh_unalloc.execute("alter table block add index block(block asc)")
             dbh_unalloc.execute("select * from block order by block asc")
             for row in dbh_unalloc:
                 ## We make a list of all blocks which are unallocated:
@@ -309,10 +311,26 @@ class Sleuthkit(DBFS):
                     size = new_block[1] * fs.block_size
                     
                     ## Add a new VFS node:
-                    self.VFSCreate("I%s" % iosource_name,'o%s:%s' % (offset, size),
-                                   "/_unallocated_/o%08d" % count, size=size)
+                    ##self.VFSCreate("I%s" % iosource_name,'o%s:%s' % (offset, size),
+                    ##               "/_unallocated_/o%08d" % count, size=size, _fast=True)
+
+                    ## This is much faster than the above:
+                    inode = 'I%s|o%s:%s' % (iosource_name, offset,size)
+                    dbh_file.mass_insert(status = 'alloc',
+                                         path = '/_unallocated_/',
+                                         inode = inode,
+                                         name = "o%08d" % count,
+                                         mode = 'r/r')
+
+                    dbh_inode.mass_insert(status = 'alloc',
+                                          inode = inode,
+                                          mode = '40755',
+                                          links = 4,
+                                          size = size
+                                          )
+
                     count+=1
-                    unalloc_blocks.append(new_block)
+                    #unalloc_blocks.append(new_block)
                     
                 last=(row['block']+row['count'],0,row['inode'])
     
@@ -405,3 +423,11 @@ class SKFSTests2(tests.FDTest):
     def setUp(self):
         self.fs = DBFS(self.test_case)
         self.fd = self.fs.open(self.test_file)
+
+class LargeFileTest(pyflag.tests.ScannerTest):
+    """ Test that pyflag can load very large images efficiently """
+    test_case = "WinXp"
+    test_file = "winxp.sgz"
+    subsystem = 'sgzip'
+    level = 15
+    

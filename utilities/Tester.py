@@ -34,6 +34,7 @@ from optparse import OptionParser
 
 parser = OptionParser(usage = """%prog [options]""")
 parser.add_option('-m','--match', default=None, help='Run only tests matching this RE')
+parser.add_option('-l','--level', default=10, type='int', help='Testing level (1 least exhaustive)')
 
 options,args = pyflag.conf.parse_command_line("Generic Test harness for running unit tests.",parser=parser)
 
@@ -48,6 +49,19 @@ if not options.match:
     classes = test_registry.classes
 else:
     classes = [ x for x in test_registry.classes if re.search(options.match,"%s" % x.__doc__)]
+
+## Only do those tests who are below the current level:
+tmp = []
+for x in classes:
+    try:
+        if x.level <= options.level:
+            tmp.append(x)
+    except AttributeError:
+        ## If they do not have a level, their level is considered to be 5
+        if 5 <= options.level:
+            tmp.append(x)
+
+classes = tmp
 
 for test_class in classes:
     try:
