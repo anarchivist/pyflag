@@ -42,10 +42,9 @@ class Buffer:
     def __init__(self,fd,offset=0,size=None):
         """ We can either specify a string, or a fd as the first arg """
         self.offset=offset
-        ## If fd is really a string, we make a StringIO
-        if isinstance(fd, basestring):
-            self.fd=cStringIO.StringIO(fd)
-            self.size=len(fd)
+        self.fd=fd
+        if size!=None:
+            self.size=size
         else:
             self.fd=fd
             if size!=None:

@@ -92,7 +92,7 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
         self._last_executed = None
 
         ## By default queries are allowed to take a long time
-        self.timeout = 3600
+        self.timeout = 0
 
     def kill_connection(self, what=''):
         dbh = DBO()

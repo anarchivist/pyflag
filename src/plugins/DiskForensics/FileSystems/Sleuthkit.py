@@ -74,42 +74,51 @@ SKCACHE = Store.Store()
 class Sleuthkit_File(File):
     """ access to skfile """
     specifier = 'K'
-    def __init__(self, case, fd, inode):
-        File.__init__(self, case, fd, inode)
+    skfd = None
 
-        cache_key = "%s:%s" % (case, fd.inode)
+    def close(self):
+        self.skfd.close()
+
+    def __init__(self, case, fd, inode):
+        File.__init__(self,case,fd,inode)
+        
+        cache_key = "%s:%s" % (self.case, self.fd.inode)
         try:
             fs = SKCACHE.get(cache_key)
         except KeyError:
-            fs = sk.skfs(fd)
+            fs = sk.skfs(self.fd)
             SKCACHE.put(fs, key=cache_key)
 
-        inode = inode[inode.find('|K')+2:]
-        self.fd = fs.open(inode=inode)
-        self.fd.seek(0,2)
-        self.size = self.fd.tell()
-        self.fd.seek(0)
+        inode = self.inode[self.inode.find('|K')+2:]
+        self.skfd = fs.open(inode=inode)
+        self.skfd.seek(0,2)
+        self.size = self.skfd.tell()
+        self.skfd.seek(0)
         self.block_size = fs.block_size
-    
-    def close(self):
-        self.fd.close()
 
     def seek(self, offset, rel=None):
-        if rel!=None:
-            self.fd.seek(offset,rel, slack=self.slack, overread=self.overread)
-        else:
-            self.fd.seek(offset, slack=self.slack, overread=self.overread)
+        File.seek(self,offset,rel)
 
-        if self.fd.tell()<0: raise IOError("Seek before start of file")
+        if self.cached_fd: return
+
+        if rel!=None:
+            self.skfd.seek(offset,rel, slack=self.slack, overread=self.overread)
+        else:
+            self.skfd.seek(offset, slack=self.slack, overread=self.overread)
+
+        if self.skfd.tell()<0: raise IOError("Seek before start of file")
 
     def read(self, length=None):
-        if length!=None:
-            return self.fd.read(length, slack=self.slack, overread=self.overread)
-        else:
-            return self.fd.read(slack=self.slack, overread=self.overread)
+        ## Call our baseclass to see if we have cached data:
+        try:
+            return File.read(self,length)
+        except IOError:
+            pass
 
-    def tell(self):
-        return self.fd.tell()
+        if length!=None:
+            return self.skfd.read(length, slack=self.slack, overread=self.overread)
+        else:
+            return self.skfd.read(slack=self.slack, overread=self.overread)
 
 class Sleuthkit(DBFS):
     """ A new improved Sleuthit based filesystem """
@@ -431,3 +440,9 @@ class LargeFileTest(pyflag.tests.ScannerTest):
     subsystem = 'sgzip'
     level = 15
     
+   
+    def test01RunScanners(self):
+	""" Run all scanners on the image """ 
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env, command="scan",
+                             argv=["*",'TypeScan','MD5Scan','VirScan','DLLScan','IEIndex','RFC2822','RegistryScan','OLEScan','PstScan','IndexScan'])

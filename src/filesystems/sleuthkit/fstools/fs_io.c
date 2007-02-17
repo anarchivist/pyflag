@@ -207,6 +207,19 @@ fs_read_file_act_aonly(FS_INFO * fs, DADDR_T addr, char *buf, size_t size,
     size_t cp_size;
     size_t blk_offset;
 
+    /* Is this a resident file?, in that case buf and size do actually
+       contain the data
+    */
+    if(flags & FS_FLAG_DATA_RES) {
+      if(buf1->size_to_copy < size)
+	size = buf1->size_to_copy;
+      
+      buf1->size_left = 0;
+      memcpy(buf1->cur, buf + buf1->offset_left, size);
+      return WALK_STOP;
+    };
+
+
     /* Is this block too early in the stream? */
     if (buf1->offset_left > size) {
 	buf1->offset_left -= size;
@@ -305,7 +318,7 @@ fs_read_file_int(FS_INFO * fs, FS_INODE * fsi, uint32_t type, uint16_t id,
      * files, we can simply do an AONLY walk and then read only the blocks 
      * that we need
      */
-    if (fsi->flags & FS_FLAG_META_COMP || fsi->flags & FS_FLAG_DATA_RES) {
+    if (fsi->flags & FS_FLAG_META_COMP) {
 	if (fs->file_walk(fs, fsi, type, id, flags, fs_read_file_act,
 		(void *) &lf)) {
 	    strncat(tsk_errstr2, " - fs_read_file",

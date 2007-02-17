@@ -88,7 +88,7 @@ class ls(pyflagsh.command):
             if self.opts.has_key('-l'):
                 for dir in self.environment._FS.longls(path=path):
                     if dir['name']:
-                        yield "%s\t%s\t%s" % (dir['mode'],dir['inode'],dir['name'])
+                        yield "%s\t%s\t%s\t%s" % (dir['mode'],dir['size'],dir['inode'],dir['name'])
 
             else:
                 for dir in self.environment._FS.ls(path=path,dirs=1):

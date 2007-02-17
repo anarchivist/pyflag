@@ -114,7 +114,7 @@ class JpegCarver(Scanner.Carver):
         buf = format.Buffer(fd=fd)[offset:]
         j = JPEG(buf)
         if j.error:
-            return self.length
+            return Scanner.Carver.get_length(self, fd,offset)
         else:
             return j.size()
     
@@ -153,8 +153,8 @@ class CarveScan(Scanner.GenScanFactory):
             dbh=DB.DBO(self.fd.case)
             ## Find the matches for our classes:
             sql = " or ".join(["word_id = '%s'" % x for x in self.outer.ids.keys()])
-            dbh.execute("select word_id,offset from LogicalIndexOffsets where offset>0 and inode_id = %r and (%s)",
-                        (self.fd.inode_id, sql))
+            dbh.execute("select word_id,offset from LogicalIndexOffsets where offset>0 and offset<%r and inode_id = %r and (%s)",
+                        (self.fd.size, self.fd.inode_id, sql))
             for row in dbh:
                 ## Ignore matches which occur within the length of the
                 ## previously found file:
@@ -164,6 +164,7 @@ class CarveScan(Scanner.GenScanFactory):
                 fsfd = FileSystem.DBFS(self.case)
                 carver = self.outer.ids[row['word_id']](fsfd)
                 carver.add_inode(self.fd, offset, self.factories)
+                
                 
 ## Unit tests:
 import unittest
@@ -186,7 +187,7 @@ class CarverTest(pyflag.tests.ScannerTest):
 
         ## See if we found the two images from within the word
         ## document:
-        expected = [ "Itest|K1289-0-0|o150712:87368", "Itest|K1289-0-0|o96317:141763"]
+        expected = [ "Itest|K1289-0-0|o150712:85550", "Itest|K1289-0-0|o96317:141763"]
         
         dbh = DB.DBO(self.test_case)
         for inode in expected:

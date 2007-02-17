@@ -202,6 +202,9 @@ class ZipFile(File):
     def __init__(self, case, fd, inode):
         File.__init__(self, case, fd, inode)
 
+        ## Make sure our parent is cached:
+        self.fd.cache()
+
         ## Parse out inode - if we got the compressed length provided,
         ## we use that, otherwise we calculate it from the zipfile
         ## header
@@ -409,6 +412,7 @@ class Tar_file(DiskForensics.DBFS_file):
     def close(self):
         pass
 
+invalid_filename = re.compile('[^a-zA-Z0-9!@#$%^&()_+-=*{}\\|]')
 class ZipFileCarver(Scanner.Carver):
     """ This is a special carver for zip files """
     regexs = ['PK\x03\x04']
@@ -427,10 +431,15 @@ class ZipFileCarver(Scanner.Carver):
             ## - so we just make it a reasonable value
             if compressed_length==0:
                 compressed_length = 100*1024
+                
             name = header['zip_path'].get_value()
+	    if len(name)==0 or invalid_filename.search(name):
+                pyflaglog.log(pyflaglog.DEBUG, "Thought the name %r is invalid - skipping file" % name[:10])
+                return 10
+
             header_offset = header['data'].buffer.offset
         except:
-            return
+            return 10
 
         new_inode = "%s|Z%s:%s" % (fd.inode, offset, compressed_length)
         self._add_inode(new_inode, size, name, fd, factories)

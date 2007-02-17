@@ -293,11 +293,11 @@ class DBFS(FileSystem):
                    
         mode =''
         if(dirs == 1):
-            mode=" and mode like 'd%'"
+            mode=" and file.mode like 'd%'"
         elif(dirs == 0):
-            mode=" and mode like 'r%'"
+            mode=" and file.mode like 'r%'"
 
-        dbh.execute("select path,mode,inode,name from file where %s %s", (where, mode))
+        dbh.execute("select size,path,file.mode,inode.inode,name from file, inode where inode.inode=file.inode and %s %s", (where, mode))
 
         return [ dent for dent in dbh ]
         ## This is done rather than return the generator to ensure that self.dbh does not get interfered with...
