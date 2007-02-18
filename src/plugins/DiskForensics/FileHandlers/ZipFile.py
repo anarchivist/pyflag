@@ -413,6 +413,7 @@ class Tar_file(DiskForensics.DBFS_file):
     def close(self):
         pass
 
+## These are characters which are invalid for a file name
 invalid_filename = re.compile('[^a-zA-Z0-9!@#$%^&()_+-=*{}\\|]')
 class ZipFileCarver(Scanner.Carver):
     """ This is a special carver for zip files """
