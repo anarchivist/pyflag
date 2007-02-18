@@ -84,6 +84,16 @@ an error to try to talloc_free a regular malloc.
 */
 extern void *global_talloc_context;
 
+// This is used to fix tsk_error_get's stupid behaviour of returning
+// null when no error occured.
+char *error_get() {
+  char *result = tsk_error_get();
+
+  if(!result) result="";
+
+  return result;
+};
+
 static u_int8_t
 inode_walk_callback(FS_INFO *fs, FS_INODE *fs_inode, int flags, void *ptr) {
     PyObject *inode, *list;
@@ -422,8 +432,12 @@ pyfile_imgstat(IMG_INFO * img_info, FILE * hFile) {
 
 void
 pyfile_close(IMG_INFO * img_info) {
-  if(img_info)
+  if(img_info) {
+    IMG_PYFILE_INFO *pyfile_info = (IMG_PYFILE_INFO *)img_info;
+
+    Py_DECREF(pyfile_info->fileobj);
     talloc_free(img_info);
+  };
   return;
 }
 
@@ -462,6 +476,11 @@ pyfile_open(PyObject *fileobj) {
     img_info->imgstat = pyfile_imgstat;
 
     img_info->size = 0;
+
+    /** FIXME: Sometimes the file like object has an attribute .size
+	which should avoid us doing this 
+    */
+
     /* this block looks aweful! */
     tmp = PyObject_CallMethod(fileobj, "seek", "(ii)", 0, 2);
     if(tmp) {
@@ -487,8 +506,7 @@ pyfile_open(PyObject *fileobj) {
  * ***************************************************************/
 
 /************* SKFS ***************/
-static void
-skfs_dealloc(skfs *self) {
+static PyObject *skfs_close(skfs *self) {
     global_talloc_context = self->context;
 
     if(self->fs)
@@ -496,12 +514,22 @@ skfs_dealloc(skfs *self) {
     if(self->img)
         self->img->close(self->img);
 
-    if(self->root_inum) {
-        Py_DECREF(self->root_inum);
-    };
+    Py_INCREF(Py_None);
+    return Py_None;
+}
 
-    talloc_free(self->context);
-    self->ob_type->tp_free((PyObject*)self);
+static void
+skfs_dealloc(skfs *self) {
+  global_talloc_context = self->context;
+
+  Py_DECREF(skfs_close(self));
+
+  if(self->root_inum) {
+    Py_DECREF(self->root_inum);
+  };
+
+  talloc_free(self->context);
+  self->ob_type->tp_free((PyObject*)self);
 }
 
 static int
@@ -528,7 +556,9 @@ skfs_init(skfs *self, PyObject *args, PyObject *kwds) {
 
     self->img = pyfile_open(imgfile);
     if(!self->img) {
-      PyErr_Format(PyExc_IOError, "Unable to open image file: %s", tsk_error_get());
+      char *error = error_get();
+
+      PyErr_Format(PyExc_IOError, "Unable to open image file: %s", error);
       return -1;
     }
 
@@ -536,7 +566,8 @@ skfs_init(skfs *self, PyObject *args, PyObject *kwds) {
     tsk_error_reset();
     self->fs = fs_open(self->img, imgoff, fstype);
     if(!self->fs) {
-      PyErr_Format(PyExc_RuntimeError, "Unable to open filesystem in image: %s", tsk_error_get());
+      char *error = error_get();
+      PyErr_Format(PyExc_RuntimeError, "Unable to open filesystem in image: %s", error);
       return -1;
     }
 
@@ -574,8 +605,10 @@ skfs_listdir(skfs *self, PyObject *args, PyObject *kwds) {
 
     tsk_error_reset();
     inode = lookup_inode(self->fs, path);
-    if(inode == 0)
-        return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %s", path, tsk_error_get());
+    if(inode == 0) {
+      char *error = error_get();
+      return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %s", path, error);
+    };
 
     /* set flags */
     if(alloc)
@@ -588,8 +621,9 @@ skfs_listdir(skfs *self, PyObject *args, PyObject *kwds) {
     tsk_error_reset();
     self->fs->dent_walk(self->fs, inode, flags, listdent_walk_callback_list, (void *)list);
     if(tsk_errno) {
-        Py_DECREF(list);
-        return PyErr_Format(PyExc_IOError, "Unable to list inode %lu: %s", (ULONG)inode, tsk_error_get());
+      char *error = error_get();
+      Py_DECREF(list);
+      return PyErr_Format(PyExc_IOError, "Unable to list inode %lu: %s", (ULONG)inode, error);
     };
 
     return list;
@@ -748,8 +782,10 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
     if(path) {
         tsk_error_reset();
         inode = lookup_inode(self->fs, path);
-        if(inode == 0)
-            return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %lu: %s", path, (ULONG) inode, tsk_error_get());
+        if(inode == 0) {
+	  char *error = error_get();
+	  return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %lu: %s", path, (ULONG) inode,  error);
+	};
     } else {
         /* inode can be an int or a string */
         if(PyNumber_Check(inode_obj)) {
@@ -765,8 +801,10 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
     /* can we lookup this inode? */
     tsk_error_reset();
     fs_inode = self->fs->inode_lookup(self->fs, inode);
-    if(fs_inode == NULL)
-        return PyErr_Format(PyExc_IOError, "Unable to find inode %lu: %s", (ULONG)inode, tsk_error_get());
+    if(fs_inode == NULL) {
+      char *error = error_get();
+      return PyErr_Format(PyExc_IOError, "Unable to find inode %lu: %s", (ULONG)inode, error);
+    };
 
     result = build_stat_result(fs_inode);
 
@@ -1076,8 +1114,9 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
         tsk_error_reset();
         inode = lookup_inode(fs, filename);
         if(inode == 0) {
-            PyErr_Format(PyExc_IOError, "Unable to find inode for file %s: %s", filename, tsk_error_get());
-            return -1;
+	  char *error = error_get();
+	  PyErr_Format(PyExc_IOError, "Unable to find inode for file %s: %s", filename, error);
+	  return -1;
         }
     } else {
         /* inode can be an int or a string */
@@ -1097,8 +1136,9 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
     tsk_error_reset();
     self->fs_inode = fs->inode_lookup(fs, inode);
     if(self->fs_inode == NULL) {
-        PyErr_Format(PyExc_IOError, "Unable to find inode: %s", tsk_error_get());
-        return -1;
+      char *error = error_get();
+      PyErr_Format(PyExc_IOError, "Unable to find inode: %s", error);
+      return -1;
     };
 
     /* store a ref to the skfs */
@@ -1123,8 +1163,9 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
     fs->file_walk(fs, self->fs_inode, self->type, self->id, flags,
                  (FS_FILE_WALK_FN) getblocks_walk_callback, (void *)self);
     if(tsk_errno) {
-        PyErr_Format(PyExc_IOError, "Error reading inode: %s", tsk_error_get());
-        return -1;
+      char *error = error_get();
+      PyErr_Format(PyExc_IOError, "Error reading inode: %s", error);
+      return -1;
     };
 
     return 0;
@@ -1358,25 +1399,29 @@ static PyObject *mmls(PyObject *self, PyObject *args, PyObject *kwds) {
     tsk_error_reset();
     img = pyfile_open(imgfile);
     if(!img) {
-        PyErr_Format(PyExc_IOError, "Unable to open image file: %s", tsk_error_get());
-        return NULL;
+      char *error = error_get();
+      PyErr_Format(PyExc_IOError, "Unable to open image file: %s", error);
+      return NULL;
     }
 
     /* initialise the mm layer */
     tsk_error_reset();
     mm = mm_open(img, imgoff, mmtype);
     if(!mm) {
-        PyErr_Format(PyExc_IOError, "Unable to read partition table: %s", tsk_error_get());
-        img->close(img);
-        talloc_free(global_talloc_context); global_talloc_context = NULL;
-        return NULL;
+      char *error = error_get();
+      PyErr_Format(PyExc_IOError, "Unable to read partition table: %s", error);
+      img->close(img);
+      talloc_free(global_talloc_context); global_talloc_context = NULL;
+      return NULL;
     }
 
     /* walk primary partition table */
     partlist = PyList_New(0);
     tsk_error_reset();
     if(mm->part_walk(mm, mm->first_part, mm->last_part, 0, mmls_callback, (void *)partlist)) {
-        PyErr_Format(PyExc_IOError, "Partition walk failed: %s", tsk_error_get());
+      char *error = error_get();
+
+        PyErr_Format(PyExc_IOError, "Partition walk failed: %s", error);
         Py_DECREF(partlist);
         mm->close(mm);
         img->close(img);

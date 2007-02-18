@@ -986,6 +986,10 @@ class EventHander:
         installation of pyflag or upgrade of schema.
         """
 
+    def exit(self, dbh, case):
+        """ This is called when we are about to exit on the default db
+        """
+
 def post_event(event, case):
     """ A function to post the specifed event to all event handlers """
     dbh = DB.DBO(case)

@@ -244,7 +244,9 @@ if __name__ == "__main__":
     except IOError:
         pass
     import atexit
+
     atexit.register(readline.write_history_file, histfile)
+    atexit.register(FlagFramework.post_event, 'exit', config.FLAGDB)
     
     readline.set_completer(completer)
     readline.set_completer_delims(' \t\n/=+\'"')

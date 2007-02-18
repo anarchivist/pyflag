@@ -34,7 +34,7 @@ import pyflag.DB as DB
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.pyflaglog as pyflaglog
-import pickle
+import pickle,gzip
 import plugins.LogAnalysis.Whois as Whois
 
 def get_file(query,result):
@@ -103,7 +103,12 @@ class Log:
             raise IOError("Datafile is not set!!!")
         
         for file in self.datafile:
-            fd=open(file,'r')
+            try:
+                ## Allow log files to be compressed.
+                fd=gzip.open(file,'r')
+            except:
+                fd=open(file,'r')
+                
             for line in fd:
                 if line.startswith('#') and ignore_comment:
                     continue

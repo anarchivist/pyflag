@@ -37,6 +37,7 @@ import struct,sys
 import format
 from format import *
 from plugins.FileFormats.BasicFormats import *
+import StringIO
 
 class Tree:
     """ A simple tree implementation """
@@ -204,7 +205,8 @@ class OLEFile:
 
         ## Read property sets, there should be len(root_chain)/small_blocksize
         ## properties. Not all of them make sense though...
-        b=Buffer(self.root_chain)
+        fd = StringIO.StringIO(self.root_chain)
+        b=Buffer(fd=fd)
         self.properties = PropertySetArray(
             b,
             count=len(self.root_chain)/0x80 ## Number of elements

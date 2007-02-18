@@ -347,3 +347,9 @@ class CaseDBInit(FlagFramework.EventHander):
         ## Update the schema version.
         dbh.set_meta('schema_version',config.SCHEMA_VERSION)
 
+    def exit(self, dbh, case):
+        print "Deleteing IO Cache"
+        del IO.IO_Cache
+        del DB.DBH
+        del DB.DBIndex_Cache
+        del Scanner.factories

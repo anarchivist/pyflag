@@ -63,6 +63,9 @@ for x in classes:
 
 classes = tmp
 
+import gc
+gc.set_debug(gc.DEBUG_UNCOLLECTABLE | gc.DEBUG_INSTANCES)
+
 for test_class in classes:
     try:
         doc = test_class.__doc__
@@ -75,3 +78,9 @@ for test_class in classes:
     print "---------------------------------------"
     suite = unittest.makeSuite(test_class)
     unittest.TextTestRunner(verbosity=2).run(suite)
+
+    ## Preform a collection:
+    gc.collect()
+
+    print gc.garbage
+    del gc.garbage[:]

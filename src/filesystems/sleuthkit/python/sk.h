@@ -70,6 +70,7 @@ typedef struct {
 } skfs;
 
 static void skfs_dealloc(skfs *self);
+static PyObject *skfs_close(skfs *self);
 static int skfs_init(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_listdir(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_open(skfs *self, PyObject *args, PyObject *kwds);
@@ -95,6 +96,8 @@ static PyMethodDef skfs_methods[] = {
      "List directory contents" },
     {"open", (PyCFunction)skfs_open, METH_VARARGS|METH_KEYWORDS,
      "Open a file" },
+    {"close", (PyCFunction)skfs_close, METH_VARARGS|METH_KEYWORDS,
+     "Close the filesyste" },
     {"walk", (PyCFunction)skfs_walk, METH_VARARGS|METH_KEYWORDS,
      "Walk filesystem from the given path" },
     {"iwalk", (PyCFunction)skfs_iwalk, METH_VARARGS|METH_KEYWORDS,

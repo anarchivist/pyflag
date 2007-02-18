@@ -100,12 +100,9 @@ class ls(pyflagsh.command):
                     if dir:
                         yield "[%s%s]" % (new_path,dir)
 
-                for file in self.environment._FS.ls(path=path,dirs=0):
-                    if path.startswith(self.environment.CWD):
-                        new_path=path[len(self.environment.CWD):]
-                    else: new_path=path
-                    if file:
-                        yield " %s%s " % (new_path,file)
+                for dent in self.environment._FS.longls(path=path,dirs=0):
+                    if dent:
+                        yield " %s%s " % (dent['path'],dent['name'])
 
             ## Do we need to recurse?
             if self.opts.has_key('-R'):
@@ -605,22 +602,22 @@ class BasicCommandTests(pyflag.tests.ScannerTest):
         ## Check we can list default directory
         lines = [ l for l in pyflagsh.shell_execv_iter(env=self.env, command="ls",
                                                        argv=[])]
-        self.assertEqual(len(lines),2)
+        self.assertEqual(len(lines),12)
 
         ## Check we can list directories
         lines = [ l for l in pyflagsh.shell_execv_iter(env=self.env, command="ls",
-                                                       argv=["stdimage"])]
-        self.assert_(len(lines)>=15)
+                                                       argv=["docs"])]
+        self.assert_(len(lines)>=3)
 
         ## Check that we can glob files:
         lines = [ l for l in pyflagsh.shell_execv_iter(env=self.env, command="ls",
-                                                       argv=["stdimage/*.jpg"])]
-        self.assertEqual(len(lines),6)
+                                                       argv=["*.jpg"])]
+        self.assertEqual(len(lines),4)
         
         ## Check that we can glob directories:
         lines = [ l for l in pyflagsh.shell_execv_iter(env=self.env, command="ls",
-                                                       argv=["*image"])]
-        self.assert_(len(lines)>32)
+                                                       argv=["do*"])]
+        self.assert_(len(lines)>3)
 
     def test02catTests(self):
         """ Test the cat command """
@@ -629,22 +626,22 @@ class BasicCommandTests(pyflag.tests.ScannerTest):
                              argv=[self.test_case,])
 
         self.fsfd = FileSystem.DBFS(self.test_case)
-        fd = self.fsfd.open("/stdimage/dscf1080.jpg")
+        fd = self.fsfd.open("/dscf1080.jpg")
         data1=fd.read()        
-        fd = self.fsfd.open("/stdimage/dscf1081.jpg")
+        fd = self.fsfd.open("/dscf1081.jpg")
         data2=fd.read()
-        fd = self.fsfd.open("/stdimage/dscf1082.jpg")
+        fd = self.fsfd.open("/dscf1082.jpg")
         data3=fd.read()
 
         result = ''
         for l in pyflagsh.shell_execv_iter(env=self.env, command="cat",
-                                           argv=["/stdimage/dscf1081.jpg"]):
+                                           argv=["/dscf1081.jpg"]):
             result+=l
         self.assertEqual(result,data2)
 
         result = ''
         for l in pyflagsh.shell_execv_iter(env=self.env, command="cat",
-                                           argv=["/stdimage/dscf108*"]):
+                                           argv=["/dscf108*"]):
             result+=l
 
         self.assertEqual(len(result),len(data1)+len(data2)+len(data3))
@@ -661,7 +658,7 @@ class BasicCommandTests(pyflag.tests.ScannerTest):
         os.mkdir(tmpname)
 
         pyflagsh.shell_execv(env=self.env, command="cp",
-                             argv=["/stdimage/dscf108*", tmpname])
+                             argv=["/dscf108*", tmpname])
 
         ## Now verify the copy worked:
         fd = open(tmpname+"/dscf1080.jpg",'r')

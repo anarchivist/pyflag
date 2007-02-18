@@ -320,7 +320,7 @@ class ApacheLogTest(unittest.TestCase):
         dbh.drop(self.test_table)
         log = ApacheLog(case=self.test_case)
         log.parse(query_type(formats['debian_common'],
-                             datafile = "%s/pyflag_apache_standard_log" % config.UPLOADDIR))
+                             datafile = "%s/pyflag_apache_standard_log.gz" % config.UPLOADDIR))
         t = time.time()
         ## Load the data:
         for a in log.load(self.test_table):

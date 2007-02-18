@@ -100,13 +100,7 @@ class Sleuthkit_File(File):
         File.seek(self,offset,rel)
 
         if self.cached_fd: return
-
-        if rel!=None:
-            self.skfd.seek(offset,rel, slack=self.slack, overread=self.overread)
-        else:
-            self.skfd.seek(offset, slack=self.slack, overread=self.overread)
-
-        if self.skfd.tell()<0: raise IOError("Seek before start of file")
+        self.skfd.seek(self.readptr, slack=self.slack, overread=self.overread)
 
     def read(self, length=None):
         ## Call our baseclass to see if we have cached data:
@@ -116,9 +110,13 @@ class Sleuthkit_File(File):
             pass
 
         if length!=None:
-            return self.skfd.read(length, slack=self.slack, overread=self.overread)
+            result= self.skfd.read(length, slack=self.slack, overread=self.overread)
         else:
-            return self.skfd.read(slack=self.slack, overread=self.overread)
+            result= self.skfd.read(slack=self.slack, overread=self.overread)
+
+        self.readptr = self.skfd.tell()
+
+        return result
 
 class Sleuthkit(DBFS):
     """ A new improved Sleuthit based filesystem """
@@ -349,7 +347,14 @@ class Sleuthkit(DBFS):
             offset = last[0] * fs.block_size
             self.VFSCreate("I%s" % iosource_name, 'o%s:%s' % (offset, 0),
                            "/_unallocated_/o%08d" % count)
-    
+
+
+class SKFSEventHandler(FlagFramework.EventHander):
+    def exit(self, dbh, case):
+        global SKCACHE
+
+        for skfs in SKCACHE:
+            skfs.close()
 
 ## Unit Tests:
 import unittest, md5
@@ -383,10 +388,10 @@ class NTFSTests(unittest.TestCase):
         dbh = DB.DBO(self.test_case)
         dbh.execute("select count(*) as count from inode")
         row = dbh.fetch()
-        self.assertEqual(row['count'],55)
+        self.assertEqual(row['count'],139)
         dbh.execute("select count(*) as count from file")
         row = dbh.fetch()
-        self.assertEqual(row['count'],65)
+        self.assertEqual(row['count'],152)
 
     def test02ReadNTFSFile(self):
         """ Test reading a regular NTFS file """
@@ -445,4 +450,5 @@ class LargeFileTest(pyflag.tests.ScannerTest):
 	""" Run all scanners on the image """ 
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env, command="scan",
-                             argv=["*",'TypeScan','MD5Scan','VirScan','DLLScan','IEIndex','RFC2822','RegistryScan','OLEScan','PstScan','IndexScan'])
+#                             argv=["*",'TypeScan','MD5Scan','VirScan','DLLScan','IEIndex','RFC2822','RegistryScan','OLEScan','PstScan','IndexScan'])
+                             argv=["*",'*'])

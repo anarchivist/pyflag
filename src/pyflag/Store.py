@@ -126,6 +126,9 @@ class Store:
         finally:
             self.mutex.release()
 
+    def __iter__(self):
+        for t, k, obj in self.creation_times:
+            yield obj
 
 ## Store unit tests:
 import unittest

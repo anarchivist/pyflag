@@ -174,8 +174,8 @@ import pyflag.tests
 class CarverTest(pyflag.tests.ScannerTest):
     """ Carving Tests """
     test_case = "PyFlagIndexTestCase"
-    test_file = "pyflag_stdimage_0.2"
-    subsystem = 'advanced'
+    test_file = "pyflag_stdimage_0.2.sgz"
+    subsystem = 'sgzip'
     order = 30
     offset = "16128s"
     

@@ -11,6 +11,7 @@ from format import *
 from plugins.FileFormats.BasicFormats import *
 import sys,re
 from plugins.FileFormats.BasicFormats import *
+import cStringIO
 
 prop_lookup = {
     '001A': 'Message class',
@@ -225,8 +226,10 @@ def parse_summary_info(p,file):
     data = file.cat(p)
     header = PropHeader(data)
 
+    fd = cStringIO.StringIO(data[header.size():])
+
     ## A FIDAndOffsetArray tells us where all the property sections are
-    fids = FIDAndOffsetArray(Buffer(data[header.size():]),count=header['cSections'])
+    fids = FIDAndOffsetArray(Buffer(fd=fd),count=header['cSections'])
 
     for fid in fids:
         offset=fid['offset'].get_value()

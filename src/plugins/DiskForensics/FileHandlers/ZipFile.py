@@ -322,8 +322,9 @@ class GZ_file(DiskForensics.DBFS_file):
             pass
 
         if not self.gz:
+            self.fd.seek(0)
             self.gz = gzip.GzipFile(fileobj=self.fd, mode='r')
-            
+
         count = 0
         step = 1024
 

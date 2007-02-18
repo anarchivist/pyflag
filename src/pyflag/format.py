@@ -127,7 +127,8 @@ class DataType:
     def __init__(self,buffer,*args,**kwargs):
         """ This will force this class to read the data type from data at the specified offset """
         if isinstance(buffer,str):
-            self.buffer=Buffer(buffer)
+            fd = cStringIO.StringIO(buffer)
+            self.buffer=Buffer(fd)
         else:
             self.buffer=buffer
 
@@ -136,7 +137,7 @@ class DataType:
         if self.buffer:
             self.data=self.read()
         else:
-            self.buffer=Buffer('')
+            self.buffer=Buffer(cStringIO.StringIO(''))
 
 
     def size(self):

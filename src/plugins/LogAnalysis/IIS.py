@@ -136,7 +136,7 @@ class IISLogTest(unittest.TestCase):
         dbh = DB.DBO(self.test_case)
         dbh.drop(self.test_table)
         log = IISLog(case=self.test_case)
-        log.parse(query_type( datafile = "%s/pyflag_iis_standard_log" % config.UPLOADDIR))
+        log.parse(query_type( datafile = "%s/pyflag_iis_standard_log.gz" % config.UPLOADDIR))
         t = time.time()
         ## Load the data:
         for a in log.load(self.test_table):

@@ -39,8 +39,8 @@ CREATE TABLE `whois_sources` (
 ) engine=MyISAM;
 
 create table whois_cache (
-	`id` int unsigned not NULL,
-	`ip` int unsigned not NULL
+	`id` int(11) unsigned not NULL,
+	`ip` int(11) unsigned not NULL
 ) engine=MyISAM;
 
 #

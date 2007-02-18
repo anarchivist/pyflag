@@ -117,8 +117,9 @@ import pyflag.tests
 class VirusScanTest(pyflag.tests.ScannerTest):
     """ Virus Scanner Tests """
     test_case = "PyFlagTestCase"
-    test_file = "pyflag_stdimage_0.1"
-    subsystem = 'standard'
+    test_file = "pyflag_stdimage_0.2.sgz"
+    subsystem = 'sgzip'
+    offset = "16128s"
     
     order = 20
     def test_scanner(self):

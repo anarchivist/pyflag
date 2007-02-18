@@ -289,7 +289,9 @@ class DBFS(FileSystem):
             where =" path=%r " % path
         else:
             ## We are listing the exact file specified:
-            where =" path=%r and name=%r" %  (os.path.dirname(path)+'/' , os.path.basename(path))
+            where =" path=%r and name=%r" %  (
+                FlagFramework.normpath(os.path.dirname(path)+'/'),
+                os.path.basename(path))
                    
         mode =''
         if(dirs == 1):
@@ -305,7 +307,7 @@ class DBFS(FileSystem):
         ## return result
     
     def ls(self, path="/", dirs=None):
-        return [ dent['name'] for dent in self.longls(path,dirs) ]
+        return [ "%s" % (dent['name']) for dent in self.longls(path,dirs) ]
 
     def dent_walk(self, path='/'):
         dbh=DB.DBO(self.case)
@@ -586,7 +588,8 @@ class File:
         if(self.size>0 and self.readptr > self.size):
             self.readptr = self.size
 
-        if self.readptr<0: self.readptr=0
+        if self.readptr<0:
+            raise IOError("Invalid Arguement")
 
         try:
             self.cached_fd.seek(self.readptr)
@@ -660,7 +663,6 @@ class File:
     def explain(self, result):
         """ This method is called to explain how we arrive at this
         data"""
-        print "%s" % self.__class__.__name__
         result.row(self.__class__.__name__, self.__doc__)
 
     def summary(self,query,result):
