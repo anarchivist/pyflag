@@ -63,10 +63,7 @@ class scan(pyflagsh.command):
         import pyflag.Farm as Farm
         Farm.wake_workers()
         
-        ## Wait until there are no more jobs left. FIXME: this is a
-        ## short cut, we should probably only wait for our own jobs to
-        ## finish. Maybe we need to add a cookie field to the jobs
-        ## table so we can easily find our own jobs only.
+        ## Wait until there are no more jobs left.
         while 1:
             pdbh.execute("select count(*) as total from jobs where cookie=%r and arg1=%r", (cookie,
                          self.environment._CASE))

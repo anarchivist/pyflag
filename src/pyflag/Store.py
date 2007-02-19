@@ -122,7 +122,11 @@ class Store:
         self.mutex.acquire()
 
         try:
-            self.creation_times = [ x for x in self.creation_times if not re.search(regex, x[1])]
+            tmp = []
+            for x in self.creation_times:
+                if not re.search(regex, x[1]):
+                    tmp.append(x)
+            self.creation_times = tmp
         finally:
             self.mutex.release()
 

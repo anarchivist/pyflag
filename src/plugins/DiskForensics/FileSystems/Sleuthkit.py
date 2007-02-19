@@ -356,6 +356,12 @@ class SKFSEventHandler(FlagFramework.EventHander):
         for skfs in SKCACHE:
             skfs.close()
 
+    def reset(self, dbh, case):
+        cache_key = "%s:.*" % (case,)
+        global SKCACHE
+
+        SKCACHE.expire(cache_key)
+
 ## Unit Tests:
 import unittest, md5
 import pyflag.pyflagsh as pyflagsh

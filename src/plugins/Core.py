@@ -219,11 +219,7 @@ class DropCase(Farm.Task):
     def run(self, case, *args):
         ## Expire any caches we have relating to this case:
         pyflaglog.log(pyflaglog.INFO, "Resetting case %s in worker" % case)
-        key_re = "%s[/|]?.*" % case
-        IO.IO_Cache.expire(key_re)
-        DB.DBH.expire(key_re)
-        DB.DBIndex_Cache.expire(key_re)
-        Scanner.factories.expire(key_re)
+        FlagFramework.post_event('reset', case)
 
 class CaseDBInit(FlagFramework.EventHander):
     """ A handler for creating common case tables """
@@ -348,8 +344,14 @@ class CaseDBInit(FlagFramework.EventHander):
         dbh.set_meta('schema_version',config.SCHEMA_VERSION)
 
     def exit(self, dbh, case):
-        print "Deleteing IO Cache"
         del IO.IO_Cache
         del DB.DBH
         del DB.DBIndex_Cache
         del Scanner.factories
+
+    def reset(self, dbh, case):
+        key_re = "%s.*" % case
+        IO.IO_Cache.expire(key_re)
+        DB.DBH.expire(key_re)
+        DB.DBIndex_Cache.expire(key_re)
+        Scanner.factories.expire(key_re)

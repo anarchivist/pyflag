@@ -229,7 +229,7 @@ def start_workers():
              try:
                  dbh.execute("lock tables jobs write")
                  sql = [ "command=%r" % x for x in Registry.TASKS.class_names ]
-                 dbh.execute("select * from jobs where ((%s) and state='pending') or (state='broadcast' and id>%r) limit %s", (" or ".join(sql), broadcast_id, config.JOB_QUEUE))
+                 dbh.execute("select * from jobs where ((%s) and state='pending') or (state='broadcast' and id>%r) order by id limit %s", (" or ".join(sql), broadcast_id, config.JOB_QUEUE))
                  jobs = [ row for row in dbh ]
                  
                  if not jobs:

@@ -915,11 +915,13 @@ def glob_to_sql(glob):
 def delete_case(case):
     """ A helper function which deletes the case """
     dbh = DB.DBO(None)    
-    ## Broadcast that the case is about to be dropped:
-    ## Ensure you can broadcast
-    dbh.execute("ALTER TABLE `jobs` CHANGE `state` `state` ENUM( 'pending', 'processing', 'broadcast' ) NULL DEFAULT 'pending'")
+    ## Broadcast that the case is about to be dropped (This broadcasts
+    ## to the workers)
 
     dbh.insert('jobs',command = "DropCase", state='broadcast', arg1=case, cookie=0, _fast = True)
+
+    ## This sends an event to our process:
+    post_event('reset', case)
 
     ## Remove any jobs that may be outstanding (dont touch the
     ## currently processing jobs)
@@ -988,6 +990,11 @@ class EventHander:
 
     def exit(self, dbh, case):
         """ This is called when we are about to exit on the default db
+        """
+
+    def reset(self, dbh, case):
+        """ This is called when the case is deleted. Its used by
+        modules to delete local caches etc.
         """
 
 def post_event(event, case):
