@@ -332,6 +332,8 @@ class SearchIndex(Reports.report):
     def display(self,query,result):
         case=query['case']
         fsfd = FileSystem.DBFS(case)
+        groupby = query.get('groupby',None)
+        del result.defaults['groupby']
         result.table(
             elements = [ InodeType(case=case, column='inode'),
                          StringType(column='word', name='Word'),
@@ -340,6 +342,7 @@ class SearchIndex(Reports.report):
                          DataPreview(column='length', name='Preview', fsfd=fsfd),
                          ],
             table = 'LogicalIndexOffsets join pyflag.dictionary on word_id=id join inode on inode.inode_id = LogicalIndexOffsets.inode_id',
+            groupby = groupby,
             case =case,
             )
 
@@ -349,32 +352,13 @@ class BrowseIndexKeywords(Reports.report):
     name = "Keyword Index Results Summary"
     family = "Keyword Indexing"
     description="This report summarises the results of the index scanning"
-    def form(self,query,result):
-        result.case_selector()
 
     def display(self,query,result):
-        result.heading("Keyword Index Scanning Result Summary")
-        dbh=self.DBO(query['case'])
-        
-        try:
-            result.table(
-                elements = [ StringType('Index Term', 'word',
-                                        link = query_type(case=query['case'],
-                                                          family="Keyword Indexing",
-                                                          report='SearchIndex',
-                                                          range=100,
-                                                          final=1,
-                                                          __target__='keyword')),
-                             StringType('Dictionary Class','class'),
-                             IntegerType('Number of Hits', 'hits')],
-                table='LogicalIndexStats join %s.dictionary on LogicalIndexStats.id=%s.dictionary.id' % (
-                config.FLAGDB,config.FLAGDB,),
-                case=query['case'],
-                )
-        except DB.DBError,e:
-            result.para("Unable to display index search results.  Did you run the index scanner?")
-            result.para("The error I got was %s"%e)
-
+        result.refresh(0, FlagFramework.query_type(report = "Search Indexed Keywords",
+                                                   family = query['family'],
+                                                   groupby = 'Word',
+                                                   case = query['case']
+                                                   ))
 
 ## Unit tests
 import unittest

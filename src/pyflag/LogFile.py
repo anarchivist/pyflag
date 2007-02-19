@@ -106,6 +106,10 @@ class Log:
             try:
                 ## Allow log files to be compressed.
                 fd=gzip.open(file,'r')
+
+                ## gzip doesnt really verify the file until you read something:
+                fd.read(10)
+                fd.seek(0)
             except:
                 fd=open(file,'r')
                 
