@@ -257,8 +257,13 @@ IOSource SgzipIOSource_Con(IOSource self, IOOptions opts) {
 
   /** was an offset specified? */
   offset = CALL(opts, get_value, "offset");
-  if(offset)
+  if(offset) {
     this->offset = parse_offsets(offset);
+    if(this->offset<0) {
+      talloc_free(self);
+      return raise_errors(EIOError, "Invalid argument");
+    };
+  };
 
   s=talloc(self,struct sgzip_obj);
   this->_handle = s;

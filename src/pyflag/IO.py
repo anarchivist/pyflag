@@ -353,7 +353,7 @@ class IOSubsystemTests(unittest.TestCase):
                             ['filename','%s/pyflag_stdimage_0.2.sgz' % config.UPLOADDIR]])
         m = md5.new()
         m.update(io.read_random(1000000,0))
-        self.assertEqual(m.hexdigest(),'740f23b50a2812dcdd96f1b4434bf242')
+        self.assertEqual(m.hexdigest(),'944d08ba21426b5821e759517bc68737')
 
     def test02HandlingErrors(self):
         """ test Handling of errors correctly """

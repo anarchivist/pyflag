@@ -551,32 +551,12 @@ class NetworkingSummary(Reports.report):
 import unittest
 import pyflag.pyflagsh as pyflagsh
 from pyflag.FileSystem import DBFS
+import pyflag.tests as tests
 
-class NetworkForensicTests(unittest.TestCase):
+class NetworkForensicTests(pyflag.tests.ScannerTest):
     """ Tests network forensics """
     test_case = "PyFlagNetworkTestCase"
-    order = 20
-    def test01LoadFilesystem(self):
-        """ Test that pcap files can be loaded """
-        pyflagsh.shell_execv(command="execute",
-                             argv=["Case Management.Remove case",'remove_case=%s' % self.test_case])
-        
-        pyflagsh.shell_execv(command="execute",
-                             argv=["Case Management.Create new case",'create_case=%s' % self.test_case])
-
-        pyflagsh.shell_execv(command="execute",
-                             argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
-                                   "iosource=pcap",
-                                   "subsys=advanced",
-                                   "io_filename=%s/stdcapture_0.3.pcap" % config.UPLOADDIR,
-                                   ])
-        
-        env = pyflagsh.environment(case=self.test_case)
-        pyflagsh.shell_execv(env=env,
-                             command="load_and_scan",
-                             argv=["pcap",                   ## IOSource
-                                   "/stdcapture/",           ## Mount point
-                                   "PCAPFS",                 ## FS type
-                                   ""])                     ## List of Scanners (None)
-
+    test_file = "stdcapture_0.3.pcap.sgz"
+    subsystem = "sgzip"
+    fstype = 'PCAP Filesystem'
         
