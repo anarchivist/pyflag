@@ -40,9 +40,9 @@ import calendar
 import datetime
 
 ## Some useful display actions
-def textarea(self, description = None, variable= None, ui=None, **options):
+def textarea(self, description = None, variable= None, result=None, **options):
     """ Draws a textarea as form input for input """
-    ui.textarea(description,variable,rows=5,cols=40,**options)
+    result.textarea(description,variable,rows=5,cols=40,**options)
 
 def date_selector(self, description = None, callback=None, variable= None, ui=None, label=None, **options):
     """ Draws a popup for selecting a date """
@@ -189,22 +189,22 @@ def uniq(table_object,fieldname,proposed_value,query=None,id=None,result=None):
 def noop(description=None, choices=None, variable=None, ui=None, **options ):
     """ A noop action """
 
-def selector_display(self, description=None, variable=None, result=None, table=None, case=None, field=None, force=False, **options ):
+def selector_display(self, description=None, variable=None, result=None, table=None, case=None, field=None, force=False, default=None, **options ):
     """ Draws a selector based on a column from a table """
     result.selector(description, variable, "select %s as `key`, %s as value from %s group by %s",  (field,field, table,field), case=self.case)
 
-    tmp=ui.__class__(ui)
+    tmp=result.__class__(result)
     dbh=DB.DBO(case)
     dbh.execute("select %s from %s group by %s order by %s", (field,table,field,field))
     keys= [ row[variable] for row in dbh]
     tmp.const_selector('',variable,[default]+keys,['default']+keys)
-    tmp2=ui.__class__(ui)
-    tmp3=ui.__class__(ui)
+    tmp2=result.__class__(result)
+    tmp3=result.__class__(result)
     tmp3.textfield('','new_%s' % variable)
     tmp2.start_table(bgcolor='lightgray')
     tmp2.row(tmp," or ",tmp3)
     tmp2.end_table()
-    ui.row(description,tmp2)
+    result.row(description,tmp2)
 
 def selector_constraint(table_object,fieldname,proposed_value,query=None,id=None, result=None):
     """ Checks if the user types a new value in selector_display to overrride the selector """

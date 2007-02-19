@@ -151,14 +151,16 @@ class IndexScan(GenScanFactory):
             # we can ignore matches which begin after the end of the file+slack
             # space.
             try:
-                fd.slack = True
-                fd.seek(0, 2)
-                self.size = fd.tell()
-                fd.seek(0, 0)
-                fd.slack=False
-                #print "size is: %d" % self.size
-            except:
-                pass
+                self.size = self.fd.size
+            except AttributeError:
+                try:
+                    fd.slack = True
+                    fd.seek(0, 2)
+                    self.size = fd.tell()
+                    fd.seek(0, 0)
+                    fd.slack=False
+                except:
+                    pass
             
         def process_buffer(self,buff):
             # Store indexing results in the dbase
@@ -191,6 +193,19 @@ class IndexScan(GenScanFactory):
 ##                self.dbh.execute("select 1 from LogicalIndexStats where id=%r", k)
 ##                if self.dbh.fetch():
 ##                    self.dbh.update('LogicalIndexStats', where="id=%r" % k, _hits = 
+
+
+## Install the dictionary in the default db
+class IndexEventHandler(FlagFramework.EventHander):
+    def init_default_db(self, dbh, case):
+        dbh.execute("""CREATE TABLE `dictionary` (
+        `id` int auto_increment,
+        `word` VARCHAR( 250 ) binary NOT NULL ,
+        `class` VARCHAR( 50 ) NOT NULL ,
+        `encoding` SET( 'all', 'asci', 'ucs16' ) DEFAULT 'all' NOT NULL,
+        `type` set ( 'word','literal','regex' ) DEFAULT 'literal' NOT NULL,
+        PRIMARY KEY  (`id`))""")
+        
  
 ## These reports allow the management of the Index Dictionary:
 class BuildDictionary(Reports.report):
@@ -244,7 +259,7 @@ class BuildDictionary(Reports.report):
         result.heading("Building Dictionary")
 
         ## Draw a form allowing users to add or delete words from the dictionary
-        form=self.ui(result)
+        form=result.__class__(result)
         form.start_form(query)
         form.start_table()
         form.const_selector("Action:",'action',('insert','delete'),('Add','Delete'))
@@ -255,28 +270,14 @@ class BuildDictionary(Reports.report):
         form.end_table()
         form.end_form('Go')
 
-        table=self.ui(result)
-        try:
-            table.table(
-                elements = [ StringType('Word','word'),
-                             StringType('Class','class'),
-                             StringType('Type','type') ],
-                table='dictionary',
-                case=None,
-                )
-            ## If the table is not there, we may be upgrading from an old version of flag, We just recreate it:
-        except DB.DBError:
-            dbh.execute("""CREATE TABLE `dictionary` (
-            `id` int auto_increment,
-            `word` VARCHAR( 250 ) binary NOT NULL ,
-            `class` VARCHAR( 50 ) NOT NULL ,
-            `encoding` SET( 'all', 'asci', 'ucs16' ) DEFAULT 'all' NOT NULL,
-            `type` set ( 'word','literal','regex' ) DEFAULT 'literal' NOT NULL,
-            PRIMARY KEY  (`id`))""")
-            
-            result.para("Just created a new empty dictionary")
-            result.refresh(3,query)
-            
+        table=result.__class__(result)
+        table.table(
+            elements = [ StringType('Word','word'),
+                         StringType('Class','class'),
+                         StringType('Type','type') ],
+            table='dictionary',
+            case=None,
+            )
         result.row(table,form,valign='top')
 
 class OffsetType(IntegerType):
@@ -358,17 +359,18 @@ class BrowseIndexKeywords(Reports.report):
         try:
             result.table(
                 elements = [ StringType('Index Term', 'word',
-                                link = query_type(case=query['case'],
-                                                  family="Keyword Indexing",
-                                                  report='SearchIndex',
-                                                  range=100,
-                                                  final=1,
-                                                  __target__='keyword')),
+                                        link = query_type(case=query['case'],
+                                                          family="Keyword Indexing",
+                                                          report='SearchIndex',
+                                                          range=100,
+                                                          final=1,
+                                                          __target__='keyword')),
                              StringType('Dictionary Class','class'),
                              IntegerType('Number of Hits', 'hits')],
-            table='LogicalIndexStats',
-            case=query['case'],
-            )
+                table='LogicalIndexStats join %s.dictionary on LogicalIndexStats.id=%s.dictionary.id' % (
+                config.FLAGDB,config.FLAGDB,),
+                case=query['case'],
+                )
         except DB.DBError,e:
             result.para("Unable to display index search results.  Did you run the index scanner?")
             result.para("The error I got was %s"%e)
@@ -431,7 +433,7 @@ class LogicalIndexTests(unittest.TestCase):
                     matched = data[offset:offset+length]
                     print "word: %s" % word, "matched: %r" % matched
                     self.assertEqual(word.lower(), matched.decode(encoding).lower())
-
+                    
     def test03RegExIndexing(self):
         """ Test Regex indexing """
         dictionary = {
@@ -508,16 +510,24 @@ class LogicalIndexScannerTest(pyflag.tests.ScannerTest):
 
     def test01RunScanners(self):
         """ Running Logical Index Scanner """
+        ## Make sure the word secret is in there.
+        pdbh = DB.DBO()
+        pdbh.execute("select * from dictionary where word='secret' limit 1")
+        row = pdbh.fetch()
+        if not row:
+            pdbh.insert('dictionary', **{'word':'secret', 'class':'English', 'type':'word'})
+        
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env, command="scan",
                              argv=["*",'IndexScan'])
 
         dbh = DB.DBO(self.test_case)
         dbh2 = DB.DBO(self.test_case)
-        pdbh = DB.DBO()
         fsfd = DBFS(self.test_case)
         dbh.execute("select inode_id, word,offset,length from LogicalIndexOffsets join %s.dictionary on LogicalIndexOffsets.word_id=pyflag.dictionary.id where word='secret'", config.FLAGDB)
+        count = 0
         for row in dbh:
+            count += 1
             inode = fsfd.lookup(inode_id = row['inode_id'])
             fd = fsfd.open(inode=inode)
             fd.overread = True
@@ -527,3 +537,6 @@ class LogicalIndexScannerTest(pyflag.tests.ScannerTest):
             print "Looking for %s: Found in %s at offset %s length %s %r" % (
                 row['word'], inode, row['offset'], row['length'],data)
             self.assertEqual(data.lower(), row['word'].lower())
+
+        ## Did we find all the secrets?
+        self.assertEqual(count,11)

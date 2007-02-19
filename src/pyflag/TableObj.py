@@ -183,14 +183,14 @@ class TableObj:
         """ Returns the name description for the column specified """
         return self._column_names[self._column_keys.index(col)]
     
-    def form(self,query,results,defaults=None):
+    def form(self,query,result,defaults=None):
         """ Draws a form.
 
         @arg query: The global query object
         @arg results: The UI to draw in
         @arg defaults: A dictionary of defaults to assign into query
         """
-        results.start_table()
+        result.start_table()
         for k,v in zip(self._column_keys,self._column_names):
             ## If there is no input from the user - override the input from the database:
             if defaults and not query.has_key(k):
@@ -206,9 +206,9 @@ class TableObj:
                 cb = getattr(self.__class__,"form_%s" % k, None)
                 
             if cb:
-                cb(self,description=v,result=results,variable=k, defaults=defaults)
+                cb(self,description=v,result=result,variable=k, defaults=defaults)
             else:
-                results.textfield(v,k,size=40)
+                result.textfield(v,k,size=40)
 
     def add_form(self,query,results):
         """ Generates a form to add a new record in the current table """

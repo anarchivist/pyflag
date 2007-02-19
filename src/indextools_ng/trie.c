@@ -161,23 +161,16 @@ static TrieNode add_unique_to_peer_list(struct list_head *l, TrieNode n,
 // normalise them. This is not unicode aware but is very fast.
 char cmap[] = { ['A' ... 'Z']='a'-'A' };
 
-int Compare_literal_nodes_with_case(TrieNode a, TrieNode b) {
-  if(!ISSUBCLASS(a,LiteralNode) || !ISSUBCLASS(b,LiteralNode)) 
-    return False;
-
-  char left=((LiteralNode)a)->value;
-  char right= ((LiteralNode)b)->value;
-  return (left+cmap[(unsigned int)left]==right+cmap[(unsigned int)right]);
-};
-
-
 int Compare_literal_nodes(TrieNode a, TrieNode b) {
   if(!ISSUBCLASS(a,LiteralNode) || !ISSUBCLASS(b,LiteralNode)) 
     return False;
 
   char left=((LiteralNode)a)->value;
   char right= ((LiteralNode)b)->value;
-  return (left==right);
+
+  // If the two nodes have a different comparison function - they are
+  // not the same
+  return (left==right && a->compare == b->compare);
 };
 
 TrieNode TrieNode_Con(TrieNode self) {
@@ -259,7 +252,6 @@ void TrieNode_AddWord(TrieNode self, char **word, int *len, long int data,
        n = (TrieNode)CONSTRUCT(LiteralNode, LiteralNode, Con, self, word, len); 
        if(!n) return;
 
-       comparison_function = Compare_literal_nodes_with_case;
        n->compare = LiteralNode_casecompare;
   } else if(type==WORD_EXTENDED) {
     n=MakeNextNode(self, word, len, data, type); 
