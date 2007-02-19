@@ -1,5 +1,6 @@
 bin_PROGRAMS		= ewfacquire ewfinfo ewfexport ewfverify
 pkglib_LTLIBRARIES		= libewf.la
+noinst_HEADERS  = $(srcdir)/*.h
 
 libewf_la_SOURCES    = libewf_endian.c ewf_compress.c ewf_crc.c ewf_data.c   	 \
 	ewf_error2.c ewf_file_header.c ewf_hash.c ewf_header.c ewf_header2.c	 \

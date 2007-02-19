@@ -2,6 +2,7 @@ INCLUDES        	= -I$(top_srcdir)/src/include -include config.h
 
 noinst_LTLIBRARIES	= libiosubsys.la
 noinst_PROGRAMS		= test
+noinst_HEADERS  = $(srcdir)/*.h
 
 bin_PROGRAMS		= iowrapper
 pkglib_LTLIBRARIES	= libio_hooker.la
