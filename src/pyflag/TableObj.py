@@ -562,8 +562,16 @@ class IPType(ColumnType):
     masks = [0] + [int(-(2**(31-x))) for x in range(32)]
 
     symbols = {
-        '=': 'operator_netmask',
+        '=': 'literal',
+        '<': 'literal',
+        '>': 'literal',
+        '<=': 'literal',
+        '>=': 'literal',
+        '!=': 'literal',
         }
+
+    def literal(self, column, operator, address):
+        return "%s %s INET_ATON(%r)" % (self.column, operator, address)
 
     def operator_matches(self, column, operator, address):
         """ Matches the IP address specified exactly """
