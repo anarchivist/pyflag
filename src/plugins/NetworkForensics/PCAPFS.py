@@ -268,15 +268,15 @@ class PCAPFS(DBFS):
                 id = max_id
                 )
 
-##            max_id = dbh.autoincrement()
-            max_id+=1
             ## Some progress reporting
             if max_id % 10000 == 0:
                 pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "processed %s packets (%s bytes)" % (max_id, p.buffer.offset))
 
             data = p.payload()
-#            print "%r" % data[:100]
             d = _dissect.dissect(data,link_type, max_id)
+
+            ## Prepare the next number
+            max_id+=1
 
         ## Now reassemble it:
             try:
