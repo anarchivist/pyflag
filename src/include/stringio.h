@@ -27,15 +27,16 @@
 # ******************************************************/
 #ifndef _STRINGIO_H
 #define _STRINGIO_H
-
+#include "config.h"			       
 #include "class.h"
 #include <sys/types.h>
+#include <stdint.h>
 
 CLASS(StringIO,Object)
   /** This is the size of the internal buffer */
   int size;
   /** Current readptr */
-  int readptr;
+  uint64_t readptr;
   char *data;
   
   /** constructor */
@@ -59,7 +60,7 @@ CLASS(StringIO,Object)
   int METHOD(StringIO, read_stream, StringIO stream, int length);
 
   /** The seek method */
-  int METHOD(StringIO, seek, int offset, int whence);
+  uint64_t METHOD(StringIO, seek, int64_t offset, int whence);
 
   /** get_buffer: Returns a pointer/length to the buffer (relative to readptr) */
   void METHOD(StringIO, get_buffer, char **data, int *len);
@@ -72,6 +73,58 @@ CLASS(StringIO,Object)
 
   /** Destructor */
   void METHOD(StringIO, destroy);
+END_CLASS
+
+/** This class is like a stringio except that all writes and reads
+    come from the disk, the nice thing about it is that we manage a
+    buffer of a reasonable size and flush it into the disk once the
+    buffer is full - its like libcs file stream model but better.
+ */
+CLASS(DiskStringIO, StringIO)
+     int fd;
+     int fileoffset;
+     DiskStringIO METHOD(DiskStringIO, OpenFile, char *filename, int mode);
+
+     // This method flushes the buffer into the disk
+     void METHOD(DiskStringIO, flush);
+END_CLASS
+
+/************************************************************
+    CachedWriter is a class which makes it easy and efficient to write
+    numerous files concurrently.
+
+The problem with the stream reassembler is that we need to keep track
+of many streams simultaneously. Each stream is written to its own
+cache file, however, data is appended to each file in small chunks
+(often up to a byte at the time).
+
+It is prohibitive to reopen each stream file, append a small amount of
+data, and close it. Due to the number of concurrent streams it is
+impossible to keep all the files open at the same time (because we
+will run out of file descriptors).
+
+This class manages a stream in memory. When the stream becomes too
+large, we flush the data to disk. This allows us to have numerous
+pending streams open without running out of file descriptors.
+***************************************************************/
+  /** The maximum size to remain buffered */
+#define MAX_DISK_STREAM_SIZE 40960
+
+CLASS(CachedWriter, StringIO)
+     char *filename;
+
+     /** Total number of bytes written to the file so far */
+     int written;
+
+     /** A Flag to indicate if we already created the file */
+     char created;
+
+     // If fd>0, we just use this fd rather than closing and reopening it.
+     int fd;
+
+     CachedWriter METHOD(CachedWriter, Con, char *filename);
+     CachedWriter METHOD(CachedWriter, from_fd, int fd);
+     int METHOD(CachedWriter, get_offset);
 END_CLASS
 
 #endif

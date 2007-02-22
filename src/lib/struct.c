@@ -197,7 +197,13 @@ void Struct_Register(unsigned char format, int size,
   unpackers[(int)format]=unpacker;
 };
 
+static int structs_initialised = 0;
+
 void struct_init(void) {
+  if(structs_initialised) return;
+
+  structs_initialised = 1;
+
   /** Zero out the packers and unpackers */
   memset(packers, 0, sizeof(packers));
   memset(unpackers, 0, sizeof(unpackers));
@@ -230,6 +236,9 @@ int calcsize(char *format) {
 int pack(char *format, char *input, StringIO output) {
   char *x;
   int offset=0;
+
+  // Make sure that structs are initialised
+  struct_init();
   
   for(x=format; *x; x++) {
     if(packers[(int)*x])
@@ -243,6 +252,9 @@ int unpack(void *context, char *format, StringIO input, char *output) {
   char *x;
   int offset=0;
   
+  // Make sure that structs are initialised
+  struct_init();
+
   for(x=format; *x; x++) {
     int result=0;
 

@@ -47,6 +47,7 @@ AC_OUTPUT([
 	Makefile 
 	src/Makefile 
 	src/lib/Makefile 
+	src/lib/libsgzip/Makefile
 	src/lib/libewf/Makefile
 	src/lib/libiosubsys/Makefile
 	src/mailtools/Makefile 

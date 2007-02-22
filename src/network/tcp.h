@@ -2,40 +2,6 @@
 #define __TCP_H
 #include "network.h"
 
-/************************************************************
-    DiskStreamIO is a class which makes it easy and efficient to write
-    numerous files concurrently.
-
-The problem with the stream reassembler is that we need to keep track
-of many streams simultaneously. Each stream is written to its own
-cache file, however, data is appended to each file in small chunks
-(often up to a byte at the time).
-
-It is prohibitive to reopen each stream file, append a small amount of
-data, and close it. Due to the number of concurrent streams it is
-impossible to keep all the files open at the same time (because we
-will run out of file descriptors).
-
-This class manages a stream in memory. When the stream becomes too
-large, we flush the data to disk. This allows us to have numerous
-pending streams open without running out of file descriptors.
-***************************************************************/
-  /** The maximum size to remain buffered */
-#define MAX_DISK_STREAM_SIZE 40960
-
-CLASS(DiskStreamIO, StringIO)
-     char *filename;
-
-     /** Total number of bytes written to the file so far */
-     int written;
-
-     /** A Flag to indicate if we already created the file */
-     int created;
-
-     DiskStreamIO METHOD(DiskStreamIO, Con, char *filename);
-     int METHOD(DiskStreamIO, get_offset);
-END_CLASS
-
 /** If we do not see anything from a stream within this many packets
     we determine it to be dead. 
 */
@@ -103,7 +69,7 @@ CLASS(TCPStream, Object)
      int max_packet_id;
 
      /** The cache file which we write on */
-     DiskStreamIO file;
+     CachedWriter file;
 
      /** The next sequence number we expect */
      uint32_t next_seq;

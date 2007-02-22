@@ -73,8 +73,8 @@ char *format_alloc(int x, ...);
 #undef max
 #define max(X, Y)  ((X) > (Y) ? (X) : (Y))
 
-
-#define BUFF_SIZE 1024
+// A size for various buffers around the place.
+#define BUFF_SIZE 10240
 
 #define LE 1
 

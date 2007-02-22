@@ -62,7 +62,7 @@ class HTTPObject:
 def goto_row_cb(query,result,variable='limit'):
     """ This is used by the table widget to allow users to skip to a
     certain row"""
-    limit = query[variable]
+    limit = query.get(variable,'0')
 
     try:
         if query['refresh']:

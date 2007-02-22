@@ -369,4 +369,7 @@ extern enum _error_type _global_error;
 
 void *raise_errors(enum _error_type t, char *string,  ...);
 
+// Some helpful little things
+#define ZSTRING_NO_NULL(str) str , (strlen(str))
+
 #endif

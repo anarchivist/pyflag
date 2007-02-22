@@ -36,12 +36,12 @@ void got_freed(void *temp) {
 
 static PyObject *New_Stream_Dict(TCPStream tcp_stream, char *direction) {
   PyObject *stream = PyDict_Copy(initial_dict);
-  DiskStreamIO file;
+  CachedWriter file;
   PyObject *tmp;
 
   if(!stream) return NULL;
 
-  file = CONSTRUCT(DiskStreamIO, DiskStreamIO, Con, tcp_stream, 
+  file = CONSTRUCT(CachedWriter, CachedWriter, Con, tcp_stream, 
 		   talloc_asprintf(tcp_stream, "%sS%u", 
 				   prefix, tcp_stream->con_id));
 

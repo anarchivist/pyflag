@@ -26,6 +26,10 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************/
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include "stringio.h"
 #include "talloc.h"
 #include "misc.h"
@@ -85,9 +89,21 @@ int StringIO_read(StringIO self,char *data,int len) {
 
 /** Writes into ourselves from a stream */
 int StringIO_read_stream(StringIO self, StringIO stream, int length) {
-  char *data;
   int len;
-  
+  char buff[BUFF_SIZE];
+
+  while(length > 0) {
+    len = CALL(stream, read, buff, min(length, BUFF_SIZE));
+    if(len==0) break;
+
+    CALL(self, write, buff, len);
+    length -= len;
+  };
+
+  return length;
+
+  // This is too error prone if we have complex stringio classes.
+#if 0  
   stream->get_buffer(stream,&data,&len);
 
   //Only write whats available:
@@ -99,6 +115,7 @@ int StringIO_read_stream(StringIO self, StringIO stream, int length) {
   stream->seek(stream,length,SEEK_CUR);
 
   return length;
+#endif
 };
 
 /** Write into a stream from ourself */
@@ -106,7 +123,7 @@ int StringIO_write_stream(StringIO self, StringIO stream, int length) {
   return stream->read_stream(stream,self,length);
 };
 
-int StringIO_seek(StringIO self,int offset,int whence) {
+uint64_t StringIO_seek(StringIO self, int64_t offset,int whence) {
   switch(whence) {
     // Set the readptr:
   case SEEK_SET:
@@ -170,4 +187,143 @@ VIRTUAL(StringIO,Object)
 //these set
   VATTR(size) = 0;
   VATTR(readptr) = 0;
+END_VIRTUAL
+
+
+/** This is an implementation of a DiskStringIO class */
+DiskStringIO DiskStringIO_OpenFile(DiskStringIO self, char *filename, int mode) {
+  self->fd = open(filename, mode);
+  
+  if(self->fd<0) {
+    talloc_free(self);
+    return NULL;
+  };
+
+  return self;
+};
+
+/** Reading always reads from the disk */
+int DiskStringIO_read(StringIO self, char *data, int len) {
+  DiskStringIO this = (DiskStringIO)self;
+  int length_read;
+
+  // If we have stuff in the write buffer we flush it to disk
+  if(self->size > 0 ) {
+    CALL(this, flush);
+  };
+
+  // Where should we be?
+  lseek(this->fd, self->readptr, SEEK_SET);
+
+  length_read = read(this->fd, data, len);
+  self->readptr += length_read;
+
+  return length_read;
+};
+
+uint64_t DiskStringIO_seek(StringIO self, long long int offset, int whence) {
+  // This is just a passthrough to the file itself:
+  DiskStringIO this = (DiskStringIO)self;
+
+  self->readptr = lseek(this->fd, offset, whence);
+
+  return self->readptr;
+};
+
+VIRTUAL(DiskStringIO, StringIO)
+     VMETHOD(OpenFile) = DiskStringIO_OpenFile;
+     VMETHOD(super.read) = DiskStringIO_read;
+     VMETHOD(super.seek) = DiskStringIO_seek;
+END_VIRTUAL
+
+/** Create a new file, or if it already exists, open the file for writing.
+    Note - caller must close fd when done to ensure no fds are leaked.
+*/
+static int get_working_fd(CachedWriter this) {
+  int fd;
+
+  // Should we just use our old fd?
+  if(this->fd>0) return this->fd;
+
+  if(!this->created) {
+    /** Check to see if we can create the required file: */
+    fd=creat(this->filename, 0777);
+    this->created = 1;
+  } else {
+    fd=open(this->filename, O_APPEND | O_WRONLY);
+  };
+
+  return fd;
+};
+
+/** An automatic destructor to be called to flush out the stream. */
+static int CachedWriter_flush(void *self) {
+  CachedWriter this=(CachedWriter)self;
+  int fd;
+
+  if(this->super.size==0) return 0;
+
+  fd=get_working_fd(this);
+  if(fd>=0) {
+    write(fd, this->super.data, this->super.size);
+    
+    // If we were given an fd - we dont close it:
+    if(this->fd < 0)
+      close(fd);
+  };
+
+  return 0;
+};
+
+CachedWriter CachedWriter_Con(CachedWriter self, char *filename) {
+  /** Call our base classes constructor */
+  self->__super__->Con((StringIO)self);
+
+  if(filename)
+    self->filename = talloc_strdup(self, filename);
+
+  /** Ensure that we get flushed out when we get destroyed */
+  talloc_set_destructor((void *)self, CachedWriter_flush);
+
+  return self;
+};
+
+int CachedWriter_write(StringIO self, char *data, int len) {
+  CachedWriter this=(CachedWriter)self;
+  int written;
+
+  /** Write the data to our base class */
+  written=this->__super__->write(self, data, len);
+
+  /** If we are too large, we flush to disk: */
+  if(self->size > MAX_DISK_STREAM_SIZE) {
+    int fd=get_working_fd(this);
+    
+    if(fd==-1) return fd;
+
+    write(fd, self->data, self->size);
+
+    this->written+=self->size;
+
+    if(this->fd<0)
+      close(fd);
+
+    self->truncate(self, 0);
+  };
+
+  return written; 
+};
+
+/** Returns the current offset in the file where the current file
+    pointer is. */
+int CachedWriter_get_offset(CachedWriter self) {
+  return self->super.size + self->written;
+};
+
+VIRTUAL(CachedWriter, StringIO)
+     VATTR(fd) = -1;
+
+     VMETHOD(Con) = CachedWriter_Con;
+     VMETHOD(get_offset) = CachedWriter_get_offset;
+     VMETHOD(super.write) = CachedWriter_write;
 END_VIRTUAL
