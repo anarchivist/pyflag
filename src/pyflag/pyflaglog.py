@@ -55,12 +55,15 @@ class LoggingThread(threading.Thread):
         import pyflag.DB as DB
 
         log(INFO, "Log thread starting in thread %s, pid %s" % (threading.currentThread().getName(), os.getpid()))
-        dbh = DB.DBO(None)
-        dbh.cursor.ignore_warnings = True
+        try:
+            dbh = DB.DBO(None)
+            dbh.cursor.ignore_warnings = True
         ## We get some weird thread related dead locks if we use the
         ## timeout feature here.
-        dbh.cursor.timeout = 0
-        dbh.mass_insert_start("logs")
+            dbh.cursor.timeout = 0
+            dbh.mass_insert_start("logs")
+        except:
+            dbh = None
         while 1:
             try:
                 level, message = LOG_QUEUE.get(block=True)
@@ -68,7 +71,8 @@ class LoggingThread(threading.Thread):
                 if level==0:
                     break
                 ## dbh.mass_insert(level=level, message=message)
-                dbh.insert('logs', level=level, message=message)
+                if dbh:
+                    dbh.insert('logs', level=level, message=message)
             except Exception,e:
                 sys.stdout.write( "Logging service: %s" % e)
                 sys.stdout.flush()

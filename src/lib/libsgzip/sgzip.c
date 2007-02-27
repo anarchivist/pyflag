@@ -12,8 +12,8 @@
 /* Prints usage information for sgzip */
 void usage(void) {
   printf("sgzip - A seekable compressed format\n");
-  printf("(c) 2004\n");
-  printf("usage: sgzip [file1] [file2]\n");
+  printf("(c) 2007\n");
+  printf("usage: sgzip [options] [file1] [file2]\n");
   printf("  -d --decompress\tdecompress\n");
   printf("  -h --help\t\tgive this help\n");
   printf("  -R --rebuild file\tRebuilds the Index on this compressed file\n");
@@ -31,7 +31,7 @@ void license(void)
   printf( " sgzip - A seekable compressed storage format\n\
 Type sgzip -h for help.\n\
 \n\
-Copyright (C) 2004, Michael Cohen\n\
+Copyright (C) 2007, Michael Cohen\n\
 \n\
 This program is free software; you can redistribute it and/or modify\n\
 it under the terms of the GNU General Public License as published by\n\
@@ -55,6 +55,7 @@ void compress_file(char *filename, int blocksize) {
   int outfd=1;
   SgzipFile sgzip;
   char *out_filename;
+  int count;
   
   // Make a local copy for memory allocations.
   filename = talloc_strdup(NULL,filename);
@@ -77,8 +78,14 @@ void compress_file(char *filename, int blocksize) {
   
   sgzip = CONSTRUCT(SgzipFile, SgzipFile, CreateFile, filename, outfd, blocksize);
   while(1) {
-    char buff[BUFF_SIZE];
+    char buff[sgzip->packet.blocksize];
     int len;
+
+    count++;
+    if(!(count % 100)) {
+      fprintf(stderr, "Wrote %u blocks of %u bytes = %llu Mb total\r",count, 
+	      sgzip->packet.blocksize, (count*sgzip->packet.blocksize/1024LL/1024));
+    };
     
     len = read(fd, buff, BUFF_SIZE);
     if(len==0) break;
@@ -96,6 +103,7 @@ void decompress_file(char * filename ) {
   int outfd=1;
   SgzipFile sgzip;
   char *out_filename = talloc_strdup(NULL, filename);
+  int count=0;
 
   if(strlen(filename)<4 || strncasecmp(filename+strlen(filename)-4,".sgz",4)) {
     raise_errors(EIOError,"File %s does not have correct extension (.sgz)\n",filename+strlen(filename)-4);
@@ -127,6 +135,11 @@ void decompress_file(char * filename ) {
     char buff[BUFF_SIZE];
     int len;
 
+    count++;
+    if(!(count % 100)) {
+      fprintf(stderr, "Wrote %u blocks of %u bytes = %llu Mb total\r",count, 
+	      sgzip->packet.blocksize, (count*sgzip->packet.blocksize/1024LL/1024));
+    };
     len = CALL(sgzip, read, buff, BUFF_SIZE);
     if(len==0) break;
     if(len<0) goto error;

@@ -213,37 +213,47 @@ def start_workers():
          pyflaglog.start_log_thread()
 
          ## These are all the methods we support
-         dbh=DB.DBO()
          jobs = []
 
          ## This is the last broadcast message we handled. We will
          ## only handle broadcasts newer than this.
-         dbh.execute("select max(id) as max from jobs")
-         row = dbh.fetch()
-         broadcast_id = row['max'];
+         try:
+             dbh=DB.DBO()
+             dbh.execute("select max(id) as max from jobs")
+             row = dbh.fetch()
+             broadcast_id = row['max']
+         except:
+             broadcast_id = 0
 
          while 1:
              ## Check for new tasks:
              if not jobs:
                  time.sleep(10)
+
+             dbh = None
              try:
-                 dbh.execute("lock tables jobs write")
-                 sql = [ "command=%r" % x for x in Registry.TASKS.class_names ]
-                 dbh.execute("select * from jobs where ((%s) and state='pending') or (state='broadcast' and id>%r) order by id limit %s", (" or ".join(sql), broadcast_id, config.JOB_QUEUE))
-                 jobs = [ row for row in dbh ]
-                 
-                 if not jobs:
-                     continue
-                 
-                 ## Ensure the jobs are marked as processing so other jobs dont touch them:
-                 for row in jobs:
-                     if row['state'] == 'pending':
-                         dbh.execute("update jobs set state='processing' where id=%r", row['id'])
-                     elif row['state'] == 'broadcast':
-                         broadcast_id = row['id']
-             finally:
-                 dbh.execute("unlock tables")
-                
+                 try:
+                     dbh = DB.DBO()
+                     dbh.execute("lock tables jobs write")
+                     sql = [ "command=%r" % x for x in Registry.TASKS.class_names ]
+                     dbh.execute("select * from jobs where ((%s) and state='pending') or (state='broadcast' and id>%r) order by id limit %s", (" or ".join(sql), broadcast_id, config.JOB_QUEUE))
+                     jobs = [ row for row in dbh ]
+
+                     if not jobs:
+                         continue
+
+                     ## Ensure the jobs are marked as processing so other jobs dont touch them:
+                     for row in jobs:
+                         if row['state'] == 'pending':
+                             dbh.execute("update jobs set state='processing' where id=%r", row['id'])
+                         elif row['state'] == 'broadcast':
+                             broadcast_id = row['id']
+                 finally:
+                     if dbh:
+                         dbh.execute("unlock tables")
+             except:
+                 continue
+             
              ## Now do the jobs
              for row in jobs:
                  try:

@@ -108,7 +108,14 @@ class InitDB(Reports.report):
 
         ## Initialise the default database: We post an initialise
         ## event to allow plugins to contribute
-        dbh = DB.DBO(None)
+        try:
+            dbh = DB.DBO()
+        except:
+            dbh = DB.DBO('mysql')
+            dbh.execute("drop database if exists %s" % config.FLAGDB)
+            dbh.execute("create database %s" % config.FLAGDB)
+            dbh = DB.DBO()
+            
         FlagFramework.post_event('init_default_db', dbh.case)
         try:
             version = dbh.get_meta("schema_version")

@@ -40,8 +40,10 @@
    all the blocks and their offsets in the compressed file. This is a
    diagram of the file format:
 
-   Header  | Size of block | Compressed Block | \
-            Size of block | Compressed Block | .... | Index | Tail
+   Header  | Size of block | Compressed Block |		\
+            Size of block | Compressed Block | .... |	\
+            Index | Size of index			\
+            total file size (64 bits) | Tail
 
    The header stores information about the blocksize used (The
    blocksize is the size of blocks in the uncompressed file). Whereas
@@ -50,12 +52,18 @@
 
    The Index is an array of 64 bit ints representing the offsets into
    the compressed file for each uncompressed block. This is used for
-   quickly searching the sgzipped file to locate a single block.
+   quickly searching the sgzipped file to locate a single block. Each
+   offset in the index points to the Size of block entry for that
+   block.
 
    Note that the information in the index is redundant, and hence the
    index may be alternatively calculated by reading each block
    offset. This may be used if the index was damaged for some reason
    (e.g. the file was truncated).
+
+   The total file size is stored in the tail of the file - this allows
+   sgzip to be used to for storing arbitrary file which do not
+   necessarily have a size which is a multiple of block size.
 
    Reading from a file:
 
@@ -122,11 +130,12 @@
 /** The sgzip file header */
 struct sgzip_file_header {
   char magic[3];
+  char version;
   uint32_t blocksize;
   char compression[4];
 } __attribute__((packed));
 
-#define SGZIP_FORMAT q(STRUCT_CHAR, STRUCT_CHAR, STRUCT_CHAR,		\
+#define SGZIP_FORMAT q(STRUCT_CHAR, STRUCT_CHAR, STRUCT_CHAR, STRUCT_CHAR, \
 		       STRUCT_INT, STRUCT_CHAR, STRUCT_CHAR,		\
 		       STRUCT_CHAR, STRUCT_CHAR)
 
@@ -141,6 +150,9 @@ CLASS(SgzipFile, Packet)
 
      // The compression level
      int level;
+
+     // This is the size of the uncompressed image
+     uint64_t size;
 
      // We keep one chunk in the cache to speed up little reads:
      int cached_block_offs;
