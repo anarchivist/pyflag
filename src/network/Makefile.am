@@ -3,21 +3,20 @@ pkgpyexec_LTLIBRARIES 	= _dissect.la reassembler.la
 
 noinst_LTLIBRARIES	= libnetwork.la libtcp.la
 libnetwork_la_SOURCES	= network.c
-libnetwork_la_CFLAGS 	= -I$(top_srcdir)/src/include -D__DEBUG__
+libnetwork_la_CFLAGS 	= -I$(top_srcdir)/src/include
 libnetwork_la_LIBADD	= ../lib/liboo.la
 
 _dissect_la_SOURCES 	= dissect.c
-_dissect_la_CPPFLAGS 	= $(SWIG_PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include -D__DEBUG__
+_dissect_la_CPPFLAGS 	= $(SWIG_PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
 _dissect_la_LDFLAGS 	= -module
 _dissect_la_LIBADD	= libnetwork.la
 
 reassembler_la_SOURCES = reassembler.c
-reassembler_la_CPPFLAGS= $(SWIG_PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include -D__DEBUG__
+reassembler_la_CPPFLAGS= $(SWIG_PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
 reassembler_la_LDFLAGS = -module
 reassembler_la_LIBADD  = libtcp.la libnetwork.la
 
 libtcp_la_SOURCES	= tcp.c
-libtcp_la_CPPFLAGS	= -D__DEBUG__
 #libtcp_la_LIBADD	= libnetwork.la
 
 noinst_HEADERS		= network.h tcp.h

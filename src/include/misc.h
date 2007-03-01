@@ -64,8 +64,12 @@ void __MODULE_INIT_ ## function_name()
 #define False 0
 #define True 1
 
-char *format_alloc(int x, ...);
+/** This is used when we need to copy the NULL as well */
+#define ZSTRING(str) str , (strlen(str)+1)
 
+#define ZSTRING_NO_NULL(str) str , (strlen(str))
+
+char *format_alloc(int x, ...);
 #define q(...) format_alloc(1, __VA_ARGS__, 0)
 
 #undef min

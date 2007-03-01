@@ -90,6 +90,44 @@ def identify_network(whois_id):
     except TypeError:
         return ''
 
+class PrecacheWhois(Reports.report):
+    """
+    Precaching Whois Lookups
+    ------------------------
+
+    Often we would like to search on specific properties of the whois properties of IP addresses. Unfortunately, to calculate the whois relationships of an IP address takes a fair amount of calculations. Pyflag normally calculates this on the fly while displaying the IP address, and stores it in the cache. In order to properly search by whois entries all the IP addresses in a table should be in the cache.
+
+    This report does this by pre-caching all IP addresses within a certain table.
+    """
+    parameters = {"table": "any", "column":"any"}
+    name = "PreCache Whois"
+    family = "Log Analysis"
+    hidden = True
+    count = 0
+    processed = 0
+
+    def analysis(self, query):
+        dbh = DB.DBO(query['case'])
+        ## Find out how many columns there are
+        dbh.execute("select count(*) as count from %s" , query['table'])
+        row = dbh.fetch()
+        self.count = row['count']
+
+        ## Now find all IP addresses:
+        dbh.execute("select count(*) as count, inet_ntoa(`%s`) as ip from `%s` group by `%s`",
+                    (query['column'], query['table'], query['column']))
+        
+        for row in dbh:
+            lookup_whois(row['ip'])
+            self.processed += row['count']
+
+    def progress(self, query, result):
+        result.heading("Caching IP addresses from table %s" % query['table'])
+        result.para("Processed %s out of %s rows" % (self.progress, self.count))
+
+    def display(self, query,result):
+        result.heading("Done caching whois lookups")
+
 class LookupIP(Reports.report):
     """ Display Whois data for the given IP address """
     parameters = {"address":"ipaddress"}

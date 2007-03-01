@@ -160,6 +160,47 @@ void StringIO_get_buffer(StringIO self,char **data, int *len) {
 void StringIO_truncate(StringIO self,int len) {
   if(self->readptr>len) self->readptr=len;
   self->size=len;
+  if(self->readptr > self->size) 
+    self->readptr=self->size;
+};
+
+void StringIO_skip(StringIO self, int len) {
+  if(len > self->size) 
+    len=self->size;
+
+  memmove(self->data, self->data+len, self->size-len);
+  self->size -= len;
+  self->readptr=0;
+};
+
+/* locate a substring. This returns a pointer inside the data
+   buffer... */
+char *StringIO_find(StringIO self, char *needle) {
+  char *i;
+  int needle_size = strlen(needle);
+
+  if(self->size < needle_size)
+    return NULL;
+
+  for(i=self->data; i<=self->data + self->size - needle_size; i++) {
+    if(memcmp(i, needle, needle_size)==0) {
+      return i;
+    };
+  };
+
+  return NULL;
+};
+
+/* case insensitive version of find */
+char *StringIO_ifind(StringIO self, char *needle) {
+  int i;
+  if(self->size < strlen(needle))
+    return NULL;
+  for(i=0; i<=self->size-strlen(needle); i++) {
+    if(strncasecmp(self->data+i, needle, strlen(needle)) == 0)
+      return self->data+i;
+  }
+  return NULL;
 };
 
 void StringIO_destroy(StringIO self) {
@@ -181,6 +222,9 @@ VIRTUAL(StringIO,Object)
   VMETHOD(get_buffer) = StringIO_get_buffer;
   VMETHOD(eof) = StringIO_eof;
   VMETHOD(truncate) = StringIO_truncate;
+  VMETHOD(skip) = StringIO_skip;
+  VMETHOD(find) = StringIO_find;
+  VMETHOD(ifind) = StringIO_ifind;
   VMETHOD(destroy) = StringIO_destroy;
 
 //These are class attributes - all instantiated objects will have

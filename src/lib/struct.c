@@ -87,14 +87,22 @@ static int NullString_pack(char *input, StringIO output) {
 }
 
 static int NullString_unpack(void *context, StringIO input, char *output) {
-  char *data;
-  int len;
-  char *string;  
-  CALL(input, get_buffer, &data, &len);
-  string = talloc_strdup(context, data);
-  *(char **)(output) = string;
-  CALL(input, seek, strlen(string)+1, SEEK_CUR);
-  return sizeof(char *);
+  StringIO temp = CONSTRUCT(StringIO, StringIO, Con, context);
+  int length=0;
+  char c;
+
+  // Search the input for a null:
+  while(CALL(input, read, &c, 1)) {
+    length++;
+    CALL(temp, write, &c, 1);
+    if(c==0) {
+      *(char **)(output) = temp->data;
+      return sizeof(char *);
+    };
+  };
+
+  //If we got here - there is no string:
+  return -1;
 }
 
 /********** SizeStrings *************/
@@ -128,6 +136,38 @@ static int SizeString_unpack(void *context, StringIO input, char *output) {
     return -1;
 
   return sizeof(uint16_t)+sizeof(char *);
+}
+
+static int SizeString32_pack(char *input, StringIO output) {
+  uint16_t length = *(uint32_t *)(input);
+  uint16_t i32;
+
+  i32=htons(length);
+  CALL(output, write, (char *)&i32, sizeof(uint32_t));
+  CALL(output, write, *(char **)(input+sizeof(i32)), length);
+  return sizeof(uint32_t)+sizeof(char *);
+}
+
+static int SizeString32_unpack(void *context, StringIO input, char *output) {
+  char *string;
+  uint32_t i32;
+  
+  if(CALL(input, read, (char *)&i32, sizeof(uint32_t)) < sizeof(uint32_t))
+    return -1;
+  
+  i32=ntohs(i32);
+
+  *(uint32_t *)(output) = i32;	
+  
+  /** Allocate this much memory */
+  string = talloc_size(context, i32);
+  *(char **)(output + sizeof(uint32_t)) = string;
+  
+  /** Copy the string into the buffer */
+  if(CALL(input, read, string, i32) < i32) 
+    return -1;
+
+  return sizeof(uint32_t)+sizeof(char *);
 }
 
 /********** Argv Array  *************/
@@ -170,6 +210,7 @@ static int ArgvArray_unpack(void *context, StringIO input, char *output) {
     array[i] = talloc_strdup(array, data);    
     CALL(input, seek, strlen(array[i])+1, SEEK_CUR);
   };
+
   /** insert NULL sentinel which may be a useful alternative to argc
       (eg. allowing argv to be passed straight to an execv) */
   array[i16] = NULL;
@@ -219,6 +260,8 @@ void struct_init(void) {
 		  NullString_pack, NullString_unpack);
   Struct_Register(STRUCT_STRING_AND_LENGTH, sizeof(uint16_t)
 		  +sizeof(char *), SizeString_pack, SizeString_unpack);
+  Struct_Register(STRUCT_STRING_AND_LENGTH32, sizeof(uint32_t)
+		  +sizeof(char *), SizeString32_pack, SizeString32_unpack);
   Struct_Register(STRUCT_ARGV_ARRAY, sizeof(uint16_t)
 		  +sizeof(char **), ArgvArray_pack, ArgvArray_unpack);
 };

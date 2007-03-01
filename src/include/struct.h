@@ -19,6 +19,7 @@
      on the specified length. Memory will be allocated. Note that the
      corresponding struct will require a uint16_t followed by a char * to
      store both length and the string.
+  STRUCT_STRING_AND_LENGTH32 (uint32_t, char *) - Same as STRUCT_STRING_AND_LENGTH
 
 ***********************************************************************/
 
@@ -43,6 +44,7 @@
 #define STRUCT_STRING_AND_LENGTH 7
 #define STRUCT_DNS_ZSTRING 8
 #define STRUCT_ARGV_ARRAY 9
+#define STRUCT_STRING_AND_LENGTH32 10
 
 /**
    You might need to increase this if other files are registrying more

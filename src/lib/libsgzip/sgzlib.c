@@ -1,5 +1,6 @@
 /** This is the implementation of the new sgz */
 #include "sgzlib.h"
+#include "misc.h"
 
 void compress_block(SgzipFile self);
 
@@ -37,7 +38,7 @@ SgzipFile SgzipFile_OpenFile(SgzipFile self, char *filename) {
   self->super.Read((Packet)self, self->io);
 
   // Is this a supported file?
-  if(0 != strncmp(self->packet.magic, ZSTRING_NO_NULL("sgz"))) {
+  if(0 != strncmp(self->packet.magic, "sgz", 3)) {
     raise_errors(EIOError, "File does not look like an sgz file\n");
     goto error;
   };

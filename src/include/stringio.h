@@ -68,8 +68,18 @@ CLASS(StringIO,Object)
   /** Return true if we are at the end of the file */
   int METHOD(StringIO, eof);
 
-  /** Truncates the file to this size */
+  /** Truncates the end of the stream to this size */
   void METHOD(StringIO, truncate, int len);
+
+  /** Removes the first len bytes from the start of the stream. The
+      stream is repositioned at its start */
+  void METHOD(StringIO, skip, int len);
+
+  /** find a substring, returns a pointer inside data */
+  char *METHOD(StringIO, find, char *string);
+
+  /** case insensitive version of find */
+  char *METHOD(StringIO, ifind, char *string);
 
   /** Destructor */
   void METHOD(StringIO, destroy);
