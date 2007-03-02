@@ -550,8 +550,8 @@ from pyflag.FileSystem import DBFS
 
 ## Is this even needed any more? Surely it should be enough with all
 ## the scanner tests?
-#class LoadDataTests(unittest.TestCase):
-class LoadDataTests:
+class LoadDataTests(unittest.TestCase):
+#class LoadDataTests:
     """ Forensic Image Loading Tests """
     order = 1
     test_case = "PyFlagTestCase"
@@ -586,7 +586,7 @@ class LoadDataTests:
                                    "mount_point=/stdimage/"])
         dbh = DB.DBO(self.test_case)
         dbh.execute("select count(*) as count from inode")
-        self.assertEqual(dbh.fetch()['count'],55)
+        self.assertEqual(dbh.fetch()['count'],57)
 
     def test03MultipleSources(self):
         """ Test that multiple images can be loaded on the same VFS """

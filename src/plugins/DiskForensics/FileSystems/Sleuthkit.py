@@ -348,6 +348,13 @@ class Sleuthkit(DBFS):
             self.VFSCreate("I%s" % iosource_name, 'o%s:%s' % (offset, 0),
                            "/_unallocated_/o%08d" % count)
 
+            ## We no longer need the index on the blocks table
+            ## (because we never really use it) - and we dont really
+            ## need to entries in the table either. FIXME: Add a
+            ## method for an File class to find its block allocation
+            ## on disk.
+            dbh_block.execute("alter table block drop index block")
+            dbh_block.delete('block', where=1)            
 
 class SKFSEventHandler(FlagFramework.EventHander):
     def exit(self, dbh, case):
