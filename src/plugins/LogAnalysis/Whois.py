@@ -63,6 +63,7 @@ def lookup_whois(ip):
     netmask = 0
     while 1:
         dbh.check_index("whois_routes","netmask")
+        dbh.check_index("whois_routes","network")
         dbh.execute("select whois_id from whois_routes where ( %s & inet_aton('255.255.255.255') & ~%r ) = network and (inet_aton('255.255.255.255') & ~%r) = netmask limit 1 " , (ip,netmask,netmask))
         row=dbh.fetch()
         ## If we found it, we return that, else we increase the

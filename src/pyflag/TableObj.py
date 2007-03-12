@@ -460,6 +460,11 @@ class ColumnType:
         """ Returns the SQL required for selecting from the table. """
         return self.sql or '.'.join(["`%s`" % x for x in self.column.split('.')])
 
+    def column_decorator(self, table, result):
+        """ Every column type is given the opportunity to decorate its
+        table heading
+        """
+
 ### Some common basic ColumnTypes:
 class StateType(ColumnType):
     ## This is a list of states that we can take on. Keys are args,

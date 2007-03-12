@@ -159,7 +159,7 @@ static TrieNode add_unique_to_peer_list(struct list_head *l, TrieNode n,
 // This is a character comparison map it represents those characters
 // which must have an offset added to their value in order to
 // normalise them. This is not unicode aware but is very fast.
-char cmap[] = { ['A' ... 'Z']='a'-'A' };
+char cmap[256] = { ['A' ... 'Z']='a'-'A' };
 
 int Compare_literal_nodes(TrieNode a, TrieNode b) {
   if(!ISSUBCLASS(a,LiteralNode) || !ISSUBCLASS(b,LiteralNode)) 
