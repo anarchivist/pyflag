@@ -46,6 +46,7 @@ AC_SYS_LARGEFILE
 AC_OUTPUT([ 
 	Makefile 
 	src/Makefile 
+	src/pyflag/Makefile 
 	src/lib/Makefile 
 	src/lib/libsgzip/Makefile
 	src/lib/libewf/Makefile

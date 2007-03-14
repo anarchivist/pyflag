@@ -1,0 +1,1 @@
+nobase_pkgpython_PYTHON		= $(shell find yapps -name \*.py -not -name .\*)

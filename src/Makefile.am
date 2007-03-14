@@ -1,11 +1,11 @@
-SUBDIRS = lib mailtools indextools_ng network regtools filesystems include
+SUBDIRS = lib mailtools indextools_ng network regtools filesystems include pyflag
 
 my_javascript		=       $(shell find javascript -not -name .\*)
 nobase_pkgdata_DATA	=	$(my_javascript)
 
 # main pyflag (python) application
 ## The pyflag directory goes in the system site-packages
-pkgpython_PYTHON 	=	$(shell find pyflag -name \*.py -not -name .\* )
+pkgpython_PYTHON 	=	$(shell find pyflag -name \*.py -not -name .\* ) 
 
 ## The plugins go in site-packages/pyflag/
 nobase_pkgpython_PYTHON 	=	$(shell find plugins -name \*.py -not -name .\*) \
