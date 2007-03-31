@@ -642,6 +642,10 @@ class InodeType(StringType):
         original_query = result.defaults
 
         def annotate_cb(query, result):
+            # We just close since we have just deleted it
+            if query.has_key('delete'):
+                return result.refresh(0, query, pane='parent')
+
             annotate = AnnotationObj(case=self.case)
             ## We are dealing with this inode
             del query['inode']
@@ -675,6 +679,18 @@ class InodeType(StringType):
                 annotate.add_form(query,result)            
 
             result.end_form(value='Annotate')
+
+            def del_annotation(query, result):
+                dbh = DB.DBO(query['case'])
+                dbh.delete('annotate', "inode=%r" % value)
+
+                del query['note']
+                del query['category']
+                query['delete'] = 'yes'
+
+                result.refresh(0, query, pane='parent')
+
+            result.toolbar(cb=del_annotation, icon='delete.png',tooltip="Click here to delete this annotation")
 
         annotate = AnnotationObj(case=self.case)
         row = annotate.select(inode=value)
