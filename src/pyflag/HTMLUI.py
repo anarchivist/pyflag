@@ -1008,8 +1008,17 @@ class HTMLUI(UI.GenericUI):
                     result.text('\n',style='black')
                     
             except KeyError,e:
-                print e
-                pass
+                
+                # If it's being submitted, it's probably a blank filter, so we just 
+                # clear it...
+                if query.has_key('__submit__'):
+                    result.refresh(0,query,pane='parent')
+                    return
+
+                # Else, who knows what happened...
+                else:
+                    print e
+                    pass
 
             result.start_form(query, pane="self")
 
@@ -1044,6 +1053,14 @@ class HTMLUI(UI.GenericUI):
         ## Add a toolbar icon for the filter:
         self.toolbar(cb=filter_gui, icon='filter.png',
                      tooltip=self.defaults.get('filter','Click here to filter table'))
+
+        try:
+            new_query = query.clone()
+            del new_query['filter']
+        except: pass
+
+        self.toolbar(link=new_query, icon='clear_filter.png', 
+                     tooltip=self.defaults.get('delfilter', 'Click here to clear the filter'))
 
         ## This is a toolbar popup which allows some fields to be hidden:
         def hide_fields(query, result):
