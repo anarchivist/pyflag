@@ -68,20 +68,20 @@ static char dirs[DIR_STRSZ];
 static char *didx[MAX_DEPTH];
 
 /* iso9660_dent_walk - walk directory entries starting with inode 'inum'.
- *	flags - FS_FLAG_NAME_RECURSE
+ *	flags - TSK_FS_DENT_FLAG_RECURSE
  */
 uint8_t
-iso9660_dent_walk(FS_INFO * fs, INUM_T inum, int flags,
-    FS_DENT_WALK_FN action, void *ptr)
+iso9660_dent_walk(TSK_FS_INFO * fs, INUM_T inum,
+    TSK_FS_DENT_FLAG_ENUM flags, TSK_FS_DENT_TYPE_WALK_CB action,
+    void *ptr)
 {
     ISO_INFO *iso = (ISO_INFO *) fs;
-    FS_DENT *fs_dent;
-    int myflags = FS_FLAG_NAME_ALLOC;
-    char *buf;			/* temp storage for directory extent */
-    int length = 0;		/* size of directory extent */
-    iso9660_dentry *dd;		/* directory descriptor */
+    TSK_FS_DENT *fs_dent;
+    char *buf;                  /* temp storage for directory extent */
+    int length = 0;             /* size of directory extent */
+    iso9660_dentry *dd;         /* directory descriptor */
     in_node *in;
-    off_t offs;			/* where we are reading in the file */
+    off_t offs;                 /* where we are reading in the file */
     int retval;
     SSIZE_T cnt;
 
@@ -89,230 +89,233 @@ iso9660_dent_walk(FS_INFO * fs, INUM_T inum, int flags,
     tsk_error_reset();
 
     if (inum < fs->first_inum || inum > fs->last_inum) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_FS_WALK_RNG;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "iso9660_dent_walk: inode value: %" PRIuINUM "\n", inum);
-	return 1;
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_FS_WALK_RNG;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "iso9660_dent_walk: inode value: %" PRIuINUM "\n", inum);
+        return 1;
     }
 
 
-    if (verbose)
-	tsk_fprintf(stderr,
-	    "iso9660_dent_walk: Processing directory %lu\n", (ULONG) inum);
+    if (tsk_verbose)
+        tsk_fprintf(stderr,
+            "iso9660_dent_walk: Processing directory %lu\n", (ULONG) inum);
 
-    if ((fs_dent = fs_dent_alloc(ISO9660_MAXNAMLEN, 0)) == NULL)
-	return 1;
+    if ((fs_dent = tsk_fs_dent_alloc(ISO9660_MAXNAMLEN, 0)) == NULL)
+        return 1;
 
     if (iso9660_dinode_load(iso, inum))
-	return 1;
+        return 1;
 
     /* walking a directory */
     if ((iso->dinode->dr.flags & ISO9660_FLAG_DIR) == ISO9660_FLAG_DIR) {
-	TSK_LIST *list_seen = NULL;
+        TSK_LIST *list_seen = NULL;
 
-	/* calculate directory extent location */
-	offs =
-	    (off_t) (fs->block_size *
-	    parseu32(fs, iso->dinode->dr.ext_loc));
+        /* calculate directory extent location */
+        offs =
+            (off_t) (fs->block_size *
+            parseu32(fs, iso->dinode->dr.ext_loc));
 
-	/* read directory extent into memory */
-	length = parseu32(fs, iso->dinode->dr.data_len);
+        /* read directory extent into memory */
+        length = parseu32(fs, iso->dinode->dr.data_len);
 
-	if ((buf = mymalloc(length)) == NULL) {
-	    return 1;
-	}
-	cnt = fs_read_random(fs, buf, length, offs);
-	if (cnt != length) {
-	    if (cnt != -1) {
-		tsk_error_reset();
-		tsk_errno = TSK_ERR_FS_READ;
-		tsk_errstr[0] = '\0';
-	    }
-	    snprintf(tsk_errstr2, TSK_ERRSTR_L, "iso_dent_walk:");
-	    return 1;
-	}
+        if ((buf = tsk_malloc(length)) == NULL) {
+            return 1;
+        }
+        cnt = tsk_fs_read_random(fs, buf, length, offs);
+        if (cnt != length) {
+            if (cnt != -1) {
+                tsk_error_reset();
+                tsk_errno = TSK_ERR_FS_READ;
+                tsk_errstr[0] = '\0';
+            }
+            snprintf(tsk_errstr2, TSK_ERRSTR_L, "iso_dent_walk:");
+            return 1;
+        }
 
-	dd = (iso9660_dentry *) buf;
+        dd = (iso9660_dentry *) buf;
 
-	/* handle "." entry */
-	fs_dent->inode = inum;
-	strcpy(fs_dent->name, ".");
+        /* handle "." entry */
+        fs_dent->inode = inum;
+        strcpy(fs_dent->name, ".");
 
-	fs_dent->path = dirs;
-	fs_dent->pathdepth = depth;
-	fs_dent->fsi = fs->inode_lookup(fs, fs_dent->inode);
-	fs_dent->ent_type = FS_DENT_DIR;
+        fs_dent->path = dirs;
+        fs_dent->pathdepth = depth;
+        fs_dent->fsi = fs->inode_lookup(fs, fs_dent->inode);
+        fs_dent->ent_type = TSK_FS_DENT_TYPE_DIR;
+        fs_dent->flags = TSK_FS_DENT_FLAG_ALLOC;
 
-	if (flags & FS_FLAG_NAME_ALLOC) {
-	    retval = action(fs, fs_dent, myflags, ptr);
-	    if (retval == WALK_ERROR) {
-		fs_dent_free(fs_dent);
-		return 1;
-	    }
-	    else if (retval == WALK_STOP) {
-		fs_dent_free(fs_dent);
-		return 0;
-	    }
-	}
+        if (flags & TSK_FS_DENT_FLAG_ALLOC) {
+            retval = action(fs, fs_dent, ptr);
+            if (retval == TSK_WALK_ERROR) {
+                tsk_fs_dent_free(fs_dent);
+                return 1;
+            }
+            else if (retval == TSK_WALK_STOP) {
+                tsk_fs_dent_free(fs_dent);
+                return 0;
+            }
+        }
 
-	length -= dd->length;
+        length -= dd->length;
 
-	dd = (iso9660_dentry *) ((char *) dd + dd->length);
+        dd = (iso9660_dentry *) ((char *) dd + dd->length);
 
-	/* handle ".." entry */
-	in = iso->in;
+        /* handle ".." entry */
+        in = iso->in;
 
-	while (in
-	    && (parseu32(fs, in->inode.dr.ext_loc) !=
-		parseu32(fs, dd->ext_loc)))
-	    in = in->next;
+        while (in
+            && (parseu32(fs, in->inode.dr.ext_loc) !=
+                parseu32(fs, dd->ext_loc)))
+            in = in->next;
 
-	fs_dent->inode = in->inum;
-	strcpy(fs_dent->name, "..");
+        fs_dent->inode = in->inum;
+        strcpy(fs_dent->name, "..");
 
-	fs_dent->path = dirs;
-	fs_dent->pathdepth = depth;
-	fs_dent->fsi = fs->inode_lookup(fs, fs_dent->inode);
-	fs_dent->ent_type = FS_DENT_DIR;
+        fs_dent->path = dirs;
+        fs_dent->pathdepth = depth;
+        fs_dent->fsi = fs->inode_lookup(fs, fs_dent->inode);
+        fs_dent->ent_type = TSK_FS_DENT_TYPE_DIR;
+        fs_dent->flags = TSK_FS_DENT_FLAG_ALLOC;
 
-	if (flags & FS_FLAG_NAME_ALLOC) {
-	    retval = action(fs, fs_dent, myflags, ptr);
-	    if (retval == WALK_ERROR) {
-		fs_dent_free(fs_dent);
-		return 1;
-	    }
-	    else if (retval == WALK_STOP) {
-		fs_dent_free(fs_dent);
-		return 0;
-	    }
-	}
+        if (flags & TSK_FS_DENT_FLAG_ALLOC) {
+            retval = action(fs, fs_dent, ptr);
+            if (retval == TSK_WALK_ERROR) {
+                tsk_fs_dent_free(fs_dent);
+                return 1;
+            }
+            else if (retval == TSK_WALK_STOP) {
+                tsk_fs_dent_free(fs_dent);
+                return 0;
+            }
+        }
 
-	length -= dd->length;
+        length -= dd->length;
 
-	dd = (iso9660_dentry *) ((char *) dd + dd->length);
+        dd = (iso9660_dentry *) ((char *) dd + dd->length);
 
-	/* for each directory descriptor in it: */
-	while (length > sizeof(iso9660_dentry)) {
-	    if (dd->length) {
-		int retval;
-		int i;
-		/* print out info on what was in extent */
-		in = iso->in;
-		while (parseu32(fs, in->inode.dr.ext_loc) !=
-		    parseu32(fs, dd->ext_loc))
-		    in = in->next;
+        /* for each directory descriptor in it: */
+        while (length > sizeof(iso9660_dentry)) {
+            if (dd->length) {
+                int retval;
+                int i;
+                /* print out info on what was in extent */
+                in = iso->in;
+                while (parseu32(fs, in->inode.dr.ext_loc) !=
+                    parseu32(fs, dd->ext_loc))
+                    in = in->next;
 
-		fs_dent->inode = in->inum;
-		strcpy(fs_dent->name, in->inode.fn);
+                fs_dent->inode = in->inum;
+                strcpy(fs_dent->name, in->inode.fn);
 
-		/* Clean up name */
-		i = 0;
-		while (fs_dent->name[i] != '\0') {
-		    if (TSK_IS_CNTRL(fs_dent->name[i]))
-			fs_dent->name[i] = '^';
-		    i++;
-		}
-
-
-		fs_dent->path = dirs;
-		fs_dent->pathdepth = depth;
-		fs_dent->fsi = fs->inode_lookup(fs, fs_dent->inode);
-		if (dd->flags & ISO9660_FLAG_DIR)
-		    fs_dent->ent_type = FS_DENT_DIR;
-		else
-		    fs_dent->ent_type = FS_DENT_REG;
-
-		if (flags & FS_FLAG_NAME_ALLOC) {
-		    retval = action(fs, fs_dent, myflags, ptr);
-		    if (retval == WALK_ERROR) {
-			fs_dent_free(fs_dent);
-			tsk_list_free(list_seen);
-			list_seen = NULL;
-			return 1;
-		    }
-		    else if (retval == WALK_STOP) {
-			fs_dent_free(fs_dent);
-			tsk_list_free(list_seen);
-			list_seen = NULL;
-			return 0;
-		    }
-		}
-
-		if ((dd->flags & ISO9660_FLAG_DIR)
-		    && (flags & FS_FLAG_NAME_RECURSE)) {
-		    int depth_added = 0;
-
-		    /* Make sure we do not get into an infinite loop */
-		    if (0 == tsk_list_find(list_seen, fs_dent->inode)) {
-			if (tsk_list_add(&list_seen, fs_dent->inode)) {
-			    fs_dent_free(fs_dent);
-			    tsk_list_free(list_seen);
-			    list_seen = NULL;
-			    return -1;
-			}
+                /* Clean up name */
+                i = 0;
+                while (fs_dent->name[i] != '\0') {
+                    if (TSK_IS_CNTRL(fs_dent->name[i]))
+                        fs_dent->name[i] = '^';
+                    i++;
+                }
 
 
-			if ((depth < MAX_DEPTH) &&
-			    (DIR_STRSZ >
-				strlen(dirs) + strlen(fs_dent->name))) {
-			    didx[depth] = &dirs[strlen(dirs)];
-			    strncpy(didx[depth], fs_dent->name,
-				DIR_STRSZ - strlen(dirs));
-			    strncat(dirs, "/", DIR_STRSZ);
-			    depth_added = 1;
-			}
-			depth++;
-			if (iso9660_dent_walk(fs, in->inum, flags, action,
-				ptr)) {
-			    /* If the directory could not be loaded,
-			     * then move on */
-			    if (verbose) {
-				tsk_fprintf(stderr,
-				    "iso_dent_parse_block: error reading directory: %"
-				    PRIuINUM "\n", in->inum);
-				tsk_error_print(stderr);
-			    }
-			    tsk_error_reset();
-			}
+                fs_dent->path = dirs;
+                fs_dent->pathdepth = depth;
+                fs_dent->fsi = fs->inode_lookup(fs, fs_dent->inode);
+                if (dd->flags & ISO9660_FLAG_DIR)
+                    fs_dent->ent_type = TSK_FS_DENT_TYPE_DIR;
+                else
+                    fs_dent->ent_type = TSK_FS_DENT_TYPE_REG;
+                fs_dent->flags = TSK_FS_DENT_FLAG_ALLOC;
 
-			depth--;
-			if (depth_added)
-			    *didx[depth] = '\0';
-		    }
-		}
+                if (flags & TSK_FS_DENT_FLAG_ALLOC) {
+                    retval = action(fs, fs_dent, ptr);
+                    if (retval == TSK_WALK_ERROR) {
+                        tsk_fs_dent_free(fs_dent);
+                        tsk_list_free(list_seen);
+                        list_seen = NULL;
+                        return 1;
+                    }
+                    else if (retval == TSK_WALK_STOP) {
+                        tsk_fs_dent_free(fs_dent);
+                        tsk_list_free(list_seen);
+                        list_seen = NULL;
+                        return 0;
+                    }
+                }
 
-		length -= dd->length;
+                if ((dd->flags & ISO9660_FLAG_DIR)
+                    && (flags & TSK_FS_DENT_FLAG_RECURSE)) {
+                    int depth_added = 0;
 
-		dd = (iso9660_dentry *) ((char *) dd + dd->length);
-		/* we need to look for files past the next NULL we discover, in case
-		 * directory has a hole in it (this is common) */
-	    }
-	    else {
-		char *a, *b;
-		length -= sizeof(iso9660_dentry);
+                    /* Make sure we do not get into an infinite loop */
+                    if (0 == tsk_list_find(list_seen, fs_dent->inode)) {
+                        if (tsk_list_add(&list_seen, fs_dent->inode)) {
+                            tsk_fs_dent_free(fs_dent);
+                            tsk_list_free(list_seen);
+                            list_seen = NULL;
+                            return -1;
+                        }
 
-		/* find next non-zero byte and we'll start over there */
 
-		a = (char *) dd;
-		b = a + sizeof(iso9660_dentry);
+                        if ((depth < MAX_DEPTH) &&
+                            (DIR_STRSZ >
+                                strlen(dirs) + strlen(fs_dent->name))) {
+                            didx[depth] = &dirs[strlen(dirs)];
+                            strncpy(didx[depth], fs_dent->name,
+                                DIR_STRSZ - strlen(dirs));
+                            strncat(dirs, "/", DIR_STRSZ);
+                            depth_added = 1;
+                        }
+                        depth++;
+                        if (iso9660_dent_walk(fs, in->inum, flags, action,
+                                ptr)) {
+                            /* If the directory could not be loaded,
+                             * then move on */
+                            if (tsk_verbose) {
+                                tsk_fprintf(stderr,
+                                    "iso_dent_parse_block: error reading directory: %"
+                                    PRIuINUM "\n", in->inum);
+                                tsk_error_print(stderr);
+                            }
+                            tsk_error_reset();
+                        }
 
-		while ((*a == 0) && (a != b))
-		    a++;
+                        depth--;
+                        if (depth_added)
+                            *didx[depth] = '\0';
+                    }
+                }
 
-		if (a != b) {
-		    length += (int) (b - a);
-		    dd = (iso9660_dentry *) ((char *) dd +
-			(sizeof(iso9660_dentry) - (int) (b - a)));
-		}
-	    }
-	}
+                length -= dd->length;
 
-	free(buf);
-	tsk_list_free(list_seen);
-	list_seen = NULL;
-	/* regular file */
+                dd = (iso9660_dentry *) ((char *) dd + dd->length);
+                /* we need to look for files past the next NULL we discover, in case
+                 * directory has a hole in it (this is common) */
+            }
+            else {
+                char *a, *b;
+                length -= sizeof(iso9660_dentry);
+
+                /* find next non-zero byte and we'll start over there */
+
+                a = (char *) dd;
+                b = a + sizeof(iso9660_dentry);
+
+                while ((*a == 0) && (a != b))
+                    a++;
+
+                if (a != b) {
+                    length += (int) (b - a);
+                    dd = (iso9660_dentry *) ((char *) dd +
+                        (sizeof(iso9660_dentry) - (int) (b - a)));
+                }
+            }
+        }
+
+        free(buf);
+        tsk_list_free(list_seen);
+        list_seen = NULL;
+        /* regular file */
     }
-    fs_dent_free(fs_dent);
+    tsk_fs_dent_free(fs_dent);
     return 0;
 }

@@ -15,7 +15,7 @@
 #define SK_FLAG_INODES	0x1	// inodes in result
 #define SK_FLAG_NAMES	0x2	// names in result
 
-/* stores the major elements of FS_DENT */
+/* stores the major elements of TSK_FS_DENT */
 struct dentwalk {
     char *path;
     INUM_T inode;
@@ -28,7 +28,7 @@ struct dentwalk {
 
 /* implements an sk img subsystem */
 typedef struct {
-	IMG_INFO img_info;
+	TSK_IMG_INFO img_info;
     PyObject *fileobj;
 } IMG_PYFILE_INFO;
 
@@ -41,17 +41,17 @@ struct block {
 
 /* callback functions for dent_walk, populate a file list */
 static uint8_t
-listdent_walk_callback_dent(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr);
+listdent_walk_callback_dent(TSK_FS_INFO *fs, TSK_FS_DENT *fs_dent, void *ptr);
 static uint8_t
-listdent_walk_callback_list(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr);
+listdent_walk_callback_list(TSK_FS_INFO *fs, TSK_FS_DENT *fs_dent, void *ptr);
 
 /* callback function for file_walk, populates a block list */
 static u_int8_t
-getblocks_walk_callback(FS_INFO *fs, DADDR_T addr, char *buf, int size, int flags, void *ptr);
+getblocks_walk_callback(TSK_FS_INFO *fs, DADDR_T addr, char *buf, size_t size, TSK_FS_BLOCK_FLAG_ENUM flags, void *ptr);
 
 /* lookup an inode from a path */
-INUM_T lookup_inode(FS_INFO *fs, char *path);
-int lookup_path(FS_INFO *fs, struct dentwalk *dent);
+INUM_T lookup_inode(TSK_FS_INFO *fs, char *path);
+int lookup_path(TSK_FS_INFO *fs, struct dentwalk *dent);
 
 /******************************************************************
  * SKFS - Sleuthkit Filesystem Python Type
@@ -61,8 +61,8 @@ typedef struct {
     PyObject_HEAD
     // The talloc context that everything is hanged from:
     void *context;
-	IMG_INFO *img;
-	FS_INFO *fs;
+	TSK_IMG_INFO *img;
+	TSK_FS_INFO *fs;
     int block_size;
     unsigned long long first_block;
     unsigned long long last_block;
@@ -320,7 +320,7 @@ typedef struct {
     PyObject_HEAD
     void *context;
     PyObject *skfs;
-    FS_INODE *fs_inode;
+    TSK_FS_INODE *fs_inode;
 	uint32_t type;
 	uint32_t id;
     struct block *blocks;
@@ -394,5 +394,8 @@ static PyTypeObject skfileType = {
 };
 
 // This is not in sleuthkit header
-uint8_t ntfs_find_file(FS_INFO * fs, INUM_T inode_toid, uint32_t type_toid,
-		       uint16_t id_toid, int flags, FS_DENT_WALK_FN action, void *ptr);
+uint8_t ntfs_find_file(TSK_FS_INFO *fs, INUM_T inode_toid, uint32_t type_toid, 
+               uint16_t id_toid, int flags, TSK_FS_DENT_TYPE_WALK_CB action, void *ptr);
+
+
+

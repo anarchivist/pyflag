@@ -25,8 +25,8 @@ tsk_printf_conv(WCHAR * wbuf, int wlen, char *msg, va_list * args)
     wbuf[0] = '\0';
 
     clen = wlen * 3;
-    if (NULL == (cbuf = (char *) mymalloc(clen))) {
-	return 1;
+    if (NULL == (cbuf = (char *) tsk_malloc(clen))) {
+        return 1;
     }
     memset(cbuf, 0, clen);
 
@@ -37,13 +37,13 @@ tsk_printf_conv(WCHAR * wbuf, int wlen, char *msg, va_list * args)
     ptr8 = (UTF8 *) cbuf;
     ptr16 = (UTF16 *) wbuf;
     retVal =
-	tsk_UTF8toUTF16(&ptr8, &ptr8[len + 1], &ptr16, &ptr16[wlen],
-	lenientConversion);
-    if (retVal != conversionOK) {
-	*ptr16 = '\0';
-	if (verbose)
-	    tsk_fprintf(stderr,
-		"tsk_printf_conv: error converting string to UTF-16\n");
+        tsk_UTF8toUTF16(&ptr8, &ptr8[len + 1], &ptr16, &ptr16[wlen],
+        TSKlenientConversion);
+    if (retVal != TSKconversionOK) {
+        *ptr16 = '\0';
+        if (tsk_verbose)
+            tsk_fprintf(stderr,
+                "tsk_printf_conv: error converting string to UTF-16\n");
     }
     free(cbuf);
 
@@ -74,9 +74,9 @@ tsk_fprintf(FILE * fd, char *msg, ...)
 
 #ifdef TSK_WIN32
     {
-	WCHAR wbuf[2048];
-	tsk_printf_conv(wbuf, 2048, msg, &args);
-	fwprintf(fd, _TSK_T("%s"), wbuf);
+        WCHAR wbuf[2048];
+        tsk_printf_conv(wbuf, 2048, msg, &args);
+        fwprintf(fd, _TSK_T("%s"), wbuf);
     }
 #else
     vfprintf(fd, msg, args);
@@ -92,9 +92,9 @@ tsk_printf(char *msg, ...)
 
 #ifdef TSK_WIN32
     {
-	WCHAR wbuf[2048];
-	tsk_printf_conv(wbuf, 2048, msg, &args);
-	wprintf(_TSK_T("%s"), wbuf);
+        WCHAR wbuf[2048];
+        tsk_printf_conv(wbuf, 2048, msg, &args);
+        wprintf(_TSK_T("%s"), wbuf);
     }
 #else
     vprintf(msg, args);

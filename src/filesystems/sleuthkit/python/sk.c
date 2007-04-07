@@ -95,16 +95,16 @@ char *error_get() {
 };
 
 static u_int8_t
-inode_walk_callback(FS_INFO *fs, FS_INODE *fs_inode, int flags, void *ptr) {
+inode_walk_callback(TSK_FS_INFO *fs, TSK_FS_INODE *fs_inode, void *ptr) {
     PyObject *inode, *list;
     list = (PyObject *)ptr;
     
     // add each ntfs data attribute
-    if (((fs->ftype & FSMASK) == NTFS_TYPE) && (fs_inode)) {
-        FS_DATA *fs_data;
+    if (((fs->ftype & TSK_FS_INFO_TYPE_FS_MASK) == TSK_FS_INFO_TYPE_NTFS_TYPE) && (fs_inode)) {
+        TSK_FS_DATA *fs_data;
 
         for(fs_data = fs_inode->attr; fs_data; fs_data = fs_data->next) {
-            if(!(fs_data->flags & FS_DATA_INUSE))
+            if(!(fs_data->flags & TSK_FS_DATA_INUSE))
                 continue;
 
             if(fs_data->type == NTFS_ATYPE_DATA) {
@@ -112,7 +112,7 @@ inode_walk_callback(FS_INFO *fs, FS_INODE *fs_inode, int flags, void *ptr) {
                 ((skfs_inode *)inode)->inode = fs_inode->addr;
                 ((skfs_inode *)inode)->type = fs_data->type;
                 ((skfs_inode *)inode)->id = fs_data->id;
-                ((skfs_inode *)inode)->alloc = (flags & FS_FLAG_META_ALLOC) ? 1 : 0;
+                ((skfs_inode *)inode)->alloc = (fs_inode->flags & TSK_FS_INODE_FLAG_ALLOC) ? 1 : 0;
 
                 PyList_Append(list, inode);
                 Py_DECREF(inode);
@@ -124,19 +124,19 @@ inode_walk_callback(FS_INFO *fs, FS_INODE *fs_inode, int flags, void *ptr) {
         ((skfs_inode *)inode)->inode = fs_inode->addr;
         ((skfs_inode *)inode)->type = 0;
         ((skfs_inode *)inode)->id = 0;
-        ((skfs_inode *)inode)->alloc = (flags & FS_FLAG_META_ALLOC) ? 1 : 0;
+        ((skfs_inode *)inode)->alloc = (fs_inode->flags & TSK_FS_INODE_FLAG_ALLOC) ? 1 : 0;
 
         PyList_Append(list, inode);
         Py_DECREF(inode);
     }
-	return WALK_CONT;
+	return TSK_WALK_CONT;
 }
 
 /* Here are a bunch of callbacks and helpers used to give sk a more filesystem
  * like interface */
 
 /* add this to the list, called by the callback */
-void listdent_add_dent(FS_DENT *fs_dent, FS_DATA *fs_data, int flags, struct dentwalk *dentlist) {
+void listdent_add_dent(TSK_FS_DENT *fs_dent, TSK_FS_DATA *fs_data, struct dentwalk *dentlist) {
     struct dentwalk *p = talloc(dentlist, struct dentwalk);
 
     p->path = talloc_strndup(p, fs_dent->name, fs_dent->name_max - 1);
@@ -156,13 +156,12 @@ void listdent_add_dent(FS_DENT *fs_dent, FS_DATA *fs_data, int flags, struct den
     } 
 
     p->alloc = 1; // allocated
-    if(flags & FS_FLAG_NAME_UNALLOC) {
-        if((fs_dent->fsi) && (fs_dent->fsi->flags & FS_FLAG_META_ALLOC))
+    if(fs_dent->flags & TSK_FS_DENT_FLAG_UNALLOC) {
+        if((fs_dent->fsi) && (fs_dent->fsi->flags & TSK_FS_INODE_FLAG_ALLOC))
             p->alloc = 2; // realloc
         else
             p->alloc = 0; // unalloc
     }
-	//p->path = talloc_asprintf_append(p->path, " (deleted%s)", ((fs_dent->fsi) && (fs_dent->fsi->flags & FS_FLAG_META_ALLOC)) ? "-realloc" : "");
 
     p->inode = fs_dent->inode;
     p->ent_type = fs_dent->ent_type;
@@ -176,18 +175,18 @@ void listdent_add_dent(FS_DENT *fs_dent, FS_DATA *fs_data, int flags, struct den
  * named ADS in NTFS
  */
 static uint8_t
-listdent_walk_callback_dent(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr) {
+listdent_walk_callback_dent(TSK_FS_INFO * fs, TSK_FS_DENT * fs_dent, void *ptr) {
     struct dentwalk *dentlist = (struct dentwalk *)ptr;
 
 	/* Make a special case for NTFS so we can identify all of the
 	 * alternate data streams!
 	 */
-    if (((fs->ftype & FSMASK) == NTFS_TYPE) && (fs_dent->fsi)) {
+    if (((fs->ftype & TSK_FS_INFO_TYPE_FS_MASK) == TSK_FS_INFO_TYPE_NTFS_TYPE) && (fs_dent->fsi)) {
 
-        FS_DATA *fs_data = fs_dent->fsi->attr;
+        TSK_FS_DATA *fs_data = fs_dent->fsi->attr;
         uint8_t printed = 0;
 
-        while ((fs_data) && (fs_data->flags & FS_DATA_INUSE)) {
+        while ((fs_data) && (fs_data->flags & TSK_FS_DATA_INUSE)) {
 
             if (fs_data->type == NTFS_ATYPE_DATA) {
                 mode_t mode = fs_dent->fsi->mode;
@@ -205,7 +204,7 @@ listdent_walk_callback_dent(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *pt
                 * printed as a directory
                 */
 
-                if ((fs_dent->fsi->mode & FS_INODE_FMT) == FS_INODE_DIR) {
+                if ((fs_dent->fsi->mode & TSK_FS_INODE_MODE_FMT) == TSK_FS_INODE_MODE_DIR) {
 
                     /* we don't want to print the ..:blah stream if
                     * the -a flag was not given
@@ -216,12 +215,12 @@ listdent_walk_callback_dent(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *pt
                         continue;
                     }
 
-                    fs_dent->fsi->mode &= ~FS_INODE_FMT;
-                    fs_dent->fsi->mode |= FS_INODE_REG;
-                    fs_dent->ent_type = FS_DENT_REG;
+                    fs_dent->fsi->mode &= ~TSK_FS_INODE_MODE_FMT;
+                    fs_dent->fsi->mode |= TSK_FS_INODE_MODE_REG;
+                    fs_dent->ent_type = TSK_FS_DENT_TYPE_REG;
                 }
             
-                listdent_add_dent(fs_dent, fs_data, flags, dentlist);
+                listdent_add_dent(fs_dent, fs_data, dentlist);
 
                 fs_dent->fsi->mode = mode;
                 fs_dent->ent_type = ent_type;
@@ -233,7 +232,7 @@ listdent_walk_callback_dent(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *pt
                  * directory has a data stream 
                  */
                 if (!(ISDOT(fs_dent->name))) 
-                    listdent_add_dent(fs_dent, fs_data, flags, dentlist);
+                    listdent_add_dent(fs_dent, fs_data, dentlist);
             }
 
             fs_data = fs_data->next;
@@ -242,44 +241,44 @@ listdent_walk_callback_dent(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *pt
 	    /* A user reported that an allocated file had the standard
 	     * attributes, but no $Data.  We should print something */
 	    if (printed == 0) {
-            listdent_add_dent(fs_dent, fs_data, flags, dentlist);
+            listdent_add_dent(fs_dent, fs_data, dentlist);
 	    }
 
     } else {
         /* skip it if it is . or .. and we don't want them */
         if (!(ISDOT(fs_dent->name)))
-            listdent_add_dent(fs_dent, NULL, flags, dentlist);
+            listdent_add_dent(fs_dent, NULL, dentlist);
     }
-    return WALK_CONT;
+    return TSK_WALK_CONT;
 }
 
 /* callback function for dent_walk used by listdir */
-static uint8_t listdent_walk_callback_list(FS_INFO *fs, FS_DENT *fs_dent, int flags, void *ptr) {
+static uint8_t listdent_walk_callback_list(TSK_FS_INFO *fs, TSK_FS_DENT *fs_dent, void *ptr) {
     PyObject *tmp;
     PyObject *list = (PyObject *)ptr;
 
     /* we dont want to add '.' and '..' */
     if(ISDOT(fs_dent->name))
-        return WALK_CONT;
+        return TSK_WALK_CONT;
 
     tmp = PyString_FromString(fs_dent->name);
     PyList_Append(list, tmp);
     Py_DECREF(tmp);
 
-    return WALK_CONT;
+    return TSK_WALK_CONT;
 }
 
 /* callback function for file_walk, populates a block list */
 static u_int8_t
-getblocks_walk_callback(FS_INFO *fs, DADDR_T addr, char *buf, int size, int flags, void *ptr) {
+getblocks_walk_callback(TSK_FS_INFO *fs, DADDR_T addr, char *buf, size_t size, TSK_FS_BLOCK_FLAG_ENUM flags, void *ptr) {
 
     struct block *b;
     skfile *file = (skfile *) ptr;
 
     if(size <= 0)
-        return WALK_CONT;
+        return TSK_WALK_CONT;
 
-    if(!(flags & FS_FLAG_DATA_RES)) {
+    if(!(flags & TSK_FS_BLOCK_FLAG_RES)) {
         /* create a new block entry */
         b = talloc(file->blocks, struct block);
         b->addr = addr;
@@ -290,11 +289,11 @@ getblocks_walk_callback(FS_INFO *fs, DADDR_T addr, char *buf, int size, int flag
     file->size += size;
 
     /* add to the list */
-    return WALK_CONT;
+    return TSK_WALK_CONT;
 }
 
 /* lookup an inode from a path */
-INUM_T lookup_inode(FS_INFO *fs, char *path) {
+INUM_T lookup_inode(TSK_FS_INFO *fs, char *path) {
     INUM_T ret;
     char *tmp = talloc_strdup(NULL,path);
     /* this is evil and modifies the path! */
@@ -305,20 +304,20 @@ INUM_T lookup_inode(FS_INFO *fs, char *path) {
 
 /* callback for lookup_path */
 static uint8_t
-lookup_path_cb(FS_INFO * fs, FS_DENT * fs_dent, int flags, void *ptr) {
+lookup_path_cb(TSK_FS_INFO * fs, TSK_FS_DENT * fs_dent, void *ptr) {
     struct dentwalk *dent = (struct dentwalk *)ptr;
 
     if (fs_dent->inode == dent->inode) {
         dent->path = talloc_asprintf(dent, "/%s%s", fs_dent->path, fs_dent->name);
-        return WALK_STOP;
+        return TSK_WALK_STOP;
     }
-    return WALK_CONT;
+    return TSK_WALK_CONT;
 }
 
 /* lookup path for inode, supply an dentwalk ptr (must be a talloc context),
  * name will be filled in */
-int lookup_path(FS_INFO *fs, struct dentwalk *dent) {
-    int flags = FS_FLAG_NAME_RECURSE | FS_FLAG_NAME_ALLOC;
+int lookup_path(TSK_FS_INFO *fs, struct dentwalk *dent) {
+    int flags = TSK_FS_DENT_FLAG_RECURSE | TSK_FS_DENT_FLAG_ALLOC;
 
     /* special case, the walk won't pick this up */
     if(dent->inode == fs->root_inum) {
@@ -327,7 +326,7 @@ int lookup_path(FS_INFO *fs, struct dentwalk *dent) {
     }
 
     /* there is a walk optimised for NTFS */
-    if((fs->ftype & FSMASK) == NTFS_TYPE) {
+    if((fs->ftype & TSK_FS_INFO_TYPE_FS_MASK) == TSK_FS_INFO_TYPE_NTFS_TYPE) {
         if(ntfs_find_file(fs, dent->inode, 0, 0, flags, lookup_path_cb, (void *)dent))
             return 1;
     } else {
@@ -366,7 +365,7 @@ void print_current_exception() {
 
 /* Return the size read and -1 if error */
 static SSIZE_T
-pyfile_read_random(IMG_INFO * img_info, OFF_T vol_offset, char *buf,
+pyfile_read_random(TSK_IMG_INFO * img_info, OFF_T vol_offset, char *buf,
                    OFF_T len, OFF_T offset) {
 
   PyObject *res;
@@ -417,12 +416,12 @@ pyfile_read_random(IMG_INFO * img_info, OFF_T vol_offset, char *buf,
 }
 
 OFF_T
-pyfile_get_size(IMG_INFO * img_info) {
+pyfile_get_size(TSK_IMG_INFO * img_info) {
     return img_info->size;
 }
 
 void
-pyfile_imgstat(IMG_INFO * img_info, FILE * hFile) {
+pyfile_imgstat(TSK_IMG_INFO * img_info, FILE * hFile) {
     fprintf(hFile, "IMAGE FILE INFORMATION\n");
     fprintf(hFile, "--------------------------------------------\n");
     fprintf(hFile, "Image Type: pyflag iosubsys\n");
@@ -431,7 +430,7 @@ pyfile_imgstat(IMG_INFO * img_info, FILE * hFile) {
 }
 
 void
-pyfile_close(IMG_INFO * img_info) {
+pyfile_close(TSK_IMG_INFO * img_info) {
   if(img_info) {
     IMG_PYFILE_INFO *pyfile_info = (IMG_PYFILE_INFO *)img_info;
 
@@ -442,10 +441,10 @@ pyfile_close(IMG_INFO * img_info) {
 }
 
 /* construct an IMG_PYFILE_INFO */
-IMG_INFO *
+TSK_IMG_INFO *
 pyfile_open(PyObject *fileobj) {
     IMG_PYFILE_INFO *pyfile_info;
-    IMG_INFO *img_info;
+    TSK_IMG_INFO *img_info;
     PyObject *tmp, *tmp2;
 
     //if ((pyfile_info = (IMG_PYFILE_INFO *) mymalloc(sizeof(IMG_PYFILE_INFO))) == NULL)
@@ -466,10 +465,10 @@ pyfile_open(PyObject *fileobj) {
     pyfile_info->fileobj = fileobj;
     Py_INCREF(fileobj);
 
-    /* setup the IMG_INFO struct */
-    img_info = (IMG_INFO *) pyfile_info;
+    /* setup the TSK_IMG_INFO struct */
+    img_info = (TSK_IMG_INFO *) pyfile_info;
 
-    img_info->itype = PYFILE_TYPE;
+    img_info->itype = TSK_IMG_INFO_TYPE_PYFILE_TYPE;
     img_info->read_random = pyfile_read_random;
     img_info->get_size = pyfile_get_size;
     img_info->close = pyfile_close;
@@ -564,7 +563,7 @@ skfs_init(skfs *self, PyObject *args, PyObject *kwds) {
 
     /* initialise the filesystem */
     tsk_error_reset();
-    self->fs = fs_open(self->img, imgoff, fstype);
+    self->fs = tsk_fs_open(self->img, imgoff, fstype);
     if(!self->fs) {
       char *error = error_get();
       PyErr_Format(PyExc_RuntimeError, "Unable to open filesystem in image: %s", error);
@@ -612,9 +611,9 @@ skfs_listdir(skfs *self, PyObject *args, PyObject *kwds) {
 
     /* set flags */
     if(alloc)
-        flags |= FS_FLAG_NAME_ALLOC;
+        flags |= TSK_FS_DENT_FLAG_ALLOC;
     if(unalloc)
-        flags |= FS_FLAG_NAME_UNALLOC;
+        flags |= TSK_FS_DENT_FLAG_UNALLOC;
 
     list = PyList_New(0);
 
@@ -721,7 +720,7 @@ skfs_walk(skfs *self, PyObject *args, PyObject *kwds) {
 static PyObject *
 skfs_iwalk(skfs *self, PyObject *args, PyObject *kwds) {
     int alloc=0, unalloc=1;
-    int flags=FS_FLAG_META_UNALLOC | FS_FLAG_META_USED;
+    int flags=TSK_FS_INODE_FLAG_UNALLOC | TSK_FS_INODE_FLAG_USED;
     PyObject *list;
     INUM_T inode=0;
 
@@ -735,12 +734,12 @@ skfs_iwalk(skfs *self, PyObject *args, PyObject *kwds) {
     // ignore args for now and just do full walk (start->end)
     list = PyList_New(0);
     self->fs->inode_walk(self->fs, self->fs->first_inum, self->fs->last_inum, flags, 
-            (FS_INODE_WALK_FN) inode_walk_callback, (void *)list);
+            inode_walk_callback, (void *)list);
 
     return list;
 }
 
-PyObject *build_stat_result(FS_INODE *fs_inode) {
+PyObject *build_stat_result(TSK_FS_INODE *fs_inode) {
   PyObject *result,*os;
   
   /* return a real stat_result! */
@@ -765,7 +764,7 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
     PyObject *inode_obj;
     char *path=NULL;
     INUM_T inode=0;
-    FS_INODE *fs_inode;
+    TSK_FS_INODE *fs_inode;
     int type=0, id=0;
 
     static char *kwlist[] = {"path", "inode", NULL};
@@ -817,7 +816,7 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
 static PyObject *
 skfs_fstat(skfs *self, PyObject *args) {
     PyObject *result, *skfile_obj;
-    FS_INODE *fs_inode;
+    TSK_FS_INODE *fs_inode;
 
     if(!PyArg_ParseTuple(args, "O", &skfile_obj))
         return NULL; 
@@ -875,9 +874,9 @@ skfs_walkiter_init(skfs_walkiter *self, PyObject *args, PyObject *kwds) {
     /* set flags */
     self->flags = self->myflags = 0;
     if(alloc)
-        self->flags |= FS_FLAG_NAME_ALLOC;
+        self->flags |= TSK_FS_DENT_FLAG_ALLOC;
     if(unalloc)
-        self->flags |= FS_FLAG_NAME_UNALLOC;
+        self->flags |= TSK_FS_DENT_FLAG_UNALLOC;
     if(names)
         self->myflags |= SK_FLAG_NAMES;
     if(inodes)
@@ -960,7 +959,7 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
         inode_name_val = Py_BuildValue("(OO)", inode_val, name_val);
 
         /* process directories */
-        if(dwtmp->ent_type & FS_DENT_DIR) {
+        if(dwtmp->ent_type & TSK_FS_DENT_TYPE_DIR) {
 
             /* place into dirlist */
             if((self->myflags & SK_FLAG_INODES) && (self->myflags & SK_FLAG_NAMES))
@@ -1002,7 +1001,7 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
     ((skfs_inode *)inode)->inode = dw->inode;
     ((skfs_inode *)inode)->type = dw->type;
     ((skfs_inode *)inode)->id = dw->id;
-    ((skfs_inode *)inode)->alloc = dw->alloc; //(dw->flags & FS_FLAG_NAME_ALLOC) ? 1 : 0;
+    ((skfs_inode *)inode)->alloc = dw->alloc; //(dw->flags & TSK_FS_DENT_FLAG_ALLOC) ? 1 : 0;
 
     if((self->myflags & SK_FLAG_INODES) && (self->myflags & SK_FLAG_NAMES))
         root = Py_BuildValue("(Ns)", inode, dw->path);
@@ -1026,7 +1025,7 @@ static PyObject *skfs_walkiter_iternext(skfs_walkiter *self) {
     return result;
 }
 
-/************** SKFS_INODE **********/
+/************** SKTSK_FS_INODE **********/
 static int skfs_inode_init(skfs_inode *self, PyObject *args, PyObject *kwds) {
     static char *kwlist[] = {"inode", "type", "id", "alloc", NULL};
     int alloc;
@@ -1081,7 +1080,7 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
     PyObject *inode_obj=NULL;
     INUM_T inode=0;
     PyObject *skfs_obj;
-    FS_INFO *fs;
+    TSK_FS_INFO *fs;
     int flags;
 
     global_talloc_context = self->context;
@@ -1153,15 +1152,15 @@ skfile_init(skfile *self, PyObject *args, PyObject *kwds) {
      * which will give us the default data attribute). size will also be set
      * during the walk */
 
-    flags = FS_FLAG_FILE_AONLY | FS_FLAG_FILE_RECOVER | FS_FLAG_FILE_NOSPARSE;
+    flags = TSK_FS_FILE_FLAG_AONLY | TSK_FS_FILE_FLAG_RECOVER | TSK_FS_FILE_FLAG_NOSPARSE;
     if(self->id == 0)
-        flags |= FS_FLAG_FILE_NOID;
+        flags |= TSK_FS_FILE_FLAG_NOID;
 
     self->blocks = talloc(self->context, struct block);
     INIT_LIST_HEAD(&self->blocks->list);
     tsk_error_reset();
     fs->file_walk(fs, self->fs_inode, self->type, self->id, flags,
-                 (FS_FILE_WALK_FN) getblocks_walk_callback, (void *)self);
+                 getblocks_walk_callback, (void *)self);
     if(tsk_errno) {
       char *error = error_get();
       PyErr_Format(PyExc_IOError, "Error reading inode: %s", error);
@@ -1186,7 +1185,7 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
     char *buf;
     int written;
     PyObject *retdata;
-    FS_INFO *fs;
+    TSK_FS_INFO *fs;
     int readlen=-1;
     int slack=0, overread=0;
     off_t maxsize;
@@ -1247,7 +1246,7 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
     if(slack && overread) {
         DADDR_T last_block = 0;
         struct block *b;
-        DATA_BUF *blockbuf;
+        TSK_DATA_BUF *blockbuf;
         int len;
 
         list_for_each_entry(b, &self->blocks->list, list) {
@@ -1258,7 +1257,7 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
         last_block++;
 
         /* do a direct block read from the filesystem */
-        blockbuf = data_buf_alloc(fs->block_size);
+        blockbuf = tsk_data_buf_alloc(fs->block_size);
         len = fs_read_block(fs, blockbuf, fs->block_size, last_block);
         if(len > readlen-written) {
             memcpy(buf+written, blockbuf->data, readlen-written);
@@ -1285,7 +1284,7 @@ skfile_seek(skfile *self, PyObject *args, PyObject *kwds) {
     int whence=0;
     int slack=0, overread=0;
     off_t maxsize;
-    FS_INFO *fs;
+    TSK_FS_INFO *fs;
 
     global_talloc_context = self->context;
 
@@ -1367,14 +1366,14 @@ skfile_close(skfile *self) {
  #define MM_TYPE_VOL     0x02
 */
 
-static uint8_t mmls_callback(MM_INFO *mminfo, PNUM_T num, MM_PART *part, int flag, void *ptr) {
+static uint8_t mmls_callback(TSK_MM_INFO *mminfo, PNUM_T num, TSK_MM_PART *part, int flag, void *ptr) {
     PyObject *partlist = (PyObject *)ptr;
     PyObject *thispart;
 
     thispart = Py_BuildValue("(KKsi)", part->start, part->len, part->desc, part->type);
     PyList_Append(partlist, thispart);
     Py_DECREF(thispart);
-    return WALK_CONT;
+    return TSK_WALK_CONT;
 }
 
 static PyObject *mmls(PyObject *self, PyObject *args, PyObject *kwds) {
@@ -1382,8 +1381,8 @@ static PyObject *mmls(PyObject *self, PyObject *args, PyObject *kwds) {
     PyObject *partlist;
     char *mmtype=NULL;
     int imgoff=0;
-    IMG_INFO *img;
-    MM_INFO *mm;
+    TSK_IMG_INFO *img;
+    TSK_MM_INFO *mm;
 
     static char *kwlist[] = {"imgfile", "imgoff", "mmtype", NULL};
 
@@ -1406,7 +1405,7 @@ static PyObject *mmls(PyObject *self, PyObject *args, PyObject *kwds) {
 
     /* initialise the mm layer */
     tsk_error_reset();
-    mm = mm_open(img, imgoff, mmtype);
+    mm = tsk_mm_open(img, imgoff, mmtype);
     if(!mm) {
       char *error = error_get();
       PyErr_Format(PyExc_IOError, "Unable to read partition table: %s", error);

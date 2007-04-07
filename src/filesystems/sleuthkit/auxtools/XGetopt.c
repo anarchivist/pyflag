@@ -149,8 +149,8 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-TSK_TCHAR *optarg;		// global argument pointer
-int optind = 0;			// global argv index
+TSK_TCHAR *optarg;              // global argument pointer
+int optind = 0;                 // global argv index
 
 int
 getopt(int argc, TSK_TCHAR * argv[], TSK_TCHAR * optstring)
@@ -158,54 +158,54 @@ getopt(int argc, TSK_TCHAR * argv[], TSK_TCHAR * optstring)
     static TSK_TCHAR *next = NULL;
     TSK_TCHAR c, *cp;
     if (optind == 0)
-	next = NULL;
+        next = NULL;
 
     optarg = NULL;
 
     if (next == NULL || *next == _TSK_T('\0')) {
-	if (optind == 0)
-	    optind++;
+        if (optind == 0)
+            optind++;
 
-	if (optind >= argc || argv[optind][0] != _TSK_T('-')
-	    || argv[optind][1] == _TSK_T('\0')) {
-	    optarg = NULL;
-	    if (optind < argc)
-		optarg = argv[optind];
-	    return EOF;
-	}
+        if (optind >= argc || argv[optind][0] != _TSK_T('-')
+            || argv[optind][1] == _TSK_T('\0')) {
+            optarg = NULL;
+            if (optind < argc)
+                optarg = argv[optind];
+            return EOF;
+        }
 
-	if (_tcscmp(argv[optind], _TSK_T("--")) == 0) {
-	    optind++;
-	    optarg = NULL;
-	    if (optind < argc)
-		optarg = argv[optind];
-	    return EOF;
-	}
+        if (_tcscmp(argv[optind], _TSK_T("--")) == 0) {
+            optind++;
+            optarg = NULL;
+            if (optind < argc)
+                optarg = argv[optind];
+            return EOF;
+        }
 
-	next = argv[optind];
-	next++;			// skip past -
-	optind++;
+        next = argv[optind];
+        next++;                 // skip past -
+        optind++;
     }
 
     c = *next++;
     cp = _tcschr(optstring, c);
 
     if (cp == NULL || c == _TSK_T(':'))
-	return _TSK_T('?');
+        return _TSK_T('?');
 
     cp++;
     if (*cp == _TSK_T(':')) {
-	if (*next != _TSK_T('\0')) {
-	    optarg = next;
-	    next = NULL;
-	}
-	else if (optind < argc) {
-	    optarg = argv[optind];
-	    optind++;
-	}
-	else {
-	    return _TSK_T('?');
-	}
+        if (*next != _TSK_T('\0')) {
+            optarg = next;
+            next = NULL;
+        }
+        else if (optind < argc) {
+            optarg = argv[optind];
+            optind++;
+        }
+        else {
+            return _TSK_T('?');
+        }
     }
 
     return c;

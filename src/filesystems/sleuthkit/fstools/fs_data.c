@@ -2,10 +2,10 @@
 ** fs_data
 ** The Sleuth Kit 
 **
-** $Date: 2006/11/29 22:02:10 $
+** $Date: 2007/04/05 16:01:58 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
-** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
+** Copyright (c) 2006-2007 Brian Carrier, Basis Technology.  All Rights reserved
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved 
 **
 ** TASK
@@ -16,271 +16,302 @@
 **
 */
 
+/**
+ * \file fs_data.c
+ * Functions to allocate and add structures to maintain generic file
+ * system attributes and run lists.  Currently used only for NTFS, but
+ * could be expanded to other file systems in the future.
+ */
+
 /*
- * The FS_DATA structure is motivated by NTFS.  NTFS (and others) allow
+ * The TSK_FS_DATA structure is motivated by NTFS.  NTFS (and others) allow
  * one to have more than one data area per file.  Furthermore, there is
  * more than one way to store the data (resident in the MFT entry or
  * in the Data Area runs).  To handle this in 
- * a generic format, the FS_DATA structure was created.  
+ * a generic format, the TSK_FS_DATA structure was created.  
  *
- * FS_DATA structures have a type and id that describe it and then
+ * TSK_FS_DATA structures have a type and id that describe it and then
  * a flag identifies it as a resident stream or a non-resident run
- * They form a linked list and are added to the FS_INODE structure
+ * They form a linked list and are added to the TSK_FS_INODE structure
  */
 #include "fs_tools_i.h"
 #include "ntfs.h"
 
-/* 
+/** 
  * Allocates and initializes a new structure.  
- * Specify which type (RES or NON_RES) for autmatic allocation, 
- * else if 0 is specified then a generic one is made
  *
- * Returns NULL on error
+ * @param type The type of attribute to create (Resident or Non-resident)
+ * @returns NULL on error
  */
-FS_DATA *
-fs_data_alloc(uint8_t type)
+TSK_FS_DATA *
+tsk_fs_data_alloc(TSK_FS_DATA_FLAG_ENUM type)
 {
-    FS_DATA *data = (FS_DATA *) mymalloc(sizeof(FS_DATA));
-    if (data == NULL) {
-	return NULL;
+    TSK_FS_DATA *fs_data = (TSK_FS_DATA *) tsk_malloc(sizeof(TSK_FS_DATA));
+    if (fs_data == NULL) {
+        return NULL;
     }
-    data->nsize = 128;
-    if ((data->name = (char *) mymalloc(data->nsize)) == NULL) {
-	free(data);
-	return NULL;
+    fs_data->nsize = 128;
+    if ((fs_data->name = (char *) tsk_malloc(fs_data->nsize)) == NULL) {
+        free(fs_data);
+        return NULL;
     }
 
-    data->size = 0;
-    data->flags = 0;
-    data->run = NULL;
-    data->type = 0;
-    data->next = NULL;
-    data->compsize = 0;
+    fs_data->size = 0;
+    fs_data->flags = 0;
+    fs_data->run = NULL;
+    fs_data->type = 0;
+    fs_data->next = NULL;
+    fs_data->compsize = 0;
 
-    if (type == FS_DATA_NONRES) {
-	data->buflen = 0;
-	data->buf = NULL;
-	data->flags = (FS_DATA_NONRES | FS_DATA_INUSE);
+    if (type == TSK_FS_DATA_NONRES) {
+        fs_data->buflen = 0;
+        fs_data->buf = NULL;
+        fs_data->flags = (TSK_FS_DATA_NONRES | TSK_FS_DATA_INUSE);
     }
-    else if (type == FS_DATA_RES) {
-	data->buflen = 1024;
-	data->buf = (uint8_t *) mymalloc(data->buflen);
-	if (data->buf == NULL) {
-	    free(data->name);
-	    return NULL;
-	}
-	data->flags = (FS_DATA_RES | FS_DATA_INUSE);
+    else if (type == TSK_FS_DATA_RES) {
+        fs_data->buflen = 1024;
+        fs_data->buf = (uint8_t *) tsk_malloc(fs_data->buflen);
+        if (fs_data->buf == NULL) {
+            free(fs_data->name);
+            return NULL;
+        }
+        fs_data->flags = (TSK_FS_DATA_RES | TSK_FS_DATA_INUSE);
     }
     else {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_FS_ARG;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "fs_data_alloc: Invalid Type: %d\n", type);
-	return NULL;
-    }
-
-    return data;
-}
-
-
-/* return NULL On error */
-FS_DATA_RUN *
-fs_data_run_alloc()
-{
-    FS_DATA_RUN *fs_data_run =
-	(FS_DATA_RUN *) mymalloc(sizeof(FS_DATA_RUN));
-    if (fs_data_run == NULL)
-	return NULL;
-
-    memset(fs_data_run, 0, sizeof(FS_DATA_RUN));
-    return fs_data_run;
-}
-
-
-/* Free a data_run list */
-void
-fs_data_run_free(FS_DATA_RUN * run)
-{
-    FS_DATA_RUN *run_prev;
-    while (run) {
-	run_prev = run;
-	run = run->next;
-	run_prev->next = NULL;
-	free(run_prev);
-    }
-}
-
-/* Free the FS_DATA structure */
-void
-fs_data_free(FS_DATA * fs_data)
-{
-    FS_DATA *tmp_data;
-
-    while (fs_data) {
-	tmp_data = fs_data->next;
-
-	fs_data->next = NULL;
-
-	if (fs_data->run)
-	    fs_data_run_free(fs_data->run);
-	fs_data->run = NULL;
-
-	if (fs_data->buf)
-	    free(fs_data->buf);
-	fs_data->buf = NULL;
-
-	if (fs_data->name)
-	    free(fs_data->name);
-	fs_data->name = NULL;
-
-	free(fs_data);
-
-	fs_data = tmp_data;
-    }
-}
-
-/*
- * follow the linked list and clear the flag each time
- * to reset them
- */
-void
-fs_data_clear_list(FS_DATA * data)
-{
-    while (data) {
-	data->size = data->type = data->id = data->flags = 0;
-	if (data->run) {
-	    fs_data_run_free(data->run);
-	    data->run = NULL;
-	    data->runlen = 0;
-	}
-	data = data->next;
-    }
-}
-
-/* 
- * Given the begining of the list, return either an empty element
- * in the list or a new one at the end
- *
- * Preference is given to finding one of the same type to prevent
- * excessive malloc's, but if one is not found then a different
- * type is used: type = [FS_DATA_NONRES | FS_DATA_RES]
- *
- * Return NULL on error
- */
-FS_DATA *
-fs_data_getnew_attr(FS_DATA * begin, uint8_t type)
-{
-    FS_DATA *temp = NULL, *data = begin;
-
-    if ((type != FS_DATA_NONRES) && (type != FS_DATA_RES)) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_FS_ARG;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "Invalid Type in fs_data_getnew_attr()");
-	return NULL;
-    }
-
-    while (data) {
-	if (data->flags == 0) {
-	    if (type == FS_DATA_NONRES) {
-		if (data->run)
-		    break;
-		else if (!temp)
-		    temp = data;
-	    }
-	    /* we want one with an allocated buf */
-	    else {
-		if (data->buflen)
-		    break;
-		else if (!temp)
-		    temp = data;
-	    }
-	}
-	data = data->next;
-    }
-
-    /* if we fell out then check temp */
-    if (!data) {
-	if (temp)
-	    data = temp;
-	else {
-	    /* make a new one */
-	    if ((data = fs_data_alloc(type)) == NULL)
-		return NULL;
-
-	    /* find the end of the list to add this to */
-	    temp = begin;
-	    while ((temp) && (temp->next))
-		temp = temp->next;
-
-	    if (temp)
-		temp->next = data;
-	}
-    }
-
-    data->flags = (FS_DATA_INUSE | type);
-    return data;
-}
-
-/*
- * Search the list of FS_DATA structures for an entry with the same
- * type and id.  If _id_ is 0, then the lowest id of the given type
- * is returned
- *
- * if the entry is not found (or an error occurs), NULL is returned
- * The difference can be determined by checking if tsk_errno is not 0
- *
- */
-FS_DATA *
-fs_data_lookup(FS_DATA * data_head, uint32_t type, uint16_t id)
-{
-    FS_DATA *fs_data = data_head;
-
-    if (!data_head) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_FS_ARG;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "fs_data_lookup: Null head pointer");
-	tsk_errstr2[0] = '\0';
-	return NULL;
-    }
-
-    while (fs_data) {
-	if ((fs_data->flags & FS_DATA_INUSE) &&
-	    (fs_data->type == type) && (fs_data->id == id))
-	    break;
-
-	fs_data = fs_data->next;
-    }
-
-    if ((!fs_data) || (fs_data->type != type) || (fs_data->id != id)) {
-	return NULL;
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_FS_ARG;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "tsk_fs_data_alloc: Invalid Type: %d\n", type);
+        return NULL;
     }
 
     return fs_data;
 }
 
-/*
- * Search the list of FS_DATA structures for an entry with the same
- * type.  The attribute with the lowest id or the default $Data attribute
- * is returned.
- *
- * Return NULL on error or if it is not found
- * The difference between the NULL cases can be determined by checking if
- * tsk_errno is not 0
- */
-FS_DATA *
-fs_data_lookup_noid(FS_DATA * data_head, uint32_t type)
-{
-    FS_DATA *fs_data = data_head;
-    FS_DATA *fs_data_ret = NULL;
 
-    if (!data_head) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_FS_ARG;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "fs_data_lookup_noid: NULL head pointer");
-	return NULL;
+/**
+ * Allocate a run list entry.
+ *
+ * @returns NULL on error
+ */
+TSK_FS_DATA_RUN *
+tsk_fs_data_run_alloc()
+{
+    TSK_FS_DATA_RUN *fs_data_run =
+        (TSK_FS_DATA_RUN *) tsk_malloc(sizeof(TSK_FS_DATA_RUN));
+    if (fs_data_run == NULL)
+        return NULL;
+
+    memset(fs_data_run, 0, sizeof(TSK_FS_DATA_RUN));
+    return fs_data_run;
+}
+
+
+/**
+ * Free a list of data_runs
+ *
+ * @param fs_data_run Head of list to free
+ */
+void
+tsk_fs_data_run_free(TSK_FS_DATA_RUN * fs_data_run)
+{
+    TSK_FS_DATA_RUN *fs_data_run_prev;
+    while (fs_data_run) {
+        fs_data_run_prev = fs_data_run;
+        fs_data_run = fs_data_run->next;
+        fs_data_run_prev->next = NULL;
+        free(fs_data_run_prev);
+    }
+}
+
+/**
+ * Free the list of TSK_FS_DATA structures and the runs that
+ * they allocated.
+ *
+ * @param fs_data_head List of structures to free.
+ */
+void
+tsk_fs_data_free(TSK_FS_DATA * fs_data_head)
+{
+    TSK_FS_DATA *fs_data_tmp;
+
+    while (fs_data_head) {
+        fs_data_tmp = fs_data_head->next;
+
+        fs_data_head->next = NULL;
+
+        if (fs_data_head->run)
+            tsk_fs_data_run_free(fs_data_head->run);
+        fs_data_head->run = NULL;
+
+        if (fs_data_head->buf)
+            free(fs_data_head->buf);
+        fs_data_head->buf = NULL;
+
+        if (fs_data_head->name)
+            free(fs_data_head->name);
+        fs_data_head->name = NULL;
+
+        free(fs_data_head);
+
+        fs_data_head = fs_data_tmp;
+    }
+}
+
+/**
+ * Clear the fields and run_lists in the FS_DATA list.
+ *
+ * @param fs_data_head List of attributes to clear
+ */
+void
+tsk_fs_data_clear_list(TSK_FS_DATA * fs_data_head)
+{
+    while (fs_data_head) {
+        fs_data_head->size = fs_data_head->type = fs_data_head->id =
+            fs_data_head->flags = 0;
+        if (fs_data_head->run) {
+            tsk_fs_data_run_free(fs_data_head->run);
+            fs_data_head->run = NULL;
+            fs_data_head->allocsize = 0;
+        }
+        fs_data_head = fs_data_head->next;
+    }
+}
+
+/** 
+ * Given the begining of the list, return either an empty element
+ * in the list or a new one at the end
+ *
+ * Preference is given to finding one of the same type to prevent
+ * excessive malloc's, but if one is not found then a different
+ * type is used: type = [TSK_FS_DATA_NONRES | TSK_FS_DATA_RES]
+ *
+ * @param fs_data_head Head of attribute list to search
+ * @param type Preference for attribute type to reuse
+ * @return NULL on error or attribute in list to use
+ */
+TSK_FS_DATA *
+tsk_fs_data_getnew_attr(TSK_FS_DATA * fs_data_head,
+    TSK_FS_DATA_FLAG_ENUM type)
+{
+    TSK_FS_DATA *fs_data_tmp = NULL, *fs_data = fs_data_head;
+
+    if ((type != TSK_FS_DATA_NONRES) && (type != TSK_FS_DATA_RES)) {
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_FS_ARG;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "Invalid Type in tsk_fs_data_getnew_attr()");
+        return NULL;
+    }
+
+    while (fs_data) {
+        if (fs_data->flags == 0) {
+            if (type == TSK_FS_DATA_NONRES) {
+                if (fs_data->run)
+                    break;
+                else if (!fs_data_tmp)
+                    fs_data_tmp = fs_data;
+            }
+            /* we want one with an allocated buf */
+            else {
+                if (fs_data->buflen)
+                    break;
+                else if (!fs_data_tmp)
+                    fs_data_tmp = fs_data;
+            }
+        }
+        fs_data = fs_data->next;
+    }
+
+    /* if we fell out then check fs_data_tmp */
+    if (!fs_data) {
+        if (fs_data_tmp)
+            fs_data = fs_data_tmp;
+        else {
+            /* make a new one */
+            if ((fs_data = tsk_fs_data_alloc(type)) == NULL)
+                return NULL;
+
+            /* find the end of the list to add this to */
+            fs_data_tmp = fs_data_head;
+            while ((fs_data_tmp) && (fs_data_tmp->next))
+                fs_data_tmp = fs_data_tmp->next;
+
+            if (fs_data_tmp)
+                fs_data_tmp->next = fs_data;
+        }
+    }
+
+    fs_data->flags = (TSK_FS_DATA_INUSE | type);
+    return fs_data;
+}
+
+/**
+ * Search the list of TSK_FS_DATA structures for an entry with a given 
+ * type and id.  
+ *
+ * @param fs_data_head Head of fs_data list to search
+ * @param type Type of attribute to find
+ * @param id Id of attribute to find.  If 0, then the lowest id of the
+ * given type is returned. 
+ *
+ * @return NULL is returned on error and if an entry could not be found.
+ * tsk_errno will be set to 0 if entry could not be found and it will be
+ * non-zero if an error occured.
+ */
+TSK_FS_DATA *
+tsk_fs_data_lookup(TSK_FS_DATA * fs_data_head, uint32_t type, uint16_t id)
+{
+    TSK_FS_DATA *fs_data = fs_data_head;
+
+    if (!fs_data_head) {
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_FS_ARG;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "tsk_fs_data_lookup: Null head pointer");
+        tsk_errstr2[0] = '\0';
+        return NULL;
+    }
+
+    while (fs_data) {
+        if ((fs_data->flags & TSK_FS_DATA_INUSE) &&
+            (fs_data->type == type) && (fs_data->id == id))
+            break;
+
+        fs_data = fs_data->next;
+    }
+
+    if ((!fs_data) || (fs_data->type != type) || (fs_data->id != id)) {
+        return NULL;
+    }
+
+    return fs_data;
+}
+
+/**
+ * Search the list of TSK_FS_DATA structures for an entry with a given 
+ * type (and ANY id).  The attribute with the lowest id (or the named
+ * $Data attribute if that type is specified) is returned. 
+ *
+ * @param fs_data_head Head of fs_data list to search
+ * @param type Type of attribute to find
+ *
+ * @return NULL is returned on error and if an entry could not be found.
+ * tsk_errno will be set to 0 if entry could not be found and it will be
+ * non-zero if an error occured.
+ */
+TSK_FS_DATA *
+tsk_fs_data_lookup_noid(TSK_FS_DATA * fs_data_head, uint32_t type)
+{
+    TSK_FS_DATA *fs_data = fs_data_head;
+    TSK_FS_DATA *fs_data_ret = NULL;
+
+    if (!fs_data_head) {
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_FS_ARG;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "tsk_fs_data_lookup_noid: NULL head pointer");
+        return NULL;
     }
 
     /* If no id was given, then we will return the entry with the
@@ -288,271 +319,287 @@ fs_data_lookup_noid(FS_DATA * data_head, uint32_t type)
      */
 
     while (fs_data) {
-	if ((fs_data->flags & FS_DATA_INUSE) && (fs_data->type == type)) {
+        if ((fs_data->flags & TSK_FS_DATA_INUSE)
+            && (fs_data->type == type)) {
 
-	    /* replace existing if new is lower */
-	    if ((!fs_data_ret) || (fs_data_ret->id > fs_data->id))
-		fs_data_ret = fs_data;
+            /* replace existing if new is lower */
+            if ((!fs_data_ret) || (fs_data_ret->id > fs_data->id))
+                fs_data_ret = fs_data;
 
-	    /* If we are looking for NTFS $Data, 
-	     * then return default when we see it */
-	    if ((fs_data->type == NTFS_ATYPE_DATA) &&
-		(fs_data->nsize > 5) &&
-		(strncmp(fs_data->name, "$Data", 5) == 0)) {
-		fs_data_ret = fs_data;
-		break;
-	    }
-	}
-	fs_data = fs_data->next;
+            /* If we are looking for NTFS $Data, 
+             * then return default when we see it */
+            if ((fs_data->type == NTFS_ATYPE_DATA) &&
+                (fs_data->nsize > 5) &&
+                (strncmp(fs_data->name, "$Data", 5) == 0)) {
+                fs_data_ret = fs_data;
+                break;
+            }
+        }
+        fs_data = fs_data->next;
     }
     return fs_data_ret;
 }
 
 
 
-/* Add _name_ to the FS_DATA structure 
+/**
+ * Add a name to an existing FS_DATA structure.  Will reallocate
+ * space for the name if needed.
  *
- * Handles the size reallocation if needed
+ * @param fs_data Structure to add name to
+ * @param name UTF-8 name to add
  *
- * Returns 1 on error and 0 on success
+ * @return 1 on error and 0 on success
  */
 static uint8_t
-fs_data_put_name(FS_DATA * data, char *name)
+fs_data_put_name(TSK_FS_DATA * fs_data, char *name)
 {
-    if (data->nsize < (strlen(name) + 1)) {
-	data->name = myrealloc(data->name, strlen(name) + 1);
-	if (data->name == NULL)
-	    return 1;
-	data->nsize = strlen(name) + 1;
+    if (fs_data->nsize < (strlen(name) + 1)) {
+        fs_data->name = tsk_realloc(fs_data->name, strlen(name) + 1);
+        if (fs_data->name == NULL)
+            return 1;
+        fs_data->nsize = strlen(name) + 1;
     }
-    strncpy(data->name, name, data->nsize);
+    strncpy(fs_data->name, name, fs_data->nsize);
     return 0;
 }
 
-/*
- * put the resident data at "addr" which has size len into the
- * data_head list.  if _data_head_ is NULL, a new list will be started
+/**
+ * Copy resident data to an attribute in the list. If no attributes
+ * exist yet, one will be created and the head of the resulting list 
+ * will be returned. 
  *
- * the head of the list is returned
- *
- * NULL is returned on error
+ * @param fs_data_head Head of the attribute list (or NULL if empty)
+ * @param name Name of the attribute to add
+ * @param type Type of the attribute to add
+ * @param id Id of the attribute to add
+ * @param res_data Pointer to where resident data is located (data will
+ * be copied from here into FS_DATA)
+ * @param len Length of resident data
+ * @return NULL on error or head of attribute list
  */
-FS_DATA *
-fs_data_put_str(FS_DATA * data_head, char *name, uint32_t type,
-    uint16_t id, void *addr, unsigned int len)
+TSK_FS_DATA *
+tsk_fs_data_put_str(TSK_FS_DATA * fs_data_head, char *name, uint32_t type,
+    uint16_t id, void *res_data, unsigned int len)
 {
-    FS_DATA *data;
+    TSK_FS_DATA *fs_data;
 
     /* get a new attribute entry in the list */
-    if ((data = fs_data_getnew_attr(data_head, FS_DATA_RES)) == NULL)
-	return NULL;
+    if ((fs_data =
+            tsk_fs_data_getnew_attr(fs_data_head,
+                TSK_FS_DATA_RES)) == NULL)
+        return NULL;
 
     /* if the head of the list is null, then set it now */
-    if (!data_head)
-	data_head = data;
+    if (!fs_data_head)
+        fs_data_head = fs_data;
 
 
-    data->flags = (FS_DATA_INUSE | FS_DATA_RES);
-    data->type = type;
-    data->id = id;
-    data->compsize = 0;
+    fs_data->flags = (TSK_FS_DATA_INUSE | TSK_FS_DATA_RES);
+    fs_data->type = type;
+    fs_data->id = id;
+    fs_data->compsize = 0;
 
-    if (fs_data_put_name(data, name)) {
-	return NULL;
+    if (fs_data_put_name(fs_data, name)) {
+        return NULL;
     }
 
-    if (data->buflen < len) {
-	data->buf = (uint8_t *) myrealloc((char *) data->buf, len);
-	if (data->buf == NULL)
-	    return NULL;
-	data->buflen = len;
+    if (fs_data->buflen < len) {
+        fs_data->buf = (uint8_t *) tsk_realloc((char *) fs_data->buf, len);
+        if (fs_data->buf == NULL)
+            return NULL;
+        fs_data->buflen = len;
     }
 
-    memset(data->buf, 0, data->buflen);
-    memcpy(data->buf, addr, len);
-    data->size = len;
+    memset(fs_data->buf, 0, fs_data->buflen);
+    memcpy(fs_data->buf, res_data, len);
+    fs_data->size = len;
 
-    return data_head;
+    return fs_data_head;
 }
 
 
-/*
- * Add a data_run of the specified type and id to the data_head list.
- * If a list head does not exist yet, a new one will be created.  The
- * list head is returned.
- *
+/**
+ * Add a set of consecutive runs of an attribute of a specified type 
+ * and id.
+ * This function first determines if the attribute exists and then
+ * either creates the attribute or adds to it. 
  * This is complicated because we could get the runs out of order
- * so we use "filler" FS_DATA_RUN structures during the process
+ * so we use "filler" TSK_FS_DATA_RUN structures during the process
  *
- * start_vcn: The virtual cluster number of this run in the file
- * runlen: length of this run
- * run: the structure to add to the list
- * name: name of the attribute
- * type & id: The Type and id of the attribute
- * size: total size of the attribute
- * compsize: Compression unit size
+ * @param fs_data_head The head of the list of attributes (or NULL if list is empty)
+ * @param start_vcn The virtual cluster number of the start of this run
+ * in the attribute.
+ * @param runlen The total number of clusters in this set of runs.
+ * @param run The set of runs to add 
+ * @param name Name of the attribute (in case it needs to be created)
+ * @param type Type of attribute to add run to
+ * @param id Id of attribute to add run to
+ * @param size Total size of the attribute (in case it needs to be created)
+ * @param flags Flags about compression, sparse etc. of data
+ * @param compsize Compression unit size (in case it needs to be created)
  *
- * NULL is returned on error
+ * @returns The head of the list or NULL on error
  */
-FS_DATA *
-fs_data_put_run(FS_DATA * data_head,
-    DADDR_T start_vcn, OFF_T runlen, FS_DATA_RUN * run,
-    char *name, uint32_t type, uint16_t id, OFF_T size, uint8_t flags,
-    uint32_t compsize)
+TSK_FS_DATA *
+tsk_fs_data_put_run(TSK_FS_DATA * fs_data_head,
+    DADDR_T start_vcn, OFF_T runlen, TSK_FS_DATA_RUN * run,
+    char *name, uint32_t type, uint16_t id, OFF_T size,
+    TSK_FS_DATA_FLAG_ENUM flags, uint32_t compsize)
 {
-    FS_DATA *data = NULL;
-    FS_DATA_RUN *data_run, *data_run_prev;
-    DADDR_T cur_vcn = 0;
+    TSK_FS_DATA *fs_data = NULL;
+    TSK_FS_DATA_RUN *data_run, *data_run_prev;
+    DADDR_T cur_vcn;
 
     tsk_error_reset();
 
     /* First thing is to find the existing data attribute */
-    if (data_head)
-	data = fs_data_lookup(data_head, type, id);
+    if (fs_data_head)
+        fs_data = tsk_fs_data_lookup(fs_data_head, type, id);
 
     /* one does not already exist, so get a new one */
-    if (!data) {
+    if (fs_data == NULL) {
 
-	/* fs_data_lookup returns NULL both on error and if it can't find 
-	 * the attribute, so check errno */
-	if (tsk_errno != 0)
-	    return NULL;
+        /* tsk_fs_data_lookup returns NULL both on error and if it can't find 
+         * the attribute, so check errno */
+        if (tsk_errno != 0)
+            return NULL;
 
-	/* get a new attribute entry in the list */
-	if ((data =
-		fs_data_getnew_attr(data_head, FS_DATA_NONRES)) == NULL)
-	    return NULL;
-
-
-	/* if the head of the list is null, then set it now */
-	if (!data_head)
-	    data_head = data;
-
-	data->flags = (FS_DATA_INUSE | FS_DATA_NONRES | flags);
-	data->type = type;
-	data->id = id;
-	data->size = size;
-	data->compsize = compsize;
-
-	if (fs_data_put_name(data, name)) {
-	    return NULL;
-	}
+        /* get a new attribute entry in the list */
+        if ((fs_data =
+                tsk_fs_data_getnew_attr(fs_data_head,
+                    TSK_FS_DATA_NONRES)) == NULL)
+            return NULL;
 
 
-	/* if this is not in the begining, then we need to make a filler 
-	 * to account for the cluster numbers we haven't seen yet
-	 *
-	 * This commonly happens when we process an MFT entry tha
-	 * is not a base entry and it is referenced in an $ATTR_LIST
-	 *
-	 * The $DATA attribute in the non-base have a non-zero
-	 * start_vcn.  
-	 */
-	if (start_vcn != 0) {
-	    FS_DATA_RUN *fill = fs_data_run_alloc();
-	    fill->flags = FS_DATA_FILLER;
-	    fill->addr = 0;
-	    fill->len = start_vcn;
-	    fill->next = run;
-	    run = fill;
-	}
+        /* if the head of the list is null, then set it now */
+        if (!fs_data_head)
+            fs_data_head = fs_data;
 
-	data->runlen = runlen;
-	data->run = run;
+        fs_data->flags = (TSK_FS_DATA_INUSE | TSK_FS_DATA_NONRES | flags);
+        fs_data->type = type;
+        fs_data->id = id;
+        fs_data->size = size;
+        fs_data->compsize = compsize;
 
-	return data_head;
+        if (fs_data_put_name(fs_data, name)) {
+            return NULL;
+        }
+
+
+        /* Add the run to the attribute.
+         *
+         * If this is not in the begining, then we need to make a filler 
+         * to account for the cluster numbers we haven't seen yet
+         *
+         * This commonly happens when we process an MFT entry that
+         * is not a base entry and it is referenced in an $ATTR_LIST
+         *
+         * The $DATA attribute in the non-base have a non-zero
+         * start_vcn.  
+         */
+        if (start_vcn != 0) {
+            TSK_FS_DATA_RUN *fill_run = tsk_fs_data_run_alloc();
+            fill_run->flags = TSK_FS_DATA_RUN_FLAG_FILLER;
+            fill_run->addr = 0;
+            fill_run->len = start_vcn;
+            fill_run->next = run;
+            run = fill_run;
+        }
+
+        fs_data->allocsize = runlen;
+        fs_data->run = run;
+
+        return fs_data_head;
     }
 
     /* 
-     * The data type and id already exist, so we will either add to 
+     * An attribute of this type and id already exist, 
+     * so we will either add to 
      * the end of it or replace a filler object with real data
      */
 
-    data_run = data->run;
+    data_run = fs_data->run;
     data_run_prev = NULL;
-
+    cur_vcn = 0;
     while (data_run) {
 
-	/* Do we replace this filler spot? */
-	if (data_run->flags & FS_DATA_FILLER) {
+        /* Do we replace this filler spot? */
+        if (data_run->flags & TSK_FS_DATA_RUN_FLAG_FILLER) {
 
-	    /* This should never happen because we always add 
-	     * the filler to start from VCN 0
-	     */
-	    if (cur_vcn > start_vcn) {
-		tsk_error_reset();
-		tsk_errno = TSK_ERR_FS_ARG;
-		snprintf(tsk_errstr, TSK_ERRSTR_L,
-		    "fs_data_put_run: could not add data_run");
-		return NULL;
-	    }
+            /* This should never happen because we always add 
+             * the filler to start from VCN 0
+             */
+            if (cur_vcn > start_vcn) {
+                tsk_error_reset();
+                tsk_errno = TSK_ERR_FS_ARG;
+                snprintf(tsk_errstr, TSK_ERRSTR_L,
+                    "tsk_fs_data_put_run: could not add data_run");
+                return NULL;
+            }
 
-	    /* The current filler ends after where we need to 
-	     * start, so it will be added here 
-	     */
-	    if (cur_vcn + data_run->len > start_vcn) {
-		FS_DATA_RUN *endrun;
+            /* The current filler ends after where we need to 
+             * start, so it will be added here 
+             */
+            if (cur_vcn + data_run->len > start_vcn) {
+                TSK_FS_DATA_RUN *endrun;
 
-		/* if the new starts at the same as the filler, 
-		 * replace the pointer */
-		if (cur_vcn == start_vcn) {
-		    if (data_run_prev)
-			data_run_prev->next = run;
-		    else
-			data->run = run;
-		}
-		/* The new run does not start at the begining of
-		 * the filler, so make a new start filler
-		 */
-		else {
-		    FS_DATA_RUN *newfill = fs_data_run_alloc();
-		    if (newfill == NULL)
-			return NULL;
+                /* if the new starts at the same as the filler, 
+                 * replace the pointer */
+                if (cur_vcn == start_vcn) {
+                    if (data_run_prev)
+                        data_run_prev->next = run;
+                    else
+                        fs_data->run = run;
+                }
+                /* The new run does not start at the begining of
+                 * the filler, so make a new start filler
+                 */
+                else {
+                    TSK_FS_DATA_RUN *newfill = tsk_fs_data_run_alloc();
+                    if (newfill == NULL)
+                        return NULL;
 
-		    if (data_run_prev)
-			data_run_prev->next = newfill;
-		    else
-			data->run = newfill;
+                    if (data_run_prev)
+                        data_run_prev->next = newfill;
+                    else
+                        fs_data->run = newfill;
 
-		    newfill->next = run;
-		    newfill->len = start_vcn - cur_vcn;
-		    newfill->flags = FS_DATA_FILLER;
+                    newfill->next = run;
+                    newfill->len = start_vcn - cur_vcn;
+                    newfill->flags = TSK_FS_DATA_RUN_FLAG_FILLER;
 
-		    data_run->len -= newfill->len;
-		}
+                    data_run->len -= newfill->len;
+                }
 
-		/* get to the end of the run that we are trying
-		 * to insert
-		 */
-		endrun = run;
-		while (endrun->next)
-		    endrun = endrun->next;
+                /* get to the end of the run that we are trying
+                 * to insert
+                 */
+                endrun = run;
+                while (endrun->next)
+                    endrun = endrun->next;
 
-		/* if the filler is the same size as the
-		 * new one, replace it 
-		 */
-		if (runlen == data_run->len) {
-		    endrun->next = data_run->next;
-		    free(data_run);
-		}
-		/* else adjust the last filler entry */
-		else {
-		    endrun->next = data_run;
-		    data_run->len -= runlen;
-		}
+                /* if the filler is the same size as the
+                 * new one, replace it 
+                 */
+                if (runlen == data_run->len) {
+                    endrun->next = data_run->next;
+                    free(data_run);
+                }
+                /* else adjust the last filler entry */
+                else {
+                    endrun->next = data_run;
+                    data_run->len -= runlen;
+                }
 
-		return data_head;
+                return fs_data_head;
+            }
+        }
 
-	    }			/* end of replacing a filler */
-
-	}			/* end of if filler */
-
-	cur_vcn += data_run->len;
-	data_run_prev = data_run;
-	data_run = data_run->next;
-
-    }				/* end of loop */
-
+        cur_vcn += data_run->len;
+        data_run_prev = data_run;
+        data_run = data_run->next;
+    }
 
 
     /* 
@@ -573,51 +620,51 @@ fs_data_put_run(FS_DATA * data_head,
      */
     if (cur_vcn > start_vcn) {
 
-	/* MAYBE this is because of a duplicate entry .. */
-	if ((data_run_prev) &&
-	    (data_run_prev->addr == run->addr) &&
-	    (data_run_prev->len == run->len)) {
-	    fs_data_run_free(run);
-	    return data_head;
-	}
+        /* MAYBE this is because of a duplicate entry .. */
+        if ((data_run_prev) &&
+            (data_run_prev->addr == run->addr) &&
+            (data_run_prev->len == run->len)) {
+            tsk_fs_data_run_free(run);
+            return fs_data_head;
+        }
 
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_FS_ARG;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "fs_data_run: error adding aditional run: %" PRIuDADDR
-	    ", Previous %" PRIuDADDR " -> %" PRIuDADDR "   Current %"
-	    PRIuDADDR " -> %" PRIuDADDR "\n", start_vcn,
-	    data_run_prev->addr, data_run_prev->len, run->addr, run->len);
-	return NULL;
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_FS_ARG;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "fs_data_run: error adding aditional run: %" PRIuDADDR
+            ", Previous %" PRIuDADDR " -> %" PRIuDADDR "   Current %"
+            PRIuDADDR " -> %" PRIuDADDR "\n", start_vcn,
+            data_run_prev->addr, data_run_prev->len, run->addr, run->len);
+        return NULL;
     }
 
     /* we should add it right here */
     else if (cur_vcn == start_vcn) {
-	if (data_run_prev)
-	    data_run_prev->next = run;
-	else
-	    data->run = run;
+        if (data_run_prev)
+            data_run_prev->next = run;
+        else
+            fs_data->run = run;
     }
     /* we need to make a filler before it */
     else {
-	FS_DATA_RUN *tmprun = fs_data_run_alloc();
-	if (tmprun == NULL)
-	    return NULL;
+        TSK_FS_DATA_RUN *tmprun = tsk_fs_data_run_alloc();
+        if (tmprun == NULL)
+            return NULL;
 
-	if (data_run_prev)
-	    data_run_prev->next = tmprun;
-	else
-	    data->run = tmprun;
-	tmprun->len = start_vcn - cur_vcn;
-	tmprun->flags = FS_DATA_FILLER;
-	tmprun->next = run;
+        if (data_run_prev)
+            data_run_prev->next = tmprun;
+        else
+            fs_data->run = tmprun;
+        tmprun->len = start_vcn - cur_vcn;
+        tmprun->flags = TSK_FS_DATA_RUN_FLAG_FILLER;
+        tmprun->next = run;
     }
 
-    /* Adjust the length of the FS_DATA structure to reflect the 
+    /* Adjust the length of the TSK_FS_DATA structure to reflect the 
      * new run
      */
-    data->runlen += runlen;
+    fs_data->allocsize += runlen;
 
     /* return head of fs_data list */
-    return data_head;
+    return fs_data_head;
 }

@@ -5,16 +5,16 @@
  */
 /*++
 * NAME
-*	mymalloc 3
+*	tsk_malloc 3
 * SUMMARY
 *	memory management wrappers
 * SYNOPSIS
-*	#include <mymalloc.h>
+*	#include <tsk_malloc.h>
 *
-*	char	*mymalloc(len)
+*	char	*tsk_malloc(len)
 *	int	len;
 *
-*	char	*myrealloc(ptr, len)
+*	char	*tsk_realloc(ptr, len)
 *	char	*ptr;
 *	int	len;
 *
@@ -25,15 +25,15 @@
 *	handling. A call of these functions either succeeds or it does
 *	not return at all.
 *
-*	mymalloc() allocates the requested amount of memory. The memory
+*	tsk_malloc() allocates the requested amount of memory. The memory
 *	is not set to zero.
 *
-*	myrealloc() resizes memory obtained from mymalloc() or myrealloc()
+*	tsk_realloc() resizes memory obtained from tsk_malloc() or tsk_realloc()
 *	to the requested size. The result pointer value may differ from
 *	that given via the \fBptr\fR argument.
 *
 *	mystrdup() returns a dynamic-memory copy of its null-terminated
-*	argument. This routine uses mymalloc().
+*	argument. This routine uses tsk_malloc().
 * SEE ALSO
 *	error(3) error reporting module.
 * DIAGNOSTICS
@@ -65,34 +65,33 @@
 
 #include "talloc.h"
 
-
-/* mymalloc - allocate memory and set error values on error
- */
 void *global_talloc_context=NULL;
 
+/* tsk_malloc - allocate memory and set error values on error
+ */
 char *
-mymalloc(size_t len)
+tsk_malloc(size_t len)
 {
     char *ptr;
 
     if ((ptr = (char *) talloc_zero_size(global_talloc_context, len)) == 0) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_AUX_MALLOC;
-	snprintf(tsk_errstr, TSK_ERRSTR_L, "mymalloc: %s",
-	    strerror(errno));
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_AUX_MALLOC;
+        snprintf(tsk_errstr, TSK_ERRSTR_L, "tsk_malloc: %s",
+            strerror(errno));
     }
     return (ptr);
 }
 
-/* myrealloc - reallocate memory and set error values if needed */
+/* tsk_realloc - reallocate memory and set error values if needed */
 char *
-myrealloc(char *ptr, size_t len)
+tsk_realloc(char *ptr, size_t len)
 {
     if ((ptr = (char *) talloc_realloc_size(global_talloc_context, ptr, len)) == 0) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_AUX_MALLOC;
-	snprintf(tsk_errstr, TSK_ERRSTR_L, "myrealloc: %s",
-	    strerror(errno));
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_AUX_MALLOC;
+        snprintf(tsk_errstr, TSK_ERRSTR_L, "tsk_realloc: %s",
+            strerror(errno));
     }
     return (ptr);
 }

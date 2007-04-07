@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2006/11/29 22:02:16 $
+ * $Date: 2007/04/04 18:48:46 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2006 Brian Carrier, Basis Technology.  All rights reserved
@@ -29,53 +29,55 @@
  * Returns the size read or -1 on error */
 
 SSIZE_T
-mm_read_block(MM_INFO * mm, DATA_BUF * buf, OFF_T len, DADDR_T addr)
+mm_read_block(TSK_MM_INFO * mm, TSK_DATA_BUF * buf, OFF_T len,
+    DADDR_T addr)
 {
     OFF_T ofmm;
     SSIZE_T cnt;
 
     if (len % mm->dev_bsize) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_MM_READ;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "mm_read_block: length %" PRIuOFF " not a multiple of %d",
-	    len, mm->dev_bsize);
-	return -1;
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_MM_READ;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "mm_read_block: length %" PRIuOFF " not a multiple of %d",
+            len, mm->dev_bsize);
+        return -1;
     }
 
 
     if (len > buf->size) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_MM_READ;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "mm_read_block: buffer too small - %"
-	    PRIuOFF " > %Zd", len, buf->size);
-	return -1;
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_MM_READ;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "mm_read_block: buffer too small - %"
+            PRIuOFF " > %Zd", len, buf->size);
+        return -1;
     }
 
     buf->addr = addr;
     ofmm = (OFF_T) addr *mm->block_size;
 
     cnt =
-	mm->img_info->read_random(mm->img_info, mm->offset, buf->data, len,
-	ofmm);
+        mm->img_info->read_random(mm->img_info, mm->offset, buf->data, len,
+        ofmm);
     buf->used = cnt;
     return cnt;
 }
 
 /* Return number of bytes read or -1 on error */
 SSIZE_T
-mm_read_block_nobuf(MM_INFO * mm, char *buf, OFF_T len, DADDR_T addr)
+tsk_mm_read_block_nobuf(TSK_MM_INFO * mm, char *buf, OFF_T len,
+    DADDR_T addr)
 {
     if (len % mm->dev_bsize) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_MM_READ;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "mm_read_block_nobuf: length %" PRIuOFF
-	    " not a multiple of %d", len, mm->dev_bsize);
-	return -1;
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_MM_READ;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "tsk_mm_read_block_nobuf: length %" PRIuOFF
+            " not a multiple of %d", len, mm->dev_bsize);
+        return -1;
     }
 
     return mm->img_info->read_random(mm->img_info, mm->offset, buf, len,
-	(OFF_T) addr * mm->block_size);
+        (OFF_T) addr * mm->block_size);
 }

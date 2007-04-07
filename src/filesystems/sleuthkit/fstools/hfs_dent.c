@@ -59,11 +59,9 @@
 
 #include "fs_tools_i.h"
 #include "hfs.h"
-#include "fs_data.h"
-#include "hfs.h"
 
 
-#include <ctype.h>		/* for isprint in hfs_uni2ascii() */
+#include <ctype.h>              /* for isprint in hfs_uni2ascii() */
 
 
 #define MAX_DEPTH   64
@@ -92,14 +90,14 @@ typedef struct {
 } HFS_DINFO;
 
 
-static void
- hfs_dent_walk_lcl(FS_INFO *, HFS_DINFO *, INUM_T, int,
-    FS_DENT_WALK_FN, void *);
+static uint8_t
+hfs_dent_walk_lcl(TSK_FS_INFO *, HFS_DINFO *, INUM_T,
+    TSK_FS_DENT_FLAG_ENUM, TSK_FS_DENT_TYPE_WALK_CB, void *);
 
 
 /* convert unicode to ascii */
 void
-hfs_uni2ascii(FS_INFO * fs, char *uni, int ulen, char *asc, int alen)
+hfs_uni2ascii(TSK_FS_INFO * fs, char *uni, int ulen, char *asc, int alen)
 {
     int i, l;
 
@@ -108,46 +106,46 @@ hfs_uni2ascii(FS_INFO * fs, char *uni, int ulen, char *asc, int alen)
      * absolute max
      */
     if ((ulen + 1) > alen)
-	l = alen - 1;
+        l = alen - 1;
     else
-	l = ulen;
+        l = ulen;
 
     if (fs->endian & TSK_LIT_ENDIAN) {
 
-	for (i = 0; i < l; i++) {
-	    /* If this value is NULL, then stop */
-	    if (uni[i * 2] == 0 && uni[i * 2 + 1] == 0)
-		break;
+        for (i = 0; i < l; i++) {
+            /* If this value is NULL, then stop */
+            if (uni[i * 2] == 0 && uni[i * 2 + 1] == 0)
+                break;
 
-	    if (isprint((int) uni[i * 2]))
-		asc[i] = uni[i * 2];
-	    else
-		asc[i] = '?';
-	}
+            if (isprint((int) uni[i * 2]))
+                asc[i] = uni[i * 2];
+            else
+                asc[i] = '?';
+        }
 
-	/* handle big endian unicode - TODO: suggest changing unicode.c to Brian */
+        /* handle big endian unicode - TODO: suggest changing unicode.c to Brian */
 
-	/* also, HFS has some filenames that have nulls in their name, so stopping
-	 * on the first null can be bad.  one example is the file 
-	 * HFS+ Private Data which is preceded by 4 nulls in its name.
-	 *
-	 * read about that here:
-	 * http://developer.apple.com/technotes/tn/tn1150.html#HardLinks
-	 */
+        /* also, HFS has some filenames that have nulls in their name, so stopping
+         * on the first null can be bad.  one example is the file 
+         * HFS+ Private Data which is preceded by 4 nulls in its name.
+         *
+         * read about that here:
+         * http://developer.apple.com/technotes/tn/tn1150.html#HardLinks
+         */
 
     }
     else {
 
-	for (i = 0; i < l; i++) {
-	    /* If this value is NULL, then stop */
-	    if (uni[i * 2] == 0 && uni[i * 2 + 1] == 0)
-		break;
+        for (i = 0; i < l; i++) {
+            /* If this value is NULL, then stop */
+            if (uni[i * 2] == 0 && uni[i * 2 + 1] == 0)
+                break;
 
-	    if (isprint((int) uni[(i * 2) + 1]))
-		asc[i] = uni[(i * 2) + 1];
-	    else
-		asc[i] = '?';
-	}
+            if (isprint((int) uni[(i * 2) + 1]))
+                asc[i] = uni[(i * 2) + 1];
+            else
+                asc[i] = '?';
+        }
     }
 
     /* NULL Terminate */
@@ -156,42 +154,45 @@ hfs_uni2ascii(FS_INFO * fs, char *uni, int ulen, char *asc, int alen)
 }
 
 
-void
-hfs_dent_walk(FS_INFO * fs, INUM_T inum, int flags,
-    FS_DENT_WALK_FN action, void *ptr)
+uint8_t
+hfs_dent_walk(TSK_FS_INFO * fs, INUM_T inum, TSK_FS_DENT_FLAG_ENUM flags,
+    TSK_FS_DENT_TYPE_WALK_CB action, void *ptr)
 {
     HFS_DINFO dinfo;
     memset(&dinfo, 0, sizeof(HFS_DINFO));
-    hfs_dent_walk_lcl(fs, &dinfo, inum, flags, action, ptr);
+    return hfs_dent_walk_lcl(fs, &dinfo, inum, flags, action, ptr);
 }
 
 
-void
-hfs_dent_walk_lcl(FS_INFO * fs, HFS_DINFO * dinfo, INUM_T inum,
-    int flags, FS_DENT_WALK_FN action, void *ptr)
+uint8_t
+hfs_dent_walk_lcl(TSK_FS_INFO * fs, HFS_DINFO * dinfo, INUM_T inum,
+    TSK_FS_DENT_FLAG_ENUM flags, TSK_FS_DENT_TYPE_WALK_CB action,
+    void *ptr)
 {
-    FS_DENT *fs_dent = fs_dent_alloc(HFS_MAXNAMLEN, 0);
+    TSK_FS_DENT *fs_dent;
     HFS_INFO *hfs = (HFS_INFO *) fs;
     uint8_t ucs_fn[HFS_MAXNAMLEN * 2];
     uint16_t filetype;
-    FS_INODE *fs_inode;
+    TSK_FS_INODE *fs_inode;
     DADDR_T offs;
     int keylen;
     uint8_t key_len[2];
-    int myflags = 0, j;
+    int j;
     INUM_T newinum;
-    hfs_inode_struct *in;
+    htsk_fs_inode_mode_struct *in;
 
-    if (verbose)
-	fprintf(stderr, "hfs_dent_walk: Processing directory %lu\n",
-	    (ULONG) inum);
+    fs_dent = tsk_fs_dent_alloc(HFS_MAXNAMLEN, 0);
+
+    if (tsk_verbose)
+        fprintf(stderr, "hfs_dent_walk: Processing directory %lu\n",
+            (ULONG) inum);
 
     if (inum < fs->first_inum || inum > fs->last_inum)
-	error("invalid inode value: %i\n", inum);
+        tsk_fprintf(stderr, "invalid inode value: %i\n", inum);
 
     fs_inode = fs->inode_lookup(fs, inum);
 
-    filetype = getu16(fs, hfs->cat->rec_type);
+    filetype = tsk_getu16(fs->endian, hfs->cat->rec_type);
 
     /*
      * "."
@@ -204,11 +205,12 @@ hfs_dent_walk_lcl(FS_INFO * fs, HFS_DINFO * dinfo, INUM_T inum,
     fs_dent->pathdepth = dinfo->depth;
     fs_dent->fsi = fs->inode_lookup(fs, fs_dent->inode);
 
-    fs_dent->ent_type = FS_DENT_DIR;
+    fs_dent->ent_type = TSK_FS_DENT_TYPE_DIR;
+    fs_dent->flags = TSK_FS_DENT_FLAG_ALLOC;
 
-    if (WALK_STOP == action(fs, fs_dent, myflags, ptr)) {
-	fs_dent_free(fs_dent);
-	return;
+    if (TSK_WALK_STOP == action(fs, fs_dent, ptr)) {
+        tsk_fs_dent_free(fs_dent);
+        return 0;
     }
 
     /*
@@ -219,9 +221,9 @@ hfs_dent_walk_lcl(FS_INFO * fs, HFS_DINFO * dinfo, INUM_T inum,
 
     /* the parent of root is 1, but there is no inode 1 */
     if (inum == HFS_ROOT_INUM)
-	newinum = HFS_ROOT_INUM;
+        newinum = HFS_ROOT_INUM;
     else
-	newinum = in->parent;
+        newinum = in->parent;
 
     fs_dent->inode = newinum;
     strcpy(fs_dent->name, "..");
@@ -231,11 +233,12 @@ hfs_dent_walk_lcl(FS_INFO * fs, HFS_DINFO * dinfo, INUM_T inum,
     fs_dent->pathdepth = dinfo->depth;
     fs_dent->fsi = fs->inode_lookup(fs, fs_dent->inode);
 
-    fs_dent->ent_type = FS_DENT_DIR;
+    fs_dent->ent_type = TSK_FS_DENT_TYPE_DIR;
+    fs_dent->flags = TSK_FS_DENT_FLAG_ALLOC;
 
-    if (WALK_STOP == action(fs, fs_dent, myflags, ptr)) {
-	fs_dent_free(fs_dent);
-	return;
+    if (TSK_WALK_STOP == action(fs, fs_dent, ptr)) {
+        tsk_fs_dent_free(fs_dent);
+        return 0;
     }
 
     /* because hfs->key (the filename offset) is reset with each lookup, this is necessary here... */
@@ -246,104 +249,106 @@ hfs_dent_walk_lcl(FS_INFO * fs, HFS_DINFO * dinfo, INUM_T inum,
 
     if (filetype == HFS_FOLDER_RECORD) {
 
-	for (j = HFS_ROOT_INUM; j <= fs->last_inum; j++) {
+        for (j = HFS_ROOT_INUM; j <= fs->last_inum; j++) {
 
-	    in = hfs->inodes + j;
+            in = hfs->inodes + j;
 
-	    if (in->parent == inum) {
+            if (in->parent == inum) {
 
-		newinum = j;
+                newinum = j;
 
-		fs_dent->inode = newinum;
-		fs_dent->path = dinfo->dirs;
-		fs_dent->pathdepth = dinfo->depth;
-		fs_dent->fsi = fs->inode_lookup(fs, fs_dent->inode);
+                fs_dent->inode = newinum;
+                fs_dent->path = dinfo->dirs;
+                fs_dent->pathdepth = dinfo->depth;
+                fs_dent->fsi = fs->inode_lookup(fs, fs_dent->inode);
 
-		offs = hfs->key;
-		fs_read_random(fs, key_len, 2, offs);
+                offs = hfs->key;
+                tsk_fs_read_random(fs, (char *) key_len, 2, offs);
 
-		keylen = getu16(fs, key_len);
-		keylen -= 6;
-		offs += 8;
+                keylen = tsk_getu16(fs->endian, key_len);
+                keylen -= 6;
+                offs += 8;
 
-		fs_read_random(fs, ucs_fn, keylen, offs);
+                tsk_fs_read_random(fs, (char *) ucs_fn, keylen, offs);
 
-		hfs_uni2ascii(fs, ucs_fn, keylen / 2, fs_dent->name,
-		    HFS_MAXNAMLEN);
+                hfs_uni2ascii(fs, (char *) ucs_fn, keylen / 2,
+                    fs_dent->name, HFS_MAXNAMLEN);
 
-		fs_inode = fs->inode_lookup(fs, newinum);
+                fs_inode = fs->inode_lookup(fs, newinum);
 
-		filetype = getu16(fs, hfs->cat->rec_type);
+                filetype = tsk_getu16(fs->endian, hfs->cat->rec_type);
 
-		if (filetype == HFS_FOLDER_RECORD)
-		    fs_dent->ent_type = FS_DENT_DIR;
-		else
-		    fs_dent->ent_type = FS_DENT_REG;
+                if (filetype == HFS_FOLDER_RECORD)
+                    fs_dent->ent_type = TSK_FS_DENT_TYPE_DIR;
+                else
+                    fs_dent->ent_type = TSK_FS_DENT_TYPE_REG;
 
-		myflags |= FS_FLAG_NAME_ALLOC;
+                fs_dent->flags = TSK_FS_DENT_FLAG_ALLOC;
 
-		if ((flags & myflags) == myflags) {
+                if ((flags & fs_dent->flags) == fs_dent->flags) {
 
-		    if (WALK_STOP == action(fs, fs_dent, myflags, ptr)) {
-			fs_dent_free(fs_dent);
-			return;
-		    }
-		}
+                    if (TSK_WALK_STOP == action(fs, fs_dent, ptr)) {
+                        tsk_fs_dent_free(fs_dent);
+                        return 0;
+                    }
+                }
 
-		if (filetype == HFS_FOLDER_RECORD) {
-		    if (flags & FS_FLAG_NAME_RECURSE) {
-			if (dinfo->depth < MAX_DEPTH) {
-			    dinfo->didx[dinfo->depth] =
-				&dinfo->dirs[strlen(dinfo->dirs)];
-			    strncpy(dinfo->didx[dinfo->depth],
-				fs_dent->name,
-				DIR_STRSZ - strlen(dinfo->dirs));
-			    strncat(dinfo->dirs, "/", DIR_STRSZ);
-			}
-			dinfo->depth++;
+                if (filetype == HFS_FOLDER_RECORD) {
+                    if (flags & TSK_FS_DENT_FLAG_RECURSE) {
+                        if (dinfo->depth < MAX_DEPTH) {
+                            dinfo->didx[dinfo->depth] =
+                                &dinfo->dirs[strlen(dinfo->dirs)];
+                            strncpy(dinfo->didx[dinfo->depth],
+                                fs_dent->name,
+                                DIR_STRSZ - strlen(dinfo->dirs));
+                            strncat(dinfo->dirs, "/", DIR_STRSZ);
+                        }
+                        dinfo->depth++;
 
-			hfs_dent_walk_lcl(fs, dinfo, newinum, flags,
-			    action, ptr);
-			dinfo->depth--;
+                        hfs_dent_walk_lcl(fs, dinfo, newinum, flags,
+                            action, ptr);
+                        dinfo->depth--;
 
-			if (dinfo->depth < MAX_DEPTH)
-			    *dinfo->didx[dinfo->depth] = '\0';
-		    }
-		}
+                        if (dinfo->depth < MAX_DEPTH)
+                            *dinfo->didx[dinfo->depth] = '\0';
+                    }
+                }
 
 
 
-	    }
-	}
+            }
+        }
 
-	/* regular file */
+        /* regular file */
     }
     else {
 
-	fs_dent->inode = inum;
-	offs = hfs->key;
-	fs_read_random(fs, key_len, 2, offs);
-	keylen = getu16(fs, key_len);
+        fs_dent->inode = inum;
+        offs = hfs->key;
+        tsk_fs_read_random(fs, (char *) key_len, 2, offs);
+        keylen = tsk_getu16(fs->endian, key_len);
 
-	/* skip key length and parent cnid fields */
-	keylen -= 6;
-	offs += 8;
+        /* skip key length and parent cnid fields */
+        keylen -= 6;
+        offs += 8;
 
-	fs_read_random(fs, ucs_fn, keylen, offs);
+        tsk_fs_read_random(fs, (char *) ucs_fn, keylen, offs);
 
-	hfs_uni2ascii(fs, ucs_fn, keylen / 2, fs_dent->name,
-	    HFS_MAXNAMLEN);
+        hfs_uni2ascii(fs, (char *) ucs_fn, keylen / 2, fs_dent->name,
+            HFS_MAXNAMLEN);
 
-	fs_dent->path = dinfo->dirs;
-	fs_dent->pathdepth = dinfo->depth;
-	fs_dent->fsi = fs->inode_lookup(fs, fs_dent->inode);
+        fs_dent->path = dinfo->dirs;
+        fs_dent->pathdepth = dinfo->depth;
+        fs_dent->fsi = fs->inode_lookup(fs, fs_dent->inode);
 
-	fs_dent->ent_type = FS_DENT_REG;
+        fs_dent->ent_type = TSK_FS_DENT_TYPE_REG;
+        fs_dent->flags = TSK_FS_DENT_FLAG_ALLOC;
 
-	if (WALK_STOP == action(fs, fs_dent, myflags, ptr)) {
-	    fs_dent_free(fs_dent);
-	    return;
-	}
+        if (TSK_WALK_STOP == action(fs, fs_dent, ptr)) {
+            tsk_fs_dent_free(fs_dent);
+            return 0;
+        }
     }
 
+    return 0;
 }

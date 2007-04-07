@@ -1,15 +1,21 @@
 /*
- * $Date: 2006/12/07 16:38:18 $
+ * $Date: 2007/04/04 20:07:00 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
  * Copyright (c) 2005 Brian Carrier.  All rights reserved
  *
- * img_open
+ * tsk_img_open
  *
  *
  * This software is distributed under the Common Public License 1.0
  *
+ */
+
+/**
+ * \file img_open.c
+ * Contains the basic img_open function call, that interfaces with
+ * the format specific _open calls
  */
 #include <sys/stat.h>
 #include <string.h>
@@ -18,31 +24,33 @@
 #include "raw.h"
 #include "split.h"
 
-#undef USE_LIBAFF
 #if defined(USE_LIBAFF)
 typedef int bool;
 #include "aff.h"
 #endif
 
-#undef USE_LIBEWF
 #if defined(USE_LIBEWF)
 #include "ewf.h"
 #endif
 
-/*
- * type is a list of types: "raw", "split", "split,raid", 
- * offset is the sector offset for the file system or other code to use when reading:
- *      "63", "63@512", "62@2048"
- * num_img is the number of images in the last argument
- * images is the array of image names to open
+/**
+ * Open one or more files as a disk image.  This serves as a
+ * wrapper around the specific types of disk image formats. You 
+ * can specify the type or autodetection can be used.
  *
- * The highest layer is returned or NULL if an error occurs
+ * @param type The text a user supplied for the type of format.
+ * Examples include "raw", "split", "aff", etc.
+ * @param num_img The number of images that are being considered.
+ * @param images The path to the files (the number of files must
+ * be equal to num_img)
+ *
+ * @return Pointer to the Image state structure or NULL on error
  */
-IMG_INFO *
-img_open(const TSK_TCHAR * type, const int num_img,
+TSK_IMG_INFO *
+tsk_img_open(const TSK_TCHAR * type, const int num_img,
     const TSK_TCHAR ** images)
 {
-    IMG_INFO *img_info = NULL;
+    TSK_IMG_INFO *img_info = NULL;
     TSK_TCHAR *tp, *next;
     TSK_TCHAR type_lcl[128], *type_lcl_p;
     const TSK_TCHAR **img_tmp;
@@ -52,17 +60,17 @@ img_open(const TSK_TCHAR * type, const int num_img,
     tsk_error_reset();
 
     if ((num_img == 0) || (images[0] == NULL)) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_IMG_NOFILE;
-	snprintf(tsk_errstr, TSK_ERRSTR_L, "img_open");
-	tsk_errstr2[0] = '\0';
-	return NULL;
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_IMG_NOFILE;
+        snprintf(tsk_errstr, TSK_ERRSTR_L, "tsk_img_open");
+        tsk_errstr2[0] = '\0';
+        return NULL;
     }
 
-    if (verbose)
-	TFPRINTF(stderr,
-	    _TSK_T("img_open: Type: %s   NumImg: %d  Img1: %s\n"),
-	    (type ? type : _TSK_T("n/a")), num_img, images[0]);
+    if (tsk_verbose)
+        TFPRINTF(stderr,
+            _TSK_T("tsk_img_open: Type: %s   NumImg: %d  Img1: %s\n"),
+            (type ? type : _TSK_T("n/a")), num_img, images[0]);
 
     // only the first in list (lowest) layer gets the files
     img_tmp = images;
@@ -73,93 +81,123 @@ img_open(const TSK_TCHAR * type, const int num_img,
      */
 
     if (type == NULL) {
-	IMG_INFO *img_set = NULL;
-	char *set = NULL;
-	struct STAT_STR stat_buf;
+        TSK_IMG_INFO *img_set = NULL;
+        char *set = NULL;
+        struct STAT_STR stat_buf;
 
-	/* First verify that the image file exists */
-	if (TSTAT(images[0], &stat_buf) == -1) {
-	    // special case to handle windows objects
-#ifdef TSK_WIN32
-	    if ((images[0][0] == _TSK_T('\\'))
-		&& (images[0][1] == _TSK_T('\\'))
-		&& (images[0][2] == _TSK_T('.'))
-		&& (images[0][3] == _TSK_T('\\'))) {
-		if (verbose)
-		    TFPRINTF(stderr,
-			_TSK_T
-			("img_open: Ignoring stat error because of windows object: %s\n"),
-			images[0]);
-	    }
-	    else {
+        /* First verify that the image file exists */
+        if (TSTAT(images[0], &stat_buf) < 0) {
+
+            // special case to handle windows objects
+#if defined(TSK_WIN32)
+            if ((images[0][0] == _TSK_T('\\'))
+                && (images[0][1] == _TSK_T('\\'))
+                && (images[0][2] == _TSK_T('.'))
+                && (images[0][3] == _TSK_T('\\'))) {
+                if (tsk_verbose)
+                    TFPRINTF(stderr,
+                        _TSK_T
+                        ("tsk_img_open: Ignoring stat error because of windows object: %s\n"),
+                        images[0]);
+            }
 #endif
-		tsk_error_reset();
-		tsk_errno = TSK_ERR_IMG_STAT;
-		snprintf(tsk_errstr, TSK_ERRSTR_L, "%s : %s", images[0],
-		    strerror(errno));
-		return NULL;
-#ifdef TSK_WIN32
-	    }
-#endif
-	}
 
-	// we rely on tsk_errno, so make sure it is 0
-	tsk_error_reset();
-
-	/* Try the non-raw formats first */
+            /* AFFLIB supports s3 storage on Amazon, so skip those 'file' paths */
 #if defined(USE_LIBAFF)
-	if ((img_info = aff_open(images, NULL)) != NULL) {
-	    set = "AFF";
-	    img_set = img_info;
-	}
-	else {
-	    tsk_error_reset();
-	}
+#if defined(TSK_WIN32)
+            else
+#endif
+                if (((images[0][0] == _TSK_T('s'))
+                    && (images[0][1] == _TSK_T('3'))
+                    && (images[0][2] == _TSK_T(':'))
+                    && (images[0][3] == _TSK_T('/'))
+                    && (images[0][4] == _TSK_T('/'))) ||
+                ((images[0][0] == _TSK_T('h'))
+                    && (images[0][1] == _TSK_T('t'))
+                    && (images[0][2] == _TSK_T('t'))
+                    && (images[0][3] == _TSK_T('p'))
+                    && (images[0][4] == _TSK_T(':'))
+                    && (images[0][5] == _TSK_T('/'))
+                    && (images[0][6] == _TSK_T('/')))) {
+                if (tsk_verbose)
+                    TFPRINTF(stderr,
+                        _TSK_T
+                        ("tsk_img_open: Ignoring stat error because of s3/http object: %s\n"),
+                        images[0]);
+
+            }
+#endif
+
+#if defined(USE_LIBAFF) || defined(TSK_WIN32)
+            else {
+#endif
+                tsk_error_reset();
+                tsk_errno = TSK_ERR_IMG_STAT;
+                snprintf(tsk_errstr, TSK_ERRSTR_L, "%s : %s", images[0],
+                    strerror(errno));
+                return NULL;
+#if defined(USE_LIBAFF) || defined(TSK_WIN32)
+            }
+#endif
+        }
+
+        // we rely on tsk_errno, so make sure it is 0
+        tsk_error_reset();
+
+        /* Try the non-raw formats first */
+#if defined(USE_LIBAFF)
+        if ((img_info = aff_open(images, NULL)) != NULL) {
+            set = "AFF";
+            img_set = img_info;
+        }
+        else {
+            tsk_error_reset();
+        }
 #endif
 
 #if defined(USE_LIBEWF)
-	if ((img_info = ewf_open(num_img, images, NULL)) != NULL) {
-	    if (set == NULL) {
-		set = "EWF";
-		img_set = img_info;
-	    }
-	    else {
-		img_set->close(img_set);
-		img_info->close(img_info);
-		tsk_error_reset();
-		tsk_errno = TSK_ERR_IMG_UNKTYPE;
-		snprintf(tsk_errstr, TSK_ERRSTR_L, "EWF or %s", set);
-		return NULL;
-	    }
-	}
-	else {
-	    tsk_error_reset();
-	}
+        if ((img_info = ewf_open(num_img, images, NULL)) != NULL) {
+            if (set == NULL) {
+                set = "EWF";
+                img_set = img_info;
+            }
+            else {
+                img_set->close(img_set);
+                img_info->close(img_info);
+                tsk_error_reset();
+                tsk_errno = TSK_ERR_IMG_UNKTYPE;
+                snprintf(tsk_errstr, TSK_ERRSTR_L, "EWF or %s", set);
+                return NULL;
+            }
+        }
+        else {
+            tsk_error_reset();
+        }
 #endif
-	if (img_set != NULL)
-	    return img_set;
+        if (img_set != NULL)
+            return img_set;
 
-	/* We'll use the raw format */
-	if (num_img == 1) {
-	    if ((img_info = raw_open(images, NULL)) != NULL) {
-		return img_info;
-	    }
-	    else if (tsk_errno) {
-		return NULL;
-	    }
-	}
-	else {
-	    if ((img_info = split_open(num_img, images, NULL)) != NULL) {
-		return img_info;
-	    }
-	    else if (tsk_errno) {
-		return NULL;
-	    }
-	}
-	tsk_errno = TSK_ERR_IMG_UNKTYPE;
-	tsk_errstr[0] = '\0';
-	tsk_errstr2[0] = '\0';
-	return NULL;
+        /* We'll use the raw format */
+        if (num_img == 1) {
+            if ((img_info = raw_open(images, NULL)) != NULL) {
+                return img_info;
+            }
+            else if (tsk_errno) {
+                return NULL;
+            }
+        }
+        else {
+            if ((img_info = split_open(num_img, images, NULL)) != NULL) {
+                return img_info;
+            }
+            else if (tsk_errno) {
+                return NULL;
+            }
+        }
+        tsk_errno = TSK_ERR_IMG_UNKTYPE;
+        tsk_errstr[0] = '\0';
+        tsk_errstr2[0] = '\0';
+        return NULL;
     }
 
     /*
@@ -172,64 +210,64 @@ img_open(const TSK_TCHAR * type, const int num_img,
     /* We parse this and go up in the layers */
     tp = TSTRTOK(type_lcl, _TSK_T(","));
     while (tp != NULL) {
-	uint8_t imgtype;
+        uint8_t imgtype;
 
-	next = TSTRTOK(NULL, _TSK_T(","));
+        next = TSTRTOK(NULL, _TSK_T(","));
 
-	imgtype = img_parse_type(type);
-	switch (imgtype) {
-	case RAW_SING:
+        imgtype = tsk_img_parse_type(type);
+        switch (imgtype) {
+        case TSK_IMG_INFO_TYPE_RAW_SING:
 
-	    /* If we have more than one image name, and raw was the only
-	     * type given, then use split */
-	    if ((num_img > 1) && (next == NULL) && (img_tmp != NULL)) {
-		img_info = split_open(num_img_tmp, img_tmp, img_info);
-		num_img_tmp = 0;
-	    }
-	    else {
-		img_info = raw_open(img_tmp, img_info);
-	    }
-	    img_tmp = NULL;
-	    break;
+            /* If we have more than one image name, and raw was the only
+             * type given, then use split */
+            if ((num_img > 1) && (next == NULL) && (img_tmp != NULL)) {
+                img_info = split_open(num_img_tmp, img_tmp, img_info);
+                num_img_tmp = 0;
+            }
+            else {
+                img_info = raw_open(img_tmp, img_info);
+            }
+            img_tmp = NULL;
+            break;
 
-	case RAW_SPLIT:
+        case TSK_IMG_INFO_TYPE_RAW_SPLIT:
 
-	    /* If only one image file is given, and only one type was
-	     * given then use raw */
-	    if ((num_img == 1) && (next == NULL) && (img_tmp != NULL)) {
-		img_info = raw_open(img_tmp, img_info);
-	    }
-	    else {
-		img_info = split_open(num_img_tmp, img_tmp, img_info);
-		num_img_tmp = 0;
-	    }
+            /* If only one image file is given, and only one type was
+             * given then use raw */
+            if ((num_img == 1) && (next == NULL) && (img_tmp != NULL)) {
+                img_info = raw_open(img_tmp, img_info);
+            }
+            else {
+                img_info = split_open(num_img_tmp, img_tmp, img_info);
+                num_img_tmp = 0;
+            }
 
-	    img_tmp = NULL;
-	    break;
+            img_tmp = NULL;
+            break;
 
 #if defined(USE_LIBAFF)
-	case AFF_AFF:
-	case AFF_AFD:
-	case AFF_AFM:
-	    img_info = aff_open(img_tmp, img_info);
-	    break;
+        case TSK_IMG_INFO_TYPE_AFF_AFF:
+        case TSK_IMG_INFO_TYPE_AFF_AFD:
+        case TSK_IMG_INFO_TYPE_AFF_AFM:
+            img_info = aff_open(img_tmp, img_info);
+            break;
 #endif
 
 #if defined(USE_LIBEWF)
-	case EWF_EWF:
-	    img_info = ewf_open(num_img_tmp, img_tmp, img_info);
-	    break;
+        case TSK_IMG_INFO_TYPE_EWF_EWF:
+            img_info = ewf_open(num_img_tmp, img_tmp, img_info);
+            break;
 #endif
 
-	default:
-	    tsk_error_reset();
-	    tsk_errno = TSK_ERR_IMG_UNSUPTYPE;
-	    snprintf(tsk_errstr, TSK_ERRSTR_L, "%s", tp);
-	    return NULL;
-	}
+        default:
+            tsk_error_reset();
+            tsk_errno = TSK_ERR_IMG_UNSUPTYPE;
+            snprintf(tsk_errstr, TSK_ERRSTR_L, "%s", tp);
+            return NULL;
+        }
 
-	/* Advance the pointer */
-	tp = next;
+        /* Advance the pointer */
+        tp = next;
     }
 
     /* Return the highest layer */

@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2006/12/07 16:38:18 $
+ * $Date: 2007/04/04 18:48:47 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2006 Brian Carrier, Basis Technology.  All rights reserved
@@ -24,47 +24,47 @@
 static char *
 sun_get_desc(uint16_t fstype)
 {
-    char *str = mymalloc(64);
+    char *str = tsk_malloc(64);
     if (str == NULL)
-	return "";
+        return "";
     switch (fstype) {
 
     case 0:
-	strncpy(str, "Unassigned (0x00)", 64);
-	break;
+        strncpy(str, "Unassigned (0x00)", 64);
+        break;
     case 1:
-	strncpy(str, "boot (0x01)", 64);
-	break;
+        strncpy(str, "boot (0x01)", 64);
+        break;
     case 2:
-	strncpy(str, "/ (0x02)", 64);
-	break;
+        strncpy(str, "/ (0x02)", 64);
+        break;
     case 3:
-	strncpy(str, "swap (0x03)", 64);
-	break;
+        strncpy(str, "swap (0x03)", 64);
+        break;
     case 4:
-	strncpy(str, "/usr/ (0x04)", 64);
-	break;
+        strncpy(str, "/usr/ (0x04)", 64);
+        break;
     case 5:
-	strncpy(str, "backup (0x05)", 64);
-	break;
+        strncpy(str, "backup (0x05)", 64);
+        break;
     case 6:
-	strncpy(str, "stand (0x06)", 64);
-	break;
+        strncpy(str, "stand (0x06)", 64);
+        break;
     case 7:
-	strncpy(str, "/var/ (0x07)", 64);
-	break;
+        strncpy(str, "/var/ (0x07)", 64);
+        break;
     case 8:
-	strncpy(str, "/home/ (0x08)", 64);
-	break;
+        strncpy(str, "/home/ (0x08)", 64);
+        break;
     case 9:
-	strncpy(str, "alt sector (0x09)", 64);
-	break;
+        strncpy(str, "alt sector (0x09)", 64);
+        break;
     case 10:
-	strncpy(str, "cachefs (0x0A)", 64);
-	break;
+        strncpy(str, "cachefs (0x0A)", 64);
+        break;
     default:
-	snprintf(str, 64, "Unknown Type (0x%.4x)", fstype);
-	break;
+        snprintf(str, 64, "Unknown Type (0x%.4x)", fstype);
+        break;
     }
 
     return str;
@@ -76,49 +76,52 @@ sun_get_desc(uint16_t fstype)
  */
 
 static uint8_t
-sun_load_table_i386(MM_INFO * mm, sun_dlabel_i386 * dlabel_x86)
+sun_load_table_i386(TSK_MM_INFO * mm, sun_dlabel_i386 * dlabel_x86)
 {
     uint32_t idx = 0;
-    DADDR_T max_addr = (mm->img_info->size - mm->offset) / mm->block_size;	// max sector
+    DADDR_T max_addr = (mm->img_info->size - mm->offset) / mm->block_size;      // max sector
 
-    if (verbose)
-	tsk_fprintf(stderr, "load_table_i386: Number of partitions: %d\n",
-	    getu16(mm->endian, dlabel_x86->num_parts));
+    if (tsk_verbose)
+        tsk_fprintf(stderr, "load_table_i386: Number of partitions: %d\n",
+            tsk_getu16(mm->endian, dlabel_x86->num_parts));
 
     /* Cycle through the partitions, there are either 8 or 16 */
-    for (idx = 0; idx < getu16(mm->endian, dlabel_x86->num_parts); idx++) {
+    for (idx = 0; idx < tsk_getu16(mm->endian, dlabel_x86->num_parts);
+        idx++) {
 
-	if (verbose)
-	    tsk_fprintf(stderr,
-		"load_table_i386: %" PRIu32
-		"  Starting Sector: %lu  Size: %lu  Type: %d\n", idx,
-		(ULONG) getu32(mm->endian,
-		    dlabel_x86->part[idx].start_sec),
-		(ULONG) getu32(mm->endian, dlabel_x86->part[idx].size_sec),
-		getu16(mm->endian, dlabel_x86->part[idx].type));
+        if (tsk_verbose)
+            tsk_fprintf(stderr,
+                "load_table_i386: %" PRIu32
+                "  Starting Sector: %lu  Size: %lu  Type: %d\n", idx,
+                (ULONG) tsk_getu32(mm->endian,
+                    dlabel_x86->part[idx].start_sec),
+                (ULONG) tsk_getu32(mm->endian,
+                    dlabel_x86->part[idx].size_sec), tsk_getu16(mm->endian,
+                    dlabel_x86->part[idx].type));
 
-	if (getu32(mm->endian, dlabel_x86->part[idx].size_sec) == 0)
-	    continue;
+        if (tsk_getu32(mm->endian, dlabel_x86->part[idx].size_sec) == 0)
+            continue;
 
-	if (getu32(mm->endian, dlabel_x86->part[idx].start_sec) > max_addr) {
-	    tsk_error_reset();
-	    tsk_errno = TSK_ERR_MM_BLK_NUM;
-	    snprintf(tsk_errstr, TSK_ERRSTR_L,
-		"sun_load_i386: Starting sector too large for image");
-	    return 1;
-	}
+        if (tsk_getu32(mm->endian,
+                dlabel_x86->part[idx].start_sec) > max_addr) {
+            tsk_error_reset();
+            tsk_errno = TSK_ERR_MM_BLK_NUM;
+            snprintf(tsk_errstr, TSK_ERRSTR_L,
+                "sun_load_i386: Starting sector too large for image");
+            return 1;
+        }
 
 
-	/* Add the partition to the internal sorted list */
-	if (NULL == mm_part_add(mm,
-		(DADDR_T) getu32(mm->endian,
-		    dlabel_x86->part[idx].start_sec),
-		(DADDR_T) getu32(mm->endian,
-		    dlabel_x86->part[idx].size_sec), MM_TYPE_VOL,
-		sun_get_desc(getu16(mm->endian,
-			dlabel_x86->part[idx].type)), -1, idx)) {
-	    return 1;
-	}
+        /* Add the partition to the internal sorted list */
+        if (NULL == tsk_mm_part_add(mm,
+                (DADDR_T) tsk_getu32(mm->endian,
+                    dlabel_x86->part[idx].start_sec),
+                (DADDR_T) tsk_getu32(mm->endian,
+                    dlabel_x86->part[idx].size_sec), TSK_MM_PART_TYPE_VOL,
+                sun_get_desc(tsk_getu16(mm->endian,
+                        dlabel_x86->part[idx].type)), -1, idx)) {
+            return 1;
+        }
     }
 
     return 0;
@@ -129,53 +132,54 @@ sun_load_table_i386(MM_INFO * mm, sun_dlabel_i386 * dlabel_x86)
  * sun_load_table
  */
 static uint8_t
-sun_load_table_sparc(MM_INFO * mm, sun_dlabel_sparc * dlabel_sp)
+sun_load_table_sparc(TSK_MM_INFO * mm, sun_dlabel_sparc * dlabel_sp)
 {
     uint32_t idx = 0;
     uint32_t cyl_conv;
-    DADDR_T max_addr = (mm->img_info->size - mm->offset) / mm->block_size;	// max sector
+    DADDR_T max_addr = (mm->img_info->size - mm->offset) / mm->block_size;      // max sector
 
     /* The value to convert cylinders to sectors */
-    cyl_conv = getu16(mm->endian, dlabel_sp->sec_per_tr) *
-	getu16(mm->endian, dlabel_sp->num_head);
+    cyl_conv = tsk_getu16(mm->endian, dlabel_sp->sec_per_tr) *
+        tsk_getu16(mm->endian, dlabel_sp->num_head);
 
-    if (verbose)
-	tsk_fprintf(stderr, "load_table_sparc: Number of partitions: %d\n",
-	    getu16(mm->endian, dlabel_sp->num_parts));
+    if (tsk_verbose)
+        tsk_fprintf(stderr, "load_table_sparc: Number of partitions: %d\n",
+            tsk_getu16(mm->endian, dlabel_sp->num_parts));
 
     /* Cycle through the partitions, there are either 8 or 16 */
-    for (idx = 0; idx < getu16(mm->endian, dlabel_sp->num_parts); idx++) {
-	uint32_t part_start = cyl_conv *
-	    getu32(mm->endian, dlabel_sp->part_layout[idx].start_cyl);
+    for (idx = 0; idx < tsk_getu16(mm->endian, dlabel_sp->num_parts);
+        idx++) {
+        uint32_t part_start = cyl_conv * tsk_getu32(mm->endian,
+            dlabel_sp->part_layout[idx].start_cyl);
 
-	uint32_t part_size = getu32(mm->endian,
-	    dlabel_sp->part_layout[idx].size_blk);
+        uint32_t part_size = tsk_getu32(mm->endian,
+            dlabel_sp->part_layout[idx].size_blk);
 
-	if (verbose)
-	    tsk_fprintf(stderr,
-		"load_table_sparc: %" PRIu32
-		"  Starting Sector: %lu  Size: %lu  Type: %d\n", idx,
-		(ULONG) part_start, (ULONG) part_size, getu16(mm->endian,
-		    dlabel_sp->part_meta[idx].type));
+        if (tsk_verbose)
+            tsk_fprintf(stderr,
+                "load_table_sparc: %" PRIu32
+                "  Starting Sector: %lu  Size: %lu  Type: %d\n", idx,
+                (ULONG) part_start, (ULONG) part_size,
+                tsk_getu16(mm->endian, dlabel_sp->part_meta[idx].type));
 
-	if (part_size == 0)
-	    continue;
+        if (part_size == 0)
+            continue;
 
-	if (part_start > max_addr) {
-	    tsk_error_reset();
-	    tsk_errno = TSK_ERR_MM_BLK_NUM;
-	    snprintf(tsk_errstr, TSK_ERRSTR_L,
-		"sun_load_sparc: Starting sector too large for image");
-	    return 1;
-	}
+        if (part_start > max_addr) {
+            tsk_error_reset();
+            tsk_errno = TSK_ERR_MM_BLK_NUM;
+            snprintf(tsk_errstr, TSK_ERRSTR_L,
+                "sun_load_sparc: Starting sector too large for image");
+            return 1;
+        }
 
 
-	/* Add the partition to the internal sorted list */
-	if (NULL == mm_part_add(mm, (DADDR_T) part_start,
-		(DADDR_T) part_size, MM_TYPE_VOL,
-		sun_get_desc(getu16(mm->endian,
-			dlabel_sp->part_meta[idx].type)), -1, idx))
-	    return 1;
+        /* Add the partition to the internal sorted list */
+        if (NULL == tsk_mm_part_add(mm, (DADDR_T) part_start,
+                (DADDR_T) part_size, TSK_MM_PART_TYPE_VOL,
+                sun_get_desc(tsk_getu16(mm->endian,
+                        dlabel_sp->part_meta[idx].type)), -1, idx))
+            return 1;
     }
 
     return 0;
@@ -191,7 +195,7 @@ sun_load_table_sparc(MM_INFO * mm, sun_dlabel_sparc * dlabel_sp)
  * Return 0 on success and 1 on error
  */
 static uint8_t
-sun_load_table(MM_INFO * mm)
+sun_load_table(TSK_MM_INFO * mm)
 {
 /* this will need to change if any of the disk label structures change */
 #define LABEL_BUF_SIZE	512
@@ -205,31 +209,31 @@ sun_load_table(MM_INFO * mm)
 
     /* Sanity check in case label sizes change */
     if ((sizeof(*dlabel_sp) > LABEL_BUF_SIZE) ||
-	(sizeof(*dlabel_x86) > LABEL_BUF_SIZE)) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_MM_BUF;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "sun_load_table: Buffer smaller than label sizes");
-	return 1;
+        (sizeof(*dlabel_x86) > LABEL_BUF_SIZE)) {
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_MM_BUF;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "sun_load_table: Buffer smaller than label sizes");
+        return 1;
     }
 
-    if (verbose)
-	tsk_fprintf(stderr,
-	    "sun_load_table: Trying sector: %" PRIuDADDR "\n", taddr);
+    if (tsk_verbose)
+        tsk_fprintf(stderr,
+            "sun_load_table: Trying sector: %" PRIuDADDR "\n", taddr);
 
     /* Try the given offset */
-    cnt = mm_read_block_nobuf
-	(mm, (char *) &buf, LABEL_BUF_SIZE, SUN_SPARC_PART_SOFFSET);
+    cnt = tsk_mm_read_block_nobuf
+        (mm, (char *) &buf, LABEL_BUF_SIZE, SUN_SPARC_PART_SOFFSET);
 
     /* If -1 is returned, tsk_errno is already set */
     if (cnt != LABEL_BUF_SIZE) {
-	if (cnt != -1) {
-	    tsk_error_reset();
-	    tsk_errno = TSK_ERR_MM_READ;
-	}
-	snprintf(tsk_errstr2, TSK_ERRSTR_L,
-	    "SUN Disk Label in Sector: %" PRIuDADDR, taddr);
-	return 1;
+        if (cnt != -1) {
+            tsk_error_reset();
+            tsk_errno = TSK_ERR_MM_READ;
+        }
+        snprintf(tsk_errstr2, TSK_ERRSTR_L,
+            "SUN Disk Label in Sector: %" PRIuDADDR, taddr);
+        return 1;
     }
 
 
@@ -241,13 +245,13 @@ sun_load_table(MM_INFO * mm)
      * */
     dlabel_sp = (sun_dlabel_sparc *) buf;
     dlabel_x86 = (sun_dlabel_i386 *) buf;
-    if (mm_guessu16(mm, dlabel_sp->magic, SUN_MAGIC) == 0) {
-	if (getu32(mm->endian, dlabel_sp->sanity) == SUN_SANITY) {
-	    return sun_load_table_sparc(mm, dlabel_sp);
-	}
-	else if (getu32(mm->endian, dlabel_x86->sanity) == SUN_SANITY) {
-	    return sun_load_table_i386(mm, dlabel_x86);
-	}
+    if (tsk_mm_guessu16(mm, dlabel_sp->magic, SUN_MAGIC) == 0) {
+        if (tsk_getu32(mm->endian, dlabel_sp->sanity) == SUN_SANITY) {
+            return sun_load_table_sparc(mm, dlabel_sp);
+        }
+        else if (tsk_getu32(mm->endian, dlabel_x86->sanity) == SUN_SANITY) {
+            return sun_load_table_i386(mm, dlabel_x86);
+        }
     }
 
 
@@ -255,40 +259,41 @@ sun_load_table(MM_INFO * mm)
      * could be stored */
 
     taddr = mm->offset / mm->block_size / SUN_I386_PART_SOFFSET;
-    if (verbose)
-	tsk_fprintf(stderr,
-	    "sun_load_table: Trying sector: %" PRIuDADDR "\n", taddr + 1);
+    if (tsk_verbose)
+        tsk_fprintf(stderr,
+            "sun_load_table: Trying sector: %" PRIuDADDR "\n", taddr + 1);
 
-    cnt = mm_read_block_nobuf
-	(mm, (char *) &buf, LABEL_BUF_SIZE, SUN_I386_PART_SOFFSET);
+    cnt = tsk_mm_read_block_nobuf
+        (mm, (char *) &buf, LABEL_BUF_SIZE, SUN_I386_PART_SOFFSET);
 
     if (cnt != LABEL_BUF_SIZE) {
-	if (cnt != -1) {
-	    tsk_error_reset();
-	    tsk_errno = TSK_ERR_MM_READ;
-	}
-	snprintf(tsk_errstr2, TSK_ERRSTR_L,
-	    "SUN (Intel) Disk Label in Sector: %" PRIuDADDR, taddr);
-	return 1;
+        if (cnt != -1) {
+            tsk_error_reset();
+            tsk_errno = TSK_ERR_MM_READ;
+        }
+        snprintf(tsk_errstr2, TSK_ERRSTR_L,
+            "SUN (Intel) Disk Label in Sector: %" PRIuDADDR, taddr);
+        return 1;
     }
 
     dlabel_x86 = (sun_dlabel_i386 *) buf;
-    if (mm_guessu16(mm, dlabel_x86->magic, SUN_MAGIC)) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_MM_MAGIC;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "SUN (intel) partition table (Sector: %"
-	    PRIuDADDR ") %x", taddr, getu16(mm->endian, dlabel_sp->magic));
-	return 1;
+    if (tsk_mm_guessu16(mm, dlabel_x86->magic, SUN_MAGIC)) {
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_MM_MAGIC;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "SUN (intel) partition table (Sector: %"
+            PRIuDADDR ") %x", taddr, tsk_getu16(mm->endian,
+                dlabel_sp->magic));
+        return 1;
     }
 
-    if (getu32(mm->endian, dlabel_x86->sanity) != SUN_SANITY) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_MM_MAGIC;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "SUN (intel) sanity value (Sector: %" PRIuDADDR
-	    ") %x", taddr, getu16(mm->endian, dlabel_sp->magic));
-	return 1;
+    if (tsk_getu32(mm->endian, dlabel_x86->sanity) != SUN_SANITY) {
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_MM_MAGIC;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "SUN (intel) sanity value (Sector: %" PRIuDADDR
+            ") %x", taddr, tsk_getu16(mm->endian, dlabel_sp->magic));
+        return 1;
     }
 
     return sun_load_table_i386(mm, dlabel_x86);
@@ -301,41 +306,41 @@ sun_load_table(MM_INFO * mm)
  * Return 1 on error and 0 on success
  */
 uint8_t
-sun_part_walk(MM_INFO * mm, PNUM_T start, PNUM_T last, int flags,
-    MM_PART_WALK_FN action, void *ptr)
+sun_part_walk(TSK_MM_INFO * mm, PNUM_T start, PNUM_T last, int flags,
+    TSK_MM_PART_WALK_CB action, void *ptr)
 {
-    MM_PART *part;
+    TSK_MM_PART *part;
     unsigned int cnt = 0;
 
     if (start < mm->first_part || start > mm->last_part) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_MM_WALK_RNG;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "sun_part_walk: Starting partition: %" PRIuPNUM, start);
-	return 1;
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_MM_WALK_RNG;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "sun_part_walk: Starting partition: %" PRIuPNUM, start);
+        return 1;
     }
 
     if (last < mm->first_part || last > mm->last_part) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_MM_WALK_RNG;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "sun_part_walk: Ending partition: %" PRIuPNUM, last);
-	return 1;
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_MM_WALK_RNG;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "sun_part_walk: Ending partition: %" PRIuPNUM, last);
+        return 1;
     }
 
     part = mm->part_list;
     while ((part != NULL) && (cnt <= last)) {
 
-	if (cnt >= start) {
-	    int retval = action(mm, cnt, part, 0, ptr);
-	    if (retval == WALK_STOP)
-		return 0;
-	    else if (retval == WALK_ERROR)
-		return 1;
-	}
+        if (cnt >= start) {
+            int retval = action(mm, cnt, part, 0, ptr);
+            if (retval == TSK_WALK_STOP)
+                return 0;
+            else if (retval == TSK_WALK_ERROR)
+                return 1;
+        }
 
-	part = part->next;
-	cnt++;
+        part = part->next;
+        cnt++;
     }
 
     return 0;
@@ -343,26 +348,26 @@ sun_part_walk(MM_INFO * mm, PNUM_T start, PNUM_T last, int flags,
 
 
 void
-sun_close(MM_INFO * mm)
+sun_close(TSK_MM_INFO * mm)
 {
-    mm_part_free(mm);
+    tsk_mm_part_free(mm);
     free(mm);
 }
 
-MM_INFO *
-sun_open(IMG_INFO * img_info, DADDR_T offset)
+TSK_MM_INFO *
+tsk_mm_sun_open(TSK_IMG_INFO * img_info, DADDR_T offset)
 {
-    MM_INFO *mm;
+    TSK_MM_INFO *mm;
 
     // clean up any errors that are lying around
     tsk_error_reset();
 
-    mm = (MM_INFO *) mymalloc(sizeof(*mm));
+    mm = (TSK_MM_INFO *) tsk_malloc(sizeof(*mm));
     if (mm == NULL)
-	return NULL;
+        return NULL;
 
     mm->img_info = img_info;
-    mm->mmtype = MM_SUN;
+    mm->mmtype = TSK_MM_INFO_TYPE_SUN;
     mm->str_type = "Sun VTOC";
 
     mm->offset = offset;
@@ -380,14 +385,14 @@ sun_open(IMG_INFO * img_info, DADDR_T offset)
 
     /* Load the partitions into the sorted list */
     if (sun_load_table(mm)) {
-	sun_close(mm);
-	return NULL;
+        sun_close(mm);
+        return NULL;
     }
 
     /* fill in the sorted list with the 'unknown' values */
-    if (mm_part_unused(mm)) {
-	sun_close(mm);
-	return NULL;
+    if (tsk_mm_part_unused(mm)) {
+        sun_close(mm);
+        return NULL;
     }
 
     return mm;

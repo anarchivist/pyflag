@@ -1,14 +1,14 @@
 /*
  * The Sleuth Kit
  * 
- * $Date: 2006/12/07 16:25:39 $
+ * $Date: 2007/02/15 20:35:16 $
  */
 #include <stdlib.h>
 #include <stdio.h>
 #include "aux_tools.h"
 
 void
-print_version(FILE * hFile)
+tsk_print_version(FILE * hFile)
 {
     char *str = "The Sleuth Kit";
 #ifdef VER

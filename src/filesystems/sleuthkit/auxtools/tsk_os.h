@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2006/11/09 14:50:35 $
+** $Date: 2007/03/23 15:02:18 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2004-2005 Brian Carrier.  All rights reserved
@@ -42,7 +42,7 @@
 #include <inttypes.h>
 #endif
 
-#endif				/* FREEBSD */
+#endif                          /* FREEBSD */
 
     /*
      * BSD/OS can handle filesystems > 2GB.
@@ -54,7 +54,7 @@
 #define HAVE_UNISTD
 
 #include <inttypes.h>
-#endif				/* BSDI */
+#endif                          /* BSDI */
 
 
 /*
@@ -67,7 +67,7 @@
 #define HAVE_UNISTD
 
 #include <inttypes.h>
-#endif				/* NETBSD */
+#endif                          /* NETBSD */
 
 
     /*
@@ -91,7 +91,7 @@
 #define HAVE_UNISTD
 
 #include <inttypes.h>
-#endif				/* DARWIN */
+#endif                          /* DARWIN */
 
 
     /*
@@ -99,12 +99,12 @@
      */
 #if defined(LINUX2)
 #define SUPPORTED
-#define USE_LIBAFF
-#define	USE_LIBEWF
+//#define USE_LIBAFF
+//#define	USE_LIBEWF
 #define HAVE_UNISTD
 
 #include <inttypes.h>
-#endif				/* LINUX */
+#endif                          /* LINUX */
 
 
 
@@ -119,7 +119,7 @@
 #define roundup(x, y)	\
 	( ( ((x)+((y) - 1)) / (y)) * (y) )
 
-#endif				/* CYGWIN */
+#endif                          /* CYGWIN */
 
 
 #if defined(__INTERNIX)
@@ -130,7 +130,7 @@
 #define roundup(x, y)	\
 	( ( ((x)+((y) - 1)) / (y)) * (y) )
 
-#endif				/* INTERNIX */
+#endif                          /* INTERNIX */
 
 #if defined(_WIN32) || defined (__WIN32__)
 #define SUPPORTED
@@ -141,9 +141,7 @@
 #ifndef _UNICODE
 #define _UNICODE
 #endif
-#define WIN32_LEAN_AND_MEAN	/* somewhat limit Win32 pollution */
-
-
+#define WIN32_LEAN_AND_MEAN     /* somewhat limit Win32 pollution */
 
 #include <windows.h>
 #include <tchar.h>
@@ -152,7 +150,6 @@
 #define _CRT_SECURE_NO_DEPRECATE	1
 
 #include "intrin.h"
-
 
 typedef unsigned __int8 uint8_t;
 typedef __int8 int8_t;
@@ -167,35 +164,29 @@ typedef uint16_t gid_t;
 typedef uint16_t uid_t;
 
 #define strtoull	strtoul
-//#define open(filename, oflag) _open(filename, oflag|_O_BINARY, 0)
-//#define lseek _lseek
-//#define read  _read
-//#define close _close
 #define snprintf   _snprintf
-#define strcasecmp(string1, string2)	_strnicmp(string1, string2, sizeof(string1))
+#define strcasecmp(string1, string2)	_strnicmp(string1, string2, strlen(string1))
 
 #define roundup(x, y)	\
 	( ( ((x)+((y) - 1)) / (y)) * (y) )
 
-#if !defined(_SYS_INT_TYPES_H)
-#if defined (_LP64) || defined (_I32LPx)
-typedef unsigned long uintptr_t;
-#else
-typedef unsigned int uintptr_t;
-#endif
-#endif
-
 #endif
 
 
+/* When TSK deals with the outside world (printing / input), the data will 
+ * be in either UTF-16 or UTF-8 (Windows or Unix).  TSK_TCHAR is defined 
+ * as the data type needed and the following function map to the required 
+ * function. 
+ */
 
 #ifdef TSK_WIN32
-#define MAIN _tmain
+
+/* TSK_TCHAR is a wide 2-byte character */
 typedef TCHAR TSK_TCHAR;
 #define _TSK_T	_T
+
 #define TSTAT _tstat
 #define STAT_STR    _stat64i32
-//#define TSTRNCPY(d, s, l)    _tcscpy_s(d, l, s)
 #define TSTRTOK	_tcstok
 #define TSTRLEN	_tcslen
 #define TSTRCMP	_tcscmp
@@ -210,14 +201,20 @@ typedef TCHAR TSK_TCHAR;
 #define PUTENV	_wputenv
 #define TZSET	_tzset
 
+#define PRIcTSK _TSK_T("S")     ///< printf macro to print a char string to TSK_TCHAR
+#define PRIwTSK _TSK_T"s")      ///< printf macro to print a wide char string to TSK_TCHAR
+
+#define unlink _unlink
+#define MAIN _tmain
+
 #else
 
-#define MAIN main
-#define _TSK_T(x)	x
+/* TSK_TCHAR is a 1-byte character */
 typedef char TSK_TCHAR;
-#define TSTAT stat
+#define _TSK_T(x)	x
+
+#define TSTAT	stat
 #define STAT_STR    stat
-//#define TSTRNCPY(d,s,l)    strncpy(d,s,l)
 #define TSTRTOK	strtok
 #define TSTRLEN	strlen
 #define TSTRCMP	strcmp
@@ -232,6 +229,11 @@ typedef char TSK_TCHAR;
 
 #define PUTENV	putenv
 #define TZSET	tzset
+
+#define PRIcTSK _TSK_T("s")     ///< printf macro to print a char string to TSK_TCHAR
+#define PRIwTSK _TSK_T("S")     ///< printf macro to print a wide char string to TSK_TCHAR
+
+#define MAIN main
 
 #endif
 

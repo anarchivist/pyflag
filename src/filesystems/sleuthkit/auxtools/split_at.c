@@ -49,23 +49,23 @@
 /* split_at - break string at first delimiter, return remainder */
 
 char *
-split_at(char *string, int delimiter)
+tsk_split_at(char *string, int delimiter)
 {
     char *cp;
 
     if ((cp = strchr(string, delimiter)) != 0)
-	*cp++ = 0;
+        *cp++ = 0;
     return (cp);
 }
 
 /* split_at_right - break string at last delimiter, return remainder */
 
 char *
-split_at_right(char *string, int delimiter)
+tsk_split_at_right(char *string, int delimiter)
 {
     char *cp;
 
     if ((cp = strrchr(string, delimiter)) != 0)
-	*cp++ = 0;
+        *cp++ = 0;
     return (cp);
 }

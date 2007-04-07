@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2006/11/29 22:02:16 $
+ * $Date: 2007/04/04 18:48:46 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2006 Brian Carrier, Basis Technology.  All rights reserved
@@ -25,7 +25,7 @@
  * It is loaded into the internal sorted list 
  */
 static uint8_t
-gpt_load_table(MM_INFO * mm)
+gpt_load_table(TSK_MM_INFO * mm)
 {
     gpt_head head;
     gpt_entry *ent;
@@ -35,187 +35,191 @@ gpt_load_table(MM_INFO * mm)
     char *safe_str, *head_str, *tab_str, *ent_buf;
     SSIZE_T cnt;
     DADDR_T taddr = mm->offset / mm->block_size + GPT_PART_SOFFSET;
-    DADDR_T max_addr = (mm->img_info->size - mm->offset) / mm->block_size;	// max sector
+    DADDR_T max_addr = (mm->img_info->size - mm->offset) / mm->block_size;      // max sector
 
-    if (verbose)
-	tsk_fprintf(stderr, "gpt_load_table: Sector: %" PRIuDADDR "\n",
-	    taddr);
+    if (tsk_verbose)
+        tsk_fprintf(stderr, "gpt_load_table: Sector: %" PRIuDADDR "\n",
+            taddr);
 
-    cnt = mm_read_block_nobuf
-	(mm, (char *) &dos_part, sizeof(dos_part), GPT_PART_SOFFSET);
+    cnt = tsk_mm_read_block_nobuf
+        (mm, (char *) &dos_part, sizeof(dos_part), GPT_PART_SOFFSET);
     /* if -1, then tsk_errno is already set */
     if (cnt != sizeof(dos_part)) {
-	if (cnt != -1) {
-	    tsk_error_reset();
-	    tsk_errno = TSK_ERR_MM_READ;
-	}
-	snprintf(tsk_errstr2, TSK_ERRSTR_L,
-	    "Error reading DOS safety partition table in Sector: %"
-	    PRIuDADDR, taddr);
-	return 1;
+        if (cnt != -1) {
+            tsk_error_reset();
+            tsk_errno = TSK_ERR_MM_READ;
+        }
+        snprintf(tsk_errstr2, TSK_ERRSTR_L,
+            "Error reading DOS safety partition table in Sector: %"
+            PRIuDADDR, taddr);
+        return 1;
     }
 
     /* Sanity Check */
-    if (mm_guessu16(mm, dos_part.magic, DOS_MAGIC)) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_MM_MAGIC;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "Missing DOS safety partition (invalid magic) (Sector: %"
-	    PRIuDADDR ")", taddr);
-	return 1;
+    if (tsk_mm_guessu16(mm, dos_part.magic, DOS_MAGIC)) {
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_MM_MAGIC;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "Missing DOS safety partition (invalid magic) (Sector: %"
+            PRIuDADDR ")", taddr);
+        return 1;
     }
 
     if (dos_part.ptable[0].ptype != GPT_DOS_TYPE) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_MM_MAGIC;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "Missing DOS safety partition (invalid type in table: %d)",
-	    dos_part.ptable[0].ptype);
-	return 1;
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_MM_MAGIC;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "Missing DOS safety partition (invalid type in table: %d)",
+            dos_part.ptable[0].ptype);
+        return 1;
     }
 
-    if ((safe_str = mymalloc(16)) == NULL)
-	return 1;
+    if ((safe_str = tsk_malloc(16)) == NULL)
+        return 1;
 
     snprintf(safe_str, 16, "Safety Table");
-    if (NULL == mm_part_add(mm, (DADDR_T) 0, (DADDR_T) 1, MM_TYPE_DESC,
-	    safe_str, -1, -1))
-	return 1;
+    if (NULL == tsk_mm_part_add(mm, (DADDR_T) 0, (DADDR_T) 1,
+            TSK_MM_PART_TYPE_DESC, safe_str, -1, -1))
+        return 1;
 
 
     /* Read the GPT header */
-    cnt = mm_read_block_nobuf
-	(mm, (char *) &head, sizeof(head), GPT_PART_SOFFSET + 1);
+    cnt = tsk_mm_read_block_nobuf
+        (mm, (char *) &head, sizeof(head), GPT_PART_SOFFSET + 1);
     if (cnt != sizeof(head)) {
-	if (cnt != -1) {
-	    tsk_error_reset();
-	    tsk_errno = TSK_ERR_MM_READ;
-	}
-	snprintf(tsk_errstr2, TSK_ERRSTR_L,
-	    "GPT Header structure in Sector: %" PRIuDADDR, taddr + 1);
-	return 1;
+        if (cnt != -1) {
+            tsk_error_reset();
+            tsk_errno = TSK_ERR_MM_READ;
+        }
+        snprintf(tsk_errstr2, TSK_ERRSTR_L,
+            "GPT Header structure in Sector: %" PRIuDADDR, taddr + 1);
+        return 1;
     }
 
 
-    if (getu64(mm->endian, &head.signature) != GPT_HEAD_SIG) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_MM_MAGIC;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "GPT Header: %" PRIx64, getu64(mm->endian, &head.signature));
-	return 1;
+    if (tsk_getu64(mm->endian, &head.signature) != GPT_HEAD_SIG) {
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_MM_MAGIC;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "GPT Header: %" PRIx64, tsk_getu64(mm->endian,
+                &head.signature));
+        return 1;
     }
 
-    if ((head_str = mymalloc(16)) == NULL)
-	return 1;
+    if ((head_str = tsk_malloc(16)) == NULL)
+        return 1;
 
     snprintf(head_str, 16, "GPT Header");
-    if (NULL == mm_part_add(mm, (DADDR_T) 1,
-	    (DADDR_T) ((getu32(mm->endian,
-			&head.head_size_b) + 511) / 512), MM_TYPE_DESC,
-	    head_str, -1, -1))
-	return 1;
+    if (NULL == tsk_mm_part_add(mm, (DADDR_T) 1,
+            (DADDR_T) ((tsk_getu32(mm->endian,
+                        &head.head_size_b) + 511) / 512),
+            TSK_MM_PART_TYPE_DESC, head_str, -1, -1))
+        return 1;
 
     /* Allocate a buffer for each table entry */
-    ent_size = getu32(mm->endian, &head.tab_size_b);
+    ent_size = tsk_getu32(mm->endian, &head.tab_size_b);
     if (ent_size < sizeof(gpt_entry)) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_MM_MAGIC;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "Header reports partition entry size of %" PRIu32
-	    " and not %d", ent_size, sizeof(gpt_entry));
-	return 1;
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_MM_MAGIC;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "Header reports partition entry size of %" PRIu32
+            " and not %zu", ent_size, sizeof(gpt_entry));
+        return 1;
     }
 
-    if ((tab_str = mymalloc(20)) == NULL)
-	return 1;
+    if ((tab_str = tsk_malloc(20)) == NULL)
+        return 1;
 
     snprintf(tab_str, 20, "Partition Table");
-    if (NULL == mm_part_add(mm, (DADDR_T) getu64(mm->endian,
-		&head.tab_start_lba),
-	    (DADDR_T) ((ent_size * getu32(mm->endian,
-			&head.tab_num_ent) + 511) / 512), MM_TYPE_DESC,
-	    tab_str, -1, -1))
-	return 1;
+    if (NULL == tsk_mm_part_add(mm, (DADDR_T) tsk_getu64(mm->endian,
+                &head.tab_start_lba),
+            (DADDR_T) ((ent_size * tsk_getu32(mm->endian,
+                        &head.tab_num_ent) + 511) / 512),
+            TSK_MM_PART_TYPE_DESC, tab_str, -1, -1))
+        return 1;
 
 
     /* Process the partition table */
-    if ((ent_buf = mymalloc(mm->block_size)) == NULL)
-	return 1;
+    if ((ent_buf = tsk_malloc(mm->block_size)) == NULL)
+        return 1;
 
     i = 0;
-    for (a = 0; i < getu32(mm->endian, &head.tab_num_ent); a++) {
-	char *name;
+    for (a = 0; i < tsk_getu32(mm->endian, &head.tab_num_ent); a++) {
+        char *name;
 
-	/* Read a sector */
-	cnt = mm_read_block_nobuf(mm, ent_buf, mm->block_size,
-	    getu64(mm->endian, &head.tab_start_lba) + a);
-	if (cnt != mm->block_size) {
-	    if (cnt != -1) {
-		tsk_error_reset();
-		tsk_errno = TSK_ERR_MM_READ;
-	    }
-	    snprintf(tsk_errstr2, TSK_ERRSTR_L,
-		"Error reading GPT partition table sector : %"
-		PRIuDADDR, getu64(mm->endian, &head.tab_start_lba) + a);
-	    return 1;
-	}
+        /* Read a sector */
+        cnt = tsk_mm_read_block_nobuf(mm, ent_buf, mm->block_size,
+            tsk_getu64(mm->endian, &head.tab_start_lba) + a);
+        if (cnt != mm->block_size) {
+            if (cnt != -1) {
+                tsk_error_reset();
+                tsk_errno = TSK_ERR_MM_READ;
+            }
+            snprintf(tsk_errstr2, TSK_ERRSTR_L,
+                "Error reading GPT partition table sector : %"
+                PRIuDADDR, tsk_getu64(mm->endian,
+                    &head.tab_start_lba) + a);
+            return 1;
+        }
 
-	/* Process the sector */
-	ent = (gpt_entry *) ent_buf;
-	for (; (uintptr_t) ent < (uintptr_t) ent_buf + mm->block_size &&
-	    i < getu32(mm->endian, &head.tab_num_ent); ent++ && i++) {
+        /* Process the sector */
+        ent = (gpt_entry *) ent_buf;
+        for (; (uintptr_t) ent < (uintptr_t) ent_buf + mm->block_size &&
+            i < tsk_getu32(mm->endian, &head.tab_num_ent); ent++ && i++) {
 
-	    UTF16 *name16;
-	    UTF8 *name8;
-	    int retVal;
+            UTF16 *name16;
+            UTF8 *name8;
+            int retVal;
 
-	    if (verbose)
-		tsk_fprintf(stderr,
-		    "gpt_load: %d  Starting Sector: %" PRIu64
-		    "  End: %" PRIu64 " Flag: %" PRIx64 "\n", i,
-		    getu64(mm->endian, ent->start_lba), getu64(mm->endian,
-			ent->end_lba), getu64(mm->endian, ent->flags));
-
-
-	    if (getu64(mm->endian, ent->start_lba) == 0)
-		continue;
-
-	    if (getu64(mm->endian, ent->start_lba) > max_addr) {
-		tsk_error_reset();
-		tsk_errno = TSK_ERR_MM_BLK_NUM;
-		snprintf(tsk_errstr, TSK_ERRSTR_L,
-		    "gpt_load_table: Starting sector too large for image");
-		return 1;
-	    }
+            if (tsk_verbose)
+                tsk_fprintf(stderr,
+                    "gpt_load: %d  Starting Sector: %" PRIu64
+                    "  End: %" PRIu64 " Flag: %" PRIx64 "\n", i,
+                    tsk_getu64(mm->endian, ent->start_lba),
+                    tsk_getu64(mm->endian, ent->end_lba),
+                    tsk_getu64(mm->endian, ent->flags));
 
 
-	    if ((name = mymalloc(256)) == NULL)
-		return 1;
+            if (tsk_getu64(mm->endian, ent->start_lba) == 0)
+                continue;
 
-	    name16 = (UTF16 *) ((uintptr_t) ent->name);
-	    name8 = (UTF8 *) name;
+            if (tsk_getu64(mm->endian, ent->start_lba) > max_addr) {
+                tsk_error_reset();
+                tsk_errno = TSK_ERR_MM_BLK_NUM;
+                snprintf(tsk_errstr, TSK_ERRSTR_L,
+                    "gpt_load_table: Starting sector too large for image");
+                return 1;
+            }
 
-	    retVal =
-		tsk_UTF16toUTF8(mm->endian, (const UTF16 **) &name16,
-		(UTF16 *) ((uintptr_t) name16 + sizeof(ent->name)),
-		&name8,
-		(UTF8 *) ((uintptr_t) name8 + 256), lenientConversion);
 
-	    if (retVal != conversionOK) {
-		if (verbose)
-		    tsk_fprintf(stderr,
-			"gpt_load_table: Error converting name to UTF8: %d\n",
-			retVal);
-		*name = '\0';
-	    }
+            if ((name = tsk_malloc(256)) == NULL)
+                return 1;
 
-	    if (NULL == mm_part_add(mm, (DADDR_T) getu64(mm->endian,
-			ent->start_lba), (DADDR_T) (getu64(mm->endian,
-			    ent->end_lba) - getu64(mm->endian,
-			    ent->start_lba) + 1), MM_TYPE_VOL, name, -1,
-		    i))
-		return 1;
-	}
+            name16 = (UTF16 *) ((uintptr_t) ent->name);
+            name8 = (UTF8 *) name;
+
+            retVal =
+                tsk_UTF16toUTF8(mm->endian, (const UTF16 **) &name16,
+                (UTF16 *) ((uintptr_t) name16 + sizeof(ent->name)),
+                &name8,
+                (UTF8 *) ((uintptr_t) name8 + 256), TSKlenientConversion);
+
+            if (retVal != TSKconversionOK) {
+                if (tsk_verbose)
+                    tsk_fprintf(stderr,
+                        "gpt_load_table: Error converting name to UTF8: %d\n",
+                        retVal);
+                *name = '\0';
+            }
+
+            if (NULL == tsk_mm_part_add(mm,
+                    (DADDR_T) tsk_getu64(mm->endian, ent->start_lba),
+                    (DADDR_T) (tsk_getu64(mm->endian,
+                            ent->end_lba) - tsk_getu64(mm->endian,
+                            ent->start_lba) + 1), TSK_MM_PART_TYPE_VOL,
+                    name, -1, i))
+                return 1;
+        }
     }
 
     return 0;
@@ -228,68 +232,68 @@ gpt_load_table(MM_INFO * mm)
  * Return 1 on error and 0 on success
  */
 uint8_t
-gpt_part_walk(MM_INFO * mm, PNUM_T start, PNUM_T last, int flags,
-    MM_PART_WALK_FN action, void *ptr)
+gpt_part_walk(TSK_MM_INFO * mm, PNUM_T start, PNUM_T last, int flags,
+    TSK_MM_PART_WALK_CB action, void *ptr)
 {
-    MM_PART *part;
+    TSK_MM_PART *part;
     unsigned int cnt = 0;
 
     if (start < mm->first_part || start > mm->last_part) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_MM_WALK_RNG;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "Starting partition: %" PRIuPNUM "", start);
-	return 1;
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_MM_WALK_RNG;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "Starting partition: %" PRIuPNUM "", start);
+        return 1;
     }
 
     if (last < mm->first_part || last > mm->last_part) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_MM_WALK_RNG;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "Ending partition: %" PRIuPNUM "", last);
-	return 1;
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_MM_WALK_RNG;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "Ending partition: %" PRIuPNUM "", last);
+        return 1;
     }
 
     part = mm->part_list;
     while ((part != NULL) && (cnt <= last)) {
 
-	if (cnt >= start) {
-	    int retval;
-	    retval = action(mm, cnt, part, 0, ptr);
-	    if (retval == WALK_STOP)
-		return 0;
-	    else if (retval == WALK_ERROR)
-		return 1;
-	}
+        if (cnt >= start) {
+            int retval;
+            retval = action(mm, cnt, part, 0, ptr);
+            if (retval == TSK_WALK_STOP)
+                return 0;
+            else if (retval == TSK_WALK_ERROR)
+                return 1;
+        }
 
-	part = part->next;
-	cnt++;
+        part = part->next;
+        cnt++;
     }
 
     return 0;
 }
 
 void
-gpt_close(MM_INFO * mm)
+gpt_close(TSK_MM_INFO * mm)
 {
-    mm_part_free(mm);
+    tsk_mm_part_free(mm);
     free(mm);
 }
 
-MM_INFO *
-gpt_open(IMG_INFO * img_info, DADDR_T offset)
+TSK_MM_INFO *
+tsk_mm_gpt_open(TSK_IMG_INFO * img_info, DADDR_T offset)
 {
-    MM_INFO *mm;
+    TSK_MM_INFO *mm;
 
     // clean up any errors that are lying around
     tsk_error_reset();
 
-    mm = (MM_INFO *) mymalloc(sizeof(*mm));
+    mm = (TSK_MM_INFO *) tsk_malloc(sizeof(*mm));
     if (mm == NULL)
-	return NULL;
+        return NULL;
 
     mm->img_info = img_info;
-    mm->mmtype = MM_GPT;
+    mm->mmtype = TSK_MM_INFO_TYPE_GPT;
     mm->str_type = "GUID Partition Table";
 
     /* If an offset was given, then use that too */
@@ -308,14 +312,14 @@ gpt_open(IMG_INFO * img_info, DADDR_T offset)
 
     /* Load the partitions into the sorted list */
     if (gpt_load_table(mm)) {
-	gpt_close(mm);
-	return NULL;
+        gpt_close(mm);
+        return NULL;
     }
 
     /* fill in the sorted list with the 'unknown' values */
-    if (mm_part_unused(mm)) {
-	gpt_close(mm);
-	return NULL;
+    if (tsk_mm_part_unused(mm)) {
+        gpt_close(mm);
+        return NULL;
     }
 
     return mm;

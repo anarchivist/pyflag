@@ -5,7 +5,7 @@
 ** Contains random internal definitions needed to compile the 
 ** library. 
 **
-** $Date: 2006/08/30 21:09:00 $
+** $Date: 2007/04/05 16:01:57 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -25,16 +25,13 @@ extern "C" {
 #endif
 
     /*
-     * External interface.
+     * Internal interface.
      */
-#include <string.h>
-#include <fcntl.h>
+// Include the external file 
+#include "fs_tools.h"
 
 #include <time.h>
 #include <locale.h>
-#include <errno.h>
-
-#include "tsk_os.h"
 
 #if defined (HAVE_UNISTD)
 #include <unistd.h>
@@ -46,8 +43,6 @@ extern "C" {
 #include <sys/time.h>
 #endif
 
-// Include the external file 
-#include "fs_tools.h"
 
 
 #ifndef NBBY
@@ -65,35 +60,40 @@ extern "C" {
 
 /* Data structure and action to internally load a file */
     typedef struct {
-	char *base;
-	char *cur;
-	size_t total;
-	size_t left;
-    } FS_LOAD_FILE;
+        char *base;
+        char *cur;
+        size_t total;
+        size_t left;
+    } TSK_FS_LOAD_FILE;
 
-    extern uint8_t load_file_action(FS_INFO *, DADDR_T, char *,
-	size_t, int, void *);
+    extern uint8_t tsk_fs_load_file_action(TSK_FS_INFO *, DADDR_T, char *,
+        size_t, TSK_FS_BLOCK_FLAG_ENUM, void *);
 
 
 /* Specific file system routines */
-    extern FS_INFO *ext2fs_open(IMG_INFO *, SSIZE_T, uint8_t, uint8_t);
-    extern FS_INFO *fatfs_open(IMG_INFO *, SSIZE_T, uint8_t, uint8_t);
-    extern FS_INFO *ffs_open(IMG_INFO *, SSIZE_T, uint8_t);
-    extern FS_INFO *ntfs_open(IMG_INFO *, SSIZE_T, uint8_t, uint8_t);
-    extern FS_INFO *rawfs_open(IMG_INFO *, SSIZE_T);
-    extern FS_INFO *swapfs_open(IMG_INFO *, SSIZE_T);
-    extern FS_INFO *iso9660_open(IMG_INFO *, SSIZE_T, unsigned char,
-	uint8_t);
-    extern FS_INFO *hfs_open(IMG_INFO *, SSIZE_T, unsigned char, uint8_t);
+    extern TSK_FS_INFO *ext2fs_open(TSK_IMG_INFO *, SSIZE_T,
+        TSK_FS_INFO_TYPE_ENUM, uint8_t);
+    extern TSK_FS_INFO *fatfs_open(TSK_IMG_INFO *, SSIZE_T,
+        TSK_FS_INFO_TYPE_ENUM, uint8_t);
+    extern TSK_FS_INFO *ffs_open(TSK_IMG_INFO *, SSIZE_T,
+        TSK_FS_INFO_TYPE_ENUM);
+    extern TSK_FS_INFO *ntfs_open(TSK_IMG_INFO *, SSIZE_T,
+        TSK_FS_INFO_TYPE_ENUM, uint8_t);
+    extern TSK_FS_INFO *rawfs_open(TSK_IMG_INFO *, SSIZE_T);
+    extern TSK_FS_INFO *swapfs_open(TSK_IMG_INFO *, SSIZE_T);
+    extern TSK_FS_INFO *iso9660_open(TSK_IMG_INFO *, SSIZE_T,
+        TSK_FS_INFO_TYPE_ENUM, uint8_t);
+    extern TSK_FS_INFO *hfs_open(TSK_IMG_INFO *, SSIZE_T,
+        TSK_FS_INFO_TYPE_ENUM, uint8_t);
 
 
 // Endian macros - actual functions in misc/
 
-#define fs_guessu16(fs, x, mag)   \
-	guess_end_u16(&(fs->endian), (x), (mag))
+#define tsk_fs_guessu16(fs, x, mag)   \
+	tsk_guess_end_u16(&(fs->endian), (x), (mag))
 
-#define fs_guessu32(fs, x, mag)   \
-	guess_end_u32(&(fs->endian), (x), (mag))
+#define tsk_fs_guessu32(fs, x, mag)   \
+	tsk_guess_end_u32(&(fs->endian), (x), (mag))
 
 #ifdef __cplusplus
 }

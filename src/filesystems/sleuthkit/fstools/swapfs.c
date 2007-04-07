@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2006/12/05 21:39:53 $
+** $Date: 2007/04/04 20:06:58 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
@@ -26,23 +26,23 @@
  * return 1 on error and 0 on success
  */
 uint8_t
-swapfs_inode_walk(FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
-    int flags, FS_INODE_WALK_FN action, void *ptr)
+swapfs_inode_walk(TSK_FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
+    TSK_FS_INODE_FLAG_ENUM flags, TSK_FS_INODE_WALK_CB action, void *ptr)
 {
     tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L,
-	"Illegal analysis method for swap space data");
+        "Illegal analysis method for swap space data");
     return 1;
 }
 
-static FS_INODE *
-swapfs_inode_lookup(FS_INFO * fs, INUM_T inum)
+static TSK_FS_INODE *
+swapfs_inode_lookup(TSK_FS_INFO * fs, INUM_T inum)
 {
     tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L,
-	"Illegal analysis method for swap space data");
+        "Illegal analysis method for swap space data");
     return NULL;
 }
 
@@ -61,10 +61,10 @@ swapfs_inode_lookup(FS_INFO * fs, INUM_T inum)
  */
 
 uint8_t
-swapfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
-    int flags, FS_BLOCK_WALK_FN action, void *ptr)
+swapfs_block_walk(TSK_FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
+    TSK_FS_BLOCK_FLAG_ENUM flags, TSK_FS_BLOCK_WALK_CB action, void *ptr)
 {
-    DATA_BUF *data_buf;
+    TSK_DATA_BUF *data_buf;
     DADDR_T addr;
 
     // clean up any error messages that are lying around
@@ -74,65 +74,65 @@ swapfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
      * Sanity checks.
      */
     if (start_blk < fs->first_block || start_blk > fs->last_block) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_FS_WALK_RNG;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "swapfs_block_walk: Start block number: %" PRIuDADDR,
-	    start_blk);
-	return 1;
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_FS_WALK_RNG;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "swapfs_block_walk: Start block number: %" PRIuDADDR,
+            start_blk);
+        return 1;
     }
 
     if (end_blk < fs->first_block || end_blk > fs->last_block
-	|| end_blk < start_blk) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_FS_WALK_RNG;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "swapfs_block_walk: Last block number: %" PRIuDADDR, end_blk);
-	return 1;
+        || end_blk < start_blk) {
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_FS_WALK_RNG;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "swapfs_block_walk: Last block number: %" PRIuDADDR, end_blk);
+        return 1;
     }
 
     /* All swap has is allocated blocks... exit if not wanted */
-    if (!(flags & FS_FLAG_DATA_ALLOC)) {
-	return 0;
+    if (!(flags & TSK_FS_BLOCK_FLAG_ALLOC)) {
+        return 0;
     }
 
-    if ((data_buf = data_buf_alloc(fs->block_size)) == NULL) {
-	return 1;
+    if ((data_buf = tsk_data_buf_alloc(fs->block_size)) == NULL) {
+        return 1;
     }
 
     for (addr = start_blk; addr <= end_blk; addr++) {
-	SSIZE_T cnt;
-	int retval;
+        SSIZE_T cnt;
+        int retval;
 
-	cnt = fs_read_block(fs, data_buf, fs->block_size, addr);
-	if (cnt != fs->block_size) {
-	    if (cnt != -1) {
-		tsk_error_reset();
-		tsk_errno = TSK_ERR_FS_READ;
-	    }
-	    snprintf(tsk_errstr2, TSK_ERRSTR_L,
-		"swapfs_block_walk: Block %" PRIuDADDR, addr);
-	    data_buf_free(data_buf);
-	    return 1;
-	}
+        cnt = tsk_fs_read_block(fs, data_buf, fs->block_size, addr);
+        if (cnt != fs->block_size) {
+            if (cnt != -1) {
+                tsk_error_reset();
+                tsk_errno = TSK_ERR_FS_READ;
+            }
+            snprintf(tsk_errstr2, TSK_ERRSTR_L,
+                "swapfs_block_walk: Block %" PRIuDADDR, addr);
+            tsk_data_buf_free(data_buf);
+            return 1;
+        }
 
-	retval = action(fs, addr, data_buf->data,
-	    FS_FLAG_DATA_ALLOC | FS_FLAG_DATA_CONT, ptr);
+        retval = action(fs, addr, data_buf->data,
+            TSK_FS_BLOCK_FLAG_ALLOC | TSK_FS_BLOCK_FLAG_CONT, ptr);
 
-	if (retval == WALK_STOP) {
-	    data_buf_free(data_buf);
-	    return 0;
-	}
-	else if (retval == WALK_ERROR) {
-	    data_buf_free(data_buf);
-	    return 1;
-	}
+        if (retval == TSK_WALK_STOP) {
+            tsk_data_buf_free(data_buf);
+            return 0;
+        }
+        else if (retval == TSK_WALK_ERROR) {
+            tsk_data_buf_free(data_buf);
+            return 1;
+        }
     }
 
     /*
      * Cleanup.
      */
-    data_buf_free(data_buf);
+    tsk_data_buf_free(data_buf);
     return 0;
 }
 
@@ -147,13 +147,14 @@ swapfs_block_walk(FS_INFO * fs, DADDR_T start_blk, DADDR_T end_blk,
  *  return 1 on error and 0 on success
  */
 uint8_t
-swapfs_file_walk(FS_INFO * fs, FS_INODE * inode, uint32_t type,
-    uint16_t id, int flags, FS_FILE_WALK_FN action, void *ptr)
+swapfs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
+    uint16_t id, TSK_FS_FILE_FLAG_ENUM flags,
+    TSK_FS_FILE_WALK_CB action, void *ptr)
 {
     tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L,
-	"Illegal analysis method for swap space data");
+        "Illegal analysis method for swap space data");
     return 1;
 }
 
@@ -161,13 +162,14 @@ swapfs_file_walk(FS_INFO * fs, FS_INODE * inode, uint32_t type,
  * return 1 on error and 0 on success
  */
 uint8_t
-swapfs_dent_walk(FS_INFO * fs, INUM_T inode, int flags,
-    FS_DENT_WALK_FN action, void *ptr)
+swapfs_dent_walk(TSK_FS_INFO * fs, INUM_T inode,
+    TSK_FS_DENT_FLAG_ENUM flags, TSK_FS_DENT_TYPE_WALK_CB action,
+    void *ptr)
 {
     tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L,
-	"Illegal analysis method for swap space data");
+        "Illegal analysis method for swap space data");
     return 1;
 }
 
@@ -176,7 +178,7 @@ swapfs_dent_walk(FS_INFO * fs, INUM_T inode, int flags,
  * return 1 on error and 0 on success
  */
 static uint8_t
-swapfs_fsstat(FS_INFO * fs, FILE * hFile)
+swapfs_fsstat(TSK_FS_INFO * fs, FILE * hFile)
 {
     tsk_fprintf(hFile, "Swap Space\n");
     tsk_fprintf(hFile, "Page Size: %d\n", fs->block_size);
@@ -189,20 +191,20 @@ swapfs_fsstat(FS_INFO * fs, FILE * hFile)
 
 /* Return 1 on error and 0 on success */
 static uint8_t
-swapfs_istat(FS_INFO * fs, FILE * hFile, INUM_T inum, DADDR_T numblock,
+swapfs_istat(TSK_FS_INFO * fs, FILE * hFile, INUM_T inum, DADDR_T numblock,
     int32_t sec_skew)
 {
     tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
     snprintf(tsk_errstr, TSK_ERRSTR_L,
-	"Illegal analysis method for swap space data");
+        "Illegal analysis method for swap space data");
     return 1;
 }
 
 
 /* Return 1 on error and 0 on success */
 uint8_t
-swapfs_jopen(FS_INFO * fs, INUM_T inum)
+swapfs_jopen(TSK_FS_INFO * fs, INUM_T inum)
 {
     tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
@@ -212,8 +214,8 @@ swapfs_jopen(FS_INFO * fs, INUM_T inum)
 
 /* Return 1 on error and 0 on success */
 uint8_t
-swapfs_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
-    void *ptr)
+swapfs_jentry_walk(TSK_FS_INFO * fs, int flags,
+    TSK_FS_JENTRY_WALK_CB action, void *ptr)
 {
     tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
@@ -224,8 +226,8 @@ swapfs_jentry_walk(FS_INFO * fs, int flags, FS_JENTRY_WALK_FN action,
 
 /* Return 1 on error and 0 on success */
 uint8_t
-swapfs_jblk_walk(FS_INFO * fs, INUM_T start, INUM_T end, int flags,
-    FS_JBLK_WALK_FN action, void *ptr)
+swapfs_jblk_walk(TSK_FS_INFO * fs, INUM_T start, INUM_T end, int flags,
+    TSK_FS_JBLK_WALK_CB action, void *ptr)
 {
     tsk_error_reset();
     tsk_errno = TSK_ERR_FS_FUNC;
@@ -237,36 +239,36 @@ swapfs_jblk_walk(FS_INFO * fs, INUM_T start, INUM_T end, int flags,
 
 /* swapfs_close - close a fast file system */
 static void
-swapfs_close(FS_INFO * fs)
+swapfs_close(TSK_FS_INFO * fs)
 {
     free(fs);
 }
 
 
 /* swaps_open - open a swap file
- * Return FS_INFO on success and NULL on error
+ * Return TSK_FS_INFO on success and NULL on error
  * */
 
-FS_INFO *
-swapfs_open(IMG_INFO * img_info, SSIZE_T offset)
+TSK_FS_INFO *
+swapfs_open(TSK_IMG_INFO * img_info, SSIZE_T offset)
 {
     OFF_T len;
-    FS_INFO *fs;
+    TSK_FS_INFO *fs;
 
     // clean up any error messages that are lying around
     tsk_error_reset();
 
-    fs = (FS_INFO *) mymalloc(sizeof(*fs));
+    fs = (TSK_FS_INFO *) tsk_malloc(sizeof(*fs));
     if (fs == NULL)
-	return NULL;
+        return NULL;
 
 
     /* All we need to set are the block sizes and max bloc size etc. */
     fs->img_info = img_info;
     fs->offset = offset;
-    fs->ftype = SWAP;
+    fs->ftype = TSK_FS_INFO_TYPE_SWAP;
+    fs->duname = "Page";
     fs->flags = 0;
-
 
     fs->inum_count = 0;
     fs->root_inum = 0;
@@ -276,7 +278,7 @@ swapfs_open(IMG_INFO * img_info, SSIZE_T offset)
     len = img_info->get_size(img_info);
     fs->block_count = len / 4096;
     if (len % 4096)
-	fs->block_count++;
+        fs->block_count++;
 
     fs->first_block = 0;
     fs->last_block = fs->block_count - 1;

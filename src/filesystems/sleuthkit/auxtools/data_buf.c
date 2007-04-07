@@ -31,24 +31,30 @@
 #include "aux_tools.h"
 
 
-/* data_buf_alloc - allocate file system I/O buffer 
+/**
+ * \file data_buf.c
+ * Contains functions to allocate and maintain the tsk_data_buf structures.
+ */
+
+
+/**
+ * Allocate and initialize a tsk_data_buf structure.
  *
- * Returns NULL on error
- * */
-
-DATA_BUF *
-data_buf_alloc(size_t size)
+ * @param size Size in bytes to allocated for the buffer
+ *
+ * @return NULL on error
+ */
+TSK_DATA_BUF *
+tsk_data_buf_alloc(size_t size)
 {
-    DATA_BUF *buf;
+    TSK_DATA_BUF *buf;
 
-    buf = (DATA_BUF *) mymalloc(sizeof(*buf));
-    if (buf == NULL)
-	return NULL;
+    if ((buf = (TSK_DATA_BUF *) tsk_malloc(sizeof(*buf))) == NULL)
+        return NULL;
 
-    buf->data = mymalloc(size);
-    if (buf->data == NULL) {
-	free(buf);
-	return NULL;
+    if ((buf->data = tsk_malloc(size)) == NULL) {
+        free(buf);
+        return NULL;
     }
     buf->size = size;
     buf->used = 0;
@@ -56,10 +62,14 @@ data_buf_alloc(size_t size)
     return (buf);
 }
 
-/* data_buf_free - destroy file system I/O buffer */
 
+/**
+ * Free the tsk_data_buf and its buffers.
+ *
+ * @param  buf The structure to free.
+ */
 void
-data_buf_free(DATA_BUF * buf)
+tsk_data_buf_free(TSK_DATA_BUF * buf)
 {
     free(buf->data);
     free((char *) buf);

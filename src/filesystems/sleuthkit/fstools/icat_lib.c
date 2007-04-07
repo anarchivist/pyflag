@@ -2,7 +2,7 @@
 ** icat_lib 
 ** The Sleuth Kit 
 **
-** $Date: 2006/11/29 22:02:11 $
+** $Date: 2007/04/04 18:18:55 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
@@ -30,52 +30,52 @@
 /* Call back action for file_walk
  */
 static uint8_t
-icat_action(FS_INFO * fs, DADDR_T addr, char *buf,
-    size_t size, int flags, void *ptr)
+icat_action(TSK_FS_INFO * fs, DADDR_T addr, char *buf,
+    size_t size, TSK_FS_BLOCK_FLAG_ENUM flags, void *ptr)
 {
     if (size == 0)
-	return WALK_CONT;
+        return TSK_WALK_CONT;
 
     if (fwrite(buf, size, 1, stdout) != 1) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_FS_WRITE;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "icat_action: error writing to stdout: %s", strerror(errno));
-	return WALK_ERROR;
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_FS_WRITE;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "icat_action: error writing to stdout: %s", strerror(errno));
+        return TSK_WALK_ERROR;
     }
 
-    return WALK_CONT;
+    return TSK_WALK_CONT;
 }
 
 /* Return 1 on error and 0 on success */
 uint8_t
-fs_icat(FS_INFO * fs, uint8_t lclflags, INUM_T inum, uint32_t type,
+tsk_fs_icat(TSK_FS_INFO * fs, uint8_t lclflags, INUM_T inum, uint32_t type,
     uint16_t id, int flags)
 {
-    FS_INODE *inode;
+    TSK_FS_INODE *inode;
 
 #ifdef TSK_WIN32
     if (-1 == _setmode(_fileno(stdout), _O_BINARY)) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_FS_WRITE;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "icat_lib: error setting stdout to binary: %s",
-	    strerror(errno));
-	return 1;
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_FS_WRITE;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "icat_lib: error setting stdout to binary: %s",
+            strerror(errno));
+        return 1;
     }
 #endif
 
     inode = fs->inode_lookup(fs, inum);
     if (!inode) {
-	return 1;
+        return 1;
     }
 
     if (fs->file_walk(fs, inode, type, id, flags, icat_action, NULL)) {
-	fs_inode_free(inode);
-	return 1;
+        tsk_fs_inode_free(inode);
+        return 1;
     }
 
-    fs_inode_free(inode);
+    tsk_fs_inode_free(inode);
 
     return 0;
 }

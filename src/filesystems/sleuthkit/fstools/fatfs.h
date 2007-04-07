@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2006/12/05 21:39:52 $
+** $Date: 2007/04/04 20:06:58 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -23,11 +23,11 @@ extern "C" {
 /*
 ** Constants
 */
-#define FATFS_ROOTINO	2	/* location of root directory inode */
+#define FATFS_ROOTINO	2       /* location of root directory inode */
 #define FATFS_FIRSTINO	2
 
 /* The following two values do not have the same meaning as they do in
- * EXT2FS and FFS because there is no notion of indirect pointers.  
+ * TSK_FS_INFO_TYPE_EXT_2 and FFS because there is no notion of indirect pointers.  
  * we will assign the first cluster to direct_addr[0] and that is it
  */
 #define FATFS_NDADDR    2
@@ -40,9 +40,9 @@ extern "C" {
 
 /* size of FAT to read into FATFS_INFO each time */
 /* This must be at least 1024 bytes or else fat12 will get messed up */
-#define FAT_CACHE_N		4	// number of caches
+#define FAT_CACHE_N		4       // number of caches
 #define FAT_CACHE_B		4096
-#define FAT_CACHE_S		8	// number of sectors in cache
+#define FAT_CACHE_S		8       // number of sectors in cache
 
 /* MASK values for FAT entries */
 #define FATFS_12_MASK	0x00000fff
@@ -94,80 +94,80 @@ extern "C" {
 
 
 /*
- * Boot Sector Structure for FAT12, FAT16, and FAT32
+ * Boot Sector Structure for TSK_FS_INFO_TYPE_FAT_12, TSK_FS_INFO_TYPE_FAT_16, and TSK_FS_INFO_TYPE_FAT_32
  */
     typedef struct {
-	uint8_t f1[3];
-	char oemname[8];
-	uint8_t ssize[2];	/* sector size in bytes */
-	uint8_t csize;		/* cluster size in sectors */
-	uint8_t reserved[2];	/* number of reserved sectors for boot sectors */
-	uint8_t numfat;		/* Number of FATs */
-	uint8_t numroot[2];	/* Number of Root dentries */
-	uint8_t sectors16[2];	/* number of sectors in FS */
-	uint8_t f2[1];
-	uint8_t sectperfat16[2];	/* size of FAT */
-	uint8_t f3[4];
-	uint8_t prevsect[4];	/* number of sectors before FS partition */
-	uint8_t sectors32[4];	/* 32-bit value of number of FS sectors */
+        uint8_t f1[3];
+        char oemname[8];
+        uint8_t ssize[2];       /* sector size in bytes */
+        uint8_t csize;          /* cluster size in sectors */
+        uint8_t reserved[2];    /* number of reserved sectors for boot sectors */
+        uint8_t numfat;         /* Number of FATs */
+        uint8_t numroot[2];     /* Number of Root dentries */
+        uint8_t sectors16[2];   /* number of sectors in FS */
+        uint8_t f2[1];
+        uint8_t sectperfat16[2];        /* size of FAT */
+        uint8_t f3[4];
+        uint8_t prevsect[4];    /* number of sectors before FS partition */
+        uint8_t sectors32[4];   /* 32-bit value of number of FS sectors */
 
-	/* The following are different for fat12/fat16 and fat32 */
-	union {
-	    struct {
-		uint8_t f5[3];
-		uint8_t vol_id[4];
-		uint8_t vol_lab[11];
-		uint8_t fs_type[8];
-		uint8_t f6[448];
-	    } f16;
-	    struct {
-		uint8_t sectperfat32[4];
-		uint8_t ext_flag[2];
-		uint8_t fs_ver[2];
-		uint8_t rootclust[4];	/* cluster where root directory is stored */
-		uint8_t fsinfo[2];	/* FS_INFO Location */
-		uint8_t bs_backup[2];	/* sector of backup of boot sector */
-		uint8_t f5[12];
-		uint8_t drvnum;
-		uint8_t f6[2];
-		uint8_t vol_id[4];
-		uint8_t vol_lab[11];
-		uint8_t fs_type[8];
-		uint8_t f7[420];
-	    } f32;
-	} a;
+        /* The following are different for fat12/fat16 and fat32 */
+        union {
+            struct {
+                uint8_t f5[3];
+                uint8_t vol_id[4];
+                uint8_t vol_lab[11];
+                uint8_t fs_type[8];
+                uint8_t f6[448];
+            } f16;
+            struct {
+                uint8_t sectperfat32[4];
+                uint8_t ext_flag[2];
+                uint8_t fs_ver[2];
+                uint8_t rootclust[4];   /* cluster where root directory is stored */
+                uint8_t fsinfo[2];      /* TSK_FS_INFO Location */
+                uint8_t bs_backup[2];   /* sector of backup of boot sector */
+                uint8_t f5[12];
+                uint8_t drvnum;
+                uint8_t f6[2];
+                uint8_t vol_id[4];
+                uint8_t vol_lab[11];
+                uint8_t fs_type[8];
+                uint8_t f7[420];
+            } f32;
+        } a;
 
-	uint8_t magic[2];	/* MAGIC for all versions */
+        uint8_t magic[2];       /* MAGIC for all versions */
 
     } fatfs_sb;
 
     typedef struct {
-	uint8_t magic1[4];	/* 41615252 */
-	uint8_t f1[480];
-	uint8_t magic2[4];	/* 61417272 */
-	uint8_t freecnt[4];	/* free clusters 0xfffffffff if unknown */
-	uint8_t nextfree[4];	/* next free cluster */
-	uint8_t f2[12];
-	uint8_t magic3[4];	/* AA550000 */
+        uint8_t magic1[4];      /* 41615252 */
+        uint8_t f1[480];
+        uint8_t magic2[4];      /* 61417272 */
+        uint8_t freecnt[4];     /* free clusters 0xfffffffff if unknown */
+        uint8_t nextfree[4];    /* next free cluster */
+        uint8_t f2[12];
+        uint8_t magic3[4];      /* AA550000 */
     } fatfs_fsinfo;
 
 
 
 /* directory entry short name structure */
     typedef struct {
-	uint8_t name[8];
-	uint8_t ext[3];
-	uint8_t attrib;
-	uint8_t lowercase;
-	uint8_t ctimeten;	/* create times */
-	uint8_t ctime[2];
-	uint8_t cdate[2];
-	uint8_t adate[2];	/* access time */
-	uint8_t highclust[2];
-	uint8_t wtime[2];	/* last write time */
-	uint8_t wdate[2];
-	uint8_t startclust[2];
-	uint8_t size[4];
+        uint8_t name[8];
+        uint8_t ext[3];
+        uint8_t attrib;
+        uint8_t lowercase;
+        uint8_t ctimeten;       /* create times */
+        uint8_t ctime[2];
+        uint8_t cdate[2];
+        uint8_t adate[2];       /* access time */
+        uint8_t highclust[2];
+        uint8_t wtime[2];       /* last write time */
+        uint8_t wdate[2];
+        uint8_t startclust[2];
+        uint8_t size[4];
     } fatfs_dentry;
 
 
@@ -175,11 +175,11 @@ extern "C" {
  * cluster 
  */
 #define FATFS_DENTRY_CLUST(fsi, de)	\
-	(DADDR_T)((getu16(fsi->endian, de->startclust)) | (getu16(fsi->endian, de->highclust)<<16))
+	(DADDR_T)((tsk_getu16(fsi->endian, de->startclust)) | (tsk_getu16(fsi->endian, de->highclust)<<16))
 
 /* constants for first byte of name[] */
 #define FATFS_SLOT_EMPTY	0x00
-#define FATFS_SLOT_E5		0x05	/* actual value is 0xe5 */
+#define FATFS_SLOT_E5		0x05    /* actual value is 0xe5 */
 #define FATFS_SLOT_DELETED	0xe5
 
 /* 
@@ -202,30 +202,30 @@ extern "C" {
 
 
 /* flags for attributes field */
-#define FATFS_ATTR_NORMAL	0x00	/* normal file */
-#define FATFS_ATTR_READONLY	0x01	/* file is readonly */
-#define FATFS_ATTR_HIDDEN	0x02	/* file is hidden */
-#define FATFS_ATTR_SYSTEM	0x04	/* file is a system file */
-#define FATFS_ATTR_VOLUME	0x08	/* entry is a volume label */
-#define FATFS_ATTR_DIRECTORY	0x10	/* entry is a directory name */
-#define FATFS_ATTR_ARCHIVE	0x20	/* file is new or modified */
-#define FATFS_ATTR_LFN		0x0f	/* A long file name entry */
-#define FATFS_ATTR_ALL		0x3f	/* all flags set */
+#define FATFS_ATTR_NORMAL	0x00    /* normal file */
+#define FATFS_ATTR_READONLY	0x01    /* file is readonly */
+#define FATFS_ATTR_HIDDEN	0x02    /* file is hidden */
+#define FATFS_ATTR_SYSTEM	0x04    /* file is a system file */
+#define FATFS_ATTR_VOLUME	0x08    /* entry is a volume label */
+#define FATFS_ATTR_DIRECTORY	0x10    /* entry is a directory name */
+#define FATFS_ATTR_ARCHIVE	0x20    /* file is new or modified */
+#define FATFS_ATTR_LFN		0x0f    /* A long file name entry */
+#define FATFS_ATTR_ALL		0x3f    /* all flags set */
 
 /* flags for lowercase field */
-#define FATFS_CASE_LOWER_BASE	0x08	/* base is lower case */
-#define FATFS_CASE_LOWER_EXT	0x10	/* extension is lower case */
-#define FATFS_CASE_LOWER_ALL	0x18	/* both are lower */
+#define FATFS_CASE_LOWER_BASE	0x08    /* base is lower case */
+#define FATFS_CASE_LOWER_EXT	0x10    /* extension is lower case */
+#define FATFS_CASE_LOWER_ALL	0x18    /* both are lower */
 
-#define FATFS_SEC_MASK		0x1f	/* number of seconds div by 2 */
+#define FATFS_SEC_MASK		0x1f    /* number of seconds div by 2 */
 #define FATFS_SEC_SHIFT		0
 #define FATFS_SEC_MIN		0
 #define FATFS_SEC_MAX		29
-#define FATFS_MIN_MASK		0x7e0	/* number of minutes 0-59 */
+#define FATFS_MIN_MASK		0x7e0   /* number of minutes 0-59 */
 #define FATFS_MIN_SHIFT		5
 #define FATFS_MIN_MIN		0
 #define FATFS_MIN_MAX		59
-#define FATFS_HOUR_MASK		0xf800	/* number of hours 0-23 */
+#define FATFS_HOUR_MASK		0xf800  /* number of hours 0-23 */
 #define FATFS_HOUR_SHIFT	11
 #define FATFS_HOUR_MIN		0
 #define FATFS_HOUR_MAX		23
@@ -236,15 +236,15 @@ extern "C" {
 	  (((x & FATFS_MIN_MASK) >> FATFS_MIN_SHIFT) > FATFS_MIN_MAX) || \
 	  (((x & FATFS_HOUR_MASK) >> FATFS_HOUR_SHIFT) > FATFS_HOUR_MAX) ) == 0)
 
-#define FATFS_DAY_MASK		0x1f	/* day of month 1-31 */
+#define FATFS_DAY_MASK		0x1f    /* day of month 1-31 */
 #define FATFS_DAY_SHIFT		0
 #define FATFS_DAY_MIN		1
 #define FATFS_DAY_MAX		31
-#define FATFS_MON_MASK		0x1e0	/* month 1-12 */
+#define FATFS_MON_MASK		0x1e0   /* month 1-12 */
 #define FATFS_MON_SHIFT		5
 #define FATFS_MON_MIN		1
 #define FATFS_MON_MAX		12
-#define FATFS_YEAR_MASK		0xfe00	/* year, from 1980 0-127 */
+#define FATFS_YEAR_MASK		0xfe00  /* year, from 1980 0-127 */
 #define FATFS_YEAR_SHIFT	9
 #define FATFS_YEAR_MIN		0
 #define FATFS_YEAR_MAX		127
@@ -263,82 +263,82 @@ extern "C" {
  * Contents of this are in UNICODE, not ASCII 
  */
     typedef struct {
-	uint8_t seq;
-	uint8_t part1[10];
-	uint8_t attributes;
-	uint8_t reserved1;
-	uint8_t chksum;
-	uint8_t part2[12];
-	uint8_t reserved2[2];
-	uint8_t part3[4];
+        uint8_t seq;
+        uint8_t part1[10];
+        uint8_t attributes;
+        uint8_t reserved1;
+        uint8_t chksum;
+        uint8_t part2[12];
+        uint8_t reserved2[2];
+        uint8_t part3[4];
     } fatfs_dentry_lfn;
 
 /* flags for seq field */
-#define FATFS_LFN_SEQ_FIRST	0x40	/* This bit is set for the first lfn entry */
-#define FATFS_LFN_SEQ_MASK	0x3f	/* These bits are a mask for the decreasing
-					 * sequence number for the entries */
+#define FATFS_LFN_SEQ_FIRST	0x40    /* This bit is set for the first lfn entry */
+#define FATFS_LFN_SEQ_MASK	0x3f    /* These bits are a mask for the decreasing
+                                         * sequence number for the entries */
 
 /* internal FATFS_INFO structure */
     typedef struct {
-	FS_INFO fs_info;	/* super class */
-	//DATA_BUF *table;      /* cached section of file allocation table */
+        TSK_FS_INFO fs_info;    /* super class */
+        //TSK_DATA_BUF *table;      /* cached section of file allocation table */
 
-	/* FAT cache */
-	char fatc_buf[FAT_CACHE_N][FAT_CACHE_B];
-	DADDR_T fatc_addr[FAT_CACHE_N];
-	uint8_t fatc_ttl[FAT_CACHE_N];	// ttl of 0 means is not in use
-
-
-	DATA_BUF *dinodes;	/* sector size buffer of inode list */
-	fatfs_sb *sb;
-
-	fatfs_dentry *dep;
+        /* FAT cache */
+        char fatc_buf[FAT_CACHE_N][FAT_CACHE_B];
+        DADDR_T fatc_addr[FAT_CACHE_N];
+        uint8_t fatc_ttl[FAT_CACHE_N];  // ttl of 0 means is not in use
 
 
-	/* FIrst sector of FAT */
-	DADDR_T firstfatsect;
+        TSK_DATA_BUF *dinodes;  /* sector size buffer of inode list */
+        fatfs_sb *sb;
 
-	/* First sector after FAT  - For FAT12 and FAT16, this is where the
-	 * root directory entries are.  For FAT32, this is the the first 
-	 * cluster */
-	DADDR_T firstdatasect;
+        fatfs_dentry *dep;
 
-	/* The sector number were cluster 2 (the first one) is
-	 * for FAT32, it will be the same as firstdatasect, but for FAT12 & 16
-	 * it will be the first sector after the Root directory  */
-	DADDR_T firstclustsect;
 
-	/* size of data area in clusters, starting at firstdatasect */
-	DADDR_T clustcnt;
+        /* FIrst sector of FAT */
+        DADDR_T firstfatsect;
 
-	DADDR_T lastclust;
+        /* First sector after FAT  - For TSK_FS_INFO_TYPE_FAT_12 and TSK_FS_INFO_TYPE_FAT_16, this is where the
+         * root directory entries are.  For TSK_FS_INFO_TYPE_FAT_32, this is the the first 
+         * cluster */
+        DADDR_T firstdatasect;
 
-	/* sector where the root directory is located */
-	DADDR_T rootsect;
+        /* The sector number were cluster 2 (the first one) is
+         * for TSK_FS_INFO_TYPE_FAT_32, it will be the same as firstdatasect, but for TSK_FS_INFO_TYPE_FAT_12 & 16
+         * it will be the first sector after the Root directory  */
+        DADDR_T firstclustsect;
 
-	uint32_t dentry_cnt_se;	/* max number of dentries per sector */
-	uint32_t dentry_cnt_cl;	/* max number of dentries per cluster */
+        /* size of data area in clusters, starting at firstdatasect */
+        DADDR_T clustcnt;
 
-	uint16_t ssize;		/* size of sectors in bytes */
-	uint16_t ssize_sh;	/* power of 2 for size of sectors */
-	uint8_t csize;		/* size of clusters in sectors */
-	//uint16_t      reserved;       /* number of reserved sectors */
-	uint8_t numfat;		/* number of fat tables */
-	uint32_t sectperfat;	/* sectors per fat table */
-	uint16_t numroot;	/* number of 32-byte dentries in root dir */
-	uint32_t mask;		/* the mask to use for the sectors */
+        DADDR_T lastclust;
+
+        /* sector where the root directory is located */
+        DADDR_T rootsect;
+
+        uint32_t dentry_cnt_se; /* max number of dentries per sector */
+        uint32_t dentry_cnt_cl; /* max number of dentries per cluster */
+
+        uint16_t ssize;         /* size of sectors in bytes */
+        uint16_t ssize_sh;      /* power of 2 for size of sectors */
+        uint8_t csize;          /* size of clusters in sectors */
+        //uint16_t      reserved;       /* number of reserved sectors */
+        uint8_t numfat;         /* number of fat tables */
+        uint32_t sectperfat;    /* sectors per fat table */
+        uint16_t numroot;       /* number of 32-byte dentries in root dir */
+        uint32_t mask;          /* the mask to use for the sectors */
 
     } FATFS_INFO;
 
 
     extern int8_t is_sectalloc(FATFS_INFO *, DADDR_T);
 
-    extern uint8_t fatfs_dent_walk(FS_INFO *, INUM_T, int, FS_DENT_WALK_FN,
-	void *);
+    extern uint8_t fatfs_dent_walk(TSK_FS_INFO *, INUM_T,
+        TSK_FS_DENT_FLAG_ENUM, TSK_FS_DENT_TYPE_WALK_CB, void *);
     extern uint8_t fatfs_isdentry(FATFS_INFO *, fatfs_dentry *);
-    extern uint8_t fatfs_make_root(FATFS_INFO *, FS_INODE *);
-    extern uint8_t fatfs_dinode_copy(FATFS_INFO *, FS_INODE *,
-	fatfs_dentry *, DADDR_T, INUM_T);
+    extern uint8_t fatfs_make_root(FATFS_INFO *, TSK_FS_INODE *);
+    extern uint8_t fatfs_dinode_copy(FATFS_INFO *, TSK_FS_INODE *,
+        fatfs_dentry *, DADDR_T, INUM_T);
 
 #ifdef __cplusplus
 }

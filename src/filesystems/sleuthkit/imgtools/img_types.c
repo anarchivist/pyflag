@@ -2,7 +2,7 @@
 ** img_types
 ** The Sleuth Kit 
 **
-** $Date: 2006/09/06 20:40:00 $
+** $Date: 2007/04/04 20:06:58 $
 **
 ** Identify the type of image file being used
 **
@@ -24,58 +24,58 @@ typedef struct {
  * - in order of expected usage
  */
 IMG_TYPES img_open_table[] = {
-    {"raw", RAW_SING, "raw (dd)"},
+    {"raw", TSK_IMG_INFO_TYPE_RAW_SING, "raw (dd)"},
 #ifdef USE_LIBAFF
-    {"aff", AFF_AFF, "Advanced Forensic Format"},
-    {"afd", AFF_AFD, "AFF Multiple File"},
-    {"afm", AFF_AFM, "AFF with external metadata"},
+    {"aff", TSK_IMG_INFO_TYPE_AFF_AFF, "Advanced Forensic Format"},
+    {"afd", TSK_IMG_INFO_TYPE_AFF_AFD, "AFF Multiple File"},
+    {"afm", TSK_IMG_INFO_TYPE_AFF_AFM, "AFF with external metadata"},
 #endif
 #ifdef USE_LIBEWF
-    {"ewf", EWF_EWF, "Expert Witness format (encase)"},
+    {"ewf", TSK_IMG_INFO_TYPE_EWF_EWF, "Expert Witness format (encase)"},
 #endif
-    {"split", RAW_SPLIT, "Split raw files"},
+    {"split", TSK_IMG_INFO_TYPE_RAW_SPLIT, "Split raw files"},
     {0},
 };
 
 
-uint8_t
-img_parse_type(const TSK_TCHAR * str)
+TSK_IMG_INFO_TYPE_ENUM
+tsk_img_parse_type(const TSK_TCHAR * str)
 {
     char tmp[16];
     IMG_TYPES *sp;
     int i;
     // convert to char
     for (i = 0; i < 15 && str[i] != '\0'; i++) {
-	tmp[i] = (char) str[i];
+        tmp[i] = (char) str[i];
     }
     tmp[i] = '\0';
 
     for (sp = img_open_table; sp->name; sp++) {
-	if (strcmp(tmp, sp->name) == 0) {
-	    return sp->code;
-	}
+        if (strcmp(tmp, sp->name) == 0) {
+            return sp->code;
+        }
     }
-    return UNSUPP_IMG;
+    return TSK_IMG_INFO_TYPE_UNSUPP;
 }
 
 
 /* Used by the usage functions to display supported types */
 void
-img_print_types(FILE * hFile)
+tsk_img_print_types(FILE * hFile)
 {
     IMG_TYPES *sp;
     tsk_fprintf(hFile, "Supported image format types:\n");
     for (sp = img_open_table; sp->name; sp++)
-	tsk_fprintf(hFile, "\t%s (%s)\n", sp->name, sp->comment);
+        tsk_fprintf(hFile, "\t%s (%s)\n", sp->name, sp->comment);
 }
 
 char *
-img_get_type(uint8_t ftype)
+tsk_img_get_type(TSK_IMG_INFO_TYPE_ENUM ftype)
 {
     IMG_TYPES *sp;
     for (sp = img_open_table; sp->name; sp++)
-	if (sp->code == ftype)
-	    return sp->name;
+        if (sp->code == ftype)
+            return sp->name;
 
     return NULL;
 }

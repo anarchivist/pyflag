@@ -41,11 +41,11 @@ strerror(int err)
     static char buf[20];
 
     if (err < sys_nerr && err > 0) {
-	return (sys_errlist[err]);
+        return (sys_errlist[err]);
     }
     else {
-	sprintf(buf, "Unknown error %d", err);
-	return (buf);
+        sprintf(buf, "Unknown error %d", err);
+        return (buf);
     }
 }
 

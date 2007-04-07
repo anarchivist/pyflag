@@ -20,4 +20,4 @@ extern TCHAR *optarg;
 
 int getopt(int argc, TCHAR * argv[], TCHAR * optstring);
 
-#endif				//XGETOPT_H
+#endif                          //XGETOPT_H

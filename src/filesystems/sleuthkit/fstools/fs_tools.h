@@ -5,10 +5,10 @@
 ** This header file is to be included if file system routines
 ** are used from the library.  
 **
-** $Date: 2006/12/05 21:39:52 $
+** $Date: 2007/04/05 16:01:57 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
-** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
+** Copyright (c) 2003-2007 Brian Carrier.  All rights reserved
 **
 ** TASK
 ** Copyright (c) 2002 @stake Inc.  All rights reserved
@@ -17,201 +17,424 @@
 ** Corporation and others. All Rights Reserved.
 */
 
-#ifndef _FS_TOOLS_H
-#define _FS_TOOLS_H
+/** \file fs_tools.h
+ * 
+ * Contains the library functions and data structures for the FS support in TSK.
+ */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
+
+
+#ifndef _TSK_FS_TOOLS_H
+#define _TSK_FS_TOOLS_H
 
 #include "img_tools.h"
+#include <sys/types.h>
+
+
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /****************  FILE SYSTEM TYPES SECTION ********************/
-    extern uint8_t fs_parse_type(const TSK_TCHAR *);
-    extern void fs_print_types(FILE *);
-    extern char *fs_get_type(uint8_t);
 
-    /*
-     * the most-sig-nibble is the file system type, which indictates which
-     * _open function to call.  The least-sig-nibble is the specific type
-     * of implementation.
-     * */
-#define FSMASK                  0xf0
-#define OSMASK                  0x0f
+    /** 
+     * Values for the file system type.  The most-significant nibble is 
+     * the high-level type.  The least-sigificant nibble is the specific 
+     * sub-type of implementation.  
+     */
+    enum TSK_FS_INFO_TYPE_ENUM {
+        TSK_FS_INFO_TYPE_FS_MASK = 0xf0,
+        TSK_FS_INFO_TYPE_SUB_MASK = 0x0f,
 
-#define UNSUPP_FS               0x00
+        TSK_FS_INFO_TYPE_UNSUPP = 0x00,
 
-#define FFS_TYPE                0x10
-#define FFS_1                   0x11	/* UFS1 - FreeBSD, OpenBSD, BSDI ... */
-#define FFS_1B                  0x12	/* Solaris (no type) */
-#define FFS_2                   0x13	/* UFS2 - FreeBSD, NetBSD */
-#define FFSAUTO                 0x14
+        TSK_FS_INFO_TYPE_FFS_TYPE = 0x10,
+        TSK_FS_INFO_TYPE_FFS_1 = 0x11,  /* UFS1 - FreeBSD, OpenBSD, BSDI ... */
+        TSK_FS_INFO_TYPE_FFS_1B = 0x12, /* Solaris (no type) */
+        TSK_FS_INFO_TYPE_FFS_2 = 0x13,  /* UFS2 - FreeBSD, NetBSD */
+        TSK_FS_INFO_TYPE_FFS_AUTO = 0x14,
 
-#define EXTxFS_TYPE             0x20
-#define EXT2FS                  0x21
-#define EXT3FS                  0x22
-#define EXTAUTO                 0x23
+        TSK_FS_INFO_TYPE_EXT_TYPE = 0x20,
+        TSK_FS_INFO_TYPE_EXT_2 = 0x21,
+        TSK_FS_INFO_TYPE_EXT_3 = 0x22,
+        TSK_FS_INFO_TYPE_EXT_AUTO = 0x23,
 
-#define FATFS_TYPE              0x30
-#define FAT12           	0x31
-#define FAT16           	0x32
-#define FAT32           	0x33
-#define FATAUTO         	0x34
+        TSK_FS_INFO_TYPE_FAT_TYPE = 0x30,
+        TSK_FS_INFO_TYPE_FAT_12 = 0x31,
+        TSK_FS_INFO_TYPE_FAT_16 = 0x32,
+        TSK_FS_INFO_TYPE_FAT_32 = 0x33,
+        TSK_FS_INFO_TYPE_FAT_AUTO = 0x34,
 
-#define NTFS_TYPE               0x40
-#define NTFS                    0x40
+        TSK_FS_INFO_TYPE_NTFS_TYPE = 0x40,
+        TSK_FS_INFO_TYPE_NTFS = 0x40,
+        TSK_FS_INFO_TYPE_NTFS_AUTO = 0x40,
 
-#define SWAPFS_TYPE             0x50
-#define SWAP                    0x50
+        TSK_FS_INFO_TYPE_SWAP_TYPE = 0x50,
+        TSK_FS_INFO_TYPE_SWAP = 0x50,
 
-#define RAWFS_TYPE              0x60
-#define RAW                     0x60
+        TSK_FS_INFO_TYPE_RAW_TYPE = 0x60,
+        TSK_FS_INFO_TYPE_RAW = 0x60,
 
-#define ISO9660_TYPE            0x70
-#define ISO9660                 0x70
+        TSK_FS_INFO_TYPE_ISO9660_TYPE = 0x70,
+        TSK_FS_INFO_TYPE_ISO9660 = 0x70,
 
-#define HFS_TYPE                0x80
-#define HFS                     0x80
+        TSK_FS_INFO_TYPE_HFS_TYPE = 0x80,
+        TSK_FS_INFO_TYPE_HFS = 0x80,
+    };
+    typedef enum TSK_FS_INFO_TYPE_ENUM TSK_FS_INFO_TYPE_ENUM;
+
+    extern TSK_FS_INFO_TYPE_ENUM tsk_fs_parse_type(const TSK_TCHAR *);
+    extern void tsk_fs_print_types(FILE *);
+    extern char *tsk_fs_get_type(TSK_FS_INFO_TYPE_ENUM);
+
+    typedef struct TSK_FS_INFO TSK_FS_INFO;
+    typedef struct TSK_FS_DATA TSK_FS_DATA;
+    typedef struct TSK_FS_DATA_RUN TSK_FS_DATA_RUN;
+    typedef struct TSK_FS_INODE_NAME_LIST TSK_FS_INODE_NAME_LIST;
+    typedef struct TSK_FS_JENTRY TSK_FS_JENTRY;
 
 
-    typedef struct FS_INFO FS_INFO;
-    typedef struct FS_INODE FS_INODE;
-    typedef struct FS_DENT FS_DENT;
-    typedef struct FS_DATA FS_DATA;
-    typedef struct FS_DATA_RUN FS_DATA_RUN;
-    typedef struct FS_NAME FS_NAME;
-    typedef struct FS_JENTRY FS_JENTRY;
 
 
-/* Flags for the return value of inode_walk, block_walk, and dent_walk
- * actions
+/************************************************************************* 
+ * Directory entries 
  */
-#define WALK_CONT	0x0
-#define WALK_STOP	0x1
-#define WALK_ERROR	0x2
 
-/* walk action functions */
-    typedef uint8_t(*FS_INODE_WALK_FN) (FS_INFO *, FS_INODE *, int,
-	void *);
-    typedef uint8_t(*FS_BLOCK_WALK_FN) (FS_INFO *, DADDR_T, char *, int,
-	void *);
-    typedef uint8_t(*FS_DENT_WALK_FN) (FS_INFO *, FS_DENT *, int, void *);
-    typedef uint8_t(*FS_FILE_WALK_FN) (FS_INFO *, DADDR_T, char *,
-	size_t, int, void *);
-
-    typedef uint8_t(*FS_JBLK_WALK_FN) (FS_INFO *, char *, int, void *);
-    typedef uint8_t(*FS_JENTRY_WALK_FN) (FS_INFO *, FS_JENTRY *, int,
-	void *);
+ /**
+  * File name flags that are used when walking directories and when specifying the status of
+  * a name in the TSK_FS_DENT structure
+  */
+    enum TSK_FS_DENT_FLAG_ENUM {
+        TSK_FS_DENT_FLAG_ALLOC = (1 << 0),      ///< Name is in an allocated state
+        TSK_FS_DENT_FLAG_UNALLOC = (1 << 1),    ///< Name is in an unallocated state
+        TSK_FS_DENT_FLAG_RECURSE = (1 << 2),    ///< Recurse into directories (dent_walk only)
+    };
+    typedef enum TSK_FS_DENT_FLAG_ENUM TSK_FS_DENT_FLAG_ENUM;
 
 
-
-/***************************************************************
- * FS_INFO: Allocated when an image is opened
+/**
+ * File type values -- as specified in the directory entry structure.
  */
-    struct FS_INFO {
-	IMG_INFO *img_info;
-	SSIZE_T offset;		/* byte offset into img_info that fs starts */
+    enum TSK_FS_DENT_TYPE_ENUM {
+        TSK_FS_DENT_TYPE_UNDEF = 0,     ///< Unknown type
+        TSK_FS_DENT_TYPE_FIFO = 1,      ///< Named pipe 
+        TSK_FS_DENT_TYPE_CHR = 2,       ///< Character device
+        TSK_FS_DENT_TYPE_DIR = 4,       ///< Directory 
+        TSK_FS_DENT_TYPE_BLK = 6,       ///< Block device
+        TSK_FS_DENT_TYPE_REG = 8,       ///< Regular file 
+        TSK_FS_DENT_TYPE_LNK = 10,      ///< Symbolic link 
+        TSK_FS_DENT_TYPE_SOCK = 12,     ///< Socket 
+        TSK_FS_DENT_TYPE_SHAD = 13,     ///< Shadow inode (solaris) 
+        TSK_FS_DENT_TYPE_WHT = 14,      ///< Whiteout (openbsd) 
+    };
+    typedef enum TSK_FS_DENT_TYPE_ENUM TSK_FS_DENT_TYPE_ENUM;
 
-	/* meta data */
-	INUM_T inum_count;	/* number of inodes */
-	INUM_T root_inum;	/* root inode */
-	INUM_T first_inum;	/* first valid inode */
-	INUM_T last_inum;	/* LINUX starts at 1 */
+#define TSK_FS_DENT_TYPE_MAX_STR 15     ///< Number of types that have a short string name
 
-	/* content */
-	DADDR_T block_count;	/* number of blocks */
-	DADDR_T first_block;	/* in case start at 1 */
-	DADDR_T last_block;	/* in case start at 1 */
-	unsigned int block_size;	/* block size in bytes */
-	unsigned int dev_bsize;	/* size of device blocks */
+/* ascii representation of above types */
+    extern char tsk_fs_dent_str[TSK_FS_DENT_TYPE_MAX_STR][2];
 
-	/* Journal */
-	INUM_T journ_inum;	/* Inode of journal */
+    /**
+     * Generic structure to store the file name information that is stored in
+     * a directory. Most file systems seperate the file name from the metadata, but
+     * some do not (such as FAT). This structure contains the name and a pointer to the
+     * metadata, if it exists 
+     */
+    struct TSK_FS_DENT {
+        char *name;             ///< The name of the file (in UTF-8)
+        ULONG name_max;         ///< The number of bytes allocated to name
 
-	uint8_t ftype;		/* type of file system */
-	uint8_t flags;		/* flags for image, see below */
+        char *shrt_name;        ///< The short name of the file (FAT and NTFS only) or null (in UTF-8)
+        ULONG shrt_name_max;    ///< The number of bytes allocated to shrt_name
 
-	/* endian order flag - values defined in misc/tsk_endian.h */
-	uint8_t endian;
+        char *path;             ///< The parent directory name (exists only when the directory was recursed into) (in UTF-8)
+        unsigned int pathdepth; ///< The number of directories in the parent directory
 
-	TSK_LIST *list_inum_named;	/* list of unallocated inodes that
+        INUM_T inode;           ///< Address of the metadata structure that the name points to. 
+        struct TSK_FS_INODE *fsi;       ///< Pointer to the metadata structure that the name points to. 
+
+        TSK_FS_DENT_TYPE_ENUM ent_type; ///< File type information (directory, file, etc.)
+        TSK_FS_DENT_FLAG_ENUM flags;    ///< Flags that describe allocation status etc. 
+    };
+
+    typedef struct TSK_FS_DENT TSK_FS_DENT;
+
+
+/******************* INODE / META DATA **************/
+
+
+/**
+ * Metadata flags used in TSK_FS_INODE.flags and in request to inode_walk
+ */
+    enum TSK_FS_INODE_FLAG_ENUM {
+        TSK_FS_INODE_FLAG_ALLOC = (1 << 0),     ///< Metadata structure is currently in an allocated state
+        TSK_FS_INODE_FLAG_UNALLOC = (1 << 1),   ///< Metadata structure is currently in an unallocated state
+        TSK_FS_INODE_FLAG_USED = (1 << 2),      ///< Metadata structure has been allocated at least once
+        TSK_FS_INODE_FLAG_UNUSED = (1 << 3),    ///< Metadata structure has never been allocated. 
+        TSK_FS_INODE_FLAG_ORPHAN = (1 << 4),    ///< Metadata structure is unallocated and has no file name pointing to it.
+        TSK_FS_INODE_FLAG_COMP = (1 << 5)       ///< The file contents are compressed. 
+    };
+    typedef enum TSK_FS_INODE_FLAG_ENUM TSK_FS_INODE_FLAG_ENUM;
+
+
+
+    /**
+     * Size of name array in TSK_FS_INODE_NAME_LIST structure
+     */
+#define TSK_FS_INODE_NAME_LIST_NSIZE    512
+
+    /**
+     * Relatively generic structure to hold file names that are stored with
+     * the file metadata.  Note that this is different from the
+     * file name stored in the directory heirarchy, which is 
+     * part of the tsk_fs_dent_... code.  This is currently
+     * used for NTFS and FAT file systems only.
+     */
+    struct TSK_FS_INODE_NAME_LIST {
+        TSK_FS_INODE_NAME_LIST *next;   ///< Pointer to next name (or NULL)
+        char name[TSK_FS_INODE_NAME_LIST_NSIZE];        ///< Name in UTF-8 (does not include parent directory name)
+        INUM_T par_inode;       ///< Inode address of parent directory (NTFS only)
+        uint32_t par_seq;       ///< Sequence number of parent directory (NTFS only)
+    };
+
+    /** 
+     * Generic data strcture to hold file meta data 
+     */
+    struct TSK_FS_INODE {
+        INUM_T addr;            ///< Address of meta data structure 
+        mode_t mode;            ///< file type and permissions
+        int nlink;              ///< link count 
+        OFF_T size;             ///< file size 
+        uid_t uid;              ///< owner id
+        gid_t gid;              ///< group id
+
+        /* @@@ Need to make these 64-bits ... ? */
+        time_t mtime;           ///< last modified time
+        time_t atime;           ///< last accessed time
+        time_t ctime;           ///< last status changed time
+
+        /* filesystem specific times */
+        union {
+            struct {
+                time_t crtime;  ///< NTFS Creation time
+            };
+            struct {
+                time_t dtime;   ///< Linux deletion time
+            };
+            struct {
+                time_t bkup_time;       ///< HFS+ backup time
+                time_t attr_mtime;      ///< HFS+ mtime
+            };
+        };
+
+        DADDR_T *direct_addr;   ///< List of direct blocks 
+        int direct_count;       ///< Number of blocks in direct list
+        DADDR_T *indir_addr;    ///< List of indirect blocks
+        int indir_count;        ///< Number of blocks in indirect list
+
+        uint32_t seq;           ///< Sequence number of file (NTFS Only) 
+        TSK_FS_DATA *attr;      ///< Attributes for file (NTFS Only) 
+        TSK_FS_INODE_NAME_LIST *name;   ///< Name of file stored in metadata (FAT and NTFS Only)
+        char *link;             ///< Name of target file if this is a symbolic link
+
+        TSK_FS_INODE_FLAG_ENUM flags;   ///< Flags for file
+    };
+
+    typedef struct TSK_FS_INODE TSK_FS_INODE;
+
+    extern TSK_FS_INODE *tsk_fs_inode_alloc(int, int);
+    extern TSK_FS_INODE *tsk_fs_inode_realloc(TSK_FS_INODE *, int, int);
+    extern void tsk_fs_inode_free(TSK_FS_INODE *);
+
+
+/** String that is prepended to orphan FAT & NTFS files when the file
+ * name is known, but the parent is not */
+#define TSK_FS_ORPHAN_STR "-ORPHAN_FILE-"
+
+/* Type of file in the mode field of Inodes.  FAT and NTFS are converted
+ * to this mode value */
+
+    /**
+     * Values for the mode field -- which identifies the file type 
+     * and permissions.
+     */
+    enum TSK_FS_INODE_MODE_ENUM {
+
+        /* the following are file types */
+        TSK_FS_INODE_MODE_FMT = 0170000,        ///< Mask to apply to mode to isolate file type
+        TSK_FS_INODE_MODE_FIFO = 0010000,       ///< Named pipe (fifo) 
+        TSK_FS_INODE_MODE_CHR = 0020000,        ///< Character device 
+        TSK_FS_INODE_MODE_DIR = 0040000,        ///< Directory file 
+        TSK_FS_INODE_MODE_BLK = 0060000,        ///< Block device 
+        TSK_FS_INODE_MODE_REG = 0100000,        ///< Regular file
+        TSK_FS_INODE_MODE_LNK = 0120000,        ///< Symbolic link
+        TSK_FS_INODE_MODE_SHAD = 0130000,       ///< SOLARIS ONLY 
+        TSK_FS_INODE_MODE_SOCK = 0140000,       ///< UNIX domain socket
+        TSK_FS_INODE_MODE_WHT = 0160000,        ///< Whiteout
+
+        /* The following describe the file permissions */
+        TSK_FS_INODE_MODE_ISUID = 0004000,      ///< set user id on execution 
+        TSK_FS_INODE_MODE_ISGID = 0002000,      ///< set group id on execution 
+        TSK_FS_INODE_MODE_ISVTX = 0001000,      ///< sticky bit 
+
+        TSK_FS_INODE_MODE_IRUSR = 0000400,      ///< R for owner 
+        TSK_FS_INODE_MODE_IWUSR = 0000200,      ///< W for owner 
+        TSK_FS_INODE_MODE_IXUSR = 0000100,      ///< X for owner 
+
+        TSK_FS_INODE_MODE_IRGRP = 0000040,      ///< R for group 
+        TSK_FS_INODE_MODE_IWGRP = 0000020,      ///< W for group 
+        TSK_FS_INODE_MODE_IXGRP = 0000010,      ///< X for group 
+
+        TSK_FS_INODE_MODE_IROTH = 0000004,      ///< R for other 
+        TSK_FS_INODE_MODE_IWOTH = 0000002,      ///< W for other 
+        TSK_FS_INODE_MODE_IXOTH = 0000001       ///< X for other 
+    };
+    typedef enum TSK_FS_INODE_MODE_ENUM TSK_FS_INODE_MODE_ENUM;
+
+
+#define TSK_FS_INODE_MODE_TYPE_SHIFT	12      ///< Number of bits to shift mode to isolate file type
+#define TSK_FS_INODE_MODE_TYPE_STR_MAX 15       ///< Number of file types in shortname array
+
+    extern char tsk_fs_inode_mode_str[TSK_FS_INODE_MODE_TYPE_STR_MAX][2];
+
+
+    /** Flags that are used when calling block_walk, in callback of
+     * of block_walk, and in callback of file_walk */
+    enum TSK_FS_BLOCK_FLAG_ENUM {
+        TSK_FS_BLOCK_FLAG_ALLOC = (1 << 0),     ///< Block is allocated
+        TSK_FS_BLOCK_FLAG_UNALLOC = (1 << 1),   ///< Block is unallocated
+        TSK_FS_BLOCK_FLAG_CONT = (1 << 2),      ///< Block contains file content
+        TSK_FS_BLOCK_FLAG_META = (1 << 3),      ///< Block contains file system metadata
+        TSK_FS_BLOCK_FLAG_BAD = (1 << 4),       ///< Block has been marked as bad by the file system
+        TSK_FS_BLOCK_FLAG_ALIGN = (1 << 5),     ///< Return entire block when walking -- applies to FS with fragments
+        TSK_FS_BLOCK_FLAG_RES = (1 << 6),       ///< The data passed in the file_walk callback is from an NTFS resident file
+        TSK_FS_BLOCK_FLAG_SPARSE = (1 << 7),    ///< The data passed in the file_walk calback was stored as sparse (all zeros)
+        TSK_FS_BLOCK_FLAG_COMP = (1 << 8)       ///< The data passed in the file_walk callback was stored in a compressed form
+    };
+    typedef enum TSK_FS_BLOCK_FLAG_ENUM TSK_FS_BLOCK_FLAG_ENUM;
+
+
+
+    /**
+     * Flags used when calling file_walk, the action of file_walk uses
+     * the TSK_FS_BLOCK_FLAG  flags */
+    enum TSK_FS_FILE_FLAG_ENUM {
+        TSK_FS_FILE_FLAG_AONLY = (1 << 0),      ///< Do not include file content in callback -- supply adddress only
+        TSK_FS_FILE_FLAG_SLACK = (1 << 1),      ///< Include the file slack space in the callback
+        TSK_FS_FILE_FLAG_RECOVER = (1 << 2),    ///< Use special data recovery techniques for deleted files
+        TSK_FS_FILE_FLAG_META = (1 << 3),       ///< Return blocks that contain metadata (such as indirect UFS/ExtX blocks)
+        TSK_FS_FILE_FLAG_NOSPARSE = (1 << 4),   ///< Do not use callback for sparse blocks
+        TSK_FS_FILE_FLAG_NOID = (1 << 5)        ///< Ignore the Id argument given in the call to file_walk -- use only the type                                          
+    };
+    typedef enum TSK_FS_FILE_FLAG_ENUM TSK_FS_FILE_FLAG_ENUM;
+
+/* walk callback functions */
+    typedef uint8_t(*TSK_FS_INODE_WALK_CB) (TSK_FS_INFO *, TSK_FS_INODE *,
+        void *);
+    typedef uint8_t(*TSK_FS_BLOCK_WALK_CB) (TSK_FS_INFO *, DADDR_T, char *,
+        TSK_FS_BLOCK_FLAG_ENUM, void *);
+    typedef uint8_t(*TSK_FS_DENT_TYPE_WALK_CB) (TSK_FS_INFO *,
+        TSK_FS_DENT *, void *);
+    typedef uint8_t(*TSK_FS_FILE_WALK_CB) (TSK_FS_INFO *, DADDR_T, char *,
+        size_t, TSK_FS_BLOCK_FLAG_ENUM, void *);
+    typedef uint8_t(*TSK_FS_JBLK_WALK_CB) (TSK_FS_INFO *, char *, int,
+        void *);
+    typedef uint8_t(*TSK_FS_JENTRY_WALK_CB) (TSK_FS_INFO *,
+        TSK_FS_JENTRY *, int, void *);
+
+
+/******************************* TSK_FS_INFO ******************/
+
+    /**
+     * Flags for the FS_INFO structure 
+     */
+    enum TSK_FS_INFO_FLAG_ENUM {
+        TSK_FS_INFO_FLAG_HAVE_SEQ = (1 << 0)    ///< File system has sequence numbers in the inode addresses.
+    };
+    typedef enum TSK_FS_INFO_FLAG_ENUM TSK_FS_INFO_FLAG_ENUM;
+
+
+/**
+ * Stores state information for an open file system. 
+ * One of these are generated for each open files system and it contains
+ * file system-type specific data.  These values are all filled in by
+ * the file system code and not the caller functions. 
+ */
+    struct TSK_FS_INFO {
+        TSK_IMG_INFO *img_info; ///< Pointer to the image layer state
+        SSIZE_T offset;         ///< Byte offset into img_info that fs starts 
+
+        /* meta data */
+        INUM_T inum_count;      ///< Number of inodes 
+        INUM_T root_inum;       ///< Address of root inode 
+        INUM_T first_inum;      ///< Address of first valid inode 
+        INUM_T last_inum;       ///< Address of last valid inode
+
+        /* content */
+        DADDR_T block_count;    ///< Number of blocks in fs
+        DADDR_T first_block;    ///< Address of first block
+        DADDR_T last_block;     ///< Address of last block
+        unsigned int block_size;        ///< Size of each block (in bytes)
+        unsigned int dev_bsize; ///< Size of device block (typically always 512)
+
+        /* Journal */
+        INUM_T journ_inum;      ///< Address of journal inode
+
+        TSK_FS_INFO_TYPE_ENUM ftype;    ///< type of file system 
+        char *duname;           ///< string "name" of data unit type 
+        TSK_FS_INFO_FLAG_ENUM flags;    ///< flags for image
+
+        uint8_t endian;         ///< Endian order (see auxtools/tsk_endian.h)
+
+        TSK_LIST *list_inum_named;      /**< List of unallocated inodes that
 					 * are pointed to by a file name -- 
 					 * Used to find orphans
 					 */
-	/* file system specific function pointers */
-	 uint8_t(*block_walk) (FS_INFO *, DADDR_T, DADDR_T, int,
-	    FS_BLOCK_WALK_FN, void *);
 
-	 uint8_t(*inode_walk) (FS_INFO *, INUM_T, INUM_T, int,
-	    FS_INODE_WALK_FN, void *);
-	FS_INODE *(*inode_lookup) (FS_INFO *, INUM_T);
-	 uint8_t(*istat) (FS_INFO *, FILE *, INUM_T, DADDR_T, int32_t);
+        /** Walk a set of blocks and pass each to the callback */
+         uint8_t(*block_walk) (TSK_FS_INFO *, DADDR_T, DADDR_T,
+            TSK_FS_BLOCK_FLAG_ENUM, TSK_FS_BLOCK_WALK_CB, void *);
 
-	 uint8_t(*file_walk) (FS_INFO *, FS_INODE *, uint32_t, uint16_t,
-	    int, FS_FILE_WALK_FN, void *);
+        /** Walk a set of inodes and pass each to the callback */
+         uint8_t(*inode_walk) (TSK_FS_INFO *, INUM_T, INUM_T,
+            TSK_FS_INODE_FLAG_ENUM, TSK_FS_INODE_WALK_CB, void *);
 
-	 uint8_t(*dent_walk) (FS_INFO *, INUM_T, int, FS_DENT_WALK_FN,
-	    void *);
+        /** Lookup an inode and return it */
+        TSK_FS_INODE *(*inode_lookup) (TSK_FS_INFO *, INUM_T);
 
-	 uint8_t(*jopen) (FS_INFO *, INUM_T);
-	 uint8_t(*jblk_walk) (FS_INFO *, DADDR_T, DADDR_T, int,
-	    FS_JBLK_WALK_FN, void *);
-	 uint8_t(*jentry_walk) (FS_INFO *, int, FS_JENTRY_WALK_FN, void *);
+        /** Print file details to a handle */
+         uint8_t(*istat) (TSK_FS_INFO *, FILE *, INUM_T, DADDR_T, int32_t);
+
+        /** Walk the contents of a file and pass each block to the callback */
+         uint8_t(*file_walk) (TSK_FS_INFO *, TSK_FS_INODE *, uint32_t,
+            uint16_t, TSK_FS_FILE_FLAG_ENUM, TSK_FS_FILE_WALK_CB, void *);
+
+        /** Walk the files in a directory and pass each file name to the callback */
+         uint8_t(*dent_walk) (TSK_FS_INFO *, INUM_T, TSK_FS_DENT_FLAG_ENUM,
+            TSK_FS_DENT_TYPE_WALK_CB, void *);
+
+        /** Open the journal */
+         uint8_t(*jopen) (TSK_FS_INFO *, INUM_T);
+
+        /** Walk the blocks in a journal */
+         uint8_t(*jblk_walk) (TSK_FS_INFO *, DADDR_T, DADDR_T, int,
+            TSK_FS_JBLK_WALK_CB, void *);
+
+        /** Walk the entries in a journal */
+         uint8_t(*jentry_walk) (TSK_FS_INFO *, int, TSK_FS_JENTRY_WALK_CB,
+            void *);
 
 
-	 uint8_t(*fsstat) (FS_INFO *, FILE *);
-	 uint8_t(*fscheck) (FS_INFO *, FILE *);
+        /** Print the file system details to FILE handle */
+         uint8_t(*fsstat) (TSK_FS_INFO *, FILE *);
 
-	void (*close) (FS_INFO *);
+        /** Check the integrity / sanity of the file system (not implemented) */
+         uint8_t(*fscheck) (TSK_FS_INFO *, FILE *);
+
+        /** Close the file system and free the allocated memory */
+        void (*close) (TSK_FS_INFO *);
     };
-
-/* flag for FS_INFO flags */
-#define FS_HAVE_SEQ		0x08
-
-//#define FS_FLAG_TMHDR (1<<9)          /* show tm header */
-
-/* flags that are used for dent_walk and FS_NAME */
-#define FS_FLAG_NAME_ALLOC   (1<<0)	/* allocated */
-#define FS_FLAG_NAME_UNALLOC (1<<1)	/* unallocated */
-#define FS_FLAG_NAME_RECURSE (1<<2)	/* recurse on directories */
-
-/* flags that are used for inode_walk and FS_INODE */
-#define FS_FLAG_META_ALLOC	(1<<0)	/* allocated */
-#define FS_FLAG_META_UNALLOC    (1<<1)	/* unallocated */
-#define FS_FLAG_META_USED	(1<<2)	/* used */
-#define FS_FLAG_META_UNUSED	(1<<3)	/* never used */
-#define FS_FLAG_META_ORPHAN	(1<<4)	/* Orphan Files */
-#define FS_FLAG_META_COMP	(1<<5)	/* The file contains compressed data */
-
-/* flags that are used for block_walk and any data units 
- * Including the data units in the action of file_walk */
-#define FS_FLAG_DATA_ALLOC	(1<<0)	/* allocated */
-#define FS_FLAG_DATA_UNALLOC    (1<<1)	/* unallocated */
-#define FS_FLAG_DATA_CONT	(1<<2)	/* allocated for file content */
-#define FS_FLAG_DATA_META	(1<<3)	/* allocated for meta data */
-#define FS_FLAG_DATA_BAD	(1<<4)	/* marked as bad by the FS */
-#define FS_FLAG_DATA_ALIGN	(1<<5)	/* block align (i.e. send a whole block) */
-#define FS_FLAG_DATA_RES	(1<<6)	/* This data is resident (NTFS ONLY) -- used by ntfs_data_walk */
-#define FS_FLAG_DATA_SPARSE	(1<<7)	/* Used to note that the block addr
-					 * is not be accurate since the block
-					 * is sparse (all zeros) */
-#define FS_FLAG_DATA_COMP	(1<<8)	/* This "block" was stored in compressed form */
-
-
-
-
-/* Flags used when calling file_walk, action of file_walk uses
- * the FS_FLAG_DATA_ flags */
-#define FS_FLAG_FILE_AONLY	(1<<0)	/* only copy address to callback */
-#define FS_FLAG_FILE_SLACK	(1<<1)	/* return slack space too */
-#define FS_FLAG_FILE_RECOVER    (1<<2)	/* Recover a deleted file */
-#define FS_FLAG_FILE_META	(1<<3)	/* return meta data units too */
-#define FS_FLAG_FILE_NOSPARSE   (1<<4)	/* don't return sparse data units */
-#define FS_FLAG_FILE_NOID	(1<<5)	/* Ignore the id field in the argument - use only type */
 
 
 
@@ -226,241 +449,125 @@ extern "C" {
  *
  * All resident non-standard attributes will be stored here so they
  * can be displayed.  By default, the $Data attribute will be saved
- * in the FS_INODE structure. If the $Data attribute is resident,
+ * in the TSK_FS_INODE structure. If the $Data attribute is resident,
  * then the dir/indir stuff will be 0 and the $Data will be the
  * first element in this linked list 
  */
 
+    /** 
+     * Flags used for data runs in attributes (FS_DATA)
+     */
+    enum TSK_FS_DATA_RUN_FLAG_ENUM {
+        TSK_FS_DATA_RUN_FLAG_FILLER = 0x1,      ///< Run entry is a filler because we haven't seen the actual run for this location yet
+        TSK_FS_DATA_RUN_FLAG_SPARSE = 0x2       ///< Run is sparse -- blocks in this run should contain all zeros
+    };
+    typedef enum TSK_FS_DATA_RUN_FLAG_ENUM TSK_FS_DATA_RUN_FLAG_ENUM;
+
 /* len = 0 when not being used */
-    struct FS_DATA_RUN {
-	FS_DATA_RUN *next;
-	DADDR_T addr;		/* Starting data unit address */
-	DADDR_T len;		/* Length in data units */
-	uint8_t flags;
-    };
-#define FS_DATA_FILLER	0x1
-#define FS_DATA_SPARSE	0x2
-
-    struct FS_DATA {
-	FS_DATA *next;
-	uint8_t flags;
-	char *name;		/* name of data (if available) */
-	size_t nsize;		/* number of allocated bytes for name */
-	uint32_t type;		/* type of attribute */
-	uint16_t id;		/* id of attr, used when duplicate types */
-
-	OFF_T size;		/* size of data (in bytes) of stream or run */
-
-	/* Run-List data (non-resident) */
-	FS_DATA_RUN *run;	/* a linked list of data runs */
-	OFF_T runlen;		/* number of bytes that are allocated in
-				 * original run (larger than size) */
-	uint32_t compsize;	/* size of the compression unit */
-
-	/* stream data (resident) */
-	size_t buflen;		/* allocated bytes in buf */
-	uint8_t *buf;		/* buffer for resident data */
-    };
-
-#define FS_DATA_INUSE	0x1	// structre in use
-#define FS_DATA_NONRES	0x2	// non-resident
-#define FS_DATA_RES		0x4	// resident
-#define	FS_DATA_ENC		0x10	// encrypted
-#define FS_DATA_COMP	0x20	// compressed
-#define FS_DATA_SPAR	0x40	// sparse
-
-
-
-    extern FS_DATA *fs_data_alloc(uint8_t);
-    extern FS_DATA_RUN *fs_data_run_alloc();
-    extern FS_DATA *fs_data_getnew_attr(FS_DATA *, uint8_t);
-    extern void fs_data_clear_list(FS_DATA *);
-
-    extern FS_DATA *fs_data_put_str(FS_DATA *, char *, uint32_t, uint16_t,
-	void *, unsigned int);
-
-    extern FS_DATA *fs_data_put_run(FS_DATA *, DADDR_T, OFF_T,
-	FS_DATA_RUN *, char *, uint32_t, uint16_t, OFF_T, uint8_t,
-	uint32_t);
-
-    extern FS_DATA *fs_data_lookup(FS_DATA *, uint32_t, uint16_t);
-    extern FS_DATA *fs_data_lookup_noid(FS_DATA *, uint32_t);
-
-    extern void fs_data_run_free(FS_DATA_RUN *);
-    extern void fs_data_free(FS_DATA *);
-
-
-
-
-
-
-
-
-
-/* Currently this is only used with NTFS & FAT systems */
-    struct FS_NAME {
-	FS_NAME *next;
-	char name[512];		// Could be in UTF-8 encoding
-	INUM_T par_inode;
-	uint32_t par_seq;
-    };
-
-    struct FS_INODE {
-	INUM_T addr;		/* Address of meta data structure */
-	mode_t mode;		/* type and permission */
-	int nlink;		/* link count */
-	OFF_T size;		/* file size */
-	uid_t uid;		/* owner */
-	gid_t gid;		/* group */
-
-	/* @@@ Need to make these 64-bits ... ? */
-	time_t mtime;		/* last modified */
-	time_t atime;		/* last access */
-	time_t ctime;		/* last status change */
-
-	/* filesystem specific times */
-	union {
-	    struct {		/* NTFS Times */
-		time_t crtime;	/* create time */
-	    };
-	    struct {		/* Linux Times */
-		time_t dtime;	/* delete time */
-	    };
-	    struct {		/* HFS Times */
-		time_t bkup_time;
-		time_t attr_mtime;
-	    };
-	};
-
-	DADDR_T *direct_addr;	/* direct blocks */
-	int direct_count;	/* number of blocks */
-	DADDR_T *indir_addr;	/* indirect blocks */
-	int indir_count;	/* number of blocks */
-
-	uint32_t seq;		/* sequence number (NTFS Only) */
-	FS_DATA *attr;		/* additional attributes for NTFS */
-	FS_NAME *name;
-	char *link;		/* used if this is a symbolic link */
-
-	int flags;		/* flags FS_FLAG_META_* */
-    };
-
-    extern FS_INODE *fs_inode_alloc(int, int);
-    extern FS_INODE *fs_inode_realloc(FS_INODE *, int, int);
-    extern void fs_inode_free(FS_INODE *);
-
-
-
-
-/************************************************************************* 
- * Directory entries 
- */
-    struct FS_DENT {
-	char *name;		/* long / normal name -- could be UTF-8 */
-	ULONG name_max;		/* number of bytes allocated to name */
-
-	char *shrt_name;	/* short version of name (FAT / NTFS only) */
-	ULONG shrt_name_max;	/* number of bytes allocated to short name */
-
-	INUM_T inode;		/* inode number */
-	struct FS_INODE *fsi;	/* Inode structure */
-
-	uint8_t ent_type;	/* dir, file etc FS_DENT_??? */
-
-	//int flags;            /* FS_FLAG_NAME_* */
-
-	char *path;		/* prefix to name when recursing */
-	unsigned int pathdepth;	/* current depth of directories */
+    /**
+     * Generic structure used to describe a run of consecutive blocks.
+     * These are in a linked list.
+     */
+    struct TSK_FS_DATA_RUN {
+        TSK_FS_DATA_RUN *next;  ///< Pointer to the next run in the attribute
+        DADDR_T addr;           ///< Starting block address of run
+        DADDR_T len;            ///< Number of blocks in run
+        TSK_FS_DATA_RUN_FLAG_ENUM flags;        ///< Flags for run
     };
 
 
-/* Type of file that entry is for (ent_type for FS_DENT) */
-#define FS_DENT_UNDEF   0	/* Unknown Type */
-#define FS_DENT_FIFO    1	/* named pipe */
-#define FS_DENT_CHR     2	/* character */
-#define FS_DENT_DIR 	4	/* directory */
-#define FS_DENT_BLK     6	/* block */
-#define FS_DENT_REG     8	/* regular file */
-#define FS_DENT_LNK 	10	/* symbolic link */
-#define FS_DENT_SOCK    12	/* socket */
-#define FS_DENT_SHAD    13	/* shadow inode (solaris) */
-#define FS_DENT_WHT 	14	/* whiteout (openbsd) */
+    /**
+     * Flags used for the TSK_FS_DATA structure, which is used to 
+     * store attribute data */
+    enum TSK_FS_DATA_FLAG_ENUM {
+        TSK_FS_DATA_INUSE = 0x1,        ///< Attribute structure is in use
+        TSK_FS_DATA_NONRES = 0x2,       ///< Attribute is for non-resident data
+        TSK_FS_DATA_RES = 0x4,  ///< Attribute is for resident data
+        TSK_FS_DATA_ENC = 0x10, ///< Attribute data is encrypted
+        TSK_FS_DATA_COMP = 0x20,        ///< Attribute data is compressed
+        TSK_FS_DATA_SPARSE = 0x40,      ///< Attribute data is sparse
+    };
+    typedef enum TSK_FS_DATA_FLAG_ENUM TSK_FS_DATA_FLAG_ENUM;
 
-#define FS_DENT_MASK    15	/* mask value */
-#define FS_DENT_MAX_STR 15	/* max index for string version of types */
+    /**
+     * Generic structure to hold attributes for files.  Attributes are a
+     * general term to describe any group of "data" -- it could be file 
+     * contents or meta data.  This structures are used
+     * currently only for NTFS because it has "multiple attributes", but
+     * it could be used for other FS in the future.  These are grouped
+     * into an unsorted linked list.
+     */
+    struct TSK_FS_DATA {
+        TSK_FS_DATA *next;      ///< Pointer to next attribute in list
+        TSK_FS_DATA_FLAG_ENUM flags;    ///< Flags for attribute
+        char *name;             ///< Attribute name (could be NULL) (in UTF-8)
+        size_t nsize;           ///< Number of bytes allocated to name
+        uint32_t type;          ///< Type of attribute
+        uint16_t id;            ///< Id of attribute
 
-/* ascii representation of above types */
-    extern char fs_dent_str[FS_DENT_MAX_STR][2];
+        OFF_T size;             ///< Size in bytes of attribute
 
-/* string that is prepended to orphan FAT & NTFS files when the file
- * name is known, but the parent is not */
-#define ORPHAN_STR "-ORPHAN_FILE-"
+        /* Run-List data (non-resident) */
+        TSK_FS_DATA_RUN *run;   ///< Linked list of runs for non-resident attributes
+        OFF_T allocsize;        ///< Number of bytes that are allocated in all clusters of non-resident run (will be larger than size)
+        uint32_t compsize;      ///< Size of compression units (needed only if file is compressed)
 
-/* Type of file in the mode field of Inodes.  FAT and NTFS are converted
- * to this mode value */
-#define FS_INODE_FMT       0170000	/* Mask of file type. */
-#define FS_INODE_FIFO      0010000	/* Named pipe (fifo). */
-#define FS_INODE_CHR       0020000	/* Character device. */
-#define FS_INODE_DIR       0040000	/* Directory file. */
-#define FS_INODE_BLK       0060000	/* Block device. */
-#define FS_INODE_REG       0100000	/* Regular file. */
-#define FS_INODE_LNK       0120000	/* Symbolic link. */
-#define FS_INODE_SHAD      0130000	/* SOLARIS ONLY */
-#define FS_INODE_SOCK      0140000	/* UNIX domain socket. */
-#define FS_INODE_WHT       0160000	/* Whiteout. */
+        /* stream data (resident) */
+        size_t buflen;          ///< Number of bytes allocated to resident buffer
+        uint8_t *buf;           ///< Buffer for resident data
+    };
 
-#define FS_INODE_SHIFT		12
-#define FS_INODE_MASK    15	/* mask value */
-#define FS_INODE_MAX_STR 15	/* max index for string version of types */
 
-    extern char fs_inode_str[FS_INODE_MAX_STR][2];
 
-#define MODE_ISUID 0004000	/* set user id on execution */
-#define MODE_ISGID 0002000	/* set group id on execution */
-#define MODE_ISVTX 0001000	/* sticky bit */
+    extern TSK_FS_DATA *tsk_fs_data_alloc(TSK_FS_DATA_FLAG_ENUM);
+    extern TSK_FS_DATA_RUN *tsk_fs_data_run_alloc();
+    extern TSK_FS_DATA *tsk_fs_data_getnew_attr(TSK_FS_DATA *,
+        TSK_FS_DATA_FLAG_ENUM);
+    extern void tsk_fs_data_clear_list(TSK_FS_DATA *);
 
-#define MODE_IRUSR 0000400	/* R for owner */
-#define MODE_IWUSR 0000200	/* W for owner */
-#define MODE_IXUSR 0000100	/* X for owner */
+    extern TSK_FS_DATA *tsk_fs_data_put_str(TSK_FS_DATA *, char *,
+        uint32_t, uint16_t, void *, unsigned int);
 
-#define MODE_IRGRP 0000040	/* R for group */
-#define MODE_IWGRP 0000020	/* W for group */
-#define MODE_IXGRP 0000010	/* X for group */
+    extern TSK_FS_DATA *tsk_fs_data_put_run(TSK_FS_DATA *, DADDR_T, OFF_T,
+        TSK_FS_DATA_RUN *, char *, uint32_t, uint16_t, OFF_T,
+        TSK_FS_DATA_FLAG_ENUM, uint32_t);
 
-#define MODE_IROTH 0000004	/* R for other */
-#define MODE_IWOTH 0000002	/* W for other */
-#define MODE_IXOTH 0000001	/* X for other */
+    extern TSK_FS_DATA *tsk_fs_data_lookup(TSK_FS_DATA *, uint32_t,
+        uint16_t);
+    extern TSK_FS_DATA *tsk_fs_data_lookup_noid(TSK_FS_DATA *, uint32_t);
+
+    extern void tsk_fs_data_run_free(TSK_FS_DATA_RUN *);
+    extern void tsk_fs_data_free(TSK_FS_DATA *);
 
 
 
 /**************** Journal Stuff **********************/
-    struct FS_JENTRY {
-	DADDR_T jblk;		/* journal block address */
-	DADDR_T fsblk;		/* fs block that journal entry is about */
+    struct TSK_FS_JENTRY {
+        DADDR_T jblk;           /* journal block address */
+        DADDR_T fsblk;          /* fs block that journal entry is about */
     };
 
 
 
-
 /* function decs */
-    extern FS_DENT *fs_dent_alloc(ULONG, ULONG);
-    extern FS_DENT *fs_dent_realloc(FS_DENT *, ULONG);
-    extern void fs_dent_free(FS_DENT *);
-    extern void fs_dent_print(FILE *, FS_DENT *, int, FS_INFO *,
-	FS_DATA *);
-    extern void fs_dent_print_long(FILE *, FS_DENT *, int, FS_INFO *,
-	FS_DATA *);
-    extern void fs_dent_print_mac(FILE *, FS_DENT *, int, FS_INFO *,
-	FS_DATA * fs_data, char *);
+    extern TSK_FS_DENT *tsk_fs_dent_alloc(ULONG, ULONG);
+    extern TSK_FS_DENT *tsk_fs_dent_realloc(TSK_FS_DENT *, ULONG);
+    extern void tsk_fs_dent_free(TSK_FS_DENT *);
+    extern void tsk_fs_dent_print(FILE *, TSK_FS_DENT *,
+        TSK_FS_INFO *, TSK_FS_DATA *);
+    extern void tsk_fs_dent_print_long(FILE *, TSK_FS_DENT *,
+        TSK_FS_INFO *, TSK_FS_DATA *);
+    extern void tsk_fs_dent_print_mac(FILE *, TSK_FS_DENT *,
+        TSK_FS_INFO *, TSK_FS_DATA * fs_data, char *);
 
-    extern void make_ls(mode_t, char *);
-    extern void fs_print_day(FILE *, time_t);
-    extern void fs_print_time(FILE *, time_t);
+    extern void tsk_fs_make_ls(mode_t, char *);
+    extern void tsk_fs_print_day(FILE *, time_t);
+    extern void tsk_fs_print_time(FILE *, time_t);
 
 /*
 ** Is this string a "." or ".."
 */
-#define ISDOT(str) ( ((str[0] == '.') && \
+#define TSK_FS_ISDOT(str) ( ((str[0] == '.') && \
  ( ((str[1] == '.') && (str[2] == '\0')) || (str[1] == '\0') ) ) ? 1 : 0 )
 
 
@@ -468,99 +575,104 @@ extern "C" {
 /**************************************************************8
  * Generic routines.
  */
-    extern FS_INFO *fs_open(IMG_INFO *, SSIZE_T, const TSK_TCHAR *);
+    extern TSK_FS_INFO *tsk_fs_open(TSK_IMG_INFO *, SSIZE_T,
+        const TSK_TCHAR *);
 
 /* fs_io routines */
-    extern SSIZE_T fs_read_block(FS_INFO *, DATA_BUF *, OFF_T, DADDR_T);
-    extern SSIZE_T fs_read_block_nobuf(FS_INFO *, char *, OFF_T, DADDR_T);
-#define fs_read_random(fsi, buf, len, offs)	\
+    extern SSIZE_T tsk_fs_read_block(TSK_FS_INFO *, TSK_DATA_BUF *, OFF_T,
+        DADDR_T);
+    extern SSIZE_T tsk_fs_read_block_nobuf(TSK_FS_INFO *, char *, OFF_T,
+        DADDR_T);
+#define tsk_fs_read_random(fsi, buf, len, offs)	\
 	(fsi)->img_info->read_random((fsi)->img_info, (fsi)->offset, (buf), (len), (offs))
 
-    extern char *fs_load_file(FS_INFO *, FS_INODE *, uint32_t, uint16_t,
-	int);
+    extern char *tsk_fs_load_file(TSK_FS_INFO *, TSK_FS_INODE *, uint32_t,
+        uint16_t, int);
 
     extern SSIZE_T
-	fs_read_file(FS_INFO *, FS_INODE *, uint32_t, uint16_t,
-	SSIZE_T, SSIZE_T, char *);
+        tsk_fs_read_file(TSK_FS_INFO *, TSK_FS_INODE *, uint32_t, uint16_t,
+        SSIZE_T, SSIZE_T, char *);
 
     extern SSIZE_T
-	fs_read_file_slack(FS_INFO *, FS_INODE *, uint32_t, uint16_t,
-	SSIZE_T, SSIZE_T, char *);
+        tsk_fs_read_file_noid(TSK_FS_INFO *, TSK_FS_INODE *, SSIZE_T,
+        SSIZE_T, char *);
 
     extern SSIZE_T
-	fs_read_file_noid(FS_INFO *, FS_INODE *, SSIZE_T, SSIZE_T, char *);
+        tsk_fs_read_file_slack(TSK_FS_INFO *, TSK_FS_INODE *, uint32_t, uint16_t,
+        SSIZE_T, SSIZE_T, char *);
 
     extern SSIZE_T
-	fs_read_file_noid_slack(FS_INFO *, FS_INODE *, SSIZE_T, SSIZE_T, char *);
-
-
+        tsk_fs_read_file_noid_slack(TSK_FS_INFO *, TSK_FS_INODE *, SSIZE_T,
+        SSIZE_T, char *);
 
 
 
 /***** LIBRARY ROUTINES FOR COMMAND LINE FUNCTIONS */
-#define DCALC_DD        0x1
-#define DCALC_DLS       0x2
-#define DCALC_SLACK     0x4
-    extern int8_t fs_dcalc(FS_INFO * fs, uint8_t lclflags, DADDR_T cnt);
+#define TSK_FS_DCALC_DD        0x1
+#define TSK_FS_DCALC_DLS       0x2
+#define TSK_FS_DCALC_SLACK     0x4
+    extern int8_t tsk_fs_dcalc(TSK_FS_INFO * fs, uint8_t lclflags,
+        DADDR_T cnt);
 
 
-#define DCAT_HEX                0x1
-#define DCAT_ASCII   0x2
-#define DCAT_HTML       0x4
-#define DCAT_STAT       0x8
-    extern uint8_t fs_dcat(FS_INFO * fs, uint8_t lclflags, DADDR_T addr,
-	DADDR_T read_num_units);
+#define TSK_FS_DCAT_HEX                0x1
+#define TSK_FS_DCAT_ASCII   0x2
+#define TSK_FS_DCAT_HTML       0x4
+#define TSK_FS_DCAT_STAT       0x8
+    extern uint8_t tsk_fs_dcat(TSK_FS_INFO * fs, uint8_t lclflags,
+        DADDR_T addr, DADDR_T read_num_units);
 
 
-#define DLS_CAT     0x01
-#define DLS_LIST    0x02
-#define DLS_SLACK   0x04
-    extern uint8_t fs_dls(FS_INFO * fs, uint8_t lclflags, DADDR_T bstart,
-	DADDR_T bend, int flags);
+#define TSK_FS_DLS_CAT     0x01
+#define TSK_FS_DLS_LIST    0x02
+#define TSK_FS_DLS_SLACK   0x04
+    extern uint8_t tsk_fs_dls(TSK_FS_INFO * fs, uint8_t lclflags,
+        DADDR_T bstart, DADDR_T bend, TSK_FS_BLOCK_FLAG_ENUM flags);
 
-    extern uint8_t fs_dstat(FS_INFO * fs, uint8_t lclflags, DADDR_T addr,
-	int flags);
+    extern uint8_t tsk_fs_dstat(TSK_FS_INFO * fs, uint8_t lclflags,
+        DADDR_T addr, TSK_FS_BLOCK_FLAG_ENUM flags);
 
-#define FFIND_ALL 0x1
-    extern uint8_t fs_ffind(FS_INFO * fs, uint8_t lclflags, INUM_T inode,
-	uint32_t type, uint16_t id, int flags);
-
-
-
-#define FLS_DOT         0x001
-#define FLS_LONG        0x002
-#define FLS_FILE        0x004
-#define FLS_DIR         0x008
-#define FLS_FULL        0x010
-#define FLS_MAC         0x020
-    extern uint8_t fs_fls(FS_INFO * fs, uint8_t lclflags, INUM_T inode,
-	int flags, TSK_TCHAR * pre, int32_t skew);
+#define TSK_FS_FFIND_ALL 0x1
+    extern uint8_t tsk_fs_ffind(TSK_FS_INFO * fs, uint8_t lclflags,
+        INUM_T inode, uint32_t type, uint16_t id, int flags);
 
 
-    extern uint8_t fs_icat(FS_INFO * fs, uint8_t lclflags, INUM_T inum,
-	uint32_t type, uint16_t id, int flags);
+
+#define TSK_FS_FLS_DOT         0x001
+#define TSK_FS_FLS_LONG        0x002
+#define TSK_FS_FLS_FILE        0x004
+#define TSK_FS_FLS_DIR         0x008
+#define TSK_FS_FLS_FULL        0x010
+#define TSK_FS_FLS_MAC         0x020
+    extern uint8_t tsk_fs_fls(TSK_FS_INFO * fs, uint8_t lclflags,
+        INUM_T inode, int flags, TSK_TCHAR * pre, int32_t skew);
 
 
-#define IFIND_ALL       0x01
-#define IFIND_PATH      0x04
-#define IFIND_DATA      0x08
-#define IFIND_PAR       0x10
-#define IFIND_PAR_LONG  0x20
-    extern int8_t fs_ifind_path(FS_INFO * fs, uint8_t lclflags,
-	TSK_TCHAR * path, INUM_T * result);
-    extern uint8_t fs_ifind_data(FS_INFO * fs, uint8_t lclflags,
-	DADDR_T blk);
-    extern uint8_t fs_ifind_par(FS_INFO * fs, uint8_t lclflags,
-	INUM_T par);
+    extern uint8_t tsk_fs_icat(TSK_FS_INFO * fs, uint8_t lclflags,
+        INUM_T inum, uint32_t type, uint16_t id, int flags);
 
 
-#define ILS_OPEN        (1<<0)
-#define ILS_MAC		(1<<1)
-#define ILS_LINK	(1<<2)
-#define ILS_UNLINK	(1<<3)
+#define TSK_FS_IFIND_ALL       0x01
+#define TSK_FS_IFIND_PATH      0x04
+#define TSK_FS_IFIND_DATA      0x08
+#define TSK_FS_IFIND_PAR       0x10
+#define TSK_FS_IFIND_PAR_LONG  0x20
+    extern int8_t tsk_fs_ifind_path(TSK_FS_INFO * fs, uint8_t lclflags,
+        TSK_TCHAR * path, INUM_T * result);
+    extern uint8_t tsk_fs_ifind_data(TSK_FS_INFO * fs, uint8_t lclflags,
+        DADDR_T blk);
+    extern uint8_t tsk_fs_ifind_par(TSK_FS_INFO * fs, uint8_t lclflags,
+        INUM_T par);
 
-    extern uint8_t fs_ils(FS_INFO * fs, uint8_t lclflags, INUM_T istart,
-	INUM_T ilast, int flags, int32_t skew, TSK_TCHAR * img);
+
+#define TSK_FS_ILS_OPEN        (1<<0)
+#define TSK_FS_ILS_MAC		(1<<1)
+#define TSK_FS_ILS_LINK	(1<<2)
+#define TSK_FS_ILS_UNLINK	(1<<3)
+
+    extern uint8_t tsk_fs_ils(TSK_FS_INFO * fs, uint8_t lclflags,
+        INUM_T istart, INUM_T ilast, int flags, int32_t skew,
+        TSK_TCHAR * img);
 
 
 

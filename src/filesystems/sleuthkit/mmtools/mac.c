@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2006/12/07 16:38:18 $
+ * $Date: 2007/04/04 18:48:46 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2006 Brian Carrier, Basis Technology.  All rights reserved
@@ -26,113 +26,113 @@
  * Return 1 on error and 0 on success
  */
 static uint8_t
-mac_load_table(MM_INFO * mm)
+mac_load_table(TSK_MM_INFO * mm)
 {
     mac_part part;
     char *table_str;
     uint32_t idx, max_part;
     DADDR_T taddr = mm->offset / mm->block_size + MAC_PART_SOFFSET;
-    DADDR_T max_addr = (mm->img_info->size - mm->offset) / mm->block_size;	// max sector
+    DADDR_T max_addr = (mm->img_info->size - mm->offset) / mm->block_size;      // max sector
 
-    if (verbose)
-	tsk_fprintf(stderr, "mac_load_table: Sector: %" PRIuDADDR "\n",
-	    taddr);
+    if (tsk_verbose)
+        tsk_fprintf(stderr, "mac_load_table: Sector: %" PRIuDADDR "\n",
+            taddr);
 
     /* The table can be variable length, so we loop on it 
      * The idx variable shows which round it is
      * Each structure is 512-bytes each
      */
 
-    max_part = 1;		/* set it to 1 and it will be set in the first loop */
+    max_part = 1;               /* set it to 1 and it will be set in the first loop */
     for (idx = 0; idx < max_part; idx++) {
-	uint32_t part_start;
-	uint32_t part_size;
-	char *str;
-	SSIZE_T cnt;
+        uint32_t part_start;
+        uint32_t part_size;
+        char *str;
+        SSIZE_T cnt;
 
 
-	/* Read the entry */
-	cnt = mm_read_block_nobuf
-	    (mm, (char *) &part, sizeof(part), MAC_PART_SOFFSET + idx);
+        /* Read the entry */
+        cnt = tsk_mm_read_block_nobuf
+            (mm, (char *) &part, sizeof(part), MAC_PART_SOFFSET + idx);
 
-	/* If -1, then tsk_errno is already set */
-	if (cnt != sizeof(part)) {
-	    if (cnt != -1) {
-		tsk_error_reset();
-		tsk_errno = TSK_ERR_MM_READ;
-	    }
-	    snprintf(tsk_errstr2, TSK_ERRSTR_L,
-		"MAC Partition entry %" PRIuDADDR, taddr + idx);
-	    return 1;
-	}
-
-
-	/* Sanity Check */
-	if (idx == 0) {
-	    /* Set the endian ordering the first time around */
-	    if (mm_guessu16(mm, part.magic, MAC_MAGIC)) {
-		tsk_error_reset();
-		tsk_errno = TSK_ERR_MM_MAGIC;
-		snprintf(tsk_errstr, TSK_ERRSTR_L,
-		    "Mac partition table entry (Sector: %"
-		    PRIuDADDR ") %" PRIx16,
-		    (taddr + idx), getu16(mm->endian, part.magic));
-		return 1;
-	    }
-
-	    /* Get the number of partitions */
-	    max_part = getu32(mm->endian, part.pmap_size);
-	}
-	else if (getu16(mm->endian, part.magic) != MAC_MAGIC) {
-	    tsk_error_reset();
-	    tsk_errno = TSK_ERR_MM_MAGIC;
-	    snprintf(tsk_errstr, TSK_ERRSTR_L,
-		"Mac partition table entry (Sector: %"
-		PRIuDADDR ") %" PRIx16, (taddr + idx),
-		getu16(mm->endian, part.magic));
-	    return 1;
-	}
+        /* If -1, then tsk_errno is already set */
+        if (cnt != sizeof(part)) {
+            if (cnt != -1) {
+                tsk_error_reset();
+                tsk_errno = TSK_ERR_MM_READ;
+            }
+            snprintf(tsk_errstr2, TSK_ERRSTR_L,
+                "MAC Partition entry %" PRIuDADDR, taddr + idx);
+            return 1;
+        }
 
 
-	part_start = getu32(mm->endian, part.start_sec);
-	part_size = getu32(mm->endian, part.size_sec);
+        /* Sanity Check */
+        if (idx == 0) {
+            /* Set the endian ordering the first time around */
+            if (tsk_mm_guessu16(mm, part.magic, MAC_MAGIC)) {
+                tsk_error_reset();
+                tsk_errno = TSK_ERR_MM_MAGIC;
+                snprintf(tsk_errstr, TSK_ERRSTR_L,
+                    "Mac partition table entry (Sector: %"
+                    PRIuDADDR ") %" PRIx16,
+                    (taddr + idx), tsk_getu16(mm->endian, part.magic));
+                return 1;
+            }
 
-	if (verbose)
-	    tsk_fprintf(stderr,
-		"mac_load: %" PRIu32 "  Starting Sector: %" PRIu32
-		"  Size: %" PRIu32 " Type: %s\n", idx, part_start,
-		part_size, part.type);
-
-	if (part_size == 0)
-	    continue;
-
-	if (part_start > max_addr) {
-	    tsk_error_reset();
-	    tsk_errno = TSK_ERR_MM_BLK_NUM;
-	    snprintf(tsk_errstr, TSK_ERRSTR_L,
-		"mac_load_table: Starting sector too large for image");
-	    return 1;
-	}
+            /* Get the number of partitions */
+            max_part = tsk_getu32(mm->endian, part.pmap_size);
+        }
+        else if (tsk_getu16(mm->endian, part.magic) != MAC_MAGIC) {
+            tsk_error_reset();
+            tsk_errno = TSK_ERR_MM_MAGIC;
+            snprintf(tsk_errstr, TSK_ERRSTR_L,
+                "Mac partition table entry (Sector: %"
+                PRIuDADDR ") %" PRIx16, (taddr + idx),
+                tsk_getu16(mm->endian, part.magic));
+            return 1;
+        }
 
 
-	if ((str = mymalloc(sizeof(part.name))) == NULL)
-	    return 1;
+        part_start = tsk_getu32(mm->endian, part.start_sec);
+        part_size = tsk_getu32(mm->endian, part.size_sec);
 
-	strncpy(str, (char *) part.type, sizeof(part.name));
+        if (tsk_verbose)
+            tsk_fprintf(stderr,
+                "mac_load: %" PRIu32 "  Starting Sector: %" PRIu32
+                "  Size: %" PRIu32 " Type: %s\n", idx, part_start,
+                part_size, part.type);
 
-	if (NULL == mm_part_add(mm, (DADDR_T) part_start,
-		(DADDR_T) part_size, MM_TYPE_VOL, str, -1, idx))
-	    return 1;
+        if (part_size == 0)
+            continue;
+
+        if (part_start > max_addr) {
+            tsk_error_reset();
+            tsk_errno = TSK_ERR_MM_BLK_NUM;
+            snprintf(tsk_errstr, TSK_ERRSTR_L,
+                "mac_load_table: Starting sector too large for image");
+            return 1;
+        }
+
+
+        if ((str = tsk_malloc(sizeof(part.name))) == NULL)
+            return 1;
+
+        strncpy(str, (char *) part.type, sizeof(part.name));
+
+        if (NULL == tsk_mm_part_add(mm, (DADDR_T) part_start,
+                (DADDR_T) part_size, TSK_MM_PART_TYPE_VOL, str, -1, idx))
+            return 1;
     }
 
     /* Add an entry for the table length */
-    if ((table_str = mymalloc(16)) == NULL)
-	return 1;
+    if ((table_str = tsk_malloc(16)) == NULL)
+        return 1;
 
     snprintf(table_str, 16, "Table");
-    if (NULL == mm_part_add(mm, taddr, max_part, MM_TYPE_DESC,
-	    table_str, -1, -1))
-	return 1;
+    if (NULL == tsk_mm_part_add(mm, taddr, max_part, TSK_MM_PART_TYPE_DESC,
+            table_str, -1, -1))
+        return 1;
 
     return 0;
 }
@@ -144,41 +144,41 @@ mac_load_table(MM_INFO * mm)
  * return 0 on success and 1 on error
  */
 uint8_t
-mac_part_walk(MM_INFO * mm, PNUM_T start, PNUM_T last, int flags,
-    MM_PART_WALK_FN action, void *ptr)
+mac_part_walk(TSK_MM_INFO * mm, PNUM_T start, PNUM_T last, int flags,
+    TSK_MM_PART_WALK_CB action, void *ptr)
 {
-    MM_PART *part;
+    TSK_MM_PART *part;
     unsigned int cnt = 0;
 
     if (start < mm->first_part || start > mm->last_part) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_MM_WALK_RNG;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "mac_part_walk: Start partition: %" PRIuPNUM "", start);
-	return 1;
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_MM_WALK_RNG;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "mac_part_walk: Start partition: %" PRIuPNUM "", start);
+        return 1;
     }
 
     if (last < mm->first_part || last > mm->last_part) {
-	tsk_error_reset();
-	tsk_errno = TSK_ERR_MM_WALK_RNG;
-	snprintf(tsk_errstr, TSK_ERRSTR_L,
-	    "mac_part_walk: Ending partition: %" PRIuPNUM "", last);
-	return 1;
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_MM_WALK_RNG;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "mac_part_walk: Ending partition: %" PRIuPNUM "", last);
+        return 1;
     }
 
     part = mm->part_list;
     while ((part != NULL) && (cnt <= last)) {
 
-	if (cnt >= start) {
-	    int retval = action(mm, cnt, part, 0, ptr);
-	    if (retval == WALK_STOP)
-		return 0;
-	    else if (retval == WALK_ERROR)
-		return 1;
-	}
+        if (cnt >= start) {
+            int retval = action(mm, cnt, part, 0, ptr);
+            if (retval == TSK_WALK_STOP)
+                return 0;
+            else if (retval == TSK_WALK_ERROR)
+                return 1;
+        }
 
-	part = part->next;
-	cnt++;
+        part = part->next;
+        cnt++;
     }
 
     return 0;
@@ -186,9 +186,9 @@ mac_part_walk(MM_INFO * mm, PNUM_T start, PNUM_T last, int flags,
 
 
 void
-mac_close(MM_INFO * mm)
+mac_close(TSK_MM_INFO * mm)
 {
-    mm_part_free(mm);
+    tsk_mm_part_free(mm);
     free(mm);
 }
 
@@ -196,20 +196,20 @@ mac_close(MM_INFO * mm)
  * Process img_info as a Mac disk.  Initialize mm_info or return
  * NULL on error
  * */
-MM_INFO *
-mac_open(IMG_INFO * img_info, DADDR_T offset)
+TSK_MM_INFO *
+tsk_mm_mac_open(TSK_IMG_INFO * img_info, DADDR_T offset)
 {
-    MM_INFO *mm;
+    TSK_MM_INFO *mm;
 
     // clean up any errors that are lying around
     tsk_error_reset();
 
-    mm = (MM_INFO *) mymalloc(sizeof(*mm));
+    mm = (TSK_MM_INFO *) tsk_malloc(sizeof(*mm));
     if (mm == NULL)
-	return NULL;
+        return NULL;
 
     mm->img_info = img_info;
-    mm->mmtype = MM_MAC;
+    mm->mmtype = TSK_MM_INFO_TYPE_MAC;
     mm->str_type = "MAC Partition Map";
 
     /* If an offset was given, then use that too */
@@ -230,14 +230,14 @@ mac_open(IMG_INFO * img_info, DADDR_T offset)
 
     /* Load the partitions into the sorted list */
     if (mac_load_table(mm)) {
-	mac_close(mm);
-	return NULL;
+        mac_close(mm);
+        return NULL;
     }
 
     /* fill in the sorted list with the 'unknown' values */
-    if (mm_part_unused(mm)) {
-	mac_close(mm);
-	return NULL;
+    if (tsk_mm_part_unused(mm)) {
+        mac_close(mm);
+        return NULL;
     }
 
     return mm;

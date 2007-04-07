@@ -2,7 +2,7 @@
 ** get
 ** The Sleuth Kit
 **
-** $Date: 2006/08/17 17:06:58 $ 
+** $Date: 2007/03/23 15:02:18 $ 
 **
 ** routines to get values in a structure that solves endian issues
 **
@@ -30,20 +30,20 @@ typedef struct {
  * fs->flags will be set accordingly
  */
 uint8_t
-guess_end_u16(uint8_t * flag, uint8_t * x, uint16_t val)
+tsk_guess_end_u16(uint8_t * flag, uint8_t * x, uint16_t val)
 {
     /* try little */
-    if (getu16(TSK_LIT_ENDIAN, x) == val) {
-	*flag &= ~TSK_BIG_ENDIAN;
-	*flag |= TSK_LIT_ENDIAN;
-	return 0;
+    if (tsk_getu16(TSK_LIT_ENDIAN, x) == val) {
+        *flag &= ~TSK_BIG_ENDIAN;
+        *flag |= TSK_LIT_ENDIAN;
+        return 0;
     }
 
     /* ok, big now */
-    if (getu16(TSK_BIG_ENDIAN, x) == val) {
-	*flag &= ~TSK_LIT_ENDIAN;
-	*flag |= TSK_BIG_ENDIAN;
-	return 0;
+    if (tsk_getu16(TSK_BIG_ENDIAN, x) == val) {
+        *flag &= ~TSK_LIT_ENDIAN;
+        *flag |= TSK_BIG_ENDIAN;
+        return 0;
     }
 
     /* didn't find it */
@@ -56,20 +56,20 @@ guess_end_u16(uint8_t * flag, uint8_t * x, uint16_t val)
  * return 1 on error and 0 else
  */
 uint8_t
-guess_end_u32(uint8_t * flag, uint8_t * x, uint32_t val)
+tsk_guess_end_u32(uint8_t * flag, uint8_t * x, uint32_t val)
 {
     /* try little */
-    if (getu32(TSK_LIT_ENDIAN, x) == val) {
-	*flag &= ~TSK_BIG_ENDIAN;
-	*flag |= TSK_LIT_ENDIAN;
-	return 0;
+    if (tsk_getu32(TSK_LIT_ENDIAN, x) == val) {
+        *flag &= ~TSK_BIG_ENDIAN;
+        *flag |= TSK_LIT_ENDIAN;
+        return 0;
     }
 
     /* ok, big now */
-    if (getu32(TSK_BIG_ENDIAN, x) == val) {
-	*flag &= ~TSK_LIT_ENDIAN;
-	*flag |= TSK_BIG_ENDIAN;
-	return 0;
+    if (tsk_getu32(TSK_BIG_ENDIAN, x) == val) {
+        *flag &= ~TSK_LIT_ENDIAN;
+        *flag |= TSK_BIG_ENDIAN;
+        return 0;
     }
 
     return 1;
