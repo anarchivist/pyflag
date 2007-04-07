@@ -231,7 +231,7 @@ listdent_walk_callback_dent(TSK_FS_INFO * fs, TSK_FS_DENT * fs_dent, void *ptr) 
                  * we continue with other streams though in case the 
                  * directory has a data stream 
                  */
-                if (!(ISDOT(fs_dent->name))) 
+                if (!(TSK_FS_ISDOT(fs_dent->name))) 
                     listdent_add_dent(fs_dent, fs_data, dentlist);
             }
 
@@ -246,7 +246,7 @@ listdent_walk_callback_dent(TSK_FS_INFO * fs, TSK_FS_DENT * fs_dent, void *ptr) 
 
     } else {
         /* skip it if it is . or .. and we don't want them */
-        if (!(ISDOT(fs_dent->name)))
+        if (!(TSK_FS_ISDOT(fs_dent->name)))
             listdent_add_dent(fs_dent, NULL, dentlist);
     }
     return TSK_WALK_CONT;
@@ -258,7 +258,7 @@ static uint8_t listdent_walk_callback_list(TSK_FS_INFO *fs, TSK_FS_DENT *fs_dent
     PyObject *list = (PyObject *)ptr;
 
     /* we dont want to add '.' and '..' */
-    if(ISDOT(fs_dent->name))
+    if(TSK_FS_ISDOT(fs_dent->name))
         return TSK_WALK_CONT;
 
     tmp = PyString_FromString(fs_dent->name);
@@ -297,7 +297,7 @@ INUM_T lookup_inode(TSK_FS_INFO *fs, char *path) {
     INUM_T ret;
     char *tmp = talloc_strdup(NULL,path);
     /* this is evil and modifies the path! */
-    fs_ifind_path(fs, 0, tmp, &ret);
+    tsk_fs_ifind_path(fs, 0, tmp, &ret);
     talloc_free(tmp);
     return ret;
 }
@@ -808,7 +808,7 @@ skfs_stat(skfs *self, PyObject *args, PyObject *kwds) {
     result = build_stat_result(fs_inode);
 
     /* release the fs_inode */
-    fs_inode_free(fs_inode);
+    tsk_fs_inode_free(fs_inode);
     return result;
 }
 
@@ -1233,14 +1233,14 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
 
     if(self->type == 0 && self->id == 0)
         if(slack)
-            written = fs_read_file_noid_slack(fs, self->fs_inode, self->readptr, readlen, buf);
+            written = tsk_fs_read_file_noid_slack(fs, self->fs_inode, self->readptr, readlen, buf);
         else
-            written = fs_read_file_noid(fs, self->fs_inode, self->readptr, readlen, buf);
+            written = tsk_fs_read_file_noid(fs, self->fs_inode, self->readptr, readlen, buf);
     else
         if(slack)
-            written = fs_read_file_slack(fs, self->fs_inode, self->type, self->id, self->readptr, readlen, buf);
+            written = tsk_fs_read_file_slack(fs, self->fs_inode, self->type, self->id, self->readptr, readlen, buf);
         else
-            written = fs_read_file(fs, self->fs_inode, self->type, self->id, self->readptr, readlen, buf);
+            written = tsk_fs_read_file(fs, self->fs_inode, self->type, self->id, self->readptr, readlen, buf);
 
     /* perform overread if necessary have to use direct block IO for this */
     if(slack && overread) {
@@ -1258,12 +1258,12 @@ skfile_read(skfile *self, PyObject *args, PyObject *kwds) {
 
         /* do a direct block read from the filesystem */
         blockbuf = tsk_data_buf_alloc(fs->block_size);
-        len = fs_read_block(fs, blockbuf, fs->block_size, last_block);
+        len = tsk_fs_read_block(fs, blockbuf, fs->block_size, last_block);
         if(len > readlen-written) {
             memcpy(buf+written, blockbuf->data, readlen-written);
             written = readlen;
         }
-        data_buf_free(blockbuf);
+        tsk_data_buf_free(blockbuf);
     }
 
     if(readlen != written) {

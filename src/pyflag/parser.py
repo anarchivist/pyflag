@@ -52,7 +52,7 @@ class SearchParserScanner(runtime.Scanner):
         ('STR', re.compile('"([^\\\\"]+|\\\\.)*"')),
         ('STR2', re.compile("'([^\\\\']+|\\\\.)*'")),
         ('WORD', re.compile('[-:+*/!@$%^&=\\<\\>.a-zA-Z0-9_]+')),
-        ('LOGICAL_OPERATOR', re.compile('(and|or)')),
+        ('LOGICAL_OPERATOR', re.compile('(and|or|AND|OR)')),
     ]
     def __init__(self, str,*args,**kw):
         runtime.Scanner.__init__(self,None,{'[ \r\t\n]+':None,},str,*args,**kw)

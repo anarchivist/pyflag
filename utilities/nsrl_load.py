@@ -105,7 +105,9 @@ def MainNSRLHash(dirname):
 
         try:
             dbh.mass_insert(
-                md5=to_md5(row[1]),
+#                md5=to_md5(row[1]),
+                ## This should be faster:
+                md5=row[1].decode("hex")
                 filename=row[3],
                 productcode=row[5],
                 oscode=row[6],

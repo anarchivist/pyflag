@@ -1984,7 +1984,7 @@ ntfs_proc_attrseq(NTFS_INFO * ntfs,
         /* File Name (always resident) */
         else if (type == NTFS_ATYPE_FNAME) {
             ntfs_attr_fname *fname;
-            TSK_FS_INODE_NAME_LIST *fs_name;
+            TSK_FS_INODE_NAME_LIST *fs_name=NULL;
             UTF16 *name16;
             UTF8 *name8;
             if (attr->res != NTFS_MFT_RES) {

@@ -46,7 +46,7 @@ parser SearchParser:
     token STR: r'"([^\\"]+|\\.)*"'
     token STR2: r"'([^\\']+|\\.)*'"
     token WORD: '[-:+*/!@$%^&=\<\>.a-zA-Z0-9_]+'
-    token LOGICAL_OPERATOR: "(and|or)"
+    token LOGICAL_OPERATOR: "(and|or|AND|OR)"
 
     rule goal<<types>>: clause<<types>>  END {{ return clause }}
 
