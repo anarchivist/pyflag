@@ -87,7 +87,10 @@ class DelCase(Reports.report):
         return result
 
     def display(self,query,result):
-        FlagFramework.delete_case(query['remove_case'])
+        try:
+            FlagFramework.delete_case(query['remove_case'])
+        except DB.DBError:
+            pass
         result.heading("Deleted case")
         result.para("Case %s has been deleted" % query['remove_case'])
         return result
