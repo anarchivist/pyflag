@@ -368,8 +368,12 @@ static SSIZE_T
 pyfile_read_random(TSK_IMG_INFO * img_info, OFF_T vol_offset, char *buf,
                    OFF_T len, OFF_T offset) {
 
-  PyObject *res;
+    PyObject *res;
+#if PY_VERSION_HEX >= 0x02050000 // python2.5
+    Py_ssize_t read;
+#else
     int read;
+#endif
     unsigned  long long int tot_offset;
     char *strbuf;
     IMG_PYFILE_INFO *pyfile_info = (IMG_PYFILE_INFO *) img_info;
