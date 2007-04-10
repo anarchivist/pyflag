@@ -142,6 +142,10 @@ static PyObject *remote_read_random(remote *self, PyObject *args) {
   if(!PyArg_ParseTuple(args, "lL", &len, &offs)) 
     return NULL;
 
+  // Ensure that when we are asked to read 0 bytes, we just return
+  // right away
+  if(len==0) return PyString_FromStringAndSize(NULL, len);
+
   // Add the default offset from our constructor
   offs = offs + self->offset;
 

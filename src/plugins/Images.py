@@ -57,7 +57,7 @@ class IOSubsysFD:
         ## FIXME - dont lie here
         try:
             self.size = io.size
-        except: self.size = 1000000000000
+        except: self.size = 10000000000000
         
     def seek(self, offset, whence=0):
         """ fake seeking routine """
@@ -195,6 +195,33 @@ class EWF(Advanced):
     """ EWF is used by other forensic packages like Encase or FTK """
     subsys = 'ewf'
 
+import Store
+
+class CachedIO(IOSubsysFD):
+    """ This is a cached version of the IOSubsysFD for filesystems for
+    which reading is expensive.
+
+    This is used for example by the remote filesystem. Typically when
+    reading a filesystem, the same blocks need to be read over and
+    over - for example reading the superblock list etc. This helps to
+    alleviate this problem by caching commonly read blocks.
+    """
+    cache = Store.Store()
+    def __init__(self,io):
+        IOSubsysFD.__init__(self,io)
+
+    def read(self, length=0):
+        ## try to get the data out of the cache:
+        key = "%s%s" % (self.readptr,length)
+        try:
+            data = self.cache.get(key)
+        except Exception,e:
+            data = self.io.read_random(length,self.readptr)
+            self.cache.put(data, key=key)
+
+        self.readptr += len(data)
+        return data
+
 class Remote(Advanced):
     """ This IO Source provides for remote access """
     mandatory_parameters = ['host','device']
@@ -211,15 +238,23 @@ class Remote(Advanced):
         self.calculate_partition_offset(query, result)
 
     def create(self, name, case, query):
-        import remote
-        offset = self.calculate_offset_suffix(query.get('offset','0'))
-        
-        io = remote.remote(host = query['host'],
-                           port = int(query.get('port', 3533)),
-                           device = query['device'],
-                           offset = offset)
+        key = "%s|%s" % (case, name)
+        try:
+            io = IO.IO_Cache.get(key)
+        except KeyError:
+            import remote
+            offset = self.calculate_offset_suffix(query.get('offset','0'))
 
-        return IOSubsysFD(io)
+            io = remote.remote(host = query['host'],
+                               port = int(query.get('port', 3533)),
+                               device = query['device'],
+                               offset = offset)
+
+            ## Store the cache copy in:
+            if name:
+                IO.IO_Cache.put(io, key=key)
+            
+        return CachedIO(io)
 
 class Mounted(Advanced):
     """ Treat a mounted directory as an image """

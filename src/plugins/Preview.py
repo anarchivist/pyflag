@@ -109,7 +109,7 @@ class PreviewLoad(LoadData.LoadFS):
     This loads a filesystem from an iosource incrementally into the
     database as the user navigates through the filesystem.
     """
-    parameters = { 'iosource': 'iosource', 'fstype':'string', 'mount_point':'string'}
+    parameters = { 'iosource': 'string', 'fstype':'string', 'mount_point':'string'}
     name = "Incremental Load"
     family = "Preview"
     

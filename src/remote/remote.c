@@ -25,12 +25,18 @@ uint64_t ntohll(uint64_t x) {
 int read_from_network(int fd, unsigned char *buffer, unsigned int len, RC4 rc4) {
   unsigned int i=0;
 
+  if(len==0) return len;
+
   //DEBUG("reading %u bytes\n", len);
 
   while(i<len) {
     int l = recv(fd, buffer+i, len-i, MSG_WAITALL);
     
-    if(l<=0) return 0;
+    if(l<0) return 0;
+    if(l==0) {
+      DEBUG("Tried to read %u bytes, got 0\n", len-i);
+      break;
+    };
     i+=l;
   };
 
