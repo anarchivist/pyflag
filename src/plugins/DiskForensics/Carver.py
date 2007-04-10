@@ -89,7 +89,7 @@ class JPEG(BasicFormats.SimpleStruct):
                 self.offset+=marker.size()
             else:        
                 size = BasicFormats.USHORT(self.buffer[self.offset:], endianess='big')
-                #print size
+                print size
                 if int(size)<2:
                     #print "Section size is out of bounds"
                     self.error = True

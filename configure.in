@@ -51,6 +51,7 @@ AC_OUTPUT([
 	src/lib/libsgzip/Makefile
 	src/lib/libewf/Makefile
 	src/lib/libiosubsys/Makefile
+	src/remote/Makefile
 	src/mailtools/Makefile 
 	src/mailtools/libpst-0.5/Makefile 
 	src/indextools_ng/Makefile

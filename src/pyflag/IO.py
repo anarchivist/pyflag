@@ -31,20 +31,40 @@
     Flag IO subsystem
     =================
     
-    This module presents a file like object using the python iosubsys
+    This module presents a file like object using the pyflag iosubsys
     module.
+
+    The base Image class provides the 
+
 """
 import iosubsys
 import pexpect
 import pyflag.FlagFramework as FlagFramework
+from pyflag.FlagFramework import query_type
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import cPickle
 import os,re
 import pyflag.pyflaglog as pyflaglog
 import pyflag.Store as Store
-
+import pyflag.Registry as Registry
 import sk
+import pyflag.DB as DB
+
+class Image:
+    """ The image base class abstracts access to different types of images """
+    ## This holds the global cache for all images
+    cache = Store.Store()
+    
+    def form(self,query,result):
+        """ This method is called to render a specialised form for
+        this particular image
+        """
+
+    def open(self, name, case, query=None):
+        """ This is a factory class for the Image. If query is None we
+        try to retrieve our configuration parameters from the db.
+        """
 
 def mmls_popup(query,result,orig_query=None, subsys=None, offset=None):
     result.decoration = "naked"
@@ -195,11 +215,7 @@ class IO:
 class sgzip(IO):
     parameters=('subsys','io_filename','io_offset')
 
-    def form(self,query,result):
-        if not query.has_key('io_offset'):
-            query['io_offset']='0'
-        result.fileselector("Select %s image:" % self.__class__.__name__.split(".")[-1], name="io_filename")
-
+    def calculate_partition_offset(self, query, result):
         tmp = result.__class__(result)
         tmp2 = result.__class__(result)
         tmp2.popup(
@@ -211,6 +227,10 @@ class sgzip(IO):
 
         tmp.row(tmp2,"Enter partition offset:")
         result.textfield(tmp,'io_offset')
+        
+    def form(self,query,result):
+        result.fileselector("Select %s image:" % self.__class__.__name__.split(".")[-1], name="io_filename")
+        self.calculate_partition_offset(query,result)
   
 class standard(sgzip):
     parameters=('subsys','io_filename')
@@ -229,18 +249,47 @@ class raid(sgzip):
 class advanced(sgzip):
     parameters=('subsys','io_filename','io_offset')
 
-class remote(IO):
-    parameters=('subsys','io_host','io_user','io_server_path','io_device')
+class remote(sgzip):
+    parameters=('subsys','io_host','io_device','io_offset')
+
+    def __init__(self, query=None,result=None,subsys='subsys',options=None, clone=None):
+        if clone:
+            self.options = clone.options
+            self.io = clone.io
+            ## FIXME: Dont lie here
+            self.size = 1*1024*1024
+            return
+        
+        try:
+            if not options:
+                host = query['io_host']
+                device = query['io_device']
+                offset = query.get('io_offset',0)
+                self.readptr = 0
+                self.size = 1*1024*1024
+                self.options = [['subsys', 'remote'],
+                                ['host', host],
+                                ['device',device],
+                                ['offset', offset]]
+            else:
+                self.options = options
+                host = options[1][1]
+                device = options[2][1]
+                offset = options[3][1]
+            import remote
+
+            self.io = remote.remote(host=host, device=device,
+                                    offset=offset)
+        except KeyError:
+            if(query and result):
+                self.form(query,result)
+            raise
 
     def form(self,query,result):
-        if not query.has_key('io_offset'):
-            query['io_offset']='0'
-
         result.textfield("Host",'io_host');
-        result.textfield("User to logon as:",'io_user')
-        result.textfield("Full servlet path:",'io_server_path')
         result.textfield("Remote device:",'io_device')
-        
+
+        self.calculate_partition_offset(query,result)
 
 class ewf(sgzip):
     parameters=('subsys','io_filename','io_offset')
@@ -277,6 +326,15 @@ def IOFactory(query,result=None, subsys='subsys'):
     io=subsystems[query[subsys]]
     return io(query,result,subsys)
 
+def IODrawForm(query, result, subsys='subsys'):
+    """ draws the correct form on the result depending on the
+    query['subsys']. Returns true if all parameters are filled in,
+    False otherwise.
+    """
+    io=subsystems[query[subsys]]
+    io = io(query, result, subsys)
+    return io.form(query,result)
+
 import pyflag.DB as DB
 
 subsystems=FlagFramework.query_type([
@@ -285,8 +343,7 @@ subsystems=FlagFramework.query_type([
             ('ewf',ewf),
             ('standard',standard),
             ('mounted',mounted),
-            ## This is currently broken
-#            ('remote',remote),
+            ('remote',remote),
             ('raid',raid),
             ])
 
@@ -296,6 +353,14 @@ del subsystems['case']
 IO_Cache = Store.Store()
 
 def open(case, iosource):
+    """ Opens the named iosource from the specified case """
+    dbh = DB.DBO(case)
+    dbh.execute("select name,parameters from iosources where name=%r",  iosource)
+    query = query_type(string=dbh.fetch()['parameters'])
+    image = Registry.IMAGES.dispatch(query['subsys'])()
+    return image.open(iosource,case)
+
+def xxopen(case, iosource):
     """ lookup iosource in database and return an IO object.
 
     This uses function memoization to speed it up.
@@ -400,3 +465,22 @@ class IOSubsystemTests(unittest.TestCase):
         t = time.time()
         test_read_random(io1,io3, io1.size, 1000000, 200)
         print "EWF vs advanced took %s sec" % (time.time()-t)
+
+class RemoteIOSourceTests(unittest.TestCase):
+    """ Test the Remote IO source implementation """
+    def test01RemoteIOSource(self):
+        """ Test the remote iosource implementation """
+        ## Start the remote server on the localhost
+        slave_pid = os.spawnl(os.P_NOWAIT, config.FLAG_BIN + "/remote_server", "remote_server", "-s")
+        
+        io1 = iosubsys.iosource([['subsys','advanced'],
+                                 ['filename','%s/pyflag_stdimage_0.2' % config.UPLOADDIR]])
+        
+        ## get the remote fd:
+        import remote
+
+        r = remote.remote("127.0.0.1", config.UPLOADDIR +"/pyflag_stdimage_0.2")
+        
+        ## Test the remote source
+        test_read_random(io1,r, io1.size, 1000000, 200)
+

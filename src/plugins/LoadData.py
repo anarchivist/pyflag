@@ -31,6 +31,7 @@
 import re,os,os.path
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
+from pyflag.FlagFramework import query_type
 import pyflag.FileSystem as FileSystem
 import pyflag.Scanner as Scanner
 import pyflag.Registry as Registry
@@ -170,43 +171,72 @@ class LoadIOSource(Reports.report):
     """
     Load IO Source
     ==============
-    This report loads a new IO source for use within PyFlag. All input to PyFlag is done through IO source. IO Sources group the different file types that PyFlag supports into a single abstract entity which can be later refered to by name.
-
-    For example, the 
-    
-    Initialises and caches an IO Subsystem datasource into the database for
-    subsequent use by other reports (eg. LoadFS and exgrep) """
-    parameters = {"iosource":"sqlsafe","subsys":"iosubsystem"}
+    This report loads a new IO source for use within PyFlag. All input
+    to PyFlag is done through IO source. IO Sources group the
+    different file types that PyFlag supports into a single abstract
+    entity which can be later refered to by name.
+    """
+    parameters = {"iosource":"sqlsafe","subsys":"string"}
     name = "Load IO Data Source"
     family="Load Data"
     description = "Load a data source into flag using IO subsystem"
     order = 10
 
-    def form(self,query,result):
-        result.start_table()
-
+    def form(self, query, result):
+        drivers = Registry.IMAGES.class_names
         try:
-            result.case_selector()
-            result.ruler()
-            subsystems=IO.subsystems.keys()
-            result.const_selector("Select IO Subsystem",'subsys',subsystems,subsystems)
-            #this will cause a form to be placed into result.
-            fd=IO.IOFactory(query,result)
+            result.const_selector("Select IO Subsystem", 'subsys', drivers, drivers)
+
+            ## Instantiate the required factory:
+            image = Registry.IMAGES.dispatch(query['subsys'])()
+
+            image.form(query,result)
+
+            ## Get the name of the source:
             result.textfield("Unique Data Load ID","iosource")
-        except (KeyError, RuntimeError):
+        except KeyError:
             pass
-        except IOError, e:
-            result.row("Error: %s" % e, **{'class':'highlight'})
 
-    def analyse(self,query):
-        # cache serialised io options in the case mata table
-        fd=IO.IOFactory(query)
-        dbh = DB.DBO(query['case'])
-        dbh.insert("meta", property='iosource', value=query['iosource'])
-        dbh.insert("meta", property=query['iosource'],value=fd.get_options())
+    def display(self, query,result):
+        ## Try to instantiate the image:
+        try:
+            image = Registry.IMAGES.dispatch(query['subsys'])()
+            io = image.open(query['iosource'], query['case'], query)
+        except Exception,e:
+            result.heading("Error: Unable to create IO Source")
+            result.para("Error reported was %s" % e, color='red')
+            return
 
-    def display(self,query,result):
-        result.refresh(0, FlagFramework.query_type((), case=query['case'], family="Load Data", report="LoadFS", iosource=query['iosource']))
+        ## If we get here all went well - go to next step
+        result.refresh(0, query_type(case=query['case'],
+                                     family="Load Data",
+                                     report="LoadFS",
+                                     iosource=query['iosource']))
+        
+##    def form(self,query,result):
+##        result.start_table()
+##        try:
+##            result.case_selector()
+##            result.ruler()
+##            subsystems=IO.subsystems.keys()
+##            result.const_selector("Select IO Subsystem",'subsys',subsystems,subsystems)
+##            #this will cause a form to be placed into result.
+##            fd=IO.IOFactory(query,result)
+##            result.textfield("Unique Data Load ID","iosource")
+##        except (KeyError, RuntimeError):
+##            pass
+##        except IOError, e:
+##            result.row("Error: %s" % e, **{'class':'highlight'})
+
+##    def analyse(self,query):
+##        # cache serialised io options in the case mata table
+##        fd=IO.IOFactory(query)
+##        dbh = DB.DBO(query['case'])
+##        dbh.insert("meta", property='iosource', value=query['iosource'])
+##        dbh.insert("meta", property=query['iosource'],value=fd.get_options())
+
+##    def display(self,query,result):
+##        result.refresh(0, FlagFramework.query_type((), case=query['case'], family="Load Data", report="LoadFS", iosource=query['iosource']))
 
 class ScanFS(Reports.report):
     """ A report used to scan the filesystem using the specified scanners.
@@ -437,7 +467,7 @@ class LoadFS(Reports.report):
 
     The mount point can be any valid path, but its probably most sensible to make it the same as the mount point of the original filesystem within the system drive. For example /freds_box/c/ or /fred/usr/.
     """
-    parameters = {"iosource":"iosource","fstype":"string", "mount_point":"string"}
+    parameters = {"iosource":"string","fstype":"string", "mount_point":"string"}
     name = "Load Filesystem image"
     family="Load Data"
     description = "Load a filesystem image into the case Database"
@@ -450,7 +480,9 @@ class LoadFS(Reports.report):
         try:
             result.case_selector()
             result.ruler()
-            result.meta_selector(message='Select IO Data Source', case=query['case'], property='iosource')
+            result.selector('Select IO Data Source', 'iosource',
+                            "select name as `key`,name as `value` from iosources",
+                            case=query['case'])
             
             # initialise/open the subsystem
             fd=IO.open(query['case'],query['iosource'])
@@ -477,8 +509,8 @@ class LoadFS(Reports.report):
         except IOError,e:
             result.text("IOError %s" % e,style='red')
         except (KeyError,TypeError),e:
-#            print e
-#            FlagFramework.get_traceback(e,result)
+            print e
+            FlagFramework.get_traceback(e,result)
             pass
 
     def analyse(self,query):

@@ -104,7 +104,7 @@ class query_type:
 
     since if the paramter is not deleted first, it will simply be appended to produce a report array.
     """
-    def __init__(self,query_list=(),user=None,passwd=None,base='',**params):
+    def __init__(self,query_list=(),string=None, user=None, passwd=None, base='',**params):
         """ Constructor initialises from a CGI list of (key,value) pairs or named keywords. These may repeat as needed.
 
         @arg query_list: A list of lists as obtained from cgi.parse_qsl. This way of initialising query_type is obsolete - do not use.
@@ -121,6 +121,9 @@ class query_type:
         ## where we need to be drawn to.
         self.window = "window"
         self.callback =''
+
+        if string:
+            query_list = cgi.parse_qsl(string)
         
         self.q=[]
         if isinstance(query_list,list):
@@ -172,6 +175,11 @@ class query_type:
     def set(self, key, value):
         del self[key]
         self[key]=value
+
+    def default(self, key, value):
+        """ Set key to value only if key is not yet defined """
+        if not self.has_key(key):
+            self[key] = value
 
     def remove(self,key,value):
         """ Removes the specific instance of key,value from the query.
@@ -794,7 +802,7 @@ def reset_all(**query):
     for row in dbh:
         import cgi
         
-        q = query_type(cgi.parse_qsl(row['value']),case=query['case'])
+        q = query_type(string=row['value'],case=query['case'])
         try:
             for k in query.keys():
                 if k=='case': continue

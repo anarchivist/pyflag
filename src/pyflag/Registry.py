@@ -377,6 +377,7 @@ FILEFORMATS = None
 TASKS = None
 CARVERS = None
 EVENT_HANDLERS = None
+IMAGES = None
 
 ## This is required for late initialisation to avoid dependency nightmare.
 def Init():
@@ -444,6 +445,11 @@ def Init():
     import pyflag.FlagFramework as FlagFramework
     global EVENT_HANDLERS
     EVENT_HANDLERS = ScannerRegistry(FlagFramework.EventHander)
+
+    ## Register IO Images:
+    import pyflag.IO as IO
+    global IMAGES
+    IMAGES = ScannerRegistry(IO.Image)
 
 def InitTests():
     return TestsRegistry(unittest.TestCase)

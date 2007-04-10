@@ -61,14 +61,6 @@ class IO_File(FileSystem.File):
         self.io = IO.open(case, self.name)
         self.size = self.io.size
 
-##        dbh = DB.DBO(self.case)
-##        ## IO Sources may have block_size specified:
-##        try:
-##            dbh.execute("select value from filesystems where iosource=%r and property='block_size' limit 1", self.name);
-##            self.block_size = int(dbh.fetch()["value"])
-##        except TypeError:
-##            pass
-
         ## This source should not be scanned directly.
         self.ignore = True
 
@@ -241,6 +233,14 @@ class CaseDBInit(FlagFramework.EventHander):
         `length` INT default 100
         ) ENGINE=InnoDB""")
         
+        case_dbh.execute("""CREATE TABLE if not exists `iosources` (
+        `id` INT(11) not null auto_increment,
+        `name` VARCHAR(250) NOT NULL,
+        `type` VARCHAR(250) NOT NULL,
+        `parameters` TEXT,
+        PRIMARY KEY(`id`)
+        )""")        
+
         case_dbh.execute("""CREATE TABLE if not exists `annotate` (
         `id` INT(11) not null auto_increment,
         `inode` VARCHAR(250) NOT NULL,
