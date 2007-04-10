@@ -35,7 +35,7 @@ from optparse import OptionParser
 parser = OptionParser(usage = """%prog [options]""")
 parser.add_option('-m','--match', default=None, help='Run only tests matching this RE')
 parser.add_option('-l','--level', default=10, type='int', help='Testing level (1 least exhaustive)')
-
+parser.add_option('-L', '--list', action='store_true', dest='list', help='Just list all the available test classes without running them')
 options,args = pyflag.conf.parse_command_line("Generic Test harness for running unit tests.",parser=parser)
 
 Registry.Init()
@@ -62,6 +62,12 @@ for x in classes:
             tmp.append(x)
 
 classes = tmp
+
+if options.list:
+    import sys
+    for test in classes:
+        print "%s" % (test.__doc__)
+    sys.exit()
 
 import gc
 gc.set_debug(gc.DEBUG_UNCOLLECTABLE | gc.DEBUG_INSTANCES)
