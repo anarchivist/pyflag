@@ -255,7 +255,34 @@ class Remote(Advanced):
                 IO.IO_Cache.put(io, key=key)
             
         return CachedIO(io)
+    
+import os, unittest,iosubsys,time
+import pyflag.conf
+config=pyflag.conf.ConfObject()
 
+class RemoteIOSourceTests(unittest.TestCase):
+    """ Test the Remote IO source implementation """
+    def test01RemoteIOSource(self):
+        """ Test the remote iosource implementation """
+        ## Start the remote server on the localhost
+        slave_pid = os.spawnl(os.P_NOWAIT, config.FLAG_BIN + "/remote_server", "remote_server", "-s")
+
+        print "slave run with pid %u" % slave_pid
+        ## Try to avoid the race
+        time.sleep(1)
+        
+        io1 = iosubsys.iosource([['subsys','advanced'],
+                                 ['filename','%s/pyflag_stdimage_0.2' % config.UPLOADDIR]])
+        
+        ## get the remote fd:
+        import remote
+
+        r = remote.remote("127.0.0.1", config.UPLOADDIR +"/pyflag_stdimage_0.2")
+
+        ## Test the remote source
+        IO.test_read_random(io1,r, io1.size, 1000000, 200)
+
+## FIXME - to do
 class Mounted(Advanced):
     """ Treat a mounted directory as an image """
     subsys = 'sgzip'

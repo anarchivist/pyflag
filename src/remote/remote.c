@@ -41,9 +41,9 @@ int read_from_network(int fd, unsigned char *buffer, unsigned int len, RC4 rc4) 
   };
 
   // Decrpyt the data:
-  CALL(rc4, crypt, buffer, len);
+  CALL(rc4, crypt, buffer, i);
 
-  return len;
+  return i;
 };
 
 void queue_for_sending(StringIO queue, unsigned char *original_buffer, unsigned int len, RC4 rc4) {
@@ -64,6 +64,7 @@ int write_to_network(int fd, StringIO queue) {
   int i=0;
 
   //  DEBUG("writing %u bytes\n", len);
+  if(len ==0) return 1;
 
   while(i<len) {
     int l = send(fd, queue->data+i, len-i, MSG_NOSIGNAL);

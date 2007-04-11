@@ -465,22 +465,3 @@ class IOSubsystemTests(unittest.TestCase):
         t = time.time()
         test_read_random(io1,io3, io1.size, 1000000, 200)
         print "EWF vs advanced took %s sec" % (time.time()-t)
-
-class RemoteIOSourceTests(unittest.TestCase):
-    """ Test the Remote IO source implementation """
-    def test01RemoteIOSource(self):
-        """ Test the remote iosource implementation """
-        ## Start the remote server on the localhost
-        slave_pid = os.spawnl(os.P_NOWAIT, config.FLAG_BIN + "/remote_server", "remote_server", "-s")
-        
-        io1 = iosubsys.iosource([['subsys','advanced'],
-                                 ['filename','%s/pyflag_stdimage_0.2' % config.UPLOADDIR]])
-        
-        ## get the remote fd:
-        import remote
-
-        r = remote.remote("127.0.0.1", config.UPLOADDIR +"/pyflag_stdimage_0.2")
-        
-        ## Test the remote source
-        test_read_random(io1,r, io1.size, 1000000, 200)
-
