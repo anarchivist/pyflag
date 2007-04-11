@@ -218,13 +218,16 @@ function post_link(query, target_name) {
 function refresh(query, pane) {
   var target;
 
-  if(pane=='parent') {
+  if(pane=='parent_pane') {
+    target = window.opener;
+    if(!target) target=window.parent;
+  } else if(pane=='parent') {
     target = find_window_by_name(window.__pyflag_parent);
   } else target=window;
 
   target.location = query + "&__pyflag_parent=" + target.__pyflag_parent + "&__pyflag_name=" + target.__pyflag_name;
 
-  if(pane=='parent') {
+  if(pane=='parent' || pane=='parent_pane') {
     var w = find_window_by_name(window.__pyflag_name);
     w.close();
   };
@@ -263,7 +266,11 @@ function submit_form(pane, current_cb, name, value) {
   var target;
   var query = 'f?';
 
-  if(pane=='parent') {
+  if(pane=='parent_pane') {
+    target = window.opener;
+    if(!target) target = window.parent;
+    query += "__pyflag_parent=" + target.__pyflag_parent + "&__pyflag_name=" + target.__pyflag_name +"&";
+  } else if(pane=='parent') {
     target = find_window_by_name(window.__pyflag_parent);
     query += "__pyflag_parent=" + target.__pyflag_parent + "&__pyflag_name=" + target.__pyflag_name +"&";
  } else if(pane=='popup') {
@@ -288,7 +295,8 @@ function submit_form(pane, current_cb, name, value) {
       if(e.type=='submit') continue;
 
       // If we submit to our parent - we need to remove our cb:
-      if(pane=='parent' && e.name=='callback_stored' && e.value==current_cb)
+      if((pane=='parent' || pane=='parent_pane') && 
+	 e.name=='callback_stored' && e.value==current_cb)
 	continue;
 
       if(e.name.length>0 ) {
@@ -301,7 +309,7 @@ function submit_form(pane, current_cb, name, value) {
     target.location = query;
   };
 
-  if(pane=='parent') {
+  if(pane=='parent' || pane=='parent_pane') {
     var w = find_window_by_name(window.__pyflag_name);
     w.close();
   };

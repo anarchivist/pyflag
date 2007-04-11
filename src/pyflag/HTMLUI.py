@@ -63,24 +63,10 @@ def goto_row_cb(query,result,variable='limit'):
     """ This is used by the table widget to allow users to skip to a
     certain row"""
     limit = query.get(variable,'0')
-
-    try:
-        if query['refresh']:
-            del query['refresh']
-
-            ## Accept hex representation for limits
-            if limit.startswith('0x'):
-                del query[variable]
-                query[variable]=int(limit,16)
-            
-            result.refresh(0,query,parent=1)            
-    except KeyError:
-        pass
-
     result.decoration = 'naked'
     result.heading("Skip directly to a row")
     result.para("You may specify the row number in hex by preceeding it with 0x")
-    result.start_form(query, pane="parent")
+    result.start_form(query, pane="parent_pane")
     result.start_table()
     if limit.startswith('0x'):
         limit=int(limit,16)
@@ -342,6 +328,9 @@ class HTMLUI(UI.GenericUI):
 
         if pane=='parent':
             return "link_to_parent(\"%s\", window.__pyflag_parent); return false;" % target
+
+        if pane=='parent_pane':
+            return "link_to_parent(\"%s\", 0); return false;" % target
 
         if pane=="main":
             return "post_link('f?%s','main'); find_window_by_name(window.__pyflag_name).close(); return false;" % target
@@ -1000,7 +989,7 @@ class HTMLUI(UI.GenericUI):
                     ## This is good if we get here - lets refresh to it now:
                     if query.has_key('__submit__'):
                         del query['__submit__']
-                        result.refresh(0,query,pane='parent')
+                        result.refresh(0,query,pane='parent_pane')
                         return
                     
                 except Exception,e:
@@ -1066,7 +1055,7 @@ class HTMLUI(UI.GenericUI):
         def hide_fields(query, result):
             if query.has_key('__submit__'):
                 del query['__submit__']
-                result.refresh(0,query,pane='parent')
+                result.refresh(0,query,pane='parent_pane')
                 return
             
             result.heading("Hide Columns")
@@ -1378,10 +1367,11 @@ class HTMLUI(UI.GenericUI):
             self.result += "<hr />\n"
         
     def refresh(self,interval, query, pane='self'):
+        print pane
         del query['time']
         query['time'] = time.time()
 
-        if pane=='parent':
+        if pane=='parent' or pane=='parent_pane':
             query.poparray('callback_stored')
             
         if int(interval)>0:
