@@ -1042,14 +1042,17 @@ class HTMLUI(UI.GenericUI):
         ## Add a toolbar icon for the filter:
         self.toolbar(cb=filter_gui, icon='filter.png',
                      tooltip=self.defaults.get('filter','Click here to filter table'))
-
+        
+        ## Add a clear filter icon if required
         try:
             new_query = query.clone()
-            del new_query['filter']
+            if new_query.has_key('filter'):
+                del new_query['filter']
+                self.toolbar(link=new_query, icon='clear_filter.png', 
+                    tooltip=self.defaults.get('delfilter', 
+                    'Click here to clear the filter'))
         except: pass
 
-        self.toolbar(link=new_query, icon='clear_filter.png', 
-                     tooltip=self.defaults.get('delfilter', 'Click here to clear the filter'))
 
         ## This is a toolbar popup which allows some fields to be hidden:
         def hide_fields(query, result):
