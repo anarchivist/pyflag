@@ -39,6 +39,11 @@ class Store:
         self.creation_times = []
         self.id = 0
 
+    def flush(self):
+        self.mutex.acquire()
+        self.creation_times = []
+        self.mutex.release()
+        
     def put(self,object, prefix='', key=None):
         """ Stores an object in the Store.  Returns the key for the
         object. If key is already supplied we use that instead - Note

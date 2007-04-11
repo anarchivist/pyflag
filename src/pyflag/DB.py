@@ -38,6 +38,10 @@ from Queue import Queue, Full, Empty
 from MySQLdb.constants import FIELD_TYPE
 import threading
 
+## This store stores information about indexes
+import Store
+DBIndex_Cache=Store.Store()
+
 db_connections=0
 
 ## This is the dispatcher for db converters
@@ -274,22 +278,19 @@ class Pool(Queue):
 
         return (dbh,mysql_bin_string)
 
-## This store stores information about indexes
-import Store
-DBIndex_Cache=Store.Store()
-DBH=Store.Store(max_size=10)
-
 class DBO:
     """ Class controlling access to DB handles
 
     We implement a pool of connection threads. This gives us both worlds - the advantage of reusing connection handles without running the risk of exhausting them, as well as the ability to issue multiple simultaneous queries from different threads.
 
-    @cvar DBH: A dict containing cached database connection objects
+    @cvar DBH: A store containing cached database connection objects
     @cvar lock: an array of unique locks that each thread must hold before executing new SQL
     @ivar temp_tables: A variable that keeps track of temporary tables so they may be dropped when this object gets gc'ed
     """
     temp_tables = []
     transaction = False
+    ## This stores references to the pools
+    DBH = Store.Store(max_size=10)
     
     def __init__(self,case=None):
         """ Constructor for DB access. Note that this object implements database connection caching and so should be instantiated whenever needed. If case is None, the handler returned is for the default flag DB
@@ -302,10 +303,10 @@ class DBO:
 ##        key = "%s/%s" % (case, threading.currentThread().getName())
         key = "%s" % (case)
         try:
-            self.dbh,self.mysql_bin_string=DBH.get(key).get()
+            self.dbh,self.mysql_bin_string=self.DBH.get(key).get()
         except KeyError:
-            DBH.put(Pool(case), key=key)
-            self.dbh,self.mysql_bin_string=DBH.get(key).get()
+            self.DBH.put(Pool(case), key=key)
+            self.dbh,self.mysql_bin_string=self.DBH.get(key).get()
             
         self.temp_tables = []
         self.case = case
@@ -368,7 +369,7 @@ class DBO:
 
 ##                key = "%s/%s" % (self.case, threading.currentThread().getName())
                 key = "%s" % (self.case)        
-                self.dbh,self.mysql_bin_string=DBH.get(key).connect()
+                self.dbh,self.mysql_bin_string=self.DBH.get(key).connect()
                 self.cursor = self.dbh.cursor()
 
                 ## Redo the query with the new connection - if we fail
@@ -731,8 +732,6 @@ class DBO:
 
     def __del__(self):
         """ Destructor that gets called when this object is gced """
-        global DBH
-        
         try:
             try:
                 self.cursor.ignore_warnings = True
@@ -750,13 +749,19 @@ class DBO:
 
             ##key = "%s/%s" % (self.case, threading.currentThread().getName())
             key = "%s" % (self.case)
-            if DBH:
-                pool = DBH.get(key)
+            if self.DBH:
+                pool = self.DBH.get(key)
                 pool.put((self.dbh, self.mysql_bin_string))
                 
         except (TypeError,AssertionError,AttributeError, KeyError),e:
             #print "dbh desctrucr: %s " % e
             pass
+        except Exception,e:
+            print "%s" % e
+            import FlagFramework
+            
+            print FlagFramework.get_bt_string(e)
+
 
     def MySQLHarness(self,client):
         """ A function to abstact the harness pipes for all programs emitting SQL.
@@ -926,7 +931,7 @@ def print_stats():
             connections[row['db']] =1
             
     print "Usage statistics for DB"
-    for time, key, pool in DBH.creation_times:
+    for time, key, pool in DBO.DBH.creation_times:
         print "%s - I have %s handles, the database has %s handles" % (key,pool.qsize(), connections[key])
 
 if config.LOG_LEVEL >= pyflaglog.VERBOSE_DEBUG:

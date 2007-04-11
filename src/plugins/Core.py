@@ -344,10 +344,10 @@ class CaseDBInit(FlagFramework.EventHander):
         dbh.set_meta('schema_version',config.SCHEMA_VERSION)
 
     def exit(self, dbh, case):
-        del IO.IO_Cache
-        del DB.DBH
-        del DB.DBIndex_Cache
-        del Scanner.factories
+        IO.IO_Cache.flush()
+        DB.DBO.DBH.flush()
+        DB.DBIndex_Cache.flush()
+        Scanner.factories.flush()
 
     def reset(self, dbh, case):
         key_re = "%s.*" % case
