@@ -989,6 +989,12 @@ class HTMLUI(UI.GenericUI):
                     ## This is good if we get here - lets refresh to it now:
                     if query.has_key('__submit__'):
                         del query['__submit__']
+
+                        ## Also, we refresh the limit value so that we jump
+                        ## back to the start of the results
+                        if query.has_key('limit'):
+                            del query['limit']
+
                         result.refresh(0,query,pane='parent_pane')
                         return
                     
@@ -1001,6 +1007,12 @@ class HTMLUI(UI.GenericUI):
                 # If it's being submitted, it's probably a blank filter, so we just 
                 # clear it...
                 if query.has_key('__submit__'):
+                    
+                    ## Also, we refresh the limit value so that we jump
+                    ## back to the start of the results
+                    if query.has_key('limit'):    
+                        del query['limit']
+
                     result.refresh(0,query,pane='parent')
                     return
 
@@ -1047,7 +1059,12 @@ class HTMLUI(UI.GenericUI):
         try:
             new_query = query.clone()
             if new_query.has_key('filter'):
+
                 del new_query['filter']
+
+                # Make it reset the limit
+                if new_query.has_key('limit'): del new_query['limit']
+
                 self.toolbar(link=new_query, icon='clear_filter.png', 
                     tooltip=self.defaults.get('delfilter', 
                     'Click here to clear the filter'))
