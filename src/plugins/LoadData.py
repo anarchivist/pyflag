@@ -382,7 +382,7 @@ class ScanFS(Reports.report):
         size = dbh.fetch()['size']
 
         pagesize=20
-        dbh.execute("select timestamp,level,message from logs limit %s, %s", (min(size-pagesize,0), pagesize))
+        dbh.execute("select timestamp,level,message from logs limit %s, %s", (max(size-pagesize,0), pagesize))
         data = '\n'.join(["%(timestamp)s(%(level)s): %(message)s" % row for row in dbh])
         tmp=result.__class__(result)
         tmp.text(data,font='typewriter',style="red")
