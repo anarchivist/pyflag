@@ -444,7 +444,7 @@ def Init():
     ## Register SQL handlers
     import pyflag.FlagFramework as FlagFramework
     global EVENT_HANDLERS
-    EVENT_HANDLERS = ScannerRegistry(FlagFramework.EventHander)
+    EVENT_HANDLERS = ScannerRegistry(FlagFramework.EventHandler)
 
     ## Register IO Images:
     import pyflag.IO as IO

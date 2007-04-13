@@ -457,7 +457,8 @@ class execute(pyflagsh.command):
         if self.environment._flag.is_cached(query):
             ## Run the display method
             result=TEXTUI.TEXTUI(query=query)
-            yield report.display(query,result)           
+            report.display(query,result)
+            yield result.display()
             return
         
         ## Execute the report:
@@ -590,7 +591,7 @@ class BasicCommandTests(pyflag.tests.ScannerTest):
     """ Test PyFlash commands """
     test_case = "PyFlagTestCase"
     test_file = "pyflag_stdimage_0.2.sgz"
-    subsystem = 'sgzip'
+    subsystem = 'SGZip'
     offset = "16128s"
 
     def test01ls(self):

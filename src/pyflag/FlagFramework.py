@@ -978,12 +978,12 @@ def delete_case(case):
     import pyflag.Scanner as Scanner
 
     IO.IO_Cache.expire(key_re)
-    DB.DBH.expire(key_re)
+    DB.DBO.DBH.expire(key_re)
     DB.DBIndex_Cache.expire(key_re)
     try: Scanner.factories.expire(key_re)
     except: pass
 
-class EventHander:
+class EventHandler:
     """ This is the base class for SQL which needs to be run on various events.
 
     This base class should be extended when plugins needs to respond to some events.

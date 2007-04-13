@@ -1392,7 +1392,7 @@ class ContextParser(HTMLParser):
     def handle_starttag(self, tag, attrs):
         self.context_meta_data = query_type(attrs)
 
-class MSNTables(FlagFramework.EventHander):
+class MSNTables(FlagFramework.EventHandler):
     def create(self, dbh,case):
         dbh.execute(
             """ CREATE TABLE if not exists `msn_session` (

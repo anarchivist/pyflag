@@ -89,7 +89,7 @@ class JPEG(BasicFormats.SimpleStruct):
                 self.offset+=marker.size()
             else:        
                 size = BasicFormats.USHORT(self.buffer[self.offset:], endianess='big')
-                print size
+                # print size
                 if int(size)<2:
                     #print "Section size is out of bounds"
                     self.error = True
@@ -175,7 +175,7 @@ class CarverTest(pyflag.tests.ScannerTest):
     """ Carving Tests """
     test_case = "PyFlagIndexTestCase"
     test_file = "pyflag_stdimage_0.2.sgz"
-    subsystem = 'sgzip'
+    subsystem = 'SGZip'
     order = 30
     offset = "16128s"
     

@@ -65,6 +65,9 @@ class IO_File(FileSystem.File):
         self.ignore = True
 
     def read(self, length=None):
+        if length==None:
+            return self.io.read()
+        
         return self.io.read(length)
 
     def seek(self, offset, rel=0):
@@ -213,7 +216,7 @@ class DropCase(Farm.Task):
         pyflaglog.log(pyflaglog.INFO, "Resetting case %s in worker" % case)
         FlagFramework.post_event('reset', case)
 
-class CaseDBInit(FlagFramework.EventHander):
+class CaseDBInit(FlagFramework.EventHandler):
     """ A handler for creating common case tables """
     def create(self,case_dbh,case):
         case_dbh.execute("""Create table if not exists meta(
@@ -352,6 +355,6 @@ class CaseDBInit(FlagFramework.EventHander):
     def reset(self, dbh, case):
         key_re = "%s.*" % case
         IO.IO_Cache.expire(key_re)
-        DB.DBH.expire(key_re)
+        DB.DBO.DBH.expire(key_re)
         DB.DBIndex_Cache.expire(key_re)
         Scanner.factories.expire(key_re)

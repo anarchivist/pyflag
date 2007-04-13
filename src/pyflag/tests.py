@@ -77,7 +77,7 @@ class ScannerTest(unittest.TestCase):
     ## Must be overridden
     test_case = ""
     test_file = ""
-    subsystem = "ewf"
+    subsystem = "EWF"
     fstype = "Sleuthkit"
     offset = 0
 
@@ -93,8 +93,8 @@ class ScannerTest(unittest.TestCase):
                              argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
                                    "iosource=test",
                                    "subsys=%s" % self.subsystem,
-                                   "io_filename=%s/%s" % (config.UPLOADDIR, self.test_file),
-                                   "io_offset=%s"%self.offset,
+                                   "filename=%s/%s" % (config.UPLOADDIR, self.test_file),
+                                   "offset=%s"%self.offset,
                                    ])
         pyflagsh.shell_execv(command="execute",
                              argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,

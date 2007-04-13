@@ -43,7 +43,7 @@ import os
 import pyflag.DB as DB
 import pyflag.FlagFramework as FlagFramework
 
-class DLLInitDB(FlagFramework.EventHander):
+class DLLInitDB(FlagFramework.EventHandler):
     ## This will be used to init the default db
     def init_default_db(self, dbh, case):
         dbh.execute("""CREATE TABLE if not exists `EventMessages` (

@@ -33,7 +33,7 @@ import pyflag.DB as DB
 from pyflag.TableObj import StringType, TimestampType, FilenameType
 import pyflag.FlagFramework as FlagFramework
 
-class IEIndexEventHandler(FlagFramework.EventHander):
+class IEIndexEventHandler(FlagFramework.EventHandler):
     def create(self, dbh, case):
         dbh.execute("""CREATE TABLE IF NOT EXISTS history (
         `path` TEXT NOT NULL,

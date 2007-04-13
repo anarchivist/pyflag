@@ -557,6 +557,6 @@ class NetworkForensicTests(pyflag.tests.ScannerTest):
     """ Tests network forensics """
     test_case = "PyFlagNetworkTestCase"
     test_file = "stdcapture_0.3.pcap.sgz"
-    subsystem = "sgzip"
+    subsystem = "SGZip"
     fstype = 'PCAP Filesystem'
         

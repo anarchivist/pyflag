@@ -356,7 +356,7 @@ class Sleuthkit(DBFS):
             dbh_block.execute("alter table block drop index block")
             dbh_block.delete('block', where=1)            
 
-class SKFSEventHandler(FlagFramework.EventHander):
+class SKFSEventHandler(FlagFramework.EventHandler):
     def exit(self, dbh, case):
         global SKCACHE
 
@@ -389,8 +389,8 @@ class NTFSTests(unittest.TestCase):
         pyflagsh.shell_execv(command="execute",
                              argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
                                    "iosource=test",
-                                   "subsys=ewf",
-                                   "io_filename=%s/ntfs_image.e01" % config.UPLOADDIR,
+                                   "subsys=EWF",
+                                   "filename=%s/ntfs_image.e01" % config.UPLOADDIR,
                                    ])
         pyflagsh.shell_execv(command="execute",
                              argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,
@@ -455,7 +455,7 @@ class LargeFileTest(pyflag.tests.ScannerTest):
     """ Test that pyflag can load very large images efficiently """
     test_case = "WinXp"
     test_file = "winxp.sgz"
-    subsystem = 'sgzip'
+    subsystem = 'SGZip'
     level = 15
     
    

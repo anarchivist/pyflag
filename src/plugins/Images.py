@@ -5,55 +5,11 @@ import pyflag.DB as DB
 from FlagFramework import query_type
 import sk,re
 
-class Standard(IO.Image):
-    """ A simple access source for raw dd images. """
-    order = 10
-    mandatory_parameters = ['filename',]
-    
-    def form(self, query, result):
-        result.fileselector("Select %s image:" % self.__class__.__name__.split(".")[-1], name="filename")
-
-    def create(self, name, case, query):
-        """ Given an iosource name, returns a file like object which represents it.
-
-        name can be None, in which case this is an anonymous source (not cached).
-        """
-        return open(query['filename'])
-    
-    def open(self, name, case, query=None):
-        """ Dont bother to even cache this - its so simple """
-        dbh = DB.DBO(case)
-        if query:
-            ## Check that all our mandatory parameters have been provided:
-            for p in self.mandatory_parameters:
-                if not query.has_key(p):
-                    raise IOError("Mandatory parameter %s not provided" % p)
-
-            ## Check that the name does not already exist:
-            dbh.execute("select * from iosources where name = %r" , name)
-            if dbh.fetch():
-                raise IOError("An iosource of name %s already exists in this case" % name)
-
-            ## Try to make it
-            fd = self.create(name, case, query)
-
-            ## If we get here we made it successfully so store in db:
-            dbh.insert('iosources',
-                       name = query['iosource'],
-                       parameters = "%s" % query,
-                       _fast = True)
-            
-            return fd
-        else:
-            dbh.execute("select parameters from iosources where name = %r" , name)
-            row = dbh.fetch()
-            fd = self.create(name, case, query_type(string=row['parameters']))
-            return fd
-
 class IOSubsysFD:
-    def __init__(self, io):
+    def __init__(self, io, name):
         self.io = io
         self.readptr = 0
+        self.name = name
         ## FIXME - dont lie here
         try:
             self.size = io.size
@@ -87,7 +43,7 @@ class IOSubsysFD:
         """ close subsystem """
         pass
 
-class Advanced(Standard):
+class Advanced(IO.Image):
     """ This is a IO source which provides access to raw DD images
     with offsets.
     """
@@ -153,7 +109,7 @@ class Advanced(Standard):
         return int(m.group(1))* multiplier
 
     def form(self, query, result):
-        Standard.form(self, query, result)
+        result.fileselector("Select %s image:" % self.__class__.__name__.split(".")[-1], name="filename")
         self.calculate_partition_offset(query, result)
 
     def make_iosource_args(self, query):
@@ -185,7 +141,38 @@ class Advanced(Standard):
             if name:
                 IO.IO_Cache.put(io, key=key)
             
-        return IOSubsysFD(io)
+        return IOSubsysFD(io, name)
+
+    def open(self, name, case, query=None):
+        dbh = DB.DBO(case)
+        if query:
+            ## Check that all our mandatory parameters have been provided:
+            for p in self.mandatory_parameters:
+                if not query.has_key(p):
+                    raise IOError("Mandatory parameter %s not provided" % p)
+
+            ## Check that the name does not already exist:
+            dbh.execute("select * from iosources where name = %r" , name)
+            if dbh.fetch():
+                raise IOError("An iosource of name %s already exists in this case" % name)
+
+            ## Try to make it
+            fd = self.create(name, case, query)
+
+            print "Setting %s" % fd
+            ## If we get here we made it successfully so store in db:
+            dbh.insert('iosources',
+                       name = query['iosource'],
+                       type = self.__class__.__name__,
+                       parameters = "%s" % query,
+                       _fast = True)
+            
+            return fd
+        else:
+            dbh.execute("select parameters from iosources where name = %r" , name)
+            row = dbh.fetch()
+            fd = self.create(name, case, query_type(string=row['parameters']))
+            return fd
 
 class SGZip(Advanced):
     """ Sgzip is pyflags native image file format """
@@ -207,8 +194,6 @@ class CachedIO(IOSubsysFD):
     alleviate this problem by caching commonly read blocks.
     """
     cache = Store.Store()
-    def __init__(self,io):
-        IOSubsysFD.__init__(self,io)
 
     def read(self, length=0):
         ## try to get the data out of the cache:

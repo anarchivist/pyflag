@@ -186,7 +186,7 @@ class HTTP:
             
         return False
 
-class HTTPTables(FlagFramework.EventHander):
+class HTTPTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
         ## This is the information we store about each http request:
         ## inode - the inode which represents the response to this request

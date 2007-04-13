@@ -124,7 +124,7 @@ class POP:
 
         return line
 
-class EmailTables(FlagFramework.EventHander):
+class EmailTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
         ## This table stores common usernames/passwords:
         dbh.execute(

@@ -33,7 +33,7 @@ import pyflag.IO as IO
 import pyflag.Registry as Registry
 from pyflag.TableObj import StringType, TimestampType, InodeType, FilenameType, IntegerType
 
-class TypeTables(FlagFramework.EventHander):
+class TypeTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
         dbh.execute(""" CREATE TABLE IF NOT EXISTS `type` (
         `inode` varchar( 250 ) NOT NULL,
@@ -164,7 +164,7 @@ class TypeTest(pyflag.tests.ScannerTest):
     """Magic related Scanner """
     test_case = "PyFlagTestCase"
     test_file = "pyflag_stdimage_0.2.sgz"
-    subsystem = 'sgzip'
+    subsystem = 'SGZip'
     offset = "16128s"
 
     def test01TypeScan(self):

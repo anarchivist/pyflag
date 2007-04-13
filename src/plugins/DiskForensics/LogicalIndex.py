@@ -54,7 +54,7 @@ config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
 from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType
 
-class IndexTables(FlagFramework.EventHander):
+class IndexTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
         dbh.execute("""create table if not exists `LogicalIndexOffsets` (
         `inode_id` INT NOT NULL,
@@ -196,7 +196,7 @@ class IndexScan(GenScanFactory):
 
 
 ## Install the dictionary in the default db
-class IndexEventHandler(FlagFramework.EventHander):
+class IndexEventHandler(FlagFramework.EventHandler):
     def init_default_db(self, dbh, case):
         dbh.execute("""CREATE TABLE `dictionary` (
         `id` int auto_increment,
@@ -247,7 +247,7 @@ class BuildDictionary(Reports.report):
                                   'type': query['type']})
                     
             elif query['action']=='delete':
-                dbh.delete("dictionary",
+                dbh.delete("dictionary", _fast = True,
                            where="word=%r and type=%r" % (query['word'],query['type']))
                                 
         except KeyError:
@@ -487,7 +487,7 @@ class LogicalIndexScannerTest(pyflag.tests.ScannerTest):
     """ Test Logical Index Scanner """
     test_case = "PyFlagIndexTestCase"
     test_file = "pyflag_stdimage_0.2.sgz"
-    subsystem = 'sgzip'
+    subsystem = 'SGZip'
     #subsystem = 'advanced'
     order = 20
     offset = "16128s"

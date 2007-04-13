@@ -447,7 +447,7 @@ def scanfile(ddfs,fd,factories):
     # use it and get confused if it returns slack. Also pass overread.
     fd.slack=True
     fd.overread=True
-    data = fd.read()
+    data = fd.read(1024)
     fd.slack=False
     fd.overread=False
     if data:

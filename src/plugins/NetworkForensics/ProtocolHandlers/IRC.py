@@ -488,7 +488,7 @@ class IRC:
         finally:
             self.fd.seek(offset)
 
-class IRCTables(FlagFramework.EventHander):
+class IRCTables(FlagFramework.EventHandler):
     def create(self, dbh,case):
         dbh.execute(
             """CREATE TABLE if not exists `irc_messages` (

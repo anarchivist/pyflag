@@ -456,7 +456,7 @@ class ZipScanTest(pyflag.tests.ScannerTest):
     """ Zip File handling Tests """
     test_case = "PyFlagTestCase"
     test_file = "pyflag_stdimage_0.2.sgz"
-    subsystem = 'sgzip'
+    subsystem = 'SGZip'
     offset = "16128s"
 
     def test_type_scan(self):
@@ -486,7 +486,7 @@ class ZipScanTest2(pyflag.tests.ScannerTest):
     """ Test handling of zip bombs """
     test_case = "PyFlagZipCase"
     test_file = "zip_test.iso.sgz"
-    subsystem = 'sgzip'
+    subsystem = 'SGZip'
 
     def test01RunScanner(self):
         """ Test Zip scanner handling of very large zip files """

@@ -50,7 +50,7 @@ class VScan:
         except Exception,e:
             pyflaglog.log(pyflaglog.WARNING, "Scanning Error: %s" % e)
 
-class VirusTables(FlagFramework.EventHander):
+class VirusTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
         dbh.execute(""" CREATE TABLE IF NOT EXISTS `virus` (
         `inode` varchar( 255 ) NOT NULL,
@@ -118,7 +118,7 @@ class VirusScanTest(pyflag.tests.ScannerTest):
     """ Virus Scanner Tests """
     test_case = "PyFlagTestCase"
     test_file = "pyflag_stdimage_0.2.sgz"
-    subsystem = 'sgzip'
+    subsystem = 'SGZip'
     offset = "16128s"
     
     order = 20

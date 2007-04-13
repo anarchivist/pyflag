@@ -34,7 +34,7 @@ from pyflag.Scanner import *
 from pyflag.TableObj import StringType, TimestampType, InodeType, FilenameType, ColumnType
                   
 import md5
-class HashTables(FlagFramework.EventHander):
+class HashTables(FlagFramework.EventHandler):
     def create(self, dbh,case):
         dbh.execute(""" CREATE TABLE IF NOT EXISTS `hash` (
         `inode` varchar( 250 ) NOT NULL default '',

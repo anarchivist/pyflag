@@ -234,7 +234,7 @@ class ViewFile(Reports.report):
         result.textfield('Inode','inode')
         return result
 
-class MACTimes(FlagFramework.EventHander):
+class MACTimes(FlagFramework.EventHandler):
     def create(self, dbh, case):
         dbh.execute("""create table if not exists mac(
         `inode` varchar(250) NOT NULL default '',
