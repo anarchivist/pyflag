@@ -25,16 +25,36 @@ import os.path
 import pyflag.DB as DB
 import pyflag.conf
 config=pyflag.conf.ConfObject()
+from optparse import OptionParser
 
 # whois database URL's
 # Full databases are available for apnic and ripencc
 # Only have 'RIR' stats for lacnic and arin
 # ...though you may be able to request full databases from them
 
-urls = ['ftp://ftp.apnic.net/apnic/whois-data/APNIC/split/apnic.db.inetnum.gz',
-        'ftp://ftp.ripe.net/ripe/dbase/split/ripe.db.inetnum.gz',
-        'ftp://ftp.arin.net/pub/stats/arin/delegated-arin-latest',
-        'ftp://ftp.lacnic.net/pub/stats/lacnic/delegated-lacnic-latest']
+urls = {'apnic':'ftp://ftp.apnic.net/apnic/whois-data/APNIC/split/apnic.db.inetnum.gz',
+        'ripe':'ftp://ftp.ripe.net/ripe/dbase/split/ripe.db.inetnum.gz',
+        'arin':'ftp://ftp.arin.net/pub/stats/arin/delegated-arin-latest',
+        'lacnic':'ftp://ftp.lacnic.net/pub/stats/lacnic/delegated-lacnic-latest'}
+
+parser = OptionParser(usage="""%prog [Options]
+Downloads some whois repositories.""")
+
+parser.add_option('-d','--delete', action="store_true",
+                  help="""Delete previous databases""")
+
+parser.add_option('-a','--all', action="store_true",
+                  help="""Load all repositories""")
+
+for k in urls.keys():
+  parser.add_option('','--%s' % k, action="store_true",
+                    help = "Load %s databases" % k)
+
+(options, args) = parser.parse_args()
+
+if options.all:
+  for k in urls.keys():
+    setattr(options, k, 1)
 
 MASK32 = 0xffffffffL
 
@@ -81,14 +101,6 @@ def aton(str):
   result=((oct[0] << 24) | (oct[1] << 16) | (oct[2] << 8) | (oct[3])) & MASK32
   return result
 
-#...doesnt work...
-#def ntoa(num):
-#  """ convert int to dotted decimal IP """
-#  return "%u.%u.%u.%u" % ((num & 0xff000000) >> 24,
-#                          (num & 0x00ff0000) >> 16,
-#                          (num & 0x0000ff00) >> 8,
-#                          (num & 0x000000ff))
-
 class WhoisRec:
     """ class representing an ipv4 inetnum whois record """
     regex = {'inetnum':re.compile('^inetnum:\s+(.*)$', re.MULTILINE),
@@ -96,7 +108,7 @@ class WhoisRec:
              'descr':re.compile('^descr:\s+(.*)$', re.MULTILINE),
              'remarks':re.compile('^remarks:\s+(.*)$', re.MULTILINE),
              'country':re.compile('^country:\s+(.*)$', re.MULTILINE),
-             'status':re.compile('^status:\s+(.*)$', re.MULTILINE),
+             'status':re.compile('^status:\s+([^\s]*)$', re.MULTILINE),
              'adminc':re.compile('^admin-c:\s+(.*)$', re.MULTILINE),
              'techc':re.compile('^tech-c:\s+(.*)$', re.MULTILINE),
              'notify':re.compile('^notify:\s+(.*)$', re.MULTILINE)}
@@ -148,7 +160,7 @@ class WhoisRec:
       self.netname=''
       self.start_ip = aton(cols[3])
       self.num_hosts = int(cols[4])
-      self.status = cols[6]
+      self.status = cols[6].strip()
       self.descr = ''
       self.remarks = ''
       
@@ -241,77 +253,79 @@ class Whois:
 
     def __iter__(self):
       return self
-
-############## Start Main  #################
-
-# parse args
-if len(sys.argv) > 1:
-  urls = sys.argv[1:]
-
-# create tables in master flag database
-# Since the whois entries often get split into many smaller
-# subnets for routing, we will use two tables to reduce space
+    
 dbh = DB.DBO(None)
-## First drop the old tables
-dbh.execute("drop table if exists whois_sources")
-dbh.execute("drop table if exists whois")
-dbh.execute("drop table if exists whois_routes")
-dbh.execute("drop table if exists whois_cache")
-dbh.execute("""CREATE TABLE IF NOT EXISTS whois_sources (
-`id` int,
-`source` varchar(20),
-`url` varchar(255),
-`updated` datetime)""")
+if options.delete:
+  # create tables in master flag database
+  # Since the whois entries often get split into many smaller
+  # subnets for routing, we will use two tables to reduce space
+  ## First drop the old tables
+  dbh.execute("drop table if exists whois_sources")
+  dbh.execute("drop table if exists whois")
+  dbh.execute("drop table if exists whois_routes")
+  dbh.execute("drop table if exists whois_cache")
+  dbh.execute("""CREATE TABLE IF NOT EXISTS whois_sources (
+  `id` int,
+  `source` varchar(20),
+  `url` varchar(255),
+  `updated` datetime)""")
 
-whois_sources_id = 0
+  whois_sources_id = 0
 
-dbh.execute("""CREATE TABLE IF NOT EXISTS whois (
-`id` int,
-`src_id` int,
-`start_ip` int(10) unsigned,
-`netname` varchar(250),
-`numhosts` int,
-`country` char(2),
-`adminc` varchar(50),
-`techc` varchar(50),
-`descr` text,
-`remarks` text,
-`status` enum('assigned','allocated','reserved','unallocated'))""")
+  dbh.execute("""CREATE TABLE IF NOT EXISTS whois (
+  `id` int,
+  `src_id` int,
+  `start_ip` int(10) unsigned,
+  `netname` varchar(250),
+  `numhosts` int,
+  `country` char(2),
+  `adminc` varchar(50),
+  `techc` varchar(50),
+  `descr` text,
+  `remarks` text,
+  `status` enum('assigned','allocated','reserved','unallocated'))""")
 
-whois_id = 0
+  whois_id = 0
 
-dbh.execute("CREATE TABLE IF NOT EXISTS whois_routes ( `network` int(10) unsigned, `netmask` int(10) unsigned, `whois_id` int)")
+  dbh.execute("CREATE TABLE IF NOT EXISTS whois_routes ( `network` int(10) unsigned, `netmask` int(10) unsigned, `whois_id` int)")
 
-dbh.execute("""create table whois_cache (
-`id` int not NULL,
-`ip` int not NULL
-) engine=MyISAM""")
+  dbh.execute("""create table whois_cache (
+  `id` int not NULL,
+  `ip` int not NULL
+  ) engine=MyISAM""")
 
-# add default (fallthrough) route and reserved ranges
-dbh.insert('whois_sources',
-           source='static',
-           id = whois_sources_id,
-           url='static',
-           updated= ':'.join(["%i"% i for i in time.localtime()[:6]]))
+  # add default (fallthrough) route and reserved ranges
+  dbh.insert('whois_sources',
+             source='static',
+             id = whois_sources_id,
+             url='static',
+             updated= ':'.join(["%i"% i for i in time.localtime()[:6]]))
 
-dbh.insert('whois',
-           id=whois_id,
-           src_id=str(dbh.cursor.lastrowid),
-           start_ip=0,
-           netname='Default',
-           numhosts=0,
-           country='--',
-           adminc='',
-           techc='',
-           descr='Default Fallthrough Route: IP INVALID OR UNASSIGNED',
-           remarks='',
-           status='unallocated'
-           )
+  dbh.insert('whois',
+             id=whois_id,
+             src_id=str(dbh.cursor.lastrowid),
+             start_ip=0,
+             netname='Default',
+             numhosts=0,
+             country='--',
+             adminc='',
+             techc='',
+             descr='Default Fallthrough Route: IP INVALID OR UNASSIGNED',
+             remarks='',
+             status='unallocated'
+             )
 
-dbh.insert('whois_routes',
-           network=0,
-           netmask = 0,
-           whois_id = whois_id)
+  dbh.insert('whois_routes',
+             network=0,
+             netmask = 0,
+             whois_id = whois_id)
+
+else:
+  dbh.execute("select max(id) as max from whois_sources")
+  whois_sources_id = dbh.fetch()["max"] + 1
+
+  dbh.execute("select max(id) as max from whois")
+  whois_id = dbh.fetch()["max"]+1
 
 # process files
 source_dbh = dbh.clone()
@@ -321,7 +335,9 @@ source_dbh.mass_insert_start('whois_sources')
 routes_dbh.mass_insert_start('whois_routes')
 dbh.mass_insert_start('whois')
 
-for url in urls:
+for k,url in urls.items():
+  if not getattr(options, k): continue
+  
   db = Whois(url)
   if not db:
     print "Invalid url: %s" % url
@@ -386,6 +402,6 @@ for url in urls:
         del masks[align[0]]
 
 # add indexes
-dbh.check_index("whois_routes","network")
-dbh.check_index("whois_routes","netmask")
-dbh.check_index("whois","id")
+#dbh.check_index("whois_routes","network")
+#dbh.check_index("whois_routes","netmask")
+#dbh.check_index("whois","id")

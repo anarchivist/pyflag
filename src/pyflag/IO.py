@@ -54,7 +54,6 @@ import pyflag.DB as DB
 class Image:
     """ The image base class abstracts access to different types of images """
     ## This holds the global cache for all images
-    cache = Store.Store()
     mandatory_parameters = ['filename',]
     def form(self,query,result):
         """ This method is called to render a specialised form for
@@ -82,14 +81,22 @@ IO_Cache = Store.Store()
 
 def open(case, iosource):
     """ Opens the named iosource from the specified case """
-    dbh = DB.DBO(case)
-    dbh.execute("select name,parameters from iosources where name=%r",  iosource)
-    row = dbh.fetch()
-    if not row:
-        raise IOError("IO Source not created yet")
+    ## Try to get it from the cache first:
+    key = "%s|%s" % (case, iosource)
     
-    query = query_type(string=row['parameters'])
-    image = Registry.IMAGES.dispatch(query['subsys'])()
+    try:
+        image =IO_Cache.get(key)
+    except KeyError:
+        dbh = DB.DBO(case)
+        dbh.execute("select name,parameters from iosources where name=%r",  iosource)
+        row = dbh.fetch()
+        if not row:
+            raise IOError("IO Source not created yet")
+    
+        query = query_type(string=row['parameters'])
+        image = Registry.IMAGES.dispatch(query['subsys'])()
+        IO_Cache.put(image, key=key)
+        
     return image.open(iosource,case)
 
 ## IO subsystem unit tests:

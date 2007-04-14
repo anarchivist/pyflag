@@ -49,6 +49,7 @@ class Advanced(IO.Image):
     """
     order = 20
     subsys = "advanced"
+    io = None
     def calculate_partition_offset(self, query, result, offset = 'offset'):
         """ A GUI function to allow the user to derive the offset by calling mmls """
         def mmls_popup(query,result):
@@ -128,51 +129,58 @@ class Advanced(IO.Image):
 
         name can be None, in which case this is an anonymous source (not cached).
         """
-        key = "%s|%s" % (case, name)
-        try:
-            io = IO.IO_Cache.get(key)
-        except KeyError: 
-            import iosubsys
+        import iosubsys
 
-            args = self.make_iosource_args(query)
-            io = iosubsys.iosource(args)
+        args = self.make_iosource_args(query)
+        io = iosubsys.iosource(args)
 
-            ## Store the cache copy in:
-            if name:
-                IO.IO_Cache.put(io, key=key)
-            
-        return IOSubsysFD(io, name)
+        return io
 
     def open(self, name, case, query=None):
-        dbh = DB.DBO(case)
-        if query:
-            ## Check that all our mandatory parameters have been provided:
-            for p in self.mandatory_parameters:
-                if not query.has_key(p):
-                    raise IOError("Mandatory parameter %s not provided" % p)
+        """
+        This function opens a new instance of a file like object using
+        the underlying subsystem.
 
-            ## Check that the name does not already exist:
-            dbh.execute("select * from iosources where name = %r" , name)
-            if dbh.fetch():
-                raise IOError("An iosource of name %s already exists in this case" % name)
-
-            ## Try to make it
-            fd = self.create(name, case, query)
-
-            print "Setting %s" % fd
-            ## If we get here we made it successfully so store in db:
-            dbh.insert('iosources',
-                       name = query['iosource'],
-                       type = self.__class__.__name__,
-                       parameters = "%s" % query,
-                       _fast = True)
+        When we first get instantiated, self.io is None. We check our
+        parameters and then call create to obtain a new self.io. The
+        IO subsystem then caches this object (refered to by case and
+        name). Subsequent open calls will use the same object which
+        will ideally use the same self.io to instantiate a new
+        IOSubsysFD() for each open call.
+        """
+        if not self.io:
+            dbh = DB.DBO(case)
             
-            return fd
-        else:
-            dbh.execute("select parameters from iosources where name = %r" , name)
-            row = dbh.fetch()
-            fd = self.create(name, case, query_type(string=row['parameters']))
-            return fd
+            ## This basically checks that the query is sane.
+            if query:
+                ## Check that all our mandatory parameters have been provided:
+                for p in self.mandatory_parameters:
+                    if not query.has_key(p):
+                        raise IOError("Mandatory parameter %s not provided" % p)
+
+                ## Check that the name does not already exist:
+                dbh.execute("select * from iosources where name = %r" , name)
+                if dbh.fetch():
+                    raise IOError("An iosource of name %s already exists in this case" % name)
+
+                ## Try to make it
+                self.io = self.create(name, case, query)
+
+                ## If we get here we made it successfully so store in db:
+                dbh.insert('iosources',
+                           name = query['iosource'],
+                           type = self.__class__.__name__,
+                           parameters = "%s" % query,
+                           _fast = True)
+
+            ## No query provided, we need to fetch it from the db:
+            else:
+                dbh.check_index('iosources','name')
+                dbh.execute("select parameters from iosources where name = %r" , name)
+                row = dbh.fetch()
+                self.io = self.create(name, case, query_type(string=row['parameters']))
+
+        return IOSubsysFD(self.io, name)
 
 class SGZip(Advanced):
     """ Sgzip is pyflags native image file format """
@@ -223,22 +231,14 @@ class Remote(Advanced):
         self.calculate_partition_offset(query, result)
 
     def create(self, name, case, query):
-        key = "%s|%s" % (case, name)
-        try:
-            io = IO.IO_Cache.get(key)
-        except KeyError:
-            import remote
-            offset = self.calculate_offset_suffix(query.get('offset','0'))
+        import remote
+        offset = self.calculate_offset_suffix(query.get('offset','0'))
+        
+        io = remote.remote(host = query['host'],
+                           port = int(query.get('port', 3533)),
+                           device = query['device'],
+                           offset = offset)
 
-            io = remote.remote(host = query['host'],
-                               port = int(query.get('port', 3533)),
-                               device = query['device'],
-                               offset = offset)
-
-            ## Store the cache copy in:
-            if name:
-                IO.IO_Cache.put(io, key=key)
-            
         return CachedIO(io)
     
 import os, unittest,iosubsys,time
