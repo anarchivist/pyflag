@@ -263,9 +263,10 @@ void TrieNode_AddWord(TrieNode self, char **word, int *len, long int data,
   if(!n) return;
 
   /** If the node is a literal node, we can store it in our hash
-      table: 
+      table. If there is a possibility that the LiteralNode can never
+      match we cant put it in the hash table either.
   */
-  if(ISINSTANCE(n, LiteralNode)) {
+  if(ISINSTANCE(n, LiteralNode) && n->lower_limit >0) {
     LiteralNode this = (LiteralNode)n;
 
     // Calculate the hash value of the literal node
