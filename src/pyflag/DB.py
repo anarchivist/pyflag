@@ -370,6 +370,8 @@ class DBO:
 ##                key = "%s/%s" % (self.case, threading.currentThread().getName())
                 key = "%s" % (self.case)        
                 self.dbh,self.mysql_bin_string=self.DBH.get(key).connect()
+                self.dbh.ignore_warnings = self.cursor.ignore_warnings
+                
                 self.cursor = self.dbh.cursor()
 
                 ## Redo the query with the new connection - if we fail

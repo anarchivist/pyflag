@@ -72,7 +72,7 @@ class LoggingThread(threading.Thread):
                     break
                 ## dbh.mass_insert(level=level, message=message)
                 if dbh:
-                    dbh.insert('logs', level=level, message=message, _fast=True)
+                    dbh.insert('logs', level=level, message=message[:250], _fast)
             except Exception,e:
                 sys.stdout.write( "Logging service: %s" % e)
                 sys.stdout.flush()
