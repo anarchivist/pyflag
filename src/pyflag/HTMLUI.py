@@ -785,7 +785,7 @@ class HTMLUI(UI.GenericUI):
             self.toolbar_ui.icon(icon,tooltip=text)
 
     def table(self,elements=[],table='',where='',groupby = None, _groupby=None, case=None,
-              limit_context='limit',
+              limit_context='limit', filter='filter',
               **opts):
         ## Building up the args list in this way ensure that defaults
         ## can be specified in _make_sql itself and not be overwritten
@@ -803,7 +803,7 @@ class HTMLUI(UI.GenericUI):
         try:    limit = int(query.get(limit_context,0))
         except: limit = 0
 
-        filter_expression = query.get('filter','')
+        filter_expression = query.get(filter,'')
 
         ## Remember our original filter elements (The list of elements
         ## which filtering will be applied to:
@@ -816,8 +816,8 @@ class HTMLUI(UI.GenericUI):
                     filter_expression = filter_expression.strip()
                     if filter_expression: filter_expression += " and "
                     filter_expression += "'%s'='%%s'" % e.name
-                    new_query.set('filter',filter_expression)
-                    new_query['__target__'] = 'filter'
+                    new_query.set(filter,filter_expression)
+                    new_query['__target__'] = filter
                     e.link = new_query
                     e.link_pane = 'parent'
                     elements = [ e,
@@ -826,7 +826,7 @@ class HTMLUI(UI.GenericUI):
                     break
             
         args = dict( elements = elements, filter_elements = filter_elements,
-                     table = table, case=case, filter=query.get('filter',''),
+                     table = table, case=case, filter=query.get(filter,''),
                      groupby = groupby, _groupby=_groupby, order = order)
 
         if where: args['where'] = where
@@ -979,7 +979,7 @@ class HTMLUI(UI.GenericUI):
         def filter_gui(query, result):
             result.heading("Filter Table")
             try:
-                filter_str = query['filter']
+                filter_str = query[filter]
                 result.para(filter_str)
 
                 ## Check the current filter string for errors by attempting to parse it:
@@ -998,9 +998,14 @@ class HTMLUI(UI.GenericUI):
                         ## Save the query
                         dbh = DB.DBO(query['case'])
                         try:
-                            dbh.insert('GUI_filter_history',
-                                       filter = filter_str,
-                                       _elements = "%r" %  ",".join([e.name for e in elements]))
+                            ## Check to make sure its not already in there
+                            dbh.execute("select * from GUI_filter_history where filter=%r",
+                                        filter_str)
+                            row = dbh.fetch()
+                            if not row:
+                                dbh.insert('GUI_filter_history',
+                                           filter = filter_str,
+                                           _elements = "%r" %  ",".join([e.name for e in elements]))
                         except DB.DBError, e:
                             pass 
                         result.refresh(0,query,pane='parent_pane')
@@ -1031,7 +1036,7 @@ class HTMLUI(UI.GenericUI):
 
             result.start_form(query, pane="self")
 
-            result.textarea("Search Query", 'filter', cols=60)
+            result.textarea("Search Query", filter, cols=60)
 
             result.result += """<tr></tr>
             <tr><td colspan=2 align=center>The following can be used to insert text rapidly into the search string</td></tr>
@@ -1062,14 +1067,17 @@ class HTMLUI(UI.GenericUI):
                 from pyflag.TableObj import StringType
                 result.heading("History")
 
-                query['__target__'] = 'filter'
+                new_query = query.clone()
+                del new_query['filter']
+                new_query['__target__'] = 'filter'
                 table_string =  ",".join([e.name for e in elements])
                 result.table(
-                    elements = [ StringType("Filter", "filter", link=query,
+                    elements = [ StringType("Filter", "filter", link=new_query,
                                             link_pane='parent')
                                     ],
                     table = "GUI_filter_history",
                     where = '`elements`=%r' % table_string,
+                    filter = "filter_history",
                     case = query['case'])
 
             result.toolbar(cb=filter_history, text="See filter history", icon='clock.png')
@@ -1090,7 +1098,7 @@ class HTMLUI(UI.GenericUI):
 
                 self.toolbar(link=new_query, icon='clear_filter.png', 
                     tooltip=self.defaults.get('delfilter', 
-                    'Click here to clear the filter'))
+                    'Click here to clear the filter'), pane='pane')
         except: pass
 
 

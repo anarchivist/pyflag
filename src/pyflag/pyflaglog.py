@@ -35,7 +35,7 @@ WARNING=3
 INFO=5
 DEBUG=7
 VERBOSE_DEBUG=12
-RING_BUFFER_SIZE=20
+
 ring_buffer = []
 
 lookup = {
