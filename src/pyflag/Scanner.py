@@ -26,7 +26,7 @@
 # * along with this program; if not, write to the Free Software
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
-""" This module implements a scanning mechanism for operating on all files within a given filesystem.
+""" This module implements a scanning mechanism for operating on all files within a given filesyst
 
 Scanners are pieces of code that are run on all the files in a filesystem when the filesystem is loaded. The purpose of scanners is to extract meta data about files in the filesystem and make deductions.
 
@@ -151,7 +151,26 @@ class GenScanFactory:
 
     def reset(self, inode):
         """ This method drops the relevant tables in the database, restoring the db to the correct state for rescanning to take place. """
+        pyflaglog.log(pyflaglog.WARNING, "The reset function is now deprecated. All calls should be to multiple_inode_reset which allows more efficient resets and also allows you to specify a single inode anyway")
 
+    def multiple_inode_reset(self, inode_glob):
+        """ This method modifies the database to reset the scanners. It takes an argument which is a glob of the inodes to be reset. It does this for performance reasons. Each scanner is expected to clean up after itself. """
+
+        ## Here we do the default (clear scanner_cache field) and hope that inherited classes either deal with it or call us
+        sql = fnmatch.translate(inode_glob)
+        db = DB.DBO(self.case)
+        db.execute("update inode set scanner_cache = REPLACE(scanner_cache, %r, '') where inode rlike %r" % (self.__class__.__name__, sql))
+                   
+
+    def reset_entire_path(self, path_glob):
+        """ This method modifies the database to reset the scanners. It takes an argument which is a path under which all inodes will be reset. It does this for performance reasons. Each scanner is expected to clean up after itself. """
+
+        ## The scanners should do their thing on their tables and then call this (the base class) method to allow us to handle the simple stuff (clear the scanner cache field. If they don't call us, it is up to them to clean it up themselves.
+        path = path_glob
+        if not path.endswith("*"): path = path + "*"  
+        db = DB.DBO(self.case)
+        db.execute("update inode join file on file.inode = inode.inode set scanner_cache = REPLACE(scanner_cache, %r, '') where file.path rlike %r" % (self.__class__.__name__, fnmatch.translate(path)))
+        
     ## Relative order of scanners - Higher numbers come later in the order
     order=10
     
@@ -447,7 +466,7 @@ def scanfile(ddfs,fd,factories):
     # use it and get confused if it returns slack. Also pass overread.
     fd.slack=True
     fd.overread=True
-    data = fd.read(1024)
+    data = fd.read()
     fd.slack=False
     fd.overread=False
     if data:

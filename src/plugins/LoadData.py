@@ -321,55 +321,15 @@ class ScanFS(Reports.report):
         return scanner_names
 
     def analyse(self,query):
-        dbh=DB.DBO(query['case'])
-        fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'])
-
         scanner_names = self.calculate_scanners(query)
 
-        ## Schedule the scanners to run in the jobs table:
-        pdbh = DB.DBO()
-        pdbh.mass_insert_start('jobs')
-
-        ## The cookie is used to identify our own requests.
-        cookie = int(time.time())
-        
-        pyflaglog.log(pyflaglog.DEBUG,"Will invoke the following scanners: %s" % scanner_names)
-
-        def process_directory(root):
-            """ Recursive function for scanning directories """
-            ## We need to capture the files and directories _before_
-            ## scanning because scanner may add files/directories
-            ## themselves:
-            files = fsfd.longls(path=root,dirs=0)
-            directories = fsfd.ls(path=root,dirs=1)
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Asking pyflash to scan the path: %s with scanners %s" % (query['path'], scanner_names))
             
-            ## First scan all the files in the directory
-            for stat in files:
-                pdbh.mass_insert(
-                    command = 'Scan',
-                    arg1 = query['case'],
-                    arg2 = stat['inode'],
-                    arg3 = ','.join(scanner_names),
-                    cookie=cookie
-                    )
-    
-            ## Now recursively scan all the directories in this directory:
-            for directory in directories:
-                new_path = "%s%s/" % (root,directory)
-                process_directory(new_path)
+        #Use pyflash to do all the work
+        env = pyflagsh.environment(case=query['case'])
+        pyflagsh.shell_execv(env=env, command="scan_path",
+                             argv=[query['path'], scanner_names])
 
-        ## Glob the files specified in path:
-        for f in FileSystem.glob(query['path'], case=query['case']):
-            process_directory(query['path'])
-
-        ## Wait untill all the files have been done:
-        while 1:
-            pdbh.execute("select count(*) as total from jobs where cookie=%r and arg1=%r",
-                         (cookie,query['case']))
-            row = pdbh.fetch()
-            if row['total']==0: break
-
-            time.sleep(1)
 
     def progress(self,query,result):
         result.heading("Scanning path %s" % (query['path']))
@@ -404,10 +364,15 @@ class ResetScanners(ScanFS):
     Sometimes it is desired to rescan files again. For example when adding new words to the dictionary. This report will reset the scanners ensuring it is safe to rescan the files again.
     """
     name = "Reset Scanners"
-    description = "Reset Scanners ran on the VFS"
+    description = "Reset Scanners run on the VFS"
     order = 40
 
+    def analyse(self,query):
+        # We just overwrite this so it doesn't get called in the base class
+        pass
+
     def display(self,query, result):
+        
         dbh=DB.DBO(query['case'])
         fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'])
 
@@ -422,25 +387,11 @@ class ResetScanners(ScanFS):
                 pyflaglog.log(pyflaglog.ERRORS,"Unable to initialise scanner %s (%s)" % (i,e))
 
         pyflaglog.log(pyflaglog.DEBUG,"Will reset the following scanners: %s" % scanners)
-        ## Prepare the scanner factories for scanning:
 
-        def process_directory(root):
-            """ Recursive function for scanning directories """
-            ## First scan all the files in the directory
-            for stat in fsfd.longls(path=root,dirs=0):
-                pyflaglog.log(pyflaglog.DEBUG,"Resetting file %s%s (inode %s)" % (stat['path'],stat['name'],stat['inode']))
-                for s in scanners:
-                    s.reset(stat['inode'])
-                    ## Remove the fact that this inode is scanned by noting that in the inode table:
-                    dbh.execute("update inode set scanner_cache = REPLACE(scanner_cache,%r,'') where inode=%r",
-                                (s.__class__.__name__, stat['inode']))
-
-            ## Now recursively scan all the directories in this directory:
-            for directory in fsfd.ls(path=root,dirs=1):
-                new_path = "%s%s/" % (root,directory)
-                process_directory(new_path)
-                    
-        process_directory(query['path'])
+        ## Use pyflash to do all the work
+        env = pyflagsh.environment(case=query['case'])
+        pyflagsh.shell_execv(env=env, command="scanner_reset_path",
+                             argv=[query['path'], scanner_names])
 
         ## Reset the ScanFS reports from the database
         FlagFramework.reset_all(family = query['family'], report="ScanFS", case=query['case'])

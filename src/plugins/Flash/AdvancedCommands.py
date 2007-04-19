@@ -8,8 +8,91 @@ import pyflag.DB as DB
 import fnmatch
 import pyflag.FileSystem as FileSystem
 import pyflag.Scanner as Scanner
-import time
+import time, types
+import pyflaglog
 
+class scan_path(pyflagsh.command):
+    """ This takes a path as an argument and runs the specified scanner on the path
+    this might be of more use than specifying inodes for the average user since if you load
+    two disk images, then you might have /disk1 and /disk2 and want to just run scans over
+    one of them, which is simpler to specify using /disk1. """
+
+    def help(self):
+        return "scan VFSPath [list of scanners]: Scans the VFS path with the scanners specified"
+    
+    def complete(self, text,state):
+        if len(self.args)>2 or len(self.args)==2 and not text:
+            scanners = [ x for x in Registry.SCANNERS.scanners if x.startswith(text) ]
+            return scanners[state]
+        else:
+            dbh = DB.DBO(self.environment._CASE)
+            dbh.execute("select substr(path,1,%r) as abbrev,path from file where path like '%s%%' group by abbrev limit %s,1",(len(text)+1,text,state))
+            return dbh.fetch()['path']
+        
+    def wait_for_scan(self, cookie):
+        """ Waits for scanners to complete """
+        
+        pdbh = DB.DBO()
+        ## Often this process owns a worker as well. In that case we can wake it up:
+        import pyflag.Farm as Farm
+        Farm.wake_workers()
+        
+        ## Wait until there are no more jobs left.
+        while 1:
+            pdbh.execute("select count(*) as total from jobs where cookie=%r and arg1=%r",
+                         (cookie,
+                          self.environment._CASE))
+            row = pdbh.fetch()
+            if row['total']==0: break
+            time.sleep(1)
+
+    def execute(self):
+        scanners=[]
+                
+        if len(self.args)<2:
+            yield self.help()
+            return
+        elif type(self.args[1]) == types.ListType:
+            scanners = self.args[1]
+        else: 
+            for i in range(1,len(self.args)):
+                scanners.extend(fnmatch.filter(Registry.SCANNERS.scanners, self.args[i]))
+
+        ## Assume that people always want recursive - I think this makes sense
+        path = self.args[0]
+        if not path.endswith("*"):
+            path = path + "*"
+            
+        ## FIXME For massive images this should be broken up, as in the old GUI method
+        dbh=DB.DBO(self.environment._CASE)
+        dbh.execute("select inode.inode from inode join file on file.inode = inode.inode where file.path rlike %r" % fnmatch.translate(path))
+
+        pdbh = DB.DBO()
+        pdbh.mass_insert_start('jobs')
+    
+        ## This is a cookie used to identify our requests so that we
+        ## can check they have been done later.
+        cookie = int(time.time())
+            
+        for row in dbh:
+            inode = row['inode']
+
+            pdbh.mass_insert(
+                command = 'Scan',
+                arg1 = self.environment._CASE,
+                arg2 = row['inode'],
+                arg3 = ','.join(scanners),
+                cookie=cookie,
+                )#
+    
+        pdbh.mass_insert_commit()
+    
+        ## Wait for the scanners to finish:
+        self.wait_for_scan(cookie)
+        
+        yield "Scanning complete"
+
+        
 class scan(pyflagsh.command):
     def help(self):
         return "scan inode [list of scanners]: Scans the inodes with the scanners specified"
@@ -72,6 +155,34 @@ class scan(pyflagsh.command):
 
             time.sleep(1)
 
+##
+## This allows people to reset based on the VFS path
+##
+            
+class scanner_reset_path(scan):
+    def help(self):
+        return "scanner_reset_path path [list of scanners]: Resets the inodes under the path given with the scanners specified"
+
+    def execute(self):
+        if len(self.args)<2:
+            yield self.help()
+            return
+
+        scanners = []
+        
+        if type(self.args[1]) == types.ListType:
+            scanners = self.args[1]
+        else:
+            for i in range(1,len(self.args)):
+                scanners.extend(fnmatch.filter(Registry.SCANNERS.scanners, self.args[i]))
+        print "GETTING FACTORIES"
+        factories = Scanner.get_factories(self.environment._CASE, scanners)
+        print "OK NOW RESETING EM"
+        for f in factories:
+                    f.reset_entire_path(self.args[0])
+        print "HOKAY"
+        yield "Reset Complete"
+
 ## There is little point in distributing this because its very quick anyway.
 class scanner_reset(scan):
     def help(self):
@@ -88,16 +199,9 @@ class scanner_reset(scan):
 
         factories = Scanner.get_factories(self.environment._CASE, scanners)
 
-        ddfs = FileSystem.DBFS(self.environment._CASE)
-
-        ## Try to glob the inode list:
-        dbh = DB.DBO(self.environment._CASE)
-        dbh.execute("select inode from inode where inode rlike %r",fnmatch.translate(self.args[0]))
-
-        for row in dbh:
-            inode = row['inode']
-            Scanner.resetfile(ddfs, inode, factories)
-
+        for f in factories:
+            f.multiple_inode_reset(self.args[0])
+            
         yield "Resetting complete"
     
 class load_and_scan(scan):

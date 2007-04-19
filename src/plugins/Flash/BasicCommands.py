@@ -279,7 +279,14 @@ class set(pyflagsh.command):
                     self.environment.__dict__[i[:index]]=i[index+1:]
                 except ValueError:
                     yield self.environment.__dict__[i]
+class quit(pyflagsh.command):
+    """ Exits the shell"""
+    def help(self):
+        return "quit: Exits the PyFlag shell"
 
+    def execute(self):
+        sys.exit()
+        
 class exit(pyflagsh.command):
     """ Exits the shell"""
     def help(self):
@@ -487,9 +494,13 @@ class reset(execute):
     """ Resets the given report """
     def help(self):
         return """
-        This command resets a flag report. After running this command the state of the database should be returned to what it was before the report was executed.
+        reset report: This command resets a flag report. After running this command the state of the database should be returned to what it was before the report was executed.
         """
     def execute(self):
+        if len(self.args) < 1:
+            yield self.help()
+            return      
+
         start_time=time.time()
         report,query = self.prepare()
 

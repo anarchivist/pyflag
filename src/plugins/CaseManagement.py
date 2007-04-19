@@ -140,4 +140,4 @@ class ViewAnnotation(Reports.report):
             table = 'annotate join file on file.inode=annotate.inode',
             case = query['case'],
             )
-                                    
+

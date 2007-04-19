@@ -115,7 +115,26 @@ class IndexScan(GenScanFactory):
                 pass
 
         pyflaglog.log(pyflaglog.DEBUG,"Index Scanner: Done in %s seconds..." % (time.time()-start_time))
-                
+
+    def reset_entire_path(self, path):
+        GenScanFactory.reset_entire_path(self, path)
+        dbh=DB.DBO(self.case)
+        dbh.execute("delete from `LogicalIndexOffsets`")
+        
+        ## Here we reset all reports that searched this disk
+        FlagFramework.reset_all(case=self.case,report='SearchIndex', family='Keyword Indexing')
+        dbh.execute("delete from `LogicalIndexStats`")
+
+    def multiple_inode_reset(self, inode_glob):
+        GenScanFactory.multiple_inode_reset(self, inode_glob)
+
+        dbh = DB.DBO(self.case)
+        dbh.execute("delete from `LogicalIndexOffsets`")
+         
+        ## Here we reset all reports that searched this disk
+        FlagFramework.reset_all(case=self.case,report='SearchIndex', family='Keyword Indexing')
+        dbh.execute("delete from `LogicalIndexStats`")
+
     def reset(self, inode):
         """ This deletes the index file and drops the LogicalIndex table.
 
@@ -124,6 +143,7 @@ class IndexScan(GenScanFactory):
         would be too confusing if users scanned parts of the VFS using
         different dictionaries.
         """
+        
         GenScanFactory.reset(self, inode)
         dbh=DB.DBO(self.case)
         dbh.execute("delete from `LogicalIndexOffsets`")

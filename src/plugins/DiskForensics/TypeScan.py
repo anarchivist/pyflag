@@ -50,6 +50,12 @@ class TypeScan(Scanner.GenScanFactory):
     an action based on the mime type of the file"""
     order=5
     default=True
+
+    def multiple_inode_reset(self,inode):
+        Scanner.GenScanFactory.multiple_inode_reset(self, inode)
+        dbh=DB.DBO(self.case)
+        dbh.execute("delete from `type`")
+
     def reset(self,inode):
         Scanner.GenScanFactory.reset(self, inode)
         dbh=DB.DBO(self.case)

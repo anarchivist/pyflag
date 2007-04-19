@@ -995,6 +995,14 @@ class HTMLUI(UI.GenericUI):
                         if query.has_key('limit'):
                             del query['limit']
 
+                        ## Save the query
+                        dbh = DB.DBO(query['case'])
+                        try:
+                            dbh.insert('GUI_filter_history',
+                                       filter = filter_str,
+                                       _elements = "%r" %  ",".join([e.name for e in elements]))
+                        except DB.DBError, e:
+                            pass 
                         result.refresh(0,query,pane='parent_pane')
                         return
                     
@@ -1013,7 +1021,7 @@ class HTMLUI(UI.GenericUI):
                     if query.has_key('limit'):    
                         del query['limit']
 
-                    result.refresh(0,query,pane='parent')
+                    result.refresh(0,query,pane='parent_pane')
                     return
 
                 # Else, who knows what happened...
@@ -1050,6 +1058,21 @@ class HTMLUI(UI.GenericUI):
             result.end_form()
 
             result.toolbar(cb=filter_help, text="Click here for operator help", icon='help.png')
+            def filter_history(query, result):
+                from pyflag.TableObj import StringType
+                result.heading("History")
+
+                query['__target__'] = 'filter'
+                table_string =  ",".join([e.name for e in elements])
+                result.table(
+                    elements = [ StringType("Filter", "filter", link=query,
+                                            link_pane='parent')
+                                    ],
+                    table = "GUI_filter_history",
+                    where = '`elements`=%r' % table_string,
+                    case = query['case'])
+
+            result.toolbar(cb=filter_history, text="See filter history", icon='clock.png')
 
         ## Add a toolbar icon for the filter:
         self.toolbar(cb=filter_gui, icon='filter.png',

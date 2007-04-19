@@ -332,6 +332,14 @@ class CaseDBInit(FlagFramework.EventHandler):
                             `value` VARCHAR(250) NOT NULL
                             ) """)
         
+        case_dbh.execute("""CREATE TABLE `GUI_filter_history` (
+                            `id` int auto_increment,
+                            `filter` VARCHAR(250),
+                            `elements` VARCHAR(500),
+                            PRIMARY KEY (`id`))""")
+
+        case_dbh.execute("""ALTER TABLE `GUI_filter_history` ADD UNIQUE INDEX stopDupes (filter, elements)""")
+    
     def init_default_db(self, dbh, case):
         ## Connect to the mysql database
         tdbh = DB.DBO('mysql')
@@ -345,6 +353,7 @@ class CaseDBInit(FlagFramework.EventHandler):
 
         ## Update the schema version.
         dbh.set_meta('schema_version',config.SCHEMA_VERSION)
+
 
     def exit(self, dbh, case):
         IO.IO_Cache.flush()
