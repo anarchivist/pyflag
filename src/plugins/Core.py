@@ -218,6 +218,10 @@ class DropCase(Farm.Task):
 
 class CaseDBInit(FlagFramework.EventHandler):
     """ A handler for creating common case tables """
+    
+    ## This should come before any other handlers if possible.
+    order = 5
+    
     def create(self,case_dbh,case):
         case_dbh.execute("""Create table if not exists meta(
         `time` timestamp NOT NULL,

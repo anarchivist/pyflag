@@ -237,7 +237,7 @@ class ZipFile(File):
         self.d = zlib.decompressobj(-15)
         self.left_over = ''
         self.blocksize = 1024*10
-
+        self.clength = self.compressed_length
         offset = self.header['data'].buffer.offset
         
         ## Seek our fd to there:
@@ -264,11 +264,11 @@ class ZipFile(File):
 
             ## We keep reading compressed data until we can satify
             ## the desired length
-            while len(result)<length and self.compressed_length>0:
+            while len(result)<length and self.clength>0:
                 ## Read up to 1k of the file:
-                available_clength = min(self.blocksize,self.compressed_length)
+                available_clength = min(self.blocksize,self.clength)
                 cdata = self.fd.read(available_clength)
-                self.compressed_length -= available_clength
+                self.clength -= available_clength
 
                 if self.type == Zip.ZIP_DEFLATED:
                     ## Now Decompress that:
@@ -298,8 +298,11 @@ class ZipFile(File):
 
         if self.cached_fd: return
 
+        if self.readptr == 0:
+            self.init()
+
         ## We want to reinitialise the file pointer:
-        if self.readptr!=0 and self.type == Zip.ZIP_DEFLATED:
+        elif self.readptr!=0 and self.type == Zip.ZIP_DEFLATED:
             pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Required to seek to offset %s in Zip File %s (%s,%s). This is inefficient, forcing disk caching." % (self.readptr, self.inode, offset,rel))
             self.init()
             self.cache()

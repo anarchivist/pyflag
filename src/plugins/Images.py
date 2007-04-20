@@ -60,7 +60,7 @@ class Advanced(IO.Image):
             except: pass
     
             ## Try creating the io source
-            io = self.create(None, query['case'], query)
+            io = self.open(None, query['case'], query)
             try:
                 parts = sk.mmls(io)
             except IOError, e:
@@ -159,19 +159,22 @@ class Advanced(IO.Image):
                         raise IOError("Mandatory parameter %s not provided" % p)
 
                 ## Check that the name does not already exist:
-                dbh.execute("select * from iosources where name = %r" , name)
-                if dbh.fetch():
-                    raise IOError("An iosource of name %s already exists in this case" % name)
+                if name:
+                    dbh.execute("select * from iosources where name = %r" , name)
+                    if dbh.fetch():
+                        raise IOError("An iosource of name %s already exists in this case" % name)
 
-                ## Try to make it
-                self.io = self.create(name, case, query)
+                    ## Try to make it
+                    self.io = self.create(name, case, query)
 
-                ## If we get here we made it successfully so store in db:
-                dbh.insert('iosources',
-                           name = query['iosource'],
-                           type = self.__class__.__name__,
-                           parameters = "%s" % query,
-                           _fast = True)
+                    ## If we get here we made it successfully so store in db:
+                    dbh.insert('iosources',
+                               name = query['iosource'],
+                               type = self.__class__.__name__,
+                               parameters = "%s" % query,
+                               _fast = True)
+                else:
+                    self.io = self.create(name, case, query)
 
             ## No query provided, we need to fetch it from the db:
             else:
