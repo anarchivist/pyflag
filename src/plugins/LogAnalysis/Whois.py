@@ -33,6 +33,7 @@ import pyflag.FlagFramework as FlagFramework
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import re
+import pyflag.pyflaglog as pyflaglog
 
 description = "Offline Whois"
 hidden = False
@@ -84,7 +85,7 @@ try:
     import GeoIP
 
     gi_resolver = GeoIP.open(config.GEOIPDB, GeoIP.GEOIP_STANDARD)
-except ImportError:
+except Exception:
     pyflaglog.log(pyflaglog.WARNING, "Unable to import the GeoIP database - will not use it.")
     gi_resolver = None
 
