@@ -615,11 +615,14 @@ class IPType(ColumnType):
         return "_"+self.column, "inet_aton(%r)" % value
 
     def display(self, value, row, result):
+        ## Provide a way for users to save the IP address:
+        
+        
         ## We try to show a whois if possible
         id = Whois.lookup_whois(value)
         result = result.__class__(result)
-        result.link(Whois.identify_network(id),
-                    target=query_type(family="Log Analysis", report="WhoisID", id=id),
+        result.link(Whois.identify_network(id) + "<br>" + Whois.geoip_resolve(value),
+                    target=query_type(family="Log Analysis", report="LookupIP", address=value),
                     pane='popup')
         result.text("\n%s" %value)
         return result

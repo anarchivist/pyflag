@@ -167,7 +167,7 @@ import pyflag.pyflagsh as pyflagsh
 import pyflag.tests
 
 class TypeTest(pyflag.tests.ScannerTest):
-    """Magic related Scanner """
+    """ Magic related Scanner """
     test_case = "PyFlagTestCase"
     test_file = "pyflag_stdimage_0.2.sgz"
     subsystem = 'SGZip'

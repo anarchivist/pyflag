@@ -125,7 +125,11 @@ class Log:
         @arg table_name: A table name to use
         @arg rows: number of rows to upload - if None , we upload them all
         @return: A generator that represents the current progress indication.
-        """        
+        """
+        ## We append _log to tablename to prevent name clashes in the
+        ## db:
+        tablename = tablename+"_log"
+        
         ## First we create the table. We do this by asking all the
         ## column types for their create clause:
         dbh = DB.DBO(self.case)
@@ -186,7 +190,7 @@ class Log:
         self.datafile = None
         self.case=None
         data=pickle.dumps(self)
-        dbh = DB.DBO(self.case)
+        dbh = DB.DBO(None)
         dbh.set_meta("log_preset", name,force_create=True)
         dbh.set_meta("log_preset_%s" % name, data)
 

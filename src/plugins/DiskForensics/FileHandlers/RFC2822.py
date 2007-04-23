@@ -149,6 +149,7 @@ class RFC2822_File(File):
         a=email.message_from_file(self.fd)
         my_part = self.inode.split('|')[-1]
         attachment_number = int(my_part[1:])
+        print "attchement number %s" % attachment_number
         count = 0
 
         for part in a.walk():
@@ -158,6 +159,7 @@ class RFC2822_File(File):
             if count==attachment_number:
                 self.message = part.get_payload(decode=1)
                 self.readptr += len(self.message)
+                print "Returning %s" % part.get_payload()
                 return self.message
 
             count+=1

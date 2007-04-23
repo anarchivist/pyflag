@@ -130,13 +130,23 @@ class IISLogTest(unittest.TestCase):
     """ IIS Log file processing """
     test_case = "PyFlagTestCase"
     test_table = "TestTable"
+    test_file = "%s/pyflag_iis_standard_log.gz" % config.UPLOADDIR
+    log_preset = "IISTest"
 
-    def test01LoadFile(self):
+    def test01CreatePreset(self):
+        """ Test that IIS Presets can be created """
+        dbh = DB.DBO(self.test_case)
+        log = IISLog(case=self.test_case)
+        query = query_type(datafile = self.test_file, log_preset=self.log_preset)
+        log.parse(query)
+        log.store(query['log_preset'])
+        
+    def test02LoadFile(self):
         """ Test that IIS Log files can be loaded """
         dbh = DB.DBO(self.test_case)
-        dbh.drop(self.test_table)
+        dbh.drop(self.test_table+"_log")
         log = IISLog(case=self.test_case)
-        log.parse(query_type( datafile = "%s/pyflag_iis_standard_log.gz" % config.UPLOADDIR))
+        log.parse(query_type( datafile = self.test_file))
         t = time.time()
         ## Load the data:
         for a in log.load(self.test_table):
@@ -144,8 +154,11 @@ class IISLogTest(unittest.TestCase):
             pass
 
         print "Took %s seconds to load log" % (time.time()-t)
+            
+        dbh.insert("meta", property='logtable', value=self.test_table)
+        dbh.insert("meta", property='log_preset_%s' % self.test_table, value=self.log_preset)
 
         ## Check that all rows were uploaded:
-        dbh.execute("select count(*) as c from %s", self.test_table)
+        dbh.execute("select count(*) as c from %s_log", self.test_table)
         row = dbh.fetch()
         self.assertEqual(row['c'], 8334)

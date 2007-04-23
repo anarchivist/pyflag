@@ -909,9 +909,6 @@ def translate(pat):
 ## This tells us if the pattern has a glob in it
 globbing_re = re.compile("[*+?\[\]]")
 
-
-
-
 def glob_sql(pattern):
     path,name = os.path.split(pattern)
 

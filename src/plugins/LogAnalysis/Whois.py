@@ -80,6 +80,23 @@ def lookup_whois(ip):
     dbh.execute("insert into whois_cache set ip=%s, id=%r" , (ip, row['whois_id']))
     return row['whois_id']
 
+try:
+    import GeoIP
+
+    gi_resolver = GeoIP.open(config.GEOIPDB, GeoIP.GEOIP_STANDARD)
+except ImportError:
+    pyflaglog.log(pyflaglog.WARNING, "Unable to import the GeoIP database - will not use it.")
+    gi_resolver = None
+
+def geoip_resolve(ip):
+    try:
+        record = gi_resolver.record_by_addr(ip)
+        result = "%s\n(%s)" % (record['city'],record['country_code3'])
+    except:
+        result = ''
+
+    return result
+
 def identify_network(whois_id):
     """ Returns a uniq netname/country combination """
     dbh = DB.DBO(None)
@@ -142,23 +159,39 @@ class LookupIP(Reports.report):
 
     def display(self, query, result):
         ## get route id
-        result.heading("Whois Search Results For: %s" % query['address'])
-        whois_id = lookup_whois(query['address'])
-        self.display_whois(query,result,whois_id)
+        self.display_geoip(result, query['address'])
+        self.display_whois(query,result,query['address'])
 
-    def display_whois(self,query,result,whois_id):
+    def display_geoip(self,result ,ip):
+        try:
+            global gi_resolver
+
+            record = gi_resolver.record_by_addr(ip)
+            result.heading("GeoIP Resolving")
+            self.render_dict(record, result)
+        except Exception,e:
+            print e
+            pass
+        
+    def display_whois(self,query,result, address):
         # lookup IP address and show a nice summary of Whois Data
+        whois_id = lookup_whois(address)
         dbh = self.DBO(None)
         dbh.check_index("whois","id")
         dbh.execute("SELECT INET_NTOA(start_ip) as start_ip, numhosts, country, descr, remarks, adminc, techc, status from whois where id=%s limit 1",whois_id)
         res = dbh.fetch()
-        
-        for name in res.keys():
+        result.heading("Whois Search Results For: %s" % query['address'])
+        self.render_dict(res,result)
+
+    def render_dict(self, dict, result):
+        result.start_table()
+        for name in dict.keys():
             tmp=result.__class__(result)
             tmp2=result.__class__(result)
-            tmp.text("%s:" % name, style='red',font='typewriter')
-            tmp2.text("%s" % (res[name]),style='black',font='typewriter')
-            result.row(tmp,tmp2,valign="top")
+            tmp.text("%s:" % name.strip(), style='red',font='typewriter')
+            tmp2.text(dict[name].__str__().strip(),style='black',font='typewriter')
+            result.row(tmp,tmp2)
+        result.end_table()
 
 class LookupWhoisID(LookupIP):
     """ A report to show the IP by netname """

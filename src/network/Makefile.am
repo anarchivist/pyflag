@@ -7,12 +7,12 @@ libnetwork_la_CFLAGS 	= -I$(top_srcdir)/src/include
 libnetwork_la_LIBADD	= ../lib/liboo.la
 
 _dissect_la_SOURCES 	= dissect.c
-_dissect_la_CPPFLAGS 	= $(SWIG_PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
+_dissect_la_CPPFLAGS 	= $(PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
 _dissect_la_LDFLAGS 	= -module
 _dissect_la_LIBADD	= libnetwork.la
 
 reassembler_la_SOURCES = reassembler.c
-reassembler_la_CPPFLAGS= $(SWIG_PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
+reassembler_la_CPPFLAGS= $(PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
 reassembler_la_LDFLAGS = -module
 reassembler_la_LIBADD  = libtcp.la libnetwork.la
 
