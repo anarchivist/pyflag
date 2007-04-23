@@ -275,7 +275,7 @@ class Sleuthkit(DBFS):
         # walk the directory tree
         for root, dirs, files in fs.walk(root_dir, unalloc=True, inodes=True):
             dbh_file.mass_insert(inode = '', mode = 'd/d',
-                                 status = 'alloc', path=mount_point+root[1],
+                                 status = 'alloc', path=FlagFramework.normpath(mount_point+root[1]),
                                  name = '')
             for d in dirs:
                 #insert_file(d[0], 'd/d', root[1], d[1])
@@ -324,7 +324,7 @@ class Sleuthkit(DBFS):
                     ## This is much faster than the above:
                     inode = 'I%s|o%s:%s' % (iosource_name, offset,size)
                     dbh_file.mass_insert(status = 'alloc',
-                                         path = mount_point + '/_unallocated_/',
+                                         path = FlagFramework.normpath(mount_point + '/_unallocated_/'),
                                          inode = inode,
                                          name = "o%08d" % count,
                                          mode = 'r/r')

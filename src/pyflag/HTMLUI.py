@@ -998,6 +998,7 @@ class HTMLUI(UI.GenericUI):
                         ## Save the query
                         dbh = DB.DBO(query['case'])
                         try:
+                            elements = ",".join([e.name for e in elements])
                             ## Check to make sure its not already in there
                             dbh.execute("select * from GUI_filter_history where filter=%r",
                                         filter_str)
@@ -1005,7 +1006,7 @@ class HTMLUI(UI.GenericUI):
                             if not row:
                                 dbh.insert('GUI_filter_history',
                                            filter = filter_str,
-                                           _elements = "%r" %  ",".join([e.name for e in elements]))
+                                           elements = elements)
                         except DB.DBError, e:
                             pass 
                         result.refresh(0,query,pane='parent_pane')

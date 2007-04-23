@@ -9,7 +9,7 @@
 #ifndef DEFINEH_H
 #define DEFINEH_H
 
-#ifdef DEBUG_ALL
+#if 0
 #define DEBUG_MODE_GEN
 #define DEBUGPRINT
 #define DEBUG_MODE_WARN

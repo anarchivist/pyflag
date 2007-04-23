@@ -78,7 +78,8 @@ class Menu(Theme.BasicTheme):
             
         result += data
         
-        result +="</div><script>AdjustHeightToPageSize('PyFlagPage'); bug_check();</script></body>"
+##        result +="</div><script>AdjustHeightToPageSize('PyFlagPage'); bug_check();</script></body>"
+        result +="</div><script>AdjustHeightToPageSize('PyFlagPage');</script></body>"
 
         return result
     

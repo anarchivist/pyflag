@@ -29,7 +29,11 @@ typedef struct {
 
 // According to Jan Wolter, sys/param.h is the most portable source of endian
 // information on UNIX systems. see http://www.unixpapa.com/incnote/byteorder.html
-#include <sys/param.h>
+#ifdef _MSC_VER
+  #define BYTE_ORDER LITTLE_ENDIAN
+#else
+  #include <sys/param.h>
+#endif // defined _MSC_VER
 
 #if BYTE_ORDER == BIG_ENDIAN
 #  define LE64_CPU(x) \
@@ -66,9 +70,7 @@ typedef struct {
 #define u_int16_t unsigned short int
 #endif // _MSC_VER
 
-
-#define PST_VERSION "0.5"
-
+#define PST_TYPE_FOLDER 0
 #define PST_TYPE_NOTE 1
 #define PST_TYPE_APPOINTMENT 8
 #define PST_TYPE_CONTACT 9
@@ -374,6 +376,7 @@ typedef struct _pst_item_appointment {
   char *timezonestring;
   int32_t showas;
   int32_t label;
+  int32_t all_day;
 } pst_item_appointment;
 
 typedef struct _pst_item {
@@ -417,14 +420,14 @@ typedef struct _pst_file {
   int32_t index1_count;
   int32_t index2;
   int32_t index2_count;
-  FILE * fp;
-  size_t size;
+  FILE * fp;				// file pointer to opened PST file
+  size_t size;				// pst file size
   unsigned char index1_depth;
   unsigned char index2_depth;
-  unsigned char encryption;
+  unsigned char encryption;		// pst encryption setting
   unsigned char id_depth_ok;
   unsigned char desc_depth_ok;
-  unsigned char ind_type;
+  unsigned char ind_type;		// pst index type
 } pst_file;
 
 typedef struct _pst_block_offset {
@@ -470,7 +473,7 @@ int32_t _pst_build_id_ptr(pst_file *pf, int32_t offset, int32_t depth, int32_t s
 int32_t _pst_build_desc_ptr (pst_file *pf, int32_t offset, int32_t depth, int32_t *high_id, 
 			     int32_t start_id, int32_t end_val);
 pst_item* _pst_getItem(pst_file *pf, pst_desc_ll *d_ptr);
-void * _pst_parse_item (pst_file *pf, pst_desc_ll *d_ptr);
+pst_item* _pst_parse_item (pst_file *pf, pst_desc_ll *d_ptr);
 pst_num_array * _pst_parse_block(pst_file *pf, u_int32_t block_id, pst_index2_ll *i2_head);
 int32_t _pst_process(pst_num_array *list, pst_item *item);
 int32_t _pst_free_list(pst_num_array *list);
@@ -479,7 +482,7 @@ int32_t _pst_free_id2(pst_index2_ll * head);
 int32_t _pst_free_id (pst_index_ll *head);
 int32_t _pst_free_desc (pst_desc_ll *head);
 int32_t _pst_free_xattrib(pst_x_attrib_ll *x);
-int32_t _pst_getBlockOffset(char *buf, int32_t i_offset, int32_t offset, pst_block_offset *p);
+int32_t _pst_getBlockOffset(unsigned char *buf, int32_t i_offset, int32_t offset, pst_block_offset *p);
 pst_index2_ll * _pst_build_id2(pst_file *pf, pst_index_ll* list, pst_index2_ll* head_ptr);
 pst_index_ll * _pst_getID(pst_file* pf, u_int32_t id);
 pst_index_ll * _pst_getID2(pst_index2_ll * ptr, u_int32_t id);
@@ -504,4 +507,5 @@ int32_t _pst_printDptr(pst_file *pf);
 int32_t _pst_printIDptr(pst_file* pf);
 int32_t _pst_printID2ptr(pst_index2_ll *ptr);
 void * xmalloc(size_t size);
-#endif
+
+#endif // defined LIBPST_H

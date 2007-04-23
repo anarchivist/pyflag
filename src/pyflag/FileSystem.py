@@ -492,6 +492,9 @@ class File:
         self.slack = False
         self.overread = False
 
+        self.look_for_cached()
+
+    def look_for_cached(self):
         ## Now we check to see if there is a cached copy of the file for us:
         self.cached_filename = self.get_temp_path()
         try:
@@ -847,6 +850,24 @@ class File:
         else:
             result.start_table(width="100%")
             result.row(left,valign='top',align="left")
+
+class StringIOFile(File):
+    """ This is a File object which is implemented as a StringIO.
+
+    Use this to work with small files which would be too slow to write
+    on the disk.
+    """
+    def look_for_cached(self):
+        self.cached_fd = None
+        data = self.read()
+
+        self.cached_fd = cStringIO.StringIO(data)
+
+    def seek(self, offset, rel=0):
+        self.cached_fd.seek(offset,rel)
+
+    def force_cache(self):
+        self.look_for_cached()
 
 def translate(pat):
     """Translate a shell PATTERN to a regular expression.

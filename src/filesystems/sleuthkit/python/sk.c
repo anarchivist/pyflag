@@ -517,15 +517,15 @@ static PyObject *skfs_close(skfs *self) {
     if(self->img)
         self->img->close(self->img);
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static void
 skfs_dealloc(skfs *self) {
   global_talloc_context = self->context;
 
-  Py_DECREF(skfs_close(self));
+  // This is not deeded here as skfs_close gets called already
+  //  Py_DECREF(skfs_close(self));
 
   if(self->root_inum) {
     Py_DECREF(self->root_inum);
@@ -749,6 +749,9 @@ PyObject *build_stat_result(TSK_FS_INODE *fs_inode) {
   /* return a real stat_result! */
   /* (mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime) */
   os = PyImport_ImportModule("os");
+  // I cant imagine it ever failing but...
+  if(!os) return NULL;
+
   result = PyObject_CallMethod(os, "stat_result", "((iKiiiiKlll))", 
 			       (int)fs_inode->mode, (unsigned PY_LONG_LONG)fs_inode->addr, 
 			       (int)0, (int)fs_inode->nlink, 
@@ -1334,8 +1337,8 @@ skfile_seek(skfile *self, PyObject *args, PyObject *kwds) {
         default:
             return PyErr_Format(PyExc_IOError, "Invalid argument (whence): %d", whence);
     }
-    Py_INCREF(Py_None);
-    return Py_None;
+
+    Py_RETURN_NONE;
 }
 
 static PyObject *
@@ -1359,8 +1362,7 @@ skfile_blocks(skfile *self) {
 
 static PyObject *
 skfile_close(skfile *self) {
-    Py_INCREF(Py_None);
-    return Py_None;
+  Py_RETURN_NONE;
 }
 
 /* This is a thin wrapper around mmls. It returns a tuple of four-tuples
