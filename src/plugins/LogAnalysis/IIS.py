@@ -139,7 +139,7 @@ class IISLogTest(unittest.TestCase):
         log = IISLog(case=self.test_case)
         query = query_type(datafile = self.test_file, log_preset=self.log_preset)
         log.parse(query)
-        log.store(query['log_preset'])
+        log.store(self.log_preset)
         
     def test02LoadFile(self):
         """ Test that IIS Log files can be loaded """

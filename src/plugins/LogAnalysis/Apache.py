@@ -313,14 +313,23 @@ class ApacheLogTest(unittest.TestCase):
     """ Apache Log file processing """
     test_case = "PyFlagTestCase"
     test_table = "TestTable"
-
+    log_preset = "ApacheDebianCommon"
+    test_table = "ApacheTest"
+    datafile = "%s/pyflag_apache_standard_log.gz" % config.UPLOADDIR
+    
     def test01LoadFile(self):
         """ Test that Apache Log files can be loaded """
         dbh = DB.DBO(self.test_case)
-        dbh.drop(self.test_table)
+        dbh.drop(self.test_table + "_log")
         log = ApacheLog(case=self.test_case)
         log.parse(query_type(formats['debian_common'],
-                             datafile = "%s/pyflag_apache_standard_log.gz" % config.UPLOADDIR))
+                             datafile = self.datafile))
+        log.store(self.log_preset)
+
+        log = ApacheLog(case=self.test_case)
+        log.parse(query_type(formats['debian_common'],
+                             datafile = self.datafile))
+        
         t = time.time()
         ## Load the data:
         for a in log.load(self.test_table):
@@ -328,7 +337,10 @@ class ApacheLogTest(unittest.TestCase):
 
         print "Took %s seconds to load log" % (time.time()-t)
 
+        dbh.insert("meta", property='logtable', value=self.test_table)
+        dbh.insert("meta", property='log_preset_%s' % self.test_table, value=self.log_preset)
+
         ## Check that all rows were uploaded:
-        dbh.execute("select count(*) as c from %s", self.test_table)
+        dbh.execute("select count(*) as c from %s_log", self.test_table)
         row = dbh.fetch()
         self.assertEqual(row['c'], 10000)
