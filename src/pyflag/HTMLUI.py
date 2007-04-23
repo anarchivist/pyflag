@@ -998,7 +998,7 @@ class HTMLUI(UI.GenericUI):
                         ## Save the query
                         dbh = DB.DBO(query['case'])
                         try:
-                            elements = ",".join([e.name for e in elements])
+                            name_elements = ",".join([e.name for e in elements])
                             ## Check to make sure its not already in there
                             dbh.execute("select * from GUI_filter_history where filter=%r",
                                         filter_str)
@@ -1006,7 +1006,7 @@ class HTMLUI(UI.GenericUI):
                             if not row:
                                 dbh.insert('GUI_filter_history',
                                            filter = filter_str,
-                                           elements = elements)
+                                           elements = name_elements)
                         except DB.DBError, e:
                             pass 
                         result.refresh(0,query,pane='parent_pane')
@@ -1189,6 +1189,7 @@ class HTMLUI(UI.GenericUI):
             
         self.toolbar(save_table,'Save Table',icon="floppy.png")
 
+        ## This allows grouping (counting) rows with the same value
         def group_by_cb(query,result):
             try:
                 result.table(
@@ -1207,6 +1208,23 @@ class HTMLUI(UI.GenericUI):
             result.end_form()
             
         self.toolbar(group_by_cb, "Group By A column",icon="group.png")
+
+        ## This returns the total number of rows in this table - it
+        ## could take a while which is why its a popup.
+        def count_cb(query, result):
+            try:
+                filter_str = query[filter]
+                sql = parser.parse_to_sql(filter_str,elements)
+            except KeyError:
+                sql = 1
+
+            dbh=DB.DBO(case)
+            dbh.execute("select count(*) as total from %s where %s", (table, sql))
+            row=dbh.fetch()
+            result.heading("Total rows")
+            result.para("%s rows" % row['total'])
+
+        self.toolbar(count_cb, "Count rows matching filter", icon = "add.png")
 
     def text(self,*cuts,**options):
         wrap = config.WRAP
