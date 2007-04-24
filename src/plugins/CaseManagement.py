@@ -35,7 +35,7 @@ import os
 import pyflag.IO as IO
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-from pyflag.TableObj import StringType,TimestampType,InodeType,FilenameType
+from pyflag.TableObj import StringType,TimestampType,EditableStringType,InodeType,FilenameType, TimelineObj, IntegerType
 import pyflag.Registry as Registry
 import time
 import pyflag.pyflagsh as pyflagsh
@@ -128,6 +128,7 @@ class ViewAnnotation(Reports.report):
     """ View the annotated Inodes """
     name = "View Annotations"
     family = "Case Management"
+    order = 40
 
     def display(self, query,result):
         result.heading("Annotated Inodes for case %s" % query['case'])
@@ -141,3 +142,69 @@ class ViewAnnotation(Reports.report):
             case = query['case'],
             )
 
+class ViewCaseTimeline(Reports.report):
+    """ View the case time line """
+    name = "View Case Timeline"
+    family = "Case Management"
+    order = 50
+
+    def display(self, query, result):
+        original_query = query
+ 
+        def add_new_event(query, result):
+            timeline = TimelineObj(case=query['case'])
+
+            ## We got submitted - actually try to do the deed:
+            if 'Add To Timeline' in query.getarray('__submit__'):
+                result.start_table()
+                newEvent = timeline.add(query, result)
+                result.para("The following is the new timeline entry:")
+                timeline.show(newEvent,result)
+                result.end_table()
+                result.link("Close this window", target=original_query, pane='parent')
+                return result
+
+            result.start_form(query, pane='self')
+            result.heading("Add an arbitrary event")
+            timeline.add_form(query,result)
+            result.end_form(value="Add To Timeline")
+            return result
+      
+        result.heading("Case Time Line for case %s" % query['case'])
+        result.text("Add arbitrary event:")
+        result.popup(add_new_event, "Add abritrary event", 
+                                            case=query['case'], 
+                                            icon="clock.png")
+        result.text("\n")
+ 
+        result.table(
+            elements = [ IntegerType(name='id', column='id'),
+                         TimestampType(name='Time', column='time'),
+                         EditableStringType('Notes', 'notes'),
+                         StringType('Category', 'category')
+                        ],
+            table = 'timeline',
+            case = query['case'],
+        )
+
+
+
+class ViewIPsOfInterest(Reports.report):
+    """ View all IPs of interest """
+    name = "View IPs of interest """
+    family = "Case Management"
+    order = 60
+
+    def display(self,query,result):
+        result.heading("IPs of interest for case %s" % query['case'])
+        result.text("\n\nNYI\n\n")
+
+class ViewCaseReport(Reports.report):
+    """ View a pretty print case report """
+    name = "View Case Report """
+    family = "Case Management"
+    order = 70
+
+    def display(self,query,result):
+        result.heading("Case report for %s" % query['case'])
+        result.text("\n\nNYI\n\n")

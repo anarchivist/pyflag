@@ -154,7 +154,7 @@ class BrowseFS(Reports.report):
                                  DeletedType('Del','file.status'),
                                  IntegerType('File Size','size'),
                                  TimestampType('Last Modified','mtime'),
-                                 TimestampType('Mode','file.mode') ],
+                                 StringType('Mode','file.mode') ],
                     table='file, inode',
                     where="file.inode=inode.inode and path=%r and file.mode!='d/d'" % (path+'/'),
                     case=query['case'],

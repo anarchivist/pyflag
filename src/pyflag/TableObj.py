@@ -191,6 +191,7 @@ class TableObj:
         @arg defaults: A dictionary of defaults to assign into query
         """
         result.start_table()
+
         for k,v in zip(self._column_keys,self._column_names):
             ## If there is no input from the user - override the input from the database:
             if defaults and not query.has_key(k):
@@ -210,9 +211,9 @@ class TableObj:
             else:
                 result.textfield(v,k,size=40)
 
-    def add_form(self,query,results):
+    def add_form(self,query,results, defaults=None):
         """ Generates a form to add a new record in the current table """
-        self.form(query,results)
+        self.form(query,results,defaults)
 
     def edit_form(self,query,results):
         """ Generates an editing form for the current table """
@@ -501,8 +502,58 @@ class IntegerType(ColumnType):
     def create(self):
         return "`%s` int(11) default 0" % self.column
 
+class EditableStringType(ColumnType):
+    def display(self, value, row, result):
+        """ This method is called by the table widget to allow us to
+        translate the output from the database to the screen. Note
+        that we have access to the entire row (i.e. all the values in
+        the query if we need it).
+        """
+        ## By default just implement a simple callback:
+        if self.callback:
+            value = self.callback(value)
+        elif self.link:
+            result = result.__class__(result)
+            q = self.link.clone()
+            q.FillQueryTarget(value.__str__())
+            result.link(value, q, pane=self.link_pane)
+            return result
+        
+        result = result.__class__(result) 
+        
+        def edit_cb(query, result):
+            
+            timeline = TimelineObj(case=query['case'])
+      
+            if 'Update' in query.getarray('__submit__'):
+                query['id']=row['id']
+                new_id=timeline.edit(query,result)
+                return result.refresh(0, query, pane='parent')
+
+            ## Present the user with the form:
+            result.start_form(query, pane='self')
+            result.heading("Edit string %s" % value)
+            
+            ## Then show the form
+            query['id']=row['id']
+            timeline.edit_form(query,result)
+            result.end_form(value='Update')
+
+        def delete_row_cb(query, result):
+            dbh = DB.DBO(query['case'])
+            dbh.delete('timeline', "id=%i" % row['id'])
+            result.refresh(0, query, pane='parent')
+
+        tmp1 = result.__class__(result)
+        tmp2 = result.__class__(result)
+        tmp1.popup(edit_cb, "Edit this string", icon="balloon.png")
+        tmp2.popup(delete_row_cb, "Delete this row from the database", icon="delete.png")
+        result.row(tmp1, tmp2, value)
+        return result
+
 class StringType(ColumnType):
-    symbols = {
+
+    Symbols = {
         "=":"literal",
         "!=":"literal",
         }
@@ -536,6 +587,66 @@ class TimestampType(IntegerType):
         """ Matches times before the specified time. The time arguement must be as described for 'after'."""
         ## FIXME Should parse arg as a date
         return "%s < %r" % (self.column, arg)
+
+    def display(self, value, row, result):
+        original_query = result.defaults
+
+        ## Do default stuff so we don't break anything:
+        ## By default just implement a simple callback:
+        self.row = row
+        if self.callback:
+            value = self.callback(value)
+        elif self.link:
+            result = result.__class__(result)
+            q = self.link.clone()
+            q.FillQueryTarget(value.__str__())
+            result.link(value, q, pane=self.link_pane)
+            return result
+
+        result = result.__class__(result)
+
+        def add_to_timeline_cb(query, result):
+
+            timeline = TimelineObj(case=query['case'])
+
+            ## We got submitted - actually try to do the deed:
+            if 'Add to Timeline' in query.getarray('__submit__'):
+                result.start_table()
+
+                newEvent = timeline.add(query, result)
+
+                result.para("The following is the new annotated record:")
+                timeline.show(newEvent,result)
+
+                result.end_table()
+                result.link("Close this window", target=original_query, pane='parent_pane')
+                return result
+
+            ## Present the user with the form:
+            result.start_form(query, pane='self')
+            result.heading("Adding an event at time %s" % value)
+
+            ## First set it up with the info from the table as defaults
+            defaultInfo = dict() 
+            defaultInfo['time']=value
+            defaultInfo['notes']=""
+            for infoFromCol in self.row:
+                    defaultInfo['notes']+=str(infoFromCol)
+                    defaultInfo['notes']+=":"
+                    defaultInfo['notes']+=str(row[infoFromCol])
+                    defaultInfo['notes']+="   "
+            
+    
+            ## Then show the form
+            timeline.add_form(query,result,defaultInfo)
+            result.end_form(value='Add to Timeline')
+
+        tmp1 = result.__class__(result)
+        tmp1.popup(add_to_timeline_cb, "Add to Timeline", icon="treenode_expand_plus.gif")
+        result.row(tmp1, value)
+        return result
+
+
 
 import plugins.LogAnalysis.Whois as Whois
 
@@ -714,6 +825,34 @@ class InodeType(StringType):
 
 ## This is an example of using the table object to manage a DB table
 import TableActions
+
+
+class TimelineObj(TableObj):
+    table = "timeline"
+    columns = (
+        'id', 'id',
+        'time', 'Time',
+        'notes','Notes',
+        'category', 'category',
+        )
+
+    add_constraints = {
+        'category': TableActions.selector_constraint,
+        }
+
+    edit_constraints = {
+        'category': TableActions.selector_constraint,
+        }
+
+    def __init__(self, case=None, id=None):
+        self.form_actions = {
+            'notes': TableActions.textarea,
+            'category': Curry(TableActions.selector_display,
+                              table='timeline', field='category', case=case),
+            }
+        self.case=case
+        TableObj.__init__(self,case,id)
+
 
 class AnnotationObj(TableObj):
     table = "annotate"
