@@ -85,8 +85,8 @@ try:
     import GeoIP
 
     gi_resolver = GeoIP.open(config.GEOIPDB, GeoIP.GEOIP_STANDARD)
-except Exception:
-    pyflaglog.log(pyflaglog.WARNING, "Unable to import the GeoIP database - will not use it.")
+except Exception,e:
+    pyflaglog.log(pyflaglog.WARNING, "Unable to import the GeoIP database (%s) - will not use it." % e)
     gi_resolver = None
 
 def geoip_resolve(ip):

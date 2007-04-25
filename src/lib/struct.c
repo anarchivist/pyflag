@@ -61,6 +61,31 @@ static int Short_unpack(void *context, StringIO input, char *output) {
   return sizeof(i16);
 }
 
+// This is guaranteed to read little endians from input
+static int LEShort_pack(char *input, StringIO output) {
+  uint16_t i16 = *(uint16_t *)(input);
+
+#ifdef WORDS_BIGENDIAN
+  i16=htons(i16);
+#endif
+
+  return CALL(output, write, (char *)&i16 , sizeof(i16));
+}
+
+static int LEShort_unpack(void *context, StringIO input, char *output) {
+  uint16_t i16;
+
+  if(CALL(input, read, (char *)&i16 , sizeof(i16)) < sizeof(i16))
+    return -1;
+
+#ifdef WORDS_BIGENDIAN
+  i16=ntohs(i16);
+#endif
+
+  *(uint16_t *)(output) = i16;
+  return sizeof(i16);
+}
+
 /********** Ints *************/
 static int Int_pack( char *input, StringIO output) {
   uint32_t i32 = *(uint32_t *)(input);
@@ -75,6 +100,30 @@ static int Int_unpack(void *context, StringIO input, char *output) {
     return -1;
 
   i32=ntohl(i32);
+  *(uint32_t *)(output) = i32;
+  return sizeof(i32);
+}
+
+static int LEInt_pack( char *input, StringIO output) {
+  uint32_t i32 = *(uint32_t *)(input);
+
+#ifdef WORDS_BIGENDIAN
+  i32=htonl(i32);
+#endif
+
+  return CALL(output, write, (char *)&i32 , sizeof(i32));
+}
+
+static int LEInt_unpack(void *context, StringIO input, char *output) {
+  uint32_t i32;
+
+  if(CALL(input, read, (char *)&i32 , sizeof(i32)) < sizeof(i32))
+    return -1;
+
+#ifdef WORDS_BIGENDIAN
+  i32=ntohl(i32);
+#endif
+
   *(uint32_t *)(output) = i32;
   return sizeof(i32);
 }
@@ -136,6 +185,43 @@ static int SizeString_unpack(void *context, StringIO input, char *output) {
     return -1;
 
   return sizeof(uint16_t)+sizeof(char *);
+}
+
+static int SizeString32LE_pack(char *input, StringIO output) {
+  uint16_t length = *(uint32_t *)(input);
+  uint16_t i32;
+
+#ifdef WORDS_BIGENDIAN
+  i32=htons(length);
+#endif
+
+  CALL(output, write, (char *)&i32, sizeof(uint32_t));
+  CALL(output, write, *(char **)(input+sizeof(i32)), length);
+  return sizeof(uint32_t)+sizeof(char *);
+}
+
+static int SizeString32LE_unpack(void *context, StringIO input, char *output) {
+  char *string;
+  uint32_t i32;
+  
+  if(CALL(input, read, (char *)&i32, sizeof(uint32_t)) < sizeof(uint32_t))
+    return -1;
+  
+#ifdef WORDS_BIGENDIAN
+  i32=ntohs(i32);
+#endif
+
+  *(uint32_t *)(output) = i32;	
+  
+  /** Allocate this much memory */
+  string = talloc_size(context, i32);
+  *(char **)(output + sizeof(uint32_t)) = string;
+  
+  /** Copy the string into the buffer */
+  if(CALL(input, read, string, i32) < i32) 
+    return -1;
+
+  return sizeof(uint32_t)+sizeof(char *);
 }
 
 static int SizeString32_pack(char *input, StringIO output) {
@@ -252,16 +338,31 @@ void struct_init(void) {
 
   Struct_Register(STRUCT_CHAR, sizeof(char), 
 		  Char_pack, Char_unpack);
+
   Struct_Register(STRUCT_SHORT, sizeof(uint16_t), 
 		  Short_pack, Short_unpack);
+
+  Struct_Register(STRUCT_SHORT_LE, sizeof(uint16_t), 
+		  LEShort_pack, LEShort_unpack);
+
   Struct_Register(STRUCT_INT, sizeof(uint32_t), 
 		  Int_pack, Int_unpack);
+
+  Struct_Register(STRUCT_INT_LE, sizeof(uint32_t), 
+		  LEInt_pack, LEInt_unpack);
+
   Struct_Register(STRUCT_STRING_NULL_TERM, sizeof(char *), 
 		  NullString_pack, NullString_unpack);
+
   Struct_Register(STRUCT_STRING_AND_LENGTH, sizeof(uint16_t)
 		  +sizeof(char *), SizeString_pack, SizeString_unpack);
+
   Struct_Register(STRUCT_STRING_AND_LENGTH32, sizeof(uint32_t)
 		  +sizeof(char *), SizeString32_pack, SizeString32_unpack);
+
+  Struct_Register(STRUCT_STRING_AND_LENGTHLE32, sizeof(uint32_t)
+		  +sizeof(char *), SizeString32LE_pack, SizeString32LE_unpack);
+
   Struct_Register(STRUCT_ARGV_ARRAY, sizeof(uint16_t)
 		  +sizeof(char **), ArgvArray_pack, ArgvArray_unpack);
 };

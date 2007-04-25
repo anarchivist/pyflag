@@ -138,7 +138,7 @@ class TableObj:
                 pass
 
         dbh = DB.DBO(self.case)
-        dbh.update(self.table, where = "%s=%r" % (self.key, new_id),
+        dbh.update(self.table, where = "%s='%s'" % (self.key, new_id),
                    **fields)
 
         return new_id
@@ -532,7 +532,7 @@ class EditableStringType(ColumnType):
 
             ## Present the user with the form:
             result.start_form(query, pane='self')
-            result.heading("Edit string %s" % value)
+            result.heading("Edit Event")
             
             ## Then show the form
             query['id']=row['id']
@@ -830,7 +830,6 @@ import TableActions
 class TimelineObj(TableObj):
     table = "timeline"
     columns = (
-        'id', 'id',
         'time', 'Time',
         'notes','Notes',
         'category', 'category',

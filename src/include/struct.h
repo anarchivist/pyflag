@@ -44,13 +44,23 @@
 #define STRUCT_STRING_AND_LENGTH 7
 #define STRUCT_DNS_ZSTRING 8
 #define STRUCT_ARGV_ARRAY 9
-#define STRUCT_STRING_AND_LENGTH32 10
+
+#define STRUCT_STRING_AND_LENGTH32 0x10
+#define STRUCT_STRING_AND_LENGTHLE32 0x11
+
+#define STRUCT_SHORT_LE 0x14
+#define FORMAT_SHORT_LE "\x14"
+
+#define STRUCT_INT_LE 0x15
+#define FORMAT_INT_LE "\x15"
+
+
 
 /**
    You might need to increase this if other files are registrying more
    packers/unpackers
 */
-#define MAX_FORMATS 20
+#define MAX_FORMATS 0x20
 
 /** 
     pack and unpack the struct passed in as the void * into or from

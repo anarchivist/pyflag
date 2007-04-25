@@ -1,12 +1,17 @@
 pkgpython_PYTHON 	= dissect.py
-pkgpyexec_LTLIBRARIES 	= _dissect.la reassembler.la
+pkgpyexec_LTLIBRARIES 	= _dissect.la reassembler.la pypcap.la
 
 noinst_LTLIBRARIES	= libnetwork.la libtcp.la
 libnetwork_la_SOURCES	= network.c
 libnetwork_la_CFLAGS 	= -I$(top_srcdir)/src/include
 libnetwork_la_LIBADD	= ../lib/liboo.la
 
-_dissect_la_SOURCES 	= dissect.c
+pypcap_la_SOURCES	= pcap.c pypcap.c
+pypcap_la_CPPFLAGS 	= $(PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
+pypcap_la_LDFLAGS 	= -module
+pypcap_la_LIBADD	= libnetwork.la
+
+_dissect_la_SOURCES 	= dissect.c pcap.c
 _dissect_la_CPPFLAGS 	= $(PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
 _dissect_la_LDFLAGS 	= -module
 _dissect_la_LIBADD	= libnetwork.la

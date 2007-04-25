@@ -12,7 +12,6 @@ AC_PROG_CC
 
 # check headers
 AC_CHECK_HEADER(zlib.h,,AC_MSG_ERROR([You Must install zlib-dev to build pyflag]))
-AC_CHECK_HEADER(pcap.h,,AC_MSG_ERROR([You Must install libpcap-dev to build pyflag]))
 AC_CHECK_HEADER(magic.h,,AC_MSG_ERROR([You Must install libmagic-dev to build pyflag this may be part of file the package for some distros]))
 
 ## This doesnt work - why?
@@ -36,6 +35,9 @@ AC_SUBST(magic)
 
 # defines and output
 AC_DEFINE([__DEBUG__], [], [Debuging enabled])
+
+# endianess support
+AC_C_BIGENDIAN()
 
 # Large file support
 AC_SYS_LARGEFILE

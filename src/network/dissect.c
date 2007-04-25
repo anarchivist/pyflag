@@ -313,7 +313,6 @@ static PyObject *get_name(PyObject *self, PyObject *args) {
   return PyString_FromString(NAMEOF(root));
 };
 
-
 static PyMethodDef DissectMethods[] = {
   {"dissect",  dissect, METH_VARARGS,
    "Dissects a packet returning a dissection object"},

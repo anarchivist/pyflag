@@ -14,8 +14,13 @@ noinst_LTLIBRARIES	= libexcept.la libsgz.la libevf.la liboo.la libmd5.la
 # Stuff that should be distributed:
 noinst_HEADERS		= $(srcdir)/*.h
 
-# python stuff - deprecated
-#pkgpyexec_LTLIBRARIES 	= iosubsys.la
+# python stuff
+pkgpyexec_LTLIBRARIES 	= pypacket.la
+
+pypacket_la_SOURCES	= pypacket.c
+pypacket_la_CPPFLAGS	= $(PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
+pypacket_la_LDFLAGS	= -module
+pypacket_la_LIBADD	= liboo.la
 
 # specifics (libs)
 libexcept_la_SOURCES 	= except.c
