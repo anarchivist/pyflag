@@ -188,8 +188,9 @@ class HTMLUI(UI.GenericUI):
         except:
             pass
         
-        for items in options.items():
-            result.append("%s=%r"% (items))
+        for k,v in options.items():
+            if v:
+                result.append("%s=%r"% (k,FlagFramework.urlencode(v.__str__())))
 
         return ' '.join(result)
 

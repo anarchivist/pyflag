@@ -146,7 +146,7 @@ class TableObj:
     def add(self,query,ui):
         """ Adds a row given in query[self.table.key] to the table """
         dbh = DB.DBO(self.case)
-        dbh.insert(self.table, **{self._column_keys[0]: 'NULL'})
+        dbh.insert(self.table, **{'_'+self.key: 'NULL'})
         ## Work out what will be the next ID if it were to succeed. We
         ## create a placeholder and then remove/replace it later.
         new_id = dbh.autoincrement()
@@ -213,7 +213,7 @@ class TableObj:
 
     def add_form(self,query,results, defaults=None):
         """ Generates a form to add a new record in the current table """
-        self.form(query,results,defaults)
+        self.form(query,results, defaults)
 
     def edit_form(self,query,results):
         """ Generates an editing form for the current table """
@@ -509,16 +509,6 @@ class EditableStringType(ColumnType):
         that we have access to the entire row (i.e. all the values in
         the query if we need it).
         """
-        ## By default just implement a simple callback:
-        if self.callback:
-            value = self.callback(value)
-        elif self.link:
-            result = result.__class__(result)
-            q = self.link.clone()
-            q.FillQueryTarget(value.__str__())
-            result.link(value, q, pane=self.link_pane)
-            return result
-        
         result = result.__class__(result) 
         
         def edit_cb(query, result):
@@ -546,9 +536,11 @@ class EditableStringType(ColumnType):
 
         tmp1 = result.__class__(result)
         tmp2 = result.__class__(result)
+        tmp3 = result.__class__(result)
         tmp1.popup(edit_cb, "Edit this string", icon="balloon.png")
         tmp2.popup(delete_row_cb, "Delete this row from the database", icon="delete.png")
-        result.row(tmp1, tmp2, value)
+        tmp3.text(value, font='typewriter')
+        result.row(tmp1, tmp2, tmp3)
         return result
 
 class StringType(ColumnType):
@@ -634,11 +626,11 @@ class TimestampType(IntegerType):
                     defaultInfo['notes']+=str(infoFromCol)
                     defaultInfo['notes']+=":"
                     defaultInfo['notes']+=str(row[infoFromCol])
-                    defaultInfo['notes']+="   "
+                    defaultInfo['notes']+="     \n"
             
-    
+            #query.default('notes', defaultInfo['notes'])
             ## Then show the form
-            timeline.add_form(query,result,defaultInfo)
+            timeline.add_form(query,result, defaultInfo)
             result.end_form(value='Add to Timeline')
 
         tmp1 = result.__class__(result)

@@ -171,11 +171,6 @@ class ViewCaseTimeline(Reports.report):
             return result
       
         result.heading("Case Time Line for case %s" % query['case'])
-        result.text("Add arbitrary event:")
-        result.popup(add_new_event, "Add abritrary event", 
-                                            case=query['case'], 
-                                            icon="clock.png")
-        result.text("\n")
  
         result.table(
             elements = [ IntegerType(name='id', column='id'),
@@ -187,7 +182,9 @@ class ViewCaseTimeline(Reports.report):
             case = query['case'],
         )
 
-
+        result.toolbar(cb=add_new_event, 
+                       icon='clock.png', 
+                       tooltip='Click to add an arbitrary event')
 
 class ViewIPsOfInterest(Reports.report):
     """ View all IPs of interest """

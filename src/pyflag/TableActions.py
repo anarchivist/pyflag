@@ -42,7 +42,7 @@ import datetime
 ## Some useful display actions
 def textarea(self, description = None, variable= None, result=None, **options):
     """ Draws a textarea as form input for input """
-    result.textarea(description,variable,rows=5,cols=40,**options)
+    result.textarea(description,variable,rows=5,cols=40)
 
 def date_selector(self, description = None, callback=None, variable= None, ui=None, label=None, **options):
     """ Draws a popup for selecting a date """
@@ -191,7 +191,7 @@ def noop(description=None, choices=None, variable=None, ui=None, **options ):
 
 def selector_display(self, description=None, variable=None, result=None, table=None, case=None, field=None, force=False, default=None, **options ):
     """ Draws a selector based on a column from a table """
-    result.selector(description, variable, "select %s as `key`, %s as value from %s group by %s",  (field,field, table,field), case=self.case)
+    #result.selector(description, variable, "select %s as `key`, %s as value from %s group by %s",  (field,field, table,field), case=self.case)
 
     tmp=result.__class__(result)
     dbh=DB.DBO(case)
