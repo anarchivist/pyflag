@@ -148,7 +148,7 @@ class LoadPresetLog(Reports.report):
         if row:
             raise Reports.ReportError("Table %s already exists with a conflicting preset (%s) - you can only append to the same table with the same preset." % (query['table'],row['value']))
         
-        for progress in log.load('%s_log' % query['table']):
+        for progress in log.load(query['table']):
             self.progress_str = progress
             
         dbh.insert("meta", property='logtable', value=query['table'])

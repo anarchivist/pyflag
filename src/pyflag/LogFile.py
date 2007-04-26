@@ -203,7 +203,7 @@ class Log:
             ## We can calculate the elements directly from our field
             ## list:
             elements = [ f for f in self.fields if f ],
-            table = table_name,
+            table = table_name + "_log",
             case = self.case
             )
 

@@ -67,7 +67,7 @@ class ListLogFile(Reports.report):
         except KeyError:
             raise Reports.ReportError("Unable to load the preset %s for table %s " % (row['value'],query['logtable']))
 
-        log.display(query['logtable']+"_log",result);
+        log.display(query['logtable'],result);
 
 class CreateLogPreset(Reports.report):
     """ Creates a new type of log file in the database, so that they can be loaded using the Load Log File report """

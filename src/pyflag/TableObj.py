@@ -194,11 +194,10 @@ class TableObj:
 
         for k,v in zip(self._column_keys,self._column_names):
             ## If there is no input from the user - override the input from the database:
-            if defaults and not query.has_key(k):
-                try:
-                    query[k]=defaults[k]
-                except KeyError:
-                    pass
+            try:
+                query.default(k,defaults[k])
+            except:
+                pass
                 
             ## Try to get the callback from the functional
             ## interface or the class interface:

@@ -191,8 +191,6 @@ def noop(description=None, choices=None, variable=None, ui=None, **options ):
 
 def selector_display(self, description=None, variable=None, result=None, table=None, case=None, field=None, force=False, default=None, **options ):
     """ Draws a selector based on a column from a table """
-    #result.selector(description, variable, "select %s as `key`, %s as value from %s group by %s",  (field,field, table,field), case=self.case)
-
     tmp=result.__class__(result)
     dbh=DB.DBO(case)
     dbh.execute("select %s from %s group by %s order by %s", (field,table,field,field))

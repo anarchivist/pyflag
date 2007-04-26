@@ -73,6 +73,7 @@ if options.glob:
 if len(args)==0:
     print "Must specify some files to merge, try -h for help"
     sys.exit(-1)
+
 ## This will hold our filehandles - if this number is too large, we
 ## will run out of file handles.
 store = Store.Store(max_size=5)
