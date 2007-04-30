@@ -208,7 +208,24 @@ static PyObject *PyPacket_get_range(PyPacket *self, PyObject *args) {
   Py_RETURN_NONE;
 }
 
+static PyObject *PyPacket_serialise(PyPacket *self, PyObject *args) {
+  StringIO tmp = CONSTRUCT(StringIO, StringIO, Con, NULL);
+  PyObject *result;
+
+  // Write ourselves onto the stringio:
+  CALL(self->obj, Write, tmp);
+
+  // give the results back:
+  result = PyString_FromStringAndSize(tmp->data, tmp->size);
+
+  talloc_free(tmp);
+
+  return result;
+};
+
 static PyMethodDef PyPacket_methods[] = {
+  {"serialise", (PyCFunction)PyPacket_serialise, METH_VARARGS,
+   "serialises the packet into a string"},
   {"list", (PyCFunction)PyPacket_list_fields, METH_VARARGS,
    "lists the fields managed by this packet"},
   {"get_field", (PyCFunction)PyPacket_get_field, METH_VARARGS,

@@ -159,6 +159,7 @@ class LookupIP(Reports.report):
         result.textfield("Enter IP Address:",'address')
 
     def display(self, query, result):
+        result.decoration = 'naked'
         ## get route id
         self.display_geoip(result, query['address'])
         self.display_whois(query,result,query['address'])
@@ -168,7 +169,7 @@ class LookupIP(Reports.report):
             global gi_resolver
 
             record = gi_resolver.record_by_addr(ip)
-            result.heading("GeoIP Resolving")
+            result.heading("GeoIP Resolving - by maxmind.com")
             self.render_dict(record, result)
         except Exception,e:
             print e
@@ -185,6 +186,12 @@ class LookupIP(Reports.report):
         self.render_dict(res,result)
 
     def render_dict(self, dict, result):
+        result.start_table()
+        for k,v in dict.items():
+            result.row(k,v)
+        result.end_table()
+
+    def xxrender_dict(self, dict, result):
         result.start_table()
         for name in dict.keys():
             tmp=result.__class__(result)

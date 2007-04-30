@@ -43,7 +43,11 @@ specified. The pcap files are sorted on their PCAP timestamps. It is
 assumed that each file contains packets in time order.
 
 This version of mergecap has no file size limits or file number
-limits.""", version="Version: %prog PyFlag "+config.VERSION)
+limits.
+
+This implementation of mergecap is done in pure python so its a little
+slow.
+""", version="Version: %prog PyFlag "+config.VERSION)
 
 parser.add_option("-g", "--glob", default=None,
                   help = """Load All files in the glob. This is useful when there are too many

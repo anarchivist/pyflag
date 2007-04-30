@@ -260,7 +260,10 @@ class StoreAndScan(BaseScanner):
 
     def finish(self):
         if not self.boring_status:
-            self.file.flush()
+            try:
+                self.file.flush()
+            except: pass
+            
             ## Reopen the file to read
             fd = open(self.file.name,'r')
             self.external_process(fd)

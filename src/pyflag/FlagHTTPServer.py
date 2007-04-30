@@ -414,4 +414,7 @@ if __name__ == "__main__":
     ## Start the logging thread:
     pyflaglog.start_log_thread()
 
-    Server(HandlerClass = FlagServerHandler)
+    try:
+        Server(HandlerClass = FlagServerHandler)
+    finally:
+        pyflaglog.log(0,"Terminating Logger")

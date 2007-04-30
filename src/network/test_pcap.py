@@ -17,6 +17,14 @@ def print_tree(packet, depth=0):
         except:
             pass
 
+offset = fd.offset()
+packet = fd.next()
+print_tree(packet)
+
+fd.seek(offset)
+packet = fd.next()
+print_tree(packet)
+
 for p in fd:
     print p.ts_sec, len(p.data)
     packet = fd.dissect()

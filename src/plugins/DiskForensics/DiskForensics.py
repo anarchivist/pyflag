@@ -97,7 +97,7 @@ class BrowseFS(Reports.report):
     description = "Display filesystem in a browsable format"
     
     def display(self,query,result):
-        result.heading("Browsing Filesystem")
+        result.heading("Browsing Virtual Filesystem")
         dbh = self.DBO(query['case'])
         main_result=result
         

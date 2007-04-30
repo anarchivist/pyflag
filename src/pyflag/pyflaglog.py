@@ -112,7 +112,7 @@ def log(level,message):
         print string
         sys.stdout.flush()
         
-    if level<=ERRORS:
+    if level<=ERRORS and level>0:
         print string
         print traceback.print_tb(sys.exc_info()[2])
         sys.stdout.flush()

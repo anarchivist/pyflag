@@ -18,7 +18,8 @@ try:
 
         class Scan(StoreAndScanType):
             types = (
-                'image/.*',
+# This forces all images to be cached do we really want this?
+#                'image/.*',
                 'application/msword',
                 'application/x-executable'
                 )

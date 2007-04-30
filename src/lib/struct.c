@@ -188,15 +188,15 @@ static int SizeString_unpack(void *context, StringIO input, char *output) {
 }
 
 static int SizeString32LE_pack(char *input, StringIO output) {
-  uint16_t length = *(uint32_t *)(input);
-  uint16_t i32;
+  uint32_t length = *(uint32_t *)(input);
+  uint32_t i32=length;
 
 #ifdef WORDS_BIGENDIAN
   i32=htons(length);
 #endif
 
   CALL(output, write, (char *)&i32, sizeof(uint32_t));
-  CALL(output, write, *(char **)(input+sizeof(i32)), length);
+  CALL(output, write, *(char **)(input + sizeof(i32)), length);
   return sizeof(uint32_t)+sizeof(char *);
 }
 
@@ -225,10 +225,11 @@ static int SizeString32LE_unpack(void *context, StringIO input, char *output) {
 }
 
 static int SizeString32_pack(char *input, StringIO output) {
-  uint16_t length = *(uint32_t *)(input);
-  uint16_t i32;
+  uint32_t length = *(uint32_t *)(input);
+  uint32_t i32;
 
   i32=htons(length);
+
   CALL(output, write, (char *)&i32, sizeof(uint32_t));
   CALL(output, write, *(char **)(input+sizeof(i32)), length);
   return sizeof(uint32_t)+sizeof(char *);

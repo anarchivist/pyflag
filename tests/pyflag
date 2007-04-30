@@ -17,8 +17,8 @@ declare -x `set | grep PYFLAG_ | cut -d= -f1`
 ## can find it itself) 
 
 export PYFLAG_PLUGINS=$SRC_DIR/src/plugins
-export PYTHONPATH=$SRC_DIR/src/pyflag:$SRC_DIR/src/:$INSTALL_DIR/lib/python2.4/site-packages/pyflag
+export PYTHONPATH=$SRC_DIR/src/pyflag:$SRC_DIR/src/:$INSTALL_DIR/lib/python2.5/site-packages/pyflag
 
 echo $PYTHONPATH
 
-exec /usr/bin/python2.4 $SRC_DIR/src/pyflag/FlagHTTPServer.py $@
+exec /usr/bin/python2.5 $SRC_DIR/src/pyflag/FlagHTTPServer.py $@

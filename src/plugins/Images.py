@@ -242,7 +242,7 @@ class Remote(Advanced):
                            device = query['device'],
                            offset = offset)
 
-        return CachedIO(io)
+        return io
     
 import os, unittest,iosubsys,time
 import pyflag.conf

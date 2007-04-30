@@ -755,10 +755,9 @@ class File:
         toolbar_id = result.new_toolbar()
         
         if (not data or len(data)==0):
-           result.text("No Data Available")
-           return result
-
-        cb(limit,data,result)
+            result.text("No Data Available")
+        else: 
+            cb(limit,data,result)
 
         #Do the navbar
         new_query = query.clone()

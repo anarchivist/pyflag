@@ -19,7 +19,15 @@ AC_CHECK_HEADER(magic.h,,AC_MSG_ERROR([You Must install libmagic-dev to build py
 
 # python checks 
 # (requires autoconf 1.5+ and the macros in acinclude.m4)
-AM_PATH_PYTHON(2.4)
+AZ_PYTHON_DEFAULT()
+AZ_PYTHON_ENABLE()
+AZ_PYTHON_WITH()
+AZ_PYTHON_PATH()
+AZ_PYTHON_VERSION_ENSURE( [2.4] )
+AZ_PYTHON_CSPEC
+AZ_PYTHON_LSPEC
+
+#AM_PATH_PYTHON(2.4)
 AC_PYTHON_DEVEL
 AC_PYTHON_MODULE(MySQLdb, REQUIRED)
 AC_PYTHON_MODULE(pexpect, REQUIRED)

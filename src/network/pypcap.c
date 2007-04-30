@@ -206,7 +206,35 @@ static PyObject *PyPCAP_next(PyPCAP *self) {
   return result;
 };
 
+/** With no args we go to the first packet */
+static PyObject *PyPCAP_seek(PyPCAP *self, PyObject *args, PyObject *kwds) {
+  static char *kwlist[] = {"offset", NULL};
+  uint64_t offset=sizeof(struct pcap_file_header);
+
+  if(!PyArg_ParseTupleAndKeywords(args, kwds, "|K", kwlist,
+				  &offset))
+    return NULL;
+
+  // Flush out the local cache:
+  CALL(self->buffer, truncate, 0);
+  
+  return PyObject_CallMethod(self->fd, "seek", "K", offset);
+};
+
+static PyObject *PyPCAP_offset(PyPCAP *self, PyObject *args) {
+  PyObject *offset = PyObject_CallMethod(self->fd, "tell", NULL);
+
+  if(!offset) return NULL;
+
+  return PyLong_FromUnsignedLongLong(PyLong_AsUnsignedLongLong(offset) - self->buffer->size);
+
+};
+
 static PyMethodDef PyPCAP_methods[] = {
+  {"offset", (PyCFunction)PyPCAP_offset, METH_VARARGS,
+   "returns the current offset of the pcap file (so we can seek to it later).\nThis is not the same as the offset of the file object because we do some caching"},
+  {"seek", (PyCFunction)PyPCAP_seek, METH_VARARGS|METH_KEYWORDS,
+   "seeks the file to a specific place. "},
   {"dissect", (PyCFunction)PyPCAP_dissect, METH_VARARGS|METH_KEYWORDS,
    "dissects the current packet returning a PyPacket object"},
   {"file_header", (PyCFunction)file_header, METH_VARARGS,

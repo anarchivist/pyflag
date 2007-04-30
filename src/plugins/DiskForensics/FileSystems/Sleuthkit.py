@@ -103,12 +103,16 @@ class Sleuthkit_File(File):
         self.skfd.seek(self.readptr, slack=self.slack, overread=self.overread)
 
     def read(self, length=None):
-        ## Call our baseclass to see if we have cached data:
-        try:
-            return File.read(self,length)
-        except IOError:
-            pass
+        ## We can not support caching to disk because we need to
+        ## support over-read (which may not be turned on when caching
+        ## to disk - but will be required later).
+##        try:
+##            return File.read(self,length)
+##        except IOError:
+##            pass
 
+        self.skfd.seek(self.readptr)
+        
         if length!=None:
             result= self.skfd.read(length, slack=self.slack, overread=self.overread)
         else:
