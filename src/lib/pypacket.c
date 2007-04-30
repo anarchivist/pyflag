@@ -5,17 +5,12 @@ efficiently. Only the required data is converted into python types.
 **/
 
 #include "packet.h"
-#include <Python.h>
+#include "pypacket.h"
 
 static char *g_talloc_reference;
 static PyObject *g_module_reference;
 
 static PyMethodDef PyPacket_methods[];
-
-typedef struct {
-  PyObject_HEAD
-  Packet obj;
-} PyPacket;
 
 /** The constructor:
 
@@ -44,8 +39,7 @@ static int PyPacket_init(PyPacket *self, PyObject *args) {
     goto invalid_object;
 
   // Make sure it doesnt get freed on us
-  //talloc_reference(g_talloc_reference, self->obj);
-  talloc_increase_ref_count(self->obj);
+  talloc_reference(g_talloc_reference, self->obj);
 
   return 0;
 
@@ -56,8 +50,7 @@ static int PyPacket_init(PyPacket *self, PyObject *args) {
 
 static void PyPacket_dealloc(PyPacket *self) {
   // Remove our link from the pointer:
-  //talloc_unlink(g_talloc_reference, self->obj);
-  talloc_free(self->obj);
+  talloc_unlink(g_talloc_reference, self->obj);
 
   self->ob_type->tp_free((PyObject*)self);
 };

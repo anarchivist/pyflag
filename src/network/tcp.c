@@ -92,7 +92,8 @@ void TCPStream_add(TCPStream self, IP ip) {
   /** Take over the packet */
   new->packet = ip;
 
-  talloc_steal(new, ip);
+  // Add a reference to ip - we need to keep it alive:
+  talloc_reference(new, ip);
 
   /** Record the most recent id we handled */
   self->max_packet_id = ip->id;

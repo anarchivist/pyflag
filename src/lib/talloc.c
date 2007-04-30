@@ -955,7 +955,7 @@ static void talloc_report_depth_FILE_helper(const void *ptr, int depth, int max_
 	FILE *f = (FILE *)_f;
 
 	if (is_ref) {
-		fprintf(f, "%*sreference to: %s\n", depth*4, "", name);
+	  fprintf(f, "%*sreference to: %s %p\n", depth*4, "", name, ptr);
 		return;
 	}
 

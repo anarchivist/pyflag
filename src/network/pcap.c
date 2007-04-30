@@ -15,7 +15,7 @@ int PcapFileHeader_Read(Packet self, StringIO input) {
     this->little_endian = 1;
 
     // Readjust the format string to little_endian:
-    self->format = PCAP_HEADER_STRUCT_LE;
+    self->format = this->le_format;
 
     // Rewind the stream:
     CALL(input, seek, 0, 0);
@@ -35,6 +35,7 @@ VIRTUAL(PcapFileHeader, Packet)
      NAME_ACCESS(header, snaplen, snaplen, FIELD_TYPE_INT);
 
      VMETHOD(super.Read) = PcapFileHeader_Read;
+     VATTR(le_format) = PCAP_HEADER_STRUCT_LE;
 END_VIRTUAL
 
 VIRTUAL(PcapPacketHeader, Packet)
@@ -43,5 +44,8 @@ VIRTUAL(PcapPacketHeader, Packet)
      SET_DOCSTRING("Pcap packet header");
      NAME_ACCESS(header, ts_sec, ts_sec, FIELD_TYPE_INT);
      NAME_ACCESS(header, ts_usec, ts_usec, FIELD_TYPE_INT);
+     NAME_ACCESS(header, caplen, caplen, FIELD_TYPE_INT);
      NAME_ACCESS_SIZE(header, data, data, FIELD_TYPE_STRING, len);
+
+     VATTR(le_format) = PCAP_PKTHEADER_STRUCT_LE;
 END_VIRTUAL

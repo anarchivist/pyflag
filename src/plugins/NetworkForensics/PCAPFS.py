@@ -38,9 +38,9 @@ import pyflag.Scanner as Scanner
 import pyflag.ScannerUtils as ScannerUtils
 import pyflag.Registry as Registry
 import os,sys,time
-import dissect,reassembler, _dissect
+import reassembler
 from NetworkScanner import *
-import FileFormats.PCAP as PCAP
+import pypcap
 from format import Buffer
 from pyflag.TableObj import StringType, IntegerType, TimestampType, InodeType
 
@@ -124,10 +124,9 @@ class PCAPFS(DBFS):
 
         ## Open the file descriptor
         self.fd = IO.open(self.case, iosource_name)
-        buffer = Buffer(fd=self.fd)
 
-        ## Try to open the file as a pcap file:
-        pcap_file = PCAP.FileHeader(buffer)
+        ## Use the C implementation:
+        pcap_file = pypcap.PyPCAP(self.fd)
 
         ## Build our streams:
         pyflaglog.log(pyflaglog.DEBUG, "Reassembling streams, this might take a while")
@@ -142,7 +141,7 @@ class PCAPFS(DBFS):
         row = dbh2.fetch()
         try:
             ## This number is designed to provide enough room for
-            ## connection ids to grow without collision. In the even
+            ## connection ids to grow without collision. In the event
             ## that another simulataneous load process is launched.
             initial_con_id = row['max']+2e6
         except:
@@ -254,33 +253,32 @@ class PCAPFS(DBFS):
         ## Scan the filesystem:
         ## Load the packets into the indes:
         dbh.mass_insert_start("pcap")
-        link_type = int(pcap_file['linktype'])
+        link_type = pcap_file.file_header().linktype
 
         for p in pcap_file:
             ## Store information about this packet in the db:
             dbh.mass_insert(
                 iosource = iosource_name,
-                offset = p.buffer.offset,
-                length = p.size(),
-                ts_sec =  p['ts_sec'],
-                ts_usec = int(p['ts_usec']),
+                offset = pcap_file.offset()+24,
+                length = p.caplen,
+                _ts_sec =  "from_unixtime('%s')" % p.ts_sec,
+                ts_usec = p.ts_usec,
                 link_type = link_type,
                 id = max_id
                 )
 
             ## Some progress reporting
             if max_id % 10000 == 0:
-                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "processed %s packets (%s bytes)" % (max_id, p.buffer.offset))
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "processed %s packets (%s bytes)" % (max_id, pcap_file.offset()))
 
-            data = p.payload()
-            d = _dissect.dissect(data,link_type, max_id)
-
+            data = pcap_file.dissect()
+       
             ## Prepare the next number
             max_id+=1
 
         ## Now reassemble it:
             try:
-                reassembler.process_packet(hashtbl, d, self.fd.name)
+                reassembler.process_pypacket(hashtbl, data, self.fd.name)
             except RuntimeError,e:
                 pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "%s" % e)
 

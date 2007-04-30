@@ -18,6 +18,7 @@ describing the stream.
 #include "class.h"
 #include "network.h"
 #include "tcp.h"
+#include "pypacket.h"
 
 static PyObject *python_cb = NULL;
 
@@ -416,12 +417,56 @@ static PyObject *py_init(PyObject *self, PyObject *args) {
   return result;
 };
 
+static PyObject *py_process_pypacket(PyObject *self, PyObject *args) {
+  IP ip;
+  PyPacket *pypacket;
+  TCPHashTable hash;
+  PyObject *hash_py;
+  char *io=NULL;
+
+  if(!PyArg_ParseTuple(args, "OO|s", &hash_py, &pypacket, &io))
+    return NULL;
+
+  // Check to make sure that its the right packet we want:
+  if(strcmp("Root", NAMEOF(pypacket->obj)))
+    return PyErr_Format(PyExc_RuntimeError, "Not a valid dissection object %s", NAMEOF(pypacket->obj));
+
+  hash = PyCObject_AsVoidPtr(hash_py);
+  if(!hash) return NULL;
+
+  ip = (IP)pypacket->obj;
+  if(!Find_Property((Packet *)&ip, NULL, "ip", "") || !ip) {
+    goto exit;
+  };
+
+  ip->id = ((Root)pypacket->obj)->packet.packet_id;
+
+  PyErr_Clear();
+
+  /** Process the packet */
+  hash->process(hash, ip);
+
+  /** Currently there is no way for us to know if the callback
+      generated an error (since the callback returns void). So here we
+      check the exception state of the interpreter explicitely 
+  */
+  if(PyErr_Occurred()) {
+    return NULL;
+  };
+
+ exit:  
+  Py_RETURN_NONE;
+};
+
 static PyMethodDef ReassemblerMethods[] = {
   {"init" , py_init, METH_VARARGS,
    "initialise the reassembler returning a handle to it"},
   {"process_tcp",  py_process_tcp, METH_VARARGS,
    "Process a tcp packet.\
     prototype: process_tcp(handle, data, packet_id, link_type);"},
+  {"process_pypacket", py_process_pypacket, METH_VARARGS,
+   "Process an already dissected packet as obtained from pypcap.dissect().\
+    prototype: process_pypacket(handle, packet);"},
   {"process_packet", py_process_packet, METH_VARARGS,
    "Process an already dissected packet.\
     prototype: process_packet(handle, packet);"},

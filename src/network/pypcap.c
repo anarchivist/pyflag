@@ -55,6 +55,9 @@ static int PyPCAP_fill_buffer(PyPCAP *self, PyObject *fd) {
 
   self->buffer->readptr = current_readptr;
 
+  // Finished with the data
+  Py_DECREF(data);
+
   return len;
 };
 
@@ -149,7 +152,7 @@ static PyObject *PyPCAP_dissect(PyPCAP *self, PyObject *args, PyObject *kwds) {
 
   CALL(self->dissection_buffer, seek, 0,0);
 
-  root = CONSTRUCT(Root, Packet, super.Con, NULL, NULL);
+  root = CONSTRUCT(Root, Packet, super.Con, self->buffer, NULL);
   root->packet.link_type = self->file_header->header.linktype;
   root->packet.packet_id = packet_id;
 
@@ -161,7 +164,7 @@ static PyObject *PyPCAP_dissect(PyPCAP *self, PyObject *args, PyObject *kwds) {
 			       PyCObject_FromVoidPtr(root, NULL),
 			       "PcapPacketHeader");
 
-  talloc_free(root);
+  talloc_unlink(self->buffer, root);
 
   return result;
 };
@@ -177,8 +180,28 @@ static PyObject *PyPCAP_next(PyPCAP *self) {
     if(len<0) return NULL;
   };
 
+  /** This is an interesting side effect of the talloc reference model:
+      
+  talloc_reference(context, ptr) adds a new context to ptr so ptr is
+  now effectively parented by two parents. The two parents are not
+  equal however because a talloc free(ptr) will remove the reference
+  first and then the original parent.
+
+  This causes problems here because we create the packet_header with
+  self->buffer as a context. However other code takes references to it
+  - pinning it to other parents. If we did a
+  talloc_free(self->packet_header) here we would be removing those
+  references _instead_ of freeing the ptr from our own self->buffer
+  reference. This will cause both memory leaks (because we will not be
+  freeing packet_header at all, and later crashes because important
+  references will be removed.
+
+  When references begin to be used extensively I think we need to
+  start using talloc_unlink instead of talloc_free everywhere.
+  */
   // Free old packets:
-  if(self->packet_header) talloc_free(self->packet_header);
+  if(self->packet_header) 
+    talloc_unlink(self->buffer, self->packet_header);
 
   // Make a new packet:
   self->packet_header = (PcapPacketHeader)CONSTRUCT(PcapPacketHeader, Packet,
@@ -186,7 +209,7 @@ static PyObject *PyPCAP_next(PyPCAP *self) {
 
   // Adjust the endianess if needed
   if(self->file_header->little_endian) {
-    self->packet_header->super.format = PCAP_PKTHEADER_STRUCT_LE;
+    self->packet_header->super.format = self->packet_header->le_format;
   };
 
   // Read the packet in:
@@ -223,10 +246,17 @@ static PyObject *PyPCAP_seek(PyPCAP *self, PyObject *args, PyObject *kwds) {
 
 static PyObject *PyPCAP_offset(PyPCAP *self, PyObject *args) {
   PyObject *offset = PyObject_CallMethod(self->fd, "tell", NULL);
+  size_t offset_int;
 
   if(!offset) return NULL;
+  offset_int = PyNumber_AsSsize_t(offset, NULL);
 
-  return PyLong_FromUnsignedLongLong(PyLong_AsUnsignedLongLong(offset) - self->buffer->size);
+  if(offset_int < 0) {
+    Py_DECREF(offset);
+    return NULL;
+  };
+
+  return PyLong_FromUnsignedLongLong(offset_int - self->buffer->size);
 
 };
 

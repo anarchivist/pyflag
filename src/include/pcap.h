@@ -61,11 +61,15 @@ CLASS(PcapFileHeader, Packet)
 
      // A flag to indicate our endianess:
      int little_endian;
+     char *le_format;
+
 END_CLASS
 
 CLASS(PcapPacketHeader, Packet)
      struct pcap_pkthdr header;
      int little_endian;
+
+     char *le_format;
 END_CLASS
 
 #endif

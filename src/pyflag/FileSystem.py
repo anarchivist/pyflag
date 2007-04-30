@@ -538,6 +538,8 @@ class File:
         self.cached_fd = None
         size=0
 
+        print "Caching inode %s" % self.inode
+
         ## Recreate the cache file (May need to use kernel locking for
         ## multithreaded support)
         cached_filename = self.get_temp_path()
@@ -745,6 +747,7 @@ class File:
         self.slack = slack
         self.overread = overread
 
+        print "limit = %s" % limit
         self.seek(limit)
         data = self.read(max+1)
 
