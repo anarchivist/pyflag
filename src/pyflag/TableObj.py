@@ -101,13 +101,18 @@ class TableObj:
         id is the key value which will be retrieved. We return a row record.
         """
         dbh =DB.DBO(self.case)
-        dbh.execute("select %s from %s where %s=%r",(self._make_column_sql(),self.table,self.key,id))
+        dbh.execute("select * from %s where %s=%r",(self.table,self.key,id))
         return dbh.fetch()
 
     def select(self, **kwargs):
-        sql = " and ".join(["%s=%s" % (k,v) for k,v in kwargs.items()])
+        condition = [ "`%s`=%r" % (k,v) for k,v in kwargs.items() if not k.startswith('_') ]
+        condition += [ "`%s`=%s" % (k[1:],v) for k,v in kwargs.items() if k.startswith('_') ]
+        sql = " and ".join(condition)
+        
         dbh =DB.DBO(self.case)
-        dbh.execute("select %s from %s where %s",(self._make_column_sql(),self.table,sql))
+        ## Although select * is usually frowned upon for the
+        ## convenience its worth it here.
+        dbh.execute("select * from %s where %s",(self.table,sql))
         return dbh.fetch()
 
     def edit(self,query,ui):
@@ -736,7 +741,7 @@ class IPType(ColumnType):
             ## We got submitted - actually try to do the deed:
             if 'Edit Note' in query.getarray('__submit__'):
                 result.start_table()
-                row = interestingIPs.select(ip='inet_aton(\"%s\")' % value)
+                row = interestingIPs.select(_ip='inet_aton(%r)' % value)
                 if row:
                     query['id'] = row['id']
                 newEvent = interestingIPs.edit(query, result)
@@ -752,7 +757,7 @@ class IPType(ColumnType):
             result.start_form(query, pane='self')
             result.heading("Adding a note for IP %s" % value)
 
-            row = interestingIPs.select(ip='inet_aton(\"%s\")' % value)
+            row = interestingIPs.select(_ip='inet_aton(%r)' % value)
             if row:
                 query['id'] = row['id']
 
@@ -798,7 +803,7 @@ class IPType(ColumnType):
             result.end_form(value='Add Note')
 
         ## Check if this IP has any notes with it:
-        row = interestingIPs.select(ip='inet_aton(\"%s\")' % value)
+        row = interestingIPs.select(_ip='inet_aton(%r)' % value)
 
         ## Provide a way for users to save the IP address:
         tmp1 = result.__class__(result)
@@ -815,7 +820,7 @@ class IPType(ColumnType):
         if row:
             tmp1.popup(edit_ips_of_interest_cb, row['notes'], icon="balloon.png")
             tmp1.text("  ", value, font="bold")
-            result.row(tmp1, **{'class': 'hilight'})
+            result.row(tmp1, **{'class': 'match'})
         else:
             tmp1.popup(add_to_ips_of_interest_cb, 
                        "Add a note about this IP", 

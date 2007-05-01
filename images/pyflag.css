@@ -302,7 +302,7 @@ iframe#right {
 
 /** Matches are highlighted here */
 .match { 
-  background-color: yellow;
+  background-color: #f4ffa9;
 }
 
 /** Slack is highlighted here */
