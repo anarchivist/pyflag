@@ -27,7 +27,7 @@ Users may annotate important things for later reference.
 """
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
-from pyflag.TableObj import StringType,TimestampType,EditableStringType,InodeType,FilenameType, TimelineObj, IntegerType
+from pyflag.TableObj import StringType,TimestampType,EditableStringType,InodeType,FilenameType, TimelineObj, IntegerType, IPType
 import pyflag.Registry as Registry
 
 class ViewAnnotation(Reports.report):
@@ -77,11 +77,6 @@ class ViewCaseTimeline(Reports.report):
             return result
       
         result.heading("Case Time Line for case %s" % query['case'])
-        result.text("Add arbitrary event:")
-        result.popup(add_new_event, "Add abritrary event", 
-                                            case=query['case'], 
-                                            icon="clock.png")
-        result.text("\n")
  
         result.table(
             elements = [ IntegerType(name='id', column='id'),
@@ -93,7 +88,8 @@ class ViewCaseTimeline(Reports.report):
             case = query['case'],
         )
 
-
+        result.toolbar(add_new_event, "Add abritrary event", 
+                                            icon="clock.png")
 
 class ViewIPsOfInterest(Reports.report):
     """ View all IPs of interest """
@@ -101,9 +97,21 @@ class ViewIPsOfInterest(Reports.report):
     family = "Case Management"
     order = 60
 
-    def display(self,query,result):
-        result.heading("IPs of interest for case %s" % query['case'])
-        result.text("\n\nNYI\n\n")
+    def display(self, query, result):
+        original_query = query
+ 
+        result.heading("Interesting IPs for case %s" % query['case'])
+ 
+        result.table(
+            elements = [ IntegerType('id','id'),
+                         IPType('ip', 'ip'),
+                         StringType('Notes', 'notes'),
+                         StringType('Category', 'category')
+                        ],
+            table = 'interesting_ips',
+            case = query['case'],
+        )
+
 
 class ViewCaseReport(Reports.report):
     """ View a pretty print case report """

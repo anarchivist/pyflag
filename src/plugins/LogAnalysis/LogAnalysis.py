@@ -58,7 +58,10 @@ class ListLogFile(Reports.report):
             pass
 
     def display(self,query,result):
-        result.heading("Log File in Table %s" % query['logtable'])            
+        if (query.has_key('limit')):
+            result.heading("Log File in Table %s" % query['logtable'])
+        else:
+            result.heading("Log File in Table %s" % query['logtable'])            
         dbh = DB.DBO(query['case'])
         dbh.execute("select value from meta where property = 'log_preset_%s' limit 1",(query['logtable']))
         row=dbh.fetch()

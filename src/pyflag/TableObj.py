@@ -39,6 +39,7 @@ config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
 import pyflag.TypeCheck as TypeCheck
 import pyflag.FileSystem as FileSystem
+import socket
 
 class ConstraintError(Exception):
     """ This exception is thrown when a contraint failed when adding or updating a row in the db.
@@ -104,7 +105,7 @@ class TableObj:
         return dbh.fetch()
 
     def select(self, **kwargs):
-        sql = " and ".join(["%s=%r" % (k,v) for k,v in kwargs.items()])
+        sql = " and ".join(["%s=%s" % (k,v) for k,v in kwargs.items()])
         dbh =DB.DBO(self.case)
         dbh.execute("select %s from %s where %s",(self._make_column_sql(),self.table,sql))
         return dbh.fetch()
@@ -133,7 +134,10 @@ class TableObj:
                     del query[k]
 
             try:
-                fields[k]=query[k]
+                if k=='ip':
+                    fields["_ip"]="inet_aton(\"%s\")" % query[k]
+                else:
+                    fields[k]=query[k]
             except KeyError:
                 pass
 
@@ -168,12 +172,15 @@ class TableObj:
                         del query[k]
 
                 try:
-                    result[k]=query[k]
+                    if k=='ip':
+                        result["_ip"]="inet_aton(\"%s\")" % query[k]
+                    else:
+                        result[k]=query[k]
                 except KeyError:
                     pass
         finally:
             ## Cleanup the placeholder
-            dbh.delete(self.table, "%s=%r" % (self.key, int(new_id)))
+            dbh.delete(self.table, "%s=%s" % (self.key, int(new_id)))
             
         dbh.insert(self.table, **result)
 
@@ -650,7 +657,7 @@ class IPType(ColumnType):
     def __init__(self, name='', column='', link='', callback=''):
         ColumnType.__init__(self, name=name, column=column,
                             link=link, callback=callback)
-        
+    
     # reMatchString: a re that matches string CIDR's
     reMatchString = re.compile(
         r'(\d+)' # first byte must always be given
@@ -717,16 +724,105 @@ class IPType(ColumnType):
         return "_"+self.column, "inet_aton(%r)" % value
 
     def display(self, value, row, result):
-        ## Provide a way for users to save the IP address:
+        result = result.__class__(result)
+
+        self.row = row
+        original_query=result.defaults
+
+        interestingIPs = InterestingIPObj(original_query['case'])
         
+        def edit_ips_of_interest_cb(query, result):
+
+            ## We got submitted - actually try to do the deed:
+            if 'Edit Note' in query.getarray('__submit__'):
+                result.start_table()
+                row = interestingIPs.select(ip='inet_aton(\"%s\")' % value)
+                if row:
+                    query['id'] = row['id']
+                newEvent = interestingIPs.edit(query, result)
+                
+                result.para("The following is the new annotated record:")
+                interestingIPs.show(newEvent,result)
+                
+                result.end_table()
+                result.link("Close this window", target=original_query, pane='parent_pane')
+                return result
+
+            ## Present the user with the form:
+            result.start_form(query, pane='self')
+            result.heading("Adding a note for IP %s" % value)
+
+            row = interestingIPs.select(ip='inet_aton(\"%s\")' % value)
+            if row:
+                query['id'] = row['id']
+
+            query['ip']=value
+            ## Then show the form
+            interestingIPs.edit_form(query,result)
+            result.end_form(value='Edit Note')
+
+        def add_to_ips_of_interest_cb(query, result):
+            ## We got submitted - actually try to do the deed:
+            if 'Add Note' in query.getarray('__submit__'):
+                result.start_table()
+                newEvent = interestingIPs.add(query, result)
+                
+                result.para("The following is the new annotated record:")
+                interestingIPs.show(newEvent,result)
+                
+                result.end_table()
+                result.link("Close this window", target=original_query, pane='parent_pane')
+                return result
+
+            ## Present the user with the form:
+            result.start_form(query, pane='self')
+            result.heading("Adding a note for IP %s" % value)
+
+            ## First set it up with the info from the table as defaults
+            defaultInfo = dict() 
+            defaultInfo['ip']=value
+            defaultInfo['notes']=""
+
+            # This doesn't work...?
+            #for infoFromCol in self.row:
+            #        print "info is:", infoFromCol
+            #        defaultInfo['notes']+=str(infoFromCol)
+            #        defaultInfo['notes']+=":"
+            #        defaultInfo['notes']+=str(row[infoFromCol])
+            #        defaultInfo['notes']+="     \n"
+
+            defaultInfo['notes'] = "IP Address of Interest"
+            
+            ## Then show the form
+            interestingIPs.add_form(query,result, defaultInfo)
+            result.end_form(value='Add Note')
+
+        ## Check if this IP has any notes with it:
+        row = interestingIPs.select(ip='inet_aton(\"%s\")' % value)
+
+        ## Provide a way for users to save the IP address:
+        tmp1 = result.__class__(result)
         
         ## We try to show a whois if possible
         id = Whois.lookup_whois(value)
-        result = result.__class__(result)
-        result.link(Whois.identify_network(id) + "<br>" + Whois.geoip_resolve(value),
-                    target=query_type(family="Log Analysis", report="LookupIP", address=value),
-                    pane='popup')
-        result.text("\n%s" %value)
+        tmp2 = result.__class__(result)
+        tmp2.link(Whois.identify_network(id) + "<br>" + Whois.geoip_resolve(value),
+                  target=query_type(family="Log Analysis", 
+                  report="LookupIP", address=value),
+                  pane='popup')
+        result.row(tmp2)
+
+        if row:
+            tmp3 = result.__class__(result)
+            tmp3.text(value, font="bold", highlight="match")
+            tmp1.popup(edit_ips_of_interest_cb, row['notes'], icon="balloon.png")
+            result.row(tmp1, tmp3)
+        else:
+            tmp1.popup(add_to_ips_of_interest_cb, 
+                       "Add a note about this IP", 
+                       icon="treenode_expand_plus.gif")
+            result.row(tmp1, value)
+        
         return result
 
 class InodeType(StringType):
@@ -817,6 +913,90 @@ class InodeType(StringType):
 ## This is an example of using the table object to manage a DB table
 import TableActions
 
+class InterestingIPObj(TableObj):
+    table = "interesting_ips"
+    columns = (
+        'ip', 'IP Address',
+        'notes','Notes',
+        'category', 'category',
+        )
+
+    add_constraints = {
+        'category': TableActions.selector_constraint,
+        }
+
+    edit_constraints = {
+        'category': TableActions.selector_constraint,
+        }
+
+    def __init__(self, case=None, id=None):
+        self.form_actions = {
+            'notes': TableActions.textarea,
+            'category': Curry(TableActions.selector_display,
+                              table='interesting_ips', field='category', case=case),
+            }
+        self.case=case
+        self.key='id'
+        TableObj.__init__(self,case,id)
+
+    def show(self,id,result):
+        dbh = DB.DBO(self.case)
+        dbh.execute("select * from %s where %s=%r",
+                         (self.table,self.key,id))
+
+        row=dbh.fetch()
+        dbh.execute("select inet_ntoa(ip) as ip from %s where %s=%r", 
+                                (self.table, self.key, id))
+        iprow=dbh.fetch()
+        row['ip']=iprow['ip']
+
+        if not row:
+            tmp=result.__class__(result)
+            tmp.text("Error: Record %s not found" % id,color='red')
+            result.row(tmp)
+            return
+        result.start_table()
+        for k,v in zip(self._column_keys,self._column_names):
+            ## If there are any specific display functions we let them
+            ## do it here...
+            cb = self.display_actions.get(k,None)
+            print "Will look for display_actions.get", k    
+            if not cb:
+                print "Not cb 1"
+                cb = getattr(self.__class__,"display_%s" % k, None)
+                
+            if cb:
+                print "cb"
+                cb(self,description=v, variable=k, ui=result, defaults=row)
+            else:
+                print "will print"
+                try:
+                    tmp = result.__class__(result)
+                    tmp.text(row[k],color='red')
+                    result.row(v,tmp)
+                except KeyError:
+                    pass
+#    def add(self,query,ui):
+#        """ Adds a row given in query[self.table.key] to the table """
+#        dbh = DB.DBO(self.case)
+#        dbh.insert(self.table, **{'_'+self.key: 'NULL'})
+#        ## Work out what will be the next ID if it were to succeed. We
+#        ## create a placeholder and then remove/replace it later.
+#        new_id = dbh.autoincrement()
+#        try:
+#            result = {self.key:new_id}
+#            for k in self._column_keys:
+#                try:
+#                    result[k]=query[k]
+#                except KeyError:
+#                    pass
+#        finally:
+#            ## Cleanup the placeholder
+#            dbh.delete(self.table, "%s=%r" % (self.key, int(new_id)))
+#            
+#        dbh.insert(self.table, **result)
+#
+#        return new_id
 
 class TimelineObj(TableObj):
     table = "timeline"
