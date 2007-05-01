@@ -30,95 +30,74 @@ import pyflag.FlagFramework as FlagFramework
 from pyflag.TableObj import StringType,TimestampType,EditableStringType,InodeType,FilenameType, TimelineObj, IntegerType, IPType
 import pyflag.Registry as Registry
 
-class ViewAnnotation(Reports.report):
-    """ View the annotated Inodes """
-    name = "View Annotations"
-    family = "Case Management"
-    order = 40
-
-    def display(self, query,result):
-        result.heading("Annotated Inodes for case %s" % query['case'])
-        result.table(
-            elements = [ InodeType('Inode', 'annotate.inode', case=query['case']),
-                         FilenameType(case=query['case']),
-                         StringType('Category','category'),
-                         StringType('Note','note'),
-                         ],
-            table = 'annotate join file on file.inode=annotate.inode',
-            case = query['case'],
-            )
-
-class ViewCaseTimeline(Reports.report):
-    """ View the case time line """
-    name = "View Case Timeline"
-    family = "Case Management"
-    order = 50
-
-    def display(self, query, result):
-        original_query = query
- 
-        def add_new_event(query, result):
-            timeline = TimelineObj(case=query['case'])
-
-            ## We got submitted - actually try to do the deed:
-            if 'Add To Timeline' in query.getarray('__submit__'):
-                result.start_table()
-                newEvent = timeline.add(query, result)
-                result.para("The following is the new timeline entry:")
-                timeline.show(newEvent,result)
-                result.end_table()
-                result.link("Close this window", target=original_query, pane='parent')
-                return result
-
-            result.start_form(query, pane='self')
-            result.heading("Add an arbitrary event")
-            timeline.add_form(query,result)
-            result.end_form(value="Add To Timeline")
-            return result
-      
-        result.heading("Case Time Line for case %s" % query['case'])
- 
-        result.table(
-            elements = [ IntegerType(name='id', column='id'),
-                         TimestampType(name='Time', column='time'),
-                         EditableStringType('Notes', 'notes'),
-                         StringType('Category', 'category')
-                        ],
-            table = 'timeline',
-            case = query['case'],
-        )
-
-        result.toolbar(add_new_event, "Add abritrary event", 
-                                            icon="clock.png")
-
-class ViewIPsOfInterest(Reports.report):
-    """ View all IPs of interest """
-    name = "View IPs of interest """
-    family = "Case Management"
-    order = 60
-
-    def display(self, query, result):
-        original_query = query
- 
-        result.heading("Interesting IPs for case %s" % query['case'])
- 
-        result.table(
-            elements = [ IntegerType('id','id'),
-                         IPType('ip', 'ip'),
-                         StringType('Notes', 'notes'),
-                         StringType('Category', 'category')
-                        ],
-            table = 'interesting_ips',
-            case = query['case'],
-        )
-
-
 class ViewCaseReport(Reports.report):
-    """ View a pretty print case report """
+    """ Show annotated entities in this case """
     name = "View Case Report """
     family = "Case Management"
     order = 70
 
     def display(self,query,result):
-        result.heading("Case report for %s" % query['case'])
-        result.text("\n\nNYI\n\n")
+        def Annotated_inodes(query, result):
+            result.table(
+                elements = [ InodeType('Inode', 'annotate.inode', case=query['case']),
+                             FilenameType(case=query['case']),
+                             StringType('Category','category'),
+                             StringType('Note','note'),
+                             ],
+                table = 'annotate join file on file.inode=annotate.inode',
+                case = query['case'],
+                )
+
+        def Timeline(query, result):
+            def add_new_event(query, result):
+                timeline = TimelineObj(case=query['case'])
+
+                ## We got submitted - actually try to do the deed:
+                if 'Add To Timeline' in query.getarray('__submit__'):
+                    result.start_table()
+                    newEvent = timeline.add(query, result)
+                    result.para("The following is the new timeline entry:")
+                    timeline.show(newEvent,result)
+                    result.end_table()
+                    result.link("Close this window", target=original_query, pane='parent')
+                    return result
+
+                result.start_form(query, pane='self')
+                result.heading("Add an arbitrary event")
+                timeline.add_form(query,result)
+                result.end_form(value="Add To Timeline")
+                return result
+
+            result.table(
+                elements = [ IntegerType(name='id', column='id'),
+                             TimestampType(name='Time', column='time'),
+                             EditableStringType('Notes', 'notes'),
+                             StringType('Category', 'category')
+                            ],
+                table = 'timeline',
+                case = query['case'],
+            )
+
+            result.toolbar(add_new_event, "Add abritrary event", 
+                                                icon="clock.png")
+
+        def Annotated_IPs(query, result):            
+            result.table(
+                elements = [ IntegerType('id','id'),
+                             IPType('ip', 'ip'),
+                             StringType('Notes', 'notes'),
+                             StringType('Category', 'category')
+                            ],
+                table = 'interesting_ips',
+                case = query['case'],
+            )
+
+        result.heading("Report for case %s" % query['case'])
+        result.notebook(
+            names = [ 'Inodes',
+                      'Timeline',
+                      'IP Addresses'],
+            callbacks = [ Annotated_inodes,
+                          Timeline,
+                          Annotated_IPs],
+            )
