@@ -2,6 +2,7 @@
 #include "pcap.h"
 #include "stringio.h"
 #include "network.h"
+#include "pypacket.h"
 #include <Python.h>
 
 /** This is a python module which provides access to the pcap packet
@@ -13,6 +14,8 @@
 #include "pypcap.h"
 
 static PyObject *g_pypacket_module=NULL;
+
+static PyObject *PyPCAP_next(PyPCAP *self);
 
 // This is called to fill the buffer when it gets too low:
 static int PyPCAP_fill_buffer(PyPCAP *self, PyObject *fd) {
@@ -115,7 +118,7 @@ static PyObject *file_header(PyPCAP *self, PyObject *args) {
 /** Dissects the current packet returning a PyPacket object */
 static PyObject *PyPCAP_dissect(PyPCAP *self, PyObject *args, PyObject *kwds) {
   Root root;
-  PyObject *result;
+  PyPacket *result;
   int packet_id=-1;
   static char *kwlist[] = {"id", NULL};
 
@@ -127,31 +130,36 @@ static PyObject *PyPCAP_dissect(PyPCAP *self, PyObject *args, PyObject *kwds) {
     self->packet_id++;
   };
 
-  if(!self->packet_header) 
-    return PyErr_Format(PyExc_RuntimeError, "You must iterate over the pcap"
-			"file first before dissecting it");
-  
+  // Get the next packet:
+  result = (PyPacket *)PyPCAP_next(self);
+  if(!result) return NULL;
+
+  // Copy the data into the dissection_buffer:
   CALL(self->dissection_buffer, truncate, 0);
   CALL(self->dissection_buffer, write, 
        self->packet_header->header.data, self->packet_header->header.len);
 
   CALL(self->dissection_buffer, seek, 0,0);
 
-  root = CONSTRUCT(Root, Packet, super.Con, self->buffer, NULL);
+  // Attach a dissection object to the packet:
+  root = CONSTRUCT(Root, Packet, super.Con, result->obj, NULL);
   root->packet.link_type = self->file_header->header.linktype;
   root->packet.packet_id = packet_id;
 
   // Read the data:
   root->super.Read((Packet)root, self->dissection_buffer);
 
+  /*
   // Create a new PyPacket object to return:
   result = PyObject_CallMethod(g_pypacket_module, "PyPacket", "N",
 			       PyCObject_FromVoidPtr(root, NULL),
 			       "PcapPacketHeader");
 
   talloc_unlink(self->buffer, root);
+  */
+  ((PcapPacketHeader)(result->obj))->header.root = root;
 
-  return result;
+  return (PyObject *)result;
 };
 
 static PyObject *PyPCAP_next(PyPCAP *self) {

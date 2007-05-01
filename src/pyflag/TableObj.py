@@ -813,15 +813,15 @@ class IPType(ColumnType):
         result.row(tmp2)
 
         if row:
-            tmp3 = result.__class__(result)
-            tmp3.text(value, font="bold", highlight="match")
             tmp1.popup(edit_ips_of_interest_cb, row['notes'], icon="balloon.png")
-            result.row(tmp1, tmp3)
+            tmp1.text("  ", value, font="bold")
+            result.row(tmp1, **{'class': 'hilight'})
         else:
             tmp1.popup(add_to_ips_of_interest_cb, 
                        "Add a note about this IP", 
                        icon="treenode_expand_plus.gif")
-            result.row(tmp1, value)
+            tmp1.text("  ", value)
+            result.row(tmp1)
         
         return result
 

@@ -122,7 +122,11 @@ CLASS(TCPHashTable, Object)
 	 packets
      */
      void (*callback)(TCPStream self, IP ip, void *object);
+
+     // Each new stream will get access to this pointer - noone will decref it though
      void *data;
+
+     // A running tally
      int packets_processed;
 
      TCPHashTable METHOD(TCPHashTable, Con, int initial_con_id);

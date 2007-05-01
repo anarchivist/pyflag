@@ -7,6 +7,7 @@ dependancy on libpcap. (We dont actually link against it). */
 
 #include <sys/types.h>
 #include <stdint.h>
+#include "network.h"
 
 #define DLT_NULL	0	/* BSD loopback encapsulation */
 #define DLT_EN10MB	1	/* Ethernet (10Mb) */
@@ -45,7 +46,10 @@ struct pcap_pkthdr {
   uint32_t caplen;	/* length of portion present */
   uint32_t len;	/* length this packet (off wire) */
   char *data;
+
   uint32_t offset;
+  // This holds the dissected tree
+  Root root;
 } __attribute__((packed));
 
 #define PCAP_PKTHEADER_STRUCT q(STRUCT_INT, STRUCT_INT, STRUCT_INT,	\

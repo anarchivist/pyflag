@@ -271,6 +271,7 @@ static PyObject *py_clear_stream_buffers(PyObject *self, PyObject *args) {
 
 static void callback(TCPStream self, IP ip, void *object) {
   PyPacket *dissected = (PyPacket *)object;
+  Reassembler *reassembler = (Reassembler *)self->data;
 
   switch(self->state) {
   case PYTCP_JUST_EST:
@@ -294,11 +295,18 @@ static void callback(TCPStream self, IP ip, void *object) {
 #endif
 
     break;
-  case PYTCP_DATA:
-    //    add_packet(self, ip);
+  case PYTCP_DATA: {
+    PyObject *result;
+    if(reassembler->packet_callback && dissected) {
+      result = PyObject_CallFunction(reassembler->packet_callback , "sO", "data", dissected);
+      Py_XDECREF(result);
+
+      // We no longer need the dissected object:
+      Py_XDECREF(dissected);
+    };
+  };
     break;
   case PYTCP_DESTROY: {
-    Py_XDECREF(dissected);
     printf("Connection ID %u -> %u destroyed\n", self->con_id, 
            self->reverse->con_id);
   };
@@ -331,6 +339,9 @@ static int Reassembler_init(Reassembler *self, PyObject *args, PyObject *kwds) {
   self->hash = CONSTRUCT(TCPHashTable, TCPHashTable, Con, NULL, initial_con_id);
   self->hash->callback = callback;
 
+  // We pass ourselves to all the callbacks
+  self->hash->data = self;
+
   return 0;
 };
 
@@ -347,8 +358,8 @@ static PyObject *process(Reassembler *self, PyObject *args) {
   if(!root) return NULL;
 
   // Check to make sure that its the right packet we want:
-  if(strcmp("Root", NAMEOF(root->obj)))
-    return PyErr_Format(PyExc_RuntimeError, "Not a dissected object %s", NAMEOF(root->obj));
+  //  if(strcmp("Root", NAMEOF(root->obj)))
+  //  return PyErr_Format(PyExc_RuntimeError, "Not a dissected object %s", NAMEOF(root->obj));
 
   ip = (IP)root->obj;
   if(!Find_Property((Packet *)&ip, NULL, "ip", "") || !ip) {
