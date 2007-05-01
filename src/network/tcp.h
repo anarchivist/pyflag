@@ -34,7 +34,15 @@ struct tuple4
 */
 struct skbuff {
   IP packet;
-  Root root;
+  // This is an arbitrary object which is passed to the callback
+  // together with the packet. We get the object when we first add the
+  // packet to the hash table. Note that we do not increase nor
+  // decrease its reference count (because we have no idea what it is)
+  // so callers to add need to increase its ref count and the callback
+  // implemented needs to decrease it. Make sure it doesnt get freed
+  // from under us. It can be NULL if there is no interesting use for
+  // it.
+  void *object;
   struct list_head list;
 };
 
@@ -83,13 +91,13 @@ CLASS(TCPStream, Object)
 
      /** An opaque data to go with the callack */
      void *data;
-     void METHOD(TCPStream, callback, IP ip);
+     void METHOD(TCPStream, callback, IP ip, void *object);
 
      /** This method is used to add an IP packet to the queue. Note
 	 that its talloc reference will be stolen and on destruction
 	 it will be automatically removed from the queue.
      */
-     void METHOD(TCPStream, add, IP packet);
+void METHOD(TCPStream, add, IP packet, void *object);
 END_CLASS
 
 /** The loading factor for the hash table */
@@ -113,7 +121,7 @@ CLASS(TCPHashTable, Object)
      /** This is the callback which will be invoked upon processing
 	 packets
      */
-     void (*callback)(TCPStream self, IP ip);
+     void (*callback)(TCPStream self, IP ip, void *object);
      void *data;
      int packets_processed;
 
@@ -125,7 +133,7 @@ CLASS(TCPHashTable, Object)
      TCPStream    METHOD(TCPHashTable, find_stream, IP ip);
 
      /** Process the ip packet */
-     int          METHOD(TCPHashTable, process, IP ip);
+     int          METHOD(TCPHashTable, process, IP ip, void *object);
 END_CLASS
 
 /** Given a packet finds the corresponding stream - or if one does not

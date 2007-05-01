@@ -45,6 +45,7 @@ struct pcap_pkthdr {
   uint32_t caplen;	/* length of portion present */
   uint32_t len;	/* length this packet (off wire) */
   char *data;
+  uint32_t offset;
 } __attribute__((packed));
 
 #define PCAP_PKTHEADER_STRUCT q(STRUCT_INT, STRUCT_INT, STRUCT_INT,	\
@@ -63,12 +64,13 @@ CLASS(PcapFileHeader, Packet)
      int little_endian;
      char *le_format;
 
+     // The offset into the pcap file of this packet
+     unsigned long long int pcap_offset;
 END_CLASS
 
 CLASS(PcapPacketHeader, Packet)
      struct pcap_pkthdr header;
      int little_endian;
-
      char *le_format;
 END_CLASS
 

@@ -10,31 +10,9 @@
 
 // This is a global reference to the pypacket module (for import
 // pypacket)
+#include "pypcap.h"
+
 static PyObject *g_pypacket_module=NULL;
-
-typedef struct {
-  PyObject_HEAD
-
-  // A buffer to be used to read from:
-  StringIO buffer;
-
-  // A python file like object - we only care that it has a read
-  // method. We use the read method to repeatadely fill the buffer
-  // with large chunks.
-  PyObject *fd;
-
-  // The file header:
-  PcapFileHeader file_header;
-  PcapPacketHeader packet_header;
-  StringIO dissection_buffer;
-
-  // Default id to use for newly dissected packets:
-  int packet_id;
-} PyPCAP;
-
-
-#define FILL_SIZE (1024 * 100)
-#define MAX_PACKET_SIZE (2 * 1024)
 
 // This is called to fill the buffer when it gets too low:
 static int PyPCAP_fill_buffer(PyPCAP *self, PyObject *fd) {
@@ -103,6 +81,9 @@ static int PyPCAP_init(PyPCAP *self, PyObject *args, PyObject *kwds) {
 
   self->dissection_buffer = CONSTRUCT(StringIO, StringIO, Con, self->buffer);
 
+  // Set our initial offset:
+  self->pcap_offset = self->buffer->readptr;
+
   // Ok we are good.
   return 0;
 
@@ -146,6 +127,10 @@ static PyObject *PyPCAP_dissect(PyPCAP *self, PyObject *args, PyObject *kwds) {
     self->packet_id++;
   };
 
+  if(!self->packet_header) 
+    return PyErr_Format(PyExc_RuntimeError, "You must iterate over the pcap"
+			"file first before dissecting it");
+  
   CALL(self->dissection_buffer, truncate, 0);
   CALL(self->dissection_buffer, write, 
        self->packet_header->header.data, self->packet_header->header.len);
@@ -219,7 +204,12 @@ static PyObject *PyPCAP_next(PyPCAP *self) {
   if(len<=0) {
     return PyErr_Format(PyExc_StopIteration, "Done");
   };
-  
+
+  // Make sure the new packet knows its offset:
+  self->packet_header->header.offset = self->pcap_offset;
+
+  // Keep track of our own file offset:
+  self->pcap_offset += self->buffer->readptr;
   CALL(self->buffer, skip, self->buffer->readptr);
 
   // create a new pypacket object:
@@ -240,24 +230,13 @@ static PyObject *PyPCAP_seek(PyPCAP *self, PyObject *args, PyObject *kwds) {
 
   // Flush out the local cache:
   CALL(self->buffer, truncate, 0);
-  
+  self->pcap_offset = offset;
+
   return PyObject_CallMethod(self->fd, "seek", "K", offset);
 };
 
 static PyObject *PyPCAP_offset(PyPCAP *self, PyObject *args) {
-  PyObject *offset = PyObject_CallMethod(self->fd, "tell", NULL);
-  size_t offset_int;
-
-  if(!offset) return NULL;
-  offset_int = PyNumber_AsSsize_t(offset, NULL);
-
-  if(offset_int < 0) {
-    Py_DECREF(offset);
-    return NULL;
-  };
-
-  return PyLong_FromUnsignedLongLong(offset_int - self->buffer->size);
-
+  return PyLong_FromUnsignedLongLong(self->pcap_offset);
 };
 
 static PyMethodDef PyPCAP_methods[] = {

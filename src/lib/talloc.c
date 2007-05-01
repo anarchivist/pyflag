@@ -162,10 +162,17 @@ do { \
 /*
   return the parent chunk of a pointer
 */
-static struct talloc_chunk *talloc_parent_chunk(const void *ptr)
+static inline struct talloc_chunk *talloc_parent_chunk(const void *ptr)
 {
-	struct talloc_chunk *tc = talloc_chunk_from_ptr(ptr);
+	struct talloc_chunk *tc;
+
+	if (unlikely(ptr == NULL)) {
+		return NULL;
+	}
+
+	tc = talloc_chunk_from_ptr(ptr);
 	while (tc->prev) tc=tc->prev;
+
 	return tc->parent;
 }
 
@@ -178,22 +185,11 @@ void *talloc_parent(const void *ptr)
 /*
   find parents name
 */
-const char *talloc_parent_name(const void *context)
+const char *talloc_parent_name(const void *ptr)
 {
-	struct talloc_chunk *tc;
-
-	if (unlikely(context == NULL)) {
-		return NULL;
-	}
-
-	tc = talloc_chunk_from_ptr(context);
-	while (tc && tc->prev) tc = tc->prev;
-	if (tc) {
-		tc = tc->parent;
-	}
-	return tc->name;
+	struct talloc_chunk *tc = talloc_parent_chunk(ptr);
+	return tc? tc->name : NULL;
 }
-
 
 /* 
    Allocate a bit of memory as a child of an existing pointer
@@ -265,6 +261,8 @@ int talloc_increase_ref_count(const void *ptr)
 
 /*
   helper for talloc_reference()
+
+  this is referenced by a function pointer and should not be inline
 */
 static int talloc_reference_destructor(struct talloc_reference_handle *handle)
 {
@@ -481,7 +479,7 @@ void *_talloc_steal(const void *new_ctx, const void *ptr)
   talloc_reference() has done. The context and pointer arguments
   must match those given to a talloc_reference()
 */
-static int talloc_unreference(const void *context, const void *ptr)
+static inline int talloc_unreference(const void *context, const void *ptr)
 {
 	struct talloc_chunk *tc = talloc_chunk_from_ptr(ptr);
 	struct talloc_reference_handle *h;
@@ -561,9 +559,9 @@ int talloc_unlink(const void *context, void *ptr)
 /*
   add a name to an existing pointer - va_list version
 */
-static const char *talloc_set_name_v(const void *ptr, const char *fmt, va_list ap) PRINTF_ATTRIBUTE(2,0);
+static inline const char *talloc_set_name_v(const void *ptr, const char *fmt, va_list ap) PRINTF_ATTRIBUTE(2,0);
 
-static const char *talloc_set_name_v(const void *ptr, const char *fmt, va_list ap)
+static inline const char *talloc_set_name_v(const void *ptr, const char *fmt, va_list ap)
 {
 	struct talloc_chunk *tc = talloc_chunk_from_ptr(ptr);
 	tc->name = talloc_vasprintf(ptr, fmt, ap);
@@ -773,7 +771,7 @@ void *_talloc_realloc(const void *context, void *ptr, size_t size, const char *n
 		return NULL;
 	}
 
-	/* realloc(NULL) is equavalent to malloc() */
+	/* realloc(NULL) is equivalent to malloc() */
 	if (ptr == NULL) {
 		return _talloc_named_const(context, size, name);
 	}
@@ -1176,10 +1174,11 @@ char *talloc_vasprintf(const void *t, const char *fmt, va_list ap)
 	va_list ap2;
 	char c;
 	
-	va_copy(ap2, ap);
-
 	/* this call looks strange, but it makes it work on older solaris boxes */
-	if ((len = vsnprintf(&c, 1, fmt, ap2)) < 0) {
+	va_copy(ap2, ap);
+	len = vsnprintf(&c, 1, fmt, ap2);
+	va_end(ap2);
+	if (len < 0) {
 		return NULL;
 	}
 
@@ -1187,6 +1186,7 @@ char *talloc_vasprintf(const void *t, const char *fmt, va_list ap)
 	if (ret) {
 		va_copy(ap2, ap);
 		vsnprintf(ret, len+1, fmt, ap2);
+		va_end(ap2);
 		_talloc_set_name_const(ret, ret);
 	}
 
@@ -1228,10 +1228,13 @@ char *talloc_vasprintf_append(char *s, const char *fmt, va_list ap)
 
 	tc = talloc_chunk_from_ptr(s);
 
-	va_copy(ap2, ap);
-
 	s_len = tc->size - 1;
-	if ((len = vsnprintf(&c, 1, fmt, ap2)) <= 0) {
+
+	va_copy(ap2, ap);
+	len = vsnprintf(&c, 1, fmt, ap2);
+	va_end(ap2);
+
+	if (len <= 0) {
 		/* Either the vsnprintf failed or the format resulted in
 		 * no characters being formatted. In the former case, we
 		 * ought to return NULL, in the latter we ought to return
@@ -1245,8 +1248,8 @@ char *talloc_vasprintf_append(char *s, const char *fmt, va_list ap)
 	if (!s) return NULL;
 
 	va_copy(ap2, ap);
-
 	vsnprintf(s+s_len, len+1, fmt, ap2);
+	va_end(ap2);
 	_talloc_set_name_const(s, s);
 
 	return s;
@@ -1288,7 +1291,6 @@ void *_talloc_zero_array(const void *ctx, size_t el_size, unsigned count, const 
 	}
 	return _talloc_zero(ctx, el_size * count, name);
 }
-
 
 /*
   realloc an array, checking for integer overflow in the array size

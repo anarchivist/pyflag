@@ -66,14 +66,14 @@ void pad_to_first_packet(TCPStream self) {
   self->next_seq+=tcp->packet.data_len;
   
   /** Call our callback with this */
-  if(self->callback) self->callback(self, first->packet);
+  if(self->callback) self->callback(self, first->packet, first->object);
   
   list_del(&(first->list));
   talloc_free(first);
 };
 
 
-void TCPStream_add(TCPStream self, IP ip) {
+void TCPStream_add(TCPStream self, IP ip, void *object) {
   struct skbuff *new = talloc(self, struct skbuff);
   struct skbuff *i;
   TCP tcp=(TCP)ip->packet.payload;
@@ -91,9 +91,10 @@ void TCPStream_add(TCPStream self, IP ip) {
 
   /** Take over the packet */
   new->packet = ip;
+  new->object = object;
 
-  // Add a reference to ip - we need to keep it alive:
-  talloc_reference(new, ip);
+  //Steal the packet:
+  talloc_steal(new, ip);
 
   /** Record the most recent id we handled */
   self->max_packet_id = ip->id;
@@ -158,7 +159,7 @@ void TCPStream_add(TCPStream self, IP ip) {
 
       /** Call our callback with this */
       self->state = PYTCP_DATA;
-      if(self->callback) self->callback(self, first->packet);
+      if(self->callback) self->callback(self, first->packet, first->object);
       
       /** Adjust the expected sequence number */
       self->next_seq += tcp->packet.data_len;
@@ -231,7 +232,7 @@ int TCPStream_flush(void *this) {
 
   /** Now we signal to the cb that the stream is destroyed */
   self->state = PYTCP_DESTROY;
-  if(self->callback) self->callback(self, NULL);
+  if(self->callback) self->callback(self, NULL, NULL);
 
   /** and we remove it from its lists */
   list_del(&(self->list));
@@ -242,7 +243,7 @@ int TCPStream_flush(void *this) {
 
   self->reverse->state = PYTCP_DESTROY;
   if(self->reverse->callback)
-    self->reverse->callback(self->reverse, NULL);
+    self->reverse->callback(self->reverse, NULL, NULL);
 
   list_del(&(self->reverse->list));
   list_del(&(self->reverse->global_list));
@@ -410,7 +411,7 @@ static void check_for_expired_packets(TCPHashTable self, int id) {
   };
 };
 
-int TCPHashTable_process_tcp(TCPHashTable self, IP ip) {
+int TCPHashTable_process_tcp(TCPHashTable self, IP ip, void *object) {
   TCPStream i = self->find_stream(self,ip);
   TCP tcp = (TCP)ip->packet.payload;
 
@@ -429,7 +430,7 @@ int TCPHashTable_process_tcp(TCPHashTable self, IP ip) {
     i->state = PYTCP_JUST_EST;
     
     /** Notify the callback of the establishment of the new connection */
-    i->callback(i, ip);
+    i->callback(i, ip, object);
 
     i->state = PYTCP_DATA;
   };
@@ -441,12 +442,12 @@ int TCPHashTable_process_tcp(TCPHashTable self, IP ip) {
   */
 
   /** Add the new IP packet to the stream queue */
-  i->add(i, ip);
+  i->add(i, ip, object);
 
   /** If we are keeping track of too many streams we need to expire
       them:
   **/
-  if(_total_streams>MAX_NUMBER_OF_STREAMS) {
+  if(_total_streams > MAX_NUMBER_OF_STREAMS) {
     TCPStream x;
 
     list_for_each_entry_prev(x, &(self->sorted->global_list), global_list) {

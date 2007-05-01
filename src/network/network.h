@@ -118,6 +118,9 @@ struct ip_struct {
 CLASS(IP, Packet)
 /** Each IP Packet has a unique number */
      int id;
+     // This contains the packet offset from the pcap file - it just
+     // gets provided to the callback
+     int pcap_offset;
      struct ip_struct packet;
 END_CLASS
 
