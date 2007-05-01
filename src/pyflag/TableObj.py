@@ -960,16 +960,12 @@ class InterestingIPObj(TableObj):
             ## If there are any specific display functions we let them
             ## do it here...
             cb = self.display_actions.get(k,None)
-            print "Will look for display_actions.get", k    
             if not cb:
-                print "Not cb 1"
                 cb = getattr(self.__class__,"display_%s" % k, None)
                 
             if cb:
-                print "cb"
                 cb(self,description=v, variable=k, ui=result, defaults=row)
             else:
-                print "will print"
                 try:
                     tmp = result.__class__(result)
                     tmp.text(row[k],color='red')
