@@ -21,6 +21,7 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 import pyflag.LogFile as LogFile
+import pyflag.pyflaglog as pyflaglog
 import pyflag.DB as DB
 import pyflag.FlagFramework as FlagFramework
 from pyflag.FlagFramework import query_type
@@ -186,7 +187,9 @@ class SimpleLog(LogFile.Log):
         """
         for row in self.read_record():
             row = self.prefilter_record(row)
-            yield row.split(self.delimiter)
+            splitUpRow = row.split(self.delimiter)
+            splitUpRow[-1] = splitUpRow[-1].strip()
+            yield splitUpRow
 
     def parse(self, query, datafile='datafile'):
         """ This function parses the query string into the appropriate fields array """
@@ -204,7 +207,7 @@ class SimpleLog(LogFile.Log):
                     num_fields=number
                     
         num_fields+=1
-        print "Found %s fields" % num_fields
+        pyflaglog.log(pyflaglog.DEBUG, "Found %i fields when parsing" % num_fields)
         ## Initialise the fields array:
         self.fields = [ None ] * num_fields
         self.num_fields = num_fields

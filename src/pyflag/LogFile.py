@@ -36,6 +36,7 @@ config=pyflag.conf.ConfObject()
 import pyflag.pyflaglog as pyflaglog
 import pickle,gzip
 import plugins.LogAnalysis.Whois as Whois
+import re
 
 def get_file(query,result):
     result.row("Select a sample log file for the previewer",stretch=False)
@@ -88,9 +89,15 @@ class Log:
         dbh = DB.DBO(self.case)
         temp_table = dbh.get_temp()
 
-        for a in self.load(temp_table,rows= 3):
-            pass
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "About to attempt to load three rows into a temp table for the preview")
 
+        ## Since this should be a temporary table, we explicitly tell the load
+        ## method to drop it if it exists
+        for a in self.load(temp_table,rows= 3, deleteExisting="YES"):
+            pass
+       
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Created a test table containing three rows. About to try and display it...")
+ 
         ## Display the new table
         self.display(temp_table, result)
     
@@ -99,6 +106,9 @@ class Log:
 
         This can handle multiple files as provided in the constructor.
         """
+        
+        blank = re.compile("^\s*$")
+
         if not self.datafile:
             raise IOError("Datafile is not set!!!")
         
@@ -114,16 +124,18 @@ class Log:
                 fd=open(file,'r')
                 
             for line in fd:
+                if blank.match(line): continue
                 if line.startswith('#') and ignore_comment:
                     continue
                 else:
                     yield line
 
-    def load(self,tablename, rows = None):
+    def load(self,tablename, rows = None, deleteExisting=None):
         """ Loads the specified number of rows into the database.
 
         @arg table_name: A table name to use
         @arg rows: number of rows to upload - if None , we upload them all
+        @arg deleteExisting: If this is anything but none, tablename will first be dropped
         @return: A generator that represents the current progress indication.
         """
         ## We append _log to tablename to prevent name clashes in the
@@ -140,6 +152,11 @@ class Log:
         if len(fields)==0:
             raise RuntimeError("No Columns were selected.")
         
+        # We just do this in case we get old temporary tables left around. 
+        # Normal calls to this method don't need to worry about this
+        if deleteExisting:
+            dbh.execute("drop table if exists %s",tablename)   
+
         dbh.execute("create table if not exists %s (%s)", (
             tablename,
             ',\n'.join([ x.create() for x in fields])

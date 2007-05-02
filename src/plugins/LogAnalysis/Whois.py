@@ -52,6 +52,9 @@ def lookup_whois(ip):
         ip/2
         ip=str(ip)
     except TypeError:
+        if ip == None:
+            pyflaglog.log(pyflaglog.WARNING, "Was asked to perform a whois lookup on a blank IP address. Will return the default route, but this might suggest an error") 
+            return 0
         ip = "inet_aton(%r)" % ip
 
     ## First check the cache:
