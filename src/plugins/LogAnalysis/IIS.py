@@ -103,7 +103,6 @@ class IISLog(Simple.SimpleLog):
 
         def test(query,result):
             self.parse(query)
-            print "self.fields: %s" % self.fields
             result.text("The following is the result of importing the first few lines from the log file into the database.\nPlease check that the importation was successfull before continuing.")
             self.display_test_log(result)
             return True

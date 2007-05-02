@@ -645,8 +645,15 @@ class TimestampType(IntegerType):
             result.end_form(value='Add to Timeline')
 
         tmp1 = result.__class__(result)
-        tmp1.popup(add_to_timeline_cb, "Add to Timeline", icon="treenode_expand_plus.gif")
-        result.row(tmp1, value)
+
+        ## You can only add to timeline if you are dealing with a case
+        if original_query.has_key('case'):
+            tmp1.popup(add_to_timeline_cb, "Add to Timeline", 
+                       icon="treenode_expand_plus.gif")
+            result.row(tmp1, value)
+        else:
+            result.row(value)
+
         return result
 
 
@@ -733,9 +740,13 @@ class IPType(ColumnType):
 
         self.row = row
         original_query=result.defaults
+        ## We can only have interesting IPs if we are associated with a case
+        ## otherwise (e.g. for previews), it doesn't make sense..
+        if original_query.has_key('case'):
+            interestingIPs = InterestingIPObj(original_query['case'])
+        else:
+            interestingIPs = None
 
-        interestingIPs = InterestingIPObj(original_query['case'])
-        
         def edit_ips_of_interest_cb(query, result):
 
             ## We got submitted - actually try to do the deed:
@@ -803,7 +814,10 @@ class IPType(ColumnType):
             result.end_form(value='Add Note')
 
         ## Check if this IP has any notes with it:
-        row = interestingIPs.select(_ip='inet_aton(%r)' % value)
+        if interestingIPs:
+            row = interestingIPs.select(_ip='inet_aton(%r)' % value)
+        else:
+            row = None
 
         ## Provide a way for users to save the IP address:
         tmp1 = result.__class__(result)
@@ -821,13 +835,15 @@ class IPType(ColumnType):
             tmp1.popup(edit_ips_of_interest_cb, row['notes'], icon="balloon.png")
             tmp1.text("  ", value, font="bold")
             result.row(tmp1, **{'class': 'match'})
-        else:
+        elif interestingIPs:
             tmp1.popup(add_to_ips_of_interest_cb, 
                        "Add a note about this IP", 
                        icon="treenode_expand_plus.gif")
             tmp1.text("  ", value)
             result.row(tmp1)
-        
+        else:
+            result.row(value)        
+
         return result
 
 class InodeType(StringType):
