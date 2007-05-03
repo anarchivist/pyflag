@@ -189,7 +189,16 @@ class SimpleLog(LogFile.Log):
             row = self.prefilter_record(row)
             splitUpRow = row.split(self.delimiter)
             splitUpRow[-1] = splitUpRow[-1].strip()
-            yield splitUpRow
+            toReturn = []
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, 
+                          "Got asked to parse. will ignore %s" % self.ignoreFields)
+            for i in range(0,len(splitUpRow)):
+                if i not in self.ignoreFields:
+                    toReturn.append(splitUpRow[i])
+
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,
+                          "Got asked to parse. returning %s" % toReturn) 
+            yield toReturn
 
     def parse(self, query, datafile='datafile'):
         """ This function parses the query string into the appropriate fields array """
@@ -205,24 +214,39 @@ class SimpleLog(LogFile.Log):
                 number=int(k[len('field'):])
                 if number>num_fields:
                     num_fields=number
-                    
-        num_fields+=1
-        pyflaglog.log(pyflaglog.DEBUG, "Found %i fields when parsing" % num_fields)
+
+        self.ignoreFields = []
+        ## Make an array that has the ignore fields in it..
+        for k in query.keys():
+            if k.startswith('ignore'):
+                self.ignoreFields.append(int(k[len('ignore'):]))
+        
+        self.num_ignores = len(self.ignoreFields)
+             
+        num_fields+=1 
+        num_fields-=len(self.ignoreFields)
+
+        pyflaglog.log(pyflaglog.DEBUG, "Found %i fields when parsing (taking into account %i ignores)" % (num_fields, len(self.ignoreFields)))
+
         ## Initialise the fields array:
         self.fields = [ None ] * num_fields
         self.num_fields = num_fields
 
+        numSkipped = 0
         ## Now parse them:
-        for i in range(0,num_fields):
+        for i in range(0,num_fields+len(self.ignoreFields)):
+            if i in self.ignoreFields: 
+                numSkipped += 1
+                continue
             try:
                 field_cls = Registry.COLUMN_TYPES.dispatch(query['type%u' % i])
                 ## This is what the field will be called:
                 name = query['field%u' % i]
-                self.fields[i] = field_cls(name=name, column=name)
+                self.fields[i-numSkipped] = field_cls(name=name, column=name)
 
                 ## Do we need to index it?
                 if query.has_key('index%u' % i):
-                    self.fields[i].index = True
+                    self.fields[i-numSkipped].index = True
                     
             except Exception,e:
                 pass
@@ -328,19 +352,24 @@ class SimpleLog(LogFile.Log):
         field = []
         type = []
         index = []
+        ignore = []
         ## Now we create the input elements:
         for i in range(self.num_fields):
             field_ui = result.__class__(result)
             type_ui = result.__class__(result)
             index_ui =  result.__class__(result)
+            ignore_ui = result.__class__(result)
             
             field_ui.textfield('','field%u' % i)
             type_ui.const_selector('',"type%u" % i, Registry.COLUMN_TYPES.class_names, Registry.COLUMN_TYPES.class_names)
             index_ui.checkbox('Add Index?','index%u'%i,'yes')
+            ignore_ui.checkbox('Ignore this Column?', 'ignore%u'%i,'yes')
             field.append(field_ui)
             type.append(type_ui)
             index.append(index_ui)
+            ignore.append(ignore_ui)
 
         result.row(*field)
         result.row(*type)
         result.row(*index)
+        result.row(*ignore)

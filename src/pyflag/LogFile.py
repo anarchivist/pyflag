@@ -75,9 +75,10 @@ class Log:
         which is unique to our instance.
         """
         
-    def __init__(self, case=None):
+    def __init__(self, case=None, ignoreFields=[]):
         self.case = case
-        
+        self.ignoreFields = ignoreFields
+
     def form(self,query,result):
         """ This method will be called when the user wants to configure a new instance of us. IE a new preset """
 
@@ -103,7 +104,7 @@ class Log:
     
     def read_record(self, ignore_comment = True):
         """ Generates records.
-
+        
         This can handle multiple files as provided in the constructor.
         """
         
@@ -151,6 +152,8 @@ class Log:
         fields = [ x for x in self.fields if x]
         if len(fields)==0:
             raise RuntimeError("No Columns were selected.")
+
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "About to create table with %s" % fields)
         
         # We just do this in case we get old temporary tables left around. 
         # Normal calls to this method don't need to worry about this
@@ -162,6 +165,8 @@ class Log:
             ',\n'.join([ x.create() for x in fields])
             ))
 
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "About to insert...")
+
         ##  Now insert into the table:
         count = 0
         for fields in self.get_fields():
@@ -169,12 +174,13 @@ class Log:
 
             args = dict()
             for i in range(len(self.fields)):
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Trying for field %i" % i)
                 try:
                     key, value = self.fields[i].insert(fields[i])
                     args[key] = value
                 except (IndexError,AttributeError):
                     pass
-                
+            if rows < 10: pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Added. About to mass insert %s" % args)    
             if args:
                 dbh.mass_insert( **args)
             
@@ -183,6 +189,8 @@ class Log:
 
             if not count % 1000:
                 yield "Loaded %s rows" % count
+
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Ok.. Committing...")
 
         dbh.mass_insert_commit()
         ## Now create indexes on the required fields
