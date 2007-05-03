@@ -1511,9 +1511,6 @@ class HTMLUI(UI.GenericUI):
             ## Ask the callback to draw on us:
             tmp = result.__class__(result)
             try:
-
-                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "About to call callback for page %i ith the following query: %s" % (page, query))
-
                 callbacks[page](query,tmp)
                 error = False
             except Exception,e:

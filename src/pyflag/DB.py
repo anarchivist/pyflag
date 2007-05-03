@@ -616,8 +616,6 @@ class DBO:
     def mass_insert_commit(self):
         try:
             keys = self.mass_insert_cache.keys()
-            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, 
-                         "Using the following keys for the mass insert commit: %s" % keys)
         except AttributeError:
             ## We called commit without start
             return
@@ -638,9 +636,6 @@ class DBO:
         sql = "insert ignore into `%s` (%s) values (%s)" % (self.mass_insert_table,
                                                    ','.join(["`%s`" % c for c in keys]),
                                                    "),(".join(values))
-
-        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Using the following SQL: %s and the following args %s" % (sql, args))
-        
         if not self.mass_insert_fast:
             self.invalidate(self.mass_insert_table)
             
