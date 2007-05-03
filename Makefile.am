@@ -4,15 +4,15 @@ my_images	 	=	$(shell find images -not -name .\*)
 my_data			=	$(shell find data -not -name .\*)
 my_utilities		=	$(shell find utilities -not -name .\*)
 my_examples		=	$(shell find examples -not -name .\*)
-bin_SCRIPTS		=	pyflag pyflash pyflag_launch
+bin_SCRIPTS		=	pyflag pyflash pyflag_launch src/pyflag/conf.py
 sysconf_DATA		=	pyflagrc
 pkgdata_DATA		=	$(my_data) \
 				data/magic.mgc data/magic.mime.mgc
 nobase_pkgdata_DATA	=	$(my_images) $(my_utilities) $(my_examples)
 man_MANS		=	pyflag.1
 EXTRA_DIST		=	pyflag.in pyflagrc.in pyflash.in \
-				pyflag_launch.in $(nobase_pkgdata_DATA) $(pkgdata_DATA) $(man_MANS)
-
+				pyflag_launch.in $(nobase_pkgdata_DATA) $(pkgdata_DATA) $(man_MANS) \
+				src/pyflag/conf.py.in
 
 # perform subs in scripts and config files
 edit = sed \
@@ -27,6 +27,18 @@ edit = sed \
 	-e 's,@mysql\@,@MYSQL@,g' \
 	-e 's,@magic\@,@magic@,g' \
 	-e 's,@python\@,$(PYTHON),g'
+
+src/pyflag/%.py: $(top_srcdir)/src/pyflag/%.py.in
+	rm -f $@ $@.tmp
+	$(edit) $< > $@.tmp
+	chmod +x $@.tmp
+	mv $@.tmp $@
+
+utilities/%: $(top_srcdir)/utilities/%.in Makefile
+	rm -f $@ $@.tmp
+	$(edit) $< > $@.tmp
+	chmod +x $@.tmp
+	mv $@.tmp $@
 
 %: $(top_srcdir)/%.in Makefile
 	rm -f $@ $@.tmp

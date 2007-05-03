@@ -1,0 +1,307 @@
+# Michael Cohen <scudette@users.sourceforge.net>
+# David Collett <daveco@users.sourceforge.net>
+#
+# ******************************************************
+#  Version: FLAG $Version: 0.84RC1 Date: Fri Feb  9 08:22:13 EST 2007$
+# ******************************************************
+#
+# * This program is free software; you can redistribute it and/or
+# * modify it under the terms of the GNU General Public License
+# * as published by the Free Software Foundation; either version 2
+# * of the License, or (at your option) any later version.
+# *
+# * This program is distributed in the hope that it will be useful,
+# * but WITHOUT ANY WARRANTY; without even the implied warranty of
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# * GNU General Public License for more details.
+# *
+# * You should have received a copy of the GNU General Public License
+# * along with this program; if not, write to the Free Software
+# * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# ******************************************************
+""" Configuration modules for pyflag.
+
+PyFlag is a complex package and requires a flexible configuration
+system. The following are the requirements of the configuration
+system:
+
+1) Configuration must be available from a number of sources:
+
+   - Autoconf must be able to set things like the python path (in case
+     pyflag is installed to a different prefix)
+     
+   - Users must be able to configure the installed system for their
+   specific requirements.
+
+   - Unconfigured parameters must be resolved at run time through the
+   GUI and saved.
+
+2) Configuration must be able to apply to cases specifically.
+
+3) Because pyflag is modular, configuration variables might be required
+   for each module. This means that definitions and declarations of
+   configuration variables must be distributed in each plugin.
+
+These goals are achieved by the use of multiple sources of
+configuration information:
+
+   - The system wide configuration file is this file: conf.py. It is
+   generated from the build system from conf.py.in by substituting
+   autoconfigured variables into it. It contains the most basic
+   settings related to the installation, e.g. which python interpreted
+   is used, where the python modules are installed etc. In particular
+   it refers to the location of the system configuration file (usually
+   found in /usr/local/etc/pyflagrc, or in /etc/pyflagrc).
+
+   - The sysconfig file contains things like where the upload
+   directory is, where to store temporary files etc. These are mainly
+   installation wide settings which are expected to be modified by the
+   administrator. Note that if you want the GUI to manipulate this
+   file it needs to be writable by the user running the GUI.
+
+   - Finally a conf table in each case is used to provide a per case
+   configuration
+   
+"""    
+import ConfigParser, optparse, os, sys
+
+class PyFlagOptionParser(optparse.OptionParser):
+    final = False
+
+    def _process_long_opt(self, rargs, values):
+        arg = rargs.pop(0)
+
+        # Value explicitly attached to arg?  Pretend it's the next
+        # argument.
+        if "=" in arg:
+            (opt, next_arg) = arg.split("=", 1)
+            rargs.insert(0, next_arg)
+            had_explicit_value = True
+        else:
+            opt = arg
+            had_explicit_value = False
+
+        try:
+            opt = self._match_long_opt(opt)
+        except optparse.BadOptionError:
+            ## we are here because we dont recognise this option.  Its
+            ## possible that it has not been defined yet so unless
+            ## this is our final run we just ignore it.
+            if self.final:
+                raise
+            
+            return None
+        
+        option = self._long_opt[opt]
+        if option.takes_value():
+            nargs = option.nargs
+            if len(rargs) < nargs:
+                if nargs == 1:
+                    self.error(_("%s option requires an argument") % opt)
+                else:
+                    self.error(_("%s option requires %d arguments")
+                               % (opt, nargs))
+            elif nargs == 1:
+                value = rargs.pop(0)
+            else:
+                value = tuple(rargs[0:nargs])
+                del rargs[0:nargs]
+
+        elif had_explicit_value:
+            self.error(_("%s option does not take a value") % opt)
+
+        else:
+            value = None
+
+        option.process(opt, value, values, self)
+    
+    def error(self, msg):
+        ## We cant emit errors about missing parameters until we are
+        ## sure that all modules have registered all their parameters
+        if self.final:
+            return optparse.OptionParser.error(self,msg)
+        
+class ConfObject(object):
+    """ This is a singleton class to manage the configuration.
+
+    This means it can be instantiated many times, but each instance
+    refers to the global configuration (which is set in class
+    variables).
+    """
+    optparser = PyFlagOptionParser(add_help_option=False,
+                                   version=False,
+                                   )
+    initialised = False
+
+    ## This is the globals dictionary which will be used for
+    ## evaluating the configuration directives.
+    g_dict = dict(__builtins__ = None)
+    
+    ## These are the options derived by reading any config files
+    cnf_opts = {}
+    
+    ## Command line opts
+    opts = {}
+    args = None
+    default_opts = {}
+    docstrings = {}
+
+    ## Filename where the configuration file is:
+    filename = None
+
+    ## These parameters can not be updated by the GUI (but will be
+    ## propagated into new configuration files)
+    readonly = {}
+
+    ## A list of option names:
+    options = []
+    
+    def __init__(self):
+        """ This is a singleton object kept in the class """
+        if not ConfObject.initialised:
+            self.add_option("help", action="store_true", default=False,
+                            short_option='h', readonly = True,
+                            help="list all available options and their default values. Default values may be set in the configuration file @sysconfdir@/pyflagrc")
+
+            ConfObject.initialised = True
+
+    def set_usage(self, usage=None, version=None):
+        if usage:
+            self.optparser.set_usage(usage)
+
+        if version:
+            self.optparser.version = version
+        
+    def add_file(self, filename, type='init'):
+        """ Adds a new file to parse """
+        try:
+            conf_parser = ConfigParser.ConfigParser()
+            conf_parser.read(filename)
+            for k,v in conf_parser.items('DEFAULT'):
+                try:
+                    v = eval(v, self.g_dict)
+                except Exception,e:
+                    pass
+
+                ## update the configured options
+                self.cnf_opts[k] = v
+
+            ConfObject.filename = filename
+            ## Allow the command line to override this
+            self.parse_options(False)
+            
+        except IOError:
+            print "Unable to open %s" % filename
+
+    def parse_options(self, final=True):
+        """ Parses the options from command line and any conf files
+        currently added.
+
+        The final parameter should be only called from main programs
+        at the point where they are prepared for us to call exit if
+        required; (For example when we detect the -h parameter).
+        """
+        self.optparser.final = final
+        
+        if final:
+            try:
+                if getattr(self, "help"):
+                    
+                ## Populate the metavars with the default values:
+                    for opt in self.optparser.option_list:
+                        try:
+                            opt.metavar = "%s" % getattr(self, opt.dest)
+                        except Exception,e:
+                            pass
+                    
+                    self.optparser.print_help()
+                    sys.exit(0)
+            except AttributeError:
+                pass
+
+        ## Parse the command line options:
+        (opts, args) = self.optparser.parse_args()
+
+        ## Update our cmdline dict:
+        for k in dir(opts):
+            v = getattr(opts,k)
+            if k in self.options and not v==None:
+                self.opts[k] = v
+
+    def add_option(self, option, short_option=None, **args):
+        """ Adds options both to the config file parser and the
+        command line parser
+        """
+        option = option.lower()
+
+        if option in self.options: return
+        
+        self.options.append(option)
+        ## If there is a default specified, we update our defaults dict:
+        try:
+            default = args['default']
+            try:
+                default = eval(default, self.g_dict)
+            except: pass
+            
+            self.default_opts[option] = default
+            del args['default']
+        except KeyError:
+            pass
+
+        try:
+            self.readonly[option] = args['readonly']
+            del args['readonly']
+        except KeyError:
+            pass
+
+        self.docstrings[option] = args.get('help',None)
+
+        if short_option:
+            self.optparser.add_option("-%s" % short_option, "--%s" % option, **args)
+        else:
+            self.optparser.add_option("--%s" % option, **args)
+            
+        ## update the command line parser
+        self.parse_options(False)
+        
+    def __getattr__(self, attr):
+        ## If someone is looking for a configuration parameter but
+        ## we have not parsed anything yet - do so now.
+        if self.opts == None:
+            self.parse_options(False)
+
+        ## Try to find the attribute in the command line options:
+        try:
+            return self.opts[attr.lower()]
+        except KeyError: pass
+
+        ## No - try the configuration file:
+        try:
+            return self.cnf_opts[attr.lower()]
+        except KeyError: pass
+
+        ## No - is there a default for it?
+        try:
+            return self.default_opts[attr.lower()]
+        except KeyError: pass
+        
+        ## Maybe its a class method?
+        try:
+            return super(ConfObject, self).__getattribute__(attr)
+        except AttributeError:
+            raise AttributeError("Parameter %s is not configured - try setting it on the command line (-h for help)" % attr)
+
+config = ConfObject()
+config.add_file("@sysconfdir@/pyflagrc", 'py')
+
+## The following are global parameters we need - administrators will
+## probably need to set those to something more sensible:
+config.add_option("UPLOADDIR", default="/tmp/",
+                  help = "Directory under which the web GUI will allow loading files")
+
+config.add_option("RESULTDIR", default="/tmp/",
+                  help = "Directory to store temporary analysed data.")
+
+config.add_option("VERSION", default="@VERSION@", readonly=True,
+                  help = "The current pyflag version")

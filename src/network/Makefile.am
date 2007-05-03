@@ -7,18 +7,18 @@ libnetwork_la_CFLAGS 	= -I$(top_srcdir)/src/include
 libnetwork_la_LIBADD	= ../lib/liboo.la
 
 pypcap_la_SOURCES	= pcap.c pypcap.c
-pypcap_la_CPPFLAGS 	= $(PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
-pypcap_la_LDFLAGS 	= -module
+pypcap_la_CPPFLAGS 	= $(PYTHON_CSPEC) -I$(top_srcdir)/src/include
+pypcap_la_LDFLAGS 	= -module $(PYTHON_LSPEC)
 pypcap_la_LIBADD	= libnetwork.la
 
 _dissect_la_SOURCES 	= dissect.c pcap.c
-_dissect_la_CPPFLAGS 	= $(PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
-_dissect_la_LDFLAGS 	= -module
+_dissect_la_CPPFLAGS 	= $(PYTHON_CSPEC) -I$(top_srcdir)/src/include
+_dissect_la_LDFLAGS 	= -module $(PYTHON_LSPEC)
 _dissect_la_LIBADD	= libnetwork.la
 
 reassembler_la_SOURCES = reassembler.c
-reassembler_la_CPPFLAGS= $(PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
-reassembler_la_LDFLAGS = -module
+reassembler_la_CPPFLAGS= $(PYTHON_CSPEC) -I$(top_srcdir)/src/include
+reassembler_la_LDFLAGS = -module $(PYTHON_LSPEC)
 reassembler_la_LIBADD  = libtcp.la libnetwork.la
 
 libtcp_la_SOURCES	= tcp.c

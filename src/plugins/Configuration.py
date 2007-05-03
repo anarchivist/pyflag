@@ -8,8 +8,82 @@ import pyflag.pyflaglog as pyflaglog
 import pyflag.FlagFramework as FlagFramework
 
 class Configure(Reports.report):
-    """ Configures pyflag """
+    """ Configures pyflag.
+
+    This report allows the modification of pyflag's configuration through the GUI.
+    """
     name = "Pyflag Configuration"
+    family = "Configuration"
+    parameters = {}
+
+    def generate_config_file(self, query):
+        """ Iterate through the parameters in query and generate a new
+        configuraion file
+        """
+        lines = ["""[DEFAULT]"""]
+        for c in config.options:
+            value = query.get(c, getattr(config,c))
+            c=c.lower()
+
+            print c,value
+
+            ## Read only values cant be changed in the config file
+            if config.readonly.has_key(c):
+                continue
+            
+            #print value, config.opts, config.cnf_opts
+            lines.append('\n# %s' % config.docstrings[c])
+
+            line = ''
+            
+            ## If this value was specified on the command line, or is
+            ## a default value, we comment the line out - but still
+            ## show it:
+            if value==str(config.cnf_opts.get(c, '')):
+                line = ''
+            elif value == str(config.opts.get(c, None)) or value == str(config.default_opts.get(c, None)):
+                line = "# "
+
+            ## We write the config option:
+            lines.append(line + "%s=%s" % (c, value))
+
+        return "\n".join(lines)
+    
+    def display(self, query, result):
+        result.heading("Update PyFlags configuration")
+        highlights = query.getarray('highlight')
+
+        result.start_form(query)
+
+        ## Try to save the configuration file:
+        if query.has_key("__submit__"):
+            fd = open(config.filename ,'w')
+            fd.write(self.generate_config_file(query))
+            fd.close()
+
+            ## Force a re-read of the configuration file:
+            config.add_file(config.filename)
+
+            result.refresh(0, query.__class__())
+
+        for c in config.options:
+            if not query.has_key(c):
+                result.defaults.set(c, getattr(config,c))
+            help = config.docstrings[c]
+
+            if config.readonly.get(c):
+                continue
+
+            if c in highlights:
+                result.textfield(c, c, tooltip=help, size=40, **{'class': 'highlight'})
+            else:
+                result.textfield(c, c, tooltip=help, size=40)
+
+        result.end_form()
+
+class Configure_old(Reports.report):
+    """ Configures pyflag """
+    name = "Pyflag Configuration old"
     family = "Configuration"
     hidden = True
     
@@ -36,6 +110,7 @@ class Configure(Reports.report):
         for k,v in dict(RESULTDIR=os.X_OK | os.R_OK | os.W_OK,
                         UPLOADDIR=os.X_OK | os.R_OK
                         ).items():
+
             if not os.access(config.__class__.__dict__[k], v):
                 result.heading("Access denied to %s" % k)
                 result.para("We do not seem to have enough privileges to access %s, or the path (%s) does not exist" %(k,config.__class__.__dict__[k]))

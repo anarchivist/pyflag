@@ -23,8 +23,8 @@ libiosubsys_la_LIBADD      = ../liboo.la ../libsgz.la ../libexcept.la ../libewf/
 
 # python module specifics
 iosubsys_la_SOURCES 	= iosubsys.c
-iosubsys_la_CPPFLAGS 	= $(PYTHON_CPPFLAGS)
-iosubsys_la_LDFLAGS 	= -module
+iosubsys_la_CPPFLAGS 	= $(PYTHON_CSPEC)
+iosubsys_la_LDFLAGS 	= -module $(PYTHON_LSPEC)
 iosubsys_la_LIBADD      = libiosubsys.la 
 
 test_SOURCES		= test.c

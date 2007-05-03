@@ -18,8 +18,8 @@ noinst_HEADERS		= $(srcdir)/*.h
 pkgpyexec_LTLIBRARIES 	= pypacket.la
 
 pypacket_la_SOURCES	= pypacket.c
-pypacket_la_CPPFLAGS	= $(PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
-pypacket_la_LDFLAGS	= -module
+pypacket_la_CPPFLAGS	= $(PYTHON_CSPEC) -I$(top_srcdir)/src/include
+pypacket_la_LDFLAGS	= -module $(PYTHON_LSPEC)
 pypacket_la_LIBADD	= liboo.la
 
 # specifics (libs)
@@ -44,13 +44,3 @@ evtool_SOURCES		= evtool.c
 evtool_LDADD		= libevf.la libsgz.la libmd5.la libexcept.la
 
 remote_server_LDADD	= libexcept.la
-
-## Deprecated
-#libiosubsys_la_SOURCES	= iosubsys.c remote_client.c
-#libiosubsys_la_LIBADD	= libevf.la libsgz.la libmd5.la libexcept.la
-
-# python module specifics
-#iosubsys_la_SOURCES 	= $(srcdir)/io.c
-#iosubsys_la_CPPFLAGS 	= $(PYTHON_CPPFLAGS)
-#iosubsys_la_LDFLAGS 	= -module
-#iosubsys_la_LIBADD	= libiosubsys.la

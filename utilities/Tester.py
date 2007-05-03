@@ -30,40 +30,51 @@ Eventually all plugins will have complete unit tests.
 import pyflag.Registry as Registry
 import unittest,re
 import pyflag.conf
+config = pyflag.conf.ConfObject()
 from optparse import OptionParser
 
-parser = OptionParser(usage = """%prog [options]""")
-parser.add_option('-m','--match', default=None, help='Run only tests matching this RE')
-parser.add_option('-l','--level', default=10, type='int', help='Testing level (1 least exhaustive)')
-parser.add_option('-L', '--list', action='store_true', dest='list', help='Just list all the available test classes without running them')
-options,args = pyflag.conf.parse_command_line("Generic Test harness for running unit tests.",parser=parser)
+config.set_usage(usage = """%prog [options]
+
+Generic Test harness for running unit tests.
+""")
+
+config.add_option('match', short_option='m', default=None,
+                  help='Run only tests matching this RE')
+
+config.add_option('level', default=10, short_option='l',
+                  type='int', help='Testing level (1 least exhaustive)')
+
+config.add_option('list', short_option='L', default=None,
+                  action='store_true', dest='list',
+                  help='Just list all the available test classes without running them')
 
 Registry.Init()
+config.parse_options()
 
 ## Start up some workers:
 import pyflag.Farm as Farm
 Farm.start_workers()
 
 test_registry = Registry.InitTests()
-if not options.match:
+if not config.match:
     classes = test_registry.classes
 else:
-    classes = [ x for x in test_registry.classes if re.search(options.match,"%s" % x.__doc__)]
+    classes = [ x for x in test_registry.classes if re.search(config.match,"%s" % x.__doc__)]
 
 ## Only do those tests who are below the current level:
 tmp = []
 for x in classes:
     try:
-        if x.level <= options.level:
+        if x.level <= config.level:
             tmp.append(x)
     except AttributeError:
         ## If they do not have a level, their level is considered to be 5
-        if 5 <= options.level:
+        if 5 <= config.level:
             tmp.append(x)
 
 classes = tmp
 
-if options.list:
+if config.list:
     import sys
     for test in classes:
         print "%s" % (test.__doc__)

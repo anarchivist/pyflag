@@ -32,8 +32,15 @@ classes in the same plugin and have them all automatically loaded.
 """
 import pyflag.conf
 config=pyflag.conf.ConfObject()
+
 import os,sys,imp
 import pyflag.pyflaglog as pyflaglog
+
+## Define the parameters we need:
+config.add_option("PLUGINS", default="src/plugins",
+                  help="Plugin directories to use")
+
+print "will load plugins from %s "% config.cnf_opts
 
 class Registry:
     """ Main class to register classes derived from a given parent class. """

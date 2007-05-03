@@ -24,8 +24,13 @@
 logging verbosity is controlled through the configuration variable LOG_LEVEL
 """
 import pyflag.conf
-config=pyflag.conf.ConfObject()
+config = pyflag.conf.ConfObject()
+
 import sys,traceback,time,threading,os
+
+## Declare the parameters we need:
+config.add_option("LOG_LEVEL", default=10, type='int', short_option='v',
+                  help="Logging level")
 
 ## These are predefined logging levels:
 ERRORS=1
@@ -102,7 +107,7 @@ def log(level,message):
     except:
         string = message
 
-    if config.LOG_LEVEL>=level:
+    if config.LOG_LEVEL >= level:
         ## Pass the message to the logger queue:
         try:
             LOG_QUEUE.put((level,message), False)

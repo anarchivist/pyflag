@@ -161,12 +161,12 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     def do_GET(self):
         headers = {}
         
-        result = flag.ui()
-        result.generator=HTMLUI.HTTPObject()
-
         ## Calculate the query from the request.
         query=self.parse_query()
 
+        result = flag.ui(query=query)
+        result.generator=HTMLUI.HTTPObject()
+        
         ## Work out if the request was for a static object
         ct=''
         if query.base.endswith(".js"):
@@ -240,7 +240,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                     fd.close()
                     return
                 else: raise TypeError("Forbidden")
-            except TypeError,e:
+            except (TypeError,OSError),e:
                 self.wfile.write("File not found: %s"%e)
                 return
 
@@ -269,7 +269,6 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             cb_key = query.getarray('callback_stored')[-1]
 
             ## Make a new UI
-            result=flag.ui(query=query)
             result.decoration = 'naked'
             try:
                 ## Get the callback from the store
@@ -301,13 +300,6 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
         #Nope - just do it
         else:            
-              ## We sometimes need to force the gc, this may prove to be a performance hit?
-              try:
-                  import gc
-                  gc.collect()
-              except ImportError:
-                  pass
-
               try:
                   #Did the user request a report?
                   if not query.has_key('family') or not query.has_key('report'):
@@ -390,9 +382,30 @@ def Server(HandlerClass = FlagServerHandler,
     print "Serving PyFlag requests on %s" % (sa,)
     httpd.serve_forever()
 
+config.add_option("THEME", default='Menu',
+                  help="Theme to use (currently Menu, AJAX)")
+
+config.add_option("HTTPSERVER_BINDIF", default='127.0.0.1',
+                  help="Interface to listen on for http connections")
+
+config.add_option("HTTPSERVER_PORT", default=8000, type='int',
+                  help="TCP Port to listen on for http connections")
+
+config.add_option("DATADIR", 
+                  help="Directory where miscelaneous pyflag data files are found")
+
 if __name__ == "__main__":
     ## Parse the command line args:
-    pyflag.conf.parse_command_line("The main PyFlag HTTP Server.")
+    config.set_usage(usage = "The main PyFlag HTTP Server.")
+
+    ## make sure all the modules were parsed to ensure that all the
+    ## options are collected
+    import pyflag.Registry as Registry
+
+    Registry.Init()
+
+    ## Parse all the command line options:
+    config.parse_options()
     
     flag = FlagFramework.Flag()
     FlagFramework.GLOBAL_FLAG_OBJ =flag

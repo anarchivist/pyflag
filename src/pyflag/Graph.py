@@ -34,6 +34,9 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import re,cStringIO
 
+config.add_option("IMAGEDIR", default=config.DATADIR + "/images/",
+                  help="Directory for all images/thumbnails")
+
 import os,pipes
 
 class GraphException(Exception): pass

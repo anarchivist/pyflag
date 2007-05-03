@@ -147,7 +147,7 @@ class NK_key(SimpleStruct):
             try:
                 nk_key = lh['ofs_nk'].get_value()
                 yield nk_key
-            except:
+            except KeyError:
                 pass
 
     def key(self,name):

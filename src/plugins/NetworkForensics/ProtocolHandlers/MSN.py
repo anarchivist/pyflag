@@ -52,6 +52,9 @@ import plugins.NetworkForensics.PCAPFS as PCAPFS
 import urllib,os,time,datetime
 from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType, ColumnType
 
+config.add_option("MSN_PORTS", default='[1863,]',
+                  help="A list of ports to be considered for MSN connections")
+
 class RingBuffer:
     def __init__(self, size_max):
         self.size_max = size_max

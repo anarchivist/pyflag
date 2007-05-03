@@ -32,6 +32,9 @@ from NetworkScanner import *
 import pyflag.Reports as Reports
 import pyflag.pyflaglog as pyflaglog
 
+config.add_option("SMTP_PORTS", default="[25,]",
+                  help="A list of ports to be considered for SMTP transactions")
+
 class SMTPException(Exception):
     """ Raised if line is an invalid SMTP command """
 

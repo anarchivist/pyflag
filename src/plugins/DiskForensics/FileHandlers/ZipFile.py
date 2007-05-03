@@ -163,7 +163,7 @@ class TarScan(GenScanFactory):
         def external_process(self,fd):
             """ This is run on the extracted file """
             #Get a TarFile object
-            tar=tarfile.TarFile(fileobj=fd)
+            tar=tarfile.TarFile(name='/', fileobj=fd)
             
             ## List all the files in the tar file:
             dircount = 0
@@ -365,6 +365,9 @@ class GZ_file(DiskForensics.DBFS_file):
 
             self.seek(offset,rel)
 
+        ## Force a new decompressor when rereading:
+        self.gz = None
+
 class Tar_file(DiskForensics.DBFS_file):
     """ A file like object to read files from within tar files. Note that the tar file is specified as an inode in the DBFS """
     specifier = 'T'
@@ -386,7 +389,7 @@ class Tar_file(DiskForensics.DBFS_file):
             t = ZIPCACHE.get(self.fd.inode)
         except (AttributeError, KeyError):
             try:
-                t = tarfile.TarFile(fileobj=fd)
+                t = tarfile.TarFile(name='/', fileobj=fd)
                 ZIPCACHE.put(t, key=self.fd.inode)
             except tarfile.CompressionError,e:
                 raise IOError("Tar file: %s" % e)

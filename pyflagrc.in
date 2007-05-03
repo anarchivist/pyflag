@@ -1,103 +1,80 @@
+## This section refers to the global system wide settings
+[DEFAULT]
+
 # This is the global site wide configuration file for pyflag. 
-PYFLAG_VERSION=@VERSION@
+VERSION=@VERSION@
 
 # Database settings
-# These are left blank and will be prompted for and
-# saved into users ~/.pyflagrc
-PYFLAG_DBUSER=
-PYFLAG_DBPASSWD=
-PYFLAG_DBHOST=127.0.0.1
-PYFLAG_DBPORT=3306
-PYFLAG_DBUNIXSOCKET=/var/run/mysqld/mysqld.sock  
-PYFLAG_STRICTSQL=0
-PYFLAG_SCHEMA_VERSION=1
-PYFLAG_FLUSH=0
-PYFLAG_JOB_QUEUE=10
+DBUNIXSOCKET=/var/run/mysqld/mysqld.sock  
 
 ## This is the number of rows where the mass insert buffer will be flushed.
-PYFLAG_MASS_INSERT_THRESHOLD=300
+MASS_INSERT_THRESHOLD=300
 
 #Default flag database
-PYFLAG_FLAGDB=pyflag
+FLAGDB=pyflag
 
 # Paths
-PYFLAG_PREFIX=@prefix@
-PYFLAG_SYSCONF=@sysconfdir@
-PYFLAG_DATADIR=@datadir@
-
-# Flag can only read and write to these directories
-# over-riden by users
-PYFLAG_UPLOADDIR=
-PYFLAG_RESULTDIR=
+PREFIX=@prefix@
+SYSCONF=@sysconfdir@
+DATADIR=@datadir@
 
 # icons etc go here
-PYFLAG_IMAGEDIR=@datadir@/images/
+IMAGEDIR=@datadir@/images/
 
 # Path to read flag plugins from
-PYFLAG_PLUGINS=@pkgpyexec@/plugins
+PLUGINS=@pkgpyexec@/plugins
 
 # Paths to some required binaries
-PYFLAG_MYSQL_BIN=@mysql@
+MYSQL_BIN=@mysql@
 
 # Path for pyflag binaries
-PYFLAG_FLAG_BIN=@bin@
+FLAG_BIN=@bin@
 
 #Location to the magic file for use
-PYFLAG_MAGICFILE=@datadir@/magic:@magic@
+MAGICFILE=@datadir@/magic:@magic@
 
 #Clamav virus updates:
-PYFLAG_CLAMDIR=/var/lib/clamav/
+CLAMDIR=/var/lib/clamav/
 
 # GUI stuff
 # Period we wait before refreshing the display when waiting for analysis to complete
-PYFLAG_REFRESH=3
+REFRESH=3
 # This forces the HTTP GUI to use GET or POST
-PYFLAG_HTTPSERVER_PORT=8000
-PYFLAG_HTTPSERVER_BINDIF=127.0.0.1
+HTTPSERVER_PORT=8000
+HTTPSERVER_BINDIF=127.0.0.1
 
-PYFLAG_PAGESIZE=50
-PYFLAG_WRAP=80
-PYFLAG_MAXTREESIZE=13
+PAGESIZE=50
+WRAP=80
+MAXTREESIZE=13
 
 #Maximum size of hex dump
-PYFLAG_MAX_DATA_DUMP_SIZE=2048
+MAX_DATA_DUMP_SIZE=2048
 
 # This can be Menu or AJAX at the moment
-PYFLAG_THEME=Menu
+THEME=Menu
 
-PYFLAG_LOG_LEVEL=10
-
-# If you require HTTP authentication add more tokens to this comma
-# seperated list of username:passwords - Or override in ~/.pyflagrc
-# PYFLAG_AUTHORISE="mic:password,joe:letmein"
-
-## This section configures the network scanners. Many of these setting
-## influence which streams will get dissected as a certain
-## protocol. If you have a capture which uses a common protocol on a
-## non-standard port, you may add this here.
-
-PYFLAG_SMTP_PORTS=25
-PYFLAG_POP3_PORTS=110
-PYFLAG_MSN_PORTS=1863
+SMTP_PORTS=25
+POP3_PORTS=110
+MSN_PORTS=1863
 
 ## Maximum age (in packets) for a session before it will be considered
 ## terminated.
-PYFLAG_MAX_SESSION_AGE=100000
+MAX_SESSION_AGE=100000
 
 ## The encodings that will be searched on in the index scanner
-PYFLAG_INDEX_ENCODINGS=UTF-8,UTF-16LE
+INDEX_ENCODINGS=UTF-8,UTF-16LE
 
 ## The table widget will not wait this long for a query:
-PYFLAG_TABLE_QUERY_TIMEOUT=20
+TABLE_QUERY_TIMEOUT=20
 
 ## The total number of workers which will be started with the GUI
-PYFLAG_WORKERS=1
+WORKERS=1
 
 ## How long to maintain SQL caches (in minutes)
-PYFLAG_DBCACHE_AGE=60
+DBCACHE_AGE=60
 
 ## The size of the sql cache by default (in rows)
-PYFLAG_DBCACHE_LENGTH=1024
+DBCACHE_LENGTH=1024
 
 ## GeoIP Database: This can be downloaded from http://www.maxmind.com/app/geolitecity
-PYFLAG_GEOIPDB=@datadir@/GeoLiteCity.dat
+GEOIPDB=@datadir@/GeoLiteCity.dat

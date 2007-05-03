@@ -31,7 +31,8 @@ import MySQLdb
 import MySQLdb.cursors
 import _mysql
 import pyflag.conf
-config=pyflag.conf.ConfObject()
+config = pyflag.conf.ConfObject()
+
 import pyflag.pyflaglog as pyflaglog
 import time,types
 from Queue import Queue, Full, Empty
@@ -43,6 +44,48 @@ import Store
 DBIndex_Cache=Store.Store()
 
 db_connections=0
+
+## Declare the configuration parameters we need here:
+config.add_option("FLAGDB", default='pyflag',
+                help="Default pyflag database name")
+
+config.add_option("FLAG_BIN", default='/usr/bin/mysql',
+                help="Location of the mysql client")
+
+config.add_option("DBUSER", default='root',
+                help="Username to connect to db with")
+
+config.add_option("DBPASSWD", default=None,
+                help="Password to connect to the database")
+
+config.add_option("STRICTSQL", default=False, action='store_true',
+                metavar = "true/false",
+                help="database warnings are fatal")
+
+config.add_option("DBHOST", default='localhost',
+                help="database host to connect to")
+
+config.add_option("DBPORT", default=3306, type='int',
+                help="database port to connect to")
+
+config.add_option("DBUNIXSOCKET", default="/var/run/mysqld/mysqld.sock",
+                help="path to mysql socket")
+
+config.add_option("MYSQL_BIN", default="/usr/bin/mysql",
+                help="path to mysql socket")
+
+config.add_option("DBCACHE_AGE", default=60, type='int',
+                help="The length of time table searches remain cached")
+
+config.add_option("DBCACHE_LENGTH", default=1024, type='int',
+                help="Number of rows to cache for table searches")
+
+config.add_option("MASS_INSERT_THRESHOLD", default=300, type='int',
+                  help="Number of rows where the mass insert buffer will be flushed.")
+
+config.add_option("TABLE_QUERY_TIMEOUT", default=20, type='int',
+                  help="The table widget will timeout queries after this many seconds")
+
 
 ## This is the dispatcher for db converters
 conv = {
@@ -211,6 +254,7 @@ class Pool(Queue):
             except Empty:
                 return self.connect()
         except Exception,e:
+            raise
             raise DBError("Unable to connect - does the DB Exist?")
 
     def connect(self):
@@ -220,60 +264,36 @@ class Pool(Queue):
         pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "New Connection to DB %s. We now have %s in total" % (self.case,
                                                                                                      db_connections, ))
         
-        case=self.case
+        args = dict(user = config.DBUSER,
+                    db = self.case,
+                    host=config.DBHOST,
+                    port=config.DBPORT,
+                    cursorclass=PyFlagCursor,
+                    conv = conv,
+                    use_unicode = False,
+                    #charset='latin1'
+                    )
+
+        if config.DBPASSWD:
+            args['passwd'] = config.DBPASSWD
+
+        if config.STRICTSQL:
+            args['sql_mode'] = "STRICT_ALL_TABLES"
+            
         try:
             #Try to connect over TCP
-            if config.STRICTSQL:
-                dbh = MySQLdb.Connect(user = config.DBUSER,
-                                      passwd = config.DBPASSWD,
-                                      db = case,
-                                      host=config.DBHOST,
-                                      port=config.DBPORT,
-                                      cursorclass=PyFlagCursor,
-                                      sql_mode="STRICT_ALL_TABLES",
-                                      conv = conv,
-                                      use_unicode = False,
-                                      #charset='latin1'
-                                      )
-            else:
-                dbh = MySQLdb.Connect(user = config.DBUSER,
-                                      passwd = config.DBPASSWD,
-                                      db = case,
-                                      host=config.DBHOST,
-                                      port=config.DBPORT,
-                                      cursorclass=PyFlagCursor,
-                                      conv = conv,
-                                      use_unicode = False,
-                                      #charset = 'latin1'
-                                      )
-                
+            dbh = MySQLdb.Connect(**args)
+
             mysql_bin_string = "%s -f -u %r -p%r -h%s -P%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBHOST,config.DBPORT)
         except Exception,e:
             ## or maybe over the socket?
             ##  The following is used for debugging to ensure we dont
             ##  have any SQL errors:
-            if config.STRICTSQL:
-                dbh = MySQLdb.Connect(user = config.DBUSER,
-                                      passwd = config.DBPASSWD,
-                                      db = case,
-                                      unix_socket = config.DBUNIXSOCKET,
-                                      sql_mode="STRICT_ALL_TABLES",
-                                      cursorclass=PyFlagCursor,
-                                      conv = conv,
-                                      use_unicode = False,
-                                      #charset='latin1'
-                                      )
-            else:
-                dbh = MySQLdb.Connect(user = config.DBUSER,
-                                      passwd = config.DBPASSWD,
-                                      db = case,
-                                      unix_socket = config.DBUNIXSOCKET,
-                                      cursorclass=PyFlagCursor,
-                                      conv = conv,
-                                      use_unicode = False,
-                                      #charset='latin1'
-                                      )
+            args['unix_socket'] = config.DBUNIXSOCKET
+            del args['host']
+            del args['port']
 
+            dbh = MySQLdb.Connect(**args)
             mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBUNIXSOCKET)
 
         return (dbh,mysql_bin_string)

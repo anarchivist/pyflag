@@ -352,3 +352,8 @@ class ViewConnections(Reports.report):
             table = 'connection_details',
             case = query['case'],
             )
+
+config.add_option("MAX_SESSION_AGE", default=100000, type='int',
+                  help="Maximum age (in packets) for a session before it "
+                  "will be considered terminated.")
+                  

@@ -1301,7 +1301,7 @@ class HTMLUI(UI.GenericUI):
         """
         self.textfield(description,name,type='file',**options)
 
-    def textfield(self,description,name,**options):
+    def textfield(self,description,name,tooltip=None, **options):
         """ Draws a text field in the form.
 
         The text field consists of a description of the purpose of the input, and a text field. When the user enters text to the input box, the variable 'name' will be appended to the query string.
@@ -1318,26 +1318,31 @@ class HTMLUI(UI.GenericUI):
             ## from the current value of name
             import cgi
             try:
-                default = cgi.escape(self.defaults[name],quote=True)
+                default = quote_quotes(self.defaults[name])
             except KeyError:
                 pass
             except AttributeError:
                 default = str(self.defaults[name])
-            
+
             ## And remove if from the form
             if self.form_parms.has_key(name):
                 del self.form_parms[name]
         
         option_str = self.opt_to_str(options)
         left = description
-        right = "<input name='%s' %s value='%s'>" % (name,option_str,default)
+        left = self.tooltipise(tooltip, left)
+
+        right = "<input name='%s' %s value=\"%s\">" % (name,option_str,default)
+        right = self.tooltipise(tooltip, right)
+
         self.row(left,right)
 
-    def textarea(self,description,name, **options):
+    def textarea(self,description,name, tooltip=None, **options):
         """ Draws a text area with the default content
 
         This is very similar to the textfield above.
         """
+        print options
         default = ''
         try:
             if options['Additional']:
@@ -1358,7 +1363,14 @@ class HTMLUI(UI.GenericUI):
         option_str = self.opt_to_str(options)
         left = description
         right = "<textarea id='%s' name='%s' %s>%s</textarea>" % (name,name,option_str,default)
+        right = self.tooltipise(tooltip, right)
+            
         self.row(left,right,valign="top")
+
+    def tooltipise(self, tooltip, string):
+        if tooltip:
+            return "<abbr title=%r>%s</abbr>" %(quote_quotes(tooltip), string)
+        else: return string
         
     def start_form(self,target, pane='self', **hiddens):
         """ start a new form with a local scope for parameters.
@@ -1640,4 +1652,20 @@ class HTMLUI(UI.GenericUI):
             return ''
 
         return re.sub(tag_regex, filter_tag, data)
+
+
+config.add_option("WRAP", default=80, type='int',
+                  help="Number of columns to wrap text at")
+
+config.add_option("MAXTREESIZE", default=13, type='int',
+                  help="Maximum number of items to show in a tree branch")
+
+config.add_option("MAX_DATA_DUMP_SIZE", default=2048, type='int',
+                  help="Maximum size of hex dump")
+
+config.add_option("PAGESIZE", default=50, type='int',
+                  help="number of rows to display per page in the Table widget")
+
+config.add_option("REFRESH", default=3, type='int',
+                  help="Polling frequency of the gui when analysing")
 

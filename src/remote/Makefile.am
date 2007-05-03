@@ -12,8 +12,8 @@ pkgpyexec_LTLIBRARIES = remote.la
 
 # python module specifics
 remote_la_SOURCES 	= remote_client.c
-remote_la_CPPFLAGS 	= $(PYTHON_CPPFLAGS)
-remote_la_LDFLAGS 	= -module
+remote_la_CPPFLAGS 	= $(PYTHON_CSPEC)
+remote_la_LDFLAGS 	= -module $(PYTHON_LSPEC)
 remote_la_LIBADD      = libremote.la ../lib/liboo.la
 
 ecc.c: pki.h

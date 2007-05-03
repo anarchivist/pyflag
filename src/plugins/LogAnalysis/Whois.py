@@ -39,6 +39,9 @@ description = "Offline Whois"
 hidden = False
 order = 40
 
+config.add_option("GEOIPDB", default=config.DATADIR +"/GeoLiteCity.dat",
+                  help="Location of the GeoIP database")
+
 def lookup_whois(ip):
     """ Functions searches the database for the most specific whois match.
 

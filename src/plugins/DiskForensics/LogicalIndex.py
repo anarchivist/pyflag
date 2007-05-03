@@ -54,6 +54,10 @@ config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
 from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType
 
+config.add_option("INDEX_ENCODINGS", default="['UTF-8','UTF-16LE']",
+                  help="A list of unicode encodings to mutate the "
+                  "dictionary through for indexing")
+
 class IndexTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
         dbh.execute("""create table if not exists `LogicalIndexOffsets` (

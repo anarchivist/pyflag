@@ -622,7 +622,7 @@ class File:
                 self.readptr += len(data)
                 return data
 
-        except AttributeError:
+        except AttributeError,e:
             raise IOError("No cached file")
 
     def stat(self):
@@ -747,7 +747,6 @@ class File:
         self.slack = slack
         self.overread = overread
 
-        print "limit = %s" % limit
         self.seek(limit)
         data = self.read(max+1)
 

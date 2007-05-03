@@ -27,6 +27,9 @@ import pyflag.Scanner as Scanner
 import re
 from NetworkScanner import *
 
+config.add_option("POP3_PORTS", default='[110,]',
+                  help="A list of ports to be considered for POP transactions")
+
 class POPException(Exception):
     """ Raised if line is an invalid pop command """
 

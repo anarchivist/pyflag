@@ -6,5 +6,5 @@ noinst_HEADERS  = $(srcdir)/*.h
 
 sk_la_SOURCES	= sk.c
 sk_la_LIBADD	= ../fstools/libfstools.la
-sk_la_CPPFLAGS 	= $(PYTHON_CPPFLAGS)
-sk_la_LDFLAGS 	= -module
+sk_la_CPPFLAGS 	= $(PYTHON_CSPEC)
+sk_la_LDFLAGS 	= -module $(PYTHON_LSPEC)

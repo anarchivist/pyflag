@@ -26,17 +26,14 @@ but have a file size limit of 2GB. Also ethereal's mergecap will try
 to open all the files at once running out of filehandles if there are
 too many files.
 """
-from optparse import OptionParser
 import glob,bisect,sys
 import Store
 import FileFormats.PCAP as PCAP
 from format import Buffer
-import pyflag.pyflaglog as logging
 import pyflag.conf
 config=pyflag.conf.ConfObject()
-import  FlagFramework
 
-parser = OptionParser(usage="""%prog -w Output [options] pcap_file ... pcap_file
+config.set_usage(usage="""%prog -w Output [options] pcap_file ... pcap_file
 
 Will merge all pcap files into the Output file which must be
 specified. The pcap files are sorted on their PCAP timestamps. It is
@@ -49,28 +46,22 @@ This implementation of mergecap is done in pure python so its a little
 slow.
 """, version="Version: %prog PyFlag "+config.VERSION)
 
-parser.add_option("-g", "--glob", default=None,
+config.add_option("glob",  short_option='g',
                   help = """Load All files in the glob. This is useful when there are too many
-files to expand in the command line. To use this option you will need
-to escape the * or ? to stop the shell from trying to expand them.""")
+                  files to expand in the command line. To use this option you will need
+                  to escape the * or ? to stop the shell from trying to expand them.""")
 
-parser.add_option("-w", "--write", default="merged.pcap",
+config.add_option("write", default="merged.pcap", short_option='w',
                   help = "The output file to write. (Mandatory)")
 
-parser.add_option("-s", "--split", default=2000000000, type='int',
+config.add_option("split", default=2000000000, type='int',short_option='s',
                   help = "The Maximum size of the output file")
 
-parser.add_option("-v", "--verbose", default=5, type='int',
-                  help = "Level of verbosity")
+config.parse_options()
 
-(options, args) = parser.parse_args()
-
-## Hush up a bit
-logging.config.LOG_LEVEL=options.verbose
-
-if options.glob:
-    print "Globbing %s "% options.glob
-    g = options.glob.replace('\\*','*')
+if config.glob:
+    print "Globbing %s "% config.glob
+    g = config.glob.replace('\\*','*')
     args.extend(glob.glob(g))
     print "Will merge %s files" % len(args)
 
@@ -202,13 +193,6 @@ f=FileList(args)
 
 ## Write the file header on:
 outfile.write(f.files[0].header)
-
-try:
-    import psyco
-    psyco.log()
-    psyco.full()
-except:
-    pass
 
 length = len(f.files[0].header)
 file_number = 0

@@ -9,7 +9,7 @@ import fnmatch
 import pyflag.FileSystem as FileSystem
 import pyflag.Scanner as Scanner
 import time, types
-import pyflaglog
+import pyflag.pyflaglog as pyflaglog
 
 class scan_path(pyflagsh.command):
     """ This takes a path as an argument and runs the specified scanner on the path

@@ -200,6 +200,13 @@ class Task:
 ## Typically pending jobs are things like scanning inodes, cracking
 ## keys etc. While broadcasts are drop case messages, which require
 ## all workers to free resources allocated to the case.
+
+config.add_option("WORKERS", default=2, type='int',
+                  help='Number of workers to start up')
+
+config.add_option("JOB_QUEUE", default=10, type='int',
+                  help='Number of jobs to take on at once')
+
 def start_workers():
     for i in range(config.WORKERS):
        pid = os.fork()
@@ -293,8 +300,9 @@ def wake_workers():
     for pid in children:
         os.kill(pid, signal.SIGUSR1)
 
+config.add_option("FLUSH", default=False, action='store_true',
+                  help='There are no workers currently processing, flush job queue.')
 
-## This flag tells us that there are no workers currently processing.
 if config.FLUSH:
     dbh = DB.DBO()
     dbh.execute("delete from jobs where state='broadcast' or state='processing'")

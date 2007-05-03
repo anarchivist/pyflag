@@ -564,16 +564,6 @@ class Flag:
         if config_checked: return
         report = None
 
-        ## First check for missing parameters:
-        for k,v in config.__class__.__dict__.items():
-            if v=='':
-                if query.has_key('PYFLAG_'+k):
-                    config.__class__.__dict__[k] = conf.parse_value(
-                        query['PYFLAG_' + k])
-                else:
-                    report = Registry.REPORTS.dispatch("Configuration",
-                                                       "Configure")
-
         ## If we were going to the config page we keep going there:
         if not report:
             if query.get('family',None)=='Configuration':
@@ -601,10 +591,11 @@ class Flag:
                     config_checked = True
                     
             except Exception,e:
-                print "DB Error was %s" % e
-                if "Access denied" in str(e):
+                error = str(e)
+                if "Access denied" in error or "Unable to connect" in error:
                     report = Registry.REPORTS.dispatch("Configuration",
                                                        "Configure")
+                    query['highlight'] = 'dbpasswd'
                 else:
                     query['error'] = str(e)
                     print e
@@ -729,6 +720,9 @@ class HexDump:
             offset+=1
 
 import magic
+
+config.add_option("MAGICFILE",
+                  help="Location of magic files")
 
 class Magic:
     """ Singleton class to manage magic library access """
