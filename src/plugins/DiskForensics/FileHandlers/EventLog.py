@@ -56,10 +56,9 @@ class DLLInitDB(FlagFramework.EventHandler):
 
         dbh.execute("""CREATE TABLE if not exists `EventMessageSources` (
         `filename` VARCHAR( 50 ) NOT NULL ,
-        `source` VARCHAR(250),
-        UNIQUE KEY `filename` (`filename`)
+        `source` VARCHAR(250)
         ) """)
-        
+
 class DLLScan(Scanner.GenScanFactory):
     """ Extract EventLog Messages from DLLs """
     default = True

@@ -29,17 +29,18 @@ config=pyflag.conf.ConfObject()
 import pyflag.pyflaglog as pyflaglog
 import plugins.LogAnalysis.Whois as Whois
 import pyflag.DB as DB
-import textwrap
+import textwrap,sys
 
-parser = OptionParser(usage = """%prog [options] [ip_address]
+config.set_usage(usage = """%prog [options] [ip_address]
 
 This will resolve the ip address against the internal offline database loaded into pyflag.
 """)
 
-parser.add_option("-f", "--file", default=None, 
-                  help = "A file to read addresses from (one per line)")
+config.optparser.add_option("-f", "--file", default=None, 
+                            help = "A file to read addresses from (one per line)")
 
-(options, args) = parser.parse_args()
+config.parse_options()
+
 pyflaglog.start_log_thread()
 
 dbh = DB.DBO()
@@ -52,11 +53,13 @@ def print_address(address):
     print "------ %(ip)s ------\nnetname:        %(netname)s\nCountry:        %(country)s\ninetnum:        %(start_ip)s\nhosts:          %(numhosts)s\ndescr:          %(descr)s\n" % row
 
 ## Resolve all args:
-for address in args:
+for address in config.args:
     print_address(address)
 
-if options.file:
-    fd = open(options.file)
+if config.file:
+    fd = open(config.file)
     for line in fd:
         line = line.strip()
         print_address(line)
+
+sys.exit(0)

@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """ EventLogTool is a stand alone event log manipulation utility.
 
 It uses the main PyFlag Event log messge database to resolve messages
@@ -70,28 +71,28 @@ import os,sys
 from format import *
 from plugins.FileFormats.BasicFormats import *
 import DB
-import logging
+import pyflag.pyflaglog as logging
 import sys
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 
-parser = OptionParser(usage="""%prog [options]
+config.set_usage(usage="""%prog [options]
 
 Will perform according to mode the following functions:
 -m dll:      Search all dlls under path for message resources and insert into the pyflag DB.
 -m reg:     Extrach service name to dll mappings from registry files.
 -m event:  Print all event logs in an evt file based on values in the pyflag DB.""",
-                      version="Version: %prog PyFlag "+config.VERSION)
+                 version="Version: %prog PyFlag "+config.VERSION)
 
-parser.add_option("-m", "--mode", default='dll',
-                  help="Set mode for operation (see above)")
+config.optparser.add_option("-m", "--mode", default='dll', choices=['dll', 'event', 'reg'], type='choice',
+                            help="Set mode for operation (see above)")
 
-parser.add_option("-H", "--more_help", default=None, action='store_true',
-                  help="Print more help")
+config.optparser.add_option("-H", "--more_help", default=None, action='store_true',
+                            help="Print more help")
 
-(options, args) = parser.parse_args()
+config.parse_options()
 
-if options.more_help:
+if config.more_help:
     print __doc__
     sys.exit(-1)
 
@@ -104,7 +105,7 @@ def recurse(path):
     except OSError:
         yield path
 
-if options.mode == 'dll':
+if config.mode == 'dll':
     import FileFormats.PElib as PElib
     import FlagFramework
 
@@ -119,7 +120,7 @@ if options.mode == 'dll':
 
     Magic=FlagFramework.Magic()
 
-    for directory in args:
+    for directory in config.args:
         for F in recurse(directory):
             f=F.lower()
             fd = open(F)
@@ -145,7 +146,7 @@ if options.mode == 'dll':
 
                 dbh.mass_insert_commit()
 
-elif options.mode == 'reg':
+elif config.mode == 'reg':
     import FileFormats.RegFile as RegFile
     dbh=DB.DBO()
 
@@ -155,7 +156,7 @@ elif options.mode == 'reg':
     UNIQUE KEY `filename` (`filename`)
     ) """)
 
-    for filename in args:
+    for filename in config.args:
         fd = open(filename)
         b = Buffer(fd=fd)
 
@@ -169,17 +170,17 @@ elif options.mode == 'reg':
                 try:
                     v = application.value('EventMessageFile')
                     filename = v['data'].__str__().lower()
-                    filename=os.path.basename(filename.replace("\\","/"))[:-1]
+                    filename=os.path.basename(filename.replace("\\","/"))
                     dbh.execute("insert into EventMessageSources set filename=%r, source=%r",(filename,appname))
                     print "Added source '%s' as file %r" % (appname, filename)
-                except KeyError:
+                except (KeyError, DB.DBError):
                     pass
 
-elif options.mode == 'event':
+elif config.mode == 'event':
     import FileFormats.EVTLog as EVTLog
     dbh=DB.DBO()
 
-    for filename in args:
+    for filename in config.args:
         fd = open(filename)
         b = Buffer(fd=fd)
         header = EVTLog.Header(b)

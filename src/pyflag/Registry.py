@@ -40,8 +40,6 @@ import pyflag.pyflaglog as pyflaglog
 config.add_option("PLUGINS", default="src/plugins",
                   help="Plugin directories to use")
 
-print "will load plugins from %s "% config.cnf_opts
-
 class Registry:
     """ Main class to register classes derived from a given parent class. """
     modules = []

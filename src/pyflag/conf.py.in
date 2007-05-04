@@ -229,6 +229,7 @@ class ConfObject(object):
                 self.opts[k] = v
 
         self.optparse_opts = opts
+        self.args = args
 
     def add_option(self, option, short_option=None, **args):
         """ Adds options both to the config file parser and the
@@ -288,9 +289,10 @@ class ConfObject(object):
             return self.default_opts[attr.lower()]
         except KeyError: pass
 
-        ## Maybe is just a command line option:
+        ## Maybe its just a command line option:
         try:
-            return getattr(self.optparse_opts, attr.lower())
+            if not attr.startswith("_") and self.optparse_opts:
+                return getattr(self.optparse_opts, attr.lower())
         except AttributeError: pass
         
         ## Maybe its a class method?
