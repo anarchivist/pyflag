@@ -36,7 +36,6 @@ import getopt
 import pyflag.FlagFramework as FlagFramework
 import pyflag.UI as UI
 import pyflag.Registry as Registry
-from optparse import OptionParser
 import pyflag.conf
 config = pyflag.conf.ConfObject()
 import pyflag.FileSystem as FileSystem
@@ -224,15 +223,17 @@ def shell_execv(env=None,command=None, argv=[]):
 
 if __name__ == "__main__":
     # Parse commandline args:
-    clparser = OptionParser(version=config.VERSION)
-    clparser.add_option("-c", "--commands", dest="filename",
-                  help="execute flash script from FILE", metavar="FILE")
+    config.set_usage(usage="PyFlash the pyflag interactive shell",
+                     version=config.VERSION)
+    
+    config.optparser.add_option("-c", "--commands", dest="command_file",
+                                help="execute flash script from FILE", metavar="FILE")
 
-    clparser.add_option("-p", "--params", dest="params", 
-                      help="comma seperated list of KEY:VALUE for flash scripts",
-                      metavar="PARAMS")
+    config.optparser.add_option("-p", "--params", dest="params", 
+                                help="comma seperated list of KEY:VALUE for flash scripts",
+                                metavar="PARAMS")
 
-    (options, args) = pyflag.conf.parse_command_line(parser=clparser)
+    config.parse_options()
 
     ## Make sure the registry is properly initialised
     Registry.Init()
@@ -259,14 +260,14 @@ if __name__ == "__main__":
     import pyflag.Farm as Farm
     Farm.start_workers()
 
-    if options.filename != None:
+    if config.command_file != None:
       asker=Asker()
-      fd=open(options.filename)
+      fd=open(config.filename)
       file = fd.read()
       
       #Initialise variable cache from parameters (if they are provided)
-      if options.params != None:
-        params = options.params.split(",")
+      if config.params != None:
+        params = config.params.split(",")
         for keypair in params:
           keyvalue = keypair.split(":")
           asker.cache[keyvalue[0]] = keyvalue[1]

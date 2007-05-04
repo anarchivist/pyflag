@@ -1,15 +1,6 @@
 #!/bin/bash
 
-. @sysconfdir@/pyflagrc
-
-## Try to load personalised configurations
-if [ -e ~/.pyflagrc ] ; then source ~/.pyflagrc; fi
-
-declare -x `set | grep PYFLAG_ | cut -d= -f1`
-
 ## This is required in case the prefix is not /usr/ (otherwise python
 ## can find it itself) 
-
 export PYTHONPATH=@pythondir@:@pythondir@/pyflag/
-
 exec @python@ @pkgpyexec@/pyflagsh.py $@

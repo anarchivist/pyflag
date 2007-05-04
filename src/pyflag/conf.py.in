@@ -146,6 +146,9 @@ class ConfObject(object):
     default_opts = {}
     docstrings = {}
 
+    ## These are the actual options returned by the optparser:
+    optparse_opts = None
+
     ## Filename where the configuration file is:
     filename = None
 
@@ -274,6 +277,11 @@ class ConfObject(object):
         if self.opts == None:
             self.parse_options(False)
 
+        ## Maybe its a class method?
+        try:
+            return super(ConfObject, self).__getattribute__(attr)
+        except AttributeError: pass
+
         ## Try to find the attribute in the command line options:
         try:
             return self.opts[attr.lower()]
@@ -295,11 +303,7 @@ class ConfObject(object):
                 return getattr(self.optparse_opts, attr.lower())
         except AttributeError: pass
         
-        ## Maybe its a class method?
-        try:
-            return super(ConfObject, self).__getattribute__(attr)
-        except AttributeError:
-            raise AttributeError("Parameter %s is not configured - try setting it on the command line (-h for help)" % attr)
+        raise AttributeError("Parameter %s is not configured - try setting it on the command line (-h for help)" % attr)
 
 config = ConfObject()
 config.add_file("@sysconfdir@/pyflagrc", 'py')
