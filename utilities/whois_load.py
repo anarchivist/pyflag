@@ -37,24 +37,24 @@ urls = {'apnic':'ftp://ftp.apnic.net/apnic/whois-data/APNIC/split/apnic.db.inetn
         'arin':'ftp://ftp.arin.net/pub/stats/arin/delegated-arin-latest',
         'lacnic':'ftp://ftp.lacnic.net/pub/stats/lacnic/delegated-lacnic-latest'}
 
-parser = OptionParser(usage="""%prog [Options]
+config.set_usage(usage="""%prog [Options]
 Downloads some whois repositories.""")
 
-parser.add_option('-d','--delete', action="store_true",
+config.optparser.add_option('-d','--delete', action="store_true",
                   help="""Delete previous databases""")
 
-parser.add_option('-a','--all', action="store_true",
+config.optparser.add_option('-a','--all', action="store_true",
                   help="""Load all repositories""")
 
 for k in urls.keys():
-  parser.add_option('','--%s' % k, action="store_true",
+  config.optparser.add_option('','--%s' % k, action="store_true",
                     help = "Load %s databases" % k)
 
-(options, args) = parser.parse_args()
+config.parse_options()
 
-if options.all:
+if config.all:
   for k in urls.keys():
-    setattr(options, k, 1)
+    setattr(config, k, 1)
 
 MASK32 = 0xffffffffL
 
@@ -255,7 +255,7 @@ class Whois:
       return self
     
 dbh = DB.DBO(None)
-if options.delete:
+if config.delete:
   # create tables in master flag database
   # Since the whois entries often get split into many smaller
   # subnets for routing, we will use two tables to reduce space
@@ -322,10 +322,19 @@ if options.delete:
 
 else:
   dbh.execute("select max(id) as max from whois_sources")
-  whois_sources_id = dbh.fetch()["max"] + 1
+  row = dbh.fetch()
+  
+  if not row:
+    whois_sources_id = 1
+  else:
+    whois_sources_id = row['max'] + 1
 
   dbh.execute("select max(id) as max from whois")
-  whois_id = dbh.fetch()["max"]+1
+  row = dbh.fetch()
+  if not row:
+    whois_id = 1
+  else:
+    whois_id = row["max"]+1
 
 # process files
 source_dbh = dbh.clone()
@@ -336,7 +345,7 @@ routes_dbh.mass_insert_start('whois_routes')
 dbh.mass_insert_start('whois')
 
 for k,url in urls.items():
-  if not getattr(options, k): continue
+  if not getattr(config, k): continue
   
   db = Whois(url)
   if not db:
