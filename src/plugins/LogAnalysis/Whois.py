@@ -40,7 +40,7 @@ hidden = False
 order = 40
 
 config.add_option("GEOIPDB", default=config.DATADIR +"/GeoLiteCity.dat",
-                  help="Location of the GeoIP database")
+                  help="Location of the GeoIP database. (This can be downloaded from http://www.maxmind.com/app/geolitecity)")
 
 def lookup_whois(ip):
     """ Functions searches the database for the most specific whois match.

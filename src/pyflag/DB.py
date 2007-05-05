@@ -254,8 +254,7 @@ class Pool(Queue):
             except Empty:
                 return self.connect()
         except Exception,e:
-            raise
-            raise DBError("Unable to connect - does the DB Exist?")
+            raise DBError("Unable to connect - does the DB Exist?: %s" % e)
 
     def connect(self):
         """ Connect specified case and return a new connection handle """

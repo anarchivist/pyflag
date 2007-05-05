@@ -7,12 +7,6 @@ VERSION=@VERSION@
 # Database settings
 DBUNIXSOCKET=/var/run/mysqld/mysqld.sock  
 
-## This is the number of rows where the mass insert buffer will be flushed.
-MASS_INSERT_THRESHOLD=300
-
-#Default flag database
-FLAGDB=pyflag
-
 # Paths
 PREFIX=@prefix@
 SYSCONF=@sysconfdir@
@@ -37,7 +31,7 @@ MAGICFILE=@datadir@/magic:@magic@
 CLAMDIR=/var/lib/clamav/
 
 # GUI stuff
-# Period we wait before refreshing the display when waiting for analysis to complete
+# 
 REFRESH=3
 # This forces the HTTP GUI to use GET or POST
 HTTPSERVER_PORT=8000
@@ -47,7 +41,7 @@ PAGESIZE=50
 WRAP=80
 MAXTREESIZE=13
 
-#Maximum size of hex dump
+#
 MAX_DATA_DUMP_SIZE=2048
 
 # This can be Menu or AJAX at the moment
@@ -57,14 +51,14 @@ SMTP_PORTS=25
 POP3_PORTS=110
 MSN_PORTS=1863
 
-## Maximum age (in packets) for a session before it will be considered
-## terminated.
+## 
+## 
 MAX_SESSION_AGE=100000
 
 ## The encodings that will be searched on in the index scanner
-INDEX_ENCODINGS=UTF-8,UTF-16LE
+INDEX_ENCODINGS=['UTF-8','UTF-16LE']
 
-## The table widget will not wait this long for a query:
+## The 
 TABLE_QUERY_TIMEOUT=20
 
 ## The total number of workers which will be started with the GUI

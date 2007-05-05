@@ -723,6 +723,22 @@ class IPType(ColumnType):
         
         return " ( `%s` >= %s and `%s` <= %s ) " % (self.column, numeric_address, self.column, broadcast)
 
+    def operator_country(self, column, operator, country):
+        """ Matches the specified country string (e.g. AU, US, CA). Note that this works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
+
+        ## We must ensure there are indexes on the right columns or
+        ## this query will never finish. This could lead to a delay
+        ## the first time this is run...
+        dbh=DB.DBO()
+        dbh.check_index("whois_cache", "ip")
+        dbh.check_index("whois","country")
+
+        return " ( `%s` in (select ip from %s.whois_cache join " \
+               "%s.whois on %s.whois.id=%s.whois_cache.id and "\
+               "%s.whois.country=%r ) ) " \
+               % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
+                  config.FLAGDB, config.FLAGDB, country)
+
     def create(self):
         ## IP addresses are stored as 32 bit integers 
         return "`%s` int(11) unsigned default 0" % self.column

@@ -156,14 +156,19 @@ class ConfObject(object):
     ## propagated into new configuration files)
     readonly = {}
 
+    ## Absolute parameters can only be set by the code or command
+    ## lines, they can not be over ridden in the configuration
+    ## file. This ensures that only configuration files dont mask new
+    ## options (e.g. schema version)
+    _absolute = {}
+
     ## A list of option names:
     options = []
     
     def __init__(self):
         """ This is a singleton object kept in the class """
         if not ConfObject.initialised:
-            self.add_option("help", action="store_true", default=False,
-                            short_option='h', readonly = True,
+            self.optparser.add_option("-h", "--help", action="store_true", default=False,
                             help="list all available options and their default values. Default values may be set in the configuration file @sysconfdir@/pyflagrc")
 
             ConfObject.initialised = True
@@ -180,7 +185,14 @@ class ConfObject(object):
         try:
             conf_parser = ConfigParser.ConfigParser()
             conf_parser.read(filename)
+            self.cnf_opts.clear()
+            
             for k,v in conf_parser.items('DEFAULT'):
+                ## Absolute parameters are protected from
+                ## configuration files:
+                if k in self._absolute.keys():
+                    continue
+                
                 try:
                     v = eval(v, self.g_dict)
                 except Exception,e:
@@ -190,9 +202,6 @@ class ConfObject(object):
                 self.cnf_opts[k] = v
 
             ConfObject.filename = filename
-            ## Allow the command line to override this
-            self.parse_options(False)
-            
         except IOError:
             print "Unable to open %s" % filename
 
@@ -207,8 +216,12 @@ class ConfObject(object):
         self.optparser.final = final
         
         if final:
+            ## Reparse the config file again:
+            self.add_file(self.filename)
+            
             try:
-                if getattr(self, "help"):
+                ## Help can only be set on the command line
+                if getattr(self.optparse_opts, "help"):
                     
                 ## Populate the metavars with the default values:
                     for opt in self.optparser.option_list:
@@ -225,6 +238,8 @@ class ConfObject(object):
         ## Parse the command line options:
         (opts, args) = self.optparser.parse_args()
 
+        self.opts.clear()
+        
         ## Update our cmdline dict:
         for k in dir(opts):
             v = getattr(opts,k)
@@ -260,6 +275,11 @@ class ConfObject(object):
             del args['readonly']
         except KeyError:
             pass
+
+        try:
+            self._absolute[option] = args['absolute']
+            del args['absolute']
+        except KeyError: pass
 
         self.docstrings[option] = args.get('help',None)
 

@@ -589,3 +589,8 @@ class HTTPTests(unittest.TestCase):
                              argv=["*",                   ## Inodes (All)
                                    "HTTPScanner",
                                    ])                   ## List of Scanners
+        dbh = DB.DBO(self.test_case)
+        dbh.execute("select count(*) as total from http")
+        row = dbh.fetch()
+        print "Number of HTTP transfers found %s" % row['total']
+        self.failIf(row['total']==0,"Count not find any HTTP transfers?")

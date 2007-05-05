@@ -60,22 +60,14 @@ def draw_only_PCAPFS(query,result):
 
     result.const_selector("Select filesystem",'fsimage',images,images)
 
-
-class PCAPFS(DBFS):
-    """ This implements a simple filesystem for PCAP files.
-    """
-    name = 'PCAP Filesystem'
-
-    def load(self, mount_point, iosource_name,scanners = None):
-        DBFS.load(self, mount_point, iosource_name)
-        
+class NetworkingInit(FlagFramework.EventHandler):
+    """ Create all the tables related to basic network forensics """
+    def create(self, case_dbh, case):
         ## We create the tables we need:
-        ## The pcap table stores indexes into the pcap file,
-        ## The connection_details table stores information about each
-        ## connection, while the connection table store all the
-        ## packets belonging to each connection.
-        dbh = DB.DBO(self.case)
-        dbh.execute("""CREATE TABLE if not exists `pcap` (
+        ## The pcap table stores indexes into the pcap file for each packet
+        ### data offset is the offset within the iosource where we can
+        ### find the data section of this packet.
+        case_dbh.execute("""CREATE TABLE if not exists `pcap` (
         `id` INT NOT NULL,
         `iosource` varchar(50),
         `offset` BIGINT NOT NULL ,
@@ -85,16 +77,10 @@ class PCAPFS(DBFS):
         `link_type`  TINYINT not null,
         KEY `id` (`id`)
         )""")
-        
-        dbh.execute("select max(id) as id from pcap")
-        row=dbh.fetch()
 
-        if row['id']:
-            max_id = row['id']
-        else:
-            max_id = 0
-            
-        dbh.execute(
+        ## The connection_details table stores information about each
+        ## connection
+        case_dbh.execute(
             """CREATE TABLE if not exists `connection_details` (
             `inode` varchar(250),
             `con_id` int(11) signed NOT NULL default 0,
@@ -107,12 +93,10 @@ class PCAPFS(DBFS):
             `ts_sec` TIMESTAMP default 0,
             KEY `con_id` (`con_id`)
             )""")
-        
-        ### data offset is the offset within the iosource where we can
-        ### find the data section of this packet.
-        ## This must be autoincrement to assign unique ids to new
-        ## streams which get created by the scanners.
-        dbh.execute(
+
+        ## the connection table store all the packets belonging to
+        ## each connection.
+        case_dbh.execute(
             """CREATE TABLE if not exists `connection` (
             `con_id` int(11) signed NOT NULL default '0',
             `original_id` int(11) unsigned NOT NULL default '0',
@@ -121,6 +105,24 @@ class PCAPFS(DBFS):
             `length` mediumint(9) unsigned NOT NULL default '0',
             `cache_offset`  bigint(9) unsigned NOT NULL default '0'
             ) """)
+
+class PCAPFS(DBFS):
+    """ This implements a simple filesystem for PCAP files.
+    """
+    name = 'PCAP Filesystem'
+
+    def load(self, mount_point, iosource_name,scanners = None):
+
+    def load_old(self, mount_point, iosource_name,scanners = None):
+        DBFS.load(self, mount_point, iosource_name)
+        
+        dbh.execute("select max(id) as id from pcap")
+        row=dbh.fetch()
+
+        if row['id']:
+            max_id = row['id']
+        else:
+            max_id = 0
 
         ## Open the file descriptor
         self.fd = IO.open(self.case, iosource_name)

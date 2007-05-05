@@ -592,15 +592,24 @@ class Flag:
                     
             except Exception,e:
                 error = str(e)
-                if "Access denied" in error or "Unable to connect" in error:
-                    report = Registry.REPORTS.dispatch("Configuration",
-                                                       "Configure")
-                    query['highlight'] = 'dbpasswd'
-                else:
+                if "Unknown database" in error:
                     query['error'] = str(e)
                     print e
                     report = Registry.REPORTS.dispatch("Configuration",
                                                        "Initialise Database")
+
+                elif "Access denied" in error or "Unable to connect" in error:
+                    report = Registry.REPORTS.dispatch("Configuration",
+                                                       "Configure")
+                    query['highlight'] = 'dbpasswd'
+
+                ## Set some helpful hints:
+                if "socket" in error:
+                    query['highlight'] = 'dbunixsocket'
+                    query['highlight'] = 'dbhost'
+                    query['highlight'] = 'dbport'
+
+                result.para(error, color='red')
 
         if report:
             ## Instantiate report:

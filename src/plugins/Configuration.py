@@ -22,16 +22,14 @@ class Configure(Reports.report):
         """
         lines = ["""[DEFAULT]"""]
         for c in config.options:
-            value = query.get(c, getattr(config,c))
             c=c.lower()
-
-            print c,value
 
             ## Read only values cant be changed in the config file
             if config.readonly.has_key(c):
-                continue
-            
-            #print value, config.opts, config.cnf_opts
+                value = getattr(config,c)
+            else:
+                value = query.get(c, getattr(config,c))
+
             lines.append('\n# %s' % config.docstrings[c])
 
             line = ''
@@ -80,58 +78,6 @@ class Configure(Reports.report):
                 result.textfield(c, c, tooltip=help, size=40)
 
         result.end_form()
-
-class Configure_old(Reports.report):
-    """ Configures pyflag """
-    name = "Pyflag Configuration old"
-    family = "Configuration"
-    hidden = True
-    
-    def __init__(self,flag,ui=None):
-        self.parameters = {}
-        ## Initialise our missing args
-        for k,v in config.__class__.__dict__.items():
-            if v=='':
-                self.parameters['PYFLAG_' + k] = 'any'
-
-        Reports.report.__init__(self,flag,ui=None)
-
-    def form(self,query, result):
-        result.para("Fill in values for the following mandatory parameters. Optional parameters can be overridden in ~/.pyflagrc")
-
-        parameters = self.parameters.keys()
-        parameters.sort()
-        
-        for parameter in parameters:
-            result.textfield(parameter,parameter)
-
-    def display(self,query,result):
-        ## Do some checks to ensure the parameters seem right
-        for k,v in dict(RESULTDIR=os.X_OK | os.R_OK | os.W_OK,
-                        UPLOADDIR=os.X_OK | os.R_OK
-                        ).items():
-
-            if not os.access(config.__class__.__dict__[k], v):
-                result.heading("Access denied to %s" % k)
-                result.para("We do not seem to have enough privileges to access %s, or the path (%s) does not exist" %(k,config.__class__.__dict__[k]))
-                return
-
-        fd=open(os.environ['HOME'] + '/.pyflagrc', 'a+') #, os.S_IRWXU)
-	os.chmod(os.environ['HOME'] + '/.pyflagrc',  stat.S_IRWXU)
-	## TODO Think append is wrong?
-        result.para("Writing new $HOME/.pyflagrc")
-
-        result.start_table(border=1)
-        for parameter in query.keys():
-            if parameter.startswith('PYFLAG_'):
-                result.row(parameter, query[parameter])
-                fd.write('\n%s="%s"\n' % (parameter, query[parameter]))
-
-        fd.close()
-        result.end_table()
-        
-        result.para("Done. You may edit your personalised configuration by overriding the system configuration at %s/pyflagrc" % config.SYSCONF)
-        result.refresh(5,query.__class__())
 
 class HigherVersion(Reports.report):
     """ A Higher version was encountered """
