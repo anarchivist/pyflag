@@ -213,4 +213,8 @@ void print_property(Packet self, struct struct_property_t *i);
 int Find_Property(OUT Packet *node, OUT struct struct_property_t **p,
 		  char *node_name, char *property_name) ;
 
+Packet find_packet_instance(Packet root, char *class_name);
+
+struct struct_property_t *get_field_by_name(Packet self, char *name);
+struct struct_property_t *get_field_by_name_r(Packet *self, char *name);
 #endif

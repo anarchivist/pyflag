@@ -55,9 +55,15 @@ class Configure(Reports.report):
 
         ## Try to save the configuration file:
         if query.has_key("__submit__"):
-            fd = open(config.filename ,'w')
-            fd.write(self.generate_config_file(query))
-            fd.close()
+            try:
+                fd = open(config.filename ,'w')
+                fd.write(self.generate_config_file(query))
+                fd.close()
+            except IOError,e:
+                result.heading("Error")
+                result.para("An error occured while writing the new configuration file.")
+                result.para("The error reported was %s" % e)
+                return
 
             ## Force a re-read of the configuration file:
             config.add_file(config.filename)

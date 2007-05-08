@@ -1,6 +1,7 @@
 #ifndef __TCP_H
 #define __TCP_H
 #include "network.h"
+#include "pypacket.h"
 
 /** If we do not see anything from a stream within this many packets
     we determine it to be dead. 
@@ -33,16 +34,7 @@ struct tuple4
     stream.
 */
 struct skbuff {
-  IP packet;
-  // This is an arbitrary object which is passed to the callback
-  // together with the packet. We get the object when we first add the
-  // packet to the hash table. Note that we do not increase nor
-  // decrease its reference count (because we have no idea what it is)
-  // so callers to add need to increase its ref count and the callback
-  // implemented needs to decrease it. Make sure it doesnt get freed
-  // from under us. It can be NULL if there is no interesting use for
-  // it.
-  void *object;
+  PyPacket *packet;
   struct list_head list;
 };
 
@@ -87,21 +79,28 @@ CLASS(TCPStream, Object)
      /** The total size of this stream */
      int total_size;
 
+     /** This is a reference to our hash table */
+     struct TCPHashTable *hash;
+
      TCPStream METHOD(TCPStream, Con, struct tuple4 *addr, int con_id);
 
-     /** An opaque data to go with the callack */
-     void *data;
-     void METHOD(TCPStream, callback, IP ip, void *object);
+     /* This is a python object which collect information about the
+	stream */
+     PyObject     *stream_object;
+
+     void METHOD(TCPStream, callback, PyPacket *packet);
 
      /** This method is used to add an IP packet to the queue. Note
 	 that its talloc reference will be stolen and on destruction
 	 it will be automatically removed from the queue.
      */
-void METHOD(TCPStream, add, IP packet, void *object);
+     void METHOD(TCPStream, add, PyPacket *packet);
 END_CLASS
 
 /** The loading factor for the hash table */
 #define TCP_STREAM_TABLE_SIZE 256
+
+#include "reassembler.h"
 
 /** This class manages a bunch of TCPStreams in a hash_table */
 CLASS(TCPHashTable, Object)
@@ -118,13 +117,10 @@ CLASS(TCPHashTable, Object)
      */
      int con_id;
 
-     /** This is the callback which will be invoked upon processing
-	 packets
-     */
-     void (*callback)(TCPStream self, IP ip, void *object);
+     void (*callback)(TCPStream self, PyPacket *packet);
 
-     // Each new stream will get access to this pointer - noone will decref it though
-     void *data;
+     // This is a reference to the main reassembler object:
+     Reassembler *reassembler;
 
      // A running tally
      int packets_processed;
@@ -137,7 +133,7 @@ CLASS(TCPHashTable, Object)
      TCPStream    METHOD(TCPHashTable, find_stream, IP ip);
 
      /** Process the ip packet */
-     int          METHOD(TCPHashTable, process, IP ip, void *object);
+     int          METHOD(TCPHashTable, process, PyPacket *packet);
 END_CLASS
 
 /** Given a packet finds the corresponding stream - or if one does not

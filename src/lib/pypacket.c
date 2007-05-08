@@ -86,36 +86,23 @@ static PyObject *PyPacket_getattr(PyPacket *self, char *field) {
 
   return PyPacket_get_item_string(self,field);
 };
-  
-static PyObject *PyPacket_get_item_string(PyPacket *self, char *field) {
-  struct struct_property_t *p, *found=NULL;
+
+static PyObject *encode_property(Packet packet, struct struct_property_t *p) {
   void *item;
-  int size;
   PyObject *result;
+  int size;
 
-  list_for_each_entry(p, &(self->obj->properties.list), list) {
-    if(!p->name) break;
-
-    if(!strcmp(p->name, field)) {
-      found =p;
-      break;
-    };
-  };
-
-  if(!found)
-    return PyErr_Format(PyExc_KeyError, "Field %s not found", field);
-
-  item = (void *) ((char *)(self->obj->struct_p) + p->item);
+  item = (void *) ((char *)(packet->struct_p) + p->item);
   
-  if(!found->size) {
-    size = *(int *)((char *)(self->obj->struct_p) + p->size_p);
+  if(!p->size) {
+    size = *(int *)((char *)(packet->struct_p) + p->size_p);
   } else 
     size=p->size;
 
   /** Now code the return value according to the node and property
       returned 
   */    
-  switch(found->field_type) {
+  switch(p->field_type) {
   case FIELD_TYPE_PACKET:
     {
       Packet node = *(Packet *)item;
@@ -152,9 +139,12 @@ static PyObject *PyPacket_get_item_string(PyPacket *self, char *field) {
       result = Py_BuildValue("h", *(uint16_t *)item); break;
 
     case FIELD_TYPE_STRING_X:
-    case FIELD_TYPE_STRING:
-      result = Py_BuildValue("s#",*(unsigned char **)item, size); break;
-
+    case FIELD_TYPE_STRING: 
+      {
+	//      result = Py_BuildValue("s#", "hello world", 11); break;
+	result = Py_BuildValue("s#",*(unsigned char **)item, size); break;
+	//result = PyString_FromStringAndSize(*(unsigned char **)item, size); break;
+      }
     case FIELD_TYPE_HEX:
       result = Py_BuildValue("s#",(unsigned char *)item, size); break;
 
@@ -183,6 +173,24 @@ static PyObject *PyPacket_get_item_string(PyPacket *self, char *field) {
     };
  
   return result;
+};
+  
+static PyObject *PyPacket_get_item_string(PyPacket *self, char *field) {
+  struct struct_property_t *p, *found=NULL;
+
+  list_for_each_entry(p, &(self->obj->properties.list), list) {
+    if(!p->name) break;
+
+    if(!strcmp(p->name, field)) {
+      found =p;
+      break;
+    };
+  };
+
+  if(!found)
+    return PyErr_Format(PyExc_KeyError, "Field %s not found", field);
+  
+  return encode_property(self->obj, found);
 }
 
 static PyObject *PyPacket_get_field(PyPacket *self, PyObject *args) {
@@ -216,7 +224,42 @@ static PyObject *PyPacket_serialise(PyPacket *self, PyObject *args) {
   return result;
 };
 
+static PyObject *PyPacket_find(PyPacket *self, PyObject *args) {
+  char *name;
+  struct struct_property_t *i;
+  Packet node = self->obj;
+  
+  if(!PyArg_ParseTuple(args, "s", &name))
+    return NULL;
+
+  i=get_field_by_name_r(&node, name);
+  if(!i) return PyErr_Format(PyExc_AttributeError, "No such item %s", name);
+
+  return encode_property(node, i);
+};
+
+static PyObject *PyPacket_find_type(PyPacket *self, PyObject *args) {
+  char *name;
+  Packet node;
+  PyObject *result;
+  
+  if(!PyArg_ParseTuple(args, "s", &name))
+    return NULL;
+
+  node = find_packet_instance(self->obj, name);
+  if(!node) return PyErr_Format(PyExc_AttributeError, "No such item %s", name);
+
+  result = PyObject_CallMethod(g_module_reference, "PyPacket", "N",
+			       PyCObject_FromVoidPtr(node, NULL), name);
+
+  return result;
+};
+
 static PyMethodDef PyPacket_methods[] = {
+  {"find_type", (PyCFunction)PyPacket_find_type, METH_VARARGS,
+   "Find a packet of the given type"},
+  {"find", (PyCFunction)PyPacket_find, METH_VARARGS,
+   "Finds and returns a field of the given name"},
   {"serialise", (PyCFunction)PyPacket_serialise, METH_VARARGS,
    "serialises the packet into a string"},
   {"list", (PyCFunction)PyPacket_list_fields, METH_VARARGS,

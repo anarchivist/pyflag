@@ -35,7 +35,7 @@ void pad_to_first_packet(TCPStream self) {
   char *new_data;
   
   list_next(first, &(self->queue.list), list);
-  tcp = (TCP)first->packet->packet.payload;
+  tcp = (TCP)find_packet_instance(first->packet->obj, "TCP");
   
   pad_length = tcp->packet.header.seq - self->next_seq;
   if(pad_length > 50000) {
@@ -66,35 +66,52 @@ void pad_to_first_packet(TCPStream self) {
   self->next_seq+=tcp->packet.data_len;
   
   /** Call our callback with this */
-  if(self->callback) self->callback(self, first->packet, first->object);
+  if(self->callback) self->callback(self, first->packet);
   
   list_del(&(first->list));
   talloc_free(first);
 };
 
+/** This gets called whenever an skbuff is destroyed to clean up the
+    object contained within 
+*/
+int destroy_object(void *buff) {
+  struct skbuff *new = (struct skbuff *)buff;
 
-void TCPStream_add(TCPStream self, IP ip, void *object) {
-  struct skbuff *new = talloc(self, struct skbuff);
+  Py_DECREF(new->packet);
+  return 0;
+};
+
+void TCPStream_add(TCPStream self, PyPacket *packet) {
+  IP ip = (IP)find_packet_instance(packet->obj, "IP");
+  struct skbuff *new;
   struct skbuff *i;
-  TCP tcp=(TCP)ip->packet.payload;
+  TCP tcp;
   int count=0;
   struct list_head *candidate;
 
+  if(!ip) return;
+  tcp=(TCP)ip->packet.payload;
+
   /** If there is no data in there we move on */
   if(tcp->packet.data_len==0) {
-    talloc_free(ip);
+    // We no longer need the object - call its destructor:
+    Py_DECREF(packet);
     return;
   }
+
+  new = talloc(self, struct skbuff);
 
   /** This is the location after which we insert the new structure */
   candidate = &(self->queue.list);
 
   /** Take over the packet */
-  new->packet = ip;
-  new->object = object;
+  new->packet = packet;
 
-  //Steal the packet:
-  talloc_steal(new, ip);
+  /** Set the destructor function which should be called when the
+      skbuff is destroyed: 
+  */
+  talloc_set_destructor((void*)new, destroy_object);
 
   /** Record the most recent id we handled */
   self->max_packet_id = ip->id;
@@ -116,7 +133,7 @@ void TCPStream_add(TCPStream self, IP ip, void *object) {
       Then we add s7 after s6.
   */
   list_for_each_entry(i, &(self->queue.list), list) {
-    TCP list_tcp = (TCP)i->packet->packet.payload;
+    TCP list_tcp = (TCP)find_packet_instance(i->packet->obj, "TCP");
 
     if(tcp->packet.header.seq >= list_tcp->packet.header.seq) {
       candidate = &(i->list);
@@ -138,8 +155,8 @@ void TCPStream_add(TCPStream self, IP ip, void *object) {
     TCP tcp;
 
     list_next(first, &(self->queue.list), list);
-    tcp = (TCP)first->packet->packet.payload;
-    
+    tcp = (TCP)find_packet_instance(first->packet->obj, "TCP");
+
     /** Have we processed the entire packet before? it could be a
 	retransmission we can drop it
     */
@@ -159,7 +176,7 @@ void TCPStream_add(TCPStream self, IP ip, void *object) {
 
       /** Call our callback with this */
       self->state = PYTCP_DATA;
-      if(self->callback) self->callback(self, first->packet, first->object);
+      if(self->callback) self->callback(self, first->packet);
       
       /** Adjust the expected sequence number */
       self->next_seq += tcp->packet.data_len;
@@ -184,10 +201,10 @@ void TCPStream_add(TCPStream self, IP ip, void *object) {
       TCP tcp_last,tcp;
 
       list_prev(last, &(self->queue.list), list);
-      tcp_last = (TCP)last->packet->packet.payload;
+      tcp_last = (TCP)find_packet_instance(last->packet->obj, "TCP");
       
       list_next(first, &(self->queue.list), list);
-      tcp = (TCP)first->packet->packet.payload;
+      tcp = (TCP)find_packet_instance(first->packet->obj, "TCP");
 
       while(!list_empty(&(self->queue.list)) && 
 	    tcp->packet.header.window + tcp->packet.header.seq 
@@ -199,7 +216,7 @@ void TCPStream_add(TCPStream self, IP ip, void *object) {
 	// If the skbuff does not contain a packet we leave - this
 	// should not happen but does??
 	if(!first || !first->packet) break;
-	tcp = (TCP)first->packet->packet.payload;
+	tcp = (TCP)find_packet_instance(first->packet->obj, "TCP");
       };
     }; 
 
@@ -232,7 +249,7 @@ int TCPStream_flush(void *this) {
 
   /** Now we signal to the cb that the stream is destroyed */
   self->state = PYTCP_DESTROY;
-  if(self->callback) self->callback(self, NULL, NULL);
+  if(self->callback) self->callback(self, NULL);
 
   /** and we remove it from its lists */
   list_del(&(self->list));
@@ -243,7 +260,7 @@ int TCPStream_flush(void *this) {
 
   self->reverse->state = PYTCP_DESTROY;
   if(self->reverse->callback)
-    self->reverse->callback(self->reverse, NULL, NULL);
+    self->reverse->callback(self->reverse, NULL);
 
   list_del(&(self->reverse->list));
   list_del(&(self->reverse->global_list));
@@ -296,21 +313,26 @@ static u_int mkhash (const struct tuple4 *addr) {
 };
 
 TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
-  TCP tcp=(TCP)ip->packet.payload;
+  TCP tcp;
   u_int forward_hash, reverse_hash;
   struct tuple4 forward,reverse;
   TCPStream i,j;
+
+  if(!ip) return NULL;
+
+  tcp =(TCP)ip->packet.payload;
 
   /** If we did not get a TCP packet, we fail */
   /** The below should work but does not because __TCP is defined in 2
       different shared objects reassemble.so and dissect.so. We are
       likely to receive a class created from dissect.so here but __TCP
-      refers to our (reassemble.so) version.
+      refers to our (reassemble.so) version. Thats why we fall back to
+      compare strings instead.
 
-      Any ideas of how to fix this???
+      FIXME: A possible optimization would be to create a class hash
+      which we can use instead of a string comparison.
    */
-  //  if(!tcp || !ISINSTANCE(tcp,TCP)) {
-  if(!tcp || strcmp(NAMEOF(tcp),"TCP")) {
+  if(!ISNAMEINSTANCE(tcp,"TCP")) {
     return NULL;
   };
   
@@ -369,7 +391,7 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   /** Build a forward stream */
   i = CONSTRUCT(TCPStream, TCPStream, Con, self, &forward, self->con_id++);
   i->callback = self->callback;
-  i->data = self->data;
+  i->hash = self;
   i->direction = TCP_FORWARD;
   list_add_tail(&(i->list),&(self->table[forward_hash]->list));
   list_add(&(i->global_list),&(self->sorted->global_list));
@@ -377,7 +399,7 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   /** Now a reverse stream */
   j = CONSTRUCT(TCPStream, TCPStream, Con, i, &reverse, self->con_id++);
   j->callback = self->callback;
-  j->data = self->data;
+  j->hash = self;
   j->direction = TCP_REVERSE;
   list_add_tail(&(j->list),&(self->table[reverse_hash]->list));
   list_add(&(j->global_list),&(self->sorted->global_list));
@@ -411,12 +433,20 @@ static void check_for_expired_packets(TCPHashTable self, int id) {
   };
 };
 
-int TCPHashTable_process_tcp(TCPHashTable self, IP ip, void *object) {
-  TCPStream i = self->find_stream(self,ip);
-  TCP tcp = (TCP)ip->packet.payload;
+int TCPHashTable_process(TCPHashTable self, PyPacket *packet) {
+  IP ip = (IP)find_packet_instance(packet->obj, "IP");
+  TCPStream i;
+  TCP tcp;
+
+  // Packet is not an IP packet
+  if(!ip) return 0;
+
+  i = self->find_stream(self,ip);
 
   /** Error - Cant create or find suitable stream */
   if(!i) return 0;
+
+  tcp = (TCP)ip->packet.payload;
 
   /** This is a new connection */
   if(i->state == PYTCP_NONE) {
@@ -430,7 +460,7 @@ int TCPHashTable_process_tcp(TCPHashTable self, IP ip, void *object) {
     i->state = PYTCP_JUST_EST;
     
     /** Notify the callback of the establishment of the new connection */
-    i->callback(i, ip, object);
+    i->callback(i, packet);
 
     i->state = PYTCP_DATA;
   };
@@ -442,7 +472,7 @@ int TCPHashTable_process_tcp(TCPHashTable self, IP ip, void *object) {
   */
 
   /** Add the new IP packet to the stream queue */
-  i->add(i, ip, object);
+  i->add(i, packet);
 
   /** If we are keeping track of too many streams we need to expire
       them:
@@ -474,5 +504,5 @@ int TCPHashTable_process_tcp(TCPHashTable self, IP ip, void *object) {
 VIRTUAL(TCPHashTable, Object)
      VMETHOD(Con) = TCPHashTable_Con;
      VMETHOD(find_stream) = TCPHashTable_find_stream;
-     VMETHOD(process) = TCPHashTable_process_tcp;
+     VMETHOD(process) = TCPHashTable_process;
 END_VIRTUAL

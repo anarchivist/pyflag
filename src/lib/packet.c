@@ -72,8 +72,10 @@ static void Packet_destroy(Packet self) {
 };
 
 /*******************************************************
-    This code looks for the node property by name. We traverse all
-    children of this node looking for it too.
+    This code looks for the node property by name. 
+
+    get_field_by_name_r traverse all children of this node looking for
+    it too.
 ********************************************************/
 struct struct_property_t *get_field_by_name(Packet self, char *name) { 
   struct struct_property_t *i;
@@ -83,6 +85,53 @@ struct struct_property_t *get_field_by_name(Packet self, char *name) {
     if(!strcmp(i->name, name)) {
       //i=talloc_memdup(self, i, sizeof(*i));
       return i;
+    };
+  };
+
+  return NULL;
+};
+
+// Recursive version of the above. self gets modified to point to the
+// correct Packet
+struct struct_property_t *get_field_by_name_r(Packet *self, char *name) { 
+  struct struct_property_t *i;
+
+  list_for_each_entry(i, &((*self)->properties.list), list) {
+    void *item = *(void **) ((char *)((*self)->struct_p) + i->item);
+
+    if(!i->name) break;
+    if(!strcmp(i->name, name)) {
+      return i;
+    };
+
+    if(i->field_type == FIELD_TYPE_PACKET && item) {
+      *self = item;
+      struct struct_property_t *result = get_field_by_name_r(self, name);
+      if(result) return result;
+    };
+  };
+
+  return NULL;
+};
+
+// Recursively searches the packet tree in root for any nodes which
+// are instances of class
+Packet find_packet_instance(Packet root, char *class_name) {
+  struct struct_property_t *i;
+  
+  if(!root) return NULL;
+
+  list_for_each_entry(i, &(root->properties.list), list) {
+    void *item = *(void **) ((char *)(root->struct_p) + i->item);
+
+    if(!i->name) break;
+    if(i->field_type == FIELD_TYPE_PACKET) {
+      if(ISNAMEINSTANCE(item,class_name))
+	return item;
+      else {
+	Packet result=find_packet_instance(item, class_name);
+	if(result) return result;
+      };
     };
   };
 

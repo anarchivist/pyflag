@@ -1,3 +1,6 @@
+#ifndef __PYPACKET_H
+#define __PYPACKET_H
+
 #include <Python.h>
 
 typedef struct {
@@ -5,3 +8,4 @@ typedef struct {
   Packet obj;
 } PyPacket;
 
+#endif

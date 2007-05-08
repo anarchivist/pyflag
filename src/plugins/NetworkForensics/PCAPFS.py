@@ -41,8 +41,9 @@ import os,sys,time
 import reassembler
 from NetworkScanner import *
 import pypcap
-from format import Buffer
+import cStringIO
 from pyflag.TableObj import StringType, IntegerType, TimestampType, InodeType
+
 
 description = "Network Forensics"
 
@@ -68,13 +69,12 @@ class NetworkingInit(FlagFramework.EventHandler):
         ### data offset is the offset within the iosource where we can
         ### find the data section of this packet.
         case_dbh.execute("""CREATE TABLE if not exists `pcap` (
-        `id` INT NOT NULL,
+        `id` INT NOT NULL auto_increment,
         `iosource` varchar(50),
         `offset` BIGINT NOT NULL ,
         `length` INT NOT NULL ,
         `ts_sec` TIMESTAMP,
         `ts_usec` INT NOT NULL,
-        `link_type`  TINYINT not null,
         KEY `id` (`id`)
         )""")
 
@@ -83,7 +83,7 @@ class NetworkingInit(FlagFramework.EventHandler):
         case_dbh.execute(
             """CREATE TABLE if not exists `connection_details` (
             `inode` varchar(250),
-            `con_id` int(11) signed NOT NULL default 0,
+            `con_id` int(11) signed NOT NULL auto_increment,
             `reverse` int(11) unsigned NOT NULL default '0',
             `src_ip` int(11) unsigned NOT NULL default '0',
             `src_port` int(11) unsigned NOT NULL default '0',
@@ -106,16 +106,246 @@ class NetworkingInit(FlagFramework.EventHandler):
             `cache_offset`  bigint(9) unsigned NOT NULL default '0'
             ) """)
 
+class CachedWriter:
+    """ A class which caches data in memory and then flushes to disk
+    when ready. This does not tie up file descriptors.
+
+    FIXME: Stream reassembly typically uses lots of very small files -
+    this is inefficient in terms of storage and access speed. The
+    CachedWriter may be used to implement a kind of compound file.
+    """
+    def __init__(self, filename):
+        cStringIO.StringIO.__init__(self)
+        self.filename = filename
+        self.fd = cStringIO.StringIO()
+        self.offset = 0
+
+    def write_to_file(self):
+        fd = open(self.filename,"a")
+        fd.write(self.fd.getvalue())
+        fd.close()
+        self.fd.truncate(0)
+        
+    def write(self, data):
+        self.fd.write(data)
+        self.offset += len(data)
+        
+        if self.fd.tell() > 100000:
+            self.write_to_file()
+
+con_id = 0
+
 class PCAPFS(DBFS):
     """ This implements a simple filesystem for PCAP files.
     """
     name = 'PCAP Filesystem'
 
     def load(self, mount_point, iosource_name,scanners = None):
-
-    def load_old(self, mount_point, iosource_name,scanners = None):
         DBFS.load(self, mount_point, iosource_name)
         
+        ## Open the file descriptor
+        self.fd = IO.open(self.case, iosource_name)
+
+        ## Use the C implementation to read the pcap files:
+        pcap_file = pypcap.PyPCAP(self.fd)
+
+        ## Build our streams:
+        pyflaglog.log(pyflaglog.DEBUG, "Reassembling streams, this might take a while")
+
+        ## We manage a number of tables here with mass insert:
+        connection_dbh = DB.DBO(self.case)
+        connection_dbh.mass_insert_start("connection")
+        
+        pcap_dbh = DB.DBO(self.case)
+        pcap_dbh.mass_insert_start("pcap")
+
+        def Callback(mode, packet, connection):
+            """ This callback is called for each packet with the following modes:
+
+            est - called when the connection is just established.
+            data - called for each data packet.
+            end - called when the connection is destroyed.
+            """
+            if mode=='est':
+                tcp = packet.find_type("TCP")
+                ip = packet.find_type("IP")
+                
+#                print "Got new connection from %s:%s -> %s:%s" % (ip.source_addr, tcp.source,
+#                                                                  ip.dest_addr, tcp.dest)
+
+                ## Connection id have not been set yet:
+                if not connection.has_key('con_id'):
+                    ## We insert and delete a single row to obtain a
+                    ## unique connection id from the autoincrement
+                    ## field. Although this might look like a race, it
+                    ## is not because autoincrement fields never go
+                    ## backwards. This technique works even when there
+                    ## is several concurrent loading operations due to
+                    ## the atomicity of the db autoincrement
+                    ## preventing connection id collisions. This seems
+                    ## to be a little expensive though.
+                    connection_dbh.insert('connection_details', _fast=True,
+                                          src_ip=0)
+                    forward_con_id = connection_dbh.autoincrement()
+
+                    connection_dbh.delete('connection_details', _fast=True,
+                                          where='con_id=%s' % forward_con_id)
+
+                    connection_dbh.insert('connection_details', _fast=True,
+                                          src_ip=0)
+                    reverse_con_id = connection_dbh.autoincrement()
+
+                    connection_dbh.delete('connection_details', _fast=True,
+                                          where='con_id=%s' % reverse_con_id)
+
+                    ## This is the simple direct way to do it - its a
+                    ## little cheaper than above but could have issues
+                    ## when we have concurrent loadings
+##                    global con_id
+                    
+##                    con_id +=1
+##                    forward_con_id = con_id
+##                    con_id +=1
+##                    reverse_con_id = con_id
+                    
+                    connection['con_id'] = forward_con_id;
+                    connection['reverse']['con_id'] = reverse_con_id;
+
+                    connection['src_ip'] = ip.source_addr
+                    connection['source'] = tcp.source
+                    connection['dest_ip'] = ip.dest_addr
+                    connection['dest'] = tcp.dest
+
+                ## Record the stream in our database:
+                connection_dbh.insert('connection_details',
+                                      con_id = connection['con_id'],
+                                      reverse = connection['reverse']['con_id'],
+
+                                      ## This is the src address as an int
+                                      src_ip=ip.src,
+                                      src_port=tcp.source,
+                                      dest_ip=ip.dest,
+                                      dest_port=tcp.dest,
+                                      isn=tcp.seq,
+                                      inode='I%s|S%s' % (iosource_name, connection['con_id']),
+                                      _ts_sec="from_unixtime('%s')" % packet.ts_sec,
+                                      _fast = True
+                                      )
+
+                ## This is where we write the data out
+                connection['data'] = CachedWriter(
+                    FlagFramework.get_temp_path(connection_dbh.case,
+                                                "I%s|S%s" % (iosource_name, connection['con_id']))
+                    )
+
+                Callback('data', packet, connection)
+
+            elif mode=='data':
+                tcp = packet.find_type("TCP")
+                data = tcp.data
+                fd = connection['data']
+
+                ## Record the packet in the pcap table:
+                pcap_dbh.insert("pcap",
+                                iosource = iosource_name,
+                                offset = packet.offset,
+                                length = packet.caplen,
+                                _ts_sec =  "from_unixtime('%s')" % packet.ts_sec,
+                                ts_usec = packet.ts_usec,
+                                _fast=True,
+                                )
+
+                pcap_id = pcap_dbh.autoincrement()
+                connection['initial_packet_id'] = pcap_id
+                
+                pcap_dbh.insert("connection",
+                                con_id = connection['con_id'],
+                                packet_id = pcap_id,
+                                cache_offset = fd.offset,
+                                length = len(data),
+                                seq = tcp.seq,
+                                _fast=True
+                                )
+
+                fd.write(data)
+
+            elif mode=='destroy':
+                ## Find the mtime of the first packet in the stream:
+                try:
+                    connection_dbh.execute("select ts_sec from pcap where id=%r or "
+                                           "id=%r order by ts_sec asc limit 1",
+                                           (connection['initial_packet_id'],
+                                            connection['reverse'].get('initial_packet_id', 9178581330)))
+                    row = connection_dbh.fetch()
+                    mtime = row['ts_sec']
+                except IndexError,e:
+                    mtime = "0000-00-00"
+
+#                print "Finalising connection %s" % connection['con_id']
+                try:
+                    fd = connection['data']
+                    fd.write_to_file()
+
+                    ## Create a new VFS node:
+                    new_inode = "I%s|S%s" % (iosource_name, connection['con_id'])
+
+                    date_str='.'
+
+                    self.VFSCreate(
+                        None,
+                        new_inode,
+                        "%s/streams/%s/%s-%s/%s:%s/forward" % (self.mount_point,
+                                                               date_str,
+                                                               connection['src_ip'],
+                                                               connection['dest_ip'],
+                                                               connection['source'],
+                                                               connection['dest']),
+                        size = fd.offset,
+                        mtime = mtime
+                        )
+                except KeyError: pass
+
+                try:
+                    fd = connection['reverse']['data']
+                    fd.write_to_file()
+
+                    ## Create a new VFS node:
+                    new_inode = "I%s|S%s" % (iosource_name, connection['reverse']['con_id'])
+
+                    date_str='.'
+
+                    self.VFSCreate(
+                        None,
+                        new_inode,
+                        "%s/streams/%s/%s-%s/%s:%s/reverse" % (self.mount_point,
+                                                               date_str,
+                                                               connection['src_ip'],
+                                                               connection['dest_ip'],
+                                                               connection['source'],
+                                                               connection['dest']),
+                        size = fd.offset,
+                        mtime = mtime
+                        )
+
+                except KeyError: pass
+                
+        ## Create a new reassembler with this callback
+        processor = reassembler.Reassembler(packet_callback = Callback)
+
+        ## Process the file with it:
+        while 1:
+            try:
+                processor.process(pcap_file)
+            except StopIteration:
+                break
+        
+        pcap_dbh.check_index("connection_details",'src_ip')
+        pcap_dbh.check_index("connection_details",'src_port')
+        pcap_dbh.check_index("connection_details",'dest_ip')
+        pcap_dbh.check_index("connection_details",'dest_port')
+        pcap_dbh.check_index('connection_details','inode')
+        
+    def load_old(self, mount_point, iosource_name,scanners = None):
         dbh.execute("select max(id) as id from pcap")
         row=dbh.fetch()
 
@@ -123,15 +353,6 @@ class PCAPFS(DBFS):
             max_id = row['id']
         else:
             max_id = 0
-
-        ## Open the file descriptor
-        self.fd = IO.open(self.case, iosource_name)
-
-        ## Use the C implementation:
-        pcap_file = pypcap.PyPCAP(self.fd)
-
-        ## Build our streams:
-        pyflaglog.log(pyflaglog.DEBUG, "Reassembling streams, this might take a while")
 
         ## Prepare the dbh for the callback
         case = dbh.case
@@ -161,28 +382,12 @@ class PCAPFS(DBFS):
             ## Flush the mass insert pcap:
             dbh.mass_insert_commit()
             
-            ## Find the mtime of the first packet in the stream:
-            try:
-                dbh2.execute("select ts_sec from pcap where id=%r limit 1",
-                                 s['packets'][0])
-                row = dbh2.fetch()
-                mtime = row['ts_sec']
-            except IndexError,e:
-                mtime = "0000-00-00"
 
             ## Add the stream to the connection details table: (Note
             ## here that dbh.insert and dbh.mass_insert do not
             ## interfer with each other and can be used alternatively
             dbh2.insert("connection_details",
                        con_id=s['con_id'],
-                       src_ip=s['src_ip'],
-                       src_port=s['src_port'],
-                       dest_ip=s['dest_ip'],
-                       dest_port=s['dest_port'],
-                       isn=s['isn'],
-                       inode='I%s|S%s' % (iosource_name, s['con_id']),
-                       reverse=s['reverse'],
-                       ts_sec=mtime
                        )
 
             ## If the stream is empty we dont really want to record it.
@@ -194,44 +399,11 @@ class PCAPFS(DBFS):
             except:
                 size = 0
 	    
-            ## Create a new VFS node:
-            new_inode = "I%s|S%s" % (iosource_name, s['con_id'])
             
             ## Seperate the streams into days to make handling huge
             ## files in the gui a little eaiser.
             date_str = mtime.split(" ")[0]
             
-            if s['direction'] == "forward":
-                self.VFSCreate(
-                    None,
-                    new_inode,
-                    "%s/streams/%s/%s-%s/%s:%s/%s" % (
-                    self.mount_point,
-                    date_str,
-                    IP2str(s['dest_ip']),
-                    IP2str(s['src_ip']),
-                    s['dest_port'],
-                    s['src_port'],
-                    s['direction']),
-                    mtime = mtime,
-                    size=size
-                    )
-            else:
-                self.VFSCreate(
-                    None,
-                    new_inode,
-                    "%s/streams/%s/%s-%s/%s:%s/%s" % (
-                    self.mount_point,
-                    date_str,
-                    IP2str(s['src_ip']),
-                    IP2str(s['dest_ip']),
-                    s['src_port'],
-                    s['dest_port'],
-                    s['direction']),
-                    mtime = mtime,
-                    size=size
-                    )
-                
             for i in range(len(s['seq'])):
                 dbh2.mass_insert(
                     con_id = s['con_id'], packet_id = s['packets'][i],
@@ -286,17 +458,6 @@ class PCAPFS(DBFS):
 
         pyflaglog.log(pyflaglog.DEBUG, "Finalising streams, nearly done")
         
-        # Finish it up
-        reassembler.clear_stream_buffers(hashtbl);
-        reassembler.set_tcp_callback(hashtbl,None);
-        
-        dbh.check_index("connection_details",'src_ip')
-        dbh.check_index("connection_details",'src_port')
-        dbh.check_index("connection_details",'dest_ip')
-        dbh.check_index("connection_details",'dest_port')
-        dbh.check_index("connection", 'con_id')
-        dbh.check_index('connection_details','inode')
-
     def delete(self):
         DBFS.delete(self)
         dbh = DB.DBO(self.case)    

@@ -16,18 +16,10 @@ describing the stream.
 ****/
 #include <Python.h>
 #include "network.h"
-#include "tcp.h"
 #include "pcap.h"
 #include "pypacket.h"
 #include "pypcap.h"
-
-typedef struct {
-  PyObject_HEAD
-  PyObject *packet_callback;
-
-  // The main reassembler hash table:
-  TCPHashTable hash;
-} Reassembler;
+#include "reassembler.h"
 
 #if 0
 static PyObject *python_cb = NULL;
@@ -251,64 +243,69 @@ static void callback(TCPStream self, IP ip) {
   };
 };
 
-static PyObject *py_clear_stream_buffers(PyObject *self, PyObject *args) {
-  TCPHashTable hash;
-  PyObject *hash_py;
-
-  if(!PyArg_ParseTuple(args, "O", &hash_py))
-    return NULL;
-  
-  hash = PyCObject_AsVoidPtr(hash_py);
-  if(!hash) return NULL;
-
-  talloc_free(hash);
-
-  Py_INCREF(Py_None);
-  return Py_None;
-};
-
 #endif
 
-static void callback(TCPStream self, IP ip, void *object) {
-  PyPacket *dissected = (PyPacket *)object;
-  Reassembler *reassembler = (Reassembler *)self->data;
+#include "tcp.h"
 
+static void callback(TCPStream self, PyPacket *dissected) {
+  PyObject *result;
+    
   switch(self->state) {
-  case PYTCP_JUST_EST:
-#if 0
-    //The first stream in a pair is the forward stream.
-    if(self->reverse->data)
-      self->data = New_Stream_Dict(self, "reverse");
-    else
-      self->data = New_Stream_Dict(self, "forward");
+  case PYTCP_JUST_EST: {
+    if(!self->stream_object) {
+      /* Create a new properties dict to pass into the python cb: This
+	 essentially creates a reference cycle because each conection
+	 pair points to each other. This is not a problem in our case
+	 because the PYTCP_DESTROY event forcably clears both
+	 Dictionaries and decreases their refcounts. */
+      self->stream_object = PyDict_New();
+      self->reverse->stream_object = PyDict_New();
 
-    stream = (PyObject *)self->data;
-
-    // The following adds another destructor to self without
-    // interfering with whatever destructor self has already.
-    {
-      TCPStream *tmp = talloc_size(self,sizeof(void *));
-
-      *tmp = self;
-      talloc_set_destructor((void *)tmp, free_data);
+      PyDict_SetItemString(self->stream_object, "reverse", self->reverse->stream_object);
+      PyDict_SetItemString(self->reverse->stream_object, "reverse", self->stream_object);
     };
-#endif
 
-    break;
-  case PYTCP_DATA: {
-    PyObject *result;
-    if(reassembler->packet_callback && dissected) {
-      result = PyObject_CallFunction(reassembler->packet_callback , "sO", "data", dissected);
-      Py_XDECREF(result);
-
-      // We no longer need the dissected object:
-      Py_XDECREF(dissected);
+    if(self->hash->reassembler->packet_callback && dissected) {
+      result = PyObject_CallFunction(self->hash->reassembler->packet_callback , "sOO", "est", 
+				     dissected, self->stream_object);
+      if(result) {
+	Py_DECREF(result);
+      };
     };
   };
     break;
+
+  case PYTCP_DATA: {
+    if(self->hash->reassembler->packet_callback && dissected && self->stream_object) {
+      result = PyObject_CallFunction(self->hash->reassembler->packet_callback , "sOO", "data", 
+				     dissected, self->stream_object);
+      if(result) {
+	Py_DECREF(result);
+      };
+    };
+  };
+    break;
+
   case PYTCP_DESTROY: {
-    printf("Connection ID %u -> %u destroyed\n", self->con_id, 
-           self->reverse->con_id);
+    // Let the callback know we finished:
+    if(self->hash->reassembler->packet_callback && self->stream_object) {
+      result = PyObject_CallFunction(self->hash->reassembler->packet_callback , "sOO", "destroy", 
+				     Py_None, self->stream_object);
+      if(result) {
+	Py_DECREF(result);
+      };
+    };
+
+
+    if(self->stream_object) {
+      PyDict_Clear(self->stream_object);
+      PyDict_Clear(self->reverse->stream_object);
+
+      Py_DECREF(self->stream_object);
+      Py_DECREF(self->reverse->stream_object);
+      self->stream_object = NULL;
+      self->reverse->stream_object = NULL;
+    };
   };
     
     break;    
@@ -320,6 +317,11 @@ static void callback(TCPStream self, IP ip, void *object) {
   default:
     break;
   };
+
+  if(PyErr_Occurred())
+    PyErr_Print();
+
+  return;
 };
 
 static int Reassembler_init(Reassembler *self, PyObject *args, PyObject *kwds) {
@@ -334,13 +336,15 @@ static int Reassembler_init(Reassembler *self, PyObject *args, PyObject *kwds) {
   if(self->packet_callback && !PyCallable_Check(self->packet_callback)) {
     PyErr_Format(PyExc_RuntimeError, "Callback must be callable");
     return -1;
-  };
+    // Make sure we keep a reference to this callback
+  } else Py_INCREF(self->packet_callback);
 
   self->hash = CONSTRUCT(TCPHashTable, TCPHashTable, Con, NULL, initial_con_id);
   self->hash->callback = callback;
+  self->hash->con_id=0;
 
   // We pass ourselves to all the callbacks
-  self->hash->data = self;
+  self->hash->reassembler = self;
 
   return 0;
 };
@@ -348,7 +352,6 @@ static int Reassembler_init(Reassembler *self, PyObject *args, PyObject *kwds) {
 static PyObject *process(Reassembler *self, PyObject *args) {
   PyPCAP *pcap;
   PyPacket *root;
-  IP ip;
 
   if(!PyArg_ParseTuple(args, "O", &pcap))
     return NULL;
@@ -357,36 +360,21 @@ static PyObject *process(Reassembler *self, PyObject *args) {
   root = (PyPacket *)PyObject_CallMethod((PyObject *)pcap, "dissect", NULL);
   if(!root) return NULL;
 
-  // Check to make sure that its the right packet we want:
-  //  if(strcmp("Root", NAMEOF(root->obj)))
-  //  return PyErr_Format(PyExc_RuntimeError, "Not a dissected object %s", NAMEOF(root->obj));
-
-  ip = (IP)root->obj;
-  if(!Find_Property((Packet *)&ip, NULL, "ip", "") || !ip) {
-    goto exit;
-  };
-
   // OK we found the ip header - we just load the object into the hash
   // table:
   PyErr_Clear();
 
   /** Process the packet */
-  self->hash->process(self->hash, ip, root);
+  self->hash->process(self->hash, root);
 
   /** Currently there is no way for us to know if the callback
       generated an error (since the callback returns void). So here we
       check the exception state of the interpreter explicitely 
   */
   if(PyErr_Occurred()) {
-    Py_DECREF(root);
+    //    Py_DECREF(root);
     return NULL;
-  };
-  
-  // Ok - all is good
-  Py_RETURN_NONE;
-
- exit:  
-  Py_DECREF(root);
+  };  
 
   Py_RETURN_NONE;
 };
@@ -394,10 +382,6 @@ static PyObject *process(Reassembler *self, PyObject *args) {
 static PyMethodDef ReassemblerMethods[] = {
   {"process", (PyCFunction)process, METH_VARARGS| METH_KEYWORDS,
    "Process a pcap packet"},
-  /*  {"clear_stream_buffers", py_clear_stream_buffers, METH_VARARGS,
-      "Clears all the stream buffers."}, 
-      {"set_tcp_callback", set_tcp_callback, METH_VARARGS,
-      "Sets the callback for the TCP streams"}, */
   {NULL, NULL, 0, NULL}
 };
 

@@ -34,12 +34,24 @@ import pyflag.pyflaglog as pyflaglog
 from pyflag.Scanner import *
 from pyflag.TableObj import StringType, TimestampType, InodeType, FilenameType
 
+WARNING_ISSUED = False
+
 class VScan:
     """ Singleton class to manage virus scanner access """
     ## May need to do locking in future, if libclamav is not reentrant.
     def scan(self,buf):
         """ Scan the given buffer, and return a virus name or 'None'"""
-        import pyclamav
+        try:
+            import pyclamav
+        except ImportError:
+            global WARNING_ISSUED
+
+            if not WARNING_ISSUED:
+                pyflaglog.log(pyflaglog.ERROR, "You do not have the python-clamav binding installed. Will not be able to scan for viruses.")
+                WARNING_ISSUED = True
+
+            pyclamav = None
+            return
         
         try:
             ret = pyclamav.scanthis(buf)
@@ -134,5 +146,6 @@ class VirusScanTest(pyflag.tests.ScannerTest):
         row = dbh.fetch()
 
         ## We expect to pick this rootkit:
+        self.assert_(row, "Unable to find any viruses")
         self.assert_("K15-0-0|Z" in row['inode'] , "Unable to find Trojan.NTRootKit.044")
         

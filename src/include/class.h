@@ -338,9 +338,17 @@ struct Object {
   int __size;
 };
 
+#define GETCLASS(class)				\
+  (Object)&__ ## class
+
 // Returns true if the obj belongs to the class
 #define ISINSTANCE(obj,class)			\
-  (((Object)obj)->__class__ == (Object)&__ ## class)
+  (((Object)obj)->__class__ == GETCLASS(class))
+
+// This is a string comparison version of ISINSTANCE which works
+// across different shared objects.
+#define ISNAMEINSTANCE(obj, class)		\
+  (obj && !strcmp(class, NAMEOF(obj)))
 
 // We need to ensure that class was properly initialised:
 #define ISSUBCLASS(obj,class)			\
