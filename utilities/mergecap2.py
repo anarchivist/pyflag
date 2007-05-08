@@ -28,7 +28,6 @@ too many files.
 """
 import glob,bisect,sys
 import Store
-import FileFormats.PCAP as PCAP
 from format import Buffer
 import pyflag.pyflaglog as logging
 import pyflag.conf

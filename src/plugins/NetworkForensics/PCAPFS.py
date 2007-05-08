@@ -115,7 +115,6 @@ class CachedWriter:
     CachedWriter may be used to implement a kind of compound file.
     """
     def __init__(self, filename):
-        cStringIO.StringIO.__init__(self)
         self.filename = filename
         self.fd = cStringIO.StringIO()
         self.offset = 0
@@ -132,8 +131,6 @@ class CachedWriter:
         
         if self.fd.tell() > 100000:
             self.write_to_file()
-
-con_id = 0
 
 class PCAPFS(DBFS):
     """ This implements a simple filesystem for PCAP files.
@@ -192,7 +189,7 @@ class PCAPFS(DBFS):
                     date_str=time.strftime("%Y-%m-%d", time.gmtime(packet.ts_sec))
                     
                     ## This is used for making the VFS inode below
-                    connection['path'] = "%s/streams/%s/%s-%s/%s:%s/forward" % (
+                    connection['path'] = "%s/streams/%s/%s-%s/%s:%s/%%s" % (
                         self.mount_point,
                         date_str,
                         ip.source_addr,
@@ -241,8 +238,11 @@ class PCAPFS(DBFS):
                                 )
 
                 pcap_id = pcap_dbh.autoincrement()
-                connection['initial_packet_id'] = pcap_id
                 
+                ## Some progress reporting
+                if pcap_id % 10000 == 0:
+                    pyflaglog.log(pyflaglog.DEBUG, "processed %s packets (%s bytes)" % (pcap_id, packet.offset))
+
                 pcap_dbh.insert("connection",
                                 con_id = connection['con_id'],
                                 packet_id = pcap_id,
@@ -266,7 +266,7 @@ class PCAPFS(DBFS):
                     self.VFSCreate(
                         None,
                         new_inode,
-                        connection['path'],
+                        connection['path'] % "forward",
                         size = fd.offset,
                         _mtime = connection['mtime'],
                         _fast = True
@@ -283,7 +283,7 @@ class PCAPFS(DBFS):
                     self.VFSCreate(
                         None,
                         new_inode,
-                        connection['path'],
+                        connection['path'] % "reverse",
                         size = fd.offset,
                         _mtime = connection['reverse']['mtime'],
                         _fast = True
@@ -307,125 +307,6 @@ class PCAPFS(DBFS):
         pcap_dbh.check_index("connection_details",'dest_port')
         pcap_dbh.check_index('connection_details','inode')
         
-    def load_old(self, mount_point, iosource_name,scanners = None):
-        dbh.execute("select max(id) as id from pcap")
-        row=dbh.fetch()
-
-        if row['id']:
-            max_id = row['id']
-        else:
-            max_id = 0
-
-        ## Prepare the dbh for the callback
-        case = dbh.case
-        dbh2 = DB.DBO(case)
-        dbh2.mass_insert_start("connection")
-
-        ## We need to find a good spot to have con_ids:
-        dbh2.execute("select max(con_id) as max from connection_details")
-        row = dbh2.fetch()
-        try:
-            ## This number is designed to provide enough room for
-            ## connection ids to grow without collision. In the event
-            ## that another simulataneous load process is launched.
-            initial_con_id = row['max']+2e6
-        except:
-            initial_con_id = 0
-
-        ## Where to store the reassembled stream files
-        hashtbl = reassembler.init(FlagFramework.get_temp_path(dbh.case,'I%s|' % iosource_name),initial_con_id)
-
-        if scanners:
-            scanner_string = ",".join(scanners)
-            pdbh = DB.DBO()
-            pdbh.mass_insert_start('jobs')
-
-        def Callback(s):
-            ## Flush the mass insert pcap:
-            dbh.mass_insert_commit()
-            
-
-            ## Add the stream to the connection details table: (Note
-            ## here that dbh.insert and dbh.mass_insert do not
-            ## interfer with each other and can be used alternatively
-            dbh2.insert("connection_details",
-                       con_id=s['con_id'],
-                       )
-
-            ## If the stream is empty we dont really want to record it.
-            if len(s['seq'])==0: return
-
-            ## Figure out the size of the stream:
-            try:
-                size = s['seq'][-1] + s['length'][-1] - s['seq'][0]
-            except:
-                size = 0
-	    
-            
-            ## Seperate the streams into days to make handling huge
-            ## files in the gui a little eaiser.
-            date_str = mtime.split(" ")[0]
-            
-            for i in range(len(s['seq'])):
-                dbh2.mass_insert(
-                    con_id = s['con_id'], packet_id = s['packets'][i],
-                    seq = s['seq'][i], length = s['length'][i],
-                    cache_offset = s['offset'][i],
-                    )
-
-            ## If we need to scan it, schedule the job now:
-            if scanners:
-                pdbh.mass_insert(
-                    command = 'Scan',
-                    arg1 = self.case,
-                    arg2 = new_inode,
-                    arg3= scanner_string,
-                    cookie=self.cookie,
-                    )
-
-        ## Register the callback
-        reassembler.set_tcp_callback(hashtbl, Callback)
-
-        ## Scan the filesystem:
-        ## Load the packets into the indes:
-        dbh.mass_insert_start("pcap")
-        link_type = pcap_file.file_header().linktype
-
-        for p in pcap_file:
-            ## Store information about this packet in the db:
-            dbh.mass_insert(
-                iosource = iosource_name,
-                offset = pcap_file.offset()+24,
-                length = p.caplen,
-                _ts_sec =  "from_unixtime('%s')" % p.ts_sec,
-                ts_usec = p.ts_usec,
-                link_type = link_type,
-                id = max_id
-                )
-
-            ## Some progress reporting
-            if max_id % 10000 == 0:
-                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "processed %s packets (%s bytes)" % (max_id, pcap_file.offset()))
-
-            data = pcap_file.dissect()
-       
-            ## Prepare the next number
-            max_id+=1
-
-        ## Now reassemble it:
-            try:
-                reassembler.process_pypacket(hashtbl, data, self.fd.name)
-            except RuntimeError,e:
-                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "%s" % e)
-
-        pyflaglog.log(pyflaglog.DEBUG, "Finalising streams, nearly done")
-        
-    def delete(self):
-        DBFS.delete(self)
-        dbh = DB.DBO(self.case)    
-        dbh.MySQLHarness("%s/pcaptool -d -t pcap" % (
-            config.FLAG_BIN))
-
 class PCAPFile(File):
     """ A file like object to read packets from a pcap file.
 
