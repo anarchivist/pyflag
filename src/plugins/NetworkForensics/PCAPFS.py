@@ -175,50 +175,35 @@ class PCAPFS(DBFS):
 
                 ## Connection id have not been set yet:
                 if not connection.has_key('con_id'):
-                    ## We insert and delete a single row to obtain a
-                    ## unique connection id from the autoincrement
-                    ## field. Although this might look like a race, it
-                    ## is not because autoincrement fields never go
-                    ## backwards. This technique works even when there
-                    ## is several concurrent loading operations due to
-                    ## the atomicity of the db autoincrement
-                    ## preventing connection id collisions. This seems
-                    ## to be a little expensive though.
+                    ## We insert a null value so we can get a valid
+                    ## autoincrement id. We later update the row with
+                    ## real data.
                     connection_dbh.insert('connection_details', _fast=True,
                                           src_ip=0)
                     forward_con_id = connection_dbh.autoincrement()
-
-                    connection_dbh.delete('connection_details', _fast=True,
-                                          where='con_id=%s' % forward_con_id)
 
                     connection_dbh.insert('connection_details', _fast=True,
                                           src_ip=0)
                     reverse_con_id = connection_dbh.autoincrement()
 
-                    connection_dbh.delete('connection_details', _fast=True,
-                                          where='con_id=%s' % reverse_con_id)
-
-                    ## This is the simple direct way to do it - its a
-                    ## little cheaper than above but could have issues
-                    ## when we have concurrent loadings
-##                    global con_id
-                    
-##                    con_id +=1
-##                    forward_con_id = con_id
-##                    con_id +=1
-##                    reverse_con_id = con_id
-                    
                     connection['con_id'] = forward_con_id;
                     connection['reverse']['con_id'] = reverse_con_id;
 
-                    connection['src_ip'] = ip.source_addr
-                    connection['source'] = tcp.source
-                    connection['dest_ip'] = ip.dest_addr
-                    connection['dest'] = tcp.dest
+                    date_str=time.strftime("%Y-%m-%d", time.gmtime(packet.ts_sec))
+                    
+                    ## This is used for making the VFS inode below
+                    connection['path'] = "%s/streams/%s/%s-%s/%s:%s/forward" % (
+                        self.mount_point,
+                        date_str,
+                        ip.source_addr,
+                        ip.dest_addr,
+                        tcp.source,
+                        tcp.dest)
 
                 ## Record the stream in our database:
-                connection_dbh.insert('connection_details',
-                                      con_id = connection['con_id'],
+                connection['mtime'] = packet.ts_sec
+                connection_dbh.update('connection_details',
+                                      where="con_id='%s'" % connection['con_id'],
                                       reverse = connection['reverse']['con_id'],
 
                                       ## This is the src address as an int
@@ -228,7 +213,7 @@ class PCAPFS(DBFS):
                                       dest_port=tcp.dest,
                                       isn=tcp.seq,
                                       inode='I%s|S%s' % (iosource_name, connection['con_id']),
-                                      _ts_sec="from_unixtime('%s')" % packet.ts_sec,
+                                      _ts_sec="from_unixtime('%s')" % connection['mtime'],
                                       _fast = True
                                       )
 
@@ -272,36 +257,19 @@ class PCAPFS(DBFS):
             elif mode=='destroy':
                 ## Find the mtime of the first packet in the stream:
                 try:
-                    connection_dbh.execute("select ts_sec from pcap where id=%r or "
-                                           "id=%r order by ts_sec asc limit 1",
-                                           (connection['initial_packet_id'],
-                                            connection['reverse'].get('initial_packet_id', 9178581330)))
-                    row = connection_dbh.fetch()
-                    mtime = row['ts_sec']
-                except IndexError,e:
-                    mtime = "0000-00-00"
-
-#                print "Finalising connection %s" % connection['con_id']
-                try:
                     fd = connection['data']
                     fd.write_to_file()
 
                     ## Create a new VFS node:
                     new_inode = "I%s|S%s" % (iosource_name, connection['con_id'])
 
-                    date_str='.'
-
                     self.VFSCreate(
                         None,
                         new_inode,
-                        "%s/streams/%s/%s-%s/%s:%s/forward" % (self.mount_point,
-                                                               date_str,
-                                                               connection['src_ip'],
-                                                               connection['dest_ip'],
-                                                               connection['source'],
-                                                               connection['dest']),
+                        connection['path'],
                         size = fd.offset,
-                        mtime = mtime
+                        _mtime = connection['mtime'],
+                        _fast = True
                         )
                 except KeyError: pass
 
@@ -312,19 +280,13 @@ class PCAPFS(DBFS):
                     ## Create a new VFS node:
                     new_inode = "I%s|S%s" % (iosource_name, connection['reverse']['con_id'])
 
-                    date_str='.'
-
                     self.VFSCreate(
                         None,
                         new_inode,
-                        "%s/streams/%s/%s-%s/%s:%s/reverse" % (self.mount_point,
-                                                               date_str,
-                                                               connection['src_ip'],
-                                                               connection['dest_ip'],
-                                                               connection['source'],
-                                                               connection['dest']),
+                        connection['path'],
                         size = fd.offset,
-                        mtime = mtime
+                        _mtime = connection['reverse']['mtime'],
+                        _fast = True
                         )
 
                 except KeyError: pass
@@ -338,7 +300,7 @@ class PCAPFS(DBFS):
                 processor.process(pcap_file)
             except StopIteration:
                 break
-        
+
         pcap_dbh.check_index("connection_details",'src_ip')
         pcap_dbh.check_index("connection_details",'src_port')
         pcap_dbh.check_index("connection_details",'dest_ip')
