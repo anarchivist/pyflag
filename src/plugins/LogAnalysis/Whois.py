@@ -224,6 +224,47 @@ class LookupWhoisID(LookupIP):
         result.heading("Whois Search Results")
         self.display_whois(query,result,int(query['id']))
 
+class WhoisInit(FlagFramework.EventHandler):
+    def init_default_db(self, dbh, case):
+        dbh.execute("""CREATE TABLE `whois` (
+        `id` int(11) NOT NULL,
+        `src_id` int(11) default NULL,
+        `start_ip` int(10) unsigned default NULL,
+        `netname` varchar(50) default NULL,
+        `numhosts` int(11) default NULL,
+        `country` char(2) default NULL,
+        `descr` varchar(255) default NULL,
+        `status` enum('assigned','allocated','reserved','unallocated') default NULL
+        ) engine=MyISAM""")
+
+        dbh.execute("""CREATE TABLE `whois_routes` (
+        `network` int(10) unsigned NOT NULL default '0',
+        `netmask` int(10) unsigned NOT NULL default '0',
+        `whois_id` int(11) NOT NULL default '0'
+        ) ENGINE=MyISAM""")
+        
+        dbh.insert("whois_routes",
+                   whois_id = 1, _fast=True);
+        
+        dbh.insert("whois",
+                   id=1,
+                   src_id=1,
+                   country='--',
+                   descr='Default Fallthrough Route: IP INVALID OR UNASSIGNED',
+                   status='unallocated')
+
+        dbh.execute("""CREATE TABLE `whois_sources` (
+        `id` int(11) NOT NULL,
+        `source` varchar(20) default NULL,
+        `url` varchar(255) default NULL,
+        `updated` datetime default NULL
+        ) engine=MyISAM""")
+
+        dbh.execute("""create table whois_cache (
+ 	`id` int(11) unsigned not NULL,
+        `ip` int(11) unsigned not NULL
+        ) engine=MyISAM""")
+
 ### Some unit tests for Whois:
 import unittest
 

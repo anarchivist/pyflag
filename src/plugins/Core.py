@@ -373,8 +373,44 @@ class CaseDBInit(FlagFramework.EventHandler):
         tdbh.execute("drop database if exists %s" % config.FLAGDB)
         tdbh.execute("create database %s" % config.FLAGDB)
 
-        ## Source the initial database script.
-        dbh.MySQLHarness("/bin/cat %s/db.setup" % config.DATADIR)
+        ## Source the initial database script. (We no longer use
+        ## db.setup to initialise the database - everything is done by
+        ## event handlers)
+
+        dbh.execute("""CREATE TABLE meta (
+        property varchar(50) default NULL,
+        value text default NULL
+        ) engine=MyISAM;""")
+
+
+        ## This is required for the new distributed architecture
+        dbh.execute("""create table jobs (
+	`id` int unsigned auto_increment, 
+	command varchar(250), 
+	arg1 text,
+	arg2 text,
+	arg3 text,
+	state enum('broadcast','pending','processing') default 'pending',
+	`cookie` INT(11) not null,
+	key `id`(id)
+	)""")
+
+        dbh.execute("""CREATE TABLE `sql_cache` (
+        `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+        `timestamp` TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL ,
+        `tables` VARCHAR( 250 ) NOT NULL ,
+        `query` MEDIUMTEXT NOT NULL,
+        `limit` INT default 0,
+        `length` INT default 100
+        )""")
+
+        dbh.execute("""CREATE TABLE `logs` (
+        `timestamp` TIMESTAMP NOT NULL ,
+        `level` TINYINT NOT NULL ,
+        `message` VARCHAR( 250 ) NOT NULL
+        )""")
+
+        ##dbh.MySQLHarness("/bin/cat %s/db.setup" % config.DATADIR)
 
         ## Update the schema version.
         dbh.set_meta('schema_version',config.SCHEMA_VERSION)

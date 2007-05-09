@@ -61,6 +61,8 @@ config.add_option("split", default=2000000000, type='int', short_option='s',
 
 config.parse_options(True)
 
+args = config.args[:]
+
 if config.glob:
     print "Globbing %s "% config.glob
     g = config.glob.replace('\\*','*')

@@ -43,7 +43,32 @@ class HashTables(FlagFramework.EventHandler):
         `NSRL_product` varchar(250),
         `NSRL_filename` varchar(60) not NULL default '',
         `FileType` tinytext
-        )""")        
+        )""")
+
+    def init_default_db(self, dbh, case):
+        # Remember to add indexes to this table after uploading the
+        # NSRL. Use the nsrl_load.py script.
+        dbh.execute("""CREATE TABLE `NSRL_hashes` (
+        `md5` varchar(16) NOT NULL default '',
+        `filename` varchar(60) NOT NULL default '',
+        `productcode` int(11) NOT NULL default '0',
+        `oscode` varchar(60) NOT NULL default ''
+        ) engine=MyISAM""")
+
+        dbh.execute("""CREATE TABLE `NSRL_products` (
+        `Code` mediumint(9) NOT NULL default '0',
+        `Name` varchar(250) NOT NULL default '',
+        `Version` varchar(20) NOT NULL default '',
+        `OpSystemCode` varchar(20) NOT NULL default '',
+        `ApplicationType` varchar(250) NOT NULL default ''
+        ) engine=MyISAM COMMENT='Stores NSRL Products'""")
+
+        dbh.insert("NSRL_products",
+                   code=0,
+                   name='Unknown',
+                   _fast=True);
+
+
 
 class MD5Scan(GenScanFactory):
     """ Scan file and record file Hash (MD5Sum) """
