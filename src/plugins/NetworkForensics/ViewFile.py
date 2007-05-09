@@ -68,7 +68,7 @@ class ViewFile(Reports.report):
         except (DB.DBError,TypeError):
             content_type = 'application/octet-stream'
 
-        fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])
+        fsfd = FileSystem.DBFS( query["case"])
         
         fd = fsfd.open(inode=query['inode'])
 

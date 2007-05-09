@@ -48,9 +48,6 @@ description = "Load Data"
 
 class LoadPresetLog(Reports.report):
     """ Loads a log file into the database using preset type """
-## See FIXME below
-##    parameters = {"table":"any", "new_table":"any",
-##                  "datafile":"filename", "log_preset":"sqlsafe", "final":"alphanum"}
     parameters = {"table":"sqlsafe", "datafile":"filename",
                   "log_preset":"any", "final":"alphanum"}
     name="Load Preset Log File"
@@ -93,14 +90,6 @@ class LoadPresetLog(Reports.report):
             result.start_table()
             result.case_selector()
             result.meta_selector(config.FLAGDB,'Select preset type','log_preset',autosubmit=True)
-            ## FIXME: This is a nice idea but it stuffs up the framework's idea of whats cached and what isnt... this needs more work!!!
-            # get existing tables
-##            dbh = self.DBO(query['case'])
-##            dbh.execute('select value from meta where property=%r group by value', 'logtable')
-##            tables = [row['value'][:-4] for row in dbh]
-##            tables.append('NEW')
-##            result.const_selector('Insert into Table', 'table', tables, tables)
-##            result.textfield("OR Enter New table name:","new_table")
             result.textfield("Table name:","table")
 
             dbh = DB.DBO(query['case'])
@@ -439,9 +428,8 @@ class LoadFS(Reports.report):
             fd=IO.open(query['case'],query['iosource'])
 
             ## FIXME: make this order definable
-            fs_types = Registry.FILESYSTEMS.filesystems.keys()
-            fs_types.sort()
-            
+            fs_types = Registry.FILESYSTEMS.class_names
+
             ## Try to get a magic hint
             try:
                 magic = FlagFramework.Magic()
@@ -460,8 +448,7 @@ class LoadFS(Reports.report):
         except IOError,e:
             result.text("IOError %s" % e,style='red')
         except (KeyError,TypeError),e:
-            print e
-            FlagFramework.get_traceback(e,result)
+            #FlagFramework.get_traceback(e,result)
             pass
 
     def analyse(self,query):
@@ -470,7 +457,7 @@ class LoadFS(Reports.report):
         self.progress_str=None
 
         # call on FileSystem to load data
-        fsobj=Registry.FILESYSTEMS.filesystems[query['fstype']](query['case'])
+        fsobj=Registry.FILESYSTEMS.dispatch(query['fstype'])(query['case'])
         mount_point = FlagFramework.normpath("/"+query['mount_point'])
         fsobj.load(mount_point, query['iosource'])
         dbh.set_meta("mount_point_%s" % query['iosource'] , mount_point)
@@ -511,10 +498,6 @@ class LoadFS(Reports.report):
             tmp=result.__class__(result)
             tmp.text('\n'.join(pyflaglog.ring_buffer),font='typewriter',style="red")
             result.row(tmp)
-            ## FIXME: This is a horribly slow query...
-  #          dbh.execute("select count(*) as count,value as total from inode_%s, meta_%s as m where m.name='last_inode' group by total" % (tablename, tablename))
-  #          row = dbh.fetch()
-  #          result.row("Uploaded Inode Entries:", "%s of %s"%(row['count'],row['total']))
             result.end_table()
         except (TypeError, DB.DBError):
             pass
@@ -522,7 +505,7 @@ class LoadFS(Reports.report):
     def reset(self,query):
         dbh = DB.DBO(query['case'])
         tablename = dbh.MakeSQLSafe(query['iosource'])
-        fsobj=Registry.FILESYSTEMS.filesystems[query['fstype']](query['case'],tablename,query['iosource'])
+        fsobj=Registry.FILESYSTEMS.dispatch(query['fstype'])(query['case'],tablename,query['iosource'])
         fsobj.delete()
 
 

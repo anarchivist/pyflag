@@ -19,6 +19,7 @@ import os.path
 class Raw(DBFS):
     """ A psuedo file system to load raw images """
     name="Raw"
+    order = 50
 
     def load(self, mount_point, iosource_name):
         ## Ensure that mount point is normalised:
@@ -32,6 +33,8 @@ class Raw(DBFS):
 class Mounted(DBFS):
     """ A class implementing the mounted filesystem option """
     name = 'Mounted'
+    order = 100
+    
     def load(self, mount_point, iosource_name):
         pyflaglog.log(pyflaglog.DEBUG,"Loading files from directory %s" % self.iosource.mount_point)
         
@@ -125,6 +128,7 @@ class Sleuthkit_File(File):
 class Sleuthkit(DBFS):
     """ A new improved Sleuthit based filesystem """
     name = 'Sleuthkit'
+    order = 5
 
     def load(self, mount_point, iosource_name, scanners = None, directory=None):
         """ Loads the filesystem on mount point from iosource_name. If

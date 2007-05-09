@@ -136,6 +136,7 @@ class PCAPFS(DBFS):
     """ This implements a simple filesystem for PCAP files.
     """
     name = 'PCAP Filesystem'
+    order = 10
 
     def load(self, mount_point, iosource_name,scanners = None):
         DBFS.load(self, mount_point, iosource_name)

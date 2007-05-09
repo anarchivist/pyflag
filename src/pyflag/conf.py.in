@@ -215,6 +215,20 @@ class ConfObject(object):
         """
         self.optparser.final = final
         
+        ## Parse the command line options:
+        (opts, args) = self.optparser.parse_args()
+
+        self.opts.clear()
+        
+        ## Update our cmdline dict:
+        for k in dir(opts):
+            v = getattr(opts,k)
+            if k in self.options and not v==None:
+                self.opts[k] = v
+
+        self.optparse_opts = opts
+        self.args = args
+
         if final:
             ## Reparse the config file again:
             self.add_file(self.filename)
@@ -234,20 +248,6 @@ class ConfObject(object):
                     sys.exit(0)
             except AttributeError:
                 pass
-
-        ## Parse the command line options:
-        (opts, args) = self.optparser.parse_args()
-
-        self.opts.clear()
-        
-        ## Update our cmdline dict:
-        for k in dir(opts):
-            v = getattr(opts,k)
-            if k in self.options and not v==None:
-                self.opts[k] = v
-
-        self.optparse_opts = opts
-        self.args = args
 
     def add_option(self, option, short_option=None, **args):
         """ Adds options both to the config file parser and the

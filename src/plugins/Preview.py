@@ -148,7 +148,7 @@ class PreviewLoad(LoadData.LoadFS):
             result.heading("Path is %s" % path)
             case = query['case']
             dbh = DB.DBO(case)
-            fsfd = Registry.FILESYSTEMS.fs[query['fstype']](case)
+            fsfd = Registry.FILESYSTEMS.dispatch(query['fstype'])(case)
             ## Try to see if the directory is already loaded:
             dbh.execute("select * from file where path=%r and name=''", path)
             if not dbh.fetch():

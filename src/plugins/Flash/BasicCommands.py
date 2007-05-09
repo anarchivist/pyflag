@@ -46,7 +46,7 @@ class load(pyflagsh.command):
             case=args[0]
             dbh = DB.DBO(case)
 
-            self.environment._FS=Registry.FILESYSTEMS.fs['DBFS'](case)
+            self.environment._FS=FileSystem.DBFS(case)
             self.environment._CASE = case
             yield "Loaded case %r" %(case)
         except Exception,e:

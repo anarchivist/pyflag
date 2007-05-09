@@ -5,6 +5,7 @@ import pyflag.format as format
 import pyflag.DB as DB
 import pyflag.HTMLUI as HTMLUI
 import plugins.FileFormats.DAFTFormats as DAFTFormats
+import pyflag.FileSystem as FileSystem
 
 active = False
 
@@ -356,7 +357,7 @@ class RevEng_GUI(Reports.report):
             except KeyError:
                 maxrows = 10
 
-            fsfd = Registry.FILESYSTEMS.fs['DBFS']( query["case"])
+            fsfd = FileSystem.DBFS( query["case"])
             try:
                 fd = fsfd.open(inode=query['fileselect'])
                 fdsize = fsfd.istat(inode=query['fileselect'])

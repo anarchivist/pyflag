@@ -213,7 +213,7 @@ class load_and_scan(scan):
             scanners = [ x for x in Registry.SCANNERS.scanners if x.startswith(text) ]
             return scanners[state]
         elif len(self.args)>3 or len(self.args)==3 and not text:
-            fstypes = [ x for x in Registry.FILESYSTEMS.fs.keys() if x.startswith(text) ]
+            fstypes = [ x for x in Registry.FILESYSTEMS.class_names if x.startswith(text) ]
             return fstypes[state]
         elif len(self.args)>2 or len(self.args)==2 and not text:
             return 
@@ -247,7 +247,7 @@ class load_and_scan(scan):
 
         ## Load the filesystem:
         try:
-            fs = Registry.FILESYSTEMS.fs[filesystem]
+            fs = Registry.FILESYSTEMS.dispatch(filesystem)
         except KeyError:
             yield "Unable to find a filesystem of %s" % filesystem
             return

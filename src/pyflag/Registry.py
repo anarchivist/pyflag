@@ -274,8 +274,14 @@ class ScannerRegistry(Registry):
             return 1
 
         self.classes.sort(sort_function)
-        self.class_names = [ ("%s" % i).split(".")[-1] for i in self.classes ]
+        self.class_names = [ self.get_name(i) for i in self.classes ]
         self.scanners = self.class_names
+
+    def get_name(self, cls):
+        try:
+            return cls.name
+        except AttributeError:
+            return ("%s" % cls).split(".")[-1]
 
     def dispatch(self,scanner_name):
         return self.classes[self.scanners.index(scanner_name)]
@@ -293,22 +299,22 @@ class VFSFileRegistry(Registry):
                 raise Exception("Class %s has the same specifier as %s. (%s)" % (cls,self.vfslist[cls.specifier],cls.specifier))
             self.vfslist[cls.specifier] = cls
 
-class FileSystemRegistry(Registry):
-    """ A class to register FileSystems.
+##class XXFileSystemRegistry(Registry):
+##    """ A class to register FileSystems.
 
-    FileSystems control the internal representation of the filesystem structure, the loading of this from an image and the browsing of the filesystem. Note that this is different than VFS which deal with how to read individual files from the FileSystem, but both are confined to use the same DBFS schema at present.
-    """
-    filesystems = {}
-    fs = {}
-    def __init__(self,ParentClass):
-        Registry.__init__(self,ParentClass)
-        for cls in self.classes:
-            if self.filesystems.has_key(cls.name):
-                raise Exception("Class %s has the same specifier as %s. (%s)" % (cls,self.filesystems[cls.name],cls.name))
-            ## A name of None will prevent from loading into Registry
-            if cls.name:
-                self.filesystems[cls.name] = cls
-            self.fs[("%s" % cls).split(".")[-1]]=cls
+##    FileSystems control the internal representation of the filesystem structure, the loading of this from an image and the browsing of the filesystem. Note that this is different than VFS which deal with how to read individual files from the FileSystem, but both are confined to use the same DBFS schema at present.
+##    """
+##    filesystems = {}
+##    fs = {}
+##    def __init__(self,ParentClass):
+##        Registry.__init__(self,ParentClass)
+##        for cls in self.classes:
+##            if self.filesystems.has_key(cls.name):
+##                raise Exception("Class %s has the same specifier as %s. (%s)" % (cls,self.filesystems[cls.name],cls.name))
+##            ## A name of None will prevent from loading into Registry
+##            if cls.name:
+##                self.filesystems[cls.name] = cls
+##            self.fs[("%s" % cls).split(".")[-1]]=cls
 
 class ShellRegistry(Registry):
     """ A class to manage Flash shell commands """
@@ -425,7 +431,7 @@ def Init():
     ## Register Filesystem drivers
     import pyflag.FileSystem as FileSystem
     global FILESYSTEMS
-    FILESYSTEMS = FileSystemRegistry(FileSystem.FileSystem)
+    FILESYSTEMS = ScannerRegistry(FileSystem.DBFS)
 
     ## Register FileFormat drivers
     import pyflag.format as format
