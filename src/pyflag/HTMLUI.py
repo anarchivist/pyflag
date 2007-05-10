@@ -1168,7 +1168,7 @@ class HTMLUI(UI.GenericUI):
                             if i in hidden_columns: continue
 
                             ## Allow the ColumnType to translate the data to csv suitability.
-                            if not query.has_key("extendedexport"):
+                            if not query.has_key("extendedexport") or len(elements[i].extended_names)==1:
                                 key = elements[i].name
                                 result[key] = elements[i].csv(row[key].__str__())
                             else:
