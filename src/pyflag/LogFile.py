@@ -36,6 +36,7 @@ config=pyflag.conf.ConfObject()
 import pyflag.pyflaglog as pyflaglog
 import pickle,gzip
 import plugins.LogAnalysis.Whois as Whois
+from pyflag.TableObj import IPType
 import re
 
 def get_file(query,result):
@@ -162,9 +163,21 @@ class Log:
             ',\n'.join([ x.create() for x in fields])
             ))
 
+        fieldsToLookup = []
+        if config.PRECACHE_IPMETADATA:
+            for i in range(0,len(fields)):
+                if issubclass(fields[i].__class__, IPType):
+                    fieldsToLookup.append(i)
+
+
         ##  Now insert into the table:
         count = 0
         for fields in self.get_fields():
+
+            if config.PRECACHE_IPMETADATA:
+                for lup in fieldsToLookup:
+                    Whois.lookup_whois(fields[lup])
+
             count += 1
 
             args = dict()
@@ -244,3 +257,6 @@ def end(query,result):
     into the load preset log file report"""
     query['log_preset'] = 'test'
     result.refresh(0, query_type(log_preset=query['log_preset'], report="Load Preset Log File", family="Load Data"), pane='parent')
+
+config.add_option("PRECACHE_IPMETADATA", default=True, help="Precache whois and geoip data for all IP addresses when loading data")
+
