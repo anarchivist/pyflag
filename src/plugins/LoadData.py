@@ -43,6 +43,8 @@ import plugins.LogAnalysis.LogAnalysis as LogAnalysis
 import pyflag.pyflaglog as pyflaglog
 import pyflag.ScannerUtils as ScannerUtils
 import time
+import plugins.LogAnalysis.Whois as Whois
+from pyflag.TableObj import IPType
 
 description = "Load Data"
 
@@ -91,7 +93,6 @@ class LoadPresetLog(Reports.report):
             result.case_selector()
             result.meta_selector(config.FLAGDB,'Select preset type','log_preset',autosubmit=True)
             result.textfield("Table name:","table")
-
             dbh = DB.DBO(query['case'])
             tmp = self.ui(result)
             tmp.filebox()
@@ -140,6 +141,22 @@ class LoadPresetLog(Reports.report):
         for progress in log.load(query['table']):
             self.progress_str = progress
             
+        ## Now we need to precache (if we have been asked to precache all the whois
+        ## stuff.
+
+        ## TODO PROGRESS METER
+        fieldsToLookup = []
+        for i in range(0,len(log.fields)):
+            if issubclass(log.fields[i].__class__, IPType):
+                fieldsToLookup.append(i)
+
+        if config.PRECACHE_IPMETADATA: 
+            ## Precache both
+            for data in log.get_fields():
+                for lup in fieldsToLookup:
+                    ## This also caches the whois - it will also populate the GeoIP info
+                    Whois.lookup_whois(data[lup])
+
         dbh.insert("meta", property='logtable', value=query['table'])
         dbh.insert("meta", property='log_preset_%s' % query['table'], value=query['log_preset'])
 
@@ -580,3 +597,7 @@ class LoadDataTests(unittest.TestCase):
         m = md5.new()
         m.update(fd.read())
         self.assertEqual(m.hexdigest(),'f5b394b5d0ca8c9ce206353e71d1d1f2')
+
+
+config.add_option("PRECACHE_IPMETADATA", default=True, help="Precache whois data for all IP addresses when loading data")
+

@@ -465,11 +465,18 @@ class DBO:
             ## Determine which tables are involved:
             self.execute("explain %s", sql)
             tables = [ row['table'] for row in self ]
+            
             if not tables or tables[0]==None:
                 ## Release the lock on the row
                 self.execute("commit")
                 self.execute(sql)
                 return 
+
+            for t in tables:
+                if t == None:
+                    self.execute("commit")
+                    self.execute(sql)
+                    return
                 
             self.insert('sql_cache',
                         query = sql, _timestamp='now()',

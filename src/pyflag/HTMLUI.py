@@ -1033,7 +1033,7 @@ class HTMLUI(UI.GenericUI):
 
                 # Else, who knows what happened...
                 else:
-                    print e
+                    pyflaglog.log(pyflaglog.WARNING, "Error. There was a problem with the filter settings: %s" % e)
                     pass
 
             result.start_form(query, pane="self")
@@ -1124,6 +1124,7 @@ class HTMLUI(UI.GenericUI):
 
         ## This part allows the user to save the table in CSV format:
         def save_table(query,result):
+
             def generate_output(rows_left):
                 dbh = DB.DBO(case)
                 row_number = 0
@@ -1131,15 +1132,25 @@ class HTMLUI(UI.GenericUI):
                 hidden_columns = [ int(i) for i in query.getarray('_hidden')]
 
                 names_list = [ elements[i].name for i in range(len(elements)) if i not in hidden_columns ]
+                extended_names_list = []
+                for i in range(len(elements)):
+                    if i not in hidden_columns:
+                        ext = elements[i].extended_names
+                        for elems in ext:
+                            extended_names_list.append(elems)
                 yield "#Pyflag Table widget output\n#Query was %s.\n" % query
+
                 try:
                     yield "# Filter: %s\n" % query['filter']
                 except KeyError:
                     pass
 
-                yield "#Fields: %s\n""" % ",".join(names_list)
-
-                csv_writer = csv.DictWriter(data,names_list,dialect='excel')
+                if query.has_key("extendedexport"):
+                    yield "#Fields: %s\n""" % ",".join(extended_names_list)
+                    csv_writer = csv.DictWriter(data,extended_names_list, dialect='excel')
+                else:
+                    yield "#Fields: %s\n""" % ",".join(names_list)
+                    csv_writer = csv.DictWriter(data,names_list,dialect='excel')
 
                 while rows_left>0:
                 ## Do the query now - we issue multiple queries
@@ -1157,8 +1168,13 @@ class HTMLUI(UI.GenericUI):
                             if i in hidden_columns: continue
 
                             ## Allow the ColumnType to translate the data to csv suitability.
-                            key = elements[i].name
-                            result[key] = elements[i].csv(row[key].__str__())
+                            if not query.has_key("extendedexport"):
+                                key = elements[i].name
+                                result[key] = elements[i].csv(row[key].__str__())
+                            else:
+                                for j in range(len(elements[i].extended_names)):
+                                    key = elements[i].extended_names[j]
+                                    result[key] = elements[i].extended_csv(row[elements[i].name].__str__())[j]
                             
                         csv_writer.writerow(result)
 
@@ -1186,6 +1202,14 @@ class HTMLUI(UI.GenericUI):
                 result.defaults['save_length'] = 0
                 
             result.textfield("How many rows to save? (0 for all rows)", "save_length")
+           
+             
+            for e in elements:
+                if len(e.extended_names) != 1:
+                    result.checkbox("Export extended row information " \
+                                    "(e.g. export a country column for ip addresses)?", 
+                                    "extendedexport", "ok")
+                    break
             result.end_form()
             
         self.toolbar(save_table,'Save Table',icon="floppy.png")
@@ -1342,7 +1366,6 @@ class HTMLUI(UI.GenericUI):
 
         This is very similar to the textfield above.
         """
-        print options
         default = ''
         try:
             if options['Additional']:

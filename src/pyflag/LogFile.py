@@ -173,6 +173,7 @@ class Log:
                     key, value = self.fields[i].insert(fields[i])
                     args[key] = value
                 except (IndexError,AttributeError):
+                    pyflaglog.log(pyflaglog.WARNING, "Attribute or Index Error when inserting value into field!")
                     pass
                 
             if args:

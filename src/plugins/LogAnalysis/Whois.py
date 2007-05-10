@@ -42,6 +42,14 @@ order = 40
 config.add_option("GEOIPDB", default=config.DATADIR +"/GeoLiteCity.dat",
                   help="Location of the GeoIP database. (This can be downloaded from http://www.maxmind.com/app/geolitecity)")
 
+try:
+    import GeoIP
+    gi_resolver = GeoIP.open(config.GEOIPDB, GeoIP.GEOIP_STANDARD)
+except Exception,e:
+    pyflaglog.log(pyflaglog.WARNING, 
+                  "Unable to import the GeoIP database (%s) - will not use it." % e)
+    gi_resolver = None
+
 def lookup_whois(ip):
     """ Functions searches the database for the most specific whois match.
 
@@ -82,27 +90,91 @@ def lookup_whois(ip):
             raise Reports.ReportError("Unable to find whois entry for %s " % ip)
 
         netmask = netmask * 2 + 1
+    
+    ## Cache it. We also may as well do a GEOIP lookup :)
+    ipinfo = {}
+    try:
+        ipinfo = gi_resolver.record_by_addr(ip.split("'")[1])
+    except Exception, e:
+        ## pyflaglog.log(pyflaglog.WARNING, "Error doing GeoIP lookup: %s" % e)
+        ipinfo['city'] = "Unknown"
+        ipinfo['country_code3'] = "???"
 
-    ## Cache it:
-    dbh.execute("insert into whois_cache set ip=%s, id=%r" , (ip, row['whois_id']))
+    if ipinfo['city'] == None or ipinfo['city'] == "None":
+        pyflaglog.log(pyflaglog.WARNING, 
+                      "Failed GeoIP city lookup for %s" % ip.split("'")[1]) 
+        ipinfo['city'] = "Unknown"
+        
+    if ipinfo['country_code3'] == None or ipinfo['country_code3'] == "None":
+        pyflaglog.log(pyflaglog.WARNING, 
+                      "Failed GeoIP country lookup for %s" % ip.split("'")[1])
+        ipinfo['country_code3'] = "???"
+
+    ## For speed we try and do it all in one go
+    try:
+        dbh.execute("insert into whois_cache set ip=%s, id=%s, geoip_city= " \
+                    " (select id from geoip_city where city=%r limit 1), " \
+                    " geoip_country = (select id from geoip_country where country" \
+                    "=%r)" % (ip,row['whois_id'],ipinfo['city'],ipinfo['country_code3']));
+
+    ## We can only assume that we got nothing back from the geoip stuff
+    except:
+        try:
+            dbh.execute("insert into geoip_country set " \
+                        "country=%r" % ipinfo['country_code3'])
+        except Exception, e:
+            ##pyflaglog.log(pyflaglog.WARNING, "Could not insert new places: %s" % e)
+            ## We probably tried to put a dupe in there
+            pass
+        try:
+            dbh.execute("insert into geoip_city set city=%r" % ipinfo['city'])
+        except Exception, e:
+            ## pyflaglog.log(pyflaglog.WARNING, "Could not insert new places: %s" % e)
+            ## We probably tried to put a dupe in there
+            pass
+
+        try:
+            ## Let's try again...
+            dbh.execute("insert into whois_cache set ip=%s, id=%s, geoip_city= " \
+                   " (select id from geoip_city where city=%r limit 1), " \
+                   " geoip_country = (select id from geoip_country where country" \
+                   "=%r)" % (ip,row['whois_id'],ipinfo['city'],ipinfo['country_code3']));
+    
+        except Exception, e: 
+            pyflaglog.log(pyflaglog.WARNING, "There was a problem doing the GeoIP " \
+                          "stuff. We had an error, tried to re insert stuff then " \
+                          "had an error: %s" % e)
+    
     return row['whois_id']
 
-try:
-    import GeoIP
-
-    gi_resolver = GeoIP.open(config.GEOIPDB, GeoIP.GEOIP_STANDARD)
-except Exception,e:
-    pyflaglog.log(pyflaglog.WARNING, "Unable to import the GeoIP database (%s) - will not use it." % e)
-    gi_resolver = None
-
 def geoip_resolve(ip):
+    country = ""
+    city = ""
+    row = None
+    ip_sql = "inet_aton(%r)" % ip
+    dbh = DB.DBO(None)
+    
     try:
-        record = gi_resolver.record_by_addr(ip)
-        result = "%s\n(%s)" % (record['city'],record['country_code3'])
+        dbh.execute("select * from whois_cache join (geoip_country join geoip_city) " \
+                   " on (whois_cache.geoip_city = geoip_city.id and " \
+                   "whois_cache.geoip_country = geoip_country.id) where whois_cache.ip=" \
+                   "%s" % ip_sql)
+        row = dbh.fetch()
     except:
-        result = ''
+        pyflaglog.log(pyflaglog.WARNING, "GeoIP information not cached...")
 
-    return result
+    if not row:
+        id = lookup_whois(ip)
+        ## Now it really should be there...        
+        try:
+            dbh.execute("select * from whois_cache join (geoip_country join geoip_city) " \
+                   " on (whois_cache.geoip_city = geoip_city.id and " \
+                   "whois_cache.geoip_country = geoip_country.id) where whois_cache.ip=" \
+                   "%s" % ip_sql)
+        except:
+            return "Unknown (???)"
+        
+    return "%s (%s)" % (row['city'], row['country'])
 
 def identify_network(whois_id):
     """ Returns a uniq netname/country combination """
@@ -261,9 +333,28 @@ class WhoisInit(FlagFramework.EventHandler):
         ) engine=MyISAM""")
 
         dbh.execute("""create table whois_cache (
- 	`id` int(11) unsigned not NULL,
-        `ip` int(11) unsigned not NULL
+ 	    `id` int(11) unsigned not NULL,
+        `ip` int(11) unsigned not NULL,
+        `geoip_city` int(11) unsigned not NULL,
+        `geoip_country` int(11) unsigned not NULL
         ) engine=MyISAM""")
+
+        dbh.execute("""CREATE TABLE `geoip_city` (
+        `id` int(11) unsigned NOT NULL auto_increment,
+        `city` varchar(64) NOT NULL UNIQUE,
+        PRIMARY KEY (`id`)
+        ) engine = MyISAM""")
+
+        dbh.execute("""insert into geoip_city (`city`) values(`unknown`)""")
+
+        dbh.execute("""CREATE TABLE `geoip_country` (
+        `id` int(11) unsigned NOT NULL auto_increment,
+        `country` varchar(3) NOT NULL UNIQUE,
+        PRIMARY KEY (`id`)
+        ) engine = MyISAM""")
+
+        dbh.execute("""insert into geoip_country (`country`) values(`unknown`)""")
+
 
 ### Some unit tests for Whois:
 import unittest

@@ -376,6 +376,7 @@ class ColumnType:
     """
     def __init__(self, name='', column='', link='', sql=None, callback=None, link_pane='self'):
         self.name = name
+        self.extended_names = [ name ]
         self.column = column
         self.link = link
         self.callback = callback
@@ -444,6 +445,9 @@ class ColumnType:
         if self.callback:
             return "-"
         else: return value
+
+    def extended_csv(self, value):
+        return self.csv(value)
 
     def create(self):
         """ This needs to generate a create clause for creating this
@@ -669,6 +673,7 @@ class IPType(ColumnType):
     def __init__(self, name='', column='', link='', callback=''):
         ColumnType.__init__(self, name=name, column=column,
                             link=link, callback=callback)
+        self.extended_names = [name, name + "_geoip_country", name + "_whois_company"]
     
     # reMatchString: a re that matches string CIDR's
     reMatchString = re.compile(
@@ -698,6 +703,20 @@ class IPType(ColumnType):
 
     def literal(self, column, operator, address):
         return "%s %s INET_ATON(%r)" % (self.column, operator, address)
+
+    def extended_csv(self, value):
+        if self.callback: return ["-", "-", "-"]
+
+        value.replace("\n","\\n")
+        value.replace("\r","\\r")
+        
+        geoipstr = Whois.geoip_resolve(value)
+        geoipstr.replace("\n", " ")
+        geoipstr.replace("\r", " ")
+        whoisstr = Whois.identify_network(Whois.lookup_whois(value))
+        whoisstr.replace("\n", " ")
+        whoisstr.replace("\r", " ")
+        return [value, geoipstr, whoisstr]
 
     def operator_matches(self, column, operator, address):
         """ Matches the IP address specified exactly """
@@ -738,6 +757,22 @@ class IPType(ColumnType):
                "%s.whois.country=%r ) ) " \
                % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
                   config.FLAGDB, config.FLAGDB, country)
+
+    def operator_city(self, column, operator, city):
+        """ Matches the specified city string (e.g. Canberra, Chicago). Note that this works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
+
+        ## We must ensure there are indexes on the right columns or
+        ## this query will never finish. This could lead to a delay
+        ## the first time this is run...
+        dbh=DB.DBO()
+        dbh.check_index("whois_cache", "ip")
+        dbh.check_index("geoip_city", "id")
+
+        return " ( `%s` in (select ip from %s.whois_cache join " \
+               "%s.geoip_city on %s.whois_cache.geoip_city=%s.geoip_city.id where "\
+               "%s.geoip_city.city=%r ) ) " \
+               % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
+                  config.FLAGDB, config.FLAGDB, city)
 
     def create(self):
         ## IP addresses are stored as 32 bit integers 

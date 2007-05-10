@@ -98,6 +98,7 @@ class CreateLogPreset(Reports.report):
             result.const_selector("Select Log Processor", 'driver',
                                   Registry.LOG_DRIVERS.drivers.keys() , Registry.LOG_DRIVERS.drivers.keys()
                                   )
+
         
 class BandWidth(Reports.report):
     """ Calculates the approximate bandwidth requirements by adding the size of each log entry within time period """

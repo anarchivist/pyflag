@@ -139,6 +139,9 @@ class PCAPFS(DBFS):
     order = 10
 
     def load(self, mount_point, iosource_name,scanners = None):
+        pass
+
+    def load_old(self, mount_point, iosource_name,scanners = None):
         DBFS.load(self, mount_point, iosource_name)
         
         ## Open the file descriptor

@@ -291,7 +291,9 @@ if config.delete:
 
   dbh.execute("""create table whois_cache (
   `id` int not NULL,
-  `ip` int not NULL
+  `ip` int not NULL,
+  `geoip_country` unsigned int NOT NULL,
+  `geoip_city` unsigned int NOT NULL
   ) engine=MyISAM""")
 
   # add default (fallthrough) route and reserved ranges
