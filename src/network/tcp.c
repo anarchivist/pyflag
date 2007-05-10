@@ -95,6 +95,11 @@ void TCPStream_add(TCPStream self, PyPacket *packet) {
 
   /** If there is no data in there we move on */
   if(tcp->packet.data_len==0) {
+    if(self->callback) {
+      self->state = PYTCP_RETRANSMISSION;
+      self->callback(self, packet);
+    };
+
     // We no longer need the object - call its destructor:
     Py_DECREF(packet);
     return;
@@ -161,6 +166,10 @@ void TCPStream_add(TCPStream self, PyPacket *packet) {
 	retransmission we can drop it
     */
     if(self->next_seq >= tcp->packet.header.seq + tcp->packet.data_len ) {
+      /** Call our callback with this */
+      self->state = PYTCP_RETRANSMISSION;
+      if(self->callback) self->callback(self, first->packet);
+
       list_del(&(first->list));
       talloc_free(first);
       continue;
@@ -290,9 +299,17 @@ TCPHashTable TCPHashTable_Con(TCPHashTable self, int initial_con_id) {
   // This list keeps all streams in order:
   self->sorted = talloc(self, struct TCPStream);
   INIT_LIST_HEAD(&(self->sorted->global_list));
+  
+  // Initialise the list head so it can be used to pass the callback
+  // non-ip packets:
+  self->sorted->hash = self;
+  self->sorted->state = PYTCP_NON_TCP;
+
   return self;
 };
 
+// FIXME: This is pretty slow and can be made much faster by hashing
+// addr, sizeof(*addr)
 static u_int mkhash (const struct tuple4 *addr) {
   u_int src=addr->saddr;
   u_short sport=addr->source;
@@ -438,13 +455,13 @@ int TCPHashTable_process(TCPHashTable self, PyPacket *packet) {
   TCPStream i;
   TCP tcp;
 
-  // Packet is not an IP packet
-  if(!ip) return 0;
+  // Packet is not an IP packet - We need to call the CB directly:
+  if(!ip)  goto non_ip;
 
   i = self->find_stream(self,ip);
 
   /** Error - Cant create or find suitable stream */
-  if(!i) return 0;
+  if(!i) goto non_ip;
 
   tcp = (TCP)ip->packet.payload;
 
@@ -499,6 +516,12 @@ int TCPHashTable_process(TCPHashTable self, PyPacket *packet) {
   };
 
   return 1;
+
+ non_ip:
+  if(self->callback)
+    self->callback(self->sorted, packet);
+  
+  return 0;
 };
 
 VIRTUAL(TCPHashTable, Object)

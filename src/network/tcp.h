@@ -45,7 +45,12 @@ enum tcp_state_t {
   PYTCP_CLOSE,
   PYTCP_RESET,
   PYTCP_TIMED_OUT,
-  PYTCP_DESTROY
+  PYTCP_DESTROY,
+  // This is used to indicate the packet is not a TCP/IP packet
+  PYTCP_NON_TCP,
+
+  // This signals that this packet is retransmitted:
+  PYTCP_RETRANSMISSION
 };
 
 #define TCP_FORWARD 1
