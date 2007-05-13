@@ -378,21 +378,21 @@ class ColumnType:
     responsible for displaying the values from the column and are used
     to generate SQL.
     """
-    def __init__(self, name='', column='', link='', sql=None, callback=None, link_pane='self'):
+    def __init__(self, name='', column='', link='', callback=None, link_pane='self'):
         self.name = name
         self.extended_names = [ name ]
         self.column = column
         self.link = link
         self.callback = callback
         self.link_pane = link_pane
-        if sql:
-            self.sql = sql
-        else:
-            self.sql = "`%s`" % column
 
     ## These are the symbols which will be treated literally
     symbols = {
         }
+
+    def make_index(self, dbh, table):
+        """ Creates an index on table using dbh """
+        dbh.check_index(table, self.column)
 
     def operators(self):
         """ Returns a list of operators we support """
@@ -478,7 +478,7 @@ class ColumnType:
 
     def select(self):
         """ Returns the SQL required for selecting from the table. """
-        return self.sql or '.'.join(["`%s`" % x for x in self.column.split('.')])
+        return '.'.join(["`%s`" % x for x in self.column.split('.')])
 
     def column_decorator(self, table, result):
         """ Every column type is given the opportunity to decorate its
@@ -666,8 +666,6 @@ class TimestampType(IntegerType):
             result.row(value)
 
         return result
-
-
 
 import plugins.LogAnalysis.Whois as Whois
 

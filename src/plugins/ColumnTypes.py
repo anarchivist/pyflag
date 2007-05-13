@@ -9,5 +9,9 @@ class Time(TimestampType):
     def create(self):
         return "`%s` TIME " % self.column
 
+class EpochTimestamp(TimestampType):
+    def insert(self, value):
+        return "_"+self.column, "from_unixtime(%r)" % value
+
 ## Import the unit tests so they are picked up by the registry:
 from pyflag.TableObj import ColumnTypeTests

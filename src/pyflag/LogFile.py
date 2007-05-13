@@ -104,6 +104,9 @@ class Log:
         dbh = DB.DBO(self.case)
         temp_table = dbh.get_temp()
 
+        ## Temporarily store a preset:
+        self.store(temp_table)
+
         try:
             pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "About to attempt to load three rows into a temp table for the preview")
 
@@ -118,8 +121,8 @@ class Log:
             self.display(temp_table, result)
             
         finally:
-            ## Drop the table:
-            drop_table(self.case, temp_table)
+            ## Drop the temporary preset and the table
+            drop_preset(temp_table)
     
     def read_record(self, ignore_comment = True):
         """ Generates records.
@@ -157,7 +160,8 @@ class Log:
         """
         for row in self.read_record():
             row = self.prefilter_record(row)
-            splitUpRow = row.split(self.delimiter)
+            splitUpRow = self.delimiter.split(row)
+            ## Make sure the last item is stripped
             splitUpRow[-1] = splitUpRow[-1].strip()
             yield splitUpRow
 
@@ -189,19 +193,12 @@ class Log:
         if len(fields)==0:
             raise RuntimeError("No Columns were selected.")
         
-        # We just do this in case we get old temporary tables left around. 
-        # Normal calls to this method don't need to worry about this
-        if deleteExisting:
-            dbh.execute("drop table if exists %s",tablename)   
-            dbh.delete("log_tables", where="table_name=%r" % tablename)
-            
         ## Add our table to the table list. This is done first to trap
         ## attempts to reuse the same table name early. FIXME - create
         ## a combined index on driver + table_name
         dbh.insert("log_tables",
                    preset = self.name,
                    table_name = name)
-
 
         ## Create the table:
         dbh.execute("create table if not exists %s (%s)", (
@@ -212,11 +209,6 @@ class Log:
         ## Now insert into the table:
         count = 0
         for fields in self.get_fields():
-
-            if config.PRECACHE_IPMETADATA:
-                for lup in fieldsToLookup:
-                    Whois.lookup_whois(fields[lup])
-
             count += 1
 
             if isinstance(fields, list):
@@ -243,8 +235,10 @@ class Log:
         ## Now create indexes on the required fields
         for i in self.fields:
             try:
+                ## Allow the column type to create an index on the
+                ## column
                 if i.index:
-                    dbh.check_index(tablename, i.sql)
+                    i.make_index(dbh, tablename)
             except AttributeError:
                 pass
 
@@ -327,7 +321,11 @@ def drop_table(case, name):
 
     dbh.execute("select * from log_tables where table_name = %r limit 1" , name)
     row = dbh.fetch()
-    if not row: raise RuntimeError("No such log file table %s" % name)
+
+    ## Table not found
+    if not row:
+        return
+    
     preset = row['preset']
 
     ## Get the driver for this table:
@@ -396,6 +394,9 @@ class LogDriverTester(unittest.TestCase):
         
         ## clear any existing presets of the same name:
         drop_preset(self.log_preset)
+
+        ## Clear any existing tables of the same name
+        drop_table(self.test_case, self.test_table)
 
     ## This is disabled so as to leave the test table behind - this is
     ## required for development so we can examine the table

@@ -27,8 +27,14 @@ import pyflag.FlagFramework as FlagFramework
 from pyflag.FlagFramework import query_type
 import re
 import pyflag.Registry as Registry
+import pyflag.conf
+config = pyflag.conf.ConfObject()
 
-delimiters = {'Space':' ', 'Comma':',', 'Colon':':', 'Semi-Colon':';', 'Hyphen':'-'}
+delimiters = {'Space':   '\s+',
+              'Comma':   ',',
+              'Colon':   ':',
+              'Semi-Colon':';',
+              'Hyphen'   :'-'}
 
 def pre_selector(result):
     f = prefilter().filters
@@ -217,9 +223,9 @@ class SimpleLog(LogFile.Log):
                 pass
   
         try:
-            self.delimiter=query['delimiter']
+            self.delimiter=re.compile(query['delimiter'])
         except KeyError:
-            self.delimiter=delimiters.values()[0]
+            self.delimiter=re.compile(delimiters.values()[0])
             query['delimiter']=self.delimiter
                     
     def form(self,query,result):
@@ -333,3 +339,58 @@ class SimpleLog(LogFile.Log):
         result.row(*field)
         result.row(*type)
         result.row(*index)
+
+import time
+
+## Unit tests for Simple log file:
+class SimpleLogTest(LogFile.LogDriverTester):
+    """ Simple Log driver Tests """
+    test_case = "PyFlagTestCase"
+    test_table = "TestTable"
+    test_file = "%s/net-acct.log" % config.UPLOADDIR
+    log_preset = "NetAcct"
+
+    def test01CreatePreset(self):
+        """ Test that Simple Presets can be created """
+        dbh = DB.DBO(self.test_case)
+        log = SimpleLog(case=self.test_case)
+        query = query_type(datafile = self.test_file, log_preset=self.log_preset,
+                           delimiter="\s+",
+                           field0="Time",
+                           field1="Protocol",
+                           field2="SourceIP",
+                           field3="SourcePort",
+                           field4="DestIP",
+                           field5="DestPort",
+                           field6="Bytes",
+                           type0="EpochTimestamp",
+                           type1="IntegerType",
+                           type2="IPType",
+                           type3="IntegerType",
+                           type4="IPType",
+                           type5="IntegerType",
+                           type6="IntegerType",
+                           index0="yes",
+                           index1="yes",
+                           index2="yes",
+                           index4="yes",
+                           index5="yes")
+
+        log.parse(query)
+        log.store(self.log_preset)
+        
+    def test02LoadFile(self):
+        """ Test that Simple Log files can be loaded """
+        dbh = DB.DBO(self.test_case)
+        log = LogFile.load_preset(self.test_case, self.log_preset, [self.test_file])
+        t = time.time()
+        ## Load the data:
+        for a in log.load(self.test_table):
+            pass
+
+        print "Took %s seconds to load log" % (time.time()-t)
+            
+        ## Check that all rows were uploaded:
+        dbh.execute("select count(*) as c from %s_log", self.test_table)
+        row = dbh.fetch()
+        self.assertEqual(row['c'], 1396)

@@ -745,18 +745,7 @@ class DBO:
         """
         thread_name = threading.currentThread().getName()
         thread_name = thread_name.replace('-','_')
-        count = 1
-
-        while 1:
-            test_name = "temp%s_%u" % (thread_name,count)
-            ## Check if the table already exists:
-            self.execute('show table status like %r',test_name)
-            rs = [ r for r in self ]
-            if not rs:
-                self.temp_tables.append(test_name)
-                return test_name
-
-            count+=1
+        return "%s_%s" % (thread_name, int(time.mktime(time.gmtime())))
 
     def __del__(self):
         """ Destructor that gets called when this object is gced """
