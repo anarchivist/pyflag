@@ -124,6 +124,7 @@ class ApacheLog(Simple.SimpleLog):
         find/consume delimiter(extra stuff), repeat
         """
         self.datafile = query.getarray(datafile)
+        self.query = query
 
         if not query.has_key('format'):
             query['format'] = formats[formats.keys()[0]]
@@ -306,30 +307,29 @@ class ApacheLog(Simple.SimpleLog):
             ))
 
 ### Some unit tests for IIS loader:
-import unittest, time
+import time
 from pyflag.FlagFramework import query_type
 
-class ApacheLogTest(unittest.TestCase):
+class ApacheLogTest(LogFile.LogDriverTester):
     """ Apache Log file processing """
     test_case = "PyFlagTestCase"
-    test_table = "TestTable"
-    log_preset = "ApacheDebianCommon"
-    test_table = "ApacheTest"
+    log_preset = "ApacheDebianCommon_test"
+    test_table = "Apache_test"
     datafile = "%s/pyflag_apache_standard_log.gz" % config.UPLOADDIR
-    
-    def test01LoadFile(self):
-        """ Test that Apache Log files can be loaded """
-        dbh = DB.DBO(self.test_case)
-        dbh.drop(self.test_table + "_log")
+
+    def test01CreatePreset(self):
+        """ Create a preset """
+        ## First create a preset
         log = ApacheLog(case=self.test_case)
         log.parse(query_type(formats['debian_common'],
                              datafile = self.datafile))
         log.store(self.log_preset)
 
-        log = ApacheLog(case=self.test_case)
-        log.parse(query_type(formats['debian_common'],
-                             datafile = self.datafile))
-        
+    def test02LoadFile(self):
+        """ Test that Apache Log files can be loaded """
+        ## See if we can load the preset again:
+        log = LogFile.load_preset(self.test_case, self.log_preset, [self.datafile])
+
         t = time.time()
         ## Load the data:
         for a in log.load(self.test_table):
@@ -337,10 +337,8 @@ class ApacheLogTest(unittest.TestCase):
 
         print "Took %s seconds to load log" % (time.time()-t)
 
-        dbh.insert("meta", property='logtable', value=self.test_table)
-        dbh.insert("meta", property='log_preset_%s' % self.test_table, value=self.log_preset)
-
         ## Check that all rows were uploaded:
+        dbh = DB.DBO(self.test_case)
         dbh.execute("select count(*) as c from %s_log", self.test_table)
         row = dbh.fetch()
         self.assertEqual(row['c'], 10000)

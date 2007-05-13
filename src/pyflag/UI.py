@@ -340,7 +340,7 @@ class GenericUI:
                 except OSError,e:
                     pass
 
-                new_query=self.defaults.clone()
+                new_query=query.clone()
                 print new_query
                 new_query['__target__'] = name
                 new_query['__target_type__'] = 'append'

@@ -41,6 +41,10 @@ import pyflag.TypeCheck as TypeCheck
 import pyflag.FileSystem as FileSystem
 import socket
 
+## Some options for various ColumnTypes
+config.add_option("PRECACHE_IPMETADATA", default=True,
+                  help="Precache whois data for all IP addresses automatically")
+
 class ConstraintError(Exception):
     """ This exception is thrown when a contraint failed when adding or updating a row in the db.
     """
@@ -384,7 +388,7 @@ class ColumnType:
         if sql:
             self.sql = sql
         else:
-            self.sql = column
+            self.sql = "`%s`" % column
 
     ## These are the symbols which will be treated literally
     symbols = {
@@ -582,6 +586,9 @@ class StringType(ColumnType):
 
 
 class TimestampType(IntegerType):
+    def __init__(self, *args, **kwargs):
+        IntegerType.__init__(self, *args, **kwargs)
+        
     def create(self):
         return "`%s` TIMESTAMP" % self.column
     
@@ -784,6 +791,9 @@ class IPType(ColumnType):
 
     def insert(self,value):
         ### When inserted we need to convert them from string to ints
+        if config.PRECACHE_IPMETADATA==True:
+            Whois.lookup_whois(value)
+
         return "_"+self.column, "inet_aton(%r)" % value
 
     def display(self, value, row, result):

@@ -53,7 +53,9 @@ class ListLogFile(Reports.report):
     def form(self,query,result):
         try:
             result.case_selector()
-            result.meta_selector(query['case'],'Select Log Table','logtable')
+            result.selector('Select Log Table','logtable',
+                            "select table_name as `key`, table_name as value from log_tables",
+                            case=query['case'])
         except KeyError:
             pass
 
@@ -63,17 +65,26 @@ class ListLogFile(Reports.report):
         else:
             result.heading("Log File in Table %s" % query['logtable'])            
         dbh = DB.DBO(query['case'])
-        dbh.execute("select value from meta where property = 'log_preset_%s' limit 1",(query['logtable']))
+        
+        ## Fetch the driver to use:
+        dbh.execute("select * from log_tables where table_name='%s' limit 1",(query['logtable']))
         row=dbh.fetch()
+        if not row:
+            raise Reports.ReportError("Log Table %s not found" % query['logtable'])
+                                      
         try:
-            log = LogFile.get_loader(query['case'],row['value'],None)
-        except KeyError:
-            raise Reports.ReportError("Unable to load the preset %s for table %s " % (row['value'],query['logtable']))
+            ## Instantiate the driver on this case:
+            log = LogFile.load_preset(query['case'],
+                                      row['preset'])
+        except KeyError,e:
+            raise Reports.ReportError("Unable to load the preset %s for table %s " % (row['preset'],query['logtable']))
 
+        ## Display it now:
         log.display(query['logtable'],result);
 
 class CreateLogPreset(Reports.report):
-    """ Creates a new type of log file in the database, so that they can be loaded using the Load Log File report """
+    """ Creates a new type of log file in the database, so that they
+    can be loaded using the Load Log File report"""
     parameters = {"log_preset":"any", "final":"any"}
     name="Create Log Preset"
     family = "Log Analysis"
@@ -82,24 +93,29 @@ class CreateLogPreset(Reports.report):
 
     def reset(self,query):
         dbh = self.DBO(None)
-        dbh.delete("meta", where= "property='log_preset' and value=%r" % query['log_preset'])
-        dbh.delete("meta", where= "property='log_preset_%s'" % query['log_preset'])
+        dbh.delete("log_preset", where="name = %r" % query['log_preset'])
 
     def display(self,query,result):
         result.heading("New log file preset %s created" % query['log_preset'])
-        result.link("Load a log file", FlagFramework.query_type((),case=None,family='Load Data',report='LoadPresetLog',log_preset=query['log_preset']))
+        result.link("Load a log file", query_type(case=None,
+                                                  family='Load Data',
+                                                  report='LoadPresetLog',
+                                                  log_preset=query['log_preset']))
         return result
 
     def form(self,query,result):
         try:
-            log=Registry.LOG_DRIVERS.drivers[query['driver']]()
+            ## Try to get the driver
+            log=Registry.LOG_DRIVERS.dispatch(query['driver'])()
+
+            ## Ask the driver to render a form:
             log.form(query,result)
         except KeyError,e:
+            ## Chose a driver to use:
             result.const_selector("Select Log Processor", 'driver',
-                                  Registry.LOG_DRIVERS.drivers.keys() , Registry.LOG_DRIVERS.drivers.keys()
+                                  Registry.LOG_DRIVERS.class_names , Registry.LOG_DRIVERS.class_names
                                   )
-
-        
+            
 class BandWidth(Reports.report):
     """ Calculates the approximate bandwidth requirements by adding the size of each log entry within time period """
     parameters = {"logtable":"casetable","timestamp":"sqlsafe","size":"sqlsafe"}
@@ -151,7 +167,7 @@ class BandWidth(Reports.report):
                 start=dbh.fetch()['min']
 
             params['start']=start
-            
+
             result.para("")
             dbh.execute('select unix_timestamp(%(timestamp)s) as `timestamp`,floor(unix_timestamp(%(timestamp)s)/%(bin_size)s)*%(bin_size)s as `Unix Timestamp`,from_unixtime(floor(unix_timestamp(%(timestamp)s)/%(bin_size)s)*%(bin_size)s) as `DateTime`,sum(%(size)s) as `Count` from %(logtable)s  where `%(timestamp)s`>from_unixtime("%(start)s") and   `%(timestamp)s`<from_unixtime("%(start)s"+100*%(bin_size)s) group by `Unix Timestamp`  order by  `Unix Timestamp` asc   limit 0, 100' % params )
             x=[]
@@ -187,6 +203,43 @@ class BandWidth(Reports.report):
             groupby='`Unix Timestamp`'
             )
 
+class RemoveLogTable(Reports.report):
+    """ Remove a log table from the current case """
+    name = "Remove Log Table"
+    family = "Log Analysis"
+
+    def display(self,query, result):
+        if not query.has_key('table'):
+            result.heading("Delete a table from this case")
+
+            def DeleteIcon(value):
+                tmp=result.__class__(result)
+                target = query.clone()
+                target.set('table',value)
+
+                tmp.link("Delete", icon="no.png",
+                         target=target)
+                return tmp
+
+            result.table(
+                elements = [ ColumnType("Delete?",'table_name',
+                                        callback = DeleteIcon),
+                             StringType("Table Name",'table_name'),
+                             StringType("Type", "preset"),
+                             ],
+                table="log_tables",
+                case=query['case']
+                )
+
+        elif query.has_key('confirm'):
+            LogFile.drop_table(query['case'] , query['table'])
+            result.refresh(0, query_type(family=query['family'], case=query['case'],
+                                         report=query['report']))
+        else:
+            result.heading("About to remove %s" % query['table'])            
+            query['confirm']=1
+            result.link("Are you sure you want to drop table %s. Click here to confirm"% query['table'], query)
+
 class RemoveLogPreset(Reports.report):
     """ Removes a log preset, dropping all tables created using it """
     name = "Remove Preset"
@@ -195,60 +248,38 @@ class RemoveLogPreset(Reports.report):
     description = "Removes a preset"
     parameters= {"log_preset":"any", "confirm":"sqlsafe"}
 
-    def find_tables(self,preset):
-        """ Yields the tables which were created by a given preset.
-
-        @return: (database,table)
-        """
-        dbh=DB.DBO(None)
-        ## Find all the cases we know about:
-        dbh.execute("select value from meta where property='flag_db'")
-        for row in dbh:
-            ## Find all log tables with the current preset
-            dbh2=DB.DBO(row['value'])
-            dbh2.execute("select * from meta where property like \"log_preset_%%\" and value=%r",preset)
-            for row2 in dbh2:
-                yield (row['value'],row2['property'][len("log_preset_"):])
-
     def form(self,query,result):
         try:
-            result.selector("Select Preset to delete",'log_preset',"select value as `key`,value from meta where property='log_preset'",(),case=None)
+            result.selector("Select Preset to delete",'log_preset',
+                            "select name as `key`, name as `value` from log_presets",
+                            case = None)
 
-            tmp=result.__class__(result)
             found=0
-            tmp.row("The following will also be dropped:",'')
+            result.row("The following will also be dropped:",'')
+            
+            tmp=result.__class__(result)
+            tmp.start_table(**{'class':'GeneralTable'})
             left=result.__class__(result)
             right=result.__class__(result)
             left.text("Case",font='bold',style='red')
             right.text("Table",font='bold',style='red')
             tmp.row(left,right)
-            for a in self.find_tables(query['log_preset']):
-                found=1
-                tmp.row(*a)
 
-            if found:
-                result.row(tmp)
+            for case, tablename in LogFile.find_tables(query['log_preset']):
+                tmp.row(case, tablename)
+
+            result.row(tmp)
             result.checkbox("Are you sure you want to do this?","confirm",'yes')
-        except KeyError:
+        except KeyError,e:
+            print e
             pass
 
     def display(self,query,result):
-        ## First drop the tables:
-        preset=query['log_preset']
-        ## This will reset all reports that loaded using the given
-        ## preset - This should cause those tables to drop
-        dbh=DB.DBO(None)
-        ## Find all the cases we know about:
-        dbh.execute("select value from meta where property='flag_db'")
-        for row in dbh:
-            FlagFramework.reset_all(family='Load Data',report='Load Preset Log File',log_preset=preset,case=row['value'])
+        LogFile.drop_preset(query['log_preset'])
 
-            ## Now lose the preset itself
-            FlagFramework.reset_all(log_preset=preset,family=query['family'],report='Create Log Preset',case=None)
-        dbh.delete("meta", where= "property='log_preset' and value=%r" % query['log_preset'])
-        dbh.delete("meta", where= "property='log_preset_%s'" % query['log_preset'])
-        
         result.heading("Deleted preset %s from the database" % query['log_preset'])
+        result.link("Manage more Presets", query_type(family=query['family'],
+                                                      report="Manage Log Presets"))
         
 class ManageLogPresets(Reports.report):
     """ View and delete the available presets """
@@ -258,32 +289,45 @@ class ManageLogPresets(Reports.report):
     parameters = {}
     
     def display(self,query,result):
-        dbh=DB.DBO(None)
         result.heading("These are the currently available presets")
         link = FlagFramework.query_type((),family=query['family'],report='CreateLogPreset')
                                                    
         result.toolbar(text="Add a new Preset",icon="new_preset.png",link=link,tooltip="Create a new Preset")
         def DeleteIcon(value):
             tmp=result.__class__(result)
-            tmp.link("Delete", icon="no.png", target=query_type(family=query['family'],report='RemoveLogPreset',__target__='log_preset'))
+            tmp.link("Delete", icon="no.png",
+                     target=query_type(family=query['family'],
+                                       report='RemoveLogPreset',
+                                       log_preset=value))
             return tmp
 
-        def Describe(value):
-            try:
-                log = LogFile.get_loader(dbh, value)
-                return( "%s" % log.__class__)
-            except (KeyError, TypeError):
-                return "Unknown"
-        
         result.table(
-            elements = [ ColumnType("Delete?",'value',
+            elements = [ ColumnType("Delete?",'name',
                                     callback = DeleteIcon),
-                         StringType("Log Preset",'value'),
-                         ColumnType("Type", "value",
-                                    callback = Describe),
+                         StringType("Log Preset",'name'),
+                         StringType("Type", "driver"),
                          ],
-            where = 'property="log_preset"',
-            table="meta",
+            table="log_presets",
             case=None
             )
         
+class LogTablesInit(FlagFramework.EventHandler):
+    def init_default_db(self, dbh, case):
+        ## Log presets live in this table - type is the class name
+        ## which will be fetched through Registry.LOG_DRIVERS.dispatch.
+        dbh.execute("""CREATE TABLE `log_presets` (
+        `name` varchar(250) NOT NULL,
+        `driver` varchar(250) NOT NULL,
+        `query` text,
+        primary key (`name`)
+        ) engine=MyISAM""")
+
+        ## Make sure the default db also has a log_tables
+        self.create(self, dbh, None)
+
+    def create(self, dbh, case):
+        dbh.execute("""CREATE TABLE `log_tables` (
+        `preset` varchar(250) NOT NULL,
+        `table_name` varchar(250) NOT NULL,
+        primary key (`table_name`)
+        ) engine=MyISAM""")

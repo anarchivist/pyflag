@@ -172,6 +172,12 @@ class query_type:
             except ValueError:
                 pass
 
+    def clear(self, key):
+        try:
+            del self[key]
+        except KeyError:
+            pass
+
     def set(self, key, value):
         del self[key]
         self[key]=value

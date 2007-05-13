@@ -51,7 +51,7 @@ description = "Load Data"
 class LoadPresetLog(Reports.report):
     """ Loads a log file into the database using preset type """
     parameters = {"table":"sqlsafe", "datafile":"filename",
-                  "log_preset":"any", "final":"alphanum"}
+                  "preset":"any", "final":"any"}
     name="Load Preset Log File"
     family="Load Data"
     description="Load Data from log file into Database using Preset"
@@ -62,7 +62,11 @@ class LoadPresetLog(Reports.report):
         result.para("Successfully uploaded the following files into case %s, table %s:" % (query['case'],query['table']))
         for fn in query.getarray('datafile'):
             result.para(fn)
-        result.link("Browse this log file", FlagFramework.query_type((), case=query['case'], family="Log Analysis", report="ListLogFile", logtable="%s"%query['table']))
+        result.link("Browse this log file",
+                    query_type(case=query['case'],
+                               family="Log Analysis",
+                               report="ListLogFile",
+                               logtable= query['table']))
         return result
 
     progress_str = None
@@ -89,16 +93,16 @@ class LoadPresetLog(Reports.report):
             
     def form(self, query, result):
         try:
-            result.start_table()
             result.case_selector()
-            result.meta_selector(config.FLAGDB,'Select preset type','log_preset',autosubmit=True)
+            result.selector('Select Log Preset','preset',
+                            "select name as `key`, name as `value` from log_presets",
+                            autosubmit=True)
+
             result.textfield("Table name:","table")
-            dbh = DB.DBO(query['case'])
-            tmp = self.ui(result)
-            tmp.filebox()
-            result.row("Select file to load:",tmp)
+            result.fileselector("log files to use", 'datafile')
+
             if query.getarray('datafile'):
-                log = LogFile.get_loader(query['case'], query['log_preset'],query.getarray('datafile'))
+                log = LogFile.load_preset(query['case'], query['preset'], query.getarray('datafile'))
             else:
                 return result
 
@@ -106,11 +110,10 @@ class LoadPresetLog(Reports.report):
             
             # show preview
             result.start_table()
-            temp_table = dbh.get_temp()
-            try:
-                for progress in log.load(temp_table, rows=3):
-                    pass
 
+            dbh = DB.DBO(query['case'])
+
+            try:
                 # retrieve and display the temp table
                 log.display_test_log(result)
             except Exception,e:
@@ -119,41 +122,40 @@ class LoadPresetLog(Reports.report):
                 print FlagFramework.get_bt_string(e)
                 return
             
-            result.end_table()
-            
-            result.checkbox('Click here when finished','final','ok')
-            
+            result.checkbox('Click here to confirm','final','ok')
+
         except KeyError:
             pass
 
     def analyse(self, query):
         """ Load the log file into the table """
-        dbh = DB.DBO(query['case'])
-        log = LogFile.get_loader(query['case'], query['log_preset'],query.getarray('datafile'))
-        
-        ## Check to make sure that this table is not used by some other preset:
-        dbh.execute("select * from meta where property='log_preset_%s' and value!='%s' limit 1" ,
-                    (query['table'],query['log_preset']))
-        row=dbh.fetch()
-        if row:
-            raise Reports.ReportError("Table %s already exists with a conflicting preset (%s) - you can only append to the same table with the same preset." % (query['table'],row['value']))
+        log = LogFile.load_preset(query['case'], query['preset'], query.getarray('datafile'))
         
         for progress in log.load(query['table']):
             self.progress_str = progress
             
+        ## Now we need to precache (if we have been asked to precache all the whois
+        ## stuff.
+
+        ## TODO PROGRESS METER
+        fieldsToLookup = []
+        for i in range(0,len(log.fields)):
+            if issubclass(log.fields[i].__class__, IPType):
+                fieldsToLookup.append(i)
+
+        if config.PRECACHE_IPMETADATA: 
+            ## Precache both
+            for data in log.get_fields():
+                for lup in fieldsToLookup:
+                    ## This also caches the whois - it will also populate the GeoIP info
+                    Whois.lookup_whois(data[lup])
+
         dbh.insert("meta", property='logtable', value=query['table'])
         dbh.insert("meta", property='log_preset_%s' % query['table'], value=query['log_preset'])
 
     def reset(self, query):
-        dbh = DB.DBO(query['case'])
-        # decide on table name
-        if query.has_key('new_table'):
-            del query['table']
-            query['table'] = query['new_table']
-
-        dbh.drop("%s_log" % query['table'])
-        dbh.delete("meta", where= "property='logtable' and value='%s'" % (query['table']))
-        dbh.delete("meta", where=" property='log_preset_%s'" % (query['table']))
+        pass
+        #LogFile.drop_table(query['case'], query['table'])
 
 import pyflag.IO as IO
 
@@ -582,4 +584,6 @@ class LoadDataTests(unittest.TestCase):
         m.update(fd.read())
         self.assertEqual(m.hexdigest(),'f5b394b5d0ca8c9ce206353e71d1d1f2')
 
+
+config.add_option("PRECACHE_IPMETADATA", default=True, help="Precache whois data for all IP addresses when loading data")
 

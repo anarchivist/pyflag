@@ -258,7 +258,8 @@ class HTMLUI(UI.GenericUI):
     
     def start_table(self,**options):
         self.table_depth += 1
-        self.result += "<table class=Row %s>\n" % self.opt_to_str(options)
+        if not options.has_key("class"): options['class'] = "Row"
+        self.result += "<table %s>\n" % self.opt_to_str(options)
 
     def row(self,*columns, **options):
         #Sort through all the options for the ones that should go to the td html element
@@ -406,13 +407,17 @@ class HTMLUI(UI.GenericUI):
         """ Create a hidden parameter to be passed on form submission """
         self.form_parms[name]=value
 
-    def checkbox(self,description,name,value,**options):
+    def checkbox(self,description,name,value, tooltip=None, **options):
         """ Create a checkbox input for the name,value pair given. """
         opt_str = ''
         if options:
             opt_str = self.opt_to_str(options)
         if value in self.defaults.getarray(name):
             opt_str += 'checked'
+
+        if tooltip:
+            description = self.tooltipise(tooltip, description)
+            
         self.row(description,"<input type=checkbox name=\"%s\" value=\"%s\" %s>" % (name,value,opt_str))
         if self.form_parms.has_key(name):
             del self.form_parms[name]

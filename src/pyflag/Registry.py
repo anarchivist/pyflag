@@ -333,7 +333,7 @@ class ShellRegistry(Registry):
             except KeyError:
                 self.commands[command]=cls
 
-class LogDriverRegistry(Registry):
+class LogDriverRegistry(ScannerRegistry):
     """ A class taking care of Log file drivers """
     drivers = {}
     def __init__(self,ParentClass):
@@ -421,7 +421,7 @@ def Init():
     ## Pick all Log File drivers:
     import pyflag.LogFile as LogFile
     global LOG_DRIVERS
-    LOG_DRIVERS = LogDriverRegistry(LogFile.Log)
+    LOG_DRIVERS = ScannerRegistry(LogFile.Log)
     
     ## Register all shell commands:
     import pyflag.pyflagsh as pyflagsh

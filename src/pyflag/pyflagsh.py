@@ -95,6 +95,14 @@ class command:
     def complete(self,text,state):
         """ Method used to complete the command. """
 
+    def complete_from_list(self, text, state, array):
+        """ Does the right thing of returning what complete() needs
+        given a list of possibilities
+        """
+        for i in range(state, len(array)):
+            if array[i].startswith(text):
+                return array[i]
+
     def execute(self):
         """ Executes the command. This generator yields each line of output """
 

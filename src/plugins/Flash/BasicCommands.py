@@ -588,9 +588,9 @@ class create_case(load):
                        property='flag_db',
                        value=case)
 
-        ## Post the create event on the case
-        FlagFramework.post_event('create', case)
-
+            ## Post the create event on the case
+            FlagFramework.post_event('create', case)
+            
         yield "Created Case %s" % case
         
 ## Unit tests:

@@ -43,17 +43,7 @@ class IISLog(Simple.SimpleLog):
         self.split_req = ''
         self.num_fields = 1
 
-    def parse(self, query, datafile='datafile'):
-
-        self.datafile = query.getarray(datafile)
-        # set these params, then we can just use SimpleLog's get_fields
-        self.delimiter = ' '
-        self.prefilters = ['PFDateFormatChange2']
-
-        # now for the IIS magic, the code below sets up the
-        # fields, types, and indexes arrays req'd by load
-        # replaces the need for the form in SimpleLog
-
+    def find_fields_line(self):
         # Find the fields line:
         count=0
         for row in self.read_record(ignore_comment = False):
@@ -74,13 +64,31 @@ class IISLog(Simple.SimpleLog):
             if count>15:
                 raise Reports.ReportError("Error parsing IIS log file (I can't find a #Fields header line.) Maybe you may be able to use the simple log driver for this log?")
         
+        return fields
+
+    def parse(self, query, datafile='datafile'):
+        Simple.SimpleLog.parse(self, query, datafile)
+        
+        self.datafile = query.getarray(datafile)
+        # set these params, then we can just use SimpleLog's get_fields
+        self.delimiter = ' '
+        self.prefilters = ['PFDateFormatChange2']
+
+        if self.datafile:
+            for f in self.find_fields_line():
+                query['fields'] = f
+
+        # now for the IIS magic, the code below sets up the
+        # fields, types, and indexes arrays req'd by load
+        # replaces the need for the form in SimpleLog
+
         # try to guess types based on known field-names, not perfect...
         # automatically index the non-varchar fields, leave the rest
         self.fields = []
         
         ## Note the original log file has -ip, -status etc, but after
         ## MakeSQLSafe dashes turn to underscores.
-        for field in fields:
+        for field in query.getarray('fields'):
             if field == 'time':
                 tmp = TimestampType('Timestamp', 'timestamp')
                 tmp.index = True
@@ -122,10 +130,11 @@ class IISLog(Simple.SimpleLog):
             ))
 
 ### Some unit tests for IIS loader:
-import unittest, time
+import time
 from pyflag.FlagFramework import query_type
+import pyflag.pyflagsh as pyflagsh
 
-class IISLogTest(unittest.TestCase):
+class IISLogTest(LogFile.LogDriverTester):
     """ IIS Log file processing """
     test_case = "PyFlagTestCase"
     test_table = "TestTable"
@@ -143,20 +152,14 @@ class IISLogTest(unittest.TestCase):
     def test02LoadFile(self):
         """ Test that IIS Log files can be loaded """
         dbh = DB.DBO(self.test_case)
-        dbh.drop(self.test_table+"_log")
-        log = IISLog(case=self.test_case)
-        log.parse(query_type( datafile = self.test_file))
+        log = LogFile.load_preset(self.test_case, self.log_preset, [self.test_file])
         t = time.time()
         ## Load the data:
         for a in log.load(self.test_table):
-            #print a
             pass
 
         print "Took %s seconds to load log" % (time.time()-t)
             
-        dbh.insert("meta", property='logtable', value=self.test_table)
-        dbh.insert("meta", property='log_preset_%s' % self.test_table, value=self.log_preset)
-
         ## Check that all rows were uploaded:
         dbh.execute("select count(*) as c from %s_log", self.test_table)
         row = dbh.fetch()

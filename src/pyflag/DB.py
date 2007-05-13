@@ -161,12 +161,14 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
             t = threading.Timer(self.timeout, cancel)
             t.start()
             try:
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, string)
                 MySQLdb.cursors.SSDictCursor.execute(self,string)
             finally:
                 t.cancel()
                 t.join()
                 pass
         else:
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, string)
             MySQLdb.cursors.SSDictCursor.execute(self,string)
 
     def fetchone(self):
@@ -319,13 +321,11 @@ class DBO:
         if not case:
             case = config.FLAGDB
 
-##        key = "%s/%s" % (case, threading.currentThread().getName())
-        key = "%s" % (case)
         try:
-            self.dbh,self.mysql_bin_string=self.DBH.get(key).get()
+            self.dbh,self.mysql_bin_string=self.DBH.get(case).get()
         except KeyError:
-            self.DBH.put(Pool(case), key=key)
-            self.dbh,self.mysql_bin_string=self.DBH.get(key).get()
+            self.DBH.put(Pool(case), key=case)
+            self.dbh,self.mysql_bin_string=self.DBH.get(case).get()
             
         self.temp_tables = []
         self.case = case
@@ -705,7 +705,7 @@ class DBO:
         """ Returns the value for the given property in meta table selected database
 
         Only returns first value """
-        self.execute("select value from `%s` where property=%r",
+        self.execute("select value from `%s` where property=%r limit 1",
                      (table,property))
         row = self.fetch()
 

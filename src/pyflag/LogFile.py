@@ -38,6 +38,7 @@ import pickle,gzip
 import plugins.LogAnalysis.Whois as Whois
 from pyflag.TableObj import IPType
 import re
+import pyflag.Registry as Registry
 
 def get_file(query,result):
     result.row("Select a sample log file for the previewer",stretch=False)
@@ -68,6 +69,8 @@ class Log:
     drivers extend this class, possibly providing new methods for form
     and field, and potentially even read_record.
     """
+    name = "BaseClass"
+
     def parse(self, query, datafile="datafile"):
         """ Parse all options from query and update ourselves.
 
@@ -75,9 +78,20 @@ class Log:
         object. We need to ensure that we completely refresh all data
         which is unique to our instance.
         """
+        self.query = query
         
     def __init__(self, case=None):
         self.case = case
+
+    def drop(self, name):
+        """ Drops the table named in name.
+        
+        By default we name the table in the db with name+'_log', but
+        that is theoretically transparent to users.
+        """
+        tablename = name + "_log"
+        dbh = DB.DBO(self.case)
+        dbh.drop(tablename)
         
     def form(self,query,result):
         """ This method will be called when the user wants to configure a new instance of us. IE a new preset """
@@ -90,17 +104,22 @@ class Log:
         dbh = DB.DBO(self.case)
         temp_table = dbh.get_temp()
 
-        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "About to attempt to load three rows into a temp table for the preview")
+        try:
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "About to attempt to load three rows into a temp table for the preview")
 
-        ## Since this should be a temporary table, we explicitly tell the load
-        ## method to drop it if it exists
-        for a in self.load(temp_table,rows= 3, deleteExisting="YES"):
-            pass
-       
-        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Created a test table containing three rows. About to try and display it...")
- 
-        ## Display the new table
-        self.display(temp_table, result)
+            ## Since this should be a temporary table, we explicitly tell the load
+            ## method to drop it if it exists
+            for a in self.load(temp_table,rows= 3):
+                pass
+
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Created a test table containing three rows. About to try and display it...")
+
+            ## Display the new table
+            self.display(temp_table, result)
+            
+        finally:
+            ## Drop the table:
+            drop_table(self.case, temp_table)
     
     def read_record(self, ignore_comment = True):
         """ Generates records.
@@ -131,8 +150,23 @@ class Log:
                 else:
                     yield line
 
-    def load(self,tablename, rows = None, deleteExisting=None):
+    def get_fields(self):
+        """ A generator that returns all the columns in a log file.
+
+        @returns: A generator that generates arrays of cells
+        """
+        for row in self.read_record():
+            row = self.prefilter_record(row)
+            splitUpRow = row.split(self.delimiter)
+            splitUpRow[-1] = splitUpRow[-1].strip()
+            yield splitUpRow
+
+    def load(self,name, rows = None, deleteExisting=None):
         """ Loads the specified number of rows into the database.
+
+        __NOTE__ We assume this generator will run to
+        completion... This is a generator just in order to provide a
+        running progress indication - maybe this should change?
 
         @arg table_name: A table name to use
         @arg rows: number of rows to upload - if None , we upload them all
@@ -141,13 +175,15 @@ class Log:
         """
         ## We append _log to tablename to prevent name clashes in the
         ## db:
-        tablename = tablename+"_log"
+        tablename = name+"_log"
         
         ## First we create the table. We do this by asking all the
         ## column types for their create clause:
         dbh = DB.DBO(self.case)
+
         dbh.cursor.ignore_warnings = True
         dbh.mass_insert_start(tablename, _fast=True)
+        dbh.invalidate(tablename)
 
         fields = [ x for x in self.fields if x]
         if len(fields)==0:
@@ -157,18 +193,21 @@ class Log:
         # Normal calls to this method don't need to worry about this
         if deleteExisting:
             dbh.execute("drop table if exists %s",tablename)   
+            dbh.delete("log_tables", where="table_name=%r" % tablename)
+            
+        ## Add our table to the table list. This is done first to trap
+        ## attempts to reuse the same table name early. FIXME - create
+        ## a combined index on driver + table_name
+        dbh.insert("log_tables",
+                   preset = self.name,
+                   table_name = name)
 
+
+        ## Create the table:
         dbh.execute("create table if not exists %s (%s)", (
             tablename,
             ',\n'.join([ x.create() for x in fields])
             ))
-
-        fieldsToLookup = []
-        if config.PRECACHE_IPMETADATA:
-            for i in range(0,len(fields)):
-                if issubclass(fields[i].__class__, IPType):
-                    fieldsToLookup.append(i)
-
 
         ##  Now insert into the table:
         count = 0
@@ -180,14 +219,16 @@ class Log:
 
             count += 1
 
-            args = dict()
-            for i in range(len(self.fields)):
-                try:
-                    key, value = self.fields[i].insert(fields[i])
-                    args[key] = value
-                except (IndexError,AttributeError):
-                    pyflaglog.log(pyflaglog.WARNING, "Attribute or Index Error when inserting value into field!")
-                    pass
+            if isinstance(fields, list):
+                args = dict()
+                for i in range(len(self.fields)):
+                    try:
+                        key, value = self.fields[i].insert(fields[i])
+                        args[key] = value
+                    except (IndexError,AttributeError),e:
+                        pyflaglog.log(pyflaglog.WARNING, "Attribute or Index Error when inserting value into field: %r" % e)
+            elif isinstance(fields, dict):
+                args = fields
                 
             if args:
                 dbh.mass_insert( **args)
@@ -209,21 +250,33 @@ class Log:
 
         return
 
+    def restore(self, name):
+        """ Restores the table from the log tables (This is the
+        opposite of self.store(name))
+        """
+        dbh = DB.DBO()
+        dbh.execute("select * from log_presets where name=%r limit 1" , name)
+        row = dbh.fetch()
+        self.query = query_type(string=row['query'])
+        self.name = name
+
     def store(self, name):
         """ Stores the configured driver in the db.
 
-        Note that Log objects are asked to pickle themselves. However
-        the base class uses a generic pickler. If you need to do
-        something really special for pickling or unpickling, you may
-        override this method.
+        Realistically since drivers can only be configured by the GUI
+        the query string that caused them to be configured is the best
+        method to reconfigure them in future. This is what is
+        implemented here.
         """
-        ## Clear stuff that is not relevant
-        self.datafile = None
-        self.case=None
-        data=pickle.dumps(self)
-        dbh = DB.DBO(None)
-        dbh.set_meta("log_preset", name,force_create=True)
-        dbh.set_meta("log_preset_%s" % name, data)
+        dbh = DB.DBO()
+        ## Clean up the query a little:
+        self.query.clear('datafile')
+        self.query.clear('callback_stored')
+
+        dbh.insert("log_presets",
+                   name = name,
+                   driver = self.name,
+                   query = self.query)
 
     def display(self,table_name, result):
         """ This method is called to display the contents of the log
@@ -240,23 +293,88 @@ class Log:
 
         return result
 
-def get_loader(case ,name,datafile="datafile"):
-    """ lookup and unpickle log object from the database, return loader object
+## The following methods unify manipulation and access of log presets.
+## The presets are stored in FLAGDB.log_presets and the table names
+## are stored in casedb.log_tables. The names specified in the
+## log_tables table sepecify the naked names of the log tables. By
+## convension all log tables need to exist on the disk using naked
+## name postfixed by _log.
 
-    We also initialise the object to the datafile list of filenames to use.
+def load_preset(case, name, datafiles=[]):
+    """ Loads the preset named with the given datafiles and return an
+    initialised object
     """
-    pydbh = DB.DBO(None)
-    log=pickle.loads(pydbh.get_meta('log_preset_%s' % name))
-    log.datafile = datafile
-    log.case = case
+    dbh = DB.DBO()
+    dbh.execute("select * from log_presets where name=%r limit 1" , name)
+    row = dbh.fetch()
+
+    log = Registry.LOG_DRIVERS.dispatch(row['driver'])(case)
+    log.restore(name)
+
+    del log.query['datafile']
+    
+    for f in datafiles:
+        log.query['datafile'] = f
+
+    log.parse(log.query)
+
     return log
 
+def drop_table(case, name):
+    """ Drops the log table tablename """
+    dbh = DB.DBO(case)
+    pyflaglog.log(pyflaglog.DEBUG, "Dropping log table %s in case %s" % (name, case))
+
+    dbh.execute("select * from log_tables where table_name = %r limit 1" , name)
+    row = dbh.fetch()
+    if not row: raise RuntimeError("No such log file table %s" % name)
+    preset = row['preset']
+
+    ## Get the driver for this table:
+    log = load_preset(case, preset)
+    log.drop(name)
+    
+    ## Ask the driver to remove its table:
+    dbh.delete("log_tables",
+               where="table_name = %r " % name);
+
+    ## Make sure that the reports get all reset
+    FlagFramework.reset_all(family='Load Data', report="Load Preset Log File",
+                                       table = name, case=case)
+
+def find_tables(preset):
+    """ Yields the tables which were created by a given preset.
+
+    @return: (database,table)
+    """
+    dbh=DB.DBO()
+    
+    ## Find all the cases we know about:
+    dbh.execute("select value as `case` from meta where property = 'flag_db'")
+    for row in dbh:
+        case = row['case']
+        ## Find all log tables with the current preset
+        try:
+            dbh2=DB.DBO(case)
+            dbh2.execute("select table_name from log_tables where preset=%r", preset)
+            for row2 in dbh2:
+                yield (case, row2['table_name'])
+                
+        except DB.DBError,e:
+            pass
+
+def drop_preset(preset):
+    """ Drops the specified preset name """
+    pyflaglog.log(pyflaglog.DEBUG, "Droppping preset %s" % preset)
+    for case, table in find_tables(preset):
+        drop_table(case, table)
+
+    dbh = DB.DBO()
+    dbh.delete("log_presets", where="name = %r" % preset)
+    
 ## Some common callbacks which log drivers might need:
 def end(query,result):
     """ This is typically the last wizard callback - we just refresh
     into the load preset log file report"""
     query['log_preset'] = 'test'
     result.refresh(0, query_type(log_preset=query['log_preset'], report="Load Preset Log File", family="Load Data"), pane='parent')
-
-config.add_option("PRECACHE_IPMETADATA", default=True, help="Precache whois and geoip data for all IP addresses when loading data")
-

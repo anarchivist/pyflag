@@ -180,17 +180,6 @@ class SimpleLog(LogFile.Log):
 
         return string
 
-    def get_fields(self):
-        """ A generator that returns all the columns in a log file.
-
-        @returns: A generator that generates arrays of cells
-        """
-        for row in self.read_record():
-            row = self.prefilter_record(row)
-            splitUpRow = row.split(self.delimiter)
-            splitUpRow[-1] = splitUpRow[-1].strip()
-            yield splitUpRow
-
     def parse(self, query, datafile='datafile'):
         """ This function parses the query string into the appropriate fields array """
         LogFile.Log.parse(self,query, datafile)
@@ -207,7 +196,7 @@ class SimpleLog(LogFile.Log):
                     num_fields=number
                     
         num_fields+=1
-        pyflaglog.log(pyflaglog.DEBUG, "Found %i fields when parsing" % num_fields)
+        
         ## Initialise the fields array:
         self.fields = [ None ] * num_fields
         self.num_fields = num_fields
