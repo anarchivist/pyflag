@@ -349,7 +349,7 @@ class WhoisInit(FlagFramework.EventHandler):
         UNIQUE KEY (`city`)
         ) engine = MyISAM""")
 
-        dbh.execute("""insert into geoip_city (`city`) values(`unknown`)""")
+        dbh.insert("geoip_city", city="Unknown")
 
         dbh.execute("""CREATE TABLE `geoip_country` (
         `id` int(11) unsigned NOT NULL auto_increment,
