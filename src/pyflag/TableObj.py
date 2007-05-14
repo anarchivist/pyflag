@@ -422,8 +422,12 @@ class ColumnType:
 
         return method(column, operator, arg)
 
+    def escape_column_name(self, column_name):
+        return '.'.join(["`%s`" % x for x in self.column.split('.')])
+
     def literal(self, column,operator, arg):
-        return "`%s` %s %r" % (self.column, operator, arg)
+        return "%s %s %r" % (self.escape_column_name(self.column),
+                             operator, arg)
     
     def display(self, value, row, result):
         """ This method is called by the table widget to allow us to
@@ -482,7 +486,7 @@ class ColumnType:
 
     def select(self):
         """ Returns the SQL required for selecting from the table. """
-        return '.'.join(["`%s`" % x for x in self.column.split('.')])
+        return self.escape_column_name(self.column)
 
     def column_decorator(self, table, result):
         """ Every column type is given the opportunity to decorate its
@@ -506,7 +510,7 @@ class StateType(ColumnType):
     def operator_is(self, column, operator, state):
         for k,v in self.states.items():
             if state.lower()==k:
-                return "`%s` = %r" % (self.column, v)
+                return "%s = %r" % (self.escape_column_name(self.column), v)
 
         raise RuntimeError("Dont understand state %r. Valid states are %s" % (state,self.states.keys()))
 
@@ -583,11 +587,11 @@ class StringType(ColumnType):
 
     def operator_matches(self, column, operator, arg):
         """ This matches the pattern to the column. Wild cards (%) can be placed anywhere, but if you place it in front of the pattern it could be slower. """
-        return '`%s` like %r' % (self.column, arg)
+        return '%s like %r' % (self.escape_column_name(self.column), arg)
 
     def operator_regex(self,column,operator,arg):
         """ This applies the regular expression to the column (Can be slow for large tables) """
-        return '`%s` rlike %r' % (self.column, arg)
+        return '%s rlike %r' % (self.escape_column_name(self.column), arg)
 
 
 class TimestampType(IntegerType):
@@ -600,12 +604,12 @@ class TimestampType(IntegerType):
     def operator_after(self, column, operator, arg):
         """ Matches times after the specified time. The time arguement must be given in the format 'YYYY-MM-DD HH:MM:SS' (i.e. Year, Month, Day, Hour, Minute, Second). """
         ## FIXME Should parse arg as a date - for now pass though to mysql
-        return "`%s` > %r" % (self.column, arg)
+        return "%s > %r" % (self.escape_column_name(self.column), arg)
 
     def operator_before(self,column, operator, arg):
         """ Matches times before the specified time. The time arguement must be as described for 'after'."""
         ## FIXME Should parse arg as a date
-        return "`%s` < %r" % (self.column, arg)
+        return "%s < %r" % (self.escape_column_name(self.column), arg)
 
     def display(self, value, row, result):
         original_query = result.defaults
@@ -712,7 +716,7 @@ class IPType(ColumnType):
         }
 
     def literal(self, column, operator, address):
-        return "`%s` %s INET_ATON(%r)" % (self.column, operator, address)
+        return "%s %s INET_ATON(%r)" % (self.escape_column_name(self.column), operator, address)
 
     def extended_csv(self, value):
         if self.callback: return ["-", "-", "-"]
@@ -750,7 +754,10 @@ class IPType(ColumnType):
         except:
             raise ValueError("%s does not look like a CIDR netmask (e.g. 10.10.10.0/24)" % address)
         
-        return " ( `%s` >= %s and `%s` <= %s ) " % (self.column, numeric_address, self.column, broadcast)
+        return " ( %s >= %s and %s <= %s ) " % (self.escape_column_name(self.column),
+                                                    numeric_address,
+                                                    self.escape_column_name(self.column),
+                                                    broadcast)
 
     def operator_country(self, column, operator, country):
         """ Matches the specified country string (e.g. AU, US, CA). Note that this works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
@@ -1224,37 +1231,37 @@ class ColumnTypeTests(unittest.TestCase):
     def test05FilteringTest(self):
         """ Test filters on columns """
         self.assertEqual(self.generate_sql("'IntegerType' > 10"),
-                         "(1) and (table.integer_type > '10')")
+                         "(1) and (`table`.`integer_type` > '10')")
         
         self.assertEqual(self.generate_sql("'StringType' contains 'Key Word'"),
-                         "(1) and (foobar.string_type like '%Key Word%')")
+                         "(1) and (`foobar`.`string_type` like '%Key Word%')")
 
         self.assertEqual(self.generate_sql("'StringType' matches 'Key Word'"),
-                         "(1) and (foobar.string_type like 'Key Word')")
+                         "(1) and (`foobar`.`string_type` like 'Key Word')")
 
         self.assertEqual(self.generate_sql("'StringType' regex '[a-z]*'"),
-                         "(1) and (foobar.string_type rlike '[a-z]*')")
+                         "(1) and (`foobar`.`string_type` rlike '[a-z]*')")
 
         self.assertEqual(self.generate_sql("'DeletedType' is allocated"),
-                         "(1) and (deleted = 'alloc')")
+                         "(1) and (`deleted` = 'alloc')")
 
         self.assertRaises(RuntimeError, self.generate_sql, ("'DeletedType' is foobar")),
         self.assertEqual(self.generate_sql("'TimestampType' after 2005-10-10"),
-                         "(1) and (timestamp > '2005-10-10')")
+                         "(1) and (`timestamp` > '2005-10-10')")
 
         self.assertEqual(self.generate_sql("'IPType' netmask 10.10.10.1/24"),
                          "(1) and ( ( `source_ip` >= 168430081 and `source_ip` <= 168430335 ) )")
         
         self.assertEqual(self.generate_sql("'InodeType' annotated FooBar"),
-                         '(1) and (inode=(select annotate.inode from annotate where note like "%FooBar%"))')
+                         '(1) and (`inode`=(select annotate.inode from annotate where note like "%FooBar%"))')
 
         ## Joined filters:
         self.assertEqual(self.generate_sql("InodeType contains 'Z|' and TimestampType after 2005-10-10"),
-                         "(1) and (inode like '%Z|%' and timestamp > '2005-10-10')")
+                         "(1) and (`inode` like '%Z|%' and `timestamp` > '2005-10-10')")
         self.assertEqual(self.generate_sql("InodeType contains 'Z|' or TimestampType after 2005-10-10 and IntegerType > 5"),
-                         "(1) and (inode like '%Z|%' or timestamp > '2005-10-10' and table.integer_type > '5')")
+                         "(1) and (`inode` like '%Z|%' or `timestamp` > '2005-10-10' and `table`.`integer_type` > '5')")
         self.assertEqual(self.generate_sql("(InodeType contains 'Z|' or TimestampType after 2005-10-10) and IntegerType > 5"),
-                         "(1) and (( inode like '%Z|%' or timestamp > '2005-10-10' ) and table.integer_type > '5')")
+                         "(1) and (( `inode` like '%Z|%' or `timestamp` > '2005-10-10' ) and `table`.`integer_type` > '5')")
 
     def test10CreateTable(self):
         """ Test table creation """

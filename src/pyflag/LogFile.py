@@ -70,13 +70,24 @@ class Log:
     and field, and potentially even read_record.
     """
     name = "BaseClass"
-
+    datafile = None
+    
     def parse(self, query, datafile="datafile"):
         """ Parse all options from query and update ourselves.
 
         This may be done several times during the life of an
         object. We need to ensure that we completely refresh all data
         which is unique to our instance.
+
+        Note that you may or may not be provided with a datafile
+        here. Its ok to parse the datafile to get some important
+        information (e.g. number of columns etc) if its provided but
+        you must save those details in the query so you can retrieve
+        them from the query in the case you dont have a datafile.
+
+        The important requirement here is that you must be able to
+        completely parse an instance of the driver from a query string
+        and nothing else (because thats how it gets stored in the db).
         """
         self.query = query
         
@@ -132,7 +143,7 @@ class Log:
         
         blank = re.compile("^\s*$")
 
-        if not self.datafile:
+        if self.datafile==None:
             raise IOError("Datafile is not set!!!")
         
         for file in self.datafile:
@@ -156,9 +167,14 @@ class Log:
     def get_fields(self):
         """ A generator that returns all the columns in a log file.
 
-        @returns: A generator that generates arrays of cells
+        This can either return an array, in which case the columns
+        return correspond with the order specificied by self.fields,
+        or a dict in which case the keys are column names.
+
+        You probably want to over ride this....
         """
-        return self.read_record()
+        ## By default we dont split the row
+        return [self.read_record(),]
     
     def load(self,name, rows = None, deleteExisting=None):
         """ Loads the specified number of rows into the database.

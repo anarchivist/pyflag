@@ -128,9 +128,10 @@ class ApacheLog(Simple.SimpleLog):
 
         if not query.has_key('format'):
             query['format'] = formats[formats.keys()[0]]
+
+        self.split_req = query.get('split_req', None)
         try:
             self.format = query['format']
-            self.split_req = query['split_req']
         except KeyError:
             pass
 
@@ -194,16 +195,25 @@ class ApacheLog(Simple.SimpleLog):
             else:
                 self.separators.append(self.format[idx+1:done])
 
-        ## Now check that the right number of fields are provided:
-        row_size=0
-        count = 0
-        for row in self.get_fields():
-            if row_size < len(row):
-                row_size = len(row)
-            count +=1
-            if count>10:
-                break
-
+        ## Now we need to establish the number of fields in this log
+        ## file. We try to get it from the query, but failing that we
+        ## use the first 10 lines as a guide. Note that query must
+        ## have number_of_fields if datafile is not provided.
+        if self.datafile and not query.has_key("number_of_fields"):
+            ## Now check that the right number of fields are provided:
+            row_size=0
+            count = 0
+            for row in self.get_fields():
+                if row_size < len(row):
+                    row_size = len(row)
+                count +=1
+                if count>10:
+                    break
+            query['number_of_fields'] = row_size
+            
+        else:
+            row_size = int(query.get('number_of_fields',len(self.fields)))
+            
         ## And truncate the fields list to match the input file
         self.fields = self.fields[:row_size]
 
@@ -242,7 +252,7 @@ class ApacheLog(Simple.SimpleLog):
                     arr[i] = self.fields[i].trans(arr[i])
                 except:
                     pass
-                    
+
             yield arr
 
     def form(self,query,result):

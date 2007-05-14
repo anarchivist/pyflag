@@ -126,10 +126,10 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                 qsl=qsl[qsl.find('?')+1:]
                 
             query = FlagFramework.query_type(cgi.parse_qsl(qsl),user=user, passwd=passwd)
-            print "pseudo posted query is %s" % query
+            pyflaglog.log(pyflaglog.DEBUG, "pseudo posted query is %s" % query)
         except KeyError:
             if self.command=='POST':
-                print "posted query is %s" % query
+                pyflaglog.log(pyflaglog.DEBUG, "posted query is %s" % query)
 
         for k,v in query.q:
             if v=='None':
@@ -217,7 +217,8 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                             return
                         
                     except ValueError:
-                        print self.headers.get('If-Modified-Since','')
+                        pass
+                        #print self.headers.get('If-Modified-Since','')
                     
                     self.send_response(200)
                     self.send_header("Content-type",ct)
@@ -379,7 +380,7 @@ def Server(HandlerClass = FlagServerHandler,
     httpd = ServerClass(server_address, HandlerClass)
     httpd.socket.settimeout(1.0)
     sa = httpd.socket.getsockname()
-    print "Serving PyFlag requests on %s" % (sa,)
+    pyflaglog.log(pyflaglog.INFO, "Serving PyFlag requests on %s" % (sa,))
     httpd.serve_forever()
 
 config.add_option("THEME", default='Menu',
