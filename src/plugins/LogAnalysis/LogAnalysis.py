@@ -323,7 +323,7 @@ class LogTablesInit(FlagFramework.EventHandler):
         ) engine=MyISAM""")
 
         ## Make sure the default db also has a log_tables
-        self.create(self, dbh, None)
+        self.create(dbh, None)
 
     def create(self, dbh, case):
         dbh.execute("""CREATE TABLE `log_tables` (
