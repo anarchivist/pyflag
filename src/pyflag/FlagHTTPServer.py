@@ -428,10 +428,11 @@ if __name__ == "__main__":
     pyflaglog.start_log_thread()
 
     try:
-        Server(HandlerClass = FlagServerHandler)
-        
-    except Exception,e:
-        pyflaglog.log(pyflaglog.ERROR, "Error %s" % e)
+        try:
+            Server(HandlerClass = FlagServerHandler)
+            
+        except Exception,e:
+            pyflaglog.log(pyflaglog.ERROR, "Error %s" % e)
         
     finally:
         pyflaglog.log(0,"Terminating Logger")

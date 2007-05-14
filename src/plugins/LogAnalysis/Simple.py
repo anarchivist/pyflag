@@ -342,7 +342,13 @@ class SimpleLog(LogFile.Log):
             index_ui =  result.__class__(result)
             
             field_ui.textfield('','field%u' % i)
-            type_ui.const_selector('',"type%u" % i, Registry.COLUMN_TYPES.class_names, Registry.COLUMN_TYPES.class_names)
+
+            ## Calculate all the column types which should be
+            ## displayed for the user (hidden column types are not
+            ## used):
+            columntypes = [ c.__name__ for c in Registry.COLUMN_TYPES.classes if not c.hidden ]
+            type_ui.const_selector('',"type%u" % i, columntypes, columntypes)
+            
             index_ui.checkbox('Add Index?','index%u'%i,'yes')
             field.append(field_ui)
             type.append(type_ui)

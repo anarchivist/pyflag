@@ -378,6 +378,10 @@ class ColumnType:
     responsible for displaying the values from the column and are used
     to generate SQL.
     """
+    ## This contols if the user is able to select it as a columntype
+    ## when importing a log file.
+    hidden = False
+    
     def __init__(self, name='', column='', link='', callback=None, link_pane='self'):
         self.name = name
         self.extended_names = [ name ]
@@ -489,6 +493,7 @@ class ColumnType:
 class StateType(ColumnType):
     ## This is a list of states that we can take on. Keys are args,
     ## values are sql types.
+    hidden = True
     states = {}
     symbols = {
         '=': 'operator_is'
@@ -522,6 +527,7 @@ class IntegerType(ColumnType):
         return "`%s` int(11) default 0" % self.column
 
 class EditableStringType(ColumnType):
+    hidden = True
     def display(self, value, row, result):
         """ This method is called by the table widget to allow us to
         translate the output from the database to the screen. Note
@@ -906,6 +912,7 @@ class IPType(ColumnType):
 
 class InodeType(StringType):
     """ A unified view of inodes """
+    hidden = True
     def __init__(self, name='Inode', column='inode', link=None, case=None, callback=None):
         self.case = case
         ColumnType.__init__(self,name,column,link,callback=callback)
@@ -1131,6 +1138,7 @@ class InodeIDType(InodeType):
         return InodeType.display(self,inode,row,result)
 
 class FilenameType(StringType):
+    hidden = True
     def __init__(self, name='Filename', filename='name', path='path', case=None):
         link = query_type(case=case,
                           family='Disk Forensics',
@@ -1161,6 +1169,7 @@ class FilenameType(StringType):
 class DeletedType(StateType):
     """ This is a column type which shows deleted inodes graphically
     """
+    hidden = True
     states = {'deleted':'deleted', 'allocated':'alloc'}
               
     def display(self,value, row, result):

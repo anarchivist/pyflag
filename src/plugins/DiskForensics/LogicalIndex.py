@@ -305,6 +305,8 @@ class BuildDictionary(Reports.report):
         result.row(table,form,valign='top')
 
 class OffsetType(IntegerType):
+    hidden = True
+    
     def __init__(self, name='', column='', fsfd=None):
         self.fsfd = fsfd
         IntegerType.__init__(self, name,column)

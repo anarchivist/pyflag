@@ -58,6 +58,10 @@ class HTTPObject:
         self.generator=None
         self.headers=[]
 
+class CounterType(TableObj.IntegerType):
+    """ This is used to count the total numbers of things (in a group by) """
+    def select(self):
+        return "count(*)"
 
 def goto_row_cb(query,result,variable='limit'):
     """ This is used by the table widget to allow users to skip to a
@@ -821,13 +825,15 @@ class HTMLUI(UI.GenericUI):
                     new_query = query.clone()
                     filter_expression = filter_expression.strip()
                     if filter_expression: filter_expression += " and "
+
                     filter_expression += "'%s'='%%s'" % e.name
                     new_query.set(filter,filter_expression)
                     new_query['__target__'] = filter
+
                     e.link = new_query
                     e.link_pane = 'parent'
                     elements = [ e,
-                                 TableObj.IntegerType(name='Count', sql='count(*)'),
+                                 CounterType(name='Count'),
                                  ]
                     break
             
