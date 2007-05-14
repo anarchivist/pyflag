@@ -38,28 +38,28 @@ import pyflag.DB as DB
 import re
 
 IPTABLES_FIELDS = [
-    ## IPTables_parameter, Name, Description, ColumnType, default
-    [ 'IN',   'Input IF',    'Interface the packet arrived on', StringType, False ],
-    [ 'OUT',  'Output IF',   'Interface the packet left on', StringType, False ],
-    [ 'MAC',  'MAC Address', 'MAC addresses from where the packet came', StringType, False],
-    [ 'SRC',  'Source IP',   'Source IP Address', IPType, True],
-    [ 'DST',  'Dest IP',     'Destination IP Address', IPType, True],
-    [ 'LEN',  'Length',      'Length of this packet', IntegerType, True],
-    [ 'TOS',  'TOS',         'Type of Service', IntegerType, False],
-    [ 'TTL',  'TTL',         'Time to Live', IntegerType, False],
-    [ 'ID',   'IP ID',       'IP ID Field', IntegerType, False],
-    [ 'PROTO', 'Protocol',    'Protocol', StringType, True ],
-    [ 'SPT',   'Source Port', 'Source Port', IntegerType, True],
-    [ 'DPT',   'Dest Port',   'Destination Port', IntegerType, True],
+    ## IPTables_parameter, Name, Description, ColumnType, default, index
+    [ 'IN',   'Input IF',    'Interface the packet arrived on', StringType, False, False],
+    [ 'OUT',  'Output IF',   'Interface the packet left on', StringType, False, False ],
+    [ 'MAC',  'MAC Address', 'MAC addresses from where the packet came', StringType, False, False],
+    [ 'SRC',  'Source IP',   'Source IP Address', IPType, True, True],
+    [ 'DST',  'Dest IP',     'Destination IP Address', IPType, True, True],
+    [ 'LEN',  'Length',      'Length of this packet', IntegerType, True, False],
+    [ 'TOS',  'TOS',         'Type of Service', IntegerType, False, False],
+    [ 'TTL',  'TTL',         'Time to Live', IntegerType, False, True],
+    [ 'ID',   'IP ID',       'IP ID Field', IntegerType, False, False],
+    [ 'PROTO', 'Protocol',    'Protocol', StringType, True, True],
+    [ 'SPT',   'Source Port', 'Source Port', IntegerType, True, True],
+    [ 'DPT',   'Dest Port',   'Destination Port', IntegerType, True, True],
 
     ## ICMP Stuff:TYPE=8 CODE=0 ID=2832 SEQ=2
-    [ 'TYPE',  'ICMP Type',   'Type of ICMP Message', IntegerType, False],
-    [ 'CODE',  'ICMP Code',   'Code of ICMP Message', IntegerType, False],
-    [ 'SEQ',   'ICMP Seq',    'Sequence number of ICMP', IntegerType, False],
+    [ 'TYPE',  'ICMP Type',   'Type of ICMP Message', IntegerType, False, True],
+    [ 'CODE',  'ICMP Code',   'Code of ICMP Message', IntegerType, False, True],
+    [ 'SEQ',   'ICMP Seq',    'Sequence number of ICMP', IntegerType, False, False],
 
     ## TCP Specific stuff:WINDOW=5840 RES=0x00 SYN URGP=0
-    [ 'WINDOW', 'Window',    'TCP Window size', IntegerType, False],
-    [ 'RES',    'Flags',     'The TCP Reserved flags', IntegerType, False],
+    [ 'WINDOW', 'Window',    'TCP Window size', IntegerType, False, False],
+    [ 'RES',    'Flags',     'The TCP Reserved flags', IntegerType, False, False],
     
     ]
 
@@ -72,12 +72,15 @@ class IPTablesLog(LogFile.Log):
         LogFile.Log.parse(self, query, datafile)
 
         self.datafile = query.getarray(datafile)
-
-        self.fields = []
+        self.cre = re.compile("([A-Z]+)=([^ ]*)")
+        self.prefix_re = re.compile("([^ :]+):IN=")
+        
+        self.fields = [ StringType(name="Action", column="action") ]
         self.parameters = {}
-        for parameter, name, desc, column, default in IPTABLES_FIELDS:
+        for parameter, name, desc, column, default, index in IPTABLES_FIELDS:
             if query.has_key(parameter):
                 new_column = column(name=name, column=parameter)
+                new_column.index = index
                 self.fields.append(new_column)
                 self.parameters[parameter] = new_column
 
@@ -85,10 +88,13 @@ class IPTablesLog(LogFile.Log):
             raise RuntimeError("No columns were selected")
 
     def get_fields(self):
-        cre = re.compile("([A-Z]+)=([^ ]*)")
         for row in self.read_record():
             fields = {}
-            for match in cre.finditer(row):
+            match = self.prefix_re.search(row)
+            if match:
+                fields["action"] = match.group(1)
+            
+            for match in self.cre.finditer(row):
                 try:
                     key, value = self.parameters[match.group(1)].insert(match.group(2))
                     
@@ -102,7 +108,7 @@ class IPTablesLog(LogFile.Log):
     def form(self, query, result):
         def select_columns(query,result):
             """ Create a selection box of all the fields we support """
-            for parameter, name, desc, column, default in IPTABLES_FIELDS:
+            for parameter, name, desc, column, default, index in IPTABLES_FIELDS:
                 if not query.has_key(name):
                     query[parameter] = default
                     

@@ -429,5 +429,10 @@ if __name__ == "__main__":
 
     try:
         Server(HandlerClass = FlagServerHandler)
+        
+    except Exception,e:
+        pyflaglog.log(pyflaglog.ERROR, "Error %s" % e)
+        
     finally:
         pyflaglog.log(0,"Terminating Logger")
+        sys.exit(0)

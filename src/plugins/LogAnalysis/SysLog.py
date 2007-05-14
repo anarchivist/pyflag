@@ -1,4 +1,23 @@
-""" This module implements a Comma Seperated Log driver for PyFlag """
+""" This module is used for loading generic syslog messages
+
+We really have little logic here- we just split the message line to a
+time stamp, a syslog source and a message text. This means we probably
+cant use any indexes for searching the message text so its going to be
+slow.
+
+Note that the exact format of a syslog message is specified in:
+http://www.faqs.org/rfcs/rfc3164.html
+
+And in particular:
+
+The TIMESTAMP field is the local time and is in the format of "Mmm dd
+hh:mm:ss" (without the quote marks) where:
+
+Mmm is the English language abbreviation for the month of the
+year with the first character in uppercase and the other two
+characters in lowercase.
+
+"""
 # Michael Cohen <scudette@users.sourceforge.net>
 # David Collett <daveco@users.sourceforge.net>
 #
@@ -21,29 +40,19 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 import time, re
-import plugins.LogAnalysis.Simple as Simple
+import pyflag.LogFile as LogFile
 import pyflag.DB as DB
-import LogFile
 import FlagFramework
 from pyflag.TableObj import TimestampType, IntegerType, StringType, IPType
+import pyflag.conf
+config = pyflag.conf.ConfObject()
 
-class Syslog(Simple.SimpleLog):
+class Syslog(LogFile.Log):
     """ Log parser designed to handle simple syslog files
     """
     name = "Syslog"
-   
-    def __init__(self, case=None):
-        Simple.SimpleLog.__init__(self, case)
-        self.separators = []
-        self.types = []
-        self.trans = []
-        self.fields = []
-        self.prefilters = []
-        self.delimiter = " "
-        self.format = ''
-        self.split_req = ''
-        self.num_fields = 1
- 
+    yearOfSyslog= 1970
+    
     def form(self, query, result):
     
         def test(query, result):
@@ -68,10 +77,10 @@ class Syslog(Simple.SimpleLog):
             )
 
     def parse(self, query, datafile='datafile'):
+        LogFile.Log.parse(self, query,datafile)
 
         self.fields = []
-        self.num_fields = 3
-        self.delimiter = " "  
+        self.delimiter = re.compile("\s+")
 
         self.fields.append(TimestampType('TimeStamp', 'TimeStamp'))
         self.fields.append(StringType('Hostname', 'Hostname'))
@@ -79,26 +88,29 @@ class Syslog(Simple.SimpleLog):
         self.fields.append(StringType('Message', 'Message'))
 
         self.datafile = query.getarray(datafile)
-        # set these params, then we can just use SimpleLog's get_fields
-    
-        if query.has_key("year_of_syslog"): self.yearOfSyslog=query['year_of_syslog']
-        else: self.yearOfSyslog="1970"
+
+        try:
+            self.yearOfSyslog=int(query['year_of_syslog'])
+        except: pass
 
     def get_fields(self):
-        checkTime = re.compile("\d{0,2} \d{0,2} \d{0,2}:\d{0,2}:\d{0,2}$")
         for row in self.read_record():
-            row = self.prefilter_record(row)
-            
-            ## Sanity check time with a regex so we can handle dodgy files
-            firstfourCols=row.split(" ",4)
-            timeString = ' '.join(firstfourCols[:3])
+            fields = re.split("\s+", row, 5)
 
-            if not checkTime.search(timeString): continue
+            if len(fields)<5:
+                pyflaglog.log(pyflaglog.DEBUG, "row does not have enough elements?")
+                continue
 
-            ## Time is either 1970 or user specified
-            timeString = self.yearOfSyslog + timeString
-            timeStamp = time.strftime("%Y%m%d%H%M%S", 
-                        time.strptime(timeString, "%Y %b %d %H:%M:%S"))           
+            ## Try to parse the time:
+            try:
+                timestamp_str = " ".join(fields[:2])
+                time = list(time.strptime(timestamp_str, "%b %d %H:%M:%S"))
+            except ValueError:
+                pyflaglog.log(pyflaglog.DEBUG, "Unable to parse %s as a time" % timestamp_str)
+                continue
+
+            ## Set the year of this timestamp
+            time[0] = self.yearOfSyslog
             
             if len(row.split(" ", 5)) > 4: host=row.split(" ",5)[3]
             else: continue
@@ -116,3 +128,39 @@ class Syslog(Simple.SimpleLog):
                 message=" ".join(row.split(" ")[5:])                
 
             yield [timeStamp, host, service, message]
+
+import time
+import pyflag.pyflagsh as pyflagsh
+from pyflag.FlagFramework import query_type
+
+class SyslogTest(LogFile.LogDriverTester):
+    """ Syslog Log file processing """
+    test_case = "PyFlagTestCase"
+    test_table = "TestTable"
+    test_file = "%s/messages.gz" % config.UPLOADDIR
+    log_preset = "IPTablesTest"
+
+    def test01CreatePreset(self):
+        """ Test that Syslog Presets can be created """
+        dbh = DB.DBO(self.test_case)
+        log = Syslog(case=self.test_case)
+        query = query_type(datafile = self.test_file, log_preset=self.log_preset)
+
+        log.parse(query)
+        log.store(self.log_preset)
+        
+    def test02LoadFile(self):
+        """ Test that Syslog Log files can be loaded """
+        dbh = DB.DBO(self.test_case)
+        log = LogFile.load_preset(self.test_case, self.log_preset, [self.test_file])
+        t = time.time()
+        ## Load the data:
+        for a in log.load(self.test_table):
+            pass
+
+        print "Took %s seconds to load log" % (time.time()-t)
+            
+        ## Check that all rows were uploaded:
+        dbh.execute("select count(*) as c from %s_log", self.test_table)
+        row = dbh.fetch()
+        self.assertEqual(row['c'], 2433)

@@ -419,7 +419,7 @@ class ColumnType:
         return method(column, operator, arg)
 
     def literal(self, column,operator, arg):
-        return "%s %s %r" % (self.column, operator, arg)
+        return "`%s` %s %r" % (self.column, operator, arg)
     
     def display(self, value, row, result):
         """ This method is called by the table widget to allow us to
@@ -501,7 +501,7 @@ class StateType(ColumnType):
     def operator_is(self, column, operator, state):
         for k,v in self.states.items():
             if state.lower()==k:
-                return "%s = %r" % (self.column, v)
+                return "`%s` = %r" % (self.column, v)
 
         raise RuntimeError("Dont understand state %r. Valid states are %s" % (state,self.states.keys()))
 
@@ -563,8 +563,7 @@ class EditableStringType(ColumnType):
         return result
 
 class StringType(ColumnType):
-
-    Symbols = {
+    symbols = {
         "=":"literal",
         "!=":"literal",
         }
@@ -578,11 +577,11 @@ class StringType(ColumnType):
 
     def operator_matches(self, column, operator, arg):
         """ This matches the pattern to the column. Wild cards (%) can be placed anywhere, but if you place it in front of the pattern it could be slower. """
-        return '%s like %r' % (self.column, arg)
+        return '`%s` like %r' % (self.column, arg)
 
     def operator_regex(self,column,operator,arg):
         """ This applies the regular expression to the column (Can be slow for large tables) """
-        return '%s rlike %r' % (self.column, arg)
+        return '`%s` rlike %r' % (self.column, arg)
 
 
 class TimestampType(IntegerType):
@@ -595,12 +594,12 @@ class TimestampType(IntegerType):
     def operator_after(self, column, operator, arg):
         """ Matches times after the specified time. The time arguement must be given in the format 'YYYY-MM-DD HH:MM:SS' (i.e. Year, Month, Day, Hour, Minute, Second). """
         ## FIXME Should parse arg as a date - for now pass though to mysql
-        return "%s > %r" % (self.column, arg)
+        return "`%s` > %r" % (self.column, arg)
 
     def operator_before(self,column, operator, arg):
         """ Matches times before the specified time. The time arguement must be as described for 'after'."""
         ## FIXME Should parse arg as a date
-        return "%s < %r" % (self.column, arg)
+        return "`%s` < %r" % (self.column, arg)
 
     def display(self, value, row, result):
         original_query = result.defaults
@@ -707,7 +706,7 @@ class IPType(ColumnType):
         }
 
     def literal(self, column, operator, address):
-        return "%s %s INET_ATON(%r)" % (self.column, operator, address)
+        return "`%s` %s INET_ATON(%r)" % (self.column, operator, address)
 
     def extended_csv(self, value):
         if self.callback: return ["-", "-", "-"]
@@ -988,7 +987,7 @@ class InodeType(StringType):
 
     def operator_annotated(self, column, operator, pattern):
         """ This operator selects those inodes with pattern matching their annotation """
-        return '%s=(select annotate.inode from annotate where note like "%%%s%%")' % (self.column, pattern)
+        return '`%s`=(select annotate.inode from annotate where note like "%%%s%%")' % (self.column, pattern)
 
 ## This is an example of using the table object to manage a DB table
 import TableActions

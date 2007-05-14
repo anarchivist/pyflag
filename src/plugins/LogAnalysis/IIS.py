@@ -1,4 +1,8 @@
-""" This module implements a Log driver for IIS logs """
+""" This module implements a Log driver for IIS logs
+
+FIXME: This can be rewritten much simpler to use the SimpleLog parser
+but just set the right tables etc in the form() method.
+"""
 # Michael Cohen <scudette@users.sourceforge.net>
 # David Collett <daveco@users.sourceforge.net>
 #
@@ -67,14 +71,15 @@ class IISLog(Simple.SimpleLog):
         return fields
 
     def parse(self, query, datafile='datafile'):
-        Simple.SimpleLog.parse(self, query, datafile)
-        
+        LogFile.Log.parse(self,query, datafile)
+
         self.datafile = query.getarray(datafile)
         # set these params, then we can just use SimpleLog's get_fields
         self.delimiter = ' '
         self.prefilters = ['PFDateFormatChange2']
 
         if self.datafile:
+            query.clear('fields')
             for f in self.find_fields_line():
                 query['fields'] = f
 

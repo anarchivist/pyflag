@@ -158,13 +158,8 @@ class Log:
 
         @returns: A generator that generates arrays of cells
         """
-        for row in self.read_record():
-            row = self.prefilter_record(row)
-            splitUpRow = self.delimiter.split(row)
-            ## Make sure the last item is stripped
-            splitUpRow[-1] = splitUpRow[-1].strip()
-            yield splitUpRow
-
+        return self.read_record()
+    
     def load(self,name, rows = None, deleteExisting=None):
         """ Loads the specified number of rows into the database.
 
@@ -213,7 +208,10 @@ class Log:
 
             if isinstance(fields, list):
                 args = dict()
-                for i in range(len(self.fields)):
+                ## Iterate on the shortest of fields (The fields array
+                ## returned from parsing this line) and self.fields
+                ## (The total number of fields we expect)
+                for i in range(min(len(self.fields),len(fields))):
                     try:
                         key, value = self.fields[i].insert(fields[i])
                         args[key] = value
