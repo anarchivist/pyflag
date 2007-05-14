@@ -56,6 +56,7 @@ int Packet_Write(Packet self, StringIO output) {
 
 int Packet_Read(Packet self, StringIO input) {
   int result;
+  int start_offset = input->readptr;
 
   /** Store the position in the input stream before we start reading
       it 
@@ -63,6 +64,10 @@ int Packet_Read(Packet self, StringIO input) {
   self->start = input->readptr;
 
   result=unpack(self, self->format, input, self->struct_p);
+
+  // Record the length of this packet
+  self->length = input->readptr - start_offset;
+
   //  if(result==-1) DEBUG("Cant read packet %s\n",NAMEOF(self));
   return result;
 };

@@ -178,6 +178,8 @@ static int SizeString_unpack(void *context, StringIO input, char *output) {
   
   /** Allocate this much memory */
   string = talloc_size(context, i16);
+  if(!string) return -1;
+
   *(char **)(output + sizeof(uint16_t)) = string;
   
   /** Copy the string into the buffer */
@@ -215,6 +217,8 @@ static int SizeString32LE_unpack(void *context, StringIO input, char *output) {
   
   /** Allocate this much memory */
   string = talloc_size(context, i32);
+  if(!string) return -1;
+
   *(char **)(output + sizeof(uint32_t)) = string;
   
   /** Copy the string into the buffer */

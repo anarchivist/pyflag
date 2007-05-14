@@ -76,6 +76,10 @@ static int PyPCAP_init(PyPCAP *self, PyObject *args, PyObject *kwds) {
     goto fail;
   };
 
+  // Set our initial offset:
+  self->pcap_offset = self->buffer->readptr;
+
+  // Skip over the file header:
   CALL(self->buffer, skip, self->buffer->readptr);
 
   // Take over the fd
@@ -83,9 +87,6 @@ static int PyPCAP_init(PyPCAP *self, PyObject *args, PyObject *kwds) {
   Py_INCREF(fd);
 
   self->dissection_buffer = CONSTRUCT(StringIO, StringIO, Con, self->buffer);
-
-  // Set our initial offset:
-  self->pcap_offset = self->buffer->readptr;
 
   // Ok we are good.
   return 0;
@@ -136,10 +137,15 @@ static PyObject *PyPCAP_dissect(PyPCAP *self, PyObject *args, PyObject *kwds) {
 
   // Copy the data into the dissection_buffer:
   CALL(self->dissection_buffer, truncate, 0);
+
+  CALL(self->dissection_buffer, write,
+       &self->packet_header->header, 16);
+
   CALL(self->dissection_buffer, write, 
        self->packet_header->header.data, self->packet_header->header.len);
 
-  CALL(self->dissection_buffer, seek, 0,0);
+  CALL(self->dissection_buffer, seek, 16, 
+       SEEK_SET);
 
   // Attach a dissection object to the packet:
   root = CONSTRUCT(Root, Packet, super.Con, result->obj, NULL);

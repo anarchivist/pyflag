@@ -36,6 +36,27 @@ import reassembler
 from pyflag.TableObj import StringType, IntegerType, TimestampType, InodeType, IPType
 import pyflag.Reports as Reports
 
+class DataType(StringType):
+    def __init__(self, name=None, combined_fd=None):
+        StringType.__init__(self, name=name)
+        self.combined_fd = combined_fd
+        
+    def select(self):
+        return 'concat(con.cache_offset, ",", con.length)'
+
+    def display(self, value, row, result):
+        offset, length = value.split(",")
+        ui=result.__class__(result)
+        ## We read at most this many chars from the packet:
+        self.combined_fd.seek(int(offset))
+        data=self.combined_fd.read(min(int(length),50))
+        
+        if(len(data) ==50):
+            data += "  ...."
+            
+        ui.text(data, sanitise='full', font='typewriter')
+        return ui
+
 class StreamFile(File):
     """ A File like object to reassemble the stream from individual packets.
     
@@ -113,17 +134,10 @@ class StreamFile(File):
         ## Store the new stream in the cache:
         dbh = DB.DBO(self.case)
 
-        ## FIXME: This is a race we should probably lock the tables.
-        dbh.execute("select min(con_id) as min from `connection_details`")
-        row=dbh.fetch()
-        if row['min']:
-            self.con_id = row['min']-1
-        else:
-            self.con_id = -1
-
         ## This is a placeholder to reserve our con_id
-        dbh.execute("insert into `connection_details` set inode=%r,con_id=%r",
-                         (self.inode,self.con_id))
+        dbh.execute("insert into `connection_details` set inode=%r",
+                         (self.inode))
+        self.con_id = dbh.autoincrement()
 
         dbh2 = dbh.clone()
 
@@ -305,19 +319,6 @@ class StreamFile(File):
         """ Shows the packets which belong in this stream """
         combined_fd = self.get_combined_fd()
 
-        def show_data(value):
-            offset, length = value.split(",")
-            ui=result.__class__(result)
-            ## We read at most this many chars from the packet:
-            combined_fd.seek(int(offset))
-            data=combined_fd.read(min(int(length),50))
-
-            if(len(data) ==50):
-                data += "  ...."
-
-            ui.text(data, sanitise='full', font='typewriter')
-            return ui
-
         result.table(
             elements = [ IntegerType('Packet ID','packet_id',
                                     link = query_type(family="Network Forensics",
@@ -327,8 +328,8 @@ class StreamFile(File):
                                                       __target__='id')),
                          TimestampType('Date','pcap.ts_sec'),
                          IntegerType('Length','con.length'),
-                         StringType('Data',sql='concat(con.cache_offset, ",", con.length)',
-                                    callback = show_data) ],
+                         DataType('Data', combined_fd = combined_fd)
+                         ],
             
             table= '`connection` as con , pcap',
             where = 'con_id="%s" and packet_id=id ' % combined_fd.con_id,

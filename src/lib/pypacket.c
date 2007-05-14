@@ -205,8 +205,34 @@ static PyObject *PyPacket_get_name(PyPacket *self, PyObject *args) {
   return PyString_FromString(NAMEOF(self->obj));
 }
 
+/** Returns the range (start, length) for the given element */
 static PyObject *PyPacket_get_range(PyPacket *self, PyObject *args) {
-  Py_RETURN_NONE;
+  char *element=NULL;
+  int start, length;
+
+  if(!PyArg_ParseTuple(args, "|s", &element))
+    return NULL;
+
+  // If no element supplied we assume we need to get the range for
+  // ourselves
+  if(!element) {
+    start = self->obj->start;
+    length = self->obj->length;
+  } else {
+    struct struct_property_t *p = get_field_by_name(self->obj, element);
+
+    if(!p)
+      return PyErr_Format(PyExc_AttributeError, "No element named %s", element);
+    
+    if(!p->size) {
+      length = *(int *)((char *)(self->obj->struct_p) + p->size_p);
+    } else 
+      length = p->size;
+
+    start = self->obj->start + p->item;
+  };
+  
+  return Py_BuildValue("ii", start, length);
 }
 
 static PyObject *PyPacket_serialise(PyPacket *self, PyObject *args) {

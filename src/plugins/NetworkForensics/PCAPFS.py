@@ -42,24 +42,10 @@ import reassembler
 from NetworkScanner import *
 import pypcap
 import cStringIO
-from pyflag.TableObj import StringType, IntegerType, TimestampType, InodeType
+from pyflag.TableObj import StringType, IntegerType, TimestampType, InodeType, CounterType
 
 
 description = "Network Forensics"
-
-def draw_only_PCAPFS(query,result):
-    """ Draws a selector with only PCAPFS filesystems """
-    dbh = DB.DBO(query['case'])
-    dbh2 = DB.DBO(query['case'])
-    images = []
-    ## Get a list of filesystems which are of type PCAPFS:
-    dbh.execute("select value from meta where property='fsimage'")
-    for row in dbh:
-        t=dbh2.get_meta("fstype")
-        if t.startswith("PCAP"):
-            images.append(row['value'])
-
-    result.const_selector("Select filesystem",'fsimage',images,images)
 
 class NetworkingInit(FlagFramework.EventHandler):
     """ Create all the tables related to basic network forensics """
@@ -139,9 +125,6 @@ class PCAPFS(DBFS):
     order = 10
 
     def load(self, mount_point, iosource_name,scanners = None):
-        pass
-
-    def load_old(self, mount_point, iosource_name,scanners = None):
         DBFS.load(self, mount_point, iosource_name)
         
         ## Open the file descriptor
@@ -310,6 +293,11 @@ class PCAPFS(DBFS):
         pcap_dbh.check_index("connection_details",'dest_ip')
         pcap_dbh.check_index("connection_details",'dest_port')
         pcap_dbh.check_index('connection_details','inode')
+
+        ## Make sure that no NULL inodes remain (This might be slow?)
+        pcap_dbh.delete("connection_details",
+                        where = "inode is null")
+
         
 class PCAPFile(File):
     """ A file like object to read packets from a pcap file.
@@ -391,41 +379,37 @@ class ViewDissectedPacket(Reports.report):
         row=dbh.fetch()
         
         io = IO.open(query['case'], row['iosource'])
-        io.seek(row['offset'])
-        packet = PCAP.Packet(io.read(row['length'])).payload()
+        packet = pypcap.PyPCAP(io)
+        packet.seek(row['offset'])
+        dissected_packet = packet.dissect()
+        
         id = int(query['id'])
         
-        link_type = row['link_type']
-
-        ## Now dissect it.
-        proto_tree = dissect.dissector(packet,link_type, id)
-
         def get_node(branch):
-            node = proto_tree
-            previous_node = node
-            for field in branch:
-                field=field.replace('/','')
-                try:
-                    tmp = node
-                    node = node[field]
-                    previous_node = tmp
-                except:
-                    break
+            """ Locate the node specified by the branch.
 
-            return previous_node,node
+            branch is a list of attribute names.
+            """
+            result = dissected_packet
+            for b in branch:
+                result = getattr(result, b)
+
+            return result
         
         def tree_cb(path):
             branch = FlagFramework.splitpath(path)
             
-            previous_node, node = get_node(branch)
+            node = get_node(branch)
             try:
-                for field in node.list_fields():
+                for field in node.list():
                     if field.startswith("_"): continue
-                    
-                    if node.is_node(field):
-                        yield  ( field, node[field].name, 'branch')
-                    else:
+
+                    child = getattr(node, field)
+                    try:
+                        yield  ( field, child.get_name(), 'branch')
+                    except AttributeError:
                         yield  ( field, field, 'leaf')
+
             except AttributeError:
                 pass
             
@@ -434,36 +418,25 @@ class ViewDissectedPacket(Reports.report):
         def pane_cb(path,result):
             branch = FlagFramework.splitpath(path)
             
-            previous_node, node = get_node(branch)
+            node = get_node(branch)
 
             result.heading("Packet %s" % id)
-
-            h=FlagFramework.HexDump(packet,result)
+            data = dissected_packet.serialise()
             
+            h=FlagFramework.HexDump(data, result)
             try:
-                result.text("%s" % node.name, font='bold')
+                result.text("%s" % node.get_name(), font='bold')
                 result.text('',style='black', font='normal')
                 start,length = node.get_range()
-                h.dump(highlight=[[start,length,'highlight'],])
                 
             except AttributeError:
-                result.text("%s.%s\n" % (previous_node.name,
-                                          branch[-1]), style='black',
-                            font='bold'
-                               )
-                try:
-                    node = node[:10000]
-                except:
-                    pass
-                
                 result.text("%s\n" % node, style='red', wrap='full', font='typewriter', sanitise='full')
                 result.text('',style='black', font='normal')
+                node = get_node(branch[:-1])
+                start,length = node.get_range(branch[-1])
 
-                try:
-                    start,length = previous_node.get_range(branch[-1])
-                    h.dump(highlight=[[start,length,'highlight'],])
-                except KeyError:
-                    pass
+            print start,length
+            h.dump(highlight=[[start,length,'highlight'],])
 
             return
 
@@ -516,7 +489,7 @@ class NetworkingSummary(Reports.report):
             #select distinct url from http group by url
             #select distinct count(inode) from http group by url
             output.table(
-                elements = [ IntegerType('Number of HTTP Get Requests', 'count(inode)') ],
+                elements = [ CounterType('Number of HTTP Get Requests') ],
                 table='http',
                 case=query['case']
                 )
@@ -524,7 +497,7 @@ class NetworkingSummary(Reports.report):
 
         def irc(query,output):
             output.table(
-                elements = [ IntegerType('Number of IRC Messages', 'count(inode)') ],
+                elements = [ CounterType('Number of IRC Messages') ],
                 table='irc_messages',
                 case=query['case']
                 )
@@ -532,7 +505,7 @@ class NetworkingSummary(Reports.report):
 
         def msn(query,output):
             output.table(
-                elements = [ IntegerType('Number of MSN Messages', sql='count(inode)') ],
+                elements = [ CounterType('Number of MSN Messages') ],
                 table='msn_session',
                 case=query['case']
                 )
@@ -540,7 +513,7 @@ class NetworkingSummary(Reports.report):
 
         def email(query,output):
             output.table(
-                elements = [ IntegerType('Number of Emails Messages', 'count(inode)') ],
+                elements = [ CounterType('Number of Emails Messages') ],
                 table='email',
                 case=query['case']
                 )

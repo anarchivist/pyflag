@@ -30,7 +30,8 @@ import sys,re,string
 import HTMLParser
 import StringIO
 import re,os.path,cgi, textwrap
-from FlagFramework import query_type,normpath
+from FlagFramework import query_type,normpath, Magic
+import pyflag.FileSystem as FileSystem
 
 class ViewFile(Reports.report):
     """
@@ -52,6 +53,7 @@ class ViewFile(Reports.report):
     name = "View File"
     family = "Network Forensics"
     parameters = {'inode':'any'}
+    hidden = True
 
     def form(self,query,result):
         result.case_selector()
@@ -61,18 +63,21 @@ class ViewFile(Reports.report):
         result.decoration = 'naked'
 
         dbh = DB.DBO(query['case'])
+        fsfd = FileSystem.DBFS( query["case"])
+        fd = fsfd.open(inode=query['inode'])
+        
         try:
             dbh.execute("select mime from type where inode=%r",query['inode'])
             row = dbh.fetch()
             content_type = row['mime']
         except (DB.DBError,TypeError):
-            content_type = 'application/octet-stream'
+            ## We could not find it in the mime table - lets do magic
+            ## ourselves:
+            m = Magic(mode = 'mime')
+            content_type = m.buffer(fd.read(1024))
+            fd.seek(0)
 
-        fsfd = FileSystem.DBFS( query["case"])
-        
-        fd = fsfd.open(inode=query['inode'])
-
-        ## Now establish the content type
+        ## Now establish the dispatcher for it
         for k,v in self.dispatcher.items():
             if k.search(content_type):
                 return v(self,fd, result)

@@ -109,8 +109,8 @@ class TableObj:
         return dbh.fetch()
 
     def select(self, **kwargs):
-        condition = [ "`%s`=%r" % (k,v) for k,v in kwargs.items() if not k.startswith('_') ]
-        condition += [ "`%s`=%s" % (k[1:],v) for k,v in kwargs.items() if k.startswith('_') ]
+        condition = [ "`%s`=%r" % (k,v.__str__()) for k,v in kwargs.items() if not k.startswith('_') ]
+        condition += [ "%s=%s" % (k[1:],v) for k,v in kwargs.items() if k.startswith('_') ]
         sql = " and ".join(condition)
         
         dbh =DB.DBO(self.case)
@@ -669,7 +669,7 @@ class TimestampType(IntegerType):
         ## You can only add to timeline if you are dealing with a case
         if original_query.has_key('case'):
             tmp1.popup(add_to_timeline_cb, "Add to Timeline", 
-                       icon="treenode_expand_plus.gif")
+                       icon="stock_timer.png")
             result.row(tmp1, value)
         else:
             result.row(value)
@@ -1200,6 +1200,10 @@ class BinaryType(StateType):
         else:
             return " "
 
+class CounterType(IntegerType):
+    """ This is used to count the total numbers of things (in a group by) """
+    def select(self):
+        return "count(*)"
 
 ## Unit tests for the column types.
 import unittest,re

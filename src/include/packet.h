@@ -131,6 +131,9 @@ CLASS(Packet,Object)
      */
      int start;
 
+     // This is a running tally of all fields read
+     int length;
+
      /** This is the list of all properties in string form so they can
 	 be introspected
       */
