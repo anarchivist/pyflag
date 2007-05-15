@@ -5,7 +5,6 @@ my_data			=	$(shell find data -not -name .\*)
 my_utilities		=	$(shell find utilities -not -name .\*)
 my_examples		=	$(shell find examples -not -name .\*)
 bin_SCRIPTS		=	pyflag pyflash pyflag_launch src/pyflag/conf.py
-sysconf_DATA		=	pyflagrc
 pkgdata_DATA		=	$(my_data) \
 				data/magic.mgc data/magic.mime.mgc
 nobase_pkgdata_DATA	=	$(my_images) $(my_utilities) $(my_examples)
@@ -58,3 +57,17 @@ data/magic.mgc: data/magic
 
 data/magic.mime.mgc: data/magic.mime
 	cd data && file -C -m magic.mime
+
+# This will not be installed automatically - it will be installed
+# using the install-data-hook below only if it does not already exist.
+# sysconf_DATA		=	pyflagrc
+
+DEFAULT_CONFIG_FILE = $(sysconfdir)/pyflagrc
+
+install-data-hook: 
+	@if test -f $(DESTDIR)$(DEFAULT_CONFIG_FILE) ; then \
+		echo "$@ will not overwrite existing $(DESTDIR)$(DEFAULT_CONFIG_FILE)" ; \
+	else \
+		echo "$(INSTALL_DATA) pyflagrc $(DESTDIR)$(DEFAULT_CONFIG_FILE)"; \
+		$(INSTALL_DATA) pyflagrc $(DESTDIR)$(DEFAULT_CONFIG_FILE); \
+	fi

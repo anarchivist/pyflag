@@ -595,9 +595,14 @@ class StringType(ColumnType):
 
 
 class TimestampType(IntegerType):
-    def __init__(self, *args, **kwargs):
-        IntegerType.__init__(self, *args, **kwargs)
-        
+    """ This is a timestamp parser.
+
+    We can accept a format string to use to parse the timestamp from the log file.
+    """
+    def __init__(self, name=None, column=None, format="%d/%b/%Y %H:%M:%S"):
+        IntegerType.__init__(self, name, column)
+        self.format = format
+
     def create(self):
         return "`%s` TIMESTAMP" % self.column
     

@@ -46,6 +46,7 @@ import FlagFramework
 from pyflag.TableObj import TimestampType, IntegerType, StringType, IPType
 import pyflag.conf
 config = pyflag.conf.ConfObject()
+import pyflag.pyflaglog as pyflaglog
 
 class Syslog(LogFile.Log):
     """ Log parser designed to handle simple syslog files
@@ -104,30 +105,15 @@ class Syslog(LogFile.Log):
             ## Try to parse the time:
             try:
                 timestamp_str = " ".join(fields[:2])
-                time = list(time.strptime(timestamp_str, "%b %d %H:%M:%S"))
+                t = list(time.strptime(timestamp_str, "%b %d %H:%M:%S"))
             except ValueError:
                 pyflaglog.log(pyflaglog.DEBUG, "Unable to parse %s as a time" % timestamp_str)
                 continue
 
             ## Set the year of this timestamp
-            time[0] = self.yearOfSyslog
-            
-            if len(row.split(" ", 5)) > 4: host=row.split(" ",5)[3]
-            else: continue
+            t[0] = self.yearOfSyslog
 
-            ## A few special cases    
-            if row.split(" ")[4:7] == ["--", "MARK", "--\n"]:
-                service = "N/A"
-                message = " -- MARK -- "
-            else:
-                service=row.split(" ",5)[4]
-            
-                # Tidy up kernel messages
-                if service.endswith(":"): service=service[:-1]
-
-                message=" ".join(row.split(" ")[5:])                
-
-            yield [timeStamp, host, service, message]
+            yield [t, fields[3], fields[4], fields[5]]
 
 import time
 import pyflag.pyflagsh as pyflagsh

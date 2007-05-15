@@ -250,7 +250,7 @@ function popup(query, callback, width, height) {
       //window refreshes to its parent we know it wasnt actually
       //submitted.
       if(e.type!='submit' && e.name.length>0 ) {
-	query+=e.name + '=' + encodeURIComponent(decodeURIComponent(e.value))+'&';
+	query+=e.name + '=' + encodeURIComponent(e.value)+'&';
 	// encodeURI needed to handle cr's properly, not sure if this will break 
 	// something else? The below is all we use to do but then newlines didn't 
 	// work.

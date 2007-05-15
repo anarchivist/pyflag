@@ -222,6 +222,7 @@ class Log:
         for fields in self.get_fields():
             count += 1
 
+            args = None
             if isinstance(fields, list):
                 args = dict()
                 ## Iterate on the shortest of fields (The fields array

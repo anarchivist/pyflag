@@ -259,7 +259,7 @@ class ScanFS(Reports.report):
         try:
             result.case_selector()
             if query['case']!=config.FLAGDB:
-               result.textfield('Scan files','path',size=50)
+               result.textfield('Scan files (glob or path)','path',size=50)
 
                ## Draw the form for each scan group:
                for cls in ScannerUtils.scan_groups_gen():

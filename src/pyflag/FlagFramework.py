@@ -247,6 +247,9 @@ class query_type:
             
         return False
 
+    def items(self):
+        return self.q.__iter__()
+
     def __setitem__(self,i,x):
         ## case may only be specified once:
         if i=='case' and self.has_key('case'):
@@ -337,6 +340,23 @@ def urlencode(string):
             result += c
 
     return result
+
+def show_help(query, result, cls=None):
+    """ This is a popup callback which displays the doc string of a
+    class nicely formatted.
+    """
+    result.decoration='naked'
+
+    ## Try to use rst2html to produce nice looking html:
+    try:
+        import docutils.core
+
+        result.result += docutils.core.publish_string(textwrap.dedent(cls.__doc__),
+                                                      writer_name='html')
+    except Exception,e:
+        pyflaglog.log(pyflaglog.ERROR,"Error running docutils: %s" % e)
+        result.heading("Help for %s" % cls.__name__)
+        result.text(textwrap.dedent(cls.__doc__), font='typewriter')
 
 class Flag:
     """ Main Flag object.
@@ -468,21 +488,6 @@ class Flag:
 
         ## We must make copies here to allow the report to be destroyed!!!
         report_name = report.name
-        report_doc  = report.__doc__
-        def show_help(query,result):
-            result.decoration='naked'
-
-            ## Try to use rst2html to produce nice looking html:
-            try:
-                import docutils.core
-
-                result.result += docutils.core.publish_string(textwrap.dedent(report_doc),
-                                                              writer_name='html')
-            except Exception,e:
-                pyflaglog.log(pyflaglog.ERROR,"Error running docutils: %s" % e)
-                result.heading("Help for %s" % report_name)
-                result.text(textwrap.dedent(report_doc), font='typewriter')
-            
         import pyflag.TypeCheck as TypeCheck
 
         # First check authentication, do this always
@@ -494,7 +499,8 @@ class Flag:
             if report.check_parameters(query):
                 canonical_query = canonicalise(query)
                 #Parameters ok, lets go
-                result.toolbar(show_help,text="Help on %s" % report.name,icon="help.png")
+#                result.toolbar(cb = my_show_help,
+#                               text="Help on %s" % report.name,icon="help.png")
 
                 #Check to see if the user wants to reset this report?
                 if query.has_key('reset'):
@@ -538,7 +544,8 @@ class Flag:
             else:
                 #Set the default form behaviour
                 result.defaults = query
-                result.toolbar(show_help,text="Help on %s" % report.name,
+                result.toolbar(Curry(show_help,cls=report),
+                               text="Help on %s" % report.name,
                                icon="help.png")
                 result.heading(report.name)
                 try:

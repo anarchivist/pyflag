@@ -37,6 +37,7 @@ from pyflag.TableObj import StringType, IntegerType, TimestampType, InodeType, I
 import pyflag.Reports as Reports
 
 class DataType(StringType):
+    hidden = True
     def __init__(self, name=None, combined_fd=None):
         StringType.__init__(self, name=name)
         self.combined_fd = combined_fd
