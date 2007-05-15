@@ -305,9 +305,11 @@ function submit_form(pane, current_cb, name, value) {
 	 e.name=='callback_stored' && e.value==current_cb)
 	continue;
 
-      if(e.name.length>0 ) {
-		query+=e.name + '=' + encodeURIComponent(decodeURIComponent(e.value))+'&';
-	    //We use to just do the below but newlines were not handled correctly
+      if(e.type=='hidden') {
+	query += e.name + '=' + e.value + '&';
+      }else if(e.name.length>0 ) {
+	query+=e.name + '=' + encodeURIComponent(decodeURIComponent(e.value))+'&';
+	//We use to just do the below but newlines were not handled correctly
         //query+=e.name + '=' + e.value+'&';
       };
     };

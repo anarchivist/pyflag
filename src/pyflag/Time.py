@@ -38,8 +38,10 @@ def strptime(data_string, format="%a %b %d %H:%M:%S %Y"):
 
     if len(data_string) < found.end():
         raise ValueError("Not enough data to convert")
-    
-    year = 1900
+
+    ## The default year if not specified. Python uses 1900 but MySQL
+    ## doesnt like it, this makes more sense.
+    year = 2007
     month = day = 1
     hour = minute = second = 0
     tz = -1

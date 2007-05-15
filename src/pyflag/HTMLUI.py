@@ -624,7 +624,7 @@ class HTMLUI(UI.GenericUI):
         
     def iframe(self, target, callback):
         self.result += """<iframe id='%s' name='%s' class=TreeFrame></iframe>
-        <script>AdjustHeightToPageSize('%s');document.getElementById('%s').src='/f?callback_stored=%s&__pyflag_parent=' + window.__pyflag_parent + '&__pyflag_name=' + window.__pyflag_name;</script>
+        <script>AdjustHeightToPageSize('%s');document.getElementById('%s').src='/iframe?callback_stored=%s&__pyflag_parent=' + window.__pyflag_parent + '&__pyflag_name=' + window.__pyflag_name;</script>
         """ % (target,target,target,target,callback)
         
     def new_toolbar(self):
@@ -1514,6 +1514,9 @@ class HTMLUI(UI.GenericUI):
         The callback should draw on the result using the parameters in query.
         The return value of cb is boolean, true indicating that this page is ok, and we should continue to the next page, while false indicates an error condition, and the page is redisplayed. Note that it is the callbacks responsibility to indicate what has gone wrong to the user.
         """
+        pyflag_name = self.defaults['__pyflag_name']
+        pyflag_parent = self.defaults['__pyflag_parent']
+
         def wizard_cb(query,result):
             """ This callback is responsible for managing the wizard popup window """
             result.title="Pyflag Wizard %s" % title
@@ -1523,6 +1526,9 @@ class HTMLUI(UI.GenericUI):
                 page=0
 
             try:
+                query.set('__pyflag_name', pyflag_name)
+                query.set('__pyflag_parent', pyflag_parent)
+                
                 if query['__submit__']=='Next' or query['__submit__']=='Finish':
                     query.set(context,page+1)
                     result.refresh(0, query)

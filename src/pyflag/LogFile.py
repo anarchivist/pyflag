@@ -394,7 +394,7 @@ def end(query,result):
     result.refresh(0, query_type(log_preset=query['log_preset'],
                                  report="Load Preset Log File",
                                  family="Load Data"),
-                   pane='main')
+                   pane='parent')
 
 import unittest
 import pyflag.pyflagsh as pyflagsh

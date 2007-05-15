@@ -142,7 +142,7 @@ class AdvancedLog(LogFile.Log):
             result.ruler()
             result.heading("Select Column Type")
             result.const_selector('',"field_types%s" % (max_number+1),
-                                  self.columntypes, self.columntypes)
+                                  self.columntypes, self.columntypes , autosubmit=True)
 
         def test(query,result):
             self.parse(query)
