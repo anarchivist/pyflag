@@ -247,6 +247,7 @@ class Remote(Advanced):
 import os, unittest,iosubsys,time
 import pyflag.conf
 config=pyflag.conf.ConfObject()
+import pyflag.pyflagsh as pyflagsh
 
 class RemoteIOSourceTests(unittest.TestCase):
     """ Test the Remote IO source implementation """

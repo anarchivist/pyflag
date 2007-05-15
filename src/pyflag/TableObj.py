@@ -720,7 +720,7 @@ class TimestampType(IntegerType):
         tmp1 = result.__class__(result)
 
         ## You can only add to timeline if you are dealing with a case
-        if original_query.has_key('case'):
+        if original_query.has_key('case') and value:
             tmp1.popup(add_to_timeline_cb, "Add to Timeline", 
                        icon="stock_timer.png")
             result.row(tmp1, value)
@@ -1238,7 +1238,7 @@ class FilenameType(StringType):
                           __target__='open_tree',open_tree="%s")
         self.path = path
         self.filename = filename
-        ColumnType.__init__(self,name, None,
+        ColumnType.__init__(self,name=name, column=filename,
                             link=link)
 
     def select(self):
