@@ -63,7 +63,6 @@ class AdvancedLog(LogFile.Log):
                     pass
 
             ## Instantiate the field:
-            print tmp, column_class
             self.fields.append(column_class(**tmp))
 
         ## Call our base class
@@ -120,6 +119,26 @@ class AdvancedLog(LogFile.Log):
                 self.render_dialog(v, i, query, result)
                 
             result.end_table()
+
+            ## Do a small test:
+            try:
+                result.ruler()
+                result.heading("Sample lines from log file")
+                result.start_table()
+                self.parse(query)
+                count =0
+                for line in self.read_record():
+                    result.row(line)
+                    count +=1
+                    if count>3:
+                        break
+                result.end_table()
+                
+                self.display_test_log(result)
+            except Exception,e:
+                result.text("Error: %s" % e, style='red')
+                result.text(" ", style='normal')
+            
             result.ruler()
             result.heading("Select Column Type")
             result.const_selector('',"field_types%s" % (max_number+1),

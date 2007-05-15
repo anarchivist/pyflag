@@ -384,12 +384,16 @@ class ColumnType:
     ## when importing a log file.
     hidden = False
     
-    def __init__(self, name='',
-                 column='', link='',
+    def __init__(self, name=None,
+                 column=None, link='',
                  callback=None, link_pane='self',
                  regex = r"[^\s]+",
                  boundary = r'\s+',
                  ):
+        
+        if not name or not column:
+            raise RuntimeError("You must set both name and column")
+        
         self.name = name
         self.extended_names = [ name ]
         self.column = column
@@ -641,12 +645,11 @@ class TimestampType(IntegerType):
     We can accept a format string to use to parse the timestamp from the log file.
     """
     def __init__(self, name=None, column=None, format="%d/%b/%Y %H:%M:%S",
-                 override_year = None
+                 override_year = 0
                  ):
         IntegerType.__init__(self, name, column)
         self.format = format
-        if override_year:
-            self.override_year = int(override_year)
+        self.override_year = int(override_year)
 
     def create(self):
         return "`%s` TIMESTAMP" % self.column

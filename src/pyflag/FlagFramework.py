@@ -334,7 +334,7 @@ def urlencode(string):
     """
     result = ''
     for c in str(string):
-        if not c.isalnum():
+        if not c.isalnum() and c not in "/.":
             result +="%%%02X" % ord(c)
         else:
             result += c
