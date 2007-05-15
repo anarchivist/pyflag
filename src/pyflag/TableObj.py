@@ -960,14 +960,35 @@ class IPType(ColumnType):
         ## We try to show a whois if possible
         id = Whois.lookup_whois(value)
         tmp2 = result.__class__(result)
-        tmp2.link(Whois.identify_network(id) + "<br>" + Whois.geoip_resolve(value),
-                  target=query_type(family="Log Analysis", 
-                  report="LookupIP", address=value),
-                  pane='popup')
-        result.row(tmp2)
+
+        
+        linkString = []
+        if config.WHOIS_DISPLAY:
+            linkString.append(Whois.identify_network(id))
+        
+        try:
+            if config.GEOIP_DISPLAY:
+                linkString.append(Whois.geoip_resolve(value))
+        
+        except Exception, e:
+            pass
+
+        try:
+            if config.EXTENDED_GEOIP_DISPLAY:
+                linkString.append(Whois.geoip_resolve_extended(value))
+        except:
+            pass
+
+        if len(linkString) != 0:
+            tmp2.link("<BR>".join(linkString),
+                      target=query_type(family="Log Analysis", 
+                      report="LookupIP", address=value),
+                      pane='popup')
+            result.row(tmp2)
 
         if row:
-            tmp1.popup(edit_ips_of_interest_cb, row['notes'], icon="balloon.png")
+            tmp1.popup(edit_ips_of_interest_cb, 
+                       row['notes'], icon="balloon.png")
             tmp1.text("  ", value, font="bold")
             result.row(tmp1, **{'class': 'match'})
         elif interestingIPs:

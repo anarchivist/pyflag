@@ -136,7 +136,13 @@ def strptime(data_string, format="%a %b %d %H:%M:%S %Y"):
     # If we know the week of the year and what day of that week, we can figure
     # out the Julian day of the year.
     if julian == -1 and week_of_year != -1 and weekday != -1:
-        week_starts_Mon = True if week_of_year_start == 0 else False
+        if week_of_year_start == 0:
+            week_starts_Mon = True
+        else:
+            week_starts_Mon = False
+        
+        #week_starts_Mon = True if week_of_year_start == 0 else False
+
         julian = _calc_julian_from_U_or_W(year, week_of_year, weekday,
                                             week_starts_Mon)
     # Cannot pre-calculate datetime_date() since can change in Julian

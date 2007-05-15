@@ -293,7 +293,9 @@ if config.delete:
   `id` int not NULL,
   `ip` int not NULL,
   `geoip_country` unsigned int NOT NULL,
-  `geoip_city` unsigned int NOT NULL
+  `geoip_city` unsigned int NOT NULL,
+  `geoip_isp` unsigned int NOT NULL,
+  `geoip_org` unsigned int NOT NULL
   ) engine=MyISAM""")
 
   # add default (fallthrough) route and reserved ranges
