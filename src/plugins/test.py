@@ -39,6 +39,7 @@ config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
 
 import os,os.path,sys
+active = False
 
 description = "Test Class"
 #Remove this line to ensure this appears in the menu

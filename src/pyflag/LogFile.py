@@ -212,9 +212,10 @@ class Log:
                    table_name = name)
 
         ## Create the table:
+        creation_strings = [ x.create() for x in fields]
         dbh.execute("create table if not exists %s (%s)", (
             tablename,
-            ',\n'.join([ x.create() for x in fields])
+            ',\n'.join([ x for x in creation_strings if x])
             ))
 
         ## Now insert into the table:

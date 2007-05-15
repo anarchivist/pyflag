@@ -39,7 +39,9 @@ config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
 import pyflag.TypeCheck as TypeCheck
 import pyflag.FileSystem as FileSystem
-import socket
+import socket,re
+import pyflag.Time as Time
+import time
 
 ## Some options for various ColumnTypes
 config.add_option("PRECACHE_IPMETADATA", default=True,
@@ -382,13 +384,21 @@ class ColumnType:
     ## when importing a log file.
     hidden = False
     
-    def __init__(self, name='', column='', link='', callback=None, link_pane='self'):
+    def __init__(self, name='',
+                 column='', link='',
+                 callback=None, link_pane='self',
+                 regex = r"[^\s]+",
+                 boundary = r'\s+',
+                 ):
         self.name = name
         self.extended_names = [ name ]
         self.column = column
         self.link = link
         self.callback = callback
         self.link_pane = link_pane
+        self.regex = re.compile(regex)
+        self.regex_str = regex
+        self.boundary = re.compile(boundary)
 
     ## These are the symbols which will be treated literally
     symbols = {
@@ -492,6 +502,37 @@ class ColumnType:
         """ Every column type is given the opportunity to decorate its
         table heading
         """
+
+    def log_parse(self, row):
+        """ This is called by the log processing to parse the value of
+        this column from the row.
+
+        We start parsing at the start of the row. FIXME: Might be
+        faster to get passed the offset where to start parsing, so we
+        dont need to keep slicing strings.
+
+        We need to return the tuple:
+
+        consumed, name, sql
+
+        Where consumed is the number of bytes consumed from the row.
+        name is the name of the column to insert as, sql is the SQL to
+        use for insertion - note that if name starts with _ we take
+        sql as raw otherwise we escape it.
+        """
+        ## Try to consume a boundary:
+        b = self.boundary.match(row)
+        if b:
+            row = row[b.end():]
+            offset = b.end()
+        else:
+            offset = 0
+
+        capture = self.regex.match(row)
+        if not capture: raise RuntimeError("Unable to match %s on row %r " %
+                                           (self.regex_str, row))
+
+        return (capture.end()+offset, self.column, capture.group(0))
 
 ### Some common basic ColumnTypes:
 class StateType(ColumnType):
@@ -599,9 +640,13 @@ class TimestampType(IntegerType):
 
     We can accept a format string to use to parse the timestamp from the log file.
     """
-    def __init__(self, name=None, column=None, format="%d/%b/%Y %H:%M:%S"):
+    def __init__(self, name=None, column=None, format="%d/%b/%Y %H:%M:%S",
+                 override_year = None
+                 ):
         IntegerType.__init__(self, name, column)
         self.format = format
+        if override_year:
+            self.override_year = int(override_year)
 
     def create(self):
         return "`%s` TIMESTAMP" % self.column
@@ -680,6 +725,17 @@ class TimestampType(IntegerType):
             result.row(value)
 
         return result
+
+    def log_parse(self, row):
+        t,m = Time.strptime(row, format = self.format)
+
+        if self.override_year:
+            t = list(t)
+            t[0] = self.override_year
+            
+        date = time.strftime("%Y-%m-%d %H:%M:%S", t)
+
+        return m.end(), self.column, date
 
 import plugins.LogAnalysis.Whois as Whois
 

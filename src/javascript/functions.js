@@ -249,7 +249,10 @@ function popup(query, callback, width, height) {
       //We must leave the submit button off, so that when the popup
       //window refreshes to its parent we know it wasnt actually
       //submitted.
-      if(e.type!='submit' && e.name.length>0 ) {
+      if(e.type=='hidden') {
+	// For some reason hidden parameters dont seem to be escaped properly
+	query += e.name + '=' + e.value + '&';
+      } else if(e.type!='submit' && e.name.length>0 ) {
 	query+=e.name + '=' + encodeURIComponent(e.value)+'&';
 	// encodeURI needed to handle cr's properly, not sure if this will break 
 	// something else? The below is all we use to do but then newlines didn't 
