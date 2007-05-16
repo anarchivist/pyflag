@@ -1287,6 +1287,9 @@ class BinaryType(StateType):
 
 class CounterType(IntegerType):
     """ This is used to count the total numbers of things (in a group by) """
+    def __init__(self, name=None):
+        IntegerType.__init__(self, name=name, column='count')
+        
     def select(self):
         return "count(*)"
 
