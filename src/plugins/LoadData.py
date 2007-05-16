@@ -180,6 +180,15 @@ class LoadIOSource(Reports.report):
         ## Try to instantiate the image:
         try:
             image = Registry.IMAGES.dispatch(query['subsys'])()
+            ## Correct the filenames to stem at the UPLOADDIR:
+            filenames = query.getarray('filename')
+            query.clear('filename')
+
+            ## Adjust all the filenames to be rooted at the UPLOADDIR:
+            for f in filenames:
+                query['filename'] = os.path.normpath(
+                    "%s/%s" % (config.UPLOADDIR, f))
+
             io = image.open(query['iosource'], query['case'], query)
         except Exception,e:
             result.heading("Error: Unable to create IO Source")

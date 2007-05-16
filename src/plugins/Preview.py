@@ -30,6 +30,7 @@ from pyflag.TableObj import IntegerType,TimestampType,InodeType,FilenameType, St
 from pyflag.TableObj import DeletedType, BinaryType
 import pyflag.DB as DB
 import time
+import pyflag.IO as IO
 
 class RegistryBrowser(Reports.report):
     """
@@ -49,7 +50,8 @@ class RegistryBrowser(Reports.report):
 
     def display(self, query, result):
         def tree_cb(path):
-            b = Buffer(fd = open(query['file'],'r'))
+            fd = IO.open_URL(query['file'])
+            b = Buffer(fd = fd)
             header = RegFile.RegF(b)
             key = header.get_key(path)
             for k in key.keys():
@@ -60,7 +62,8 @@ class RegistryBrowser(Reports.report):
                 yield (name,name,'branch')
 
         def pane_cb(path, result):
-            b = Buffer(fd = open(query['file'],'r'))
+            fd = IO.open_URL(query['file'])
+            b = Buffer(fd = fd)
             header = RegFile.RegF(b)
             key = header.get_key(path)
             result.text("Timestamp: %s" % key['WriteTS'], style='red')
@@ -69,7 +72,8 @@ class RegistryBrowser(Reports.report):
             ## We dont want to reference the keys because we
             ## will leak memeory while the callback remains stored.
             def details(query,result):
-                b = Buffer(fd = open(query['file'],'r'))
+                fd = IO.open_URL(query['file'])
+                b = Buffer(fd = fd)
                 header = RegFile.RegF(b)
                 key = header.get_key(path)
                 result.heading("Key %s" % path)

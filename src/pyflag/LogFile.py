@@ -127,7 +127,7 @@ class Log:
             
         finally:
             ## Drop the temporary preset and the table
-            drop_preset(temp_table)
+            drop_table(self.case, temp_table)
     
     def read_record(self, ignore_comment = True):
         """ Generates records.
