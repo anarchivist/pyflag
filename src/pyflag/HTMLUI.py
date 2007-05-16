@@ -824,14 +824,13 @@ class HTMLUI(UI.GenericUI):
                     filter_expression += "'%s'='%%s'" % e.name
                     new_query.set(filter,filter_expression)
                     new_query['__target__'] = filter
-
                     e.link = new_query
                     e.link_pane = 'parent'
                     elements = [ e,
                                  TableObj.CounterType(name='Count'),
                                  ]
                     break
-            
+                
         args = dict( elements = elements, filter_elements = filter_elements,
                      table = table, case=case, filter=query.get(filter,''),
                      groupby = groupby, _groupby=_groupby, order = order)
@@ -1422,7 +1421,9 @@ class HTMLUI(UI.GenericUI):
             callback = self.callback
         else: callback = 'None'
 
-        return "<input type=submit name=%s value='%s' onclick=\"submit_form(%r,%r,%r,%r); return false;\" %s>\n" % (name,value,target,callback,name,value,self.opt_to_str(opts))
+        if value:
+            return "<input type=submit name=%s value='%s' onclick=\"submit_form(%r,%r,%r,%r); return false;\" %s>\n" % (name,value,target,callback,name,value,self.opt_to_str(opts))
+        else: return ''
 
     def end_form(self,value='Submit',name='__submit__',**opts):
         base = ''
@@ -1572,17 +1573,19 @@ class HTMLUI(UI.GenericUI):
 
             return
 
-        cb = self.store_callback(wizard_cb)
-        id = self.get_unique_id()
-        self.iframe("Wizard%s" % id, cb)
+        wizard_cb(self.defaults, self)
+
+        ## Stop our own submit button from showing:
+        self.submit_string = None
+        
+#        cb = self.store_callback(wizard_cb)
+#        id = self.get_unique_id()
+
+        #self.iframe("Wizard%s" % id, cb)
         
         #self.popup(wizard_cb, "Click here to launch the wizard")
         return
     
-        cb = self.store_callback(wizard_cb)
-        self.result+="""<script language=javascript>var client; function open_wizard_window() {window.open('%s&%s=0&callback_stored=%s','client','toolbar=0,menubar=0,HEIGHT=600,WIDTH=800,scrollbars=yes')}; open_wizard_window(); </script><abbr title=\"If your browser blocks popups, click here to popup a wizard\"><a onclick=\"open_wizard_window()\">Click here to launch wizard</a></abbr>""" % (self.defaults,context,cb)
-        raise FlagFramework.DontDraw()
-                
     def notebook(self,names=[],context="notebook",callbacks=[],
                  descriptions=[], callback_args=[]):
         """ Draw a notebook like UI with tabs.

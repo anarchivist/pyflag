@@ -79,6 +79,59 @@ import pyflag.DB as DB
 ## This caches the io subsys
 IO_Cache = Store.Store()
 
+
+class FileHandler:
+    """ This is a base class for handling files.
+
+    PyFlag needs to access different kinds of files all the time. Its
+    convenient to have a single function which can be used to access
+    files regardless of the method. This is provided by implementors
+    of this class.
+
+    The open factory function below takes a URL to access the file in
+    the form:
+
+    method://name/path
+
+    where method is provided by the method property of this class, the
+    name and path are both given to the constructor.
+    """
+    method = "file"
+
+    def __init__(self, name, path):
+        self.name = name
+        self.path = path
+
+    def open(self):
+        """ This is called to return a file like handle to the
+        resource
+        """
+        return None
+
+url_re = re.compile("([^:]+)://([^/]*)(/.*)")
+
+def open_URL(url):
+    """ Uses the FileHandler methods to open the URL. """
+    match = url_re.match(url)
+    
+    ## By default we use the URL as a file handler if it doesnt look
+    ## like a proper URL
+    if not match:
+        method = 'file'
+        path = url
+        name = ''
+    else:
+        method = match.group(1)
+        name = match.group(2)
+        path = match.group(3)
+
+    try:
+        driver = Registry.FILE_HANDLERS.dispatch(method)
+    except ValueError:
+        raise RuntimeError("No handler for method %s" % method)
+    
+    return driver(name, path).open()
+
 def open(case, iosource):
     """ Opens the named iosource from the specified case """
     ## Try to get it from the cache first:

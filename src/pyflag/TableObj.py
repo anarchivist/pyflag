@@ -1231,15 +1231,18 @@ class InodeIDType(InodeType):
 
 class FilenameType(StringType):
     hidden = True
-    def __init__(self, name='Filename', filename='name', path='path', case=None):
-        link = query_type(case=case,
-                          family='Disk Forensics',
-                          report='Browse Filesystem',
-                          __target__='open_tree',open_tree="%s")
+    def __init__(self, name='Filename', filename='name', path='path',
+                 link=None, link_pane=None, case=None):
+        
+        if not link:
+            link = query_type(case=case,
+                              family='Disk Forensics',
+                              report='Browse Filesystem',
+                              __target__='open_tree',open_tree="%s")
         self.path = path
         self.filename = filename
         ColumnType.__init__(self,name=name, column=filename,
-                            link=link)
+                            link=link, link_pane=link_pane)
 
     def select(self):
         return "concat(`%s`,`%s`)" % (self.path,self.filename)

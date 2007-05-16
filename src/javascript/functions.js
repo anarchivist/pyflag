@@ -251,7 +251,7 @@ function popup(query, callback, width, height) {
       //submitted.
       if(e.type!='submit' && e.name.length>0 ) {
 	try {
-	  query+=e.name + '=' + encodeURIComponent(e.value)+'&';
+	  query+=e.name + '=' + encodeURIComponent(decodeURIComponent(e.value))+'&';
 	} catch(err) {
 	  // For some reason hidden parameters dont seem to be escaped properly
 	  query += e.name + '=' + e.value + '&';
@@ -436,7 +436,7 @@ function find_window_by_name(name) {
 function link_to_parent(url, name) {
   var w = 0;
 
-  if(!w) w=find_window_by_name(name);
+  if(!w && name) w=find_window_by_name(name);
   if(!w) w=window.opener;
   if(!w) w=window.parent;
 

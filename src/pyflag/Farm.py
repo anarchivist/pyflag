@@ -224,13 +224,13 @@ def start_workers():
 
          ## This is the last broadcast message we handled. We will
          ## only handle broadcasts newer than this.
+         broadcast_id = 0
          try:
              dbh=DB.DBO()
              dbh.execute("select max(id) as max from jobs")
              row = dbh.fetch()
-             broadcast_id = row['max']
-         except:
-             broadcast_id = 0
+             broadcast_id = row['max'] or 0
+         except: pass
 
          while 1:
              ## Check for new tasks:

@@ -39,17 +39,11 @@ import plugins.LogAnalysis.Whois as Whois
 from pyflag.TableObj import IPType
 import re
 import pyflag.Registry as Registry
+import pyflag.IO as IO
 
 def get_file(query,result):
     result.row("Select a sample log file for the previewer",stretch=False)
-    tmp = result.__class__(result)
-    tmp.filebox(target='datafile')
-    result.row("Enter name of log file:",tmp)
-    if query.has_key('datafile'):
-        return True
-    else:
-        result.text("Please input a log file name\n",color='red')
-        return False
+    result.fileselector("Please input a log file name", 'datafile')
 
 def save_preset(query,result, log=None):
     result.textfield("name for preset:",'log_preset')
@@ -147,16 +141,8 @@ class Log:
             raise IOError("Datafile is not set!!!")
         
         for file in self.datafile:
-            try:
-                ## Allow log files to be compressed.
-                fd=gzip.open(file,'r')
-
-                ## gzip doesnt really verify the file until you read something:
-                fd.read(10)
-                fd.seek(0)
-            except:
-                fd=open(file,'r')
-                
+            ## open the file as a url:
+            fd = IO.open_URL(file)                
             for line in fd:
                 if blank.match(line): continue
                 if line.startswith('#') and ignore_comment:

@@ -101,9 +101,15 @@ class LoadPresetLog(Reports.report):
             result.textfield("Table name:","table")
             result.fileselector("log files to use", 'datafile')
 
-            if query.getarray('datafile'):
-                log = LogFile.load_preset(query['case'], query['preset'], query.getarray('datafile'))
-            else:
+            try:
+                if query.getarray('datafile'):
+                    log = LogFile.load_preset(query['case'], query['preset'], query.getarray('datafile'))
+                else:
+                    return result
+            except Exception,e:
+                result.end_table()
+                result.text("\nError: %s\n\n" % e, style='red')
+#                raise
                 return result
 
             result.end_table()
@@ -117,7 +123,7 @@ class LoadPresetLog(Reports.report):
                 # retrieve and display the temp table
                 log.display_test_log(result)
             except Exception,e:
-                result.text("Error: Unable to load a test set - maybe this log file is incompatible with this log preset?",style='red',font='bold')
+                result.text("Error: Unable to load a test set - maybe this log file is incompatible with this log preset?\nError was %s" % e,style='red',font='bold')
                 pyflaglog.log(pyflaglog.DEBUG,"Unable to load test set - error returned was %s" % e)
                 print FlagFramework.get_bt_string(e)
                 return

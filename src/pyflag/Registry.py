@@ -284,7 +284,12 @@ class ScannerRegistry(Registry):
             return ("%s" % cls).split(".")[-1]
 
     def dispatch(self,scanner_name):
-        return self.classes[self.scanners.index(scanner_name)]
+        return self.classes[self.class_names.index(scanner_name)]
+
+class FileHandlerRegistry(ScannerRegistry):
+    def __init__(self, ParentClass):
+        Registry.__init__(self, ParentClass)
+        self.class_names = [ i.method for i in self.classes ]
 
 class VFSFileRegistry(Registry):
     """ A class to register VFS (Virtual File System) File classes """
@@ -298,23 +303,6 @@ class VFSFileRegistry(Registry):
             if self.vfslist.has_key(cls.specifier):
                 raise Exception("Class %s has the same specifier as %s. (%s)" % (cls,self.vfslist[cls.specifier],cls.specifier))
             self.vfslist[cls.specifier] = cls
-
-##class XXFileSystemRegistry(Registry):
-##    """ A class to register FileSystems.
-
-##    FileSystems control the internal representation of the filesystem structure, the loading of this from an image and the browsing of the filesystem. Note that this is different than VFS which deal with how to read individual files from the FileSystem, but both are confined to use the same DBFS schema at present.
-##    """
-##    filesystems = {}
-##    fs = {}
-##    def __init__(self,ParentClass):
-##        Registry.__init__(self,ParentClass)
-##        for cls in self.classes:
-##            if self.filesystems.has_key(cls.name):
-##                raise Exception("Class %s has the same specifier as %s. (%s)" % (cls,self.filesystems[cls.name],cls.name))
-##            ## A name of None will prevent from loading into Registry
-##            if cls.name:
-##                self.filesystems[cls.name] = cls
-##            self.fs[("%s" % cls).split(".")[-1]]=cls
 
 class ShellRegistry(Registry):
     """ A class to manage Flash shell commands """
@@ -389,6 +377,7 @@ TASKS = None
 CARVERS = None
 EVENT_HANDLERS = None
 IMAGES = None
+FILE_HANDLERS = None
 
 ## This is required for late initialisation to avoid dependency nightmare.
 def Init():
@@ -461,6 +450,9 @@ def Init():
     import pyflag.IO as IO
     global IMAGES
     IMAGES = ScannerRegistry(IO.Image)
+
+    global FILE_HANDLERS
+    FILE_HANDLERS = FileHandlerRegistry(IO.FileHandler)
 
 def InitTests():
     return TestsRegistry(unittest.TestCase)

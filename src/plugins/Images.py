@@ -211,7 +211,7 @@ class CachedIO(IOSubsysFD):
         key = "%s%s" % (self.readptr,length)
         try:
             data = self.cache.get(key)
-        except Exception,e:
+        except KeyError,e:
             data = self.io.read_random(length,self.readptr)
             self.cache.put(data, key=key)
 

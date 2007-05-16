@@ -138,12 +138,6 @@ class query_type:
             for k,v in params.items():
                 self.__setitem__(k,v)
 
-        #All query strings should have a case to operate on:
-#        try:
-#            self.__getitem__('case')
-#        except KeyError:
-#            self.__setitem__('case',config.FLAGDB)
-
     def __str__(self):
         """ Prints the query object as a url string """
         mark=''
@@ -296,28 +290,14 @@ class query_type:
         @except KeyError: if the query is not formatted properly (i.e. no _target_ key)
         """
         for target in self.getarray('__target__'):
-            try:
-                ## Do we need to append it:
-                if self.has_key('__target_type__') and self['__target_type__'] == 'append':
-                    self[target] = dest
-                else:
-                    tmp = str(self.__getitem__(target)) % dest
-                    self.set(target,tmp)                    
+            ## Calculate the destination value:
+            dest = self.get('__target_format__','%s') % dest
             
-            ## No q[target]
-            except (KeyError,TypeError):
-                self.__delitem__(target)
-                self.__setitem__(target,dest)
-
-        try:
-            ## If we were asked to mark this target, we do so here. (Note that __mark__ could still be set to a constant, in which case we ignore it, and its query_type.__str__ will fill it in)
-            if self.__getitem__('__mark__')=='target':
-                self.__delitem__('__mark__')
-                self.__setitem__('__mark__',dest)
-        except KeyError:
-            pass
-            
-        self.__delitem__('__target__')
+            ## Do we need to append it:
+            if self.has_key('__target_type__') and self['__target_type__'] == 'append':
+                self[target] = dest
+            else:
+                self.set(target,dest)
 
 import pyflag.DB as DB
 import threading
@@ -552,7 +532,7 @@ class Flag:
                     result.start_form(query)
                     report.form(query,result)
                     result.end_table()
-                    result.end_form('Submit')
+                    result.end_form(result.submit_string)
                 except DontDraw:
                     pass
                 

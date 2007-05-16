@@ -108,13 +108,12 @@ class TypeChecker:
 
     def filename(self,field,query):
         """ Tests to see if the string is a valid filename within the upload dir """
-        string=os.path.normpath( query[field])
-
-        dir = os.path.normpath(config.UPLOADDIR)
-        if string.startswith(dir) and os.access(string,os.R_OK):
-            return
-        else:
-            raise ReportInvalidParamter,"%s is not a filename in dir %s " % (query[field],dir)
+        for filename in query.getarray(field):
+            string=os.path.normpath(filename)
+            
+            full_filename = os.path.normpath(config.UPLOADDIR + "/" + string)
+            if not os.access(full_filename,os.R_OK):
+                raise ReportInvalidParamter,"%s is not a filename" % (full_filename)
 
     def unique(self,field,query):
         """ Tests all fields given by fieldxx for unique values. """

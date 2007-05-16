@@ -51,6 +51,7 @@ class IISLog(Simple.SimpleLog):
     def find_fields_line(self):
         # Find the fields line:
         count=0
+        fields = None
         for row in self.read_record(ignore_comment = False):
             count+=1
             if row.startswith('#Fields: '):
@@ -67,7 +68,10 @@ class IISLog(Simple.SimpleLog):
 
             ## couldnt we find the field header?
             if count>15:
-                raise Reports.ReportError("Error parsing IIS log file (I can't find a #Fields header line.) Maybe you may be able to use the simple log driver for this log?")
+                break
+            
+        if not fields:
+            raise RuntimeError("Error parsing IIS log file (I can't find a #Fields header line.)\nMaybe you may be able to use the Simple or Advanced log driver for this log?")
         
         return fields
 

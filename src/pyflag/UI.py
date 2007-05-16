@@ -37,7 +37,7 @@ import pyflag.conf
 import pyflag.pyflaglog as pyflaglog
 config=pyflag.conf.ConfObject()
 import pyflag.parser as parser
-from pyflag.TableObj import IntegerType, TimestampType, StringType
+from pyflag.TableObj import IntegerType, TimestampType, StringType, FilenameType
 
 config.LOG_LEVEL=7
 
@@ -45,6 +45,8 @@ class UIException(Exception): pass
 
 class GenericUI:
     """ Baseclass for UI objects. Note that this is an abstract class which must be implemented fully by derived classes. This base class exists for the purpose of documentations. UI method prototypes should be added to this base class so they could be implemented in derived classes as well. """
+    submit_string = 'Submit'
+
     def __init__(self,default = None):
         """Create a new UI object.
         Default is another UI object which we are basing this UI object on. In particular this new UI object and the default object share the same internal state variables, so that changes on one will affect the other. This is required for example when we are creating a temporary UI object inside an object which has a form in it. This way the new UI object can adjust the internal state of the form.
@@ -199,11 +201,6 @@ class GenericUI:
                 del q[i]
         
         q['__target__']=target
-        try:
-            q['__mark__']=options['mark']
-        except KeyError:
-            pass
-        
         if target_format:
             q[target]=target_format
 
@@ -295,9 +292,31 @@ class GenericUI:
         ##query_str += " limit %s, %s" % (limit, config.PAGESIZE)
 
         return query_str
-
-    def fileselector(self, description, name):
+    
+    def fileselector(self, description, name, vfs=True):
         """ Draws a file selector for files in the upload directory """
+        def vfs_popup(query, result):
+            if not query.has_key('case'):
+                result.heading("No case selected")
+            else:
+                case = query['case']
+                new_query = query.clone()
+                new_query['__target__'] = name
+                new_query['__target_type__'] = 'append'
+                new_query['__target_format__'] = "vfs://%s%%s" % case
+                new_query.poparray('callback_stored')
+                
+                result.table(
+                    elements = [ FilenameType(case = case,
+                                              link = new_query,
+                                              link_pane = 'parent'),
+                                 IntegerType('File Size', 'size')
+                                 ],
+                    table = 'file as f, inode as i',
+                    where = 'f.inode=i.inode',
+                    case=case,
+                    )
+
         def file_popup(query, result):
             result.heading(description)
             def left(path):
@@ -325,23 +344,24 @@ class GenericUI:
                 )""", tablename)
 
                 ## populate the table:
-                path=os.path.normpath(config.UPLOADDIR + '/' +path)
+                full_path=os.path.normpath(config.UPLOADDIR + '/' + path)
                 dbh.mass_insert_start(tablename)
                 ## List all the files in the directory:
                 try:
-                    for d in os.listdir(path):
+                    for d in os.listdir(full_path):
                         filename = os.path.join(path,d)
-                        if not os.path.isdir(filename):
-                            s = os.stat(filename)
+                        full_filename = "%s/%s" % (full_path, filename)
+                        if not os.path.isdir(full_filename):
+                            s = os.stat(full_filename)
                             dbh.mass_insert(filename = filename,
                                             _timestamp = "from_unixtime(%d)" % s.st_mtime,
                                             size = s.st_size)
                     dbh.mass_insert_commit()
                 except OSError,e:
+                    print e
                     pass
 
                 new_query=query.clone()
-                print new_query
                 new_query['__target__'] = name
                 new_query['__target_type__'] = 'append'
 
@@ -392,7 +412,18 @@ class GenericUI:
             self.row('Currently Selected files',tmp)
 
         tmp = self.__class__(self)
-        tmp.popup(file_popup, "Add Files",
+        tmp.start_table( **{'class': 'highlight'})
+        tmp2 = self.__class__(self)
+        tmp2.popup(file_popup, "Upload Directory",
                   icon="file-selection.png",
                   width=1024, height=600)
+
+        if vfs:
+            tmp2.popup(vfs_popup, "VFS Files",
+                       icon = "vfs.png",
+                       width=1024,
+                       height = 600)
+        tmp.row('',tmp2)
+        tmp.textfield('', name, Additional = True)
+        tmp.end_table()
         self.row(description, tmp)
