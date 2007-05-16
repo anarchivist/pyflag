@@ -251,8 +251,8 @@ import pyflag.pyflagsh as pyflagsh
 
 class RemoteIOSourceTests(unittest.TestCase):
     """ Test the Remote IO source implementation """
-    def test01RemoteIOSource(self):
-        """ Test the remote iosource implementation """
+    def setUp(self):
+        time.sleep(1)
         ## Start the remote server on the localhost
         slave_pid = os.spawnl(os.P_NOWAIT, config.FLAG_BIN + "/remote_server", "remote_server", "-s")
 
@@ -260,16 +260,43 @@ class RemoteIOSourceTests(unittest.TestCase):
         ## Try to avoid the race
         time.sleep(1)
         
+    def test02RemoteIOSource(self):
+        """ Test the remote iosource implementation """
         io1 = iosubsys.iosource([['subsys','advanced'],
                                  ['filename','%s/pyflag_stdimage_0.2' % config.UPLOADDIR]])
         
         ## get the remote fd:
         import remote
 
-        r = remote.remote("127.0.0.1", config.UPLOADDIR +"/pyflag_stdimage_0.2")
+        r = remote.remote("127.0.0.1", config.UPLOADDIR + self.test_file)
 
         ## Test the remote source
-        IO.test_read_random(io1,r, io1.size, 1000000, 200)
+        IO.test_read_random(io1,r, io1.size, 1000000, 100)
+
+    test_case = "PyFlagTestCase"
+    test_file = "/pyflag_stdimage_0.2"
+    fstype = "Sleuthkit"
+    
+    def test01LoadingFD(self):
+        """ Try to load a filesystem using the Remote source """
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Case Management.Remove case",'remove_case=%s' % self.test_case])
+
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Case Management.Create new case",'create_case=%s' % self.test_case])
+
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
+                                   "iosource=test",
+                                   "subsys=Remote",
+                                   "filename=%s/%s" % (config.UPLOADDIR, self.test_file),
+                                   ])
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,
+                                   "iosource=test",
+                                   "fstype=%s" % self.fstype,
+                                   "mount_point=/"])
+
 
 ## FIXME - to do
 class Mounted(Advanced):

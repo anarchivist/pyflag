@@ -249,11 +249,13 @@ function popup(query, callback, width, height) {
       //We must leave the submit button off, so that when the popup
       //window refreshes to its parent we know it wasnt actually
       //submitted.
-      if(e.type=='hidden') {
-	// For some reason hidden parameters dont seem to be escaped properly
-	query += e.name + '=' + e.value + '&';
-      } else if(e.type!='submit' && e.name.length>0 ) {
-	query+=e.name + '=' + encodeURIComponent(e.value)+'&';
+      if(e.type!='submit' && e.name.length>0 ) {
+	try {
+	  query+=e.name + '=' + encodeURIComponent(e.value)+'&';
+	} catch(err) {
+	  // For some reason hidden parameters dont seem to be escaped properly
+	  query += e.name + '=' + e.value + '&';
+	};
 	// encodeURI needed to handle cr's properly, not sure if this will break 
 	// something else? The below is all we use to do but then newlines didn't 
 	// work.
@@ -305,10 +307,12 @@ function submit_form(pane, current_cb, name, value) {
 	 e.name=='callback_stored' && e.value==current_cb)
 	continue;
 
-      if(e.type=='hidden') {
-	query += e.name + '=' + e.value + '&';
-      }else if(e.name.length>0 ) {
-	query+=e.name + '=' + encodeURIComponent(decodeURIComponent(e.value))+'&';
+      if(e.name.length>0 ) {
+	try {
+	  query+=e.name + '=' + encodeURIComponent(decodeURIComponent(e.value))+'&';
+	} catch(err) {
+	  query += e.name + '=' + e.value + '&';	  
+	}
 	//We use to just do the below but newlines were not handled correctly
         //query+=e.name + '=' + e.value+'&';
       };

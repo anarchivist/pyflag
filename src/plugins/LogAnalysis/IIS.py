@@ -32,6 +32,7 @@ from pyflag.TableObj import TimestampType, IntegerType, StringType, IPType
 import pyflag.Reports as Reports
 import pyflag.conf
 config=pyflag.conf.ConfObject()
+import re
 
 class IISLog(Simple.SimpleLog):
     """ Log parser for IIS (W3C Extended) log files """
@@ -75,7 +76,7 @@ class IISLog(Simple.SimpleLog):
 
         self.datafile = query.getarray(datafile)
         # set these params, then we can just use SimpleLog's get_fields
-        self.delimiter = ' '
+        self.delimiter = re.compile(' ')
         self.prefilters = ['PFDateFormatChange2']
 
         if self.datafile:
@@ -110,7 +111,7 @@ class IISLog(Simple.SimpleLog):
                 tmp = StringType(field,field)
                 tmp.index = True
                 self.fields.append(tmp)
-                
+
     def form(self, query, result):
         result.para('NOTICE: This loader attempts to load IIS log files completely automatically by determining field names and types from the header comments, if this loader fails, please use the "Simple" loader')
 
@@ -169,3 +170,13 @@ class IISLogTest(LogFile.LogDriverTester):
         dbh.execute("select count(*) as c from %s_log", self.test_table)
         row = dbh.fetch()
         self.assertEqual(row['c'], 8334)
+
+        ## More specific tests
+        dbh.execute("select count(*) as c from %s_log where `IP Address` = 2921232307", self.test_table)
+        row = dbh.fetch()
+        self.assertEqual(row['c'], 129)
+
+
+        dbh.execute("select count(*) as c from %s_log where cs_username = 'administrator'", self.test_table)
+        row = dbh.fetch()
+        self.assertEqual(row['c'], 7898)
