@@ -732,7 +732,7 @@ class File:
         
         The callback takes care of paging the data from self. The callback cb is used to actually render the data:
         
-        def cb(offset,data,result)
+        'def cb(offset,data,result)
         
         offset is the offset in the file where we start, data is the data.
         """
@@ -741,7 +741,7 @@ class File:
             limit=int(query['hexlimit'])
         except KeyError:
             limit=0
-
+            
         oldslack = self.slack
         oldoverread = self.overread
         self.slack = slack
@@ -784,9 +784,10 @@ class File:
         else:
             result.toolbar(text="Previous page", icon="stock_left_gray.png", toolbar=toolbar_id, pane="self")
 
-        next=limit+max
+        next=limit + max
+            
         ## If we did not read a full page, we do not display
-        ## the next arrow:
+        ## the next arrow
         if len(data)>=max:
             new_query.set('hexlimit',next)
             result.toolbar(text="Next page", icon="stock_right.png",
@@ -794,7 +795,7 @@ class File:
         else:
             result.toolbar(text="Next page", icon="stock_right_gray.png", toolbar=toolbar_id, pane="self")
 
-        if len(data)>=max:                           
+        if len(data)>=max:
             new_query.set('hexlimit',self.size - self.size % 1024)
             result.toolbar(text="End", icon="stock_last.png",
                            link = new_query , toolbar=toolbar_id, pane="self")

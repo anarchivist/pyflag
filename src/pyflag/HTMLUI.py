@@ -44,6 +44,7 @@ import pyflag.Registry as Registry
 import pyflag.parser as parser
 import pyflag.TableObj as TableObj
 import pyflag.pyflaglog as pyflaglog
+import pyflag.FlagFramework as FlagFramework
 
 def quote_quotes(string):
     """ Replaces \' with \" for insertion into html """
@@ -84,47 +85,51 @@ class HTMLUI(UI.GenericUI):
     callback = None
     name = "HTMLUI"
     tree_id = 0
+    toolbar_ui = None
+    generator = None
+    style = None
+    font = None
+    table_depth = 0
+    type = "text/html"
+    #This specifies if we should render the UI in the theme or
+    #naked. Note that this only affects UIs which are drawn in a
+    #window not ones which are added to other UIs:
+    decoration = 'full'
+    title = ''
+
     ## This is used as a unique count of ids
     id=0
-    def __init__(self,default = None,query=None):
+    def __init__(self,default = None,query=None, initial=None):
+        """ The UI is _always_ instantited with a parent. This allows
+        us to traverse the UI trees to find things such as toolbars or
+        generators..
+        """
         self.result = ''
 
-        import pyflag.FlagFramework as FlagFramework
-        self.flag = FlagFramework.GLOBAL_FLAG_OBJ
-            
         if default != None:
             self.form_parms = default.form_parms
             self.form_target = None
             self.defaults = default.defaults
-            self.toolbar_ui=default.toolbar_ui
-            self.generator=default.generator
-            self.depth = default.depth+1
+            self.toolbar_ui = default.toolbar_ui
+            self.generator = default.generator
             self.parent = default
             try:
                 self.callback = default.callback
             except: pass
 
         else:
+            if not initial:
+                raise RuntimeError("You must instantiate this with a parent ui")
+
             self.form_parms =FlagFramework.query_type(())
             self.form_target = None
             self.defaults = FlagFramework.query_type(())
-            self.toolbar_ui=None
+            self.toolbar_ui=self.__class__(self)
             self.generator=HTTPObject()
-            self.depth=1
             self.parent = None
 
         if query:
             self.defaults=query
-
-        self.style=None
-        self.font=None
-        self.table_depth = 0
-        self.type = "text/html"
-        #This specifies if we should render the UI in the theme or
-        #naked. Note that this only affects UIs which are drawn in a
-        #window not ones which are added to other UIs:
-        self.decoration='full'
-        self.title=''
 
 ## The __pyflag_parent, __pyflag_name are variables set in js window
 ## object to refer back to the logical parent of each pyflag
@@ -247,12 +252,12 @@ class HTMLUI(UI.GenericUI):
         the window until the user pops it up.
         """
 
-        cb_key = self.flag.store.put(callback, prefix="CB")
+        cb_key = FlagFramework.STORE.put(callback, prefix="CB")
         return cb_key
     
     def store(self,ui):
         """ Function stores the current UI in a dict in the class method. This is required when we need to store a UI and later get the browser to retrieve it. """
-        key = self.flag.store.put(ui, prefix="UI")
+        key = FlagFramework.STORE.put(ui, prefix="UI")
         return key
     
     def start_table(self,**options):
@@ -779,9 +784,6 @@ class HTMLUI(UI.GenericUI):
         When the user clicks on the toolbar button, a popup window is
         created which the callback function then uses to render on.
         """
-        if self.toolbar_ui==None:
-            self.toolbar_ui=self.__class__(self)
-
         if link:
             self.toolbar_ui.link(text,target=link,icon=icon,tooltip=tooltip, pane=pane)
         elif cb:

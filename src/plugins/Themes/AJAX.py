@@ -95,13 +95,13 @@ class AJAX(Menu):
         <div dojoType="Toolbar" id="toolbar"></div></div>
         ''' % ('\n'.join(menus),'\n'.join(menus_titles))
 
-    def naked_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
+    def naked_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % config.VERSION):
         """ Render the ui with minimal interventions """
         result= data
         #print result
         return result
 
-    def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None,ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
+    def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None,ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % config.VERSION):
         ## This is a little scriptlet to ensure we are loaded within
         ## dojo environment FIXME: How do we solve the link problem? 
         ## Is it possible? The problem is that the URL is not enough
@@ -113,7 +113,7 @@ class AJAX(Menu):
         #print data+result
         return data+result
 
-    def raw_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
+    def raw_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % config.VERSION):
         #print data
         return data
 
@@ -121,7 +121,7 @@ class AJAX(Menu):
         result=flag.ui()
 
         self.menu_javascript = self.make_menu_javascript(query)
-        title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version
+        title="FLAG - Forensic Log Analysis GUI. %s" % config.VERSION
 
         result.result+=" ".join(
             (self.header % (title),

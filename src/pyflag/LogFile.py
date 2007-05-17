@@ -127,6 +127,7 @@ class Log:
             
         finally:
             ## Drop the temporary preset and the table
+            drop_preset(temp_table)
             drop_table(self.case, temp_table)
     
     def read_record(self, ignore_comment = True):
@@ -403,8 +404,9 @@ class LogDriverTester(unittest.TestCase):
         ## Clear any existing tables of the same name
         drop_table(self.test_case, self.test_table)
 
+    ## FIXME:
     ## This is disabled so as to leave the test table behind - this is
-    ## required for development so we can examine the table
+    ## required for development so we can examine the table afterwards
     def XXXtest99Cleanup(self):
         """ Remove test log tables """
         ## clear the preset we created

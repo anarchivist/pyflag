@@ -27,8 +27,6 @@
 # ******************************************************
 
 """ Main flag framework modules contains many core classes
-
-@var flag_version: Current version of the flag program
 """ 
 import sys,os
 import pyflag.conf
@@ -38,7 +36,8 @@ import pyflag.Registry as Registry
 import pyflag.Store as Store
 import textwrap
 
-flag_version = config.VERSION
+## This global tells us if we checked the configuration already - we
+## only check configuration the first time we are run.
 config_checked = False
 
 class DontDraw(Exception):
@@ -88,6 +87,9 @@ def get_bt_string(e=None):
 def get_traceback(e,result):
     result.heading("%s: %s" % (sys.exc_info()[0],sys.exc_info()[1]))
     result.text(get_bt_string(e))            
+
+
+STORE = Store.Store()
 
 class FlagException(Exception):
     """ Generic Flag Exception """
@@ -341,35 +343,9 @@ def show_help(query, result, cls=None):
 class Flag:
     """ Main Flag object.
 
-    This object is responsible with maintaining configuration data, dispatching reports and processing queries.
-    
+    This object is used to process requests and run analysis, manage
+    caching etc. You need to extend it to create a Flag Server.
     """
-    def __init__(self,ui=None):
-        import pyflag.HTMLUI as UI
-
-        if not ui:
-            ui=UI.HTMLUI
-        ## Figure out where the plugins are. We first take from the current dir
-        plugins=["plugins"]
-        try:
-            ## If any dirs are specified in the conf file we take those
-            plugins.append(config.PLUGINS)
-        except AttributeError:
-            pass
-
-        ## Now try the system default. If pyflag was installed into the system
-        try:
-            import pyflag.plugins
-            plugins.extend(sys.modules['pyflag.plugins'].__path__)
-        except ImportError:
-            pass
-
-        ## Initialise the registry:
-        Registry.Init()
-
-        ## Create a store for us:
-        self.store = Store.Store()
-                
     def is_cached(self,query):
         """ Checks the database to see if the report has been cached """
         try:
@@ -401,7 +377,7 @@ class Flag:
             return
         except Exception,e:
             #If anything goes wrong in the analysis phase, we have to set the error in report.executing
-            result = self.ui()
+            result.clear()
             get_traceback(e,result)
             report.executing[thread_name]['error'] = result
             print report.executing, result.__str__()
@@ -418,7 +394,7 @@ class Flag:
         #Remove the lock
         del report.executing[thread_name]
 
-    def check_progress(self,report,query):
+    def check_progress(self,report,query, result):
         """ Checks the progress of a report. If the report is not running this method returns None. If the report is still running or has died due to an error, this method returns a UI object containing either the error message or a progress report called from the report's own progress method """
         canonical_query = canonicalise(query)
         if report.is_executing(canonical_query):
@@ -428,16 +404,12 @@ class Flag:
             result = report.executing[thread_name]['error']
             #If the analysis thread set an error UI object we just return it else evaluate the progress
             if result:
-                tmp = self.ui()
-                tmp.heading("Error occured during analysis stage")
-                tmp.join(result)
-                result=tmp
-                result.defaults = query
+                result.clear()
+                result.heading("Error occured during analysis stage")
                 del report.executing[thread_name]
                 return result
             else:
-                result = self.ui()
-                result.defaults = query
+                result.clear()
                 report.progress(query,result)
                 #Refresh page
                 result.refresh(config.REFRESH,query)
@@ -445,26 +417,22 @@ class Flag:
         #we are not executing
         else: return None
 
-    ui = None
     ### FIXME- This needs to move to FlagHTTPServer
-    def process_request(self,query):
+    def process_request(self,query, result):
         """ Function responsible for processing the request presented by query, which is of query_type. Results returned are a UI object which may be used to display the results
         @arg query: A query_type object.
         @return: A UI object which must be displayed.
         """
-        result = self.ui()
-        result.defaults = query
-        
         #Check to see if the report is valid:
         try:
             report_cls = Registry.REPORTS.dispatch(query['family'],query['report'])
             ## Instantiate the report:
-            report = report_cls(self,ui=self.ui)
+            report = report_cls(self,ui=result)
             
         except (IndexError):
             result.heading("Report Or family not recognized")
             result.para("It is possible that the appropriate module is not installed.")
-            return result
+            return 
 
         ## We must make copies here to allow the report to be destroyed!!!
         report_name = report.name
@@ -488,15 +456,15 @@ class Flag:
                     result.heading("Report reset")
                     del query['reset']
                     result.refresh(1,query)
-                    return result
+                    return 
 
                 #Check to see if the report is cached in the database
                 if self.is_cached(query):
                     report.display(query,result)
-                    return result
+                    return 
                 
                 #Are we currently executing the report?
-                progress_result = self.check_progress(report,query)
+                progress_result = self.check_progress(report,query, result)
                 
                 #OK - we run the analysis method in a seperate thread
                 if not progress_result:
@@ -508,7 +476,7 @@ class Flag:
                    #wait a little for the analysis to work
                    time.sleep(0.5)
                    #Are we still running the analysis?
-                   progress_result = self.check_progress(report,query)
+                   progress_result = self.check_progress(report,query, result)
 
                    #Nope - we should run the display method now...
                    if not progress_result:
@@ -606,7 +574,7 @@ class Flag:
 
         if report:
             ## Instantiate report:
-            report = report(self, ui=self.ui)
+            report = report(self, ui=result)
             query['family']=report.family
             query['report']=report.name
 
@@ -838,70 +806,6 @@ def splitpath(path):
 
 def joinpath(branch):
     return '/'+'/'.join(branch)
-
-def make_sql_from_filter(filter_str,having,column,name,data_callbacks={}):
-    """ This function creates the SQL depending on the filter_str that was provided and its prefixes.
-
-    @arg filter_str: The filter string to process.
-    @arg having: this array will get the SQL appended to it.
-    @arg column: The array of all the column names.
-    @return: A condition text describing this condition.
-    """
-
-    try:
-        cb = data_callbacks[name]
-    except KeyError:
-        cb = lambda x, mode: x
-
-    def compose_simple_expression(simple_string):
-        if simple_string.startswith('=') or simple_string.startswith('<') or simple_string.startswith('>'):
-            ## If the input starts with =<>, we do an exact match
-            if simple_string.startswith('<=') or simple_string.startswith('>='):
-                condition=simple_string[0:2]
-                operand=cb(simple_string[2:], mode=1)
-            else:
-                condition=simple_string[0]
-                operand=cb(simple_string[1:], mode=1)
-        elif (simple_string.find('%')>=0) and (not simple_string.startswith('!')):
-            #If the user already supplied the %, we dont add our own:
-            condition="like"
-            operand=simple_string
-        elif simple_string.startswith('!='):
-            condition="!="
-            operand=cb(simple_string[2:], mode=1)
-        elif simple_string.startswith('!%'):
-            condition="not like"
-            operand=simple_string[1:]
-        elif simple_string.startswith('!'):
-            ## If the input starts with !, we do an exact match
-            condition="not like"
-            operand="%%%s%%" % simple_string[1:]
-        else:
-            ## Otherwise we do a fuzzy match.
-            condition="like"
-            operand="%%%s%%"% simple_string
-            
-        return (condition,operand)
-        
-    if filter_str.find(" || ")>=0:
-        #TODO: Currently only a or b, c and d.  Would be nice to do a or b or c.
-        split_filter=filter_str.split(" || ")
-        (cond,op)=compose_simple_expression(split_filter[0])
-        (cond2,op2)=compose_simple_expression(split_filter[1])
-        having.append("((%s %s %r) or (%s %s %r))" % (column,cond,op,column,cond2,op2))
-        condition_text="((%s %s %r) or (%s %s %r))" % (name,cond,op,name,cond2,op2)
-    elif filter_str.find(" && ")>=0:
-        split_filter=filter_str.split(" && ")
-        (cond,op)=compose_simple_expression(split_filter[0])
-        (cond2,op2)=compose_simple_expression(split_filter[1])
-        having.append("((%s %s %r) and (%s %s %r))" % (column,cond,op,column,cond2,op2))
-        condition_text="((%s %s %r) and (%s %s %r))" % (name,cond,op,name,cond2,op2)
-    else:
-        (cond,op)=compose_simple_expression(filter_str)
-        having.append("%s %s %r" % (column,cond,op))
-        condition_text=("%s %s %r" % (name,cond,cb(op, mode=0)))
-
-    return condition_text
 
 def get_temp_path(case,filename):
     """ Returns the full path to a temporary file based on filename.

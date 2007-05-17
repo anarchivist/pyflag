@@ -50,7 +50,7 @@ class BlueTheme(Theme.BasicTheme):
 
         return toolbar
 
-    def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None,ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
+    def render(self, query=FlagFramework.query_type(()), meta='',data='',next=None,previous=None,pageno=None,ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % config.VERSION):
 
         if not ui.toolbar_ui:
             toolbar_str='&nbsp;&nbsp;'

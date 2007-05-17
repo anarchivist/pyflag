@@ -32,7 +32,7 @@
 import BaseHTTPServer, SimpleHTTPServer, SocketServer
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
-import pyflag.HTMLUI as HTMLUI
+import pyflag.UI as UI
 import pyflag.pyflaglog as pyflaglog
 import cgi,os
 import re,time,sys
@@ -40,12 +40,12 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.Theme
 
-class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework.Flag):
     """ Main flag webserver handler.
 
     Dispatches the relevant reports depending on HTTP requests """
     
-    server_version = "PyFlag Server, "+FlagFramework.flag_version.replace(":",'-')
+    server_version = "PyFlag Server, " + config.VERSION.replace(":",'-')
     def parse_query(self):
         """ Parses the query and prepares a query object.
 
@@ -164,8 +164,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         ## Calculate the query from the request.
         query=self.parse_query()
 
-        result = flag.ui(query=query)
-        result.generator=HTMLUI.HTTPObject()
+        result = UI.UI(query=query, initial=True)
         
         ## Work out if the request was for a static object
         ct=''
@@ -246,7 +245,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                 return
 
         #We need to check the configuration and if it is incorrect, we prompt the user
-        if flag.check_config(result,query):
+        if self.check_config(result,query):
             self.send_response(200)
             self.send_header("Content-type",result.type)
             self.end_headers()
@@ -261,7 +260,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             
         #Is this a request for a saved UI?
         elif query.has_key('draw_stored'):
-            result = flag.store.get(query['draw_stored'])
+            result = FlagFramework.STORE.get(query['draw_stored'])
             
             ## This expires stored pictures in case pyflag is
             ## restarted
@@ -274,7 +273,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             try:
                 ## Get the callback from the store
                 try:
-                    cb=flag.store.get(cb_key)
+                    cb=FlagFramework.STORE.get(cb_key)
                 except KeyError:
                     raise Exception("Session expired. Please try to select this report from the menu\n")
 
@@ -309,7 +308,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                       result.defaults=query
                   else:
                       try:
-                          result = flag.process_request(query)
+                          self.process_request(query, result)
                       except FlagFramework.AuthError, e:
                           # deal with authentication issues here
                           self.send_response(401)
@@ -322,8 +321,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                               self.wfile.write("<html><body>Authentication Required for this page</body></html>")
                           return
               except Exception,e:
-                  result = flag.ui()
-                  result.defaults = query
+                  result.clear()
                   result.heading("Error")
                   import traceback,sys
                   import cStringIO
@@ -413,10 +411,10 @@ if __name__ == "__main__":
     #Set the UI module to produce HTML
     if config.THEME=="AJAX":
         import pyflag.AJAXUI as AJAXUI
-        flag.ui = AJAXUI.AJAXUI
+        UI.UI = AJAXUI.AJAXUI
     else:
         import pyflag.HTMLUI as HTMLUI
-        flag.ui = HTMLUI.HTMLUI
+        UI.UI = HTMLUI.HTMLUI
 
     import pyflag.Graph as Graph
     Graph.Graph = Graph.Ploticus

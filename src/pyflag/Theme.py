@@ -91,7 +91,7 @@ class BasicTheme:
         <tr>
         <td align=left width=10><img src="/images/pyflag.png" alt="flag_heading" border="0"></td><td align=center> ''' 
 
-    def naked_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
+    def naked_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % config.VERSION):
         """ Render the ui with minimal interventions """
         return " ".join((self.header % title,data,self.footer))
     

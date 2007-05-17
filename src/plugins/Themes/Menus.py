@@ -43,12 +43,12 @@ class Menu(Theme.BasicTheme):
         tmp.icon("logo.png")
         left.link(tmp,url="http://pyflag.sourceforge.net/")
         right = result.__class__(result)
-        right.text("PyFlag is a GPL Project maintained at http://pyflag.sourceforge.net/ . \nThis is %s" % FlagFramework.flag_version ,style="red",font="bold")
+        right.text("PyFlag is a GPL Project maintained at http://pyflag.sourceforge.net/ . \nThis is %s" % config.VERSION ,style="red",font="bold")
         result.row(tmp,right,align="center")
 
         return result
 
-    def raw_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
+    def raw_render(self,data='',ui=None,title="FLAG - Forensic Log Analysis GUI. %s" % config.VERSION):
         return data
 
     def naked_render(self,data='',ui=None,title=None):
@@ -83,7 +83,7 @@ class Menu(Theme.BasicTheme):
 
         return result
     
-    def render(self, ui=None, data='', title="FLAG - Forensic Log Analysis GUI. %s" % FlagFramework.flag_version):
+    def render(self, ui=None, data='', title="FLAG - Forensic Log Analysis GUI. %s" % config.VERSION):
         self.menu_javascript = self.make_menu_javascript(ui.defaults)
 
         if not ui.toolbar_ui:
