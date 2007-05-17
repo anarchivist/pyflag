@@ -325,7 +325,7 @@ class ApacheLogTest(LogFile.LogDriverTester):
     test_case = "PyFlagTestCase"
     log_preset = "ApacheDebianCommon_test"
     test_table = "Apache_test"
-    datafile = "%s/pyflag_apache_standard_log.gz" % config.UPLOADDIR
+    datafile = "pyflag_apache_standard_log.gz"
 
     def test01CreatePreset(self):
         """ Create a preset """

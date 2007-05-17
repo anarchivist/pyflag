@@ -888,6 +888,9 @@ class EventHandler:
 
     This base class should be extended when plugins needs to respond to some events.
     """
+    def startup(self):
+        """ This will be called when pyflag starts up """
+        
     def create(self,dbh,case):
         """ This method will be called when a new case is created """
 

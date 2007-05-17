@@ -742,6 +742,22 @@ class TimestampType(IntegerType):
 
 import plugins.LogAnalysis.Whois as Whois
 
+## The following options control how we display IPs within the GUI:
+# Would be nice if somewhere we did a count(*) and if whois wasn't there 
+# we didn't show this either....
+config.add_option("WHOIS_DISPLAY", default=True, 
+                  help="Should the WHOIS data be shown within the GUI?")
+
+if Whois.gi_resolver:
+    config.add_option("GEOIP_DISPLAY", default=True, 
+                      help="Should we show GEOIP data in the normal " \
+                      "display of IP addresses? This only works if the " \
+                      "GEOIPDIR option is set correctly")
+    
+if Whois.gi_org_resolver or Whois.gi_isp_resolver:
+    config.add_option("EXTENDED_GEOIP_DISPLAY", default=True, 
+                      help="Should we show extended GEOIP information? ")
+    
 class IPType(ColumnType):
     """ Handles creating appropriate IP address ranges from a CIDR specification.
 
@@ -934,14 +950,6 @@ class IPType(ColumnType):
             defaultInfo['ip']=value
             defaultInfo['notes']=""
 
-            # This doesn't work...?
-            #for infoFromCol in self.row:
-            #        print "info is:", infoFromCol
-            #        defaultInfo['notes']+=str(infoFromCol)
-            #        defaultInfo['notes']+=":"
-            #        defaultInfo['notes']+=str(row[infoFromCol])
-            #        defaultInfo['notes']+="     \n"
-
             defaultInfo['notes'] = "IP Address of Interest"
             
             ## Then show the form
@@ -964,19 +972,18 @@ class IPType(ColumnType):
         
         linkString = []
         if config.WHOIS_DISPLAY:
-            linkString.append(Whois.identify_network(id))
+            linkString.append(Whois.identify_network(id, value))
         
         try:
             if config.GEOIP_DISPLAY:
                 linkString.append(Whois.geoip_resolve(value))
-        
-        except Exception, e:
+        except AttributeError:
             pass
 
         try:
             if config.EXTENDED_GEOIP_DISPLAY:
                 linkString.append(Whois.geoip_resolve_extended(value))
-        except:
+        except AttributeError:
             pass
 
         if len(linkString) != 0:

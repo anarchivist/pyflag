@@ -134,7 +134,7 @@ class IPTablesLogTest(LogFile.LogDriverTester):
     """ IPTables Log file processing """
     test_case = "PyFlagTestCase"
     test_table = "TestTable"
-    test_file = "%s/messages.gz" % config.UPLOADDIR
+    test_file = "messages.gz"
     log_preset = "IPTablesTest"
 
     def test01CreatePreset(self):

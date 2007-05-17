@@ -40,22 +40,24 @@ description = "Offline Whois"
 hidden = False
 order = 40
 
-config.add_option("GEOIPDIR", default=config.DATADIR, help="The directory containing all the GeoIP files. We try to open (in this order) GeoIPCity.dat, GeoLiteCity.dat (if GeoIPCity.dat fails), GeoIPISP.dat, GeoIPOrg.dat. If any of them fail we just don't use them")
+config.add_option("GEOIPDIR", default=config.DATADIR,
+                  help="The directory containing all the GeoIP files. We try to open (in this order) GeoIPCity.dat, GeoLiteCity.dat (if GeoIPCity.dat fails), GeoIPISP.dat, GeoIPOrg.dat. If any of them fail we just don't use them")
 
-config.add_option("GEOIP_MEMORY_CACHE", default=True, help="Should the GEOIP database(s) (if found) be loaded into memory? Will result in better performance but will use more memory")
+config.add_option("PRECACHE_WHOIS", default=False, action="store_true",
+                  help="Perform whois calculations from offline db on all IP addresses. This"
+                  " makes it possible to search on whois metadata but its relatively very"
+                  " slow (especially when loading large log"
+                  " files). Select this to enable this option.")
+
+## This is not needed because we use DB caching anyway:
+##config.add_option("GEOIP_MEMORY_CACHE", default=True,
+##                  help="Should the GEOIP database(s) (if found) be loaded into memory? Will result in better performance but will use more memory")
 
 ## NYI - Current the PRECACHE IP METADATA does this
 
 #config.add_option("SEARCHABLE_WHOIS", default=True, help="Should the WHOIS data be preloaded so you can search on it (makes things slower)")
 #config.add_option("SEARCHABLE_ORG
 #config.add_option("SEARCHABLE_ISP
-
-
-# Would be nice if somewhere we did a count(*) and if whois wasn't there 
-# we didn't show this either....
-config.add_option("WHOIS_DISPLAY", default=True, 
-                  help="Should the WHOIS data (if available) be shown?")
-
 
 ## A cache of whois addresses - This really does not need to be
 ## invalidated as the data should never change
@@ -65,119 +67,78 @@ WHOIS_CACHE = Store.Store()
 
 try:
     import GeoIP
-    if config.GEOIP_MEMORY_CACHE:
-        gi_resolver = GeoIP.open(config.GEOIPDIR + "/GeoIPCity.dat", 
-                                GeoIP.GEOIP_MEMORY_CACHE)
-        
-    else:
-        gi_resolver = GeoIP.open(config.GEOIPDIR + "/GeoIPCity.dat", 
-                                GeoIP.GEOIP_STANDARD)
+    gi_resolver = ( GeoIP.open(config.GEOIPDIR + "/GeoIPCity.dat", 
+                               GeoIP.GEOIP_STANDARD) or \
+                    GeoIP.open(config.GEOIPDIR + "/GeoLiteCity.dat", 
+                               GeoIP.GEOIP_STANDARD))
 
-except Exception,e:
-    pyflaglog.log(pyflaglog.WARNING, 
-                  "Unable to import the GeoIP city database (%s) - " \
-                  "will attempt to load the free one." % e)
-    try:
-        import GeoIP
-        if config.GEOIP_MEMORY_CACHE:
-            gi_resolver = GeoIP.open(config.GEOIPDIR + "/GeoLiteCity.dat", 
-                                    GeoIP.GEOIP_MEMORY_CACHE)
-    
-        else:
-            gi_resolver = GeoIP.open(config.GEOIPDIR + "/GeoLiteCity.dat", 
-                                    GeoIP.GEOIP_STANDARD)
+    ## Now try for the GeoIPISP
+    gi_isp_resolver = GeoIP.open(config.GEOIPDIR + "/GeoIPISP.dat",
+                                 GeoIP.GEOIP_STANDARD)
 
-    except Exception, e:
-        pyflaglog.log(pyflaglog.WARNING,
-                    "Unable to import the GeoIP city database (the free one) " \
-                    "error was: %s. No GeoIP available." %e)
+    ## Now try the GEOIPOrg    
+    gi_org_resolver = GeoIP.open(config.GEOIPDIR + "/GeoIPOrg.dat",
+                                 GeoIP.GEOIP_STANDARD)
 
-        gi_resolver = None
-
-
-if gi_resolver:
-    config.add_option("GEOIP_DISPLAY", default=True, 
-                      help="Should we show GEOIP data in the normal " \
-                      "display of IP addresses? This only works if the " \
-                      "GEOIPDIR option is set correctly")
-
-## Now try for the GeoIPISP
-
-try:
-    import GeoIP
-    if config.GEOIP_MEMORY_CACHE:
-        gi_isp_resolver = GeoIP.open(config.GEOIPDIR + "/GeoIPISP.dat",
-                                    GeoIP.GEOIP_MEMORY_CACHE)
-    else:
-        gi_isp_resolver = GeoIP.open(config.GEOIPISPDB + "/GeoIPISP.dat",
-                                    GeoIP.GEOIP_STANDARD)
-
-except Exception,e:
-    pyflaglog.log(pyflaglog.WARNING, 
-                  "Unable to import the GeoIP ISP database (%s) - " \
-                  "will not use it." % e)
+except ImportError:
+    gi_resolver = None
     gi_isp_resolver = None
-
-## Now try the GEOIPOrg
-
-try:
-    import GeoIP
-    if config.GEOIP_MEMORY_CACHE:
-        gi_org_resolver = GeoIP.open(config.GEOIPDIR + "/GeoIPOrg.dat",
-                                     GeoIP.GEOIP_MEMORY_CACHE)
-    else:
-        gi_org_resolver = GeoIP.open(config.GEOIPDIR + "/GeoIPOrg.dat",
-                                     GeoIP.GEOIP_STANDARD)
-
-except Exception,e:
-    pyflaglog.log(pyflaglog.WARNING, 
-                  "Unable to import the GeoIP organisation database (%s) - will not use it." % e)
     gi_org_resolver = None
 
-if gi_org_resolver or gi_isp_resolver:
-    config.add_option("EXTENDED_GEOIP_DISPLAY", default=True, 
-                      help="Should we show extended GEOIP information? " \
-                      "This only works if the GEOIP* options are set " \
-                      "correctly. In particular this option needs the ISP " \
-                      " and/or ORG GeoIP databases (not free)")
-
 def get_all_geoip_data(ip):
+    result = {}
     try:
-        ipinfo = gi_resolver.record_by_addr(ip)
-        assert(ipinfo != None)
-    except Exception, e:
-        ##pyflaglog.log(pyflaglog.WARNING, "Error doing GeoIP lookup: %r" % e)
-        ipinfo = dict(city = 'Unknown', country_code3='---')
-
-    ## We should try for the other things too...
-    try:
-        organisation = gi_org_resolver.org_by_addr(ip)
-        assert(organisation != None)
-    except Exception, e:
-        organisation = "Unknown"
+        result.update(gi_resolver.record_by_addr(ip))
+    except (TypeError,AttributeError): pass
 
     try:
-        isp = gi_isp_resolver.org_by_addr(ip)
-        assert(isp != None)
-    except Exception, e:
-        isp = "Unknown"
+        result.update(gi_org_resolver.org_by_addr(ip))
+    except (TypeError,AttributeError): pass
 
+    try:
+        result.update(gi_isp_resolver.org_by_addr(ip))
+    except (TypeError,AttributeError): pass
 
-    ipinfo['org'] = organisation
-    ipinfo['isp'] = isp
-
-    return ipinfo
+    return result
 
 def insert_whois_cache(sql_ip, id, ipinfo):
-    dbh = DB.DBO(None)
-    dbh.execute("insert into whois_cache set ip=%s, id=%s, geoip_city= " \
-                " (select id from geoip_city where city='%s' limit 1), " \
-                " geoip_country = (select id from geoip_country where country" \
-                "='%s' limit 1), geoip_isp = (select id from geoip_isp where" \
-                " isp='%s' limit 1), geoip_org = (select id from " \
-                " geoip_org where org='%s')" % (sql_ip,id,ipinfo['city'],
-                ipinfo['country_code3'], ipinfo['isp'], ipinfo['org']));
-    
+    dbh = DB.DBO()
+    dbh.insert("whois_cache",
+               _ip = sql_ip,
+               id = id,
+
+               _geoip_city = "(select id from geoip_city where city='%s' " \
+               "limit 1)" % ipinfo.get('city', 'Unknown'),
+               
+               _geoip_country = "(select id from geoip_country where country" \
+               "='%s' limit 1)" % DB.escape(ipinfo.get("country_code3","---")),
+
+               _geoip_org = "(select id from geoip_org where org" \
+               "='%s' limit 1)" % DB.escape(ipinfo.get("org","Unknown")),
+
+               _geoip_isp = "(select id from geoip_isp where isp" \
+               "='%s' limit 1)" % DB.escape(ipinfo.get("isp","Unknown")),
+
+               _fast = True
+               )
+
+def lookup_whois_id(dbh, ip):
+    netmask = 0
+    while 1:
+        dbh.execute("select whois_id from whois_routes where ( inet_aton(%r) & inet_aton('255.255.255.255') & ~%r ) = network and (inet_aton('255.255.255.255') & ~%r) = netmask limit 1 " , (ip,netmask,netmask))
+        row=dbh.fetch()
+        ## If we found it, we return that, else we increase the
+        ## netmask one more step and keep trying. Worst case we should
+        ## pick off the 0.0.0.0 network which is our exit condition.
+        if row:
+            id = row['whois_id']
+            return id
+
+        if netmask>pow(2,32):
+            raise Reports.ReportError("Unable to find whois entry for %s. This should not happen... " % ip)
+
+        netmask = netmask * 2 + 1
+
 def lookup_whois(ip):
     """ Functions searches the database for the most specific whois match.
 
@@ -211,31 +172,11 @@ def lookup_whois(ip):
             
             return id
 
-    netmask = 0
-    while 1:
-        dbh.check_index("whois_routes","netmask")
-        dbh.check_index("whois_routes","network")
-        dbh.execute("select whois_id from whois_routes where ( %s & inet_aton('255.255.255.255') & ~%r ) = network and (inet_aton('255.255.255.255') & ~%r) = netmask limit 1 " , (sql_ip,netmask,netmask))
-        row=dbh.fetch()
-        ## If we found it, we return that, else we increase the
-        ## netmask one more step and keep trying. Worst case we should
-        ## pick off the 0.0.0.0 network which is our exit condition.
-        if row:
-            id = row['whois_id']
-            break
-
-        if netmask>pow(2,32):
-            raise Reports.ReportError("Unable to find whois entry for %s " % ip)
-
-        netmask = netmask * 2 + 1
-                
+    if config.PRECACHE_WHOIS:
+        id = lookup_whois_id(dbh, ip)
+    
     ## Cache it. We also may as well do a GEOIP lookup :)
-    try:
-        ipinfo = get_all_geoip_data(ip)
-    except Exception, e:
-        ##pyflaglog.log(pyflaglog.WARNING, "Error doing GeoIP lookup: %r" % e)
-        ipinfo = dict(city = 'Unknown', country_code3='---', 
-                      isp='Unknown', org='Unknown')
+    ipinfo = get_all_geoip_data(ip)
 
     ## For speed we try and do it all in one go
     try:
@@ -247,10 +188,8 @@ def lookup_whois(ip):
         ##
         try:
             dbh.insert("geoip_country", _fast=True,
-                       country = ipinfo['country_code3'])
+                       country = ipinfo.get('country_code3','---'))
         except DB.DBError, e:
-            ##pyflaglog.log(pyflaglog.WARNING, "Could not insert new places: %s" % e)
-            ## We probably tried to put a dupe in there
             pass
 
         ## 
@@ -258,10 +197,8 @@ def lookup_whois(ip):
         ##
         try:
             dbh.insert("geoip_city", _fast=True,
-                       city=ipinfo['city'])
+                       city=ipinfo.get('city','Unknown'))
         except DB.DBError, e:
-            ## pyflaglog.log(pyflaglog.WARNING, "Could not insert new places: %s" % e)
-            ## We probably tried to put a dupe in there
             pass
 
         ##
@@ -269,10 +206,8 @@ def lookup_whois(ip):
         ##
         try:
             dbh.insert("geoip_isp", _fast=True,
-                       isp=ipinfo['isp'])
+                       isp=ipinfo.get('isp','Unknown'))
         except DB.DBError, e:
-            ## pyflaglog.log(pyflaglog.WARNING, "Could not insert new places: %s" % e)
-            ## We probably tried to put a dupe in there
             pass
 
         ## 
@@ -280,10 +215,8 @@ def lookup_whois(ip):
         ##
         try:
             dbh.insert("geoip_org", _fast=True,
-                       org=ipinfo['org'])
+                       org=ipinfo.get('org','Unknown'))
         except DB.DBError, e:
-            ## pyflaglog.log(pyflaglog.WARNING, "Could not insert new places: %s" % e)
-            ## We probably tried to put a dupe in there
             pass
 
 
@@ -298,60 +231,44 @@ def lookup_whois(ip):
                           "had an error: %s" % e)
     return id
 
-def geoip_cached_record(ip):
-    country = ""
-    city = ""
-    row = None
-    ip_sql = "inet_aton(%r)" % ip
-    dbh = DB.DBO(None)
+def _geoip_cached_record(ip):
+    dbh = DB.DBO()
     
-    try:
-        dbh.execute("select * from whois_cache join " \
-                   " (geoip_country join geoip_city join geoip_isp " \
-                   " join geoip_org) " \
-                   " on (whois_cache.geoip_city = geoip_city.id and " \
-                   "whois_cache.geoip_country = geoip_country.id and " \
-                   "whois_cache.geoip_isp = geoip_isp.id and " \
-                   "whois_cache.geoip_org = geoip_org.id)" \
-                    "where whois_cache.ip=" \
-                   "%s" % ip_sql)
-        row = dbh.fetch()
-    except:
-        pyflaglog.log(pyflaglog.WARNING, "GeoIP information not cached...")
+    dbh.execute("select city,country, isp, org from whois_cache join " \
+                " (geoip_country join geoip_city join geoip_isp " \
+                " join geoip_org) " \
+                " on (whois_cache.geoip_city = geoip_city.id and " \
+                "whois_cache.geoip_country = geoip_country.id and " \
+                "whois_cache.geoip_isp = geoip_isp.id and " \
+                "whois_cache.geoip_org = geoip_org.id) " \
+                "where whois_cache.ip=inet_aton(%r)" % ip)
+    return dbh.fetch()
 
-    if not row:
-        id = lookup_whois(ip)
+def geoip_cached_record(ip):
+    result = _geoip_cached_record(ip)
+    if not result:
+        lookup_whois(ip)
         ## Now it really should be there...        
-        try:
-            dbh.execute("select * from whois_cache join " \
-                        " (geoip_country join geoip_city join geoip_isp " \
-                        " join geoip_org) " \
-                        " on (whois_cache.geoip_city = geoip_city.id and " \
-                        "whois_cache.geoip_country = geoip_country.id and " \
-                        "whois_cache.geoip_isp = geoip_isp.id and " \
-                        "whois_cache.geoip_org = geoip_org.id)" \
-                        "where whois_cache.ip=" \
-                        "%s" % ip_sql)
-            row = dbh.fetch()
-        except:
-            return dict(city="Unknown", country_code3="---",
-                        isp="Unknown", org="Unknown")
-    return dict(city=row['city'], country_code3=row['country'],
-                org=row['org'], isp=row['isp'])
+        result = _geoip_cached_record(ip)
 
+    return result
 
 def geoip_resolve_extended(ip):
     rec = geoip_cached_record(ip)
     return "%s / %s" % (rec['org'], rec['isp'])
 
-
 def geoip_resolve(ip):
     rec = geoip_cached_record(ip)
-    return "%s (%s) " % (rec['city'], rec['country_code3'])
+    return "%s (%s) " % (rec['city'], rec['country'])
 
-def identify_network(whois_id):
+def identify_network(whois_id,ip):
     """ Returns a uniq netname/country combination """
     dbh = DB.DBO(None)
+    ## No cached info - just work it out again
+    if not whois_id:
+        whois_id = lookup_whois_id(dbh, ip)
+
+    if whois_id<10: return ''
     dbh.check_index("whois","id")
     dbh.execute("select netname,country from whois where id=%r limit 1" , whois_id)
     row = dbh.fetch()
@@ -427,8 +344,8 @@ class LookupIP(Reports.report):
         
     def display_whois(self,query,result, address):
         # lookup IP address and show a nice summary of Whois Data
-        whois_id = lookup_whois(address)
         dbh = self.DBO(None)
+        whois_id = lookup_whois_id(dbh, address)
         dbh.check_index("whois","id")
         dbh.execute("SELECT INET_NTOA(start_ip) as start_ip, numhosts, country, descr, remarks, adminc, techc, status from whois where id=%s limit 1",whois_id)
         res = dbh.fetch()
@@ -469,6 +386,11 @@ class LookupWhoisID(LookupIP):
         self.display_whois(query,result,int(query['id']))
 
 class WhoisInit(FlagFramework.EventHandler):
+    def startup(self):
+        dbh = DB.DBO()
+        dbh.check_index("whois_routes","netmask")
+        dbh.check_index("whois_routes","network")
+
     def init_default_db(self, dbh, case):
         dbh.execute("""CREATE TABLE `whois` (
         `id` int(11) NOT NULL,

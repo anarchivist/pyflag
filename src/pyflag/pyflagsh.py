@@ -47,11 +47,11 @@ class ParserException(Exception):
 class environment:
     """ A class representing the environment """
     def __init__(self, case=None):
-        self._flag=FlagFramework.Flag(UI.GenericUI)
+        self._flag=FlagFramework.Flag()
+        UI.UI = UI.GenericUI
         self._FS = None
         self.CWD='/'
         self._CASE = case
-        self.ui=UI.GenericUI
 
 class command:
     """ Base class for each command """

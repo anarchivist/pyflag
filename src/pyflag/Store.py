@@ -73,6 +73,8 @@ class Store:
 
     def get(self, key):
         """ Retrieve the key from the store """
+        ## FIXME: This is slow for large stores... use a dict for
+        ## quick reference:
         self.mutex.acquire()
 
         try:

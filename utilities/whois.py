@@ -52,6 +52,10 @@ def print_address(address):
     row['descr'] = '\ndescr:          '.join([ x for x in row['descr'].splitlines()])
     print "------ %(ip)s ------\nnetname:        %(netname)s\nCountry:        %(country)s\ninetnum:        %(start_ip)s\nhosts:          %(numhosts)s\ndescr:          %(descr)s\n" % row
 
+    if config.geoip_display:
+        print Whois.geoip_cached_record(address)
+        print Whois.get_all_geoip_data(address)
+
 ## Resolve all args:
 for address in config.args:
     print_address(address)

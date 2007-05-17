@@ -148,7 +148,7 @@ class IISLogTest(LogFile.LogDriverTester):
     """ IIS Log file processing """
     test_case = "PyFlagTestCase"
     test_table = "TestTable"
-    test_file = "%s/pyflag_iis_standard_log.gz" % config.UPLOADDIR
+    test_file = "pyflag_iis_standard_log.gz"
     log_preset = "IISTest"
 
     def test01CreatePreset(self):
