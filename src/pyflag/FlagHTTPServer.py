@@ -255,7 +255,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
         # Did the user asked for a complete render of the window?
         if query.has_key('__main__'):
             theme=pyflag.Theme.get_theme(query)
-            result = theme.menu(flag,query)
+            theme.menu(flag,query,result)
             result.defaults=query
             
         #Is this a request for a saved UI?
@@ -304,7 +304,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                   #Did the user request a report?
                   if not query.has_key('family') or not query.has_key('report'):
                       theme=pyflag.Theme.get_theme(query)
-                      result = theme.menu(flag,query)
+                      theme.menu(flag,query,result)
                       result.defaults=query
                   else:
                       try:

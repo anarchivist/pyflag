@@ -277,10 +277,10 @@ if config.delete:
   `src_id` int,
   `start_ip` int(10) unsigned,
   `netname` varchar(250),
-  `numhosts` int,
-  `country` char(2),
-  `adminc` varchar(50),
-  `techc` varchar(50),
+  `numhosts` int unsigned,
+  `country` char(3),
+  `adminc` varchar(250),
+  `techc` varchar(250),
   `descr` text,
   `remarks` text,
   `status` enum('assigned','allocated','reserved','unallocated'))""")
@@ -290,12 +290,12 @@ if config.delete:
   dbh.execute("CREATE TABLE IF NOT EXISTS whois_routes ( `network` int(10) unsigned, `netmask` int(10) unsigned, `whois_id` int)")
 
   dbh.execute("""create table whois_cache (
-  `id` int not NULL,
-  `ip` int not NULL,
-  `geoip_country` unsigned int NOT NULL,
-  `geoip_city` unsigned int NOT NULL,
-  `geoip_isp` unsigned int NOT NULL,
-  `geoip_org` unsigned int NOT NULL
+  `id` int unsigned not NULL,
+  `ip` int unsigned not NULL,
+  `geoip_country` int unsigned NOT NULL,
+  `geoip_city` int unsigned NOT NULL,
+  `geoip_isp` int unsigned NOT NULL,
+  `geoip_org` int unsigned NOT NULL
   ) engine=MyISAM""")
 
   # add default (fallthrough) route and reserved ranges
@@ -328,7 +328,7 @@ else:
   dbh.execute("select max(id) as max from whois_sources")
   row = dbh.fetch()
   
-  if not row:
+  if not row or not row['max']:
     whois_sources_id = 1
   else:
     whois_sources_id = row['max'] + 1
@@ -372,11 +372,11 @@ for k,url in urls.items():
     dbh.mass_insert(
       src_id = whois_sources_id,
       start_ip = "%u" % rec.start_ip,
-      netname = rec.netname,
+      netname = rec.netname[:250],
       numhosts = rec.num_hosts,
-      country = rec.country,
-      adminc = rec.adminc,
-      techc = rec.techc,
+      country = rec.country[:2],
+      adminc = rec.adminc[:250],
+      techc = rec.techc[:250],
       id = whois_id,
       descr = rec.descr,
       remarks = rec.remarks,

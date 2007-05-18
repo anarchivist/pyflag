@@ -34,9 +34,8 @@ class Menu(Theme.BasicTheme):
 
         return result + "</tr></table>" + submenus
     
-    def menu(self,flag,query):
+    def menu(self,flag,query, result):
         """ We just draw the main page for the database here """
-        result=flag.ui()
         result.heading("PyFlag - Forensic and Log Analysis GUI")
         left = result.__class__(result)
         tmp = result.__class__(result)
