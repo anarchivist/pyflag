@@ -1,4 +1,9 @@
 /* -*- Mode: C; indent-tabs-mode: t; c-basic-offset: 2; tab-width: 2 -*- */
+/** This is a heavily modified version of the original py_GeoIP.c
+		released by MaxMind. The original version has an odd interface and
+		many bugs. This version should be much more pythonic.
+*/
+
 /* py_GeoIP.c
  *
  * Copyright (C) 2003 MaxMind LLC
@@ -27,131 +32,137 @@ staticforward PyTypeObject GeoIP_GeoIPType;
 typedef struct {
   PyObject_HEAD;
   GeoIP *gi;
-} GeoIP_GeoIPObject;
+} GeoIPObject;
 
-static PyObject*
-GeoIP_new_Py(PyObject* self, PyObject *args) {
-  GeoIP_GeoIPObject* GeoIP;
-  int flags;
+/** Here if we fail to open the file we raise an IOError as is
+		customery in python. The original module returned None.
 
-  if (!PyArg_ParseTuple(args, "i", &flags)) {
-    return NULL;
-  }
+		We also ask callers to tell us what type of database they expect
+		so we can check it right here. The original code would not
+		indicate an error until it was time to read the handle, at which
+		time it was way too late. For example it was possible to do:
 
-  GeoIP = PyObject_New(GeoIP_GeoIPObject, &GeoIP_GeoIPType);
+		a = GeoIP("/etc/passwd")
 
-  GeoIP->gi = GeoIP_new(flags);
+		without an exception raised until we actually tried to query it.
 
-  if (!GeoIP->gi) {
-    return NULL;
-  }
-
-  return (PyObject*)GeoIP;
-}
-
-static PyObject*
-GeoIP_open_Py(PyObject* self, PyObject *args) {
-  GeoIP_GeoIPObject* GeoIP;
+		The GEOIP_STANDARD is the default here - so this parameter is
+		optional.
+*/
+static int GeoIP_init(GeoIPObject* self, PyObject *args) {
   char * filename;
-  int flags;
+  int flags=0;
+	int expected_type;
 
-  if (!PyArg_ParseTuple(args, "si", &filename, &flags)) {
-    return NULL;
+	if (!PyArg_ParseTuple(args, "si|i", &filename, &expected_type, &flags)) {
+    return -1;
   }
 
-  GeoIP = PyObject_New(GeoIP_GeoIPObject, &GeoIP_GeoIPType);
+  self->gi = GeoIP_open(filename, flags);
 
-  GeoIP->gi = GeoIP_open(filename, flags);
+	// We need to raise a proper python Exception - the original code
+	// just returned NULL which is incorrect because GeoIP_open does not
+	// properly set the exception state:
+  if (!self->gi) {
+		PyErr_Format(PyExc_IOError, "Cant open file %s", filename);
+    return -1;
+  };
 
-  if (!GeoIP->gi) {
-    return NULL;
-  }
+	// We need to verify that this database is something we can handle
+	if(self->gi->databaseType != expected_type) {
+		PyErr_Format(PyExc_IOError, "This file is not of the expected type");
+		return -1;
+	};
 
-  return (PyObject*)GeoIP;
+	return 0;
 }
 
 static void
-GeoIP_GeoIP_dealloc(PyObject* self)
+GeoIP_dealloc(GeoIPObject* self)
 {
-  GeoIP_GeoIPObject* GeoIP = (GeoIP_GeoIPObject*)self;
-  GeoIP_delete(GeoIP->gi);
-  PyObject_Del(self);
-}
+	if(self->gi)
+		GeoIP_delete(self->gi);
 
-static PyObject * GeoIP_country_code_by_name_Py(PyObject *self, PyObject *args) {
+  self->ob_type->tp_free((PyObject*)self);
+};
+
+static PyObject * GeoIP_country_code_by_name_Py(GeoIPObject *self, PyObject *args) {
   char * name;
   const char * retval;
-  GeoIP_GeoIPObject* GeoIP = (GeoIP_GeoIPObject*)self;
   if (!PyArg_ParseTuple(args, "s", &name)) {
     return NULL;
-  }
-  retval = GeoIP_country_code_by_name(GeoIP->gi, name);
+  };
+
+  retval = GeoIP_country_code_by_name(self->gi, name);
   return Py_BuildValue("s", retval);
 }
 
-static PyObject * GeoIP_country_name_by_name_Py(PyObject *self, PyObject *args) {
+static PyObject * GeoIP_country_name_by_name_Py(GeoIPObject *self, PyObject *args) {
   char * name;
   const char * retval;
-  GeoIP_GeoIPObject* GeoIP = (GeoIP_GeoIPObject*)self;
+
   if (!PyArg_ParseTuple(args, "s", &name)) {
     return NULL;
   }
-  retval = GeoIP_country_name_by_name(GeoIP->gi, name);
+  retval = GeoIP_country_name_by_name(self->gi, name);
   return Py_BuildValue("s", retval);
 }
 
-static PyObject * GeoIP_country_code_by_addr_Py(PyObject *self, PyObject *args) {
+static PyObject * GeoIP_country_code_by_addr_Py(GeoIPObject *self, PyObject *args) {
   char * name;
   const char * retval;
-  GeoIP_GeoIPObject* GeoIP = (GeoIP_GeoIPObject*)self;
+
   if (!PyArg_ParseTuple(args, "s", &name)) {
     return NULL;
   }
-  retval = GeoIP_country_code_by_addr(GeoIP->gi, name);
+
+  retval = GeoIP_country_code_by_addr(self->gi, name);
   return Py_BuildValue("s", retval);
 }
 
-static PyObject * GeoIP_country_name_by_addr_Py(PyObject *self, PyObject *args) {
+static PyObject * GeoIP_country_name_by_addr_Py(GeoIPObject *self, PyObject *args) {
   char * name;
   const char * retval;
-  GeoIP_GeoIPObject* GeoIP = (GeoIP_GeoIPObject*)self;
+
   if (!PyArg_ParseTuple(args, "s", &name)) {
     return NULL;
   }
-  retval = GeoIP_country_name_by_addr(GeoIP->gi, name);
+  retval = GeoIP_country_name_by_addr(self->gi, name);
   return Py_BuildValue("s", retval);
 }
 
-static PyObject * GeoIP_org_by_addr_Py(PyObject *self, PyObject *args) {
+static PyObject * GeoIP_org_by_addr_Py(GeoIPObject *self, PyObject *args) {
   char * name;
   const char * retval;
-  GeoIP_GeoIPObject* GeoIP = (GeoIP_GeoIPObject*)self;
+
   if (!PyArg_ParseTuple(args, "s", &name)) {
     return NULL;
   }
-  retval = GeoIP_org_by_addr(GeoIP->gi, name);
+  retval = GeoIP_org_by_addr(self->gi, name);
   return Py_BuildValue("s", retval);
 }
 
-static PyObject * GeoIP_org_by_name_Py(PyObject *self, PyObject *args) {
+static PyObject * GeoIP_org_by_name_Py(GeoIPObject *self, PyObject *args) {
   char * name;
   const char * retval;
-  GeoIP_GeoIPObject* GeoIP = (GeoIP_GeoIPObject*)self;
+
   if (!PyArg_ParseTuple(args, "s", &name)) {
     return NULL;
   }
-  retval = GeoIP_org_by_name(GeoIP->gi, name);
+  
+	retval = GeoIP_org_by_name(self->gi, name);
   return Py_BuildValue("s", retval);
 }
 
-void GeoIP_SetItemString(PyObject *dict, const char * name, char * value) {
-	PyObject * nameObj;
+int GeoIP_SetItemString(PyObject *dict, const char * name, char * value) {
 	PyObject * valueObj;
-	nameObj = Py_BuildValue("s",name);
-	valueObj = Py_BuildValue("s",value);
-	PyDict_SetItem(dict,nameObj,valueObj);
-	Py_DECREF(nameObj);
+	int result;
+
+	valueObj = Py_BuildValue("s", value);
+	result = PyDict_SetItemString(dict, name, valueObj);
 	Py_DECREF(valueObj);
+
+	return result;
 }
 
 void GeoIP_SetItemFloat(PyObject *dict, const char * name, float value) {
@@ -200,110 +211,146 @@ static PyObject * GeoIP_populate_dict(GeoIPRecord *gir) {
 	return retval;
 }
 
-static PyObject * GeoIP_record_by_addr_Py(PyObject *self, PyObject *args) {
+static PyObject * GeoIP_record_by_addr_Py(GeoIPObject *self, PyObject *args) {
   char * addr;
   GeoIPRecord * gir;
-  GeoIP_GeoIPObject* GeoIP = (GeoIP_GeoIPObject*)self;
+
   if (!PyArg_ParseTuple(args, "s", &addr)) {
     return NULL;
   }
-  gir = GeoIP_record_by_addr(GeoIP->gi, addr);
+
+  gir = GeoIP_record_by_addr(self->gi, addr);
+
+	// Properly set the exception state here...
 	if (gir == NULL) {
-		return NULL;
+		return PyErr_Format(PyExc_KeyError, "Unable to find record for %s", addr);
 	}
+
 	return GeoIP_populate_dict(gir);
 }
 
-static PyObject * GeoIP_record_by_name_Py(PyObject *self, PyObject *args) {
+static PyObject * GeoIP_record_by_name_Py(GeoIPObject *self, PyObject *args) {
   char * name;
   GeoIPRecord * gir;
-  GeoIP_GeoIPObject* GeoIP = (GeoIP_GeoIPObject*)self;
+
   if (!PyArg_ParseTuple(args, "s", &name)) {
     return NULL;
-  }
-  gir = GeoIP_record_by_name(GeoIP->gi, name);
+  };
+
+	// Properly set the exception state here...
+  gir = GeoIP_record_by_name(self->gi, name);
 	if (gir == NULL) {
-		return NULL;
-	}
+		return PyErr_Format(PyExc_KeyError, "Unable to find record for %s", name);
+	};
+
 	return GeoIP_populate_dict(gir);
 }
 
-static PyObject * GeoIP_region_by_name_Py(PyObject *self, PyObject * args) {
+static PyObject * GeoIP_region_by_name_Py(GeoIPObject *self, PyObject * args) {
   char * name;
   GeoIPRegion * retval;
-  GeoIP_GeoIPObject* GeoIP = (GeoIP_GeoIPObject*)self;
+
   if (!PyArg_ParseTuple(args, "s", &name)) {
     return NULL;
-  }
-  retval = GeoIP_region_by_name(GeoIP->gi, name);
-  return GeoIP_region_populate_dict(retval);
+  };
+
+	// Properly set the exception state here...
+  retval = GeoIP_region_by_name(self->gi, name);
+	if(!retval)
+		return PyErr_Format(PyExc_KeyError, "Unable to find record for %s", name);  
+
+	return GeoIP_region_populate_dict(retval);
 }
 
-static PyObject * GeoIP_region_by_addr_Py(PyObject *self, PyObject * args) {
+static PyObject * GeoIP_region_by_addr_Py(GeoIPObject *self, PyObject * args) {
   char * name;
   GeoIPRegion * retval;
-  GeoIP_GeoIPObject* GeoIP = (GeoIP_GeoIPObject*)self;
+
   if (!PyArg_ParseTuple(args, "s", &name)) {
     return NULL;
   }
-  retval = GeoIP_region_by_addr(GeoIP->gi, name);
+
+  retval = GeoIP_region_by_addr(self->gi, name);
+	if(!retval)
+ 		return PyErr_Format(PyExc_KeyError, "Unable to find record for %s", name);
+
   return GeoIP_region_populate_dict(retval);
 }
 
 static PyMethodDef GeoIP_Object_methods[] = {
-  {"country_code_by_name", GeoIP_country_code_by_name_Py, 1, "Lookup Country Code By Name"},
-  {"country_name_by_name", GeoIP_country_name_by_name_Py, 1, "Lookup Country Name By Name"},
-  {"country_code_by_addr", GeoIP_country_code_by_addr_Py, 1, "Lookup Country Code By IP Address"},
-  {"country_name_by_addr", GeoIP_country_name_by_addr_Py, 1, "Lookup Country Name By IP Address"},
-  {"org_by_addr", GeoIP_org_by_addr_Py, 1, "Lookup Organization or ISP By IP Address"},
-  {"org_by_name", GeoIP_org_by_name_Py, 1, "Lookup Organization or ISP By Name"},
-  {"region_by_addr", GeoIP_region_by_addr_Py, 1, "Lookup Region By IP Address"},
-  {"region_by_name", GeoIP_region_by_name_Py, 1, "Lookup Region By Name"},
-  {"record_by_addr", GeoIP_record_by_addr_Py, 1, "Lookup City Region By IP Address"},
-  {"record_by_name", GeoIP_record_by_name_Py, 1, "Lookup City Region By Name"},
+  {"country_code_by_name", (PyCFunction)GeoIP_country_code_by_name_Py, 
+	 METH_VARARGS, "Lookup Country Code By Name"},
+  {"country_name_by_name", (PyCFunction)GeoIP_country_name_by_name_Py, 
+	 METH_VARARGS, "Lookup Country Name By Name"},
+  {"country_code_by_addr", (PyCFunction)GeoIP_country_code_by_addr_Py, 
+	 METH_VARARGS, "Lookup Country Code By IP Address"},
+  {"country_name_by_addr", (PyCFunction)GeoIP_country_name_by_addr_Py, 
+	 METH_VARARGS, "Lookup Country Name By IP Address"},
+  {"org_by_addr", (PyCFunction)GeoIP_org_by_addr_Py, 
+	 METH_VARARGS, "Lookup Organization or ISP By IP Address"},
+  {"org_by_name", (PyCFunction)GeoIP_org_by_name_Py, 
+	 METH_VARARGS, "Lookup Organization or ISP By Name"},
+  {"region_by_addr", (PyCFunction)GeoIP_region_by_addr_Py, 
+	 METH_VARARGS, "Lookup Region By IP Address"},
+  {"region_by_name", (PyCFunction)GeoIP_region_by_name_Py, 
+	 METH_VARARGS, "Lookup Region By Name"},
+  {"record_by_addr", (PyCFunction)GeoIP_record_by_addr_Py, 
+	 METH_VARARGS, "Lookup City Region By IP Address"},
+  {"record_by_name", (PyCFunction)GeoIP_record_by_name_Py, 
+	 METH_VARARGS, "Lookup City Region By Name"},
   {NULL, NULL, 0, NULL}
 };
-
-static PyObject *
-GeoIP_GetAttr(PyObject *self, char *attrname)
-{
-  if (strcmp(attrname, "GEOIP_STANDARD") == 0) {
-    return Py_BuildValue("i", 0);
-  }
-  return Py_FindMethod(GeoIP_Object_methods, self, attrname);
-}
 
 static PyTypeObject GeoIP_GeoIPType = {
-  PyObject_HEAD_INIT(NULL)
-  0,
-  "GeoIP",
-  sizeof(GeoIP_GeoIPObject),
-  0,
-  GeoIP_GeoIP_dealloc, /*tp_dealloc*/
-  0,          /*tp_print*/
-  (getattrfunc)GeoIP_GetAttr,  /*tp_getattr*/
-  0,          /*tp_setattr*/
-  0,          /*tp_compare*/
-  0,          /*tp_repr*/
-  0,          /*tp_as_number*/
-  0,          /*tp_as_sequence*/
-  0,          /*tp_as_mapping*/
-  0,          /*tp_hash */
+	PyObject_HEAD_INIT(NULL)
+	0,                         /* ob_size */
+	"geoip.GeoIP",             /* tp_name */
+	sizeof(GeoIPObject),          /* tp_basicsize */
+	0,                         /* tp_itemsize */
+	(destructor)GeoIP_dealloc, /* tp_dealloc */
+	0,                         /* tp_print */
+	0,                         /* tp_getattr */
+	0,                         /* tp_setattr */
+	0,                         /* tp_compare */
+	0,                         /* tp_repr */
+	0,                         /* tp_as_number */
+	0,                         /* tp_as_sequence */
+	0,                         /* tp_as_mapping */
+	0,                         /* tp_hash */
+	0,                         /* tp_call */
+	0,                         /* tp_str */
+	0,                         /* tp_getattro */
+	0,                         /* tp_setattro */
+	0,                         /* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,        /* tp_flags */
+	"GeoIP Object",      /* tp_doc */
+	0,	                       /* tp_traverse */
+	0,                         /* tp_clear */
+	0,                         /* tp_richcompare */
+	0,                         /* tp_weaklistoffset */
+	0,                         /* tp_iter */
+	0,                         /* tp_iternext */
+	GeoIP_Object_methods,          /* tp_methods */
+	0,                         /* tp_members */
+	0,                         /* tp_getset */
+	0,                         /* tp_base */
+	0,                         /* tp_dict */
+	0,                         /* tp_descr_get */
+	0,                         /* tp_descr_set */
+	0,                         /* tp_dictoffset */
+	(initproc)GeoIP_init,      /* tp_init */
+	0,                         /* tp_alloc */
+	0,                         /* tp_new */
 };
 
-static PyMethodDef GeoIP_Class_methods[] = {
-  {"new", GeoIP_new_Py, 1, "GeoIP Constructor"},
-  {"open", GeoIP_open_Py, 1, "GeoIP Constructor with database filename argument"},
-  {NULL, NULL, 0, NULL}
+static PyMethodDef GeoIPModuleMethods[] = {
+	{NULL, NULL, 0, NULL}
 };
 
-DL_EXPORT(void)
-initGeoIP(void) 
-{
+PyMODINIT_FUNC initgeoip(void) {
   PyObject *m, *d, *tmp;
-  GeoIP_GeoIPType.ob_type = &PyType_Type;
 
-  m = Py_InitModule("GeoIP", GeoIP_Class_methods);
+  m = Py_InitModule("geoip", GeoIPModuleMethods);
   d = PyModule_GetDict(m);
 
   tmp = PyInt_FromLong(0);
@@ -313,4 +360,26 @@ initGeoIP(void)
   tmp = PyInt_FromLong(1);
   PyDict_SetItemString(d, "GEOIP_MEMORY_CACHE", tmp);
   Py_DECREF(tmp);
+
+
+	GeoIP_SetItemInt(d,"GEOIP_COUNTRY_EDITION"     , 1);
+	GeoIP_SetItemInt(d,"GEOIP_REGION_EDITION_REV0" , 7);
+	GeoIP_SetItemInt(d,"GEOIP_CITY_EDITION_REV0"   , 6);
+	GeoIP_SetItemInt(d,"GEOIP_ORG_EDITION"         , 5);
+	GeoIP_SetItemInt(d,"GEOIP_ISP_EDITION"         , 4);
+	GeoIP_SetItemInt(d,"GEOIP_CITY_EDITION_REV1"   , 2);
+	GeoIP_SetItemInt(d,"GEOIP_REGION_EDITION_REV1" , 3);
+	GeoIP_SetItemInt(d,"GEOIP_PROXY_EDITION"       , 8);
+	GeoIP_SetItemInt(d,"GEOIP_ASNUM_EDITION"       , 9);
+	GeoIP_SetItemInt(d,"GEOIP_NETSPEED_EDITION"    , 10);
+	GeoIP_SetItemInt(d,"GEOIP_DOMAIN_EDITION"      , 11);
+
+
+	GeoIP_GeoIPType.tp_new = PyType_GenericNew;
+	if(PyType_Ready(&GeoIP_GeoIPType)<0)
+		return;
+
+	Py_INCREF(&GeoIP_GeoIPType);
+
+	PyModule_AddObject(m, "GeoIP", (PyObject *)&GeoIP_GeoIPType);
 }

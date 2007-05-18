@@ -68,20 +68,32 @@ WHOIS_CACHE = Store.Store()
 ## Try for the GeoIP City Stuff....
 
 try:
-    import GeoIP
-    gi_resolver = ( GeoIP.open(config.GEOIPDIR + "/GeoIPCity.dat", 
-                               GeoIP.GEOIP_STANDARD) or \
-                    GeoIP.open(config.GEOIPDIR + "/GeoLiteCity.dat", 
-                               GeoIP.GEOIP_STANDARD))
+    from geoip import GeoIP, GEOIP_CITY_EDITION_REV1, GEOIP_ORG_EDITION
+
+    try:
+        gi_resolver = GeoIP(config.GEOIPDIR + "/GeoIPCity.dat", 
+                                 GEOIP_CITY_EDITION_REV1)
+    except IOError:
+        try:
+            gi_resolver = GeoIP(config.GEOIPDIR + "/GeoLiteCity.dat", 
+                                     GEOIP_CITY_EDITION_REV1)
+        except IOError:
+            gi_resolver = None
 
     ## Now try for the GeoIPISP
-    gi_isp_resolver = GeoIP.open(config.GEOIPDIR + "/GeoIPISP.dat",
-                                 GeoIP.GEOIP_STANDARD)
+    try:
+        gi_isp_resolver = GeoIP(config.GEOIPDIR + "/GeoIPISP.dat",\
+                                GEOIP_ORG_EDITION)
+    except IOError:
+        gi_isp_resolver = None
 
-    ## Now try the GEOIPOrg    
-    gi_org_resolver = GeoIP.open(config.GEOIPDIR + "/GeoIPOrg.dat",
-                                 GeoIP.GEOIP_STANDARD)
-
+    ## Now try the GEOIPOrg
+    try:
+        gi_org_resolver = GeoIP(config.GEOIPDIR + "/GeoIPOrg.dat",\
+                                GEOIP_ORG_EDITION)
+    except IOError:
+        gi_org_resolver = None
+        
 except ImportError:
     gi_resolver = None
     gi_isp_resolver = None
@@ -229,7 +241,7 @@ def lookup_whois(ip):
             insert_whois_cache(sql_ip, id, ipinfo)
         except DB.DBError, e: 
             pyflaglog.log(pyflaglog.WARNING, "Problem in GeoIP " \
-                          "caching: %s" e)
+                          "caching: %s" % e)
     return id
 
 def _geoip_cached_record(ip):

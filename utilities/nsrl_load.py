@@ -40,6 +40,7 @@ import csv
 import sys,os
 import pyflag.conf
 config=pyflag.conf.ConfObject()
+import gzip
 
 parser = OptionParser(usage="""%prog path_to_nsrl_directory path_to_nsrl_directory
 
@@ -81,11 +82,18 @@ def to_md5(string):
 
 ## First do the main NSRL hash table
 def MainNSRLHash(dirname):
-    file_fd=file(dirname+"/NSRLFile.txt")
+    try:
+        file_fd = gzip.open(dirname+"/NSRLFile.txt.gz")
+    except IOError:
+        file_fd = open(dirname+"/NSRLFile.txt")
+        
     ## Work out the size:
-    file_fd.seek(0,2)
-    size = file_fd.tell()
-    file_fd.seek(0)
+    try:
+        file_fd.seek(0,2)
+        size = file_fd.tell()
+        file_fd.seek(0)
+    except TypeError:
+        size = None
     
     fd=csv.reader(file_fd)
     print "Starting to import %s/NSRLFile.txt" % dirname
@@ -98,7 +106,7 @@ def MainNSRLHash(dirname):
     count = 0
     dbh.mass_insert_start('NSRL_hashes')
     for row in fd:
-        if not count % 10000:
+        if size and not count % 10000:
             sys.stdout.write(" Progress %02u%% Done - %uk rows\r" % (file_fd.tell()*100/size,count/1000))
             sys.stdout.flush()
         count+=1
@@ -107,12 +115,12 @@ def MainNSRLHash(dirname):
             dbh.mass_insert(
 #                md5=to_md5(row[1]),
                 ## This should be faster:
-                md5=row[1].decode("hex")
+                md5=row[1].decode("hex"),
                 filename=row[3],
                 productcode=row[5],
                 oscode=row[6],
                 )
-        except (ValueError,DB.DBError),e:
+        except (ValueError,DB.DBError, TypeError),e:
             print "SQL Error skipped %s" %e
         except IndexError:
             continue
@@ -121,11 +129,18 @@ def MainNSRLHash(dirname):
 
 ## Now insert the product table:
 def ProductTable(dirname):
-    file_fd=file(dirname+"/NSRLProd.txt")
+    try:
+        file_fd=gzip.open(dirname+"/NSRLProd.txt.gz")
+    except IOError:
+        file_fd=open(dirname+"/NSRLProd.txt")
+        
     ## Work out the size:
-    file_fd.seek(0,2)
-    size = file_fd.tell()
-    file_fd.seek(0)
+    try:
+        file_fd.seek(0,2)
+        size = file_fd.tell()
+        file_fd.seek(0)
+    except TypeError:
+        size = None
     
     fd=csv.reader(file_fd)
     print "Starting to import %s/NSRLProd.txt" % dirname
@@ -139,7 +154,7 @@ def ProductTable(dirname):
     count = 0
     dbh.mass_insert_start('NSRL_products')
     for row in fd:
-        if not count % 10000:
+        if size and not count % 10000:
             sys.stdout.write(" Progress %02u%% Done - %uk rows\r" % (file_fd.tell()*100/size,count/1000))
             sys.stdout.flush()
         count+=1
@@ -152,7 +167,7 @@ def ProductTable(dirname):
                 OpSystemCode=row[3],
                 ApplicationType=row[6],
                 )
-        except (ValueError,DB.DBError),e:
+        except (TypeError, ValueError,DB.DBError),e:
             print "SQL Error skipped %s" %e
 
     dbh.mass_insert_commit()
