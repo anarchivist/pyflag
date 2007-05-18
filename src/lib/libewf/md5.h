@@ -45,12 +45,12 @@
 #ifndef _LIBEWF_MD5_H
 #define _LIBEWF_MD5_H
 
-#include <openssl/md5.h>
+#include <../md5.h>
 
 #define LIBEWF_MD5_CTX MD5_CTX
-#define LIBEWF_MD5_INIT MD5_Init
-#define LIBEWF_MD5_UPDATE MD5_Update
-#define LIBEWF_MD5_FINAL MD5_Final
+#define LIBEWF_MD5_INIT MD5Init
+#define LIBEWF_MD5_UPDATE MD5Update
+#define LIBEWF_MD5_FINAL MD5Final
 
 #endif
 

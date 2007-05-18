@@ -41,12 +41,14 @@ hidden = False
 order = 40
 
 config.add_option("GEOIPDIR", default=config.DATADIR,
-                  help="The directory containing all the GeoIP files. We try to open (in this order) GeoIPCity.dat, GeoLiteCity.dat (if GeoIPCity.dat fails), GeoIPISP.dat, GeoIPOrg.dat. If any of them fail we just don't use them")
+                  help="The directory containing all the GeoIP files. We try to open (in this"
+                  " order) GeoIPCity.dat, GeoLiteCity.dat (if GeoIPCity.dat fails),"
+                  " GeoIPISP.dat, GeoIPOrg.dat. If any of them fail we just don't use them")
 
 config.add_option("PRECACHE_WHOIS", default=False, action="store_true",
                   help="Perform whois calculations from offline db on all IP addresses. This"
                   " makes it possible to search on whois metadata but its relatively very"
-                  " slow (especially when loading large log"
+                  " slow (especially when loading large log "
                   " files). Select this to enable this option.")
 
 ## This is not needed because we use DB caching anyway:
@@ -202,7 +204,7 @@ def lookup_whois(ip):
             pass
 
         ##
-        ## LOOKIP GEOIP ISP
+        ## LOOKUP GEOIP ISP
         ##
         try:
             dbh.insert("geoip_isp", _fast=True,
@@ -211,7 +213,7 @@ def lookup_whois(ip):
             pass
 
         ## 
-        ## LOOKIP GEOISP ORG
+        ## LOOKUP GEOISP ORG
         ##
         try:
             dbh.insert("geoip_org", _fast=True,
@@ -226,9 +228,8 @@ def lookup_whois(ip):
         try:
             insert_whois_cache(sql_ip, id, ipinfo)
         except DB.DBError, e: 
-            pyflaglog.log(pyflaglog.WARNING, "There was a problem doing the GeoIP " \
-                          "stuff. We had an error, tried to re insert stuff then " \
-                          "had an error: %s" % e)
+            pyflaglog.log(pyflaglog.WARNING, "Problem in GeoIP " \
+                          "caching: %s" e)
     return id
 
 def _geoip_cached_record(ip):

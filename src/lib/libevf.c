@@ -75,7 +75,6 @@ THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED WAR
  ****************************************************/
 #include "libevf.h"
 #include "except.h"
-#include "global.h"
 #include "md5.h"
 
 // Constant messages:

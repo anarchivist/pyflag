@@ -92,3 +92,8 @@ class IOSourceMethod(IO.FileHandler):
                 "%s/%s" % (config.UPLOADDIR, f))
         
         return image.open(None, None, query=query)
+
+import pyflag.tests as tests
+
+class MethodHandlerTests(tests.FDTest):
+    pass
