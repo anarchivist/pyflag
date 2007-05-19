@@ -29,7 +29,8 @@ class AdvancedLog(LogFile.Log):
             for f in self.fields:
                 consumed, name, sql = f.log_parse(row)
                 row = row[consumed:]
-                result[name] = sql
+                if name:
+                    result[name] = sql
 
             yield result
 
@@ -165,9 +166,21 @@ class AdvancedLog(LogFile.Log):
             )
 
 class PadType(TableObj.ColumnType):
+    def __init__(self, regex='.'):
+        TableObj.ColumnType.__init__(self, name="-", column="-")
+        self.re = re.compile(regex)
+        
     def insert(self, value):
         pass
 
+    def log_parse(self, row):
+        m = self.re.match(row)
+        
+        if m:
+            return m.end(), None, None
+
+        return None, None, None
+    
 ## Unit tests - a simple syslog parser:
 import time
 
@@ -176,7 +189,7 @@ class AdvancedLogTest(LogFile.LogDriverTester):
     """ Advanced Log driver Tests """
     test_case = "PyFlagTestCase"
     test_table = "TestTable"
-    test_file = "%s/messages.gz" % config.UPLOADDIR
+    test_file = "messages.gz"
     log_preset = "AdvancedSyslog"
 
     def test01CreatePreset(self):

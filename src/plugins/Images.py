@@ -251,6 +251,7 @@ import pyflag.pyflagsh as pyflagsh
 
 class RemoteIOSourceTests(unittest.TestCase):
     """ Test the Remote IO source implementation """
+    level = 10
     def setUp(self):
         time.sleep(1)
         ## Start the remote server on the localhost

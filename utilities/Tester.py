@@ -41,6 +41,9 @@ Generic Test harness for running unit tests.
 config.add_option('match', short_option='m', default=None,
                   help='Run only tests matching this RE')
 
+config.add_option('file', short_option='f', default=None,
+                  help="Run only tests in this file (file is an RE)")
+
 config.add_option('level', default=10, short_option='l',
                   type='int', help='Testing level (1 least exhaustive)')
 
@@ -56,10 +59,14 @@ import pyflag.Farm as Farm
 Farm.start_workers()
 
 test_registry = Registry.InitTests()
-if not config.match:
-    classes = test_registry.classes
-else:
+if config.match:
     classes = [ x for x in test_registry.classes if re.search(config.match,"%s" % x.__doc__)]
+elif config.file:
+    classes = [ x for x in test_registry.classes if re.search(config.file, \
+                    test_registry.filename(test_registry.get_name(x))) ]
+else:
+    classes = test_registry.classes
+
 
 ## Only do those tests who are below the current level:
 tmp = []
@@ -91,7 +98,7 @@ for test_class in classes:
         doc = test_class
         
     print "---------------------------------------"
-    print "Running tests in %s (%s)" % (doc, test_registry.filename(test_class))
+    print "Running tests in %s (%s)" % (doc, test_registry.filename(test_registry.get_name(test_class)))
     print "---------------------------------------"
     suite = unittest.makeSuite(test_class)
     unittest.TextTestRunner(verbosity=2).run(suite)

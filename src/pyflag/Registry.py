@@ -48,7 +48,7 @@ class Registry:
     classes = []
     class_names = []
     order = []
-    filenames = []
+    filenames = {}
     
     def __init__(self,ParentClass):
         """ Search the plugins directory for all classes extending ParentClass.
@@ -161,7 +161,7 @@ class Registry:
         """
         if Class not in self.classes:
             self.classes.append(Class)
-            self.filenames.append(filename)
+            self.filenames[self.get_name(Class)] = filename
             try:
                 self.order.append(Class.order)
             except:
@@ -197,9 +197,14 @@ class Registry:
 
         raise ImportError("No module by name %s" % name)
 
+    def get_name(self, cls):
+        try:
+            return cls.name
+        except AttributeError:
+            return ("%s" % cls).split(".")[-1]
 
-    def filename(self, cls):
-        return self.filenames[self.classes.index(cls)]
+    def filename(self, cls_name):
+        return self.filenames.get(cls_name, "Unknown")
 
 class ReportRegistry(Registry):
     """ A class to register reports.
@@ -281,12 +286,6 @@ class ScannerRegistry(Registry):
         self.classes.sort(sort_function)
         self.class_names = [ self.get_name(i) for i in self.classes ]
         self.scanners = self.class_names
-
-    def get_name(self, cls):
-        try:
-            return cls.name
-        except AttributeError:
-            return ("%s" % cls).split(".")[-1]
 
     def dispatch(self,scanner_name):
         return self.classes[self.class_names.index(scanner_name)]
