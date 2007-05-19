@@ -359,3 +359,12 @@ config.add_option("MAX_SESSION_AGE", default=100000, type='int',
                   help="Maximum age (in packets) for a session before it "
                   "will be considered terminated.")
                   
+
+import pyflag.tests
+
+class NetworkForensicTests2(pyflag.tests.ScannerTest):
+    """ Tests Reassembler with difficult to reassemble streams """
+    test_case = "PyFlagNetworkTestCase"
+    test_file = "full_dump.pcap"
+    subsystem = "Advanced"
+    fstype = 'PCAP Filesystem'

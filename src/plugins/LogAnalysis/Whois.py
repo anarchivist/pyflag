@@ -103,15 +103,15 @@ def get_all_geoip_data(ip):
     result = {}
     try:
         result.update(gi_resolver.record_by_addr(ip))
-    except (TypeError,AttributeError): pass
+    except (KeyError,AttributeError): pass
 
     try:
         result.update(gi_org_resolver.org_by_addr(ip))
-    except (TypeError,AttributeError): pass
+    except (KeyError,AttributeError): pass
 
     try:
         result.update(gi_isp_resolver.org_by_addr(ip))
-    except (TypeError,AttributeError): pass
+    except (KeyError,AttributeError): pass
 
     return result
 

@@ -365,7 +365,7 @@ class SimpleLogTest(LogFile.LogDriverTester):
     """ Simple Log driver Tests """
     test_case = "PyFlagTestCase"
     test_table = "TestTable"
-    test_file = "%s/net-acct.log" % config.UPLOADDIR
+    test_file = "net-acct.log"
     log_preset = "NetAcct"
 
     def test01CreatePreset(self):

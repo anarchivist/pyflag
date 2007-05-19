@@ -542,7 +542,7 @@ class LoadDataTests(unittest.TestCase):
                              argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
                                    "iosource=first_image",
                                    "subsys=Advanced",
-                                   "filename=%s/pyflag_stdimage_0.1" % config.UPLOADDIR,
+                                   "filename=pyflag_stdimage_0.1" ,
                                    ])
         pyflagsh.shell_execv(command="execute",
                              argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,
@@ -559,7 +559,7 @@ class LoadDataTests(unittest.TestCase):
                              argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
                                    "iosource=second_image",
                                    "subsys=EWF",
-                                   "filename=%s/ntfs_image.e01" % config.UPLOADDIR,
+                                   "filename=ntfs_image.e01" ,
                                    ])
         pyflagsh.shell_execv(command="execute",
                              argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,

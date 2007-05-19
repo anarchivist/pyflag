@@ -289,7 +289,7 @@ class RemoteIOSourceTests(unittest.TestCase):
                              argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
                                    "iosource=test",
                                    "subsys=Remote",
-                                   "filename=%s/%s" % (config.UPLOADDIR, self.test_file),
+                                   "filename=%s" % (self.test_file),
                                    ])
         pyflagsh.shell_execv(command="execute",
                              argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,

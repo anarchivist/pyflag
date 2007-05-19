@@ -36,32 +36,27 @@ from pyflag.TableObj import StringType, TimestampType, InodeType, FilenameType
 
 WARNING_ISSUED = False
 
-class VScan:
-    """ Singleton class to manage virus scanner access """
-    ## May need to do locking in future, if libclamav is not reentrant.
-    def scan(self,buf):
-        """ Scan the given buffer, and return a virus name or 'None'"""
-        try:
-            import pyclamav
-        except ImportError:
-            global WARNING_ISSUED
+## We can only work if we are connected to the clamd server. If not,
+## this module will not be available. See more information at
+## http://www.pyflag.net/PyFlagWiki/ClamAvConfiguration
+import pyflag.pyclamd as pyclamd
 
-            if not WARNING_ISSUED:
-                pyflaglog.log(pyflaglog.ERROR, "You do not have the python-clamav binding installed. Will not be able to scan for viruses.")
-                WARNING_ISSUED = True
+## Allow the user to specific a different socket:
+config.add_option("CLAMAV_SOCKET", default="/var/run/clamav/clamd.ctl",
+                  help = "The location to the clamd socket. If we cant connect"
+                  " virus scanning will not be available")
 
-            pyclamav = None
-            return
-        
-        try:
-            ret = pyclamav.scanthis(buf)
-            if ret == 0:
-                return None
-            elif ret[0] == 1:
-                return ret[1]
-        except Exception,e:
-            pyflaglog.log(pyflaglog.WARNING, "Scanning Error: %s" % e)
+active = True
 
+try:
+    pyclamd.init_unix_socket(config.CLAMAV_SOCKET)
+
+    if not pyclamd.ping():
+        raise pyclamd.ScanError("Server not pingable")
+except (pyclamd.ScanError, TypeError, ValueError):
+    pyflaglog.log(pyflaglog.WARNING, "Unable to contact clamav - Virus scanning will not be available")
+    active = False
+    
 class VirusTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
         dbh.execute(""" CREATE TABLE IF NOT EXISTS `virus` (
@@ -70,10 +65,6 @@ class VirusTables(FlagFramework.EventHandler):
 
 class VirScan(GenScanFactory):
     """ Scan file for viruses """
-    def __init__(self,fsfd):
-        GenScanFactory.__init__(self, fsfd)        
-        self.scanner=VScan()
-
     def destroy(self):
         dbh=DB.DBO(self.case)
         dbh.check_index('virus','inode')
@@ -90,14 +81,15 @@ class VirScan(GenScanFactory):
 
         def process_buffer(self,buf):
             if not self.virus:
-                self.virus=self.outer.scanner.scan(buf)
+                self.virus=pyclamd.scan_stream(buf)
 
         def finish(self):
             dbh=DB.DBO(self.case)
             if self.virus:
+                print self.virus
                 dbh.insert('virus',
                            inode=self.inode,
-                           virus=self.virus)
+                           virus=self.virus['stream'])
 
 class VirusScan(Reports.report):
     """ Scan Filesystem for Viruses using clamav"""
@@ -147,5 +139,5 @@ class VirusScanTest(pyflag.tests.ScannerTest):
 
         ## We expect to pick this rootkit:
         self.assert_(row, "Unable to find any viruses")
-        self.assert_("K15-0-0|Z" in row['inode'] , "Unable to find Trojan.NTRootKit.044")
+        self.assert_("K15-0-0" in row['inode'] , "Unable to find Trojan.NTRootKit.044")
         

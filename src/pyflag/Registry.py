@@ -48,6 +48,7 @@ class Registry:
     classes = []
     class_names = []
     order = []
+    filenames = []
     
     def __init__(self,ParentClass):
         """ Search the plugins directory for all classes extending ParentClass.
@@ -143,7 +144,7 @@ class Registry:
                                             continue
 
                                         ## Add the class to ourselves:
-                                        self.add_class(ParentClass, module_desc, cls, Class)
+                                        self.add_class(ParentClass, module_desc, cls, Class, filename)
                                             
                                 # Oops: it isnt a class...
                                 except (TypeError, NameError) , e:
@@ -154,12 +155,13 @@ class Registry:
                                         % (module_name,e))
                             continue
 
-    def add_class(self, ParentClass, module_desc, cls, Class):
+    def add_class(self, ParentClass, module_desc, cls, Class, filename):
         """ Adds the class provided to our self. This is here to be
         possibly over ridden by derived classes.
         """
         if Class not in self.classes:
             self.classes.append(Class)
+            self.filenames.append(filename)
             try:
                 self.order.append(Class.order)
             except:
@@ -195,7 +197,10 @@ class Registry:
 
         raise ImportError("No module by name %s" % name)
 
-                
+
+    def filename(self, cls):
+        return self.filenames[self.classes.index(cls)]
+
 class ReportRegistry(Registry):
     """ A class to register reports.
 

@@ -91,7 +91,7 @@ for test_class in classes:
         doc = test_class
         
     print "---------------------------------------"
-    print "Running tests in %s" % doc
+    print "Running tests in %s (%s)" % (doc, test_registry.filename(test_class))
     print "---------------------------------------"
     suite = unittest.makeSuite(test_class)
     unittest.TextTestRunner(verbosity=2).run(suite)

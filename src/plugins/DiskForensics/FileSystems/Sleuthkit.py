@@ -398,7 +398,7 @@ class NTFSTests(unittest.TestCase):
                              argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
                                    "iosource=test",
                                    "subsys=EWF",
-                                   "filename=%s/ntfs_image.e01" % config.UPLOADDIR,
+                                   "filename=ntfs_image.e01",
                                    ])
         pyflagsh.shell_execv(command="execute",
                              argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,
