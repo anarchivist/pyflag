@@ -576,6 +576,16 @@ class delete_case(load):
         except Exception,e:
             raise RuntimeError("Unable to delete case %s (%s)" %(case,e))
 
+##class create_iosource(load):
+##    def help(self):
+##        return "create_iosource CaseName iosource_name URL. Creates the named IOSource in the specified case using the URL "
+
+##    def execute(self):
+##        case = self.args[0]
+##        name = self.args[1]
+##        url = self.args[2]
+        
+
 class create_case(load):
     def execute(self):
         dbh = DB.DBO(None)

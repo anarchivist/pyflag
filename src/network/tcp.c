@@ -66,6 +66,7 @@ void pad_to_first_packet(TCPStream self) {
   self->next_seq+=tcp->packet.data_len;
   
   /** Call our callback with this */
+  self->state = PYTCP_DATA;
   if(self->callback) self->callback(self, first->packet);
   
   list_del(&(first->list));
@@ -256,6 +257,12 @@ int TCPStream_flush(void *this) {
   /** For each stream we pad out the remaining data */
   pad_data(self);
 
+  /** Now do the reverse stream. Note that we need to pad reverse
+      stream _before_ we call destroy so it has a chance to do
+      something.
+  */
+  pad_data(self->reverse);
+
   /** Now we signal to the cb that the stream is destroyed */
   self->state = PYTCP_DESTROY;
   if(self->callback) self->callback(self, NULL);
@@ -264,9 +271,9 @@ int TCPStream_flush(void *this) {
   list_del(&(self->list));
   list_del(&(self->global_list));
 
-  /** Now do the reverse stream */
-  pad_data(self->reverse);
-
+  // Call destroy on the reverse stream - FIXME: This is unneeded in
+  // the current implementation because the previous destroy removes
+  // the python objects.
   self->reverse->state = PYTCP_DESTROY;
   if(self->reverse->callback)
     self->reverse->callback(self->reverse, NULL);

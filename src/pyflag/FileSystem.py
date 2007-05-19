@@ -754,7 +754,8 @@ class File:
         self.overread = oldoverread
 
         ## We try to use our own private toolbar if possible:
-        toolbar_id = result.new_toolbar()
+        #toolbar_id = result.new_toolbar()
+        toolbar_id = 1
         
         if (not data or len(data)==0):
             result.text("No Data Available")

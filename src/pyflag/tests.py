@@ -93,7 +93,7 @@ class ScannerTest(unittest.TestCase):
                              argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
                                    "iosource=test",
                                    "subsys=%s" % self.subsystem,
-                                   "filename=%s/%s" % (config.UPLOADDIR, self.test_file),
+                                   "filename=%s" % ( self.test_file),
                                    "offset=%s"%self.offset,
                                    ])
         pyflagsh.shell_execv(command="execute",

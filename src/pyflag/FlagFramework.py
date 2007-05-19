@@ -401,11 +401,12 @@ class Flag:
             #Did the analysis thread die with an error?
             thread_name = report.is_executing(canonical_query)
             #if an error exists, we get the error traceback produced by the analysis thread
-            result = report.executing[thread_name]['error']
+            new_result = report.executing[thread_name]['error']
             #If the analysis thread set an error UI object we just return it else evaluate the progress
-            if result:
+            if new_result:
                 result.clear()
                 result.heading("Error occured during analysis stage")
+                result.join(new_result)
                 del report.executing[thread_name]
                 return result
             else:

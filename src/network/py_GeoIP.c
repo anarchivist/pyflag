@@ -48,6 +48,8 @@ typedef struct {
 
 		The GEOIP_STANDARD is the default here - so this parameter is
 		optional.
+
+		The expected_type arg indicates which type of db we expect.
 */
 static int GeoIP_init(GeoIPObject* self, PyObject *args) {
   char * filename;

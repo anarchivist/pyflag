@@ -34,7 +34,7 @@ import pyflag.IO as IO
 import shlex,os,os.path,re,fnmatch
 import getopt
 import pyflag.FlagFramework as FlagFramework
-import pyflag.UI as UI
+import pyflag.TEXTUI as TEXTUI
 import pyflag.Registry as Registry
 import pyflag.conf
 config = pyflag.conf.ConfObject()
@@ -48,7 +48,6 @@ class environment:
     """ A class representing the environment """
     def __init__(self, case=None):
         self._flag=FlagFramework.Flag()
-        UI.UI = UI.GenericUI
         self._FS = None
         self.CWD='/'
         self._CASE = case
@@ -245,7 +244,11 @@ if __name__ == "__main__":
 
     ## Make sure the registry is properly initialised
     Registry.Init()
+
+    import pyflag.UI as UI
     
+    UI.UI = TEXTUI.TEXTUI
+
     ## Handle a history file
     histfile = os.path.join(os.environ["HOME"], ".flashhist")
     try:

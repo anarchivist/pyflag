@@ -427,3 +427,5 @@ class GenericUI:
         tmp.textfield('', name, Additional = True)
         tmp.end_table()
         self.row(description, tmp)
+
+UI = None

@@ -106,10 +106,14 @@ class CachedWriter:
         self.offset = 0
 
     def write_to_file(self):
-        fd = open(self.filename,"a")
-        fd.write(self.fd.getvalue())
-        fd.close()
-        self.fd.truncate(0)
+        ## Only write if we have data - so 0 length files will never
+        ## be written.
+        data = self.fd.getvalue()
+        if len(data)>=0:
+            fd = open(self.filename,"a")
+            fd.write(data)
+            fd.close()
+            self.fd.truncate(0)
         
     def write(self, data):
         self.fd.write(data)
@@ -117,6 +121,9 @@ class CachedWriter:
         
         if self.fd.tell() > 100000:
             self.write_to_file()
+
+    def __del__(self):
+        self.write_to_file()
 
 class PCAPFS(DBFS):
     """ This implements a simple filesystem for PCAP files.
@@ -247,34 +254,36 @@ class PCAPFS(DBFS):
                     fd = connection['data']
                     fd.write_to_file()
 
-                    ## Create a new VFS node:
-                    new_inode = "I%s|S%s" % (iosource_name, connection['con_id'])
+                    if fd.offset > 0:
+                        ## Create a new VFS node:
+                        new_inode = "I%s|S%s" % (iosource_name, connection['con_id'])
 
-                    self.VFSCreate(
-                        None,
-                        new_inode,
-                        connection['path'] % "forward",
-                        size = fd.offset,
-                        _mtime = connection['mtime'],
-                        _fast = True
-                        )
+                        self.VFSCreate(
+                            None,
+                            new_inode,
+                            connection['path'] % "forward",
+                            size = fd.offset,
+                            _mtime = connection['mtime'],
+                            _fast = True
+                            )
                 except KeyError: pass
 
                 try:
                     fd = connection['reverse']['data']
                     fd.write_to_file()
 
-                    ## Create a new VFS node:
-                    new_inode = "I%s|S%s" % (iosource_name, connection['reverse']['con_id'])
+                    if fd.offset > 0:
+                        ## Create a new VFS node:
+                        new_inode = "I%s|S%s" % (iosource_name, connection['reverse']['con_id'])
 
-                    self.VFSCreate(
-                        None,
-                        new_inode,
-                        connection['path'] % "reverse",
-                        size = fd.offset,
-                        _mtime = connection['reverse']['mtime'],
-                        _fast = True
-                        )
+                        self.VFSCreate(
+                            None,
+                            new_inode,
+                            connection['path'] % "reverse",
+                            size = fd.offset,
+                            _mtime = connection['reverse']['mtime'],
+                            _fast = True
+                            )
 
                 except KeyError: pass
                 
@@ -435,7 +444,6 @@ class ViewDissectedPacket(Reports.report):
                 node = get_node(branch[:-1])
                 start,length = node.get_range(branch[-1])
 
-            print start,length
             h.dump(highlight=[[start,length,'highlight'],])
 
             return

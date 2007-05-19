@@ -130,6 +130,7 @@ class HTMLUI(UI.GenericUI):
 
         if query:
             self.defaults=query
+            self.toolbar_ui.defaults = self.defaults
 
 ## The __pyflag_parent, __pyflag_name are variables set in js window
 ## object to refer back to the logical parent of each pyflag
@@ -1004,7 +1005,7 @@ class HTMLUI(UI.GenericUI):
                             del query['limit']
 
                         ## Save the query
-                        dbh = DB.DBO(query['case'])
+                        dbh = DB.DBO(case)
                         try:
                             name_elements = ",".join([e.name for e in elements])
                             ## Check to make sure its not already in there
@@ -1087,7 +1088,7 @@ class HTMLUI(UI.GenericUI):
                     table = "GUI_filter_history",
                     where = '`elements`=%r' % table_string,
                     filter = "filter_history",
-                    case = query['case'])
+                    case = case)
 
             result.toolbar(cb=filter_history, text="See filter history", icon='clock.png')
 
