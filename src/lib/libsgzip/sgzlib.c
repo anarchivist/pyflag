@@ -81,7 +81,7 @@ SgzipFile SgzipFile_OpenFile(SgzipFile self, char *filename) {
     CALL(self->io, read, magic, 6);
     
     // Sanity checking:
-    if(0 != memcmp(magic, ZSTRING_NO_NULL("sgzidx"))) {
+    if(0 != ZSTRING_NO_NULL_CMP(magic, "sgzidx")) {
       DEBUG("No index found - is file truncated?\n");
       goto no_index;
     };
@@ -295,8 +295,8 @@ SgzipFile SgzipFile_CreateFile(SgzipFile self, int fd, int blocksize) {
 
   // Initialise the header
   self->packet.blocksize = blocksize;
-  memcpy(&self->packet.magic, ZSTRING_NO_NULL("sgz"));
-  memcpy(&self->packet.compression, ZSTRING_NO_NULL("gzip"));
+  ZSTRING_NO_NULL_CPY(&self->packet.magic, "sgz");
+  ZSTRING_NO_NULL_CPY(&self->packet.compression, "gzip");
 
   // Write the header on the disk:
   self->super.Write((Packet)self, self->io);
