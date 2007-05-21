@@ -1650,7 +1650,7 @@ class HTMLUI(UI.GenericUI):
         self.result+=out + "<script>AdjustHeightToPageSize('Notebook%s');</script>" % id
 
     def get_unique_id(self):
-        self.id+=1
+        self.id =(self.id+1) % config.PAGESIZE
         return self.id
 
     def raw(self, html):

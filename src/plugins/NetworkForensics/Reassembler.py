@@ -364,7 +364,7 @@ import pyflag.tests
 
 class NetworkForensicTests2(pyflag.tests.ScannerTest):
     """ Tests Reassembler with difficult to reassemble streams """
-    test_case = "PyFlag Network Test Case"
-    test_file = "stdcapture_0.3.pcap.sgz"
+    test_case = "PyFlag Network Test Case2"
+    test_file = "stdcapture_0.3.pcap"
     subsystem = "Advanced"
     fstype = 'PCAP Filesystem'

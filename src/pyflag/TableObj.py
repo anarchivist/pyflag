@@ -871,6 +871,22 @@ class IPType(ColumnType):
                % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
                   config.FLAGDB, config.FLAGDB, city)
 
+    def operator_gcountry(self, column, operator, country):
+        """ Matches the specified country string in the GeoIP Database (e.g. FRA, USA, AUS). Note that this works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
+
+        ## We must ensure there are indexes on the right columns or
+        ## this query will never finish. This could lead to a delay
+        ## the first time this is run...
+        dbh=DB.DBO()
+        dbh.check_index("whois_cache", "ip")
+        dbh.check_index("geoip_country", "id")
+
+        return " ( `%s` in (select ip from %s.whois_cache join " \
+               "%s.geoip_country on %s.whois_cache.geoip_country=%s.geoip_country.id where "\
+               "%s.geoip_country.country=%r ) ) " \
+               % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
+                  config.FLAGDB, config.FLAGDB, country)
+
     def create(self):
         ## IP addresses are stored as 32 bit integers 
         return "`%s` int(11) unsigned default 0" % self.column

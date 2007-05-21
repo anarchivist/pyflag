@@ -51,6 +51,14 @@ config.add_option("PRECACHE_WHOIS", default=False, action="store_true",
                   " slow (especially when loading large log "
                   " files). Select this to enable this option.")
 
+config.add_option("flush_geocache", default=False, action="store_true",
+                  help="Flush the GeoIP/Whois Cache. You will not be able to search on "
+                  " GeoIP/Whois data loaded previously until a new lookup is done")
+
+if config.flush_geocache:
+    dbh = DB.DBO()
+    dbh.delete("whois_cache", where="1", _fast=True)
+
 ## This is not needed because we use DB caching anyway:
 ##config.add_option("GEOIP_MEMORY_CACHE", default=True,
 ##                  help="Should the GEOIP database(s) (if found) be loaded into memory? Will result in better performance but will use more memory")
