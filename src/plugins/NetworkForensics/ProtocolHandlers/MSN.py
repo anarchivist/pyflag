@@ -1688,7 +1688,7 @@ from pyflag.FileSystem import DBFS
 
 class MSNTests(unittest.TestCase):
     """ Tests MSN Scanner """
-    test_case = "PyFlagNetworkTestCase"
+    test_case = "PyFlag Network Test Case"
     order = 21
     def test01MSNScanner(self):
         """ Test MSN Scanner """

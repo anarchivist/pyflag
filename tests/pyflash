@@ -6,19 +6,9 @@ INSTALL_DIR=/var/tmp/build/pyflag/
 
 ######### END CONFIGURATION ####################
 
-. $SRC_DIR/pyflagrc
-
-## Try to load personalised configurations
-if [ -e ~/.pyflagrc ] ; then source ~/.pyflagrc; fi
-
-declare -x `set | grep PYFLAG_ | cut -d= -f1`
-
-## This is required in case the prefix is not /usr/ (otherwise python
-## can find it itself) 
-
 export PYFLAG_PLUGINS=$SRC_DIR/src/plugins
 export PYTHONPATH=$SRC_DIR/src/pyflag:$SRC_DIR/src/:$INSTALL_DIR/lib/python2.5/site-packages/pyflag
 
 echo $PYTHONPATH
 
-exec /usr/bin/python2.5 $SRC_DIR/src/pyflag/pyflagsh.py $@
+exec /usr/bin/python2.5 $SRC_DIR/src/pyflag/pyflagsh.py --plugins=$SRC_DIR/src/plugins $@

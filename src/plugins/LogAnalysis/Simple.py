@@ -363,8 +363,8 @@ import time
 ## Unit tests for Simple log file:
 class SimpleLogTest(LogFile.LogDriverTester):
     """ Simple Log driver Tests """
-    test_case = "PyFlagTestCase"
-    test_table = "TestTable"
+    test_case = "PyFlag Test Case"
+    test_table = "Test Table"
     test_file = "net-acct.log"
     log_preset = "NetAcct"
 
@@ -409,6 +409,6 @@ class SimpleLogTest(LogFile.LogDriverTester):
         print "Took %s seconds to load log" % (time.time()-t)
             
         ## Check that all rows were uploaded:
-        dbh.execute("select count(*) as c from %s_log", self.test_table)
+        dbh.execute("select count(*) as c from `%s_log`", self.test_table)
         row = dbh.fetch()
         self.assertEqual(row['c'], 1396)

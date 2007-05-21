@@ -129,7 +129,7 @@ class Log:
             ## Drop the temporary preset and the table
             drop_preset(temp_table)
             drop_table(self.case, temp_table)
-    
+            
     def read_record(self, ignore_comment = True):
         """ Generates records.
 
@@ -194,13 +194,16 @@ class Log:
         ## Add our table to the table list. This is done first to trap
         ## attempts to reuse the same table name early. FIXME - create
         ## a combined index on driver + table_name
-        dbh.insert("log_tables",
-                   preset = self.name,
-                   table_name = name)
+        try:
+            dbh.insert("log_tables",
+                       preset = self.name,
+                       table_name = name)
+        except DB.DBError,e:
+            pyflaglog.log(pyflaglog.WARNING, "Table %s already exists (%s)" % (name, e))
 
         ## Create the table:
         creation_strings = [ x.create() for x in fields]
-        dbh.execute("create table if not exists %s (%s)", (
+        dbh.execute("create table if not exists `%s` (%s)", (
             tablename,
             ',\n'.join([ x for x in creation_strings if x])
             ))
@@ -284,7 +287,7 @@ class Log:
             ## We can calculate the elements directly from our field
             ## list:
             elements = [ f for f in self.fields if f ],
-            table = table_name + "_log",
+            table = "`%s_log`" % table_name,
             case = self.case
             )
 
@@ -304,7 +307,8 @@ def load_preset(case, name, datafiles=[]):
     dbh = DB.DBO()
     dbh.execute("select * from log_presets where name=%r limit 1" , name)
     row = dbh.fetch()
-
+    if not row: raise RuntimeError("Unable to find preset %s" % name)
+    
     log = Registry.LOG_DRIVERS.dispatch(row['driver'])(case)
     log.restore(name)
 

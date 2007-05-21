@@ -214,7 +214,8 @@ class PCAPFS(DBFS):
                                                 "I%s|S%s" % (iosource_name, connection['con_id']))
                     )
 
-                Callback('data', packet, connection)
+                if tcp.data_len > 0:
+                    Callback('data', packet, connection)
 
             elif mode=='data':
                 tcp = packet.find_type("TCP")
@@ -544,7 +545,7 @@ import pyflag.tests as tests
 
 class NetworkForensicTests(pyflag.tests.ScannerTest):
     """ Tests network forensics """
-    test_case = "PyFlagNetworkTestCase"
+    test_case = "PyFlag Network Test Case"
     test_file = "stdcapture_0.3.pcap.sgz"
     subsystem = "SGZip"
     fstype = 'PCAP Filesystem'

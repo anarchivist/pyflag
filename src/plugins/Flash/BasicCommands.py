@@ -88,7 +88,10 @@ class ls(pyflagsh.command):
             if self.opts.has_key('-l'):
                 for dir in self.environment._FS.longls(path=path):
                     if dir['name']:
-                        yield "%s\t%s\t%s\t%s" % (dir['mode'],dir['size'],dir['inode'],dir['name'])
+                        yield "%s\t%s\t%s\t%s" % (dir['mode'],
+                                                  dir.get('size','-'),
+                                                  dir['inode'],
+                                                  dir['name'])
 
             else:
                 for dir in self.environment._FS.ls(path=path,dirs=1):
@@ -106,10 +109,12 @@ class ls(pyflagsh.command):
 
             ## Do we need to recurse?
             if self.opts.has_key('-R'):
-                for dir in self.environment._FS.ls(path=path,dirs=1):
-                    print "Directory %s:" % (path+dir)
-                    for file in self.list(path+dir):
-                        yield file
+                for dir in self.environment._FS.longls(path=path,dirs=1):
+                    if dir['name']:
+                        new_path = path + dir['name']
+                        yield "Directory %s:" % (new_path)
+                        for file in self.list(new_path):
+                            yield file
 
         except AttributeError:
             raise RuntimeError("No Filesystem loaded, do you need to load a filesystem first?")
@@ -591,7 +596,7 @@ class create_case(load):
         dbh = DB.DBO(None)
         case = self.args[0]
         dbh.cursor.ignore_warnings = True
-        dbh.execute("Create database if not exists %s",(case))
+        dbh.execute("Create database if not exists `%s`",(case))
         dbh.execute("select * from meta where property='flag_db' and value=%r",case)
         if not dbh.fetch():
             dbh.insert('meta',
@@ -610,7 +615,7 @@ import pyflag.tests
 
 class BasicCommandTests(pyflag.tests.ScannerTest):
     """ Test PyFlash commands """
-    test_case = "PyFlagTestCase"
+    test_case = "PyFlag Test Case"
     test_file = "pyflag_stdimage_0.2.sgz"
     subsystem = 'SGZip'
     offset = "16128s"

@@ -451,6 +451,7 @@ class IRC:
             while count<5:
                 count+=1
                 line=self.fd.readline().strip()
+                print line
                 m = self.regex.match(line)
                 if not m:
                     return False
@@ -611,7 +612,7 @@ from pyflag.FileSystem import DBFS
 
 class IRCTests(unittest.TestCase):
     """ Tests IRC Scanner """
-    test_case = "PyFlagNetworkTestCase"
+    test_case = "PyFlag Network Test Case"
     order = 21
     def test01IRCScanner(self):
         """ Test IRC Scanner """

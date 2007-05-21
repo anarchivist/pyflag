@@ -307,7 +307,7 @@ import pyflag.tests
 
 class PstScannerTest(pyflag.tests.ScannerTest):
     """ Test handling of pst files """
-    test_case = "PyFlagTestCase"
+    test_case = "PyFlag Test Case"
     test_file = "pyflag_stdimage_0.2.sgz"
     subsystem = 'SGZip'
     offset = "16128s"

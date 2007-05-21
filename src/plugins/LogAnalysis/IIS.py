@@ -146,8 +146,8 @@ import pyflag.pyflagsh as pyflagsh
 
 class IISLogTest(LogFile.LogDriverTester):
     """ IIS Log file processing """
-    test_case = "PyFlagTestCase"
-    test_table = "TestTable"
+    test_case = "PyFlag Test Case"
+    test_table = "Test Table"
     test_file = "pyflag_iis_standard_log.gz"
     log_preset = "IISTest"
 
@@ -171,16 +171,16 @@ class IISLogTest(LogFile.LogDriverTester):
         print "Took %s seconds to load log" % (time.time()-t)
             
         ## Check that all rows were uploaded:
-        dbh.execute("select count(*) as c from %s_log", self.test_table)
+        dbh.execute("select count(*) as c from `%s_log`", self.test_table)
         row = dbh.fetch()
         self.assertEqual(row['c'], 8334)
 
         ## More specific tests
-        dbh.execute("select count(*) as c from %s_log where `IP Address` = 2921232307", self.test_table)
+        dbh.execute("select count(*) as c from `%s_log` where `IP Address` = 2921232307", self.test_table)
         row = dbh.fetch()
         self.assertEqual(row['c'], 129)
 
 
-        dbh.execute("select count(*) as c from %s_log where cs_username = 'administrator'", self.test_table)
+        dbh.execute("select count(*) as c from `%s_log` where cs_username = 'administrator'", self.test_table)
         row = dbh.fetch()
         self.assertEqual(row['c'], 7898)

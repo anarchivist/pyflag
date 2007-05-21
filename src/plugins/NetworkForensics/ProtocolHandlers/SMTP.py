@@ -175,7 +175,7 @@ from pyflag.FileSystem import DBFS
 
 class SMTPTests(unittest.TestCase):
     """ Tests SMTP Scanner """
-    test_case = "PyFlagNetworkTestCase"
+    test_case = "PyFlag Network Test Case"
     order = 21
     def test01SMTPScanner(self):
         """ Test SMTP Scanner """

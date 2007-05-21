@@ -132,8 +132,8 @@ from pyflag.FlagFramework import query_type
 
 class IPTablesLogTest(LogFile.LogDriverTester):
     """ IPTables Log file processing """
-    test_case = "PyFlagTestCase"
-    test_table = "TestTable"
+    test_case = "Py Flag Test Case"
+    test_table = "Test Table"
     test_file = "messages.gz"
     log_preset = "IPTablesTest"
 
@@ -162,6 +162,6 @@ class IPTablesLogTest(LogFile.LogDriverTester):
         print "Took %s seconds to load log" % (time.time()-t)
             
         ## Check that all rows were uploaded:
-        dbh.execute("select count(*) as c from %s_log", self.test_table)
+        dbh.execute("select count(*) as c from `%s_log`", self.test_table)
         row = dbh.fetch()
         self.assertEqual(row['c'], 2433)

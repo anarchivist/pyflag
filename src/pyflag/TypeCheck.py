@@ -131,6 +131,13 @@ class TypeChecker:
 
     def sqlsafe(self,field,query):
         """ Checks to see if the type had bad characters in it """
+        ### FIXME: PyFlag should be able to handle special characters
+        ### in anything by properly escaping all places. We want to
+        ### see when things break badly so we just issue a warning
+        ### here and let it go.
+        pyflaglog.log(pyflaglog.WARNING, "Unusual characters in field %s: %r. We should be able to handle it though." % (field, query[field]))
+        return True
+                    
         for d in query.getarray(field):
             for char in "`\\\"' !@#$%^&*+/-()":
                 if char in d:
@@ -161,7 +168,7 @@ class TypeChecker:
         """ Checks that field is a table within the case given as query[case]. This is not a fatal error, we just return false if not. """
         dbh= DB.DBO(query['case'])
         try:
-            dbh.execute("select * from %s_log limit 1",query[field])
+            dbh.execute("select * from `%s_log` limit 1",query[field])
         except DB.DBError:
             return False
 

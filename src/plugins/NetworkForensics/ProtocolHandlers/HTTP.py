@@ -579,7 +579,7 @@ from pyflag.FileSystem import DBFS
 
 class HTTPTests(unittest.TestCase):
     """ Tests HTTP Scanner """
-    test_case = "PyFlagNetworkTestCase"
+    test_case = "PyFlag Network Test Case"
     order = 21
     def test01HTTPScanner(self):
         """ Test HTTP Scanner """

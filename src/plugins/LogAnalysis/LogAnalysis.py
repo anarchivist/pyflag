@@ -130,7 +130,7 @@ class BandWidth(Reports.report):
         try:
             result.case_selector()
             result.meta_selector(query['case'],'Select Log Table','logtable')
-            dbh.execute("select * from %s limit 1",query['logtable'])
+            dbh.execute("select * from `%s` limit 1",query['logtable'])
             columns = [ d[0] for d in dbh.cursor.description ]
             result.const_selector("Timestamp column:",'timestamp',columns,columns)
             result.const_selector("Size column:",'size',columns,columns)

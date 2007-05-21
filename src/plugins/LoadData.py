@@ -82,7 +82,7 @@ class LoadPresetLog(Reports.report):
 
         if not self.progress_str:
             dbh = DB.DBO(query['case'])
-            dbh.execute("select count(*) as count from %s_log", (query['table']))
+            dbh.execute("select count(*) as count from `%s_log`", (query['table']))
             tmp = dbh.fetch()
             try:
                 result.para("Uploaded %s rows. " % tmp['count'])

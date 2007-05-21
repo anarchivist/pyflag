@@ -139,8 +139,8 @@ class InitDB(Reports.report):
             dbh = DB.DBO()
         except:
             dbh = DB.DBO('mysql')
-            dbh.execute("drop database if exists %s" % config.FLAGDB)
-            dbh.execute("create database %s" % config.FLAGDB)
+            dbh.execute("drop database if exists `%s`" % config.FLAGDB)
+            dbh.execute("create database `%s`" % config.FLAGDB)
             dbh = DB.DBO()
             
         FlagFramework.post_event('init_default_db', dbh.case)

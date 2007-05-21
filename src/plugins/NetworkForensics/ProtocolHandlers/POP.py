@@ -208,7 +208,7 @@ from pyflag.FileSystem import DBFS
 
 class POPTests(unittest.TestCase):
     """ Tests POP Scanner """
-    test_case = "PyFlagNetworkTestCase"
+    test_case = "PyFlag Network Test Case"
     order = 21
     def test01SMTPScanner(self):
         """ Test POP Scanner """

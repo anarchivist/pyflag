@@ -187,7 +187,7 @@ import time
 ## Unit tests for Simple log file:
 class AdvancedLogTest(LogFile.LogDriverTester):
     """ Advanced Log driver Tests """
-    test_case = "PyFlagTestCase"
+    test_case = "PyFlag Test Case"
     test_table = "TestTable"
     test_file = "messages.gz"
     log_preset = "AdvancedSyslog"

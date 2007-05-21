@@ -95,5 +95,5 @@ class IOSourceMethod(IO.FileHandler):
 
 import pyflag.tests as tests
 
-class MethodHandlerTests(tests.FDTest):
-    pass
+#class MethodHandlerTests(tests.FDTest):
+#    pass

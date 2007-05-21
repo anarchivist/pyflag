@@ -424,7 +424,7 @@ class DBO:
             tables = [ row['id'] for row in self]
             for table_id in tables:
                 self.execute("delete from sql_cache where id = %r" , table_id)
-                self.execute("drop table if exists cache_%s" , table_id)
+                self.execute("drop table if exists `cache_%s`" , table_id)
                 
         finally:
             self.execute("commit")
@@ -503,8 +503,8 @@ class DBO:
                              (id,sql, lower_limit, config.DBCACHE_LENGTH))
             except:
                 ## Oops the table already exists (should not happen)
-                self.execute("drop table cache_%s",id )
-                self.execute("create table cache_%s %s limit %s,%s",
+                self.execute("drop table `cache_%s`",id )
+                self.execute("create table `cache_%s` %s limit %s,%s",
                              (id,sql, lower_limit, config.DBCACHE_LENGTH))
 
         except:
@@ -534,7 +534,7 @@ class DBO:
         self.execute("select id from sql_cache where tables like '%%,%s,%%' for update",table)
         ids = [row['id'] for row in self]
         for id in ids:
-            self.execute("drop table if exists cache_%s", id)
+            self.execute("drop table if exists `cache_%s`", id)
             self.execute("delete from sql_cache where id=%r", id)
 
         self.execute("commit")
@@ -564,7 +564,7 @@ class DBO:
 
     def drop(self, table):
         self.invalidate(table)
-        self.execute("drop table if exists %s", table)
+        self.execute("drop table if exists `%s`", table)
 
     def delete(self, table, where='0', _fast=False):
         sql = "delete from %s where %s"

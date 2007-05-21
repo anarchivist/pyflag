@@ -60,10 +60,12 @@ Farm.start_workers()
 
 test_registry = Registry.InitTests()
 if config.match:
-    classes = [ x for x in test_registry.classes if re.search(config.match,"%s" % x.__doc__)]
+    classes = [ x for x in test_registry.classes if \
+                re.search(config.match,"%s" % x.__doc__)]
 elif config.file:
-    classes = [ x for x in test_registry.classes if re.search(config.file, \
-                    test_registry.filename(test_registry.get_name(x))) ]
+    classes = [ x for x in test_registry.classes if \
+                re.search(config.file,  \
+                          test_registry.filename(test_registry.get_name(x))) ]
 else:
     classes = test_registry.classes
 
@@ -84,7 +86,8 @@ classes = tmp
 if config.list:
     import sys
     for test in classes:
-        print "%s" % (test.__doc__)
+        print "%s (%s)" % (test.__doc__,
+                           test_registry.filename(test_registry.get_name(test)))
     sys.exit()
 
 import gc
@@ -98,7 +101,8 @@ for test_class in classes:
         doc = test_class
         
     print "---------------------------------------"
-    print "Running tests in %s (%s)" % (doc, test_registry.filename(test_registry.get_name(test_class)))
+    print "Running tests in %s (%s)" % (doc, test_registry.filename( \
+        test_registry.get_name(test_class)))
     print "---------------------------------------"
     suite = unittest.makeSuite(test_class)
     unittest.TextTestRunner(verbosity=2).run(suite)

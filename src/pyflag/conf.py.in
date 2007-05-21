@@ -152,6 +152,8 @@ class ConfObject(object):
     ## Filename where the configuration file is:
     filename = None
 
+    filenames = []
+
     ## These parameters can not be updated by the GUI (but will be
     ## propagated into new configuration files)
     readonly = {}
@@ -182,28 +184,33 @@ class ConfObject(object):
         
     def add_file(self, filename, type='init'):
         """ Adds a new file to parse """
-        try:
-            conf_parser = ConfigParser.ConfigParser()
-            conf_parser.read(filename)
-            self.cnf_opts.clear()
-            
-            for k,v in conf_parser.items('DEFAULT'):
-                ## Absolute parameters are protected from
-                ## configuration files:
-                if k in self._absolute.keys():
-                    continue
-                
-                try:
-                    v = eval(v, self.g_dict)
-                except Exception,e:
-                    pass
+        self.filenames.append(filename)
+        
+        self.cnf_opts.clear()
 
-                ## update the configured options
-                self.cnf_opts[k] = v
+        for f in self.filenames:
+            try:
+                conf_parser = ConfigParser.ConfigParser()
+                conf_parser.read(f)                
 
-            ConfObject.filename = filename
-        except IOError:
-            print "Unable to open %s" % filename
+                for k,v in conf_parser.items('DEFAULT'):
+                    ## Absolute parameters are protected from
+                    ## configuration files:
+                    if k in self._absolute.keys():
+                        continue
+
+                    try:
+                        v = eval(v, self.g_dict)
+                    except Exception,e:
+                        pass
+
+                    ## update the configured options
+                    self.cnf_opts[k] = v
+                    
+            except IOError:
+                print "Unable to open %s" % filename
+
+        ConfObject.filename = filename
 
     def parse_options(self, final=True):
         """ Parses the options from command line and any conf files
@@ -338,3 +345,11 @@ config.add_option("RESULTDIR", default="/tmp/",
 
 config.add_option("VERSION", default="@VERSION@", readonly=True,
                   help = "The current pyflag version")
+
+try:
+    config.add_option("CONF_FILE", default=os.environ['HOME']+'/.pyflagrc',
+                      help = "User based configuration file")
+
+    config.add_file(config.CONF_FILE)
+except KeyError:
+    pass

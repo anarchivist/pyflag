@@ -322,9 +322,9 @@ from pyflag.FlagFramework import query_type
 
 class ApacheLogTest(LogFile.LogDriverTester):
     """ Apache Log file processing """
-    test_case = "PyFlagTestCase"
+    test_case = "PyFlag Test Case"
     log_preset = "ApacheDebianCommon_test"
-    test_table = "Apache_test"
+    test_table = "Apache Test"
     datafile = "pyflag_apache_standard_log.gz"
 
     def test01CreatePreset(self):
@@ -349,6 +349,6 @@ class ApacheLogTest(LogFile.LogDriverTester):
 
         ## Check that all rows were uploaded:
         dbh = DB.DBO(self.test_case)
-        dbh.execute("select count(*) as c from %s_log", self.test_table)
+        dbh.execute("select count(*) as c from `%s_log`", self.test_table)
         row = dbh.fetch()
         self.assertEqual(row['c'], 10000)

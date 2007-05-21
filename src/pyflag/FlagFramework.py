@@ -358,7 +358,7 @@ class Flag:
         
         return False
 
-    def run_analysis(self,report,query):
+    def run_analysis(self,report,query, result):
         canonical_query = canonicalise(query)
         #Find our thread name
         thread_name = threading.currentThread().getName()
@@ -369,12 +369,13 @@ class Flag:
         #report class - The lock is shared amongst all objects)
         report.executing[thread_name]={'query': canonical_query, 'error': None}
         try:
-            result = report.analyse(query)
+            report.analyse(query)
         ## These are deliberate errors that reports raise with their own custom UI message:
         except Reports.ReportError,e:
             report.executing[thread_name]['error'] = e
             print report.executing, e.__str__()
             return
+
         except Exception,e:
             #If anything goes wrong in the analysis phase, we have to set the error in report.executing
             result.clear()
@@ -404,9 +405,7 @@ class Flag:
             new_result = report.executing[thread_name]['error']
             #If the analysis thread set an error UI object we just return it else evaluate the progress
             if new_result:
-                result.clear()
                 result.heading("Error occured during analysis stage")
-                result.join(new_result)
                 del report.executing[thread_name]
                 return result
             else:
@@ -470,7 +469,7 @@ class Flag:
                 #OK - we run the analysis method in a seperate thread
                 if not progress_result:
                    #Start a new thread and run the analysis in it.
-                   t = threading.Thread(target=self.run_analysis,args=(report,query))
+                   t = threading.Thread(target=self.run_analysis,args=(report,query, result))
                    t.start()
                    import time
 

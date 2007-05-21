@@ -299,9 +299,15 @@ class DBFS(FileSystem):
         elif(dirs == 0):
             mode=" and file.mode like 'r%'"
 
-        dbh.execute("select size,path,file.mode,inode.inode,name from file, inode where inode.inode=file.inode and %s %s", (where, mode))
+        dbh.execute("select * from file where %s %s", (where, mode))
+        result = [dent for dent in dbh]
 
-        return [ dent for dent in dbh ]
+        for dent in result:
+            if dent['inode']:
+                dbh.execute("select * from inode where inode = %r", dent['inode'])
+                dent.update(dbh.fetch())
+
+        return result
         ## This is done rather than return the generator to ensure that self.dbh does not get interfered with...
         ## result=[dent for dent in self.dbh]
         ## return result
