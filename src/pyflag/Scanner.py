@@ -368,6 +368,8 @@ def resetfile(ddfs, inode,factories):
         f.reset(inode)
         dbh.execute("update inode set scanner_cache = REPLACE(scanner_cache,%r,'') where inode=%r",
                                 (f.__class__.__name__, inode))
+
+MESSAGE_COUNT = 0
     
 ### This is used to scan a file with all the requested scanner factories
 def scanfile(ddfs,fd,factories):
@@ -410,7 +412,13 @@ def scanfile(ddfs,fd,factories):
     ## scanners.
     metadata = {}
 
-    pyflaglog.log(pyflaglog.DEBUG,"Scanning file %s%s (inode %s)" % (stat['path'],stat['name'],stat['inode']))
+    messages = "Scanning file %s%s (inode %s)" % (stat['path'],stat['name'],stat['inode'])
+    global MESSAGE_COUNT
+    MESSAGE_COUNT += 1
+    if not MESSAGE_COUNT % 50:
+        pyflaglog.log(pyflaglog.DEBUG, messages)
+    else:
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, messages)
 
     while 1:
         ## If the file is too fragmented, we skip it because it might take too long... NTFS is a shocking filesystem, with some files so fragmented that it takes a really long time to read them. In our experience these files are not important for scanning so we disable them here. Maybe this should be tunable?
