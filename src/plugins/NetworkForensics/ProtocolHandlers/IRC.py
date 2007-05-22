@@ -451,7 +451,6 @@ class IRC:
             while count<5:
                 count+=1
                 line=self.fd.readline().strip()
-                print line
                 m = self.regex.match(line)
                 if not m:
                     return False
@@ -609,11 +608,14 @@ class BrowseIRCChat(Reports.report):
 import unittest
 import pyflag.pyflagsh as pyflagsh
 from pyflag.FileSystem import DBFS
+import pyflag.tests as tests
 
-class IRCTests(unittest.TestCase):
+class IRCTests(tests.ScannerTest):
     """ Tests IRC Scanner """
-    test_case = "PyFlag Network Test Case"
-    order = 21
+    test_case = "PyFlagTestCase"
+    test_file = 'irc.pcap'
+    subsystem = "Advanced"
+    fstype = "PCAP Filesystem"
     def test01IRCScanner(self):
         """ Test IRC Scanner """
         env = pyflagsh.environment(case=self.test_case)

@@ -23,6 +23,8 @@
 import csv
 import plugins.LogAnalysis.Simple as Simple
 
+active = False
+
 class CSVLog(Simple.SimpleLog):
     """ Log parser designed to handle comma seperated files """
     name = "CSV"

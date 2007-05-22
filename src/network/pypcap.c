@@ -139,7 +139,7 @@ static PyObject *PyPCAP_dissect(PyPCAP *self, PyObject *args, PyObject *kwds) {
   CALL(self->dissection_buffer, truncate, 0);
 
   CALL(self->dissection_buffer, write,
-       &self->packet_header->header, 16);
+       (char *)&self->packet_header->header, 16);
 
   CALL(self->dissection_buffer, write, 
        self->packet_header->header.data, self->packet_header->header.len);
@@ -253,9 +253,20 @@ static PyObject *PyPCAP_offset(PyPCAP *self, PyObject *args) {
   return PyLong_FromUnsignedLongLong(self->pcap_offset);
 };
 
+static PyObject *PyPCAP_set_id(PyPCAP *self, PyObject *args) {
+  int id;
+  if(!PyArg_ParseTuple(args, "i", &id)) return NULL;
+
+  self->packet_header->header.id = id;
+
+  Py_RETURN_NONE;
+};
+
 static PyMethodDef PyPCAP_methods[] = {
   {"offset", (PyCFunction)PyPCAP_offset, METH_VARARGS,
    "returns the current offset of the pcap file (so we can seek to it later).\nThis is not the same as the offset of the file object because we do some caching"},
+  {"set_id", (PyCFunction)PyPCAP_set_id, METH_VARARGS,
+   "Sets the ID of this packet"},
   {"seek", (PyCFunction)PyPCAP_seek, METH_VARARGS|METH_KEYWORDS,
    "seeks the file to a specific place. "},
   {"dissect", (PyCFunction)PyPCAP_dissect, METH_VARARGS|METH_KEYWORDS,

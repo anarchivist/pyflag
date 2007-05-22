@@ -222,25 +222,9 @@ class PCAPFS(DBFS):
                 data = tcp.data
                 fd = connection['data']
 
-                ## Record the packet in the pcap table:
-                pcap_dbh.insert("pcap",
-                                iosource = iosource_name,
-                                offset = packet.offset,
-                                length = packet.caplen,
-                                _ts_sec =  "from_unixtime('%s')" % packet.ts_sec,
-                                ts_usec = packet.ts_usec,
-                                _fast=True,
-                                )
-
-                pcap_id = pcap_dbh.autoincrement()
-                
-                ## Some progress reporting
-                if pcap_id % 10000 == 0:
-                    pyflaglog.log(pyflaglog.DEBUG, "processed %s packets (%s bytes)" % (pcap_id, packet.offset))
-
                 pcap_dbh.insert("connection",
                                 con_id = connection['con_id'],
-                                packet_id = pcap_id,
+                                packet_id = packet.id,
                                 cache_offset = fd.offset,
                                 length = len(data),
                                 seq = tcp.seq,
@@ -294,7 +278,26 @@ class PCAPFS(DBFS):
         ## Process the file with it:
         while 1:
             try:
-                processor.process(pcap_file)
+                packet = pcap_file.dissect()
+                ## Record the packet in the pcap table:
+                pcap_dbh.insert("pcap",
+                                iosource = iosource_name,
+                                offset = packet.offset,
+                                length = packet.caplen,
+                                _ts_sec =  "from_unixtime('%s')" % packet.ts_sec,
+                                ts_usec = packet.ts_usec,
+                                _fast=True,
+                                )
+
+                pcap_id = pcap_dbh.autoincrement()
+                pcap_file.set_id(pcap_id)
+                
+                ## Some progress reporting
+                if pcap_id % 10000 == 0:
+                    pyflaglog.log(pyflaglog.DEBUG, "processed %s packets (%s bytes)" % (pcap_id, packet.offset))
+
+
+                processor.process(packet)
             except StopIteration:
                 break
 

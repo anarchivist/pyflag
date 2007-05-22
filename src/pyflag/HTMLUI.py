@@ -1544,7 +1544,7 @@ class HTMLUI(UI.GenericUI):
                 pass
 
             result.heading(names[page])
-            result.start_form(query)
+#            result.start_form(query)
             result.start_table()
 
             ## Ask the callback to draw on us:
@@ -1563,16 +1563,13 @@ class HTMLUI(UI.GenericUI):
 
             if page>0:
                 result.result += result.submit(value="Back")
-                
+
+            result.result += result.submit(value="Update")
             if not error:
                 if page < len(callbacks)-1:
-                    result.result += result.submit(value="Update")
-                    result.end_form("Next")
+                    result.result += result.submit(value="Next")
                 else:
-                    result.result += result.submit(value="Update")            
-                    result.end_form("Finish")
-            else:
-                result.end_form("Update")
+                    result.result += result.submit(value="Finish")            
 
             return
 

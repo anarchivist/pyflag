@@ -273,7 +273,7 @@ if __name__ == "__main__":
 
     if config.command_file != None:
       asker=Asker()
-      fd=open(config.filename)
+      fd=open(config.command_file)
       file = fd.read()
       
       #Initialise variable cache from parameters (if they are provided)

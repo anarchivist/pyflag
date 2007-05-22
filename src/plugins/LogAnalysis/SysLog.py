@@ -48,6 +48,8 @@ import pyflag.conf
 config = pyflag.conf.ConfObject()
 import pyflag.pyflaglog as pyflaglog
 
+active = False
+
 class Syslog(LogFile.Log):
     """ Log parser designed to handle simple syslog files
     """

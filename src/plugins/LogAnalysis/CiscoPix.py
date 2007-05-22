@@ -24,6 +24,9 @@ import plugins.LogAnalysis.Simple as Simple
 import pyflag.FlagFramework as FlagFramework
 import pyflag.LogFile as LogFile
 
+## I cant enable this until I have unit tests. (MC)
+active=False
+
 months = { 'jan':1, 'feb':2,
            'mar':3, 'apr':4,
            'may':5, 'jun':6,

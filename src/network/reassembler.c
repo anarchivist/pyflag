@@ -155,16 +155,12 @@ static int Reassembler_init(Reassembler *self, PyObject *args, PyObject *kwds) {
 };
 
 static PyObject *process(Reassembler *self, PyObject *args) {
-  PyPCAP *pcap;
   PyPacket *root;
 
-  if(!PyArg_ParseTuple(args, "O", &pcap))
+  if(!PyArg_ParseTuple(args, "O", &root))
     return NULL;
 
-  // Dissect the current packet:
-  root = (PyPacket *)PyObject_CallMethod((PyObject *)pcap, "dissect", NULL);
-  if(!root) return NULL;
-
+  Py_INCREF(root);
   // OK we found the ip header - we just load the object into the hash
   // table:
   PyErr_Clear();

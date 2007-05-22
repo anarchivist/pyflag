@@ -65,6 +65,7 @@ class Log:
     """
     name = "BaseClass"
     datafile = None
+    query = query_type()
     
     def parse(self, query, datafile="datafile"):
         """ Parse all options from query and update ourselves.
@@ -385,7 +386,7 @@ def end(query,result):
     """ This is typically the last wizard callback - we just refresh
     into the load preset log file report"""
     query['log_preset'] = 'test'
-    result.refresh(0, query_type(log_preset=query['log_preset'],
+    result.refresh(0, query_type(preset=query['log_preset'],
                                  report="Load Preset Log File",
                                  family="Load Data"),
                    pane='parent')

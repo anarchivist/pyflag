@@ -123,23 +123,28 @@ class AdvancedLog(LogFile.Log):
 
             ## Do a small test:
             try:
-                result.ruler()
-                result.heading("Sample lines from log file")
-                result.start_table()
                 self.parse(query)
-                count =0
-                for line in self.read_record():
-                    result.row(line)
-                    count +=1
-                    if count>3:
-                        break
-                result.end_table()
-                
+            except Exception,e:
+                result.text("Error: %s" % e, style='red')
+                result.text(" ", style='normal')
+
+            result.ruler()
+            result.heading("Sample lines from log file")
+            result.start_table()
+            count =0
+            for line in self.read_record():
+                result.row(line)
+                count +=1
+                if count>3:
+                    break
+            result.end_table()
+
+            try:
                 self.display_test_log(result)
             except Exception,e:
                 result.text("Error: %s" % e, style='red')
                 result.text(" ", style='normal')
-            
+
             result.ruler()
             result.heading("Select Column Type")
             result.const_selector('',"field_types%s" % (max_number+1),

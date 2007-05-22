@@ -48,6 +48,7 @@ struct pcap_pkthdr {
   char *data;
 
   uint32_t offset;
+  uint32_t id;
   // This holds the dissected tree
   Root root;
 } __attribute__((packed));
