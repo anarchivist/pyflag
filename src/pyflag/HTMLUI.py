@@ -825,7 +825,7 @@ class HTMLUI(UI.GenericUI):
                     if filter_expression: filter_expression += " and "
 
                     filter_expression += "'%s'='%%s'" % e.name
-                    new_query.set(filter,filter_expression)
+                    new_query['__target_format__'] = filter_expression
                     new_query['__target__'] = filter
                     e.link = new_query
                     e.link_pane = 'parent'
