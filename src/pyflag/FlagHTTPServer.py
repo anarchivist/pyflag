@@ -390,9 +390,6 @@ config.add_option("HTTPSERVER_BINDIF", default='127.0.0.1',
 config.add_option("HTTPSERVER_PORT", default=8000, type='int',
                   help="TCP Port to listen on for http connections")
 
-config.add_option("DATADIR", 
-                  help="Directory where miscelaneous pyflag data files are found")
-
 if __name__ == "__main__":
     ## Parse the command line args:
     config.set_usage(usage = "The main PyFlag HTTP Server.")

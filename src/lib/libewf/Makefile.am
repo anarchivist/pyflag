@@ -8,7 +8,7 @@ libewf_la_SOURCES    = libewf_endian.c ewf_compress.c ewf_crc.c ewf_data.c   	 \
 	ewf_volume_smart.c handle.c header_values.c file.c file_read.c file_write.c  \
 	notify.c offset_table.c section_list.c segment_table.c
 
-libewf_la_LDFLAGS	   = -lz -lcrypto
+libewf_la_LDFLAGS	   = -lz
 libewf_la_LIBADD	   = ../libexcept.la ../libmd5.la
 
 ewfacquire_SOURCES  =  ewfacquire.c

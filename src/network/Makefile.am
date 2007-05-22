@@ -1,5 +1,13 @@
 pkgpython_PYTHON 	= dissect.py
+
+if HAVE_GEOIP
+geoip_la_SOURCES = py_GeoIP.c
+geoip_la_CPPFLAGS= $(PYTHON_CSPEC) -I$(top_srcdir)/src/include
+geoip_la_LDFLAGS = -module $(PYTHON_LSPEC) -lGeoIP
 pkgpyexec_LTLIBRARIES 	= _dissect.la reassembler.la pypcap.la geoip.la
+else
+pkgpyexec_LTLIBRARIES 	= _dissect.la reassembler.la pypcap.la
+endif
 
 noinst_LTLIBRARIES	= libnetwork.la
 libnetwork_la_SOURCES	= network.c
@@ -20,9 +28,5 @@ reassembler_la_SOURCES = reassembler.c tcp.c
 reassembler_la_CPPFLAGS= $(PYTHON_CSPEC) -I$(top_srcdir)/src/include
 reassembler_la_LDFLAGS = -module $(PYTHON_LSPEC)
 reassembler_la_LIBADD  = libnetwork.la
-
-geoip_la_SOURCES = py_GeoIP.c
-geoip_la_CPPFLAGS= $(PYTHON_CSPEC) -I$(top_srcdir)/src/include
-geoip_la_LDFLAGS = -module $(PYTHON_LSPEC) -lGeoIP
 
 noinst_HEADERS		= network.h tcp.h GeoIPCity.h GeoIP.h init.h pypcap.h reassembler.h

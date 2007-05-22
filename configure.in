@@ -13,9 +13,14 @@ AC_PROG_CC
 # check headers
 AC_CHECK_HEADER(zlib.h,,AC_MSG_ERROR([You Must install zlib-dev to build pyflag]))
 AC_CHECK_HEADER(magic.h,,AC_MSG_ERROR([You Must install libmagic-dev to build pyflag this may be part of file the package for some distros]))
+AC_CHECK_HEADER(GeoIP.h,have_geoip=yes,AC_MSG_WARN([please install libgeoip-dev for ip geolocation]))
 
 ## This doesnt work - why?
 #AC_CHECK_LIB(extractor, EXTRACTOR_getKeywords,AC_MSG_WARN([If you install libextractor, you may find more metadata about your files - this is highly recommended, but optional. Under debian/ubuntu this requires libextractor-dev and python-ctypes]))
+
+#AC_CHECK_LIB(GeoIP, GeoIP_new, AM_CONDITIONAL(HAVE_GEOIP, true))
+
+AM_CONDITIONAL(HAVE_GEOIP, test "$have_geoip" = yes)
 
 # python checks 
 # (requires autoconf 1.5+ and the macros in acinclude.m4)
