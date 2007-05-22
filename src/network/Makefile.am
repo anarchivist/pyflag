@@ -25,4 +25,4 @@ geoip_la_SOURCES = py_GeoIP.c
 geoip_la_CPPFLAGS= $(PYTHON_CSPEC) -I$(top_srcdir)/src/include
 geoip_la_LDFLAGS = -module $(PYTHON_LSPEC) -lGeoIP
 
-noinst_HEADERS		= network.h tcp.h
+noinst_HEADERS		= network.h tcp.h GeoIPCity.h GeoIP.h init.h pypcap.h reassembler.h
