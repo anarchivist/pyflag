@@ -350,7 +350,7 @@ class GenericUI:
                 try:
                     for d in os.listdir(full_path):
                         filename = os.path.join(path,d)
-                        full_filename = "%s/%s" % (full_path, filename)
+                        full_filename = "%s/%s" % (config.UPLOADDIR, filename)
                         if not os.path.isdir(full_filename):
                             s = os.stat(full_filename)
                             dbh.mass_insert(filename = filename,

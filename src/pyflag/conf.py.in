@@ -340,7 +340,7 @@ config.add_file("@sysconfdir@/pyflagrc", 'py')
 config.add_option("UPLOADDIR", default="/tmp/",
                   help = "Directory under which the web GUI will allow loading files")
 
-config.add_option("DATADIR", default="@DATADIR@",
+config.add_option("DATADIR", default="@DATADIR@", readonly=True,
                   help = "Directory where pyflag installation files go")
 
 config.add_option("RESULTDIR", default="/tmp/",
