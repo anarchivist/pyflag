@@ -389,6 +389,7 @@ class ColumnType:
                  callback=None, link_pane='self',
                  regex = r"[^\s]+",
                  boundary = r'\s+',
+                 escape=True,
                  ):
         
         if not name or not column:
@@ -403,6 +404,7 @@ class ColumnType:
         self.regex = re.compile(regex)
         self.regex_str = regex
         self.boundary = re.compile(boundary)
+        self.escape = escape
 
     ## These are the symbols which will be treated literally
     symbols = {
@@ -437,7 +439,10 @@ class ColumnType:
         return method(column, operator, arg)
 
     def escape_column_name(self, column_name):
-        return '.'.join(["`%s`" % x for x in self.column.split('.')])
+        if self.escape:
+            return '.'.join(["`%s`" % x for x in self.column.split('.')])
+        else:
+            return self.column
 
     def literal(self, column,operator, arg):
         return "%s %s %r" % (self.escape_column_name(self.column),

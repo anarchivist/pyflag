@@ -58,9 +58,15 @@ class Advanced(IO.Image):
             try:
                 del query[offset]
             except: pass
-    
+
+            new_query = query.clone()
+            filenames = query.getarray('filename')
+            new_query.clear('filename')
+            for f in filenames:
+                new_query['filename'] = os.path.normpath("%s/%s" % (config.UPLOADDIR, f))
+
             ## Try creating the io source
-            io = self.open(None, query['case'], query)
+            io = self.open(None, query['case'], new_query)
             try:
                 parts = sk.mmls(io)
             except IOError, e:

@@ -186,7 +186,7 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                                      
                                      StringType('Type','type'),
                                      ## FIXME - Does this need to be a standard type?
-                                     StringType('Value',"if(length(value)<50,value,concat(left(value,50),' .... '))") ],
+                                     StringType('Value',"if(length(value)<50,value,concat(left(value,50),' .... '))",escape=False) ],
                         names=('Key','Type','Value'),
                         table='reg',
                         where="path=%r" % path,

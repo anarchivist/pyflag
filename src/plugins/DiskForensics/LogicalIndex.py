@@ -332,7 +332,8 @@ class DataPreview(OffsetType):
         self.name = name
         self.column = column
         self.sql = column
-        self.fsfd = fsfd
+        OffsetType.__init__(self, name, column, fsfd=fsfd)
+        #self.fsfd = fsfd
 
     def display(self, length, row, result):
         low = max(0,row['Offset']-50)
