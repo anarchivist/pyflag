@@ -56,19 +56,24 @@ from Queue import Queue, Full, Empty
 LOG_QUEUE = Queue(100)
 
 class LoggingThread(threading.Thread):
-    def run(self):
+    def try_to_connect(self):
         import pyflag.DB as DB
 
-        log(INFO, "Log thread starting in thread %s, pid %s" % (threading.currentThread().getName(), os.getpid()))
-        try:
-            dbh = DB.DBO(None)
-            dbh.cursor.ignore_warnings = True
+        dbh = DB.DBO(None)
+        dbh.cursor.ignore_warnings = True
         ## We get some weird thread related dead locks if we use the
         ## timeout feature here.
-            dbh.cursor.timeout = 0
-            dbh.mass_insert_start("logs")
+        dbh.cursor.timeout = 0
+        
+        return dbh
+        
+    def run(self):
+        log(INFO, "Log thread starting in thread %s, pid %s" % (threading.currentThread().getName(), os.getpid()))
+        try:
+            dbh = self.try_to_connect()
         except:
             dbh = None
+            
         while 1:
             try:
                 level, message = LOG_QUEUE.get(block=True)
@@ -76,6 +81,9 @@ class LoggingThread(threading.Thread):
                 if level==0:
                     break
                 ## dbh.mass_insert(level=level, message=message)
+                if not dbh:
+                    dbh = self.try_to_connect()
+                    
                 if dbh:
                     dbh.insert('logs', level=level, message=message[:250], _fast=True)
             except Exception,e:

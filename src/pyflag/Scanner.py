@@ -454,7 +454,7 @@ def scanfile(ddfs,fd,factories):
         ## If none of the scanners are interested with this file, we
         ## stop right here
         if not interest:
-            pyflaglog.log(pyflaglog.DEBUG, "No interest for %s" % fd.inode)
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "No interest for %s" % fd.inode)
             break
         
         for o in objs:

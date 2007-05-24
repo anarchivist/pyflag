@@ -50,7 +50,7 @@ description = "Load Data"
 
 class LoadPresetLog(Reports.report):
     """ Loads a log file into the database using preset type """
-    parameters = {"table":"sqlsafe", "datafile":"filename",
+    parameters = {"table":"sqlsafe", "datafile":"any",
                   "preset":"any", "final":"any"}
     name="Load Preset Log File"
     family="Load Data"

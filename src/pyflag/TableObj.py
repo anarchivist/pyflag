@@ -1091,20 +1091,24 @@ class IPType(ColumnType):
                       pane='popup')
             result.row(tmp2)
 
+        opts = {}
         if row:
             tmp1.popup(edit_ips_of_interest_cb, 
                        row['notes'], icon="balloon.png")
-            tmp1.text("  ", value, font="bold")
-            result.row(tmp1, **{'class': 'match'})
+            opts = {'class': 'match'}
         elif interestingIPs:
             tmp1.popup(add_to_ips_of_interest_cb, 
                        "Add a note about this IP", 
                        icon="treenode_expand_plus.gif")
-            tmp1.text("  ", value)
-            result.row(tmp1)
-        else:
-            result.row(value)        
 
+        if self.link:
+            q = self.link.clone()
+            q.FillQueryTarget(value.__str__())
+            tmp1.link(value, q, pane=self.link_pane)
+        else:
+            tmp1.text("  ", value, font="bold")
+
+        result.row(tmp1, **opts)
         return result
 
 class InodeType(StringType):

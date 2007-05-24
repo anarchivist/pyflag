@@ -40,6 +40,7 @@ from pyflag.TableObj import IPType
 import re
 import pyflag.Registry as Registry
 import pyflag.IO as IO
+import cStringIO
 
 def get_file(query,result):
     result.row("Select a sample log file for the previewer",stretch=False)
@@ -123,6 +124,7 @@ class Log:
 
             pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Created a test table containing three rows. About to try and display it...")
 
+            del result.default['filter']
             ## Display the new table
             self.display(temp_table, result)
             
@@ -147,9 +149,23 @@ class Log:
         
         for file in self.datafile:
             ## open the file as a url:
-            fd = IO.open_URL(file)                
-            for line in fd:
-                if blank.match(line): continue
+            fd = IO.open_URL(file)
+            buffer = ''
+            while 1:
+                if len(buffer) < 1024:
+                    data = fd.read(1024)
+                    buffer = buffer + data
+
+                tmp = buffer.split("\n",1)
+                line = tmp[0]
+                if not line: break
+                
+                try:
+                    buffer = tmp[1]
+                except: break
+                
+                if blank.match(line):
+                    continue
                 if line.startswith('#') and ignore_comment:
                     continue
                 else:
