@@ -4,7 +4,7 @@ AC_INIT(pyflag.in)
 # Store the configuration in this header
 AC_CONFIG_HEADER(src/include/config.h)
 AC_CONFIG_AUX_DIR(config)
-AM_INIT_AUTOMAKE(pyflag, 0.84RC3)
+AM_INIT_AUTOMAKE(pyflag, 0.84RC4)
 
 # check standard stuff
 AC_PROG_LIBTOOL

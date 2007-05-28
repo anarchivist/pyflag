@@ -124,7 +124,7 @@ class Log:
 
             pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Created a test table containing three rows. About to try and display it...")
 
-            del result.default['filter']
+            del result.defaults['filter']
             ## Display the new table
             self.display(temp_table, result)
             
