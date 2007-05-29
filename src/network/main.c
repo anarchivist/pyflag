@@ -7,8 +7,6 @@
 #include <stdlib.h>
 #include <fcntl.h>
 
-#include "init.h"
-
 /** Prints the entire contents of the tree */
 void print_tree(Packet self) {
   struct struct_property_t *i;

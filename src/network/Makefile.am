@@ -29,4 +29,4 @@ reassembler_la_CPPFLAGS= $(PYTHON_CSPEC) -I$(top_srcdir)/src/include
 reassembler_la_LDFLAGS = -module $(PYTHON_LSPEC)
 reassembler_la_LIBADD  = libnetwork.la
 
-noinst_HEADERS		= network.h tcp.h GeoIPCity.h GeoIP.h init.h pypcap.h reassembler.h
+noinst_HEADERS		= network.h tcp.h GeoIPCity.h GeoIP.h pypcap.h reassembler.h

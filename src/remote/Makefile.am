@@ -18,7 +18,7 @@ remote_la_CPPFLAGS 	= $(PYTHON_CSPEC)
 remote_la_LDFLAGS 	= -module $(PYTHON_LSPEC)
 remote_la_LIBADD      = libremote.la ../lib/liboo.la
 
-ecc.c: pki.h ecc.h
+ecc.o: ecc.c pki.h ecc.h
 
 ## This is a helper program to generate random keys
 pki.h: pki_gen_keys
