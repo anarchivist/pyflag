@@ -953,6 +953,25 @@ class IPType(ColumnType):
                % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
                   config.FLAGDB, config.FLAGDB, city)
 
+    # TODO - How do we do this if we don't have access to the case name? 
+    #
+    #def operator_annotatedIPs(self, column, operator, category):
+    #    """ Annotated IPs. Show only those IPs that have annotations 
+    #       associated with them of a certain category, or all.  """
+    #    
+    #   ## We must ensure there are indexes on the right columns or
+    #   ## this query will never finish. This could lead to a delay
+    #   ## the first time this is run...
+    #   dbh=DB.DBO()
+    #   dbh.check_index("%s.interesting_ips" % self.case, "ip")
+    #   if category=="All":
+    #      return " ( `%s` in (select ip from %s.interesting_ips) ) " \
+    #           % (self.column, self.case)       
+    #   else:
+    #      return " ( `%s` in (select ip from %s.interesting_ips where " \
+    #             " %s.interesting_ips.category = %r) ) " \
+    #           % (self.column, self.case, self.case, country)
+
     def operator_gcountry(self, column, operator, country):
         """ Matches the specified country string in the GeoIP Database (e.g. FRA, USA, AUS). Note that this works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
 
