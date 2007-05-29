@@ -114,11 +114,11 @@ def get_all_geoip_data(ip):
     except (KeyError,AttributeError): pass
 
     try:
-        result.update(gi_org_resolver.org_by_addr(ip))
+        result.update({"org":gi_org_resolver.org_by_addr(ip)})
     except (KeyError,AttributeError): pass
 
     try:
-        result.update(gi_isp_resolver.org_by_addr(ip))
+        result.update({"isp":gi_isp_resolver.org_by_addr(ip)})
     except (KeyError,AttributeError): pass
 
     return result
