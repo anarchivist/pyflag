@@ -157,14 +157,16 @@ class Log:
                     buffer = buffer + data
 
                 tmp = buffer.split("\n",1)
+                if len(tmp) == 0: break
+
                 line = tmp[0]
-                if not line: break
-                
+               
                 try:
                     buffer = tmp[1]
-                except: break
+                except:
+                    break
                 
-                if blank.match(line):
+                if blank.match(line) or not line:
                     continue
                 if line.startswith('#') and ignore_comment:
                     continue

@@ -1001,7 +1001,7 @@ class IPType(ColumnType):
         if config.PRECACHE_IPMETADATA==True:
             Whois.lookup_whois(value)
 
-        return "_"+self.column, "inet_aton(%r)" % value
+        return "_"+self.column, "inet_aton(%r)" % value.strip()
 
     def display(self, value, row, result):
         result = result.__class__(result)
