@@ -1586,7 +1586,7 @@ class BrowseMSNSessions(Reports.report):
             elements = [ ColumnType('Prox','pcap.ts_sec',
                                     callback = draw_prox_cb),
                          TimestampType('Timestamp','pcap.ts_sec'),
-                         InodeType("Stream","inode",
+                         InodeType("Stream","inode", case = query['case'],
                                    link = query_type(family="Disk Forensics",
                                                      case=query['case'],
                                                      report='View File Contents',
@@ -1644,7 +1644,7 @@ class BrowseMSNUsers(BrowseMSNSessions):
         result.heading("MSN User Information Captured")
         
         result.table(
-            elements = [ InodeType("Stream","inode",
+            elements = [ InodeType("Stream","inode", case = query['case'],
                                    link = query_type(family="Disk Forensics",
                                                      case=query['case'],
                                                      report='View File Contents',
