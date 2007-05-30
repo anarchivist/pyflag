@@ -414,8 +414,10 @@ import pyflag.pyflagsh as pyflagsh
 
 class LogDriverTester(unittest.TestCase):
     test_case = None
-    test_table =None
+    test_table = None
+    test_table_two = None
     log_preset = None
+    log_preset_two = None
     datafile = None
     
     def test00Cleanup(self):
@@ -426,9 +428,11 @@ class LogDriverTester(unittest.TestCase):
         
         ## clear any existing presets of the same name:
         drop_preset(self.log_preset)
+        drop_preset(self.log_preset_two)
 
         ## Clear any existing tables of the same name
         drop_table(self.test_case, self.test_table)
+        drop_table(self.test_case, self.test_table_two)
 
     ## FIXME:
     ## This is disabled so as to leave the test table behind - this is

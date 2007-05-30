@@ -469,8 +469,12 @@ class ColumnType:
     def csv(self, value):
         """ This outputs data for csv output"""
         ## We seem to need to escape this for some stupid spreadsheets
-        value.replace("\n","\\n")
-        value.replace("\r","\\r")
+        try:
+            value.replace("\n","\\n")
+            value.replace("\r","\\r")
+        except AttributeError:
+            # Probably not a string...
+            pass
 
         ## If we have a callback we cant render anything:
         if self.callback:
@@ -478,7 +482,7 @@ class ColumnType:
         else: return value
 
     def extended_csv(self, value):
-        return self.csv(value)
+        return {self.name:self.csv(value)}
 
     def create(self):
         """ This needs to generate a create clause for creating this
@@ -849,7 +853,7 @@ class IPType(ColumnType):
     def __init__(self, name='', column='', link='', callback=''):
         ColumnType.__init__(self, name=name, column=column,
                             link=link, callback=callback)
-        self.extended_names = [name, name + "_geoip_country", name + "_whois_company"]
+        self.extended_names = [name, name + "_geoip_city", name + "_geoip_country", name + "_geoip_org", name + "_geoip_isp", name + "_geoip_lat", name + "_geoip_long"]
     
     # reMatchString: a re that matches string CIDR's
     reMatchString = re.compile(
@@ -881,18 +885,51 @@ class IPType(ColumnType):
         return "%s %s INET_ATON(%r)" % (self.escape_column_name(self.column), operator, address)
 
     def extended_csv(self, value):
-        if self.callback: return ["-", "-", "-"]
+        #if self.callback: return ["-", "-", "-"]
 
         value.replace("\n","\\n")
         value.replace("\r","\\r")
+       
+        geoipdata = Whois.get_all_geoip_data(value)
         
-        geoipstr = Whois.geoip_resolve(value)
-        geoipstr.replace("\n", " ")
-        geoipstr.replace("\r", " ")
-        whoisstr = Whois.identify_network(Whois.lookup_whois(value))
-        whoisstr.replace("\n", " ")
-        whoisstr.replace("\r", " ")
-        return [value, geoipstr, whoisstr]
+        if geoipdata.has_key("city"):
+            returnCity = geoipdata['city'] or "Unknown"
+        else:
+            returnCity = "Unknown"
+
+        if geoipdata.has_key("country_code3"):
+            returnCountry = geoipdata['country_code3'] or "---"
+        else:
+            returnCountry = "---"
+   
+        if geoipdata.has_key("org"):
+            returnOrg = geoipdata['org'] or "Unknown" 
+        else:
+            returnOrg = "Unknown"
+
+        if geoipdata.has_key("isp"):
+            returnISP = geoipdata['isp'] or "Unknown" 
+        else:
+            returnISP = "Unknown"
+
+        if geoipdata.has_key("latitude"):
+            returnLat = geoipdata['latitude'] or "Unknown" 
+        else:
+            returnLat = "Unknown"
+
+        if geoipdata.has_key("longitude"):
+            returnLong = geoipdata['longitude'] or "Unknown"
+        else:
+            returnLong = "Unknown"
+        
+        #self.extended_names = [name, name + "_geoip_city", name + "_geoip_country", name + "_whois_organisation", name + "_geoip_isp", name + "_geoip_lat", name + "_geoip_long"]
+        return {self.name:value, 
+                self.name + "_geoip_city":returnCity, 
+                self.name + "_geoip_country":returnCountry, 
+                self.name + "_geoip_org":returnOrg, 
+                self.name + "_geoip_isp":returnISP, 
+                self.name + "_geoip_lat":returnLat,
+                self.name + "_geoip_long":returnLong}
 
     def operator_matches(self, column, operator, address):
         """ Matches the IP address specified exactly """

@@ -176,7 +176,7 @@ def lookup_whois(ip):
         if ip == None:
             pyflaglog.log(pyflaglog.WARNING, "Was asked to perform a whois lookup on a blank IP address. Will return the default route, but this might suggest an error") 
             return 0
-        sql_ip = "inet_aton(%r)" % ip
+        sql_ip = "inet_aton(%r)" % ip.strip()
 
     ## First check the cache:
     id = 0

@@ -417,6 +417,7 @@ class HTMLUI(UI.GenericUI):
         opt_str = ''
         if options:
             opt_str = self.opt_to_str(options)
+        
         if value in self.defaults.getarray(name):
             opt_str += 'checked'
 
@@ -1137,15 +1138,9 @@ class HTMLUI(UI.GenericUI):
                 dbh = DB.DBO(case)
                 row_number = 0
                 data = cStringIO.StringIO()
-                hidden_columns = [ int(i) for i in query.getarray('_hidden')]
 
-                names_list = [ elements[i].name for i in range(len(elements)) if i not in hidden_columns ]
-                extended_names_list = []
-                for i in range(len(elements)):
-                    if i not in hidden_columns:
-                        ext = elements[i].extended_names
-                        for elems in ext:
-                            extended_names_list.append(elems)
+                requestedExport = query.getarray('exportColumn')
+
                 yield "#Pyflag Table widget output\n#Query was %s.\n" % query
 
                 try:
@@ -1153,14 +1148,12 @@ class HTMLUI(UI.GenericUI):
                 except KeyError:
                     pass
 
-                if query.has_key("extendedexport"):
-                    yield "#Fields: %s\n""" % ",".join(extended_names_list)
-                    csv_writer = csv.DictWriter(data,extended_names_list, dialect='excel')
-                else:
-                    yield "#Fields: %s\n""" % ",".join(names_list)
-                    csv_writer = csv.DictWriter(data,names_list,dialect='excel')
+                yield "#Fields: %s\n" % ",".join(requestedExport)
 
-                while rows_left>0:
+                csv_writer = csv.DictWriter(data,requestedExport,
+                                            dialect = 'excel')
+
+                while rows_left > 0:
                 ## Do the query now - we issue multiple queries
                 ## because we have a better chance of hitting the
                 ## cache this way.
@@ -1172,18 +1165,17 @@ class HTMLUI(UI.GenericUI):
                         count += 1
                         row_number+=1
                         result = {}
+                
                         for i in range(len(elements)):
-                            if i in hidden_columns: continue
+                            keysWanted = []
+                            allKeys = elements[i].extended_names
 
-                            ## Allow the ColumnType to translate the data to csv suitability.
-                            if not query.has_key("extendedexport") or len(elements[i].extended_names)==1:
-                                key = elements[i].name
-                                result[key] = elements[i].csv(row[key].__str__())
-                            else:
-                                for j in range(len(elements[i].extended_names)):
-                                    key = elements[i].extended_names[j]
-                                    result[key] = elements[i].extended_csv(row[elements[i].name].__str__())[j]
-                            
+                            for k in allKeys:
+                                if k in requestedExport: keysWanted.append(k)
+
+                            for j in range (len(keysWanted)):
+                                result[keysWanted[j]] = elements[i].extended_csv(row[elements[i].name])[keysWanted[j]]
+
                         csv_writer.writerow(result)
 
                     if count==0: break
@@ -1210,14 +1202,12 @@ class HTMLUI(UI.GenericUI):
                 result.defaults['save_length'] = 0
                 
             result.textfield("How many rows to save? (0 for all rows)", "save_length")
-           
-             
-            for e in elements:
-                if len(e.extended_names) != 1:
-                    result.checkbox("Export extended row information " \
-                                    "(e.g. export a country column for ip addresses)?", 
-                                    "extendedexport", "ok")
-                    break
+            for e in range(len(elements)):
+                for col in elements[e].extended_names:
+                    if e.__str__() not in query.getarray('_hidden'):
+                        result.defaults.set("exportColumn",col) # On by default
+                    result.checkbox("Export column %s?" % col, "exportColumn"
+, col)
             result.end_form()
             
         self.toolbar(save_table,'Save Table',icon="floppy.png")

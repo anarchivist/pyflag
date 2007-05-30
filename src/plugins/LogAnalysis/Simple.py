@@ -364,9 +364,14 @@ import time
 class SimpleLogTest(LogFile.LogDriverTester):
     """ Simple Log driver Tests """
     test_case = "PyFlag Test Case"
+
     test_table = "Test Table"
     test_file = "net-acct.log"
     log_preset = "NetAcct"
+
+    test_table_two = "Test Two Table"
+    test_file_two = "blank-test.csv"
+    log_preset_two = "blankTest"
 
     def test01CreatePreset(self):
         """ Test that Simple Presets can be created """
@@ -412,3 +417,46 @@ class SimpleLogTest(LogFile.LogDriverTester):
         dbh.execute("select count(*) as c from `%s_log`", self.test_table)
         row = dbh.fetch()
         self.assertEqual(row['c'], 1396)
+
+    def test03CreateAnotherPreset(self):
+        """ Another setup test for Simple log file preset ... """
+        dbh = DB.DBO(self.test_case)
+        
+        myLog = SimpleLog(case=self.test_case)
+        myQuery = query_type(datafile = self.test_file_two, log_preset=self.log_preset_two,
+                           delimiter=",",
+                           field0="AString",
+                           field1="SomeNumber",
+                           field2="FirstIP",
+                           field3="BString",
+                           field4="SecondIP",
+                           field5="OtherNumber",
+                           field6="ThirdIP",
+
+                           type0="StringType",
+                           type1="IntegerType",
+                           type2="IPType",
+                           type3="StringType",
+                           type4="IPType",
+                           type5="IntegerType",
+                           type6="IPType"
+                           )
+
+        myLog.parse(myQuery)
+        myLog.store(self.log_preset_two)
+
+    def test04LoadFileTwo(self):
+        """ Test that Simple Log files can be loaded when they contain weird spaces"""
+        dbh = DB.DBO(self.test_case)
+        log = LogFile.load_preset(self.test_case, self.log_preset_two, [self.test_file_two])
+        t = time.time()
+        ## Load the data:
+        for a in log.load(self.test_table_two):
+            pass
+
+        print "Took %s seconds to load log" % (time.time()-t)
+            
+        ## Check that all rows were uploaded:
+        dbh.execute("select count(*) as c from `%s_log`", self.test_table_two)
+        row = dbh.fetch()
+        self.assertEqual(row['c'], 12)
