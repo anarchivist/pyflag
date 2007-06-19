@@ -587,7 +587,7 @@ class DBO:
         rather than use raw SQL.
         """
         sql , args = self._calculate_set(**fields)
-        sql = "insert into %s set " + sql
+        sql = "insert into `%s` set " + sql
         ## We are about to invalidate the table:
         if not _fast:
             self.invalidate(table)
