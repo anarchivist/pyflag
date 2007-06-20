@@ -34,6 +34,9 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.pyflaglog as pyflaglog
 
+
+config.add_option("AUTHORISED_USERS", default=None, help="If present, specify access controls in the form user:pass,user2:pass2,etc")
+
 class ReportError(Exception):
     """ Base class for errors in reports """
     pass
@@ -74,10 +77,12 @@ class report:
     def authenticate(self, query, result):
         """ This method is called first by FlagFramework to evaluate authentication and determine if the user is allowed to execute this report."""
         ## By default everyone is authorised
-        try:
-            ## If it exists config.AUTHORISE consists of a line looking like:
-            ## PYFLAG_AUTHORISE="mic:password,joe:letmein"
-            for token in config.AUTHORISE:
+        
+        ## If it exists config.AUTHORISED_USERS consists of a line looking like:
+        ## PYFLAG_AUTHORISES_USERS="mic:password,joe:letmein"
+
+            if not config.AUTHORISED_USERS return True
+            for token in config.AUTHORISED_USERS.split(","):
                 try:
                     username, password = token.split(':')
                     if username.lstrip().rstrip()==query.user and password.lstrip().rstrip()==query.passwd:
