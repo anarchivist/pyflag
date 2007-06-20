@@ -222,16 +222,27 @@ class PCAPFS(DBFS):
                 data = tcp.data
                 fd = connection['data']
 
-                pcap_dbh.insert("connection",
-                                con_id = connection['con_id'],
-                                packet_id = packet.id,
-                                cache_offset = fd.offset,
-                                length = len(data),
-                                seq = tcp.seq,
-                                _fast=True
-                                )
+                try:
+                    pcap_dbh.insert("connection",
+                                    con_id = connection['con_id'],
+                                    packet_id = packet.id,
+                                    cache_offset = fd.offset,
+                                    length = len(data),
+                                    seq = tcp.seq,
+                                    _fast=True
+                                    )
+                except TypeError, e:
+                    pyflaglog.log(pyflaglog.DEBUG, "There was a problem inserting data into the database. Will continue anyway, the error was: %s" % e)
+                    pcap_dbh.insert("connection",
+                                    con_id = connection['con_id'],
+                                    packet_id = packet.id,
+                                    cache_offset = fd.offset,
+                                    length = len(data),
+                                    seq = tcp.seq,
+                                    _fast=True
+                                    )
 
-                fd.write(data)
+                if data: fd.write(data)
 
             elif mode=='destroy':
                 ## Find the mtime of the first packet in the stream:
