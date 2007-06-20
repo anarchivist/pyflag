@@ -77,7 +77,7 @@ class report:
     def authenticate(self, query, result):
         """ This method is called first by FlagFramework to evaluate authentication and determine if the user is allowed to execute this report."""
         ## By default everyone is authorised
-        
+        try: 
         ## If it exists config.AUTHORISED_USERS consists of a line looking like:
         ## PYFLAG_AUTHORISES_USERS="mic:password,joe:letmein"
 
