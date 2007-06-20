@@ -81,7 +81,7 @@ class report:
         ## If it exists config.AUTHORISED_USERS consists of a line looking like:
         ## PYFLAG_AUTHORISES_USERS="mic:password,joe:letmein"
 
-            if not config.AUTHORISED_USERS return True
+            if not config.AUTHORISED_USERS: return True
             for token in config.AUTHORISED_USERS.split(","):
                 try:
                     username, password = token.split(':')
