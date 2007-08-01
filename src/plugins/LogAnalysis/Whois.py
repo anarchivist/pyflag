@@ -76,7 +76,7 @@ WHOIS_CACHE = Store.Store()
 ## Try for the GeoIP City Stuff....
 
 try:
-    from geoip import GeoIP, GEOIP_CITY_EDITION_REV1, GEOIP_ORG_EDITION
+    from geoip import GeoIP, GEOIP_CITY_EDITION_REV1, GEOIP_ORG_EDITION, GEOIP_ISP_EDITION
 
     try:
         gi_resolver = GeoIP(config.GEOIPDIR + "/GeoIPCity.dat", 
@@ -91,7 +91,7 @@ try:
     ## Now try for the GeoIPISP
     try:
         gi_isp_resolver = GeoIP(config.GEOIPDIR + "/GeoIPISP.dat",\
-                                GEOIP_ORG_EDITION)
+                                GEOIP_ISP_EDITION)
     except IOError:
         gi_isp_resolver = None
 
