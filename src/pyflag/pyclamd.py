@@ -411,7 +411,7 @@ def __init_socket__():
         try:
             s.connect(clamd_SOCKET)
         except socket.error:
-            raise ScanError, 'Could not reach clamd using unix socket (%s)' % (clamd_SOCKET)
+            raise ScanError('Could not reach clamd using unix socket (%s)' % (clamd_SOCKET))
     elif use_socket=="NET":
         s=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:

@@ -150,6 +150,8 @@ class PCAPFS(DBFS):
         pcap_dbh = DB.DBO(self.case)
         pcap_dbh.mass_insert_start("pcap")
 
+        packet_handlers = [ x(self.case) for x in Registry.PACKET_HANDLERS.classes ]
+
         def Callback(mode, packet, connection):
             """ This callback is called for each packet with the following modes:
 
@@ -282,6 +284,16 @@ class PCAPFS(DBFS):
                             )
 
                 except KeyError: pass
+
+            ## Miscelaneous packets do not belong in a TCP connection
+            ## and can be processed by packet handlers. Should we make
+            ## all packets parsable by packet handlers or just misc?
+            ## Its a performance consideration. For now there are no
+            ## packet handlers for TCP related packets, so this seems
+            ## best.
+            elif mode=='misc':
+                for handler in packet_handlers:
+                    handler.handle(packet)
                 
         ## Create a new reassembler with this callback
         processor = reassembler.Reassembler(packet_callback = Callback)

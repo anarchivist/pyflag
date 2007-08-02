@@ -458,6 +458,12 @@ def Init():
     global FILE_HANDLERS
     FILE_HANDLERS = FileHandlerRegistry(IO.FileHandler)
 
+
+    ## Register packet handlers:
+    import pyflag.Packets as Packets
+    global PACKET_HANDLERS
+    PACKET_HANDLERS = ScannerRegistry(Packets.PacketHandler)
+
 def InitTests():
     return TestsRegistry(unittest.TestCase)
 

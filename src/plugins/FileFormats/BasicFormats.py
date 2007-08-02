@@ -242,7 +242,7 @@ class SimpleStruct(DataType):
             parameters = self.parameters.copy()
             try:
                 parameters.update(item[2])
-            except:
+            except Exception,e:
                 parameters = {}
 
             ## Evaluate the parameters if needed:
@@ -451,6 +451,9 @@ class STRING(BYTE):
         self.fmt = "%ss" % self.length
 
     def __len__(self):
+        return self.length
+
+    def size(self):
         return self.length
     
     def form(self,prefix, query,result):
@@ -667,3 +670,11 @@ class LPSTR(SimpleStruct):
 
     def __str__(self):
         return self['data'].__str__()
+
+class IPAddress(STRING):
+    def __init__(self, buffer,*args,**kwargs):
+        kwargs['length'] = 4
+        STRING.__init__(self, buffer, *args, **kwargs)
+        
+    def __str__(self):
+        return '.'.join([ord(x).__str__() for x in self.data])
