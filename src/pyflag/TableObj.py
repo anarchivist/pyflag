@@ -1461,6 +1461,15 @@ class CounterType(IntegerType):
     def select(self):
         return "count(*)"
 
+class PacketType(IntegerType):
+    """ A Column type which links directly to the packet browser """
+    def __init__(self, name, column, case):
+        IntegerType.__init__(self, name=name, column=column,
+                             link = query_type(family='Network Forensics',
+                                               report="View Packet",
+                                               case=case,
+                                               __target__='id'))
+
 ## Unit tests for the column types.
 import unittest,re
 

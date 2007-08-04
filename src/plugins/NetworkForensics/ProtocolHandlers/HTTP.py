@@ -35,7 +35,7 @@ import pyflag.Reports as Reports
 import plugins.NetworkForensics.PCAPFS as PCAPFS
 import re,time,cgi
 import TreeObj
-from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType
+from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType, PacketType
 
 def escape(uri):
     """ Make a filename from a URI by escaping / chars """
@@ -447,11 +447,7 @@ class BrowseHTTPRequests(Reports.report):
         def tabular_view(query,result):
             result.table(
                 elements = [ TimestampType('Date','ts_sec'),
-                             IntegerType('Request Packet','request_packet',
-                               link = query_type(family=query['family'],
-                                                 report="View Packet",
-                                                 case=query['case'],
-                                                 __target__='id')),
+                             PacketType('Request Packet','request_packet', case=query['case']),
                              InodeType('Inode','inode', case=query['case']),
                              StringType('Method','method'),
                              StringType('URL','url'),

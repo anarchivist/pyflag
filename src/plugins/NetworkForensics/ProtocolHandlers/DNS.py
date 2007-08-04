@@ -2,6 +2,11 @@
 import pyflag.Packets as Packets
 from format import *
 from plugins.FileFormats.BasicFormats import *
+import pyflag.FlagFramework as FlagFramework
+import pyflag.DB as DB
+import struct
+from pyflag.TableObj import StringType, PacketType, IPType
+
 
 class DNSString(STRING):
     """ This parses names encoded in DNS. We support standard DNS
@@ -140,12 +145,58 @@ class DNSHandler(Packets.PacketHandler):
         try:
             udp = packet.find_type("UDP")
             if udp.src_port==53 or udp.dest_port==53:
-                print "Handling packet %s->%s" % (udp.src_port, udp.dest_port)
+                ##print "Handling packet %s->%s" % (udp.src_port, udp.dest_port)
+                ## Try to parse the packet as a DNS packet:
                 dns = DNSPacket(udp.data)
-                print dns
+                dbh = DB.DBO(self.case)
+                ## This is needed so we can iterate twice over the
+                ## same array in case a CNAME is found
+                answers = [x for x in dns['Answers']]
+                
+                for answer in answers:
+                    if answer['Type']=='A':
+                        dbh.insert('dns', packet_id = packet.id,
+                                   name = answer['Name'],
+                                   ip_addr = struct.unpack('>I',answer['IP Address'].data)[0])
 
-        except AttributeError,e:
+                    ## See if there are any CNAMEs in this packet:
+                    elif answer['Type']=='CNAME':
+                        ## Try to find an A record for it. Normally
+                        ## CNAME records are followed by A records.
+                        for possible_a in answers:
+                            if possible_a['Type']=='A' and possible_a['Name']==answer['C Name']:
+                                dbh.insert('dns', packet_id = packet.id,
+                                           name = answer['Name'],
+                                           ip_addr = struct.unpack('>I',possible_a['IP Address'].data)[0])
+
+        except (AttributeError,KeyError),e:
             pass
+
+class DNSInit(FlagFramework.EventHandler):
+    def create(self, dbh, case):
+        dbh.execute(
+            """Create table if not exists `dns` (
+            `packet_id` int,
+            `name` VARCHAR(255) NOT NULL,
+            `ip_addr` int NOT NULL,
+            key(ip_addr)
+            )""")
+
+import pyflag.Reports as Reports
+
+class DNSBrowser(Reports.report):
+    """ A list of all DNS names seen in the traffic """
+    name = "Browse DNS"
+    family = "Network Forensics"
+    def display(self, query, result):
+        result.table(
+            elements = [ PacketType('Packet ID','packet_id', case=query['case']),
+                         StringType("Name", 'name'),
+                         IPType('IP Address', 'ip_addr'),
+                         ],
+            table = 'dns',
+            case=query['case'],
+            )
         
 import pyflag.tests as tests
 
