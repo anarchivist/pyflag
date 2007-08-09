@@ -52,7 +52,8 @@ static int PyPCAP_init(PyPCAP *self, PyObject *args, PyObject *kwds) {
   PyObject *fd = NULL;
   int len;
   static char *kwlist[] = {"fd", NULL};
-  
+  int i;
+
   if(!PyArg_ParseTupleAndKeywords(args, kwds, "O", kwlist,
 				  &fd))
     return -1;
@@ -63,6 +64,15 @@ static int PyPCAP_init(PyPCAP *self, PyObject *args, PyObject *kwds) {
   //Fill it up:
   if(PyPCAP_fill_buffer(self, fd)<0) {
     goto fail;
+  };
+
+  // Look for pcap magic somewhere in our buffer:
+  for(i=0;i<self->buffer->size; i+=sizeof(uint32_t)) {
+    uint32_t test = *(uint32_t *)(self->buffer->data + i);
+    
+    if(test==0xD4C3B2A1 || test==0xA1B2C3D4) {
+      CALL(self->buffer, skip, i);
+    };
   };
 
   // Read the header from our buffer:

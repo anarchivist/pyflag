@@ -178,7 +178,7 @@ class DNSInit(FlagFramework.EventHandler):
             """Create table if not exists `dns` (
             `packet_id` int,
             `name` VARCHAR(255) NOT NULL,
-            `ip_addr` int NOT NULL,
+            `ip_addr` int unsigned NOT NULL,
             key(ip_addr)
             )""")
 
