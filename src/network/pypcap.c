@@ -67,7 +67,7 @@ static int PyPCAP_init(PyPCAP *self, PyObject *args, PyObject *kwds) {
   };
 
   // Look for pcap magic somewhere in our buffer:
-  for(i=0;i<self->buffer->size; i+=sizeof(uint32_t)) {
+  for(i=0;i<self->buffer->size; i+=1) {
     uint32_t test = *(uint32_t *)(self->buffer->data + i);
     
     if(test==0xD4C3B2A1 || test==0xA1B2C3D4) {
