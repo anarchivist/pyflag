@@ -118,6 +118,7 @@ class FileList:
 
         ## This is a list of the time of the next packet in each file (floats):
         self.times = []
+        self.firstValid = None
 
         ## Initialise the timestamps of all args
         for f in args:
@@ -128,6 +129,10 @@ class FileList:
             except IOError:
                 print "Unable to read %s, skipping" % f
                 continue
+
+            if not self.firstValid:
+                self.firstValid = f
+
 
             self.put(fd)
             fd.reset()
@@ -163,7 +168,7 @@ class FileList:
 outfile = open(config.write,'w')
 f=FileList(args)
 
-fd = pypcap.PyPCAP(open(args[0]))
+fd = pypcap.PyPCAP(open(f.firstValid))
 
 ## Write the file header on:
 header = fd.file_header().serialise()
