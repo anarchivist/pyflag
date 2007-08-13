@@ -72,7 +72,7 @@ class Registry:
                         path = dirpath+'/'+filename
                         try:
                             if path not in self.module_paths:
-                                pyflaglog.log(pyflaglog.DEBUG,"Will attempt to load plugin '%s/%s'"
+                                pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Will attempt to load plugin '%s/%s'"
                                             % (dirpath,filename))
                                 ## If we do not have the module in the cache, we load it now
                                 try:
@@ -101,14 +101,14 @@ class Registry:
                                 #Is this module active?
                                 try:
                                     if module.hidden:
-                                        pyflaglog.log(pyflaglog.DEBUG, "*** Will not load Module %s: Module Hidden"% (module_name))
+                                        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "*** Will not load Module %s: Module Hidden"% (module_name))
                                         continue
                                 except AttributeError:
                                     pass
                                 
                                 try:
                                     if not module.active:
-                                        pyflaglog.log(pyflaglog.DEBUG, "*** Will not load Module %s: Module not active" % (module_name))
+                                        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "*** Will not load Module %s: Module not active" % (module_name))
                                         continue
                                 except AttributeError:
                                     pass
@@ -167,7 +167,7 @@ class Registry:
             except:
                 self.order.append(10)
 
-            pyflaglog.log(pyflaglog.DEBUG, "Added %s '%s:%s'"
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Added %s '%s:%s'"
                           % (ParentClass,module_desc,cls))
 
     def check_class(self,Class):

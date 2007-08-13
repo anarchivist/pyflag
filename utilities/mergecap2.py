@@ -123,11 +123,12 @@ class FileList:
         for f in args:
             try:
                 fd = PCAPParser(f)
+                fd.next()
+
             except IOError:
                 print "Unable to read %s, skipping" % f
                 continue
 
-            fd.next()
             self.put(fd)
             fd.reset()
 

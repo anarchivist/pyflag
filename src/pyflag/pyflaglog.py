@@ -64,6 +64,7 @@ class LoggingThread(threading.Thread):
         ## We get some weird thread related dead locks if we use the
         ## timeout feature here.
         dbh.cursor.timeout = 0
+        dbh.cursor.logged  = False
         
         return dbh
         

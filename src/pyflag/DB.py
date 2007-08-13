@@ -130,6 +130,7 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
     the server when needed.
     """
     ignore_warnings = False
+    logged = True
     
     def __init__(self, connection):
         MySQLdb.cursors.SSDictCursor.__init__(self, connection)
@@ -168,7 +169,8 @@ class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
                 t.join()
                 pass
         else:
-            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, string)
+            if self.logged:
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, string)
             MySQLdb.cursors.SSDictCursor.execute(self,string)
 
     def fetchone(self):
@@ -694,7 +696,7 @@ class DBO:
             else:
                 sql="(`%s`)" % (key) 
 
-            pyflaglog.log(pyflaglog.DEBUG,"Oops... No index found in table %s on field %s - Generating index, this may take a while" %(table,key))
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Oops... No index found in table %s on field %s - Generating index, this may take a while" %(table,key))
             ## Index not found, we make it here:
             self.execute("Alter table `%s` add index%s",(table,sql))
 
