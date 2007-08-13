@@ -232,7 +232,7 @@ static int SizeString32_pack(char *input, StringIO output) {
   uint32_t length = *(uint32_t *)(input);
   uint32_t i32;
 
-  i32=htons(length);
+  i32=htonl(length);
 
   CALL(output, write, (char *)&i32, sizeof(uint32_t));
   CALL(output, write, *(char **)(input+sizeof(i32)), length);
@@ -246,7 +246,7 @@ static int SizeString32_unpack(void *context, StringIO input, char *output) {
   if(CALL(input, read, (char *)&i32, sizeof(uint32_t)) < sizeof(uint32_t))
     return -1;
   
-  i32=ntohs(i32);
+  i32=ntohl(i32);
 
   *(uint32_t *)(output) = i32;	
   
