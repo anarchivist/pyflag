@@ -130,6 +130,10 @@ class FileList:
                 print "Unable to read %s, skipping" % f
                 continue
 
+            except StopIteration:
+                print "Unable to read packet from %s, skipping" % f
+                continue
+
             if not self.firstValid:
                 self.firstValid = f
 
