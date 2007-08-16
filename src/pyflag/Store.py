@@ -97,8 +97,8 @@ class Store:
                 i+=1
 
             ## If we are here we could not find the key:
-            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Key %s not found" % (key))
-            raise KeyError("Key not found %s" % key)
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Key %s not found" % (key,))
+            raise KeyError("Key not found %s" % (key,))
 
         finally:
             self.mutex.release()

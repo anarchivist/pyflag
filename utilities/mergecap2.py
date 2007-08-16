@@ -169,7 +169,7 @@ class FileList:
         except StopIteration:
             return self.next()
 
-outfile = open(config.write,'w')
+outfile = open(config.write,'w', 64*1024)
 f=FileList(args)
 
 fd = pypcap.PyPCAP(open(f.firstValid))

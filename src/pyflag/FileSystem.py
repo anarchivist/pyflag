@@ -305,7 +305,9 @@ class DBFS(FileSystem):
         for dent in result:
             if dent['inode']:
                 dbh.execute("select * from inode where inode = %r", dent['inode'])
-                dent.update(dbh.fetch())
+                data = dbh.fetch()
+                if data:
+                    dent.update(data)
 
         return result
         ## This is done rather than return the generator to ensure that self.dbh does not get interfered with...

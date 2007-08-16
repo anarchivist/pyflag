@@ -180,7 +180,13 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
 
         elif re.search("\.(htm)l?$",query.base):
             ct="text/html"
-            
+
+        elif re.search("\.(swf)l?$",query.base):
+            ct="application/x-shockwave-flash"
+
+        elif re.search("\.(mp3)l?$",query.base):
+            ct="audio/mpeg"
+
         if ct:
             try:
                 import sys
@@ -339,6 +345,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
             self.send_header(k,v)
         
         if result.generator and result.generator.generator:
+            self.send_header("Connection","close")
             self.send_header("Content-type", result.generator.content_type)
             
             for i in result.generator.headers:

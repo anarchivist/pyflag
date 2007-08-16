@@ -345,6 +345,8 @@ def load_preset(case, name, datafiles=[]):
 
 def drop_table(case, name):
     """ Drops the log table tablename """
+    if not name: return
+    
     dbh = DB.DBO(case)
     pyflaglog.log(pyflaglog.DEBUG, "Dropping log table %s in case %s" % (name, case))
 
@@ -397,7 +399,8 @@ def drop_preset(preset):
         drop_table(case, table)
 
     dbh = DB.DBO()
-    dbh.delete("log_presets", where="name = %r" % preset)
+    if preset:
+        dbh.delete("log_presets", where="name = %r" % preset)
     
 ## Some common callbacks which log drivers might need:
 def end(query,result):

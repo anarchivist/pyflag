@@ -33,6 +33,7 @@ import re,os.path,cgi, textwrap
 from FlagFramework import query_type,normpath, Magic
 import pyflag.FileSystem as FileSystem
 
+## FIXME: This needs to be pluggable too
 class ViewFile(Reports.report):
     """
     View HTML
@@ -76,6 +77,8 @@ class ViewFile(Reports.report):
             m = Magic(mode = 'mime')
             content_type = m.buffer(fd.read(1024))
             fd.seek(0)
+
+        print content_type
 
         ## Now establish the dispatcher for it
         for k,v in self.dispatcher.items():
@@ -147,9 +150,24 @@ class ViewFile(Reports.report):
             date = "%d-%02d-%02d %02d:%02d:%02d" % zinfo.date_time
             ui.row(zinfo.filename, date, zinfo.file_size)
 
+    def mpeg_handler(self, fd, ui):
+        ## TODO: run down the ID3 tags here
+        
+        ## Convert to mp3 at 44100 samples in order to normalise
+        ## the input
+        def play_file(fd):
+            while 1:
+                data = fd.read(64*1024)
+                if not data: break
+
+                yield data
+                
+        ui.sound_control("Listen to file", play_file(fd))
+
     dispatcher = { re.compile("text/html"): html_handler,
                    re.compile("image.*"): image_handler,
-                   re.compile("application/x-zip"): zip_handler
+                   re.compile("application/x-zip"): zip_handler,
+                   re.compile("audio/mpeg"): mpeg_handler,
                    }
 
 class HTMLSanitiser(HTMLParser.HTMLParser):

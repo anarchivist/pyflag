@@ -39,7 +39,7 @@ config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
 
 import os,os.path,sys
-active = False
+#active = False
 
 description = "Test Class"
 #Remove this line to ensure this appears in the menu
@@ -401,3 +401,18 @@ class HexDumpTest(Refresher):
         result.heading("HexDump test")
         ## highlight and match are styles defined in the css file.
         h.dump(highlight=[[30,80,'highlight'], [40,50,'match']])
+
+class AudioTest(Refresher):
+    """ Test the Audio control """
+    name = "Audio Test"
+    def display(self, query, result):
+        fd = open("/var/www/music.mp3")
+
+        def audio_cb():
+            while 1:
+                data = fd.read(64*1024)
+                if len(data)==0: break
+                
+                yield data
+                
+        result.sound_control("Play music sequence", audio_cb())
