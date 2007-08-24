@@ -65,7 +65,9 @@ static int PyPCAP_init(PyPCAP *self, PyObject *args, PyObject *kwds) {
     } else if(!strcmp(output,"little")) {
       self->output_format = FORCE_LITTLE_ENDIAN;
     } else {
-      return PyErr_Format("Unknown value (%s) for endianess - can be only 'big' or 'little'\n", output);
+      PyErr_Format(PyExc_KeyError, 
+		   "Unknown value (%s) for endianess - can be only 'big' or 'little'\n", output);
+      goto fail;
     };
   };
 
