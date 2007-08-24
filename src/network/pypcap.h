@@ -1,6 +1,12 @@
 #ifndef _PYPCAP_H
 #define _PYPCAP_H
 
+enum endianess_output { 
+  NO_ENDIANESS_CHANGE,
+  FORCE_BIG_ENDIAN,
+  FORCE_LITTLE_ENDIAN 
+};
+
 typedef struct {
   PyObject_HEAD
 
@@ -20,6 +26,7 @@ typedef struct {
   // Default id to use for newly dissected packets:
   int packet_id;
   uint32_t pcap_offset;
+  enum endianess_output output_format;
 } PyPCAP;
 
 

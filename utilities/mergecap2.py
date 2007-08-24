@@ -59,6 +59,9 @@ config.add_option("write", default="merged.pcap", short_option='w',
 config.add_option("split", default=2000000000, type='int', short_option='s',
                      help = "The Maximum size of the output file")
 
+config.add_option("output", default=None,
+                  help = "Forces output endianess to this (big or little)")
+
 config.parse_options(True)
 
 args = config.args[:]
@@ -97,7 +100,7 @@ class PCAPParser:
             parser = store.get(self.filename)
         except KeyError:
             fd = open(self.filename)
-            parser = pypcap.PyPCAP(fd)
+            parser = pypcap.PyPCAP(fd, output=config.output)
             try:
                 parser.seek(self.offset)
             except TypeError: pass
@@ -172,7 +175,8 @@ class FileList:
 outfile = open(config.write,'w', 64*1024)
 f=FileList(args)
 
-fd = pypcap.PyPCAP(open(f.firstValid))
+## Force output endianess if necessary:
+fd = pypcap.PyPCAP(open(f.firstValid), output=config.output)
 
 ## Write the file header on:
 header = fd.file_header().serialise()

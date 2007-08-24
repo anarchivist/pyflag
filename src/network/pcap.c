@@ -52,6 +52,19 @@ int PcapPacketHeader_Read(Packet self, StringIO input) {
   return len+ this->header.caplen;
 };
 
+int PcapPacketHeader_Write(Packet self, StringIO output) {
+  PcapPacketHeader this = (PcapPacketHeader)self;
+  int len;
+  
+  // We start off trying to read the header as big endian
+  len = this->__super__->Write(self, output);
+
+  // Write the data now:
+  CALL(output, write, this->header.data, this->header.caplen);
+
+  return len+ this->header.caplen;
+};
+
 VIRTUAL(PcapPacketHeader, Packet)
      INIT_STRUCT(header, PCAP_PKTHEADER_STRUCT);
 
@@ -59,6 +72,7 @@ VIRTUAL(PcapPacketHeader, Packet)
      NAME_ACCESS(header, ts_sec, ts_sec, FIELD_TYPE_INT);
      NAME_ACCESS(header, ts_usec, ts_usec, FIELD_TYPE_INT);
      NAME_ACCESS(header, caplen, caplen, FIELD_TYPE_INT);
+     NAME_ACCESS(header, len, len, FIELD_TYPE_INT);
      NAME_ACCESS(header, offset, offset, FIELD_TYPE_INT);
      NAME_ACCESS(header, id, id, FIELD_TYPE_INT);
      NAME_ACCESS(header, root, root, FIELD_TYPE_PACKET);
@@ -67,4 +81,5 @@ VIRTUAL(PcapPacketHeader, Packet)
      VATTR(le_format) = PCAP_PKTHEADER_STRUCT_LE;
 
      VMETHOD(super.Read) = PcapPacketHeader_Read;
+     VMETHOD(super.Write) = PcapPacketHeader_Write;
 END_VIRTUAL

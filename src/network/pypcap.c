@@ -51,12 +51,23 @@ static int PyPCAP_fill_buffer(PyPCAP *self, PyObject *fd) {
 static int PyPCAP_init(PyPCAP *self, PyObject *args, PyObject *kwds) {
   PyObject *fd = NULL;
   int len;
-  static char *kwlist[] = {"fd", NULL};
+  static char *kwlist[] = {"fd", "output",NULL};
   int i;
+  char *output=NULL;
 
-  if(!PyArg_ParseTupleAndKeywords(args, kwds, "O", kwlist,
-				  &fd))
+  if(!PyArg_ParseTupleAndKeywords(args, kwds, "O|s", kwlist,
+				  &fd, &output))
     return -1;
+
+  if(output) {
+    if(!strcmp(output, "big")) {
+      self->output_format = FORCE_BIG_ENDIAN;
+    } else if(!strcmp(output,"little")) {
+      self->output_format = FORCE_LITTLE_ENDIAN;
+    } else {
+      return PyErr_Format("Unknown value (%s) for endianess - can be only 'big' or 'little'\n", output);
+    };
+  };
 
   // Create the new buffer - the buffer is used as our talloc context:
   self->buffer = CONSTRUCT(StringIO, StringIO, Con, NULL);
@@ -123,6 +134,23 @@ static PyObject *file_header(PyPCAP *self, PyObject *args) {
 					 PyCObject_FromVoidPtr(self->file_header, 
 							       NULL),
 					 "PcapFileHeader");
+  
+  if(!result) return NULL;
+
+  // Adjust the output endianess if needed
+  switch(self->output_format) {
+  case FORCE_BIG_ENDIAN:
+    self->file_header->super.format = PCAP_HEADER_STRUCT;
+    break;
+
+  case FORCE_LITTLE_ENDIAN:
+    self->file_header->super.format = PCAP_HEADER_STRUCT_LE;
+    break;
+
+  default:
+    // Do nothing
+    break;
+  };
 
   return result;
 };
@@ -217,7 +245,6 @@ static PyObject *PyPCAP_next(PyPCAP *self) {
   self->packet_header = (PcapPacketHeader)CONSTRUCT(PcapPacketHeader, Packet,
 						    super.Con, self->buffer, NULL);
 
-  // Adjust the endianess if needed
   if(self->file_header->little_endian) {
     self->packet_header->super.format = self->packet_header->le_format;
   };
@@ -236,6 +263,21 @@ static PyObject *PyPCAP_next(PyPCAP *self) {
   // Keep track of our own file offset:
   self->pcap_offset += self->buffer->readptr;
   CALL(self->buffer, skip, self->buffer->readptr);
+
+  // Adjust the output endianess if needed
+  switch(self->output_format) {
+  case FORCE_BIG_ENDIAN:
+    self->packet_header->super.format = PCAP_PKTHEADER_STRUCT;
+    break;
+
+  case FORCE_LITTLE_ENDIAN:
+    self->packet_header->super.format = PCAP_PKTHEADER_STRUCT_LE;
+    break;
+
+  default:
+    // Do nothing
+    break;
+  };
 
   // create a new pypacket object:
   result = PyObject_CallMethod(g_pypacket_module, "PyPacket", "N",
