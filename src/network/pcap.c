@@ -38,6 +38,20 @@ VIRTUAL(PcapFileHeader, Packet)
      VATTR(le_format) = PCAP_HEADER_STRUCT_LE;
 END_VIRTUAL
 
+int PcapPacketHeader_Read(Packet self, StringIO input) {
+  PcapPacketHeader this = (PcapPacketHeader)self;
+  int len;
+  
+  // We start off trying to read the header as big endian
+  len = this->__super__->Read(self, input);
+
+  // Read the data now:
+  this->header.data = talloc_size(self, this->header.caplen);
+  CALL(input, read, this->header.data, this->header.caplen);
+
+  return len+ this->header.caplen;
+};
+
 VIRTUAL(PcapPacketHeader, Packet)
      INIT_STRUCT(header, PCAP_PKTHEADER_STRUCT);
 
@@ -51,4 +65,6 @@ VIRTUAL(PcapPacketHeader, Packet)
      NAME_ACCESS_SIZE(header, data, data, FIELD_TYPE_STRING, len);
 
      VATTR(le_format) = PCAP_PKTHEADER_STRUCT_LE;
+
+     VMETHOD(super.Read) = PcapPacketHeader_Read;
 END_VIRTUAL

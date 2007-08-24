@@ -62,7 +62,7 @@ static int PyPCAP_init(PyPCAP *self, PyObject *args, PyObject *kwds) {
   self->buffer = CONSTRUCT(StringIO, StringIO, Con, NULL);
 
   //Fill it up:
-  if(PyPCAP_fill_buffer(self, fd)<0) {
+  if(PyPCAP_fill_buffer(self, fd)<=0) {
     goto fail;
   };
 
@@ -153,7 +153,7 @@ static PyObject *PyPCAP_dissect(PyPCAP *self, PyObject *args, PyObject *kwds) {
        (char *)&self->packet_header->header, 16);
 
   CALL(self->dissection_buffer, write, 
-       self->packet_header->header.data, self->packet_header->header.len);
+       self->packet_header->header.data, self->packet_header->header.caplen);
 
   CALL(self->dissection_buffer, seek, 16, 
        SEEK_SET);

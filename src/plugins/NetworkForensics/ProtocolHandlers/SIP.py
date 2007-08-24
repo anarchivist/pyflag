@@ -199,7 +199,7 @@ class SIPHandler(Packets.PacketHandler):
                     print e
                     print FlagFramework.get_bt_string(e)
                 
-        except AttributeError:
+        except (AttributeError, TypeError):
             pass
 
 class RDPPacket(SimpleStruct):

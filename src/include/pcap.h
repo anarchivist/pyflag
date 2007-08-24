@@ -53,11 +53,9 @@ struct pcap_pkthdr {
   Root root;
 } __attribute__((packed));
 
-#define PCAP_PKTHEADER_STRUCT q(STRUCT_INT, STRUCT_INT, STRUCT_INT,	\
-				STRUCT_STRING_AND_LENGTH32)
+#define PCAP_PKTHEADER_STRUCT q(STRUCT_INT, STRUCT_INT, STRUCT_INT, STRUCT_INT)
 
-#define PCAP_PKTHEADER_STRUCT_LE q(STRUCT_INT_LE, STRUCT_INT_LE,	\
-				   STRUCT_INT_LE, STRUCT_STRING_AND_LENGTHLE32)
+#define PCAP_PKTHEADER_STRUCT_LE q(STRUCT_INT_LE, STRUCT_INT_LE, STRUCT_INT_LE, STRUCT_INT_LE)
 
 /** These are serializers and unserializers for packets */
 #include "packet.h"

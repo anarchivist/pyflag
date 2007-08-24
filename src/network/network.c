@@ -284,7 +284,7 @@ int UDP_Read(Packet self, StringIO input) {
   len =this->__super__->Read(self, input);
 
   /** UDP has no options, data starts right away. */
-  this->packet.data_len = this->packet.length - len;
+  this->packet.data_len = min(this->packet.length, input->size) - len;
   this->packet.data = talloc_memdup(self, input->data + input->readptr,
 				    this->packet.data_len);
 
