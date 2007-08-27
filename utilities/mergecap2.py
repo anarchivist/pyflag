@@ -264,8 +264,8 @@ for packet in f:
 
             ymdh = "%s_%s_%s_%s" % (lastTime.year, lastTime.month, 
                                     lastTime.day, lastTime.hour)
-            print "Packets saved into last file: ", packetsThisFile
-            packetsThisFile = 0
+            #print "Packets saved into last file: ", packetsThisFile
+            #packetsThisFile = 0
             print "Creating new file %s%s" % (ymdh, config.write)
             outfile = open("%s%s" % (ymdh, config.write),'w', 
                                    64*1024)
@@ -277,8 +277,8 @@ for packet in f:
     elif config.split:
         if length>config.split:
             file_number+=1
-            print "Packets saved into last file: ", packetsThisFile
-            packetsThisFile = 0
+            #print "Packets saved into last file: ", packetsThisFile
+            #packetsThisFile = 0
             print "Creating a new file %s%s" % (config.write, file_number)
             outfile = open("%s%s" % (config.write,file_number),'w')
         
@@ -288,10 +288,10 @@ for packet in f:
         
     ## Write the packet onto the file:
     outfile.write(data)
-    totalPackets += 1
-    packetsThisFile += 1
+    #totalPackets += 1
+    #packetsThisFile += 1
 
 
-print "Packets saved into last file: ", packetsThisFile
-print "-------"
-print "The total number of packets written out was: ", totalPackets
+#print "Packets saved into last file: ", packetsThisFile
+#print "-------"
+#print "The total number of packets written out was: ", totalPackets
