@@ -32,7 +32,7 @@ from format import Buffer
 import pyflag.pyflaglog as logging
 import pyflag.conf
 config = pyflag.conf.ConfObject()
-
+import datetime
 import pypcap
 
 config.set_usage(usage = """%prog -w Output [options] pcap_file ... pcap_file
@@ -56,11 +56,14 @@ config.add_option("glob", short_option='g',
 config.add_option("write", default="merged.pcap", short_option='w',
                      help = "The output file to write. (Mandatory)")
 
-config.add_option("split", default=2000000000, type='int', short_option='s',
+config.add_option("split", default=None, type='int', short_option='s',
                      help = "The Maximum size of the output file")
 
-config.add_option("output", default=None,
-                  help = "Forces output endianess to this (big or little)")
+config.add_option("split_by_hours", default=None, type='int', 
+                    help = "Split PCAP files by hours.")
+
+config.add_option("output", default=None, 
+                    help="Forces output endianess to this(big or little)")
 
 config.parse_options(True)
 
@@ -100,7 +103,10 @@ class PCAPParser:
             parser = store.get(self.filename)
         except KeyError:
             fd = open(self.filename)
-            parser = pypcap.PyPCAP(fd, output=config.output)
+            if config.output:
+                parser = pypcap.PyPCAP(fd, output=config.output)
+            else:
+                parser = pypcap.PyPCAP(fd)
             try:
                 parser.seek(self.offset)
             except TypeError: pass
@@ -172,44 +178,120 @@ class FileList:
         except StopIteration:
             return self.next()
 
-outfile = open(config.write,'w', 64*1024)
+
 f=FileList(args)
 
-## Force output endianess if necessary:
-fd = pypcap.PyPCAP(open(f.firstValid), output=config.output)
+## Force endianess if necessary:
+if config.output:
+    fd = pypcap.PyPCAP(open(f.firstValid), output=config.output)
+else:
+    fd = pypcap.PyPCAP(open(f.firstValid))
+##
+## Split by hours?
+##
+if config.split_by_hours: 
+
+    print "Earliest time is ", f.times[0]
+    print "Abs Starting date is ", datetime.datetime.fromtimestamp(f.times[0])
+
+    lastTimeFull = datetime.datetime.fromtimestamp(f.times[0])
+
+    if config.split_by_hours < 24:
+        lastTime = datetime.datetime(year=lastTimeFull.year,
+                                     month=lastTimeFull.month,
+                                     day=lastTimeFull.day,
+                                     hour=lastTimeFull.hour)
+    else:
+        lastTime = datetime.datetime(year=lastTimeFull.year,
+                                     month=lastTimeFull.month,
+                                     day=lastTimeFull.day)
+
+    ymdh = "%s_%s_%s_%s" % (lastTime.year, lastTime.month, lastTime.day, lastTime.hour)
+    print "Starting with file %s%s" % (ymdh, config.write)
+    outfile = open("%s%s" % (ymdh, config.write),'w', 
+                                64*1024)
+##
+## Nope - Either don't split or by size - either way just open the first file
+##
+
+else:
+    outfile = open(config.write,'w', 64*1024)
+
 
 ## Write the file header on:
 header = fd.file_header().serialise()
 outfile.write(header)
 
-#for packet in fd:
-#    outfile.write(packet.serialise())
-
-#sys.exit(0)
-
-count = 0
-
 length = len(header)
 file_number = 0
+count = 0
+totalPackets = 0
+packetsThisFile = 0
+
+## Step through and write out each packet:
 for packet in f:
+
     data = packet.serialise()
     length += len(data)
     count += len(data)
-
+    
     if count > 1000000:
         sys.stdout.write(".")
         sys.stdout.flush()
-#        print "Wrote %s Mbytes" % int(length/1e6)
         count = 0
     
-    if length>config.split:
-        file_number+=1
-        print "Creating a new file %s%s" % (config.write, file_number)
-        outfile = open("%s%s" % (config.write,file_number),'w')
+    if config.split_by_hours:
+        currentFullTime = datetime.datetime.fromtimestamp(packet.ts_sec + 
+                    (packet.ts_usec/1e6))
         
-        ## Write the file header on:
-        outfile.write(header)
-        length = len(header) + len(data)
+        #print "Current is: ", current
+        #print "Delta is:", current - lastTime
+
+        if (currentFullTime-lastTime)>datetime.timedelta(config.split_by_hours):
+
+            # Need to create a new file.
+            file_number += 1
+
+            if config.split_by_hours < 24:
+                lastTime = datetime.datetime(year=currentFullTime.year,
+                                             month=currentFullTime.month,
+                                             day=currentFullTime.day,
+                                             hour=currentFullTime.hour)
+            else:
+                lastTime = datetime.datetime(year=currentFullTime.year,
+                                             month=currentFullTime.month,
+                                             day=currentFullTime.day)
+
+            ymdh = "%s_%s_%s_%s" % (lastTime.year, lastTime.month, 
+                                    lastTime.day, lastTime.hour)
+            print "Packets saved into last file: ", packetsThisFile
+            packetsThisFile = 0
+            print "Creating new file %s%s" % (ymdh, config.write)
+            outfile = open("%s%s" % (ymdh, config.write),'w', 
+                                   64*1024)
+        
+            ## Write the file header on:
+            outfile.write(header)
+            length = len(header) + len(data)
+
+    elif config.split:
+        if length>config.split:
+            file_number+=1
+            print "Packets saved into last file: ", packetsThisFile
+            packetsThisFile = 0
+            print "Creating a new file %s%s" % (config.write, file_number)
+            outfile = open("%s%s" % (config.write,file_number),'w')
+        
+            ## Write the file header on:
+            outfile.write(header)
+            length = len(header) + len(data)
         
     ## Write the packet onto the file:
     outfile.write(data)
+    totalPackets += 1
+    packetsThisFile += 1
+
+
+print "Packets saved into last file: ", packetsThisFile
+print "-------"
+print "The total number of packets written out was: ", totalPackets
