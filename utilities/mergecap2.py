@@ -247,7 +247,7 @@ for packet in f:
         #print "Current is: ", current
         #print "Delta is:", current - lastTime
 
-        if (currentFullTime-lastTime)>datetime.timedelta(config.split_by_hours):
+        if (currentFullTime-lastTime)>datetime.timedelta(hours=config.split_by_hours):
 
             # Need to create a new file.
             file_number += 1
