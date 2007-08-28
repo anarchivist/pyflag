@@ -192,9 +192,9 @@ else:
 if config.split_by_hours: 
 
     print "Earliest time is ", f.times[0]
-    print "Abs Starting date is ", datetime.datetime.fromtimestamp(f.times[0])
+    print "Abs Starting date is ",datetime.datetime.utcfromtimestamp(f.times[0])
 
-    lastTimeFull = datetime.datetime.fromtimestamp(f.times[0])
+    lastTimeFull = datetime.datetime.utcfromtimestamp(f.times[0])
 
     if config.split_by_hours < 24:
         lastTime = datetime.datetime(year=lastTimeFull.year,
@@ -241,7 +241,7 @@ for packet in f:
         count = 0
     
     if config.split_by_hours:
-        currentFullTime = datetime.datetime.fromtimestamp(packet.ts_sec + 
+        currentFullTime = datetime.datetime.utcfromtimestamp(packet.ts_sec + 
                     (packet.ts_usec/1e6))
         
         #print "Current is: ", current
