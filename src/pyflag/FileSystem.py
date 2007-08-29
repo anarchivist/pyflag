@@ -207,8 +207,12 @@ class DBFS(FileSystem):
         self.mount_point = mount_point
         dbh=DB.DBO(self.case)
         
-        ## Ensure the VFS contains the mount point:
-        self.VFSCreate(None, "I%s" % iosource_name, mount_point, directory=True)
+        ## Commented out to fix Bug0035. This should be (and is) done
+        ## by VFSCreate, since we want to avoid duplicate mount points.
+          ## Ensure the VFS contains the mount point:
+          #self.VFSCreate(None, "I%s" % iosource_name, mount_point, 
+          #                                      directory=True)
+        ##
 
         ## Ensure that we have the IOSource available
         self.iosource = IO.open(self.case, iosource_name)
