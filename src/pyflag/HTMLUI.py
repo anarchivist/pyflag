@@ -1040,9 +1040,12 @@ class HTMLUI(UI.GenericUI):
                     result.refresh(0,query,pane='parent_pane')
                     return
 
-                # Else, who knows what happened...
+                # Else, it's not a submit
                 else:
-                    pyflaglog.log(pyflaglog.WARNING, "Error. There was a problem with the filter settings: %s" % e)
+                    # This probably occurs when first opening. It should
+                    # be OK to just ignore.
+
+                    #pyflaglog.log(pyflaglog.DEBUG, "Error. There was a problem with the filter settings: %s" % e)
                     pass
 
             result.start_form(query, pane="self")
