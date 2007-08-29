@@ -382,6 +382,7 @@ CARVERS = None
 EVENT_HANDLERS = None
 IMAGES = None
 FILE_HANDLERS = None
+STATS_HANDLERS = None
 
 ## This is required for late initialisation to avoid dependency nightmare.
 def Init():
@@ -458,11 +459,15 @@ def Init():
     global FILE_HANDLERS
     FILE_HANDLERS = FileHandlerRegistry(IO.FileHandler)
 
-
     ## Register packet handlers:
     import pyflag.Packets as Packets
     global PACKET_HANDLERS
     PACKET_HANDLERS = ScannerRegistry(Packets.PacketHandler)
+
+    ## Register stats viewers:
+    import pyflag.Stats as Stats
+    global STATS_HANDLERS
+    STATS_HANDLERS = ScannerRegistry(Stats.Handler)
 
 def InitTests():
     return TestsRegistry(unittest.TestCase)

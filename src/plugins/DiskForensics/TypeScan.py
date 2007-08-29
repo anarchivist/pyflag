@@ -161,6 +161,88 @@ class ViewFileTypes(Reports.report):
             result.para("Error reported was:")
             result.text(e,style="red")
 
+## Show some stats:
+import pyflag.Stats as Stats
+class MimeTypeStats(Stats.Handler):
+    name = "Mime Types"
+
+    def render_tree(self, branch, query):
+        dbh = DB.DBO(self.case)
+        ## Top level view - we only show the File Types stats branch
+        ## if we have any types there.
+        if not branch[0]:
+            dbh.execute("select count(*) as a from type")
+            row = dbh.fetch()
+            if row['a']>0:
+                yield (self.name, self.name, 'branch')
+        elif branch[0] != self.name:
+            return
+        elif len(branch)==1:
+            dbh.execute("select `type`.`mime`  from `type` group by `mime`")
+            for row in dbh:
+                t = row['mime'][:20]
+                yield (row['mime'].replace("/","__"), t, 'leaf')
+
+    def render_pane(self, branch, query, result):
+        ## We may only draw on the pane that belongs to us:
+        if branch[0] != self.name:
+            return
+
+        if len(branch)==1:
+            result.heading("Show file types")
+            result.text("This statistic allows different file types to be examined")
+        else:
+            t = branch[1].replace("__",'/')
+            result.table(
+                elements = [ FilenameType(case = self.case),
+                             IntegerType('Size','c.size'),
+                             TimestampType('Timestamp','c.mtime')],
+                table = 'file as a, type as b, inode as c',
+                where = 'b.inode=c.inode and a.inode=b.inode and a.mode like "r%%%%" and b.mime=%r ' % t,
+                case = self.case,
+                )
+
+class TypeStats(Stats.Handler):
+    name = "File Types"
+
+    def render_tree(self, branch, query):
+        dbh = DB.DBO(self.case)
+
+        print branch
+        ## Top level view - we only show the File Types stats branch
+        ## if we have any types there.
+        if not branch[0]:
+            dbh.execute("select count(*) as a from type")
+            row = dbh.fetch()
+            if row['a']>0:
+                yield (self.name, self.name, 'branch')
+        elif branch[0] != self.name:
+            return
+        elif len(branch)==1:
+            dbh.execute("select `type`.`type`  from `type` group by `type`")
+            for row in dbh:
+                t = row['type'][:20]
+                yield (row['type'].replace("/","__"), t, 'leaf')
+
+    def render_pane(self, branch, query, result):
+        ## We may only draw on the pane that belongs to us:
+        if branch[0] != self.name:
+            return
+
+        if len(branch)==1:
+            result.heading("Show file types")
+            result.text("This statistic allows different file types to be examined")
+        else:
+            t = branch[1].replace("__",'/')
+            result.table(
+                elements = [ FilenameType(case = self.case),
+                             IntegerType('Size','c.size'),
+                             TimestampType('Timestamp','c.mtime')],
+                table = 'file as a, type as b, inode as c',
+                where = 'b.inode=c.inode and a.inode=b.inode and a.mode like "r%%%%" and b.type=%r ' % t,
+                case = self.case,
+                )
+                
 ## UnitTests:
 import unittest
 import pyflag.pyflagsh as pyflagsh
