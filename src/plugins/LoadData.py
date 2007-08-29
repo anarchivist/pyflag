@@ -180,6 +180,14 @@ class LoadIOSource(Reports.report):
         ## Try to instantiate the image:
         try:
             image = Registry.IMAGES.dispatch(query['subsys'])()
+        except:
+            result.heading("Error: Unable to create IO Source")
+            result.para("Could not find a driver for requested IO"\
+                        " subsystem (%s). Are you sure you spelt it "\
+                        "correctly? It's case sensitive!" % query['subsys'])
+            return
+    
+        try:
             ## Correct the filenames to stem at the UPLOADDIR:
             filenames = query.getarray('filename')
             query.clear('filename')
