@@ -194,7 +194,8 @@ class MimeTypeStats(Stats.Handler):
         else:
             t = branch[1].replace("__",'/')
             result.table(
-                elements = [ FilenameType(case = self.case),
+                elements = [ InodeType(column='a.inode', case = self.case),
+                             FilenameType(case = self.case, link_pane='main'),
                              IntegerType('Size','c.size'),
                              TimestampType('Timestamp','c.mtime')],
                 table = 'file as a, type as b, inode as c',
@@ -235,7 +236,8 @@ class TypeStats(Stats.Handler):
         else:
             t = branch[1].replace("__",'/')
             result.table(
-                elements = [ FilenameType(case = self.case),
+                elements = [ InodeType(column='a.inode', case = self.case),
+                             FilenameType(case = self.case, link_pane='main'),
                              IntegerType('Size','c.size'),
                              TimestampType('Timestamp','c.mtime')],
                 table = 'file as a, type as b, inode as c',

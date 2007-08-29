@@ -88,9 +88,9 @@ class LoggingThread(threading.Thread):
                 if dbh:
                     dbh.insert('logs', level=level, message=message[:250], _fast=True)
             except Exception,e:
-                sys.stdout.write( "Logging service: %s" % e)
+                sys.stdout.write( "Logging service: %s\nIf PyFlag is not configured yet just connect to its URL.\n" % e)
                 sys.stdout.flush()
-                time.sleep(1)
+                time.sleep(10)
 
 def start_log_thread():
     """ This needs to be called to start the log thread.

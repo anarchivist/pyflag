@@ -151,7 +151,7 @@ class BasicTheme:
             q.FillQueryTarget(previous)
             previous = '<a href="f?%s"><img src="/images/back.png"  border="0"></a>' %  (str(q))
 
-        bar = {'family': propegate(query,FlagFramework.query_type()),'back': previous,'case': query['case'],'pageno':  pageno,'next': next,'reset': str(query)+'&reset=1','stop': str(query)+'&stop=1'}
+        bar = {'family': propegate(query,FlagFramework.query_type()),'back': previous,'case': query.get('case',''),'pageno':  pageno,'next': next,'reset': str(query)+'&reset=1','stop': str(query)+'&stop=1'}
 
         toolbar = '''<table><tr>
         <td valign="bottom"><a href="f?family=%(family)s"><img src="/images/home.png" border="0"></a></td><td valign="bottom">%(back)s</td>%(case)s - page %(pageno)s<td valign="bottom">%(next)s</td> <td valign="bottom">
