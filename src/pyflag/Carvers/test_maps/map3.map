@@ -1,0 +1,6 @@
+## Junk at start, 10kb of data from offset 20kb, 10kb of junk and the
+## first 10kb of data (transposition and insertion).
+
+0	30720	File starts
+10240   10240   Next 10k out of order
+20480	40960   Rest of file

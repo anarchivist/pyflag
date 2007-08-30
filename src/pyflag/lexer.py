@@ -19,6 +19,9 @@
 # * along with this program; if not, write to the Free Software
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
+""" A simple feed lexer.
+"""
+
 import re,sys
 
 class Lexer:
@@ -29,51 +32,112 @@ class Lexer:
     tokens = []
     buffer = ''
     error = 0
+    verbose = 0
     state_stack = []
+    processed = 0
+    processed_buffer = ''
+    saved_state = None
     
-    def __init__(self):
+    def __init__(self, verbose=0):
+        if not self.verbose:
+            self.verbose = verbose
+        
         for row in self.tokens:
-            row.append(re.compile(row[0]))
-            row.append(re.compile(row[1]))
+            row.append(re.compile(row[0], re.DOTALL))
+            row.append(re.compile(row[1], re.DOTALL))
+
+    def save_state(self, t=None, m=None):
+        """ Returns a dict which represents the current state of the lexer.
+
+        When provided to restore_state, the lexer is guaranteed to be
+        in the same state as when the save_state was called.
+
+        Note that derived classes may need to extend this.
+        """
+        ## Cant save our state if we have errors. We need to guarantee
+        ## that we rewind to a good part of the file.
+        if self.error: return
+        if self.verbose>2:
+            print "Saving state %s\n" % self.processed
+
+        try:
+            end = m.end()
+        except: end = 0
+        
+        self.saved_state = dict(state_stack = self.state_stack[:],
+                                processed = self.processed - end,
+                                processed_buffer = self.processed_buffer,
+                                readptr = self.fd.tell() - len(self.buffer) - end,
+                                state = self.state,
+                                objects = self.objects[:],
+                                error = self.error,
+                                )
+
+    def restore_state(self):
+        if self.verbose>2:
+            print "Restoring state"
+
+        state = self.saved_state
+        if not state: return
+        
+        self.state_stack = state['state_stack']
+        self.processed = state['processed']
+        self.processed_buffer = state['processed_buffer']
+        self.buffer = ''
+        self.fd.seek(state['readptr'])
+        self.state = state['state']
+        self.objects = state['objects']
+        self.error = state['error']
 
     def next_token(self, end = True):
         ## Now try to match any of the regexes in order:
+        current_state = self.state
         for state_re, re_str, token, next, state, regex in self.tokens:
             ## Does the rule apply for us now?
-            if state.match(self.state):
-                #print "Trying to match %r with %r" % (self.buffer[:10], re_str)
+            if state.match(current_state):
+                if self.verbose > 2:
+                    print "Trying to match %r with %r" % (self.buffer[:10], re_str)
+                    
                 m = regex.match(self.buffer)
                 if m:
-                    #print "%s matched %s" % (re_str, m.group(0))
+                    if self.verbose > 3:
+                        print "%s matched %s" % (re_str, m.group(0))
                     ## The match consumes the data off the buffer (the
                     ## handler can put it back if it likes)
+                    self.processed_buffer += self.buffer[:m.end()]
                     self.buffer = self.buffer[m.end():]
+                    self.processed += m.end()
 
                     ## Try to iterate over all the callbacks specified:
                     for t in token.split(','):
                         try:
-                            #print "Calling %s %r" % (t, m.group(0))
+                            if self.verbose > 0:
+                                print "0x%X: Calling %s %r" % (self.processed, t, m.group(0))
                             cb = getattr(self, t, self.default_handler)
                         except AttributeError:
                             continue
 
                         ## Is there a callback to handle this action?
                         next_state = cb(t, m)
-                        if next_state:
+                        if next_state == "CONTINUE":
+                            continue
+                        
+                        elif next_state:
                             next = next_state
+                            self.state = next
 
-                    #print "Going into state %s" % next
+                    
                     if next:
                         self.state = next
-                        
+                
                     return token
 
         ## Check that we are making progress - if we are too full, we
         ## assume we are stuck:
         if end and len(self.buffer)>0 or len(self.buffer)>1024:
-            print "Lexer Stuck, discarding 1 byte (%r) - state %s" % (self.buffer[:10], self.state)
+            self.processed_buffer += self.buffer[:1]
             self.buffer = self.buffer[1:]
-            self.ERROR()
+            self.ERROR("Lexer Stuck, discarding 1 byte (%r) - state %s" % (self.buffer[:10], self.state))
             return "ERROR"
 
         ## No token were found
@@ -86,21 +150,50 @@ class Lexer:
         return not len(self.buffer)
 
     def default_handler(self, token, match):
-        pass
-        #print "Got %s with %r" % (token,match.group(0))
+        if self.verbose > 2:
+            print "Default handler: %s with %r" % (token,match.group(0))
 
-    def ERROR(self):
-        self.error+=1
+    def ERROR(self, message = None, weight =1):
+        if message:
+            print "Error(%s): %s" % (weight,message)
+
+        self.error += weight
 
     def PUSH_STATE(self, token = None, match = None):
-        #print "Storing state %s" % self.state
+        if self.verbose > 1:
+            print "Storing state %s" % self.state
         self.state_stack.append(self.state)
 
     def POP_STATE(self, token = None, match = None):
         try:
             state = self.state_stack.pop()
-            #print "Returned state to %s" % state
+            if self.verbose > 1:
+                print "Returned state to %s" % state
+                
             return state
         except IndexError:
             print "Tried to pop the state but failed - possible recursion error"
             return None
+
+
+class SelfFeederMixIn(Lexer):
+    """ This mixin is used to make a lexer which feeds itself one
+    sector at the time.
+
+    Note that self.fd must be the fd we read from.
+    """
+    def next_token(self):
+        ## If we dont have enough data - feed ourselves: We assume
+        ## that we must have at least one sector in our buffer.
+        if len(self.buffer) < 512:
+            if self.feed()==0 and len(self.buffer)==0:
+                raise IOError("No data left")
+
+        return Lexer.next_token(self)
+        
+    def feed(self, size=512):
+        data = self.fd.read(size)
+        Lexer.feed(self, data)
+
+        return len(data)
+

@@ -1,0 +1,9 @@
+## A simple out of order transposition- first 10k of file are
+## exchanged with second 10k of file.
+
+##  This is a test map for the image generator. Format is Fileoffset,
+##  image offset, comment. function is forward interpolated.
+
+0     10240	Start of file
+10240 0 	Start of image
+20480 20480

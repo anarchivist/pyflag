@@ -1,0 +1,357 @@
+# ******************************************************
+# Michael Cohen <scudette@users.sourceforge.net>
+#
+# ******************************************************
+#  Version: FLAG $Version: 0.84RC4 Date: Wed May 30 20:48:31 EST 2007$
+# ******************************************************
+#
+# * This program is free software; you can redistribute it and/or
+# * modify it under the terms of the GNU General Public License
+# * as published by the Free Software Foundation; either version 2
+# * of the License, or (at your option) any later version.
+# *
+# * This program is distributed in the hope that it will be useful,
+# * but WITHOUT ANY WARRANTY; without even the implied warranty of
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# * GNU General Public License for more details.
+# *
+# * You should have received a copy of the GNU General Public License
+# * along with this program; if not, write to the Free Software
+# * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# ******************************************************
+import sys, re
+
+""" This class abstracts the reassembled file 
+
+Carving a file from an image can be seen as a mathematical operation
+mapping sectors in the image into sectors in the logical reassembled
+file.
+
+If we plot the sequences of bytes from the file to the bytes in the
+image it might look like this:
+
+Bytes  |          /
+In     |         /
+Image  |     /|  |
+       |    / |  |
+       |   /  |  |
+       |   |  | /
+       |   |   /
+       |  /
+       | /
+       |/
+       ------------------>
+       0     Bytes in File ->
+
+The function mapping the bytes in the file to the bytes in the image
+has a number of properties:
+
+1) The slope of the function is always 1 (because there is a 1-1
+mapping for the image with the file).
+
+2) There are a number of discontiuities in the function at various
+places.
+
+3) The function is invertible - i.e. there is at most one file offset
+for each value of the image offset (if such a value exists).
+
+4) Discontinuities can only occur on sector boundaries (512 bytes).
+
+The process of carving essentially boils down to estimating the
+mapping function.
+
+For a finite size image, there are actually only a finite number of
+mapping functions, resulting from the permutations of all sectors with
+each other (this number may be absolutely huge but it is actually
+finite).
+
+In order to find the correct mapping function, a series of deductions
+and algorithms may be used to impose constraints on the function. The
+constraints may be positive or negative constraints:
+
+A positive constraint is a deduction which positively identifies a
+point on the function's graph. This identification may stem from an
+observation specific to the file format in question. For example, a
+positively identified file header places a constraint on the first
+sector of the file. Sometimes, depending on the file format, positive
+constaints may be identified throughout the file.
+
+A negative constraint can be defined as an observation that a certain
+sector does not belong within the sequence observed. This might occur
+if the sector clearly does not exhibit the characteristics required
+from this file type (e.g. sector with binary bytes following a HTML
+sector etc).
+
+The job of the carver is therefore to first add as many positive
+constraints as possible, and then iterate through the file and
+discount those sectors which do not belong. (Hence imposing negative
+constraints).
+
+Consider the following possible mapping function:
+         /| (1)
+   |    / |
+   |    | | 
+   |    |/|  x 
+   | (2)/ | /
+   |   /| |/
+   |  / | /  Potential discontinueties.
+   | /  |/ (3)
+   |x   /
+   ----------------->
+
+This function has 2 positively identified points (marked with
+x). Since the points do not lie on the same line of slope one, there
+must be at least one discontinuty between them. The figure shows 3
+possibilities. Possibility 1 has 2 discontinuities. Possibilities 2
+and 3 only have a single discontinuity.
+
+We say that possibilities 2 and 3 exihibit first order fragementation,
+while possibility 3 exhibits second order (or higher order)
+framentation.
+
+Interpolation:
+--------------
+In order to estimate the mapping function we must predict values on
+the function which do not correspond to identified points. This
+process is called interpolation. There are 2 possible ways to
+interpolate between two identified points:
+                
+   |       
+   |   Forward Interpolation
+   |     /|    
+   |P1  / | /
+   |   x  |/
+   |  /|  x  P2
+   | / | /    
+   |/  |/ Reverse Interpolation
+   ----------------->
+
+Forward interpolation
+---------------------
+The value is interpolated forward from P1 through a straight line of
+unit slope which goes through P1. The line terminates where the file
+offset is the same as that of P2.
+
+Reverse interpolation
+---------------------
+The value is interpolated backwards from P2 through a straight line of
+unit slope which goes through P2. The line terminates where the file
+offset is the same as that of P1.
+
+
+Ambiguous points
+----------------
+Note that any point between identified points dont need to lie on the
+line connecting them. However, if we assume first order fragmentation
+(i.e. only a single discontinuity between the two points), there are
+two possible values for image offsets for a given file offset:
+
+ Image offset
+   |       
+   |   X1 /|
+   |     x |    
+   |P1  /  |/
+   |   x   x
+   |  /|  /  P2
+   | / | x    
+   |/  |/ X2
+   ----------------->  File offset
+
+X1 and X2 are the possible points for a given file offset. X1 is
+obtained for forward interpolation, while X2 is obtained by reverse
+interpolation.
+
+If P1 and P2 lie on the same line, X1==X2 and there is only a single
+possibility. We term the case where P1 and P2 do not lie on the same
+line as ambiguous. Of course the correct mapping function could only
+have either X1 or X2, and our problem is to determine which one is
+correct.
+
+
+Although in theory there can be as many discontinuities between the
+positively identified points as there are sectors, in practice the
+total number of discontinuities is as low as possible (filesystems
+generally try to keep data contiguous). Hence preference should be
+given to those mapping functions with less discontinuities.
+
+This file implements classes which make this simpler.
+"""
+import bisect
+
+class Reassembler:
+    """ This class presents a file like object for interpolating
+    between identified points on the mapping function.
+    """
+    ## This controls if we will interpolate forward from one
+    ## identified point to the next or interpolate backwards
+    interpolate_forward = True
+    readptr = 0
+    ## This list is the file position coordinates of all the points,
+    ## this is sorted.
+    points = []
+
+    ## This is the image_pos for each file_pos inserted.
+    mapping = {}
+
+    ## This is a comment attached to each file_pos identified.
+    comments = {}
+
+    ## This is how much we read after the last identified point
+    overread = 100*1024
+    
+    def __init__(self, fd):
+        self.fd = fd
+
+    def del_point(self, file_pos):
+        """ Remove the point at file_pos if it exists """
+        idx = self.points.index(file_pos)
+        try:
+            del self.mapping[file_pos]
+            self.points.pop(idx)
+        except: pass
+
+    def add_point(self, file_pos, image_pos, comment=None):
+        """ Adds a new point to the mapping function. Points may be
+        added in any order.
+        """
+        bisect.insort_left(self.points, file_pos)
+        ## We already have this position in here - we need to decide
+        ## if this is a better value. Its not a hard and fast rule,
+        ## but generally if the current position is not too far away
+        ## from the interpolated position, we dont want to update
+        ## it. FIXME: Make this able to take multiple number of
+        ## possibilties.
+        if self.mapping.has_key(file_pos):
+            expected, left = self.interpolate(file_pos-1)
+            if abs(image_pos - expected) > abs(self.mapping[file_pos] - expected):
+                return
+            
+        self.mapping[file_pos] = image_pos
+        self.comments[file_pos] = comment
+        
+    def seek(self, offset, whence=0):
+        if whence==0:
+            self.readptr = offset
+        elif whence==1:
+            self.readptr += offset
+        elif whence==2:
+            self.readptr = self.points[-1]
+
+    def interpolate(self, file_offset, direction_forward = None):
+        """ Provides a tuple of (image_offset, valid length) for the
+        file_offset provided. The valid length is the number of bytes
+        until the next discontinuity.
+        """
+        if direction_forward == None:
+            direction_forward = self.interpolate_forward
+            
+        ## We can't interpolate forward before the first point - must
+        ## interpolate backwards.
+        if file_offset < self.points[0]:
+            direction_forward = False
+
+        ## We can't interpolate backwards after the last point, we must
+        ## interpolate forwards.
+        elif file_offset > self.points[-1]:
+            direction_forward = True
+
+        if direction_forward:
+            l = bisect.bisect_right(self.points, file_offset)-1
+            try:
+                left = self.points[l+1] - file_offset
+            except:
+                left = self.overread
+                
+            #print "Forward interpolation %s %s %s" % (self.points[l],file_offset,self.points[l+1])
+            return self.mapping[self.points[l]]+file_offset - self.points[l], left
+        else:
+            r = bisect.bisect_right(self.points, file_offset)
+            #print "Reverse interpolation %s %s %s" % (self.points[r],file_offset, r)
+            return self.mapping[self.points[r]] - (self.points[r] - file_offset), self.points[r] - file_offset
+
+    def tell(self):
+        return self.readptr
+
+    def read(self, length):
+        result = ''
+        while length>0:
+            try:
+                m, left = self.interpolate(self.readptr)
+                #print m, self.readptr, left, length
+                self.fd.seek(m,0)
+            except:
+                left = 1000
+
+            want_to_read = min(left, length)
+            #print "About to read %s bytes" % want_to_read
+            assert(want_to_read > 0)
+            sys.stdout.flush()
+            data = self.fd.read(want_to_read)
+            if not data: break
+
+            self.readptr += min(left, length)
+            result += data
+            length -= len(data)
+
+        return result
+
+    def save_map(self, fd):
+        """ Saves the map onto the fd 
+        The format of the map file is as follows:
+
+        - Comment lines start with #
+        - First column, file offset
+        - Second column, image offset
+        - If a number of possible locations are present, there will be a
+        number of image offsets for the same file offset.
+        
+        The idea is that different map files may be coalesced together by
+        simply using 'cat'.
+        """
+        for x in self.points:
+            fd.write("%s %s %s\n" % (x, self.mapping[x], self.comments[x]))
+
+    def load_map(self, mapfile):
+        """ Opens the mapfile and loads the points from it """
+        fd = open(mapfile)
+        for line in fd:
+            if line.startswith("#"): continue
+            try:
+                temp = re.split("[\t ]+", line, 2)
+                off = temp[0]
+                image_off = temp[1]
+                try:
+                    id = temp[2]
+                except: id=''
+                
+                self.add_point(int(off), int(image_off), comment=id)
+            except (ValueError,IndexError),e:
+                pass
+
+import unittest
+
+class CarverTest(unittest.TestCase):
+    filename = "Carver_Test_file"
+    def setUp(self):
+        """ Build a test file """
+        text = ''.join([chr(x) for x in range(0,100) ]) * 100
+        text = text[512:] + text[:512]
+        fd = open(self.filename,'w')
+        fd.write(text)
+        fd.close()
+
+    def test_Carver(self):
+        """ Test that we can interpolate forward and backward around
+        transition points
+        """
+        fd = open(self.filename)
+        c = Reassembler(fd)
+
+        c.add_point(512,0)
+        c.add_point(0,512)
+
+        print c.interpolate(50, True)
+        print c.interpolate(520, True)
+
+if __name__=='__main__':    
+    unittest.main()

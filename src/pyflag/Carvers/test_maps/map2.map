@@ -1,0 +1,5 @@
+## simple insertion fragmantation, after 10k of file, 10k of junk is
+## inserted, then the rest of the file:
+
+0      0      Start of file
+10240  20480  continuation of file (skip 10k)
