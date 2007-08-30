@@ -210,7 +210,8 @@ def lookup_whois(ip):
         ##
         try:
             dbh.insert("geoip_country", _fast=True,
-                       country = ipinfo.get('country_code3','---'))
+                       country = ipinfo.get('country_code3','---'),
+                       country2 = ipinfo.get('country_code','00'))
         except DB.DBError, e:
             pass
 
@@ -255,7 +256,7 @@ def lookup_whois(ip):
 def _geoip_cached_record(ip):
     dbh = DB.DBO()
     
-    dbh.execute("select city,country, isp, org from whois_cache join " \
+    dbh.execute("select city,country,country2, isp, org from whois_cache join " \
                 " (geoip_country join geoip_city join geoip_isp " \
                 " join geoip_org) " \
                 " on (whois_cache.geoip_city = geoip_city.id and " \
@@ -274,15 +275,17 @@ def geoip_cached_record(ip):
 
     return result
 
-def geoip_resolve_extended(ip):
+def geoip_resolve_extended(ip, result):
     rec = geoip_cached_record(ip)
-    return "%s / %s" % (rec['org'], rec['isp'])
+    result.text( "%s / %s\n" % (rec['org'], rec['isp']))
 
-def geoip_resolve(ip):
+def geoip_resolve(ip, result):
     rec = geoip_cached_record(ip)
-    return "%s (%s) " % (rec['city'], rec['country'])
+    tmp = result.__class__(result)
+    tmp.icon("flags/%s.gif" % rec['country2'].lower(), tooltip=rec['country'])
+    result.text( "%s %s\n" % (tmp,rec['city']))
 
-def identify_network(whois_id,ip):
+def identify_network(whois_id,ip, result):
     """ Returns a uniq netname/country combination """
     dbh = DB.DBO(None)
     ## No cached info - just work it out again
@@ -294,9 +297,9 @@ def identify_network(whois_id,ip):
     dbh.execute("select netname,country from whois where id=%r limit 1" , whois_id)
     row = dbh.fetch()
     try:
-        return "%s/%s" % (row['country'],row['netname'])
+        return result.text("%s/%s\n" % (row['country'],row['netname']))
     except TypeError:
-        return ''
+        pass
 
 class PrecacheWhois(Reports.report):
     """
@@ -472,6 +475,7 @@ class WhoisInit(FlagFramework.EventHandler):
         dbh.execute("""CREATE TABLE `geoip_country` (
         `id` int(11) unsigned NOT NULL auto_increment,
         `country` char(3) NOT NULL UNIQUE,
+        `country2` char(3) NOT NULL UNIQUE,
         PRIMARY KEY (`id`),
         UNIQUE KEY (`country`)
         ) engine = MyISAM""")

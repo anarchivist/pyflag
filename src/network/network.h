@@ -50,8 +50,8 @@
 *************************************************/
 struct root_node_struct {
   Packet eth;
-  int link_type;
-  int packet_id;
+  unsigned int link_type;
+  unsigned int packet_id;
 } __attribute__((packed));
 
 CLASS(Root, Packet)
@@ -139,10 +139,10 @@ struct ip_struct {
 
 CLASS(IP, Packet)
 /** Each IP Packet has a unique number */
-     int id;
+     unsigned int id;
      // This contains the packet offset from the pcap file - it just
      // gets provided to the callback
-     int pcap_offset;
+     unsigned int pcap_offset;
      struct ip_struct packet;
 END_CLASS
 
@@ -187,13 +187,13 @@ struct tcp_struct {
   struct packed_tcphdr header;
 
   /** Private derived data */
-  int len;
+  unsigned int len;
 
   /* The offset in the packet where the data portion starts */
-  int data_offset;
+  unsigned int data_offset;
 
   /** The payload data portion */
-  int data_len;
+  unsigned int data_len;
   char *data;
 } __attribute__((packed));
 
@@ -226,5 +226,7 @@ END_CLASS
 
 /** This must be called to initialise the network structs */
 void network_structs_init(void);
+
+#define MAX_PACKET_SIZE 64*1024
 
 #endif

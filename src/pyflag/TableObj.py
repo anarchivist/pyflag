@@ -1122,30 +1122,28 @@ class IPType(ColumnType):
         ## We try to show a whois if possible
         id = Whois.lookup_whois(value)
         tmp2 = result.__class__(result)
-
+        tmp3 = result.__class__(result)
         
-        linkString = []
         if config.WHOIS_DISPLAY:
-            linkString.append(Whois.identify_network(id, value))
+            Whois.identify_network(id, value, tmp3)
         
         try:
             if config.GEOIP_DISPLAY:
-                linkString.append(Whois.geoip_resolve(value))
+                Whois.geoip_resolve(value,tmp3)
         except AttributeError:
             pass
 
         try:
             if config.EXTENDED_GEOIP_DISPLAY:
-                linkString.append(Whois.geoip_resolve_extended(value))
+                Whois.geoip_resolve_extended(value,tmp3)
         except AttributeError:
             pass
 
-        if len(linkString) != 0:
-            tmp2.link("<BR>".join(linkString),
-                      target=query_type(family="Log Analysis", 
-                      report="LookupIP", address=value),
-                      pane='popup')
-            result.row(tmp2)
+        tmp2.link(tmp3,
+                  target=query_type(family="Log Analysis", 
+                                    report="LookupIP", address=value),
+                  pane='popup')
+        result.row(tmp2)
 
         opts = {}
         if row:
@@ -1398,7 +1396,6 @@ class FilenameType(StringType):
     hidden = True
     def __init__(self, name='Filename', filename='name', path='path',
                  link=None, link_pane=None, case=None):
-        
         if not link:
             link = query_type(case=case,
                               family='Disk Forensics',

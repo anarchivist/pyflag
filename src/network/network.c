@@ -250,7 +250,7 @@ int TCP_Read(Packet self, StringIO input) {
       there is only 1 packet in the input stream). This is not always
       true, we really need to go from the IP total length field.
   */
-  this->packet.data_len = input->size - input->readptr;
+  this->packet.data_len = min(input->size - input->readptr, MAX_PACKET_SIZE);
 
   this->packet.data = talloc_memdup(self, input->data + input->readptr,
 				    this->packet.data_len);

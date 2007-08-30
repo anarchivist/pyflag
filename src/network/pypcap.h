@@ -2,7 +2,7 @@
 #define _PYPCAP_H
 
 enum endianess_output { 
-  NO_ENDIANESS_CHANGE,
+  NO_ENDIANESS_CHANGE=0,
   FORCE_BIG_ENDIAN,
   FORCE_LITTLE_ENDIAN 
 };
@@ -31,6 +31,5 @@ typedef struct {
 
 
 #define FILL_SIZE (1024 * 100)
-#define MAX_PACKET_SIZE (2 * 1024)
 
 #endif
