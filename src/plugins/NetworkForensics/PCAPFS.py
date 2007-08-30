@@ -225,24 +225,18 @@ class PCAPFS(DBFS):
                 fd = connection['data']
 
                 try:
-                    pcap_dbh.insert("connection",
-                                    con_id = connection['con_id'],
-                                    packet_id = packet.id,
-                                    cache_offset = fd.offset,
-                                    length = len(data),
-                                    seq = tcp.seq,
-                                    _fast=True
-                                    )
-                except TypeError, e:
-                    pyflaglog.log(pyflaglog.DEBUG, "There was a problem inserting data into the database. Will continue anyway, the error was: %s" % e)
-                    pcap_dbh.insert("connection",
-                                    con_id = connection['con_id'],
-                                    packet_id = packet.id,
-                                    cache_offset = fd.offset,
-                                    length = len(data),
-                                    seq = tcp.seq,
-                                    _fast=True
-                                    )
+                    datalen = len(data)
+                except TypeError:
+                    datalen = 0
+
+                pcap_dbh.insert("connection",
+                                con_id = connection['con_id'],
+                                packet_id = packet.id,
+                                cache_offset = fd.offset,
+                                length = datalen,
+                                seq = tcp.seq,
+                                _fast=True
+                                )
 
                 if data: fd.write(data)
 
