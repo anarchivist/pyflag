@@ -69,8 +69,10 @@ from format import Buffer
 import FileFormats.Zip as Zip
 from optparse import OptionParser
 import re,sys,binascii
-import pickle, zlib
+import pickle, zlib, os, re
 from Carver import Reassembler
+
+zip_header_re = re.compile("PK[\x01\x03\x05][\x02\x04\x06]")
 
 SECTOR_SIZE = 512
 
@@ -84,7 +86,7 @@ parser.add_option('-c', '--create', default=False, action="store_true",
 parser.add_option('-m', '--maps', default=False,  action="store_true",
                   help = 'Carve the index file by creating initial map files')
 
-parser.add_option('-p', '--print', default=False, action="store_true",
+parser.add_option('-P', '--print', default=False, action="store_true",
                   help = 'print the index hits')
 
 parser.add_option('-e', '--extract', default=None,
@@ -93,8 +95,11 @@ parser.add_option('-e', '--extract', default=None,
 parser.add_option('-M', '--map', default=None,
                   help = 'map file to read for extraction') 
 
-parser.add_option('-f', '--force', default=False, action="store_true",
-                  help = "Force the map file given in --map")
+parser.add_option('-f', '--force', default=None,
+                  help = "Force the map file given in --map and write as the specified filename")
+
+parser.add_option('-p', '--plot', default=False, action="store_true",
+                  help = "Plot the mapping function specified using --map")
 
 (options, args) = parser.parse_args()
 
@@ -105,18 +110,59 @@ class ZipDiscriminator:
     def __init__(self, reassembler):
         self.r = reassembler
 
-    def decode_file(self, b):
+        ## Try to load the central directory if possible: This may
+        ## fail if the cd is fragmented. FIXME: be able to handle
+        ## fragmentation at the CD.
+        cd_x = self.r.get_point("Central_Directory")
+        self.cds = []
+        if cd_x:
+            b = Buffer(self.r)[cd_x:]
+            while 1:
+                try:
+                    cd = Zip.CDFileHeader(b)
+                except RuntimeError,e:
+                    print "Stopped reading CD"
+                    break
+
+                self.cds.append(cd)
+                b = b[cd.size():]
+
+    def decode_file(self, b, length_to_test):
         """ Attempts to decode and verify a ZipFileHeader """
         fh = Zip.ZipFileHeader(b)
-
         print "Zip File Header @ offset %s (name %s) " % (b.offset, fh['zip_path'])
 
+        ## The following is necessary because some Zip writers do not
+        ## write the same information in both the ZipFileHeader and
+        ## CDFileHeader - FIXME: what do we do if the information is
+        ## actually different but set? (This is a common way for
+        ## malware to break email filtering or virus scanners ala zip
+        ## bombs).
+        compression_method = fh['compression_method'].get_value()
+        compressed_size = fh['compr_size'].get_value()
+        uncompr_size = fh['uncompr_size'].get_value()
+        crc32 = fh['crc32'].get_value()
+
+        for cd in self.cds:
+            if cd['filename']==fh['zip_path']:
+                ## Found the CD entry for our file:
+                if not compression_method:
+                    compression_method = cd['compression'].get_value()
+
+                if not compressed_size:
+                    compressed_size = cd['compressed_size'].get_value()
+
+                if not uncompr_size:
+                    uncompr_size = cd['uncompr_size'].get_value()
+
+                if not crc32:
+                    crc32 = cd['crc-32'].get_value()
+
         ## Deflate:
-        if fh['compression_method']==8:
+        if compression_method==8:
             dc = zlib.decompressobj(-15)
             crc = 0
 
-            compressed_size = fh['compr_size'].get_value()
             print "compressed_size = %s" % compressed_size
             self.offset = b.offset + fh.size()
             self.r.seek(self.offset)
@@ -124,46 +170,62 @@ class ZipDiscriminator:
             print "Start of data: %s" % (self.offset)
             total = 0
 
-            while compressed_size>0:
-                cdata = self.r.read(min(512,compressed_size))
-                compressed_size -= len(cdata)
+            to_read = compressed_size
+
+            while to_read > 0:
+                cdata = self.r.read(min(SECTOR_SIZE,to_read))
+                #print "Read %s" % len(cdata)
+                to_read -= len(cdata)
                 data = dc.decompress(cdata)
                 total += len(data)
                 self.offset += len(cdata)
                 crc = binascii.crc32(data, crc)
+
+                ## Only test as much as was asked
+                if self.offset > length_to_test: return length_to_test
 
             ## Finalise the data:
             ex = dc.decompress('Z') + dc.flush()
             total += len(ex)
             crc = binascii.crc32(ex, crc)
 
-            if total != fh['uncompr_size'].get_value():
-                print "Total decompressed data: %s (%s)" % (total, fh['uncompr_size'])
+            if total != uncompr_size:
+                print "Total decompressed data: %s (%s)" % (total, uncompr_size)
                 raise IOError("Decompressed file does not have the expected length")
 
             if crc<0: crc = crc + (1 << 32)
-            if crc != fh['crc32'].get_value():
-                print "CRC is %d %s" % (crc, fh['crc32'])
+            if crc != crc32:
+                print "CRC is %d %s" % (crc, crc32)
                 raise IOError("CRC does not match")
             
         else:
-            print "Unable to verify compression_method %s - not implemented, skipping file" % fh['compression_method']
+            print "Unable to verify compression_method %s - not implemented, skipping file" % compression_method
 
-        return fh.size() + fh['compr_size'].get_value()
+        ## Sometimes there is some padding before th enext file is
+        ## written. We try to account for this If possible:
+        total_size = fh.size() + compressed_size
+        
+        data = self.r.read(SECTOR_SIZE)
+        m = zip_header_re.search(data)
+        if m:
+            total_size += m.start()
 
-    def decode_cd_file(self, b):
+        print "Total size is %s "% total_size
+        return total_size
+
+    def decode_cd_file(self, b, length_to_test):
         cd = Zip.CDFileHeader(b)
         print "Found CD Header: %s" % cd['filename']
 
         return cd.size()
 
-    def decode_ecd_header(self, b):
+    def decode_ecd_header(self, b, length_to_test):
         ecd = Zip.EndCentralDirectory(b)
 
         print "Found ECD %s" % ecd
         return ecd.size()
     
-    def parse(self, error_count):
+    def parse(self, length_to_test):
         """
         Reads the reassembled zip file from the start and detect errors.
 
@@ -176,55 +238,93 @@ class ZipDiscriminator:
         ## between archived files:
         ## Is the structure a ZipFileHeader?
         while 1:
+            if b.offset >= length_to_test:
+                return
+            
             try:
-                length = self.decode_file(b)
+                length = self.decode_file(b, length_to_test)
                 b = b[length:]
-            except RuntimeError:
+            except RuntimeError, e:
+                print e
                 try:
-                    length = self.decode_cd_file(b)
+                    length = self.decode_cd_file(b, length_to_test)
                     b=b[length:]
                 except RuntimeError:
-                    length = self.decode_ecd_header(b)
+                    length = self.decode_ecd_header(b, length_to_test)
                     ## If we found the ecd we can quit:
                     return b.offset+length
                 
             except Exception,e:
-                print "Error occured after parsing %s bytes" % self.offset
+                print "Error occured after parsing %s bytes (%s)" % (self.offset,e)
                 raise
 
-if options.force:
-    if options.map == None:
-        print "You must provide a map file to extract"
-        sys.exit(1)
-        
-    c = Reassembler(open(args[0]))
-    c.load_map(options.map)
-    
+def generate_function(c):
+    """ Generates a series of functions and uses the ZipDiscriminator
+    to guide the generation process.
+
+    We alter the carver object as we process it. We return the total
+    final error count.
+    """
+    ## We check each sector in turn until we find ambiguous sectors,
+    ## then brute force them using the discriminator:
     d = ZipDiscriminator(c)
-    d.parse(10)
+    for x in range(0,c.size(), SECTOR_SIZE):
+        y_forward, length = c.interpolate(x, True)
+        y_reverse, length = c.interpolate(x, False)
 
-if options.extract:
-    if options.map == None:
-        print "You must provide a map file to extract"
-        sys.exit(1)
+        ## Its not possible to interpolate before the start of the
+        ## image:
+        if y_reverse<0: continue
 
-    c = Reassembler(open(args[0]))
+        ## Is this an ambigous point?
+        if y_forward != y_reverse:
+            print "Ambiguous point found at offset %s: forward=%s vs reverse=%s..." % (x, y_forward, y_reverse)
+            ## Disambiguate the function by adding a new point:
+            c.add_point(x, y_reverse, comment = "Forced")
+            
+            ## Test the file up to the last point:
+            try:
+                d.parse(x + length)
+            except Exception,e:
+                print c.points
+                print "Errors detected, point removed.(%s)" % e
+                ## Error occured, move the point over by one:
+                c.del_point(x)
+                continue
+            
+            print "Match found at offset %s" % x
+
+if options.map != None:
+    try:
+        arg = open(args[0])
+    except IndexError:
+        arg = None
+        
+    c = Reassembler(arg)
     c.load_map(options.map)
 
-    outfd = open(options.extract, 'w')
+    if options.force:
+        generate_function(c)
+        c.extract(open(options.force,'w'))
 
-    ## We count on the last identified point to mark the end of the
-    ## zip file:
-    while 1:
-        required_len = min(c.points[-1] - c.readptr, 1024*1024)
-        data = c.read(required_len)
-        if not data:
-            break
-        
-        outfd.write(data)
+    elif options.extract:
+        outfd = open(options.extract, 'w')
+
+        ## We count on the last identified point to mark the end of the
+        ## zip file:
+        while 1:
+            required_len = min(c.points[-1] - c.readptr, 1024*1024)
+            data = c.read(required_len)
+            if not data:
+                break
+
+            outfd.write(data)
+
+    elif options.plot:
+        c.plot(os.path.basename(options.map))
 
     sys.exit(0)
-    
+
 if not options.index:
     print "Need an index file to operate on."
     sys.exit(1)
@@ -318,7 +418,7 @@ def print_structs():
         
         ## The file end - this is used to stop the carver:
         r.add_point(offset_of_cd + ecd['size_of_cd'].get_value() + ecd.size(),
-                                     ecd_offset + ecd.size(), "End")
+                                     ecd_offset + ecd.size(), "EOF")
         
         for i in range(ecd['total_entries_in_cd_on_disk'].get_value()):
             b = Buffer(image_fd)[cd_image_offset:]
@@ -371,10 +471,11 @@ def print_structs():
             ## Progress to the next file in the archive:
             cd_image_offset += cd.size()
 
-    r.save_map(open("%s.map" % ecd_offset, 'w'))
+        r.save_map(open("%s.map" % ecd_offset, 'w'))
 
 if options.create:
     build_index()
+    sys.exit(0)
     
 if getattr(options, "maps"):
     print_structs()

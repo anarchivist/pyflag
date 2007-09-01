@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """ This module implements a unit test generator for the carvers
 implemented within PyFlag.
 
@@ -69,18 +70,8 @@ if __name__ =="__main__":
     if config.plot:
         r = ReverseMapper(None)
         r.load_map(config.map)
-        max_size = r.points[-1] + r.overread
-        p = os.popen("gnuplot", "w")
-        p.write('pl "-" title "%s" w l\n' % config.map)
-
-        for i in range(0,max_size,SECTOR_SIZE):
-            x,length = r.interpolate(i)
-            p.write("%s %s\n" % (i,x))
-
-        p.write("e\n")
-        p.flush()
+        r.plot(os.path.basename(config.map))
         import time
-        
         time.sleep(100)
         sys.exit(0)
 

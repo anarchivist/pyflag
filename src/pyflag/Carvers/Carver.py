@@ -19,7 +19,7 @@
 # * along with this program; if not, write to the Free Software
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
-import sys, re
+import sys, re, os
 
 """ This class abstracts the reassembled file 
 
@@ -186,21 +186,20 @@ class Reassembler:
     ## identified point to the next or interpolate backwards
     interpolate_forward = True
     readptr = 0
-    ## This list is the file position coordinates of all the points,
-    ## this is sorted.
-    points = []
-
-    ## This is the image_pos for each file_pos inserted.
-    mapping = {}
-
-    ## This is a comment attached to each file_pos identified.
-    comments = {}
-
     ## This is how much we read after the last identified point
     overread = 100*1024
     
     def __init__(self, fd):
         self.fd = fd
+        ## This list is the file position coordinates of all the points,
+        ## this is sorted.
+        self.points = []
+
+        ## This is the image_pos for each file_pos inserted.
+        self.mapping = {}
+        
+        ## This is a comment attached to each file_pos identified.        
+        self.comments = {}
 
     def del_point(self, file_pos):
         """ Remove the point at file_pos if it exists """
@@ -255,7 +254,12 @@ class Reassembler:
         elif file_offset > self.points[-1]:
             direction_forward = True
 
-        if direction_forward:
+        ## If we are asked to interpolate an identified point its
+        ## always the same as itself.
+        if file_offset in self.points:
+            return self.mapping[file_offset], 1
+
+        elif direction_forward:
             l = bisect.bisect_right(self.points, file_offset)-1
             try:
                 left = self.points[l+1] - file_offset
@@ -277,15 +281,13 @@ class Reassembler:
         while length>0:
             try:
                 m, left = self.interpolate(self.readptr)
-                #print m, self.readptr, left, length
                 self.fd.seek(m,0)
             except:
                 left = 1000
 
             want_to_read = min(left, length)
-            #print "About to read %s bytes" % want_to_read
+
             assert(want_to_read > 0)
-            sys.stdout.flush()
             data = self.fd.read(want_to_read)
             if not data: break
 
@@ -315,6 +317,7 @@ class Reassembler:
         """ Opens the mapfile and loads the points from it """
         fd = open(mapfile)
         for line in fd:
+            line = line.strip()
             if line.startswith("#"): continue
             try:
                 temp = re.split("[\t ]+", line, 2)
@@ -327,6 +330,53 @@ class Reassembler:
                 self.add_point(int(off), int(image_off), comment=id)
             except (ValueError,IndexError),e:
                 pass
+
+    def plot(self, title):
+        max_size = self.points[-1] + self.overread
+        p = os.popen("gnuplot", "w")
+        p.write("set term x11\n")
+        p.write('pl "-" title "%s" w l, "-" title "." w p ps 5\n' % title)
+
+        offset = 1
+        while 1:
+            x,length = self.interpolate(offset-1)
+            p.write("%s %s\n" % (offset,x))
+
+            x,length = self.interpolate(offset)
+            p.write("%s %s\n" % (offset,x))
+            offset += length
+
+            if offset > self.points[-1] + self.overread: break
+            
+        p.write("e\n")
+
+        print len(self.points)
+        for i in self.points:
+            p.write("%s %s\n" % (i,self.mapping[i]))
+
+        p.write("e\npause 10\n")
+        p.flush()
+
+        return p
+
+    def get_point(self, name):
+        for p in self.points:
+            if self.comments[p] == name:
+                return p
+
+    def size(self):
+        return self.get_point("EOF") or (self.points[-1] + self.overread)
+
+    def extract(self, fd):
+        """ Write the reconstructed file into fd """
+        length = self.size()
+        self.seek(0)
+        while length > 0:
+            data = self.read(min(1024*1024, length))
+            if len(data)==0: break
+            
+            length -= len(data)
+            fd.write(data)
 
 import unittest
 
