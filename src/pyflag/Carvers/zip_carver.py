@@ -67,41 +67,13 @@ reconstruct the file without a CD this could be useful.
 """
 from format import Buffer
 import FileFormats.Zip as Zip
-from optparse import OptionParser
 import re,sys,binascii
 import pickle, zlib, os, re
-from Carver import Reassembler
+import Carver
 
 zip_header_re = re.compile("PK[\x01\x03\x05][\x02\x04\x06]")
 
 SECTOR_SIZE = 512
-
-parser = OptionParser(usage="""%prog """)
-parser.add_option('-i', '--index', default=None,
-                  help = 'Index file to operate on')
-
-parser.add_option('-c', '--create', default=False, action="store_true",
-                  help = 'Create a new index file')
-
-parser.add_option('-m', '--maps', default=False,  action="store_true",
-                  help = 'Carve the index file by creating initial map files')
-
-parser.add_option('-P', '--print', default=False, action="store_true",
-                  help = 'print the index hits')
-
-parser.add_option('-e', '--extract', default=None,
-                  help = 'extract the zip file described in MAP into the file provided')
-
-parser.add_option('-M', '--map', default=None,
-                  help = 'map file to read for extraction') 
-
-parser.add_option('-f', '--force', default=None,
-                  help = "Force the map file given in --map and write as the specified filename")
-
-parser.add_option('-p', '--plot', default=False, action="store_true",
-                  help = "Plot the mapping function specified using --map")
-
-(options, args) = parser.parse_args()
 
 class ZipDiscriminator:
     """ We test the provided carved zip file for errors by reading it
@@ -121,7 +93,7 @@ class ZipDiscriminator:
                 try:
                     cd = Zip.CDFileHeader(b)
                 except RuntimeError,e:
-                    print "Stopped reading CD"
+                    print "Finished reading CD (%s items)" % len(self.cds)
                     break
 
                 self.cds.append(cd)
@@ -130,7 +102,7 @@ class ZipDiscriminator:
     def decode_file(self, b, length_to_test):
         """ Attempts to decode and verify a ZipFileHeader """
         fh = Zip.ZipFileHeader(b)
-        print "Zip File Header @ offset %s (name %s) " % (b.offset, fh['zip_path'])
+        #print "Zip File Header @ offset %s (name %s) " % (b.offset, fh['zip_path'])
 
         ## The following is necessary because some Zip writers do not
         ## write the same information in both the ZipFileHeader and
@@ -145,7 +117,9 @@ class ZipDiscriminator:
 
         for cd in self.cds:
             if cd['filename']==fh['zip_path']:
-                ## Found the CD entry for our file:
+                ## Found the CD entry for our file, if any of the
+                ## above parameters are not set in the ZipFileHeader,
+                ## try to get them from the CD:
                 if not compression_method:
                     compression_method = cd['compression'].get_value()
 
@@ -163,11 +137,9 @@ class ZipDiscriminator:
             dc = zlib.decompressobj(-15)
             crc = 0
 
-            print "compressed_size = %s" % compressed_size
             self.offset = b.offset + fh.size()
             self.r.seek(self.offset)
 
-            print "Start of data: %s" % (self.offset)
             total = 0
 
             to_read = compressed_size
@@ -201,8 +173,11 @@ class ZipDiscriminator:
         else:
             print "Unable to verify compression_method %s - not implemented, skipping file" % compression_method
 
-        ## Sometimes there is some padding before th enext file is
-        ## written. We try to account for this If possible:
+        ## Sometimes there is some padding before the next file is
+        ## written. We try to account for this if possible by scanning
+        ## ahead a little bit. This occurs if the file has a data
+        ## descriptor record. We ignore this record because its values
+        ## are usually present in the CD anyway.
         total_size = fh.size() + compressed_size
         
         data = self.r.read(SECTOR_SIZE)
@@ -210,7 +185,7 @@ class ZipDiscriminator:
         if m:
             total_size += m.start()
 
-        print "Total size is %s "% total_size
+        #print fh
         return total_size
 
     def decode_cd_file(self, b, length_to_test):
@@ -245,7 +220,6 @@ class ZipDiscriminator:
                 length = self.decode_file(b, length_to_test)
                 b = b[length:]
             except RuntimeError, e:
-                print e
                 try:
                     length = self.decode_cd_file(b, length_to_test)
                     b=b[length:]
@@ -258,227 +232,156 @@ class ZipDiscriminator:
                 print "Error occured after parsing %s bytes (%s)" % (self.offset,e)
                 raise
 
-def generate_function(c):
-    """ Generates a series of functions and uses the ZipDiscriminator
-    to guide the generation process.
+class ZipCarver(Carver.CarverFramework):
+    ## For now use regex - later convert to pyflag indexs:
+    regexs = {
+        'ZipFileHeader': 'PK\x03\x04',
+        'EndCentralDirectory': 'PK\x05\x06',
+        'CDFileHeader': 'PK\x01\x02'
+        }
 
-    We alter the carver object as we process it. We return the total
-    final error count.
-    """
-    ## We check each sector in turn until we find ambiguous sectors,
-    ## then brute force them using the discriminator:
-    d = ZipDiscriminator(c)
-    for x in range(0,c.size(), SECTOR_SIZE):
-        y_forward, length = c.interpolate(x, True)
-        y_reverse, length = c.interpolate(x, False)
-
-        ## Its not possible to interpolate before the start of the
-        ## image:
-        if y_reverse<0: continue
-
-        ## Is this an ambigous point?
-        if y_forward != y_reverse:
-            print "Ambiguous point found at offset %s: forward=%s vs reverse=%s..." % (x, y_forward, y_reverse)
-            ## Disambiguate the function by adding a new point:
-            c.add_point(x, y_reverse, comment = "Forced")
-            
-            ## Test the file up to the last point:
-            try:
-                d.parse(x + length)
-            except Exception,e:
-                print c.points
-                print "Errors detected, point removed.(%s)" % e
-                ## Error occured, move the point over by one:
-                c.del_point(x)
-                continue
-            
-            print "Match found at offset %s" % x
-
-if options.map != None:
-    try:
-        arg = open(args[0])
-    except IndexError:
-        arg = None
+    def build_maps(self, index_file):
+        hits = self.load_index(index_file)
         
-    c = Reassembler(arg)
-    c.load_map(options.map)
+        image_fd = open(self.args[0],'r')
+        zip_files = {}
 
-    if options.force:
-        generate_function(c)
-        c.extract(open(options.force,'w'))
+        for ecd_offset in hits['EndCentralDirectory']:
+            ## Each EndCentralDirectory represents a new Zip file
+            r = Carver.Reassembler(None)
+            b = Buffer(image_fd)[ecd_offset:]
+            ecd = Zip.EndCentralDirectory(b)
+            print "End Central Directory at offset %s:" % (ecd_offset,)
 
-    elif options.extract:
-        outfd = open(options.extract, 'w')
+            ## Find the CD:
+            offset_of_cd = ecd['offset_of_cd'].get_value()
 
-        ## We count on the last identified point to mark the end of the
-        ## zip file:
-        while 1:
-            required_len = min(c.points[-1] - c.readptr, 1024*1024)
-            data = c.read(required_len)
-            if not data:
-                break
+            ## Check if the cd is where we think it should be:
+            possibles = []
+            for x in hits['CDFileHeader']:
+                if x == ecd_offset - ecd['size_of_cd'].get_value():
+                    ## No fragmentation in CD:
+                    print "No fragmentation in Central Directory at offset %s discovered... good!" % x
+                    possibles = [ x,]
+                    break
 
-            outfd.write(data)
+                if x % 512 == offset_of_cd % 512:
+                    print "Possible Central Directory Starts at %s" % x
+                    possibles.append(x)
 
-    elif options.plot:
-        c.plot(os.path.basename(options.map))
+            ## FIXME: this needs to be made to estimate the most similar
+            ## possibility - we really have very little to go on here -
+            ## how can we distinguish between two different CDs that occur
+            ## in the same spot? I dont think its very likely in reality
+            ## because the CD will be at the end of the zip file which
+            ## will be of varying sizes.
 
-    sys.exit(0)
+            ## For now we go with the first possibility:
+            cd_image_offset = possibles[0]
 
-if not options.index:
-    print "Need an index file to operate on."
-    sys.exit(1)
+            ## Identify the central directory:
+            r.add_point(offset_of_cd, cd_image_offset, "Central_Directory")
 
-## For now use regex - later convert to pyflag indexs:
-regexs = {
-    'ZipFileHeader': 'PK\x03\x04',
-    'EndCentralDirectory': 'PK\x05\x06',
-    'CDFileHeader': 'PK\x01\x02'
-    }
+            ## We can calculate the offset of ecd here:
+            r.add_point(offset_of_cd + ecd['size_of_cd'].get_value(),
+                        ecd_offset, "End_Central_Directory")
 
-cregexs = {}
-hits = {}
+            ## The file end - this is used to stop the carver:
+            r.add_point(offset_of_cd + ecd['size_of_cd'].get_value() + ecd.size(),
+                                         ecd_offset + ecd.size(), "EOF")
 
-def build_index():
-    ## Compile the res
-    for k,v in regexs.items():
-        cregexs[k] = re.compile(v)
+            ## Read all entries in the CD and try to locate their
+            ## corresponding ZipFileHeaders:
+            for i in range(ecd['total_entries_in_cd_on_disk'].get_value()):
+                b = Buffer(image_fd)[cd_image_offset:]
+                cd = Zip.CDFileHeader(b)
 
-    BLOCK_SIZE = 4096
+                ## Now try to find the ZipFileHeader for this cd entry:
+                fh_offset = cd['relative_offset_local_header'].get_value()
 
-    p = pickle.Pickler(open(options.index,'w'))
+                for fh_image_offset in hits['ZipFileHeader']:
+                    ## Apply the modulo rule:
+                    if fh_image_offset % 512 == fh_offset % 512:
+                        print "Possible File header at image offset %s" % fh_image_offset
 
-    offset = 0
-    fd = open(args[0],'r')
-    while 1:
-        data = fd.read(BLOCK_SIZE)
-        if len(data)==0: break
+                        b = Buffer(image_fd)[fh_image_offset:]
+                        try:
+                            fh = Zip.ZipFileHeader(b)
+                        except:
+                            print "Oops - no File Header here... continuing"
+                            continue
 
-        for k,v in cregexs.items():
-            for m in v.finditer(data):
-                print "Found %s in %s" % (k, offset + m.start())
+                        ## Is it the file we expect?
+                        path = fh['zip_path'].get_value()
+                        expected_path = cd['filename'].get_value()
+
+                        ## Check the paths:
+                        if path and expected_path and path != expected_path:
+                            print "This ZipFileHeader is for %s, while we wanted %s" % (path,expected_path)
+                            continue
+
+                        ## Check the expected lengths with the central directory:
+                        cd_compr_size = cd['compressed_size'].get_value()
+                        cd_uncompr_size = cd['uncompr_size'].get_value()
+
+                        fh_comr_size = fh['compr_size'].get_value()
+                        fh_uncomr_size = fh['uncompr_size'].get_value()
+
+                        if cd_compr_size and fh_comr_size and cd_compr_size!=fh_comr_size:
+                            print "Compressed size does not match (%s - expected %s)" % (cd_compr_size, fh_comr_size)
+                            continue
+
+                        if cd_uncompr_size and fh_uncomr_size and cd_uncompr_size!=fh_uncomr_size:
+                            print "Uncompressed size does not match (%s - expected %s)" % (
+                                cd_uncompr_size, fh_uncomr_size)
+                            continue
+
+                        print "Will use Zip File Header at %s." % (fh_image_offset)
+
+                        ## Identify point:
+                        r.add_point(fh_offset, fh_image_offset, "File_%s" % path)
+
+                ## Progress to the next file in the archive:
+                cd_image_offset += cd.size()
+
+            r.save_map("%s.map" % ecd_offset)
+
+    def generate_function(self, c):
+        """ Generates a series of functions and uses the ZipDiscriminator
+        to guide the generation process.
+
+        We alter the carver object as we process it. We return the total
+        final error count.
+        """
+        ## We check each sector in turn until we find ambiguous sectors,
+        ## then brute force them using the discriminator:
+        d = ZipDiscriminator(c)
+        for x in range(0,c.size(), SECTOR_SIZE):
+            y_forward, length = c.interpolate(x, True)
+            y_reverse, length = c.interpolate(x, False)
+
+            ## Its not possible to interpolate before the start of the
+            ## image:
+            if y_reverse<0: continue
+
+            ## Is this an ambigous point?
+            if y_forward != y_reverse:
+                print "Ambiguous point found at offset %s: forward=%s vs reverse=%s..." % (x, y_forward, y_reverse)
+                ## Disambiguate the function by adding a new point:
+                c.add_point(x, y_reverse, comment = "Forced")
+
+                ## Test the file up to the last point:
                 try:
-                    hits[k].append(offset + m.start())
-                except KeyError:
-                    hits[k] = [ offset + m.start(), ]
+                    d.parse(x + length)
+                except Exception,e:
+                    print "Errors detected, point removed.(%s)" % e
+                    ## Error occured, move the point over by one:
+                    c.del_point(x)
+                    continue
 
-        offset += len(data)
+                print "Match found at offset %s" % x
 
-    ## Serialise the hits into a file:
-    p.dump(hits)
-
-    print hits
-
-def print_structs():
-    p = pickle.Unpickler(open(options.index,'r'))
-    hits = p.load()
-    
-    image_fd = open(args[0],'r')
-    zip_files = {}
-
-    for ecd_offset in hits['EndCentralDirectory']:
-        ## Each EndCentralDirectory represents a new Zip file
-        r = Reassembler(None)
-        b = Buffer(image_fd)[ecd_offset:]
-        ecd = Zip.EndCentralDirectory(b)
-        print "End Central Directory at offset %s:" % (ecd_offset,)
-
-        ## Find the CD:
-        offset_of_cd = ecd['offset_of_cd'].get_value()
-
-        ## Check if the cd is where we think it should be:
-        possibles = []
-        for x in hits['CDFileHeader']:
-            if x == ecd_offset - ecd['size_of_cd'].get_value():
-                ## No fragmentation in CD:
-                print "No fragmentation in Central Directory at offset %s discovered... good!" % x
-                possibles = [ x,]
-                break
-            
-            if x % 512 == offset_of_cd % 512:
-                print "Possible Central Directory Starts at %s" % x
-                possibles.append(x)
-
-        ## FIXME: this needs to be made to estimate the most similar
-        ## possibility - we really have very little to go on here -
-        ## how can we distinguish between two different CDs that occur
-        ## in the same spot? I dont think its very likely in reality
-        ## because the CD will be at the end of the zip file which
-        ## will be of varying sizes.
-
-        ## For now we go with the first possibility:
-        cd_image_offset = possibles[0]
-
-        ## Identify the central directory:
-        r.add_point(offset_of_cd, cd_image_offset, "Central_Directory")
-
-        ## We can calculate the offset of ecd here:
-        r.add_point(offset_of_cd + ecd['size_of_cd'].get_value(),
-                    ecd_offset, "End_Central_Directory")
-        
-        ## The file end - this is used to stop the carver:
-        r.add_point(offset_of_cd + ecd['size_of_cd'].get_value() + ecd.size(),
-                                     ecd_offset + ecd.size(), "EOF")
-        
-        for i in range(ecd['total_entries_in_cd_on_disk'].get_value()):
-            b = Buffer(image_fd)[cd_image_offset:]
-            cd = Zip.CDFileHeader(b)
-
-            ## Now try to find the ZipFileHeader for this cd entry:
-            fh_offset = cd['relative_offset_local_header'].get_value()
-
-            for fh_image_offset in hits['ZipFileHeader']:
-                if fh_image_offset % 512 == fh_offset % 512:
-                    print "Possible File header at image offset %s" % fh_image_offset
-                    
-                    b = Buffer(image_fd)[fh_image_offset:]
-                    try:
-                        fh = Zip.ZipFileHeader(b)
-                    except:
-                        print "Oops - no File Header here... continuing"
-                        continue
-
-                    ## Is it the file we expect?
-                    path = fh['zip_path'].get_value()
-                    expected_path = cd['filename'].get_value()
-
-                    ## Check the paths:
-                    if path and expected_path and path != expected_path:
-                        print "This ZipFileHeader is for %s, while we wanted %s" % (path,expected_path)
-                        continue
-
-                    ## Check the expected lengths with the central directory:
-                    cd_compr_size = cd['compressed_size'].get_value()
-                    cd_uncompr_size = cd['uncompr_size'].get_value()
-
-                    fh_comr_size = fh['compr_size'].get_value()
-                    fh_uncomr_size = fh['uncompr_size'].get_value()
-                    
-                    if cd_compr_size and fh_comr_size and cd_compr_size!=fh_comr_size:
-                        print "Compressed size does not match (%s - expected %s)" % (cd_compr_size, fh_comr_size)
-                        continue
-
-                    if cd_uncompr_size and fh_uncomr_size and cd_uncompr_size!=fh_uncomr_size:
-                        print "Uncompressed size does not match (%s - expected %s)" % (
-                            cd_uncompr_size, fh_uncomr_size)
-                        continue
-
-                    print "Will use Zip File Header at %s." % (fh_image_offset)
-                    
-                    ## Identify point:
-                    r.add_point(fh_offset, fh_image_offset, "File_%s" % path)
-                    
-            ## Progress to the next file in the archive:
-            cd_image_offset += cd.size()
-
-        r.save_map(open("%s.map" % ecd_offset, 'w'))
-
-if options.create:
-    build_index()
-    sys.exit(0)
-    
-if getattr(options, "maps"):
-    print_structs()
-    
-else:
-    print "nothing to do. Use -h"
+if __name__=='__main__':
+    carver = ZipCarver()
+    ## Work out what we need to do:
+    carver.parse()

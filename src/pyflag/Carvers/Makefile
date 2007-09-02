@@ -5,11 +5,11 @@ pdf_tests: test?.dd
 ## Create an index of PDF objects \
 		python pdf_carver.py -c -i $$f.idx $$f && \
 ## Coalesce maps \
-		python pdf_carver.py -m -i $$f.idx $$f && \
+		rm -f *.map && python pdf_carver.py -m -i $$f.idx $$f && \
 ## Brute force the discontinueties \
-		python PDFForcer.py -m *-*.map -o $$f.pdf $$f && \
+		ls *-*.map && python pdf_carver.py -M *-*.map -f $$f.pdf $$f && \
 ## Check that its ok: \
-		cmp $$f.pdf sample.pdf && \
+		cmp $$f.pdf sample.pdf ; \
 		rm *.map $$f.idx ;\
 	done
 

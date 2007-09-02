@@ -111,160 +111,186 @@ from optparse import OptionParser
 import FileFormats.PDF as PDF
 import re,sys
 import pickle
-from Carver import Reassembler
+import Carver
 SECTOR_SIZE = 512
 
+class PDFDiscriminator:
+    slow = False
 
-parser = OptionParser(usage="""%prog """)
-parser.add_option('-i', '--index', default=None,
-                  help = 'Index file to operate on')
+    def __init__(self, reassembler, verbose=None):
+        self.reassembler = reassembler
+        self.p = PDF.PDFParser(reassembler)
 
-parser.add_option('-c', '--create', default=False, action="store_true",
-                  help = 'Create a new index file')
+        if verbose:
+            self.p.verbose = verbose
 
-parser.add_option('-m', '--maps', default=False,  action="store_true",
-                  help = 'Carve the index file by creating initial map files')
+    def parse(self, length_to_test):
+        """ Runs a PDF parser over the carver until end_offset"""
+        ## Rewind back to a convenient spot if we are allowed to:
+        if self.slow:
+            print "Making new parser"
+            self.p = PDF.PDFParser(self.reassembler)
+            self.reassembler.seek(0)
+        else:
+            self.p.restore_state()
 
-parser.add_option('-p', '--print', default=False, action="store_true",
-                  help = 'print the index hits')
+        ## We are only willing to tolerate a small number of errors
+        while self.p.processed < length_to_test and self.p.error < 10:
+            self.p.next_token()
+            
+        ## Return the error count
+        return self.p.error
 
-(options, args) = parser.parse_args()
+class PDFCarver(Carver.CarverFramework):
+    ## These are the artifacts we index:
+    regexs = {
+        'OBJECTS': '(\d+) (\d+) obj',
+        'XREFS'  : '([\r\n ])xref([\r\n])',
+        'STARTXREF' : 'startxref([\r\n])',
+        }
 
-if not options.index:
-    print "Need an index file to operate on."
-    sys.exit(1)
+    def build_maps(self, index_file):
+        hits = self.load_index(index_file)
+        image_fd = open(self.args[0],'r')
+        total_xrefs = {}
+        carvers = {}
+        
+        for xref in hits['XREFS']:
+            print "Reading XREFs table from %s "% xref
+            image_fd.seek(xref, 0)
+            
+            p = PDF.PDFParser(image_fd)
+            
+            ## Read until the EOF marker
+            while p.next_token() != "RESET_STATE" and p.error < 10:
+                pass
 
-## For now use regex - later convert to pyflag indexs:
-regexs = {
-    'OBJECTS': '(\d+) (\d+) obj',
-    'XREFS'  : '([\r\n ])xref([\r\n])',
-    'STARTXREF' : 'startxref([\r\n])',
-    }
+            total_xrefs[xref] = p.pdf
+            c = self.make_carver_from_xref(p.pdf, image_fd, hits)
+            c.save_map("%s.map" % xref)
+            carvers[xref] = c
 
-cregexs = {}
-hits = {}
+        ## Now try to coalesce xref tables together:
+        for x in total_xrefs.keys():
+            for xref_offset in total_xrefs[x].xref_offsets:
+                for y in total_xrefs.keys():
+                    ## Only coalesce the tables once:
+                    if y>x: continue
 
-def build_index():
-    ## Compile the res
-    for k,v in regexs.items():
-        cregexs[k] = re.compile(v)
+                    #print "Checking %s against xref at %s (%s,%s)" % (xref_offset, y, xref_offset % 512, y % 512)
+                    # Search for us refering to them: (The +1 is related
+                    # to the regex above having an extra \r\n at the
+                    # start)
+                    if xref_offset % SECTOR_SIZE == y % SECTOR_SIZE + 1:
+                        print "Xref at offset %s is possibly related to xref at offset %s" % (y, x)
+                        print "%s's range is %s, %s's range is %s" % (y,total_xrefs[y].xref_range,
+                                                                      x,total_xrefs[x].xref_range,)
+                        if total_xrefs[y].xref_range[0] == total_xrefs[x].xref_range[1] or \
+                           total_xrefs[y].xref_range[1] == total_xrefs[x].xref_range[0]:
+                            new_pdf = PDF.PDFFile()
+                            new_pdf.xref = total_xrefs[x].xref + total_xrefs[y].xref
+                            new_pdf.xref_range = [ min(total_xrefs[y].xref_range[0],
+                                                       total_xrefs[x].xref_range[0]),
+                                                   max(total_xrefs[y].xref_range[1],
+                                                       total_xrefs[x].xref_range[1]),
+                                                   ]
 
-    BLOCK_SIZE = 409600
+                            print "Ranges for xref tables match - coalescing..."
+                            carvers[x].coalesce(carvers[y])
+                            ## Save the new mapping function
+                            carvers[x].save_map("%s-%s.map" % (x,y))
+            
+    def make_carver_from_xref(self, pdf, image_fd, hits):
+        """ Derives a carver object from 
+        """
+        c = Carver.Reassembler(None)
 
-    p = pickle.Pickler(open(options.index,'w'))
+        for id, offset, generation, type in pdf.xref:
+            if type == 'n':
+                ## Enumerate all the possibilities which obey the
+                ## modulo rule
+                possibles = [ x for x in hits['OBJECTS']
+                              if x % SECTOR_SIZE == offset % SECTOR_SIZE ]
 
-    offset = 0
-    fd = open(args[0],'r')
-    while 1:
-        data = fd.read(BLOCK_SIZE)
-        if len(data)==0: break
+                ## Check the object with the correct ID:
+                for possibility in possibles:
+                    image_fd.seek(possibility)
+                    line = image_fd.read(SECTOR_SIZE)
+                    ## These are not the objects we are looking for:
+                    if not line.startswith("%s %s obj" % (id, generation)):
+                        continue
 
-        for k,v in cregexs.items():
-            for m in v.finditer(data):
-                print "Found %s in %s" % (k, offset + m.start())
+                    c.add_point(offset, possibility, "Object_%s" % id)
+
+        return c
+
+    slow = False
+
+    def __init__(self):
+        Carver.CarverFramework.__init__(self)
+        self.parser.add_option('-s', '--slow', default=False, action='store_true',
+                               help = 'Disable state saving optimisations (Not usually needed)')
+
+        self.parser.add_option('-v', '--verbose', default=0, type='int',
+                               help = "Verbosity")
+
+    def generate_function(self, c):
+        d = PDFDiscriminator(c, self.options.verbose)
+        if self.options.slow:
+            d.slow = True
+
+        for x in range(0, c.size(), SECTOR_SIZE):
+            y_forward, left = c.interpolate(x, True)
+            y_reverse, left = c.interpolate(x, False)
+
+            if y_reverse < 0: continue
+
+            ## This is an ambiguous point:
+            if y_forward != y_reverse:
+                print "Ambiguous point found at offset %s: forward=%s vs reverse=%s..." % (x, y_forward, y_reverse)
+
+                c.add_point(x, y_reverse, comment = "Forced")
+
+                ## Check a reasonable way after the next identified point
+                ## (This might need some work)
+                until_offset = left + x + SECTOR_SIZE
+
+                print "Checking until %s" % (until_offset)
+
+                ## Check the errors:
                 try:
-                    hits[k].append(offset + m.start())
-                except KeyError:
-                    hits[k] = [ offset + m.start(), ]
+                    error_count = d.parse(until_offset)
+                except Exception,e:
+                    print "Exception occured %s" % e
+                    error_count = 10
+                    
+                if error_count == 0:
+                    sys.stderr.write("Found a hit at %s\n" % x)
+                else:
+                    ## No thats not the right point.
+                    c.del_point(x)
+                    print "Total errors were %s" % error_count
 
-        offset += len(data)
-
-    ## Serialise the hits into a file:
-    p.dump(hits)
-
-    print hits
-
-def save_map(filename, pdf, image_fd, hits):
-    """ Saves a carving map from an xref table.
-
-    We look through the hits to see which object is likely to belong
-    to each item of the xref table.
-
-
-    The file name is chosen as the offset of the table.
-    """
-    description = '\n#'.join(pdf.__str__().splitlines())
-    fd = open("%s.map" % filename, 'w')
-    fd.write("#"+description+"\n")
-    
-    for id, offset, generation, type in pdf.xref:
-        print "%s - %s %s" % (id, offset, type)
-        if type == 'n':
-            possibles = [ x for x in hits['OBJECTS'] if x % 512 == offset % 512 ]
-            for possibility in possibles:
-                image_fd.seek(possibility,0)
-                line = image_fd.readline()
-                if not line.startswith("%s %s" % (id, generation)):
-                    continue
-                
-                fd.write("%s %s Object_%s\n" % (offset, possibility,id))
-
-    fd.close()
-    
-def print_xrefs():
-    p = pickle.Unpickler(open(options.index,'r'))
-    hits = p.load()
-
-    image_fd = open(args[0],'r')
-
-    total_xrefs = {}
-
-    for xref in hits['XREFS']:
-        print "Reading XREFs table from %s "% xref
-        image_fd.seek(xref, 0)
+        ## Perform a complete start to finish verification to find the
+        ## end of file:
+        print "Verifying complete file:"
+        if self.options.slow:
+            p = PDF.PDFParser(c)
+            c.seek(0)
+        else:
+            p = d.p
+            p.restore_state()
         
-        p = PDF.PDFParser(image_fd)
+        while 1:
+            token = p.next_token()
+            if token == 'RESET_STATE' and p.processed > c.points[-1]:
+                c.add_point(p.processed, c.interpolate(p.processed), 'EOF')
+                break
 
-        ## Read until the EOF marker
-        while p.next_token() != "RESET_STATE" and p.error < 10:
-            pass
+            if p.error > 10:
+                print "Too many errors - reconstructed file is likely to be corrupted"
+                break
 
-        #print p.objects
-        ## Try to grab an XREF offset
-        p.START_XREF(None,None)
-        
-        #print p.pdf
-        total_xrefs[xref] = p.pdf
-        save_map(xref, p.pdf, image_fd, hits)
-
-    ## See if this xref table is related to another table:
-    print total_xrefs.keys()
-    for x in total_xrefs.keys():
-        print "Node %s has the following xrefs: " % x
-        for xref_offset in total_xrefs[x].xref_offsets:
-            for y in total_xrefs.keys():
-                if y>x: continue
-                
-                print "Checking %s against xref at %s (%s,%s)" % (xref_offset, y, xref_offset % 512, y % 512)
-                # Search for us refering to them: (The +1 is related
-                # to the regex above having an extra \r\n at the
-                # start)
-                if xref_offset % SECTOR_SIZE == y % SECTOR_SIZE + 1:
-                    print "Xref at offset %s is possibly related to xref at offset %s" % (y, x)
-                    print "My range is %s, their range is %s" % (total_xrefs[y].xref_range,
-                                                                 total_xrefs[x].xref_range,)
-                    if total_xrefs[y].xref_range[0] == total_xrefs[x].xref_range[1] or \
-                       total_xrefs[y].xref_range[1] == total_xrefs[x].xref_range[0]:
-                        new_pdf = PDF.PDFFile()
-                        new_pdf.xref = total_xrefs[x].xref + total_xrefs[y].xref
-                        new_pdf.xref_range = [ min(total_xrefs[y].xref_range[0],
-                                                   total_xrefs[x].xref_range[0]),
-                                               max(total_xrefs[y].xref_range[1],
-                                                   total_xrefs[x].xref_range[1]),
-                                               ]
-                        
-                        print "Ranges for xref tables match - coalescing..."
-                        save_map("%s-%s" % (x,y), new_pdf, image_fd, hits)
-
-if options.create:
-    build_index()
-    
-elif options.maps:
-    print_xrefs()
-    
-elif getattr(options,'print'):
-    p = pickle.Unpickler(open(options.index,'r'))
-    hits = p.load()
-    print hits
-
-else: print "Nothing to do... try -h"
+if __name__=="__main__":
+    c = PDFCarver()
+    c.parse()

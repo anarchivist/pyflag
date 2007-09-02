@@ -57,9 +57,6 @@ class Lexer:
         ## Cant save our state if we have errors. We need to guarantee
         ## that we rewind to a good part of the file.
         if self.error: return
-        if self.verbose>2:
-            print "Saving state %s\n" % self.processed
-
         try:
             end = m.end()
         except: end = 0
@@ -73,10 +70,10 @@ class Lexer:
                                 error = self.error,
                                 )
 
-    def restore_state(self):
-        if self.verbose>2:
-            print "Restoring state"
+        if self.verbose>1:
+            print "Saving state %s" % self.processed
 
+    def restore_state(self):
         state = self.saved_state
         if not state: return
         
@@ -88,6 +85,8 @@ class Lexer:
         self.state = state['state']
         self.objects = state['objects']
         self.error = state['error']
+        if self.verbose>1:
+            print "Restoring state to offset %s" % self.processed
 
     def next_token(self, end = True):
         ## Now try to match any of the regexes in order:

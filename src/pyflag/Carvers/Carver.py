@@ -19,7 +19,7 @@
 # * along with this program; if not, write to the Free Software
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
-import sys, re, os
+import sys, re, os, pickle
 
 """ This class abstracts the reassembled file 
 
@@ -310,6 +310,13 @@ class Reassembler:
         The idea is that different map files may be coalesced together by
         simply using 'cat'.
         """
+        try:
+            ## Does it have a write method?
+            fd.write
+        except AttributeError:
+            ## It might be a string
+            fd = open(fd, 'w')
+        
         for x in self.points:
             fd.write("%s %s %s\n" % (x, self.mapping[x], self.comments[x]))
 
@@ -377,6 +384,167 @@ class Reassembler:
             
             length -= len(data)
             fd.write(data)
+
+        fd.close()
+
+    def coalesce(self, c):
+        """ Coalesce the current mapping function with the carver provided """
+        for p in c.points:
+            self.add_point(p, c.mapping[p], c.comments[p])
+
+from optparse import OptionParser
+
+class CarverFramework:
+    """ This base class is the framework for building advanced
+    carvers. This is basically just a way to provide the same kind of
+    functionality to all carvers using a unified command line
+    interface.
+    """
+
+    usage = """%prog [options] [image_file]"""
+
+    def __init__(self):
+        parser = OptionParser(usage=self.usage)
+        parser.add_option('-i', '--index', default=None,
+                          help = 'Index file to operate on')
+
+        parser.add_option('-c', '--create', default=False, action="store_true",
+                          help = 'Create a new index file')
+
+        parser.add_option('-m', '--maps', default=False,  action="store_true",
+                          help = 'Carve the index file by creating initial map files')
+
+        parser.add_option('-P', '--print', default=False, action="store_true",
+                          help = 'print the index hits')
+
+        parser.add_option('-e', '--extract', default=None,
+                          help = 'extract the zip file described in MAP into the file provided')
+
+        parser.add_option('-M', '--map', default=None,
+                          help = 'map file to read for analysis') 
+
+        parser.add_option('-f', '--force', default=None,
+                          help = "Force the map file given in --map and write as the specified filename")
+
+        parser.add_option('-F', '--forced_map', default=None,
+                          help = "Saved forced map into this filename")
+
+        parser.add_option('-p', '--plot', default=False, action="store_true",
+                          help = "Plot the mapping function specified using --map")
+
+        self.parser = parser
+
+    cregexs = {}
+    regexs = {}
+    
+    def build_index(self, index_file):
+        hits = {}
+        ## Compile the res
+        for k,v in self.regexs.items():
+            self.cregexs[k] = re.compile(v)
+
+        BLOCK_SIZE = 4096
+
+        p = pickle.Pickler(open(index_file,'w'))
+
+        offset = 0
+        fd = open(self.args[0],'r')
+        while 1:
+            data = fd.read(BLOCK_SIZE)
+            if len(data)==0: break
+
+            for k,v in self.cregexs.items():
+                for m in v.finditer(data):
+                    print "Found %s in %s" % (k, offset + m.start())
+                    try:
+                        hits[k].append(offset + m.start())
+                    except KeyError:
+                        hits[k] = [ offset + m.start(), ]
+
+            offset += len(data)
+
+        ## Serialise the hits into a file:
+        p.dump(hits)
+        return hits
+
+    def generate_function(self, c):
+        """ Generates test functions and uses a discriminator to
+        evolve the carver object c into the best suitable one.
+
+        This is an abstract method.
+        """ 
+
+    def build_maps(self):
+        """ Generates a set of initial mapping functions.
+        """
+
+    def load_index(self, index_file):
+        p = pickle.Unpickler(open(index_file,'r'))
+        hits = p.load()
+
+        return hits
+
+    def print_index(self, index_file):
+        print self.load_index(index_file)
+
+    def parse(self):
+        (self.options, self.args) = self.parser.parse_args()
+        self.action_parse()
+
+    def action_parse(self):
+        """ This function is called to parse the command line options
+        in a consistant way
+        """
+        if self.options.map:
+            try:
+                arg = open(self.args[0])
+                print "Opening file %s" % self.args[0]
+            except IndexError:
+                arg = None
+
+            c = Reassembler(arg)
+            c.load_map(self.options.map)
+
+            if self.options.force != None:
+                self.generate_function(c)
+                if not arg: raise RuntimeError("Image name not specified")
+                
+                print "Extracting into file %s" % self.options.force
+                c.extract(open(self.options.force,'w'))
+                
+                if self.options.forced_map:
+                    print "Saving map in %s" % self.options.forced_map
+                    c.save_map(open(self.options.forced_map,'w'))
+
+            elif self.options.extract:
+                if not arg: raise RuntimeError("Image name not specified")
+                print "Extracting into file %s" % self.options.extract
+                c.extract(open(self.options.extract,'w'))
+
+            elif self.options.plot:
+                c.plot(os.path.basename(self.options.map))
+
+        elif self.options.create:
+            if not self.options.index:
+                raise RuntimeError("Need an index file to operate on.")
+
+            self.build_index(self.options.index)
+
+        elif self.options.maps:
+            if not self.options.index:
+                raise RuntimeError("Need an index file to operate on.")
+
+            self.build_maps(self.options.index)
+
+        elif getattr(self.options, "print"):
+            if not self.options.index:
+                raise RuntimeError("Need an index file to operate on.")
+
+            self.print_index(self.options.index)
+
+        else:
+            raise RuntimeError("Nothing to do, use -h for help")
+
 
 import unittest
 
