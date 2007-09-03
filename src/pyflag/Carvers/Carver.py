@@ -338,10 +338,15 @@ class Reassembler:
             except (ValueError,IndexError),e:
                 pass
 
-    def plot(self, title):
+    def plot(self, title, filename=None, type='png'):
         max_size = self.points[-1] + self.overread
         p = os.popen("gnuplot", "w")
-        p.write("set term x11\n")
+        if filename:
+            p.write("set term %s\n" % type)
+            p.write("set output \"%s\"\n" % filename)
+        else:
+            p.write("set term x11\n")
+            
         p.write('pl "-" title "%s" w l, "-" title "." w p ps 5\n' % title)
 
         offset = 1
@@ -359,9 +364,13 @@ class Reassembler:
 
         print len(self.points)
         for i in self.points:
-            p.write("%s %s\n" % (i,self.mapping[i]))
+            if self.comments[i] != "Forced":
+                p.write("%s %s\n" % (i,self.mapping[i]))
 
-        p.write("e\npause 10\n")
+        p.write("e\n")
+        if not filename:
+            p.write("pause 10\n")
+            
         p.flush()
 
         return p
@@ -431,6 +440,12 @@ class CarverFramework:
 
         parser.add_option('-p', '--plot', default=False, action="store_true",
                           help = "Plot the mapping function specified using --map")
+
+        parser.add_option('', '--plot_file', default=None,
+                          help = "The file to save the plot to")
+
+        parser.add_option('', '--plot_type', default="png",
+                          help = "The file type to save the plot to (e.g. png, eps)")
 
         self.parser = parser
 
@@ -522,7 +537,8 @@ class CarverFramework:
                 c.extract(open(self.options.extract,'w'))
 
             elif self.options.plot:
-                c.plot(os.path.basename(self.options.map))
+                c.plot(os.path.basename(self.options.map), self.options.plot_file,
+                       self.options.plot_type)
 
         elif self.options.create:
             if not self.options.index:

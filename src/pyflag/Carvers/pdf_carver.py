@@ -227,6 +227,7 @@ class PDFCarver(Carver.CarverFramework):
     slow = False
 
     def __init__(self):
+        ## Add a couple of extra command line args:
         Carver.CarverFramework.__init__(self)
         self.parser.add_option('-s', '--slow', default=False, action='store_true',
                                help = 'Disable state saving optimisations (Not usually needed)')
@@ -285,6 +286,7 @@ class PDFCarver(Carver.CarverFramework):
             token = p.next_token()
             if token == 'RESET_STATE' and p.processed > c.points[-1]:
                 c.add_point(p.processed, c.interpolate(p.processed), 'EOF')
+                print "Error count = %s" % p.error
                 break
 
             if p.error > 10:

@@ -276,6 +276,10 @@ class ZipCarver(Carver.CarverFramework):
             ## because the CD will be at the end of the zip file which
             ## will be of varying sizes.
 
+            ## We probably should prefer the CD found at image offset
+            ## of ecd - ecd['size_of_cd'] which will be the case if
+            ## the CD is not fragmented.
+
             ## For now we go with the first possibility:
             cd_image_offset = possibles[0]
 
