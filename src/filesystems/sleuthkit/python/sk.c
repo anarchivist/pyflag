@@ -539,12 +539,12 @@ static int
 skfs_init(skfs *self, PyObject *args, PyObject *kwds) {
     PyObject *imgfile;
     char *fstype=NULL;
-    int imgoff=0;
+    long long int imgoff=0;
     self->root_inum = NULL;
 
     static char *kwlist[] = {"imgfile", "imgoff", "fstype", NULL};
 
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "O|is", kwlist, 
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "O|Ks", kwlist, 
 				    &imgfile, &imgoff, &fstype))
         return -1; 
 
