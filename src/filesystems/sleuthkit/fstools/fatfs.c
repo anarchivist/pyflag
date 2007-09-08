@@ -2,7 +2,7 @@
 ** fatfs
 ** The Sleuth Kit 
 **
-** $Date: 2007/04/05 16:01:56 $
+** $Date: 2007/05/17 19:32:28 $
 **
 ** Content and meta data layer support for the FAT file system 
 **
@@ -1220,10 +1220,6 @@ static uint8_t
 inode_walk_dent_orphan_act(TSK_FS_INFO * fs, TSK_FS_DENT * fs_dent,
     void *ptr)
 {
-    if ((fs_dent->fsi) && (fs_dent->fsi->addr == 1031)) {
-        printf("Alloc Status: %d\n",
-            fs_dent->fsi->flags & TSK_FS_INODE_FLAG_UNALLOC ? 0 : 1);
-    }
     if ((fs_dent->fsi)
         && (fs_dent->fsi->flags & TSK_FS_INODE_FLAG_UNALLOC)) {
         if (tsk_list_add(&fs->list_inum_named, fs_dent->fsi->addr))
@@ -1346,16 +1342,17 @@ fatfs_inode_walk(TSK_FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
             tsk_fs_inode_free(fs_inode);
             return 1;
         }
-
-        if (start_inum == end_inum) {
-            tsk_fs_inode_free(fs_inode);
-            return 0;
-        }
     }
 
     /* advance it so that it is a valid starting point */
-    if (start_inum == fs->root_inum)
+    if (start_inum == fs->root_inum) {
+        // exit if we only wanted the root inode 
+        if (end_inum == fs->root_inum) {
+            tsk_fs_inode_free(fs_inode);
+            return 0;
+        }
         start_inum++;
+    }
 
     /* We are going to be looking at each sector to see if it has 
      * dentries.  First, run dent_walk to find all sectors that are 
@@ -1571,6 +1568,11 @@ fatfs_inode_walk(TSK_FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
             free(sect_alloc);
             return 0;
         }
+    }
+    /* update sect if we did not go into the previous case
+     * because the ORPHAN flag was set */
+    else if (sect < fatfs->firstclustsect) {
+        sect = fatfs->firstclustsect;
     }
 
     /* get the base sector for the cluster in which the first inode exists */
@@ -2025,7 +2027,7 @@ fatfs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * fs_inode, uint32_t type,
         size = recoversize;
 
         // we could make this negative so sign it for the comparison
-        while ((int32_t) size > 0) {
+        while ((int64_t) size > 0) {
             int retval;
             sbase = FATFS_CLUST_2_SECT(fatfs, clust);
 
@@ -2067,7 +2069,7 @@ fatfs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * fs_inode, uint32_t type,
         /* If we got this far, then we can recover the file */
         clust = startclust;
         size = recoversize;
-        while (size > 0) {
+        while ((int64_t) size > 0) {
             int myflags =
                 TSK_FS_BLOCK_FLAG_CONT | TSK_FS_BLOCK_FLAG_UNALLOC;
 
@@ -2114,7 +2116,7 @@ fatfs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * fs_inode, uint32_t type,
 
 
             /* Go through each sector in the cluster we read */
-            for (i = 0; i < fatfs->csize && size > 0; i++) {
+            for (i = 0; i < fatfs->csize && (int64_t) size > 0; i++) {
                 int retval;
 
                 if (flags & TSK_FS_FILE_FLAG_SLACK)
@@ -2157,7 +2159,7 @@ fatfs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * fs_inode, uint32_t type,
                 " in normal mode\n", fs_inode->addr);
 
         /* Cycle through the cluster chain */
-        while ((clust & fatfs->mask) > 0 && size > 0 &&
+        while ((clust & fatfs->mask) > 0 && (int64_t) size > 0 &&
             (0 == FATFS_ISEOF(clust, fatfs->mask))) {
             int myflags;
             int retval;
@@ -2205,7 +2207,7 @@ fatfs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * fs_inode, uint32_t type,
             }
 
             /* Go through each sector in the cluster we read */
-            for (i = 0; i < fatfs->csize && size > 0; i++) {
+            for (i = 0; i < fatfs->csize && (int64_t) size > 0; i++) {
                 int retval;
 
                 if (flags & TSK_FS_FILE_FLAG_SLACK)
@@ -2238,7 +2240,7 @@ fatfs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * fs_inode, uint32_t type,
                 }
                 size -= len;
             }
-            if (size > 0) {
+            if ((int64_t) size > 0) {
                 DADDR_T nxt;
                 if (getFAT(fatfs, clust, &nxt)) {
                     snprintf(tsk_errstr2, TSK_ERRSTR_L,

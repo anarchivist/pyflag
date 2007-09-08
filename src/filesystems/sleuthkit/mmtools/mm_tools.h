@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2007/04/04 20:06:59 $
+ * $Date: 2007/04/25 21:46:06 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -25,9 +25,6 @@
 
 #if defined(HAVE_UNISTD)
 #include <unistd.h>
-#endif
-#if !defined (TSK_WIN32)
-#include <sys/param.h>
 #endif
 
 #ifdef __cplusplus

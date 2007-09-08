@@ -1,8 +1,8 @@
 /*
- * $Date: 2007/04/04 20:06:59 $
+ * $Date: 2007/06/05 20:04:41 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
- * Copyright (c) 2006 Brian Carrier, Basis Technology.  All rights reserved
+ * Copyright (c) 2006-2007 Brian Carrier, Basis Technology.  All rights reserved
  * Copyright (c) 2005 Brian Carrier.  All rights reserved
  *
  * raw
@@ -11,6 +11,11 @@
  *
  */
 
+
+/**
+ * \file raw.c
+ * Code to open and read single raw disk images
+ */
 
 #include <sys/stat.h>
 #include "img_tools.h"
@@ -48,14 +53,15 @@ raw_read_random(TSK_IMG_INFO * img_info, OFF_T vol_offset, char *buf,
             DWORD nread;
 
             if (raw_info->seek_pos != tot_offset) {
-                LONG lo, hi;
-                OFF_T max = (OFF_T) MAXLONG + 1;
+                LARGE_INTEGER li;
+                li.QuadPart = tot_offset;
 
-                hi = (LONG) (tot_offset / max);
-                lo = (LONG) (tot_offset - max * hi);
+                li.LowPart = SetFilePointer(raw_info->fd, li.LowPart,
+                    &li.HighPart, FILE_BEGIN);
 
-                if (0xFFFFFFFF == SetFilePointer(raw_info->fd, lo, &hi,
-                        FILE_BEGIN)) {
+                if ((li.LowPart == INVALID_SET_FILE_POINTER) &&
+                    (GetLastError()
+                        != NO_ERROR)) {
                     tsk_error_reset();
                     tsk_errno = TSK_ERR_IMG_SEEK;
                     snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -187,8 +193,9 @@ raw_open(const TSK_TCHAR ** images, TSK_IMG_INFO * next)
             }
             else if ((stat_buf.st_mode & S_IFMT) == S_IFDIR) {
                 if (tsk_verbose)
-                    tsk_fprintf(stderr,
-                        "raw_open: image %s is a directory\n", images[0]);
+                    TFPRINTF(stderr,
+                        _TSK_T("raw_open: image %s is a directory\n"),
+                        images[0]);
 
                 tsk_error_reset();
                 tsk_errno = TSK_ERR_IMG_MAGIC;
@@ -208,7 +215,7 @@ raw_open(const TSK_TCHAR ** images, TSK_IMG_INFO * next)
                 tsk_error_reset();
                 tsk_errno = TSK_ERR_IMG_OPEN;
                 snprintf(tsk_errstr, TSK_ERRSTR_L,
-                    "raw_open file: %s msg: %d", images[0],
+                    "raw_open file: %" PRIttocTSK " msg: %d", images[0],
                     GetLastError());
                 return NULL;
             }
@@ -222,8 +229,8 @@ raw_open(const TSK_TCHAR ** images, TSK_IMG_INFO * next)
                     tsk_error_reset();
                     tsk_errno = TSK_ERR_IMG_OPEN;
                     snprintf(tsk_errstr, TSK_ERRSTR_L,
-                        "raw_open file: %s GetFileSize: %d", images[0],
-                        GetLastError());
+                        "raw_open file: %" PRIttocTSK " GetFileSize: %d",
+                        images[0], GetLastError());
                     return NULL;
                 }
                 img_info->size = dwLo | ((OFF_T) dwHi << 32);
@@ -239,8 +246,8 @@ raw_open(const TSK_TCHAR ** images, TSK_IMG_INFO * next)
                     tsk_error_reset();
                     tsk_errno = TSK_ERR_IMG_OPEN;
                     snprintf(tsk_errstr, TSK_ERRSTR_L,
-                        "raw_open file: %s DeviceIoControl: %d", images[0],
-                        GetLastError());
+                        "raw_open file: %" PRIttocTSK
+                        " DeviceIoControl: %d", images[0], GetLastError());
                     return NULL;
                 }
 
@@ -255,8 +262,9 @@ raw_open(const TSK_TCHAR ** images, TSK_IMG_INFO * next)
         if ((raw_info->fd = open(images[0], O_RDONLY)) < 0) {
             tsk_error_reset();
             tsk_errno = TSK_ERR_IMG_OPEN;
-            snprintf(tsk_errstr, TSK_ERRSTR_L, "raw_open file: %s msg: %s",
-                images[0], strerror(errno));
+            snprintf(tsk_errstr, TSK_ERRSTR_L,
+                "raw_open file: %" PRIttocTSK " msg: %s", images[0],
+                strerror(errno));
             return NULL;
         }
 

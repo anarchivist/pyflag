@@ -2,7 +2,7 @@
 ** ifind (inode find)
 ** The Sleuth Kit
 **
-** $Date: 2007/04/05 16:01:58 $
+** $Date: 2007/06/12 19:56:19 $
 **
 ** Given an image  and block number, identify which inode it is used by
 ** 
@@ -102,6 +102,7 @@ typedef struct {
     int id;
     char *cur_dir;
     char *cur_attr;
+    char *strtok_last;
     uint8_t found;
     uint8_t badpath;
     INUM_T addr;                // "Inode" address for file name
@@ -117,6 +118,7 @@ static uint8_t
 ifind_path_act(TSK_FS_INFO * fs, TSK_FS_DENT * fs_dent, void *ptr)
 {
     IFIND_PATH_DATA *ipd = (IFIND_PATH_DATA *) ptr;
+    char *pname;
 
     if ((!ipd) || (ipd->id != IFIND_PATH_DATA_ID)) {
         tsk_error_reset();
@@ -199,8 +201,9 @@ ifind_path_act(TSK_FS_INFO * fs, TSK_FS_DENT * fs_dent, void *ptr)
         }
     }
 
-    /* Get the next directory or file name */
-    ipd->cur_dir = (char *) strtok(NULL, "/");
+    /* Get the next directory or file name in the path */
+    pname = ipd->cur_dir;   // save a copy of the current name pointer
+    ipd->cur_dir = (char *) strtok_r(NULL, "/", &(ipd->strtok_last));
     ipd->cur_attr = NULL;
 
     if (tsk_verbose)
@@ -215,10 +218,13 @@ ifind_path_act(TSK_FS_INFO * fs, TSK_FS_DENT * fs_dent, void *ptr)
 
         // if our only hit is an unallocated entry 
         // then keep on looking -- this commonly happens with NTFS
-        if (fs_dent->flags & TSK_FS_DENT_FLAG_UNALLOC)
+        if (fs_dent->flags & TSK_FS_DENT_FLAG_UNALLOC) {
+            ipd->cur_dir = pname;
             return TSK_WALK_CONT;
-        else
+        }
+        else {
             return TSK_WALK_STOP;
+        }
     }
 
     /* if it is an NTFS image with an ADS in the name, then
@@ -299,7 +305,7 @@ tsk_fs_ifind_path(TSK_FS_INFO * fs, uint8_t lclflags, TSK_TCHAR * tpath,
     ipd.id = IFIND_PATH_DATA_ID;
     ipd.found = 0;
     ipd.badpath = 0;
-    ipd.cur_dir = (char *) strtok(cpath, "/");
+    ipd.cur_dir = (char *) strtok_r(cpath, "/", &ipd.strtok_last);
     ipd.cur_attr = NULL;
 
     /* If there is no token, then only a '/' was given */

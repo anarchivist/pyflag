@@ -1131,8 +1131,8 @@ hfs_open(TSK_IMG_INFO * img_info, SSIZE_T offset,
     hfs->inodes = (htsk_fs_inode_mode_struct *)
         tsk_malloc((fs->last_inum +
             1) * sizeof(htsk_fs_inode_mode_struct));
-    memset(hfs->inodes, fs->last_inum * sizeof(htsk_fs_inode_mode_struct),
-        0);
+    memset(hfs->inodes, 0,
+        (fs->last_inum + 1) * sizeof(htsk_fs_inode_mode_struct));
     hfs_load_inode_list(hfs);
 
     /*

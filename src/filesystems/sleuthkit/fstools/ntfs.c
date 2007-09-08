@@ -2,7 +2,7 @@
 ** ntfs
 ** The Sleuth Kit 
 **
-** $Date: 2007/04/05 16:02:00 $
+** $Date: 2007/05/28 23:17:13 $
 **
 ** Content and meta data layer support for the NTFS file system
 **
@@ -354,9 +354,16 @@ ntfs_dinode_lookup(NTFS_INFO * ntfs, ntfs_mft * mft, INUM_T mftnum)
     if ((tsk_getu16(fs->endian,
                 mft->upd_cnt) - 1) * ntfs->ssize_b > ntfs->mft_rsize_b) {
         tsk_error_reset();
-        tsk_errno = TSK_ERR_FS_GENFS;
+        tsk_errno = TSK_ERR_FS_INODE_INT;
         snprintf(tsk_errstr, TSK_ERRSTR_L,
-            "More Update Sequence Entries than MFT size");
+            "dinode_lookup: More Update Sequence Entries than MFT size");
+        return 1;
+    }
+    if (tsk_getu16(fs->endian, mft->upd_off) > ntfs->mft_rsize_b) {
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_FS_INODE_INT;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "dinode_lookup: Update sequence offset larger than MFT size");
         return 1;
     }
 
@@ -439,7 +446,6 @@ is_clustalloc(NTFS_INFO * ntfs, DADDR_T addr)
     if (addr > ntfs->fs_info.last_block) {
         tsk_error_reset();
         tsk_errno = TSK_ERR_FS_INODE_INT;
-
         snprintf(tsk_errstr, TSK_ERRSTR_L,
             "is_clustalloc: cluster too large");
         return -1;
@@ -572,6 +578,15 @@ ntfs_make_data_run(NTFS_INFO * ntfs,
                     data_run->len, data_run->len);
         }
 
+        /* Sanity check on length */
+        if (data_run->len > fs->block_count) {
+            tsk_error_reset();
+            tsk_errno = TSK_ERR_FS_INODE_INT;
+            snprintf(tsk_errstr, TSK_ERRSTR_L,
+                "ntfs_make_run: Run length is larger than file system");
+            return NULL;
+        }
+
         /* Update the length if we were passed a value */
         if (totlen)
             *totlen += (data_run->len * ntfs->csize_b);
@@ -628,8 +643,19 @@ ntfs_make_data_run(NTFS_INFO * ntfs,
          * to the current "prev_addr" so skip that code
          */
         else if ((offset) || (ntfs->mnum == NTFS_MFT_BOOT)) {
+
             data_run->addr = prev_addr + offset;
             prev_addr = data_run->addr;
+
+            /* Sanity check on length and offset */
+            if (data_run->addr + data_run->len > fs->block_count) {
+                tsk_error_reset();
+                tsk_errno = TSK_ERR_FS_INODE_INT;
+                snprintf(tsk_errstr, TSK_ERRSTR_L,
+                    "ntfs_make_run: Run offset and length is larger than file system");
+                return NULL;
+            }
+
         }
         else {
             data_run->flags |= TSK_FS_DATA_RUN_FLAG_SPARSE;
@@ -1596,6 +1622,7 @@ ntfs_data_walk(NTFS_INFO * ntfs, INUM_T inum,
                 }
                 else {
                     fs_data_run = fs_data_run->next;
+                    continue;
                 }
             }
 
@@ -1752,10 +1779,11 @@ ntfs_proc_attrseq(NTFS_INFO * ntfs,
         if (attr->nlen) {
             int i;
 
+            name8 = (UTF8 *) name;
             name16 =
                 (UTF16 *) ((uintptr_t) attr + tsk_getu16(fs->endian,
                     attr->name_off));
-            name8 = (UTF8 *) name;
+
             retVal =
                 tsk_UTF16toUTF8(fs->endian, (const UTF16 **) &name16,
                 (UTF16 *) ((uintptr_t) name16 +
@@ -1818,6 +1846,23 @@ ntfs_proc_attrseq(NTFS_INFO * ntfs,
                     PRIuINUM " Type: %" PRIu32 " Id: %"
                     PRIu16 " Name: %s\n", ntfs->mnum,
                     type, tsk_getu16(fs->endian, attr->id), name);
+
+            /* Validate the offset lengths */
+            if (((tsk_getu16(fs->endian,
+                            attr->c.r.soff) + (uintptr_t) attr) >
+                    ((uintptr_t) attrseq + len))
+                || ((tsk_getu16(fs->endian,
+                            attr->c.r.soff) + tsk_getu32(fs->endian,
+                            attr->c.r.ssize) + (uintptr_t) attr) >
+                    ((uintptr_t) attrseq + len))) {
+                tsk_error_reset();
+                tsk_errno = TSK_ERR_FS_CORRUPT;
+                snprintf(tsk_errstr, TSK_ERRSTR_L,
+                    "ntfs_data_walk: Resident attribute %" PRIuINUM
+                    "-%d starting offset and length too large",
+                    fs_inode->addr, type);
+                return 1;
+            }
 
             /* Add this resident stream to the fs_inode->attr list */
             fs_inode->attr =
@@ -2398,9 +2443,6 @@ ntfs_dinode_copy(NTFS_INFO * ntfs, TSK_FS_INODE * fs_inode)
             NTFS_MFT_INUSE) ? TSK_FS_INODE_FLAG_ALLOC :
         TSK_FS_INODE_FLAG_UNALLOC);
 
-    /* MFT entries are only allocated when needed, so it has been used */
-    fs_inode->flags |= TSK_FS_INODE_FLAG_USED;
-
     /* Process the attribute sequence to fill in the fs_inode->attr
      * list and the other info such as size and times
      */
@@ -2411,6 +2453,13 @@ ntfs_dinode_copy(NTFS_INFO * ntfs, TSK_FS_INODE * fs_inode)
             ntfs->mft_rsize_b - tsk_getu16(fs->endian, mft->attr_off))) {
         return 1;
     }
+
+    /* The entry has been 'used' if it has attributes */
+    if (fs_inode->attr != NULL)
+        fs_inode->flags |= TSK_FS_INODE_FLAG_USED;
+    else
+        fs_inode->flags |= TSK_FS_INODE_FLAG_UNUSED;
+
     return 0;
 }
 
@@ -2745,6 +2794,7 @@ ntfs_load_ver(NTFS_INFO * ntfs)
 
 
 
+#if TSK_USE_SID
 
 /* 
  * Process the SDS entry from the $Secure File and save to
@@ -2756,14 +2806,24 @@ static int
 ntfs_load_sid(TSK_FS_INFO * fs, ntfs_attr_sds * sds)
 {
     char *sid_str = NULL;
+    ntfs_sid *sid = NULL;
+
     // "S-"
     unsigned int sid_str_len = 2;
-
     NTFS_INFO *ntfs = (NTFS_INFO *) fs;
-
     unsigned int owner_offset =
         tsk_getu32(fs->endian, sds->self_rel_sec_desc.owner);
-    ntfs_sid *sid =
+
+    if (((uintptr_t) & sds->self_rel_sec_desc + owner_offset) >
+        ((uintptr_t) sds + tsk_getu32(fs->endian, sds->ent_size))) {
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_FS_INODE_INT;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "ntfs_load_sid: owner offset larger than sds length");
+        return 1;
+    }
+
+    sid =
         (ntfs_sid *) ((uint8_t *) & sds->self_rel_sec_desc + owner_offset);
 
     // "1-"
@@ -2858,7 +2918,7 @@ ntfs_proc_sds(TSK_FS_INFO * fs, NTFS_SXX_BUFFER * sds_buffer)
 {
     NTFS_INFO *ntfs = (NTFS_INFO *) fs;
 
-    unsigned int offset = 0;
+    unsigned int ent_len = 0;
     unsigned int total_bytes_processed = 0;
     uint64_t current_offset = 0;
 
@@ -2867,15 +2927,15 @@ ntfs_proc_sds(TSK_FS_INFO * fs, NTFS_SXX_BUFFER * sds_buffer)
 
 
     while (total_bytes_processed < sds_buffer->size) {
-        current_offset =
-            (uintptr_t *) sds - (uintptr_t *) sds_buffer->buffer;
+        current_offset = (uintptr_t) sds - (uintptr_t) sds_buffer->buffer;
 
-        offset = tsk_getu32(fs->endian, sds->ent_size);
-        if (offset % 16) {
-            offset = ((offset / 16) + 1) * 16;
+        ent_len = tsk_getu32(fs->endian, sds->ent_size);
+        if (ent_len % 16) {
+            ent_len = ((ent_len / 16) + 1) * 16;
         }
 
-        if ((offset != 0) && (offset < (sds_buffer->size - current_offset))
+        // verify the length value is valid 
+        if ((ent_len > 0) && (current_offset + ent_len < sds_buffer->size)
             && (tsk_getu64(fs->endian, sds->file_off) < sds_buffer->size)) {
 
             NTFS_SDS_ENTRY *sds_entry;
@@ -2885,12 +2945,13 @@ ntfs_proc_sds(TSK_FS_INFO * fs, NTFS_SXX_BUFFER * sds_buffer)
                 == NULL) {
                 return 1;
             }
-            if ((sds_entry->data = (uint8_t *) talloc_size(sds_entry, offset)) == NULL) {
+            if ((sds_entry->data =
+					(uint8_t *) talloc_size(sds_entry, ent_len)) == NULL) {
                 free(sds_entry);
                 return 1;
             }
-            memcpy(sds_entry->data, sds, offset);
-            sds_entry->len = offset;
+            memcpy(sds_entry->data, sds, ent_len);
+            sds_entry->len = ent_len;
             sds_entry->next = NULL;
 
             if (previous_sds_entry == NULL) {
@@ -2905,8 +2966,8 @@ ntfs_proc_sds(TSK_FS_INFO * fs, NTFS_SXX_BUFFER * sds_buffer)
                 return 1;
             }
 
-            sds = (ntfs_attr_sds *) ((uint8_t *) sds + offset);
-            total_bytes_processed += offset;
+            sds = (ntfs_attr_sds *) ((uint8_t *) sds + ent_len);
+            total_bytes_processed += ent_len;
         }
         else {
             total_bytes_processed =
@@ -3117,6 +3178,48 @@ ntfs_load_secure(NTFS_INFO * ntfs)
     tsk_fs_inode_free(fs_inode);
     return 0;
 }
+
+char *
+ntfs_get_sid_as_string(TSK_FS_INFO * fs, uint32_t security_id)
+{
+    NTFS_INFO *ntfs = (NTFS_INFO *) fs;
+    NTFS_SID_ENTRY *sid_entry = ntfs->sid;
+
+    while ((sid_entry) && sid_entry->sec_id != security_id) {
+        sid_entry = sid_entry->next;
+    }
+
+    if (sid_entry) {
+        return sid_entry->sid_str;
+    }
+
+    return "";
+}
+
+ntfs_secure_data_free(NTFS_INFO * ntfs)
+{
+    NTFS_SDS_ENTRY *nsds;
+    NTFS_SID_ENTRY *nsid;
+
+    // Iterate of sds entries and free them
+    while (ntfs->sds) {
+        nsds = ntfs->sds->next;
+        free(ntfs->sds->data);
+        free(ntfs->sds);
+        ntfs->sds = nsds;
+    }
+
+    // Iterate of sid entries and free them
+    while (ntfs->sid) {
+        nsid = ntfs->sid->next;
+        free(ntfs->sid->data);
+        free(ntfs->sid->sid_str);
+        free(ntfs->sid);
+        ntfs->sid = nsid;
+    }
+}
+
+#endif
 
 
 
@@ -3358,9 +3461,7 @@ inode_walk_dent_orphan_act(TSK_FS_INFO * fs, TSK_FS_DENT * fs_dent,
  * inode_walk
  *
  * Flags: TSK_FS_INODE_FLAG_ALLOC, TSK_FS_INODE_FLAG_UNALLOC, 
- * TSK_FS_INODE_FLAG_USED, TSK_FS_INODE_FLAG_ORPHAN
- *
- * Not used: TSK_FS_INODE_FLAG_UNUSED (Only allocated when needed)
+ * TSK_FS_INODE_FLAG_USED, TSK_FS_INODE_FLAG_UNUSED, TSK_FS_INODE_FLAG_ORPHAN
  *
  * Note that with ORPHAN, entries will be found that can also be
  * found by searching based on parent directories (if parent directory is
@@ -3478,10 +3579,12 @@ ntfs_inode_walk(TSK_FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
                 NTFS_MFT_INUSE) ? TSK_FS_INODE_FLAG_ALLOC :
             TSK_FS_INODE_FLAG_UNALLOC);
 
-        /* MFT entries are only allocated when needed, so it must have 
-         * been used
-         */
-        myflags |= TSK_FS_INODE_FLAG_USED;
+        /* We consider USED entries to be ones with attributes */
+        if (tsk_getu16(fs->endian, ntfs->mft->attr_off) == 0)
+            myflags |= TSK_FS_INODE_FLAG_UNUSED;
+        else
+            myflags |= TSK_FS_INODE_FLAG_USED;
+
         if ((flags & myflags) != myflags)
             continue;
 
@@ -3520,22 +3623,6 @@ ntfs_inode_walk(TSK_FS_INFO * fs, INUM_T start_inum, INUM_T end_inum,
 }
 
 
-char *
-ntfs_get_sid_as_string(TSK_FS_INFO * fs, uint32_t security_id)
-{
-    NTFS_INFO *ntfs = (NTFS_INFO *) fs;
-    NTFS_SID_ENTRY *sid_entry = ntfs->sid;
-
-    while ((sid_entry) && sid_entry->sec_id != security_id) {
-        sid_entry = sid_entry->next;
-    }
-
-    if (sid_entry) {
-        return sid_entry->sid_str;
-    }
-
-    return "";
-}
 
 
 
@@ -3837,9 +3924,11 @@ ntfs_istat(TSK_FS_INFO * fs, FILE * hFile,
         tsk_fprintf(hFile, "Owner ID: %" PRIu32 "\n",
             tsk_getu32(fs->endian, si->own_id));
 
+#if TSK_USE_SID
         tsk_fprintf(hFile, "Security ID: %" PRIu32 "  (%s)\n",
             tsk_getu32(fs->endian, si->sec_id), ntfs_get_sid_as_string(fs,
                 tsk_getu32(fs->endian, si->sec_id)));
+#endif
 
 
         if (tsk_getu32(fs->endian, si->maxver) != 0) {
@@ -4200,31 +4289,6 @@ ntfs_jblk_walk(TSK_FS_INFO * fs, DADDR_T start,
 
 
 static void
-ntfs_secure_data_free(NTFS_INFO * ntfs)
-{
-    NTFS_SDS_ENTRY *nsds;
-    NTFS_SID_ENTRY *nsid;
-
-    // Iterate of sds entries and free them
-    while (ntfs->sds) {
-        nsds = ntfs->sds->next;
-        free(ntfs->sds->data);
-        free(ntfs->sds);
-        ntfs->sds = nsds;
-    }
-
-    // Iterate of sid entries and free them
-    while (ntfs->sid) {
-        nsid = ntfs->sid->next;
-        free(ntfs->sid->data);
-        free(ntfs->sid->sid_str);
-        free(ntfs->sid);
-        ntfs->sid = nsid;
-    }
-}
-
-
-static void
 ntfs_close(TSK_FS_INFO * fs)
 {
     NTFS_INFO *ntfs = (NTFS_INFO *) fs;
@@ -4233,7 +4297,9 @@ ntfs_close(TSK_FS_INFO * fs)
     tsk_fs_data_run_free(ntfs->bmap);
     tsk_data_buf_free(ntfs->bmap_buf);
     tsk_fs_inode_free(ntfs->mft_inode);
+#if TSK_USE_SID
     ntfs_secure_data_free(ntfs);
+#endif
 
     if (fs->list_inum_named) {
         tsk_list_free(fs->list_inum_named);
@@ -4497,6 +4563,7 @@ ntfs_open(TSK_IMG_INFO * img_info, SSIZE_T offset,
     }
 
     /* load the SID data into ntfs_info ($Secure - $SDS, $SDH, $SII */
+#if TSK_USE_SID
     if (ntfs_load_secure(ntfs)) {
         tsk_fs_inode_free(ntfs->mft_inode);
         free(ntfs->mft);
@@ -4504,6 +4571,7 @@ ntfs_open(TSK_IMG_INFO * img_info, SSIZE_T offset,
         free(ntfs);
         return NULL;
     }
+#endif
 
 
     /* set this to NULL and it will be loaded if needed */

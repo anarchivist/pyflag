@@ -2,7 +2,7 @@
 ** ext2fs_dent
 ** The Sleuth Kit 
 **
-** $Date: 2007/04/05 16:01:56 $
+** $Date: 2007/05/17 19:32:28 $
 **
 ** File name layer support for an TSK_FS_INFO_TYPE_EXT_2 image
 **
@@ -463,7 +463,7 @@ ext2fs_dent_walk_lcl(TSK_FS_INFO * fs, EXT2FS_DINFO * dinfo,
     }
     dirptr = dirbuf;
 
-    while (size > 0) {
+    while ((int64_t) size > 0) {
         int len = (fs->block_size < size) ? fs->block_size : (int) size;
 
         retval =

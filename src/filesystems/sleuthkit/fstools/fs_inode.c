@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2007/04/04 22:06:14 $
+ * $Date: 2007/05/03 15:17:25 $
  *
  * Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
  *
@@ -41,29 +41,34 @@ tsk_fs_inode_alloc(int direct_count, int indir_count)
 {
     TSK_FS_INODE *fs_inode;
 
-    fs_inode = (TSK_FS_INODE *) tsk_malloc(sizeof(*fs_inode));
+    fs_inode = (TSK_FS_INODE *) tsk_malloc(sizeof(TSK_FS_INODE));
     if (fs_inode == NULL)
         return NULL;
+    memset(fs_inode, 0, sizeof(TSK_FS_INODE));
 
     fs_inode->direct_count = direct_count;
-    fs_inode->direct_addr =
-        (DADDR_T *) tsk_malloc(direct_count * sizeof(DADDR_T));
-    if (fs_inode->direct_addr == NULL)
-        return NULL;
+    if (direct_count > 0) {
+        fs_inode->direct_addr =
+            (DADDR_T *) tsk_malloc(direct_count * sizeof(DADDR_T));
+        if (fs_inode->direct_addr == NULL)
+            return NULL;
+        memset(fs_inode->direct_addr, 0, direct_count * sizeof(DADDR_T));
+    }
+    else {
+        fs_inode->direct_addr = NULL;
+    }
 
     fs_inode->indir_count = indir_count;
-    fs_inode->indir_addr =
-        (DADDR_T *) tsk_malloc(indir_count * sizeof(DADDR_T));
-    if (fs_inode->indir_addr == NULL)
-        return NULL;
-
-    fs_inode->attr = NULL;
-    fs_inode->name = NULL;
-    fs_inode->link = NULL;
-    fs_inode->addr = 0;
-    fs_inode->seq = 0;
-    fs_inode->atime = fs_inode->mtime = fs_inode->ctime =
-        fs_inode->crtime = fs_inode->dtime = 0;
+    if (indir_count > 0) {
+        fs_inode->indir_addr =
+            (DADDR_T *) tsk_malloc(indir_count * sizeof(DADDR_T));
+        if (fs_inode->indir_addr == NULL)
+            return NULL;
+        memset(fs_inode->indir_addr, 0, indir_count * sizeof(DADDR_T));
+    }
+    else {
+        fs_inode->indir_addr = NULL;
+    }
 
     return (fs_inode);
 }

@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2007/04/05 16:01:59 $
+** $Date: 2007/04/27 14:57:45 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
@@ -74,7 +74,7 @@ MAIN(int argc, TSK_TCHAR ** argv)
     TSK_FS_INFO *fs;
     INUM_T istart = 0, ilast = 0;
     int ch;
-    int flags = TSK_FS_INODE_FLAG_UNALLOC;
+    int flags = TSK_FS_INODE_FLAG_UNALLOC | TSK_FS_INODE_FLAG_USED;
     int argflags = 0;
     SSIZE_T imgoff = 0;
     int set_range = 1;
@@ -111,6 +111,7 @@ MAIN(int argc, TSK_TCHAR ** argv)
             break;
         case _TSK_T('e'):
             flags |= (TSK_FS_INODE_FLAG_ALLOC | TSK_FS_INODE_FLAG_UNALLOC);
+            flags &= ~TSK_FS_INODE_FLAG_USED;
             break;
         case _TSK_T('m'):
             argflags |= TSK_FS_ILS_MAC;
@@ -132,7 +133,7 @@ MAIN(int argc, TSK_TCHAR ** argv)
             flags &= ~TSK_FS_INODE_FLAG_ALLOC;
             break;
         case _TSK_T('r'):
-            flags |= TSK_FS_INODE_FLAG_UNALLOC;
+            flags |= (TSK_FS_INODE_FLAG_UNALLOC | TSK_FS_INODE_FLAG_USED);
             flags &= ~TSK_FS_INODE_FLAG_ALLOC;
             break;
         case _TSK_T('s'):
@@ -286,7 +287,7 @@ MAIN(int argc, TSK_TCHAR ** argv)
             || ((fs->ftype & TSK_FS_INFO_TYPE_FS_MASK) ==
                 TSK_FS_INFO_TYPE_FAT_TYPE))) {
         fprintf(stderr,
-            "Error: '-o' argument does not work with NTFS and FAT images\n");
+            "Error: '-O' argument does not work with NTFS and FAT images\n");
         exit(1);
     }
 

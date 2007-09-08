@@ -5,7 +5,7 @@
 ** Contains random internal definitions needed to compile the 
 ** library. 
 **
-** $Date: 2007/04/05 16:01:57 $
+** $Date: 2007/04/25 21:46:05 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -39,7 +39,6 @@ extern "C" {
 
 #if !defined (TSK_WIN32)
 #include <sys/fcntl.h>
-#include <sys/param.h>
 #include <sys/time.h>
 #endif
 

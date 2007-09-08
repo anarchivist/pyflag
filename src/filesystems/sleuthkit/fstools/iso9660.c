@@ -1568,7 +1568,7 @@ iso9660_istat(TSK_FS_INFO * fs, FILE * hFile, INUM_T inum,
         OFF_T size = fs_inode->size;
         int rowcount = 0;
 
-        while (size > 0) {
+        while ((int64_t) size > 0) {
             tsk_fprintf(hFile, "%d ", block++);
             size -= fs->block_size;
             rowcount++;

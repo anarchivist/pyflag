@@ -2,7 +2,7 @@
 ** ntfs_dent
 ** The Sleuth Kit
 **
-** $Date: 2007/04/05 16:02:00 $
+** $Date: 2007/05/17 19:32:28 $
 **
 ** name layer support for the NTFS file system
 **
@@ -155,20 +155,26 @@ is_time(uint64_t t)
     return 1;
 }
 
-/* 
- * Process a list of directory entries, starting at idxe with a length
- * of _size_ bytes.  _len_ is the length that is reported in the 
- * idxelist header.  in other words, everything after _len_ bytes is
- * considered unallocated area and therefore deleted content 
+/** 
+ * Process a lsit of index entries and call the callback for
+ * each. 
  *
- * The only flag that we care about is ALLOC and UNALLOC
+ * @param list_seen List of directories that have already been analyzed
+ * @param idxe Buffer with index entries to process
+ * @param idxe_len Length of idxe buffer (in bytes)
+ * @param used_len Length of data as reported by idexlist header (everything
+ * after which and less then idxe_len is considered deleted)
+ * @param flags (All we care about is ALLOC and UNALLOC)
+ * @param action Callback
+ * @param ptr Pointer to data to pass to callback
  *
- * Return 1 to stop, 0 on success, and -1 on error
+ * @returns 1 to stop, 0 on success, and -1 on error
  */
 static int
 ntfs_dent_idxentry(NTFS_INFO * ntfs, NTFS_DINFO * dinfo,
-    TSK_LIST ** list_seen, ntfs_idxentry * idxe, uint32_t size,
-    uint32_t len, int flags, TSK_FS_DENT_TYPE_WALK_CB action, void *ptr)
+    TSK_LIST ** list_seen, ntfs_idxentry * idxe, uint32_t idxe_len,
+    uint32_t used_len, int flags, TSK_FS_DENT_TYPE_WALK_CB action,
+    void *ptr)
 {
     uintptr_t endaddr, endaddr_alloc;
     TSK_FS_DENT *fs_dent;
@@ -182,13 +188,22 @@ ntfs_dent_idxentry(NTFS_INFO * ntfs, NTFS_DINFO * dinfo,
         tsk_fprintf(stderr,
             "ntfs_dent_idxentry: Processing index entry: %" PRIu64
             "  Size: %" PRIu32 "  Len: %" PRIu32 "  Flags: %x\n",
-            (uint64_t) ((uintptr_t) idxe), size, len, flags);
+            (uint64_t) ((uintptr_t) idxe), idxe_len, used_len, flags);
+
+    /* Sanity check */
+    if (idxe_len < used_len) {
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_FS_INODE_INT;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "ntfs_dent_idxentry: Allocated length of index entries is larger than buffer length");
+        return 1;
+    }
 
     /* where is the end of the buffer */
-    endaddr = ((uintptr_t) idxe + size);
+    endaddr = ((uintptr_t) idxe + idxe_len);
 
     /* where is the end of the allocated data */
-    endaddr_alloc = ((uintptr_t) idxe + len);
+    endaddr_alloc = ((uintptr_t) idxe + used_len);
 
     /* cycle through the index entries, based on provided size */
     while (((uintptr_t) & (idxe->stream) + sizeof(ntfs_attr_fname)) <
@@ -216,7 +231,7 @@ ntfs_dent_idxentry(NTFS_INFO * ntfs, NTFS_DINFO * dinfo,
             (tsk_getu16(fs->endian, idxe->idxlen) <= tsk_getu16(fs->endian,
                     idxe->strlen))
             || (tsk_getu16(fs->endian, idxe->idxlen) % 4)
-            || (tsk_getu16(fs->endian, idxe->idxlen) > size)) {
+            || (tsk_getu16(fs->endian, idxe->idxlen) > idxe_len)) {
             idxe = (ntfs_idxentry *) ((uintptr_t) idxe + 4);
             continue;
         }
@@ -741,12 +756,27 @@ ntfs_dent_walk_lcl(TSK_FS_INFO * fs, NTFS_DINFO * dinfo,
             "ntfs_dent_walk: Processing $IDX_ROOT of inum %" PRIuINUM "\n",
             inum);
 
+    /* Verify the offset pointers */
+    if ((tsk_getu32(fs->endian, idxelist->seqend_off) <
+            tsk_getu32(fs->endian, idxelist->begin_off)) ||
+        (tsk_getu32(fs->endian, idxelist->bufend_off) <
+            tsk_getu32(fs->endian, idxelist->seqend_off)) ||
+        (((uintptr_t) idxe + tsk_getu32(fs->endian,
+                    idxelist->bufend_off)) >
+            ((uintptr_t) fs_data_root->buf + fs_data_root->buflen))) {
+        tsk_error_reset();
+        tsk_errno = TSK_ERR_FS_INODE_INT;
+        snprintf(tsk_errstr, TSK_ERRSTR_L,
+            "Error: Index list offsets are invalid on entry: %" PRIuINUM,
+            fs_inode->addr);
+        tsk_fs_inode_free(fs_inode);
+        return 1;
+    }
+
     retval = ntfs_dent_idxentry(ntfs, dinfo, list_seen, idxe,
-        tsk_getu32(fs->endian,
-            idxelist->buf_off) -
+        tsk_getu32(fs->endian, idxelist->bufend_off) -
         tsk_getu32(fs->endian, idxelist->begin_off),
-        tsk_getu32(fs->endian,
-            idxelist->end_off) -
+        tsk_getu32(fs->endian, idxelist->seqend_off) -
         tsk_getu32(fs->endian, idxelist->begin_off), flags, action, ptr);
 
     if (retval != 0) {
@@ -895,15 +925,30 @@ ntfs_dent_walk_lcl(TSK_FS_INFO * fs, NTFS_DINFO * dinfo,
 
         /* the length from the start of the next record to where our
          * list starts.
-         * This should be the same as buf_off in idxelist, but we don't
+         * This should be the same as bufend_off in idxelist, but we don't
          * trust it.
          */
         list_len = (uint32_t) ((uintptr_t) idxrec - (uintptr_t) idxe);
 
+        /* Verify the offset pointers */
+        if (((uintptr_t) idxe > (uintptr_t) idxrec) ||
+            ((uintptr_t) idxelist +
+                tsk_getu32(fs->endian,
+                    idxelist->seqend_off) > (uintptr_t) idxrec)) {
+            tsk_error_reset();
+            tsk_errno = TSK_ERR_FS_INODE_INT;
+            snprintf(tsk_errstr, TSK_ERRSTR_L,
+                "Error: Index list offsets are invalid on entry: %"
+                PRIuINUM, fs_inode->addr);
+            tsk_fs_inode_free(fs_inode);
+            free(idxalloc);
+            return 1;
+        }
+
+
         /* process the list of index entries */
         retval = ntfs_dent_idxentry(ntfs, dinfo, list_seen, idxe, list_len,
-            tsk_getu32(fs->endian,
-                idxelist->end_off) -
+            tsk_getu32(fs->endian, idxelist->seqend_off) -
             tsk_getu32(fs->endian, idxelist->begin_off), flags, action,
             ptr);
         if (retval != 0) {
@@ -948,10 +993,24 @@ ntfs_dent_walk_lcl(TSK_FS_INFO * fs, NTFS_DINFO * dinfo,
             (uint32_t) ((uintptr_t) idxalloc + idxalloc_len) -
             (uintptr_t) idxe;
 
+        /* Verify the offset pointers */
+        if ((list_len > rec_len) ||
+            ((uintptr_t) idxelist +
+                tsk_getu32(fs->endian, idxelist->seqend_off) >
+                (uintptr_t) idxalloc + idxalloc_len)) {
+            tsk_error_reset();
+            tsk_errno = TSK_ERR_FS_INODE_INT;
+            snprintf(tsk_errstr, TSK_ERRSTR_L,
+                "Error: Index list offsets are invalid on entry: %"
+                PRIuINUM, fs_inode->addr);
+            tsk_fs_inode_free(fs_inode);
+            free(idxalloc);
+            return 1;
+        }
+
         /* process the list of index entries */
         retval = ntfs_dent_idxentry(ntfs, dinfo, list_seen, idxe, list_len,
-            tsk_getu32(fs->endian,
-                idxelist->end_off) -
+            tsk_getu32(fs->endian, idxelist->seqend_off) -
             tsk_getu32(fs->endian, idxelist->begin_off), flags, action,
             ptr);
         if (retval != 0) {

@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  *
- * $Date: 2007/04/04 20:06:59 $
+ * $Date: 2007/06/05 20:04:41 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
  * Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -24,12 +24,12 @@ typedef struct {
 
 MM_TYPES mm_open_table[] = {
     {"dos", TSK_MM_INFO_TYPE_DOS,
-            "DOS-based partitions [Windows, Linux, etc.]"},
+        "DOS-based partitions [Windows, Linux, etc.]"},
     {"mac", TSK_MM_INFO_TYPE_MAC, "MAC partitions"},
     {"bsd", TSK_MM_INFO_TYPE_BSD,
-            "BSD Disklabels [FreeBSD, OpenBSD, NetBSD]"},
+        "BSD Disklabels [FreeBSD, OpenBSD, NetBSD]"},
     {"sun", TSK_MM_INFO_TYPE_SUN,
-            "Sun Volume Table of Contents (Solaris)"},
+        "Sun Volume Table of Contents (Solaris)"},
     {"gpt", TSK_MM_INFO_TYPE_GPT, "GUID Partition Table (EFI)"},
     {0},
 };

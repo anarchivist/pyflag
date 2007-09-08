@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit
 **
-** $Date: 2007/04/04 18:48:45 $
+** $Date: 2007/05/28 23:17:13 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2003-2005 Brian Carrier.  All rights reserved
@@ -16,6 +16,11 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+
+// the SID code has been buggy on some systems and byitself it does
+// not provide much security info.  It is being disabled until fixed. 
+#define TSK_USE_SID 0
 
 //#define NTFS_FS_MAGIC 0x5346544E      /* "NTFS" in little endian */
 #define NTFS_FS_MAGIC	0xAA55
@@ -366,9 +371,9 @@ extern "C" {
  * Starting at begin_off is a stream of ntfs_idxentry structures 
  */
     typedef struct {
-        uint8_t begin_off[4];   /* offset to seq of idx entries */
-        uint8_t end_off[4];     /* offset to end of seq of idx entries */
-        uint8_t buf_off[4];     /* offset to end of idx buffer */
+        uint8_t begin_off[4];   /* offset to start of seq of idx entries */
+        uint8_t seqend_off[4];  /* offset to end of seq of idx entries */
+        uint8_t bufend_off[4];  /* offset to end of idx buffer */
         uint8_t flags[4];
     } ntfs_idxelist;
 
@@ -473,6 +478,8 @@ extern "C" {
         uint8_t orig_domid2[8];
     } ntfs_attr_objid;
 
+
+#if TSK_USE_SID
 
 /************************************************************************
  * Self-relative security descriptor
@@ -636,7 +643,7 @@ extern "C" {
         NTFS_SII_ENTRY *next;
         ntfs_attr_sii *data;    /* ntfs_attr_sii record */
     };
-
+#endif
 
 /************************************************************************
 */
@@ -662,10 +669,12 @@ extern "C" {
         ntfs_attrdef *attrdef;  // buffer of attrdef file contents
         SSIZE_T attrdef_len;    // length of addrdef buffer
 
+#if TSK_USE_SID
         NTFS_SDS_ENTRY *sds;    /* Data run of ntfs_attr_sds */
         //NTFS_SDH_ENTRY *sdh;  /* Data run of ntfs_attr_sdh */
         //NTFS_SII_ENTRY *sii;  /* Data run of ntfs_attr_sii */
         NTFS_SID_ENTRY *sid;    /* Data run of ntfs_sid */
+#endif
     } NTFS_INFO;
 
     extern uint8_t

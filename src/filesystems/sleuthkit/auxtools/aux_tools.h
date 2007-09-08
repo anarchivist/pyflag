@@ -1,7 +1,7 @@
 /*
  * The Sleuth Kit
  * 
- * $Date: 2007/04/04 18:48:43 $
+ * $Date: 2007/04/25 21:46:05 $
  */
 #ifndef _AUX_LIB_H
 #define _AUX_LIB_H
@@ -10,6 +10,10 @@
 #include <stdlib.h>
 
 #include "tsk_os.h"
+
+#if !defined (TSK_WIN32)
+#include <sys/param.h>
+#endif
 
 #include "talloc.h"
 #define free talloc_free
@@ -91,6 +95,11 @@ extern "C" {
     typedef unsigned long long ULLONG;
     typedef unsigned char UCHAR;
 
+#ifndef rounddown
+#define rounddown(x, y)	\
+    ((((x) % (y)) == 0) ? (x) : \
+    (roundup((x),(y)) - (y)))
+#endif
 
 
 /* Standard local variable sizes */

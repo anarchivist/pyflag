@@ -1,8 +1,8 @@
 /*
- * $Date: 2007/04/04 20:06:59 $
+ * $Date: 2007/06/05 20:04:41 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
- * Copyright (c) 2006 Brian Carrier, Basis Technology.  All rights reserved
+ * Copyright (c) 2006-2007 Brian Carrier, Basis Technology.  All rights reserved
  * Copyright (c) 2005 Brian Carrier.  All rights reserved
  *
  * split
@@ -12,14 +12,26 @@
  *
  */
 
+/**
+ * \file split.c
+ * Code to handle opening and reading of split raw disk images.
+ */
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "img_tools.h"
 #include "split.h"
 
 
-/* Read len number of bytes at relative offset rel_offset of entry idx in the split
- * Return the number of bytes read or -1 on error
+/** \internal
+ * Read from one of the multiple files in a split set of disk images.
+ *
+ * @param split_info Disk image info to read from
+ * @param idx Index of the disk image in the set to read from
+ * @param buf [out] Buffer to write data to
+ * @param len Number of bytes to read
+ * @param rel_offset Byte offset in the disk image to read from (not the offset in the full disk image set)
+ * @return -1 on error or number of bytes read
  */
 static SSIZE_T
 split_read_segment(IMG_SPLIT_INFO * split_info, int idx, char *buf,
@@ -32,8 +44,8 @@ split_read_segment(IMG_SPLIT_INFO * split_info, int idx, char *buf,
     if (split_info->cptr[idx] == -1) {
         if (tsk_verbose)
             tsk_fprintf(stderr,
-                "split_read_rand: opening file into slot %d %s\n",
-                split_info->next_slot, split_info->images[idx]);
+                "split_read_rand: opening file into slot %d %" PRIttocTSK
+                "\n", split_info->next_slot, split_info->images[idx]);
 
         /* Grab the next cache slot */
         cimg = &split_info->cache[split_info->next_slot];
@@ -42,7 +54,7 @@ split_read_segment(IMG_SPLIT_INFO * split_info, int idx, char *buf,
         if (cimg->fd != 0) {
             if (tsk_verbose)
                 tsk_fprintf(stderr,
-                    "split_read_rand: closing file %s\n",
+                    "split_read_rand: closing file %" PRIttocTSK "\n",
                     split_info->images[cimg->image]);
 #ifdef TSK_WIN32
             CloseHandle(cimg->fd);
@@ -58,7 +70,7 @@ split_read_segment(IMG_SPLIT_INFO * split_info, int idx, char *buf,
             tsk_error_reset();
             tsk_errno = TSK_ERR_IMG_OPEN;
             snprintf(tsk_errstr, TSK_ERRSTR_L,
-                "split_read_random file: %s msg: %s",
+                "split_read_random file: %" PRIttocTSK " msg: %s",
                 split_info->images[idx], strerror(errno));
             return -1;
         }
@@ -67,7 +79,7 @@ split_read_segment(IMG_SPLIT_INFO * split_info, int idx, char *buf,
             tsk_error_reset();
             tsk_errno = TSK_ERR_IMG_OPEN;
             snprintf(tsk_errstr, TSK_ERRSTR_L,
-                "split_read_random file: %s msg: %s",
+                "split_read_random file: %" PRIttocTSK " msg: %s",
                 split_info->images[idx], strerror(errno));
             return -1;
         }
@@ -87,14 +99,14 @@ split_read_segment(IMG_SPLIT_INFO * split_info, int idx, char *buf,
     {
         DWORD nread;
         if (cimg->seek_pos != rel_offset) {
-            LONG lo, hi;
-            OFF_T max = (OFF_T) MAXLONG + 1;
+            LARGE_INTEGER li;
+            li.QuadPart = rel_offset;
 
-            hi = (LONG) (rel_offset / max);
-            lo = (LONG) (rel_offset - max * hi);
+            li.LowPart = SetFilePointer(cimg->fd, li.LowPart,
+                &li.HighPart, FILE_BEGIN);
 
-            if (0xFFFFFFFF == SetFilePointer(cimg->fd, lo, &hi,
-                    FILE_BEGIN)) {
+            if ((li.LowPart == INVALID_SET_FILE_POINTER) &&
+                (GetLastError() != NO_ERROR)) {
                 tsk_error_reset();
                 tsk_errno = TSK_ERR_IMG_SEEK;
                 snprintf(tsk_errstr, TSK_ERRSTR_L,
@@ -142,7 +154,17 @@ split_read_segment(IMG_SPLIT_INFO * split_info, int idx, char *buf,
     return cnt;
 }
 
-/* return the size read or -1 on error */
+/**
+ * Read data from a split disk image.  The offset to start reading from is 
+ * equal to the volume offset plus the read offset.
+ *
+ * @param img_info Disk image to read from
+ * @param vol_offset Byte offset of the start of the current volume (relative to start of disk image)
+ * @param buf [out] Buffer to write data to
+ * @param len Number of bytes to read
+ * @param offset Byte offset relative to start of volume to read from
+ * @return number of bytes read or -1 on error
+ */
 static SSIZE_T
 split_read_random(TSK_IMG_INFO * img_info, OFF_T vol_offset, char *buf,
     OFF_T len, OFF_T offset)
@@ -248,6 +270,12 @@ split_read_random(TSK_IMG_INFO * img_info, OFF_T vol_offset, char *buf,
     return -1;
 }
 
+/**
+ * Display information about the disk image set.
+ *
+ * @param img_info Disk image to analyze
+ * @param hFile Handle to print information to
+ */
 void
 split_imgstat(TSK_IMG_INFO * img_info, FILE * hFile)
 {
@@ -271,12 +299,24 @@ split_imgstat(TSK_IMG_INFO * img_info, FILE * hFile)
 }
 
 
+/**
+ * Returns the number of bytes in the split disk image set.
+ * 
+ * @param img_info Disk image to analyze
+ * @return Number of bytes in disk image
+ */
 OFF_T
 split_get_size(TSK_IMG_INFO * img_info)
 {
     return img_info->size;
 }
 
+
+/** 
+ * Free the memory and close the file  handles for the disk image
+ *
+ * @param img_info Disk image to close
+ */
 void
 split_close(TSK_IMG_INFO * img_info)
 {
@@ -295,8 +335,14 @@ split_close(TSK_IMG_INFO * img_info)
 }
 
 
-/*
- * Return TSK_IMG_INFO or NULL if an error occurs
+/**
+ * Open the set of disk images as a set of split raw images
+ *
+ * @param num_img Number of images in set
+ * @param images List of disk image paths (in sorted order)
+ * @param next Pointer to next image type abstraction (can be NULL)
+ *
+ * @return NULL on error
  */
 TSK_IMG_INFO *
 split_open(int num_img, const TSK_TCHAR ** images, TSK_IMG_INFO * next)
@@ -360,8 +406,9 @@ split_open(int num_img, const TSK_TCHAR ** images, TSK_IMG_INFO * next)
         if (TSTAT(images[i], &sb) < 0) {
             tsk_error_reset();
             tsk_errno = TSK_ERR_IMG_STAT;
-            snprintf(tsk_errstr, TSK_ERRSTR_L, "split_open - %s - %s",
-                images[i], strerror(errno));
+            snprintf(tsk_errstr, TSK_ERRSTR_L,
+                "split_open - %" PRIttocTSK " - %s", images[i],
+                strerror(errno));
             free(split_info->max_off);
             free(split_info->cptr);
             free(split_info);
@@ -370,7 +417,8 @@ split_open(int num_img, const TSK_TCHAR ** images, TSK_IMG_INFO * next)
         else if ((sb.st_mode & S_IFMT) == S_IFDIR) {
             if (tsk_verbose)
                 tsk_fprintf(stderr,
-                    "split_open: image %s is a directory\n", images[i]);
+                    "split_open: image %" PRIttocTSK " is a directory\n",
+                    images[i]);
 
             tsk_error_reset();
             tsk_errno = TSK_ERR_IMG_MAGIC;
@@ -386,7 +434,7 @@ split_open(int num_img, const TSK_TCHAR ** images, TSK_IMG_INFO * next)
         if (tsk_verbose)
             tsk_fprintf(stderr,
                 "split_open: %d  size: %" PRIuOFF "  max offset: %"
-                PRIuOFF "  Name: %s\n", i, sb.st_size,
+                PRIuOFF "  Name: %" PRIttocTSK "\n", i, sb.st_size,
                 split_info->max_off[i], images[i]);
     }
 

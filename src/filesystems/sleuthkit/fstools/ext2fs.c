@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2007/04/05 16:01:55 $
+** $Date: 2007/05/17 19:32:28 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2006-2007 Brian Carrier, Basis Technology.  All Rights reserved
@@ -1274,8 +1274,8 @@ ext2fs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
             inode->direct_addr[n], flags, action, ptr);
 
         if (read_b == -1) {
-            free(buf);
             tsk_data_buf_free(buf[0]);
+            free(buf);
             return 1;
         }
         else if (read_b == 0) {
@@ -1290,7 +1290,7 @@ ext2fs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
             if ((buf[level] = tsk_data_buf_alloc(fs->block_size)) == NULL) {
                 int f;
                 for (f = 0; f < level; f++)
-                    free(buf[f]);
+                    tsk_data_buf_free(buf[f]);
                 free(buf);
                 return 1;
             }
@@ -1792,10 +1792,9 @@ print_addr_act(TSK_FS_INFO * fs, DADDR_T addr, char *buf,
     EXT2FS_PRINT_ADDR *print = (EXT2FS_PRINT_ADDR *) ptr;
 
     if (flags & TSK_FS_BLOCK_FLAG_CONT) {
-        int i;
-        size_t s;
+        int i, s;
         /* cycle through the blocks if they exist */
-        for (i = 0, s = size; s > 0; s -= fs->block_size, i++) {
+        for (i = 0, s = (int) size; s > 0; s -= fs->block_size, i++) {
 
             /* sparse file */
             if (addr)

@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2007/03/23 15:02:18 $
+** $Date: 2007/06/13 21:17:01 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2004-2005 Brian Carrier.  All rights reserved
@@ -202,10 +202,15 @@ typedef TCHAR TSK_TCHAR;
 #define TZSET	_tzset
 
 #define PRIcTSK _TSK_T("S")     ///< printf macro to print a char string to TSK_TCHAR
-#define PRIwTSK _TSK_T"s")      ///< printf macro to print a wide char string to TSK_TCHAR
+#define PRIwTSK _TSK_T("s")     ///< printf macro to print a wide char string to TSK_TCHAR
+
+#define PRIttocTSK  "S"         ///< printf macro to print a TSK_TCHAR string to stderr or other char device
 
 #define unlink _unlink
 #define MAIN _tmain
+#define fseeko _fseeki64
+
+#define strtok_r(a,b,c) strtok(a,b)
 
 #else
 
@@ -232,6 +237,8 @@ typedef char TSK_TCHAR;
 
 #define PRIcTSK _TSK_T("s")     ///< printf macro to print a char string to TSK_TCHAR
 #define PRIwTSK _TSK_T("S")     ///< printf macro to print a wide char string to TSK_TCHAR
+
+#define PRIttocTSK  "s"         ///< printf macro to print a TSK_TCHAR string to stderr or other char device
 
 #define MAIN main
 

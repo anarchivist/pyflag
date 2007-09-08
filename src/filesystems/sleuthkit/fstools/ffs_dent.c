@@ -2,7 +2,7 @@
 ** ffs_dent
 ** The  Sleuth Kit 
 **
-** $Date: 2007/04/05 16:01:56 $
+** $Date: 2007/05/17 19:32:28 $
 **
 ** File name layer for a FFS/UFS image 
 **
@@ -438,7 +438,7 @@ ffs_dent_walk_lcl(TSK_FS_INFO * fs, FFS_DINFO * dinfo,
      */
     nchnk = (int) (size) / (FFS_DIRBLKSIZ) + 1;
 
-    for (cidx = 0; cidx < nchnk && size > 0; cidx++) {
+    for (cidx = 0; cidx < nchnk && (int64_t) size > 0; cidx++) {
         int len = (FFS_DIRBLKSIZ < size) ? FFS_DIRBLKSIZ : (int) size;
 
         retval =

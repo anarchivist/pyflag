@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2007/04/05 16:01:56 $
+** $Date: 2007/05/17 19:32:28 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2006-2007 Brian Carrier, Basis Technology.  All Rights reserved
@@ -1447,12 +1447,12 @@ ffs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
 
         if (read_b == -1) {
             tsk_data_buf_free(buf[0]);
-            free((char *) buf);
+            free(buf);
             return 1;
         }
         else if (read_b == 0) {
             tsk_data_buf_free(buf[0]);
-            free((char *) buf);
+            free(buf);
             return 0;
         }
         length -= read_b;
@@ -1466,7 +1466,7 @@ ffs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
             if ((buf[level] = tsk_data_buf_alloc(ffs->ffsbsize_b)) == NULL) {
                 int f;
                 for (f = 0; f < level; f++) {
-                    free(buf[f]);
+                    tsk_data_buf_free(buf[f]);
                 }
                 free(buf);
                 return 1;
@@ -1487,11 +1487,10 @@ ffs_file_walk(TSK_FS_INFO * fs, TSK_FS_INODE * inode, uint32_t type,
          */
         for (level = 1; level <= inode->indir_count; level++)
             tsk_data_buf_free(buf[level]);
-
     }
 
     tsk_data_buf_free(buf[0]);
-    free((char *) buf);
+    free(buf);
 
     if (read_b == -1)
         return 1;
@@ -1859,10 +1858,9 @@ print_addr_act(TSK_FS_INFO * fs, DADDR_T addr, char *buf,
     FFS_PRINT_ADDR *print = (FFS_PRINT_ADDR *) ptr;
 
     if (flags & TSK_FS_BLOCK_FLAG_CONT) {
-        int i;
-        size_t s;
+        int i, s;
         /* cycle through the fragments if they exist */
-        for (i = 0, s = size; s > 0; s -= fs->block_size, i++) {
+        for (i = 0, s = (int) size; s > 0; s -= fs->block_size, i++) {
 
             /* sparse file */
             if (addr)

@@ -1,7 +1,7 @@
 /*
 ** The Sleuth Kit 
 **
-** $Date: 2007/04/04 18:18:53 $
+** $Date: 2007/04/26 22:53:26 $
 **
 ** Brian Carrier [carrier@sleuthkit.org]
 ** Copyright (c) 2006-2007 Brian Carrier, Basis Technology.  All Rights reserved
@@ -13,6 +13,11 @@
 ** Copyright (c) 1997,1998,1999, International Business Machines          
 ** Corporation and others. All Rights Reserved.
 */
+
+/**
+ * \file ils_lib.c
+ * Library functionality of the ils tool.
+ */
 
 /* TCT */
 /*++
@@ -117,10 +122,16 @@ ils_act(TSK_FS_INFO * fs, TSK_FS_INODE * fs_inode, void *ptr)
 {
     uint8_t lclflags = *(uint8_t *) ptr;
 
+    // if we have no link count and want open files -- exit
+    if ((fs_inode->nlink == 0) && ((lclflags & TSK_FS_ILS_OPEN) != 0)) {
+        return TSK_WALK_CONT;
+    }
+
+    // verify link flags
     if ((fs_inode->nlink == 0) && ((lclflags & TSK_FS_ILS_UNLINK) == 0)) {
         return TSK_WALK_CONT;
     }
-    else if ((fs_inode->nlink == 1) && ((lclflags & TSK_FS_ILS_LINK) == 0)) {
+    else if ((fs_inode->nlink > 0) && ((lclflags & TSK_FS_ILS_LINK) == 0)) {
         return TSK_WALK_CONT;
     }
 
@@ -203,7 +214,19 @@ ils_mac_act(TSK_FS_INFO * fs, TSK_FS_INODE * fs_inode, void *ptr)
 
 
 
-/* return 1 on error and 0 on success */
+/**
+ * Library API for inode walking.
+ *
+ * @param fs File system to analyze
+ * @param lclflags TSK_FS_ILS_XXX flag settings
+ * @param istart Starting inode address
+ * @param ilast Ending inode address
+ * @param flags Inode walk flags
+ * @param skew clock skew in seconds
+ * @param img Path to disk image name for header
+ *
+ * @returns 1 on error and 0 on success 
+ */
 uint8_t
 tsk_fs_ils(TSK_FS_INFO * fs, uint8_t lclflags, INUM_T istart, INUM_T ilast,
     int flags, int32_t skew, TSK_TCHAR * img)
@@ -213,6 +236,13 @@ tsk_fs_ils(TSK_FS_INFO * fs, uint8_t lclflags, INUM_T istart, INUM_T ilast,
     /* If orphan is desired, then make sure LINK flags are set */
     if (flags & TSK_FS_INODE_FLAG_ORPHAN) {
         lclflags |= (TSK_FS_ILS_LINK | TSK_FS_ILS_UNLINK);
+    }
+    /* if OPEN lcl flag is given, then make sure ALLOC is not and UNALLOC is */
+    if (lclflags & TSK_FS_ILS_OPEN) {
+        flags |= TSK_FS_INODE_FLAG_UNALLOC;
+        flags &= ~TSK_FS_INODE_FLAG_ALLOC;
+        lclflags |= TSK_FS_ILS_LINK;
+        lclflags &= ~TSK_FS_ILS_UNLINK;
     }
     else {
         /* If LINK is not set at all, then set them */

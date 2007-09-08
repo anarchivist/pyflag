@@ -1,8 +1,8 @@
 /*
- * $Date: 2007/04/04 20:07:00 $
+ * $Date: 2007/06/05 20:04:41 $
  *
  * Brian Carrier [carrier@sleuthkit.org]
- * Copyright (c) 2006 Brian Carrier, Basis Technology.  All Rights reserved
+ * Copyright (c) 2006-2007 Brian Carrier, Basis Technology.  All Rights reserved
  * Copyright (c) 2005 Brian Carrier.  All rights reserved
  *
  * tsk_img_open
@@ -133,8 +133,8 @@ tsk_img_open(const TSK_TCHAR * type, const int num_img,
 #endif
                 tsk_error_reset();
                 tsk_errno = TSK_ERR_IMG_STAT;
-                snprintf(tsk_errstr, TSK_ERRSTR_L, "%s : %s", images[0],
-                    strerror(errno));
+                snprintf(tsk_errstr, TSK_ERRSTR_L, "%" PRIttocTSK " : %s",
+                    images[0], strerror(errno));
                 return NULL;
 #if defined(USE_LIBAFF) || defined(TSK_WIN32)
             }
@@ -262,7 +262,7 @@ tsk_img_open(const TSK_TCHAR * type, const int num_img,
         default:
             tsk_error_reset();
             tsk_errno = TSK_ERR_IMG_UNSUPTYPE;
-            snprintf(tsk_errstr, TSK_ERRSTR_L, "%s", tp);
+            snprintf(tsk_errstr, TSK_ERRSTR_L, "%" PRIttocTSK, tp);
             return NULL;
         }
 
