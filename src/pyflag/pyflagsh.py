@@ -115,7 +115,7 @@ class command_parse:
             command=Registry.SHELL_COMMANDS[args[0]](args[1:],env=self.environment)
             return command.execute()
         except KeyError:
-            raise ParserException("No such command %s" % args[0])
+            raise ParserException("No such command (%s)" % args[0])
 
 def escape(string):
     """ Escapes spaces in the string """
@@ -305,6 +305,8 @@ if __name__ == "__main__":
                 sys.exit(0)
             except KeyboardInterrupt:
                 print "\nInterrupted"
+            except ParserException, e:
+                print "Problem parsing the previous line: %s" % e
             except Exception,e:
                 print isinstance(e,ParserException)
                 print "Unknown error: %r %s" % (e,e)
