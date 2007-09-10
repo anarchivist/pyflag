@@ -236,7 +236,36 @@ class StreamFile(File):
         fsfd = FileSystem.DBFS(self.case)
         inode = self.inode[:self.inode.rfind("|")] +"|S%s" % stream_ids[0]
         pathname = os.path.dirname(fsfd.lookup(inode = inode))+"/combined"
-        fsfd.VFSCreate(None, self.inode, pathname, size=outfd_len)
+       
+        ## Get mtime 
+        try:
+            
+            dbh2.execute("""select pcap.ts_sec from pcap,`connection` where pcap.id=connection.packet_id and connection.con_id=%s order by pcap.ts_sec asc limit 1""" % (self.con_id))
+            metamtime=dbh2.fetch()['ts_sec']
+        except DB.DBError, e:
+            pyflaglog.log(pyflaglog.ERROR, "Failed to determine mtime of newly combined stream %s" % self.inode)
+            metamtime=None
+        
+        ## Create VFS Entry 
+        fsfd.VFSCreate(None, self.inode, pathname, size=outfd_len, _mtime=metamtime, mtime=metamtime)
+
+        ##  We also now fill in the details for the combined stream in 
+        ##  the connection_details table...
+        try:
+            dbh2.execute("""update connection_details set ts_sec=(select pcap.ts_sec from pcap,`connection` where pcap.id=connection.packet_id and connection.con_id=%s order by pcap.ts_sec asc limit 1) where con_id=%s""" % (self.con_id,self.con_id))
+        except DB.DBError, e:
+            pyflaglog.log(pyflaglog.ERROR, "Failed to set the mtime for the combined stream %s" % self.inode)
+
+        ##  Earliest connection in this stream we use for source, 
+        ## source port and dest, and dest port...
+        try:
+            dbh2.execute("""select src_ip,src_port,dest_ip,dest_port from connection_details where %s order by con_id limit 1""", (
+            " or ".join(["con_id=%r" % a for a in stream_ids])
+            ))
+            row = dbh2.fetch()
+            dbh2.execute("""update connection_details set src_port=%s, src_ip=%s, dest_ip=%s, dest_port=%s where con_id=%s""" % (row['src_port'], row['src_ip'], row['dest_ip'], row['dest_port'], self.con_id))
+        except DB.DBError, e:
+            pyflaglog.log(pyflaglog.ERROR, "Failed to set meta data for the combined stream %s" % self.inode)
 
     def get_packet_id(self, position=None):
         """ Gets the current packet id (where the readptr is currently at) """
