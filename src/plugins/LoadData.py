@@ -369,21 +369,25 @@ class ResetScanners(ScanFS):
 
     def display(self,query, result):
         
-        dbh=DB.DBO(query['case'])
-        fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'])
+        # We use to call all the scanners from here, but now
+        # we just call pyflash to do all the work
+
+        #dbh=DB.DBO(query['case'])
+        #fsfd = Registry.FILESYSTEMS.fs['DBFS'](query['case'])
+        #
+        #
+        #scanners = [ ]
+        #for i in scanner_names:
+        #    try:
+        #        tmp  = Registry.SCANNERS.dispatch(i)
+        #        scanners.append(tmp(fsfd))
+        #    except Exception,e:
+        #        pyflaglog.log(pyflaglog.ERRORS,"Unable to initialise scanner %s (%s)" % (i,e))
+        #
+        #pyflaglog.log(pyflaglog.DEBUG,"Will reset the following scanners: %s" % scanners)
 
         scanner_names = self.calculate_scanners(query)
         
-        scanners = [ ]
-        for i in scanner_names:
-            try:
-                tmp  = Registry.SCANNERS.dispatch(i)
-                scanners.append(tmp(fsfd))
-            except Exception,e:
-                pyflaglog.log(pyflaglog.ERRORS,"Unable to initialise scanner %s (%s)" % (i,e))
-
-        pyflaglog.log(pyflaglog.DEBUG,"Will reset the following scanners: %s" % scanners)
-
         ## Use pyflash to do all the work
         env = pyflagsh.environment(case=query['case'])
         pyflagsh.shell_execv(env=env, command="scanner_reset_path",
