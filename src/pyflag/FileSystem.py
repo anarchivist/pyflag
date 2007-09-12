@@ -208,11 +208,13 @@ class DBFS(FileSystem):
         dbh=DB.DBO(self.case)
         
         ## Commented out to fix Bug0035. This should be (and is) done
-        ## by VFSCreate, since we want to avoid duplicate mount points.
-          ## Ensure the VFS contains the mount point:
-          #self.VFSCreate(None, "I%s" % iosource_name, mount_point, 
-          #                                      directory=True)
-        ##
+        ## by VFSCreate, since we want to avoid duplicate mount
+        ## points.  mic: This is here because skfs.load does not use
+        ## VFSCreate for speed reasons and therefore does not
+        ## necessarily create the mount points when needed.  Ensure
+        ## the VFS contains the mount point:
+        self.VFSCreate(None, "I%s" % iosource_name, mount_point, 
+                       directory=True)
 
         ## Ensure that we have the IOSource available
         self.iosource = IO.open(self.case, iosource_name)
@@ -244,16 +246,20 @@ class DBFS(FileSystem):
         
         ## Make sure that all intermediate dirs exist:
         dirs = os.path.dirname(new_filename).split("/")
-
         dbh = DB.DBO(self.case)
-        for d in range(1,len(dirs)):
+        dbh.check_index('file','path', 200)
+        dbh.check_index('file','name', 200)
+        for d in range(len(dirs)-1,0,-1):
             path = "/".join(dirs[:d])+"/"
             path = FlagFramework.normpath(path)
-            dbh.check_index('file','path', 200)
-            dbh.check_index('file','name', 200)
             dbh.execute("select * from file where path=%r and name=%r and mode='d/d' limit 1",(path, dirs[d]))
             if not dbh.fetch():
                 dbh.execute("insert into file set inode='',path=%r,name=%r,status='alloc',mode='d/d'",(path,dirs[d]))
+            else: break
+
+        ## Fixes bug0035: directories get interpolated above and need
+        ## not be specifically inserted.
+        if directory: return
 
         ## Now add to the file and inode tables:
         dbh.insert('file',
@@ -960,3 +966,43 @@ def glob(pattern, case=None):
 ##    for row in dbh:
 ##        if row['path']:
 ##            yield row['path']
+
+## Unit Tests
+import unittest
+
+class VFSTests(unittest.TestCase):
+    """ Test implementation of the VFS """
+    test_case = "PyFlagTestCase"
+    def test00preLoadCase(self):
+        """ Reset case """
+        import pyflag.pyflagsh as pyflagsh
+        
+        pyflagsh.shell_execv(command = "execute",
+                             argv=["Case Management.Remove case",'remove_case=%s' % self.test_case])
+
+        pyflagsh.shell_execv(command="execute",
+                             argv=["Case Management.Create new case",'create_case=%s' % self.test_case])
+
+    def test01VFSTests(self):
+        """ Test common aspects of VFSCreate """
+        ## Get a handle to our VFS:
+        vfs = DBFS(self.test_case)
+        dbh = DB.DBO(self.test_case)
+        ## Try to create a node without parent directories:
+        vfs.VFSCreate(None, "TestInode1", "/toplevel/somedir/somefile")
+        vfs.VFSCreate(None, "TestInode1", "/toplevel/somedir/somefile2")
+
+        ## Verify that the parent directories are created:
+        dbh.execute("select * from file where path='/toplevel/' and name='somedir'")
+        self.assert_(dbh.fetch())
+
+        ## Create a node based on another node:
+        vfs.VFSCreate("TestInode1", "TestInode2", "foobar")
+        dbh.execute("select * from file where path='/toplevel/somedir/somefile/' and name='foobar' and inode='TestInode1|TestInode2'")
+        self.assert_(dbh.fetch())
+
+        ## Multiple creates:
+        #vfs.VFSCreate(None, "TestInode1", "/toplevel/somedir/somefile")
+        #dbh.execute("select count(*) from file where path='/toplevel/somedir/somefile/' and name='foobar' and inode='TestInode1|TestInode2'")
+        #self.assert_(dbh.fetch())
+        

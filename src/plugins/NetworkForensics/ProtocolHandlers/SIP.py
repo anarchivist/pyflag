@@ -251,7 +251,7 @@ class RDPHandler(Packets.PacketHandler):
         type = rdp_packet['Type'].get_value() & 0x7F
         ## G711Alaw
         if type==0x08:
-            import audio_codecs
+            #import audio_codecs
 
             #data = audio_codecs.g711a_decode(data[12:])
             data = data[12:]

@@ -462,7 +462,7 @@ class execute(pyflagsh.command):
         start_time=time.time()
         report,query = self.prepare()
 
-        pyflaglog.log(pyflaglog.DEBUG, "Flash will execute the following query: %s" % query)
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Flash will execute the following query: %s" % query)
 
         ## Instantiate the report
         report=report(self.environment._flag)
@@ -490,7 +490,7 @@ class execute(pyflagsh.command):
             report.display(query,result)
             yield result.display()
             yield "Execution of %s successful in %s sec" % (self.args[1],time.time()-start_time)
-            pyflaglog.log(pyflaglog.DEBUG, "Flash successfully ran the following query: %s" % query)
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Flash successfully ran the following query: %s" % query)
         except Exception,e:
             import traceback
             print traceback.print_tb(sys.exc_info()[2])

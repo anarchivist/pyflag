@@ -3,3 +3,4 @@
 from pyflag.DB import DBOTest
 from pyflag.IO import IOSubsystemTests
 from pyflag.Store import StoreTests
+from pyflag.FileSystem import VFSTests
