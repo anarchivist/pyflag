@@ -86,7 +86,7 @@ class RegistryScan(GenScanFactory):
             b=Buffer(fd)
             header = RegF(b)
             root_key = header['root_key_offset'].get_value()
-            parent_path = self.ddfs.lookup(inode=self.inode)
+            parent_path = self.ddfs.lookup(inode=self.inode)+'/'
             
             ## One handle does the reg table, the other handle the
             ## regi table:
@@ -95,13 +95,26 @@ class RegistryScan(GenScanFactory):
 
             reg_handle.mass_insert_start('reg')
             regi_handle.mass_insert_start('regi')
+
+            ## Make sure that parents are properly created in the regi
+            ## table:
+            dirs = parent_path.split("/")
+            for d in range(len(dirs)-1,0,-1):
+                path = "/".join(dirs[:d])+"/"
+                print path
+                regi_handle.execute("select * from regi where dirname=%r and basename=%r", (path, dirs[d]))
+                if not regi_handle.fetch():
+                    regi_handle.insert("regi", dirname=path, basename=dirs[d], _fast=True)
+                else:
+                    break
             
             def store_key(nk_key, path):
                 regi_handle.mass_insert(dirname=path,
                                         basename=nk_key['key_name'])
 
-                new_path="%s/%s" % (path,nk_key['key_name'])
-
+                new_path="%s/%s/" % (path,nk_key['key_name'])
+                new_path=FlagFramework.normpath(new_path)
+                
                 ## Store all the values:
                 for v in nk_key.values():
                     reg_handle.mass_insert(path=new_path,
@@ -157,6 +170,8 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                     the registry file."""
                     dbh = DB.DBO(query['case'])
 
+                    path = FlagFramework.normpath(path+"/")
+
                     ##Show the directory entries:
                     dbh.execute("select basename from regi where dirname=%r",(path))
                     for row in dbh:
@@ -164,6 +179,7 @@ class BrowseRegistry(DiskForensics.BrowseFS):
     
                 def pane_cb(path,table):
                     tmp=result.__class__(result)
+                    path = path+'/'
                     dbh.execute("select modified as time from reg where path=%r limit 1",(path))
                     row=dbh.fetch()
 
@@ -457,3 +473,20 @@ class InterestingRegKeyInit(FlagFramework.EventHandler):
                        path=path, reg_key=reg_key,
                        category=category, description=description,
                        _fast=True)
+
+import pyflag.tests
+import pyflag.pyflagsh as pyflagsh
+
+class RegScanTest(pyflag.tests.ScannerTest):
+    """ Test Registry scanner """
+    test_case = "PyFlagTestCase"
+    test_file = "pyflag_stdimage_0.3"
+    subsystem = 'Advanced'
+    offset = "16128s"
+
+    def test01RunScanner(self):
+        """ Test Reg scanner """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env, command="scan",
+                             argv=["*",'RegistryScan'])
+
