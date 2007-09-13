@@ -259,7 +259,7 @@ class DBFS(FileSystem):
 
         ## Fixes bug0035: directories get interpolated above and need
         ## not be specifically inserted.
-        if directory: return
+        #if directory: return
 
         ## Now add to the file and inode tables:
         dbh.insert('file',

@@ -135,8 +135,10 @@ class BrowseFS(Reports.report):
                 ## as not to affect other instances!!!
                 fsfd = FileSystem.DBFS( query["case"])
 
+                dirs = []
                 for i in fsfd.dent_walk(path): 
-                    if i['mode']=="d/d" and i['status']=='alloc':
+                    if i['mode']=="d/d" and i['status']=='alloc' and i['name'] not in dirs:
+                        dirs.append(i['name'])
                         yield(([i['name'],i['name'],'branch']))
 
             def pane_cb(path,tmp):
