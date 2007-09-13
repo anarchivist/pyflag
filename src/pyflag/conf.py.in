@@ -349,6 +349,9 @@ config.add_option("RESULTDIR", default="/tmp/",
 config.add_option("VERSION", default="@VERSION@", readonly=True,
                   help = "The current pyflag version")
 
+config.add_option("MAGICFILE", default = "@datadir@/magic:@magic@",
+                  help="Location of magic files")
+
 try:
     config.add_option("CONF_FILE", default=os.environ['HOME']+'/.pyflagrc',
                       help = "User based configuration file")

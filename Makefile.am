@@ -9,23 +9,23 @@ pkgdata_DATA		=	$(my_data) \
 				data/magic.mgc data/magic.mime.mgc
 nobase_pkgdata_DATA	=	$(my_images) $(my_utilities) $(my_examples)
 man_MANS		=	pyflag.1
-EXTRA_DIST		=	pyflag.in pyflagrc.in pyflash.in \
+EXTRA_DIST		=	pyflag.in pyflash.in \
 				pyflag_launch.in $(nobase_pkgdata_DATA) $(pkgdata_DATA) $(man_MANS) \
 				src/pyflag/conf.py.in
 
 # perform subs in scripts and config files
 edit = sed \
-	-e 's,@DATADIR\@,$(pkgdatadir),g' \
-	-e 's,@sysconfdir\@,$(sysconfdir),g' \
-	-e 's,@pkgpyexec\@,$(pkgpyexecdir),g' \
-	-e 's,@pythondir\@,$(pythondir),g' \
-	-e 's,@prefix\@,$(prefix),g' \
-	-e 's,@bin\@,$(bindir),g' \
-	-e 's,@VERSION\@,$(VERSION),g' \
-	-e 's,@ploticus\@,@PLOTICUS@,g' \
-	-e 's,@mysql\@,@MYSQL@,g' \
-	-e 's,@magic\@,@magic@,g' \
-	-e 's,@python\@,$(PYTHON),g'
+	-e 's,@datadir\@,$(pkgdatadir),gi' \
+	-e 's,@sysconfdir\@,$(sysconfdir),gi' \
+	-e 's,@pkgpyexec\@,$(pkgpyexecdir),gi' \
+	-e 's,@pythondir\@,$(pythondir),gi' \
+	-e 's,@prefix\@,$(prefix),gi' \
+	-e 's,@bin\@,$(bindir),gi' \
+	-e 's,@VERSION\@,$(VERSION),gi' \
+	-e 's,@ploticus\@,@PLOTICUS@,gi' \
+	-e 's,@mysql\@,@MYSQL@,gi' \
+	-e 's,@magic\@,@magic@,gi' \
+	-e 's,@python\@,$(PYTHON),gi'
 
 src/pyflag/%.py: $(top_srcdir)/src/pyflag/%.py.in
 	rm -f $@ $@.tmp

@@ -691,9 +691,6 @@ class HexDump:
 
 import magic
 
-config.add_option("MAGICFILE",
-                  help="Location of magic files")
-
 class Magic:
     """ Singleton class to manage magic library access """
     ## May need to do locking in future, if libmagic is not reentrant.
