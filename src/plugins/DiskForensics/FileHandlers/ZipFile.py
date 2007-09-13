@@ -238,8 +238,8 @@ class ZipFile(File):
         self.left_over = ''
         self.blocksize = 1024*10
         self.clength = self.compressed_length
-        offset = self.header['data'].buffer.offset
-        
+        offset = self.header.buffer.offset + self.header.size()
+
         ## Seek our fd to there:
         self.fd.seek(offset)
         
