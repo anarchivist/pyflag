@@ -958,8 +958,8 @@ class IPType(ColumnType):
                                                     self.escape_column_name(self.column),
                                                     broadcast)
 
-    def operator_country(self, column, operator, country):
-        """ Matches the specified country string (e.g. AU, US, CA). Note that this works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
+    def operator_whois_country(self, column, operator, country):
+        """ Matches the specified country whois string (e.g. AU, US, CA). Note that this works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
 
         ## We must ensure there are indexes on the right columns or
         ## this query will never finish. This could lead to a delay
@@ -974,7 +974,71 @@ class IPType(ColumnType):
                % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
                   config.FLAGDB, config.FLAGDB, country)
 
-    def operator_city(self, column, operator, city):
+    def operator_maxmind_isp(self, column, operator, city):
+        """ Matches the specified isp based on maxmind data. Note that works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
+
+        ## We must ensure there are indexes on the right columns or
+        ## this query will never finish. This could lead to a delay
+        ## the first time this is run...
+        dbh=DB.DBO()
+        dbh.check_index("whois_cache", "ip")
+        dbh.check_index("geoip_isp", "id")
+
+        return " ( `%s` in (select ip from %s.whois_cache join " \
+               "%s.geoip_isp on %s.whois_cache.geoip_isp=%s.geoip_isp.id where "\
+               "%s.geoip_isp.isp = %r ) ) " \
+               % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
+                  config.FLAGDB, config.FLAGDB, city)
+
+    def operator_maxmind_isp_like(self, column, operator, city):
+        """ Matches the specified isp. Note that works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
+
+        ## We must ensure there are indexes on the right columns or
+        ## this query will never finish. This could lead to a delay
+        ## the first time this is run...
+        dbh=DB.DBO()
+        dbh.check_index("whois_cache", "ip")
+        dbh.check_index("geoip_isp", "id")
+
+        return " ( `%s` in (select ip from %s.whois_cache join " \
+               "%s.geoip_isp on %s.whois_cache.geoip_isp=%s.geoip_isp.id where"\
+               " %s.geoip_isp.isp like %r ) ) " \
+               % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
+                  config.FLAGDB, config.FLAGDB, city)
+
+    def operator_maxmind_organisation(self, column, operator, city):
+        """ Matches the specified isp. Note that works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
+
+        ## We must ensure there are indexes on the right columns or
+        ## this query will never finish. This could lead to a delay
+        ## the first time this is run...
+        dbh=DB.DBO()
+        dbh.check_index("whois_cache", "ip")
+        dbh.check_index("geoip_org", "id")
+
+        return " ( `%s` in (select ip from %s.whois_cache join " \
+               "%s.geoip_org on %s.whois_cache.geoip_org=%s.geoip_org.id where"\
+               " %s.geoip_org.org = %r ) ) " \
+               % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
+                  config.FLAGDB, config.FLAGDB, city)
+
+    def operator_maxmind_organisation_like(self, column, operator, city):
+        """ Matches the specified organisation. Note that works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
+
+        ## We must ensure there are indexes on the right columns or
+        ## this query will never finish. This could lead to a delay
+        ## the first time this is run...
+        dbh=DB.DBO()
+        dbh.check_index("whois_cache", "ip")
+        dbh.check_index("geoip_org", "id")
+
+        return " ( `%s` in (select ip from %s.whois_cache join " \
+               "%s.geoip_org on %s.whois_cache.geoip_org=%s.geoip_org.id where"\
+               " %s.geoip_org.org like %r ) ) " \
+               % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
+                  config.FLAGDB, config.FLAGDB, city)
+
+    def operator_maxmind_city(self, column, operator, city):
         """ Matches the specified city string (e.g. Canberra, Chicago). Note that this works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
 
         ## We must ensure there are indexes on the right columns or
@@ -985,8 +1049,8 @@ class IPType(ColumnType):
         dbh.check_index("geoip_city", "id")
 
         return " ( `%s` in (select ip from %s.whois_cache join " \
-               "%s.geoip_city on %s.whois_cache.geoip_city=%s.geoip_city.id where "\
-               "%s.geoip_city.city=%r ) ) " \
+               "%s.geoip_city on %s.whois_cache.geoip_city=%s.geoip_city.id " \
+               "where %s.geoip_city.city=%r ) ) " \
                % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
                   config.FLAGDB, config.FLAGDB, city)
 
@@ -1009,7 +1073,7 @@ class IPType(ColumnType):
     #             " %s.interesting_ips.category = %r) ) " \
     #           % (self.column, self.case, self.case, country)
 
-    def operator_gcountry(self, column, operator, country):
+    def operator_maxmind_country(self, column, operator, country):
         """ Matches the specified country string in the GeoIP Database (e.g. FRA, USA, AUS). Note that this works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
 
         ## We must ensure there are indexes on the right columns or
@@ -1020,8 +1084,8 @@ class IPType(ColumnType):
         dbh.check_index("geoip_country", "id")
 
         return " ( `%s` in (select ip from %s.whois_cache join " \
-               "%s.geoip_country on %s.whois_cache.geoip_country=%s.geoip_country.id where "\
-               "%s.geoip_country.country=%r ) ) " \
+               "%s.geoip_country on %s.whois_cache.geoip_country=" \
+               "%s.geoip_country.id where %s.geoip_country.country=%r ) ) " \
                % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
                   config.FLAGDB, config.FLAGDB, country)
 
