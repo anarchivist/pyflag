@@ -122,6 +122,10 @@ static PyObject *encode_property(Packet packet, struct struct_property_t *p) {
     case FIELD_TYPE_INT_X:
       result = PyLong_FromUnsignedLong(*(unsigned int *)item); break;
 
+    case FIELD_TYPE_INT_64:
+    case FIELD_TYPE_INT_X_64:
+      result = PyLong_FromUnsignedLongLong(*(unsigned long long int *)item); break;
+
     case FIELD_TYPE_IP_ADDR:
       {
 	struct in_addr temp;

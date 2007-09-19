@@ -25,7 +25,7 @@ typedef struct {
 
   // Default id to use for newly dissected packets:
   int packet_id;
-  uint32_t pcap_offset;
+  uint64_t pcap_offset;
   enum endianess_output output_format;
 } PyPCAP;
 

@@ -47,7 +47,7 @@ struct pcap_pkthdr {
   uint32_t len;	/* length this packet (off wire) */
   char *data;
 
-  uint32_t offset;
+  uint64_t offset;
   uint32_t id;
   // This holds the dissected tree
   Root root;
@@ -68,7 +68,7 @@ CLASS(PcapFileHeader, Packet)
      char *le_format;
 
      // The offset into the pcap file of this packet
-     unsigned long long int pcap_offset;
+     uint64_t pcap_offset;
 END_CLASS
 
 CLASS(PcapPacketHeader, Packet)

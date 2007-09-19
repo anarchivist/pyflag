@@ -142,7 +142,7 @@ CLASS(IP, Packet)
      unsigned int id;
      // This contains the packet offset from the pcap file - it just
      // gets provided to the callback
-     unsigned int pcap_offset;
+     uint64_t pcap_offset;
      struct ip_struct packet;
 END_CLASS
 
