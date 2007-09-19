@@ -177,31 +177,26 @@ class PDFCarver(Carver.CarverFramework):
                     ## Only coalesce the tables once:
                     if y>x: continue
 
-                    #print "Checking %s against xref at %s (%s,%s)" % (xref_offset, y, xref_offset % 512, y % 512)
-                    # Search for us refering to them: (The +1 is related
-                    # to the regex above having an extra \r\n at the
-                    # start)
+                    ## Can the two offsets plausibly be related by the
+                    ## modulo rule? (The +1 is related to the regex
+                    ## above having an extra \r\n at the start)
                     if xref_offset % SECTOR_SIZE == y % SECTOR_SIZE + 1:
                         print "Xref at offset %s is possibly related to xref at offset %s" % (y, x)
                         print "%s's range is %s, %s's range is %s" % (y,total_xrefs[y].xref_range,
                                                                       x,total_xrefs[x].xref_range,)
+                        # Search for us refering to them:
                         if total_xrefs[y].xref_range[0] == total_xrefs[x].xref_range[1] or \
-                           total_xrefs[y].xref_range[1] == total_xrefs[x].xref_range[0]:
-                            new_pdf = PDF.PDFFile()
-                            new_pdf.xref = total_xrefs[x].xref + total_xrefs[y].xref
-                            new_pdf.xref_range = [ min(total_xrefs[y].xref_range[0],
-                                                       total_xrefs[x].xref_range[0]),
-                                                   max(total_xrefs[y].xref_range[1],
-                                                       total_xrefs[x].xref_range[1]),
-                                                   ]
-
+                               total_xrefs[y].xref_range[1] == total_xrefs[x].xref_range[0]:
                             print "Ranges for xref tables match - coalescing..."
                             carvers[x].coalesce(carvers[y])
                             ## Save the new mapping function
                             carvers[x].save_map("%s-%s.map" % (x,y))
             
     def make_carver_from_xref(self, pdf, image_fd, hits):
-        """ Derives a carver object from 
+        """ Derives a carver object from a pdf object containing XREF tables.
+
+        We basically find objects which are plausible for this xref
+        table (i.e. satisfy the modulo rule).
         """
         c = Carver.Reassembler(None)
 
@@ -237,8 +232,7 @@ class PDFCarver(Carver.CarverFramework):
 
     def generate_function(self, c):
         d = PDFDiscriminator(c, self.options.verbose)
-        if self.options.slow:
-            d.slow = True
+        d.slow = self.options.slow
 
         for x in range(0, c.size(), SECTOR_SIZE):
             y_forward, left = c.interpolate(x, True)

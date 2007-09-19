@@ -28,7 +28,6 @@ JPEG File carving
 """
 
 from optparse import OptionParser
-import FileFormats.PDF as PDF
 import re,sys
 import pickle
 import Carver
@@ -42,12 +41,12 @@ class JPEGDiscriminator:
         """ Runs a JPEG parser over the carver until end_offset"""
         return 0
 
-class PDFCarver(Carver.CarverFramework):
+class JPEGCarver(Carver.CarverFramework):
     ## These are the artifacts we index:
     regexs = {
-        'HEADERS': '\xFF\xD8\xFF\xE1',
+        'HEADERS': r'\xFF\xD8....(JFIF|EXIF)',
         }
     
 if __name__=="__main__":
-    c = PDFCarver()
+    c = JPEGCarver()
     c.parse()

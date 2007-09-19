@@ -489,7 +489,7 @@ class CarverFramework:
         This is an abstract method.
         """ 
 
-    def build_maps(self):
+    def build_maps(self, index):
         """ Generates a set of initial mapping functions.
         """
 
