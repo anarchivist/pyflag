@@ -598,7 +598,14 @@ class create_case(load):
         dbh = DB.DBO(None)
         case = self.args[0]
         dbh.cursor.ignore_warnings = True
-        dbh.execute("Create database if not exists `%s`",(case))
+        try:
+           dbh.execute("Create database `%s`",(case))
+        except DB.DBError, e:
+           raise RuntimeError("Unable to create case %s, does the database "\
+                              "already have a table with this name? Cowardly"\
+                              " refusing to replace it. "\
+                              " Error was %s" % (case, e))
+           
         dbh.execute("select * from meta where property='flag_db' and value=%r",case)
         if not dbh.fetch():
             dbh.insert('meta',

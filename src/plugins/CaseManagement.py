@@ -56,9 +56,21 @@ class NewCase(Reports.report):
         return result
 
     def display(self,query,result):
+
         ## Use the shell to do the heavy lifting.
-        pyflagsh.shell_execv(command='create_case',
+        try:
+           pyflagsh.shell_execv(command='create_case',
                              argv=[ query['create_case'],])
+        except RuntimeError, e:
+
+            result.heading("Problem Creating Case!")
+            result.para("There was a problem creating the case. Are you sure "\
+                        "that this wasn't because a database with the same "\
+                        "name already existed in the DB?")
+            result.para("Perhaps try again with a different name.")
+            result.link("Try again", family="Case Management", 
+                        report="Create new case")
+            return result
 
         #Get handle to flag db
         result.heading("Case Created")
