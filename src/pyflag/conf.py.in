@@ -296,7 +296,13 @@ class ConfObject(object):
             self.optparser.add_option("--%s" % option, **args)
             
         ## update the command line parser
-        self.parse_options(False)
+
+        ## We have to do the try-catch for python 2.4 support of short
+        ## arguments. It can be removed when python 2.5 is a requirement
+        try:
+            self.parse_options(False)
+        except AttributeError:
+            pass
         
     def __getattr__(self, attr):
         ## If someone is looking for a configuration parameter but
