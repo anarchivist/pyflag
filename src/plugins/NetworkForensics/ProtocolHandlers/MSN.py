@@ -187,11 +187,11 @@ class Message:
                            inode=self.fd.inode,
                            packet_id=self.get_packet_id(),
                            transaction_id=tr_id,
-                           session_id=session_id,
+                           session_id=sessionid,
                            nick=nick,
                            user_data_type=data_type,
                            user_data=data)
-        except:
+        except Exception,e :
             #We have duplicate user data,
             #pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Ignoring data as duplicate:%s,%s,%s" % (nick,data_type,data))
             pass
@@ -268,7 +268,6 @@ class Message:
             ## must have lost sync:
             if self.cmd != self.cmd.upper() or not self.cmd.isalpha(): return None
         except Exception, e:
-            print "Error parsing commandline %s" % self.cmdline
             pyflaglog.log(pyflaglog.ERROR, e)
             return ''
 
@@ -277,7 +276,8 @@ class Message:
         try:
             return getattr(self,self.cmd)()
         except AttributeError,e:
-            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Unable to handle command %r from line %s (%s)" % (self.cmd,self.cmdline,e))
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Unable to handle command "\
+                          "%r from line %s (%s)" % (self.cmd,self.cmdline,e))
             return None
 
     def get_data(self):
@@ -287,12 +287,12 @@ class Message:
         """ Parse the contents of the headers
 
         """
-        #print "words%s"%self.words
         try:
             self.length = int(self.words[-1])
         except:
             #The last parameter isn't the length, so this message is stuffed
-            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Line %s is not a valid MSG, no length in bytes" % self.cmdline)
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Line %s is not a valid "\
+                          "MSG, no length in bytes" % self.cmdline)
             return False
         
         self.offset = self.fd.tell()
@@ -300,7 +300,6 @@ class Message:
         ## Read the headers:
         while 1:
             line = self.fd.readline()
-            #print "parsing header line:%s" % line
             #We are finished if we see a newline
             if (line =='\r\n'): break
             try:
@@ -418,7 +417,7 @@ class Message:
 	"""
 	
         
-        #pyflaglog.log(pyflaglog.VERBOSE_DEBUG,  "USR:%s" % self.cmdline.strip())
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG,  "USR:%s" % self.cmdline.strip())
         self.state = "USR"
         
         if (self.words[2]=="OK"):
@@ -861,6 +860,8 @@ class Message:
     def VER (self):
         #More useful info in CVR
         pass
+
+
     def SYN(self):
         """
         Ignore?  Maybe TODO
@@ -1217,31 +1218,41 @@ class Message:
 
     def ignore_type(self,content_type,sender,is_server):
         #Nonexistent callback for ignored types.
-        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Ignoring message:%s.  Headers:%s. Data:%s" % (self.cmdline.strip(),self.headers,self.data.strip()))
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Ignoring message:%s.  "\
+                                               "Headers:%s. Data:%s" % 
+                        (self.cmdline.strip(),self.headers,self.data.strip()))
 
     def p2p_handler(self,content_type,sender,is_server):
         """ Handle a p2p transfer """
-
-        #print "content_type%s,sender%s,is_server%s"%(content_type,sender,is_server)
+        #print " content_type %s , sender %s , is_server %s" % (content_type,
+        #                                                    sender,is_server)
         def strip_username(p2pusername):
-            # TO and FROM are of format <msnmsgr:name@hotmail.com> so strip the extra stuff out
+            # TO and FROM are of format <msnmsgr:name@hotmail.com> so 
+            # strip the extra stuff out
             return p2pusername.replace('<msnmsgr:','').strip('>')
             
-            
         data = self.get_data()
+
         ## Now we break out the header:
-        ( channel_sid, id, offset, total_data_size, message_size ) = struct.unpack(
-            "IIQQI",data[:4+4+8+8+4])
+        ( channel_sid, 
+          id, 
+          offset, 
+          total_data_size, 
+          message_size ) = struct.unpack("IIQQI",data[:4+4+8+8+4])
 
         ## MSN header is 48 bytes long
         data = data[48:48+message_size]
-        
+
+        ## print " Data is: ", data
+ 
         ## When channel session id is 0 we are negotiating a transfer
         ## channel
+
         if channel_sid==0:
             fd = cStringIO.StringIO(data)
             request_type=fd.readline()
             if request_type.startswith("INVITE"):
+                
                 ## We parse out the invite headers here:
                 headers = {}
                 while 1:
@@ -1252,24 +1263,30 @@ class Message:
                     headers[key.lower()]=value.strip()
 
                 context = safe_base64_decode(headers['context'])
+    
+                ## Try and get some non-weird file names hapnin:
+                filename = ''.join([ a for a in context if a in \
+                                        allowed_file_chars ])
 
                 dbh=DB.DBO(self.case)
-                dbh.insert("msn_p2p",
-                                session_id = self.session_id,
-                                channel_id = headers['sessionid'],
-                                to_user= headers['to'],
-                                from_user= headers['from'],
-                                context=context,
-                                )
                 
-                ## Add a VFS entry for this file:
+                ## Add a VFS entry for this file and update the p2p table
                 new_inode = "%s|CMSN%s-%s" % (
                     self.fd.inode,
                     headers['sessionid'],
                     self.session_id)
                 
-                self.insert_session_data(sender=strip_username(headers['from']),recipient=strip_username(headers['to']),type="P2P FILE TRANSFER",p2pfile="%s|%s" % (self.fd.inode, new_inode))
+                dbh.insert("msn_p2p",
+                                session_id = self.session_id,
+                                channel_id = headers['sessionid'],
+                                to_user= headers['to'],
+                                from_user= headers['from'],
+                                context=filename,
+                                inode=new_inode,
+                                )
                 
+
+                self.insert_session_data(sender=strip_username(headers['from']),recipient=strip_username(headers['to']),type="P2P FILE TRANSFER",p2pfile=new_inode)
                 try:
                 ## Parse the context line:
                     parser = ContextParser()
@@ -1279,8 +1296,8 @@ class Message:
                 except:
                     ## If the context line is not a valid xml line, we
                     ## just make a filename off its printables.
-                    filename = ''.join([ a for a in context if a in allowed_file_chars ])
-
+                    filename = ''.join([ a for a in context if a in \
+                                        allowed_file_chars ])
                 try:
                     size=parser.context_meta_data['size']
                 except: size = len(data)
@@ -1290,8 +1307,21 @@ class Message:
                 except:
                     mtime = 0
 
-                date_str = mtime.split(" ")[0]
-                path=self.fsfd.lookup(inode=self.fd.inode)
+                date_str = mtime
+
+                ## FIXME - This is how it was (line below), 
+                ## but the problem was this throws on mtime = 0. 
+                ## It was being silently caught 
+                ## somewhere else. This might give us issues later 
+
+                #date_str = mtime.split(" ")[0]
+
+                try:
+                   path=self.ddfs.lookup(inode=self.fd.inode)
+                except Exception, e:
+                   pyflaglog.log(pyflaglog.WARNINGS,  "Could not determine "\
+                                                      "the path to the inode.")
+
                 path=os.path.normpath(path+"/../../../../../")
 
                 ## The filename and size is given in the context
@@ -1300,24 +1330,29 @@ class Message:
                                     "%s/MSN/%s/%s" % (path, date_str, filename),
                                     mtime=mtime,
                                     size=size)
-
-                self.inodes.append(new_inode)
+                
+                self.inodes.append("CMSN%s-%s" % (headers['sessionid'], 
+                                                  self.session_id))
                 
         ## We have a real channel id so this is an actual file:
+
         else:
             dbh=DB.DBO(self.case)
-            filename = get_temp_path(dbh.case,"%s|CMSN%s-%s" % (self.fd.inode, channel_sid,self.session_id))
+            filename = get_temp_path(dbh.case,"%s|CMSN%s-%s" % 
+                    (self.fd.inode, channel_sid,self.session_id))
             fd=os.open(filename,os.O_RDWR | os.O_CREAT)
             os.lseek(fd,offset,0)
             bytes = os.write(fd,data)
+
             if bytes <message_size:
-                pyflaglog.log(pyflaglog.WARNINGS,  "Unable to write as much data as needed into MSN p2p file. Needed %s, write %d." %(message_size,bytes))
+                pyflaglog.log(pyflaglog.WARNINGS,  "Unable to write as "\
+                              "much data as needed into MSN p2p file. "\
+                              "Needed %s, write %d." %(message_size,bytes))
             os.close(fd)
             
     ct_dispatcher = {
         #Ignore list:
-        #text/x-msmsgscontrol are 'typing user' messages.
-        
+        #text/x-msmsgscontrol are 'typing user' messages.        
         'text/plain': plain_handler,
         'application/x-msnmsgrp2p': p2p_handler,
         'text/x-msmsgscontrol': control_msg_handler,
@@ -1328,8 +1363,14 @@ class Message:
         """ Sends message to members of the current session
 
         There are two types of messages that may be sent:
-        1) A message from the client to the message server. This does not contain the nick of the client, but does contain a transaction ID.  This message is sent to all users in the current session.
-        2) A message from the Switchboard server to the client contains the nick of the sender.
+
+        1) A message from the client to the message server. 
+           This does not contain the nick of the client, but does contain a 
+           transaction ID.  This message is sent to all users in the 
+           current session.
+
+        2) A message from the Switchboard server to the client contains 
+           the nick of the sender.
 
         These two commands are totally different.
 
@@ -1358,34 +1399,51 @@ class Message:
         if self.parse_mime():
         
             try:
-                ## If the second word is a transaction id (int) its a message from client to server.  ie. FROM target to all users in session.
+                ## If the second word is a transaction id (int) its a message 
+                ## from client to server.  
+                ## ie. FROM target to all users in session.
+
                 tid = int(self.words[1])
                 sender = "%s (Target)" % self.client_id
-                #pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "participants:%s" % (",".join(self.participants)))
+
+                #pyflaglog.log(pyflaglog.VERBOSE_DEBUG, 
+                #"participants:%s" % (",".join(self.participants)))
+
                 self.recipient = ",".join(self.participants)
                 server = False
+
             except ValueError:
+
                 # Message TO target
                 tid = 0
                 sender = self.words[1]
-                self.insert_user_data(sender,'url_enc_display_name',urllib.unquote(self.words[2]))
+                self.insert_user_data(sender,
+                                      'url_enc_display_name',
+                                      urllib.unquote(self.words[2]))
                 server = True
                 self.recipient = "%s (Target)" % self.client_id
             try:
-                #Cater for "text/x-msmsgsprofile; charset=UTF-8" by stripping charset
+                # Cater for "text/x-msmsgsprofile; charset=UTF-8" 
+                # by stripping charset
+
                 content_type = self.headers['content-type'].split(";")[0]
 
             except:
                 content_type = "unknown/unknown"
-                pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Couldn't figure out MIME type for this message: %s" % self.cmdline)
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG,
+                              "Couldn't figure out MIME type for "\
+                              "this message: %s" % self.cmdline)
 
             ## Now dispatch the relevant handler according to the content
             ## type:
+
             try:
                 ct = content_type.split(';')[0]
                 self.ct_dispatcher[ct](self,content_type,sender,server)
             except KeyError,e:
-                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Unable to handle content-type %s(%s) - ignoring message %s " % (content_type,e,tid))
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, 
+                              "Unable to handle content-type %s(%s) - i"\
+                              "gnoring message %s " % (content_type,e,tid))
         self.state = "MSG"
 	
 from HTMLParser import HTMLParser
@@ -1467,8 +1525,8 @@ class MSNScanner(StreamScannerFactory):
     def __init__(self,fsfd):
         StreamScannerFactory.__init__(self,fsfd)
 
-        #Should hit the reverse stream within 30 streams (usually it
-        #is the very next one)
+        # Should hit the reverse stream within 30 streams (usually it
+        # is the very next one)
         
         self.processed=RingBuffer(30)
 
@@ -1478,14 +1536,13 @@ class MSNScanner(StreamScannerFactory):
     def process_stream(self, stream, factories):
         forward_stream, reverse_stream = self.stream_to_server(stream, "MSN")
                 
-        #We need both streams otherwise this won't work
+        # We need both streams otherwise this won't work
         if reverse_stream==None or forward_stream==None: return
 
-        pyflaglog.log(pyflaglog.DEBUG,"Opening Combined Stream S%s/%s for MSN" % (forward_stream, reverse_stream))
+        pyflaglog.log(pyflaglog.DEBUG, "Opening Combined Stream S%s/%s for MSN" % (forward_stream, reverse_stream))
 
-        #Create the combined inode
+        # Create the combined inode
         combined_inode = "I%s|S%s/%s" % (stream.fd.name, forward_stream, reverse_stream)
-
         # Open the combined stream.
         fd = self.fsfd.open(inode=combined_inode)
         dbh=DB.DBO(stream.case)
@@ -1513,44 +1570,58 @@ class MSNScanner(StreamScannerFactory):
             finallist.append(thislistname+":"+",".join(thislist))
             m.store_list(list=finallist,listname='contact_list_groups')
                     
-        #Fix up all the session IDs (=-1) that were stored before we figured out the session ID.
+        # Fix up all the session IDs (=-1) that were stored before 
+        # we figured out the session ID.
         if m.session_id==-1:
-            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Couldn't figure out the MSN session ID for stream S%s/%s" % (forward_stream, reverse_stream))
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,
+                          "Couldn't figure out the MSN session ID for "\
+                          "stream S%s/%s" % (forward_stream, reverse_stream))
         else:
-            dbh.execute("update msn_session set session_id=%r where session_id=-1 and inode=%r",(m.session_id,combined_inode))
+            dbh.execute("update msn_session set session_id=%r where "\
+                        "session_id=-1 and inode=%r",
+                        (m.session_id,combined_inode))
         try:
-            dbh.execute("update msn_users set session_id=%r where session_id=-1 and inode=%r",(m.session_id,combined_inode))
+            dbh.execute("update msn_users set session_id=%r where "\
+                        "session_id=-1 and inode=%r",
+                        (m.session_id,combined_inode))
+
         except Exception:
-            #We already have this identical row with a real session ID - will delete it below
+            # We already have this identical row with a real session ID - 
+            # will delete it below
             pass
 
-        #We can delete everything with session id =-1 because we know we have an actual session id for this stream
-        dbh.execute("delete from msn_users where session_id=-1 and inode=%r",combined_inode)
+        # We can delete everything with session id =-1 because we know we 
+        # have an actual session id for this stream
+        dbh.execute("delete from msn_users where session_id=-1 and "\
+                    "inode=%r",combined_inode)
         
-        #Similarly go back and fix up all the Unknown (Target) entries with the actual target name
+        # Similarly go back and fix up all the Unknown (Target) entries 
+        # with the actual target name
         if m.client_id=='Unknown':
-            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Couldn't figure out target identity for stream S%s/%s" % (forward_stream, reverse_stream))
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Couldn't figure out "\
+                          "target identity for stream S%s/%s" % 
+                          (forward_stream, reverse_stream))
         else:
-            dbh.execute("update msn_session set recipient=%r where recipient='Unknown (Target)' and inode=%r",(m.client_id,combined_inode))
-            dbh.execute("update msn_session set sender=%r where sender='Unknown (Target)' and inode=%r",(m.client_id,combined_inode))
+            dbh.execute("update msn_session set recipient=%r where "\
+                        "recipient='Unknown (Target)' and inode=%r",
+                        (m.client_id,combined_inode))
+
+            dbh.execute("update msn_session set sender=%r where "\
+                        "sender='Unknown (Target)' and inode=%r",
+                        (m.client_id,combined_inode))
                 
 class MSNFile(File):
     """ VFS driver for reading the cached MSN files """
     specifier = 'C'
-        
-class BrowseMSNSessions(Reports.report):
-    """ This allows MSN sessions to be browsed.
+       
 
-    Note that to the left of each column there is an icon with an
-    arrow pointing downwards. Clicking on this icon shows the full msn
-    messages for all sessions from 60 seconds prior to this message.
-
-    This is useful if you have isolated a specific message by
-    searching for it, but want to see what messages were sent around
-    the same time to get some context.
+class BrowseMSNData(Reports.report):
+    """ 
+       pass :P
     """
-    name = "Browse MSN Sessions"
+    name = "Browse MSN Data"
     family = "Network Forensics"
+
     def form(self,query,result):
         try:
             result.case_selector()
@@ -1562,60 +1633,70 @@ class BrowseMSNSessions(Reports.report):
         """ This callback renders an icon which when clicked shows the
         full msn messages for all sessions from 60 seconds prior to
         this message."""
-        
-        result.heading("MSN Chat sessions")
 
-        def draw_prox_cb(value):
-            tmp = result.__class__(result)
-            ## Calculate time to go to: (This is so complex - is there a better way?)
-            a=datetime.datetime(*time.strptime(value,"%Y-%m-%d %H:%M:%S")[:7]) +  datetime.timedelta(0,-60)
-            new_value = a.strftime("%Y-%m-%d %H:%M:%S")
+        def sessions(query, result):
+            """ This allows MSN sessions to be browsed.
+
+            Note that to the left of each column there is an icon with an
+            arrow pointing downwards. Clicking on this icon shows the full msn
+            messages for all sessions from 60 seconds prior to this message.
+
+            This is useful if you have isolated a specific message by
+            searching for it, but want to see what messages were sent around
+            the same time to get some context.
+            """
+            def draw_prox_cb(value):
+                tmp = result.__class__(result)
+                ## Calculate time to go to: 
+                ## (This is so complex - is there a better way?)
+                a=datetime.datetime(*time.strptime(value,
+                        "%Y-%m-%d %H:%M:%S")[:7]) +  datetime.timedelta(0,-60)
+                new_value = a.strftime("%Y-%m-%d %H:%M:%S")
             
-            tmp.link('Go To Approximate Time',
-              target=query_type((),
-                family=query['family'], report=query['report'],
-                filter = "Timestamp after '%s'" % new_value,
-                case = query['case'],
-              ),
-              icon = "stock_down-with-subpoints.png",
-	                     )
+                tmp.link('Go To Approximate Time',
+                        target=query_type((),family=query['family'], 
+                                             report=query['report'],
+                                  filter = "Timestamp after '%s'" % new_value,
+                                            case = query['case']),
+                        icon = "stock_down-with-subpoints.png",
+	                    )
 
-            return tmp
+                return tmp
 
-        result.table(
+            result.table(
             elements = [ ColumnType('Prox','pcap.ts_sec',
                                     callback = draw_prox_cb),
                          TimestampType('Timestamp','pcap.ts_sec'),
                          InodeType("Stream","inode", case = query['case'],
                                    link = query_type(family="Disk Forensics",
-                                                     case=query['case'],
-                                                     report='View File Contents',
-                                                     __target__='inode',
-                                                     mode="Combined streams")),
+                                                   case=query['case'],
+                                                   report='View File Contents',
+                                                   __target__='inode',
+                                                   mode="Combined streams")),
                          IntegerType("Packet","packet_id",
-                                    link = query_type(family="Network Forensics",
-                                                      case=query['case'],
-                                                      report='View Packet',
-                                                      __target__='id')),
+                                  link = query_type(family="Network Forensics",
+                                                   case=query['case'],
+                                                   report='View Packet',
+                                                   __target__='id')),
                          IntegerType("Session ID","session_id",
-                                    link = query_type(family="Network Forensics",
-                                                      case=query['case'],
-                                                      report='BrowseMSNSessions', 
-                                                      __target__='filter',
-                                                      filter='"Session ID" = %s')),
+                                link = query_type(family="Network Forensics",
+                                                   case=query['case'],
+                                                   report='BrowseMSNSessions', 
+                                                   __target__='filter',
+                                                   filter='"Session ID" = %s')),
                          StringType("Type","type"),
                          StringType("Sender","sender",
-                                    link = query_type(family="Network Forensics",
-                                                      case=query['case'],
-                                                      report='BrowseMSNUsers',
-                                                      filter='Nick = "%s"',
-                                                      __target__='filter')),
+                                link = query_type(family="Network Forensics",
+                                                   case=query['case'],
+                                                   report='BrowseMSNUsers',
+                                                   filter='Nick = "%s"',
+                                                   __target__='filter')),
                          StringType("Recipient","recipient",
-                                    link = query_type(family="Network Forensics",
-                                                      case=query['case'],
-                                                      report='BrowseMSNUsers',
-                                                      filter='Nick = "%s"',
-                                                      __target__='filter')),
+                                link = query_type(family="Network Forensics",
+                                                   case=query['case'],
+                                                   report='BrowseMSNUsers',
+                                                   filter='Nick = "%s"',
+                                                   __target__='filter')),
 
                          StringType("Data","data"),
                          IntegerType("Transaction ID","transaction_id"),
@@ -1634,46 +1715,66 @@ class BrowseMSNSessions(Reports.report):
             hide_columns = ['Date']
             )
 
-class BrowseMSNUsers(BrowseMSNSessions):
-    """ This report shows the data known about MSN participants (users).
-    """
-    name = "Browse MSN Users"
-    family = "Network Forensics"
-    
-    def display(self,query,result):
-        result.heading("MSN User Information Captured")
-        
-        result.table(
-            elements = [ InodeType("Stream","inode", case = query['case'],
-                                   link = query_type(family="Disk Forensics",
-                                                     case=query['case'],
-                                                     report='View File Contents',
-                                                     __target__='inode',
-                                                     mode="Combined streams")),
+        def users(query, result):
+            """ This report shows the data known about MSN participants (users).
+            """
+            result.table(
+                elements = [ InodeType("Stream","inode", case = query['case'],
+                              link = query_type(family="Disk Forensics",
+                                                case=query['case'],
+                                                report='View File Contents',
+                                                __target__='inode',
+                                                mode="Combined streams")),
                          IntegerType("Session ID","session_id",
-                                    link = query_type(family="Network Forensics",
-                                                      case=query['case'],
-                                                      report='BrowseMSNSessions', 
-                                                      __target__='filter',
-                                                      filter='"Session ID" = %s')),
+                               link = query_type(family="Network Forensics",
+                                                case=query['case'],
+                                                report='BrowseMSNSessions', 
+                                                __target__='filter',
+                                                filter='"Session ID" = %s')),
                          TimestampType('Timestamp','pcap.ts_sec'),
                          StringType('Data Type', 'user_data_type'),
                          StringType('Nick', 'nick',
-                                    link = query_type(family="Network Forensics",
-                                                      case=query['case'],
-                                                      report='BrowseMSNUsers',
-                                                      filter='Nick = "%s"',
-                                                      __target__='filter')),
+                               link = query_type(family="Network Forensics",
+                                                 case=query['case'],
+                                                 report='BrowseMSNUsers',
+                                                 filter='Nick = "%s"',
+                                                 __target__='filter')),
                          IntegerType("Packet","packet_id",
-                                    link = query_type(family="Network Forensics",
-                                                      case=query['case'],
-                                                      report='View Packet',
-                                                      __target__='id')),
+                               link = query_type(family="Network Forensics",
+                                                 case=query['case'],
+                                                 report='View Packet',
+                                                 __target__='id')),
                          IntegerType("Transaction ID","transaction_id"),
-                         ],
+                         StringType("User Data", "user_data")
+                        ],
             table = "msn_users join pcap on packet_id=id",
             case = query['case'],
             )
+
+        def file_transfers(query, result):
+            result.table(
+                    elements =[InodeType("Stream","inode", case = query['case'],
+                                      link = query_type(family="Disk Forensics",
+                                      case=query['case'],
+                                      report='View File Contents',
+                                      __target__='inode',
+                                      mode="Combined streams")) ,
+                                StringType("To", "to_user"), 
+                                StringType("From", "from_user"), 
+                                StringType("Context", "context")],
+                    table = "msn_p2p",
+                    case = query['case'],
+                         )
+
+        result.heading("MSN Data")
+        result.notebook(
+                names = ['MSN Sessions',
+                         'MSN Users',
+                         'MSN File Transfers'],
+            callbacks = [ sessions,
+                          users,
+                          file_transfers ]
+                        )
 
 if __name__ == "__main__":
     fd = open("/tmp/case_demo/S93-94")
@@ -1688,13 +1789,249 @@ from pyflag.FileSystem import DBFS
 
 class MSNTests(unittest.TestCase):
     """ Tests MSN Scanner """
-    test_case = "PyFlag Network Test Case"
+    
+    # We pick an obscure name on purpose
+    test_case = "Pyflagtest01MSNScannerTestCase"
+    
     order = 21
+
+    ## Test protocol version 8 handling...
     def test01MSNScanner(self):
-        """ Test MSN Scanner """
+        """ Test MSN Scanner Handling Basic Protocol Ver 8 Commands"""
+        self.test_case = "Pyflagtest01MSNScannerTestCase"
         env = pyflagsh.environment(case=self.test_case)
+
+        ## First we drop the case in case it already exists
+        ## Since it might not exist, we allow this to throw:
+        try:
+            pyflagsh.shell_execv(env=env,
+                                 command = "delete_case",
+                                 argv=[self.test_case])       
+        except RuntimeError:
+            pass
+ 
+        ## Now we create it
+        pyflagsh.shell_execv(env=env,
+                             command = "create_case",
+                             argv=[self.test_case])
+
+        pyflagsh.shell_execv(command="execute", 
+                            argv=["Load Data.Load IO Data Source", 
+                              "case=%s" % self.test_case , 
+                              "iosource=MSNTest1", 
+                              "subsys=Advanced", 
+                              "filename=MSN_Cap1_Ver8_LoginWithMessages.pcap"])
+        
+        pyflagsh.shell_execv(command="execute", 
+                             argv=["Load Data.Load Filesystem image", 
+                                   "case=%s" %self.test_case , 
+                                   "iosource=MSNTest1", 
+                                   "fstype=PCAP Filesystem", 
+                                   "mount_point=/MSNTest1"])
+
         pyflagsh.shell_execv(env=env,
                              command="scan",
                              argv=["*",                   ## Inodes (All)
-                                   "MSNScanner", "TypeScan"
-                                   ])                   ## List of Scanners
+                                   "MSNScanner"
+                                  ])                   ## List of Scanners
+
+        ## What should we have found?
+        dbh = DB.DBO(self.test_case)
+        dbh.execute("""select * from `msn_session` where type=\"MESSAGE\"""")
+
+        ## Well we should find 10 messages
+        messages = 0
+        while dbh.fetch():
+            messages += 1        
+        assert messages == 10
+
+        ## We should also find user information  
+        ## For example, check we pulled out the user's OS.
+        dbh.execute("""select user_data from `msn_users` where """\
+                    """user_data_type=\"os\" and packet_id=19""")
+        row=dbh.fetch()
+        assert row["user_data"] == "winnt 5.1 i386"
+
+    ## Test protocol version 9 handling...
+    def test02MSNScanner(self):
+        """ Test MSN Scanner Handling Basic Protocl Ver 9 Commands"""
+
+        self.test_case = "Pyflagtest02MSNScannerTestCase"
+
+        env = pyflagsh.environment(case=self.test_case)
+
+        ## First we drop the case in case it already exists
+        ## Since it might not exist, we allow this to throw:
+        try:
+            pyflagsh.shell_execv(env=env,
+                                 command = "delete_case",
+                                 argv=[self.test_case])       
+        except RuntimeError:
+            pass
+ 
+        ## Now we create it
+        pyflagsh.shell_execv(env=env,
+                             command = "create_case",
+                             argv=[self.test_case])
+
+        pyflagsh.shell_execv(command="execute", 
+                            argv=["Load Data.Load IO Data Source", 
+                              "case=%s" % self.test_case , 
+                              "iosource=MSNTest2", 
+                              "subsys=Advanced", 
+                              "filename=MSN_Cap3_Ver9_LoginWithMessages.pcap"])
+        
+        pyflagsh.shell_execv(command="execute", 
+                             argv=["Load Data.Load Filesystem image", 
+                                   "case=%s" %self.test_case , 
+                                   "iosource=MSNTest2", 
+                                   "fstype=PCAP Filesystem", 
+                                   "mount_point=/MSNTest2"])
+
+        pyflagsh.shell_execv(env=env,
+                             command="scan",
+                             argv=["*",                   ## Inodes (All)
+                                   "MSNScanner"
+                                  ])                   ## List of Scanners
+
+        ## What should we have found?
+        dbh = DB.DBO(self.test_case)
+        dbh.execute("""select * from `msn_session` where type=\"MESSAGE\"""")
+
+        ## Well we should find 10 messages
+        messages = 0
+        while dbh.fetch():
+            messages += 1        
+        assert messages == 12
+
+        ## We should also find user information  
+        ## For example, check we pulled out the user's OS.
+        dbh.execute("""select user_data from `msn_users` where """\
+                    """user_data_type=\"country_code\" and packet_id=30""")
+        row=dbh.fetch()
+        assert row["user_data"] == "au"
+        
+        
+    ## Test protocol version 9 handling...
+    def test03MSNScanner(self):
+        """ Test MSN Scanner Handling Basic Protocol Ver 15 Commands"""
+
+        self.test_case = "Pyflagtest03MSNScannerTestCase"
+
+        env = pyflagsh.environment(case=self.test_case)
+
+        ## First we drop the case in case it already exists
+        ## Since it might not exist, we allow this to throw:
+        try:
+            pyflagsh.shell_execv(env=env,
+                                 command = "delete_case",
+                                 argv=[self.test_case])       
+        except RuntimeError:
+            pass
+ 
+        ## Now we create it
+        pyflagsh.shell_execv(env=env,
+                             command = "create_case",
+                             argv=[self.test_case])
+
+        pyflagsh.shell_execv(command="execute", 
+                            argv=["Load Data.Load IO Data Source", 
+                              "case=%s" % self.test_case , 
+                              "iosource=MSNTest3", 
+                              "subsys=Advanced", 
+                              "filename=MSN_Cap2_Ver15_LoginWithMessages.pcap"])
+        
+        pyflagsh.shell_execv(command="execute", 
+                             argv=["Load Data.Load Filesystem image", 
+                                   "case=%s" %self.test_case , 
+                                   "iosource=MSNTest3", 
+                                   "fstype=PCAP Filesystem", 
+                                   "mount_point=/MSNTest3"])
+
+        pyflagsh.shell_execv(env=env,
+                             command="scan",
+                             argv=["*",                   ## Inodes (All)
+                                   "MSNScanner"
+                                  ])                   ## List of Scanners
+
+        ## What should we have found?
+        dbh = DB.DBO(self.test_case)
+        dbh.execute("""select * from `msn_session` where type=\"MESSAGE\"""")
+
+        ## Well we should find 10 messages
+        messages = 0
+        while dbh.fetch():
+            messages += 1        
+        assert messages == 5
+
+        ## We should also find user information  
+        ## For example, check we pulled out the user's OS.
+
+
+    ## Test protocol version 15 handling...
+    def test04MSNScanner(self):
+        """ Test MSN Scanner Handling P2P Send Using Protocol Ver 15"""
+
+        self.test_case = "Pyflagtest04MSNScannerTestCase"
+
+        env = pyflagsh.environment(case=self.test_case)
+
+        ## First we drop the case in case it already exists
+        ## Since it might not exist, we allow this to throw:
+        try:
+            pyflagsh.shell_execv(env=env,
+                                 command = "delete_case",
+                                 argv=[self.test_case])       
+        except RuntimeError:
+            pass
+ 
+        ## Now we create it
+        pyflagsh.shell_execv(env=env,
+                             command = "create_case",
+                             argv=[self.test_case])
+
+        pyflagsh.shell_execv(command="execute", 
+                            argv=["Load Data.Load IO Data Source", 
+                              "case=%s" % self.test_case , 
+                              "iosource=MSNTest4", 
+                              "subsys=Advanced", 
+                              "filename=MSN_Cap4_Ver15_SendingAFile.pcap"])
+        
+        pyflagsh.shell_execv(command="execute", 
+                             argv=["Load Data.Load Filesystem image", 
+                                   "case=%s" %self.test_case , 
+                                   "iosource=MSNTest4", 
+                                   "fstype=PCAP Filesystem", 
+                                   "mount_point=/MSNTest4"])
+
+        pyflagsh.shell_execv(env=env,
+                             command="scan",
+                             argv=["*",                   ## Inodes (All)
+                                   "MSNScanner"
+                                  ])                   ## List of Scanners
+
+        ## What should we have found?
+        dbh = DB.DBO(self.test_case)
+        dbh.execute("""select * from `msn_session` where """\
+                    """type=\"P2P FILE TRANSFER\"""")
+
+        ## Well we should find a single file transfer
+        row = dbh.fetch()
+        assert row['p2p_file'] != None
+
+        ## Test it has what we expect in it
+        fsfd = DBFS(self.test_case)
+        test = fsfd.open(inode=row['p2p_file'])
+
+        # Check that we got the contents of the file correct
+        line = test.read()
+        assert line == "This is the contents of the file that were "\
+                       "transferred over MSN."
+
+        ## Now we also check it showed up in the p2p table...
+        dbh.execute("""select * from `msn_session` where """ \
+                    """type=\"P2P FILE TRANSFER\"""")
+        row = dbh.fetch()
+        assert row != None
+        assert dbh.fetch() == None
+        

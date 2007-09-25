@@ -494,7 +494,7 @@ class execute(pyflagsh.command):
         except Exception,e:
             import traceback
             print traceback.print_tb(sys.exc_info()[2])
-            pyflaglog.log(pyflaglog.WARNING, "Flash encountered the following error: %s: %s when running query: %s" % (sys.exc_info()[0],sys.exc_info()[1]),query)
+            pyflaglog.log(pyflaglog.WARNING, "Flash encountered the following error: %s: %s when running query: %s" % (sys.exc_info()[0],sys.exc_info()[1],query))
             raise RuntimeError("%s: %s after %s sec" %  (sys.exc_info()[0],sys.exc_info()[1],time.time()-start_time))
 
 class reset(execute):
@@ -574,6 +574,9 @@ class file(ls):
                 yield row
 
 class delete_case(load):
+    def help(self):
+        return """Delete the specified case and all data within it. E.g. 'delete_case foobar'"""
+
     def execute(self):
         try:
             case=self.args[0]
@@ -594,6 +597,9 @@ class delete_case(load):
         
 
 class create_case(load):
+    def help(self):
+        return """Create a new empty case with specified name. E.g. 'create_case foobar'"""
+
     def execute(self):
         dbh = DB.DBO(None)
         case = self.args[0]
