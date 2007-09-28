@@ -120,7 +120,7 @@ static PyObject *encode_property(Packet packet, struct struct_property_t *p) {
 
     case FIELD_TYPE_INT:
     case FIELD_TYPE_INT_X:
-      result = PyLong_FromUnsignedLong(*(unsigned int *)item); break;
+      result = PyLong_FromUnsignedLong(*(unsigned long int *)item); break;
 
     case FIELD_TYPE_INT_64:
     case FIELD_TYPE_INT_X_64:

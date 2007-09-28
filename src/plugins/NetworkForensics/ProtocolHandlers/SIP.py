@@ -188,7 +188,7 @@ class SIPHandler(Packets.PacketHandler):
                 try:
                     attributes.parse_request(m.group(2), m.group(3), m.group(5))
                 except Exception, e:
-                    print FlagFramework.get_bt_string(e)
+                    pass
 
             m = self.response_re.match(data)
             if m:
@@ -196,8 +196,9 @@ class SIPHandler(Packets.PacketHandler):
                 try:
                     attributes.parse_response(m.group(3), m.group(4), m.group(5))
                 except Exception, e:
-                    print e
-                    print FlagFramework.get_bt_string(e)
+                    pass
+                    #print e
+                    #print FlagFramework.get_bt_string(e)
                 
         except (AttributeError, TypeError):
             pass
@@ -235,7 +236,7 @@ class RDPHandler(Packets.PacketHandler):
                 except KeyError:
                     return
         except AttributeError,e:
-            print e
+            pass
 
     def process_session(self, a, b, stream_id, data):
         rdp_packet = RDPPacket(data)

@@ -361,8 +361,8 @@ class Sleuthkit(DBFS):
             ## need to entries in the table either. FIXME: Add a
             ## method for an File class to find its block allocation
             ## on disk.
-            dbh_block.execute("alter table block drop index block")
-            dbh_block.delete('block', where=1)            
+            #dbh_block.execute("alter table block drop index block")
+            #dbh_block.delete('block', where=1)            
 
 class SKFSEventHandler(FlagFramework.EventHandler):
     def exit(self, dbh, case):

@@ -223,7 +223,6 @@ static void my_term_source (j_decompress_ptr cinfo) {
  need to copy it all the time - it is the responsibility of the caller
  to ensure that the memory will continue to be available for the life
  of this source. Typically we just need to incref it. */
-//static void jpeg_my_src(j_decompress_ptr cinfo, unsigned char *buff, int length) {
 static void jpeg_my_src(j_decompress_ptr cinfo, PyObject *fd) {
   struct my_src_mgr *self;
 
@@ -243,7 +242,6 @@ static void jpeg_my_src(j_decompress_ptr cinfo, PyObject *fd) {
   self->pub.bytes_in_buffer = 0;
   self->pub.next_input_byte = NULL;
 };
-
 
 typedef struct {
   PyObject_HEAD
@@ -293,6 +291,7 @@ static int decoder_init(decoder *self, PyObject *args) {
   // The decoded frame
   self->frame = NULL;
 
+
   return 0;
 }
 
@@ -306,10 +305,13 @@ static PyObject *decoder_decode(decoder *self, PyObject *args) {
   struct my_src_mgr *src;
   int start_pixel=0;
   int width;
+  struct my_memory_mgr *self = (struct my_memory_mgr *)(cinfo->mem);
 
   if(!PyArg_ParseTuple(args, "|ii", &maximum_sector, &start_pixel)) return NULL;
 
-  // Fetch new data from our fd. Seek to the start of the stream:
+  
+
+  // Seek to the start of the stream:
   result = PyObject_CallMethod(self->fd, "seek", "(k)", 0);
   if(!result)
     return NULL;
@@ -385,10 +387,13 @@ static PyObject *decoder_decode(decoder *self, PyObject *args) {
 	int row = self->cinfo->output_scanline -3;
 	estimate = estimate_row(self, row,
 				start_pixel, width);
-	if(estimate > 100) {
+#if 0
 	  printf("Row %u from %u-%u - integral %u\n", self->cinfo->output_scanline, 
 		 start_pixel, width,
 		 estimate);
+#endif
+
+	if(estimate > 100) {
 	  // Register this as an error:
 	  src->error_count++;
 	};
@@ -451,7 +456,9 @@ static int calculate_integral(decoder *self, int row, int left, int right) {
   int result=0;
   int i;
 
-  if(self->integrals[row] && left==0 && right==self->cinfo->output_width) return self->integrals[row];
+  if(self->integrals[row] && left==0 && right==self->cinfo->output_width) {
+    return self->integrals[row];
+  };
 
   for(i= left * self->cinfo->output_components;
       i < right * self->cinfo->output_components; i++) {

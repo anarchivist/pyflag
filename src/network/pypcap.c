@@ -269,6 +269,7 @@ static PyObject *PyPCAP_next(PyPCAP *self) {
   // Adjust the output endianess if needed
   switch(self->output_format) {
   case FORCE_BIG_ENDIAN:
+    // FIXME - Leaks!!!
     self->packet_header->super.format = PCAP_PKTHEADER_STRUCT;
     break;
 

@@ -62,12 +62,12 @@ data/magic.mime.mgc: data/magic.mime
 # using the install-data-hook below only if it does not already exist.
 # sysconf_DATA		=	pyflagrc
 
-DEFAULT_CONFIG_FILE = $(sysconfdir)/pyflagrc
+#DEFAULT_CONFIG_FILE = $(sysconfdir)/pyflagrc
 
-install-data-hook: pyflagrc
-	@if test -f $(DESTDIR)$(DEFAULT_CONFIG_FILE) ; then \
-		echo "$@ will not overwrite existing $(DESTDIR)$(DEFAULT_CONFIG_FILE)" ; \
-	else \
-		echo "$(INSTALL_DATA) -D pyflagrc $(DESTDIR)$(DEFAULT_CONFIG_FILE)"; \
-		$(INSTALL_DATA) -D pyflagrc $(DESTDIR)$(DEFAULT_CONFIG_FILE); \
-	fi
+#install-data-hook: pyflagrc
+#	@if test -f $(DESTDIR)$(DEFAULT_CONFIG_FILE) ; then \
+#		echo "$@ will not overwrite existing $(DESTDIR)$(DEFAULT_CONFIG_FILE)" ; \
+#	else \
+#		echo "$(INSTALL_DATA) -D pyflagrc $(DESTDIR)$(DEFAULT_CONFIG_FILE)"; \
+#		$(INSTALL_DATA) -D pyflagrc $(DESTDIR)$(DEFAULT_CONFIG_FILE); \
+#	fi
