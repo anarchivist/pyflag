@@ -65,11 +65,11 @@ struct jvirt_barray_control {
   jvirt_barray_ptr next;	/* link to next virtual barray control block */
 };
 
-METHODDEF(void *) alloc_small (j_common_ptr cinfo, int pool_id, size_t sizeofobject) {
+void *alloc_small (j_common_ptr cinfo, int pool_id, size_t sizeofobject) {
   struct my_memory_mgr *self = (struct my_memory_mgr *)(cinfo->mem);
   char *obj_ptr = self->pool + self->total_space_allocated;
 
-  printf("allocating %u bytes\n", sizeofobject);
+  //  printf("allocating %u bytes\n", sizeofobject);
 
   self->total_space_allocated += sizeofobject;
   if(self->total_space_allocated > self->pool_size) return NULL;
@@ -181,12 +181,13 @@ METHODDEF(JSAMPARRAY) access_virt_sarray (j_common_ptr cinfo, jvirt_sarray_ptr p
 
 METHODDEF(void) free_pool (j_common_ptr cinfo, int pool_id) {
   struct my_memory_mgr *self = (struct my_memory_mgr *)(cinfo->mem);
+  printf("Freeing pool\n");
   self->total_space_allocated = 0;
 }
 
 METHODDEF(void) self_destruct (j_common_ptr cinfo) {
   struct my_memory_mgr *self = (struct my_memory_mgr *)(cinfo->mem);
-
+  printf("Destroying pool\n");
   free(self->pool);
   free(self->shadow_pool);
 
@@ -199,7 +200,17 @@ void suspend_memory(j_common_ptr cinfo, int row, int sector) {
   self->row = row;
   self->sector = sector;
 
+  printf("Suspending at sector %u\n", sector);
   memcpy(self->shadow_pool, self->pool, self->total_space_allocated);
+  self->total_space_shadowed = self->total_space_allocated;
+};
+
+void resume_memory(j_common_ptr cinfo) {
+  struct my_memory_mgr *self = (struct my_memory_mgr *)(cinfo->mem);
+  
+  printf("Resuming from sector %u (copying %u bytes)\n", self->sector, self->total_space_shadowed);
+  memcpy(self->pool, self->shadow_pool, self->total_space_shadowed);
+  self->total_space_allocated = self->total_space_shadowed;
 };
 
 GLOBAL(void) jinit_memory_mgr (j_common_ptr cinfo) {
@@ -216,18 +227,15 @@ GLOBAL(void) jinit_memory_mgr (j_common_ptr cinfo) {
     ERREXIT(cinfo, JERR_BAD_ALLOC_CHUNK);
 
   max_to_use = 0;  
-  mem = (my_mem_ptr) malloc(SIZEOF(struct my_memory_mgr));
+  mem = (my_mem_ptr) calloc(1, SIZEOF(struct my_memory_mgr));
   if (mem == NULL) {
     ERREXIT1(cinfo, JERR_OUT_OF_MEMORY, 0);
   };
 
   // Prepare our memroy pools:
-  mem->pool = malloc(POOL_SIZE);
-  mem->shadow_pool = malloc(POOL_SIZE);
+  mem->pool = calloc(POOL_SIZE,1);
+  mem->shadow_pool = calloc(POOL_SIZE,1);
   mem->pool_size = POOL_SIZE;
-  mem->total_space_allocated = 0;
-  mem->row = 0;
-  mem->sector = 0;
 
   /* OK, fill in the method pointers */
   mem->pub.alloc_small = alloc_small;
@@ -250,7 +258,8 @@ GLOBAL(void) jinit_memory_mgr (j_common_ptr cinfo) {
   mem->virt_sarray_list = NULL;
   mem->virt_barray_list = NULL;
   mem->total_space_allocated = SIZEOF(struct my_memory_mgr);
-  
+  mem->sector = 0;
+
   /* Declare ourselves open for business */
   cinfo->mem = & mem->pub;
 }

@@ -1,4 +1,6 @@
 void suspend_memory(j_common_ptr cinfo, int row, int sector);
+void resume_memory(j_common_ptr cinfo);
+void *alloc_small(j_common_ptr cinfo, int pool_id, size_t sizeofobject);
 
 struct my_memory_mgr {
   struct jpeg_memory_mgr pub;	/* public fields */
@@ -17,6 +19,7 @@ struct my_memory_mgr {
 
   // This is the very end of the allocated pool.
   long total_space_allocated;
+  long total_space_shadowed;
 
   // The row number where we suspended
   int row;
