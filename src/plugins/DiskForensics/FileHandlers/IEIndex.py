@@ -50,14 +50,11 @@ class IEIndex(Scanner.GenScanFactory):
     default = True
     depends = ['TypeScan']
 
+    ## FIXME: Implement multiple_inode_reset
     def reset(self, inode):
         Scanner.GenScanFactory.reset(self, inode)
         dbh=DB.DBO(self.case)
         dbh.execute("delete from history")
-        
-    def destroy(self):
-        dbh=DB.DBO(self.case)
-        dbh.check_index("history" ,"url",10)
 
     class Scan(Scanner.StoreAndScanType):
         types = ['application/x-ie-index']
@@ -82,26 +79,20 @@ class IEHistory(Reports.report):
     name = "IE Browser History (pasco)"
     family = "Disk Forensics"
     description="This report will display all IE browsing history data found in index.dat files"
-    def form(self,query,result):
-        result.case_selector()
-        
+
     def display(self,query,result):
         result.heading("IE History")
         dbh=self.DBO(query['case'])
-
-        try:
-            result.table(
-                elements = [ StringType('Path','path'),
-                             StringType('Type','type'),
-                             StringType('URL','url'),
-                             TimestampType('Modified','modified'),
-                             TimestampType('Accessed','accessed'),
-                             FilenameType(filename='filename', path='filepath', case=query['case']),
-                             StringType('Headers','headers') ],
-                table=('history'),
-                case=query['case']
-                )
-        except DB.DBError,e:
-            result.para("Error reading the history table. Did you remember to run the IEHistory scanner?")
-            result.para("Error reported was:")
-            result.text(e,style="red")
+        dbh.check_index("history" ,"url",10)
+        
+        result.table(
+            elements = [ StringType('Path','path'),
+                         StringType('Type','type'),
+                         StringType('URL','url'),
+                         TimestampType('Modified','modified'),
+                         TimestampType('Accessed','accessed'),
+                         FilenameType(filename='filename', path='filepath', case=query['case']),
+                         StringType('Headers','headers') ],
+            table=('history'),
+            case=query['case']
+            )

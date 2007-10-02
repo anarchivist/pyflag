@@ -30,6 +30,7 @@ class Lexer:
     ## way we move through them: format is an array of
     ## [ state_re, re, token/action, next state ]
     tokens = []
+    state = "INITIAL"
     buffer = ''
     error = 0
     verbose = 0
@@ -38,13 +39,15 @@ class Lexer:
     processed_buffer = ''
     saved_state = None
     
-    def __init__(self, verbose=0):
+    def __init__(self, verbose=0, fd=None):
         if not self.verbose:
             self.verbose = verbose
         
         for row in self.tokens:
             row.append(re.compile(row[0], re.DOTALL))
             row.append(re.compile(row[1], re.DOTALL))
+
+        self.fd = fd
 
     def save_state(self, t=None, m=None):
         """ Returns a dict which represents the current state of the lexer.

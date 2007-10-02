@@ -76,7 +76,6 @@ class PDFFile:
         return result
         
 class PDFParser(lexer.SelfFeederMixIn, lexer.Lexer):
-    state = "INITIAL"
     error = 0
     verbose = 1
 
