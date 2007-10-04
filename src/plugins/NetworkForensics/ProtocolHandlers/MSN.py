@@ -80,7 +80,8 @@ def safe_base64_decode(s):
 
     return s
 
-allowed_file_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_ "
+allowed_file_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ"\
+                     "RSTUVWXYZ0123456789.-_ "
 
 def get_temp_path(case,inode):
     """ Returns the full path to a temporary file based on filename.
@@ -96,10 +97,14 @@ class Message:
         self.fd=fd
         self.ddfs = ddfs
         self.client_id='Unknown'
-        self.session_id = -1
+        self.session_id = None
+        self.tr_id = None
         self.inodes = []
         self.participants = []
         self.contact_list_groups = {}
+        self.otherDir = None
+       
+        self.done = False
 
         self.list_lookup={}
         self.list_lookup['forward_list']=self.forward_list = []
@@ -107,18 +112,35 @@ class Message:
         self.list_lookup['block_list']=self.block_list = []
         self.list_lookup['reverse_list']=self.reverse_list = []
         self.list_lookup['pending_list']=self.pending_list = []
+    
+        self.declineRegex = re.compile("MSNSLP.... 603 Decline")
 
     def get_packet_id(self):
         self.offset = self.fd.tell()
         ## Try to find the time stamp of this request:
         self.packet_id = self.fd.get_packet_id(self.offset)
         return self.packet_id
+    
+    def get_next_packet_id(self):
+        self.offset = self.fd.tell()
+        ## Try to find the time stamp of this request:
+        try:
+            self.next_packet_id = self.fd.get_packet_id(self.offset+1)
+        except IOError:
+            self.next_packet_id = None
+
+        return self.next_packet_id
 
     def store_list(self,list,listname):
         """Store list in DB"""
+
         if len(list)>0:
-            #pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Inserting list: %s" % ",".join(list))
-            self.insert_user_data(nick="%s (Target)" % self.client_id,data_type=listname,data=",".join(list),sessionid=-99)
+            #pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Inserting list:i"\
+            #                                        " %s" % ",".join(list))
+            self.insert_user_data(nick="%s (Target)" % self.client_id,
+                                  data_type=listname,
+                                  data=",".join(list),
+                                  sessionid=-99)
                     
     def add_unique_to_list(self,data,list):
         #Add a unique entry to the list specified
@@ -129,17 +151,29 @@ class Message:
         except ValueError:
             #Don't have this one, so insert it
             list.append(data)
-            #pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Appending to list:%s" % (list))
+            #pyflaglog.log(pyflaglog.VERBOSE_DEBUG, 
+            #              "Appending to list:%s" % (list))
 
     def del_participant(self,username):
         try:
-            #pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Removing participant:%s" % username)
+            # pyflaglog.log(pyflaglog.VERBOSE_DEBUG, 
+            #              "Removing participant:%s" % username)
             self.participants.remove(username)
+            self.otherDir.participants.remove(username)
         except:
-            #name wasn't in participants for some reason, shouldn't really happen.
+            # name wasn't in participants for some reason, 
+            # shouldn't really happen.
             pass
 
-    def insert_session_data(self,sender,recipient,type,tr_id=-99,data=None,sessionid=None,p2pfile=None):
+    def insert_session_data(self,
+                            sender,
+                            recipient,
+                            type,
+                            tr_id=None,
+                            data=None,
+                            sessionid=None,
+                            p2pfile=None,
+                           ):
         """
         Insert MSN session data.  A session id of -1 means we couldn't
         figure out what the session id was, but it matters to this
@@ -155,8 +189,22 @@ class Message:
 
         """
         if not sessionid:
-            sessionid=self.session_id
+            # We have to check if we have a valid session id yet...
+            if self.session_id:
+                sessionid=self.session_id
+                self.otherDir.session_id = sessionid
+            elif self.otherDir.session_id:
+                sessionid = self.otherDir.session_id
+                self.session_id = self.otherDir.session_id
+            else:
+            # We don't. We therefore assume that we will never know it.
+                sessionid = -99
 
+        if not tr_id:
+            tr_id = self.tr_id
+            if not tr_id:
+                tr_id = -1
+        
         dbh=DB.DBO(self.case)
         dbh.insert("msn_session",
                         inode=self.fd.inode,
@@ -179,7 +227,18 @@ class Message:
         
         """
         if not sessionid:
-            sessionid=self.session_id
+            # We have to check if we have a valid session id yet...
+            if self.session_id:
+                sessionid=self.session_id
+                self.otherDir.session_id = sessionid
+            elif self.otherDir.session_id:
+                sessionid = self.otherDir.session_id
+                self.session_id = sessionid
+            else:
+            # We don't. We therefore assume that we will never know it.
+                sessionid = -99
+
+        if not tr_id: tr_id = -99
 
         try:
             dbh = DB.DBO(self.case)
@@ -227,27 +286,28 @@ class Message:
         """
         
         if (type=="PHH"):
-            
-            self.insert_user_data(nick,'home_phone',urllib.unquote(number),sessionid=-99)
+            self.insert_user_data(nick,'home_phone',
+                                  urllib.unquote(number),sessionid=-99)
             
         elif (type=="PHW"):
-            
-            self.insert_user_data(nick,'work_phone',urllib.unquote(number),sessionid=-99)
+            self.insert_user_data(nick,'work_phone',
+                                  urllib.unquote(number),sessionid=-99)
             
         elif (type=="PHM"):
-            
-            self.insert_user_data(nick,'mobile_phone',urllib.unquote(number),sessionid=-99)
+            self.insert_user_data(nick,'mobile_phone',
+                                  urllib.unquote(number),sessionid=-99)
             
         elif (type=="MOB"):
-            
-            self.insert_user_data(nick,'msn_mobile_auth',urllib.unquote(number),sessionid=-99)
+            self.insert_user_data(nick,'msn_mobile_auth',
+                                  urllib.unquote(number),sessionid=-99)
             
         elif (type=="MBE"):
-            
-            self.insert_user_data(nick,'msn_mobile_device',urllib.unquote(number),sessionid=-99)
+            self.insert_user_data(nick,'msn_mobile_device',
+                                  urllib.unquote(number),sessionid=-99)
             
         else:
-            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Unknown phone type: %s" % self.cmdline.strip())
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, 
+                          "Unknown phone type: %s" % self.cmdline.strip())
         
         
     def parse(self):
@@ -256,29 +316,30 @@ class Message:
         
         # Read the first command:
         self.cmdline=self.fd.readline()
-        if len(self.cmdline)==0: raise IOError("Unable to read command from stream")
+        if len(self.cmdline)==0: self.done = True
 
         try:
             ## We take the last 3 letters of the line as the
             ## command. If we lose sync at some point, readline will
             ## resync up to the next command automatically
             self.cmd = self.cmdline.split()[0][-3:]
+        except:
+            return
 
-            ## All commands are in upper case - if they are not we
-            ## must have lost sync:
-            if self.cmd != self.cmd.upper() or not self.cmd.isalpha(): return None
-        except Exception, e:
-            pyflaglog.log(pyflaglog.ERROR, e)
-            return ''
+        ## All commands are in upper case - if they are not we
+        ## must have lost sync:
+        if self.cmd != self.cmd.upper() or not self.cmd.isalpha():
+            return
 
         self.words = self.cmdline.split()
         ## Dispatch the command handler
-        try:
-            return getattr(self,self.cmd)()
-        except AttributeError,e:
-            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Unable to handle command "\
-                          "%r from line %s (%s)" % (self.cmd,self.cmdline,e))
-            return None
+        if hasattr(self, self.cmd):
+            #print self.cmd
+            getattr(self,self.cmd)()
+        else:
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,
+                         "Unable to handle command "\
+                         "%r from line %s" % (self.cmd,self.cmdline))
 
     def get_data(self):
         return self.data
@@ -297,44 +358,58 @@ class Message:
         
         self.offset = self.fd.tell()
         self.headers = {}
+
         ## Read the headers:
         while 1:
             line = self.fd.readline()
+
             #We are finished if we see a newline
             if (line =='\r\n'): break
+
             try:
                 header,value = line.split(":")
                 self.headers[header.lower()]=value.lower().strip()
+
             except ValueError:
                 #We don't have : separated parameters, so something is wrong.
-                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Parse mime failed on:%s.  Headers:%s" % (line,self.headers))
+
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Parse mime failed "\
+                              "on:%s.  Headers:%s" % (line,self.headers))
                 return False
 
         current_position = self.fd.tell()
         self.data = self.fd.read(self.length-(current_position-self.offset))
+        
         return True
     
     def CAL(self):
 
         """ Target is inviting someone to a new session
 
-        CAL 8 dave@passport.com\r\n
+        CAL 8 dave@passport.com
 
         Server responds, saying I am ringing the person:
-
         We use this to store the current session ID for the entire TCP stream.
-        
         CAL 8 RINGING 17342299\r\n
 
         """
         
         if (self.words[2] == "RINGING"):
             self.session_id=self.words[3]
+            self.otherDir.session_id = self.session_id
+
         else:
-            self.insert_session_data("%s (Target)" % self.client_id,self.words[2],"INVITE FROM TARGET",tr_id=self.words[1])            
-            self.insert_user_data(self.words[2],'user_msn_passport',self.words[2],tr_id=self.words[1])
+            self.insert_session_data("%s (Target)" % self.client_id,
+                                     self.words[2],
+                                     "INVITE FROM TARGET",
+                                     tr_id=self.words[1]) 
+           
+            self.insert_user_data(self.words[2],
+                                  'user_msn_passport',
+                                  self.words[2],
+                                  tr_id=self.words[1])
             
-	self.state = "CAL"
+	    self.state = "CAL"
 
     def OUT(self):
         """Target left MSN session"""
@@ -357,9 +432,11 @@ class Message:
 
     def USR(self):
         """
-        Target logging into switchboard server using same auth string as passed back by server in XFR
+        Target logging into switchboard server using same auth string 
+        as passed back by server in XFR
 
-        Most of this info is pretty boring.  I only store stuff that has usernames in it.
+        Most of this info is pretty boring.  I only store stuff that 
+        has usernames in it.
         
                 
         USR <transation id> example@passport.com 17262740.1050826919.32307
@@ -381,7 +458,8 @@ class Message:
             * account_name : Your passport address 
 
         Returns
-        The server will either respond with XFR to transfer you, or with USR to continue the authentication process.
+        The server will either respond with XFR to transfer you, 
+        or with USR to continue the authentication process.
 
         Subsequent USR Response:
 
@@ -414,31 +492,112 @@ class Message:
             * verified : Either 0 or 1 if your account is verified
             * 0 : Unknown (Kids passport?) 
         
+
+        Protocol Version 15 introduces single sign on
+        We have to look for the SSO flag too. Also, the policy is 
+
+        Client: USR <TrId> SSO I <email>
+        Server: USR <TrId> SSO S <policy> <base64 encoded nonce>
+        Client: USR <TrId> SSO S <ticket> <base64 encoded response structure>
+        Server: USR <TrId> OK <email> <verified> 0
+
+        Example:
+
+        Client: USR 10 SSO I buddy@live.com
+        Server: USR 10 SSO S MBI_KEY_OLD E4Fhehbe0q2Je+SUSp7IRnJV+rN4uME75ljIpUjIZ1Si+DgmrfuiIL+AFmkMA6Wv
+        Client: USR 11 SSO S t=... HAAAAAEAAAADZgAABIAAAA...
+        Server: USR 11 OK buddy@live.com 1 0
+
+        The policy is an XML thing that contains LOTS of info, but I don't
+        think it's of much use to us atm...
+
+        More info here:
+
+        http://msnpiki.msnfanatic.com/index.php/MSNP15:SSO
+
 	"""
 	
         
-        pyflaglog.log(pyflaglog.VERBOSE_DEBUG,  "USR:%s" % self.cmdline.strip())
-        self.state = "USR"
+        pyflaglog.log(pyflaglog.VERBOSE_DEBUG,  
+                      "USR:%s" % self.cmdline.strip())
         
-        if (self.words[2]=="OK"):
-            
-            self.client_id = self.words[3]
-            #print "USR setting self.client_id to %s for inode %s" %(self.client_id,self.fd.inode)
-            self.insert_session_data("%s (Target)" % self.client_id,'SWITCHBOARD SERVER',"TARGET ENTERING NEW SWITCHBOARD SESSION")
+        self.state = "USR"
 
-            self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',self.words[3],tr_id=self.words[1])
-            self.insert_user_data("%s (Target)" % self.client_id,'url_enc_display_name',urllib.unquote(self.words[4]),tr_id=self.words[1])
-            
-        elif (self.words[2]=="TWN")and(self.words[3]=="I"):
+        ## E.G:
+        ## USR 19 OK msnpersonone@hotmail.com FirstNameOfThePerson 
+        if (self.words[2]=="OK"):
+            self.client_id = self.words[3]
+           
+            self.insert_session_data(recipient = "%s (Target)" % self.client_id,
+                                      sender='SWITCHBOARD SERVER',
+                                      type="TARGET ENTERING NEW SWITCHBOARD "\
+                                           "SESSION",
+                                      tr_id = self.words[1]
+                                     )
+
+            self.insert_user_data("%s (Target)" % self.client_id,
+                                  'target_msn_passport',
+                                   self.words[3], 
+                                   tr_id=self.words[1]
+                                  )
+
+            self.insert_user_data("%s (Target)" % self.client_id,
+                                  'url_enc_display_name',
+                                  urllib.unquote(self.words[4]),
+                                  tr_id=self.words[1]
+                                 )
+
+        ## Look for single sign on messages
+        ## Mainly just so they don't bork our other stuff           
+        elif (self.words[2]=="SSO"):
+
+            if self.words[3] == "I":
+                #Initial Client connection to server, e.g.:
+                # Client: USR <TrId> SSO I <email>
+                self.client_id = self.words[4]
+           
+                self.insert_session_data(recipient = \
+                                        "NOTIFICATION SERVER",
+                                        sender = "%s (Target)" % self.client_id,
+                                        type="INITIAL SIGN ON REQUEST",
+                                        tr_id = self.words[1],
+                                        )
+
+            elif self.words[3] == "S":
+                #Single sign on stuff, e.g.:
+                # Server: USR <TrId> SSO S <policy> <base64 encoded nonce>
+                # OR
+                # Client: USR <TrId> SSO S <ticket> \
+                #                     <base64 encoded response structure>
+                ## TODO
+                ## We should probably handle this at some stage
+                pass
+
+            else:
+                ## TODO 
+                # Who knows. Other single signon magic.
+                pass
+        
+        elif (self.words[2]=="TWN") and (self.words[3]=="I"):
             #Ignore 'S' messages - no value.
             self.client_id = self.words[4]
-            #print "USR setting self.client_id to %s for inode %s" %(self.client_id,self.fd.inode)
-            self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',self.words[4],tr_id=self.words[1])
+
+            self.insert_user_data("%s (Target)" % self.client_id,
+                                  'target_msn_passport',
+                                  self.words[4],
+                                  tr_id=self.words[1])
+        
+            #print "Client id: %s, tr: %s" % (self.client_id, self.words[1])
+        
         elif (self.words[2]!="TWN"):
-            #must be of form: USR <transation id> example@passport.com 17262740.1050826919.32307
+        #must be of form: USR <transation id> example@passport.com 17262740.1050826919.32307
+
             self.client_id = self.words[2]
-            #print "USR  setting self.client_id to %s for inode %s" %(self.client_id,self.fd.inode)
-            self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',self.words[2],tr_id=self.words[1])
+            
+            self.insert_user_data("%s (Target)" % self.client_id,
+                                  'target_msn_passport',
+                                  self.words[2],
+                                  tr_id=self.words[1])
 
     def XFR(self):
 
@@ -475,8 +634,6 @@ class Message:
 
         """
 
-        
-        #print "XFR:%s" % self.cmdline.strip()
         try:
             self.switchboard_ip = self.words[3].split(":")[0]
             self.switchboard_port = self.words[3].split(":")[1]
@@ -501,20 +658,35 @@ class Message:
         ANS 1854 OK
         
         """
-        
-
+        #print "ANS: ", self.words
         if (self.words[2].find("OK")<0):
 
             try:
-                self.session_id=int(self.words[-1])
+                self.session_id = int(self.words[-1])
+                self.otherDir.session_id = self.session_id
+
+                #print "ANS Session is " , self.session_id
+
                 ## This stores the current clients username
+                ## We need to some hackery here because we process 
+                ## streams in two parts
                 self.client_id = self.words[2]
-                #print "ANS setting self.client_id to %s for inode %s" %(self.client_id,self.fd.inode)
-                self.insert_session_data("%s (Target)" % self.client_id,"SWITCHBOARD SERVER","TARGET JOINING_SESSION",tr_id=self.words[1])
+                self.otherDir.client_id = self.words[2]
                 
-                self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',self.words[2],tr_id=self.words[1])
+                self.insert_session_data("%s (Target)" % self.client_id,
+                                         "SWITCHBOARD SERVER",
+                                         "TARGET JOINING_SESSION",
+                                         tr_id=self.words[1])
+                
+                self.insert_user_data("%s (Target)" % self.client_id,
+                                      'target_msn_passport',
+                                      self.words[2],
+                                      tr_id=self.words[1])
             except Exception,e:
-                pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"ANS not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG,
+                             "ANS not decoded correctly: %s. " \
+                             "Exception: %s" % (self.cmdline.strip(),e))
+                #print "ANS DECODE FAILED with", e
                 pass
 
             self.state = "ANS"
@@ -528,26 +700,43 @@ class Message:
         """
         
         try:
-            self.insert_session_data(sender=self.words[4],recipient="%s (Target)" % self.client_id,type="CURRENT_PARTICIPANTS",tr_id=self.words[1])
+            self.insert_session_data(sender=self.words[4],
+                                     recipient="%s (Target)" % self.client_id,
+                                     type="CURRENT_PARTICIPANTS",
+                                     tr_id=self.words[1])
             self.state = "IRO"
 
-            self.insert_user_data(self.words[4],'user_msn_passport',self.words[4],tr_id=self.words[1])
-            self.insert_user_data(self.words[4],'url_enc_display_name',urllib.unquote(self.words[5]),tr_id=self.words[1])
-            self.add_unique_to_list(self.words[4],self.participants)                
+            self.insert_user_data(self.words[4],
+                                  'user_msn_passport',
+                                  self.words[4],
+                                  tr_id=self.words[1])
+            
+            self.insert_user_data(self.words[4],
+                                  'url_enc_display_name',
+                                  urllib.unquote(self.words[5]),
+                                  tr_id=self.words[1])
+
+            self.add_unique_to_list(self.words[4],self.participants)
+            self.add_unique_to_list(self.words[4],self.otherDir.participants)
 
         except Exception,e:
-                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "IRO not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "IRO not decoded"\
+                              "  correctly: %s. Exception: %s" % 
+                              (self.cmdline.strip(),e))
                 pass
 
     def parse_psm(self,length,trid=None):
-        """ Parse read the contents of the xml personal message following a UBX/UUX command
+        """ Parse read the contents of the xml personal message 
+            following a UBX/UUX command
 
         """
         if length > 0:
             #print "Reading %s bytes of personal message" % length
-            self.insert_user_data(nick=self.words[1],data_type='personal_message',data=self.fd.read(length),tr_id=trid)
+            self.insert_user_data(nick=self.words[1],
+                                  data_type='personal_message',
+                                  data=self.fd.read(length),
+                                  tr_id=trid)
         
-
     def UUX(self):
         """
         UUX
@@ -635,9 +824,12 @@ class Message:
         """
         
         self.session_id = self.words[1]
+        self.otherDir.session_id = self.words[1]
 
         #The inviter is a participant
         self.add_unique_to_list(self.words[5],self.participants)
+        self.add_unique_to_list(self.words[5],self.otherDir.participants)
+
         self.insert_session_data(sender=self.words[5],recipient="%s (Target)" % self.client_id,type="TARGET INVITED")
 	self.state = "RNG"
 
@@ -652,6 +844,8 @@ class Message:
         """
         
         self.add_unique_to_list(self.words[1],self.participants)
+        self.add_unique_to_list(self.words[1],self.otherDir.participants)
+
         self.insert_session_data(sender=self.words[1],recipient="%s (Target)" % self.client_id,type="USER JOINING_SESSION WITH TARGET")
 
         self.insert_user_data(self.words[1],'user_msn_passport',self.words[1])
@@ -679,17 +873,33 @@ class Message:
         # I think we only care about the client, not the server, hence:
         if (self.words[2].find("x")==1):
             self.client_id=self.words[9]
-            #print "CVR  setting self.client_id to %s for inode %s" %(self.client_id,self.fd.inode)
+            
             try:
-                self.insert_user_data("%s (Target)" % self.client_id,'locale',self.words[2],tr_id=self.words[1])
-                self.insert_user_data("%s (Target)" % self.client_id,'os'," ".join(self.words[3:6]),tr_id=self.words[1])
-                self.insert_user_data("%s (Target)" % self.client_id,'client'," ".join(self.words[6:8]),tr_id=self.words[1])
-                self.insert_user_data("%s (Target)" % self.client_id,'target_msn_passport',self.words[9],tr_id=self.words[1])
+                self.insert_user_data("%s (Target)" % self.client_id,
+                                      'locale',self.words[2],
+                                      tr_id=self.words[1])
+
+                self.insert_user_data("%s (Target)" % self.client_id,
+                                      'os',
+                                      " ".join(self.words[3:6]),
+                                      tr_id=self.words[1])
+
+                self.insert_user_data("%s (Target)" % self.client_id,
+                                      'client',
+                                      " ".join(self.words[6:8]),
+                                      tr_id=self.words[1])
+
+                self.insert_user_data("%s (Target)" % self.client_id,
+                                      'target_msn_passport',
+                                      self.words[9],
+                                      tr_id=self.words[1])
                 
                 self.state = "CVR"
 
             except Exception,e:
-                pyflaglog.log(pyflaglog.VERBOSE_DEBUG,  "CVR not decoded correctly: %s. Exception: %s" % (self.cmdline.strip(),e))
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG,  
+                              "CVR not decoded correctly: %s. "\
+                              "Exception: %s" % (self.cmdline.strip(),e))
                 pass
 
     def PRP(self):
@@ -1165,9 +1375,15 @@ class Message:
         """
         if is_server:
             #Typing user message from server - way to identify participants!
-            self.add_unique_to_list(self.headers['typinguser'],self.participants)
+            self.add_unique_to_list(self.headers['typinguser'],
+                                    self.participants)
+            self.add_unique_to_list(self.headers['typinguser'],
+                                    self.otherDir.participants)
+
         else:
             self.client_id = self.headers['typinguser']
+            self.otherDir.client_id = self.headers['typinguser']
+
             #print "Typing user setting self.client_id to %s for inode %s" %(self.client_id,self.fd.inode)
 
     def profile_msg_handler(self,content_type,sender,is_server):
@@ -1224,8 +1440,7 @@ class Message:
 
     def p2p_handler(self,content_type,sender,is_server):
         """ Handle a p2p transfer """
-        #print " content_type %s , sender %s , is_server %s" % (content_type,
-        #                                                    sender,is_server)
+        
         def strip_username(p2pusername):
             # TO and FROM are of format <msnmsgr:name@hotmail.com> so 
             # strip the extra stuff out
@@ -1240,19 +1455,20 @@ class Message:
           total_data_size, 
           message_size ) = struct.unpack("IIQQI",data[:4+4+8+8+4])
 
+        #print "Channel (%s), id (%s), offset (%s), total_data_size(%s), messageIsize (%s)" % (channel_sid, id, offset, total_data_size, message_size)
+
         ## MSN header is 48 bytes long
         data = data[48:48+message_size]
 
-        ## print " Data is: ", data
- 
         ## When channel session id is 0 we are negotiating a transfer
         ## channel
 
         if channel_sid==0:
             fd = cStringIO.StringIO(data)
             request_type=fd.readline()
+
             if request_type.startswith("INVITE"):
-                
+
                 ## We parse out the invite headers here:
                 headers = {}
                 while 1:
@@ -1262,11 +1478,16 @@ class Message:
                     key,value = line[:tmp],line[tmp+1:]
                     headers[key.lower()]=value.strip()
 
-                context = safe_base64_decode(headers['context'])
-    
+                if headers.has_key("context"):
+                    context = safe_base64_decode(headers['context'])
+                else:
+                    context = "Unable To Determine Context."
+                    return
+
                 ## Try and get some non-weird file names hapnin:
                 filename = ''.join([ a for a in context if a in \
                                         allowed_file_chars ])
+
 
                 dbh=DB.DBO(self.case)
                 
@@ -1275,7 +1496,7 @@ class Message:
                     self.fd.inode,
                     headers['sessionid'],
                     self.session_id)
-                
+                #print "ADDING FILE" 
                 dbh.insert("msn_p2p",
                                 session_id = self.session_id,
                                 channel_id = headers['sessionid'],
@@ -1285,8 +1506,11 @@ class Message:
                                 inode=new_inode,
                                 )
                 
+                self.insert_session_data(sender=strip_username(headers['from']),
+                                        recipient=strip_username(headers['to']),
+                                        type="P2P FILE TRANSFER - OFFER",
+                                        p2pfile=new_inode)
 
-                self.insert_session_data(sender=strip_username(headers['from']),recipient=strip_username(headers['to']),type="P2P FILE TRANSFER",p2pfile=new_inode)
                 try:
                 ## Parse the context line:
                     parser = ContextParser()
@@ -1333,9 +1557,96 @@ class Message:
                 
                 self.inodes.append("CMSN%s-%s" % (headers['sessionid'], 
                                                   self.session_id))
+        
+                ## We also touch the file, just in case... (for example
+                ## what happens if this file is later declined
+                ## but we never see the deline message
+                filename = get_temp_path(dbh.case,"%s|CMSN%s-%s" % 
+                                                (self.fd.inode, 
+                                                headers['sessionid'],
+                                                self.session_id))
+                fd=os.open(filename,os.O_RDWR | os.O_CREAT)
+                bytes = os.write(fd,"COULD NOT GET MSN FILE DATA!")
                 
-        ## We have a real channel id so this is an actual file:
+            elif (self.declineRegex.match(request_type)):
+                # Ok, so now a file has been declined.
 
+                headers = {}
+                try:
+                   while 1:
+                      line = fd.readline()
+                      if not line: break
+                      tmp = line.find(":")
+                      key,value = line[:tmp],line[tmp+1:]
+                      headers[key.lower()]=value.strip()
+                except Exception, e:
+                    pass
+                    ## TODO FIXME (Don't catch all like this)
+
+   
+                # We first add the notification that the file
+                # trasnfer got cancelled
+                self.insert_session_data(sender=strip_username(headers['from']),
+                                        recipient=strip_username(headers['to']),
+                                        type="P2P FILE TRANSFER - DECLINED")
+               
+                # Now we are stuck with a dodgy inode in two places
+
+                old_inode = "%s|CMSN%s-%s" % (
+                                             self.fd.inode,
+                                             headers['sessionid'],
+                                             self.session_id,
+                                            )
+
+                old_inode_other_stream = "%s|CMSN%s-%s" % (
+                                                self.otherDir.fd.inode,
+                                                headers['sessionid'],
+                                                self.session_id,
+                                            )
+
+                dbh=DB.DBO(self.case)
+
+                dbh.execute("""update `msn_session` set p2p_file="None """ \
+                            """(Declined)" where p2p_file="%s" or p2p_file """ \
+                            """= "%s" """ % (old_inode, old_inode_other_stream))
+
+                dbh.execute("""select * from `msn_session` where p2p_file=""" \
+                            """"%s" or inode = "%s" """ % (old_inode, 
+                                                        old_inode_other_stream))
+
+                dbh.execute("""update `msn_p2p` set inode="None (Declined""" \
+                            """)" where inode="%s" or inode="%s"  """ % \
+                                        (old_inode, old_inode_other_stream))
+   
+                # Now we actually need to delete it from the VFS!
+                # There is no VFSDelete TODO 
+
+                dbh.execute("""delete from `inode` where `inode` = "%s" """ \
+                            """ or inode = "%s" """ % \
+                            (old_inode, old_inode_other_stream))
+
+                ## Remove it from our inodes 
+                try:
+                    self.inodes.remove("CMSN%s-%s" % (headers['sessionid'], 
+                                                          self.session_id))
+
+                except ValueError:
+                    pass
+
+                ## And remove it from the other inodes
+                try:
+                    self.otherDir.inodes.remove("CMSN%s-%s" % \
+                                                (headers['sessionid'], 
+                                                 self.session_id))
+      
+                except ValueError:
+                    pass
+
+            else:
+                pass
+                ## TODO verbose debug
+    
+        ## We have a real channel id so this is an actual file:
         else:
             dbh=DB.DBO(self.case)
             filename = get_temp_path(dbh.case,"%s|CMSN%s-%s" % 
@@ -1344,10 +1655,10 @@ class Message:
             os.lseek(fd,offset,0)
             bytes = os.write(fd,data)
 
-            if bytes <message_size:
+            if bytes < message_size:
                 pyflaglog.log(pyflaglog.WARNINGS,  "Unable to write as "\
                               "much data as needed into MSN p2p file. "\
-                              "Needed %s, write %d." %(message_size,bytes))
+                              "Needed %s, wrote %d." %(message_size,bytes))
             os.close(fd)
             
     ct_dispatcher = {
@@ -1403,7 +1714,8 @@ class Message:
                 ## from client to server.  
                 ## ie. FROM target to all users in session.
 
-                tid = int(self.words[1])
+                self.tr_id = int(self.words[1])
+
                 sender = "%s (Target)" % self.client_id
 
                 #pyflaglog.log(pyflaglog.VERBOSE_DEBUG, 
@@ -1415,13 +1727,28 @@ class Message:
             except ValueError:
 
                 # Message TO target
-                tid = 0
+                self.tr_id = 0
                 sender = self.words[1]
                 self.insert_user_data(sender,
                                       'url_enc_display_name',
                                       urllib.unquote(self.words[2]))
                 server = True
-                self.recipient = "%s (Target)" % self.client_id
+            
+                # What about if this is a group chat? We need to check
+                # and if so note it.
+                if self.participants:
+                    uniqueRecip = []
+                    for participant in self.participants:
+                        if participant != sender:
+                            uniqueRecip.append(participant)
+                    if len(uniqueRecip) != 0:
+                        self.recipient = "%s (Target),%s" % (self.client_id, 
+                                                    ",".join(uniqueRecip))
+                    else:
+                        self.recipient = "%s (Target)" % self.client_id
+                else:
+                    self.recipient = "%s (Target)" % self.client_id
+
             try:
                 # Cater for "text/x-msmsgsprofile; charset=UTF-8" 
                 # by stripping charset
@@ -1434,16 +1761,34 @@ class Message:
                               "Couldn't figure out MIME type for "\
                               "this message: %s" % self.cmdline)
 
+            ct = None
+#            try:
+#               ct = content_type.split(';')[0]
+#               self.ct_dispatcher[ct](self,content_type,sender,server)
+#            except:
+#               pyflaglog.log(pyflaglog.VERBOSE_DEBUG, 
+#                              "Unable to handle content-type %s - i"\
+#                              "gnoring message %s " % (content_type,tid))
+#               print "Ignoring: ", content_type
+#
             ## Now dispatch the relevant handler according to the content
             ## type:
-
+            ct = None
             try:
-                ct = content_type.split(';')[0]
+               ct = content_type.split(';')[0]
+            except:
+               pass
+
+            if self.ct_dispatcher.has_key(ct):
                 self.ct_dispatcher[ct](self,content_type,sender,server)
-            except KeyError,e:
+            else:
                 pyflaglog.log(pyflaglog.VERBOSE_DEBUG, 
-                              "Unable to handle content-type %s(%s) - i"\
-                              "gnoring message %s " % (content_type,e,tid))
+                            "Unable to handle content-type %s - i"\
+                            "gnoring message %s " % (content_type,self.tr_id))
+        else:
+            ##TODO pyflaglog
+            pass
+
         self.state = "MSG"
 	
 from HTMLParser import HTMLParser
@@ -1521,6 +1866,7 @@ class MSNTables(FlagFramework.EventHandler):
 class MSNScanner(StreamScannerFactory):
     """ Collect information about MSN Instant messanger traffic """
     default = True
+    import re
 
     def __init__(self,fsfd):
         StreamScannerFactory.__init__(self,fsfd)
@@ -1529,6 +1875,11 @@ class MSNScanner(StreamScannerFactory):
         # is the very next one)
         
         self.processed=RingBuffer(30)
+
+    ## TODO
+    #def multiple_inode_reset(self, inode_glob):
+    #    StreamScannerFactor.multiple_inode_reset(self, inode_glob)
+                
 
     def prepare(self):
         self.msn_connections = {}
@@ -1539,77 +1890,209 @@ class MSNScanner(StreamScannerFactory):
         # We need both streams otherwise this won't work
         if reverse_stream==None or forward_stream==None: return
 
-        pyflaglog.log(pyflaglog.DEBUG, "Opening Combined Stream S%s/%s for MSN" % (forward_stream, reverse_stream))
+        pyflaglog.log(pyflaglog.DEBUG, "Opening Combined Stream S%s/%s " \
+                                "for MSN" % (forward_stream, reverse_stream))
 
-        # Create the combined inode
-        combined_inode = "I%s|S%s/%s" % (stream.fd.name, forward_stream, reverse_stream)
+        # Create the combined inode (we use to use this but it actually
+        # screws us up, for example on file transfers).
+
+        combined_inode = "I%s|S%s/%s" % (stream.fd.name, 
+                                         forward_stream, reverse_stream)
+        forward_inode = "I%s|S%s" % (stream.fd.name, 
+                                         forward_stream)
+        reverse_inode = "I%s|S%s" % (stream.fd.name, 
+                                         reverse_stream)
+        
         # Open the combined stream.
         fd = self.fsfd.open(inode=combined_inode)
+
+        # Open individual streams
+        forward_fd = self.fsfd.open(inode = forward_inode)
+        reverse_fd = self.fsfd.open(inode = reverse_inode)
+
+        # We actually want to process these as two distinct streams..
+        # The problem is that just processing it as a single stream raises
+        # issues, because if A sends B a bit file, and then B sends A a
+        # message while it is transferring, we can't really handle this.
+
         dbh=DB.DBO(stream.case)
 
-        m = Message(dbh, fd, self.fsfd)
-        while 1:
-            try:
-                result=m.parse()
-            except IOError:
-                break
+            ## Combined streams (old way)
 
-        #Scan p2p files we found
-        for inode in m.inodes:
-            self.scan_as_file("%s|%s" % (combined_inode, inode), factories)
+            #m = Message(dbh, fd, self.fsfd)
+            #m.parse()
+
+            #Scan p2p files we found
+            #for inode in m.inodes:
+            #    self.scan_as_file("%s|%s" % (combined_inode, inode), factories)
+        
+        ## Separate streams (new way)
+        forward_messages = Message(dbh, forward_fd, self.fsfd)
+        reverse_messages = Message(dbh, reverse_fd, self.fsfd)
+
+        forward_messages.otherDir = reverse_messages
+        reverse_messages.otherDir = forward_messages
+
+        #print "----\nProcessing %s / %s \n----" % (forward_inode, 
+        #                                           reverse_inode)
+        while not (forward_messages.done and reverse_messages.done):
+
+         
+
+            # Is one or the other done?
+            if forward_messages.done:
+                reverse_messages.parse()
+            elif reverse_messages.done:
+                forward_messages.parse()
+
+            # Nope, both are still going, which one is next in the stream?
+            elif (forward_messages.get_next_packet_id() < \
+                  reverse_messages.get_next_packet_id()):
+                #print "Forward... F: %s R: %s" % (forward_messages.get_next_packet_id(), reverse_messages.get_next_packet_id())
+                forward_messages.parse()
+            elif (reverse_messages.get_next_packet_id() < \
+                  forward_messages.get_next_packet_id()):
+                #print "Reverse... F: %s R:%s" %  (forward_messages.get_next_packet_id(), reverse_messages.get_next_packet_id())
+                reverse_messages.parse()
+
+            # Who knows, just do the forward one?
+            else:
+                #print "Huh. Forward id was: %s, reverse id was:%s" % \
+                #    (forward_messages.get_packet_id(), 
+                #     reverse_messages.get_packet_id())
+                forward_messages.parse()
+
+        for inode in forward_messages.inodes:
+            self.scan_as_file("%s|%s" % (forward_inode, inode), factories)
+        
+        for inode in reverse_messages.inodes:
+            self.scan_as_file("%s|%s" % (reverse_inode, inode), factories)
             
+        ####
         #### Post Processing ####
+        ####
 
         #Store each of fl,bl,al etc.
-        for (thislistname,thislist) in m.list_lookup.items():
-            m.store_list(list=thislist,listname=thislistname)
+        # New:
+        for m in [forward_messages, reverse_messages]: 
+            #print "After processing, we had the following in lookup items:"
+            #print m.list_lookup.items()
+            for (thislistname,thislist) in m.list_lookup.items():
+                m.store_list(list=thislist,listname=thislistname)
+
+        # Old:
+        #for (thislistname,thislist) in m.list_lookup.items():
+        #    m.store_list(list=thislist,listname=thislistname)
             
         #Flatten contact list groups and store as one entry
-        finallist=[]
-        for (thislistname,thislist) in m.contact_list_groups.items():
-            finallist.append(thislistname+":"+",".join(thislist))
-            m.store_list(list=finallist,listname='contact_list_groups')
+        # New:
+        for m in [forward_messages, reverse_messages]: 
+            finallist=[]
+            for (thislistname,thislist) in m.contact_list_groups.items():
+                finallist.append(thislistname+":"+",".join(thislist))
+                m.store_list(list=finallist,listname='contact_list_groups')
+
+        # Old:
+        #finallist=[]
+        #for (thislistname,thislist) in m.contact_list_groups.items():
+        #    finallist.append(thislistname+":"+",".join(thislist))
+        #    m.store_list(list=finallist,listname='contact_list_groups')
                     
         # Fix up all the session IDs (=-1) that were stored before 
         # we figured out the session ID.
-        if m.session_id==-1:
-            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,
+
+        # New
+
+        iter = 0
+        inodes = [forward_inode, reverse_inode]
+        for m in [forward_messages, reverse_messages]: 
+            if m.session_id==-1:
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG,
                           "Couldn't figure out the MSN session ID for "\
                           "stream S%s/%s" % (forward_stream, reverse_stream))
-        else:
-            dbh.execute("update msn_session set session_id=%r where "\
-                        "session_id=-1 and inode=%r",
-                        (m.session_id,combined_inode))
-        try:
-            dbh.execute("update msn_users set session_id=%r where "\
-                        "session_id=-1 and inode=%r",
-                        (m.session_id,combined_inode))
+            else:
+                dbh.execute("update msn_session set session_id=%r where "\
+                            "session_id=-1 and inode=%r",
+                            (m.session_id,inodes[iter]))
+            try:
+                dbh.execute("update msn_users set session_id=%r where "\
+                            "session_id=-1 and inode=%r",
+                            (m.session_id,inodes[iter]))
 
-        except Exception:
-            # We already have this identical row with a real session ID - 
-            # will delete it below
-            pass
+            except Exception:
+                # We already have this identical row with a real session ID - 
+                # will delete it below
+                pass
+
+            iter += 1
+
+        # Old 
+        #if m.session_id==-1:
+        #    pyflaglog.log(pyflaglog.VERBOSE_DEBUG,
+        #                  "Couldn't figure out the MSN session ID for "\
+        #                  "stream S%s/%s" % (forward_stream, reverse_stream))
+        #else:
+        #    dbh.execute("update msn_session set session_id=%r where "\
+        #                "session_id=-1 and inode=%r",
+        #                (m.session_id,combined_inode))
+        #try:
+        #    dbh.execute("update msn_users set session_id=%r where "\
+        #                "session_id=-1 and inode=%r",
+        #                (m.session_id,combined_inode))
+
+#        except Exception:
+#            # We already have this identical row with a real session ID - 
+#            # will delete it below
+#            pass
 
         # We can delete everything with session id =-1 because we know we 
         # have an actual session id for this stream
-        dbh.execute("delete from msn_users where session_id=-1 and "\
-                    "inode=%r",combined_inode)
-        
-        # Similarly go back and fix up all the Unknown (Target) entries 
-        # with the actual target name
-        if m.client_id=='Unknown':
-            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Couldn't figure out "\
-                          "target identity for stream S%s/%s" % 
-                          (forward_stream, reverse_stream))
-        else:
-            dbh.execute("update msn_session set recipient=%r where "\
-                        "recipient='Unknown (Target)' and inode=%r",
-                        (m.client_id,combined_inode))
 
-            dbh.execute("update msn_session set sender=%r where "\
-                        "sender='Unknown (Target)' and inode=%r",
-                        (m.client_id,combined_inode))
-                
+        # New
+        iter = 0
+        inodes = [forward_inode, reverse_inode]
+        for m in [forward_messages, reverse_messages]:
+            dbh.execute("delete from msn_users where session_id=-1 and "\
+                        "inode=%r",inodes[iter])
+        
+            # Similarly go back and fix up all the Unknown (Target) entries 
+            # with the actual target name
+            if m.client_id=='Unknown':
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Couldn't figure out "\
+                              "target identity for stream S%s/%s" % 
+                               (forward_stream, reverse_stream))
+            else:   
+                dbh.execute("update msn_session set recipient=%r where "\
+                            "recipient='Unknown (Target)' and inode=%r",
+                            (m.client_id,inodes[iter]))
+
+                dbh.execute("update msn_session set sender=%r where "\
+                            "sender='Unknown (Target)' and inode=%r",
+                            (m.client_id,inodes[iter]))
+            iter += 1
+
+        # Old
+    
+        #dbh.execute("delete from msn_users where session_id=-1 and "\
+#                    "inode=%r",combined_inode)
+#        
+#        # Similarly go back and fix up all the Unknown (Target) entries 
+#        # with the actual target name
+#        if m.client_id=='Unknown':
+#            pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"Couldn't figure out "\
+#                          "target identity for stream S%s/%s" % 
+#                          (forward_stream, reverse_stream))
+#        else:
+#            dbh.execute("update msn_session set recipient=%r where "\
+#                        "recipient='Unknown (Target)' and inode=%r",
+#                        (m.client_id,combined_inode))
+#
+#            dbh.execute("update msn_session set sender=%r where "\
+#                        "sender='Unknown (Target)' and inode=%r",
+#                        (m.client_id,combined_inode))
+#
+#
+          
 class MSNFile(File):
     """ VFS driver for reading the cached MSN files """
     specifier = 'C'
@@ -1798,6 +2281,7 @@ class MSNTests(unittest.TestCase):
     ## Test protocol version 8 handling...
     def test01MSNScanner(self):
         """ Test MSN Scanner Handling Basic Protocol Ver 8 Commands"""
+
         self.test_case = "Pyflagtest01MSNScannerTestCase"
         env = pyflagsh.environment(case=self.test_case)
 
@@ -1820,7 +2304,8 @@ class MSNTests(unittest.TestCase):
                               "case=%s" % self.test_case , 
                               "iosource=MSNTest1", 
                               "subsys=Advanced", 
-                              "filename=MSN_Cap1_Ver8_LoginWithMessages.pcap"])
+                              "filename=NetworkForensics/ProtocolHandlers/"\
+                                   "MSN/MSN_Cap1_Ver8_LoginWithMessages.pcap"])
         
         pyflagsh.shell_execv(command="execute", 
                              argv=["Load Data.Load Filesystem image", 
@@ -1879,7 +2364,8 @@ class MSNTests(unittest.TestCase):
                               "case=%s" % self.test_case , 
                               "iosource=MSNTest2", 
                               "subsys=Advanced", 
-                              "filename=MSN_Cap3_Ver9_LoginWithMessages.pcap"])
+                              "filename=NetworkForensics/ProtocolHandlers/" \
+                                   "MSN/MSN_Cap3_Ver9_LoginWithMessages.pcap"])
         
         pyflagsh.shell_execv(command="execute", 
                              argv=["Load Data.Load Filesystem image", 
@@ -1909,6 +2395,7 @@ class MSNTests(unittest.TestCase):
         dbh.execute("""select user_data from `msn_users` where """\
                     """user_data_type=\"country_code\" and packet_id=30""")
         row=dbh.fetch()
+        assert row != None
         assert row["user_data"] == "au"
         
         
@@ -1939,7 +2426,8 @@ class MSNTests(unittest.TestCase):
                               "case=%s" % self.test_case , 
                               "iosource=MSNTest3", 
                               "subsys=Advanced", 
-                              "filename=MSN_Cap2_Ver15_LoginWithMessages.pcap"])
+                              "filename=NetworkForensics/ProtocolHandlers/"\
+                                  "MSN/MSN_Cap2_Ver15_LoginWithMessages.pcap"])
         
         pyflagsh.shell_execv(command="execute", 
                              argv=["Load Data.Load Filesystem image", 
@@ -1966,12 +2454,12 @@ class MSNTests(unittest.TestCase):
 
         ## We should also find user information  
         ## For example, check we pulled out the user's OS.
-
+        ## TODO
 
     ## Test protocol version 15 handling...
     def test04MSNScanner(self):
         """ Test MSN Scanner Handling P2P Send Using Protocol Ver 15"""
-
+        
         self.test_case = "Pyflagtest04MSNScannerTestCase"
 
         env = pyflagsh.environment(case=self.test_case)
@@ -1995,7 +2483,8 @@ class MSNTests(unittest.TestCase):
                               "case=%s" % self.test_case , 
                               "iosource=MSNTest4", 
                               "subsys=Advanced", 
-                              "filename=MSN_Cap4_Ver15_SendingAFile.pcap"])
+                              "filename=NetworkForensics/ProtocolHandlers"\
+                                      "/MSN/MSN_Cap4_Ver15_SendingAFile.pcap"])
         
         pyflagsh.shell_execv(command="execute", 
                              argv=["Load Data.Load Filesystem image", 
@@ -2013,7 +2502,7 @@ class MSNTests(unittest.TestCase):
         ## What should we have found?
         dbh = DB.DBO(self.test_case)
         dbh.execute("""select * from `msn_session` where """\
-                    """type=\"P2P FILE TRANSFER\"""")
+                    """type=\"P2P FILE TRANSFER - OFFER\"""")
 
         ## Well we should find a single file transfer
         row = dbh.fetch()
@@ -2029,9 +2518,255 @@ class MSNTests(unittest.TestCase):
                        "transferred over MSN."
 
         ## Now we also check it showed up in the p2p table...
-        dbh.execute("""select * from `msn_session` where """ \
-                    """type=\"P2P FILE TRANSFER\"""")
+        dbh.execute("""select * from `msn_p2p`""")
         row = dbh.fetch()
         assert row != None
+        assert row['context'] == "transferMe.txt"
         assert dbh.fetch() == None
         
+    ## Test protocol version 15 handling...
+    def test05MSNScanner(self):
+        """ Test MSN P2P Send (Rejecting a File) Protocol Ver 16"""
+
+        self.test_case = "Pyflagtest05MSNScannerTestCase"
+
+        env = pyflagsh.environment(case=self.test_case)
+
+        ## First we drop the case in case it already exists
+        ## Since it might not exist, we allow this to throw:
+        try:
+            pyflagsh.shell_execv(env=env,
+                                 command = "delete_case",
+                                 argv=[self.test_case])       
+        except RuntimeError:
+            pass
+ 
+        ## Now we create it
+        pyflagsh.shell_execv(env=env,
+                             command = "create_case",
+                             argv=[self.test_case])
+
+        pyflagsh.shell_execv(command="execute", 
+                            argv=["Load Data.Load IO Data Source", 
+                              "case=%s" % self.test_case , 
+                              "iosource=MSNTest5", 
+                              "subsys=Advanced", 
+                              "filename=NetworkForensics/ProtocolHandlers/MS"\
+                                "N/MSN_Cap5_Ver15_RejectingAReceivedFile.pcap"])
+        
+        pyflagsh.shell_execv(command="execute", 
+                             argv=["Load Data.Load Filesystem image", 
+                                   "case=%s" %self.test_case , 
+                                   "iosource=MSNTest5", 
+                                   "fstype=PCAP Filesystem", 
+                                   "mount_point=/MSNTest5"])
+
+        pyflagsh.shell_execv(env=env,
+                             command="scan",
+                             argv=["*",                   ## Inodes (All)
+                                   "MSNScanner"
+                                  ])                   ## List of Scanners
+
+        ## What should we have found?
+        dbh = DB.DBO(self.test_case)
+        dbh.execute("""select * from `msn_session` where """\
+                    """type=\"P2P FILE TRANSFER - DECLINED\"""")
+
+        ## Well we should find a single declined file transfer
+        row = dbh.fetch()
+        assert row != None
+        assert row['p2p_file'] != None
+        row = dbh.fetch()
+        assert row == None
+
+    ## Test protocol version 15 handling...
+    def test06MSNScanner(self):
+        """ Test MSN P2P Send Being Rejected Using Protocol Ver 15 """ 
+
+        self.test_case = "Pyflagtest06MSNScannerTestCase"
+
+        env = pyflagsh.environment(case=self.test_case)
+
+        ## First we drop the case in case it already exists
+        ## Since it might not exist, we allow this to throw:
+        try:
+            pyflagsh.shell_execv(env=env,
+                                 command = "delete_case",
+                                 argv=[self.test_case])       
+        except RuntimeError:
+            pass
+ 
+        ## Now we create it
+        pyflagsh.shell_execv(env=env,
+                             command = "create_case",
+                             argv=[self.test_case])
+
+        pyflagsh.shell_execv(command="execute", 
+                            argv=["Load Data.Load IO Data Source", 
+                            "case=%s" % self.test_case , 
+                            "iosource=MSNTest6", 
+                            "subsys=Advanced", 
+                            "filename=NetworkForensics/ProtocolHandlers/" \
+                               "MSN/MSN_Cap6_Ver15_HavingAFileRejected.pcap"])
+        
+        pyflagsh.shell_execv(command="execute", 
+                             argv=["Load Data.Load Filesystem image", 
+                                   "case=%s" %self.test_case , 
+                                   "iosource=MSNTest6", 
+                                   "fstype=PCAP Filesystem", 
+                                   "mount_point=/MSNTest6"])
+
+        pyflagsh.shell_execv(env=env,
+                             command="scan",
+                             argv=["*",                   ## Inodes (All)
+                                   "MSNScanner"
+                                  ])                   ## List of Scanners
+
+        ## What should we have found?
+        ## TODO
+
+
+    ## Test protocol version 15 handling...
+    def test07MSNScanner(self):
+        """ Test MSN P2P Sending Big File Ver 15 """ 
+
+        self.test_case = "Pyflagtest07MSNScannerTestCase"
+
+        env = pyflagsh.environment(case=self.test_case)
+
+        ## First we drop the case in case it already exists
+        ## Since it might not exist, we allow this to throw:
+        try:
+            pyflagsh.shell_execv(env=env,
+                                 command = "delete_case",
+                                 argv=[self.test_case])       
+        except RuntimeError:
+            pass
+ 
+        ## Now we create it
+        pyflagsh.shell_execv(env=env,
+                             command = "create_case",
+                             argv=[self.test_case])
+
+        pyflagsh.shell_execv(command="execute", 
+                            argv=["Load Data.Load IO Data Source", 
+                            "case=%s" % self.test_case , 
+                            "iosource=MSNTest7", 
+                            "subsys=Advanced", 
+                            "filename=NetworkForensics/ProtocolHandlers/" \
+                               "MSN/MSN_Cap7_Ver15_LargeFileReceived.pcap"])
+        
+        pyflagsh.shell_execv(command="execute", 
+                             argv=["Load Data.Load Filesystem image", 
+                                   "case=%s" %self.test_case , 
+                                   "iosource=MSNTest7", 
+                                   "fstype=PCAP Filesystem", 
+                                   "mount_point=/MSNTest7"])
+
+        pyflagsh.shell_execv(env=env,
+                             command="scan",
+                             argv=["*",                   ## Inodes (All)
+                                   "MSNScanner"
+                                  ])                   ## List of Scanners
+
+        ## What should we have found?
+        dbh = DB.DBO(self.test_case)
+        dbh.execute("""select * from `msn_session` where """\
+                    """type=\"P2P FILE TRANSFER - OFFER\"""")
+
+        ## Well we should find a single file transfer
+        row = dbh.fetch()
+        assert row['p2p_file'] != None
+
+        ## Test it has what we expect in it
+        fsfd = DBFS(self.test_case)
+        test = fsfd.open(inode=row['p2p_file'])
+
+        # Check that we got the contents of the file correct
+        
+        data = test.read(3000000)
+        assert len(data) == 2751920
+
+        import md5
+        m = md5.new()
+        m.update(data)
+        assert (m.digest()).encode("hex") == "f8f279e05e1cb00cc24d92060ad377b3"
+
+        ## Now we also check it showed up in the p2p table...
+        dbh.execute("""select * from `msn_p2p`""")
+        row = dbh.fetch()
+        assert row != None
+        assert row['context'] == "transferMe.zip"
+        assert dbh.fetch() == None
+
+    def test08MSNScanner(self):
+        """ Test MSN P2P Multi User Ver 15 """ 
+
+        self.test_case = "Pyflagtest08MSNScannerTestCase"
+
+        env = pyflagsh.environment(case=self.test_case)
+
+        ## First we drop the case in case it already exists
+        ## Since it might not exist, we allow this to throw:
+        try:
+            pyflagsh.shell_execv(env=env,
+                                 command = "delete_case",
+                                 argv=[self.test_case])       
+        except RuntimeError:
+            pass
+ 
+        ## Now we create it
+        pyflagsh.shell_execv(env=env,
+                             command = "create_case",
+                             argv=[self.test_case])
+
+        pyflagsh.shell_execv(command="execute", 
+                            argv=["Load Data.Load IO Data Source", 
+                            "case=%s" % self.test_case , 
+                            "iosource=MSNTest8", 
+                            "subsys=Advanced", 
+                            "filename=NetworkForensics/ProtocolHandlers/" \
+                               "MSN/MSN_Cap8_Ver15_MultiUserChat.pcap"])
+        
+        pyflagsh.shell_execv(command="execute", 
+                             argv=["Load Data.Load Filesystem image", 
+                                   "case=%s" %self.test_case , 
+                                   "iosource=MSNTest8", 
+                                   "fstype=PCAP Filesystem", 
+                                   "mount_point=/MSNTest8"])
+
+        pyflagsh.shell_execv(env=env,
+                             command="scan",
+                             argv=["*",                   ## Inodes (All)
+                                   "MSNScanner"
+                                  ])                   ## List of Scanners
+
+        ## What should we have found?
+        dbh = DB.DBO(self.test_case)
+        dbh.execute("""select * from `msn_session` where type=\"MESSAGE\""""\
+                    """ order by packet_id""")
+
+        ## Well we should find 14 messages
+        messages = 0
+
+        while 1:
+            row = dbh.fetch()
+            if not row:
+                break
+            
+            messages += 1 
+            if messages == 3:
+                assert row['recipient'] == "msnpersonone@hotmail.com,"\
+                                           "msnpersontwo@hotmail.com"
+                assert row['data'] == "message from person three to both "\
+                                      "person two and one"
+            elif messages == 11:
+                assert row['recipient'] == "msnpersonthree@hotmail.com "\
+                                           "(Target),msnpersonone@hotmail.com"
+                assert row['data'] == "person two is now leaving the chat......"       
+            elif messages == 12:
+                assert row['data'] == "message to just person one after pers"\
+                                      "on two left"
+                assert row['recipient'] == "msnpersonone@hotmail.com"
+
+        assert messages == 14

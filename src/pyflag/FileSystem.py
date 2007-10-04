@@ -641,7 +641,7 @@ class File:
                 return data
 
         except AttributeError,e:
-            raise IOError("No cached file")
+            raise IOError("No cached file: (%s)" % e )
 
     def stat(self):
         """ Returns a dict of statistics about the content of the file. """
