@@ -35,7 +35,7 @@ from pyflag.FlagFramework import query_type
 from NetworkScanner import *
 import plugins.NetworkForensics.PCAPFS as PCAPFS
 import TreeObj
-from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType, PacketType
+from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType, PacketType, IPType
 
 import dissect,sys,struct,sys,cStringIO, re, time, cgi
 
@@ -55,7 +55,8 @@ class FTPControlStream:
     port_command_regex = re.compile("\s*?(\d{1,3}),(\d{1,3}),(\d{1,3})"\
                                     ",(\d{1,3}),(\d{1,3}),(\d{1,3})\s*")
 
-    def __init__(self, forward_fd=None, reverse_fd=None):
+    def __init__(self, forward_fd=None, reverse_fd=None, case=None):
+        self.case = case
 
         self.forward_fd = forward_fd
         self.reverse_fd = reverse_fd
@@ -68,6 +69,15 @@ class FTPControlStream:
 
         self.session_events = []
         self.session_meta_data = {}
+        self.session_meta_data['username'] = "<Unknown>"
+        self.session_meta_data['password'] = "<Unknown>"
+        self.session_meta_data['server_banner'] = "<None>"
+        self.session_meta_data['welcome_banner'] = "<None>"
+        self.session_meta_data['client_ip'] = 0
+        self.session_meta_data['server_ip'] = 0
+        self.session_meta_data['total_bytes'] = 0
+        self.session_meta_data['start_time'] = 0
+        self.session_meta_data['inode'] = "None"
 
         self.data_streams = []
 
@@ -93,11 +103,28 @@ class FTPControlStream:
                               " command! Not sure what to do. It looked like"\
                               " this: %s" % self.forward_commands['data'])
                 return
+
             
-            self.data_streams.append( { "source":"TODO",
-                                   "destination":".".join(match.groups()[0:4]),
-                                   "destination_port":(p2 + (256 * p1)),
-                                   "source_port":"TODO" } )
+            # Assumes a download! TODO
+            MASK32 = 0xffffffffL
+            def aton(str):
+                """ convert dotted decimal IP to int """
+                oct = [long(i) for i in str.split('.')]
+                result=((oct[0] << 24) | (oct[1] << 16) | (oct[2] << 8) | (oct[3])) & MASK32
+                return result
+
+            self.data_streams.append( { "source":
+                                           self.session_meta_data['server_ip'],
+                                        "destination":
+                                           aton(".".join(match.groups()[0:4])),
+                                        "destination_port":
+                                           (p2 + (256 * p1)),
+                                        "source_port":
+                                           20,
+                                        "inode":
+                                           "Unknown",
+                                        "time":
+                                           self.get_time_of_packet() } )
 
             self.state['current'] = "port_pending"
 
@@ -266,6 +293,13 @@ class FTPControlStream:
                           " from the server. Setting state to idle")
             self.state['current'] = "idle"
 
+    def get_time_of_packet(self, forward = True):
+        id = self.get_forward_packet_id()
+        dbh = DB.DBO(case = self.case)
+        dbh.execute("""select * from `pcap` where id="%s" """ % id)
+        row = dbh.fetch()
+        return row['ts_sec']
+
     def get_next_packet_id(self,forward=True):
         try:
             if forward:
@@ -283,7 +317,32 @@ class FTPControlStream:
     def get_next_reverse_packet_id(self):
         return self.get_next_packet_id(forward=False)
 
+    def get_packet_id(self,forward=True):
+        try:
+            if forward:
+                offset = self.forward_fd.tell()
+                return self.forward_fd.get_packet_id(offset)
+            else:
+                offset = self.reverse_fd.tell()
+                return self.reverse_fd.get_packet_id(offset)
+        except IOError:
+            return -1
+
+    def get_forward_packet_id(self):
+        return self.get_packet_id(forward=True)
+        
+    def get_reverse_packet_id(self):
+        return self.get_packet_id(forward=False)
+
     def parse(self):
+    
+        # Meta data
+        self.session_meta_data['client_ip'] = self.forward_fd.src_ip
+        self.session_meta_data['server_ip'] = self.forward_fd.dest_ip
+        self.session_meta_data['start_time'] = self.forward_fd.ts_sec
+        self.session_meta_data['total_bytes'] = self.forward_fd.size
+        self.session_meta_data['inode'] = self.forward_fd.inode
+
         while not (self.forward_stream_parsed and self.reverse_stream_parsed):
 
             # Is one or the other done?
@@ -308,11 +367,49 @@ class FTPControlStream:
                 self.forward_stream_parse()
 
 
-    def saveToDb(self,dbh = None):
+    def save_to_db(self,dbh = None):
         # here we save everything in 
         # self.session_meta_data, self.session_events and self.data_streams
+        
+        ## First save the meta data...
+        if not dbh:
+            return
 
-        pass
+        dbh.insert('ftp_sessions',
+                    client_ip = self.session_meta_data['client_ip'],
+                    server_ip = self.session_meta_data['server_ip'],
+                    username = self.session_meta_data['username'],
+                    password = self.session_meta_data['password'],
+                    server_banner = self.session_meta_data['server_banner'],
+                    welcome_banner = self.session_meta_data['welcome_banner'],
+                    total_bytes = self.session_meta_data['total_bytes'],
+                    start_time = self.session_meta_data['start_time'],
+                    inode = self.session_meta_data['inode'])
+    
+
+        session_id = dbh.autoincrement()
+        
+        for event in self.session_events:
+            dbh.insert('ftp_commands',
+                        command = event['command'],
+                        command_type = event['type'],
+                        data = event['data'],
+                        ftp_session_id = session_id,
+                        data_stream = "None")
+
+
+        for stream in self.data_streams:
+            dbh.insert('ftp_data_streams',
+                       ftp_session_id = session_id,
+                       source = stream['source'],
+                       source_port = stream['source_port'],
+                       destination = stream['destination'],
+                       destination_port = stream['destination_port'],
+                       purpose = stream['purpose'],
+                       time_created = stream['time'],
+                       inode = stream['inode'])
+        
+            
 
     def printStatus(self):
         print "--- Control Stream ---"
@@ -338,12 +435,28 @@ class FTPScanner(StreamScannerFactory):
         def is_data_stream(stream):
             ## TODO
             # Search the DB to see if this is an FTP stream.
+            dbh = DB.DBO(case = self.case)
+            dbh.execute("""select * from ftp_data_streams where """ \
+                        """`source` = %s and `source_port` = %s and """ \
+                        """`destination` = %s and `destination_port` = %s """\
+                        % (stream.src_ip, stream.src_port, stream.dest_ip,
+                           stream.dest_port))
+            row = dbh.fetch()
+            if row:
+                return True
+
             return False
 
         ## We first need to check whether or not it's a data stream
         if is_data_stream(stream):
-            #dataStream = 
-            #self.process_data_stream(stream)
+            print "DATA stream."
+            dbh = DB.DBO(case = self.case)
+            dbh.execute("""update ftp_data_streams set inode  """ \
+                        """ = "%s" where """ \
+                        """`source` = %s and `source_port` = %s and """ \
+                        """`destination` = %s and `destination_port` = %s """\
+                        % (stream.inode, stream.src_ip, stream.src_port, 
+                           stream.dest_ip, stream.dest_port))
             return
 
         ## Nope, is it a control stream?
@@ -367,13 +480,20 @@ class FTPScanner(StreamScannerFactory):
 
         ## Create our FTPControl stream...
         controlStream = FTPControlStream(forward_fd = forward_fd,
-                                         reverse_fd = reverse_fd)
+                                         reverse_fd = reverse_fd,
+                                         case = self.case)
+
+
+        dbh = DB.DBO(self.case)
 
         ## Allow it to parse iteself
         controlStream.parse()
 
         ## How did we go? (debug)
         # controlStream.printStatus()
+
+        ## Save to DB
+        controlStream.save_to_db(dbh)
         
 
 
@@ -381,61 +501,109 @@ class FTPTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
         pass
         
-#        # ftp_sessions will give an overview of each "session" (control 
-#        # connection
-#        dbh.execute(
-#            """CREATE TABLE if not exists `ftp_sessions` (
-#            `id` INT(11) not null auto_increment,
-#            `client_ip`
-#            `server_ip`
-#            `username`
-#            `password`
-#            `server_banner`
-#            `total_bytes`
-#            `starttime`
-#
-#            primary key (`id`)
-#            )""")
-#
-#        # ftp_commands will list each ftp command
-#        dbh.execute(
-#            """CREATE TABLE if not exists `ftp_commands` (
-#            `id` INT(11) not null auto_increment,
-#            `ftp_session_id`
-#            `command_type`
-#            `command`
-#            `data`
-#            `timestamp`
-#            `data_stream`
-#
-#            primary key (`id`)
-#            )""")
-#        
-#        # ftp_data_streams will list each ftp data stream (directory 
-#        # listings and also file transfers etc)
-#        dbh.execute(
-#            """CREATE TABLE if not exists `ftp_data_streams` (
-#            `id` INT(11) not null auto_increment,
-#            `ftp_session_id`
-#            `source`
-#            `source_port`
-#            `destination`
-#            `destination_port`
-#            `purpose`
-#            `inode`
-#
-#            primary key (`id`)
-#            )""")
+        # ftp_sessions will give an overview of each "session" (control 
+        # connection
+        dbh.execute(
+            """CREATE TABLE if not exists `ftp_sessions` (
+            `id` INT(16) not null auto_increment,
+            `client_ip` int(11) unsigned not null,
+            `server_ip` int(11) unsigned not null,
+            `username` varchar(128) not null,
+            `password` varchar(128) not null,
+            `server_banner` text,
+            `welcome_banner` text,
+            `total_bytes` int(32),
+            `start_time` timestamp,
+            `inode` varchar(255),
+            primary key (`id`)
+            )""")
+
+        # ftp_commands will list each ftp command
+        dbh.execute(
+            """CREATE TABLE if not exists `ftp_commands` (
+            `id` INT(16) not null auto_increment,
+            `ftp_session_id` INT(16) not null, 
+            `command_type` varchar(128),
+            `command` varchar(128),
+            `data` text,
+            `timestamp` timestamp,
+            `data_stream` varchar(255),
+            primary key (`id`)
+            )""")
+        
+        # ftp_data_streams will list each ftp data stream (directory 
+        # listings and also file transfers etc)
+        dbh.execute(
+            """CREATE TABLE if not exists `ftp_data_streams` (
+            `id` INT(16) not null auto_increment,
+            `ftp_session_id` int(16) not null,
+            `source` INT(11) unsigned not null,
+            `source_port` INT(16) not null,
+            `destination` INT(11) unsigned not null,
+            `destination_port` int(16) not null,
+            `purpose` varchar(255) not null,
+            `inode` varchar(255) not null,
+            `time_created` timestamp not null,
+            primary key (`id`)
+            )""")
 
         
 class BrowseFTPRequests(Reports.report):
     name = "Browse FTP Data"
     family = "Network Forensics"
-    hidden = True
+    hidden = False
     
     def display(self,query,result):    
-        result.heading("FTP Session Browser")
-        result.para("NYI Sorry")
+    
+        def sessions(query, result):
+            result.table(
+                elements = [ IntegerType("FTP Session id", "id"),
+                             InodeType("Forward Stream", "inode", 
+                                        case=query['case']),
+                             TimestampType("Start Time", "start_time"), 
+                             IPType("Client IP", "client_ip"),
+                             IPType("Server IP", "server_ip"),
+                             StringType("Username", "username"),
+                             StringType("Password", "password"),
+                             StringType("Server Banner", "server_banner"),
+                             IntegerType("Total bytes", "total_bytes")],
+                table = "ftp_sessions",
+                case = query['case'])
+
+        def commands(query, result):
+            result.table(
+                elements = [ IntegerType("FTP Session id", "ftp_session_id",
+                                link = query_type(family = "Network Forensics", 
+                                                  case = query['case'], 
+                                                  report = "Browse FTP Data")),
+                             StringType("Command Type", "command_type"),
+                             StringType("Command", "command"),
+                             StringType("Data", "data")],
+                table = 'ftp_commands',
+                case = query['case'])
+
+        def streams(query, result):
+            result.table(
+                elements = [ IntegerType("FTP Session id", "ftp_session_id",
+                                link = query_type(family = "Network Forensics", 
+                                                  case = query['case'], 
+                                                  report = "Browse FTP Data")),
+                             TimestampType("Time Created", "time_created"),
+                             StringType("Purpose", "purpose"),
+                             InodeType("Inode", "inode", case=query['case'])],
+                table = 'ftp_data_streams',
+                case = query['case'])
+
+        result.heading("FTP Data Browser")
+        result.notebook(
+                        names = ['FTP Sessions',
+                                 'FTP Commands',
+                                 'FTP Data Streams'],
+                    callbacks = [sessions,
+                                 commands,
+                                 streams]
+                        )
+                                        
 
 
 import unittest, pyflag.pyflagsh as pyflagsh
