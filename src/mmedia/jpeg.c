@@ -57,6 +57,9 @@ struct my_src_mgr {
 
   // The end of the image in sector
   int last_sector;
+
+  // The last fully decoded row in the image:
+  int last_row;
 };
 
 /*

@@ -189,7 +189,7 @@ class SelfFeederMixIn(Lexer):
         ## that we must have at least one sector in our buffer.
         if len(self.buffer) < 512:
             if self.feed()==0 and len(self.buffer)==0:
-                raise IOError("No data left")
+                return None
 
         return Lexer.next_token(self)
         

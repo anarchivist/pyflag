@@ -158,13 +158,14 @@ class PDFCarver(Carver.CarverFramework):
         for xref in hits['XREFS']:
             print "Reading XREFs table from %s "% xref
             image_fd.seek(xref, 0)
-            
+
             p = PDF.PDFParser(image_fd)
             
             ## Read until the EOF marker
             while p.next_token() != "RESET_STATE" and p.error < 10:
                 pass
 
+            if p.error > 0: print "Errors parsing the XREF table this will probably be corrupted"
             total_xrefs[xref] = p.pdf
             c = self.make_carver_from_xref(p.pdf, image_fd, hits)
             c.save_map("%s.map" % xref)
@@ -181,7 +182,7 @@ class PDFCarver(Carver.CarverFramework):
                     ## modulo rule? (The +1 is related to the regex
                     ## above having an extra \r\n at the start)
                     if xref_offset % SECTOR_SIZE == y % SECTOR_SIZE + 1:
-                        print "Xref at offset %s is possibly related to xref at offset %s" % (y, x)
+                        print "Xref at offset %s is possibly related to xref at offset %s (modulo rule)" % (y, x)
                         print "%s's range is %s, %s's range is %s" % (y,total_xrefs[y].xref_range,
                                                                       x,total_xrefs[x].xref_range,)
                         # Search for us refering to them:

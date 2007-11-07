@@ -19,8 +19,11 @@
 # * along with this program; if not, write to the Free Software
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
-""" A Parser for the mozilla database format. This is mostly used to
-store Mozilla history.
+""" A Parser for the mozilla database format (Its called Mork). This
+is mostly used to store Mozilla history and saved forms.
+
+The format specification can be found here
+http://www.mozilla.org/mailnews/arch/mork/primer.txt
 """
 
 import pyflag.lexer as lexer
@@ -32,12 +35,13 @@ class MozHist(lexer.SelfFeederMixIn, lexer.Lexer):
             ## Comments are C++ style and occur at any place
             [ '.', '//[^\n]+', "COMMENT", None ],
 
-            ## Sections are delimited by < >
+            ## Sections are delimited by < > (< > can appear in other
+            ## states like within the VALUE)
             [ '(INITIAL|SECTION)', '<', 'START_SECTION,PUSH_STATE', 'SECTION' ],
             [ 'SECTION', '>', 'END_SECTION,POP_STATE', None],
 
             ## properties are delimited by () and are followed by property = value
-            [ 'SECTION', '\(([^=\s]+)(\s+)?=', 'PROPERTY,PUSH_STATE', 'VALUE'],
+            [ 'SECTION', r'\(([^=\s]+)(\s+)?=', 'PROPERTY,PUSH_STATE', 'VALUE'],
             ## Values are sometimes broken across lines:
             [ 'VALUE', r'\\\n', 'SPACE', None],
 
@@ -54,9 +58,11 @@ class MozHist(lexer.SelfFeederMixIn, lexer.Lexer):
             [ 'VALUE', r'\)', 'VALUE,POP_STATE', None],
 
             ## Event lists are delimited by {}. We actually ignore the
-            ## whole line here because I dont really know what that
-            ## line means.
+            ## whole first line here because I dont really know what
+            ## that line means.
             [ 'INITIAL', '{[^\n]+', 'EVENT_LIST_START', 'EVENT_LIST'],
+
+            ## Events start with [id within the EVENT_LIST
             [ 'EVENT_LIST', '\[([^\(]+)', 'EVENT_START', 'EVENT'],
 
             ## Events contain attributes like (^xx^yy)
@@ -100,7 +106,7 @@ class MozHist(lexer.SelfFeederMixIn, lexer.Lexer):
         if self.types.has_key('a'): self.types = None
 
     def EVENT_START(self, t, m):
-        self.event = {}
+        self.event = {"id": m.group(1)}
 
     def EVENT_ATTRIBUTE(self, t, m):
         field = self.types[m.group(1)]
@@ -114,9 +120,10 @@ class MozHist(lexer.SelfFeederMixIn, lexer.Lexer):
     def EVENT_END(self, t, m):
         ## Some of the fields are given in UTF 16 we convert them
         ## here.
-        try:
-            self.event['Name'] = self.event['Name'].decode('utf16')
-        except: pass
+        for k in ('Name','Value'):
+            try:
+                self.event[k] = self.event[k].decode('utf16')
+            except: pass
 
 if __name__=="__main__":
     fd = open(sys.argv[1])

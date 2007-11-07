@@ -168,10 +168,9 @@ class PDFParser(lexer.SelfFeederMixIn, lexer.Lexer):
             ## Whitespace:
             [ '.','\s+', 'SPACE', None],
             ]
-
+        lexer.Lexer.__init__(self)
         self.objects=[]
         self.fd = fd
-        lexer.Lexer.__init__(self)
         self.pdf = PDFFile()
         self.string =''
         self.xref_start_entry = 0
