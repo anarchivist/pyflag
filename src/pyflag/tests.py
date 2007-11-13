@@ -80,6 +80,7 @@ class ScannerTest(unittest.TestCase):
     subsystem = "EWF"
     fstype = "Sleuthkit"
     offset = 0
+    mount_point = '/'
 
     def test00preLoadCase(self):
         """ Load test Case"""
@@ -100,4 +101,4 @@ class ScannerTest(unittest.TestCase):
                              argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,
                                    "iosource=test",
                                    "fstype=%s" % self.fstype,
-                                   "mount_point=/"])
+                                   "mount_point=%s" % self.mount_point])

@@ -310,11 +310,15 @@ class CaseDBInit(FlagFramework.EventHandler):
         )""",",".join(scanners))
 
         case_dbh.execute("""CREATE TABLE IF NOT EXISTS file (
+        `inode_id` INT NULL,
         `inode` VARCHAR(250) NOT NULL,
         `mode` VARCHAR(3) NOT NULL,
         `status` VARCHAR(8) NOT NULL,
         `path` TEXT,
-        `name` TEXT)""")
+        `name` TEXT,
+        `link` TEXT NULL,
+        key `inode_id` (`inode_id`)
+        )""")
 
         case_dbh.execute("""CREATE TABLE IF NOT EXISTS block (
         `inode` VARCHAR(250) NOT NULL,
@@ -354,14 +358,14 @@ class CaseDBInit(FlagFramework.EventHandler):
         case_dbh.execute("""CREATE TABLE if not exists `xattr` (
                             `inode_id` INT NOT NULL ,
                             `property` VARCHAR(250) NOT NULL ,
-                            `value` VARCHAR(250) NOT NULL
+                            `value` TEXT NOT NULL
                             ) """)
         
         case_dbh.execute("""CREATE TABLE `GUI_filter_history` (
                             `id` int auto_increment,
                             `filter` VARCHAR(250),
                             `elements` VARCHAR(500),
-                            PRIMARY KEY (`id`))""")
+                            PRIMARY KEY (`id`)) character set latin1""")
 
         case_dbh.execute("""ALTER TABLE `GUI_filter_history` ADD UNIQUE INDEX stopDupes (filter, elements)""")
     

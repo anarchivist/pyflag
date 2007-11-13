@@ -1458,7 +1458,8 @@ class InodeIDType(InodeType):
 
 class FilenameType(StringType):
     hidden = True
-    def __init__(self, name='Filename', filename='name', path='path',
+    def __init__(self, name='Filename', filename='name', path='path', file='file',
+                 basename=False,
                  link=None, link_pane=None, case=None):
         if not link:
             link = query_type(case=case,
@@ -1466,12 +1467,26 @@ class FilenameType(StringType):
                               report='Browse Filesystem',
                               __target__='open_tree',open_tree="%s")
         self.path = path
+        self.file = file
+        ## This is true we only display the basename
+        self.basename = basename
         self.filename = filename
         ColumnType.__init__(self,name=name, column=filename,
                             link=link, link_pane=link_pane)
 
+    def display(self, value, row, result):
+        tmp = result.__class__(result)
+        tmp.text(value)
+        if row['link']:
+            tmp.text("\n->%s" % row['link'], style="red")
+
+        return tmp
+
     def select(self):
-        return "concat(`%s`,`%s`)" % (self.path,self.filename)
+        if self.basename:
+            return "`%s`.link, `%s`" % (self.file, self.filename)
+        else:
+            return "`%s`.link, concat(`%s`,`%s`)" % (self.file, self.path,self.filename)
     
     ## FIXME: implement filename globbing operators - this should be
     ## much faster than regex or match operators because in marches,

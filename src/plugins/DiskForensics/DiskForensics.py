@@ -108,7 +108,7 @@ class BrowseFS(Reports.report):
             result.table(
                 elements = [ InodeType('Inode','f.inode',case=query['case']),
                              StringType('Mode','f.mode'),
-                             FilenameType(case=query['case']),
+                             FilenameType(case=query['case'], file='f'),
                              DeletedType('Del','f.status'),
                              IntegerType('File Size','size'),
                              TimestampType('Last Modified','mtime'),
@@ -116,7 +116,7 @@ class BrowseFS(Reports.report):
                              TimestampType('Created','ctime'),
                              ],
                 table='file as f, inode as i',
-                where="f.inode=i.inode",
+                where="f.inode_id=i.inode_id",
                 case=query['case'],
                 )
 
@@ -152,13 +152,13 @@ class BrowseFS(Reports.report):
 
                 tmp.table(
                     elements = [ InodeType('Inode','file.inode',case=query['case']),
-                                 StringType('Filename','name'),
+                                 FilenameType('Filename','name', basename=True),
                                  DeletedType('Del','file.status'),
                                  IntegerType('File Size','size'),
                                  TimestampType('Last Modified','mtime'),
                                  StringType('Mode','file.mode') ],
                     table='file, inode',
-                    where="file.inode=inode.inode and path=%r and file.mode!='d/d'" % (path+'/'),
+                    where="file.inode_id=inode.inode_id and path=%r and file.mode!='d/d'" % (path+'/'),
                     case=query['case'],
                     pagesize=10,
                     )

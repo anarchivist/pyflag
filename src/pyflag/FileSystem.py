@@ -103,7 +103,7 @@ class FileSystem:
         """ list directory content longly """
         pass
 
-    def VFSCreate(self,root_inode,inode, _fast=False):
+    def VFSCreate(self,root_inode,inode, _fast=False, link=None):
         """ This method creates inodes within the virtual filesystem.
 
         This facility allows callers to extend the VFS to include more virtual files.
@@ -261,16 +261,6 @@ class DBFS(FileSystem):
         ## not be specifically inserted.
         #if directory: return
 
-        ## Now add to the file and inode tables:
-        dbh.insert('file',
-                   path = FlagFramework.normpath(os.path.dirname(new_filename)+"/"),
-                   name = os.path.basename(new_filename),
-                   status = 'alloc',
-                   mode = directory_string,
-                   inode = inode,
-                   _fast = _fast
-                   )
-
         inode_properties = dict(status="alloc", mode=40755, links=4, _fast=_fast,
                                 inode=inode,size=0)
         
@@ -281,6 +271,7 @@ class DBFS(FileSystem):
 
         for t in ['ctime','atime','mtime']:
             try:
+                if not properties["_"+t]: continue
                 inode_properties["_"+t] = "from_unixtime(%r)" % int(properties["_"+t])
             except ValueError:
                 inode_properties[t] = properties[t]
@@ -288,6 +279,25 @@ class DBFS(FileSystem):
                 pass
 
         dbh.insert('inode', **inode_properties)
+        inode_id = dbh.autoincrement()
+
+        ## Now add to the file and inode tables:
+        file_props = dict(path = FlagFramework.normpath(os.path.dirname(new_filename)+"/"),
+                          name = os.path.basename(new_filename),
+                          status = 'alloc',
+                          mode = directory_string,
+                          inode = inode,
+                          inode_id = inode_id,
+                          _fast = _fast)
+
+        try:
+            file_props['link'] = properties['link']
+        except KeyError:
+            pass
+
+        dbh.insert('file',**file_props)
+
+        return inode_id
 
     def longls(self,path='/', dirs = None):
         dbh=DB.DBO(self.case)
