@@ -180,7 +180,7 @@ static int my_fill_input_buffer (j_decompress_ptr cinfo) {
   if(self->maximum_sector && self->current_sector >= self->maximum_sector) {
     self->pub.next_input_byte = (unsigned char *)end_marker;
     self->pub.bytes_in_buffer = 2;
-
+    printf("Stopped reading at %u\n", self->maximum_sector);
   } else {
     // Read a new sector:
     PyObject *result;
@@ -275,6 +275,10 @@ typedef struct {
 } decoder;
 
 static void decoder_dealloc(decoder *self) {
+  // This will free all memory allocated to the cinfo (including the
+  // cinfo itself)
+  self->cinfo->mem->self_destruct(self->cinfo);
+
   if(self->fd) {
     Py_DECREF(self->fd);
   };
@@ -326,6 +330,21 @@ static int decoder_init(decoder *self, PyObject *args) {
 // prototypes
 int estimate_row(decoder *self, int row, int left, int right);
 
+
+// FIXME: Does this work properly?
+static int is_line_empty(char *buffer, int len, int minimum) {
+  int i,j;
+  for(i=0; i<len-minimum; i++) {
+    for(j=0;j<=minimum;j++) {
+      if(buffer[i+j] !=0) break;
+    };
+
+    if(j==minimum) return 1;
+  };
+
+  return 0;
+};
+
 static PyObject *decoder_decode(decoder *self, PyObject *args, PyObject *kwds) {
   PyObject *result;
   JSAMPROW row_pointer[1];
@@ -344,7 +363,7 @@ static PyObject *decoder_decode(decoder *self, PyObject *args, PyObject *kwds) {
   if(mem->sector && mem->sector < maximum_sector) {
     int i;
     resume_memory(self->cinfo);
-    
+
     // Seek to where we left off:
     result = PyObject_CallMethod(self->fd, "seek", "(k)", (mem->sector) * SECTOR_SIZE);
     if(!result)
@@ -356,6 +375,7 @@ static PyObject *decoder_decode(decoder *self, PyObject *args, PyObject *kwds) {
     memset(self->frame + mem->row * self->row_stride, 0, 
 	   self->row_stride * (self->cinfo->output_height - mem->row));
   } else {
+    printf("Starting decoding from scratch\n");
     // Seek to the start - we will not decode from the start
     result = PyObject_CallMethod(self->fd, "seek", "(k)", 0);
     if(!result)
@@ -363,6 +383,7 @@ static PyObject *decoder_decode(decoder *self, PyObject *args, PyObject *kwds) {
     Py_DECREF(result);
   
     // Decode the data:
+    jpeg_abort(self->cinfo);
     jpeg_read_header(self->cinfo, TRUE);
     jpeg_start_decompress(self->cinfo);
   };
@@ -378,27 +399,23 @@ static PyObject *decoder_decode(decoder *self, PyObject *args, PyObject *kwds) {
 
   
   self->row_stride = self->cinfo->output_width * self->cinfo->output_components;
-  {
-    int size = sizeof(int) * self->cinfo->output_height;
-
-    if(!self->integrals) {
-      self->integrals = talloc_size(NULL, size);
-    };
-    memset(self->integrals, 0, size);
-  
-    // Set some defaults:
-    if(maximum_sector)
-      src->maximum_sector = maximum_sector;
+  if(maximum_sector) {
+    src->maximum_sector = maximum_sector;
   };
 
-  // Make sure we have enough space:
+  // Make sure we have enough space to decode the picture to: FIXME -
+  // this will fail if we re-decode a different jpeg which is larger
+  // than before (Why would we do that?).
   if(!self->frame) {
     int buffer_size = self->row_stride * self->cinfo->output_height;
     self->frame = talloc_size(NULL, buffer_size);
     
-    memset(self->frame, 0x80, buffer_size);
+    memset(self->frame, 0, buffer_size);
   };
 
+  /** Loop over all scanlines and decode them all. Quit when we see
+      some empty data. 
+  */
   while (self->cinfo->output_scanline < self->cinfo->output_height) {
     int estimate;
 
@@ -414,41 +431,20 @@ static PyObject *decoder_decode(decoder *self, PyObject *args, PyObject *kwds) {
     // Read one line at the time
     jpeg_read_scanlines(self->cinfo, row_pointer, 1);
 
-    width=self->cinfo->output_width;
-    
     // Estimate how good is this line - we try to estimate the
     // integral as we go to detect discontinuities asap:
     if(self->cinfo->output_scanline > 10 ) {
       unsigned char *j;
-
+      
       // Try to see if this row is partially empty:
-      for(j=row_pointer[0]; 
-	  j<row_pointer[0] + self->row_stride - sizeof(empty); 
-	  j+=self->cinfo->output_components) {
-	if(!memcmp(empty, j, sizeof(empty))) {
-	  width = (j-row_pointer[0])/self->cinfo->output_components;
-	  break;
-	};
+      if(is_line_empty(row_pointer[0], self->row_stride, 128)) {
+	src->last_row = self->cinfo->output_scanline - 1;
+	goto abort;
+	break;
       };
-
-      if(width) {
-	int row = self->cinfo->output_scanline -3;
-	estimate = estimate_row(self, row,
-				start_pixel, width);
-#if 0
-	  printf("Row %u from %u-%u - integral %u\n", self->cinfo->output_scanline, 
-		 start_pixel, width,
-		 estimate);
-#endif
-
-	if(estimate > 100) {
-	  // Register this as an error:
-	  src->error_count++;
-	};
-      } else break;
     };
   };
-
+  
   {
     struct my_src_mgr *this = (struct my_src_mgr *) self->cinfo->src;
 
@@ -459,23 +455,17 @@ static PyObject *decoder_decode(decoder *self, PyObject *args, PyObject *kwds) {
     if(this->error_count == 0) 
       this->last_sector = this->current_sector;
   };
-
-  //jpeg_finish_decompress(self->cinfo);
-
-  //  return Py_BuildValue("i", width);
   Py_RETURN_NONE;
 
  abort:
-  //jpeg_abort_decompress(self->cinfo);
-  //jpeg_destroy_decompress(self->cinfo);
-  //return Py_BuildValue("i", width);
   Py_RETURN_NONE;
 };
 
 static PyObject *py_find_frame_bounds(decoder *self, PyObject *args) {
   uint32_t i,j;
   int frame_size = self->cinfo->output_height * self->row_stride;
-  int x1=0,y1=0;
+  struct my_src_mgr *src = (struct my_src_mgr *)self->cinfo->src;
+  int x1=0,y1=0, y_min=0;
 
   j = 0;
   for(i=0; i<frame_size; i+= sizeof(uint32_t)) {
@@ -489,11 +479,17 @@ static PyObject *py_find_frame_bounds(decoder *self, PyObject *args) {
 
   // Avoid an FPE
   if(self->row_stride) {
-    y1 = i/self->row_stride - 7;
-    x1 = (i % self->row_stride) / self->cinfo->output_components;
+    y1 = j/self->row_stride;
+    x1 = (j % self->row_stride) / self->cinfo->output_components;
   };
 
-  return Py_BuildValue("(ii)", x1, y1);
+  //Try to find the width of the last decoded chunk:
+  if(x1 < self->cinfo->output_width) {
+    for(y_min=y1; y_min>0 && self->frame[y_min*self->row_stride + x1*self->cinfo->output_components] == 0x80;
+	y_min--);
+  };
+
+  return Py_BuildValue("(iii)", x1, y1, y_min);
 };
 
 /** Calculates the integral on self->frame, between left and right
@@ -504,9 +500,11 @@ static int calculate_integral(decoder *self, int row, int left, int right) {
   int result=0;
   int i;
 
+  /*
   if(self->integrals[row] && left==0 && right==self->cinfo->output_width) {
     return self->integrals[row];
   };
+  */
 
   for(i= left * self->cinfo->output_components;
       i < right * self->cinfo->output_components; i++) {
@@ -519,7 +517,7 @@ static int calculate_integral(decoder *self, int row, int left, int right) {
   // Try to normalise the result wrt the width calculated
   //result = result / (right - left);
   //  printf("Integral on row %u (%u-%u) is %u\n", row, left, right, result);
-  self->integrals[row] = result;
+  //  self->integrals[row] = result;
   return result;
 };
 
@@ -528,15 +526,32 @@ static int calculate_integral(decoder *self, int row, int left, int right) {
 // belong, we expect to get a lot of noise - i.e. it will not fit well
 // with the integral derived from the previous row and the next row.
 int estimate_row(decoder *self, int row, int left, int right) {
-  int previous_value = calculate_integral(self, row-1, left, right);
-  int value = calculate_integral(self, row, left, right);
-  int next_value = calculate_integral(self, row+1, left, right);
-  int expected_value = abs(previous_value + next_value)/2;
+  int pos,result=0;
 
-  // Result scaled to 100 - 100 means the integral for this value is
-  // exactly the average of the previous and next row
-  //return value * 10000 / expected_value / scale;
-  return abs(100 + value - expected_value)*100/(expected_value + 100);
+  if(row<1 || left==right) return 0;
+  
+  // We calculate the value for all components:
+  for(pos = left * self->cinfo->output_components; 
+      pos < right * self->cinfo->output_components; pos++) {
+
+    // The estimate is basically the sum of differences between the
+    // current row value and the expected row value as obtained by
+    // averaging the next and previous row (We scale the values up by
+    // 100 to prevent round off errors):
+    //if(self->frame[(row+1) * self->row_stride + pos] == 0x80) continue;
+
+    result += abs(100 * self->frame[row * self->row_stride + pos] - 
+		  (100 * self->frame[(row-1) * self->row_stride + pos] + 
+		   100 * self->frame[(row+1) * self->row_stride + pos])/2
+		  );
+    // Mark the image so we can see whats happening:
+    self->frame[(row-1) * self->row_stride + pos] = 0;
+    self->frame[(row+1) * self->row_stride + pos] = 0;
+  };
+
+
+  // We normalise the estimate to the total width of the line estimated
+  return result / (right - left);
 };
 
 /** This function uses edge detection to estimate a discontinuity
@@ -572,6 +587,13 @@ static PyObject *py_find_discontinuity(decoder *self, PyObject *args) {
   
  exit:
   return Py_BuildValue("(ll)", max_row, max_estimate);
+};
+
+static PyObject *py_estimate(decoder *self, PyObject *args) {
+  int row, x,y;
+  if(!PyArg_ParseTuple(args, "iii", &row, &x, &y)) return  NULL;
+
+  return Py_BuildValue("l", estimate_row(self, row, x, y));
 };
 
 /** Save a copy of the decoded frame as a pnm bitmap file */
@@ -622,6 +644,10 @@ static PyObject *last_sector(decoder *self, PyObject *args) {
   return Py_BuildValue("i", src->last_sector);
 };
 
+static PyObject *py_dimensions(decoder *self, PyObject *args) {
+  return Py_BuildValue("(iii)", self->cinfo->output_width, self->cinfo->output_height, self->cinfo->output_components);
+};
+
 static PyMethodDef decoder_methods[] = {
   {"find_frame_bounds", (PyCFunction)py_find_frame_bounds, METH_VARARGS,
    "Calculates the position of the frames end" },
@@ -640,6 +666,10 @@ static PyMethodDef decoder_methods[] = {
    "Returns the last sector as calculated by decode"},
   {"last_good_row", (PyCFunction)last_good_row, METH_VARARGS,
    "Returns the last good row as calculated by decode"},
+  {"estimate", (PyCFunction)py_estimate, METH_VARARGS,
+   "Returns the estimate for the row. Expects a row number, left offset and right offset"},
+  {"dimensions", (PyCFunction)py_dimensions, METH_VARARGS,
+   "Returns the dimensions of the image"},
   {NULL}  /* Sentinel */
 };
 

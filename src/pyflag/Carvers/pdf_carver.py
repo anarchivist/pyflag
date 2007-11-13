@@ -1,4 +1,4 @@
-#!/usr/bin/python2.4
+#!/usr/bin/python
 # ******************************************************
 # Michael Cohen <scudette@users.sourceforge.net>
 #

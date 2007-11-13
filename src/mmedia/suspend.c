@@ -181,8 +181,8 @@ METHODDEF(JSAMPARRAY) access_virt_sarray (j_common_ptr cinfo, jvirt_sarray_ptr p
 
 METHODDEF(void) free_pool (j_common_ptr cinfo, int pool_id) {
   struct my_memory_mgr *self = (struct my_memory_mgr *)(cinfo->mem);
-  printf("Freeing pool\n");
-  self->total_space_allocated = 0;
+  //  printf("Freeing pool\n");
+  //  self->total_space_allocated = 0;
 }
 
 METHODDEF(void) self_destruct (j_common_ptr cinfo) {
@@ -190,8 +190,6 @@ METHODDEF(void) self_destruct (j_common_ptr cinfo) {
   printf("Destroying pool\n");
   free(self->pool);
   free(self->shadow_pool);
-
-  cinfo->mem = NULL;
 }
 
 void suspend_memory(j_common_ptr cinfo, int row, int sector) {

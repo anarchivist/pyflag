@@ -1,4 +1,4 @@
-#!/usr/bin/python2.4
+#!/usr/bin/python
 # ******************************************************
 # Michael Cohen <scudette@users.sourceforge.net>
 #
@@ -69,11 +69,15 @@ class JPEGCarver(Carver.CarverFramework):
                                help = "Verbosity")
 
     def find_discontinuity(self, c):
+        c.overread = 1000 * 1024
         d = jpeg.decoder(c)        
         start = d.decode() or 0
+        print c.tell()
+        print d.find_frame_bounds(), d.dimensions()
 
         old_x = 0
         old_y = 0
+        old_y_min = 0
         width, height, components = d.dimensions()
 
         print "Discontinuity detected after %s" % d.last_good_sector()
@@ -82,18 +86,19 @@ class JPEGCarver(Carver.CarverFramework):
             print "Trying to decompress %s" % sector
             d.decode(sector)
 
-            x,y = d.find_frame_bounds()
-            print "Frame bounded at %s, %s" % (x,y)
+            x,y, y_min = d.find_frame_bounds()
+            print "Frame bounded at %s, %s, %s" % (x,y, y_min)
 
-            if old_y==y:
-                estimate = d.estimate(y, old_x, x)
-                print "Integral calculated %s, %s - %s, value %s" % (y, old_x, x,estimate)
-            else:
-                e1 = d.estimate(old_y, old_x, width)
-                e2 = d.estimate(y, 0, x)
+            if y==height: return sector, width, height
+
+            if y_min > old_y_min:
+                e1 = d.estimate(old_y_min, old_x, width)
+                e2 = d.estimate(y_min, 0, x)
                 estimate = (e1+e2)/2
-                print "Integral calculated %s, %s - %s (%s), %s, %s - %s (%s) (%s)" % (old_y, old_x, width, e1,
-                                                                                       y, 0, x, e2, estimate)
+            else:
+                estimate = d.estimate(old_y_min, old_x, x)
+
+            print "Sector %s Integral calculated %s" % (sector, estimate)
 
             if self.options.verbose > 1:
                 d.save(open("output_test%s.ppm" % sector,'w'))
@@ -111,6 +116,7 @@ class JPEGCarver(Carver.CarverFramework):
 
             old_x = x
             old_y = y
+            old_y_min = y_min
 
     def generate_function(self, c):
         d = JPEGDiscriminator(c, self.options.verbose)
@@ -119,7 +125,7 @@ class JPEGCarver(Carver.CarverFramework):
         ## Find the next discontinuity:
         s, x, y = self.find_discontinuity(c)
 
-        for 
+        
         
     
 if __name__=="__main__":
