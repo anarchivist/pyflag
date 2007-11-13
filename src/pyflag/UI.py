@@ -351,11 +351,14 @@ class GenericUI:
                     for d in os.listdir(full_path):
                         filename = os.path.join(path,d)
                         full_filename = "%s/%s" % (config.UPLOADDIR, filename)
-                        if not os.path.isdir(full_filename):
-                            s = os.stat(full_filename)
-                            dbh.mass_insert(filename = filename,
-                                            _timestamp = "from_unixtime(%d)" % s.st_mtime,
-                                            size = s.st_size)
+                        try:
+                            if not os.path.isdir(full_filename):
+                                s = os.stat(full_filename)
+                                dbh.mass_insert(filename = filename,
+                                                _timestamp = "from_unixtime(%d)" % s.st_mtime,
+                                                size = s.st_size)
+                        except OSError:
+                            pass
                     dbh.mass_insert_commit()
                 except OSError,e:
                     print e
