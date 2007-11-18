@@ -6,6 +6,10 @@
 
 #include <Python.h>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include "sk.h"
 #include "list.h"
 #include "misc.h"
@@ -839,6 +843,65 @@ skfs_fstat(skfs *self, PyObject *args) {
     //FIXME should we set size to be skfile->size? It is not the same as
     //fs_inode->size when we have the non-default attribute open.
     result = build_stat_result(fs_inode);
+    return result;
+}
+
+/* read link */
+static PyObject *
+skfs_readlink(skfs *self, PyObject *args, PyObject *kwds) {
+    PyObject *result;
+    PyObject *inode_obj;
+    char *path=NULL;
+    INUM_T inode=0;
+    TSK_FS_INODE *fs_inode;
+    int type=0, id=0;
+
+    static char *kwlist[] = {"path", "inode", NULL};
+
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, "|sO", kwlist, &path, &inode_obj))
+        return NULL; 
+
+    /* make sure we at least have a path or inode */
+    if(path==NULL && inode_obj==NULL)
+        return PyErr_Format(PyExc_SyntaxError, "One of path or inode must be specified");
+
+    global_talloc_context = self->context;
+
+    if(path) {
+        tsk_error_reset();
+        inode = lookup_inode(self->fs, path);
+        if(inode == 0) {
+	  char *error = error_get();
+	  return PyErr_Format(PyExc_IOError, "Unable to find inode for path %s: %lu: %s", path, (ULONG) inode,  error);
+	};
+    } else {
+        /* inode can be an int or a string */
+        if(PyNumber_Check(inode_obj)) {
+            PyObject *l = PyNumber_Long(inode_obj);
+            inode = PyLong_AsUnsignedLongLong(l);
+            Py_DECREF(l);
+        } else {
+            if(!parse_inode_str(PyString_AsString(inode_obj), &inode, &type, &id))
+                return PyErr_Format(PyExc_IOError, "Inode must be a long or a string of the format \"inode[-type-id]\"");
+        }
+    }
+
+    /* can we lookup this inode? */
+    tsk_error_reset();
+    fs_inode = self->fs->inode_lookup(self->fs, inode);
+    if(fs_inode == NULL) {
+      char *error = error_get();
+      return PyErr_Format(PyExc_IOError, "Unable to find inode %lu: %s", (ULONG)inode, error);
+    };
+
+    if(S_ISLNK(fs_inode->mode) && fs_inode->link) {
+        result = PyString_FromString(fs_inode->link);
+    } else {
+    	result = PyErr_Format(PyExc_IOError, "Invalid Arguement, not a link");
+    }
+
+    /* release the fs_inode */
+    tsk_fs_inode_free(fs_inode);
     return result;
 }
 

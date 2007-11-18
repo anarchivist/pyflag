@@ -15,6 +15,7 @@ import bisect
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import os.path
+import stat
 
 class Raw(DBFS):
     """ A psuedo file system to load raw images """
@@ -158,18 +159,19 @@ class Sleuthkit(DBFS):
         dbh_block.cursor.ignore_warnings = True
 
         dbh_file.mass_insert_start("file")
-        dbh_inode.mass_insert_start("inode")
+        #dbh_inode.mass_insert_start("inode")
         dbh_block.mass_insert_start("block")
 
         def insert(inode, type, path, name):
-            # insert the file record
-            insert_file(inode, type, path, name)
-
             # insert inode record
+            inode_id = None;
             if inode.alloc == 1:
-                insert_inode(inode)
+                inode_id = insert_inode(inode)
 
-        def insert_file(inode, type, path, name):
+            # insert the file record
+            insert_file(inode_id, inode, type, path, name)
+
+        def insert_file(inode_id, inode, type, path, name):
             # dont do anything for realloc inodes
             if inode.alloc == 2:
                 return
@@ -188,14 +190,24 @@ class Sleuthkit(DBFS):
                 allocstr = "deleted"
                 type = type[:-1]+'-'
 
+            fields = {
+                "inode":inodestr,
+                "mode":type,
+                "status":allocstr,
+                "path":pathstr,
+                "name":name
+            }
+
+            if(inode_id):
+            	fields['inode_id'] = inode_id
+
+            try:
+                fields["link"] = fs.readlink(inode=inode)
+            except IOError:
+                pass
+
             # insert file entry
-            dbh_file.mass_insert(
-                inode = inodestr,
-                mode = type,
-                status = allocstr,
-                path = pathstr,
-                name = name
-                )
+            dbh_file.mass_insert(**fields)
 
         def runs(blocks):
             # converts an ordered list e.g. [1,2,3,4,7,8,9] into a list of
@@ -220,9 +232,12 @@ class Sleuthkit(DBFS):
             yield index,start,length
 
         def insert_inode(inode):
+            """ Inserts inode into database and returns new inode_id and a
+            stat object for the newly inserted inode """
+            inode_id = None
             # dont do anything for realloc inodes
             if inode.alloc == 2:
-                return
+                return None
 
             inodestr = "I%s|K%s" % (iosource_name, inode)
 
@@ -234,7 +249,7 @@ class Sleuthkit(DBFS):
             try:
                 f = fs.open(inode=str(inode))
                 s = fs.fstat(f)
-                dbh_inode.mass_insert(
+                dbh_inode.insert( "inode",
                     inode = inodestr,
                     status = status,
                     uid = s.st_uid,
@@ -247,6 +262,7 @@ class Sleuthkit(DBFS):
                     link = "",
                     size = s.st_size
                     )
+                inode_id = dbh_inode.autoincrement()
                 
                 #insert block runs
                 index = 0
@@ -271,6 +287,7 @@ class Sleuthkit(DBFS):
                     arg3= scanner_string,
                     cookie=cookie,
                     )
+            return inode_id
 
         # insert root inode
         insert_inode(fs.root_inum)
@@ -302,10 +319,10 @@ class Sleuthkit(DBFS):
         if root_dir=='/':
             # find any unlinked inodes here. Note that in some filesystems, a
             # 'deleted' directory may have been found and added in the walk above.
-            insert_file(sk.skinode(0, 0, 0, 1), 'd/d', '/', '_deleted_')
+            insert_file(None, sk.skinode(0, 0, 0, 1), 'd/d', '/', '_deleted_')
             for s in fs.iwalk():
-                insert_inode(s)
-                insert_file(s, '-/-', '/_deleted_', "%s" % s)
+                inode_id = insert_inode(s)
+                insert_file(inode_id, s, '-/-', '/_deleted_', "%s" % s)
 
             # add contiguous unallocated blocks here as 'unallocated' files.
             # the offset driver over the iosource should work for this
@@ -337,7 +354,7 @@ class Sleuthkit(DBFS):
                                          name = "o%08d" % count,
                                          mode = 'r/r')
 
-                    dbh_inode.mass_insert(status = 'alloc',
+                    dbh_inode.insert("inode", status = 'alloc',
                                           inode = inode,
                                           mode = '40755',
                                           links = 4,

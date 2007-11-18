@@ -78,6 +78,7 @@ static PyObject *skfs_walk(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_iwalk(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_stat(skfs *self, PyObject *args, PyObject *kwds);
 static PyObject *skfs_fstat(skfs *self, PyObject *args);
+static PyObject *skfs_readlink(skfs *self, PyObject *args, PyObject *kwds);
 
 static PyMemberDef skfs_members[] = {
     {"root_inum", T_OBJECT, offsetof(skfs, root_inum), 0,
@@ -106,6 +107,8 @@ static PyMethodDef skfs_methods[] = {
      "Stat a file path" },
     {"fstat", (PyCFunction)skfs_fstat, METH_VARARGS,
      "Stat a skfile" },
+    {"readlink", (PyCFunction)skfs_readlink, METH_VARARGS|METH_KEYWORDS,
+     "Resolve a symlink" },
     {NULL}  /* Sentinel */
 };
 
