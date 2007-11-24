@@ -123,8 +123,8 @@ def log(level,message):
         except Full:
             pass
         
-        print string
-        sys.stdout.flush()
+        sys.stderr.write(string + "\n")
+        sys.stderr.flush()
         
     if level<=ERRORS and level>0:
         print string

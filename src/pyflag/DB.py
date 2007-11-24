@@ -533,13 +533,17 @@ class DBO:
     def invalidate(self,table):
         """ Invalidate all copies of the cache which relate to this table """
         self.execute("start transaction")
-        self.execute("select id from sql_cache where tables like '%%,%s,%%' for update",table)
-        ids = [row['id'] for row in self]
-        for id in ids:
-            self.execute("drop table if exists `cache_%s`", id)
-            self.execute("delete from sql_cache where id=%r", id)
-
-        self.execute("commit")
+        try:
+            try:
+                self.execute("select id from sql_cache where tables like '%%,%s,%%' for update",table)
+            except:
+                pass
+            ids = [row['id'] for row in self]
+            for id in ids:
+                self.execute("drop table if exists cache_%s", id)
+                self.execute("delete from sql_cache where id=%r", id)
+        finally:
+            self.execute("commit")
 
     def _calculate_set(self, **fields):
         """ Calculates the required set clause from the fields provided """

@@ -16,6 +16,10 @@ parser.add_option("-s","--skip",
                   default='0',
                   help="skip this many bytes from the start of each file")
 
+parser.add_option("-S", "--subsys",
+                  default=None,
+                  help="Subsystem to use (e.g. EWF)")
+
 (options, args) = parser.parse_args()
 
 if len(args)<2: 
@@ -45,8 +49,46 @@ def parse_offsets(arg):
     except (KeyError,ValueError,TypeError):
         return int(arg,base)
 
-fds=[ open(arg,'r') for arg in args ]
-[ fd.seek(parse_offsets(options.skip)) for fd in fds ]
+class ParityDisk:
+    """ A file like object to simulate a disk which is missing by
+    calculating parity from several other disks.
+    """
+    def __init__(self, fds):
+        self.fds = fds
+        
+    def seek(self, offset):
+        for fd in self.fds:
+            fd.seek(offset)
+
+    def read(self, length):
+        data = '\x00' * length
+        for fd in self.fds:
+            new_data = fd.read(length)
+            data = ''.join([ chr(ord(data[x]) ^ ord(new_data[x]))
+                             for x in range(length) ])
+
+        return data
+
+def open_image(filename):
+    if not options.subsys:
+        io=open(filename, 'r')
+
+    else:
+        import Registry, FlagFramework, IO
+        Registry.Init()
+        
+        driver = Registry.IMAGES.dispatch(options.subsys)()
+        q = FlagFramework.query_type(filename = filename)
+        io = driver.open(None, None, q)
+
+    return io
+
+fds=[]
+for arg in args:
+    if arg != "None":
+        fds.append(open_image(arg))
+    else:
+        fds.append(ParityDisk([open_image(arg) for arg in args if arg != 'None']))
 
 count=parse_offsets(options.skip)
 blocksize = parse_offsets(options.blocksize)

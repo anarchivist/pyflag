@@ -199,6 +199,27 @@ class EWF(Advanced):
     """ EWF is used by other forensic packages like Encase or FTK """
     subsys = 'ewf'
 
+    def make_iosource_args(self, query):
+        offset = self.calculate_offset_suffix(query.get('offset','0'))
+        
+        args = [['subsys', self.subsys],
+                ['offset', offset]]
+
+        ## If a single Ewf file is given we try to glob all the
+        ## filenames:
+        filenames = query.getarray('filename')
+
+        if len(filenames)==1:
+            f = filenames[0]
+            import glob
+            filenames = glob.glob(f[:-3]+"E*")
+
+        for f in filenames:
+            args.append(['filename', f])
+
+        return args
+
+
 import Store
 
 class CachedIO(IOSubsysFD):
