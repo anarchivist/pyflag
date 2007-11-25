@@ -224,7 +224,7 @@ class EWF(Advanced):
 
             ## Glob it:
             import glob
-            filenames = glob.glob(f[:-3]+"E*")
+            filenames = glob.glob(f[:-3]+"E*") + glob.glob(f[:-3]+"e*") 
             
             for f in filenames:
                 args.append(['filename', f])

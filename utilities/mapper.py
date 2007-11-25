@@ -1,4 +1,4 @@
-import re,sys
+import re,sys,md5
 import optparse
 
 def pretty_print(raid_map, period, number):
@@ -265,5 +265,11 @@ if __name__ == '__main__':
     fd.read(parse_offsets(options.skip))
     print "Creating output file"
     outfd = open(options.output,"w")
+    m = md5.md5()
     while 1:
-        outfd.write(fd.read(10*64*1024))
+        data = fd.read(100*64*1024)
+	if len(data)==0: break
+	m.update(data)
+        outfd.write(data)
+
+    print "MD5 Sum: %s" % m.hexdigest()
