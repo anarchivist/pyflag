@@ -209,13 +209,25 @@ class EWF(Advanced):
         ## filenames:
         filenames = query.getarray('filename')
 
-        if len(filenames)==1:
-            f = filenames[0]
+        for f in filenames:
+            ## Is it a symlink? This allows us to symlink to a single
+            ## file from a fileset using a simple name. This makes it
+            ## nice to manage the upload directory because you can
+            ## just put a single symlink (e.g. freds_disk.E01) to the
+            ## entire evidence set (could be huge and mounted
+            ## somewhere different then the upload directory, e.g. an
+            ## external driver).
+            try:
+                f = os.readlink(f)
+            except OSError:
+                pass
+
+            ## Glob it:
             import glob
             filenames = glob.glob(f[:-3]+"E*")
-
-        for f in filenames:
-            args.append(['filename', f])
+            
+            for f in filenames:
+                args.append(['filename', f])
 
         return args
 

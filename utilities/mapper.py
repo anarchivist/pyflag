@@ -1,11 +1,11 @@
 import re,sys
 import optparse
 
-def pretty_print(raid_map):
-    print raid_map
+def pretty_print(raid_map, period, number):
+    print "Raid map: %s" % raid_map
     print "----------------------"
-    for x in range(options.period):
-        for y in range(options.number):
+    for x in range(period):
+        for y in range(number):
             try:
                 print raid_map[(x,y)],
             except:
@@ -14,10 +14,10 @@ def pretty_print(raid_map):
         print "."
     print "----------------------"
     
-def calculate_map(raid_map):
-    new_map = [ [None] * options.number for x in range(options.period) ]
-    from_block = 2
-    from_disk = 0
+def calculate_map(raid_map, period, number):
+    new_map = [ [None] * number for x in range(period) ]
+    from_block = 0
+    from_disk = 1
     count = 0
     while None == new_map[from_block][from_disk]:
         new_map[from_block][from_disk] = count
@@ -38,16 +38,16 @@ def calculate_map(raid_map):
     print new_map
     return new_map
 
-def open_image(filename):
+def open_image(filename, subsys):
     print "Opening image %s" % filename
-    if not options.subsys:
+    if not subsys:
         io=open(filename, 'r')
 
     else:
         import Registry, FlagFramework, IO
         Registry.Init()
         
-        driver = Registry.IMAGES.dispatch(options.subsys)()
+        driver = Registry.IMAGES.dispatch(subsys)()
         q = FlagFramework.query_type(filename = filename)
         io = driver.open(None, None, q)
 
@@ -136,7 +136,7 @@ class RaidReassembler:
 
         ## Now do the actual seeking
         ## The offset of the specific period
-        period = (self.offset+1) / self.period_length
+        period = (self.offset) / self.period_length
 
         ## The block within this period
         residual_block = (self.offset % self.period_length) / self.block_size
@@ -154,19 +154,22 @@ class RaidReassembler:
 #                                       sub_block_residual)
         
         self.current_fd.seek(seek_offset + self.skip)
-        print "Seeking to image offset %s, block %s(%s), disk %s offset %s" % (self.offset, self.current_block, period, number, seek_offset + self.skip)
+#        print "Seeking to image offset %s, block %s(%s), disk %s offset %s" % (self.offset, self.current_block, period, number, seek_offset + self.skip)
         self.sub_block_residual = sub_block_residual
 
     def read(self, length):
         data = ''
         while length > 0:
-            sub_length = self.block_size - self.sub_block_residual
-#            print "Reading %s "% sub_length
-            data += self.current_fd.read(sub_length)
+            sub_length = min(length, self.block_size - self.sub_block_residual)
+            #print "Asked for %s@%s" % (sub_length,self.offset)
+            read_data =self.current_fd.read(sub_length)
+            data += read_data
+            #print "Got %s from %s " % (len(read_data), self.current_fd)
             self.offset += sub_length
             self.seek(self.offset)
             length -= sub_length
 
+        #print "Returned %s" % len(data)
         return data
 
     def dump(self, outfd):
@@ -184,8 +187,11 @@ class RaidReassembler:
                 
                 outfd.write(data)
             count+=1
+
+    def tell(self):
+        return self.offset
                 
-def load_map_file(filename):
+def load_map_file(filename, period):
     fd=open(filename)
     raid_map = {}
     for line in fd:
@@ -193,9 +199,9 @@ def load_map_file(filename):
 
         m = re.match("(\d+),(\d+) +(\d+),(\d+)", line)
         if m:
-            from_block = int(m.group(1)) % options.period
+            from_block = int(m.group(1)) % period
             from_disk = int(m.group(2))
-            to_block = int(m.group(3)) % options.period
+            to_block = int(m.group(3)) % period
             to_disk = int(m.group(4))
 
             try:
@@ -239,7 +245,7 @@ if __name__ == '__main__':
     
     (options, args) = parser.parse_args()
 
-    raid_map = load_map_file(options.map)
+    raid_map = load_map_file(options.map, options.period)
     if options.print_map:
         pretty_print(raid_map)
         print calculate_map(raid_map)
@@ -251,14 +257,13 @@ if __name__ == '__main__':
     fds=[]
     for arg in args:
         if arg != "None":
-            fds.append(open_image(arg))
+            fds.append(open_image(arg, options.subsys))
         else:
-            fds.append(ParityDisk([open_image(arg) for arg in args if arg != 'None']))
+            fds.append(ParityDisk([open_image(arg, options.subsys) for arg in args if arg != 'None']))
 
     fd = RaidReassembler(raid_map, fds, blocksize)
-    # fd.read(parse_offsets(options.skip))
+    fd.read(parse_offsets(options.skip))
     print "Creating output file"
     outfd = open(options.output,"w")
-    fd.dump(outfd)
-#    while 1:
-#        outfd.write(fd.read(1024*1024))
+    while 1:
+        outfd.write(fd.read(10*64*1024))
