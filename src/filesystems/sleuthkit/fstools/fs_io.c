@@ -407,11 +407,13 @@ fs_read_file_int(TSK_FS_INFO * fs, TSK_FS_INODE * fsi, uint32_t type,
                 return -1;
             }
 
+            if(!type) {
             if ((fsi->mode & TSK_FS_INODE_MODE_FMT) ==
                 TSK_FS_INODE_MODE_DIR)
                 type = NTFS_ATYPE_IDXROOT;
             else
                 type = NTFS_ATYPE_DATA;
+            }
 
             if (flags & TSK_FS_FILE_FLAG_NOID)
                 fs_data = tsk_fs_data_lookup_noid(fsi->attr, type);
