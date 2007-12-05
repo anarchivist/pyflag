@@ -584,6 +584,8 @@ class delete_case(load):
             FlagFramework.delete_case(case)
             yield "Deleted case %r" %(case)
         except Exception,e:
+            ## Should we just return here or report an error?
+            return
             raise RuntimeError("Unable to delete case %s (%s)" %(case,e))
 
 ##class create_iosource(load):
@@ -631,8 +633,8 @@ import pyflag.tests
 class BasicCommandTests(pyflag.tests.ScannerTest):
     """ Test PyFlash commands """
     test_case = "PyFlag Test Case"
-    test_file = "pyflag_stdimage_0.2.sgz"
-    subsystem = 'SGZip'
+    test_file = "pyflag_stdimage_0.2.e01"
+    subsystem = 'EWF'
     offset = "16128s"
 
     def test01ls(self):
@@ -644,7 +646,7 @@ class BasicCommandTests(pyflag.tests.ScannerTest):
         ## Check we can list default directory
         lines = [ l for l in pyflagsh.shell_execv_iter(env=self.env, command="ls",
                                                        argv=[])]
-        self.assertEqual(len(lines),12)
+        self.assertEqual(len(lines),17)
 
         ## Check we can list directories
         lines = [ l for l in pyflagsh.shell_execv_iter(env=self.env, command="ls",
@@ -654,7 +656,7 @@ class BasicCommandTests(pyflag.tests.ScannerTest):
         ## Check that we can glob files:
         lines = [ l for l in pyflagsh.shell_execv_iter(env=self.env, command="ls",
                                                        argv=["*.jpg"])]
-        self.assertEqual(len(lines),4)
+        self.assertEqual(len(lines),5)
         
         ## Check that we can glob directories:
         lines = [ l for l in pyflagsh.shell_execv_iter(env=self.env, command="ls",

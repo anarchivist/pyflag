@@ -41,7 +41,7 @@ WARNING_ISSUED = False
 ## http://www.pyflag.net/PyFlagWiki/ClamAvConfiguration
 import pyflag.pyclamd as pyclamd
 
-## Allow the user to specific a different socket:
+## Allow the user to specify a different socket:
 config.add_option("CLAMAV_SOCKET", default="/var/run/clamav/clamd.ctl",
                   help = "The location to the clamd socket. If we cant connect"
                   " virus scanning will not be available")

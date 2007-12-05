@@ -274,7 +274,7 @@ def start_workers():
                          task = task()
                          task.run(row['arg1'], row['arg2'], row['arg3'])
                      except Exception,e:
-                         pyflaglog.log(pyflaglog.ERRORS, "Error scanning %s" % e)
+                         pyflaglog.log(pyflaglog.ERRORS, "Error %s(%s,%s,%s) %s" % (task.__class__.__name__,row['arg1'], row['arg2'],row['arg3'],e))
 
                  finally:
                      if row['state'] != 'broadcast':

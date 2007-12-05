@@ -282,7 +282,7 @@ def geoip_resolve_extended(ip, result):
 def geoip_resolve(ip, result):
     rec = geoip_cached_record(ip)
     tmp = result.__class__(result)
-    tmp.icon("flags/%s.gif" % rec['country2'].lower(), tooltip=rec['country'])
+    tmp.icon("flags/%s.gif" % (rec['country2'].lower() or "00"), tooltip=rec['country'])
     result.text( "%s %s\n" % (tmp,rec['city']))
 
 def identify_network(whois_id,ip, result):

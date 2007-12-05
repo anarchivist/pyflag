@@ -380,7 +380,7 @@ class DBO:
 
                 ## We terminate the current connection and reconnect
                 ## to the DB
-                pyflaglog.log(pyflaglog.DEBUG, "Killing connection because %s. Last query was %s" % (e,self.cursor._last_executed))
+                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Killing connection because %s. Last query was %s" % (e,self.cursor._last_executed))
                                 
                 self.cursor.kill_connection()
                 del self.dbh

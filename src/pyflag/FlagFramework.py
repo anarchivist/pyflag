@@ -373,7 +373,7 @@ class Flag:
         ## These are deliberate errors that reports raise with their own custom UI message:
         except Reports.ReportError,e:
             report.executing[thread_name]['error'] = e
-            print report.executing, e.__str__()
+            pyflaglog.log(pyflaglog.ERROR, "Error executing analysis: %s" % e)
             return
 
         except Exception,e:

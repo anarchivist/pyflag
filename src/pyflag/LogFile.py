@@ -426,6 +426,10 @@ class LogDriverTester(unittest.TestCase):
     def test00Cleanup(self):
         """ Remove test log tables """
         ## Create the case if it does not already exist:
+        pyflagsh.shell_execv(command = "delete_case",
+                             argv=[self.test_case])
+
+        ## Create the case if it does not already exist:
         pyflagsh.shell_execv(command = "create_case",
                              argv=[self.test_case])
         

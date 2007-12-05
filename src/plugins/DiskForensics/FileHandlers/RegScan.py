@@ -109,6 +109,7 @@ class RegistryScan(GenScanFactory):
                     break
             
             def store_key(nk_key, path):
+                if not nk_key: return
                 regi_handle.mass_insert(dirname=path,
                                         basename=nk_key['key_name'])
 

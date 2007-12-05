@@ -172,10 +172,14 @@ class SMTPScanner(StreamScannerFactory):
 import unittest
 import pyflag.pyflagsh as pyflagsh
 from pyflag.FileSystem import DBFS
+import pyflag.tests 
 
-class SMTPTests(unittest.TestCase):
+class SMTPTests(pyflag.tests.ScannerTest):
     """ Tests SMTP Scanner """
     test_case = "PyFlag Network Test Case"
+    test_file = "stdcapture_0.3.pcap"
+    subsystem = "Advanced"
+    fstype = "PCAP Filesystem"
     order = 21
     def test01SMTPScanner(self):
         """ Test SMTP Scanner """

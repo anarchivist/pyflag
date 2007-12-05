@@ -1000,6 +1000,9 @@ class IPType(ColumnType):
         dbh.check_index("whois_cache", "ip")
         dbh.check_index("geoip_isp", "id")
 
+        if not "%" in city:
+            city = "%%%s%%" % city
+
         return " ( `%s` in (select ip from %s.whois_cache join " \
                "%s.geoip_isp on %s.whois_cache.geoip_isp=%s.geoip_isp.id where"\
                " %s.geoip_isp.isp like %r ) ) " \

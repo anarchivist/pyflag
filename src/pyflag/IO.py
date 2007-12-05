@@ -144,7 +144,7 @@ def open(case, iosource):
         dbh.execute("select name,parameters from iosources where name=%r",  iosource)
         row = dbh.fetch()
         if not row:
-            raise IOError("IO Source not created yet")
+            raise IOError("IO Source (%r) not created yet" % key)
     
         query = query_type(string=row['parameters'])
         image = Registry.IMAGES.dispatch(query['subsys'])()

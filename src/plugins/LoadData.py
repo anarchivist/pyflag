@@ -178,6 +178,7 @@ class LoadIOSource(Reports.report):
 
     def display(self, query,result):
         ## Try to instantiate the image:
+        print "Trying to create IOSource"
         try:
             image = Registry.IMAGES.dispatch(query['subsys'])()
         except:
@@ -199,6 +200,7 @@ class LoadIOSource(Reports.report):
 
             io = image.open(query['iosource'], query['case'], query)
         except Exception,e:
+            pyflaglog.log(pyflaglog.WARNING,"Error instantiating driver: %s" % e)
             result.heading("Error: Unable to create IO Source")
             result.para("Error reported was %s" % e, color='red')
             return

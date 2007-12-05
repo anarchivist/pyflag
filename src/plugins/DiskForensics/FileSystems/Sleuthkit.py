@@ -317,6 +317,11 @@ class Sleuthkit(DBFS):
         dbh_block.mass_insert_commit()
 
         if root_dir=='/':
+            ## Drop any indexes for the time to speed up inserts:
+            try:
+                dbh_block.execute("drop index block on block")
+            except DB.DBError: pass
+            
             # find any unlinked inodes here. Note that in some filesystems, a
             # 'deleted' directory may have been found and added in the walk above.
             insert_file(None, sk.skinode(0, 0, 0, 1), 'd/d', '/', '_deleted_')

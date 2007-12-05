@@ -822,7 +822,7 @@ class HTMLUI(UI.GenericUI):
             for e in elements:
                 if e.name==groupby:
                     new_query = query.clone()
-                    filter_expression = filter_expression.strip()
+                    filter_expression = filter_expression.strip().replace('%','%%')
                     if filter_expression: filter_expression += " and "
 
                     filter_expression += "'%s'='%%s'" % e.name
@@ -903,7 +903,11 @@ class HTMLUI(UI.GenericUI):
 
                 ## Give the row to the column element to allow it
                 ## to translate the output suitably:
-                value = elements[i].display(row[elements[i].name],row,self)
+                value = row[elements[i].name]
+                try:
+                    value = elements[i].display(value,row,self)
+                except Exception, e:
+                    pyflaglog.log(pyflaglog.ERROR, "Unable to render %r: %s" % (value , e))
 
                 ## Render the row styles so that equal values on
                 ## the sorted column have the same style

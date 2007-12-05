@@ -2269,57 +2269,28 @@ if __name__ == "__main__":
 import unittest
 import pyflag.pyflagsh as pyflagsh
 from pyflag.FileSystem import DBFS
+import pyflag.tests
 
-class MSNTests(unittest.TestCase):
-    """ Tests MSN Scanner """
-    
+class MSNTests(pyflag.tests.ScannerTest):
+    """ Tests MSN Scanner (Ver 8) """
     # We pick an obscure name on purpose
-    test_case = "Pyflagtest01MSNScannerTestCase"
-    
+    test_case = "PyFlag Test Case"
+    test_file = "/NetworkForensics/ProtocolHandlers/MSN/MSN_Cap1_Ver8_LoginWithMessages.pcap"
     order = 21
-
+    subsystem = "Advanced"
+    fstype = "PCAP Filesystem"
     ## Test protocol version 8 handling...
-    def test01MSNScanner(self):
-        """ Test MSN Scanner Handling Basic Protocol Ver 8 Commands"""
-
-        self.test_case = "Pyflagtest01MSNScannerTestCase"
+    def test01Scan(self):
+        """ Scan for MSN Messages """
         env = pyflagsh.environment(case=self.test_case)
-
-        ## First we drop the case in case it already exists
-        ## Since it might not exist, we allow this to throw:
-        try:
-            pyflagsh.shell_execv(env=env,
-                                 command = "delete_case",
-                                 argv=[self.test_case])       
-        except RuntimeError:
-            pass
- 
-        ## Now we create it
-        pyflagsh.shell_execv(env=env,
-                             command = "create_case",
-                             argv=[self.test_case])
-
-        pyflagsh.shell_execv(command="execute", 
-                            argv=["Load Data.Load IO Data Source", 
-                              "case=%s" % self.test_case , 
-                              "iosource=MSNTest1", 
-                              "subsys=Advanced", 
-                              "filename=NetworkForensics/ProtocolHandlers/"\
-                                   "MSN/MSN_Cap1_Ver8_LoginWithMessages.pcap"])
-        
-        pyflagsh.shell_execv(command="execute", 
-                             argv=["Load Data.Load Filesystem image", 
-                                   "case=%s" %self.test_case , 
-                                   "iosource=MSNTest1", 
-                                   "fstype=PCAP Filesystem", 
-                                   "mount_point=/MSNTest1"])
-
         pyflagsh.shell_execv(env=env,
                              command="scan",
                              argv=["*",                   ## Inodes (All)
                                    "MSNScanner"
-                                  ])                   ## List of Scanners
+                                   ])                   ## List of Scanners
 
+    def test02Scanner(self):
+        """ Test MSN Scanner Handling Basic Protocol Ver 8 Commands"""
         ## What should we have found?
         dbh = DB.DBO(self.test_case)
         dbh.execute("""select * from `msn_session` where type=\"MESSAGE\"""")
@@ -2337,49 +2308,13 @@ class MSNTests(unittest.TestCase):
         row=dbh.fetch()
         assert row["user_data"] == "winnt 5.1 i386"
 
+class MSNTests2(MSNTests):
+    """ Tests MSN Scanner (Ver 9) """
+    test_file = "/NetworkForensics/ProtocolHandlers/MSN/MSN_Cap3_Ver9_LoginWithMessages.pcap"
+    
     ## Test protocol version 9 handling...
-    def test02MSNScanner(self):
+    def test02Scanner(self):
         """ Test MSN Scanner Handling Basic Protocl Ver 9 Commands"""
-
-        self.test_case = "Pyflagtest02MSNScannerTestCase"
-
-        env = pyflagsh.environment(case=self.test_case)
-
-        ## First we drop the case in case it already exists
-        ## Since it might not exist, we allow this to throw:
-        try:
-            pyflagsh.shell_execv(env=env,
-                                 command = "delete_case",
-                                 argv=[self.test_case])       
-        except RuntimeError:
-            pass
- 
-        ## Now we create it
-        pyflagsh.shell_execv(env=env,
-                             command = "create_case",
-                             argv=[self.test_case])
-
-        pyflagsh.shell_execv(command="execute", 
-                            argv=["Load Data.Load IO Data Source", 
-                              "case=%s" % self.test_case , 
-                              "iosource=MSNTest2", 
-                              "subsys=Advanced", 
-                              "filename=NetworkForensics/ProtocolHandlers/" \
-                                   "MSN/MSN_Cap3_Ver9_LoginWithMessages.pcap"])
-        
-        pyflagsh.shell_execv(command="execute", 
-                             argv=["Load Data.Load Filesystem image", 
-                                   "case=%s" %self.test_case , 
-                                   "iosource=MSNTest2", 
-                                   "fstype=PCAP Filesystem", 
-                                   "mount_point=/MSNTest2"])
-
-        pyflagsh.shell_execv(env=env,
-                             command="scan",
-                             argv=["*",                   ## Inodes (All)
-                                   "MSNScanner"
-                                  ])                   ## List of Scanners
-
         ## What should we have found?
         dbh = DB.DBO(self.test_case)
         dbh.execute("""select * from `msn_session` where type=\"MESSAGE\"""")
@@ -2397,51 +2332,12 @@ class MSNTests(unittest.TestCase):
         row=dbh.fetch()
         assert row != None
         assert row["user_data"] == "au"
-        
-        
-    ## Test protocol version 9 handling...
-    def test03MSNScanner(self):
+
+class MSNTests3(MSNTests):
+    """ Tests MSN Scanner (Ver 15) """
+    test_file = "/NetworkForensics/ProtocolHandlers/MSN/MSN_Cap2_Ver15_LoginWithMessages.pcap"
+    def test02Scanner(self):
         """ Test MSN Scanner Handling Basic Protocol Ver 15 Commands"""
-
-        self.test_case = "Pyflagtest03MSNScannerTestCase"
-
-        env = pyflagsh.environment(case=self.test_case)
-
-        ## First we drop the case in case it already exists
-        ## Since it might not exist, we allow this to throw:
-        try:
-            pyflagsh.shell_execv(env=env,
-                                 command = "delete_case",
-                                 argv=[self.test_case])       
-        except RuntimeError:
-            pass
- 
-        ## Now we create it
-        pyflagsh.shell_execv(env=env,
-                             command = "create_case",
-                             argv=[self.test_case])
-
-        pyflagsh.shell_execv(command="execute", 
-                            argv=["Load Data.Load IO Data Source", 
-                              "case=%s" % self.test_case , 
-                              "iosource=MSNTest3", 
-                              "subsys=Advanced", 
-                              "filename=NetworkForensics/ProtocolHandlers/"\
-                                  "MSN/MSN_Cap2_Ver15_LoginWithMessages.pcap"])
-        
-        pyflagsh.shell_execv(command="execute", 
-                             argv=["Load Data.Load Filesystem image", 
-                                   "case=%s" %self.test_case , 
-                                   "iosource=MSNTest3", 
-                                   "fstype=PCAP Filesystem", 
-                                   "mount_point=/MSNTest3"])
-
-        pyflagsh.shell_execv(env=env,
-                             command="scan",
-                             argv=["*",                   ## Inodes (All)
-                                   "MSNScanner"
-                                  ])                   ## List of Scanners
-
         ## What should we have found?
         dbh = DB.DBO(self.test_case)
         dbh.execute("""select * from `msn_session` where type=\"MESSAGE\"""")
@@ -2456,49 +2352,12 @@ class MSNTests(unittest.TestCase):
         ## For example, check we pulled out the user's OS.
         ## TODO
 
+class MSNTests4(MSNTests):
+    """ Tests MSN Scanner (Ver 15) """
+    test_file = "NetworkForensics/ProtocolHandlers/MSN/MSN_Cap4_Ver15_SendingAFile.pcap"
     ## Test protocol version 15 handling...
-    def test04MSNScanner(self):
+    def test02Scanner(self):
         """ Test MSN Scanner Handling P2P Send Using Protocol Ver 15"""
-        
-        self.test_case = "Pyflagtest04MSNScannerTestCase"
-
-        env = pyflagsh.environment(case=self.test_case)
-
-        ## First we drop the case in case it already exists
-        ## Since it might not exist, we allow this to throw:
-        try:
-            pyflagsh.shell_execv(env=env,
-                                 command = "delete_case",
-                                 argv=[self.test_case])       
-        except RuntimeError:
-            pass
- 
-        ## Now we create it
-        pyflagsh.shell_execv(env=env,
-                             command = "create_case",
-                             argv=[self.test_case])
-
-        pyflagsh.shell_execv(command="execute", 
-                            argv=["Load Data.Load IO Data Source", 
-                              "case=%s" % self.test_case , 
-                              "iosource=MSNTest4", 
-                              "subsys=Advanced", 
-                              "filename=NetworkForensics/ProtocolHandlers"\
-                                      "/MSN/MSN_Cap4_Ver15_SendingAFile.pcap"])
-        
-        pyflagsh.shell_execv(command="execute", 
-                             argv=["Load Data.Load Filesystem image", 
-                                   "case=%s" %self.test_case , 
-                                   "iosource=MSNTest4", 
-                                   "fstype=PCAP Filesystem", 
-                                   "mount_point=/MSNTest4"])
-
-        pyflagsh.shell_execv(env=env,
-                             command="scan",
-                             argv=["*",                   ## Inodes (All)
-                                   "MSNScanner"
-                                  ])                   ## List of Scanners
-
         ## What should we have found?
         dbh = DB.DBO(self.test_case)
         dbh.execute("""select * from `msn_session` where """\
@@ -2523,50 +2382,13 @@ class MSNTests(unittest.TestCase):
         assert row != None
         assert row['context'] == "transferMe.txt"
         assert dbh.fetch() == None
-        
+
+class MSNTests5(MSNTests):
+    """ Test MSN P2P Send (Rejecting a File) Protocol Ver 16"""
+    test_file = "NetworkForensics/ProtocolHandlers/MSN" \
+                "/MSN_Cap5_Ver15_RejectingAReceivedFile.pcap"
     ## Test protocol version 15 handling...
-    def test05MSNScanner(self):
-        """ Test MSN P2P Send (Rejecting a File) Protocol Ver 16"""
-
-        self.test_case = "Pyflagtest05MSNScannerTestCase"
-
-        env = pyflagsh.environment(case=self.test_case)
-
-        ## First we drop the case in case it already exists
-        ## Since it might not exist, we allow this to throw:
-        try:
-            pyflagsh.shell_execv(env=env,
-                                 command = "delete_case",
-                                 argv=[self.test_case])       
-        except RuntimeError:
-            pass
- 
-        ## Now we create it
-        pyflagsh.shell_execv(env=env,
-                             command = "create_case",
-                             argv=[self.test_case])
-
-        pyflagsh.shell_execv(command="execute", 
-                            argv=["Load Data.Load IO Data Source", 
-                              "case=%s" % self.test_case , 
-                              "iosource=MSNTest5", 
-                              "subsys=Advanced", 
-                              "filename=NetworkForensics/ProtocolHandlers/MS"\
-                                "N/MSN_Cap5_Ver15_RejectingAReceivedFile.pcap"])
-        
-        pyflagsh.shell_execv(command="execute", 
-                             argv=["Load Data.Load Filesystem image", 
-                                   "case=%s" %self.test_case , 
-                                   "iosource=MSNTest5", 
-                                   "fstype=PCAP Filesystem", 
-                                   "mount_point=/MSNTest5"])
-
-        pyflagsh.shell_execv(env=env,
-                             command="scan",
-                             argv=["*",                   ## Inodes (All)
-                                   "MSNScanner"
-                                  ])                   ## List of Scanners
-
+    def test02Scanner(self):
         ## What should we have found?
         dbh = DB.DBO(self.test_case)
         dbh.execute("""select * from `msn_session` where """\
@@ -2579,96 +2401,23 @@ class MSNTests(unittest.TestCase):
         row = dbh.fetch()
         assert row == None
 
+class MSNTests6(MSNTests):
+    """ Test MSN P2P Send Being Rejected Using Protocol Ver 15 """
+    test_file = "filename=NetworkForensics/ProtocolHandlers/" \
+                "MSN/MSN_Cap6_Ver15_HavingAFileRejected.pcap"
+
     ## Test protocol version 15 handling...
-    def test06MSNScanner(self):
-        """ Test MSN P2P Send Being Rejected Using Protocol Ver 15 """ 
-
-        self.test_case = "Pyflagtest06MSNScannerTestCase"
-
-        env = pyflagsh.environment(case=self.test_case)
-
-        ## First we drop the case in case it already exists
-        ## Since it might not exist, we allow this to throw:
-        try:
-            pyflagsh.shell_execv(env=env,
-                                 command = "delete_case",
-                                 argv=[self.test_case])       
-        except RuntimeError:
-            pass
- 
-        ## Now we create it
-        pyflagsh.shell_execv(env=env,
-                             command = "create_case",
-                             argv=[self.test_case])
-
-        pyflagsh.shell_execv(command="execute", 
-                            argv=["Load Data.Load IO Data Source", 
-                            "case=%s" % self.test_case , 
-                            "iosource=MSNTest6", 
-                            "subsys=Advanced", 
-                            "filename=NetworkForensics/ProtocolHandlers/" \
-                               "MSN/MSN_Cap6_Ver15_HavingAFileRejected.pcap"])
-        
-        pyflagsh.shell_execv(command="execute", 
-                             argv=["Load Data.Load Filesystem image", 
-                                   "case=%s" %self.test_case , 
-                                   "iosource=MSNTest6", 
-                                   "fstype=PCAP Filesystem", 
-                                   "mount_point=/MSNTest6"])
-
-        pyflagsh.shell_execv(env=env,
-                             command="scan",
-                             argv=["*",                   ## Inodes (All)
-                                   "MSNScanner"
-                                  ])                   ## List of Scanners
-
-        ## What should we have found?
+    def test02Scanner(self):
+        pass
         ## TODO
 
-
+class MSNTests7(MSNTests):
+    """ Test MSN P2P Sending Big File Ver 15 """ 
+    test_file = "filename=NetworkForensics/ProtocolHandlers/" \
+                "MSN/MSN_Cap7_Ver15_LarOAgeFileReceived.pcap"
+    
     ## Test protocol version 15 handling...
-    def test07MSNScanner(self):
-        """ Test MSN P2P Sending Big File Ver 15 """ 
-
-        self.test_case = "Pyflagtest07MSNScannerTestCase"
-
-        env = pyflagsh.environment(case=self.test_case)
-
-        ## First we drop the case in case it already exists
-        ## Since it might not exist, we allow this to throw:
-        try:
-            pyflagsh.shell_execv(env=env,
-                                 command = "delete_case",
-                                 argv=[self.test_case])       
-        except RuntimeError:
-            pass
- 
-        ## Now we create it
-        pyflagsh.shell_execv(env=env,
-                             command = "create_case",
-                             argv=[self.test_case])
-
-        pyflagsh.shell_execv(command="execute", 
-                            argv=["Load Data.Load IO Data Source", 
-                            "case=%s" % self.test_case , 
-                            "iosource=MSNTest7", 
-                            "subsys=Advanced", 
-                            "filename=NetworkForensics/ProtocolHandlers/" \
-                               "MSN/MSN_Cap7_Ver15_LargeFileReceived.pcap"])
-        
-        pyflagsh.shell_execv(command="execute", 
-                             argv=["Load Data.Load Filesystem image", 
-                                   "case=%s" %self.test_case , 
-                                   "iosource=MSNTest7", 
-                                   "fstype=PCAP Filesystem", 
-                                   "mount_point=/MSNTest7"])
-
-        pyflagsh.shell_execv(env=env,
-                             command="scan",
-                             argv=["*",                   ## Inodes (All)
-                                   "MSNScanner"
-                                  ])                   ## List of Scanners
-
+    def test02Scanner(self):
         ## What should we have found?
         dbh = DB.DBO(self.test_case)
         dbh.execute("""select * from `msn_session` where """\
@@ -2699,48 +2448,12 @@ class MSNTests(unittest.TestCase):
         assert row['context'] == "transferMe.zip"
         assert dbh.fetch() == None
 
-    def test08MSNScanner(self):
-        """ Test MSN P2P Multi User Ver 15 """ 
+class MSNTests8(MSNTests):
+    """ Test MSN P2P Multi User Ver 15 """ 
+    test_file = "filename=NetworkForensics/ProtocolHandlers/" \
+                "MSN/MSN_Cap8_Ver15_MultiUserChat.pcap"
 
-        self.test_case = "Pyflagtest08MSNScannerTestCase"
-
-        env = pyflagsh.environment(case=self.test_case)
-
-        ## First we drop the case in case it already exists
-        ## Since it might not exist, we allow this to throw:
-        try:
-            pyflagsh.shell_execv(env=env,
-                                 command = "delete_case",
-                                 argv=[self.test_case])       
-        except RuntimeError:
-            pass
- 
-        ## Now we create it
-        pyflagsh.shell_execv(env=env,
-                             command = "create_case",
-                             argv=[self.test_case])
-
-        pyflagsh.shell_execv(command="execute", 
-                            argv=["Load Data.Load IO Data Source", 
-                            "case=%s" % self.test_case , 
-                            "iosource=MSNTest8", 
-                            "subsys=Advanced", 
-                            "filename=NetworkForensics/ProtocolHandlers/" \
-                               "MSN/MSN_Cap8_Ver15_MultiUserChat.pcap"])
-        
-        pyflagsh.shell_execv(command="execute", 
-                             argv=["Load Data.Load Filesystem image", 
-                                   "case=%s" %self.test_case , 
-                                   "iosource=MSNTest8", 
-                                   "fstype=PCAP Filesystem", 
-                                   "mount_point=/MSNTest8"])
-
-        pyflagsh.shell_execv(env=env,
-                             command="scan",
-                             argv=["*",                   ## Inodes (All)
-                                   "MSNScanner"
-                                  ])                   ## List of Scanners
-
+    def test02Scanner(self):
         ## What should we have found?
         dbh = DB.DBO(self.test_case)
         dbh.execute("""select * from `msn_session` where type=\"MESSAGE\""""\
