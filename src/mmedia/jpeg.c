@@ -10,8 +10,6 @@
 #include "misc.h"
 
 #define SECTOR_SIZE 512
-static char empty[128];
-
 #undef DEBUG
 
 /** We need to do some special error handling because we expect lots
@@ -132,6 +130,22 @@ determine with greater accuracy which sector causes corruption.
 static void my_init_source (j_decompress_ptr cinfo) {
   struct my_src_mgr *self = (struct my_src_mgr *)cinfo->src;
   self->sector = alloc_small(cinfo, 0, SECTOR_SIZE);
+
+  // We do not populate the buffer first off - the decompressor will
+  // call my_fill_input_buffer immediately
+  self->pub.bytes_in_buffer = 0;
+  self->pub.next_input_byte = NULL;
+  self->last_row = 0;
+  self->error_count = 0;
+  self->last_sector = 0;
+  if(self->fd) {
+    PyObject *result;
+
+    result = PyObject_CallMethod(self->fd, "seek", "(k)", 0);
+    if(!result)
+      return NULL;
+    Py_DECREF(result);
+  };
 };
 
 static int my_fill_input_buffer (j_decompress_ptr cinfo) {
@@ -249,11 +263,6 @@ static void jpeg_my_src(j_decompress_ptr cinfo, PyObject *fd) {
   self->pub.skip_input_data = my_skip_input_data;
   self->pub.resync_to_restart = jpeg_resync_to_restart; /* use default method */
   self->pub.term_source = my_term_source;
-
-  // We do not populate the buffer first off - the decompressor will
-  // call my_fill_input_buffer immediately
-  self->pub.bytes_in_buffer = 0;
-  self->pub.next_input_byte = NULL;
 };
 
 typedef struct {
@@ -265,19 +274,29 @@ typedef struct {
   // The output buffer where we decode the image to
   unsigned char *frame;
 
-  // The decompressor object itself (This is also the main talloc context):
+  // The decompressor object itself
   j_decompress_ptr cinfo;
+
+  // This is the main talloc context
+  void *talloc_context;
 
   // Some stats about this image:
   int row_stride;
+
+  // A helper for making quick comparisons
+  char *empty;
+
   // A cache of integrals
   int *integrals;
+
 } decoder;
 
 static void decoder_dealloc(decoder *self) {
   // This will free all memory allocated to the cinfo (including the
   // cinfo itself)
   self->cinfo->mem->self_destruct(self->cinfo);
+
+  talloc_free(self->talloc_context);
 
   if(self->fd) {
     Py_DECREF(self->fd);
@@ -291,7 +310,8 @@ static int decoder_init(decoder *self, PyObject *args) {
     return -1;
 
   self->integrals = NULL;
-  self->cinfo = malloc(sizeof(struct jpeg_decompress_struct));
+  self->cinfo = talloc_size(NULL, sizeof(struct jpeg_decompress_struct));
+  self->talloc_context = self->cinfo;
 
   // Build a new decompressor object - this will assign the correct
   // memory manager automatically
@@ -305,7 +325,6 @@ static int decoder_init(decoder *self, PyObject *args) {
 
     self->cinfo = alloc_small(self->cinfo, 0, sizeof(struct jpeg_decompress_struct));
     memcpy(self->cinfo, tmp, sizeof(struct jpeg_decompress_struct));
-    free(tmp);
   };
 
   // Now build the error manager
@@ -372,7 +391,7 @@ static PyObject *decoder_decode(decoder *self, PyObject *args, PyObject *kwds) {
 
     // Clear the frame from the save position onwards to prevent
     // confusion from left over scanlines:
-    memset(self->frame + mem->row * self->row_stride, 0, 
+    memset(self->frame + mem->row * self->row_stride, 0x80, 
 	   self->row_stride * (self->cinfo->output_height - mem->row));
   } else {
     printf("Starting decoding from scratch\n");
@@ -385,7 +404,11 @@ static PyObject *decoder_decode(decoder *self, PyObject *args, PyObject *kwds) {
     // Decode the data:
     jpeg_abort(self->cinfo);
     jpeg_read_header(self->cinfo, TRUE);
-    jpeg_start_decompress(self->cinfo);
+    jpeg_start_decompress(self->cinfo);  
+
+    if(self->frame)
+      memset(self->frame, 0x80, 
+	     self->row_stride * self->cinfo->output_height);
   };
 
   src = (struct my_src_mgr *)self->cinfo->src;
@@ -397,7 +420,6 @@ static PyObject *decoder_decode(decoder *self, PyObject *args, PyObject *kwds) {
     goto abort;
   }
 
-  
   self->row_stride = self->cinfo->output_width * self->cinfo->output_components;
   if(maximum_sector) {
     src->maximum_sector = maximum_sector;
@@ -408,9 +430,12 @@ static PyObject *decoder_decode(decoder *self, PyObject *args, PyObject *kwds) {
   // than before (Why would we do that?).
   if(!self->frame) {
     int buffer_size = self->row_stride * self->cinfo->output_height;
-    self->frame = talloc_size(NULL, buffer_size);
+    self->frame = talloc_size(self->talloc_context, buffer_size);
     
-    memset(self->frame, 0, buffer_size);
+    memset(self->frame, 0x80, buffer_size);
+
+    self->empty = talloc_size(self->frame, self->row_stride);
+    memset(self->empty, 0x80, self->row_stride);
   };
 
   /** Loop over all scanlines and decode them all. Quit when we see
@@ -433,15 +458,12 @@ static PyObject *decoder_decode(decoder *self, PyObject *args, PyObject *kwds) {
 
     // Estimate how good is this line - we try to estimate the
     // integral as we go to detect discontinuities asap:
-    if(self->cinfo->output_scanline > 10 ) {
-      unsigned char *j;
-      
-      // Try to see if this row is partially empty:
-      if(is_line_empty(row_pointer[0], self->row_stride, 128)) {
-	src->last_row = self->cinfo->output_scanline - 1;
-	goto abort;
-	break;
-      };
+    // Try to see if this row is partially empty:
+    //    printf("Testing %u bytes %u %u\n", self->row_stride-1, src->last_row, self->cinfo->output_scanline);
+    if(memcmp(row_pointer[0], self->empty, self->row_stride-1)) {
+      src->last_row = self->cinfo->output_scanline;
+      //goto abort;
+      //break;
     };
   };
   
@@ -479,17 +501,20 @@ static PyObject *py_find_frame_bounds(decoder *self, PyObject *args) {
 
   // Avoid an FPE
   if(self->row_stride) {
-    y1 = j/self->row_stride;
+    //    y1 = j/self->row_stride;
+    y1 = src->last_row;
     x1 = (j % self->row_stride) / self->cinfo->output_components;
   };
 
+#if 0
   //Try to find the width of the last decoded chunk:
   if(x1 < self->cinfo->output_width) {
-    for(y_min=y1; y_min>0 && self->frame[y_min*self->row_stride + x1*self->cinfo->output_components] == 0x80;
+    for(y_min=y1; y_min>0 && self->frame[y_min*self->row_stride + (x1+1)*self->cinfo->output_components] == 0x80;
 	y_min--);
   };
+#endif 
 
-  return Py_BuildValue("(iii)", x1, y1, y_min);
+  return Py_BuildValue("(ii)", x1, y1);
 };
 
 /** Calculates the integral on self->frame, between left and right
@@ -552,6 +577,7 @@ int estimate_row(decoder *self, int row, int left, int right) {
 
   // We normalise the estimate to the total width of the line estimated
   return result / (right - left);
+  // return result;
 };
 
 /** This function uses edge detection to estimate a discontinuity
@@ -570,7 +596,7 @@ static PyObject *py_find_discontinuity(decoder *self, PyObject *args) {
 
     // Try to see if this row is partially empty:
     for(j=0; j<self->row_stride; j+=self->cinfo->output_components) {
-      if(!memcmp(empty, self->frame + self->row_stride * (i+1) + j, sizeof(empty))) {
+      if(!memcmp(self->empty, self->frame + self->row_stride * (i+1) + j, 128)) {
 	printf("Exiting at row %u\n", i+1);
 	goto exit;
       };
@@ -722,8 +748,6 @@ static PyMethodDef JpegMethods[] = {
 PyMODINIT_FUNC initjpeg(void) {
 
   PyObject *m;
-
-  memset(empty, 0x80, sizeof(empty));
 
   m = Py_InitModule("jpeg", JpegMethods);
 

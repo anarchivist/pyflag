@@ -11,6 +11,7 @@
 #include "jpeglib.h"
 #include "jerror.h"
 #include "suspend.h"
+#include "talloc.h"
 
 #ifndef NO_GETENV
 #ifndef HAVE_STDLIB_H		/* <stdlib.h> should declare getenv() */
@@ -188,8 +189,8 @@ METHODDEF(void) free_pool (j_common_ptr cinfo, int pool_id) {
 METHODDEF(void) self_destruct (j_common_ptr cinfo) {
   struct my_memory_mgr *self = (struct my_memory_mgr *)(cinfo->mem);
   printf("Destroying pool\n");
-  free(self->pool);
-  free(self->shadow_pool);
+  //free(self->pool);
+  //free(self->shadow_pool);
 }
 
 void suspend_memory(j_common_ptr cinfo, int row, int sector) {
@@ -225,14 +226,14 @@ GLOBAL(void) jinit_memory_mgr (j_common_ptr cinfo) {
     ERREXIT(cinfo, JERR_BAD_ALLOC_CHUNK);
 
   max_to_use = 0;  
-  mem = (my_mem_ptr) calloc(1, SIZEOF(struct my_memory_mgr));
+  mem = talloc(cinfo, struct my_memory_mgr);
   if (mem == NULL) {
     ERREXIT1(cinfo, JERR_OUT_OF_MEMORY, 0);
   };
 
   // Prepare our memroy pools:
-  mem->pool = calloc(POOL_SIZE,1);
-  mem->shadow_pool = calloc(POOL_SIZE,1);
+  mem->pool = talloc_zero_size(cinfo, POOL_SIZE);
+  mem->shadow_pool = talloc_zero_size(cinfo, POOL_SIZE);
   mem->pool_size = POOL_SIZE;
 
   /* OK, fill in the method pointers */
