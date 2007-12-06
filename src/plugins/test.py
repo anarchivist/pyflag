@@ -357,7 +357,7 @@ class TableTest(PopUpTest):
         
         result.table(
                          ## Can use keyword args
-            elements = [ TimestampType(name = 'TimeStamp',
+            elements = [ TimestampType(name = 'Timestamp',
                                        sql = 'time',
                                        ),
                          

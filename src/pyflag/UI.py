@@ -312,8 +312,8 @@ class GenericUI:
                                               link_pane = 'parent'),
                                  IntegerType('File Size', 'size')
                                  ],
-                    table = 'file as f, inode as i',
-                    where = 'f.inode=i.inode',
+                    table = '`file`, `inode`',
+                    where = 'file.inode_id=inode.inode_id',
                     case=case,
                     )
 

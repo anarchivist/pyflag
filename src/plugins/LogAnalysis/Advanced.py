@@ -202,7 +202,7 @@ class AdvancedLogTest(LogFile.LogDriverTester):
         dbh = DB.DBO(self.test_case)
         log = AdvancedLog(case=self.test_case)
         query = query_type(datafile = self.test_file, log_preset=self.log_preset,
-                           field_param_1_name="TimeStamp",
+                           field_param_1_name="Timestamp",
                            field_param_1_column="time",
                            field_param_1_format="%b %d %H:%M:%S",
                            field_param_1_override_year="2007",

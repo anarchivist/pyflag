@@ -85,7 +85,7 @@ class Syslog(LogFile.Log):
         self.fields = []
         self.delimiter = re.compile("\s+")
 
-        self.fields.append(TimestampType('TimeStamp', 'TimeStamp'))
+        self.fields.append(TimestampType('Timestamp', 'Timestamp'))
         self.fields.append(StringType('Hostname', 'Hostname'))
         self.fields.append(StringType('ServiceName', 'ServiceName'))
         self.fields.append(StringType('Message', 'Message'))

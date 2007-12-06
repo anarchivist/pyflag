@@ -35,7 +35,7 @@ import pyflag.FlagFramework as FlagFramework
 import pyflag.UI as UI
 import pyflag.pyflaglog as pyflaglog
 import cgi,os
-import re,time,sys
+import re,time,sys,socket
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.Theme
@@ -156,9 +156,18 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
         headers = {}
         headers['Expires']='-1'
         for k,v in headers.items():
-            self.send_header(k,v)
+            try:
+                self.send_header(k,v)
+            except socket.error:
+                pass
     
     def do_GET(self):
+        try:
+            self.handle_request()
+        except socket.error:
+            pass
+        
+    def handle_request(self):
         headers = {}
         
         ## Calculate the query from the request.
@@ -366,7 +375,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
         return
 
     def log_message(self, format, *args):
-        pyflaglog.log(pyflaglog.INFO, "%s - - [%s] %s\n" %
+        pyflaglog.log(pyflaglog.INFO, "%s - - [%s] %s" %
                       (self.address_string(),
                        self.log_date_time_string(),
                        format%args))

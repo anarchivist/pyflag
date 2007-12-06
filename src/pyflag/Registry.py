@@ -36,8 +36,10 @@ config=pyflag.conf.ConfObject()
 import os,sys,imp
 import pyflag.pyflaglog as pyflaglog
 
-## Define the parameters we need:
-config.add_option("PLUGINS", default="src/plugins",
+## Define the parameters we need. The default plugins directory is
+## taken from the path of the current module because the installer
+## will put the plugins directory within this directory.
+config.add_option("PLUGINS", default=os.path.dirname(__file__) + "/plugins",
                   help="Plugin directories to use")
 
 class Registry:

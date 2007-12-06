@@ -42,6 +42,8 @@ import pyflag.FileSystem as FileSystem
 import socket,re
 import pyflag.Time as Time
 import time
+## This is for parsing ambigous dates:
+import dateutil.parser
 
 ## Some options for various ColumnTypes
 config.add_option("PRECACHE_IPMETADATA", default=True,
@@ -60,6 +62,13 @@ class OmitValue(ConstraintError):
     """ This exception can be thrown by constraints to indicate the
     value should be totally ignored.
     """
+
+def guess_date(string):
+    try:
+        return dateutil.parser.parse(arg)
+    except ValueError:
+        ## Try a fuzzy match
+        return dateutil.parser.parse(arg, fuzzy=True)
 
 class TableObj:
     """ An abstract object representing a table in the database """
@@ -579,6 +588,13 @@ class StateType(ColumnType):
     def __init__(self, name='', column='', link='', callback=None):
         ColumnType.__init__(self, name=name, column=column, link=link, callback=callback)
         self.docs = {'is': """ Matches when the column is of the specified state. Supported states are %s""" % self.states.keys()}
+
+    def code_is(self, column, operator, state):
+        for k,v in self.states.items():
+            if state.lower()==k:
+                return lambda row: row[column] == v
+
+        raise RuntimeError("Dont understand state %r. Valid states are %s" % (state,self.states.keys()))
         
     def operator_is(self, column, operator, state):
         for k,v in self.states.items():
@@ -778,18 +794,26 @@ class TimestampType(IntegerType):
         return "`%s` TIMESTAMP" % self.column
 
     def code_after(self, column, operator, arg):
-        """ Matches in the time in the column is later than the time specified. We try to parse the time formats flexibly if possible. """
-        
+        """ Matches if the time in the column is later than the time
+        specified. We try to parse the time formats flexibly if
+        possible.
+        """
+        date_arg = guess_date(arg)
+        return lambda row: guess_date(row[column]) > date_arg
     
     def operator_after(self, column, operator, arg):
         """ Matches times after the specified time. The time arguement must be given in the format 'YYYY-MM-DD HH:MM:SS' (i.e. Year, Month, Day, Hour, Minute, Second). """
-        ## FIXME Should parse arg as a date - for now pass though to mysql
-        return "%s > %r" % (self.escape_column_name(self.column), arg)
+        date_arg = guess_date(arg)
+        return "%s > '%s'" % (self.escape_column_name(self.column), date_arg)
 
+    def code_before(self,column, operator, arg):
+        date_arg = guess_date(arg)
+        return lambda row: guess_date(row[column]) <= date_arg
+        
     def operator_before(self,column, operator, arg):
         """ Matches times before the specified time. The time arguement must be as described for 'after'."""
-        ## FIXME Should parse arg as a date
-        return "%s < %r" % (self.escape_column_name(self.column), arg)
+        date_arg = guess_date(arg)
+        return "%s < '%s'" % (self.escape_column_name(self.column), date_arg)
 
     def display(self, value, row, result):
         original_query = result.defaults
@@ -1545,12 +1569,11 @@ class FilenameType(StringType):
                             link=link, link_pane=link_pane)
 
     def display(self, value, row, result):
-        tmp = result.__class__(result)
-        tmp.text(value)
         if row['link']:
-            tmp.text("\n->%s" % row['link'], style="red")
+            tmp = result.__class__(result)
+            value = tmp.text("%s\n->%s" % (value, row['link']), style="red")
 
-        return tmp
+        return ColumnType.display(self, value, row, result)
 
     def select(self):
         if self.basename:

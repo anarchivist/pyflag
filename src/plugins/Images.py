@@ -84,8 +84,9 @@ class Advanced(IO.Image):
                 tmp = result.__class__(result)
                 new_query[offset] = "%ds" % parts[i][0]
                 tmp.link("%010d" % parts[i][0], new_query, pane='parent')
-                result.row(i, tmp, "%010d" % (parts[i][0] + parts[i][1]), "%010d" % parts[i][1] , parts[i][2])
-                result.end_table()
+                result.row(i, tmp, "%010d" % (parts[i][0] + parts[i][1]),
+                           "%010d" % parts[i][1] , parts[i][2])
+            result.end_table()
         
         tmp = result.__class__(result)
         tmp2 = result.__class__(result)

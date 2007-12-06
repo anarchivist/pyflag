@@ -375,7 +375,7 @@ class ViewConnections(Reports.report):
     def display(self, query,result):
         result.table(
             elements = [ InodeType('Inode','inode', case=query['case']),
-                         TimestampType('TimeStamp','ts_sec'),
+                         TimestampType('Timestamp','ts_sec'),
                          IPType('Source','src_ip'),
                          IntegerType('Src Port','src_port'),
                          IPType('Destination','dest_ip'),
