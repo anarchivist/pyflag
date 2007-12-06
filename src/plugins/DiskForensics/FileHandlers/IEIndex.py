@@ -75,8 +75,8 @@ class IEIndex(Scanner.GenScanFactory):
                                headers = event['data'])
 
 class IEHistory(Reports.report):
-    """ View IE browsing history with pasco"""
-    name = "IE Browser History (pasco)"
+    """ View IE browsing history """
+    name = "IE Browser History "
     family = "Disk Forensics"
     description="This report will display all IE browsing history data found in index.dat files"
 

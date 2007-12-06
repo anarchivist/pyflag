@@ -1002,28 +1002,42 @@ class IPType(ColumnType):
                 self.name + "_geoip_lat":returnLat,
                 self.name + "_geoip_long":returnLong}
 
+    def code_matches(self, column, operator, address):
+        """ Matches the IP address specified exactly """
+        return self.code_netmask(column, operator, address)
+
+    def code_netmask(self, column, operator, address):
+        """ Matches IP addresses that fall within the specified netmask. Netmask must be provided in CIDR notation or as an IP address (e.g. 192.168.1.1/24)."""        
+        numeric_address, broadcast = self.parse_netmask(address)
+        def f(row):
+            ip = FlagFramework.inet_aton(row[column])
+            return ip > numeric_address and ip < broadcast
+        return f
+        
     def operator_matches(self, column, operator, address):
         """ Matches the IP address specified exactly """
         return self.operator_netmask(column, operator,address)
 
-    def operator_netmask(self, column, operator, address):
-        """ Matches IP addresses that fall within the specified netmask. Netmask must be provided in CIDR notation or as an IP address (e.g. 192.168.1.1/24)."""
+    def parse_netmask(self, address):
         # Parse arg as a netmask:
         match = self.reMatchString.match(address)
         try:
-            if not match:
-                raise Exception
-            else:
-                    numbers = [x and int(x) or 0 for x in match.groups()]
-                    # by packing we throw errors if any byte > 255
-                    packed_address = struct.pack('4B', *numbers[:4]) # first 4 are in network order
-                    numeric_address = struct.unpack('!I', packed_address)[0]
-                    bits = numbers[4] or numbers[3] and 32 or numbers[2] and 24 or numbers[1] and 16 or 8
-                    mask = self.masks[bits]
-                    broadcast = (numeric_address & mask)|(~mask)
-        except:
-            raise ValueError("%s does not look like a CIDR netmask (e.g. 10.10.10.0/24)" % address)
-        
+            if match:
+                numbers = [x and int(x) or 0 for x in match.groups()]
+                # by packing we throw errors if any byte > 255
+                packed_address = struct.pack('4B', *numbers[:4]) # first 4 are in network order
+                numeric_address = struct.unpack('!I', packed_address)[0]
+                bits = numbers[4] or numbers[3] and 32 or numbers[2] and 24 or numbers[1] and 16 or 8
+                mask = self.masks[bits]
+                broadcast = (numeric_address & mask)|(~mask)
+                return numeric_address, broadcast
+            
+        except: pass    
+        raise ValueError("%s does not look like a CIDR netmask (e.g. 10.10.10.0/24)" % address)
+    
+    def operator_netmask(self, column, operator, address):
+        """ Matches IP addresses that fall within the specified netmask. Netmask must be provided in CIDR notation or as an IP address (e.g. 192.168.1.1/24)."""
+        numeric_address, broadcast = self.parse_netmask(address)
         return " ( %s >= %s and %s <= %s ) " % (self.escape_column_name(self.column),
                                                     numeric_address,
                                                     self.escape_column_name(self.column),
@@ -1057,6 +1071,10 @@ class IPType(ColumnType):
                 return False
 
         return f
+
+    def code_maxmind_isp(self, column, operator, isp):
+        """ Returns true if column has an ISP which contains the word isp in it """
+        return self.code_maxmind_isp_like(column, operator, isp)
     
     def operator_maxmind_isp(self, column, operator, isp):
         """ Matches the specified isp based on maxmind data. Note that works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
@@ -1093,7 +1111,23 @@ class IPType(ColumnType):
                % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
                   config.FLAGDB, config.FLAGDB, isp)
 
-    def operator_maxmind_organisation(self, column, operator, org):
+    def code_maxmind_org(self, column, operator, org):
+        """ Returns true if column has an ISP which contains the word isp in it """
+        def f(row):
+            data = Whois.get_all_geoip_data(row[column])
+            ## this is not that accurate but close:
+            clean_isp = org.replace('%','.*')
+            if 'org' in data and re.search(clean_isp,data['org']):
+                return True
+            else:
+                return False
+
+        return f
+
+    def code_maxmind_org_like(self, column, operator, org):
+        return self.code_maxmind_org( column, operator, org)
+
+    def operator_maxmind_org(self, column, operator, org):
         """ Matches the specified isp. Note that works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
 
         ## We must ensure there are indexes on the right columns or
@@ -1124,6 +1158,19 @@ class IPType(ColumnType):
                " %s.geoip_org.org like %r ) ) " \
                % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
                   config.FLAGDB, config.FLAGDB, org)
+
+    def code_maxmind_city(self, column, operator, city):
+        """ Returns true if column has an ISP which contains the word isp in it """
+        def f(row):
+            data = Whois.get_all_geoip_data(row[column])
+            ## this is not that accurate but close:
+            clean_isp = isp.replace('%','.*')
+            if 'city' in data and re.search(clean_isp,data['city']):
+                return True
+            else:
+                return False
+
+        return f
 
     def operator_maxmind_city(self, column, operator, city):
         """ Matches the specified city string (e.g. Canberra, Chicago). Note that this works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """

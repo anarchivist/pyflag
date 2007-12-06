@@ -913,3 +913,8 @@ def post_event(event, case):
         
         ## Post the event:
         getattr(event_handler, event)(dbh,case)
+
+import socket,struct
+
+def inet_aton(address):
+    return struct.unpack("I", socket.inet_aton(address))[0]

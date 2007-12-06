@@ -2403,7 +2403,7 @@ class MSNTests5(MSNTests):
 
 class MSNTests6(MSNTests):
     """ Test MSN P2P Send Being Rejected Using Protocol Ver 15 """
-    test_file = "filename=NetworkForensics/ProtocolHandlers/" \
+    test_file = "NetworkForensics/ProtocolHandlers/" \
                 "MSN/MSN_Cap6_Ver15_HavingAFileRejected.pcap"
 
     ## Test protocol version 15 handling...
@@ -2413,8 +2413,8 @@ class MSNTests6(MSNTests):
 
 class MSNTests7(MSNTests):
     """ Test MSN P2P Sending Big File Ver 15 """ 
-    test_file = "filename=NetworkForensics/ProtocolHandlers/" \
-                "MSN/MSN_Cap7_Ver15_LarOAgeFileReceived.pcap"
+    test_file = "NetworkForensics/ProtocolHandlers/" \
+                "MSN/MSN_Cap7_Ver15_LargeFileReceived.pcap"
     
     ## Test protocol version 15 handling...
     def test02Scanner(self):
@@ -2450,7 +2450,7 @@ class MSNTests7(MSNTests):
 
 class MSNTests8(MSNTests):
     """ Test MSN P2P Multi User Ver 15 """ 
-    test_file = "filename=NetworkForensics/ProtocolHandlers/" \
+    test_file = "NetworkForensics/ProtocolHandlers/" \
                 "MSN/MSN_Cap8_Ver15_MultiUserChat.pcap"
 
     def test02Scanner(self):

@@ -239,7 +239,7 @@ class ConfObject(object):
         if final:
             ## Reparse the config file again:
             self.add_file(self.filename)
-            
+
             try:
                 ## Help can only be set on the command line
                 if getattr(self.optparse_opts, "help"):
@@ -318,6 +318,11 @@ class ConfObject(object):
         ## Try to find the attribute in the command line options:
         try:
             return self.opts[attr.lower()]
+        except KeyError: pass
+
+        ## Was it given in the environment?
+        try:
+            return os.environ["PYFLAG_" + attr.upper()]
         except KeyError: pass
 
         ## No - try the configuration file:
