@@ -3,6 +3,7 @@
 import pyflag.IO as IO
 import pyflag.DB as DB
 from FlagFramework import query_type
+import pyflag.FlagFramework as FlagFramework
 import sk,re
 
 class IOSubsysFD:
@@ -338,7 +339,3 @@ class RemoteIOSourceTests(unittest.TestCase):
                                    "mount_point=/"])
 
 
-## FIXME - to do
-class Mounted(Advanced):
-    """ Treat a mounted directory as an image """
-    subsys = 'sgzip'

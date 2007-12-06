@@ -117,7 +117,7 @@ while 1:
         print ''
         count+=blocksize - 2*width * context
         current_block +=1
-        [ fd.seek(count) for fd in fds ]
+        for fd in fds: fd.seek(count)
 
     print_context_lines(fds)
     if blocksize>width*context:

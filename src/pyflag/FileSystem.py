@@ -188,6 +188,23 @@ class FileSystem:
         The purpose of this method is to do all analysis which must read file data in one place
         for performance, currently this includes file typing, file hashing and virus scanning"""
         pass
+
+    def guess(self, fd, result, metadata):
+        """ Uses fd to guess how suitable this filesystem driver is for this image """
+        if not "magic" in metadata:
+            fd.seek(0)
+            data = fd.read(10240)
+            if data:
+                magic = FlagFramework.Magic()
+                result.ruler()
+                sig = magic.buffer(data)
+                result.row("Magic identifies this file as: %s" % sig,**{'colspan':50,'class':'hilight'})
+                fd.close()
+                metadata['magic'] = sig
+            else:
+                metadata['magic'] = ''
+        
+        return 10
     
 class DBFS(FileSystem):
     """ Class for accessing filesystems using data in the database """

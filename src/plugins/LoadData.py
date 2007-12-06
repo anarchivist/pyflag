@@ -178,7 +178,6 @@ class LoadIOSource(Reports.report):
 
     def display(self, query,result):
         ## Try to instantiate the image:
-        print "Trying to create IOSource"
         try:
             image = Registry.IMAGES.dispatch(query['subsys'])()
         except:
@@ -440,24 +439,33 @@ class LoadFS(Reports.report):
             # initialise/open the subsystem
             fd=IO.open(query['case'],query['iosource'])
 
-            ## FIXME: make this order definable
-            fs_types = Registry.FILESYSTEMS.class_names
+            ## We need to ask all our filesystems to have a go at
+            ## this:
+            metadata = {}
+            order = []
+            for c in Registry.FILESYSTEMS.classes:
+                c = c(query['case'])
+                guess = c.guess(fd, result, metadata)
+                if guess>0:
+                    order.append((guess , c.name))
 
-            ## Try to get a magic hint
-            try:
-                magic = FlagFramework.Magic()
-                result.ruler()
-                sig = magic.buffer(fd.read(10240))
-                result.row("Magic identifies this file as: %s" % sig,**{'colspan':50,'class':'hilight'})
-                fd.close()
+            ## Sort according to the guess value
+            order.sort(lambda x,y: y[0] - x[0])
+                    
+            ## We only show those whose guess is within 100 off
+            ## the top - this allows a strong guess to bump out
+            ## weaker guesses.
+            maximum = order[0][0]
+            fs_types = [ x[1] for x in order if x[0] > maximum - 100 ]
 
-                get_default_fs_driver(result.defaults,sig)
-                
+            ## If only one option is possible here, 
+            if len(fs_types)==1:
+                result.hidden('fstype',fs_types[0], exclusive = True)
+            else:
                 result.const_selector("Enter Filesystem type",'fstype',fs_types,fs_types)
-                result.textfield("VFS Mount Point:","mount_point")
-                result.ruler()
-            except FlagFramework.FlagException,e:
-                result.hidden('fstype','Mounted')
+
+            result.textfield("VFS Mount Point:","mount_point")
+            result.ruler()
         except IOError,e:
             result.text("IOError %s" % e,style='red')
         except (KeyError,TypeError),e:

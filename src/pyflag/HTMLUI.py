@@ -408,8 +408,11 @@ class HTMLUI(UI.GenericUI):
             del self.form_parms[name]
         self.row(description,tmp)
 
-    def hidden(self,name,value):
+    def hidden(self,name,value, exclusive=False):
         """ Create a hidden parameter to be passed on form submission """
+        if exclusive:
+            del self.form_parms[name]
+            
         self.form_parms[name]=value
 
     def checkbox(self,description,name,value, tooltip=None, **options):

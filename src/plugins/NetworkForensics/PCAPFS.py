@@ -131,6 +131,15 @@ class PCAPFS(DBFS):
     name = 'PCAP Filesystem'
     order = 10
 
+    def guess(self, fd, result, metadata):
+        """ We need to see if its a PCAP file """
+        DBFS.guess(self, fd, result, metadata)
+        if 'tcpdump' in metadata['magic']:
+            result.row("Selecting PCAP Virtual Filesystem automatically" ,**{'colspan':50,'class':'hilight'})
+            return 120
+        else:
+            return -1
+
     def load(self, mount_point, iosource_name,scanners = None):
         DBFS.load(self, mount_point, iosource_name)
         

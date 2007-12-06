@@ -17,59 +17,6 @@ config=pyflag.conf.ConfObject()
 import os.path
 import stat
 
-class Raw(DBFS):
-    """ A psuedo file system to load raw images """
-    name="Raw"
-    order = 50
-
-    def load(self, mount_point, iosource_name):
-        ## Ensure that mount point is normalised:
-        mount_point = os.path.normpath(mount_point)
-        DBFS.load(self, mount_point, iosource_name)
-
-        ## Just add a single inode:
-        self.VFSCreate("I%s" % iosource_name,'o0', "%s/raw_filesystem" % mount_point)
-
-## FIXME - This is now broken
-class Mounted(DBFS):
-    """ A class implementing the mounted filesystem option """
-    name = 'Mounted'
-    order = 100
-    
-    def load(self, mount_point, iosource_name):
-        pyflaglog.log(pyflaglog.DEBUG,"Loading files from directory %s" % self.iosource.mount_point)
-        
-        dbh=DB.DBO(self.case)
-        ## Create the tables for the filesystem
-        dbh.MySQLHarness("%s -n %s -d create -m / blah" %(config.SLEUTHKIT,iosource_name))
-
-        ## This deals with a mounted filesystem - we dont get the full
-        ## forensic joy, but we can handle more filesystems than
-        ## sleuthkit can.  The downside is that the user has to mount
-        ## the filesystem first, we also need to be running as root or
-        ## we may not be able to stat all the files :-(
-        def insert_into_table(mode,root,name):
-            rel_root="/"+root[len(self.iosource.mount_point):]+"/"
-            if rel_root=="//": rel_root="/"
-            s=os.lstat(os.path.join(root,name))
-            dbh.execute("insert into file set inode='M%s',mode=%r,status='alloc',path=%r,name=%r",(self.table, s.st_ino, mode, rel_root, name))
-            try:
-                link=os.readlink("%s/%s" % (root,name))
-            except OSError:
-                link=''
-            
-            dbh.execute("insert into inode_%s set inode='M%s',uid=%r,gid=%r, mtime=%r,atime=%r,ctime=%r,mode=%r,links=%r,link=%r,size=%r",(self.table,s.st_ino,s.st_uid,s.st_gid,s.st_mtime,s.st_atime,s.st_ctime,str(oct(s.st_mode))[1:],s.st_nlink,link,s.st_size))
-
-        ## Just walk over all the files and stat them all building the tables.
-        for root, dirs, files in os.walk(self.iosource.mount_point):
-            for name in dirs:
-                insert_into_table('d/d',root,name)
-            for name in files:
-                insert_into_table('r/r',root,name)
-
-        ## End mounted filesystem handling
-        return
-
 import sk
 import Store
 
@@ -495,3 +442,4 @@ class LargeFileTest(pyflag.tests.ScannerTest):
         pyflagsh.shell_execv(env=env, command="scan",
 #                             argv=["*",'TypeScan','MD5Scan','VirScan','DLLScan','IEIndex','RFC2822','RegistryScan','OLEScan','PstScan','IndexScan'])
                              argv=["*",'*'])
+
