@@ -414,25 +414,40 @@ class ColumnType:
         """ Creates an index on table using dbh """
         dbh.check_index(table, self.column)
 
-    def operators(self):
+    def operators(self, context = 'sql'):
         """ Returns a list of operators we support """
         ops = self.symbols.copy()
+        if context == 'sql':
+            prefix = 'operator_'
+        else:
+            prefix = "code_"
+            
         for m in dir(self):
-            if m.startswith("operator_"):
-                ops[m[len("operator_"):]]=m
+            if m.startswith(prefix):
+                ops[m[len(prefix):]]=m
 
         return ops
 
-    def parse(self, column, operator, arg):
+    ## When returning an sql context we expect to get a string
+    ## containing the sql to be written to the server. When called
+    ## with code context, we expect to get back a function of
+    ## prototype: x(row) which evaluates the expression given a dict
+    ## row of all the columns in the row.
+    def parse(self, column, operator, arg, context='sql'):
         ## Try to find the method which handles this operator. We look
         ## first in symbols and then in a method containing the name
         ## requested:
-        if self.symbols.has_key(operator):
+        if context == 'sql':
+            prefix = "operator_"
+        else:
+            prefix = 'code_'
+
+        if operator in self.symbols:
             ## This has to succeed or there is a programming error.
-            method = getattr(self, self.symbols[operator])
+            method = getattr(self, prefix + self.symbols[operator])
         else:
             try:
-                method = getattr(self, "operator_"+operator)
+                method = getattr(self, prefix + operator)
             except:
                 raise RuntimeError("%s is of type %s and has no operator %r. Does it make sense to use this operator on this data?" % (column, ("%s"% self.__class__).split('.')[-1], operator))
 
@@ -444,7 +459,11 @@ class ColumnType:
         else:
             return self.column
 
-    def literal(self, column,operator, arg):
+    def code_literal(self, column, operator, arg):
+        ## Bit of a hack really:
+        return lambda row: eval("%r %s %r" % (row[column], operator, arg.__str__()), {})
+
+    def operator_literal(self, column,operator, arg):
         return "%s %s %r" % (self.escape_column_name(self.column),
                              operator, arg)
     
@@ -554,12 +573,12 @@ class StateType(ColumnType):
     hidden = True
     states = {}
     symbols = {
-        '=': 'operator_is'
+        '=': 'is'
         }
 
     def __init__(self, name='', column='', link='', callback=None):
         ColumnType.__init__(self, name=name, column=column, link=link, callback=callback)
-        self.docs = {'operator_is': """ Matches when the column is of the specified state. Supported states are %s""" % self.states.keys()}
+        self.docs = {'is': """ Matches when the column is of the specified state. Supported states are %s""" % self.states.keys()}
         
     def operator_is(self, column, operator, state):
         for k,v in self.states.items():
@@ -573,13 +592,21 @@ class StateType(ColumnType):
 
 class IntegerType(ColumnType):
     symbols = {
-        "=":"literal",
+        "=":"equal",
         "!=":"literal",
         "<=": "literal",
         ">=": "literal",
         "<": "literal",
         ">": "literal",
         }
+
+    def code_equal(self, column, operator, arg):
+        ## Make sure our arg is actually an integer:
+        integer = int(arg)
+        return lambda row: int(row[column]) == integer
+
+    def operator_equal(self, column, operator, address):
+        return "%s = %r" % (self.escape_column_name(self.column), address)
 
     def create(self):
         return "`%s` int(11) default 0" % self.column
@@ -635,13 +662,23 @@ class StringType(ColumnType):
     def create(self):
         return "`%s` VARCHAR(255) default NULL" % self.column
 
+    def code_contains(self, column, operator, arg):
+        return lambda row: arg in row[column]
+    
     def operator_contains(self, column, operator, arg):
         """ Matches when the column contains the pattern anywhere. Its the same as placing wildcards before and after the pattern. """
         return '%s like %r' % (self.select(), "%" + arg + "%")
 
+    def code_matches(self, column, operator, arg):
+        regex = arg.replace("%",".*")
+        return lambda row: re.match(regex, row[column])
+
     def operator_matches(self, column, operator, arg):
         """ This matches the pattern to the column. Wild cards (%) can be placed anywhere, but if you place it in front of the pattern it could be slower. """
         return '%s like %r' % (self.escape_column_name(self.column), arg)
+
+    def code_regex(self, column, operator, arg):
+        return lambda row: re.match(arg, row[column])
 
     def operator_regex(self,column,operator,arg):
         """ This applies the regular expression to the column (Can be slow for large tables) """
@@ -739,6 +776,10 @@ class TimestampType(IntegerType):
 
     def create(self):
         return "`%s` TIMESTAMP" % self.column
+
+    def code_after(self, column, operator, arg):
+        """ Matches in the time in the column is later than the time specified. We try to parse the time formats flexibly if possible. """
+        
     
     def operator_after(self, column, operator, arg):
         """ Matches times after the specified time. The time arguement must be given in the format 'YYYY-MM-DD HH:MM:SS' (i.e. Year, Month, Day, Hour, Minute, Second). """
@@ -873,13 +914,19 @@ class IPType(ColumnType):
     masks = [0] + [int(-(2**(31-x))) for x in range(32)]
 
     symbols = {
-        '=': 'literal',
+        '=': 'equal',
         '<': 'literal',
         '>': 'literal',
         '<=': 'literal',
         '>=': 'literal',
         '!=': 'literal',
         }
+
+    def code_equal(self, column, operator, address):
+        return lambda row: row[column] == address
+
+    def operator_equal(self, column, operator, address):
+        return "%s = INET_ATON(%r)" % (self.escape_column_name(self.column), address)
 
     def literal(self, column, operator, address):
         return "%s %s INET_ATON(%r)" % (self.escape_column_name(self.column), operator, address)
@@ -974,7 +1021,20 @@ class IPType(ColumnType):
                % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
                   config.FLAGDB, config.FLAGDB, country)
 
-    def operator_maxmind_isp(self, column, operator, city):
+    def code_maxmind_isp_like(self, column, operator, isp):
+        """ Returns true if column has an ISP which contains the word isp in it """
+        def f(row):
+            data = Whois.get_all_geoip_data(row[column])
+            ## this is not that accurate but close:
+            clean_isp = isp.replace('%','.*')
+            if 'isp' in data and re.search(clean_isp,data['isp']):
+                return True
+            else:
+                return False
+
+        return f
+    
+    def operator_maxmind_isp(self, column, operator, isp):
         """ Matches the specified isp based on maxmind data. Note that works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
 
         ## We must ensure there are indexes on the right columns or
@@ -988,9 +1048,9 @@ class IPType(ColumnType):
                "%s.geoip_isp on %s.whois_cache.geoip_isp=%s.geoip_isp.id where "\
                "%s.geoip_isp.isp = %r ) ) " \
                % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
-                  config.FLAGDB, config.FLAGDB, city)
+                  config.FLAGDB, config.FLAGDB, isp)
 
-    def operator_maxmind_isp_like(self, column, operator, city):
+    def operator_maxmind_isp_like(self, column, operator, isp):
         """ Matches the specified isp. Note that works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
 
         ## We must ensure there are indexes on the right columns or
@@ -1000,16 +1060,16 @@ class IPType(ColumnType):
         dbh.check_index("whois_cache", "ip")
         dbh.check_index("geoip_isp", "id")
 
-        if not "%" in city:
-            city = "%%%s%%" % city
+        if not "%" in isp:
+            isp = "%%%s%%" % isp
 
         return " ( `%s` in (select ip from %s.whois_cache join " \
                "%s.geoip_isp on %s.whois_cache.geoip_isp=%s.geoip_isp.id where"\
                " %s.geoip_isp.isp like %r ) ) " \
                % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
-                  config.FLAGDB, config.FLAGDB, city)
+                  config.FLAGDB, config.FLAGDB, isp)
 
-    def operator_maxmind_organisation(self, column, operator, city):
+    def operator_maxmind_organisation(self, column, operator, org):
         """ Matches the specified isp. Note that works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
 
         ## We must ensure there are indexes on the right columns or
@@ -1023,9 +1083,9 @@ class IPType(ColumnType):
                "%s.geoip_org on %s.whois_cache.geoip_org=%s.geoip_org.id where"\
                " %s.geoip_org.org = %r ) ) " \
                % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
-                  config.FLAGDB, config.FLAGDB, city)
+                  config.FLAGDB, config.FLAGDB, org)
 
-    def operator_maxmind_organisation_like(self, column, operator, city):
+    def operator_maxmind_organisation_like(self, column, operator, org):
         """ Matches the specified organisation. Note that works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
 
         ## We must ensure there are indexes on the right columns or
@@ -1039,7 +1099,7 @@ class IPType(ColumnType):
                "%s.geoip_org on %s.whois_cache.geoip_org=%s.geoip_org.id where"\
                " %s.geoip_org.org like %r ) ) " \
                % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
-                  config.FLAGDB, config.FLAGDB, city)
+                  config.FLAGDB, config.FLAGDB, org)
 
     def operator_maxmind_city(self, column, operator, city):
         """ Matches the specified city string (e.g. Canberra, Chicago). Note that this works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
@@ -1076,6 +1136,13 @@ class IPType(ColumnType):
     #             " %s.interesting_ips.category = %r) ) " \
     #           % (self.column, self.case, self.case, country)
 
+    def code_maxmind_country(self, column, operator, country):
+        def f(row):
+            data = Whois.get_all_geoip_data(row[column])
+            return data.get("country_code3")==country
+
+        return f
+
     def operator_maxmind_country(self, column, operator, country):
         """ Matches the specified country string in the GeoIP Database (e.g. FRA, USA, AUS). Note that this works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
 
@@ -1098,7 +1165,7 @@ class IPType(ColumnType):
 
     def select(self):
         ## Upon selection they will be converted to strings:
-        return "inet_ntoa(`%s`)" % self.column
+        return "inet_ntoa(`%s`)" % (self.column)
 
     def insert(self,value):
         ### When inserted we need to convert them from string to ints
@@ -1193,7 +1260,7 @@ class IPType(ColumnType):
         
         if config.WHOIS_DISPLAY:
             Whois.identify_network(id, value, tmp3)
-        
+
         try:
             if config.GEOIP_DISPLAY:
                 Whois.geoip_resolve(value,tmp3)

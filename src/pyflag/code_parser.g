@@ -1,28 +1,3 @@
-""" This is a parser for the table search widget. The parser
-implements a simple language for structured queries depending on the
-type of the columns presented.
-"""
-# Michael Cohen <scudette@users.sourceforge.net>
-#
-# ******************************************************
-#  Version: FLAG $Version: 0.84RC4 Date: Wed May 30 20:48:31 EST 2007$
-# ******************************************************
-#
-# * This program is free software; you can redistribute it and/or
-# * modify it under the terms of the GNU General Public License
-# * as published by the Free Software Foundation; either version 2
-# * of the License, or (at your option) any later version.
-# *
-# * This program is distributed in the hope that it will be useful,
-# * but WITHOUT ANY WARRANTY; without even the implied warranty of
-# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# * GNU General Public License for more details.
-# *
-# * You should have received a copy of the GNU General Public License
-# * along with this program; if not, write to the Free Software
-# * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-# ******************************************************
-
 def eval_expression(elements, name, operator, arg):
 #    print "Evaluating %s.%s(%r)" % (name,operator,arg)
     ## Try and find the element with the specified name:
@@ -36,10 +11,18 @@ def eval_expression(elements, name, operator, arg):
         raise RuntimeError("Column %s not known" % name)
 
     ## Use the element to parse:
-    return element.parse(name, operator, arg)
+    return element.parse(name, operator, arg, context='code')
+
+def logical_operator_parse(left, operator, right):
+    if operator=="and":
+        return lambda row: left(row) and right(row)
+    elif operator=="or":
+        return lambda row: left(row) or right(row)
+
+    raise RuntimeError("operator %s not supported" % operator)
 
 %%
-parser SearchParser:
+parser CodeParser:
     ignore:    "[ \r\t\n]+"
     
     token END: "$"
@@ -56,7 +39,7 @@ parser SearchParser:
     rule clause<<types>>: expr<<types>> {{ result = expr }}
                     (
                         LOGICAL_OPERATOR {{ logical_operator = LOGICAL_OPERATOR }}
-                        expr<<types>> {{ result = "%s %s %s" % (result, logical_operator, expr) }}
+                        expr<<types>> {{ result = logical_operator_parse(result, logical_operator, expr) }}
                      )*  {{ return result }}
 
     ## A term may be encapsulated with " or ' or not. Note that
@@ -74,12 +57,26 @@ parser SearchParser:
                      WORD {{ operator = WORD }}
                      term {{ return  eval_expression(types, column,operator,term)}}
                      #Preserve parenthases
-                     | '\\(' clause<<types>> '\\)' {{ return "( %s )" % clause }}
+                     | '\\(' clause<<types>> '\\)' {{ return  clause }}
 
 %%
 
-def parse_to_sql(text, types):
-    P = SearchParser(SearchParserScanner(text))
+def parse_eval(text, types):
+    """ This return a parse tree from the expression in text using the
+    table objects in types.
+
+    A parse tree is essentially a function which may be called with:
+    function(row)
+
+    where row is a dict containing all the column in the row. The
+    function returns True if the filter expression applies to the row
+    or False otherwise.
+
+    Note that once the filter is parsed there is no need to re-parse
+    it for each row, just reuse the function over and over. This is
+    very fast.
+    """
+    P = CodeParser(CodeParserScanner(text))
     return runtime.wrap_error_reporter(P, 'goal', types)
 
 if __name__=='__main__':
@@ -90,4 +87,4 @@ if __name__=='__main__':
 
     test = 'Timestamp < "2006-10-01 \\\"10:10:00\\\"" or (Timestamp before \'2006-11-01 "10:10:00"\' and  "IP Address" netmask "10.10.10.0/24") or "IP Address" = 192.168.1.1'
     print "Will test %s" % test
-    print parse_to_sql(test,types)
+    print parse_eval(test,types)

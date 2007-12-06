@@ -106,6 +106,8 @@ def legend(query, result):
         result.row(key, field_codes[key][0])
     result.end_table()
 
+import pyflag.parser as parser
+
 class ApacheLog(Simple.SimpleLog):
     """ Log parser for apache log files """
     name = "Apache Log"
@@ -352,3 +354,29 @@ class ApacheLogTest(LogFile.LogDriverTester):
         dbh.execute("select count(*) as c from `%s_log`", self.test_table)
         row = dbh.fetch()
         self.assertEqual(row['c'], 10000)
+
+    def test03FilteredLoad(self):
+        """ Test that filter expressions work when loading """
+        filter = ' "rhost"  maxmind_country AUS and  "status" = 404 '
+        ## See if we can load the preset again:
+        log = LogFile.load_preset(self.test_case, self.log_preset, [self.datafile])
+
+        t = time.time()
+        table_name = self.test_table + "filtered"
+        ## Load the data:
+        for a in log.load(table_name, filter=filter):
+            print a
+
+        print "Took %s seconds to load log" % (time.time()-t)
+
+        ## How many rows were inserted
+        dbh = DB.DBO(self.test_case)
+        dbh.execute("select count(*) as c from `%s_log`", table_name)
+        row = dbh.fetch()
+        
+        ## Now try to enforce the same filter on the original table
+        ## (which has all the rows in it):
+        filter_sql = parser.parse_to_sql(filter, log.fields)
+        dbh.execute("select count(*) as c from `%s_log` where %s", (self.test_table, filter_sql))
+        row2 = dbh.fetch()
+        self.assertEqual(row['c'], row2['c'])

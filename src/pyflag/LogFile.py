@@ -41,6 +41,7 @@ import re
 import pyflag.Registry as Registry
 import pyflag.IO as IO
 import cStringIO
+import pyflag.code_parser as code_parser
 
 def get_file(query,result):
     result.row("Select a sample log file for the previewer",stretch=False)
@@ -185,7 +186,7 @@ class Log:
         ## By default we dont split the row
         return [self.read_record(),]
     
-    def load(self,name, rows = None, deleteExisting=None):
+    def load(self,name, rows = None, deleteExisting=None, filter=None):
         """ Loads the specified number of rows into the database.
 
         __NOTE__ We assume this generator will run to
@@ -230,12 +231,20 @@ class Log:
             ',\n'.join([ x for x in creation_strings if x])
             ))
 
+        ## Is there a filter implemented?
+        if filter:
+            filter_parser = code_parser.parse_eval(filter, fields)
+        else:
+            filter_parser = None
+
         ## Now insert into the table:
         count = 0
         for fields in self.get_fields():
             count += 1
 
             args = None
+            columns = {}
+
             if isinstance(fields, list):
                 args = dict()
                 ## Iterate on the shortest of fields (The fields array
@@ -243,13 +252,23 @@ class Log:
                 ## (The total number of fields we expect)
                 for i in range(min(len(self.fields),len(fields))):
                     try:
-                        key, value = self.fields[i].insert(fields[i])
+                        c = self.fields[i]
+                        v = fields[i]
+                        columns[c.column] = v
+
+                        ## Ask the columns to format their own insert statements
+                        key, value = c.insert(v)
                         args[key] = value
                     except (IndexError,AttributeError),e:
                         pyflaglog.log(pyflaglog.WARNING, "Attribute or Index Error when inserting value into field: %r" % e)
             elif isinstance(fields, dict):
                 args = fields
+                columns = fields
                 
+            ## If the filter does not match, we ignore this row:
+            if filter_parser:
+                if not filter_parser(columns): continue
+
             if args:
                 dbh.mass_insert( **args)
             
