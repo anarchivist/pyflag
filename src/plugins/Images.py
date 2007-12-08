@@ -44,6 +44,8 @@ class IOSubsysFD:
         """ close subsystem """
         pass
 
+filename_re = re.compile("(.+?)(\d+)")
+
 class Advanced(IO.Image):
     """ This is a IO source which provides access to raw DD images
     with offsets.
@@ -126,9 +128,47 @@ class Advanced(IO.Image):
         
         args = [['subsys', self.subsys],
                 ['offset', offset]]
-        
-        for f in query.getarray('filename'):
-            args.append(['filename', f])
+
+        ## If a single Ewf file is given we try to glob all the
+        ## filenames:
+        filenames = query.getarray('filename')
+
+        for f in filenames:
+            ## Is it a symlink? This allows us to symlink to a single
+            ## file from a fileset using a simple name. This makes it
+            ## nice to manage the upload directory because you can
+            ## just put a single symlink (e.g. freds_disk.E01) to the
+            ## entire evidence set (could be huge and mounted
+            ## somewhere different then the upload directory, e.g. an
+            ## external driver).
+            try:
+                f = os.readlink(f)
+            except OSError:
+                pass
+
+            ## If the filename we were provided with, ends with a
+            ## digit we assume that its part of an evidence set.
+            m = filename_re.match(f)
+            import glob
+            
+            if m:
+                globbed_filenames = glob.glob(m.group(1) + "*")
+                ## This list must be sorted on the numeric extension
+                ## (Even if its not 0 padded so an alphabetic sort
+                ## works - I have seen some cases where the images
+                ## were named image.1 image.10 image.100):
+                def comp(x,y):
+                    m1 = filename_re.match(x)
+                    m2 = filename_re.match(y)
+                    if not m1 or not m2: return 0
+                    return int(m1.group(2)) - int(m2.group(2))
+
+                globbed_filenames.sort(comp)
+            else:
+                globbed_filenames = [f]
+                
+            for f in globbed_filenames:
+                args.append(['filename', f])
 
         return args
 
@@ -200,39 +240,6 @@ class SGZip(Advanced):
 class EWF(Advanced):
     """ EWF is used by other forensic packages like Encase or FTK """
     subsys = 'ewf'
-
-    def make_iosource_args(self, query):
-        offset = self.calculate_offset_suffix(query.get('offset','0'))
-        
-        args = [['subsys', self.subsys],
-                ['offset', offset]]
-
-        ## If a single Ewf file is given we try to glob all the
-        ## filenames:
-        filenames = query.getarray('filename')
-
-        for f in filenames:
-            ## Is it a symlink? This allows us to symlink to a single
-            ## file from a fileset using a simple name. This makes it
-            ## nice to manage the upload directory because you can
-            ## just put a single symlink (e.g. freds_disk.E01) to the
-            ## entire evidence set (could be huge and mounted
-            ## somewhere different then the upload directory, e.g. an
-            ## external driver).
-            try:
-                f = os.readlink(f)
-            except OSError:
-                pass
-
-            ## Glob it:
-            import glob
-            filenames = glob.glob(f[:-3]+"E*") + glob.glob(f[:-3]+"e*") 
-            
-            for f in filenames:
-                args.append(['filename', f])
-
-        return args
-
 
 import Store
 
@@ -339,4 +346,10 @@ class RemoteIOSourceTests(unittest.TestCase):
                                    "fstype=%s" % self.fstype,
                                    "mount_point=/"])
 
-
+import pyflag.tests as tests
+class AdvancedTest(tests.ScannerTest):
+    """ Test basic performance of Advanced IO Source """
+    test_case = "PyFlagTestCase"
+    test_file = "split/test_image.1"
+    subsystem = "Advanced"
+    offset = "16128s"

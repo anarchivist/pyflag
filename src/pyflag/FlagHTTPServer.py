@@ -335,6 +335,13 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                           except (IndexError, AttributeError):
                               self.wfile.write("<html><body>Authentication Required for this page</body></html>")
                           return
+                      except Reports.ReportError, e:
+                          if e.ui:
+                              result = e.ui
+                          else:
+                              result.clear()
+                              FlagFramework.get_traceback(e, result)
+                          
               except Exception,e:
                   result.clear()
                   result.heading("Error")

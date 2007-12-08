@@ -33,14 +33,39 @@ import pyflag.Registry as Registry
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.pyflaglog as pyflaglog
-
+import traceback
 
 config.add_option("AUTHORISED_USERS", default=None, help="If present, specify access controls in the form user:pass,user2:pass2,etc")
 
 class ReportError(Exception):
-    """ Base class for errors in reports """
-    pass
+    """ Base class for errors in reports.
 
+    This is needed as a standard way of raising errors from reports
+    which can return a GUI formatted error or a simple string (or
+    both). For example the Flash will only look at the string.
+    """
+    def __init__(self, ui=None, text=None, exception=None, bt=None):
+        self.bt = bt
+        if not ui:
+            self.ui = text
+        else:
+            self.ui = ui
+            
+        self.text = text
+
+        if exception:
+            self.text = "%s: %s" % (exception.__class__.__name__,
+                                    exception)
+            if ui:
+                ui.heading("Error: Unable to create IO Source")
+                ui.para("Error reported was %s" % exception, color='red')
+
+        if not bt:
+            self.bt = traceback.format_exc()
+        
+    def __str__(self):
+        return self.text
+    
 class report:
     """ This is the main report base class for flag. Note that all reports should be subclassed from here, and should provide the following methods at least:
 

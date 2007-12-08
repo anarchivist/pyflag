@@ -39,6 +39,7 @@ import pyflag.Registry as Registry
 import pyflag.conf
 config = pyflag.conf.ConfObject()
 import pyflag.FileSystem as FileSystem
+import pyflag.Reports as Reports
 
 class ParserException(Exception):
     """ Exception thrown by the parser when we cant parse the line """
@@ -225,9 +226,9 @@ def shell_execv(env=None,command=None, argv=[]):
                 string = i
             else:
                 string += i
-
+                
     return string
-
+        
 if __name__ == "__main__":
     # Parse commandline args:
     config.set_usage(usage="PyFlash the pyflag interactive shell",

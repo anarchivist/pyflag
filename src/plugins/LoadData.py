@@ -212,9 +212,7 @@ class LoadIOSource(Reports.report):
             io = image.open(query['iosource'], query['case'], query)
         except Exception,e:
             pyflaglog.log(pyflaglog.WARNING,"Error instantiating driver: %s" % e)
-            result.heading("Error: Unable to create IO Source")
-            result.para("Error reported was %s" % e, color='red')
-            return
+            raise Reports.ReportError(ui=result, exception=e)
 
         ## If we get here all went well - go to next step
         result.refresh(0, query_type(case=query['case'],
