@@ -63,6 +63,13 @@ class LoadPresetLog(Reports.report):
         result.para("Successfully uploaded the following files into case %s, table %s:" % (query['case'],query['table']))
         for fn in query.getarray('datafile'):
             result.para(fn)
+
+        try:
+            if len(query['filter'])>1:
+                result.text("Log was filtered with: %s\n" % query['filter'], style='red')
+        except KeyError:
+            pass
+        
         result.link("Browse this log file",
                     query_type(case=query['case'],
                                family="Log Analysis",

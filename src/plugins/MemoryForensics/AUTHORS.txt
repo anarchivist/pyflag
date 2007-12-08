@@ -1,0 +1,11 @@
+Volatility authors:
+
+AAron Walters <awalters@volatilesystems.com>
+
+Volatools Basic authors:
+
+AAron Walters <awalters@komoku.com>
+Nick L. Petroni, Jr. <npetroni@komoku.com>
+Komoku, Inc.
+9601 Baltimore Ave, Suite A-1
+College Park, MD 20740
