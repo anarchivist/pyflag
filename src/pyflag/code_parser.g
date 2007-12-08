@@ -77,7 +77,11 @@ def parse_eval(text, types):
     very fast.
     """
     P = CodeParser(CodeParserScanner(text))
-    return runtime.wrap_error_reporter(P, 'goal', types)
+    try:
+        return P.goal(types)
+    except runtime.SyntaxError, e:
+        raise RuntimeError("\n%s\n%s^\n%s" % (text, '-' * e.pos[2], e.msg))
+
 
 if __name__=='__main__':
     import pyflag.TableObj as TableObj

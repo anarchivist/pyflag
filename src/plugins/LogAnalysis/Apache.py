@@ -36,7 +36,7 @@ def trans_date(time):
         return '0'
     else:
         f = m.groups()
-        return "%s/%s/%s/:%s:%s:%s" % (f[2],months[f[1]],f[0],f[3],f[4],f[5])
+        return "%s/%s/%s:%s:%s:%s" % (f[2],months[f[1]],f[0],f[3],f[4],f[5])
 
 # here are some standard apache formats taken from a debian httpd.conf
 # add new ones here...
@@ -344,7 +344,7 @@ class ApacheLogTest(LogFile.LogDriverTester):
 
         t = time.time()
         ## Load the data:
-        for a in log.load(self.test_table):
+        for a in log.load(self.test_table, filter=None):
             print a
 
         print "Took %s seconds to load log" % (time.time()-t)

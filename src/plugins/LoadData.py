@@ -45,6 +45,7 @@ import pyflag.ScannerUtils as ScannerUtils
 import time
 import plugins.LogAnalysis.Whois as Whois
 from pyflag.TableObj import IPType
+import pyflag.code_parser as code_parser
 
 description = "Load Data"
 
@@ -112,32 +113,36 @@ class LoadPresetLog(Reports.report):
 #                raise
                 return result
 
+            ## Draw the filter GUI:
+            result.add_filter(query, query['case'], code_parser.parse_eval,
+                           log.fields, search_text = "Pre-Filter Expression")
+
+            result.ruler()
             result.end_table()
-            
+            result.para("Please check the test table before continuing. Note that the filter is not applied to the test table.")
+
             # show preview
             result.start_table()
-
             dbh = DB.DBO(query['case'])
 
             try:
                 # retrieve and display the temp table
-                log.display_test_log(result)
+                log.display_test_log(result, filter=None)
             except Exception,e:
                 result.text("Error: Unable to load a test set - maybe this log file is incompatible with this log preset?\nError was %s" % e,style='red',font='bold')
                 pyflaglog.log(pyflaglog.DEBUG,"Unable to load test set - error returned was %s" % e)
-                print FlagFramework.get_bt_string(e)
                 return
             
             result.checkbox('Click here to confirm','final','ok')
 
-        except KeyError:
+        except (KeyError, RuntimeError):
             pass
 
     def analyse(self, query):
         """ Load the log file into the table """
         log = LogFile.load_preset(query['case'], query['preset'], query.getarray('datafile'))
         
-        for progress in log.load(query['table']):
+        for progress in log.load(query['table'], filter=query.get('filter')):
             self.progress_str = progress
             
     def reset(self, query):

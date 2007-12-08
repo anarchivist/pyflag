@@ -135,13 +135,12 @@ class TypeChecker:
         ### in anything by properly escaping all places. We want to
         ### see when things break badly so we just issue a warning
         ### here and let it go.
-        pyflaglog.log(pyflaglog.WARNING, "Unusual characters in field %s: %r. We should be able to handle it though." % (field, query[field]))
-        return True
-                    
         for d in query.getarray(field):
             for char in "`\\\"' !@#$%^&*+/-()":
                 if char in d:
-                    raise ReportInvalidParamter,"Invalid character (%s) in field name" % char
+                    #raise ReportInvalidParamter,"Invalid character (%s) in field name" % char
+                    pyflaglog.log(pyflaglog.WARNING, "Unusual characters in field %s: %r. We should be able to handle it though." % (field, query[field]))
+        return True
 
     def iosubsystem(self,field,query):
         """ Check to see that the io subsystem is adequitely filled in

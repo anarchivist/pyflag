@@ -796,6 +796,162 @@ class HTMLUI(UI.GenericUI):
         else:
             self.toolbar_ui.icon(icon,tooltip=text)
 
+    def add_filter(self, query, case, parser, elements,
+                   filter_context="filter",
+                   search_text="Search Query"):
+        """ Add a filter dialog based on the parser.
+
+        parser is a function of the prototype:
+        parser(filter_str, elements)
+
+        it should raise an exception if the expression does not parse
+        properly.
+        """
+        ## Some GUI callbacks:
+        def filter_help(query,result):
+            """ Print help for all operators available """
+            result.heading("Available operators")
+            result.para("Filter expressions consist of the syntax: column_name operator argument")
+            result.para("following is the list of all the operators supported by all the columns in this table:")
+            result.start_table( **{'class':'GeneralTable'})
+            result.row("Column Name","Operator","Description", **{'class':'hilight'})
+            for e in elements:
+                tmp = result.__class__(result)
+                tmp.text(e.name,style='red', font='bold')
+                result.row(tmp,'','')
+                for name,method_name in e.operators().items():
+                    try:
+                        method = getattr(e,method_name)
+                        doc = method.__doc__
+                    except:
+                        pass
+                    if not doc:
+                        try:
+                            ## This allows for late initialisation of
+                            ## doc strings
+                            doc = e.docs[method_name]
+                        except:
+                            doc=''
+
+                    result.row('',name, doc)
+
+        def filter_history(query, result):
+            """ This callback will render all the history for this filter """
+            from pyflag.TableObj import StringType
+            result.heading("History")
+
+            new_query = query.clone()
+            del new_query['filter']
+            new_query['__target__'] = 'filter'
+            table_string =  ",".join([e.name for e in elements])
+            result.table(
+                elements = [ StringType("Filter", "filter", link=new_query,
+                                        link_pane='parent')
+                                ],
+                table = "GUI_filter_history",
+                where = '`elements`=%r' % table_string,
+                filter = "filter_history",
+                case = case)
+
+        ## OK Now to render the GUI:
+        message = self.__class__(self)
+        parse_error = False
+        try:
+            filter_str = query[filter_context]
+            
+            ## Check the current filter string for errors by attempting to parse it:
+            try:
+                parser(filter_str,elements)
+
+                ## This is good if we get here - lets refresh to it now:
+                if query.has_key('__submit__'):
+                    del query['__submit__']
+
+                    ## Also, we refresh the limit value so that we jump
+                    ## back to the start of the results
+                    if query.has_key('limit'):
+                        del query['limit']
+
+                    ## Save the query
+                    dbh = DB.DBO(case)
+                    try:
+                        name_elements = ",".join([e.name for e in elements])
+                        ## Check to make sure its not already in there
+                        dbh.execute("select * from GUI_filter_history where filter=%r",
+                                    filter_str)
+                        row = dbh.fetch()
+                        if not row:
+                            dbh.insert('GUI_filter_history',
+                                       filter = filter_str,
+                                       elements = name_elements)
+                    except DB.DBError, e:
+                        pass
+                    self.refresh(0,query,pane='parent_pane')
+                    return
+
+            except Exception,e:
+                parse_error = True
+                message.text('Error parsing expression: %s' % e, style='red', font='typewriter')
+                message.text('',style='black', font='normal')
+
+        except KeyError,e:
+
+            # If it's being submitted, it's probably a blank filter, so we just 
+            # clear it...
+            if query.has_key('__submit__'):
+
+                ## Also, we refresh the limit value so that we jump
+                ## back to the start of the results
+                if query.has_key('limit'):    
+                    del query['limit']
+
+                self.refresh(0,query,pane='parent_pane')
+                return
+
+            # Else, it's not a submit
+            else:
+                # This probably occurs when first opening. It should
+                # be OK to just ignore.
+
+                #pyflaglog.log(pyflaglog.DEBUG, "Error. There was a problem with the filter settings: %s" % e)
+                pass
+
+        self.textarea(search_text, filter_context, cols=60)
+
+        self.result += """<tr></tr>
+        <tr><td colspan=2 align=left>%s</td></tr>
+        <tr><td colspan=2 align=center>The following can be used to insert text rapidly into the search string</td></tr>
+        <tr><td>Column</td><td>
+        <select id=filter_column>
+        %s
+        </select> <a href=# onclick='document.getElementById("%s").value += document.getElementById("filter_column").value;'>Insert </a></td></tr>
+        """ % (message,
+               "\n".join(["<option value=' \"%s\" '>%s</option>" % (e.name,e.name)
+                          for e in elements if e.operators()]),
+               filter_context)
+
+        ## Round up all the possible methods from all colmn types:
+        operators = {}
+        for e in elements:
+            for k,v in e.operators().items():
+                operators[k]=v
+
+        methods = operators.keys()
+        methods.sort()
+        self.result+="""<tr><td>Operators</td><td>
+        <select id=filter_operators>
+        %s
+        </select><a href=# onclick='document.getElementById("%s").value += document.getElementById("filter_operators").value;'>Insert </a></td></tr>
+        """ % ("\n".join(["<option value=' %s '>%s</option>" % (m,m)
+                          for m in methods]),
+               filter_context)
+
+        self.toolbar(cb=filter_help, text="Click here for operator help", icon='help.png')
+        self.toolbar(cb=filter_history, text="See filter history", icon='clock.png')
+
+        if parse_error:
+            raise RuntimeError(message)
+
     def table(self,elements=[],table='',where='',groupby = None, _groupby=None, case=None,
               limit_context='limit', filter='filter',
               **opts):
@@ -965,148 +1121,17 @@ class HTMLUI(UI.GenericUI):
             icon="stock_next-page.png", pane='pane',
             )
 
-        def filter_help(query,result):
-            """ Print help for all operators available """
-            result.heading("Available operators")
-            result.para("Filter expressions consist of the syntax: column_name operator argument")
-            result.para("following is the list of all the operators supported by all the columns in this table:")
-            result.start_table( **{'class':'GeneralTable'})
-            result.row("Column Name","Operator","Description", **{'class':'hilight'})
-            for e in elements:
-                tmp = result.__class__(result)
-                tmp.text(e.name,style='red', font='bold')
-                result.row(tmp,'','')
-                for name,method_name in e.operators().items():
-                    try:
-                        method = getattr(e,method_name)
-                        doc = method.__doc__
-                    except:
-                        pass
-                    if not doc:
-                        try:
-                            ## This allows for late initialisation of
-                            ## doc strings
-                            doc = e.docs[method_name]
-                        except:
-                            doc=''
-                    
-                    result.row('',name, doc)
-
         ## Add a possible filter condition:
         def filter_gui(query, result):
             result.heading("Filter Table")
-            try:
-                filter_str = query[filter]
-                result.para(filter_str)
-
-                ## Check the current filter string for errors by attempting to parse it:
-                try:
-                    sql = parser.parse_to_sql(filter_str,elements)
-
-                    ## This is good if we get here - lets refresh to it now:
-                    if query.has_key('__submit__'):
-                        del query['__submit__']
-
-                        ## Also, we refresh the limit value so that we jump
-                        ## back to the start of the results
-                        if query.has_key('limit'):
-                            del query['limit']
-
-                        ## Save the query
-                        dbh = DB.DBO(case)
-                        try:
-                            name_elements = ",".join([e.name for e in elements])
-                            ## Check to make sure its not already in there
-                            dbh.execute("select * from GUI_filter_history where filter=%r",
-                                        filter_str)
-                            row = dbh.fetch()
-                            if not row:
-                                dbh.insert('GUI_filter_history',
-                                           filter = filter_str,
-                                           elements = name_elements)
-                        except DB.DBError, e:
-                            pass 
-                        result.refresh(0,query,pane='parent_pane')
-                        return
-                    
-                except Exception,e:
-                    result.text('Error parsing expression: %s' % e, style='red')
-                    result.text('\n',style='black')
-                    
-            except KeyError,e:
-                
-                # If it's being submitted, it's probably a blank filter, so we just 
-                # clear it...
-                if query.has_key('__submit__'):
-                    
-                    ## Also, we refresh the limit value so that we jump
-                    ## back to the start of the results
-                    if query.has_key('limit'):    
-                        del query['limit']
-
-                    result.refresh(0,query,pane='parent_pane')
-                    return
-
-                # Else, it's not a submit
-                else:
-                    # This probably occurs when first opening. It should
-                    # be OK to just ignore.
-
-                    #pyflaglog.log(pyflaglog.DEBUG, "Error. There was a problem with the filter settings: %s" % e)
-                    pass
-
-            result.start_form(query, pane="self")
-
-            result.textarea("Search Query", filter, cols=60)
-
-            result.result += """<tr></tr>
-            <tr><td colspan=2 align=center>The following can be used to insert text rapidly into the search string</td></tr>
-            <tr><td>Column</td><td>
-            <select id=filter_column>
-            %s
-            </select> <a href=# onclick='document.getElementById("filter").value += document.getElementById("filter_column").value;'>Insert </a></td></tr>
-            """ % "\n".join(["<option value=' \"%s\" '>%s</option>" % (e.name,e.name) for e in elements if e.operators()])
-
-            ## Round up all the possible methods from all colmn types:
-            operators = {}
-            for e in elements:
-                for k,v in e.operators().items():
-                    operators[k]=v
-
-            methods = operators.keys()
-            methods.sort()
-            result.result+="""<tr><td>Operators</td><td>
-            <select id=filter_operators>
-            %s
-            </select><a href=# onclick='document.getElementById("filter").value += document.getElementById("filter_operators").value;'>Insert </a></td></tr>
-            """ % "\n".join(["<option value=' %s '>%s</option>" % (m,m) for m in methods])
-
-            result.end_form()
-
-            result.toolbar(cb=filter_help, text="Click here for operator help", icon='help.png')
-            def filter_history(query, result):
-                from pyflag.TableObj import StringType
-                result.heading("History")
-
-                new_query = query.clone()
-                del new_query['filter']
-                new_query['__target__'] = 'filter'
-                table_string =  ",".join([e.name for e in elements])
-                result.table(
-                    elements = [ StringType("Filter", "filter", link=new_query,
-                                            link_pane='parent')
-                                    ],
-                    table = "GUI_filter_history",
-                    where = '`elements`=%r' % table_string,
-                    filter = "filter_history",
-                    case = case)
-
-            result.toolbar(cb=filter_history, text="See filter history", icon='clock.png')
-
+            self.start_form(query, pane="self")
+            result.add_filter(query, case, parser.parse_to_sql, elements, filter)
+            self.end_form()
+            
         ## Add a toolbar icon for the filter:
         self.toolbar(cb=filter_gui, icon='filter.png',
                      tooltip=self.defaults.get('filter','Click here to filter table'))
-        
+
         ## Add a clear filter icon if required
         try:
             new_query = query.clone()
@@ -1121,7 +1146,6 @@ class HTMLUI(UI.GenericUI):
                     tooltip=self.defaults.get('delfilter', 
                     'Click here to clear the filter'), pane='pane')
         except: pass
-
 
         ## This is a toolbar popup which allows some fields to be hidden:
         def hide_fields(query, result):

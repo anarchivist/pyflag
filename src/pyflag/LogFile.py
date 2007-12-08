@@ -107,7 +107,7 @@ class Log:
     def reset(self, query):
         """ This is called to reset the log tables this log driver has created """
 
-    def display_test_log(self,result):
+    def display_test_log(self,result, filter=None):
         # try to load and display as a final test
         dbh = DB.DBO(self.case)
         temp_table = dbh.get_temp()
@@ -120,7 +120,7 @@ class Log:
 
             ## Since this should be a temporary table, we explicitly tell the load
             ## method to drop it if it exists
-            for a in self.load(temp_table,rows= 3):
+            for a in self.load(temp_table,rows= 3, filter=filter):
                 pass
 
             pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Created a test table containing three rows. About to try and display it...")

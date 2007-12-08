@@ -91,7 +91,7 @@ if config.list:
     sys.exit()
 
 import gc
-gc.set_debug(gc.DEBUG_UNCOLLECTABLE | gc.DEBUG_INSTANCES | gc.DEBUG_SAVEALL | gc.DEBUG_LEAK)
+#gc.set_debug(gc.DEBUG_UNCOLLECTABLE | gc.DEBUG_INSTANCES | gc.DEBUG_SAVEALL | gc.DEBUG_LEAK)
 
 for test_class in classes:
     try:

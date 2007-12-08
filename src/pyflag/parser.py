@@ -116,7 +116,11 @@ def parse(rule, text):
 
 def parse_to_sql(text, types):
     P = SearchParser(SearchParserScanner(text))
-    return runtime.wrap_error_reporter(P, 'goal', types)
+    P = CodeParser(CodeParserScanner(text))
+    try:
+        return P.goal(types)
+    except runtime.SyntaxError, e:
+        raise RuntimeError("\n%s\n%s^\n%s" % (text, '-' * e.pos[2], e.msg))
 
 if __name__=='__main__':
     import pyflag.TableObj as TableObj

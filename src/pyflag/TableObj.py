@@ -78,6 +78,9 @@ except ImportError:
                 "%Y%m%d %H:%M",
                 "%Y%m%d",
                 "%d/%m/%Y",
+                "%d/%m/%Y %H:%M:%S",
+                "%d/%m/%Y %H:%M",
+                "%d/%m/%Y %H:%M:%S",                
                 "%Y/%m/%d:%H:%M:%S",
                 ]
     def guess_date(string):
@@ -484,7 +487,7 @@ class ColumnType:
             try:
                 method = getattr(self, prefix + operator)
             except:
-                raise RuntimeError("%s is of type %s and has no operator %r. Does it make sense to use this operator on this data?" % (column, ("%s"% self.__class__).split('.')[-1], operator))
+                raise RuntimeError("%s is of type %s and has no operator %r.\nDoes it make sense to use this operator on this data?" % (column, ("%s"% self.__class__).split('.')[-1], operator))
 
         return method(column, operator, arg)
 

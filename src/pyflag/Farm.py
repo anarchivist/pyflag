@@ -305,4 +305,5 @@ config.add_option("FLUSH", default=False, action='store_true',
 
 if config.FLUSH:
     dbh = DB.DBO()
-    dbh.execute("delete from jobs where state='broadcast' or state='processing'")
+    print "Deleting job queue"
+    dbh.execute("delete from jobs")
