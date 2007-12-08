@@ -279,7 +279,9 @@ class DBFS(FileSystem):
         #if directory: return
 
         inode_properties = dict(status="alloc", mode=40755, links=4, _fast=_fast,
-                                inode=inode,size=0)
+                                size=0)
+        if inode:
+            inode_properties['inode'] = inode
         
         try:
             inode_properties['size'] = int(properties['size'])
@@ -303,9 +305,10 @@ class DBFS(FileSystem):
                           name = os.path.basename(new_filename),
                           status = 'alloc',
                           mode = directory_string,
-                          inode = inode,
                           inode_id = inode_id,
                           _fast = _fast)
+
+        if inode: file_props['inode'] = inode
 
         try:
             file_props['link'] = properties['link']

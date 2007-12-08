@@ -45,7 +45,7 @@ class DontDraw(Exception):
 
     This is mainly used by the form method to allow a UI to manage its own window
     """
-
+    
 def canonicalise(query):
     """ Converts the query into the canonical form.
 

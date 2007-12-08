@@ -42,8 +42,6 @@ import pyflag.FileSystem as FileSystem
 import socket,re
 import pyflag.Time as Time
 import time
-## This is for parsing ambigous dates:
-import dateutil.parser
 
 ## Some options for various ColumnTypes
 config.add_option("PRECACHE_IPMETADATA", default=True,
@@ -63,12 +61,40 @@ class OmitValue(ConstraintError):
     value should be totally ignored.
     """
 
-def guess_date(string):
-    try:
-        return dateutil.parser.parse(arg)
-    except ValueError:
-        ## Try a fuzzy match
-        return dateutil.parser.parse(arg, fuzzy=True)
+try:
+    ## This is for parsing ambigous dates:
+    import dateutil.parser
+
+    def guess_date(string):
+        try:
+            return dateutil.parser.parse(arg)
+        except ValueError:
+            ## Try a fuzzy match
+            return dateutil.parser.parse(arg, fuzzy=True)
+except ImportError:
+    import time
+
+    FORMATS = [ "%Y%m%d %H:%M:%S",
+                "%Y%m%d %H:%M",
+                "%Y%m%d",
+                "%d/%m/%Y",
+                "%Y/%m/%d:%H:%M:%S",
+                ]
+    def guess_date(string):
+        for i in range(len(FORMATS)):
+            try:
+                f = FORMATS[i]
+                result = time.strptime(string, f)
+                ## Move the format to the start we are likely to use it again
+                if i>0:
+                    FORMATS.pop(i)
+                    FORMATS.insert(0,f)
+
+                return result
+            except ValueError:
+                pass
+
+        raise ValueError("Unable to parse date %s" % string)
 
 class TableObj:
     """ An abstract object representing a table in the database """
@@ -1378,6 +1404,8 @@ class InodeType(StringType):
         ColumnType.__init__(self,name,column,link,callback=callback)
 
     def display(self, value, row, result):
+        if not value: return ''
+
         result = result.__class__(result)
         link = FlagFramework.query_type(case=self.case,
                                         family='Disk Forensics',
@@ -1618,8 +1646,9 @@ class FilenameType(StringType):
     def display(self, value, row, result):
         if row['link']:
             tmp = result.__class__(result)
-            value = tmp.text("%s\n->%s" % (value, row['link']), style="red")
-
+            tmp.text("%s\n->%s" % (value, row['link']), style="red")
+            value = tmp
+            
         return ColumnType.display(self, value, row, result)
 
     def select(self):

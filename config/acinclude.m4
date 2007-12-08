@@ -60,10 +60,17 @@ AC_DEFUN([AC_PYTHON_MODULE],[
 		AC_MSG_RESULT(no)
 		eval AS_TR_CPP(HAVE_PYMOD_$1)=no
 		#
-		if test -n "$2"
+		if test "REQUIRED" == "$2"
 		then
-			AC_MSG_ERROR(failed to find required python module $1)
+			if test -n "$3"
+			then	
+				AC_MSG_ERROR($3)			
+			else
+				AC_MSG_ERROR(failed to find required python module $1)
+			fi
 			exit 1
+		else
+			AC_MSG_WARN($3)
 		fi
 	fi
 ])

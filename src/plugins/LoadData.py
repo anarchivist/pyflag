@@ -287,8 +287,11 @@ class ScanFS(Reports.report):
 
                ## Draw the form for each scan group:
                for cls in ScannerUtils.scan_groups_gen():
-                   drawer = cls.Drawer()
-                   drawer.form(query,result)
+                   try:
+                       drawer = cls.Drawer()
+                       drawer.form(query,result)
+                   except RuntimeError:
+                       pass
                result.checkbox('Click here when finished','final','ok')
 
         except KeyError:

@@ -35,9 +35,10 @@ AZ_PYTHON_VERSION_ENSURE( [2.5] )
 AZ_PYTHON_CSPEC()
 AZ_PYTHON_LSPEC()
 
-AC_PYTHON_MODULE(MySQLdb, REQUIRED)
-AC_PYTHON_MODULE(pexpect, REQUIRED)
-AC_PYTHON_MODULE(PIL, REQUIRED)
+AC_PYTHON_MODULE(MySQLdb, REQUIRED, [ You must install the python-mysql package ])
+AC_PYTHON_MODULE(pexpect, REQUIRED, [ You must install the python-pexpect package ])
+AC_PYTHON_MODULE(PIL, REQUIRED, [ You must install the python-imaging package ])
+AC_PYTHON_MODULE(dateutil, OPTIONAL, [ Installing the python-dateutil package will provide enhanced date parsing support. ])
 
 # check for binaries
 AC_PATH_PROG([MYSQL], mysql)
