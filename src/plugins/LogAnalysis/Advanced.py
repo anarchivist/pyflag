@@ -174,6 +174,7 @@ class PadType(TableObj.ColumnType):
     def __init__(self, regex='.'):
         TableObj.ColumnType.__init__(self, name="-", column="-")
         self.re = re.compile(regex)
+        self.ignore = True
         
     def insert(self, value):
         pass

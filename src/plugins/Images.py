@@ -4,7 +4,7 @@ import pyflag.IO as IO
 import pyflag.DB as DB
 from FlagFramework import query_type
 import pyflag.FlagFramework as FlagFramework
-import sk,re
+import sk,re,os,os.path
 
 class IOSubsysFD:
     def __init__(self, io, name):
@@ -44,7 +44,7 @@ class IOSubsysFD:
         """ close subsystem """
         pass
 
-filename_re = re.compile("(.+?)(\d+)")
+filename_re = re.compile("(.+?)(\d+)$")
 
 class Advanced(IO.Image):
     """ This is a IO source which provides access to raw DD images
@@ -149,10 +149,23 @@ class Advanced(IO.Image):
             ## If the filename we were provided with, ends with a
             ## digit we assume that its part of an evidence set.
             m = filename_re.match(f)
-            import glob
             
             if m:
-                globbed_filenames = glob.glob(m.group(1) + "*")
+                globbed_filenames = []
+                dirname , base = os.path.split(m.group(1))
+                for f in os.listdir(dirname):
+                    if f.startswith(base):
+                        try:
+                            int(f[len(base):])
+                        except ValueError:
+                            continue
+
+                        globbed_filenames.append(os.path.join(dirname, f))
+    
+                print globbed_filenames
+                if not globbed_filenames:
+                    raise IOError("Unable to find file %s" % f)
+
                 ## This list must be sorted on the numeric extension
                 ## (Even if its not 0 padded so an alphabetic sort
                 ## works - I have seen some cases where the images

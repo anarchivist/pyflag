@@ -253,7 +253,7 @@ class ReportRegistry(Registry):
             result= [ i for i in f if report == ("%s" % i).split('.')[-1]]
 
         if not result:
-            raise Exception("Can not find report %s/%s" % (family,report))
+            raise ValueError("Can not find report %s/%s" % (family,report))
         
         return result[0]
     
@@ -293,7 +293,7 @@ class ScannerRegistry(Registry):
         if scanner_name in self.class_names:
             return self.classes[self.class_names.index(scanner_name)]
         else:
-            raise RuntimeError("Object %s does not exist in the registry. Is the relevant plugin loaded?" % scanner_name)
+            raise ValueError("Object %s does not exist in the registry. Is the relevant plugin loaded?" % scanner_name)
 
 class FileHandlerRegistry(ScannerRegistry):
     def __init__(self, ParentClass):

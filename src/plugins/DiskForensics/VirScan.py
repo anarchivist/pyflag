@@ -32,7 +32,7 @@ import pyflag.DB as DB
 import os.path
 import pyflag.pyflaglog as pyflaglog
 from pyflag.Scanner import *
-from pyflag.TableObj import StringType, TimestampType, InodeType, FilenameType
+from pyflag.TableObj import StringType, TimestampType, InodeType, FilenameType, IntegerType
 
 WARNING_ISSUED = False
 
@@ -112,7 +112,49 @@ class VirusScan(Reports.report):
         except DB.DBError,e:
             result.para("Unable to display Virus table, maybe you did not run the virus scanner over the filesystem?")
             result.para("The error I got was %s"%e)
-            
+
+import pyflag.Stats as Stats
+class VirusStats(Stats.Handler):
+    name = "Viruses,Trojans"
+
+    def render_tree(self, branch, query):
+        dbh = DB.DBO(self.case)
+        ## Top level view - we only show the File Types stats branch
+        ## if we have any types there.
+        if not branch[0]:
+            dbh.execute("select count(*) as a from virus")
+            row = dbh.fetch()
+            if row['a']>0:
+                yield (self.name, self.name, 'branch')
+        elif branch[0] != self.name:
+            return
+        elif len(branch)==1:
+            dbh.execute("select virus from virus group by virus")
+            for row in dbh:
+                t = row['virus'][:20]
+                yield (row['virus'].replace("/","__"), t, 'leaf')
+
+    def render_pane(self, branch, query, result):
+        ## We may only draw on the pane that belongs to us:
+        if branch[0] != self.name:
+            return
+
+        if len(branch)==1:
+            result.heading("Show infected files")
+            result.text("Lists all the files infected with a particular virus")
+        else:
+            t = branch[1].replace("__",'/')
+            result.table(
+                elements = [ InodeType(column='file.inode', case = self.case),
+                             FilenameType(case = self.case, link_pane='main'),
+                             IntegerType('Size','inode.size'),
+                             TimestampType('Timestamp','inode.mtime')],
+                table = 'file, inode, virus',
+                where = 'virus.inode=inode.inode and file.inode_id=inode.inode_id and virus.virus = %r ' % t,
+                case = self.case,
+                )
+
+    
 ## UnitTests:
 import unittest
 import pyflag.pyflagsh as pyflagsh

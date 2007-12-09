@@ -50,12 +50,6 @@ class RegEventHandler(FlagFramework.EventHandler):
         ## The regi table is used for the key navigation
         dbh.execute("""create table if not exists regi (
         `dirname` TEXT NOT NULL ,`basename` TEXT NOT NULL)""")
-
-        ## These collect interesting keys:
-        dbh.execute("""create table `interestingregkeys` select a.path, a.modified, a.type,\
-        a.reg_key, a.value, b.category, b.description from reg as a, %s.registrykeys as b\
-        where a.path LIKE concat('%%',b.path,'%%') AND a.reg_key LIKE\
-        concat('%%',b.reg_key,'%%')""",(config.FLAGDB))
             
 class RegistryScan(GenScanFactory):
     """ Load in Windows Registry files """
@@ -71,9 +65,6 @@ class RegistryScan(GenScanFactory):
     def destroy(self):
         ## Add indexes:
         dbh=DB.DBO(self.case)
-        dbh.check_index("reg" ,"path",250)
-        dbh.check_index("regi" ,"dirname",100)
-
 
     class Scan(StoreAndScanType):
         types =  (
@@ -133,6 +124,21 @@ class RegistryScan(GenScanFactory):
             reg_handle.mass_insert_commit()
             regi_handle.mass_insert_commit()
             
+            regi_handle.check_index("reg" ,"path",250)
+            regi_handle.check_index("regi" ,"dirname",100)
+            regi_handle.check_index("reg" ,"reg_key")
+
+            ## Recreate the interesting reg key table
+            regi_handle.drop("interestingregkeys");
+            
+            ## These collect interesting keys. FIXME - Do we really
+            ## need the like clause its vaery slow especially since it
+            ## has a wildcard at the start.
+            regi_handle.execute("""create table `interestingregkeys` select 
+            a.path, a.modified, a.type,a.reg_key, a.value, b.category, 
+            b.description from reg as a, %s.registrykeys as b where a.path 
+            LIKE concat('%%',b.path,'%%') AND
+            a.reg_key=b.reg_key""",(config.FLAGDB))
 
 ## Report to browse Loaded Registry Files:
 class BrowseRegistry(DiskForensics.BrowseFS):
@@ -481,8 +487,8 @@ import pyflag.pyflagsh as pyflagsh
 class RegScanTest(pyflag.tests.ScannerTest):
     """ Test Registry scanner """
     test_case = "PyFlagTestCase"
-    test_file = "pyflag_stdimage_0.3"
-    subsystem = 'Advanced'
+    test_file = "pyflag_stdimage_0.3.e01"
+    subsystem = 'EWF'
     offset = "16128s"
 
     def test01RunScanner(self):

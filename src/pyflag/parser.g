@@ -80,7 +80,6 @@ parser SearchParser:
 
 def parse_to_sql(text, types):
     P = SearchParser(SearchParserScanner(text))
-    P = CodeParser(CodeParserScanner(text))
     try:
         return P.goal(types)
     except runtime.SyntaxError, e:

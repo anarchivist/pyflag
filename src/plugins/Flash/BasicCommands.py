@@ -493,7 +493,7 @@ class execute(pyflagsh.command):
             pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Flash successfully ran the following query: %s" % query)
         except Exception,e:
             pyflaglog.log(pyflaglog.WARNING, "Flash encountered the following error: %s when running query: %s" % (e,query))
-            print e.bt
+            print FlagFramework.get_bt_string(e)
             raise RuntimeError("%s: %s after %s sec" %  (sys.exc_info()[0],sys.exc_info()[1],time.time()-start_time))
 
 class reset(execute):

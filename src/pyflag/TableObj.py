@@ -421,6 +421,7 @@ class ColumnType:
     ## This contols if the user is able to select it as a columntype
     ## when importing a log file.
     hidden = False
+    ignore = False
     
     def __init__(self, name=None,
                  column=None, link='',

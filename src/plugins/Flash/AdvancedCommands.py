@@ -33,6 +33,8 @@ class scan_path(pyflagsh.command):
         """ Waits for scanners to complete """
         
         pdbh = DB.DBO()
+        pdbh.check_index('jobs','cookie')
+        
         ## Often this process owns a worker as well. In that case we can wake it up:
         import pyflag.Farm as Farm
         Farm.wake_workers()

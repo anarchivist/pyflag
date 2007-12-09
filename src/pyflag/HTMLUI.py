@@ -1124,9 +1124,9 @@ class HTMLUI(UI.GenericUI):
         ## Add a possible filter condition:
         def filter_gui(query, result):
             result.heading("Filter Table")
-            self.start_form(query, pane="self")
+            result.start_form(query, pane="self")
             result.add_filter(query, case, parser.parse_to_sql, elements, filter)
-            self.end_form()
+            result.end_form()
             
         ## Add a toolbar icon for the filter:
         self.toolbar(cb=filter_gui, icon='filter.png',

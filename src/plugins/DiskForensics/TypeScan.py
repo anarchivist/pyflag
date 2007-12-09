@@ -194,12 +194,12 @@ class MimeTypeStats(Stats.Handler):
         else:
             t = branch[1].replace("__",'/')
             result.table(
-                elements = [ InodeType(column='a.inode', case = self.case),
+                elements = [ InodeType(column='file.inode', case = self.case),
                              FilenameType(case = self.case, link_pane='main'),
-                             IntegerType('Size','c.size'),
-                             TimestampType('Timestamp','c.mtime')],
-                table = 'file as a, type as b, inode as c',
-                where = 'b.inode=c.inode and a.inode=b.inode and a.mode like "r%%%%" and b.mime=%r ' % t,
+                             IntegerType('Size','inode.size'),
+                             TimestampType('Timestamp','inode.mtime')],
+                table = 'file, type, inode',
+                where = 'type.inode=inode.inode and file.inode_id=inode.inode_id and file.mode like "r%%%%" and type.mime=%r ' % t,
                 case = self.case,
                 )
 
@@ -236,12 +236,12 @@ class TypeStats(Stats.Handler):
         else:
             t = branch[1].replace("__",'/')
             result.table(
-                elements = [ InodeType(column='a.inode', case = self.case),
+                elements = [ InodeType(column='file.inode', case = self.case),
                              FilenameType(case = self.case, link_pane='main'),
-                             IntegerType('Size','c.size'),
-                             TimestampType('Timestamp','c.mtime')],
-                table = 'file as a, type as b, inode as c',
-                where = 'b.inode=c.inode and a.inode=b.inode and a.mode like "r%%%%" and b.type=%r ' % t,
+                             IntegerType('Size','inode.size'),
+                             TimestampType('Timestamp','inode.mtime')],
+                table = 'file, type, inode',
+                where = 'type.inode=inode.inode and file.inode_id=inode.inode_id and file.mode like "r%%%%" and type.type=%r ' % t,
                 case = self.case,
                 )
                 
