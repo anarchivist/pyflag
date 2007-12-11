@@ -112,6 +112,13 @@ class Log:
         dbh = DB.DBO(self.case)
         temp_table = dbh.get_temp()
 
+        ## Is there a filter implemented?
+        fields = [ x for x in self.fields if x]
+        if filter:
+            filter_parser = code_parser.parse_eval(filter, fields)
+        else:
+            filter_parser = None
+
         ## Temporarily store a preset:
         self.store(temp_table)
 
@@ -241,7 +248,6 @@ class Log:
         count = 0
         for fields in self.get_fields():
             count += 1
-
             args = None
             columns = {}
 

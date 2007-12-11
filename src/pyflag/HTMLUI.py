@@ -1225,7 +1225,7 @@ class HTMLUI(UI.GenericUI):
                 
                 result.generator.generator = generate_output(rows_required)
                 result.generator.content_type = "text/csv"
-                result.generator.headers = [("Content-Disposition","attachment; filename=%s_%s.csv" %(case,table) ),]
+                result.generator.headers = [("Content-Disposition","attachment; filename=%s_%s.csv" %(case,re.sub("[^a-zA-Z0-9]", "_", table) )),]
                 return
 
             result.heading("Save Table output")

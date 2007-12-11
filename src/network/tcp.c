@@ -315,30 +315,20 @@ TCPHashTable TCPHashTable_Con(TCPHashTable self, int initial_con_id) {
   return self;
 };
 
-// FIXME: This is pretty slow and can be made much faster by hashing
-// addr, sizeof(*addr)
-static u_int mkhash (const struct tuple4 *addr) {
-  u_int src=addr->saddr;
-  u_short sport=addr->source;
-  u_int dest=addr->daddr;
-  u_short dport=addr->dest;
-  u_int res = 0;
+static u_int32_t mkhash (const struct tuple4 *addr) {
+  int *data = (int *)addr;
+  u_int res=0;
   int i;
-  u_char data[12];
-  u_int *data_i = (u_int *)data;
-  *(u_int *) (data) = src;
-  *(u_int *) (data + 4) = dest;
-  *(u_short *) (data + 8) = sport;
-  *(u_short *) (data + 10) = dport;
-  for (i = 0; i < 3; i++)
-    res += data_i[i];
+
+  for (i = 0; i < sizeof(struct tuple4) / sizeof(int); i++)
+    res += data[i];
 
   return res % (TCP_STREAM_TABLE_SIZE);
 };
 
 TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   TCP tcp;
-  u_int forward_hash, reverse_hash;
+  u_int32_t forward_hash, reverse_hash;
   struct tuple4 forward,reverse;
   TCPStream i,j;
 
@@ -364,6 +354,7 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   forward.daddr  = ip->packet.header.daddr;
   forward.source = tcp->packet.header.source;
   forward.dest   = tcp->packet.header.dest;
+  forward.pad    = 0;
   forward_hash = mkhash(&forward);
 
   /** Now try to find the forward stream in our hash table */
@@ -390,6 +381,7 @@ TCPStream TCPHashTable_find_stream(TCPHashTable self, IP ip) {
   reverse.daddr  = ip->packet.header.saddr;
   reverse.source = tcp->packet.header.dest;
   reverse.dest   = tcp->packet.header.source;
+  reverse.pad    = 0;
   reverse_hash = mkhash(&reverse);
 
   /** Now try to find the reverse stream in our hash table */

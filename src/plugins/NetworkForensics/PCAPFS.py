@@ -109,7 +109,7 @@ class CachedWriter:
         ## Only write if we have data - so 0 length files will never
         ## be written.
         data = self.fd.getvalue()
-        if len(data)>=0:
+        if len(data)>0:
             fd = open(self.filename,"a")
             fd.write(data)
             fd.close()

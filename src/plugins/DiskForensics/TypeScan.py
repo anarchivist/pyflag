@@ -147,13 +147,13 @@ class ViewFileTypes(Reports.report):
         fsfd = FileSystem.DBFS(query["case"])
         try:
             result.table(
-                elements = [ ThumbnailType('Thumbnail','a.inode', fsfd = fsfd),
+                elements = [ ThumbnailType('Thumbnail','file.inode', fsfd = fsfd),
                              FilenameType(case=query['case']),
                              StringType('Type','type'),
-                             IntegerType('Size','c.size'),
-                             TimestampType('Timestamp','c.mtime') ],
-                table = 'file as a, type as b, inode as c',
-                where = 'b.inode=c.inode and a.inode=b.inode and a.mode like "r%%" ',
+                             IntegerType('Size','inode.size'),
+                             TimestampType('Timestamp','inode.mtime') ],
+                table = 'file, type, inode',
+                where = 'type.inode=inode.inode and file.inode=type.inode and file.mode like "r%%" ',
                 case = query['case']
                 )
         except DB.DBError,e:
@@ -253,7 +253,7 @@ import pyflag.tests
 class TypeTest(pyflag.tests.ScannerTest):
     """ Magic related Scanner """
     test_case = "PyFlag Test Case"
-    test_file = "pyflag_stdimage_0.3"
+    test_file = "pyflag_stdimage_0.3.dd"
     subsystem = 'Advanced'
     offset = "16128s"
 

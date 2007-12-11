@@ -60,11 +60,13 @@ class MozHist(lexer.SelfFeederMixIn, lexer.Lexer):
             ## Event lists are delimited by {}. We actually ignore the
             ## whole first line here because I dont really know what
             ## that line means.
-            [ 'INITIAL', '{[^\n]+', 'EVENT_LIST_START', 'EVENT_LIST'],
+            [ 'INITIAL', '{[^\n]+', 'EVENT_LIST_START,PUSH_STATE', 'EVENT_LIST'],
+            [ 'INITIAL', r'\$\$.+\@', 'SECTION_DELIMITER', 'INITIAL'],
 
             ## Events start with [id within the EVENT_LIST
             [ 'EVENT_LIST', '\[([^\(]+)', 'EVENT_START', 'EVENT'],
-
+            [ 'EVENT_LIST', '\}', 'POP_STATE', None],
+            
             ## Events contain attributes like (^xx^yy)
             [ 'EVENT', r'\(\^([^\^=]+)\^([^\^\)]+)\)', 'EVENT_ATTRIBUTE', None],
 

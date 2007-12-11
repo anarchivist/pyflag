@@ -195,13 +195,13 @@ class IOSubsystemTests(unittest.TestCase):
         
         ## Test failour to open a file:
         self.assertRaises(IOError, lambda : iosubsys.iosource([['subsys','sgzip'],
-                                                           ['filename','%s/pyflag_stdimage_0.2' % config.UPLOADDIR],]))
+                                                           ['filename','%s/pyflag_stdimage_0.2.dd' % config.UPLOADDIR],]))
         self.assertRaises(IOError, lambda : iosubsys.iosource([['subsys','ewf'],
-                                                           ['filename','%s/pyflag_stdimage_0.2' % config.UPLOADDIR],]))
+                                                           ['filename','%s/pyflag_stdimage_0.2.dd' % config.UPLOADDIR],]))
 
         ## Test weird parameters:
         self.assertRaises(IOError, lambda : iosubsys.iosource([['subsys','raid'],
-                                                           ['filename','%s/pyflag_stdimage_0.2' % config.UPLOADDIR],]))
+                                                           ['filename','%s/pyflag_stdimage_0.2.dd' % config.UPLOADDIR],]))
         
         ## Test weird values:
         self.assertRaises(RuntimeError, lambda : iosubsys.iosource([['subsys','standard'],
@@ -217,7 +217,7 @@ class IOSubsystemTests(unittest.TestCase):
     def test03DataReadAccuracy(self):
         """ Test data accuracy in image decompression (takes a while) """
         io1 = iosubsys.iosource([['subsys','advanced'],
-                             ['filename','%s/pyflag_stdimage_0.2' % config.UPLOADDIR]])
+                             ['filename','%s/pyflag_stdimage_0.2.dd' % config.UPLOADDIR]])
         io2 = iosubsys.iosource([['subsys','sgzip'],
                              ['filename','%s/pyflag_stdimage_0.2.sgz' % config.UPLOADDIR]])
         io3 = iosubsys.iosource([['subsys','ewf'],

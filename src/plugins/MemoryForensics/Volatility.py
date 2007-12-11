@@ -9,6 +9,7 @@ import pyflag.pyflaglog as pyflaglog
 from pyflag.FileSystem import FileSystem, DBFS, File
 import pyflag.DB as DB
 import pyflag.IO as IO
+from pyflag.TableObj import StringType, TimestampType, InodeType, FilenameType, IntegerType
 
 ## FIXME: Conditionally import these in case Volatility is not installed
 ## FIXME2: Remove wildcard imports to more specific imports.

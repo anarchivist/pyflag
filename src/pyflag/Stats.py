@@ -26,4 +26,18 @@ class Handler:
         """ This generator is called to render the leaf of the tree in
         the stats tree
         """
-        
+
+    def chain_tree(self, stats_class, branch, query, condition='1'):
+        """ Chains the tree to a different Stats class. This allows
+        the same stats handlers to be invoked from many different
+        stats handlers.
+        """
+        c = stats_class(self.case)
+        if not branch: branch=['']
+        return c.render_tree(branch, query, condition)
+
+    def chain_pane(self, stats_class, branch, query, result, condition='1'):
+        """ Chains the pane to a different Stats class. """
+        c = stats_class(self.case)
+        if not branch: branch=['']
+        c.render_pane(branch, query, result, condition)

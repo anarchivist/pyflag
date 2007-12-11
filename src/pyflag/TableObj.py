@@ -41,7 +41,7 @@ import pyflag.TypeCheck as TypeCheck
 import pyflag.FileSystem as FileSystem
 import socket,re
 import pyflag.Time as Time
-import time
+import time, textwrap
 
 ## Some options for various ColumnTypes
 config.add_option("PRECACHE_IPMETADATA", default=True,
@@ -77,6 +77,9 @@ except ImportError:
     FORMATS = [ "%Y%m%d %H:%M:%S",
                 "%Y%m%d %H:%M",
                 "%Y%m%d",
+                "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%d %H:%M",
+                "%Y-%m-%d",
                 "%d/%m/%Y",
                 "%d/%m/%Y %H:%M:%S",
                 "%d/%m/%Y %H:%M",
@@ -428,7 +431,7 @@ class ColumnType:
                  callback=None, link_pane='self',
                  regex = r"[^\s]+",
                  boundary = r'\s+',
-                 escape=True,
+                 escape=True, wrap=True, **kwargs
                  ):
         
         if not name or not column:
@@ -444,6 +447,7 @@ class ColumnType:
         self.regex_str = regex
         self.boundary = re.compile(boundary)
         self.escape = escape
+        self.wrap = wrap
 
     ## These are the symbols which will be treated literally
     symbols = {
@@ -500,7 +504,7 @@ class ColumnType:
 
     def code_literal(self, column, operator, arg):
         ## Bit of a hack really:
-        return lambda row: eval("%r %s %r" % (row[column], operator, arg.__str__()), {})
+        return lambda row: eval("%r %s %r" % (row[self.column], operator, arg.__str__()), {})
 
     def operator_literal(self, column,operator, arg):
         return "%s %s %r" % (self.escape_column_name(self.column),
@@ -515,10 +519,13 @@ class ColumnType:
         ## By default just implement a simple callback:
         if self.callback:
             value = self.callback(value)
-        elif self.link:
+        elif self.wrap:
+            value = textwrap.fill(value.__str__())
+            
+        if self.link and not self.callback:
             result = result.__class__(result)
             q = self.link.clone()
-            q.FillQueryTarget(value.__str__())
+            q.FillQueryTarget(value)
             result.link(value, q, pane=self.link_pane)
             return result
         
@@ -622,7 +629,7 @@ class StateType(ColumnType):
     def code_is(self, column, operator, state):
         for k,v in self.states.items():
             if state.lower()==k:
-                return lambda row: row[column] == v
+                return lambda row: row[self.column] == v
 
         raise RuntimeError("Dont understand state %r. Valid states are %s" % (state,self.states.keys()))
         
@@ -649,7 +656,7 @@ class IntegerType(ColumnType):
     def code_equal(self, column, operator, arg):
         ## Make sure our arg is actually an integer:
         integer = int(arg)
-        return lambda row: int(row[column]) == integer
+        return lambda row: int(row[self.column]) == integer
 
     def operator_equal(self, column, operator, address):
         return "%s = %r" % (self.escape_column_name(self.column), address)
@@ -709,7 +716,9 @@ class StringType(ColumnType):
         return "`%s` VARCHAR(255) default NULL" % self.column
 
     def code_contains(self, column, operator, arg):
-        return lambda row: arg in row[column]
+        def x(row):
+            return arg in row[self.column]
+        return x
     
     def operator_contains(self, column, operator, arg):
         """ Matches when the column contains the pattern anywhere. Its the same as placing wildcards before and after the pattern. """
@@ -717,14 +726,14 @@ class StringType(ColumnType):
 
     def code_matches(self, column, operator, arg):
         regex = arg.replace("%",".*")
-        return lambda row: re.match(regex, row[column])
+        return lambda row: re.match(regex, row[self.column])
 
     def operator_matches(self, column, operator, arg):
         """ This matches the pattern to the column. Wild cards (%) can be placed anywhere, but if you place it in front of the pattern it could be slower. """
         return '%s like %r' % (self.escape_column_name(self.column), arg)
 
     def code_regex(self, column, operator, arg):
-        return lambda row: re.match(arg, row[column])
+        return lambda row: re.match(arg, row[self.column])
 
     def operator_regex(self,column,operator,arg):
         """ This applies the regular expression to the column (Can be slow for large tables) """
@@ -829,21 +838,23 @@ class TimestampType(IntegerType):
         possible.
         """
         date_arg = guess_date(arg)
-        return lambda row: guess_date(row[column]) > date_arg
+        return lambda row: guess_date(row[self.column]) > date_arg
     
     def operator_after(self, column, operator, arg):
         """ Matches times after the specified time. The time arguement must be given in the format 'YYYY-MM-DD HH:MM:SS' (i.e. Year, Month, Day, Hour, Minute, Second). """
         date_arg = guess_date(arg)
-        return "%s > '%s'" % (self.escape_column_name(self.column), date_arg)
+        return "%s > '%s'" % (self.escape_column_name(self.column),
+                              time.strftime("%Y%m%d %H:%M:%S",date_arg))
 
     def code_before(self,column, operator, arg):
         date_arg = guess_date(arg)
-        return lambda row: guess_date(row[column]) <= date_arg
+        return lambda row: guess_date(row[self.column]) <= date_arg
         
     def operator_before(self,column, operator, arg):
         """ Matches times before the specified time. The time arguement must be as described for 'after'."""
         date_arg = guess_date(arg)
-        return "%s < '%s'" % (self.escape_column_name(self.column), date_arg)
+        return "%s < '%s'" % (self.escape_column_name(self.column),
+                              time.strftime("%Y%m%d %H:%M:%S",date_arg))
 
     def display(self, value, row, result):
         original_query = result.defaults
@@ -977,7 +988,7 @@ class IPType(ColumnType):
         }
 
     def code_equal(self, column, operator, address):
-        return lambda row: row[column] == address
+        return lambda row: row[self.column] == address
 
     def operator_equal(self, column, operator, address):
         return "%s = INET_ATON(%r)" % (self.escape_column_name(self.column), address)
@@ -1092,7 +1103,7 @@ class IPType(ColumnType):
     def code_maxmind_isp_like(self, column, operator, isp):
         """ Returns true if column has an ISP which contains the word isp in it """
         def f(row):
-            data = Whois.get_all_geoip_data(row[column])
+            data = Whois.get_all_geoip_data(row[self.column])
             ## this is not that accurate but close:
             clean_isp = isp.replace('%','.*')
             if 'isp' in data and re.search(clean_isp,data['isp']):
@@ -1144,7 +1155,7 @@ class IPType(ColumnType):
     def code_maxmind_org(self, column, operator, org):
         """ Returns true if column has an ISP which contains the word isp in it """
         def f(row):
-            data = Whois.get_all_geoip_data(row[column])
+            data = Whois.get_all_geoip_data(row[self.column])
             ## this is not that accurate but close:
             clean_isp = org.replace('%','.*')
             if 'org' in data and re.search(clean_isp,data['org']):
@@ -1673,7 +1684,10 @@ class FilenameType(StringType):
         sql = ''
         if directory:
             pass
-#            sql += "%s rlike %r" % (self.path, glob_re(
+    def operator_contains(self, column, operator, pattern):
+        return 'concat(`%s`,`%s`) like %r' % (self.path, self.filename, "%" + pattern + "%")
+
+
 
 class DeletedType(StateType):
     """ This is a column type which shows deleted inodes graphically

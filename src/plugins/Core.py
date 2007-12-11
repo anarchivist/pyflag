@@ -45,7 +45,7 @@ import os
 import pyflag.FlagFramework as FlagFramework
 import pyflag.Registry as Registry
 
-config.add_option("SCHEMA_VERSION", default=2, absolute=True,
+config.add_option("SCHEMA_VERSION", default=3, absolute=True,
                   help="Current schema version")
 
 class IO_File(FileSystem.File):
