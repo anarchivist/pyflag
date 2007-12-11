@@ -4,7 +4,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.84RC4 Date: Wed May 30 20:48:31 EST 2007$
+#  Version: FLAG $Version: 0.84RC5 Date: Wed Dec 12 00:45:27 HKT 2007$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -587,9 +587,9 @@ class delete_case(load):
             return
             raise RuntimeError("Unable to delete case %s (%s)" %(case,e))
 
-##class create_iosource(load):
-##    def help(self):
-##        return "create_iosource CaseName iosource_name URL. Creates the named IOSource in the specified case using the URL "
+class create_iosource(load):
+    def help(self):
+        return "create_iosource CaseName iosource_name URL. Creates the named IOSource in the specified case using the URL "
 
 ##    def execute(self):
 ##        case = self.args[0]
