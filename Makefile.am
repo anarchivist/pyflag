@@ -7,6 +7,7 @@ my_examples		=	$(shell find examples -not -name .\*)
 bin_SCRIPTS		=	pyflag pyflash pyflag_launch src/pyflag/conf.py
 pkgdata_DATA		=	$(my_data) \
 				data/magic.mgc data/magic.mime.mgc
+pkgpython_PYTHON        =       src/pyflag/conf.py
 nobase_pkgdata_DATA	=	$(my_images) $(my_utilities) $(my_examples)
 man_MANS		=	pyflag.1
 EXTRA_DIST		=	pyflag.in pyflash.in \

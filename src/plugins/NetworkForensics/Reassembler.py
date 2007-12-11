@@ -120,6 +120,12 @@ class StreamFile(File):
         stream_ids = [ int(x) for x in inode[1:].split("/")]
         self.create_new_stream(stream_ids)
 
+    def read(self, length=None):
+        try:
+            return File.read(self, length)
+        except IOError:
+            return ''
+
     def create_new_stream(self,stream_ids):
         """ Creates a new stream by combining the streams given by the list stream_ids.
         

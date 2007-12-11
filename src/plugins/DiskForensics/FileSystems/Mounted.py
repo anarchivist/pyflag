@@ -24,7 +24,7 @@ class Raw(DBFS):
     name="Raw"
     order = 50
 
-    def load(self, mount_point, iosource_name):
+    def load(self, mount_point, iosource_name, scanners=None, directory = None):
         ## Ensure that mount point is normalised:
         mount_point = os.path.normpath(mount_point)
         DBFS.load(self, mount_point, iosource_name)

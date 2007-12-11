@@ -405,7 +405,7 @@ class DBFS(FileSystem):
         dbh.execute("select inode_id, inode, status, uid, gid, mtime, atime, ctime, dtime, mode, links, link, size from inode where inode=%r limit 1",(inode))
         row = dbh.fetch()
         if not row:
-            raise IOError("Inode %s not found" % inode)
+            return None
 
         dbh.execute("select * from file where inode=%r order by mode limit 1", inode);
         result = dbh.fetch()
@@ -868,6 +868,7 @@ class File:
         link = result.__class__(result)
 
         path = fsfd.lookup(inode=query['inode'])
+        if not path: return
         base_path, name = os.path.split(path)
         link.link(path,
                   FlagFramework.query_type((),family="Disk Forensics",
