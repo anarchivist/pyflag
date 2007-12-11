@@ -200,6 +200,8 @@ class Memory(DBFS):
         ## Ensure that mount point is normalised:
         self.iosource_name = iosource_name
         mount_point = os.path.normpath(mount_point)
+        self.mount_point = mount_point
+        
         DBFS.load(self, mount_point, iosource_name)
         
         # open the iosource

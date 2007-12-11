@@ -1482,6 +1482,11 @@ class InodeType(StringType):
 
             result.toolbar(cb=del_annotation, icon='delete.png',tooltip="Click here to delete this annotation")
 
+        ## Check to see if the inode exists at all:
+        dbh = DB.DBO(self.case)
+        dbh.execute("select inode from inode where inode.inode = %r", value)
+        if not dbh.fetch(): return ''
+
         annotate = AnnotationObj(case=self.case)
         row = annotate.select(inode=value)
         tmp1 = result.__class__(result)
