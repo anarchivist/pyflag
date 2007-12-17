@@ -31,11 +31,12 @@ The log format is described in the file ip4/netfilter/ipt_LOG.c
 # ******************************************************
 import pyflag.LogFile as LogFile
 from pyflag.FlagFramework import Curry
-from pyflag.TableObj import StringType, IPType, IntegerType
+from pyflag.TableObj import StringType, IPType, IntegerType, TimestampType
 import pyflag.conf
 config = pyflag.conf.ConfObject()
 import pyflag.DB as DB
 import re
+import Simple
 
 IPTABLES_FIELDS = [
     ## IPTables_parameter, Name, Description, ColumnType, default, index
@@ -74,8 +75,10 @@ class IPTablesLog(LogFile.Log):
         self.datafile = query.getarray(datafile)
         self.cre = re.compile("([A-Z]+)=([^ ]*)")
         self.prefix_re = re.compile("([^ :]+):IN=")
+        self.date_re = re.compile("^(...)\s+(\d+)\s+(\d\d:\d\d:\d\d)")
         
-        self.fields = [ StringType(name="Action", column="action") ]
+        self.fields = [ TimestampType(name = "TIME", column="TIME"),
+                        StringType(name="Action", column="action") ]
         self.parameters = {}
         for parameter, name, desc, column, default, index in IPTABLES_FIELDS:
             if query.has_key(parameter):
@@ -90,6 +93,12 @@ class IPTablesLog(LogFile.Log):
     def get_fields(self):
         for row in self.read_record():
             fields = {}
+            match = self.date_re.match(row)
+            if not match:
+                continue
+
+            fields["TIME"] = "2007%s%s %s" % (match.group(1), match.group(2))
+            
             match = self.prefix_re.search(row)
             if match:
                 fields["action"] = match.group(1)

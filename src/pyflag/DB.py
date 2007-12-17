@@ -426,6 +426,7 @@ class DBO:
             tables = [ row['id'] for row in self]
             for table_id in tables:
                 self.execute("delete from sql_cache where id = %r" , table_id)
+                self.execute("delete from sql_cache_tables where id = %r" , table_id)
                 self.execute("drop table if exists `cache_%s`" , table_id)
                 
         finally:
@@ -482,7 +483,7 @@ class DBO:
                 
             self.insert('sql_cache',
                         query = sql, _timestamp='now()',
-                        tables = ",%s," % ','.join(tables),
+                        #tables = ",%s," % ','.join(tables),
                         limit = lower_limit,
                         length = config.DBCACHE_LENGTH,
                         _fast = True
@@ -490,6 +491,13 @@ class DBO:
 
             ## Create the new table
             id = self.autoincrement()
+
+            ## Store the tables in the sql_cache_tables:
+            for t in tables:
+                self.insert('sql_cache_tables',
+                            sql_id = id,
+                            table_name = t,
+                            _fast = True)
 
             ## Lock the new row - this avoids the race above because other
             ## threads are forced to wait until we finish here:
@@ -535,13 +543,15 @@ class DBO:
         self.execute("start transaction")
         try:
             try:
-                self.execute("select id from sql_cache where tables like '%%,%s,%%' for update",table)
-            except:
+                self.execute("select sql_id from sql_cache_tables where `table_name`=%r for update", table)
+            except Exception, e:
+                print e
                 pass
             ids = [row['id'] for row in self]
             for id in ids:
                 self.execute("drop table if exists cache_%s", id)
                 self.execute("delete from sql_cache where id=%r", id)
+                self.execute("delete from sql_cache_tables where id=%r", id)
         finally:
             self.execute("commit")
 

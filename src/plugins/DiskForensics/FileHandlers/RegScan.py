@@ -37,6 +37,7 @@ from pyflag.TableObj import StringType, TimestampType, InodeType
 class RegEventHandler(FlagFramework.EventHandler):
     def create(self, dbh, case):
         dbh.execute("""CREATE TABLE if not exists `reg` (
+        `node_id` INT NOT NULL,
         `path` text NOT NULL,
         `offset` INT(11),
         `type` enum('REG_NONE','REG_SZ','REG_EXPAND_SZ','REG_BINARY','REG_DWORD',\
@@ -45,7 +46,8 @@ class RegEventHandler(FlagFramework.EventHandler):
           'Unknown') NOT NULL,
         `modified` TIMESTAMP,
         `reg_key` VARCHAR(200) NOT NULL,
-        `value` text)""")        
+        `value` text,
+        key (`node_id`))""")        
 
         ## The regi table is used for the key navigation
         dbh.execute("""create table if not exists regi (
@@ -74,6 +76,7 @@ class RegistryScan(GenScanFactory):
             )
         
         def external_process(self,fd):
+            node_id = self.fd.lookup_id()
             b=Buffer(fd)
             header = RegF(b)
             root_key = header['root_key_offset'].get_value()
@@ -109,7 +112,8 @@ class RegistryScan(GenScanFactory):
                 
                 ## Store all the values:
                 for v in nk_key.values():
-                    reg_handle.mass_insert(path=new_path,
+                    reg_handle.mass_insert(node_id = node_id,
+                                           path=new_path,
                                            offset=v['data']['offs_data'],
                                            modified=nk_key['WriteTS'],
                                            type=v['data']['val_type'],

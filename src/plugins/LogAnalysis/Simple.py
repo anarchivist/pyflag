@@ -200,11 +200,10 @@ class SimpleLog(LogFile.Log):
 
     def parse(self, query, datafile='datafile'):
         """ This function parses the query string into the appropriate fields array """
-        LogFile.Log.parse(self,query, datafile)
-        
         self.datafile = query.getarray(datafile)
         self.prefilters = query.getarray('prefilter')
-
+        LogFile.Log.parse(self,query, datafile)
+        
         num_fields = 0
         ## Count the fields presented:
         for k in query.keys():

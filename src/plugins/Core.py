@@ -237,11 +237,17 @@ class CaseDBInit(FlagFramework.EventHandler):
         case_dbh.execute("""CREATE TABLE if not exists `sql_cache` (
         `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY ,
         `timestamp` TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL ,
-        `tables` VARCHAR( 250 ) NOT NULL ,
         `query` MEDIUMTEXT NOT NULL,
         `limit` INT default 0,
         `length` INT default 100
         ) ENGINE=InnoDB""")
+
+        case_dbh.execute("""CREATE TABLE sql_cache_tables (
+        `sql_id` INT UNSIGNED,
+        `table_name` VARCHAR(250))""")
+
+        case_dbh.check_index("sql_cache_tables","sql_id")
+        case_dbh.check_index("sql_cache_tables","table_name")
         
         case_dbh.execute("""CREATE TABLE if not exists `iosources` (
         `id` INT(11) not null auto_increment,
@@ -253,6 +259,7 @@ class CaseDBInit(FlagFramework.EventHandler):
 
         case_dbh.execute("""CREATE TABLE if not exists `annotate` (
         `id` INT(11) not null auto_increment,
+        `inode_id` int not null,
         `inode` VARCHAR(250) NOT NULL,
         `note` TEXT,
         `category` VARCHAR( 250 ) NOT NULL default 'Note',
@@ -399,10 +406,16 @@ class CaseDBInit(FlagFramework.EventHandler):
 	key `id`(id)
 	)""")
 
+        dbh.execute("""CREATE TABLE sql_cache_tables (
+        `sql_id` INT UNSIGNED,
+        `table_name` VARCHAR(250))""")
+
+        dbh.check_index("sql_cache_tables","sql_id")
+        dbh.check_index("sql_cache_tables","table_name")
+        
         dbh.execute("""CREATE TABLE `sql_cache` (
         `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY ,
         `timestamp` TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL ,
-        `tables` VARCHAR( 250 ) NOT NULL ,
         `query` MEDIUMTEXT NOT NULL,
         `limit` INT default 0,
         `length` INT default 100

@@ -63,27 +63,34 @@ class DLLScan(Scanner.GenScanFactory):
     """ Extract EventLog Messages from DLLs """
     default = True
     depends = [ 'TypeScan', 'RegistryScan']
-
-    def destroy(self):
-        ## populate the EventMessageSources table from the registry
-        dbh=DB.DBO(self.case)
-        dbh.execute("select * from reg where reg_key='EventMessageFile'")
-        for row in dbh:
-            service = os.path.basename(os.path.normpath(row['path']))
-            self.pydbh.execute("select * from EventMessageSources where source=%r limit 1",service)
-            pyrow=self.pydbh.fetch()
-            if not pyrow:
-                filename = row['value'].split("\\")[-1].lower()
-                self.pydbh.execute("insert ignore into EventMessageSources set filename=%r, source=%r" , (filename, service))
+    order = 110
 
     class Scan(Scanner.StoreAndScanType):
-        types = [ 'application/x-dosexec' ]
+        types = [ 'application/x-dosexec',
+                  'application/x-winnt-registry',]
 
         def external_process(self, fd):
+            if self.mime_type == "application/x-winnt-registry":
+                print "Grabbing message sources from %s" % self.fd.inode
+                ## populate the EventMessageSources table from the registry
+                dbh=DB.DBO(self.case)
+                pydbh = DB.DBO()
+                node_id = self.fd.lookup_id()
+                dbh.execute("select * from reg where reg_key='EventMessageFile' and node_id=%r", node_id)
+                for row in dbh:
+                    service = os.path.basename(os.path.normpath(row['path']))
+                    pydbh.execute("select * from EventMessageSources where source=%r limit 1",service)
+                    pyrow=pydbh.fetch()
+                    if not pyrow:
+                        filename = row['value'].split("\\")[-1].lower()
+                        pydbh.execute("insert ignore into EventMessageSources set filename=%r, source=%r" , (filename, service))
+
+                return
+            
             filename = self.ddfs.lookup(inode=self.inode)
             b = Buffer(fd=fd)
 
-            pyflaglog.log(pyflaglog.DEBUG, "Opening %s to extract messages" % self.inode)
+            pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Opening %s to extract messages" % self.inode)
             pydbh = DB.DBO()
             pydbh.mass_insert_start('EventMessages')
             try:
@@ -99,3 +106,20 @@ class DLLScan(Scanner.GenScanFactory):
                 pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "%s does not contain messages" % filename)
 
 ## FIXME: This is not finished yet - need to finish the log viewer
+import pyflag.tests
+import pyflag.pyflagsh as pyflagsh
+
+class EventScanTest(pyflag.tests.ScannerTest):
+    """ Test EventLog DLL scanner """
+    test_case = "PyFlagTestCase"
+    #test_file = "pyflag_stdimage_0.3.e01"
+    test_file = "winxp.sgz"
+    subsystem = 'SGZip'
+    offset = "0"
+
+    def test01RunScanner(self):
+        """ Test EventLog scanner """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env, command="scan",
+                             argv=["*",'DLLScan'])
+

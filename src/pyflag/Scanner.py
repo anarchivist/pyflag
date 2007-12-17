@@ -265,7 +265,7 @@ class StoreAndScan(BaseScanner):
             except: pass
             
             ## Reopen the file to read
-            fd = open(self.file.name,'r')
+            fd = open(self.name,'r')
             self.external_process(fd)
 
         if self.file:
@@ -312,6 +312,7 @@ class StoreAndScanType(StoreAndScan):
             for t in self.types:
                 if re.search(t,mime_type):
                     ## Not boring:
+                    self.mime_type = mime_type
                     return False
 
         self.ignore = True

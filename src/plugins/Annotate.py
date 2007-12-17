@@ -44,7 +44,8 @@ class ViewCaseReport(Reports.report):
                              StringType('Category','category'),
                              StringType('Note','note'),
                              ],
-                table = 'annotate join file on file.inode=annotate.inode',
+                table = 'annotate,file',
+                where = 'file.inode=annotate.inode',
                 case = query['case'],
                 )
 

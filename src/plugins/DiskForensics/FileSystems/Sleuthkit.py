@@ -197,18 +197,19 @@ class Sleuthkit(DBFS):
                 f = fs.open(inode=str(inode))
                 s = fs.fstat(f)
                 dbh_inode.insert( "inode",
-                    inode = inodestr,
-                    status = status,
-                    uid = s.st_uid,
-                    gid = s.st_gid,
-                    _mtime = "from_unixtime(%d)" % s.st_mtime,
-                    _atime = "from_unixtime(%d)" % s.st_atime,
-                    _ctime = "from_unixtime(%d)" % s.st_ctime,
-                    mode = s.st_mode,
-                    links = s.st_nlink,
-                    link = "",
-                    size = s.st_size
-                    )
+                                  inode = inodestr,
+                                  status = status,
+                                  uid = s.st_uid,
+                                  gid = s.st_gid,
+                                  _mtime = "from_unixtime(%d)" % s.st_mtime,
+                                  _atime = "from_unixtime(%d)" % s.st_atime,
+                                  _ctime = "from_unixtime(%d)" % s.st_ctime,
+                                  mode = s.st_mode,
+                                  links = s.st_nlink,
+                                  link = "",
+                                  size = s.st_size,
+                                  _fast = True
+                                  )
                 inode_id = dbh_inode.autoincrement()
                 
                 #insert block runs
@@ -429,7 +430,7 @@ class SKFSTests2(tests.FDTest):
         self.fd = self.fs.open(self.test_file)
 
 class LargeFileTest(pyflag.tests.ScannerTest):
-    """ Test that pyflag can load very large images efficiently """
+    """ Test that pyflag can load very large images efficiently (WinXp) """
     test_case = "WinXp"
     test_file = "winxp.sgz"
     subsystem = 'SGZip'
@@ -440,6 +441,6 @@ class LargeFileTest(pyflag.tests.ScannerTest):
 	""" Run all scanners on the image """ 
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env, command="scan",
-#                             argv=["*",'TypeScan','MD5Scan','VirScan','DLLScan','IEIndex','RFC2822','RegistryScan','OLEScan','PstScan','IndexScan'])
-                             argv=["*",'*'])
+                             argv=["*",'TypeScan','MD5Scan','DLLScan','IEIndex','RFC2822','RegistryScan','OLEScan','PstScan','IndexScan'])
+#                             argv=["*",'*'])
 
