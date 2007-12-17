@@ -423,6 +423,7 @@ class DBO:
         self.start_transaction()
         try:
             self.execute("select * from sql_cache where timestamp < date_sub(now(), interval %r minute) for update", config.DBCACHE_AGE)
+            ## Make a copy to maintain the cursor
             tables = [ row['id'] for row in self]
             for table_id in tables:
                 self.execute("delete from sql_cache where id = %r" , table_id)
