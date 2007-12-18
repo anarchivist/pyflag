@@ -67,6 +67,9 @@ Developers should not use the windows event logging mechanism for anything serio
 Windows System adminsitrators need to be aware of the limitations, and in fact should probably install a syslog server to record all logging messages. There are a number of event log to syslog plugins which do the job.
 
 Forensic examiners have to live with it, and should use PyFlags event log message database to guess what the log files say (That sounds rediculous, but unfortunately thats how it is).
+
+The information below was taken from:
+http://msdn2.microsoft.com/en-us/library/aa363646(printer).aspx
 """
 from format import *
 from plugins.FileFormats.BasicFormats import *
@@ -118,7 +121,7 @@ class Event(Header):
     """
     fields = [
         [ 'size' ,LONG ],
-        [ 'Magic', STRING,{'length':4}],
+        [ 'Magic', STRING, {'length':4}],
         [ 'RecordNumber',LONG ],
         [ 'TimeGenerated',TIMESTAMP ],
         [ 'TimeWritten',TIMESTAMP ],
@@ -126,7 +129,13 @@ class Event(Header):
         [ 'EventType', EventType ],
         [ 'NumStrings', WORD ],
         [ 'EventCategory', WORD ],
-        [ 'Unknown', BYTE_ARRAY,{'count':26} ],
+        [ 'ReservedFlags', WORD ],
+        [ 'ClosingRecordNumber', DWORD ],
+        [ 'StringOffset', DWORD ],
+        [ 'UserSidLength', DWORD ],
+        [ 'UserSidOffset', DWORD ],
+        [ 'DataLength', DWORD ],
+        [ 'DataOffset', DWORD ],
             
         ## Following the struct is an array of NumStrings UCS16
         ## strings. The first 2 strings are name of service and
@@ -135,7 +144,8 @@ class Event(Header):
         [ 'Machine', TERMINATED_UCS16],
         
         ## These are all the strings
-        [ 'Strings', TERMINATED_UCS16_Array, dict(count = lambda x: x['NumStrings'])],
+        [ 'Strings', TERMINATED_UCS16_Array, dict(count = lambda x: x['NumStrings'],
+                                                  offset= lambda x: int(x['StringOffset']))],
         ]
 
     def read(self):
