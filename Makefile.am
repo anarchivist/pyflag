@@ -28,7 +28,7 @@ edit = sed \
 	-e 's,@magic\@,@magic@,gi' \
 	-e 's,@python\@,$(PYTHON),gi'
 
-src/pyflag/%.py: $(top_srcdir)/src/pyflag/%.py.in
+src/pyflag/%.py: $(top_srcdir)/src/pyflag/%.py.in Makefile
 	rm -f $@ $@.tmp
 	$(edit) $< > $@.tmp
 	chmod +x $@.tmp

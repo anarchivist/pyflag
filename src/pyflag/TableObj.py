@@ -509,6 +509,13 @@ class ColumnType:
     def operator_literal(self, column,operator, arg):
         return "%s %s %r" % (self.escape_column_name(self.column),
                              operator, arg)
+
+    def code_equal(self, column, operator, arg):
+        ## Make sure our arg is actually an integer:
+        return lambda row: row[self.column] == arg
+
+    def operator_equal(self, column, operator, address):
+        return "%s = %r" % (self.escape_column_name(self.column), address)
     
     def display(self, value, row, result):
         """ This method is called by the table widget to allow us to
@@ -658,9 +665,6 @@ class IntegerType(ColumnType):
         integer = int(arg)
         return lambda row: int(row[self.column]) == integer
 
-    def operator_equal(self, column, operator, address):
-        return "%s = %r" % (self.escape_column_name(self.column), address)
-
     def create(self):
         return "`%s` int(11) default 0" % self.column
 
@@ -708,7 +712,7 @@ class EditableStringType(ColumnType):
 
 class StringType(ColumnType):
     symbols = {
-        "=":"literal",
+        "=":"equal",
         "!=":"literal",
         }
 
@@ -1640,6 +1644,15 @@ class AnnotationObj(TableObj):
         TableObj.__init__(self,case,id)
 
 class InodeIDType(InodeType):
+    def parse(self, column, operator,arg, context = 'sql'):
+        column = self.column
+        self.column = 'inode'
+        
+        result = "%s in (select %s from inode where %s)" % (column, column,
+                                                            InodeType.parse(self, column, operator, arg))
+        self.column = column
+        return result
+
     def display(self, value, row, result):
         fsfd = FileSystem.DBFS(self.case)
         inode = fsfd.lookup(inode_id=value)

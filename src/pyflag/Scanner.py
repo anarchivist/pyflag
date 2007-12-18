@@ -37,7 +37,7 @@ Scanners are actually factory classes and must be inherited from GenScanFactory.
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.pyflaglog as pyflaglog
-import os,imp
+import os,imp, StringIO
 import re
 import pyflag.Registry as Registry
 import pyflag.DB as DB
@@ -343,6 +343,7 @@ class StringIOType(StoreAndScanType):
             StoreAndScanFiles.remove(self.name)
 
         if not self.boring_status:
+            self.file.seek(0)
             self.external_process(self.file)
 
 class ScanIfType(StoreAndScanType):

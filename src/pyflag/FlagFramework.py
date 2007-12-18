@@ -386,14 +386,18 @@ class Flag:
 
         #Lets remember the fact that we analysed this report - in the database
         try:
-            dbh = DB.DBO(query['case'])
-        except KeyError:
-            dbh = DB.DBO(None)
-            
-        dbh.execute("insert into meta set property=%r,value=%r",('report_executed',canonical_query))
+            try:
+                dbh = DB.DBO(query['case'])
+            except KeyError:
+                dbh = DB.DBO(None)
         
+            dbh.execute("insert into meta set property=%r,value=%r",('report_executed',canonical_query))
+        except DB.DBError:
+            pass
+
         #Remove the lock
         del report.executing[thread_name]
+
 
     def check_progress(self,report,query, result):
         """ Checks the progress of a report. If the report is not running this method returns None. If the report is still running or has died due to an error, this method returns a UI object containing either the error message or a progress report called from the report's own progress method """
@@ -907,7 +911,11 @@ class EventHandler:
 
 def post_event(event, case):
     """ A function to post the specifed event to all event handlers """
-    dbh = DB.DBO(case)
+    try:
+        dbh = DB.DBO(case)
+    except DB.DBError:
+        return
+    
     for cls in Registry.EVENT_HANDLERS.classes:
         event_handler = cls()
         

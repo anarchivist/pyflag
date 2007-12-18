@@ -427,7 +427,7 @@ class DBO:
             tables = [ row['id'] for row in self]
             for table_id in tables:
                 self.execute("delete from sql_cache where id = %r" , table_id)
-                self.execute("delete from sql_cache_tables where id = %r" , table_id)
+                self.execute("delete from sql_cache_tables where sql_id = %r" , table_id)
                 self.execute("drop table if exists `cache_%s`" , table_id)
                 
         finally:
@@ -548,11 +548,11 @@ class DBO:
             except Exception, e:
                 print e
                 pass
-            ids = [row['id'] for row in self]
+            ids = [row['sql_id'] for row in self]
             for id in ids:
                 self.execute("drop table if exists cache_%s", id)
                 self.execute("delete from sql_cache where id=%r", id)
-                self.execute("delete from sql_cache_tables where id=%r", id)
+                self.execute("delete from sql_cache_tables where sql_id=%r", id)
         finally:
             self.execute("commit")
 

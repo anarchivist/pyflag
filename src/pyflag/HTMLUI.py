@@ -841,8 +841,8 @@ class HTMLUI(UI.GenericUI):
             result.heading("History")
 
             new_query = query.clone()
-            del new_query['filter']
-            new_query['__target__'] = 'filter'
+            del new_query[filter_context]
+            new_query['__target__'] = filter_context
             table_string =  ",".join([e.name for e in elements])
             result.table(
                 elements = [ StringType("Filter", "filter", link=new_query,
@@ -1130,14 +1130,14 @@ class HTMLUI(UI.GenericUI):
             
         ## Add a toolbar icon for the filter:
         self.toolbar(cb=filter_gui, icon='filter.png',
-                     tooltip=self.defaults.get('filter','Click here to filter table'))
+                     tooltip=self.defaults.get(filter,'Click here to filter table'))
 
         ## Add a clear filter icon if required
         try:
             new_query = query.clone()
-            if new_query.has_key('filter'):
+            if new_query.has_key(filter):
 
-                del new_query['filter']
+                del new_query[filter]
 
                 # Make it reset the limit
                 if new_query.has_key('limit'): del new_query['limit']
@@ -1178,7 +1178,7 @@ class HTMLUI(UI.GenericUI):
                 yield "#Pyflag Table widget output\n#Query was %s.\n" % query
 
                 try:
-                    yield "# Filter: %s\n" % query['filter']
+                    yield "# Filter: %s\n" % query[filter]
                 except KeyError:
                     pass
 

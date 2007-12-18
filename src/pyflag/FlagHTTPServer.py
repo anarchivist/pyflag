@@ -183,7 +183,9 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
         #Is this a request for an image?
         elif re.search("\.(png|jpg|gif|ico)$",query.base):
             ct="image/jpeg"
-        
+            if not query.base.startswith("/images"):
+                query.base = "/images/"+query.base
+                
         elif re.search("\.(css)$",query.base):
             ct="text/css"
 
