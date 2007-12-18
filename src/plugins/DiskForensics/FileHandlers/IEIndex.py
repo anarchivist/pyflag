@@ -30,19 +30,18 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import FileFormats.IECache as IECache
 import pyflag.DB as DB
-from pyflag.TableObj import StringType, TimestampType, FilenameType
+from pyflag.TableObj import StringType, TimestampType, FilenameType, InodeIDType
 import pyflag.FlagFramework as FlagFramework
 
 class IEIndexEventHandler(FlagFramework.EventHandler):
     def create(self, dbh, case):
-        dbh.execute("""CREATE TABLE IF NOT EXISTS history (
-        `path` TEXT NOT NULL,
+        dbh.execute("""CREATE TABLE IF NOT EXISTS ie_history (
+        `inode_id` int not null,
         `type` VARCHAR(20) NOT NULL,
         `url` TEXT NOT NULL,
         `modified` TIMESTAMP DEFAULT 0,
         `accessed` TIMESTAMP DEFAULT 0,
-        `filename` VARCHAR(250),
-        `filepath` VARCHAR(250),
+        `filename` VARCHAR(500),
         `headers` TEXT)""")                
 
 class IEIndex(Scanner.GenScanFactory):
@@ -54,26 +53,26 @@ class IEIndex(Scanner.GenScanFactory):
     def reset(self, inode):
         Scanner.GenScanFactory.reset(self, inode)
         dbh=DB.DBO(self.case)
-        dbh.execute("delete from history")
+        dbh.execute("delete from ie_history")
 
     class Scan(Scanner.StoreAndScanType):
         types = ['application/x-ie-index']
 
         def external_process(self,fd):
             dbh=DB.DBO(self.case)
+            dbh.mass_insert_start('ie_history')
+            inode_id = self.fd.lookup_id()
             history = IECache.IEHistoryFile(fd)
             for event in history:
                 if event:
-                    dbh.insert('history',
-                               path=self.ddfs.lookup(inode=self.inode),
-                               type = event['type'],
-                               url = event['url'],
-                               modified = event['modified_time'],
-                               accessed = event['accessed_time'],
-                               filename = event['filename'],
-                               filepath = '',
-                               headers = event['data'])
-
+                    dbh.mass_insert(inode_id = inode_id,
+                                    type = event['type'],
+                                    url = event['url'],
+                                    modified = event['modified_time'],
+                                    accessed = event['accessed_time'],
+                                    filename = event['filename'],
+                                    headers = event['data'])
+                    
 class IEHistory(Reports.report):
     """ View IE browsing history """
     name = "IE Browser History "
@@ -83,16 +82,33 @@ class IEHistory(Reports.report):
     def display(self,query,result):
         result.heading("IE History")
         dbh=self.DBO(query['case'])
-        dbh.check_index("history" ,"url",10)
+        dbh.check_index("ie_history" ,"url",10)
         
         result.table(
-            elements = [ StringType('Path','path'),
+            elements = [ InodeIDType('Inode','inode_id', case=query['case']),
                          StringType('Type','type'),
                          StringType('URL','url'),
                          TimestampType('Modified','modified'),
                          TimestampType('Accessed','accessed'),
-                         FilenameType(filename='filename', path='filepath', case=query['case']),
+                         StringType('Filename', 'filename'),
                          StringType('Headers','headers') ],
-            table=('history'),
+            table='ie_history',
             case=query['case']
             )
+
+import pyflag.tests
+import pyflag.pyflagsh as pyflagsh
+
+class IECacheScanTest(pyflag.tests.ScannerTest):
+    """ Test IE History scanner """
+    test_case = "PyFlagTestCase"
+    test_file = "pyflag_stdimage_0.4.e01"
+    subsystem = 'EWF'
+    offset = "16128s"
+
+    def test01RunScanner(self):
+        """ Test IE History scanner """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env, command="scan",
+                             argv=["*",'IEIndex'])
+

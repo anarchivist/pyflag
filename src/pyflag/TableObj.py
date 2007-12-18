@@ -1688,7 +1688,7 @@ class FilenameType(StringType):
         if self.basename:
             return "`%s`.link, `%s`" % (self.file, self.filename)
         else:
-            return "`%s`.link, concat(`%s`,`%s`)" % (self.file, self.path,self.filename)
+            return "`%s`.link, concat(file.`%s`,file.`%s`)" % (self.file, self.path,self.filename)
     
     ## FIXME: implement filename globbing operators - this should be
     ## much faster than regex or match operators because in marches,
