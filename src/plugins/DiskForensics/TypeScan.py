@@ -31,17 +31,17 @@ import pyflag.Reports as Reports
 import pyflag.Graph as Graph
 import pyflag.IO as IO
 import pyflag.Registry as Registry
-from pyflag.TableObj import StringType, TimestampType, InodeType, FilenameType, IntegerType
+from pyflag.TableObj import StringType, TimestampType, InodeIDType, FilenameType, IntegerType
 
 class TypeTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
         dbh.execute(""" CREATE TABLE IF NOT EXISTS `type` (
-        `inode` varchar( 250 ) NOT NULL,
+        `inode_id` int NOT NULL,
         `mime` tinytext NOT NULL,
         `type` tinytext NOT NULL )""")
         
         ## Create indexes on this table immediately because we need to select
-        dbh.check_index('type','inode')
+        dbh.check_index('type','inode_id')
         
 class TypeScan(Scanner.GenScanFactory):
     """ Detect File Type (magic).
@@ -83,24 +83,26 @@ class TypeScan(Scanner.GenScanFactory):
         def finish(self):
             # insert type into DB
             dbh=DB.DBO(self.case)
+            inode_id = self.fd.lookup_id()
             dbh.insert('type',
-                       inode = self.inode,
+                       inode_id = inode_id,
                        mime = self.type_mime,
                        type = self.type_str)
 
-class ThumbnailType(InodeType):
+class ThumbnailType(InodeIDType):
     def __init__(self, name='Inode', column='inode', fsfd=None):
-        InodeType.__init__(self,name=name,column=column, case=fsfd.case)
+        InodeIDType.__init__(self,name=name,column=column, case=fsfd.case)
         self.fsfd = fsfd
 
     ## We dont want any operations on the thumbnail
     def operators(self):
         return {}
         
-    def display(self, inode, row, result):
+    def display(self, inode_id, row, result):
         tmp = result.__class__(result)
         try:
-            fd = self.fsfd.open(inode=inode)
+            fd = self.fsfd.open(inode_id=inode_id)
+            inode = self.fsfd.lookup(inode_id=inode_id)
             image = Graph.Thumbnailer(fd,200)
         except IOError:
             tmp.icon("broken.png")
@@ -126,7 +128,7 @@ class ThumbnailType(InodeType):
         except AttributeError:
             pass
 
-        tmp2.raw(InodeType.display(self,inode,row, tmp2))
+        tmp2.raw(InodeIDType.display(self,inode_id,row, tmp2))
         return tmp2
 
 ## A report to examine the Types of different files:
@@ -147,13 +149,13 @@ class ViewFileTypes(Reports.report):
         fsfd = FileSystem.DBFS(query["case"])
         try:
             result.table(
-                elements = [ ThumbnailType('Thumbnail','file.inode', fsfd = fsfd),
-                             FilenameType(case=query['case']),
+                elements = [ ThumbnailType('Thumbnail','inode_id', fsfd = fsfd),
+                             FilenameType(case=query['case'], table='type'),
                              StringType('Type','type'),
-                             IntegerType('Size','inode.size'),
-                             TimestampType('Timestamp','inode.mtime') ],
-                table = 'file, type, inode',
-                where = 'type.inode=inode.inode and file.inode=type.inode and file.mode like "r%%" ',
+#                             IntegerType('Size','inode.size'),
+#                             TimestampType('Timestamp','inode.mtime')
+                             ],
+                table = 'type',
                 case = query['case']
                 )
         except DB.DBError,e:

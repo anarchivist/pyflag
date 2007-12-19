@@ -169,7 +169,7 @@ class URLEntry(SimpleStruct):
             [ 'unknown', WORD ],
             [ 'filename', HIST_STR_PTR, dict(section_offset=self.buffer.offset)],
             [ '0x00200001', LONG ],
-            [ 'content', PContent ],
+            [ 'content', PContent, dict(relative_offset = lambda x: x['type'].buffer.offset -4) ],
             ] 
 class IEHistoryFile:
     """ A Class to access the records in an IE History index.dat file.

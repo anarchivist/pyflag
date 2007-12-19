@@ -515,7 +515,7 @@ class ColumnType:
         return lambda row: row[self.column] == arg
 
     def operator_equal(self, column, operator, address):
-        return "%s = %r" % (self.escape_column_name(self.column), address)
+        return self.operator_literal(column, '=', address)
     
     def display(self, value, row, result):
         """ This method is called by the table widget to allow us to
@@ -726,7 +726,7 @@ class StringType(ColumnType):
     
     def operator_contains(self, column, operator, arg):
         """ Matches when the column contains the pattern anywhere. Its the same as placing wildcards before and after the pattern. """
-        return '%s like %r' % (self.select(), "%" + arg + "%")
+        return self.operator_literal(column , 'like' , "%" + arg + "%")
 
     def code_matches(self, column, operator, arg):
         regex = arg.replace("%",".*")
@@ -734,15 +734,14 @@ class StringType(ColumnType):
 
     def operator_matches(self, column, operator, arg):
         """ This matches the pattern to the column. Wild cards (%) can be placed anywhere, but if you place it in front of the pattern it could be slower. """
-        return '%s like %r' % (self.escape_column_name(self.column), arg)
+        return self.operator_literal(column , 'like' , arg)
 
     def code_regex(self, column, operator, arg):
         return lambda row: re.match(arg, row[self.column])
 
     def operator_regex(self,column,operator,arg):
         """ This applies the regular expression to the column (Can be slow for large tables) """
-        return '%s rlike %r' % (self.escape_column_name(self.column), arg)
-
+        return self.operator_literal(column, 'rlike', arg)
 
 class TimestampType(IntegerType):
     """
@@ -1660,20 +1659,19 @@ class InodeIDType(InodeType):
 
 class FilenameType(StringType):
     hidden = True
-    def __init__(self, name='Filename', filename='name', path='path', file='file',
-                 basename=False,
+    def __init__(self, name='Filename', inode_id='inode_id',
+                 basename=False, table=None,
                  link=None, link_pane=None, case=None):
         if not link:
             link = query_type(case=case,
                               family='Disk Forensics',
                               report='Browse Filesystem',
                               __target__='open_tree',open_tree="%s")
-        self.path = path
-        self.file = file
+
         ## This is true we only display the basename
+        self.table = table
         self.basename = basename
-        self.filename = filename
-        ColumnType.__init__(self,name=name, column=filename,
+        ColumnType.__init__(self,name=name, column=inode_id,
                             link=link, link_pane=link_pane)
 
     def display(self, value, row, result):
@@ -1686,9 +1684,11 @@ class FilenameType(StringType):
 
     def select(self):
         if self.basename:
-            return "`%s`.link, `%s`" % (self.file, self.filename)
+            return "(select link from file where inode_id=%s.inode_id limit 1) as link," % self.table + \
+                   "(select name from file where inode_id=%s.inode_id limit 1)" % self.table
         else:
-            return "`%s`.link, concat(file.`%s`,file.`%s`)" % (self.file, self.path,self.filename)
+            return "(select link from file where inode_id=%s.inode_id limit 1) as link," % self.table + \
+                   "(select concat(path,name) from file where inode_id=%s.inode_id limit 1)" % self.table
     
     ## FIXME: implement filename globbing operators - this should be
     ## much faster than regex or match operators because in marches,
@@ -1702,10 +1702,28 @@ class FilenameType(StringType):
         sql = ''
         if directory:
             pass
-    def operator_contains(self, column, operator, pattern):
-        return 'concat(`%s`,`%s`) like %r' % (self.path, self.filename, "%" + pattern + "%")
 
+    def operator_literal(self, column, operator, pattern):
+        return "`%s` in (select inode_id from file where concat(file.path, file.name) %s %r)" % (self.column, operator, pattern) 
 
+class InodeInfo(StringType):
+    """ Displays inode information from inode_id """
+    hidden = True
+    def __init__(self, name='Size', inode_id='inode_id', field='size',
+                 table=None,
+                 link=None, link_pane=None, case=None):
+
+        ## This is true we only display the basename
+        self.table = table
+        self.field = field
+        ColumnType.__init__(self,name=name, column=inode_id,
+                            link=link, link_pane=link_pane)
+
+    def select(self):
+        return "(select `%s` from inode where inode_id=%s.inode_id limit 1)" % (self.field, self.table)
+    
+    def operator_literal(self, column, operator, pattern):
+        return "`%s` in (select inode_id from inode where `%s` %s %r)" % (self.column, self.field, operator, pattern) 
 
 class DeletedType(StateType):
     """ This is a column type which shows deleted inodes graphically

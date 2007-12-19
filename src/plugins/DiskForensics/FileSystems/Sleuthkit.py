@@ -301,18 +301,20 @@ class Sleuthkit(DBFS):
 
                     ## This is much faster than the above:
                     inode = 'I%s|o%s:%s' % (iosource_name, offset,size)
-                    dbh_file.mass_insert(status = 'alloc',
-                                         path = FlagFramework.normpath(mount_point + '/_unallocated_/'),
-                                         inode = inode,
-                                         name = "o%08d" % count,
-                                         mode = 'r/r')
-
                     dbh_inode.insert("inode", status = 'alloc',
                                           inode = inode,
                                           mode = '40755',
                                           links = 4,
                                           size = size
                                           )
+
+                    inode_id = dbh_inode.autoincrement()
+                    dbh_file.mass_insert(status = 'alloc',
+                                         path = FlagFramework.normpath(mount_point + '/_unallocated_/'),
+                                         inode = inode,
+                                         inode_id = inode_id,
+                                         name = "o%08d" % count,
+                                         mode = 'r/r')
 
                     count+=1
                     #unalloc_blocks.append(new_block)

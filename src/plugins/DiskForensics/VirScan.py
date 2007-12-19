@@ -32,7 +32,7 @@ import pyflag.DB as DB
 import os.path
 import pyflag.pyflaglog as pyflaglog
 from pyflag.Scanner import *
-from pyflag.TableObj import StringType, TimestampType, InodeType, FilenameType, IntegerType
+from pyflag.TableObj import StringType, TimestampType, InodeIDType, FilenameType, IntegerType
 
 WARNING_ISSUED = False
 
@@ -60,8 +60,9 @@ except (pyclamd.ScanError, TypeError, ValueError):
 class VirusTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
         dbh.execute(""" CREATE TABLE IF NOT EXISTS `virus` (
-        `inode` varchar( 255 ) NOT NULL,
-        `virus` tinytext NOT NULL )""")
+        `inode_id` int not null,
+        `virus` tinytext NOT NULL,
+        primary key (inode_id))""")
 
 class VirScan(GenScanFactory):
     """ Scan file for viruses """
@@ -86,9 +87,9 @@ class VirScan(GenScanFactory):
         def finish(self):
             dbh=DB.DBO(self.case)
             if self.virus:
-                print self.virus
+                inode_id = self.fd.lookup_id()
                 dbh.insert('virus',
-                           inode=self.inode,
+                           inode_id=inode_id,
                            virus=self.virus['stream'])
 
 class VirusScan(Reports.report):
@@ -102,11 +103,11 @@ class VirusScan(Reports.report):
         dbh=self.DBO(query['case'])
         try:
             result.table(
-                elements = [ InodeType('Inode','virus.inode',
-                                       case=query['case']),
-                             FilenameType(case=query['case']),
+                elements = [ InodeIDType('Inode','inode_id',
+                                         case=query['case']),
+                             FilenameType(case=query['case'], table='virus'),
                              StringType('Virus Detected','virus') ],
-                table='virus join file on virus.inode=file.inode ',
+                table='virus',
                 case=query['case'],
                 )
         except DB.DBError,e:
@@ -146,7 +147,7 @@ class VirusStats(Stats.Handler):
             t = branch[1].replace("__",'/')
             result.table(
                 elements = [ InodeType(column='file.inode', case = self.case),
-                             FilenameType(case = self.case, link_pane='main'),
+                             FilenameType(case = self.case, link_pane='main', table='virus'),
                              IntegerType('Size','inode.size'),
                              TimestampType('Timestamp','inode.mtime')],
                 table = 'file, inode, virus',
@@ -181,5 +182,5 @@ class VirusScanTest(pyflag.tests.ScannerTest):
 
         ## We expect to pick this rootkit:
         self.assert_(row, "Unable to find any viruses")
-        self.assert_("K15-0-0" in row['inode'] , "Unable to find Trojan.NTRootKit.044")
+        self.assert_("NTRootKit" in row['virus'] , "Unable to find Trojan.NTRootKit.044")
         

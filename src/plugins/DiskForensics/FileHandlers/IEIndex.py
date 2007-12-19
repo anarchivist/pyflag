@@ -72,29 +72,6 @@ class IEIndex(Scanner.GenScanFactory):
                                     accessed = event['accessed_time'],
                                     filename = event['filename'],
                                     headers = event['data'])
-                    
-class IEHistory(Reports.report):
-    """ View IE browsing history """
-    name = "IE Browser History "
-    family = "Disk Forensics"
-    description="This report will display all IE browsing history data found in index.dat files"
-
-    def display(self,query,result):
-        result.heading("IE History")
-        dbh=self.DBO(query['case'])
-        dbh.check_index("ie_history" ,"url",10)
-        
-        result.table(
-            elements = [ InodeIDType('Inode','inode_id', case=query['case']),
-                         StringType('Type','type'),
-                         StringType('URL','url'),
-                         TimestampType('Modified','modified'),
-                         TimestampType('Accessed','accessed'),
-                         StringType('Filename', 'filename'),
-                         StringType('Headers','headers') ],
-            table='ie_history',
-            case=query['case']
-            )
 
 import pyflag.tests
 import pyflag.pyflagsh as pyflagsh

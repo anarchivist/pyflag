@@ -50,9 +50,9 @@ class MozHistEventHandler(FlagFramework.EventHandler):
         `name` VARCHAR(250) NOT NULL,
         `value` VARCHAR(250) NOT NULL)""")
 
-class MozHistoryReport(Reports.report):
-    """ View Mozilla history """
-    name = "Mozilla History"
+class BrowserHistoryReport(Reports.report):
+    """ View Browser History """
+    name = "Browser History"
     family = "Disk Forensics"
 
     def display(self, query,result):
@@ -83,8 +83,25 @@ class MozHistoryReport(Reports.report):
                 case = query['case'],
                 )
 
-        result.notebook(names = ['History', 'Forms'],
-                        callbacks = [ hist_cb, form_cb])
+        def ie_history_cb(query,result):
+            dbh=self.DBO(query['case'])
+            dbh.check_index("ie_history" ,"url",10)
+            
+            result.table(
+                elements = [ InodeIDType('Inode','inode_id', case=query['case']),
+                             StringType('Type','type'),
+                             StringType('URL','url'),
+                             TimestampType('Modified','modified'),
+                             TimestampType('Accessed','accessed'),
+                             StringType('Filename', 'filename'),
+                             StringType('Headers','headers') ],
+                table='ie_history',
+                case=query['case']
+                )
+
+
+        result.notebook(names = ['Mozilla History', 'Mozilla Forms', 'IE Cache'],
+                        callbacks = [ hist_cb, form_cb, ie_history_cb])
 
 ## We make the scanner store it in memory - typically history files
 ## are not that large.

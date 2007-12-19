@@ -68,6 +68,7 @@ class NetworkingInit(FlagFramework.EventHandler):
         ## connection
         case_dbh.execute(
             """CREATE TABLE if not exists `connection_details` (
+            `inode_id` int not null,
             `inode` varchar(250),
             `con_id` int(11) signed NOT NULL auto_increment,
             `reverse` int(11) unsigned NOT NULL default '0',

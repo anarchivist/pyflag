@@ -31,18 +31,17 @@ import pyflag.Reports as Reports
 import pyflag.DB as DB
 import os.path
 from pyflag.Scanner import *
-from pyflag.TableObj import StringType, TimestampType, InodeType, FilenameType, ColumnType
+from pyflag.TableObj import StringType, TimestampType, InodeIDType, FilenameType, ColumnType
                   
 import md5
 class HashTables(FlagFramework.EventHandler):
     def create(self, dbh,case):
         dbh.execute(""" CREATE TABLE IF NOT EXISTS `hash` (
-        `inode` varchar( 250 ) NOT NULL default '',
-        `md5` char( 32 ) NOT NULL default '',
-        `binary_md5` char( 16 ) binary NOT NULL default '',
+        `inode_id` int not null,
+        `binary_md5` binary( 16 ) NOT NULL default '',
         `NSRL_product` varchar(250),
         `NSRL_filename` varchar(60) not NULL default '',
-        `FileType` tinytext
+        `FileType` varchar(250)
         )""")
 
     def init_default_db(self, dbh, case):
@@ -106,9 +105,9 @@ class MD5Scan(GenScanFactory):
             if not nsrl: nsrl={}
             
             dbh=DB.DBO(self.case)
+            inode_id = self.fd.lookup_id()
             dbh.insert('hash',
-                       inode = self.inode,
-                       md5 = self.m.hexdigest(),
+                       inode_id = inode_id,
                        binary_md5 = self.m.digest(),
                        NSRL_product = nsrl.get('Name','-'),
                        NSRL_filename = nsrl.get('filename','-'),
@@ -127,17 +126,20 @@ class HashComparison(Reports.report):
     def display(self,query,result):
         result.heading("MD5 Hash comparisons")
         dbh=self.DBO(query['case'])
-
+        dbh.check_index('hash','FileType')
+        dbh.check_index('hash','inode_id')
+        
         try:
             result.table(
-                elements = [ InodeType(case=query['case']),
-                             FilenameType(case=query['case']),
+                elements = [ InodeIDType('Inode','inode_id',
+                                         case=query['case']),
+                             FilenameType(case=query['case'], table='hash'),
                              StringType('File Type', 'FileType'),
                              StringType('NSRL Product','NSRL_product'),
                              StringType('NSRL Filename','NSRL_filename'),
                              ## We dont want to have any operators on this
-                             ColumnType('MD5','md5') ],
-                table='hash join file using (inode)',
+                             ColumnType('MD5','binary_md5', callback=lambda x: x.encode('hex')) ],
+                table='hash',
                 case=query['case'],
                 )
         except DB.DBError,e:
@@ -145,3 +147,23 @@ class HashComparison(Reports.report):
             result.para("Error reported was:")
             result.text(e,style="red")
          
+## UnitTests:
+import unittest
+import pyflag.pyflagsh as pyflagsh
+import pyflag.tests
+
+class HashScanTest(pyflag.tests.ScannerTest):
+    """ Hash Scanner Tests """
+    test_case = "PyFlag Test Case"
+    test_file = "pyflag_stdimage_0.2.sgz"
+    subsystem = 'SGZip'
+    offset = "16128s"
+    
+    order = 20
+    def test_scanner(self):
+        """ Check the virus scanner works """
+        dbh = DB.DBO(self.test_case)
+
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env, command="scan",
+                             argv=["*",'MD5Scan'])        

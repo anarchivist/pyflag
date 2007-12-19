@@ -106,17 +106,17 @@ class BrowseFS(Reports.report):
 
         def tabular_view(query,result):
             result.table(
-                elements = [ InodeType('Inode','f.inode',case=query['case']),
-                             StringType('Mode','f.mode'),
-                             FilenameType(case=query['case'], file='f'),
-                             DeletedType('Del','f.status'),
+                elements = [ InodeType('Inode','file.inode',case=query['case']),
+                             StringType('Mode','file.mode'),
+                             FilenameType(case=query['case'], table='inode'),
+                             DeletedType('Del','file.status'),
                              IntegerType('File Size','size'),
                              TimestampType('Last Modified','mtime'),
                              TimestampType('Last Accessed','atime'),
                              TimestampType('Created','ctime'),
                              ],
-                table='file as f, inode as i',
-                where="f.inode_id=i.inode_id",
+                table='file, inode',
+                where="file.inode_id=inode.inode_id",
                 case=query['case'],
                 )
 
@@ -152,7 +152,7 @@ class BrowseFS(Reports.report):
 
                 tmp.table(
                     elements = [ InodeType('Inode','file.inode',case=query['case']),
-                                 FilenameType('Filename','name', basename=True),
+                                 FilenameType(basename=True, table='inode'),
                                  DeletedType('Del','file.status'),
                                  IntegerType('File Size','size'),
                                  TimestampType('Last Modified','mtime'),
