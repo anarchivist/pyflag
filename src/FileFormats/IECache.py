@@ -239,10 +239,6 @@ if __name__ == "__main__":
     history=IEHistoryFile(fd)
     for event in history:
         if event:
-#            print event['event']
-#            r=["%s=%r" % (k,"%s"%v) for k,v in event.items() if k!='event' ]
-#            print '\n'.join(r)
-
-            print "url is %s" % event['event']
+            print "url is %s" % event['event'], event['event']['content'].get_value()
 
     sys.stderr.write("Completed in %s seconds\n" % (time.time()-a))

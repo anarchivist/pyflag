@@ -30,13 +30,12 @@ tcptrace.py pcap_file ... pcap_file
 Files will be written to the current directory one file per stream.
 """
 from optparse import OptionParser
-import FileFormats.PCAP as PCAP
-from format import Buffer
-import pyflag.pyflaglog as pyflaglog
-import reassembler, _dissect
+import reassembler
 import socket, struct
+import pypcap
 import pyflag.conf
 config=pyflag.conf.ConfObject()
+from plugins.NetworkForensics.PCAPFS import CachedWriter
 
 parser = OptionParser(usage = """%prog [options] pcap_file ... pcap_file
 
@@ -55,13 +54,47 @@ parser.add_option("-v", "--verbose", default=5, type='int',
 
 (options, args) = parser.parse_args()
 
-## Hush up a bit
-pyflaglog.config.LOG_LEVEL=options.verbose
 if options.stats:
     stats_fd = open(options.stats,'w')
     stats_fd.write("""## Stats for streams in the following format:
 ## stream name: (packet_id, offselt, length) ....
 """)
+
+CONS = 0
+
+def Callback(mode, packet, connection):
+    global CONS
+    
+    if mode=='est':
+        if not connection.has_key('con_id'):
+            connection['con_id'] = CONS
+            CONS +=1
+            connection['reverse']['con_id'] = CONS
+            CONS +=1
+
+            connection['data'] = CachedWriter("%s/S%s" % (options.prefix, connection['con_id']))
+            connection['reverse']['data'] = CachedWriter("%s/S%s" % (options.prefix, connection['reverse']['con_id']))
+
+        tcp = packet.find_type("TCP")
+        if tcp.data_len > 0:
+            Callback('data', packet, connection)
+            
+    if mode=='data':
+        tcp = packet.find_type("TCP")
+        data = tcp.data
+        fd = connection['data']
+        if data: fd.write(data)
+
+    if mode=='destroy':
+        try:
+            fd = connection['data']
+            fd.write_to_file()
+        except KeyError: pass
+
+        try:
+            fd = connection['reverse']['data']
+            fd.write_to_file()
+        except KeyError: pass
 
 def tcp_callback(s):
     l =0
@@ -81,22 +114,13 @@ def tcp_callback(s):
 
         stats_fd.write("%s\n" % ','.join(tmp))
 
-hashtbl = reassembler.init(options.prefix,0)
-reassembler.set_tcp_callback(hashtbl, tcp_callback)
-
-count = 0
+processor = reassembler.Reassembler(packet_callback = Callback)
 for f in args:
-    fd = open(f,'r')
-    buffer = Buffer(fd=fd)
-    header = PCAP.FileHeader(buffer)
-    for p in header:
-        data = p.payload()
-        d = _dissect.dissect(data,header['linktype'], count)
-        count+=1
+    pcap_file = pypcap.PyPCAP(open(f))
+    while 1:
         try:
-            reassembler.process_packet(hashtbl, d)
-        except Exception,e:
-            pyflaglog.log(pyflaglog.DEBUG, "%s" % e)
+            packet = pcap_file.dissect()
+            processor.process(packet)
+        except StopIteration: break
 
-# Finish it up
-reassembler.clear_stream_buffers(hashtbl);
+
