@@ -7,11 +7,19 @@ i.e. data is fed in arbitrary chunks.
 """
 
 import lexer
-import sys
+import sys,re
+
+def decode_entity(string):
+    return re.sub("&#(\d+);", lambda x: chr(int(x.group(1))), string)
 
 class HTMLParser(lexer.Lexer):
     state = "CDATA"
     tokens = [
+        ## Detect HTML comments
+        [ "CDATA", "<!--", "COMMENT_START", "COMMENT" ],
+        [ "COMMENT", "(.*?)-->", "COMMENT", "CDATA" ],
+        [ "COMMENT", ".+", "COMMENT", "COMMENT" ],
+
         [ "CDATA", '[^<]+', "CDATA", "CDATA"],
         [ "CDATA", "<", "TAG_START", "TAG" ],
 
@@ -19,30 +27,31 @@ class HTMLParser(lexer.Lexer):
         [ "TAG", " +", "SPACE", "TAG" ],
         [ "TAG", ">", "END_TAG", "CDATA" ],
 
+        ## Scripts can actually contain lots of <> which confuse us so
+        ## we need to ignore all the dat until the </script>
+        [ "SCRIPT", "(.*?)</script.*?>", "SCRIPT", "CDATA" ],
+        [ "SCRIPT", "(.+)", "SCRIPT", "SCRIPT" ],
+
         ## Identify DTDs: (We dont bother parsing DTDs, just skip
         ## them:
         [ "TAG", "![^-]", "DTD_START", "DTD" ],
         [ 'DTD', '[^>]+>', "DTD", "CDATA" ],
 
-        ## Detect HTML comments
-        [ "TAG", "!--", "COMMENT_START", "COMMENT" ],
-        [ "COMMENT", "(.*?)-->", "COMMENT", "CDATA" ],
-
         ## Identify a self closing tag (e.g. one that ends in />):
         [ "TAG", "/", "CLOSING_TAG", "TAG" ],
 
         ## Identify the tag name
-        [ "TAG", "[^ /<>]+ ?", "TAG_NAME", "ATTRIBUTE LIST"],
+        [ "TAG", "[^ /<>]+", "TAG_NAME", "ATTRIBUTE LIST"],
 
         ## An attribute list is a list of key=value pairs within a tag
-        [ "ATTRIBUTE LIST", "([-a-z0-9A-Z]+) *=", "ATTRIBUTE_NAME", "ATTRIBUTE VALUE"],
-        [ "ATTRIBUTE LIST", ">", "END_TAG","CDATA"],
+        [ "ATTRIBUTE LIST", "([-a-z0-9A-Z]+)\s*=", "ATTRIBUTE_NAME", "ATTRIBUTE VALUE"],
+        [ "ATTRIBUTE LIST", ">", "END_TAG", "CDATA"],
         
         ## Swallow spaces
         [ "ATTRIBUTE LIST", " +", "SPACE", "ATTRIBUTE LIST"],
 
         ## End tag:
-        [ "ATTRIBUTE LIST", "/>", "CLOSING_TAG", "CDATA" ],
+        [ "ATTRIBUTE LIST", "/>", "SELF_CLOSING_TAG,END_TAG", "CDATA" ],
 
         ## Attribute without a value - we look ahead after the name to
         ## confirm that there is no =. The lookahead is important to
@@ -51,37 +60,95 @@ class HTMLParser(lexer.Lexer):
         [ "ATTRIBUTE LIST", r"([-a-z0=9A-Z]+)(?=( [^\s]|[/>]))", "ATTRIBUTE_NAME", "ATTRIBUTE LIST"],
 
         ## Quoted attribute values
-        [ "ATTRIBUTE VALUE", "'([^']+)'|\"([^\"]+)\"", "ATTRIBUTE_VALUE", "ATTRIBUTE LIST" ],
+        [ "ATTRIBUTE VALUE", "(?ms)'([^']+)'|\"([^\"]+)\"", "ATTRIBUTE_VALUE", "ATTRIBUTE LIST" ],
         
         ## Non quoted attribute value
         [ "ATTRIBUTE VALUE", " *([^ <>]+) ?", "ATTRIBUTE_VALUE", "ATTRIBUTE LIST" ],
         ]
 
+    def __init__(self, verbose = 0):
+        lexer.Lexer.__init__(self, verbose)
+        self.root = dict(_children = [], _name='root', _cdata = '', _type ='open')
+        self.stack = [self.root,]
+        self.TAG_START(None, None)
+
     def CDATA(self, token, match):
-        print "CDATA: %r" % match.group(0)
+        self.tag['_cdata'] += match.group(0)
 
     def CLOSING_TAG(self, token, match):
-        self.tag['type'] = 'close'
+        self.tag['_type'] = 'close'
+
+    def SELF_CLOSING_TAG(self, token, match):
+        self.tag['_type'] = 'selfclose'
 
     def TAG_NAME(self, token,match):
-        self.tag['name'] = match.group(0)
+        self.tag['_name'] = match.group(0).lower()
+
+    def SCRIPT(self, token, match):
+        self.tag['_cdata'] += match.group(1)
 
     def ATTRIBUTE_NAME(self, token, match):
         self.current_attribute = match.group(1)
         self.tag[self.current_attribute] = ''
 
     def END_TAG(self, token, match):
-        ## Show use the full tag
-        print self.tag
+        if self.tag['_type']=='close':
+            ## Pop the last tag off the stack
+            del self.stack[-1]
+        else:
+            ## Push the tag into the end of the stack and add it to
+            ## our parent
+            self.stack[-1]['_children'].append(self.tag)
+            if self.tag['_type'] != 'selfclose':
+                self.stack.append(self.tag)
+
+        if self.tag['_name'] == 'script':
+            return "SCRIPT"
 
     def TAG_START(self, token, match):
-        self.tag = {}
-
+        self.tag = dict(_cdata = '', _children=[], _name='', _type='open')
+        
     def ATTRIBUTE_VALUE(self, token, match):
         self.tag[self.current_attribute] = match.group(1) or match.group(2)
 
+    def search(self, tag, _name):
+        """ Generate all objects of given name from the tag provided downwards """
+        for c in tag['_children']:
+            if c['_name'] == _name:
+                yield c
+
+            for match in self.search(c,_name):
+                yield match 
+
+    def find(self, tag, _name, **regex):
+        """ Search all tags below tag for a tag with the name
+        specified and all regexes matching attributes
+        """
+        for m in self.search(tag, _name):
+            failed = False
+            for k,v in regex.items():
+                ## Is the required attribute actually there?
+                if k not in m.keys():
+                    failed = True
+                    break
+
+                ## does it match?
+                if not re.search(v, m[k]):
+                    failed = True
+                    break
+
+            if not failed:
+                return m
+
+    def p(self, tag):
+        result = {}
+        for k,v in tag.items():
+            if k != "_children":
+                result[k] = v
+        print result
+
 if __name__ == '__main__':
-    l = HTMLParser()
+    l = HTMLParser(verbose=0)
 
     if len(sys.argv)==1:
         l.feed("foobar");
@@ -121,3 +188,48 @@ if __name__ == '__main__':
             ## Get all the tokens
             while l.next_token(True): pass
         print "Total error rate %s" % l.error
+
+        ## This is a test for dom navigation
+
+        ## Find the ComposeHeader table:
+        tag = l.find(l.root, 'table', **{"class":'ComposeHeader'})
+
+        ## Iterate over its rows:
+        for row in l.search(tag, 'tr'):
+            try:
+                if not row.has_key('id'): continue
+                
+                if row['id'] == 'From':
+                    option = l.find(row, 'option', selected='.*')
+                    print "From: %s" % decode_entity(option['value'])
+                    
+                elif row['id'] == 'To':
+                    option = l.find(row, 'input', type='text')
+                    if option:
+                        print "To: %s" % decode_entity(option['value'])
+
+                elif row['id'] == 'Cc':
+                    option = l.find(row, 'input', name='fCc')
+                    if option:
+                        print "Cc: %s" % decode_entity(option['value'])
+
+                elif row['id'] == 'Bcc':
+                    option = l.find(row, 'input', name='fBcc')
+                    if option:
+                        print "Bcc: %s" % decode_entity(option['value'])
+
+            except Exception,e:
+                print e
+                pass
+
+        ## Extract the subject:
+        option = l.find(tag, 'input', type='text', name='fSubject')
+        if option:
+            print "Subject: %s" % decode_entity(option['value'])
+
+        ## Now extract the content of the email:
+        for s in l.search(l.root,'script'):
+            m=re.match("document\.getElementById\(\"fEditArea\"\)\.innerHTML='([^']*)'", s['_cdata'])
+            if m:
+                print "Message: %s" % m.group(1).decode("string_escape")
+                break

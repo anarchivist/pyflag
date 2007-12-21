@@ -73,6 +73,10 @@ class IOSourceMethod(IO.FileHandler):
     For example:
 
     io://Advanced/filename=image.dd&offset=0
+
+    This allows us to specify an io source everywhere a file is
+    required. For example this is useful for a raid set which has each
+    disk compressed, or a log file which is compressed using ewf etc.
     """
     method = "io"
 

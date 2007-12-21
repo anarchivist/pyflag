@@ -263,7 +263,6 @@ class Pool(Queue):
     def connect(self):
         """ Connect specified case and return a new connection handle """
         global db_connections
-        db_connections +=1
         pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "New Connection to DB %s. We now have %s in total" % (self.case,
                                                                                                      db_connections, ))
         
@@ -299,6 +298,7 @@ class Pool(Queue):
             dbh = MySQLdb.Connect(**args)
             mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBUNIXSOCKET)
 
+        db_connections +=1
         return (dbh,mysql_bin_string)
 
 class DBO:

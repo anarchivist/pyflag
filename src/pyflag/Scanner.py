@@ -58,6 +58,7 @@ class BaseScanner:
         """
         self.inode = inode
         self.fd=fd
+        self.inode_id = self.fd.lookup_id()
         self.size = 0
         self.ddfs = ddfs
         self.case=outer.case
@@ -294,7 +295,7 @@ class StoreAndScanType(StoreAndScan):
             mime_type = metadata['mime']
         except KeyError:
             dbh = DB.DBO(self.case)
-            dbh.execute("select mime,type from type where inode=%r limit 1",(self.inode))
+            dbh.execute("select mime,type from type where inode_id=%r limit 1",(self.inode_id))
             row=dbh.fetch()
             if row:
                 mime_type = row['mime']

@@ -277,7 +277,6 @@ class HTMLSanitiser(HTMLParser.HTMLParser):
             return "%s" % query_type(case=self.case, family="Network Forensics",
                                      report="ViewFile", inode=row['inode'])
 
-        print original_reference, reference
         return '#original reference=%s' % original_reference
 
     def handle_data(self,data):

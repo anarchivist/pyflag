@@ -232,7 +232,7 @@ class HTTPScanner(StreamScannerFactory):
         description = "Network Scanners"
         name = "NetworkScanners"
         contains = [ "IRCScanner", "MSNScanner", "HTTPScanner", "POPScanner",
-                     "SMTPScanner","RFC2822", "YahooScanner" ]
+                     "SMTPScanner","RFC2822", "YahooScanner", "LiveScanner" ]
         default = True
         special_fs_name = 'PCAPFS'
 
@@ -269,6 +269,9 @@ class HTTPScanner(StreamScannerFactory):
                                 id = id,
                                 key = key,
                                 value = value)
+                
+            ## FIXME: Implement form-multipart parsing too
+
 
         insert_query(query)
         if request['method']=='POST':

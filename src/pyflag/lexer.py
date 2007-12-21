@@ -42,11 +42,12 @@ class Lexer:
     def __init__(self, verbose=0, fd=None):
         if not self.verbose:
             self.verbose = verbose
-        
-        for row in self.tokens:
-            row.append(re.compile(row[0], re.DOTALL))
-            row.append(re.compile(row[1], re.DOTALL))
 
+        if len(self.tokens[0])==4:
+            for row in self.tokens:
+                row.append(re.compile(row[0], re.DOTALL))
+                row.append(re.compile(row[1], re.DOTALL | re.M | re.S))
+                
         self.fd = fd
 
     def save_state(self, t=None, m=None):
@@ -98,7 +99,7 @@ class Lexer:
             ## Does the rule apply for us now?
             if state.match(current_state):
                 if self.verbose > 2:
-                    print "Trying to match %r with %r" % (self.buffer[:10], re_str)
+                    print "%s: Trying to match %r with %r" % (self.state, self.buffer[:10], re_str)
                     
                 m = regex.match(self.buffer)
                 if m:
@@ -156,7 +157,7 @@ class Lexer:
             print "Default handler: %s with %r" % (token,match.group(0))
 
     def ERROR(self, message = None, weight =1):
-        if message:
+        if self.verbose > 0 and message:
             print "Error(%s): %s" % (weight,message)
 
         self.error += weight
