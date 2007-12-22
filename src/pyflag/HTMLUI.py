@@ -486,26 +486,26 @@ class HTMLUI(UI.GenericUI):
 
                 ## Mark the currently opened branch especially
                 img_class = 'PyFlagTreeNode'
-                img_src = '/images/treenode_blank.gif'
+                img_src = 'images/treenode_blank.gif'
                 
                 if 'branch' in state:
                     if depth < len(branch) and name == branch[depth]:
-                        img_src = '/images/treenode_expand_minus.gif'
+                        img_src = 'images/treenode_expand_minus.gif'
                     else:
-                        img_src = '/images/treenode_expand_plus.gif'
+                        img_src = 'images/treenode_expand_plus.gif'
 
                 if 'up' in state:
-                    img_src = '/images/up.png'
+                    img_src = 'images/up.png'
                 elif 'down' in state:
-                    img_src = '/images/down.png'
+                    img_src = 'images/down.png'
 
                 ## We ensure to not draw vertical lines past the end
                 ## of the tree
                 if 'end' in state:
                     img_class = 'PyFlagTreeNodeEnd'
-                    preamble += "<img class='PyFlagTreeSpacer' src='/images/treenode_blank.gif'>"
+                    preamble += "<img class='PyFlagTreeSpacer' src='images/treenode_blank.gif'>"
                 else:
-                    preamble += "<img class='PyFlagTreeVerticalLine' src='/images/treenode_blank.gif'>"
+                    preamble += "<img class='PyFlagTreeVerticalLine' src='images/treenode_blank.gif'>"
 
                 result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img class=%r src='%s'>" % (cb,query['right_pane_cb'],quote(link.__str__()), img_class, img_src)
 
@@ -583,8 +583,8 @@ class HTMLUI(UI.GenericUI):
             left_cb = query.getarray('callback_stored')[-1]
             right_pane_cb = query['right_pane_cb']
             result.result+="<div class='PyFlagTree' >"
-            result.result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img class=PyFlagTreeNodeEnd src='/images/treenode_expand_plus.gif'></a>/" % (left_cb,query['right_pane_cb'],link.__str__())
-            result.result+=draw_branch(0,"<img class='PyFlagTreeSpacer' src='/images/treenode_blank.gif'>",query)
+            result.result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img class=PyFlagTreeNodeEnd src='images/treenode_expand_plus.gif'></a>/" % (left_cb,query['right_pane_cb'],link.__str__())
+            result.result+=draw_branch(0,"<img class='PyFlagTreeSpacer' src='images/treenode_blank.gif'>",query)
             try:
                 result.result+="<script>document.body.scrollTop = %s; document.body.scrollLeft = %s;</script>\n" % (query['yoffset'], query['xoffset'])
             except:
@@ -634,7 +634,7 @@ class HTMLUI(UI.GenericUI):
         
     def iframe(self, target, callback):
         self.result += """<iframe id='%s' name='%s' class=TreeFrame></iframe>
-        <script>AdjustHeightToPageSize('%s');document.getElementById('%s').src='/iframe?callback_stored=%s&__pyflag_parent=' + window.__pyflag_parent + '&__pyflag_name=' + window.__pyflag_name;</script>
+        <script>AdjustHeightToPageSize('%s');document.getElementById('%s').src='iframe?callback_stored=%s&__pyflag_parent=' + window.__pyflag_parent + '&__pyflag_name=' + window.__pyflag_name;</script>
         """ % (target,target,target,target,callback)
         
     def new_toolbar(self):
@@ -701,7 +701,7 @@ class HTMLUI(UI.GenericUI):
                     if found and len(tmp)>config.MAXTREESIZE:
                         tree_array += tmp
                         if len(tmp) > config.MAXTREESIZE:
-                            tree_array.append((depth,tmp[-1][1],'<img src=/images/down.png border=0> ...','special'))
+                            tree_array.append((depth,tmp[-1][1],'<img src=images/down.png border=0> ...','special'))
                         return
 
                     #Do we find the current item in the list?
@@ -713,7 +713,7 @@ class HTMLUI(UI.GenericUI):
                             start = 0
                         else:
                             start = match_pos - config.MAXTREESIZE
-                            tree_array.append((depth,tmp[start-1][1],'<img src=/images/up.png border=0> ...','special'))
+                            tree_array.append((depth,tmp[start-1][1],'<img src=images/up.png border=0> ...','special'))
                         
                         tree_array += tmp[start:]
                         tmp = []
@@ -732,7 +732,7 @@ class HTMLUI(UI.GenericUI):
             split =  tmp[:config.MAXTREESIZE]
             tree_array += split
             if len(split) == config.MAXTREESIZE:
-                tree_array.append( (depth,split[-1][1],'<img src=/images/down.png border=0> ...','special'))
+                tree_array.append( (depth,split[-1][1],'<img src=images/down.png border=0> ...','special'))
 
         #### End draw_branch
 
@@ -1029,13 +1029,13 @@ class HTMLUI(UI.GenericUI):
                     tmp = self.__class__(self)
                     new_query.set('order', e)
                     new_query.set('direction',0)
-                    tmp.link("%s<img src='/images/increment.png'>" % n, target= new_query, pane='self')
+                    tmp.link("%s<img src='images/increment.png'>" % n, target= new_query, pane='self')
                     self.result+="<th>%s</th>" % tmp
                 else:
                     tmp = self.__class__(self)
                     new_query.set('order', e)
                     new_query.set('direction',1)
-                    tmp.link("%s<img src='/images/decrement.png'>" % n, target= new_query, pane='self')
+                    tmp.link("%s<img src='images/decrement.png'>" % n, target= new_query, pane='self')
                     self.result+="<th>%s</th>" % tmp
             else:
                 tmp = self.__class__(self)
@@ -1440,7 +1440,7 @@ class HTMLUI(UI.GenericUI):
         for k,v in hiddens.items():
             self.form_parms[k]=v
 
-        self.result += '<form id="pyflag_form_1" name="pyflag_form_1" method=POST action="/f" enctype="multipart/form-data">\n'
+        self.result += '<form id="pyflag_form_1" name="pyflag_form_1" method=POST action="f" enctype="multipart/form-data">\n'
 
     def submit(self, value='Submit',name='__submit__', target='self', **opts):
         """ Put submit buttons """
@@ -1458,7 +1458,7 @@ class HTMLUI(UI.GenericUI):
         ## Do not propagate __ parameters:
         for k,v in self.form_parms:
             if not k.startswith("__"):
-                base += "<input type=hidden name='%s' value='%s'>\n" % (k,urlencode(v))
+                base += "<input type=hidden name='%s' value=\"%s\">\n" % (k,cgi.escape(v, True))
 
         base += self.submit(value,name, target=self.form_target, **opts)
 

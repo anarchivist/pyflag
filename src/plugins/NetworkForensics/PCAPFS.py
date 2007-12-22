@@ -141,26 +141,10 @@ class PCAPFS(DBFS):
         else:
             return -1
 
-    def load(self, mount_point, iosource_name,scanners = None):
-        DBFS.load(self, mount_point, iosource_name)
-        
-        ## Open the file descriptor
-        self.fd = IO.open(self.case, iosource_name)
-
-        ## Use the C implementation to read the pcap files:
-        pcap_file = pypcap.PyPCAP(self.fd)
-
-        ## Build our streams:
-        pyflaglog.log(pyflaglog.DEBUG, "Reassembling streams, this might take a while")
-
+    def make_processor(self, iosource_name, scanners):
         ## We manage a number of tables here with mass insert:
-        connection_dbh = DB.DBO(self.case)
-        connection_dbh.mass_insert_start("connection")
-        
-        pcap_dbh = DB.DBO(self.case)
-        pcap_dbh.mass_insert_start("pcap")
-
         packet_handlers = [ x(self.case) for x in Registry.PACKET_HANDLERS.classes ]
+        dbh = DB.DBO(self.case)
 
         def Callback(mode, packet, connection):
             """ This callback is called for each packet with the following modes:
@@ -172,22 +156,19 @@ class PCAPFS(DBFS):
             if mode=='est':
                 tcp = packet.find_type("TCP")
                 ip = packet.find_type("IP")
-                
-#                print "Got new connection from %s:%s -> %s:%s" % (ip.source_addr, tcp.source,
-#                                                                  ip.dest_addr, tcp.dest)
 
                 ## Connection id have not been set yet:
                 if not connection.has_key('con_id'):
                     ## We insert a null value so we can get a valid
                     ## autoincrement id. We later update the row with
                     ## real data.
-                    connection_dbh.insert('connection_details', _fast=True,
-                                          src_ip=0)
-                    forward_con_id = connection_dbh.autoincrement()
+                    dbh.insert('connection_details', _fast=True,
+                               src_ip=0)
+                    forward_con_id = dbh.autoincrement()
 
-                    connection_dbh.insert('connection_details', _fast=True,
-                                          src_ip=0)
-                    reverse_con_id = connection_dbh.autoincrement()
+                    dbh.insert('connection_details', _fast=True,
+                               src_ip=0)
+                    reverse_con_id = dbh.autoincrement()
 
                     connection['con_id'] = forward_con_id;
                     connection['reverse']['con_id'] = reverse_con_id;
@@ -205,24 +186,24 @@ class PCAPFS(DBFS):
 
                 ## Record the stream in our database:
                 connection['mtime'] = packet.ts_sec
-                connection_dbh.update('connection_details',
-                                      where="con_id='%s'" % connection['con_id'],
-                                      reverse = connection['reverse']['con_id'],
-
-                                      ## This is the src address as an int
-                                      src_ip=ip.src,
-                                      src_port=tcp.source,
-                                      dest_ip=ip.dest,
-                                      dest_port=tcp.dest,
-                                      isn=tcp.seq,
-                                      inode='I%s|S%s' % (iosource_name, connection['con_id']),
-                                      _ts_sec="from_unixtime('%s')" % connection['mtime'],
-                                      _fast = True
-                                      )
+                dbh.update('connection_details',
+                           where="con_id='%s'" % connection['con_id'],
+                           reverse = connection['reverse']['con_id'],
+                           
+                           ## This is the src address as an int
+                           src_ip=ip.src,
+                           src_port=tcp.source,
+                           dest_ip=ip.dest,
+                           dest_port=tcp.dest,
+                           isn=tcp.seq,
+                           inode='I%s|S%s' % (iosource_name, connection['con_id']),
+                           _ts_sec="from_unixtime('%s')" % connection['mtime'],
+                           _fast = True
+                           )
 
                 ## This is where we write the data out
                 connection['data'] = CachedWriter(
-                    FlagFramework.get_temp_path(connection_dbh.case,
+                    FlagFramework.get_temp_path(dbh.case,
                                                 "I%s|S%s" % (iosource_name, connection['con_id']))
                     )
 
@@ -239,15 +220,15 @@ class PCAPFS(DBFS):
                 except TypeError:
                     datalen = 0
 
-                pcap_dbh.insert("connection",
-                                con_id = connection['con_id'],
-                                packet_id = packet.id,
-                                cache_offset = fd.offset,
-                                length = datalen,
-                                seq = tcp.seq,
-                                _fast=True
-                                )
-
+                dbh.insert("connection",
+                           con_id = connection['con_id'],
+                           packet_id = packet.id,
+                           cache_offset = fd.offset,
+                           length = datalen,
+                           seq = tcp.seq,
+                           _fast=True
+                           )
+                
                 if data: fd.write(data)
 
             elif mode=='destroy':
@@ -301,28 +282,52 @@ class PCAPFS(DBFS):
                 
         ## Create a new reassembler with this callback
         processor = reassembler.Reassembler(packet_callback = Callback)
+        return processor
+
+    def load(self, mount_point, iosource_name,scanners = None):
+        DBFS.load(self, mount_point, iosource_name)
+        
+        ## Open the file descriptor
+        self.fd = IO.open(self.case, iosource_name)
+
+        ## Use the C implementation to read the pcap files:
+        pcap_file = pypcap.PyPCAP(self.fd)
+
+        ## Build our streams:
+        pyflaglog.log(pyflaglog.DEBUG, "Reassembling streams, this might take a while")
+        pcap_dbh = DB.DBO(self.case)
+        pcap_dbh.mass_insert_start("pcap")
+
+        pcap_dbh.execute("select max(id) as m from pcap")
+        max_id = pcap_dbh.fetch()['m'] or 0
+        processor = self.make_processor(iosource_name, scanners)
 
         ## Process the file with it:
         while 1:
             try:
                 packet = pcap_file.dissect()
-                ## Record the packet in the pcap table:
-                pcap_dbh.insert("pcap",
-                                iosource = iosource_name,
-                                offset = packet.offset,
-                                length = packet.caplen,
-                                _ts_sec =  "from_unixtime('%s')" % packet.ts_sec,
-                                ts_usec = packet.ts_usec,
-                                _fast=True,
-                                )
+                max_id += 1
 
-                pcap_id = pcap_dbh.autoincrement()
+                ## FIXME - this is a bottleneck. For now we use mass
+                ## insert but this will break when we have multiple
+                ## concurrent loaders.  Record the packet in the pcap
+                ## table:
+                pcap_dbh.mass_insert(
+                    iosource = iosource_name,
+                    offset = packet.offset,
+                    length = packet.caplen,
+                    _ts_sec =  "from_unixtime('%s')" % packet.ts_sec,
+                    ts_usec = packet.ts_usec,
+                    )
+                
+                #pcap_id = pcap_dbh.autoincrement()
+                pcap_id = max_id
                 pcap_file.set_id(pcap_id)
+
                 
                 ## Some progress reporting
                 if pcap_id % 10000 == 0:
                     pyflaglog.log(pyflaglog.DEBUG, "processed %s packets (%s bytes)" % (pcap_id, packet.offset))
-
 
                 processor.process(packet)
             except StopIteration:

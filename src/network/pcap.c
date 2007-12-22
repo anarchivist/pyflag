@@ -6,6 +6,7 @@
 int PcapFileHeader_Read(Packet self, StringIO input) {
   PcapFileHeader this = (PcapFileHeader)self;
   int len;
+  int offset = input->readptr;
 
   // We start off trying to read the header as big endian
   len = this->__super__->Read(self, input);
@@ -18,7 +19,7 @@ int PcapFileHeader_Read(Packet self, StringIO input) {
     self->format = this->le_format;
 
     // Rewind the stream:
-    CALL(input, seek, 0, 0);
+    CALL(input, seek, offset, 0);
 
     // Reread the data:
     len = this->__super__->Read(self,input);

@@ -199,7 +199,7 @@ function post_link(query, target_name) {
 
   var form = document.createElement('form');
   form.setAttribute('method','Post');
-  form.setAttribute('action','/post');
+  form.setAttribute('action','post');
   form.setAttribute('target',target_window.name);
 
   var input = document.createElement('input');

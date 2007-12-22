@@ -40,9 +40,9 @@ class Menu(Theme.BasicTheme):
         left = result.__class__(result)
         tmp = result.__class__(result)
         tmp.icon("logo.png")
-        left.link(tmp,url="http://pyflag.sourceforge.net/")
+        left.link(tmp,url="http://www.pyflag.net/")
         right = result.__class__(result)
-        right.text("PyFlag is a GPL Project maintained at http://pyflag.sourceforge.net/ . \nThis is %s" % config.VERSION ,style="red",font="bold")
+        right.text("PyFlag is a GPL Project maintained at http://www.pyflag.net/ . \nThis is version %s" % config.VERSION ,style="red",font="bold")
         result.row(tmp,right,align="center")
 
         return result
@@ -67,7 +67,7 @@ class Menu(Theme.BasicTheme):
         <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
         </head>
         <body style="overflow: auto;">
-        <script src="/javascript/functions.js" type="text/javascript" language="javascript"></script>'''
+        <script src="javascript/functions.js" type="text/javascript" language="javascript"></script>'''
         if toolbar_str:
             result += '''<div class=PyFlagHeader>
             <div class=Toolbar> %s </div>
@@ -101,7 +101,7 @@ class Menu(Theme.BasicTheme):
             <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
             <title>%s</title>
             <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
-            <script src="/javascript/functions.js" type="text/javascript" language="javascript"></script>
+            <script src="javascript/functions.js" type="text/javascript" language="javascript"></script>
             <script> window.__pyflag_parent = "main"; window.__pyflag_name = "main"; </script>
           </head>
         <body>\n''' % title

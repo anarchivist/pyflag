@@ -68,7 +68,7 @@ thead th {
 
 /** General Page layout */
 div.PyFlagHeader { 
-  background-image: url(/images/toolbar-bg.gif);
+  background-image: url(toolbar-bg.gif);
   width: 100%;
   height: 32px;
 }
@@ -148,15 +148,15 @@ img.PyFlagTreeSpacer, img.PyFlagTreeVerticalLine, img.PyFlagTreeNode, img.PyFlag
 }
 
 img.PyFlagTreeVerticalLine { 
-  background-image: url(/images/treenode_grid_v.gif);
+  background-image: url(treenode_grid_v.gif);
 }
 
 img.PyFlagTreeNode { 
-  background-image: url(/images/treenode_grid_t.gif);
+  background-image: url(treenode_grid_t.gif);
 }
 
 img.PyFlagTreeNodeEnd { 
-  background-image: url(/images/treenode_grid_l.gif);
+  background-image: url(treenode_grid_l.gif);
 }
 
 span.PyFlagTreeSelected { 
@@ -182,7 +182,7 @@ table.MenuBar, table.PopupMenu {
 
 table.MenuBar { 
   background-color:	#A9CCFE;
-  background-image: url(/images/soriaMenuBg.gif);
+  background-image: url(soriaMenuBg.gif);
   width: 100%;
   height: 29px;
   vertical-align: middle;
@@ -229,7 +229,7 @@ div.TabContent {
   margin-bottom : 0px;
   padding-left : 9px;
   border-bottom : 1px solid #6290d2;
-  background : url(/images/tab_left.gif) no-repeat left top;
+  background : url(tab_left.gif) no-repeat left top;
   white-space: nowrap;
 }
 
@@ -245,7 +245,7 @@ div.TabContent {
   z-index: 3;
   display : block;
   padding : 4px 15px 4px 6px;
-  background : url(/images/tab_top_right.gif) no-repeat right top;
+  background : url(tab_top_right.gif) no-repeat right top;
   color : #333;
   font-size : 90%;
 }

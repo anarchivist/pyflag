@@ -565,7 +565,7 @@ class Flag:
 
                 elif "Access denied" in error or "Unable to connect" in error:
                     report = Registry.REPORTS.dispatch("Configuration",
-                                                       "Configure")
+                                                       "Pyflag Configuration")
                     query['highlight'] = 'dbpasswd'
 
                 ## Set some helpful hints:
@@ -590,9 +590,10 @@ class Flag:
                 report.form(query,result)
                 result.end_table()
                 result.end_form('Submit')
+                
+            config_checked = True
             return True
 
-        config_checked = True
         return False
                 
 class HexDump:
