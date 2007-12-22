@@ -88,6 +88,8 @@
   _(FIELD_TYPE_INT)				\
        _(FIELD_TYPE_INT_64)			\
        _(FIELD_TYPE_INT_X)			\
+       _(FIELD_TYPE_INT32)			\
+       _(FIELD_TYPE_INT32_X)			\
        _(FIELD_TYPE_INT_X_64)			\
        _(FIELD_TYPE_CHAR)			\
        _(FIELD_TYPE_CHAR_X)			\

@@ -216,8 +216,8 @@ VIRTUAL(IP, Packet)
 
      NAME_ACCESS(packet, header.saddr, source_addr, FIELD_TYPE_IP_ADDR);
      NAME_ACCESS(packet, header.daddr, dest_addr, FIELD_TYPE_IP_ADDR);
-     NAME_ACCESS(packet, _src, src, FIELD_TYPE_INT);
-     NAME_ACCESS(packet, _dest, dest, FIELD_TYPE_INT);
+     NAME_ACCESS(packet, _src, src, FIELD_TYPE_INT32);
+     NAME_ACCESS(packet, _dest, dest, FIELD_TYPE_INT32);
      NAME_ACCESS(packet, header.ttl, ttl, FIELD_TYPE_CHAR);
      NAME_ACCESS(packet, header.protocol, protocol, FIELD_TYPE_CHAR);
      NAME_ACCESS(packet, header.id, id, FIELD_TYPE_SHORT);
@@ -263,8 +263,8 @@ VIRTUAL(TCP, Packet)
 
      NAME_ACCESS(packet, header.source, source, FIELD_TYPE_SHORT);
      NAME_ACCESS(packet, header.dest, dest, FIELD_TYPE_SHORT);
-     NAME_ACCESS(packet, header.seq, seq, FIELD_TYPE_INT);
-     NAME_ACCESS(packet, header.ack_seq, ack_seq, FIELD_TYPE_INT);
+     NAME_ACCESS(packet, header.seq, seq, FIELD_TYPE_INT32);
+     NAME_ACCESS(packet, header.ack_seq, ack_seq, FIELD_TYPE_INT32);
      NAME_ACCESS(packet, len, len, FIELD_TYPE_INT);
      NAME_ACCESS(packet, header.window, window, FIELD_TYPE_SHORT);
      NAME_ACCESS(packet, data_offset, data_offset, FIELD_TYPE_INT);

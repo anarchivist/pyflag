@@ -76,6 +76,8 @@ static int PyPCAP_init(PyPCAP *self, PyObject *args, PyObject *kwds) {
 
   //Fill it up:
   if(PyPCAP_fill_buffer(self, fd)<=0) {
+      PyErr_Format(PyExc_IOError, 
+		   "Cant read file");
     goto fail;
   };
 

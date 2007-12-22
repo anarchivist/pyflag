@@ -214,6 +214,10 @@ static PyObject *get_field(PyObject *self, PyObject *args) {
     case FIELD_TYPE_INT_X:
       result = PyLong_FromUnsignedLong(*(unsigned int *)item); break;
 
+    case FIELD_TYPE_INT32:
+    case FIELD_TYPE_INT32_X:
+      result = PyLong_FromUnsignedLong(*(uint32_t *)item); break;
+
     case FIELD_TYPE_IP_ADDR:
       {
 	struct in_addr temp;
