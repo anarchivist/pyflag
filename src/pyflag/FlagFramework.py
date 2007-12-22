@@ -590,10 +590,9 @@ class Flag:
                 report.form(query,result)
                 result.end_table()
                 result.end_form('Submit')
-                
-            config_checked = True
             return True
 
+        config_checked = True
         return False
                 
 class HexDump:

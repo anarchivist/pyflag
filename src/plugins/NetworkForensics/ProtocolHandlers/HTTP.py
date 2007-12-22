@@ -245,6 +245,7 @@ class HTTPScanner(StreamScannerFactory):
         dbh.execute("delete from http")
 
     def parse_date_time_string(self, s):
+        if not s: return 0
         try:
             return time.mktime(time.strptime(s, "%a, %d %b %Y %H:%M:%S %Z"))
         except:

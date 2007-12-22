@@ -19,6 +19,7 @@ edit = sed \
 	-e 's,@datadir\@,$(pkgdatadir),gi' \
 	-e 's,@sysconfdir\@,$(sysconfdir),gi' \
 	-e 's,@pkgpyexec\@,$(pkgpyexecdir),gi' \
+	-e 's,@pkgpythondir\@,$(pkgpythondir),gi' \
 	-e 's,@pythondir\@,$(pythondir),gi' \
 	-e 's,@prefix\@,$(prefix),gi' \
 	-e 's,@bin\@,$(bindir),gi' \

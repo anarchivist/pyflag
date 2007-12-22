@@ -78,8 +78,6 @@ class ViewFile(Reports.report):
             content_type = m.buffer(fd.read(1024))
             fd.seek(0)
 
-        print content_type
-
         ## Now establish the dispatcher for it
         for k,v in self.dispatcher.items():
             if k.search(content_type):

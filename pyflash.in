@@ -2,5 +2,5 @@
 
 ## This is required in case the prefix is not /usr/ (otherwise python
 ## can find it itself) 
-export PYTHONPATH=@pythondir@:@pythondir@/pyflag/
-exec @python@ @pkgpyexec@/pyflagsh.py $@
+export PYTHONPATH=@pythondir@:@pythondir@/pyflag/:@pkgpyexec@:@pkgpyexec@/pyflag
+exec @python@ @pkgpythondir@/pyflagsh.py $@

@@ -56,10 +56,11 @@ class LiveTables(FlagFramework.EventHandler):
             `Message` Text,
             primary key (`id`))""")
 
-class LiveScanner(Scanner.GenScanFactory):
+class HotmailScanner(Scanner.GenScanFactory):
     """ Detects Live.com/Hotmail web mail sessions """
     default = True
-
+    depends = ['TypeScan']
+    
     class Scan(Scanner.StoreAndScanType):
         types = (
             'text/html',
@@ -101,25 +102,21 @@ class LiveScanner(Scanner.GenScanFactory):
                 try:
                     if row['id'] == 'From':
                         option = self.parser.find(row, 'option', selected='.*')
-                        print "From: %s" % decode_entity(option['value'])
                         result['From'] = decode_entity(option['value'])
                         
                     elif row['id'] == 'To':
                         option = self.parser.find(row, 'input', type='text')
                         if option:
-                            print "To: %s" % decode_entity(option['value'])
                             result['To'] = decode_entity(option['value'])
                             
                     elif row['id'] == 'Cc':
                         option = self.parser.find(row, 'input', name='fCc')
                         if option:
-                            print "Cc: %s" % decode_entity(option['value'])
                             result['Cc'] = decode_entity(option['value'])
 
                     elif row['id'] == 'Bcc':
                         option = self.parser.find(row, 'input', name='fBcc')
                         if option:
-                            print "Bcc: %s" % decode_entity(option['value'])
                             result['Bcc'] = decode_entity(option['value'])
                             
                 except KeyError:
@@ -128,14 +125,12 @@ class LiveScanner(Scanner.GenScanFactory):
             ## Extract the subject:
             option = self.parser.find(tag, 'input', type='text', name='fSubject')
             if option:
-                print "Subject: %s" % decode_entity(option['value'])
                 result['Subject'] = decode_entity(option['value'])
 
             ## Now extract the content of the email:
             for s in self.parser.search(self.parser.root,'script'):
                 m=re.match("document\.getElementById\(\"fEditArea\"\)\.innerHTML='([^']*)'", s['_cdata'])
                 if m:
-                    print "Message: %s" % m.group(1).decode("string_escape")
                     result['Message'] = m.group(1).decode("string_escape")
                     break
 

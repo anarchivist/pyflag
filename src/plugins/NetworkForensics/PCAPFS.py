@@ -145,6 +145,10 @@ class PCAPFS(DBFS):
         ## We manage a number of tables here with mass insert:
         packet_handlers = [ x(self.case) for x in Registry.PACKET_HANDLERS.classes ]
         dbh = DB.DBO(self.case)
+        pdbh = DB.DBO()
+        pdbh.mass_insert_start('jobs')
+        scanner_string = ','.join(scanners)
+        cookie = int(time.time())
 
         def Callback(mode, packet, connection):
             """ This callback is called for each packet with the following modes:
@@ -249,6 +253,16 @@ class PCAPFS(DBFS):
                             _mtime = connection['mtime'],
                             _fast = True
                             )
+                        
+                        if scanners:
+                            pdbh.mass_insert(
+                                command = 'Scan',
+                                arg1 = self.case,
+                                arg2 = new_inode,
+                                arg3= scanner_string,
+                                cookie=cookie,
+                                )
+
                 except KeyError: pass
 
                 try:
@@ -267,6 +281,15 @@ class PCAPFS(DBFS):
                             _mtime = connection['reverse']['mtime'],
                             _fast = True
                             )
+
+                        if scanners:
+                            pdbh.mass_insert(
+                                command = 'Scan',
+                                arg1 = self.case,
+                                arg2 = new_inode,
+                                arg3= scanner_string,
+                                cookie=cookie,
+                                )
 
                 except KeyError: pass
 

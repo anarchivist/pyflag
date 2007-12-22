@@ -39,13 +39,12 @@ class ViewCaseReport(Reports.report):
     def display(self,query,result):
         def Annotated_inodes(query, result):
             result.table(
-                elements = [ InodeType('Inode', 'annotate.inode', case=query['case']),
-                             FilenameType(case=query['case']),
+                elements = [ InodeType('Inode', 'inode', case=query['case']),
+                             FilenameType(case=query['case'], table='annotate'),
                              StringType('Category','category'),
                              StringType('Note','note'),
                              ],
-                table = 'annotate,file',
-                where = 'file.inode=annotate.inode',
+                table = 'annotate',
                 case = query['case'],
                 )
 
