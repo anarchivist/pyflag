@@ -59,6 +59,9 @@ config.add_option("sleep", default=60, type="int",
 config.add_option("scanners", default='HTTPScanner,HotmailScanner,MSNScanner,IRCScanner,POPScanner',
                   help='A comma delimited string of scanners to run')
 
+config.add_option("timeout", default=120, type='int',
+                  help="The maximum inactivity time after which the tcp reassembler will be flushed")
+
 config.parse_options(True)
 
 try:
@@ -127,7 +130,11 @@ def load_file(filename):
 
     pyflaglog.log(pyflaglog.INFO, "%s: Processing %s" % (time.ctime(),filename))
 
-    input_file = pypcap.PyPCAP(open(filename))
+    try:
+        input_file = pypcap.PyPCAP(open(filename))
+    except IOError,e:
+        pyflaglog.log(pyflaglog.INFO, "Error reading %s: %s" % (filename, e))
+        return
     
     ## Iterate over all the packets in the file:
     while 1:
@@ -161,6 +168,8 @@ def load_file(filename):
 
     output_fd.flush()
 
+last_time = 0
+
 while 1:
     files = os.listdir(directory)
     files.sort()
@@ -168,6 +177,12 @@ while 1:
         filename = "%s/%s" % (directory,f)
         load_file(filename)
         os.unlink(filename)
+        last_time = time.time()
 
     print "%s: Sleeping for %s seconds" % (time.ctime(), config.sleep)
     time.sleep(config.sleep)
+    ## We need to flush the decoder:
+    if time.time() - last_time > config.timeout:
+        print "Flushing reassembler"
+        processor.flush()
+        last_time = time.time()

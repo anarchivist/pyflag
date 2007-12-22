@@ -248,8 +248,8 @@ class StreamFile(File):
             
             dbh2.execute("""select pcap.ts_sec from pcap,`connection` where pcap.id=connection.packet_id and connection.con_id=%s order by pcap.ts_sec asc limit 1""" % (self.con_id))
             metamtime=dbh2.fetch()['ts_sec']
-        except DB.DBError, e:
-            pyflaglog.log(pyflaglog.ERROR, "Failed to determine mtime of newly combined stream %s" % self.inode)
+        except (DB.DBError, TypeError), e:
+            pyflaglog.log(pyflaglog.WARNING, "Failed to determine mtime of newly combined stream %s" % self.inode)
             metamtime=None
         
         ## Create VFS Entry 

@@ -180,9 +180,18 @@ static PyObject *process(Reassembler *self, PyObject *args) {
   Py_RETURN_NONE;
 };
 
+static PyObject *flush(Reassembler *self, PyObject *args) {
+  // Flush the reassembler:
+  self->hash->flush(self->hash);
+
+  Py_RETURN_NONE;
+};
+
 static PyMethodDef ReassemblerMethods[] = {
   {"process", (PyCFunction)process, METH_VARARGS| METH_KEYWORDS,
    "Process a pcap packet"},
+  {"flush", (PyCFunction)flush, METH_VARARGS| METH_KEYWORDS,
+   "Flush the reassembler"},
   {NULL, NULL, 0, NULL}
 };
 

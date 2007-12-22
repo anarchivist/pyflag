@@ -449,6 +449,22 @@ static void check_for_expired_packets(TCPHashTable self, int id) {
   };
 };
 
+static void TCPHashTable_flush(TCPHashTable self) {
+  TCPStream i;
+  int k;
+
+  for(k=0; k<TCP_STREAM_TABLE_SIZE; k++) {
+    list_for_each_entry(i, &(self->table[k]->list),list) {
+      if(i->direction == TCP_FORWARD) { 
+	talloc_free(i);
+	// We need to break here because the list is no longer
+	// consistant (we may remove 2 items from it).
+	break;
+      };
+    };
+  };
+};
+
 int TCPHashTable_process(TCPHashTable self, PyPacket *packet) {
   IP ip = (IP)find_packet_instance(packet->obj, "IP");
   TCPStream i;
@@ -527,4 +543,5 @@ VIRTUAL(TCPHashTable, Object)
      VMETHOD(Con) = TCPHashTable_Con;
      VMETHOD(find_stream) = TCPHashTable_find_stream;
      VMETHOD(process) = TCPHashTable_process;
+     VMETHOD(flush) = TCPHashTable_flush;
 END_VIRTUAL

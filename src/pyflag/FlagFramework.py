@@ -856,7 +856,8 @@ def delete_case(case):
       #Delete the case from the database
       dbh.delete('meta',"property='flag_db' and value=%r" % case, _fast=True)
       dbh.execute("drop database if exists `%s`" ,case)
-    except DB.DBError:
+    except DB.DBError,e:
+        print e
         pass
 
     ## Delete the temporary directory corresponding to this case and all its content

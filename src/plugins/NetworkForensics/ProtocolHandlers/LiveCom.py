@@ -48,6 +48,7 @@ class LiveTables(FlagFramework.EventHandler):
             """ CREATE table if not exists `live_messages` (
             `id` int not null auto_increment,
             `inode_id` int not null,
+            `type` enum('Edit Read','Edit Sent','Read','Listed') default 'Edit Read',
             `From` VARCHAR(250),
             `To` VARCHAR(250),
             `CC` VARCHAR(250),
@@ -56,10 +57,18 @@ class LiveTables(FlagFramework.EventHandler):
             `Message` Text,
             primary key (`id`))""")
 
+import fnmatch
+
 class HotmailScanner(Scanner.GenScanFactory):
     """ Detects Live.com/Hotmail web mail sessions """
     default = True
     depends = ['TypeScan']
+
+    def multiple_inode_reset(self, inode_glob):
+        Scanner.GenScanFactory.multiple_inode_reset(self, inode_glob)
+        dbh = DB.DBO(self.case)
+        sql = fnmatch.translate(inode_glob)
+        dbh.delete("live_messages", where="inode_id in (select inode_id from inode where inode rlike %r)" % sql) 
     
     class Scan(Scanner.StoreAndScanType):
         types = (
@@ -89,13 +98,21 @@ class HotmailScanner(Scanner.GenScanFactory):
 
         def external_process(self, fd):
             pyflaglog.log(pyflaglog.DEBUG,"Opening %s for Hotmail processing" % self.fd.inode)
-            result = {}
 
             ## Now we should be able to parse the data out:
+            self.process_editread(fd)
+
+        def process_readmessage(self,fd):
+            pass
+
+        def process_editread(self, fd):
             ## Find the ComposeHeader table:
+            result = {'type':'Edit Read', 'inode_id': self.fd.inode_id}
+
             tag = self.parser.find(self.parser.root, 'table', **{"class":'ComposeHeader'})
-            pyflaglog.log(pyflaglog.DEBUG, "Tag ComposeHeader not found in %s" % self.fd.inode)
-            if not tag: return
+            if not tag:
+                #pyflaglog.log(pyflaglog.DEBUG, "Tag ComposeHeader not found in %s" % self.fd.inode)
+                return
             
             ## Iterate over its rows:
             for row in self.parser.search(tag, 'tr'):
@@ -137,6 +154,8 @@ class HotmailScanner(Scanner.GenScanFactory):
             dbh = DB.DBO(self.case)
             dbh.insert('live_messages', **result)
 
+            return True
+
 class LiveComMessages(Reports.report):
     """
     Browse LiveCom/Hotmail messages.
@@ -151,13 +170,15 @@ class LiveComMessages(Reports.report):
 
     def display(self, query, result):
         result.table(
-            elements = [ StringType('From', 'From'),
+            elements = [ TimestampType('Timestamp','http.date'),
+                         StringType('From', 'From'),
                          StringType('To', 'To'),
                          StringType('CC', 'CC'),
                          StringType('BCC', 'BCC'),
                          StringType('Subject', 'Subject'),
                          StringType('Message','Message'),
                          ],
-            table = 'live_messages',
+            table = 'live_messages,http',
+            where = 'http.id=live_messages.id',
             case = query['case']
             )
