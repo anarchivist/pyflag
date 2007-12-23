@@ -32,8 +32,8 @@ VIRTUAL(PcapFileHeader, Packet)
      INIT_STRUCT(header, PCAP_HEADER_STRUCT);
 
      SET_DOCSTRING("PCap file header");
-     NAME_ACCESS(header, linktype, linktype, FIELD_TYPE_INT);
-     NAME_ACCESS(header, snaplen, snaplen, FIELD_TYPE_INT);
+     NAME_ACCESS(header, linktype, linktype, FIELD_TYPE_INT32);
+     NAME_ACCESS(header, snaplen, snaplen, FIELD_TYPE_INT32);
 
      VMETHOD(super.Read) = PcapFileHeader_Read;
      VATTR(le_format) = PCAP_HEADER_STRUCT_LE;
@@ -70,12 +70,12 @@ VIRTUAL(PcapPacketHeader, Packet)
      INIT_STRUCT(header, PCAP_PKTHEADER_STRUCT);
 
      SET_DOCSTRING("Pcap packet header");
-     NAME_ACCESS(header, ts_sec, ts_sec, FIELD_TYPE_INT);
-     NAME_ACCESS(header, ts_usec, ts_usec, FIELD_TYPE_INT);
-     NAME_ACCESS(header, caplen, caplen, FIELD_TYPE_INT);
-     NAME_ACCESS(header, len, len, FIELD_TYPE_INT);
-     NAME_ACCESS(header, offset, offset, FIELD_TYPE_INT);
-     NAME_ACCESS(header, id, id, FIELD_TYPE_INT);
+     NAME_ACCESS(header, ts_sec, ts_sec, FIELD_TYPE_INT32);
+     NAME_ACCESS(header, ts_usec, ts_usec, FIELD_TYPE_INT32);
+     NAME_ACCESS(header, caplen, caplen, FIELD_TYPE_INT32);
+     NAME_ACCESS(header, len, len, FIELD_TYPE_INT32);
+     NAME_ACCESS(header, offset, offset, FIELD_TYPE_INT_64);
+     NAME_ACCESS(header, id, id, FIELD_TYPE_INT32);
      NAME_ACCESS(header, root, root, FIELD_TYPE_PACKET);
      NAME_ACCESS_SIZE(header, data, data, FIELD_TYPE_STRING, len);
 
