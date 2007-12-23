@@ -167,6 +167,8 @@ def load_file(filename):
         output_fd.write(packet_data)
 
     output_fd.flush()
+    pcap_dbh.delete("connection_details",
+                    where = "inode is null")
 
 last_time = 0
 

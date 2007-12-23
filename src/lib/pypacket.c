@@ -50,7 +50,8 @@ static int PyPacket_init(PyPacket *self, PyObject *args) {
 
 static void PyPacket_dealloc(PyPacket *self) {
   // Remove our link from the pointer:
-  talloc_unlink(g_talloc_reference, self->obj);
+  if(self->obj)
+    talloc_unlink(g_talloc_reference, self->obj);
 
   self->ob_type->tp_free((PyObject*)self);
 };
@@ -60,6 +61,10 @@ static PyObject *PyPacket_list_fields(PyPacket *self, PyObject *args) {
   PyObject *list = PyList_New(0);
 
   if(!list) return NULL;
+  if(!self->obj) {
+    Py_DECREF(list);
+    return NULL;
+  };
 
   list_for_each_entry(p, &(self->obj->properties.list), list) {
     if(p->name) {
@@ -251,7 +256,7 @@ static PyObject *PyPacket_serialise(PyPacket *self, PyObject *args) {
   CALL(self->obj, Write, tmp);
 
   // give the results back:
-  result = PyString_FromStringAndSize(tmp->data, tmp->size);
+  result = PyString_FromStringAndSize(tmp->data, (Py_ssize_t)tmp->size);
 
   talloc_free(tmp);
 

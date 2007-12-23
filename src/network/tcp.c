@@ -102,7 +102,7 @@ void TCPStream_add(TCPStream self, PyPacket *packet) {
     };
 
     // We no longer need the object - call its destructor:
-    Py_DECREF(packet);
+    //Py_DECREF(packet);
     return;
   }
 
@@ -112,6 +112,7 @@ void TCPStream_add(TCPStream self, PyPacket *packet) {
   candidate = &(self->queue.list);
 
   /** Take over the packet */
+  Py_INCREF(packet);
   new->packet = packet;
 
   /** Set the destructor function which should be called when the
@@ -533,6 +534,7 @@ int TCPHashTable_process(TCPHashTable self, PyPacket *packet) {
   return 1;
 
  non_ip:
+  self->sorted->state = PYTCP_NON_TCP;
   if(self->callback)
     self->callback(self->sorted, packet);
   

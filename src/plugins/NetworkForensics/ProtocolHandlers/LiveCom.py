@@ -12,26 +12,42 @@ How this works:
 1) We only target inodes with a type of html as well as the regex
 '<title>\s+Windows Live' in the top.
 
-InboxLight pages (pages showing a view of the inbox or another mail folder)
+InboxLight pages (pages showing a view of the inbox or another mail
+folder)
 
-2) We obtain the list of folders by doing some dom navigation (find li with class=FolderItemNormal, get the a below it and extract the FolderID, get the span below that and get the name of the mail box. This gives us a mapping between folder id and mailbox name).
+2) We obtain the list of folders by doing some dom navigation (find li
+with class=FolderItemNormal, get the a below it and extract the
+FolderID, get the span below that and get the name of the mail
+box. This gives us a mapping between folder id and mailbox name).
 
 3) Extract all the messages using some more DOM stuff:
   - Locate a table with class InboxTable, iterate over its rows
-  - for each row, the 5th td is the to field. The mailbox can be found from the a tag there.
-  - The subject is the 6th field. Date is the 7th field. Size is the 8th field.
 
-EditMessageLight - This page is what the user receives when they want to edit a new message.
+  - for each row, the 5th td is the to field. The mailbox can be found
+  from the a tag there.
+
+  - The subject is the 6th field. Date is the 7th field. Size is the
+  8th field.
+
+EditMessageLight - This page is what the user receives when they want
+to edit a new message.
 
 3) Search for a table with class ComposeHeader, iterate over its rows
    - For each row extract the fields from the id attributes:
-     - From tr - find an option tag with selected attribute
-     - To tr, Cc tr, Bcc tr, Subject tr - find an input tag and extract the value attribute
-     - To find the actual context of the message search for script tags, with a regex:
-     document.getElementById\(\"fEditArea\"\).innerHTML='([^']+)'
-     The result needs to be unescaped suitably.
 
-4) When EditMessageLight is called it has a form which submits into itself. To get the post values look at the http_parameters table for that HTTP object id.
+     - From tr - find an option tag with selected attribute
+
+     - To tr, Cc tr, Bcc tr, Subject tr - find an input tag and
+     extract the value attribute
+
+     - To find the actual context of the message search for script
+     tags, with a regex:
+     document.getElementById\(\"fEditArea\"\).innerHTML='([^']+)' The
+     result needs to be unescaped suitably.
+
+4) When EditMessageLight is called it has a form which submits into
+itself. To get the post values look at the http_parameters table for
+that HTTP object id.
 """
 import pyflag.FlagFramework as FlagFramework
 from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType, PacketType
@@ -145,10 +161,18 @@ class HotmailScanner(Scanner.GenScanFactory):
                 result['Subject'] = decode_entity(option['value'])
 
             ## Now extract the content of the email:
+            result['Message'] = ''
+
+            ## Sometimes the message is found in the EditArea div:
+            div = self.parser.find(tag, 'div', **{'class':"EditArea"})
+            if div:
+                result['Message'] += div['_cdata']
+
+            ## On newer sites its injected using script:
             for s in self.parser.search(self.parser.root,'script'):
                 m=re.match("document\.getElementById\(\"fEditArea\"\)\.innerHTML='([^']*)'", s['_cdata'])
                 if m:
-                    result['Message'] = m.group(1).decode("string_escape")
+                    result['Message'] += m.group(1).decode("string_escape")
                     break
 
             dbh = DB.DBO(self.case)

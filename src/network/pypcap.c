@@ -207,7 +207,7 @@ static PyObject *PyPCAP_dissect(PyPCAP *self, PyObject *args, PyObject *kwds) {
   talloc_unlink(self->buffer, root);
   */
   ((PcapPacketHeader)(result->obj))->header.root = root;
-
+  
   return (PyObject *)result;
 };
 

@@ -160,7 +160,6 @@ static PyObject *process(Reassembler *self, PyObject *args) {
   if(!PyArg_ParseTuple(args, "O", &root))
     return NULL;
 
-  Py_INCREF(root);
   // OK we found the ip header - we just load the object into the hash
   // table:
   PyErr_Clear();
