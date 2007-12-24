@@ -169,7 +169,8 @@ class HotmailScanner(Scanner.GenScanFactory):
 
             inode_id = self.ddfs.VFSCreate(self.fd.inode,
                                            "tlive_messages:id:%s" % id,
-                                           "Message", mtime = row['mtime'])
+                                           "Message", mtime = row['mtime'],
+                                           _fast = True)
 
             dbh.update('live_messages',where = 'id = "%s"' % id,
                        inode_id = inode_id)

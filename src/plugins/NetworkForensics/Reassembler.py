@@ -255,7 +255,7 @@ class StreamFile(File):
             metamtime=None
         
         ## Create VFS Entry 
-        fsfd.VFSCreate(None, self.inode, pathname, size=outfd_len, _mtime=metamtime, mtime=metamtime)
+        fsfd.VFSCreate(None, self.inode, pathname, size=outfd_len, mtime=metamtime)
 
         ##  We also now fill in the details for the combined stream in 
         ##  the connection_details table...
