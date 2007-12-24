@@ -143,6 +143,7 @@ class FileSystem:
             sofar.append(part)
             try:
                 retfd = Registry.VFS_FILES.vfslist[part[0]](self.case, retfd, '|'.join(sofar))
+                    
             except IndexError:
                 raise IOError, "Unable to open inode: %s, no VFS" % part
 
@@ -279,12 +280,11 @@ class DBFS(FileSystem):
 
         for t in ['ctime','atime','mtime']:
             try:
-                if not properties["_"+t]: continue
                 inode_properties["_"+t] = "from_unixtime(%r)" % int(properties["_"+t])
-            except ValueError:
-                inode_properties[t] = properties[t]
             except KeyError:
-                pass
+                try:
+                    inode_properties[t] = properties[t]
+                except KeyError: pass
 
         dbh.insert('inode', **inode_properties)
         inode_id = dbh.autoincrement()
@@ -574,8 +574,6 @@ class File:
         ## of getting it from the cache
         self.cached_fd = None
         size=0
-
-        print "Caching inode %s" % self.inode
 
         ## Recreate the cache file (May need to use kernel locking for
         ## multithreaded support)

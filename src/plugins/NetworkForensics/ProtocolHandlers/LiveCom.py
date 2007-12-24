@@ -164,9 +164,12 @@ class HotmailScanner(Scanner.GenScanFactory):
             dbh.insert('live_messages', **result)
             id = dbh.autoincrement()
 
+            dbh.execute("select mtime from inode where inode_id = %r" , self.fd.inode_id)
+            row = dbh.fetch()
+
             inode_id = self.ddfs.VFSCreate(self.fd.inode,
                                            "tlive_messages:id:%s" % id,
-                                           "Message")
+                                           "Message", mtime = row['mtime'])
 
             dbh.update('live_messages',where = 'id = "%s"' % id,
                        inode_id = inode_id)
@@ -187,8 +190,8 @@ class LiveComMessages(Reports.report):
 
     def display(self, query, result):
         result.table(
-            elements = [ TimestampType('Timestamp','http.date'),
-                         InodeIDType('Inode', 'inode_id', case = query['case']),
+            elements = [ TimestampType('Timestamp','inode.mtime'),
+                         InodeIDType('Inode', 'inode.inode_id', case = query['case']),
                          StringType('From', 'From'),
                          StringType('To', 'To'),
                          StringType('CC', 'CC'),
@@ -196,8 +199,8 @@ class LiveComMessages(Reports.report):
                          StringType('Subject', 'Subject'),
                          StringType('Message','Message'),
                          ],
-            table = 'live_messages,http',
-            where = 'http.id=live_messages.id',
+            table = 'live_messages,inode',
+            where = 'inode.inode_id=live_messages.inode_id',
             case = query['case']
             )
 
@@ -208,7 +211,6 @@ class TableViewer(FileSystem.StringIOFile):
     specifier = 't'
 
     def __init__(self, case, fd, inode):
-        print "My inode is %s" % inode
         parts = inode.split('|')
         ourinode = parts[-1][1:]
 

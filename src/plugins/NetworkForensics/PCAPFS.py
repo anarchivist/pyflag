@@ -461,7 +461,10 @@ class ViewDissectedPacket(Reports.report):
             """
             result = dissected_packet
             for b in branch:
-                result = getattr(result, b)
+                try:
+                    result = getattr(result, b)
+                except AttributeError:
+                    pass
 
             return result
         

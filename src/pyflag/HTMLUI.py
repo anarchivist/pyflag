@@ -623,8 +623,8 @@ class HTMLUI(UI.GenericUI):
             <HTML>
             <script> window.__pyflag_name = "%s"; window.__pyflag_parent="%s";</script>
             <FRAMESET FRAMEBORDER=1 FRAMESPACING=1 COLS="340,*">
-            <FRAME SRC="%s" name=left id=left scrolling=auto>
-            <FRAME SRC="%s" name=right id=right scrolling=auto>
+            <FRAME SRC="f?%s" name=left id=left scrolling=auto>
+            <FRAME SRC="f?%s" name=right id=right scrolling=auto>
             </FRAMESET>
             </HTML>''' % (query['__pyflag_name'], query['__pyflag_parent'], left_url, right_url)
 
