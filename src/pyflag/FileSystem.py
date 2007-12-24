@@ -61,6 +61,10 @@ import zipfile
 import cStringIO
 import pyflag.Scanner as Scanner
 import pyflag.Graph as Graph
+import pyflag.Store as Store
+
+### This is a cache of file drivers:
+FILE_CACHE = Store.Store()
 
 class FileSystem:
     """ This is the base class for accessing file systems in PyFlag. This class is abstract and is here purely for documentation purposes.
@@ -135,17 +139,8 @@ class FileSystem:
         if not inode:
             raise IOError('Inode not found for file')
 
-        ## We should be allowed to open inodes which do not exist in
-        ## the filesystem proper, but the VFS may be able to do
-        ## something with them -- all it means is that we cant really
-        ## navigate to them.
-#        if not path:
-#            path = self.lookup(inode=inode)
-#        if not path:
-#            raise IOError('File not found for inode %s' % inode)
-
-        # open the file, first pass will generally be 'D' or 'M'
-        # then any virtual file systems (vfs) will kick in
+        global FILE_CACHE
+        
         parts = inode.split('|')
         sofar = [] # the inode part up to the file we want
         ## We start with the FileSystem iosource as the file like object for use, and then as each file is opened, we update retfd.
@@ -153,7 +148,14 @@ class FileSystem:
         for part in parts:
             sofar.append(part)
             try:
-                retfd = Registry.VFS_FILES.vfslist[part[0]](self.case, retfd, '|'.join(sofar))
+                ## Try to get the retfd from the cache:
+                key = "%s:%s" % (self.case, '|'.join(sofar))
+                try:
+                    retfd = FILE_CACHE.get(key)
+                except KeyError:
+                    retfd = Registry.VFS_FILES.vfslist[part[0]](self.case, retfd, '|'.join(sofar))
+                    FILE_CACHE.put(retfd, key=key)
+                    
             except IndexError:
                 raise IOError, "Unable to open inode: %s, no VFS" % part
 
