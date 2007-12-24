@@ -147,8 +147,9 @@ class PCAPFS(DBFS):
         dbh = DB.DBO(self.case)
         pdbh = DB.DBO()
         pdbh.mass_insert_start('jobs')
-        scanner_string = ','.join(scanners)
-        cookie = int(time.time())
+        if scanners:
+            scanner_string = ','.join(scanners)
+            cookie = int(time.time())
 
         def Callback(mode, packet, connection):
             """ This callback is called for each packet with the following modes:

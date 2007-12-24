@@ -50,11 +50,12 @@ itself. To get the post values look at the http_parameters table for
 that HTTP object id.
 """
 import pyflag.FlagFramework as FlagFramework
-from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType, PacketType
+from pyflag.TableObj import StringType, TimestampType, InodeIDType, IntegerType, PacketType
 from FileFormats.HTML import decode_entity, HTMLParser
 import pyflag.DB as DB
 import pyflag.Scanner as Scanner
 import pyflag.Reports as Reports
+import pyflag.FileSystem as FileSystem
 import re
 import pyflag.pyflaglog as pyflaglog
 
@@ -123,50 +124,34 @@ class HotmailScanner(Scanner.GenScanFactory):
 
         def process_editread(self, fd):
             ## Find the ComposeHeader table:
-            result = {'type':'Edit Read', 'inode_id': self.fd.inode_id}
+            result = {'type':'Edit Read'}
 
             tag = self.parser.find(self.parser.root, 'table', **{"class":'ComposeHeader'})
             if not tag:
                 #pyflaglog.log(pyflaglog.DEBUG, "Tag ComposeHeader not found in %s" % self.fd.inode)
                 return
+
+            ## Find the From:
+            row = self.parser.find(tag, 'select', name = 'ffrom')
+            if row:
+                option = self.parser.find(row, 'option', selected='.*')
+                result['From'] = decode_entity(option['value'])                
+
+            for field, pattern in [('To','fto'),
+                                   ('CC','fcc'),
+                                   ('Bcc', 'fbcc'),
+                                   ('Subject', 'fsubject')]:
+                tmp = self.parser.find(tag, 'input', name = pattern)
+                if tmp:
+                    result[field] = decode_entity(tmp['value'])
             
-            ## Iterate over its rows:
-            for row in self.parser.search(tag, 'tr'):
-                try:
-                    if row['id'] == 'From':
-                        option = self.parser.find(row, 'option', selected='.*')
-                        result['From'] = decode_entity(option['value'])
-                        
-                    elif row['id'] == 'To':
-                        option = self.parser.find(row, 'input', type='text')
-                        if option:
-                            result['To'] = decode_entity(option['value'])
-                            
-                    elif row['id'] == 'Cc':
-                        option = self.parser.find(row, 'input', name='fCc')
-                        if option:
-                            result['Cc'] = decode_entity(option['value'])
-
-                    elif row['id'] == 'Bcc':
-                        option = self.parser.find(row, 'input', name='fBcc')
-                        if option:
-                            result['Bcc'] = decode_entity(option['value'])
-                            
-                except KeyError:
-                    continue
-
-            ## Extract the subject:
-            option = self.parser.find(tag, 'input', type='text', name='fSubject')
-            if option:
-                result['Subject'] = decode_entity(option['value'])
-
             ## Now extract the content of the email:
             result['Message'] = ''
 
             ## Sometimes the message is found in the EditArea div:
-            div = self.parser.find(tag, 'div', **{'class':"EditArea"})
+            div = self.parser.find(self.parser.root, 'div', id='EditArea')
             if div:
-                result['Message'] += div['_cdata']
+                result['Message'] += self.parser.innerHTML(div)
 
             ## On newer sites its injected using script:
             for s in self.parser.search(self.parser.root,'script'):
@@ -177,7 +162,15 @@ class HotmailScanner(Scanner.GenScanFactory):
 
             dbh = DB.DBO(self.case)
             dbh.insert('live_messages', **result)
+            id = dbh.autoincrement()
 
+            inode_id = self.ddfs.VFSCreate(self.fd.inode,
+                                           "tlive_messages:id:%s" % id,
+                                           "Message")
+
+            dbh.update('live_messages',where = 'id = "%s"' % id,
+                       inode_id = inode_id)
+            
             return True
 
 class LiveComMessages(Reports.report):
@@ -195,6 +188,7 @@ class LiveComMessages(Reports.report):
     def display(self, query, result):
         result.table(
             elements = [ TimestampType('Timestamp','http.date'),
+                         InodeIDType('Inode', 'inode_id', case = query['case']),
                          StringType('From', 'From'),
                          StringType('To', 'To'),
                          StringType('CC', 'CC'),
@@ -206,3 +200,54 @@ class LiveComMessages(Reports.report):
             where = 'http.id=live_messages.id',
             case = query['case']
             )
+
+import textwrap
+
+## A VFS File driver which formats a row in the db nicely:
+class TableViewer(FileSystem.StringIOFile):
+    specifier = 't'
+
+    def __init__(self, case, fd, inode):
+        print "My inode is %s" % inode
+        parts = inode.split('|')
+        ourinode = parts[-1][1:]
+
+        self.table, self.id, self.value = ourinode.split(':')
+        FileSystem.StringIOFile.__init__(self, case, fd, inode)
+        self.force_cache()
+        
+    def read(self, length = None):
+        try:
+            return FileSystem.StringIOFile.read(self, length)
+        except IOError: pass
+
+        result = ''
+        dbh = DB.DBO(self.case)
+        dbh.execute("select * from %s where `%s`=%r", (self.table, self.id, self.value))
+        for row in dbh:
+            result += ("-------------------\n")
+            for k,v in row.items():
+                result += "%s: %s\n" % (k,textwrap.fill("%s" % v,
+                                                        subsequent_indent = (2+len(k)) * " "))
+                
+        return result
+
+## Unit tests:
+import pyflag.pyflagsh as pyflagsh
+import pyflag.tests as tests
+
+class HotmailTests(tests.ScannerTest):
+    """ Tests Hotmail Scanner """
+    test_case = "PyFlagTestCase"
+    test_file = 'test/files/'
+    subsystem = "Mounted"
+    fstype = "Mounted"
+
+    def test01HTTPScanner(self):
+        """ Test HTTP Scanner """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env,
+                             command="scan",
+                             argv=["*",                   ## Inodes (All)
+                                   "HotmailScanner",
+                                   ])                   ## List of Scanners

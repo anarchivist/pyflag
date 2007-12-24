@@ -92,6 +92,13 @@ class HTMLParser(lexer.Lexer):
         self.tag[self.current_attribute] = ''
 
     def END_TAG(self, token, match):
+        #print "Depth %s" % len(self.stack)
+        ## These tags need to be ignored because often they do not balance
+        for t in ['br', 'p']:
+            if self.tag['_name']==t:
+                #print "Self closing"
+                self.tag['_type'] = 'selfclose'
+
         if self.tag['_type']=='close':
             ## Pop the last tag off the stack
             del self.stack[-1]
@@ -104,7 +111,7 @@ class HTMLParser(lexer.Lexer):
 
         if self.tag['_name'] == 'script':
             return "SCRIPT"
-
+                
     def TAG_START(self, token, match):
         self.tag = dict(_cdata = '', _children=[], _name='', _type='open')
         
@@ -120,6 +127,13 @@ class HTMLParser(lexer.Lexer):
             for match in self.search(c,_name):
                 yield match 
 
+    def innerHTML(self, tag):
+        result = tag['_cdata']
+        for c in tag['_children']:
+            result += "<%s>" % c['_name'] + self.innerHTML(c) + "</%s>" % c['_name']
+
+        return result
+
     def find(self, tag, _name, **regex):
         """ Search all tags below tag for a tag with the name
         specified and all regexes matching attributes
@@ -133,7 +147,7 @@ class HTMLParser(lexer.Lexer):
                     break
 
                 ## does it match?
-                if not re.search(v, m[k]):
+                if not re.compile(v, re.M | re.I).search(m[k]):
                     failed = True
                     break
 
@@ -148,7 +162,7 @@ class HTMLParser(lexer.Lexer):
         print result
 
 if __name__ == '__main__':
-    l = HTMLParser(verbose=0)
+    l = HTMLParser(verbose=1)
 
     if len(sys.argv)==1:
         l.feed("foobar");

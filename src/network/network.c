@@ -242,6 +242,9 @@ int TCP_Read(Packet self, StringIO input) {
       not account for.
   */
   this->packet.data_offset = self->start + this->packet.len;
+  if(input->size <= this->packet.data_offset) 
+    goto end;
+
   CALL(input, seek, this->packet.data_offset, SEEK_SET);
 
   /** Now populate the data payload of the tcp packet 
@@ -254,7 +257,8 @@ int TCP_Read(Packet self, StringIO input) {
 
   this->packet.data = talloc_memdup(self, input->data + input->readptr,
 				    this->packet.data_len);
-  
+
+ end:  
   return input->size - self->start;
 };
 

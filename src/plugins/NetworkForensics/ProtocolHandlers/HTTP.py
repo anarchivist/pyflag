@@ -576,11 +576,15 @@ class HTTPTree(TreeObj.TreeObj):
 import unittest
 import pyflag.pyflagsh as pyflagsh
 from pyflag.FileSystem import DBFS
+import pyflag.tests as tests
 
-class HTTPTests(unittest.TestCase):
+class HTTPTests(tests.ScannerTest):
     """ Tests HTTP Scanner """
-    test_case = "PyFlag Network Test Case"
-    order = 21
+    test_case = "PyFlagTestCase"
+    test_file = 'stdcapture_0.3.pcap'
+    subsystem = "Advanced"
+    fstype = "PCAP Filesystem"
+
     def test01HTTPScanner(self):
         """ Test HTTP Scanner """
         env = pyflagsh.environment(case=self.test_case)
