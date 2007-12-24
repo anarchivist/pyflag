@@ -438,7 +438,6 @@ class CaseDBInit(FlagFramework.EventHandler):
         DB.DBO.DBH.flush()
         DB.DBIndex_Cache.flush()
         Scanner.factories.flush()
-        FileSystem.FILE_CACHE.flush()
         
     def reset(self, dbh, case):
         key_re = "%s.*" % case
@@ -446,4 +445,3 @@ class CaseDBInit(FlagFramework.EventHandler):
         DB.DBO.DBH.expire(key_re)
         DB.DBIndex_Cache.expire(key_re)
         Scanner.factories.expire(key_re)
-        FileSystem.FILE_CACHE.expire(key_re)

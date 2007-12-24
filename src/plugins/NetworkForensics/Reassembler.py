@@ -100,10 +100,6 @@ class StreamFile(File):
             self.dest_ip = row['dest_ip']
             self.src_ip = row['src_ip']
 
-        ## Are we already cached?
-        if self.cached_fd:
-            return
-
         inode = inode.split("|")[-1]
 
         ## We allow the user to ask for a number of streams which will
@@ -119,12 +115,13 @@ class StreamFile(File):
         ## cache this so we only have to combine the streams once.
         stream_ids = [ int(x) for x in inode[1:].split("/")]
         self.create_new_stream(stream_ids)
-
-    def read(self, length=None):
-        try:
-            return File.read(self, length)
-        except IOError:
-            return ''
+        self.look_for_cached()
+        
+##    def read(self, length=None):
+##        try:
+##            return File.read(self, length)
+##        except IOError:
+##            return ''
 
     def create_new_stream(self,stream_ids):
         """ Creates a new stream by combining the streams given by the list stream_ids.
@@ -234,9 +231,14 @@ class StreamFile(File):
 
         dbh2.mass_insert_commit()
 
+        ## Close the output files, and the input files:
         out_fd.close()
+        for fd in fds:
+            try:
+                fd.close()
+            except: pass
         
-        self.cached_fd = open(get_temp_path(dbh.case, self.inode),"r")
+        #self.cached_fd = open(get_temp_path(dbh.case, self.inode),"r")
 
         ## Now create the stream in the VFS:
         fsfd = FileSystem.DBFS(self.case)

@@ -63,9 +63,6 @@ import pyflag.Scanner as Scanner
 import pyflag.Graph as Graph
 import pyflag.Store as Store
 
-### This is a cache of file drivers:
-FILE_CACHE = Store.Store()
-
 class FileSystem:
     """ This is the base class for accessing file systems in PyFlag. This class is abstract and is here purely for documentation purposes.
 
@@ -130,7 +127,6 @@ class FileSystem:
 
         This object can then be used to read data from the specified file.
         @note: Only files may be opened, not directories."""
-
         if path:
             inode = self.lookup(path=path)
         elif inode_id:
@@ -139,8 +135,6 @@ class FileSystem:
         if not inode:
             raise IOError('Inode not found for file')
 
-        global FILE_CACHE
-        
         parts = inode.split('|')
         sofar = [] # the inode part up to the file we want
         ## We start with the FileSystem iosource as the file like object for use, and then as each file is opened, we update retfd.
@@ -148,14 +142,7 @@ class FileSystem:
         for part in parts:
             sofar.append(part)
             try:
-                ## Try to get the retfd from the cache:
-                key = "%s:%s" % (self.case, '|'.join(sofar))
-                try:
-                    retfd = FILE_CACHE.get(key)
-                except KeyError:
-                    retfd = Registry.VFS_FILES.vfslist[part[0]](self.case, retfd, '|'.join(sofar))
-                    FILE_CACHE.put(retfd, key=key)
-                    
+                retfd = Registry.VFS_FILES.vfslist[part[0]](self.case, retfd, '|'.join(sofar))
             except IndexError:
                 raise IOError, "Unable to open inode: %s, no VFS" % part
 
@@ -604,10 +591,16 @@ class File:
             fd.write(data)
             size+=len(data)
 
+        fd.close()
+        
         ## Now set the cached fd so a subsequent read will get it from the cache:
         self.cached_fd =  open(cached_filename, 'r')
         self.size = size
         self.readptr = readptr
+
+        ## Close our parent fd:
+        self.fd.close()
+
         return size
 
     def lookup_id(self):
@@ -622,11 +615,15 @@ class File:
 
     def close(self):
         """ Fake close method. """
-        try:
-            self.cached_fd.close()
-            self.cached_fd = None
-        except AttributeError:
-            pass
+        if self.cached_fd:
+            try:
+                self.cached_fd.close()
+                self.cached_fd = None
+            except AttributeError:
+                pass
+
+        if self.fd:
+            self.fd.close()
     
     def seek(self, offset, rel=None):
         """ Seeks to a specified position inside the file """
