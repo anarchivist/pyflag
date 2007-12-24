@@ -113,9 +113,11 @@ class StreamFile(File):
 
         ## We use the inode column in the connection_details table to
         ## cache this so we only have to combine the streams once.
-        stream_ids = [ int(x) for x in inode[1:].split("/")]
-        self.create_new_stream(stream_ids)
-        self.look_for_cached()
+        if not self.cached_fd:
+            stream_ids = [ int(x) for x in inode[1:].split("/")]
+
+            self.create_new_stream(stream_ids)
+            self.look_for_cached()
         
 ##    def read(self, length=None):
 ##        try:
