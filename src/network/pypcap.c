@@ -21,12 +21,13 @@ static PyObject *PyPCAP_next(PyPCAP *self);
 static int PyPCAP_fill_buffer(PyPCAP *self, PyObject *fd) {
   PyObject *data = PyObject_CallMethod(fd, "read", "l", FILL_SIZE);
   char *buff;
-  int len;
+  Py_ssize_t len;
   int current_readptr = self->buffer->readptr;
 
   if(!data) return -1;
 
   if(0 > PyString_AsStringAndSize(data, &buff, &len)) return -1;
+  if(!buff) return -1;
 
   // Append the data to the end:
   CALL(self->buffer, seek, 0, SEEK_END);

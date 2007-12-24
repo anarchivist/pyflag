@@ -1499,7 +1499,11 @@ class InodeType(StringType):
         else:
             tmp1.popup(annotate_cb, "Annotate", icon="pen.png")
 
-        tmp2.link(value, target=link)
+        if len(value)> 15:
+            value1="..%s" % value[-13:]
+        else:
+            value1 = value
+        tmp2.link(value1, tooltip = value, target=link)
         result.row(tmp1,tmp2)
         return result
 

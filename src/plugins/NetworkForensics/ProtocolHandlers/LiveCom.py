@@ -221,15 +221,17 @@ class TableViewer(FileSystem.StringIOFile):
             return FileSystem.StringIOFile.read(self, length)
         except IOError: pass
 
-        result = ''
+        result = '<html><body>'
         dbh = DB.DBO(self.case)
         dbh.execute("select * from %s where `%s`=%r", (self.table, self.id, self.value))
         for row in dbh:
-            result += ("-------------------\n")
+            result += ("<hrule><table border=1>\n")
             for k,v in row.items():
-                result += "%s: %s\n" % (k,textwrap.fill("%s" % v,
-                                                        subsequent_indent = (2+len(k)) * " "))
+                result += "<tr><td>%s</td>" % k
+                result += "<td>%s</td></tr>\n" % textwrap.fill(
+                    "%s" % v, subsequent_indent = "<br>")
                 
+            result += "</table></body></html>"
         return result
 
 ## Unit tests:
