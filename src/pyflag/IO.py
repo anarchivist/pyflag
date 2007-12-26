@@ -179,7 +179,7 @@ class IOSubsystemTests(unittest.TestCase):
     def test01LowerLevelSGZIP(self):
         """ Test lower level access to sgzip files """
         io = iosubsys.iosource([['subsys','sgzip'],
-                            ['filename','%s/pyflag_stdimage_0.2.sgz' % config.UPLOADDIR]])
+                            ['filename','%s/pyflag_stdimage_0.4.sgz' % config.UPLOADDIR]])
         m = md5.new()
         m.update(io.read_random(1000000,0))
         self.assertEqual(m.hexdigest(),'944d08ba21426b5821e759517bc68737')
@@ -195,13 +195,13 @@ class IOSubsystemTests(unittest.TestCase):
         
         ## Test failour to open a file:
         self.assertRaises(IOError, lambda : iosubsys.iosource([['subsys','sgzip'],
-                                                           ['filename','%s/pyflag_stdimage_0.2.dd' % config.UPLOADDIR],]))
+                                                           ['filename','%s/pyflag_stdimage_0.4.dd' % config.UPLOADDIR],]))
         self.assertRaises(IOError, lambda : iosubsys.iosource([['subsys','ewf'],
-                                                           ['filename','%s/pyflag_stdimage_0.2.dd' % config.UPLOADDIR],]))
+                                                           ['filename','%s/pyflag_stdimage_0.4.dd' % config.UPLOADDIR],]))
 
         ## Test weird parameters:
         self.assertRaises(IOError, lambda : iosubsys.iosource([['subsys','raid'],
-                                                           ['filename','%s/pyflag_stdimage_0.2.dd' % config.UPLOADDIR],]))
+                                                           ['filename','%s/pyflag_stdimage_0.4.dd' % config.UPLOADDIR],]))
         
         ## Test weird values:
         self.assertRaises(RuntimeError, lambda : iosubsys.iosource([['subsys','standard'],
@@ -210,7 +210,7 @@ class IOSubsystemTests(unittest.TestCase):
         self.assertRaises(IOError, lambda : iosubsys.iosource([['subsys','advanced'],
                                                            ['filename','/etc/passwd'],['offset',-100]]))
         self.assertRaises(IOError, lambda : iosubsys.iosource([['subsys','sgzip'],
-                                                           ['filename','%s/pyflag_stdimage_0.2.sgz' % config.UPLOADDIR],['offset',-100]]))
+                                                           ['filename','%s/pyflag_stdimage_0.4.sgz' % config.UPLOADDIR],['offset',-100]]))
         self.assertRaises(IOError, lambda : iosubsys.iosource([['subsys','ewf'],
                                                            ['filename','%s/ntfs_image.e01' % config.UPLOADDIR],['offset',-100]]))
 

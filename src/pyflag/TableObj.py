@@ -1829,11 +1829,11 @@ class ColumnTypeTests(unittest.TestCase):
 
         ## Joined filters:
         self.assertEqual(self.generate_sql("InodeType contains 'Z|' and TimestampType after 2005-10-10"),
-                         "(1) and (`inode` like '%Z|%' and `timestamp` > '2005-10-10')")
+                         "(1) and (`inode` like '%Z|%' and `timestamp` > '20051010 00:00:00')")
         self.assertEqual(self.generate_sql("InodeType contains 'Z|' or TimestampType after 2005-10-10 and IntegerType > 5"),
                          "(1) and (`inode` like '%Z|%' or `timestamp` > '20051010 00:00:00' and `table`.`integer_type` > '5')")
         self.assertEqual(self.generate_sql("(InodeType contains 'Z|' or TimestampType after 2005-10-10) and IntegerType > 5"),
-                         "(1) and (( `inode` like '%Z|%' or `timestamp` > '2005-10-10' ) and `table`.`integer_type` > '5')")
+                         "(1) and (( `inode` like '%Z|%' or `timestamp` > '20051010 00:00:00' ) and `table`.`integer_type` > '5')")
 
     def test10CreateTable(self):
         """ Test table creation """

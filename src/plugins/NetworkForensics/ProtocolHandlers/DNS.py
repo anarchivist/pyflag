@@ -203,8 +203,9 @@ import pyflag.tests as tests
 class DNSTests(tests.ScannerTest):
     """ Test DNS Scanner """
     test_case = "PyFlagTestCase"
-    test_file = "ftp3.pcap"
-    subsystem = "Advanced"
+##    test_file = "ftp3.pcap"
+    test_file = "full_dump.pcap.e01"
+    subsystem = "EWF"
     fstype = "PCAP Filesystem"
     
 if __name__=='__main__':

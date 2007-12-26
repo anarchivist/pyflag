@@ -62,6 +62,9 @@ config.add_option("scanners", default='HTTPScanner,HotmailScanner,MSNScanner,IRC
 config.add_option("timeout", default=120, type='int',
                   help="The maximum inactivity time after which the tcp reassembler will be flushed")
 
+config.add_option("single", default=False, action='store_true',
+                  help = "Single shot (exit once done)")
+
 config.parse_options(True)
 
 try:
@@ -181,6 +184,9 @@ while 1:
         os.unlink(filename)
         last_time = time.time()
 
+    if config.single:
+        sys.exit(0)
+        
     print "%s: Sleeping for %s seconds" % (time.ctime(), config.sleep)
     time.sleep(config.sleep)
     ## We need to flush the decoder:

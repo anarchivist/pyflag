@@ -632,7 +632,7 @@ import pyflag.tests
 class BasicCommandTests(pyflag.tests.ScannerTest):
     """ Test PyFlash commands """
     test_case = "PyFlag Test Case"
-    test_file = "pyflag_stdimage_0.2.e01"
+    test_file = "pyflag_stdimage_0.4.e01"
     subsystem = 'EWF'
     offset = "16128s"
 
@@ -645,7 +645,7 @@ class BasicCommandTests(pyflag.tests.ScannerTest):
         ## Check we can list default directory
         lines = [ l for l in pyflagsh.shell_execv_iter(env=self.env, command="ls",
                                                        argv=[])]
-        self.assertEqual(len(lines),17)
+        self.assertEqual(len(lines),18)
 
         ## Check we can list directories
         lines = [ l for l in pyflagsh.shell_execv_iter(env=self.env, command="ls",

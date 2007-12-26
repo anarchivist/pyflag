@@ -114,8 +114,8 @@ class EventScanTest(pyflag.tests.ScannerTest):
     test_case = "PyFlagTestCase"
     test_file = "pyflag_stdimage_0.4.e01"
     #test_file = "winxp.sgz"
-    subsystem = 'SGZip'
-    offset = "0"
+    subsystem = 'EWF'
+    offset = "16128s"
 
     def test01RunScanner(self):
         """ Test EventLog scanner """

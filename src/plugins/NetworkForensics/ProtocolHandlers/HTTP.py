@@ -598,8 +598,8 @@ import pyflag.tests as tests
 class HTTPTests(tests.ScannerTest):
     """ Tests HTTP Scanner """
     test_case = "PyFlagTestCase"
-    test_file = 'stdcapture_0.3.pcap'
-    subsystem = "Advanced"
+    test_file = 'stdcapture_0.3.pcap.e01'
+    subsystem = "EWF"
     fstype = "PCAP Filesystem"
 
     def test01HTTPScanner(self):

@@ -308,7 +308,7 @@ import pyflag.tests
 class PstScannerTest(pyflag.tests.ScannerTest):
     """ Test handling of pst files """
     test_case = "PyFlag Test Case"
-    test_file = "pyflag_stdimage_0.2.e01"
+    test_file = "pyflag_stdimage_0.4.e01"
     subsystem = 'EWF'
     offset = "16128s"
     

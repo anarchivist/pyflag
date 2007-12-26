@@ -255,6 +255,7 @@ class LiveComMessages(Reports.report):
                          StringType('BCC', 'BCC'),
                          StringType('Subject', 'Subject'),
                          StringType('Message','Message'),
+                         StringType('Type','type'),
                          ],
             table = 'live_messages,inode',
             where = 'inode.inode_id=live_messages.inode_id',
@@ -312,3 +313,8 @@ class HotmailTests(tests.ScannerTest):
                              argv=["*",                   ## Inodes (All)
                                    "HotmailScanner",
                                    ])                   ## List of Scanners
+
+        dbh = DB.DBO(self.test_case)
+        dbh.execute("select count(*) as c from live_messages")
+        row = dbh.fetch()
+        self.assert_(row['c'] > 0, "No hotmail messages were found")

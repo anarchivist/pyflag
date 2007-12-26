@@ -205,6 +205,14 @@ import pyflag.tests as tests
 class MountedTest(pyflag.tests.ScannerTest):
     """ Test the Mounted Psuedo Filesystem driver """
     test_case = "PyFlagTestCase"
-    test_file = "pyflag_stdimage_0.3"
+    test_file = "pyflag_stdimage_0.4.dd"
     subsystem = "Mounted"
     fstype = "Mounted"
+
+    def test01Mounted(self):
+        """ Test that mounted images work """
+        ## We should be able to see test_file in the file table:
+        dbh=DB.DBO(self.test_case)
+        dbh.execute("select * from file where name = %r",self.test_file)
+        row = dbh.fetch()
+        self.assert_(row,"Unable to find the file in the VFS???")
