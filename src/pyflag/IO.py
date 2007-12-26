@@ -217,11 +217,11 @@ class IOSubsystemTests(unittest.TestCase):
     def test03DataReadAccuracy(self):
         """ Test data accuracy in image decompression (takes a while) """
         io1 = iosubsys.iosource([['subsys','advanced'],
-                             ['filename','%s/pyflag_stdimage_0.2.dd' % config.UPLOADDIR]])
+                             ['filename','%s/pyflag_stdimage_0.4.dd' % config.UPLOADDIR]])
         io2 = iosubsys.iosource([['subsys','sgzip'],
-                             ['filename','%s/pyflag_stdimage_0.2.sgz' % config.UPLOADDIR]])
+                             ['filename','%s/pyflag_stdimage_0.4.sgz' % config.UPLOADDIR]])
         io3 = iosubsys.iosource([['subsys','ewf'],
-                             ['filename','%s/pyflag_stdimage_0.2.e01' % config.UPLOADDIR]])
+                             ['filename','%s/pyflag_stdimage_0.4.e01' % config.UPLOADDIR]])
 
         t = time.time()
         test_read_random(io1,io2, io1.size, 1000000, 200)

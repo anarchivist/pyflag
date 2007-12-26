@@ -51,6 +51,9 @@ config.add_option('list', short_option='L', default=None,
                   action='store_true', dest='list',
                   help='Just list all the available test classes without running them')
 
+config.add_option('pause', short_option='p', default=False, action='store_true',
+                  help='Pause after each test')
+
 Registry.Init()
 config.parse_options()
 
@@ -111,3 +114,6 @@ for test_class in classes:
     gc.collect()
 
     print "Garbage is %s" % (gc.garbage,)
+
+    if config.pause:
+        raw_input("Pause")

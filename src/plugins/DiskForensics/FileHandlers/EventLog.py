@@ -112,8 +112,8 @@ import pyflag.pyflagsh as pyflagsh
 class EventScanTest(pyflag.tests.ScannerTest):
     """ Test EventLog DLL scanner """
     test_case = "PyFlagTestCase"
-    #test_file = "pyflag_stdimage_0.3.e01"
-    test_file = "winxp.sgz"
+    test_file = "pyflag_stdimage_0.4.e01"
+    #test_file = "winxp.sgz"
     subsystem = 'SGZip'
     offset = "0"
 

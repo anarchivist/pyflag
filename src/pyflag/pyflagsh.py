@@ -230,6 +230,8 @@ def shell_execv(env=None,command=None, argv=[]):
     return string
         
 if __name__ == "__main__":
+    import pyflag.Farm as Farm
+
     # Parse commandline args:
     config.set_usage(usage="PyFlash the pyflag interactive shell",
                      version=config.VERSION)
@@ -269,7 +271,6 @@ if __name__ == "__main__":
     print "Welcome to the Flag shell. Type help for help"
     
     ## Create a worker thread:
-    import pyflag.Farm as Farm
     Farm.start_workers()
 
     if config.command_file != None:

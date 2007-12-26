@@ -143,7 +143,7 @@ def load_file(filename):
             pcap_id += 1
         except StopIteration:
             break
-
+        
         pcap_dbh.mass_insert(
             id = pcap_id,
             iosource = config.iosource,

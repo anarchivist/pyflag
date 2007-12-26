@@ -114,7 +114,7 @@ class JpegSearchTest(pyflag.tests.ScannerTest):
 
     def check_for_file(self, sql='1'):
         dbh=DB.DBO(self.test_case)
-        dbh.execute("select type.inode as inode,type.type,path,name from file join type on file.inode=type.inode where type.type like '%%JPEG%%' and %s limit 1", sql)
+        dbh.execute("select inode.inode as inode,type.type,path,name from file,type,inode where file.inode_id=type.inode_id and inode.inode_id=type.inode_id and type.type like '%%JPEG%%' and %s limit 1", sql)
         row = dbh.fetch()
         if not row: return None
 
@@ -159,11 +159,11 @@ class JpegSearchTest(pyflag.tests.ScannerTest):
 
     def test07(self):
         """ Did the search results include the deleted picture in MFT entry #32 (del1/file6.jpg)? """
-        self.assert_(self.check_for_file('type.inode like "%K32-128-3%"'))
+        self.assert_(self.check_for_file('inode.inode like "%K32-128-3%"'))
 
     def test08(self):
         """ Did the search results include the deleted picture in MFT entry #31 (del2/file7.jpg)? """
-        self.assert_(self.check_for_file('type.inode like "%K31-128-3%"'))
+        self.assert_(self.check_for_file('inode.inode like "%K31-128-3%"'))
 
     def test09(self):
         """ Did the search results include the picture inside of archive\\file8.zip? """

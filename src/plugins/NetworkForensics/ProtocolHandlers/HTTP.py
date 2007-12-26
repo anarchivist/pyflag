@@ -217,7 +217,7 @@ class HTTPTables(FlagFramework.EventHandler):
             """CREATE TABLE if not exists `http_parameters` (
             `id` int(11) not null,
             `key` VARCHAR(255) not null,
-            `value` text not null
+            `value` blob not null
             ) """)
 
         dbh.check_index("http", "inode")
@@ -232,10 +232,10 @@ class HTTPScanner(StreamScannerFactory):
         description = "Network Scanners"
         name = "NetworkScanners"
         contains = [ "IRCScanner", "MSNScanner", "HTTPScanner", "POPScanner",
-                     "SMTPScanner","RFC2822", "YahooScanner", "LiveScanner" ]
+                     "SMTPScanner","RFC2822", "YahooScanner",
+                     'HotmailScanner' ]
         default = True
         special_fs_name = 'PCAPFS'
-
 
     def prepare(self):
         self.http_inodes = {}
@@ -254,30 +254,40 @@ class HTTPScanner(StreamScannerFactory):
 
     def handle_parameters(self, request, id):
         """ Store the parameters of the request in the http_parameters
-        table
+        table. We parse both GET and POST parameters here.
         """
+        ## FIXME: Adapt to use cgi.FieldStorage
         try:
             base, query = request['url'].split('?',1)
         except:
             return
         
-        def insert_query(query):
-            dbh = DB.DBO(self.case)
-            for key,value in cgi.parse_qsl(query, False):
-                ## Non printable keys are probably not keys at all.
-                if re.match("[^a-z0-9]+",key): return
-                dbh.insert('http_parameters',
-                                id = id,
-                                key = key,
-                                value = value)
-                
-            ## FIXME: Implement form-multipart parsing too
+        ## We use pythons standard CGI module for parsing, this allows
+        ## us to handle both kinds on post encodings
+        ## (multipart/form-data and
+        ## application/x-www-form-urlencoded).
+        body = request.get('body','')
+        
+        env = dict(REQUEST_METHOD=request['method'],
+                   CONTENT_TYPE=request.get('content-type',''),
+                   CONTENT_LENGTH=len(body),
+                   QUERY_STRING=query)
 
+        dbh = DB.DBO(self.case)
+        result =cgi.parse(environ = env, fp = cStringIO.StringIO(body))
 
-        insert_query(query)
-        if request['method']=='POST':
-            insert_query(request['body'])
-
+        for key,value in result.items():
+            ## Non printable keys are probably not keys at all.
+            if re.match("[^a-z0-9A-Z_]+",key): return
+            try:
+                value = value[0]
+            except: pass
+            
+            dbh.insert('http_parameters',
+                       id = id,
+                       key = key,
+                       value = value)
+            
     def process_stream(self, stream, factories):
         """ We look for HTTP requests to identify the stream. This
         allows us to processes HTTP connections on unusual ports. This
@@ -326,13 +336,20 @@ class HTTPScanner(StreamScannerFactory):
             ## stream.ts_sec is already formatted in DB format
             date_str = stream.ts_sec.split(" ")[0]
             path=self.fsfd.lookup(inode=combined_inode)
+
+            ## Try to put the HTTP inodes at the mount point. FIXME:
+            ## This should not be needed when a http stats viewer is
+            ## written.
             path=os.path.normpath(path+"/../../../../../")
 
-            self.fsfd.VFSCreate(None,new_inode,
-                                "%s/HTTP/%s/%s" % (path,date_str,
-                                                   escape(p.request['url'])),
-                                mtime=stream.ts_sec, size=size
-                                )
+            ## No point creating VFS inodes of 0 size because we dont
+            ## need to scan them:
+            if size>0:
+                self.fsfd.VFSCreate(None,new_inode,
+                                    "%s/HTTP/%s/%s" % (path,date_str,
+                                                       escape(p.request['url'])),
+                                    mtime=stream.ts_sec, size=size
+                                    )
 
             ## Store information about this request in the
             ## http table:

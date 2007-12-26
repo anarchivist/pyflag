@@ -412,7 +412,7 @@ class NTFSTests(unittest.TestCase):
                              argv=["*",'TypeScan'])
 
         dbh = DB.DBO(self.test_case)
-        dbh.execute('select * from type where type like "%executable%" and inode like "%33-128-7%"')
+        dbh.execute('select type.type from type,inode where type.inode_id=inode.inode_id and type like "%executable%" and inode.inode like "%33-128-7%"')
         row = dbh.fetch()
 
         self.assert_(row, "Executable within ADS was not found???")

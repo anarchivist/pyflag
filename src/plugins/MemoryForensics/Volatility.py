@@ -97,7 +97,7 @@ def find_dtb(addr_space, types):
         while 1:
             found = data.find("\x03\x00\x1b\x00", found+1)
             if found >= 0:
-                print "Found at %s" % (offset+found)
+                #print "Found at %s" % (offset+found)
                 (type,size) = unpack('HH',data[found:found+4])
                 if process_imagename(addr_space,types,offset+found).find('Idle') != -1:
                     return process_dtb(addr_space, types, offset+found)
@@ -428,7 +428,6 @@ class MemoryFilesStats(Stats.Handler):
                 yield (t, t, 'leaf')
         
     def render_pane(self, branch, query, result, condition='1'):
-        print branch
         ## We may only draw on the pane that belongs to us:
         if branch[0] != self.name:
             return

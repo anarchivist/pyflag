@@ -357,6 +357,8 @@ class PCAPFS(DBFS):
             except StopIteration:
                 break
 
+        processor.flush()
+
         pcap_dbh.check_index("connection_details",'src_ip')
         pcap_dbh.check_index("connection_details",'src_port')
         pcap_dbh.check_index("connection_details",'dest_ip')

@@ -324,7 +324,7 @@ class RemoteIOSourceTests(unittest.TestCase):
     def test02RemoteIOSource(self):
         """ Test the remote iosource implementation """
         io1 = iosubsys.iosource([['subsys','advanced'],
-                                 ['filename','%s/pyflag_stdimage_0.2' % config.UPLOADDIR]])
+                                 ['filename','%s/pyflag_stdimage_0.4.dd' % config.UPLOADDIR]])
         
         ## get the remote fd:
         import remote
@@ -335,7 +335,7 @@ class RemoteIOSourceTests(unittest.TestCase):
         IO.test_read_random(io1,r, io1.size, 1000000, 100)
 
     test_case = "PyFlagTestCase"
-    test_file = "/pyflag_stdimage_0.2"
+    test_file = "/pyflag_stdimage_0.4.dd"
     fstype = "Sleuthkit"
     
     def test01LoadingFD(self):

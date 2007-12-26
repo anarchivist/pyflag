@@ -72,6 +72,7 @@ class LiveTables(FlagFramework.EventHandler):
             `BCC` VARCHAR(250),
             `Subject` VARCHAR(250),
             `Message` Text,
+            `Sent` TIMESTAMP default 0,
             primary key (`id`))""")
 
 import fnmatch
@@ -79,7 +80,7 @@ import fnmatch
 class HotmailScanner(Scanner.GenScanFactory):
     """ Detects Live.com/Hotmail web mail sessions """
     default = True
-    depends = ['TypeScan']
+    depends = ['TypeScan', 'HTTPScanner']
 
     def multiple_inode_reset(self, inode_glob):
         Scanner.GenScanFactory.multiple_inode_reset(self, inode_glob)
@@ -115,12 +116,65 @@ class HotmailScanner(Scanner.GenScanFactory):
 
         def external_process(self, fd):
             pyflaglog.log(pyflaglog.DEBUG,"Opening %s for Hotmail processing" % self.fd.inode)
-
             ## Now we should be able to parse the data out:
+            self.process_send_message(fd)
             self.process_editread(fd)
+            self.process_readmessage(fd)
+
+
+        def process_send_message(self,fd):
+            ## Check to see if this is a POST request (i.e. mail is
+            ## sent to the server):
+            dbh = DB.DBO(self.case)
+            dbh.execute("select `key`,`value` from http_parameters, http where http.inode = %r and http.id = http_parameters.id", self.fd.inode)
+            query = dict([(r['key'].lower(),r['value']) for r in dbh])
+            result = {'type':'Edit Sent'}
+            for field, pattern in [('To','fto'),
+                                   ('From','ffrom'),
+                                   ('CC','fcc'),
+                                   ('Bcc', 'fbcc'),
+                                   ('Subject', 'fsubject'),
+                                   ('Message', 'fmessagebody')]:
+                if query.has_key(pattern):
+                    result[field] = query[pattern]
+
+            if len(result.keys())>2:
+                return self.insert_message(result)
+            else: return False
 
         def process_readmessage(self,fd):
-            pass
+            result = {'type': 'Read', 'Message':'' }
+            tag = self.parser.find(self.parser.root, 'div', **{'class':'ReadMsgContainer'})
+            if not tag: return
+
+            ## Find the subject:
+            sbj = self.parser.find(tag, 'td', **{'class':'ReadMsgSubject'})
+            if sbj: result['Subject'] = decode_entity(sbj['_cdata'])
+
+            ## Fill in all the other fields:
+            context = None
+            for td in self.parser.search(tag, 'td'):
+                data = td['_cdata']
+                if context:
+                    result[context] = decode_entity(data)
+                    context = None
+                
+                if data.lower().startswith('from:'):
+                    context = 'From'
+                elif data.lower().startswith('to:'):
+                    context = 'To'
+                elif data.lower().startswith('sent:'):
+                    context = 'Sent'
+
+            ## Now the message:
+            ## On newer sites its injected using script:
+            for s in self.parser.search(self.parser.root,'script'):
+                m=re.match("document\.getElementById\(\"MsgContainer\"\)\.innerHTML='([^']*)'", s['_cdata'])
+                if m:
+                    result['Message'] += m.group(1).decode("string_escape")
+                    break
+
+            return self.insert_message(result)            
 
         def process_editread(self, fd):
             ## Find the ComposeHeader table:
@@ -128,7 +182,6 @@ class HotmailScanner(Scanner.GenScanFactory):
 
             tag = self.parser.find(self.parser.root, 'table', **{"class":'ComposeHeader'})
             if not tag:
-                #pyflaglog.log(pyflaglog.DEBUG, "Tag ComposeHeader not found in %s" % self.fd.inode)
                 return
 
             ## Find the From:
@@ -160,6 +213,9 @@ class HotmailScanner(Scanner.GenScanFactory):
                     result['Message'] += m.group(1).decode("string_escape")
                     break
 
+            return self.insert_message(result)
+            
+        def insert_message(self, result):
             dbh = DB.DBO(self.case)
             dbh.insert('live_messages', **result)
             id = dbh.autoincrement()
@@ -244,12 +300,12 @@ import pyflag.tests as tests
 class HotmailTests(tests.ScannerTest):
     """ Tests Hotmail Scanner """
     test_case = "PyFlagTestCase"
-    test_file = 'test/files/'
-    subsystem = "Mounted"
-    fstype = "Mounted"
+    test_file = 'live.com.pcap.e01'
+    subsystem = "EWF"
+    fstype = "PCAP Filesystem"
 
-    def test01HTTPScanner(self):
-        """ Test HTTP Scanner """
+    def test01HotmailScanner(self):
+        """ Test Hotmail Scanner """
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env,
                              command="scan",

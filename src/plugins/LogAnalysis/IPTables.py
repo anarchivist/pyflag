@@ -37,6 +37,7 @@ config = pyflag.conf.ConfObject()
 import pyflag.DB as DB
 import re
 import Simple
+import Apache
 
 IPTABLES_FIELDS = [
     ## IPTables_parameter, Name, Description, ColumnType, default, index
@@ -97,7 +98,9 @@ class IPTablesLog(LogFile.Log):
             if not match:
                 continue
 
-            fields["TIME"] = "2007%s%s %s" % (match.group(1), match.group(2))
+            fields["TIME"] = "2007-%02u-%02u %s" % (Apache.months[match.group(1)],
+                                                  int(match.group(2)),
+                                                  match.group(3))
             
             match = self.prefix_re.search(row)
             if match:
@@ -111,7 +114,7 @@ class IPTablesLog(LogFile.Log):
                 except KeyError:
                     pass
 
-            if fields:
+            if len(fields.keys())>2:
                 yield fields
 
     def form(self, query, result):

@@ -145,14 +145,4 @@ class EventLogTest(LogFile.LogDriverTester):
         ## Check that all rows were uploaded:
         dbh.execute("select count(*) as c from `%s_log`", self.test_table)
         row = dbh.fetch()
-        self.assertEqual(row['c'], 8334)
-
-        ## More specific tests
-        dbh.execute("select count(*) as c from `%s_log` where `IP Address` = 2921232307", self.test_table)
-        row = dbh.fetch()
-        self.assertEqual(row['c'], 129)
-
-
-        dbh.execute("select count(*) as c from `%s_log` where cs_username = 'administrator'", self.test_table)
-        row = dbh.fetch()
-        self.assertEqual(row['c'], 7898)
+        self.assertEqual(row['c'], 626)

@@ -491,7 +491,7 @@ import pyflag.pyflagsh as pyflagsh
 class RegScanTest(pyflag.tests.ScannerTest):
     """ Test Registry scanner """
     test_case = "PyFlagTestCase"
-    test_file = "pyflag_stdimage_0.3.e01"
+    test_file = "pyflag_stdimage_0.4.e01"
     subsystem = 'EWF'
     offset = "16128s"
 

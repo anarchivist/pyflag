@@ -1458,7 +1458,7 @@ class HTMLUI(UI.GenericUI):
         ## Do not propagate __ parameters:
         for k,v in self.form_parms:
             if not k.startswith("__"):
-                base += "<input type=hidden name='%s' value=\"%s\">\n" % (k,cgi.escape(v, True))
+                base += "<input type=hidden name='%s' value=\"%s\">\n" % (k,cgi.escape(v.__str__(), True))
 
         base += self.submit(value,name, target=self.form_target, **opts)
 
