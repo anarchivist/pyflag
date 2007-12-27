@@ -393,8 +393,31 @@ function AdjustHeightToPageSize(element_id) {
 
   var position = getAbsolutePosition(element);
 
-  element.style.height = window.innerHeight - position.y -1 + "px";
-  element.style.overflowY = 'auto';
+  /** Try to determine the window height catering for IE
+      braindeadness 
+  */
+  var myHeight = 0;
+  var myWidth = 0;
+
+  if( typeof( window.innerWidth ) == 'number' ) {
+    //Non-IE
+    myWidth = window.innerWidth;
+    myHeight = window.innerHeight;
+  } else if( document.documentElement && ( document.documentElement.clientWidth || document.documentElement.clientHeight ) ) {
+    //IE 6+ in 'standards compliant mode'
+    myWidth = document.documentElement.clientWidth;
+    myHeight = document.documentElement.clientHeight;
+  } else if( document.body && ( document.body.clientWidth || document.body.clientHeight ) ) {
+    //IE 4 compatible
+    myWidth = document.body.clientWidth;
+    myHeight = document.body.clientHeight;
+  }
+
+  try {
+    element.style.height = myHeight - position.y -1 + "px";
+    element.style.width = myWidth - position.x -1 + "px";
+    element.style.overflowY = 'auto';
+  } catch(err) {};
 }
 
 /** This searches the heirarchy of windows for a window of the given

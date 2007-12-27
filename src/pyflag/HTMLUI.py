@@ -340,7 +340,8 @@ class HTMLUI(UI.GenericUI):
             return "link_to_parent(\"%s\", 0); return false;" % target
 
         if pane=="main":
-            return "post_link('f?%s','main'); find_window_by_name(window.__pyflag_name).close(); return false;" % target
+            #return "post_link('f?%s','main'); find_window_by_name(window.__pyflag_name).close(); return false;" % target
+            return "post_link('f?%s','main'); return false;" % target
     
     def link(self,string,target=None,options=None,icon=None,tooltip=None, pane='main', **target_options):
         ## If the user specified a URL, we just use it as is:

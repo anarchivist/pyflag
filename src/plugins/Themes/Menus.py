@@ -67,6 +67,9 @@ class Menu(Theme.BasicTheme):
         <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
         </head>
         <body style="overflow: auto;">
+        <!--[if lt IE 7.]>
+        <script defer src="javascript/pngfix.js" type="text/javascript" language="javascript"></script>
+        <![endif]-->
         <script src="javascript/functions.js" type="text/javascript" language="javascript"></script>'''
         if toolbar_str:
             result += '''<div class=PyFlagHeader>
@@ -102,6 +105,9 @@ class Menu(Theme.BasicTheme):
             <title>%s</title>
             <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
             <script src="javascript/functions.js" type="text/javascript" language="javascript"></script>
+            <!--[if lt IE 7.]>
+            <script defer type="text/javascript" src="javascript/pngfix.js"></script>
+            <![endif]-->
             <script> window.__pyflag_parent = "main"; window.__pyflag_name = "main"; </script>
           </head>
         <body>\n''' % title

@@ -271,7 +271,8 @@ class TableViewer(FileSystem.StringIOFile):
     def __init__(self, case, fd, inode):
         parts = inode.split('|')
         ourinode = parts[-1][1:]
-
+        self.size = 0
+        
         self.table, self.id, self.value = ourinode.split(':')
         FileSystem.StringIOFile.__init__(self, case, fd, inode)
         self.force_cache()

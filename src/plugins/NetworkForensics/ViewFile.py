@@ -78,11 +78,13 @@ class ViewFile(Reports.report):
             content_type = m.buffer(fd.read(1024))
             fd.seek(0)
 
+        result.generator.content_type = content_type
+
         ## Now establish the dispatcher for it
         for k,v in self.dispatcher.items():
             if k.search(content_type):
                 return v(self,fd, result)
-                
+
         return self.default_handler(fd, result)
 
     def default_handler(self, fd, ui):
