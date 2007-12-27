@@ -62,6 +62,12 @@ config.add_option("scanners", default='HTTPScanner,HotmailScanner,MSNScanner,IRC
 config.add_option("timeout", default=120, type='int',
                   help="The maximum inactivity time after which the tcp reassembler will be flushed")
 
+config.add_option("destination", default=None, 
+                  help='Move files to there rather than unlink them')
+
+config.add_option("lock", default='.lock',
+                  help="Do not operate on directory while lock file is present")
+
 config.add_option("single", default=False, action='store_true',
                   help = "Single shot (exit once done)")
 
@@ -178,11 +184,17 @@ last_time = 0
 while 1:
     files = os.listdir(directory)
     files.sort()
-    for f in files:
-        filename = "%s/%s" % (directory,f)
-        load_file(filename)
-        os.unlink(filename)
-        last_time = time.time()
+    if config.lock not in files:
+        for f in files:
+           filename = "%s/%s" % (directory,f)
+           load_file(filename)
+           if config.destination:
+               os.rename(filename, destination+"/"+filename)
+           else:
+               os.unlink(filename)
+           last_time = time.time()
+    else:
+       print "Lock file found"
 
     if config.single:
         sys.exit(0)
