@@ -141,7 +141,7 @@ CLASS(TCPHashTable, Object)
 
      /** Process the ip packet */
      int          METHOD(TCPHashTable, process, PyPacket *packet);
-     int          METHOD(TCPHashTable, flush);
+     void         METHOD(TCPHashTable, flush);
 END_CLASS
 
 /** Given a packet finds the corresponding stream - or if one does not

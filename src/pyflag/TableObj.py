@@ -1437,6 +1437,7 @@ class InodeType(StringType):
         def annotate_cb(query, result):
             # We just close since we have just deleted it
             if query.has_key('delete'):
+                del query['delete']
                 return result.refresh(0, query, pane='parent')
 
             annotate = AnnotationObj(case=self.case)

@@ -189,7 +189,7 @@ while 1:
            filename = "%s/%s" % (directory,f)
            load_file(filename)
            if config.destination:
-               os.rename(filename, destination+"/"+filename)
+               os.symlink(filename, config.destination+"/"+f)
            else:
                os.unlink(filename)
            last_time = time.time()

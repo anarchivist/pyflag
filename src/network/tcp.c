@@ -7,8 +7,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-static int con_id=1;
-
 /** 
     We keep count of the total number of streams we are currenrtly
     keeping track of.

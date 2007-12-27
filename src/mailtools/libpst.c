@@ -357,10 +357,10 @@ int32_t pst_load_extended_attributes(pst_file *pf) {
   pst_desc_ll *p;
   pst_num_array *na;
   //  pst_index_ll *list;
-  pst_index2_ll *list2;
+  pst_index2_ll *list2=NULL;
   unsigned char * buffer=NULL, *headerbuffer=NULL;//, *tc;
   pst_x_attrib xattrib;
-  int32_t bptr = 0, bsize, hsize, tint, err=0, x;
+  int32_t bptr = 0, bsize=0, hsize=0, tint, err=0, x;
   pst_x_attrib_ll *ptr, *p_head=NULL, *p_sh=NULL, *p_sh2=NULL;
 
   DEBUG_ENT("pst_loadExtendedAttributes");
@@ -4051,7 +4051,7 @@ size_t _pst_ff_getID2block(pst_file *pf, u_int32_t id2, pst_index2_ll *id2_head,
 size_t _pst_ff_getID2data(pst_file *pf, pst_index_ll *ptr, struct holder *h) {
   // if the attachment begins with 01 01, <= 256 bytes, it is stored in the record
   int32_t ret;
-  unsigned char *b = NULL, *t;
+  unsigned char *b = NULL;
   DEBUG_ENT("_pst_ff_getID2data");
   if (!(ptr->id & 0x02)) {
     ret = _pst_ff_getIDblock_dec(pf, ptr->id, &b);
@@ -4084,8 +4084,8 @@ size_t _pst_ff_getID2data(pst_file *pf, pst_index_ll *ptr, struct holder *h) {
 size_t _pst_ff_compile_ID(pst_file *pf, u_int32_t id, struct holder *h, int32_t size) {
   size_t z, a;
   u_int16_t count, y;
-  u_int32_t x, b;
-  unsigned char * buf3 = NULL, *buf2 = NULL, *t;
+  u_int32_t x;
+  unsigned char * buf3 = NULL, *buf2 = NULL;
   unsigned char fdepth;
 
   DEBUG_ENT("_pst_ff_compile_ID");

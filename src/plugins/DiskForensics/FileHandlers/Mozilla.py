@@ -28,6 +28,7 @@ import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 import pyflag.Scanner as Scanner
 import FileFormats.MozHist as MozHist
+import pyflag.pyflaglog as pyflaglog
 
 class MozHistEventHandler(FlagFramework.EventHandler):
     def create(self, dbh, case):
@@ -118,7 +119,7 @@ class MozHistScan(Scanner.GenScanFactory):
 
         def external_process(self, fd):
             ## Read all the events from the file:
-            print "Processing %s as mork" % self.fd.inode
+            pyflaglog.log(pyflaglog.DEBUG, "Processing %s as mork" % self.fd.inode)
             
             dbh = DB.DBO(self.case)
             inode_id = self.fd.lookup_id()

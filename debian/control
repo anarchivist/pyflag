@@ -2,14 +2,14 @@ Source: pyflag
 Section: utils
 Priority: optional
 Maintainer: Michael Cohen and David Collett <pyflag-support@lists.sourceforge.net>
-Build-Depends: debhelper (>= 4.0.0), zlib1g-dev, libmagic-dev, python-dev (>= 2.4), libclamav-dev, make, libextractor-dev, zlib1g-dev, python-ctypes
+Build-Depends: debhelper (>= 4.0.0), zlib1g-dev, libmagic-dev, python-dev (>= 2.5), make, python-imaging, python-pexpect, python-mysqldb
 Build-Conflicts: 
 Standards-Version: 3.6.1
 
 Package: pyflag
 Architecture: any
-Depends: python (>= 2.4), libmagic1, libclamav1, python2.4-mysqldb, mysql-server (>= 4.0.23), python2.4-imaging, libextractor1c2a, zlib1g, python-pexpect, python-ctypes, python-clamav
-Recommends: 
+Depends: python (>= 2.5), libmagic1, python-mysqldb, python-imaging, zlib1g, python-pexpect
+Recommends: python-dateutil, libgeoip-dev, libjpeg62-dev, clamav-daemon
 Description: python-based forensic tool
  The python Forensic Log Analysis GUI was designed to simplify the process of
  log file analysis and forensic investigations.  PyFlag performs
@@ -19,4 +19,4 @@ Description: python-based forensic tool
 Package: pyflag-doc
 Architecture: all
 Description: Documentation for pyflag
- This documentation includes blah
+ Documentation for PyFlag can be found on the pyflag wiki: http://www.pyflag.net/
