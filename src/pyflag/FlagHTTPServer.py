@@ -45,7 +45,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
 
     Dispatches the relevant reports depending on HTTP requests """
     
-    server_version = "PyFlag Server, " + config.VERSION.replace(":",'-')
+    server_version = "PyFlag Server, %s" % config.VERSION
     def parse_query(self):
         """ Parses the query and prepares a query object.
 
