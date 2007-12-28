@@ -1,4 +1,4 @@
-SUBDIRS = lib mailtools indextools_ng network regtools filesystems include pyflag remote mmedia
+SUBDIRS = lib mailtools indextools_ng network filesystems include pyflag remote mmedia
 
 my_javascript		=       $(shell find javascript -not -name .\*)
 nobase_pkgdata_DATA	=	$(my_javascript)

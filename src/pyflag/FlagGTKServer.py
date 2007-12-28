@@ -10,7 +10,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG ($Version: 0.84RC5 Date: Wed Dec 12 00:45:27 HKT 2007$)
+#  Version: FLAG ($Version: 0.85 Date: Fri Dec 28 16:12:30 EST 2007$)
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -42,6 +42,8 @@ config=pyflag.conf.ConfObject()
 import pyflag.Registry as Registry
 import pyflag.DB as DB
 import threading
+
+Registry.Init()
 
 class FlagServerToolbar(FlagToolbar):
     def __init__(self,canvas):
@@ -298,7 +300,7 @@ class GTKServer(gtk.Window):
         result=GTKUI.GTKUI(server=main,ftoolbar=main.ftoolbar)
         result.heading("PyFlag - Forensic and Log Analysis GUI")
         result.text("""
-        Version: $Version: 0.84RC5 Date: Wed Dec 12 00:45:27 HKT 2007$
+        Version: $Version: 0.85 Date: Fri Dec 28 16:12:30 EST 2007$
         Copyright 2004-2005:
            David Collett <daveco@users.sourceforge.net>
            Michael Cohen <scudette@users.sourceforge.net>

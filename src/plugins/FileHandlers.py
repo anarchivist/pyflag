@@ -97,6 +97,37 @@ class IOSourceMethod(IO.FileHandler):
         
         return image.open(None, None, query=query)
 
+class IOSourceMethod(IO.FileHandler):
+    """ This method returns an IO Source expressed as a URL.
+
+    The format is:
+
+    io://driver/query_string
+
+    For example:
+
+    io://Advanced/filename=image.dd&offset=0
+    """
+    method = "io"
+
+    def open(self):
+        try:
+            image = Registry.IMAGES.dispatch(self.name)()
+        except ValueError:
+            raise RuntimeError("Unknown IOSource driver %s" % self.name)
+
+        query = FlagFramework.query_type(string=self.path[1:])
+        filenames = query.getarray('filename')
+        query.clear('filename')
+
+        ## Adjust all the filenames to be rooted at the UPLOADDIR:
+        for f in filenames:
+            query['filename'] = os.path.normpath(
+                "%s/%s" % (config.UPLOADDIR, f))
+        
+        return image.open(None, None, query=query)
+
+
 import pyflag.tests as tests
 
 #class MethodHandlerTests(tests.FDTest):
