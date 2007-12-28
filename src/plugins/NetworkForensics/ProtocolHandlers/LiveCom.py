@@ -266,6 +266,12 @@ import textwrap
 
 ## A VFS File driver which formats a row in the db nicely:
 class TableViewer(FileSystem.StringIOFile):
+    """ A VFS driver to read rows from an SQL table.
+
+    Format is 't%s:%s:%s' % (table_name, column_name, value)
+
+    e.g. tlive_messages:id:2
+    """
     specifier = 't'
 
     def __init__(self, case, fd, inode):

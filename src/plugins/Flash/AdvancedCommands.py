@@ -96,6 +96,7 @@ class scan_path(pyflagsh.command):
 
         
 class scan(pyflagsh.command):
+    """ Scan a glob of inodes with a glob of scanners """
     def help(self):
         return "scan inode [list of scanners]: Scans the inodes with the scanners specified"
 
@@ -162,6 +163,7 @@ class scan(pyflagsh.command):
 ##
             
 class scanner_reset_path(scan):
+    """ Reset all files under a specified path """
     def help(self):
         return "scanner_reset_path path [list of scanners]: Resets the inodes under the path given with the scanners specified"
 
@@ -187,6 +189,7 @@ class scanner_reset_path(scan):
 
 ## There is little point in distributing this because its very quick anyway.
 class scanner_reset(scan):
+    """ Reset multiple inodes as specified by a glob """
     def help(self):
         return "reset inode [list of scanners]: Resets the inodes with the scanners specified"
     
@@ -207,6 +210,7 @@ class scanner_reset(scan):
         yield "Resetting complete"
     
 class load_and_scan(scan):
+    """ Load a filesystem and scan it at the same time """
     def help(self):
         return "load_and_scan iosource fstype mount_point [list of scanners]: Loads the iosource into the right mount point and scans all new inodes using the scanner list. This allows scanning to start as soon as VFS inodes are produced and before the VFS is fully populated."
 

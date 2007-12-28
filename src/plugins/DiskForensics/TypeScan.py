@@ -31,7 +31,7 @@ import pyflag.Reports as Reports
 import pyflag.Graph as Graph
 import pyflag.IO as IO
 import pyflag.Registry as Registry
-from pyflag.TableObj import StringType, TimestampType, InodeIDType, FilenameType, IntegerType
+from pyflag.TableObj import StringType, TimestampType, InodeIDType, FilenameType, IntegerType, InodeType
 
 class TypeTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
@@ -44,10 +44,7 @@ class TypeTables(FlagFramework.EventHandler):
         dbh.check_index('type','inode_id')
         
 class TypeScan(Scanner.GenScanFactory):
-    """ Detect File Type (magic).
-
-    In addition to recording the file type, this class can also perform
-    an action based on the mime type of the file"""
+    """ Detect File Type (magic). """
     order=5
     default=True
 
@@ -196,12 +193,12 @@ class MimeTypeStats(Stats.Handler):
         else:
             t = branch[1].replace("__",'/')
             result.table(
-                elements = [ InodeType(column='file.inode', case = self.case),
-                             FilenameType(case = self.case, link_pane='main'),
+                elements = [ InodeIDType('Inode', 'type.inode_id', case = self.case),
+                             FilenameType(case = self.case, link_pane='main', table='type'),
                              IntegerType('Size','inode.size'),
                              TimestampType('Timestamp','inode.mtime')],
-                table = 'file, type, inode',
-                where = 'type.inode=inode.inode and file.inode_id=inode.inode_id and file.mode like "r%%%%" and type.mime=%r ' % t,
+                table = 'type join inode on inode.inode_id = type.inode_id',
+                where = 'type.mime=%r ' % t,
                 case = self.case,
                 )
 
@@ -238,12 +235,12 @@ class TypeStats(Stats.Handler):
         else:
             t = branch[1].replace("__",'/')
             result.table(
-                elements = [ InodeType(column='file.inode', case = self.case),
-                             FilenameType(case = self.case, link_pane='main'),
+                elements = [ InodeIDType(column='type.inode_id', case = self.case),
+                             FilenameType(case = self.case, link_pane='main', table='type'),
                              IntegerType('Size','inode.size'),
                              TimestampType('Timestamp','inode.mtime')],
-                table = 'file, type, inode',
-                where = 'type.inode=inode.inode and file.inode_id=inode.inode_id and file.mode like "r%%%%" and type.type=%r ' % t,
+                table = 'type join inode on inode.inode_id = type.inode_id',
+                where = 'type.type=%r ' % t,
                 case = self.case,
                 )
                 

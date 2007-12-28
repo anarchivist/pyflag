@@ -429,7 +429,9 @@ class FTPDataStream:
 
 
 class FTPScanner(StreamScannerFactory):
-
+    """ Analyse data for FTP protocol """
+    default = True
+    
     def process_stream(self, stream, factories):
 
         def is_data_stream(stream):
@@ -449,7 +451,7 @@ class FTPScanner(StreamScannerFactory):
 
         ## We first need to check whether or not it's a data stream
         if is_data_stream(stream):
-            print "DATA stream."
+            #print "DATA stream."
             dbh = DB.DBO(case = self.case)
             dbh.execute("""update ftp_data_streams set inode  """ \
                         """ = "%s" where """ \

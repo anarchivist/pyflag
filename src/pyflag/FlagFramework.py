@@ -927,3 +927,18 @@ import socket,struct
 
 def inet_aton(address):
     return struct.unpack("I", socket.inet_aton(address))[0]
+
+def print_info():
+    print "PyFlag installation information:"
+    for heading, registry in (("Scanners", "SCANNERS"),
+                              ("VFS File drivers", "VFS_FILES"),
+                              ("Shell commands", "SHELL_COMMANDS"),
+                              ("File systems", "FILESYSTEMS"),
+                              ("Image format handlers", "IMAGES"),
+                              ):
+        print "%s:\n%s\n" % (heading, '-' * len(heading))
+        registry = getattr(Registry, registry)
+        for cls in registry.classes:
+            print "%s: %s" % (cls, cls.__doc__)
+
+        print

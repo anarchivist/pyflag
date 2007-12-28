@@ -107,6 +107,10 @@ class BrowserHistoryReport(Reports.report):
 ## We make the scanner store it in memory - typically history files
 ## are not that large.
 class MozHistScan(Scanner.GenScanFactory):
+    """ Scan for Mozilla history files """
+    default = True
+    depends = ['TypeScan']
+    
     class Scan(Scanner.StringIOType):
         mork = None
         def boring(self, metadata, data=''):

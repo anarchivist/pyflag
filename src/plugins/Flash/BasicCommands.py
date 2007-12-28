@@ -36,8 +36,9 @@ import fnmatch
 import pyflag.TEXTUI as TEXTUI
 
 class load(pyflagsh.command):
+    """ Assigns a current case for use in the shell """
     def help(self):
-        return  "load case.iosource: loads the iosource within case into the shell."
+        return  "load case.iosource: loads the case into the shell."
     
     def execute(self):
         args=self.args
@@ -135,6 +136,7 @@ class ls(pyflagsh.command):
                 return files[i]
 
 class cd(ls):
+    """ Change working directory """
     def help(self):
         return  "cd [dir]: changes directory to root (if dir not specified) or to dir."
     
@@ -233,6 +235,7 @@ class cp(ls):
                 yield "Unable to copy %s: %s" %(arg,e)
 
 class help(pyflagsh.command):
+    """ Print some help about a command (try help help) """
     def help(self):
         return("""PyFlag shell allows direct access to the filesystems. Command line expansion is supported. The following commands are defined, type help command to find out more:
 %s
@@ -257,6 +260,7 @@ class help(pyflagsh.command):
                 yield(command.__doc__)
 
 class pwd(pyflagsh.command):
+    """ Print the current working directory """
     def execute(self):
         yield "Current directory is %s" % self.environment.CWD
 
@@ -573,6 +577,8 @@ class file(ls):
                 yield row
 
 class delete_case(load):
+    """ Drop a case and delete all its data """
+    
     def help(self):
         return """Delete the specified case and all data within it. E.g. 'delete_case foobar'"""
 
@@ -587,10 +593,10 @@ class delete_case(load):
             return
             raise RuntimeError("Unable to delete case %s (%s)" %(case,e))
 
-class create_iosource(load):
-    def help(self):
-        return "create_iosource CaseName iosource_name URL. Creates the named IOSource in the specified case using the URL "
-
+#class create_iosource(load):
+#    def help(self):
+#        return "create_iosource CaseName iosource_name URL. Creates the named IOSource in the specified case using the URL "
+#
 ##    def execute(self):
 ##        case = self.args[0]
 ##        name = self.args[1]
@@ -598,6 +604,8 @@ class create_iosource(load):
         
 
 class create_case(load):
+    """ Create a new PyFlag case """
+    
     def help(self):
         return """Create a new empty case with specified name. E.g. 'create_case foobar'"""
 

@@ -3,6 +3,7 @@ import pyflag.LogFile as LogFile
 import pyflag.DB as DB
 
 class drop_log_preset(pyflagsh.command):
+    """ Delete a log preset """
     def help(self):
         return "Delete the given log preset and all the tables which use it (DANGEROUS)"
 

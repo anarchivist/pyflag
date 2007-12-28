@@ -65,8 +65,9 @@ class PstScan(GenScanFactory):
     class Drawer(Scanner.Drawer):
         description = "File Type Related Scanners"
         name = "File Scanners"
-        contains = [ 'PstScan','IEIndex', 'RegistryScan', 'TypeScan', 'DLLScan',
-                     'ExtractorScan' ]
+        contains = [ 'PstScan','IEIndex', 'MozHistScan', 'RegistryScan',
+                     'TypeScan', 'DLLScan', 'ExtractorScan', 'OLEScan',
+                     ]
         default = True
 
     class Scan(StoreAndScanType):

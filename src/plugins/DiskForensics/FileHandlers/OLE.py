@@ -70,7 +70,7 @@ class OLEScan(Scanner.GenScanFactory):
             new_inode = "%s|O%s" % (self.fd.inode, self.count)
             self.count+=1
             filename = metadata.get('Attach filename', metadata.get('Attach long filenm','Attachment'))
-            print "Creating a new inode %s on %s/%s" % (new_inode, path, filename)
+            #print "Creating a new inode %s on %s/%s" % (new_inode, path, filename)
             
             ## Create a cache file:
             out_fd = open(FlagFramework.get_temp_path(self.case, new_inode),'w')
@@ -127,6 +127,7 @@ class OLEScan(Scanner.GenScanFactory):
 ## recreate the file if the cache does not exist. This way we can
 ## delete all files in the cache with no effect.
 class OLEFile(FileSystem.File):
+    """ A VFS Driver to access files within the OLE """
     specifier = 'O'
 
 ## UnitTests:

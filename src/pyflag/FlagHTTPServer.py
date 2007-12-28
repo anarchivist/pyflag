@@ -425,8 +425,15 @@ if __name__ == "__main__":
 
     Registry.Init()
 
+    config.add_option("info", default=False, action='store_true',
+                      help = "Print information about this pyflag installation and exit")
+
     ## Parse all the command line options:
     config.parse_options()
+
+    if config.info:
+        FlagFramework.print_info()
+        sys.exit(0)
     
     flag = FlagFramework.Flag()
     FlagFramework.GLOBAL_FLAG_OBJ =flag
