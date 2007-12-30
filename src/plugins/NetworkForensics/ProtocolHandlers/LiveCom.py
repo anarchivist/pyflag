@@ -65,6 +65,7 @@ class LiveTables(FlagFramework.EventHandler):
             """ CREATE table if not exists `live_messages` (
             `id` int not null auto_increment,
             `inode_id` int not null,
+            `service` VARCHAR(50),
             `type` enum('Edit Read','Edit Sent','Read','Listed') default 'Edit Read',
             `From` VARCHAR(250),
             `To` VARCHAR(250),
@@ -93,6 +94,7 @@ class HotmailScanner(Scanner.GenScanFactory):
             'text/html',
             )
         parser = None
+        service = "Hotmail"
 
         def boring(self, metadata, data=''):
             ## We dont think its boring if our base class does not:
@@ -128,7 +130,7 @@ class HotmailScanner(Scanner.GenScanFactory):
             dbh = DB.DBO(self.case)
             dbh.execute("select `key`,`value` from http_parameters, http where http.inode = %r and http.id = http_parameters.id", self.fd.inode)
             query = dict([(r['key'].lower(),r['value']) for r in dbh])
-            result = {'type':'Edit Sent'}
+            result = {'type':'Edit Sent' }
             for field, pattern in [('To','fto'),
                                    ('From','ffrom'),
                                    ('CC','fcc'),
@@ -143,7 +145,7 @@ class HotmailScanner(Scanner.GenScanFactory):
             else: return False
 
         def process_readmessage(self,fd):
-            result = {'type': 'Read', 'Message':'' }
+            result = {'type': 'Read', 'Message':''}
             tag = self.parser.find(self.parser.root, 'div', **{'class':'ReadMsgContainer'})
             if not tag: return
 
@@ -256,6 +258,7 @@ class LiveComMessages(Reports.report):
                          StringType('Subject', 'Subject'),
                          StringType('Message','Message'),
                          StringType('Type','type'),
+                         StringType('Service','service'),
                          ],
             table = 'live_messages,inode',
             where = 'inode.inode_id=live_messages.inode_id',

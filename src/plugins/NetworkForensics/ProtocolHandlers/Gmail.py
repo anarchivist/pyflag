@@ -13,7 +13,6 @@ import pyflag.Reports as Reports
 import pyflag.FileSystem as FileSystem
 import re, urllib
 import pyflag.pyflaglog as pyflaglog
-import fnmatch
 import LiveCom
 
 def parse_json(string):
@@ -59,6 +58,7 @@ class GmailScanner(LiveCom.HotmailScanner):
     class Scan(LiveCom.HotmailScanner.Scan):
         parser = None
         javascript = None
+        service = "Gmail"
 
         def boring(self, metadata, data=''):
             dbh = DB.DBO(self.case)
@@ -87,7 +87,7 @@ class GmailScanner(LiveCom.HotmailScanner):
                     while self.parser.next_token(True): pass
                 else:
                     self.javascript += data
-                    
+                     
         def external_process(self, fd):
             if self.process_send_message(fd) or self.process_readmessage(fd):
                 pyflaglog.log(pyflaglog.DEBUG,"Opening %s for Gmail processing" % self.fd.inode)

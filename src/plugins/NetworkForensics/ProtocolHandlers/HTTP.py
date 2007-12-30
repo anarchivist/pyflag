@@ -49,7 +49,7 @@ class HTTP:
         self.ddfs = ddfs
         self.request = { 'url':'/unknown_request_%s' % fd.con_id }
         self.response = {}
-        self.request_re = re.compile("(GET|POST|PUT|OPTIONS) +([^ ]+) +HTTP/1\..",
+        self.request_re = re.compile("(GET|POST|PUT|OPTIONS|PROPFIND) +([^ ]+) +HTTP/1\..",
                                      re.IGNORECASE)
         self.response_re = re.compile("HTTP/1\.. (\\d+) +", re.IGNORECASE)
 
@@ -131,7 +131,7 @@ class HTTP:
 
                     ## There is a \r\n delimiter after the data chunk
                     headers['body'] += self.fd.read(length+2)
-                    
+
                 return
         except KeyError:
             pass
@@ -139,7 +139,7 @@ class HTTP:
         ## If the header says close then the rest of the file is the
         ## body (all data until connection is closed)
         try:
-            if "closed" in headers['connection'].lower():
+            if "close" in headers['connection'].lower():
                 headers['body'] = self.fd.read()
                 return
         except KeyError:
@@ -259,7 +259,10 @@ class HTTPScanner(StreamScannerFactory):
         ## FIXME: Adapt to use cgi.FieldStorage
         try:
             base, query = request['url'].split('?',1)
-        except:
+        except ValueError:
+            base = request['url']
+            query = ''
+        except KeyError:
             return
         
         ## We use pythons standard CGI module for parsing, this allows
@@ -405,7 +408,10 @@ class HTTPScanner(StreamScannerFactory):
                             parent         = parent)                            
 
             ## handle the request's parameters:
-            self.handle_parameters(p.request, dbh.autoincrement())
+            try:
+                self.handle_parameters(p.request, dbh.autoincrement())
+            except KeyError:
+                pass
 
             ## Scan the new file using the scanner train. 
             self.scan_as_file(new_inode, factories)

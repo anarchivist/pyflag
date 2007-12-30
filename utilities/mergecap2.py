@@ -46,7 +46,7 @@ limits.
 
 This is the fast implementation of mergecap done using the python pcap
 extension module.
-""", version = "Version: %prog PyFlag " + config.VERSION)
+""", version = "Version: %%prog PyFlag %s" % config.VERSION)
 
 config.add_option("glob", short_option='g',
                   help = "Load All files in the glob. This is useful when there are too many"
