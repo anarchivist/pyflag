@@ -547,7 +547,7 @@ class Chunked(File):
             try:
                 size = int(self.data[:end],16)
             except:
-                pyflaglog.log(pyflaglog.DEBUG, "Expecting chunked data length, found %s. Losing sync." % self.data[:end])
+                pyflaglog.log(pyflaglog.DEBUG, "(%s)Expecting chunked data length, found %r. Losing sync." % (self.inode, self.data[:min(end,10)]))
                 return
             
             if size==0: break

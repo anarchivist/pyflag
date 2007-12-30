@@ -1,5 +1,5 @@
 """ This module uses volatility from
-http://www.volatilesystems.com/VolatileWeb/ to implement a memory
+https://www.volatilesystems.com/default/volatility to implement a memory
 forensic capability in pyflag
 """
 

@@ -29,7 +29,7 @@ class HTMLParser(lexer.Lexer):
 
         ## Scripts can actually contain lots of <> which confuse us so
         ## we need to ignore all the dat until the </script>
-        [ "SCRIPT", "(.*?)</script.*?>", "SCRIPT", "CDATA" ],
+        [ "SCRIPT", "(.*?)</script[^>]*>", "SCRIPT", "CDATA" ],
         [ "SCRIPT", "(.+)", "SCRIPT", "SCRIPT" ],
 
         ## Identify DTDs: (We dont bother parsing DTDs, just skip
@@ -68,9 +68,9 @@ class HTMLParser(lexer.Lexer):
 
     def __init__(self, verbose = 0):
         lexer.Lexer.__init__(self, verbose)
-        self.root = dict(_children = [], _name='root', _cdata = '', _type ='open')
-        self.stack = [self.root,]
         self.TAG_START(None, None)
+        self.root = self.tag
+        self.stack = [self.root,]
 
     def CDATA(self, token, match):
         self.tag['_cdata'] += match.group(0)

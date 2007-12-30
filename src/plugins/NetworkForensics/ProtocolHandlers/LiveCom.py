@@ -56,7 +56,7 @@ import pyflag.DB as DB
 import pyflag.Scanner as Scanner
 import pyflag.Reports as Reports
 import pyflag.FileSystem as FileSystem
-import re
+import re,cgi
 import pyflag.pyflaglog as pyflaglog
 
 class LiveTables(FlagFramework.EventHandler):
@@ -292,11 +292,12 @@ class TableViewer(FileSystem.StringIOFile):
         dbh = DB.DBO(self.case)
         dbh.execute("select * from %s where `%s`=%r", (self.table, self.id, self.value))
         for row in dbh:
-            result += ("<hrule><table border=1>\n")
+            result += ("<table border=1>\n")
             for k,v in row.items():
                 result += "<tr><td>%s</td>" % k
                 result += "<td>%s</td></tr>\n" % textwrap.fill(
-                    "%s" % v, subsequent_indent = "<br>")
+                    cgi.escape("%s" % v) or "&nbsp;",
+                    subsequent_indent = "<br>")
                 
             result += "</table></body></html>"
         return result
