@@ -219,7 +219,7 @@ class HotmailScanner(Scanner.GenScanFactory):
             
         def insert_message(self, result):
             dbh = DB.DBO(self.case)
-            dbh.insert('live_messages', **result)
+            dbh.insert('live_messages', service=self.service, **result)
             id = dbh.autoincrement()
 
             dbh.execute("select mtime from inode where inode_id = %r" , self.fd.inode_id)
