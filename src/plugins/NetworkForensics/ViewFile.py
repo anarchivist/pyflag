@@ -30,7 +30,7 @@ import sys,re,string
 import HTMLParser
 import StringIO
 import re,os.path,cgi, textwrap
-from FlagFramework import query_type,normpath, Magic
+from FlagFramework import query_type,normpath, Magic, Curry
 import pyflag.FileSystem as FileSystem
 import FileFormats.HTML as HTML
 
@@ -63,9 +63,10 @@ class ViewFile(Reports.report):
 
     def display(self,query,result):
         result.decoration = 'naked'
+        self.case = query['case']
 
-        dbh = DB.DBO(query['case'])
-        fsfd = FileSystem.DBFS( query["case"])
+        dbh = DB.DBO(self.case)
+        fsfd = FileSystem.DBFS( self.case)
         fd = fsfd.open(inode=query['inode'])
         
         try:
@@ -123,7 +124,9 @@ class ViewFile(Reports.report):
     def html_handler(self,fd, ui):
         """ We sanitise the html here """
         def generator():
-            parser = HTML.HTMLParser(tag_class = HTML.SanitizingTag)
+            parser = HTML.HTMLParser(tag_class = Curry(HTML.ResolvingHTMLTag,
+                                                       inode_id = fd.lookup_id(),
+                                                       case = self.case))
             data = fd.read(1000000)
             parser.feed(data)
             while parser.next_token(): pass
@@ -191,7 +194,7 @@ class HTMLSanitiser(HTMLParser.HTMLParser):
         HTMLParser.HTMLParser.__init__(self)
         ## Output will be written to this
         self.output = StringIO.StringIO()
-        self.dbh = DB.DBO(case)
+        dbh = DB.DBO(self.case)
         self.inode = inode
         self.case = case
         self.dbh.execute("select url from http where inode=%r", self.inode)

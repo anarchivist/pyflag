@@ -51,7 +51,7 @@ that HTTP object id.
 """
 import pyflag.FlagFramework as FlagFramework
 from pyflag.TableObj import StringType, TimestampType, InodeIDType, IntegerType, PacketType
-from FileFormats.HTML import decode_entity, HTMLParser
+import FileFormats.HTML as HTML
 import pyflag.DB as DB
 import pyflag.Scanner as Scanner
 import pyflag.Reports as Reports
@@ -103,7 +103,7 @@ class HotmailScanner(Scanner.GenScanFactory):
                    re.search("<title>\s+Windows Live", data):
                    ## Make a new parser:
                 if not self.parser:
-                    self.parser =  HTMLParser(verbose=0)
+                    self.parser =  HTML.HTMLParser(verbose=0)
                 return False
 
             return True
@@ -153,14 +153,14 @@ class HotmailScanner(Scanner.GenScanFactory):
 
             ## Find the subject:
             sbj = tag.find('td', {'class':'ReadMsgSubject'})
-            if sbj: result['Subject'] = decode_entity(sbj.innerHTML())
+            if sbj: result['Subject'] = HTML.decode_entity(sbj.innerHTML())
 
             ## Fill in all the other fields:
             context = None
             for td in tag.search('td'):
                 data = td.innerHTML()
                 if context:
-                    result[context] = decode_entity(data)
+                    result[context] = HTML.decode_entity(data)
                     context = None
                 
                 if data.lower().startswith('from:'):
@@ -193,7 +193,7 @@ class HotmailScanner(Scanner.GenScanFactory):
             row = tag.find( 'select', dict(name = 'ffrom'))
             if row:
                 option = row.find('option', dict(selected='.*'))
-                result['From'] = decode_entity(option['value']) 
+                result['From'] = HTML.decode_entity(option['value']) 
 
             for field, pattern in [('To','fto'),
                                    ('CC','fcc'),
@@ -201,7 +201,7 @@ class HotmailScanner(Scanner.GenScanFactory):
                                    ('Subject', 'fsubject')]:
                 tmp = tag.find('input', dict(name = pattern))
                 if tmp:
-                    result[field] = decode_entity(tmp['value'])
+                    result[field] = HTML.decode_entity(tmp['value'])
             
             ## Now extract the content of the email:
             result['Message'] = ''
@@ -238,6 +238,20 @@ class HotmailScanner(Scanner.GenScanFactory):
             
             return True
 
+class HTMLStringType(StringType):
+    """ A ColumnType which sanitises its input for HTML.
+    We also fetch images etc from the db if available.
+    """
+    def display(self, value, row, result):
+        print row
+        parser = HTML.HTMLParser(tag_class = FlagFramework.Curry(HTML.ResolvingHTMLTag,
+                                                                 case = result.defaults['case'],
+                                                                 inode_id = row['Inode']))
+        parser.feed(value)
+        parser.close()
+
+        return parser.root.innerHTML()
+
 class LiveComMessages(Reports.report):
     """
     Browse LiveCom/Hotmail messages.
@@ -259,7 +273,7 @@ class LiveComMessages(Reports.report):
                          StringType('CC', 'CC'),
                          StringType('BCC', 'BCC'),
                          StringType('Subject', 'Subject'),
-                         StringType('Message','Message'),
+                         HTMLStringType('Message','Message'),
                          StringType('Type','type'),
                          StringType('Service','service'),
                          ],

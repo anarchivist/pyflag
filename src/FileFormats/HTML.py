@@ -10,7 +10,9 @@ to keep going as much as possible.
 """
 
 import lexer
-import sys,re,urllib
+import sys,re,urllib,os
+import pyflag.DB as DB
+from FlagFramework import query_type, normpath
 
 def decode_entity(string):
     return re.sub("&#(\d+);", lambda x: chr(int(x.group(1))), string)
@@ -142,12 +144,87 @@ class SanitizingTag(Tag):
         attributes = "".join([" %s='%s'" % (k,v) for k,v \
                               in self.attributes.items() if k in \
                               self.allowable_attributes])
+
+        if 'src' in self.attributes:
+            attributes += ' src=%s' % self.resolve_reference(self.attributes['src'])
+
+        if 'href' in self.attributes:
+            attributes += ' href="javascript: alert(%r)"' % urllib.quote(self.attributes['href'])
         
         if self.type == 'selfclose':
             return "<%s%s/>" % (self.name, attributes)
         else:
             return "<%s%s>%s</%s>" % (self.name, attributes,
                                       self.innerHTML(), self.name)
+
+
+    def resolve_reference(self, reference):
+        return urllib.quote(reference)
+
+class ResolvingHTMLTag(SanitizingTag):
+    """ A special tag which resolves src and href back into the
+    database. This is useful in order to show embedded images etc from
+    the traffic.
+
+    Note that you would probably want to Curry this before passing it
+    to the parser because we need to know the inode and case (our
+    constructor takes more parameters.
+    """
+
+    def __init__(self, case, inode_id, name=None, attributes=None):
+        self.case = case
+        self.inode_id = inode_id
+        SanitizingTag.__init__(self, name, attributes)
+
+        ## Collect some information about this inode:
+        dbh = DB.DBO(case)
+        dbh.execute("select url,http.inode from http, inode where http.inode=inode.inode and inode.inode_id=%r", inode_id)
+        row = dbh.fetch()
+        try:
+            self.inode = row['inode']
+            url = row['url']
+            m=re.search("(http|ftp)://([^/]+)/([^?]*)",url)
+            self.method = m.group(1)
+            self.host = m.group(2)
+            self.base_url = os.path.dirname(m.group(3))
+            if not self.base_url.startswith("/"):
+                self.base_url = "/"+self.base_url
+
+            if self.base_url.endswith("/"):
+                self.base_url = self.base_url[:-1]
+
+        except Exception,e:
+            raise
+            self.method = ''
+            self.host = ''
+            self.base_url = ''
+
+        self.comment = False
+
+    def resolve_reference(self, reference):
+        original_reference = reference
+
+        ## Absolute reference
+        if reference.startswith('http'):
+            pass
+        elif reference.startswith("/"):
+            path = normpath("%s" % (reference))
+            reference="%s://%s%s" % (self.method, self.host, path)
+        else:
+            path = normpath("/%s/%s" % (self.base_url,reference))
+            reference="%s://%s%s" % (self.method, self.host, path)
+
+        ## Try to make reference more url friendly:
+        reference = reference.replace(" ","%20")
+        dbh = DB.DBO(self.case)
+        dbh.execute("select inode from http where url=%r and not isnull(inode) limit 1", reference)
+        row = dbh.fetch()
+        if row and row['inode']:
+            return '"f?%s"' % query_type(case=self.case, family="Network Forensics",
+                                         report="ViewFile", inode=row['inode'])
+
+        return '/images/spacer.png reference=\"%s\"' % original_reference
+
 
 class HTMLParser(lexer.Lexer):
     state = "CDATA"
@@ -250,12 +327,19 @@ class HTMLParser(lexer.Lexer):
                 self.tag = self.stack[-1]
             except IndexError: pass
         elif self.tag.type=='selfclose':
-            self.stack[-1].add_child(self.tag)
-            self.tag = self.stack[-1]
+            try:
+                self.stack[-1].add_child(self.tag)
+                self.tag = self.stack[-1]
+            except IndexError:
+                self.TAG_START(None, None)
+            
         elif self.tag.type=='open':
             ## Push the tag into the end of the stack and add it to
             ## our parent
-            self.stack[-1].add_child(self.tag)
+            try:
+                self.stack[-1].add_child(self.tag)
+            except IndexError: pass
+            
             self.stack.append(self.tag)
 
         if self.tag.name == 'script' and self.tag.type=='open':
@@ -266,6 +350,9 @@ class HTMLParser(lexer.Lexer):
         
     def ATTRIBUTE_VALUE(self, token, match):
         self.tag[self.current_attribute] = match.group(1) or match.group(2)
+
+    def close(self):
+        while self.next_token(): pass
 
 if __name__ == '__main__':
     l = HTMLParser(verbose=1, tag_class = SanitizingTag)

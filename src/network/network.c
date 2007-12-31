@@ -243,7 +243,7 @@ int TCP_Read(Packet self, StringIO input) {
   */
   this->packet.data_offset = self->start + this->packet.len;
   if(input->size <= this->packet.data_offset) 
-    goto end;
+    goto error;
 
   CALL(input, seek, this->packet.data_offset, SEEK_SET);
 
@@ -258,7 +258,12 @@ int TCP_Read(Packet self, StringIO input) {
   this->packet.data = talloc_memdup(self, input->data + input->readptr,
 				    this->packet.data_len);
 
- end:  
+  return input->size - self->start;
+
+ error:
+  this->packet.data_len = 0;
+  this->packet.data = NULL;
+
   return input->size - self->start;
 };
 

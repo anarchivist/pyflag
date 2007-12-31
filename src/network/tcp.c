@@ -36,7 +36,7 @@ void pad_to_first_packet(TCPStream self) {
   tcp = (TCP)find_packet_instance(first->packet->obj, "TCP");
   
   pad_length = tcp->packet.header.seq - self->next_seq;
-  if(pad_length > 50000) {
+  if(pad_length > 50000 || pad_length < -50000) {
     //printf("Needing to pad excessively, dropping data...\n");
     self->next_seq = tcp->packet.header.seq;
     return;

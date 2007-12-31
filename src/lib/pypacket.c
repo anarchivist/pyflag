@@ -95,7 +95,7 @@ static PyObject *PyPacket_getattr(PyPacket *self, char *field) {
 static PyObject *encode_property(Packet packet, struct struct_property_t *p) {
   void *item;
   PyObject *result;
-  int size;
+  unsigned int size;
 
   item = (void *) ((char *)(packet->struct_p) + p->item);
   
