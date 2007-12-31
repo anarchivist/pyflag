@@ -14,7 +14,7 @@ class SquirrelMailScan(LiveCom.HotmailScanner):
             dbh = DB.DBO(self.case)
             dbh.execute("select content_type,url,host from http where inode=%r limit 1", self.fd.inode)
             row = dbh.fetch()
-            if row and "compose.php" in row['url'] or "SquirrelMail" in data:
+            if (row and "compose.php" in row['url']) or "SquirrelMail" in data[:256]:
                 self.parser =  HTMLParser(verbose=0)
                 return False
             
@@ -51,15 +51,15 @@ class SquirrelMailScan(LiveCom.HotmailScanner):
 
             ## Fill in all the other fields:
             context = None
-            for td in self.parser.search(self.parser.root, 'td'):
+            for td in self.parser.root.search('td'):
                 if context:
-                    result[context] = decode_entity(td['_cdata'])
+                    result[context] = decode_entity(td.innerHTML())
                     context = None
 
-                b = self.parser.find(td, 'b')
+                b = td.find('b')
                 if not b: continue
 
-                data = b['_cdata']
+                data = b.innerHTML()
                 if data.lower().startswith('from:'):
                     context = 'From'
                 elif data.lower().startswith('to:'):
@@ -70,9 +70,9 @@ class SquirrelMailScan(LiveCom.HotmailScanner):
                     context = 'Subject'
 
             ## Now the message:
-            pre = self.parser.find(self.parser.root, 'pre')
+            pre = self.parser.root.find('pre')
             if pre:
-                result['Message'] += pre['_cdata']
+                result['Message'] += pre.innerHTML().replace("\n","\n<br>")
                 
             if len(result.keys())>3:
                 return self.insert_message(result)            

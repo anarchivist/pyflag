@@ -1,16 +1,153 @@
 """ This is an implementation of a HTML parser using the pyflag lexer. 
 
+We do not use pythons native sgml parser because that is too fragile
+for us. The native parser will raise when encountering invalid html,
+causing us to mis-parse many pages we see in the wild.
+
 We concentrate on robustness here - we detect errors and flag them, but we try
-to keep going as much as possible. The parser is designed to be a feed parser -
-i.e. data is fed in arbitrary chunks.
+to keep going as much as possible. 
 
 """
 
 import lexer
-import sys,re
+import sys,re,urllib
 
 def decode_entity(string):
     return re.sub("&#(\d+);", lambda x: chr(int(x.group(1))), string)
+
+class Tag:
+    def __init__(self, name=None, attributes=None):
+        if not attributes: attributes={}
+        self.name = name
+        self.attributes = attributes
+        self.children = []
+        self.type = 'open'
+
+    def __setitem__(self, item, value):
+        self.attributes[item] = value
+
+    def __getitem__(self, item):
+        return self.attributes[item]
+
+    def __str__(self):
+        attributes = "".join([" %s='%s'" % (k,urllib.quote(v)) for k,v \
+                               in self.attributes.items()])
+        if self.type == 'selfclose':
+            return "<%s%s/>" % (self.name, attributes)
+        else:
+            return "<%s%s>%s</%s>" % (self.name, attributes,
+                                      self.innerHTML(), self.name)
+
+    def innerHTML(self):
+        result = ''
+        for c in self.children:
+            result += c.__str__()
+
+        return result
+
+    def add_child(self, child):
+        ## Try to augment CDATAs together for efficiency:
+        try:
+            ## CDATAs are strings, but tags are classes without __add__
+            self.children[-1] += child
+        except (IndexError, TypeError):
+            self.children.append(child)
+
+    def tree(self, width=''):
+        result = "%s%s\n" % (width, self.name)
+        width += ' '
+        for c in self.children:
+            try:
+                result += c.tree(width)
+            except AttributeError:
+                result += "%sCDATA: %r\n" % (width, c)
+                
+        return result
+
+    def search(self, name):
+        """ Generates all the tags of a given name under this DOM
+        element in order
+        """
+
+        ## Return ourselves first:
+        if self.name == name:
+            yield self
+        
+        for c in self.children:
+            try:
+                for match in c.search(name):
+                    yield match
+            except AttributeError:
+                pass
+
+
+    def find(self, name, regex=None):
+        """ Search our subtree for tags with the name specified and
+        all regexes matching the attributes. regex is a dict with keys
+        as attribute names, and values are regexes that should all
+        match for that element to be returned.
+        """
+        for m in self.search(name):
+            failed = False
+            if regex:
+                for k,v in regex.items():
+                    ## Is the required attribute actually there?
+                    try:
+                        value = m[k]
+                    except KeyError:
+                        failed = True
+                        break
+
+                    ## does it match?
+                    if not re.compile(v, re.M | re.I).search(value):
+                        failed = True
+                        break
+
+            if not failed:
+                return m
+
+class SanitizingTag(Tag):
+    """ This is a version of Tag which restricts the attributes
+    printed and tags printed to a safe set. This can be used
+    everywhere to sanitize html.
+    """
+    
+    ## No other tags will be allowed (especially script tags)
+    allowable_tags = [ 'b','i','a','img','em','br','strong', 'blockquote',
+                       'tt', 'li', 'ol', 'ul', 'p', 'table', 'td', 'tr',
+                       'h1', 'h2', 'h3', 'pre', 'html', 'font', 'body',
+                       'code', 'head', 'meta', 'title','style', 'form',
+                       'sup', 'input', 'span', 'label', 'option','select',
+                       'div','span','nobr','u', 'frameset','frame','iframe',
+                       'textarea','tbody','thead','center','hr','small']
+
+    ## Only these attributes are allowed (note that href and src
+    ## attributes are handled especially):
+    allowable_attributes = ['color', 'bgolor', 'width', 'border',
+                            'rules', 'cellspacing', 
+                            'cellpadding', 'height',
+                            'align', 'bgcolor', 'rowspan', 
+                            'colspan', 'valign','id', 'class','name', 
+                            'compact', 'type', 'start', 'rel',
+                            'value', 'checked', 'rows','cols',
+                            'framespacing','frameborder',
+                            ]
+
+    def __str__(self):
+        ## Some tags are never allowed to be outputted
+        if self.name not in self.allowable_tags:
+            #print "Rejected tag %s" % self.name
+            return ''
+
+        attributes = "".join([" %s='%s'" % (k,v) for k,v \
+                              in self.attributes.items() if k in \
+                              self.allowable_attributes])
+        
+        if self.type == 'selfclose':
+            return "<%s%s/>" % (self.name, attributes)
+        else:
+            return "<%s%s>%s</%s>" % (self.name, attributes,
+                                      self.innerHTML(), self.name)
 
 class HTMLParser(lexer.Lexer):
     state = "CDATA"
@@ -29,7 +166,7 @@ class HTMLParser(lexer.Lexer):
 
         ## Scripts can actually contain lots of <> which confuse us so
         ## we need to ignore all the dat until the </script>
-        [ "SCRIPT", "(.*?)</script[^>]*>", "SCRIPT", "CDATA" ],
+        [ "SCRIPT", "(.*?)</script[^>]*>", "SCRIPT_END", "CDATA" ],
         [ "SCRIPT", "(.+)", "SCRIPT", "SCRIPT" ],
 
         ## Identify DTDs: (We dont bother parsing DTDs, just skip
@@ -48,7 +185,7 @@ class HTMLParser(lexer.Lexer):
         [ "ATTRIBUTE LIST", ">", "END_TAG", "CDATA"],
         
         ## Swallow spaces
-        [ "ATTRIBUTE LIST", " +", "SPACE", "ATTRIBUTE LIST"],
+        [ "ATTRIBUTE LIST", "(?ms)\s+", "SPACE", "ATTRIBUTE LIST"],
 
         ## End tag:
         [ "ATTRIBUTE LIST", "/>", "SELF_CLOSING_TAG,END_TAG", "CDATA" ],
@@ -60,109 +197,78 @@ class HTMLParser(lexer.Lexer):
         [ "ATTRIBUTE LIST", r"([-a-z0=9A-Z]+)(?=( [^\s]|[/>]))", "ATTRIBUTE_NAME", "ATTRIBUTE LIST"],
 
         ## Quoted attribute values
-        [ "ATTRIBUTE VALUE", "(?ms)'([^']+)'|\"([^\"]+)\"", "ATTRIBUTE_VALUE", "ATTRIBUTE LIST" ],
+        [ "ATTRIBUTE VALUE", "(?ms)'([^']*)'|\"([^\"]*)\"", "ATTRIBUTE_VALUE", "ATTRIBUTE LIST" ],
         
         ## Non quoted attribute value
-        [ "ATTRIBUTE VALUE", " *([^ <>]+) ?", "ATTRIBUTE_VALUE", "ATTRIBUTE LIST" ],
+        [ "ATTRIBUTE VALUE", " *([^ <>\"\']+) ?", "ATTRIBUTE_VALUE", "ATTRIBUTE LIST" ],
         ]
 
-    def __init__(self, verbose = 0):
+    def __init__(self, verbose = 0, tag_class = None):
         lexer.Lexer.__init__(self, verbose)
+        self.Tag = tag_class or Tag
+        
+        ## First we create the root of the DOM
         self.TAG_START(None, None)
         self.root = self.tag
         self.stack = [self.root,]
-
+        self.tag.name = 'root'
+        
     def CDATA(self, token, match):
-        self.tag['_cdata'] += match.group(0)
+        self.tag.add_child(match.group(0))
 
     def CLOSING_TAG(self, token, match):
-        self.tag['_type'] = 'close'
+        self.tag.type = 'close'
 
     def SELF_CLOSING_TAG(self, token, match):
-        self.tag['_type'] = 'selfclose'
+        self.tag.type = 'selfclose'
 
     def TAG_NAME(self, token,match):
-        self.tag['_name'] = match.group(0).lower()
+        self.tag.name = match.group(0).lower()
 
     def SCRIPT(self, token, match):
-        self.tag['_cdata'] += match.group(1)
+        self.tag.add_child(match.group(1))
+
+    def SCRIPT_END(self, t, m):
+        self.SCRIPT(t,m)
+        self.tag.type = 'close'
+        self.END_TAG(t,m)
 
     def ATTRIBUTE_NAME(self, token, match):
         self.current_attribute = match.group(1)
         self.tag[self.current_attribute] = ''
 
     def END_TAG(self, token, match):
-        #print "Depth %s" % len(self.stack)
         ## These tags need to be ignored because often they do not balance
         for t in ['br', 'p']:
-            if self.tag['_name']==t:
-                #print "Self closing"
-                self.tag['_type'] = 'selfclose'
+            if self.tag.name==t:
+                self.tag.type = 'selfclose'
 
-        if self.tag['_type']=='close':
+        if self.tag.type=='close':
             ## Pop the last tag off the stack
-            del self.stack[-1]
-        else:
+            try:
+                self.tag = self.stack.pop(-1)
+                self.tag = self.stack[-1]
+            except IndexError: pass
+        elif self.tag.type=='selfclose':
+            self.stack[-1].add_child(self.tag)
+            self.tag = self.stack[-1]
+        elif self.tag.type=='open':
             ## Push the tag into the end of the stack and add it to
             ## our parent
-            self.stack[-1]['_children'].append(self.tag)
-            if self.tag['_type'] != 'selfclose':
-                self.stack.append(self.tag)
+            self.stack[-1].add_child(self.tag)
+            self.stack.append(self.tag)
 
-        if self.tag['_name'] == 'script':
+        if self.tag.name == 'script' and self.tag.type=='open':
             return "SCRIPT"
                 
     def TAG_START(self, token, match):
-        self.tag = dict(_cdata = '', _children=[], _name='', _type='open')
+        self.tag = self.Tag()
         
     def ATTRIBUTE_VALUE(self, token, match):
         self.tag[self.current_attribute] = match.group(1) or match.group(2)
 
-    def search(self, tag, _name):
-        """ Generate all objects of given name from the tag provided downwards """
-        for c in tag['_children']:
-            if c['_name'] == _name:
-                yield c
-
-            for match in self.search(c,_name):
-                yield match 
-
-    def innerHTML(self, tag):
-        result = tag['_cdata']
-        for c in tag['_children']:
-            result += "<%s>" % c['_name'] + self.innerHTML(c) + "</%s>" % c['_name']
-
-        return result
-
-    def find(self, tag, _name, **regex):
-        """ Search all tags below tag for a tag with the name
-        specified and all regexes matching attributes
-        """
-        for m in self.search(tag, _name):
-            failed = False
-            for k,v in regex.items():
-                ## Is the required attribute actually there?
-                if k not in m.keys():
-                    failed = True
-                    break
-
-                ## does it match?
-                if not re.compile(v, re.M | re.I).search(m[k]):
-                    failed = True
-                    break
-
-            if not failed:
-                return m
-
-    def p(self, tag):
-        result = {}
-        for k,v in tag.items():
-            if k != "_children":
-                result[k] = v
-        print result
-
 if __name__ == '__main__':
-    l = HTMLParser(verbose=1)
+    l = HTMLParser(verbose=1, tag_class = SanitizingTag)
 
     if len(sys.argv)==1:
         l.feed("foobar");
@@ -200,50 +306,17 @@ if __name__ == '__main__':
             l.feed(line)
             
             ## Get all the tokens
-            while l.next_token(True): pass
+            while l.next_token(end=False): pass
+
+        while l.next_token(): pass
         print "Total error rate %s" % l.error
 
         ## This is a test for dom navigation
+        root = l.root
+        print root.tree()
+        print root.innerHTML()
 
-        ## Find the ComposeHeader table:
-        tag = l.find(l.root, 'table', **{"class":'ComposeHeader'})
-
-        ## Iterate over its rows:
-        for row in l.search(tag, 'tr'):
-            try:
-                if not row.has_key('id'): continue
-                
-                if row['id'] == 'From':
-                    option = l.find(row, 'option', selected='.*')
-                    print "From: %s" % decode_entity(option['value'])
-                    
-                elif row['id'] == 'To':
-                    option = l.find(row, 'input', type='text')
-                    if option:
-                        print "To: %s" % decode_entity(option['value'])
-
-                elif row['id'] == 'Cc':
-                    option = l.find(row, 'input', name='fCc')
-                    if option:
-                        print "Cc: %s" % decode_entity(option['value'])
-
-                elif row['id'] == 'Bcc':
-                    option = l.find(row, 'input', name='fBcc')
-                    if option:
-                        print "Bcc: %s" % decode_entity(option['value'])
-
-            except Exception,e:
-                print e
-                pass
-
-        ## Extract the subject:
-        option = l.find(tag, 'input', type='text', name='fSubject')
-        if option:
-            print "Subject: %s" % decode_entity(option['value'])
-
-        ## Now extract the content of the email:
-        for s in l.search(l.root,'script'):
-            m=re.match("document\.getElementById\(\"fEditArea\"\)\.innerHTML='([^']*)'", s['_cdata'])
-            if m:
-                print "Message: %s" % m.group(1).decode("string_escape")
-                break
+        print l.Tag
+        
+        tag = root.find('pre')
+        print tag.innerHTML()

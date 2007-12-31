@@ -146,17 +146,19 @@ class HotmailScanner(Scanner.GenScanFactory):
 
         def process_readmessage(self,fd):
             result = {'type': 'Read', 'Message':''}
-            tag = self.parser.find(self.parser.root, 'div', **{'class':'ReadMsgContainer'})
+            root = self.parser.root
+
+            tag = root.find('div', {'class':'ReadMsgContainer'})
             if not tag: return
 
             ## Find the subject:
-            sbj = self.parser.find(tag, 'td', **{'class':'ReadMsgSubject'})
-            if sbj: result['Subject'] = decode_entity(sbj['_cdata'])
+            sbj = tag.find('td', {'class':'ReadMsgSubject'})
+            if sbj: result['Subject'] = decode_entity(sbj.innerHTML())
 
             ## Fill in all the other fields:
             context = None
-            for td in self.parser.search(tag, 'td'):
-                data = td['_cdata']
+            for td in tag.search('td'):
+                data = td.innerHTML()
                 if context:
                     result[context] = decode_entity(data)
                     context = None
@@ -170,8 +172,8 @@ class HotmailScanner(Scanner.GenScanFactory):
 
             ## Now the message:
             ## On newer sites its injected using script:
-            for s in self.parser.search(self.parser.root,'script'):
-                m=re.match("document\.getElementById\(\"MsgContainer\"\)\.innerHTML='([^']*)'", s['_cdata'])
+            for s in root.search('script'):
+                m=re.match("document\.getElementById\(\"MsgContainer\"\)\.innerHTML='([^']*)'", s.innerHTML())
                 if m:
                     result['Message'] += m.group(1).decode("string_escape")
                     break
@@ -182,21 +184,22 @@ class HotmailScanner(Scanner.GenScanFactory):
             ## Find the ComposeHeader table:
             result = {'type':'Edit Read'}
 
-            tag = self.parser.find(self.parser.root, 'table', **{"class":'ComposeHeader'})
+            root = self.parser.root
+            tag = root.find('table', {"class":'ComposeHeader'})
             if not tag:
                 return
 
             ## Find the From:
-            row = self.parser.find(tag, 'select', name = 'ffrom')
+            row = tag.find( 'select', dict(name = 'ffrom'))
             if row:
-                option = self.parser.find(row, 'option', selected='.*')
-                result['From'] = decode_entity(option['value'])                
+                option = row.find('option', dict(selected='.*'))
+                result['From'] = decode_entity(option['value']) 
 
             for field, pattern in [('To','fto'),
                                    ('CC','fcc'),
                                    ('Bcc', 'fbcc'),
                                    ('Subject', 'fsubject')]:
-                tmp = self.parser.find(tag, 'input', name = pattern)
+                tmp = tag.find('input', dict(name = pattern))
                 if tmp:
                     result[field] = decode_entity(tmp['value'])
             
@@ -204,13 +207,13 @@ class HotmailScanner(Scanner.GenScanFactory):
             result['Message'] = ''
 
             ## Sometimes the message is found in the EditArea div:
-            div = self.parser.find(self.parser.root, 'div', id='EditArea')
+            div = root.find('div', dict(id='EditArea'))
             if div:
-                result['Message'] += self.parser.innerHTML(div)
+                result['Message'] += div.innerHTML()
 
             ## On newer sites its injected using script:
-            for s in self.parser.search(self.parser.root,'script'):
-                m=re.match("document\.getElementById\(\"fEditArea\"\)\.innerHTML='([^']*)'", s['_cdata'])
+            for s in root.search('script'):
+                m=re.match("document\.getElementById\(\"fEditArea\"\)\.innerHTML='([^']*)'", s.innerHTML())
                 if m:
                     result['Message'] += m.group(1).decode("string_escape")
                     break

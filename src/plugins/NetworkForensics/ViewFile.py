@@ -32,6 +32,7 @@ import StringIO
 import re,os.path,cgi, textwrap
 from FlagFramework import query_type,normpath, Magic
 import pyflag.FileSystem as FileSystem
+import FileFormats.HTML as HTML
 
 ## FIXME: This needs to be pluggable too
 class ViewFile(Reports.report):
@@ -122,20 +123,12 @@ class ViewFile(Reports.report):
     def html_handler(self,fd, ui):
         """ We sanitise the html here """
         def generator():
-            sanitiser = HTMLSanitiser(fd.case, fd.inode)
-            while 1:
-                data = fd.read(1000000)
-                try:
-                    if data:
-                        sanitiser.feed(data)
-                    else:
-                        sanitiser.close()
-                except HTMLParser.HTMLParseError:
-                    pass
-
-                yield sanitiser.read()
-
-                if not data: break
+            parser = HTML.HTMLParser(tag_class = HTML.SanitizingTag)
+            data = fd.read(1000000)
+            parser.feed(data)
+            while parser.next_token(): pass
+            
+            yield parser.root.innerHTML()
 
         ui.generator.generator = generator()
         
