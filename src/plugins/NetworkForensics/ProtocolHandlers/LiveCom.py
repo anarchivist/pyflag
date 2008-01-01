@@ -252,6 +252,15 @@ class HTMLStringType(StringType):
 
         return parser.root.innerHTML()
 
+    def display(self, value, row, result):
+        parser = HTML.HTMLParser(tag_class = HTML.TextTag)
+        parser.feed(value)
+        parser.close()
+
+        tmp = result.__class__(result)
+	tmp.text(parser.root.innerHTML(), wrap='full', font='typewriter')
+
+        return tmp
 class LiveComMessages(Reports.report):
     """
     Browse LiveCom/Hotmail messages.

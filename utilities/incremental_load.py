@@ -42,7 +42,7 @@ output file. The pcap file will be unlinked (removed) afterwards.
 
 NOTE: This loader does not start any workers, if you want to scan the
 data as well you will need to start seperate workers.
-""", version = "Version: %prog PyFlag " + config.VERSION)
+""", version = "Version: %%prog PyFlag %s" % config.VERSION)
 
 config.add_option("case", default=None,
                   help="Case to load the files into (mandatory). Case must have been created already.")
@@ -182,10 +182,13 @@ def load_file(filename):
 last_time = 0
 
 while 1:
+    files_we_have = os.listdir(config.destination)
     files = os.listdir(directory)
     files.sort()
     if config.lock not in files:
         for f in files:
+           if f in files_we_have: continue
+
            filename = "%s/%s" % (directory,f)
            load_file(filename)
            if config.destination:

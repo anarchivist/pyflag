@@ -12,10 +12,13 @@ to keep going as much as possible.
 import lexer
 import sys,re,urllib,os
 import pyflag.DB as DB
-from FlagFramework import query_type, normpath
+from FlagFramework import query_type, normpath, get_bt_string
 
 def decode_entity(string):
     return re.sub("&#(\d+);", lambda x: chr(int(x.group(1))), string)
+
+def decode_unicode(string):
+    return re.sub(r"\\u(..)(..)", lambda x: (chr(int(x.group(1),16)) + chr(int(x.group(2),16))).decode("utf_16_be").encode('utf8'), string)
 
 class Tag:
     def __init__(self, name=None, attributes=None):
@@ -108,6 +111,23 @@ class Tag:
             if not failed:
                 return m
 
+import textwrap
+
+class TextTag(Tag):
+    def __str__(self):
+        if self.name in ['br','p']: 
+            return "\n"
+
+        if self.name in ['script','style']:
+	    return ''
+
+        data = decode_unicode(self.innerHTML())
+        data = re.sub("[\r\n]+","\n",data)	
+
+	return data
+        return "%s" % data.replace("\n","<br>")
+
+
 class SanitizingTag(Tag):
     """ This is a version of Tag which restricts the attributes
     printed and tags printed to a safe set. This can be used
@@ -159,7 +179,7 @@ class SanitizingTag(Tag):
 
 
     def resolve_reference(self, reference):
-        return urllib.quote(reference)
+        return 'images/spacer.png'
 
 class ResolvingHTMLTag(SanitizingTag):
     """ A special tag which resolves src and href back into the
