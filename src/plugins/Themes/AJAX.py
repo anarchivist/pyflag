@@ -117,7 +117,7 @@ class AJAX(Menu):
         #print data
         return data
 
-    def menu(self,flag,query):
+    def menu(self,flag,query, result):
         result=flag.ui()
 
         self.menu_javascript = self.make_menu_javascript(query)

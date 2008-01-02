@@ -95,7 +95,7 @@ class BasicTheme:
         """ Render the ui with minimal interventions """
         return " ".join((self.header % title,data,self.footer))
     
-    def menu(self,flag,query):
+    def menu(self,flag,query, result):
         """ Draws the menu for the current family.
 
         @arg flag: A Flag object containing the appropriate dispatcher

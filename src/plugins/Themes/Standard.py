@@ -60,7 +60,7 @@ class BlueTheme(Theme.BasicTheme):
         toolbar=self.navbar(query=query , next=next , previous=previous , pageno=pageno)
         return " ".join((self.header % title,self.banner,meta,'''</td><td width=10><img src="/images/logo.png"></td></tr></tbody></table> </tr></table>\n''',self.hilight_bar % (toolbar_str,toolbar), data ,self.hilight_bar % (toolbar_str,toolbar),self.footer))
 
-    def menu(self,flag,query):
+    def menu(self,flag,query, result):
         """ Draws the menu for the current family.
 
         @arg flag: A Flag object containing the appropriate dispatcher

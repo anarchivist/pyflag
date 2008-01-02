@@ -71,6 +71,7 @@ try:
         except ValueError:
             ## Try a fuzzy match
             return dateutil.parser.parse(arg, fuzzy=True)
+
 except ImportError:
     import time
 
@@ -583,7 +584,7 @@ class ColumnType:
         """ Returns the SQL required for selecting from the table. """
         return self.escape_column_name(self.column)
 
-    def column_decorator(self, table, result):
+    def column_decorator(self, table, result, query):
         """ Every column type is given the opportunity to decorate its
         table heading
         """

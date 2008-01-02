@@ -1277,7 +1277,7 @@ class HTMLUI(UI.GenericUI):
                 sql = 1
 
             dbh=DB.DBO(case)
-            dbh.execute("select count(*) as total from %s where %s", (table, sql))
+            dbh.execute("select count(*) as total from %s where (%s and %s)", (table, where, sql))
             row=dbh.fetch()
             result.heading("Total rows")
             result.para("%s rows" % row['total'])

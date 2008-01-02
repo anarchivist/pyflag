@@ -242,8 +242,7 @@ class HTMLStringType(StringType):
     """ A ColumnType which sanitises its input for HTML.
     We also fetch images etc from the db if available.
     """
-    def display(self, value, row, result):
-        print row
+    def xdisplay(self, value, row, result):
         parser = HTML.HTMLParser(tag_class = FlagFramework.Curry(HTML.ResolvingHTMLTag,
                                                                  case = result.defaults['case'],
                                                                  inode_id = row['Inode']))

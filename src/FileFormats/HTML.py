@@ -111,9 +111,12 @@ class Tag:
             if not failed:
                 return m
 
-import textwrap
-
 class TextTag(Tag):
+    """ A Sanitising Tag to print the DOM as plain text.
+
+    We basically remove all the tags, and try to clean up the text a
+    bit.
+    """
     def __str__(self):
         if self.name in ['br','p']: 
             return "\n"
@@ -197,10 +200,11 @@ class ResolvingHTMLTag(SanitizingTag):
         SanitizingTag.__init__(self, name, attributes)
 
         ## Collect some information about this inode:
-        dbh = DB.DBO(case)
-        dbh.execute("select url,http.inode from http, inode where http.inode=inode.inode and inode.inode_id=%r", inode_id)
-        row = dbh.fetch()
         try:
+            dbh = DB.DBO(case)
+            dbh.execute("select url,http.inode from http, inode where http.inode=inode.inode and inode.inode_id=%r", inode_id)
+            row = dbh.fetch()
+
             self.inode = row['inode']
             url = row['url']
             m=re.search("(http|ftp)://([^/]+)/([^?]*)",url)
@@ -214,7 +218,6 @@ class ResolvingHTMLTag(SanitizingTag):
                 self.base_url = self.base_url[:-1]
 
         except Exception,e:
-            raise
             self.method = ''
             self.host = ''
             self.base_url = ''
@@ -372,6 +375,7 @@ class HTMLParser(lexer.Lexer):
         self.tag[self.current_attribute] = match.group(1) or match.group(2)
 
     def close(self):
+        """ Just a conveniece function to force us to parse all the data """
         while self.next_token(): pass
 
 if __name__ == '__main__':
