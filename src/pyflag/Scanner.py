@@ -659,16 +659,6 @@ def get_factories(case,scanners):
 
         result.append(f)
 
-    ## Now sort the scanners by their specified order:
-    def cmpfunc(x,y):
-        if x.order>y.order:
-            return 1
-        elif x.order<y.order:
-            return -1
-
-        return 0
-
-    result.sort(cmpfunc)
     return result
 
 ## These are carvers:

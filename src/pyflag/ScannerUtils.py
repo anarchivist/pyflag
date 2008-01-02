@@ -37,20 +37,31 @@ def scan_groups_gen():
         yield cls
 
 def fill_in_dependancies(scanners):
-    """ Will add scanner names to scanners to satisfy all dependancies """
+    """ Will add scanner names to scanners to satisfy all dependancies.
+
+    Will also sort scanners in dependancy order - so that scanners
+    which depend on other scanners follow them in the list.
+    """
     while 1:
         modified = False
 
-        for s in scanners:
-            cls = Registry.SCANNERS.dispatch(s)
+        for i in range(len(scanners)):
+            cls = Registry.SCANNERS.dispatch(scanners[i])
             if type(cls.depends)==type(''):
                 d = [cls.depends]
             else:
                 d = cls.depends
 
             for dependancy in d:
-                if dependancy not in scanners:
-                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"%s depends on %s, which was not enabled - enabling to satisfy dependancy" % (s,dependancy))
-                    scanners.append(dependancy)
+                if dependancy in scanners[i+1:]:
+                    scanners.pop(scanners.index(dependancy))
                     modified = True
+
+                if dependancy not in scanners[:i]:
+                    pyflaglog.log(pyflaglog.VERBOSE_DEBUG,"%s depends on %s, which was not enabled - enabling to satisfy dependancy" % (scanners[i],dependancy))
+                    scanners.insert(i,dependancy)
+                    modified = True
+
+            if modified: break
+                
         if not modified: break

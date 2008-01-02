@@ -307,7 +307,7 @@ class CaseDBInit(FlagFramework.EventHandler):
         `mtime` TIMESTAMP NULL,
         `atime` TIMESTAMP NULL,
         `ctime` TIMESTAMP NULL,
-        `dtime` TIMESTAMP,
+        `dtime` TIMESTAMP NULL,
         `mode` INT,
         `links` INT,
         `link` TEXT,

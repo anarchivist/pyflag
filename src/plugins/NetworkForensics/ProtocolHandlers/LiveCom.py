@@ -73,7 +73,7 @@ class LiveTables(FlagFramework.EventHandler):
             `BCC` VARCHAR(250),
             `Subject` VARCHAR(250),
             `Message` Text,
-            `Sent` TIMESTAMP default 0,
+            `Sent` TIMESTAMP NULL,
             primary key (`id`))""")
 
 import fnmatch

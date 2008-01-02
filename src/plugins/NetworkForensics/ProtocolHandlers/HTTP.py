@@ -207,7 +207,7 @@ class HTTPTables(FlagFramework.EventHandler):
             `response_packet` int null,
             `content_type` VARCHAR( 255 ) NULL,
             `referrer` text NULL,
-            `date` timestamp,
+            `date` timestamp NULL,
             `host` VARCHAR(255),
             `useragent` VARCHAR(255),
             primary key (`id`)

@@ -177,5 +177,5 @@ def get_theme(query):
         try:
             return Registry.THEMES.themes[config.THEME]()
         except KeyError:
-            return BasicTheme()
+            raise RuntimeError("No suitable theme available... Are any plugins loaded?")
 

@@ -41,7 +41,7 @@ class MemoryForensicEventHandler(FlagFramework.EventHandler):
         `active_threads` INT not null,
         `inherited_from` INT not null,
         `handle_count` INT not null,
-        `create_time` TIMESTAMP
+        `create_time` TIMESTAMP NULL
         )""")
 
         case_dbh.execute("""CREATE TABLE if not exists `open_files` (
@@ -71,7 +71,7 @@ class MemoryForensicEventHandler(FlagFramework.EventHandler):
         `iosource` VARCHAR(250),
         `proto`  int not null,
         `port` int not null,
-        `create_time` TIMESTAMP)""")
+        `create_time` TIMESTAMP NULL)""")
         
 class IOSourceAddressSpace(FileAddressSpace):
     def __init__(self, fd):
