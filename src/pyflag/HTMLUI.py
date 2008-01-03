@@ -326,6 +326,10 @@ class HTMLUI(UI.GenericUI):
             id=self.get_unique_id()
             return "window.open('f?%s&__pyflag_parent='+window.__pyflag_name+'&__pyflag_name=child_%s','child_%s',  'width=600, height=600,scrollbars=yes'); return false;" % (target, id,id)
 
+        if pane=='new':
+            id=self.get_unique_id()
+            return "window.open('f?%s&__pyflag_parent='+window.__pyflag_name+'&__pyflag_name=child_%s','child_%s',  'fullscreen=yes,scrollbars=yes'); return false;" % (target, id,id)
+
         if target:
             ## Try to remove the callback which we are generated from:
             try:
@@ -629,14 +633,19 @@ class HTMLUI(UI.GenericUI):
             </FRAMESET>
             </HTML>''' % (query['__pyflag_name'], query['__pyflag_parent'], left_url, right_url)
 
-        tfcb = self.store_callback(tree_frame_cb)
         id = self.get_unique_id()
-        self.iframe("TreeFrame%s" % id, tfcb)
+        self.iframe(target = "TreeFrame%s" % id, callback = tree_frame_cb)
         
-    def iframe(self, target, callback):
+    def iframe(self, target=None, callback=None, link=None):
+        if not target:
+            target = self.get_unique_id()
+
+        if callback:
+            link = "callback_stored=%s" % self.store_callback(callback)
+        
         self.result += """<iframe id='%s' name='%s' class=TreeFrame></iframe>
-        <script>AdjustHeightToPageSize('%s');document.getElementById('%s').src='iframe?callback_stored=%s&__pyflag_parent=' + window.__pyflag_parent + '&__pyflag_name=' + window.__pyflag_name;</script>
-        """ % (target,target,target,target,callback)
+        <script>AdjustHeightToPageSize('%s');document.getElementById('%s').src='iframe?%s&__pyflag_parent=' + window.__pyflag_parent + '&__pyflag_name=' + window.__pyflag_name;</script>
+        """ % (target,target,target,target,link)
         
     def new_toolbar(self):
         id = "Toolbar%s" % self.get_unique_id()
@@ -784,7 +793,7 @@ class HTMLUI(UI.GenericUI):
 
         self.result += '''<div class="TreeLeft">%s</div><div class="TreeRight">%s</div>''' % (left,right)
 
-    def toolbar(self,cb=None,text=None,icon=None,popup=True,tooltip=None,link=None, toolbar=None, pane='self'):
+    def toolbar(self, cb=None, text=None, icon=None, tooltip=None, link=None, toolbar=None, pane='popup'):
         """ Create a toolbar button.
 
         When the user clicks on the toolbar button, a popup window is
@@ -1022,7 +1031,9 @@ class HTMLUI(UI.GenericUI):
         for e in range(len(elements)):
             if e in hiddens: continue
             new_query = query.clone()
-            n = elements[e].name
+            ui = self.__class__(self)
+            n = elements[e].column_decorator(table, sql, query, ui)
+            n = n or ui
             column_names.append(n)
             
             if order==e:
@@ -1119,7 +1130,7 @@ class HTMLUI(UI.GenericUI):
         self.toolbar(
             cb = goto_row_cb,
             text="Row %s" % limit,
-            icon="stock_next-page.png", pane='pane',
+            icon="stock_next-page.png", pane='popup',
             )
 
         ## Add a possible filter condition:

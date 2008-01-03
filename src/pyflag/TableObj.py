@@ -42,6 +42,7 @@ import pyflag.FileSystem as FileSystem
 import socket,re
 import pyflag.Time as Time
 import time, textwrap
+import pyflag.Registry as Registry
 
 ## Some options for various ColumnTypes
 config.add_option("PRECACHE_IPMETADATA", default=True,
@@ -584,10 +585,11 @@ class ColumnType:
         """ Returns the SQL required for selecting from the table. """
         return self.escape_column_name(self.column)
 
-    def column_decorator(self, table, result, query):
+    def column_decorator(self, table, sql, query, result):
         """ Every column type is given the opportunity to decorate its
         table heading
         """
+        return self.name
 
     def log_parse(self, row):
         """ This is called by the log processing to parse the value of
@@ -1422,6 +1424,68 @@ class InodeType(StringType):
         self.case = case
         ColumnType.__init__(self,name,column,link,callback=callback)
 
+    def get_inode(self, inode):
+        return inode
+
+    def column_decorator(self, table, sql, query, result):
+        case = query['case']
+
+        def browse_cb(query, result):
+            try:
+                limit = int(query.get('inode_limit',0))
+            except: limit = 0
+
+            dbh = DB.DBO(case)
+            dbh.cached_execute(sql, limit=limit, length=2)
+            row = dbh.fetch()
+            next_row = dbh.fetch()
+            inode = self.get_inode(row[self.name])
+
+            annotate = query.get('annotate','no')
+            
+            if annotate == 'yes':
+                query.set('annotate','no')
+                result.toolbar(icon='no.png', link = query, pane = 'pane')
+            else:
+                query.set('annotate','yes')
+                result.toolbar(icon='yes.png', link = query, pane = 'pane')
+
+            query.clear('annotate')
+                
+            new_query = FlagFramework.query_type(family ="Network Forensics",
+                                                 report ="ViewFile",
+                                                 case   = case,
+                                                 inode  =inode)
+            
+            result.iframe(link = new_query)
+            
+            new_query = FlagFramework.query_type(family ="Disk Forensics",
+                                                 report ="ViewFile",
+                                                 case   = case,
+                                                 mode   ="Summary",
+                                                 inode  = inode)
+
+            result.toolbar(icon = 'view.png', link = new_query, pane='new')
+
+            new_query = query.clone()
+
+            if limit==0:
+                result.toolbar(icon = 'stock_left_gray.png')
+            else:
+                new_query.set('inode_limit', limit-1)
+                result.toolbar(icon = 'stock_left.png', link=new_query, pane='self')
+
+            if not next_row:
+                result.toolbar(icon = 'stock_right_gray.png')
+            else:
+                new_query.set('inode_limit', limit + 1)
+                result.toolbar(icon = 'stock_right.png', link=new_query, pane='self')
+                
+        result.toolbar(cb = browse_cb, icon="browse.png",
+                       tooltip = "Browse Inodes in table", pane='new')
+
+        return self.name
+
     def display(self, value, row, result):
         if not value: return ''
 
@@ -1658,9 +1722,13 @@ class InodeIDType(InodeType):
         self.column = column
         return result
 
-    def display(self, value, row, result):
+    def get_inode(self, inode_id):
         fsfd = FileSystem.DBFS(self.case)
-        inode = fsfd.lookup(inode_id=value)
+        inode = fsfd.lookup(inode_id=inode_id)
+        return inode
+
+    def display(self, value, row, result):
+        inode = self.get_inode(value)
         return InodeType.display(self,inode,row,result)
 
 class FilenameType(StringType):

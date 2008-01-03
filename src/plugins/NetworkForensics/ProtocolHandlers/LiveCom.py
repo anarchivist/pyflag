@@ -65,6 +65,7 @@ class LiveTables(FlagFramework.EventHandler):
             """ CREATE table if not exists `live_messages` (
             `id` int not null auto_increment,
             `inode_id` int not null,
+            `parent_inode_id` int not null,
             `service` VARCHAR(50),
             `type` enum('Edit Read','Edit Sent','Read','Listed') default 'Edit Read',
             `From` VARCHAR(250),
@@ -222,7 +223,10 @@ class HotmailScanner(Scanner.GenScanFactory):
             
         def insert_message(self, result):
             dbh = DB.DBO(self.case)
-            dbh.insert('live_messages', service=self.service, **result)
+            dbh.insert('live_messages', service=self.service,
+                       parent_inode_id = self.fd.inode_id,
+                       **result)
+            
             id = dbh.autoincrement()
 
             dbh.execute("select mtime from inode where inode_id = %r" , self.fd.inode_id)

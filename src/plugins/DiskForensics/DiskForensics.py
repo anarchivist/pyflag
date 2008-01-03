@@ -61,7 +61,7 @@ def make_inode_link(query,result, variable='inode'):
         del new_query[variable]
         new_query[variable]= '|'.join(tmp[:i+1])
         tmp_result = result.__class__(result)
-        tmp_result.link(tmp[i],target=new_query)
+        tmp_result.link(tmp[i],target=new_query, pane='pane')
         out.text(" ")
         out.text(tmp_result)
 
@@ -223,12 +223,12 @@ class ViewFile(Reports.report):
             )
 
         result.toolbar(text="Scan this File",icon="examine.png",
-                   link=query_type((),
-                      family="Load Data", report="ScanFS",
-                      path=fsfd.lookup(inode=query['inode']),
-                      case=query['case'],
+                       link=query_type(family="Load Data", report="ScanFS",
+                                       path=fsfd.lookup(inode=query['inode']),
+                                       case=query['case']
+                                       ),
+                       pane = 'pane'
                        )
-                   )
             
     def form(self,query,result):
         result.defaults = query

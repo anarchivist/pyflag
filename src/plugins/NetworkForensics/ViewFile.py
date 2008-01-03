@@ -70,16 +70,25 @@ class ViewFile(Reports.report):
         fd = fsfd.open(inode=query['inode'])
         
         try:
-            dbh.execute("select mime from type where inode=%r",query['inode'])
+            dbh.execute("select mime,type from type where inode=%r",query['inode'])
             row = dbh.fetch()
             content_type = row['mime']
+            type = row['type']
         except (DB.DBError,TypeError):
             ## We could not find it in the mime table - lets do magic
             ## ourselves:
-            m = Magic(mode = 'mime')
-            content_type = m.buffer(fd.read(1024))
+            data = fd.read(1024)
             fd.seek(0)
+            
+            m = Magic(mode = 'mime')
+            content_type = m.buffer(data)
+            m = Magic()
+            type = m.buffer(data)
 
+        for k,v in self.mappings.items():
+            if k in type:
+                content_type = v
+            
         result.generator.content_type = content_type
 
         ## Now establish the dispatcher for it
@@ -159,6 +168,8 @@ class ViewFile(Reports.report):
                 yield data
                 
         ui.sound_control("Listen to file", play_file(fd))
+
+    mappings = { "SGML": "text/html"}
 
     dispatcher = { re.compile("text/html"): html_handler,
                    re.compile("image.*"): image_handler,
