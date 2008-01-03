@@ -29,10 +29,10 @@ class Menu(Theme.BasicTheme):
                 continue
 
             if items > 0:
-                result += "\n<td class=MenuBarItem id='MenuBarItem%s' onmouseover='displaySubMenu(\"%s\")'>%s</td>" % (k,k,k)
+                result += "\n<td class=MenuBarItem id='MenuBarItem%s' onmouseover='displaySubMenu(\"%s\")'>%s</td>" % (k,k,k.replace(" ","&nbsp;"))
                 submenus += submenu_text + "</table>"
 
-        return result + "</tr></table>" + submenus
+        return result + "<td style='width=100%'></td></tr></table>" + submenus
     
     def menu(self,flag,query, result):
         """ We just draw the main page for the database here """
@@ -115,7 +115,7 @@ class Menu(Theme.BasicTheme):
         result += self.menu_javascript
 
         result += '''<div class=PyFlagHeader>
-        <div class=Toolbar> %s </div><div class="CaseSelector"><form id=CaseSelector>%s</form></div>
+        <div class=Toolbar> %s </div><div class="CaseSelector"><form class=CaseSelector id=CaseSelector>%s</form></div>
         </div>
         <div class="PyFlagPage" id="PyFlagPage" onmouseover="hideSubMenus()">
         ''' % (toolbar_str,case_selector)

@@ -73,17 +73,23 @@ div.PyFlagHeader {
   height: 32px;
 }
 
+form.CaseSelector { 
+  float: right;
+  height: 0;
+}
+
 div.Toolbar { 
   float: left;
   padding-top: 3px;
+  height: 32px;
 }
 
 div.CaseSelector { 
-  float: right;
   height: 24px;
 }
 
 div.PyFlagPage { 
+  float: left;
   width: 100%;
   overflow-y: auto;
   overflow-x: auto;
