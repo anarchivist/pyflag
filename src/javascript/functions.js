@@ -265,7 +265,7 @@ function popup(query, callback, width, height) {
   };
 
   //Now open the window:
-  var w=window.open(query+"&callback_stored="+callback + "&__pyflag_parent=" + window.__pyflag_name+"&__pyflag_name=popup" + callback,'popup'+callback, 'width='+width+', height='+height+', scrollbars=yes');
+  var w=window.open(query+"&callback_stored="+callback + "&__pyflag_parent=" + window.__pyflag_name+"&__pyflag_name=popup" + callback,'popup'+callback, 'width='+width+', height='+height+', scrollbars=yes,resizable=yes');
   w.parent = window.name;
 };
 

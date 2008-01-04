@@ -294,7 +294,15 @@ class StreamFile(File):
                 return packet_id
 
         return 0
-    
+
+    def get_packet_ts(self, position=None):
+        """ Returns the timestamp of the current packet """
+        packet_id = self.get_packet_id(position)
+        dbh=DB.DBO(self.case)
+        dbh.execute("select ts_sec from pcap where id = %r" , packet_id)
+        row = dbh.fetch()
+        return row['ts_sec']
+
     def get_combined_fd(self):
         """ Returns an fd opened to the combined stream """
         ## If we are already a combined stream, we just return ourselves

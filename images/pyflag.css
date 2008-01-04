@@ -337,10 +337,6 @@ table.PyFlagTable {
   overflow: auto;
  }
 
-form { 
-  clear: left;
- }
-
 .Row { 
   clear: left;
  }

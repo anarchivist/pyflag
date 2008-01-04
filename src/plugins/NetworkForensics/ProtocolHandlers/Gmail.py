@@ -1,3 +1,26 @@
+# ******************************************************
+# Copyright 2004: Commonwealth of Australia.
+#
+# Michael Cohen <scudette@users.sourceforge.net>
+#
+# ******************************************************
+#  Version: FLAG $Version: 0.85 Date: Fri Dec 28 16:12:30 EST 2007$
+# ******************************************************
+#
+# * This program is free software; you can redistribute it and/or
+# * modify it under the terms of the GNU General Public License
+# * as published by the Free Software Foundation; either version 2
+# * of the License, or (at your option) any later version.
+# *
+# * This program is distributed in the hope that it will be useful,
+# * but WITHOUT ANY WARRANTY; without even the implied warranty of
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# * GNU General Public License for more details.
+# *
+# * You should have received a copy of the GNU General Public License
+# * along with this program; if not, write to the Free Software
+# * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# ******************************************************
 """ This module is designed to extract information from gmail traffic.
 
 This is similar but slightly different to the module implemented in
@@ -62,7 +85,7 @@ class GmailScanner(LiveCom.HotmailScanner):
 
         def boring(self, metadata, data=''):
             dbh = DB.DBO(self.case)
-            dbh.execute("select content_type,url,host from http where inode=%r limit 1", self.fd.inode)
+            dbh.execute("select content_type,url,host from http where id=%r limit 1", self.fd.inode_id)
             row = dbh.fetch()
             if row and row['host']=='mail.google.com' and \
                    row['url'].startswith("http://mail.google.com/mail/"):
@@ -72,7 +95,7 @@ class GmailScanner(LiveCom.HotmailScanner):
                     self.parser =  HTMLParser(verbose=0)
                 else:
                     return True
-                
+
                 return False
 
             return True
@@ -96,8 +119,14 @@ class GmailScanner(LiveCom.HotmailScanner):
             ## Check to see if this is a POST request (i.e. mail is
             ## sent to the server):
             dbh = DB.DBO(self.case)
-            dbh.execute("select `key`,`value` from http_parameters, http where http.inode = %r and http.id = http_parameters.id", self.fd.inode)
-            query = dict([(r['key'].lower(),r['value']) for r in dbh])
+            dbh.execute("select `id`,`key`,`value` from http_parameters where inode_id=%r", self.fd.inode_id)
+            query = {}
+            key_map = {}
+
+            for row in dbh:
+                query[row['key'].lower()] = row['value']
+                key_map[row['key'].lower()] = row['id']
+
             result = {'type':'Edit Sent'}
             for field, pattern in [('To','to'),
                                    ('From','from'),
@@ -108,11 +137,33 @@ class GmailScanner(LiveCom.HotmailScanner):
                 if query.has_key(pattern):
                     result[field] = query[pattern]
 
-            if len(result.keys())>2:
-                ## Fixme: Create VFS node for attachments
-                return self.insert_message(result)
+            if len(result.keys())<2: return False
+            
+            ## Fixme: Create VFS node for attachments
+            message_id = self.insert_message(result)
+            
+            ## Are there any attachments?
+            for k in query.keys():
+                if k.startswith("f_"):
+                    ## Create an Inode for it:
+                    dbh.execute("select mtime from inode where inode_id = %r" , self.fd.inode_id)
+                    row = dbh.fetch()
 
-            else: return False
+                    new_inode = "thttp_parameters:id:%s:value" % key_map[k]
+                    
+                    inode_id = self.ddfs.VFSCreate(self.fd.inode,
+                                                   new_inode,
+                                                   k, mtime = row['mtime'],
+                                                   _fast = True)
+                    
+                    dbh.insert("live_message_attachments",
+                               message_id = message_id,
+                               inode_id = inode_id)
+
+                    fd = self.ddfs.open(inode = "%s|%s" % (self.fd.inode, new_inode))
+                    Scanner.scanfile(self.ddfs, fd, self.factories)
+
+            return message_id
 
         def process_readmessage(self,fd):
             """ This one pulls out the read message from the AJAX stream.
@@ -146,8 +197,22 @@ class GmailScanner(LiveCom.HotmailScanner):
                         result['Subject'] = gmail_unescape(message[5])
                         result['Message'] = gmail_unescape(message[6])
 
-                        return self.insert_message(result)
+                        message_id = self.insert_message(result)
+
+                        try:
+                            attachment = message[7][0][0]
+                            url = gmail_unescape(attachment[8])
+
+                            ## Make a note of the attachment so we can
+                            ## try to resolve it later.
+                            dbh = DB.DBO(self.case)
+                            dbh.insert("live_message_attachments",
+                                       message_id = message_id,
+                                       url = url)
+                        except IndexError:
+                            pass
                         
+                        return message_id
             except Exception,e:
                 print "Unable to parse %s as json stream: %s" % (self.fd.inode , e)
                 return False

@@ -347,6 +347,27 @@ class iless(istat):
             pipe.close()
             yield 'Viewing of %s with less successful' % inode
 
+class iiless(iless):
+    def help(self):
+        return """ Dump the value of an inode_id (inode ids are internal db ids for the inodes, this is probably not generally useful for anyone other than developers) """
+    
+    def execute(self):
+        dbh = DB.DBO(self.environment._CASE)
+        for inode_id in self.args:
+            dbh.execute("select inode from inode where inode_id = %r ", inode_id)
+            row = dbh.fetch()
+            if not row['inode']: continue
+
+            fd=self.environment._FS.open(inode=row['inode'])
+            pipe=os.popen("less","w")
+            while 1:
+                data=fd.read(10000)
+                if not data: break
+                pipe.write(data)
+                
+            pipe.close()
+            yield 'Viewing of %s with less successful' % row['inode']
+    
 class icp(iless):
     """ Copy Inodes from the VFS to the file system """
     def execute(self):

@@ -41,7 +41,7 @@ parser = OptionParser(usage = """%prog [options] pcap_file ... pcap_file
 
 Will reassemble all TCP streams in pcap_files into seperate files
 written to the current directory.""",
-                      version="Version: %prog PyFlag "+config.VERSION)
+                      version="Version: %%prog PyFlag %s " % config.VERSION)
 
 parser.add_option("-p", "--prefix", default="",
                   help = "The prefix which will be appended to all stream files. (This can be used to place them in a different directory)")

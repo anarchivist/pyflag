@@ -1,3 +1,26 @@
+# ******************************************************
+# Copyright 2004: Commonwealth of Australia.
+#
+# Michael Cohen <scudette@users.sourceforge.net>
+#
+# ******************************************************
+#  Version: FLAG $Version: 0.85 Date: Fri Dec 28 16:12:30 EST 2007$
+# ******************************************************
+#
+# * This program is free software; you can redistribute it and/or
+# * modify it under the terms of the GNU General Public License
+# * as published by the Free Software Foundation; either version 2
+# * of the License, or (at your option) any later version.
+# *
+# * This program is distributed in the hope that it will be useful,
+# * but WITHOUT ANY WARRANTY; without even the implied warranty of
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# * GNU General Public License for more details.
+# *
+# * You should have received a copy of the GNU General Public License
+# * along with this program; if not, write to the Free Software
+# * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# ******************************************************
 """ This module is designed to extract messages from live.com (the new
 name for hotmail).
 
@@ -76,6 +99,12 @@ class LiveTables(FlagFramework.EventHandler):
             `Message` Text,
             `Sent` TIMESTAMP NULL,
             primary key (`id`))""")
+
+        ## We need to keep the URL in case we find it later on
+        dbh.execute( """ CREATE table if not exists `live_message_attachments` (
+        `message_id` int NOT NULL,
+        `inode_id` int NULL,
+        `url` VARCHAR(500))""")
 
 import fnmatch
 
@@ -240,7 +269,7 @@ class HotmailScanner(Scanner.GenScanFactory):
             dbh.update('live_messages',where = 'id = "%s"' % id,
                        inode_id = inode_id)
             
-            return True
+            return id
 
 class HTMLStringType(StringType):
     """ A ColumnType which sanitises its input for HTML.
@@ -300,7 +329,7 @@ import textwrap
 class TableViewer(FileSystem.StringIOFile):
     """ A VFS driver to read rows from an SQL table.
 
-    Format is 't%s:%s:%s' % (table_name, column_name, value)
+    Format is 't%s:%s:%s:%s' % (table_name, column_name, value, column_to_retrieve (optional))
 
     e.g. tlive_messages:id:2
     """
@@ -310,8 +339,13 @@ class TableViewer(FileSystem.StringIOFile):
         parts = inode.split('|')
         ourinode = parts[-1][1:]
         self.size = 0
-        
-        self.table, self.id, self.value = ourinode.split(':')
+        self.column_to_retrieve = None
+
+        try:
+            self.table, self.id, self.value = ourinode.split(':')
+        except ValueError:
+            self.table, self.id, self.value, self.column_to_retrieve = ourinode.split(':')
+            
         FileSystem.StringIOFile.__init__(self, case, fd, inode)
         self.force_cache()
         
@@ -324,6 +358,9 @@ class TableViewer(FileSystem.StringIOFile):
         dbh = DB.DBO(self.case)
         dbh.execute("select * from %s where `%s`=%r", (self.table, self.id, self.value))
         for row in dbh:
+            if self.column_to_retrieve:
+                return row[self.column_to_retrieve]
+
             result += ("<table border=1>\n")
             for k,v in row.items():
                 result += "<tr><td>%s</td>" % k

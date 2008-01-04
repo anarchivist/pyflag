@@ -392,9 +392,9 @@ class HTMLUI(UI.GenericUI):
         cb = self.store_callback(callback)
 
         if icon:
-            base = "<img alt='%s' border=0 src='images/%s' onclick=\"popup('%s','%s',%r,%r); return false;\" class=PopupIcon />" % (label,icon, self.defaults,cb, width, height)
+            base = "<img alt='%s' border=0 src='images/%s' onclick=\"popup('f?%s','%s',%r,%r); return false;\" class=PopupIcon />" % (label,icon, self.defaults,cb, width, height)
         else:
-            base = "<input type=button value=%r onclick=\"popup('%s','%s',%r,%r); return false;\" />" % (label,self.defaults,cb,width,height)
+            base = "<input type=button value=%r onclick=\"popup('f?%s','%s',%r,%r); return false;\" />" % (label,self.defaults,cb,width,height)
         if tooltip:
             self.result += "<abbr title=%r>%s</abbr>" % (quote_quotes(tooltip),base)
         else:
@@ -962,7 +962,7 @@ class HTMLUI(UI.GenericUI):
         if parse_error:
             raise RuntimeError(message)
 
-    def table(self,elements=[],table='',where='',groupby = None, _groupby=None, case=None,
+    def table(self,elements=[],table='',where='1',groupby = None, _groupby=None, case=None,
               limit_context='limit', filter='filter',
               **opts):
         ## Building up the args list in this way ensure that defaults

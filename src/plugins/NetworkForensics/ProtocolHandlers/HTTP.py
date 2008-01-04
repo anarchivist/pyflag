@@ -35,7 +35,7 @@ import pyflag.Reports as Reports
 import plugins.NetworkForensics.PCAPFS as PCAPFS
 import re,time,cgi
 import TreeObj
-from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType, PacketType
+from pyflag.TableObj import StringType, TimestampType, InodeIDType, IntegerType, PacketType
 
 def escape(uri):
     """ Make a filename from a URI by escaping / chars """
@@ -198,7 +198,7 @@ class HTTPTables(FlagFramework.EventHandler):
         
         dbh.execute(
             """CREATE TABLE if not exists `http` (
-            `id` INT(11) not null auto_increment,
+            `id` INT(11) not null,
             `parent` INT(11) default 0 not null,
             `inode` VARCHAR( 255 ) NULL ,
             `request_packet` int null,
@@ -209,15 +209,16 @@ class HTTPTables(FlagFramework.EventHandler):
             `referrer` text NULL,
             `date` timestamp NULL,
             `host` VARCHAR(255),
-            `useragent` VARCHAR(255),
-            primary key (`id`)
+            `useragent` VARCHAR(255)
             )""")
 
         dbh.execute(
             """CREATE TABLE if not exists `http_parameters` (
-            `id` int(11) not null,
+            `id` int(11) not null auto_increment,
+            `inode_id` int not null,
             `key` VARCHAR(255) not null,
-            `value` blob not null
+            `value` mediumblob not null,
+            primary key (`id`)
             ) """)
 
         dbh.check_index("http", "inode")
@@ -287,7 +288,7 @@ class HTTPScanner(StreamScannerFactory):
             except: pass
             
             dbh.insert('http_parameters',
-                       id = id,
+                       inode_id = id,
                        key = key,
                        value = value)
             
@@ -337,7 +338,8 @@ class HTTPScanner(StreamScannerFactory):
                 pass
 
             ## stream.ts_sec is already formatted in DB format
-            date_str = stream.ts_sec.split(" ")[0]
+            timestamp =  stream.get_packet_ts(offset)
+            date_str = timestamp.split(" ")[0]
             path=self.fsfd.lookup(inode=combined_inode)
 
             ## Try to put the HTTP inodes at the mount point. FIXME:
@@ -348,12 +350,14 @@ class HTTPScanner(StreamScannerFactory):
             ## No point creating VFS inodes of 0 size because we dont
             ## need to scan them:
             if size>0:
-                self.fsfd.VFSCreate(None,new_inode,
+                inode_id = self.fsfd.VFSCreate(None,new_inode,
                                     "%s/HTTP/%s/%s" % (path,date_str,
                                                        escape(p.request['url'])),
-                                    mtime=stream.ts_sec, size=size
+                                    mtime=timestamp, size=size
                                     )
-
+            else:
+                inode_id = 0
+                
             ## Store information about this request in the
             ## http table:
             host = p.request.get("host",IP2str(stream.dest_ip))
@@ -395,21 +399,22 @@ class HTTPScanner(StreamScannerFactory):
                     parent = row['id']
 
             dbh.insert('http',
-                            inode          = new_inode,
-                            request_packet = p.request.get("packet_id",0),
-                            method         = p.request.get("method","-"),
-                            url            = url,
-                            response_packet= p.response.get("packet_id"),
-                            content_type   = p.response.get("content-type","text/html"),
-                            _date           = "from_unixtime(%r)" % date,
-                            referrer       = referer,
-                            host           = host,
-                            useragent      = p.request.get('user-agent', '-'),
-                            parent         = parent)                            
-
+                       id = inode_id,
+                       inode          = new_inode,
+                       request_packet = p.request.get("packet_id",0),
+                       method         = p.request.get("method","-"),
+                       url            = url,
+                       response_packet= p.response.get("packet_id"),
+                       content_type   = p.response.get("content-type","text/html"),
+                       _date           = "from_unixtime(%r)" % date,
+                       referrer       = referer,
+                       host           = host,
+                       useragent      = p.request.get('user-agent', '-'),
+                       parent         = parent)                            
+            
             ## handle the request's parameters:
             try:
-                self.handle_parameters(p.request, dbh.autoincrement())
+                self.handle_parameters(p.request, inode_id)
             except KeyError:
                 pass
 
@@ -475,7 +480,7 @@ class BrowseHTTPRequests(Reports.report):
             result.table(
                 elements = [ TimestampType('Date','ts_sec'),
                              PacketType('Request Packet','request_packet', case=query['case']),
-                             InodeType('Inode','inode', case=query['case']),
+                             InodeIDType('Inode', 'http.id', case=query['case']),
                              StringType('Method','method'),
                              StringType('URL','url'),
                              StringType('Content Type','content_type') ],
