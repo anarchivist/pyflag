@@ -136,6 +136,11 @@ int Eth2_Read(Packet self, StringIO input) {
     len += CALL(this->packet.payload, Read, input);
     break;
 
+  case 0x8864:
+    this->packet.payload = (Packet)CONSTRUCT(PPPOE, Packet, super.Con, self, self);
+    len += CALL(this->packet.payload, Read, input);
+    break;
+
   default:
 #ifdef __VERBOSE_DEBUG__
     DEBUG("Unknown ethernet payload type 0x%x.\n", 
@@ -157,6 +162,43 @@ VIRTUAL(ETH_II, Packet)
 
      NAMEOF(this) = "eth";
      VMETHOD(super.Read) = Eth2_Read;
+END_VIRTUAL
+
+/****************************************************
+   PPPOE header
+*****************************************************/
+int PPPOE_Read(Packet self, StringIO input) {
+  PPPOE this=(PPPOE)self;
+  int len;
+  
+  len = this->__super__->Read(self, input);
+
+  switch(this->packet.protocol) {
+    /** This packet carries IP */
+  case 0x0021:
+    this->packet.payload = (Packet)CONSTRUCT(IP, Packet, super.Con, self, self);
+    len += CALL(this->packet.payload, Read, input);
+    break;
+
+  default:
+#ifdef __VERBOSE_DEBUG__
+    DEBUG("Unknown PPPOE payload type 0x%x.\n", 
+	  this->packet.protocol);
+#endif
+    break;
+  };
+
+  return len;
+};
+
+VIRTUAL(PPPOE, Packet)
+     INIT_STRUCT(packet, pppoe_Format);
+
+     NAME_ACCESS(packet, version, version, FIELD_TYPE_SHORT_X);
+     NAME_ACCESS(packet, session_id, session_id, FIELD_TYPE_SHORT_X);
+     NAME_ACCESS(packet, payload, payload, FIELD_TYPE_PACKET);
+
+     VMETHOD(super.Read) = PPPOE_Read;
 END_VIRTUAL
 
 /****************************************************

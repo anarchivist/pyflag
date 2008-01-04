@@ -78,6 +78,25 @@ CLASS(Cooked, Packet)
 END_CLASS
 
 /***********************************************
+     PPPOE headers
+*************************************************/
+struct pppoe_struct {
+  char version;
+  char session_data;
+  uint16_t session_id;
+  uint16_t payload_length;
+  uint16_t protocol;
+  Packet payload;
+} __attribute__((packed));
+
+#define pppoe_Format q(STRUCT_CHAR, STRUCT_CHAR, STRUCT_SHORT, STRUCT_SHORT, \
+		       STRUCT_SHORT);
+
+CLASS(PPPOE, Packet)
+     struct pppoe_struct packet;
+END_CLASS
+
+/***********************************************
     Ethernet headers
 *************************************************/
 struct ethernet_2_struct {
