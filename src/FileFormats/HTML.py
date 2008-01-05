@@ -29,10 +29,10 @@ class Tag:
         self.type = 'open'
 
     def __setitem__(self, item, value):
-        self.attributes[item] = value
+        self.attributes[item.lower()] = value
 
     def __getitem__(self, item):
-        return self.attributes[item]
+        return self.attributes[item.lower()]
 
     def __str__(self):
         attributes = "".join([" %s='%s'" % (k,urllib.quote(v)) for k,v \
@@ -202,10 +202,9 @@ class ResolvingHTMLTag(SanitizingTag):
         ## Collect some information about this inode:
         try:
             dbh = DB.DBO(case)
-            dbh.execute("select url,http.inode from http, inode where http.inode=inode.inode and inode.inode_id=%r", inode_id)
+            dbh.execute("select url from http where inode_id=%r", inode_id)
             row = dbh.fetch()
 
-            self.inode = row['inode']
             url = row['url']
             m=re.search("(http|ftp)://([^/]+)/([^?]*)",url)
             self.method = m.group(1)
@@ -240,17 +239,18 @@ class ResolvingHTMLTag(SanitizingTag):
         ## Try to make reference more url friendly:
         reference = reference.replace(" ","%20")
         dbh = DB.DBO(self.case)
-        dbh.execute("select inode from http where url=%r and not isnull(inode) limit 1", reference)
+        dbh.execute("select inode_id from http where url=%r and not isnull(http.inode_id) limit 1", reference)
         row = dbh.fetch()
-        if row and row['inode']:
+        if row and row['inode_id']:
             return '"f?%s"' % query_type(case=self.case, family="Network Forensics",
-                                         report="ViewFile", inode=row['inode'])
+                                         report="ViewFile", inode_id=row['inode_id'])
 
         return '/images/spacer.png reference=\"%s\"' % original_reference
 
 
 class HTMLParser(lexer.Lexer):
     state = "CDATA"
+    flags = re.I
     tokens = [
         ## Detect HTML comments
         [ "CDATA", "<!--", "COMMENT_START", "COMMENT" ],

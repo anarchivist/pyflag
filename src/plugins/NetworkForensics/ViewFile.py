@@ -54,12 +54,7 @@ class ViewFile(Reports.report):
     
     name = "View File"
     family = "Network Forensics"
-    parameters = {'inode':'any'}
     hidden = True
-
-    def form(self,query,result):
-        result.case_selector()
-        result.textfield("Inode to view",'inode')
 
     def display(self,query,result):
         result.decoration = 'naked'
@@ -67,10 +62,15 @@ class ViewFile(Reports.report):
 
         dbh = DB.DBO(self.case)
         fsfd = FileSystem.DBFS( self.case)
-        fd = fsfd.open(inode=query['inode'])
+        try:
+            fd = fsfd.open(inode=query['inode'])
+            inode_id = fd.lookup_id()
+        except KeyError:
+            fd = fsfd.open(inode_id=query['inode_id'])
+            inode_id = query['inode_id']
         
         try:
-            dbh.execute("select mime,type from type where inode=%r",query['inode'])
+            dbh.execute("select mime,type from type where inode_id=%r",inode_id)
             row = dbh.fetch()
             content_type = row['mime']
             type = row['type']

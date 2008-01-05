@@ -38,6 +38,7 @@ class Lexer:
     processed = 0
     processed_buffer = ''
     saved_state = None
+    flags = 0
     
     def __init__(self, verbose=0, fd=None):
         if not self.verbose:
@@ -46,7 +47,7 @@ class Lexer:
         if len(self.tokens[0])==4:
             for row in self.tokens:
                 row.append(re.compile(row[0], re.DOTALL))
-                row.append(re.compile(row[1], re.DOTALL | re.M | re.S))
+                row.append(re.compile(row[1], re.DOTALL | re.M | re.S | self.flags ))
                 
         self.fd = fd
 
