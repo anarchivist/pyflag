@@ -30,6 +30,7 @@ import pyflag.Reports as Reports
 import pyflag.DB as DB
 import pyflag.pyflaglog as pyflaglog
 import pyflag.ScannerUtils as ScannerUtils
+import pyflag.Farm as Farm
 
 Registry.Init()
 
@@ -62,8 +63,8 @@ config.add_option("scanners", default='HTTPScanner,HotmailScanner,MSNScanner,IRC
 config.add_option("timeout", default=120, type='int',
                   help="The maximum inactivity time after which the tcp reassembler will be flushed")
 
-config.add_option("destination", default=None, 
-                  help='Move files to there rather than unlink them')
+config.add_option("log", default="log.txt", 
+                  help='This is a log file where we maintain a list of files that we already processed.')
 
 config.add_option("lock", default='.lock',
                   help="Do not operate on directory while lock file is present")
@@ -181,31 +182,49 @@ def load_file(filename):
 
 last_time = 0
 
+print "Reading log file"
+log_fd = open(config.log)
+files_we_have = set()
+for l in log_fd:
+    files_we_have.add(l.strip())
+print "Done - added %s files from log" % len(files_we_have)
+
+log_fd = open(config.log, "a")
+last_mtime = os.stat(directory).st_mtime
+
+## Start up some workers if needed:
+Farm.start_workers()
+
 while 1:
-    files_we_have = os.listdir(config.destination)
-    files = os.listdir(directory)
-    files.sort()
-    if config.lock not in files:
-        for f in files:
-           if f in files_we_have: continue
+    t = os.stat(directory).st_mtime
+    if t>=last_mtime:
+        last_mtime = t
+        files = os.listdir(directory)
+        files.sort()
 
-           filename = "%s/%s" % (directory,f)
-           load_file(filename)
-           if config.destination:
-               os.symlink(filename, config.destination+"/"+f)
-           else:
-               os.unlink(filename)
-           last_time = time.time()
-    else:
-       print "Lock file found"
+        if config.lock not in files:
+            for f in files:
+               if f in files_we_have: continue
 
-    if config.single:
-        sys.exit(0)
-        
+               filename = "%s/%s" % (directory,f)
+               load_file(filename)
+               if config.log:
+                   log_fd.write(f+"\n")
+                   log_fd.flush()
+                   files_we_have.add(f)
+
+               last_time = time.time()
+        else:
+           print "Lock file found"
+
+        if config.single:
+            sys.exit(0)
+
+        ## We need to flush the decoder:
+        if time.time() - last_time > config.timeout:
+            print "Flushing reassembler"
+            processor.flush()
+            last_time = time.time()
+
     print "%s: Sleeping for %s seconds" % (time.ctime(), config.sleep)
     time.sleep(config.sleep)
-    ## We need to flush the decoder:
-    if time.time() - last_time > config.timeout:
-        print "Flushing reassembler"
-        processor.flush()
-        last_time = time.time()
