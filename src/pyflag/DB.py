@@ -342,7 +342,7 @@ class DBO:
         """ Returns a new database object for the same case database """
         return self.__class__(self.case)
 
-    def execute(self,query_str,params=None):
+    def execute(self,query_str, *params):
         """  SQL execution method.
                This functions executes the SQL in this object's cursor context. the query must be given as a string with with %s or %r escape characters, and the correct number of strings in the params list.
 
@@ -352,20 +352,15 @@ class DBO:
                        
                @arg query_str: A format string with only %r and %s format sequences
                @arg params: A list of strings which will be formatted into query_str. If there is only one format string and the programmer is truely lazy, a string is ok. """
-
-        if params==None:
-            string = query_str
-        else:
-            try:
-                ## We only do this if the params are truely iteratable
-                params.__getattribute__('__iter__')
-
-                ## Hopefully this does not bear a huge performance overhead???
-                params = tuple([ DBExpander(i) for i in params])
-            except AttributeError,e:
-                params=(DBExpander(params),)
-
-            string= query_str % params
+        try:
+            params[0].__iter__
+            params = params[0]
+        except (AttributeError,IndexError):
+            pass
+            
+        ## Hopefully this does not bear a huge performance overhead???
+        params = tuple( DBExpander(i) for i in params )
+        string = query_str % params
         try:
             ## The following decode is required to go around MySQLdb's
             ## stupid unicode crap - this has just recently been
@@ -662,7 +657,7 @@ class DBO:
         if not self.mass_insert_fast:
             self.invalidate(self.mass_insert_table)
             
-        self.execute(sql,args)
+        self.execute(sql,*args)
 
         ## Ensure the cache is now empty:
         self.mass_insert_start(self.mass_insert_table,

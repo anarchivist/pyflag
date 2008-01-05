@@ -182,12 +182,15 @@ def load_file(filename):
 
 last_time = 0
 
-print "Reading log file"
-log_fd = open(config.log)
 files_we_have = set()
-for l in log_fd:
-    files_we_have.add(l.strip())
-print "Done - added %s files from log" % len(files_we_have)
+try:
+    log_fd = open(config.log)
+    print "Reading log file"
+    for l in log_fd:
+        files_we_have.add(l.strip())
+    print "Done - added %s files from log" % len(files_we_have)
+except IOError:
+    pass
 
 log_fd = open(config.log, "a")
 last_mtime = os.stat(directory).st_mtime
