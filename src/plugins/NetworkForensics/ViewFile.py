@@ -60,7 +60,6 @@ class ViewFile(Reports.report):
         result.decoration = 'naked'
         self.case = query['case']
 
-        dbh = DB.DBO(self.case)
         fsfd = FileSystem.DBFS( self.case)
         try:
             fd = fsfd.open(inode=query['inode'])
@@ -68,27 +67,8 @@ class ViewFile(Reports.report):
         except KeyError:
             fd = fsfd.open(inode_id=query['inode_id'])
             inode_id = query['inode_id']
-        
-        try:
-            dbh.execute("select mime,type from type where inode_id=%r",inode_id)
-            row = dbh.fetch()
-            content_type = row['mime']
-            type = row['type']
-        except (DB.DBError,TypeError):
-            ## We could not find it in the mime table - lets do magic
-            ## ourselves:
-            data = fd.read(1024)
-            fd.seek(0)
-            
-            m = Magic(mode = 'mime')
-            content_type = m.buffer(data)
-            m = Magic()
-            type = m.buffer(data)
 
-        for k,v in self.mappings.items():
-            if k in type:
-                content_type = v
-            
+        content_type = self.guess_content_type(query, inode_id)
         result.generator.content_type = content_type
 
         ## Now establish the dispatcher for it
@@ -98,6 +78,33 @@ class ViewFile(Reports.report):
 
         return self.default_handler(fd, result)
 
+    def guess_content_type(self, query, inode_id):
+        try:
+            if query['hint']: content_type=query['hint']
+        except KeyError:      
+            try:
+                dbh = DB.DBO(self.case)
+                dbh.execute("select mime,type from type where inode_id=%r",inode_id)
+                row = dbh.fetch()
+                content_type = row['mime']
+                type = row['type']
+            except (DB.DBError,TypeError):
+                ## We could not find it in the mime table - lets do magic
+                ## ourselves:
+                data = fd.read(1024)
+                fd.seek(0)
+
+                m = Magic(mode = 'mime')
+                content_type = m.buffer(data)
+                m = Magic()
+                type = m.buffer(data)
+
+            for k,v in self.mappings.items():
+                if k in type:
+                    content_type = v
+
+        return content_type
+    
     def default_handler(self, fd, ui):
         ui.generator.content_type = "text/plain"
 
@@ -136,6 +143,7 @@ class ViewFile(Reports.report):
             parser = HTML.HTMLParser(tag_class = Curry(HTML.ResolvingHTMLTag,
                                                        inode_id = fd.lookup_id(),
                                                        case = self.case))
+            #parser = HTML.HTMLParser(tag_class = HTML.Tag)
             data = fd.read(1000000)
             parser.feed(data)
             while parser.next_token(): pass
@@ -155,6 +163,17 @@ class ViewFile(Reports.report):
             date = "%d-%02d-%02d %02d:%02d:%02d" % zinfo.date_time
             ui.row(zinfo.filename, date, zinfo.file_size)
 
+    def css_handler(self, fd, ui):
+        def generator():
+            data = fd.read(100000)
+            tag = HTML.ResolvingHTMLTag(inode_id = fd.lookup_id(), case =self.case)
+            tag.add_child(data)
+            filtered = tag.css_filter()
+            print filtered
+            yield filtered
+            
+        ui.generator.generator = generator()
+        
     def mpeg_handler(self, fd, ui):
         ## TODO: run down the ID3 tags here
         
@@ -175,6 +194,7 @@ class ViewFile(Reports.report):
                    re.compile("image.*"): image_handler,
                    re.compile("application/x-zip"): zip_handler,
                    re.compile("audio/mpeg"): mpeg_handler,
+                   re.compile("css"): css_handler,
                    }
 
 class HTMLSanitiser(HTMLParser.HTMLParser):

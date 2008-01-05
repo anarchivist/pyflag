@@ -139,17 +139,20 @@ class SanitizingTag(Tag):
     
     ## No other tags will be allowed (especially script tags)
     allowable_tags = [ 'b','i','a','img','em','br','strong', 'blockquote',
-                       'tt', 'li', 'ol', 'ul', 'p', 'table', 'td', 'tr',
+                       'tt', 'li', 'ol', 'ul', 'p', 'table', 'td', 'tr','th',
                        'h1', 'h2', 'h3', 'pre', 'html', 'font', 'body',
                        'code', 'head', 'meta', 'title','style', 'form',
                        'sup', 'input', 'span', 'label', 'option','select',
                        'div','span','nobr','u', 'frameset','frame','iframe',
-                       'textarea','tbody','thead','center','hr','small']
+                       'textarea','tbody','thead','center','hr','small', 'link']
+
+    ## These tags will have their contents deleted
+    forbidden_tag = [ 'script' ]
 
     ## Only these attributes are allowed (note that href and src
     ## attributes are handled especially):
     allowable_attributes = ['color', 'bgolor', 'width', 'border',
-                            'rules', 'cellspacing', 
+                            'rules', 'cellspacing', 'id',
                             'cellpadding', 'height',
                             'align', 'bgcolor', 'rowspan', 
                             'colspan', 'valign','id', 'class','name', 
@@ -158,11 +161,23 @@ class SanitizingTag(Tag):
                             'framespacing','frameborder',
                             ]
 
+    def css_filter(self):
+        data = "<style>%s</style>" % self.innerHTML()
+        return re.sub("(?i)url\(([^\)]+)\)",
+                      lambda m: "url(%s)" % self.resolve_reference(m.group(1),'text/css'),
+                      data)
+
     def __str__(self):
         ## Some tags are never allowed to be outputted
         if self.name not in self.allowable_tags:
+            if self.name in self.forbidden_tag:
+                return ''
             #print "Rejected tag %s" % self.name
-            return ''
+            return self.innerHTML()
+
+        ## CSS needs to be filtered extra well
+        if self.name == 'style':
+            return self.css_filter()
 
         attributes = "".join([" %s='%s'" % (k,v) for k,v \
                               in self.attributes.items() if k in \
@@ -172,7 +187,10 @@ class SanitizingTag(Tag):
             attributes += ' src=%s' % self.resolve_reference(self.attributes['src'])
 
         if 'href' in self.attributes:
-            attributes += ' href="javascript: alert(%r)"' % urllib.quote(self.attributes['href'])
+            if self.name == 'link':
+                attributes += " href=%s" % self.resolve_reference(self.attributes['href'], 'text/css')
+            else:
+                attributes += ' href="javascript: alert(%r)"' % urllib.quote(self.attributes['href'])
         
         if self.type == 'selfclose':
             return "<%s%s/>" % (self.name, attributes)
@@ -223,7 +241,7 @@ class ResolvingHTMLTag(SanitizingTag):
 
         self.comment = False
 
-    def resolve_reference(self, reference):
+    def resolve_reference(self, reference, hint=''):
         original_reference = reference
 
         ## Absolute reference
@@ -243,7 +261,8 @@ class ResolvingHTMLTag(SanitizingTag):
         row = dbh.fetch()
         if row and row['inode_id']:
             return '"f?%s"' % query_type(case=self.case, family="Network Forensics",
-                                         report="ViewFile", inode_id=row['inode_id'])
+                                         report="ViewFile", inode_id=row['inode_id'],
+                                         hint=hint)
 
         return '/images/spacer.png reference=\"%s\"' % original_reference
 
@@ -339,7 +358,7 @@ class HTMLParser(lexer.Lexer):
 
     def END_TAG(self, token, match):
         ## These tags need to be ignored because often they do not balance
-        for t in ['br', 'p']:
+        for t in ['br', 'p', 'meta', 'link']:
             if self.tag.name==t:
                 self.tag.type = 'selfclose'
 
