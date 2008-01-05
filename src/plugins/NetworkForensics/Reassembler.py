@@ -301,7 +301,8 @@ class StreamFile(File):
         dbh=DB.DBO(self.case)
         dbh.execute("select ts_sec from pcap where id = %r" , packet_id)
         row = dbh.fetch()
-        return row['ts_sec']
+        if row:
+            return row['ts_sec']
 
     def get_combined_fd(self):
         """ Returns an fd opened to the combined stream """

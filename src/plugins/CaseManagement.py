@@ -44,7 +44,7 @@ order = 10
 
 class NewCase(Reports.report):
     """ Creates a new flag case database."""
-    parameters = {"create_case":"alphanum"}
+    parameters = {"create_case":"sqlsafe"}
     name = "Create new case"
     family = "Case Management"
     description = "Create database for new case to load data into"

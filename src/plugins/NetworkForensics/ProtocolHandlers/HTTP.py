@@ -198,9 +198,8 @@ class HTTPTables(FlagFramework.EventHandler):
         
         dbh.execute(
             """CREATE TABLE if not exists `http` (
-            `id` INT(11) not null,
+            `inode_id` INT(11) not null,
             `parent` INT(11) default 0 not null,
-            `inode` VARCHAR( 255 ) NULL ,
             `request_packet` int null,
             `method` VARCHAR( 10 ) NULL ,
             `url` text NULL,
@@ -221,8 +220,9 @@ class HTTPTables(FlagFramework.EventHandler):
             primary key (`id`)
             ) """)
 
-        dbh.check_index("http", "inode")
         dbh.check_index("http", "url", 100)
+        dbh.check_index("http", "inode_id")
+        dbh.check_index("http_parameters", "inode_id")
         
 class HTTPScanner(StreamScannerFactory):
     """ Collect information about HTTP Transactions.
@@ -383,7 +383,7 @@ class HTTPScanner(StreamScannerFactory):
             parent = 0
             dbh = DB.DBO(self.case)
             if referer:
-                dbh.execute("select id from http where url=%r order by id desc limit 1", referer)
+                dbh.execute("select inode_id from http where url=%r order by inode_id desc limit 1", referer)
                 row = dbh.fetch()
 
                 ## If there is no referrer we just make a psuedo entry
@@ -396,11 +396,10 @@ class HTTPScanner(StreamScannerFactory):
                         dbh.insert("http", url=referer, host=host)
                         parent = dbh.autoincrement()
                 else:
-                    parent = row['id']
+                    parent = row['inode_id']
 
             dbh.insert('http',
-                       id = inode_id,
-                       inode          = new_inode,
+                       inode_id = inode_id,
                        request_packet = p.request.get("packet_id",0),
                        method         = p.request.get("method","-"),
                        url            = url,
@@ -480,7 +479,7 @@ class BrowseHTTPRequests(Reports.report):
             result.table(
                 elements = [ TimestampType('Date','ts_sec'),
                              PacketType('Request Packet','request_packet', case=query['case']),
-                             InodeIDType('Inode', 'http.id', case=query['case']),
+                             InodeIDType('Inode', 'http.inode_id', case=query['case']),
                              StringType('Method','method'),
                              StringType('URL','url'),
                              StringType('Content Type','content_type') ],
@@ -516,7 +515,7 @@ class BrowseHTTPRequests(Reports.report):
                         type = 'branch'
                         break
 
-                    yield(("%s" % row['id'],result,type))
+                    yield(("%s" % row['inode_id'],result,type))
 
             def pane_cb(path, result):
                 t = HTTPTree(path=path, case=query['case'], table='http')
@@ -597,7 +596,7 @@ class HTTPTree(TreeObj.TreeObj):
     each request to its previous ones. The users select nodes in the
     tree which causes more pages to be downloaded.
     """
-    node_name = "id"
+    node_name = "inode_id"
 
 
 ## UnitTests:

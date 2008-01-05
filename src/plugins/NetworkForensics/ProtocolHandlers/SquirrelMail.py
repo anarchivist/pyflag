@@ -35,7 +35,7 @@ class SquirrelMailScan(LiveCom.HotmailScanner):
         
         def boring(self, metadata, data=''):
             dbh = DB.DBO(self.case)
-            dbh.execute("select content_type,url,host from http where inode=%r limit 1", self.fd.inode)
+            dbh.execute("select content_type,url,host from http where inode_id=%r limit 1", self.fd.inode_id)
             row = dbh.fetch()
             if (row and "compose.php" in row['url']) or "SquirrelMail" in data[:256]:
                 self.parser =  HTMLParser(verbose=0)
@@ -51,7 +51,7 @@ class SquirrelMailScan(LiveCom.HotmailScanner):
 
         def process_send_message(self,fd):
             dbh = DB.DBO(self.case)
-            dbh.execute("select `key`,`value` from http_parameters, http where http.inode = %r and http.id = http_parameters.id", self.fd.inode)
+            dbh.execute("select `key`,`value` from http_parameters where inode_id = %r", self.fd.inode_id)
             query = dict([(r['key'].lower(),r['value']) for r in dbh])
             result = {'type':'Edit Sent'}
             for field, pattern in [('To','send_to'),

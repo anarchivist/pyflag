@@ -44,14 +44,16 @@ class ReportError(Exception):
     which can return a GUI formatted error or a simple string (or
     both). For example the Flash will only look at the string.
     """
-    def __init__(self, ui=None, text=None, exception=None, bt=None):
+    def __init__(self, ui='', text='', exception=None, bt=None):
         self.bt = bt
         if not ui:
             self.ui = text
         else:
             self.ui = ui
-            
-        self.text = text
+
+        if text:
+            self.text = text
+        else: self.text = ui
 
         if exception:
             self.text = "%s: %s" % (exception.__class__.__name__,

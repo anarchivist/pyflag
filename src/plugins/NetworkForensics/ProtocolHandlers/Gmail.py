@@ -85,7 +85,7 @@ class GmailScanner(LiveCom.HotmailScanner):
 
         def boring(self, metadata, data=''):
             dbh = DB.DBO(self.case)
-            dbh.execute("select content_type,url,host from http where id=%r limit 1", self.fd.inode_id)
+            dbh.execute("select content_type,url,host from http where inode_id=%r limit 1", self.fd.inode_id)
             row = dbh.fetch()
             if row and row['host']=='mail.google.com' and \
                    row['url'].startswith("http://mail.google.com/mail/"):

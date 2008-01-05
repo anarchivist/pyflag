@@ -372,12 +372,12 @@ class DBFS(FileSystem):
             return res["inode"]
         elif inode_id:
             dbh.check_index('inode','inode_id')
-            dbh.execute("select inode from inode where inode_id=%r order by status limit 1", (inode_id))
+            dbh.execute("select inode from inode where inode_id=%r order by status limit 1", inode_id)
             res = dbh.fetch()
             return res['inode']
         else:
             dbh.check_index('file','inode')
-            dbh.execute("select concat(path,name) as path from file where inode=%r order by status limit 1", (inode))
+            dbh.execute("select concat(path,name) as path from file where inode=%r order by status limit 1", inode)
             res = dbh.fetch()
             if not res:
                 return None

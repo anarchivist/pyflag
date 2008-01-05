@@ -158,7 +158,7 @@ class HotmailScanner(Scanner.GenScanFactory):
             ## Check to see if this is a POST request (i.e. mail is
             ## sent to the server):
             dbh = DB.DBO(self.case)
-            dbh.execute("select `key`,`value` from http_parameters, http where http.inode = %r and http.id = http_parameters.id", self.fd.inode)
+            dbh.execute("select `key`,`value` from http_parameters where inode_id = %r", self.fd.inode_id)
             query = dict([(r['key'].lower(),r['value']) for r in dbh])
             result = {'type':'Edit Sent' }
             for field, pattern in [('To','fto'),
