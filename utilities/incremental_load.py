@@ -179,6 +179,7 @@ def load_file(filename):
     output_fd.flush()
     pcap_dbh.delete("connection_details",
                     where = "inode is null")
+    pcap_dbh.mass_insert_commit()
 
 last_time = 0
 

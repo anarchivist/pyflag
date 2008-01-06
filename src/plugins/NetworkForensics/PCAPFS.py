@@ -145,8 +145,11 @@ class PCAPFS(DBFS):
         ## We manage a number of tables here with mass insert:
         packet_handlers = [ x(self.case) for x in Registry.PACKET_HANDLERS.classes ]
         dbh = DB.DBO(self.case)
+        ## We do not want to use mass insert here to ensure that
+        ## scanning can begin immediately - this is useful when the
+        ## incremental_loader is used because small files may be
+        ## processed.
         pdbh = DB.DBO()
-        pdbh.mass_insert_start('jobs')
         if scanners:
             scanner_string = ','.join(scanners)
             cookie = int(time.time())
@@ -256,7 +259,7 @@ class PCAPFS(DBFS):
                             )
                         
                         if scanners:
-                            pdbh.mass_insert(
+                            pdbh.insert("jobs",
                                 command = 'Scan',
                                 arg1 = self.case,
                                 arg2 = new_inode,
@@ -284,7 +287,7 @@ class PCAPFS(DBFS):
                             )
 
                         if scanners:
-                            pdbh.mass_insert(
+                            pdbh.insert("jobs",
                                 command = 'Scan',
                                 arg1 = self.case,
                                 arg2 = new_inode,

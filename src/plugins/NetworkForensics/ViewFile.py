@@ -61,14 +61,14 @@ class ViewFile(Reports.report):
         self.case = query['case']
 
         fsfd = FileSystem.DBFS( self.case)
-        try:
+        if query.has_key('inode'):
             fd = fsfd.open(inode=query['inode'])
             inode_id = fd.lookup_id()
-        except KeyError:
+        else:
             fd = fsfd.open(inode_id=query['inode_id'])
             inode_id = query['inode_id']
 
-        content_type = self.guess_content_type(query, inode_id)
+        content_type = self.guess_content_type(fd, query, inode_id)
         result.generator.content_type = content_type
 
         ## Now establish the dispatcher for it
@@ -78,7 +78,7 @@ class ViewFile(Reports.report):
 
         return self.default_handler(fd, result)
 
-    def guess_content_type(self, query, inode_id):
+    def guess_content_type(self, fd, query, inode_id):
         try:
             if query['hint']: content_type=query['hint']
         except KeyError:      

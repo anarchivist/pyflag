@@ -339,7 +339,11 @@ class HTTPScanner(StreamScannerFactory):
 
             ## stream.ts_sec is already formatted in DB format
             timestamp =  stream.get_packet_ts(offset)
-            date_str = timestamp.split(" ")[0]
+            try:
+                date_str = timestamp.split(" ")[0]
+            except:
+                date_str = stream.ts_sec.split(" ")[0]
+                
             path=self.fsfd.lookup(inode=combined_inode)
 
             ## Try to put the HTTP inodes at the mount point. FIXME:

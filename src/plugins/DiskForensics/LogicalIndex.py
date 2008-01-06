@@ -64,7 +64,8 @@ class IndexTables(FlagFramework.EventHandler):
         `inode_id` INT NOT NULL,
         `word_id` INT NOT NULL ,
         `offset` BIGINT NOT NULL,
-        `length` smallint not null
+        `length` smallint not null,
+        `version` int not null
         )""")
 
         dbh.execute("""CREATE TABLE if not exists `LogicalIndexStats` (
