@@ -346,6 +346,10 @@ class GZ_file(DiskForensics.DBFS_file):
                 
                 else:
                     continue
+
+            except Exception, e:
+                pyflaglog.log(pyflaglog.WARNING, "Unable to decompress inode %s" % e)
+                break
             
             count += len(data)
             if len(data)==0: break

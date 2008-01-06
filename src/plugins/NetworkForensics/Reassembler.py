@@ -245,7 +245,9 @@ class StreamFile(File):
         ## Now create the stream in the VFS:
         fsfd = FileSystem.DBFS(self.case)
         inode = self.inode[:self.inode.rfind("|")] +"|S%s" % stream_ids[0]
-        pathname = os.path.dirname(fsfd.lookup(inode = inode))+"/combined"
+        old_pathname = fsfd.lookup(inode = inode)
+        if not old_pathname: old_pathname = "lost+find/%s" % inode
+        pathname = os.path.dirname(old_pathname)+"/combined"
        
         ## Get mtime 
         try:
