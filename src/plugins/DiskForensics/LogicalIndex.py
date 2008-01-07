@@ -79,17 +79,26 @@ class IndexScan(GenScanFactory):
     ## Indexing must occur after all scanners have run.
     order=200
     default = True
+    version = 0
 
     class Drawer(Scanner.Drawer):
         description = "General Forensics"
         name = "General Forensics"
         contains = ['RegExpScan','IndexScan','MD5Scan','VirScan','CarveScan']
         default = True
+
+    def check_version(self):
+        pdbh = DB.DBO()
+        pydbh.execute("select max(id) as version from dictionary")
+        row = pydbh.fetch()
+        return row['version']
     
     def prepare(self):
         ## Create new index trie - This takes a serious amount of time
         ## for large dictionaries (about 2 sec for 70000 words):
         self.index = index.Index()
+        self.version = self.check_version()
+        
         pydbh = DB.DBO(None)
         #Do word index (literal) prep
         pyflaglog.log(pyflaglog.DEBUG,"Index Scanner: Building index trie")
@@ -167,6 +176,10 @@ class IndexScan(GenScanFactory):
     class Scan(MemoryScan):
         def __init__(self, inode,ddfs,outer,factories=None,fd=None):
             MemoryScan.__init__(self, inode,ddfs,outer,factories,fd=fd)
+            ## Check we are operating with the correct dictionary version
+            if self.outer.version != self.outer.check_version():
+                self.outer.prepare()
+            
             self.dbh = DB.DBO(fd.case)
             self.dbh.mass_insert_start('LogicalIndexOffsets')
             self.inode_id = fd.inode_id
@@ -205,6 +218,7 @@ class IndexScan(GenScanFactory):
                         word_id = id,
                         offset = offset+self.offset,
                         length = length,
+                        version = self.outer.version
                         )
 
         def slack(self,data,metadata=None):

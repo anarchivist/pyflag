@@ -91,9 +91,15 @@ class ViewFile(Reports.report):
         try:
             if query['hint']: content_type=query['hint']
         except KeyError:      
+            dbh = DB.DBO(self.case)
+            # Is it in the http table?
+            dbh.execute("select content_type from http where inode_id=%r limit 1", inode_id)
+            row = dbh.fetch()
+            if row and row['content_type']:
+                return row['content_type']
+            
             try:
-                dbh = DB.DBO(self.case)
-                dbh.execute("select mime,type from type where inode_id=%r",inode_id)
+                dbh.execute("select mime,type from type where inode_id=%r limit 1",inode_id)
                 row = dbh.fetch()
                 content_type = row['mime']
                 type = row['type']

@@ -205,7 +205,7 @@ class SanitizingTag(Tag):
                                       self.innerHTML(), self.name)
 
 
-    def resolve_reference(self, reference):
+    def resolve_reference(self, reference, hint=''):
         return 'images/spacer.png'
 
 class ResolvingHTMLTag(SanitizingTag):
@@ -267,9 +267,12 @@ class ResolvingHTMLTag(SanitizingTag):
         dbh.execute("select inode_id from http where url=%r and not isnull(http.inode_id) limit 1", reference)
         row = dbh.fetch()
         if row and row['inode_id']:
-            return '"f?%s"' % query_type(case=self.case, family="Network Forensics",
-                                         report="ViewFile", inode_id=row['inode_id'],
-                                         hint=hint)
+            return '"f?%s" reference="%s"' % (query_type(case=self.case,
+                                                         family="Network Forensics",
+                                                         report="ViewFile",
+                                                         inode_id=row['inode_id'],
+                                                         hint=hint),
+                                              original_reference)
 
         return 'images/spacer.png reference=\"%s\"' % original_reference
 
@@ -372,8 +375,15 @@ class HTMLParser(lexer.Lexer):
         if self.tag.type=='close':
             ## Pop the last tag off the stack
             try:
-                self.tag = self.stack.pop(-1)
-                self.tag = self.stack[-1]
+                ## We go back in the stack until we find the matching
+                ## opening tag for this closing tag. This helps us fix
+                ## situations where tags are not properly balanced.
+                while 1:
+                    old_tag = self.stack.pop(-1)
+                    if old_tag.name == self.tag.name:
+                        self.tag = self.stack[-1]
+                        break
+                    
             except IndexError: pass
         elif self.tag.type=='selfclose':
             try:
@@ -451,7 +461,7 @@ if __name__ == '__main__':
         ## This is a test for dom navigation
         root = l.root
         print root.tree()
-        print root.innerHTML()
+        print "Inner HTML %s" % root.innerHTML()
 
         print l.Tag
         

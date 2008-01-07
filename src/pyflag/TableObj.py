@@ -1438,6 +1438,10 @@ class InodeType(StringType):
             dbh = DB.DBO(case)
             dbh.cached_execute(sql, limit=limit, length=2)
             row = dbh.fetch()
+            if not row:
+                result.heading("No inodes matching")
+                return
+            
             next_row = dbh.fetch()
             inode = self.get_inode(row[self.name])
 
