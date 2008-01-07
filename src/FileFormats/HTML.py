@@ -14,6 +14,19 @@ import sys,re,urllib,os
 import pyflag.DB as DB
 from FlagFramework import query_type, normpath, get_bt_string
 
+XML_SPECIAL_CHARS_TO_ENTITIES = { "'" : "squot",
+                                  '"' : "quote",
+                                  "&" : "amp",
+                                  " " : "nbsp",
+                                  "<" : "lt",
+                                  ">" : "gt" }
+
+def unquote(string):
+    for k,v in XML_SPECIAL_CHARS_TO_ENTITIES.items():
+        string = string.replace("&%s;" % v, k)
+
+    return string
+
 def decode_entity(string):
     return re.sub("&#(\d+);", lambda x: chr(int(x.group(1))), string)
 
@@ -110,6 +123,19 @@ class Tag:
 
             if not failed:
                 return m
+
+    def __iter__(self):
+        self.i = 0
+        return self
+
+    def next(self):
+        try:
+            result = self.children[self.i]
+            self.i +=1
+            return result
+        except IndexError:
+            raise StopIteration()
+
 
 class TextTag(Tag):
     """ A Sanitising Tag to print the DOM as plain text.

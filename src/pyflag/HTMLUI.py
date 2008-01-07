@@ -380,7 +380,7 @@ class HTMLUI(UI.GenericUI):
         else:
             self.result+=base
 
-    def popup(self,callback, label,icon=None, tooltip=None, width=600, height=600, **options):
+    def popup(self,callback, label,icon=None, tooltip=None, width=600, height=600, pane='self', **options):
         """ This method presents a button on the screen, which when
         clicked will open a new window and use the callback to render
         in it.
@@ -390,6 +390,10 @@ class HTMLUI(UI.GenericUI):
         """
         if not tooltip: tooltip = label
         cb = self.store_callback(callback)
+
+        if pane=='new':
+            width=1024
+            height=768
 
         if icon:
             base = "<img alt='%s' border=0 src='images/%s' onclick=\"popup('f?%s','%s',%r,%r); return false;\" class=PopupIcon />" % (label,icon, self.defaults,cb, width, height)

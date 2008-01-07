@@ -21,33 +21,43 @@
 # * along with this program; if not, write to the Free Software
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
-""" This is a module to parse squirel mail web mails """
+""" This module will retrieve the email messages from Yahoo mail """
 import pyflag.DB as DB
 import LiveCom
-from FileFormats.HTML import decode_entity, HTMLParser
 import pyflag.pyflaglog as pyflaglog
+import pyflag.Scanner as Scanner
+import re
+import FileFormats.HTML as HTML
+import pyflag.TableObj as TableObj
+import pyflag.FileSystem as FileSystem
+import pyflag.FlagFramework as FlagFramework
 
-class SquirrelMailScan(LiveCom.HotmailScanner):
-    """ Detect SquirrelMail Sessions """
+class YahooMailScan(LiveCom.HotmailScanner):
+    """ Detect YahooMail Sessions """
 
     class Scan(LiveCom.HotmailScanner.Scan):
-        service = "Squirrel"
+        service = "Yahoo"
         
         def boring(self, metadata, data=''):
-            dbh = DB.DBO(self.case)
-            dbh.execute("select content_type,url,host from http where inode_id=%r limit 1", self.fd.inode_id)
-            row = dbh.fetch()
-            if (row and "compose.php" in row['url']) or "SquirrelMail" in data[:256]:
-                self.parser =  HTMLParser(verbose=0)
-                return False
-            
-            return True
-                   
-        def external_process(self, fd):
-            pyflaglog.log(pyflaglog.DEBUG,"Opening %s for SquirrelMail processing" % self.fd.inode)
+            ## We dont think its boring if our base class does not:
+            ## And the data contains '<title>\s+Yahoo! Mail' in the top.
+            if not Scanner.StoreAndScanType.boring(self, metadata, data=''):
+                m=re.search("<title>\s+Yahoo! Mail\s+-\s+([^< ]+)", data)
+                if m:
+                    self.username = m.group(1)
+                    ## Make a new parser:
+                    if not self.parser:
+                        self.parser =  HTML.HTMLParser(verbose=0)
+                    return False
 
-            if self.process_send_message(fd) or self.process_readmessage(fd):
-                pass
+            return True
+
+        def external_process(self, fd):
+            pyflaglog.log(pyflaglog.DEBUG,"Opening %s for YahooMail processing" % self.fd.inode)
+
+            self.process_readmessage(fd)
+            #if self.process_send_message(fd) or self.process_readmessage(fd):
+            #    pass
 
         def process_send_message(self,fd):
             dbh = DB.DBO(self.case)
@@ -72,17 +82,21 @@ class SquirrelMailScan(LiveCom.HotmailScanner):
         def process_readmessage(self, fd):
             result = {'type': 'Read', 'Message':'' }
 
-            ## Fill in all the other fields:
+            ## Try to find the messageheader
+            header = self.parser.root.find("table", {"class":"messageheader"})
+            if not header: return
+            
+            ## Look through all its rows:
             context = None
-            for td in self.parser.root.search('td'):
+            for td in header.search("td"):
                 if context:
-                    result[context] = decode_entity(td.innerHTML())
+                    for i in td:
+                        if type(i)==str:
+                            result[context] = HTML.unquote(HTML.decode_entity(i))
+                            break
                     context = None
 
-                b = td.find('b')
-                if not b: continue
-
-                data = b.innerHTML()
+                data = td.innerHTML()
                 if data.lower().startswith('from:'):
                     context = 'From'
                 elif data.lower().startswith('to:'):
@@ -93,30 +107,29 @@ class SquirrelMailScan(LiveCom.HotmailScanner):
                     context = 'Subject'
 
             ## Now the message:
-            pre = self.parser.root.find('pre')
-            if pre:
-                result['Message'] += pre.innerHTML()
+            msgbody = self.parser.root.find('div', {"class":"msgbody"})
+            if msgbody:
+                result['Message'] = msgbody.innerHTML()
                 
+            if 'Sent' in result:
+                result['Sent'] = TableObj.guess_date(result['Sent'])
+            
             if len(result.keys())>3:
-                return self.insert_message(result)            
+                return self.insert_message(result, inode_template = "y%s")            
 
-## Unit tests:
-import pyflag.pyflagsh as pyflagsh
-import pyflag.tests as tests
 
-class SquirrelTests(tests.ScannerTest):
-    """ Tests SquirrelMail Scanner """
-    test_case = "PyFlagTestCase"
-    test_file = 'output.pcap'
-    subsystem = "Advanced"
-    fstype = "PCAP Filesystem"
+class YahooMailViewer(LiveCom.LiveMailViewer):
+    specifier = 'y'
 
-    def test01GmailScanner(self):
-        """ Test SquirrelMail Scanner """
-        env = pyflagsh.environment(case=self.test_case)
-        pyflagsh.shell_execv(env=env,
-                             command="scan",
-                             argv=["*",                   ## Inodes (All)
-                                   "SquirrelMailScan","GmailScanner"
-                                   ,"HotmailScanner",
-                                   ])                   ## List of Scanners
+    def fixup_page(self, root):
+        ## Put in some script to turn on visibility (this emulates
+        ## what yahoo does).
+        tag = root.find("body")
+
+        ## This will not be filtered out because the parser thinks its
+        ## just a string
+        tag.add_child("""<script>
+        document.write('<style>* { visibility: visible; }</style>');
+        </script>""")
+
+

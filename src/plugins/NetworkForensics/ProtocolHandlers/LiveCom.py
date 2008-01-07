@@ -250,7 +250,7 @@ class HotmailScanner(Scanner.GenScanFactory):
 
             return self.insert_message(result)
             
-        def insert_message(self, result):
+        def insert_message(self, result, inode_template="l%s"):
             dbh = DB.DBO(self.case)
             dbh.insert('live_messages', service=self.service,
                        parent_inode_id = self.fd.inode_id,
@@ -262,7 +262,7 @@ class HotmailScanner(Scanner.GenScanFactory):
             row = dbh.fetch()
 
             inode_id = self.ddfs.VFSCreate(self.fd.inode,
-                                           "tlive_messages:id:%s" % id,
+                                           inode_template % id,
                                            "Message", mtime = row['mtime'],
                                            _fast = True)
 
@@ -371,6 +371,92 @@ class TableViewer(FileSystem.StringIOFile):
                 
             result += "</table></body></html>"
         return result
+
+class LiveMailViewer(FileSystem.StringIOFile):
+    """ A VFS Driver to render a realistic view of a Yahoo mail
+    message without allowing scripts to run.
+    """
+    specifier = 'l'
+
+    def __init__(self, case, fd, inode):
+        parts = inode.split('|')
+        self.id = parts[-1][1:]
+        dbh = DB.DBO(case)
+        dbh.execute("select * from live_messages where id=%r", (self.id))
+        row = dbh.fetch()
+        if not row: raise RuntimeError("No such message %s" % self.id)
+
+        self.parent_inode_id = row['parent_inode_id']
+        self.message = row['Message']
+        self.size = len(self.message)
+        
+        FileSystem.StringIOFile.__init__(self, case, fd, inode)
+        self.force_cache()
+        
+    def read(self, length = None):
+        try:
+            return FileSystem.StringIOFile.read(self, length)
+        except IOError: pass
+
+        return self.message
+
+    def fixup_page(self, root):
+        ## We have to inject the message into the edit area:
+        edit_area = root.find("div", {"class":"EditArea"})
+        if edit_area:
+            parser = HTML.HTMLParser(tag_class = FlagFramework.Curry(
+                HTML.ResolvingHTMLTag,
+                case = self.case,
+                inode_id = self.parent_inode_id))
+            parser.feed(self.message)
+            parser.close()
+            edit_area.add_child(parser.root.innerHTML())
+
+    def stats(self, query,result):
+        result.start_table(**{'class':'GeneralTable'})
+        dbh = DB.DBO(self.case)
+        columns = ["service","type","From","To","CC","BCC","Sent","Subject","Message"]
+        dbh.execute("select `%s` from live_messages where `id`=%r", ('`, `'.join(columns), self.id))
+        row = dbh.fetch()
+        for c in columns:
+            if c=='Message':
+                ## Filter the message out here:
+                parser = HTML.HTMLParser(tag_class = HTML.TextTag)
+                parser.feed(row[c])
+                parser.close()
+                tmp = result.__class__(result)
+                tmp.text(parser.root.innerHTML(), font='typewriter', wrap='full')
+                row[c] = tmp
+                
+            result.row(c, row[c])
+
+    def summary(self, query, result):
+        ## Get the original HTML File:
+        fsfd = FileSystem.DBFS(self.case)
+        fd = fsfd.open(inode_id = self.parent_inode_id)
+        data = fd.read()
+
+        ## Make a parser:
+        p = HTML.HTMLParser(tag_class = FlagFramework.Curry(HTML.ResolvingHTMLTag,
+                                                            case = self.case,
+                                                            inode_id = self.parent_inode_id))
+        p.feed(data)
+        p.close()
+
+        ## Allow us to fix the html page
+        root = p.root
+        self.fixup_page(root)
+        page = root.innerHTML()
+        
+        def frame_cb(query, result):
+            def generator():
+                yield page
+
+            result.generator.content_type = 'text/html'
+            result.generator.generator = generator()
+
+        result.iframe(callback = frame_cb)
+
 
 ## Unit tests:
 import pyflag.pyflagsh as pyflagsh

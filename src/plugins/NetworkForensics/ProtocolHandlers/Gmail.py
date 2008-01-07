@@ -193,7 +193,6 @@ class GmailScanner(LiveCom.HotmailScanner):
                 return False
 
             for i in json[0]:
-                print self.fd.inode, i[0]
                 ## Message index (contains all kinds of meta data)
                 if i[0]=='mi':
                     result['From'] = gmail_unescape(i[7])

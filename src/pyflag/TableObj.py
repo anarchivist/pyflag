@@ -1448,7 +1448,11 @@ class InodeType(StringType):
 
     def column_decorator(self, table, sql, query, result):
         case = query['case']
+        report = Registry.REPORTS.dispatch(family = 'Disk Forensics',
+                                           report = "ViewFile")
 
+        report = report(None, result)
+        
         def browse_cb(query, result):
             try:
                 limit = int(query.get('inode_limit',0))
@@ -1462,7 +1466,11 @@ class InodeType(StringType):
                 return
             
             next_row = dbh.fetch()
+            fsfd = FileSystem.DBFS(self.case)
             inode = self.get_inode(row[self.name])
+
+            query.set('inode', inode)
+            report.display(query, result)
 
             annotate = query.get('annotate','no')
             
@@ -1474,35 +1482,21 @@ class InodeType(StringType):
                 result.toolbar(icon='yes.png', link = query, pane = 'pane')
 
             query.clear('annotate')
-                
-            new_query = FlagFramework.query_type(family ="Network Forensics",
-                                                 report ="ViewFile",
-                                                 case   = case,
-                                                 inode  =inode)
-            
-            result.iframe(link = new_query)
-            
-            new_query = FlagFramework.query_type(family ="Disk Forensics",
-                                                 report ="ViewFile",
-                                                 case   = case,
-                                                 mode   ="Summary",
-                                                 inode  = inode)
-
-            result.toolbar(icon = 'view.png', link = new_query, pane='new')
 
             new_query = query.clone()
-
             if limit==0:
                 result.toolbar(icon = 'stock_left_gray.png')
             else:
                 new_query.set('inode_limit', limit-1)
-                result.toolbar(icon = 'stock_left.png', link=new_query, pane='self')
+                result.toolbar(icon = 'stock_left.png', link=new_query,
+                               pane='self', tooltip = "Inode %s" % (limit -1))
 
             if not next_row:
                 result.toolbar(icon = 'stock_right_gray.png')
             else:
                 new_query.set('inode_limit', limit + 1)
-                result.toolbar(icon = 'stock_right.png', link=new_query, pane='self')
+                result.toolbar(icon = 'stock_right.png', link=new_query,
+                               pane='self',tooltip = "Inode %s" % (limit + 1))
                 
         result.toolbar(cb = browse_cb, icon="browse.png",
                        tooltip = "Browse Inodes in table", pane='new')
