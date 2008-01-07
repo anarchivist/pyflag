@@ -62,16 +62,36 @@ class OmitValue(ConstraintError):
     value should be totally ignored.
     """
 
+class date_obj:
+    format = "%Y-%m-%d %H:%M:%S"
+    def __init__(self, date):
+        self.date = date
+
+    def __str__(self):
+        try:
+            return time.strftime(self.format,self.date)
+        except TypeError:
+            return self.date.strftime(self.format)
+
+    def __eq__(self, x):
+        return x == self.date
+
+    def __le__(self, x):
+        return x < self.date
+
+    def __gt__(self, x):
+        return x > self.date
+
 try:
     ## This is for parsing ambigous dates:
     import dateutil.parser
 
-    def guess_date(string):
+    def guess_date(arg):
         try:
-            return dateutil.parser.parse(arg)
+            return date_obj(dateutil.parser.parse(arg))
         except ValueError:
             ## Try a fuzzy match
-            return dateutil.parser.parse(arg, fuzzy=True)
+            return date_obj(dateutil.parser.parse(arg, fuzzy=True))
 
 except ImportError:
     import time
@@ -87,6 +107,7 @@ except ImportError:
                 "%d/%m/%Y %H:%M",
                 "%d/%m/%Y %H:%M:%S",                
                 "%Y/%m/%d:%H:%M:%S",
+                "%a, %d %b %Y %H:%M:%S %Z",
                 ]
     def guess_date(string):
         for i in range(len(FORMATS)):
@@ -98,7 +119,7 @@ except ImportError:
                     FORMATS.pop(i)
                     FORMATS.insert(0,f)
 
-                return result
+                return date_obj(result)
             except ValueError:
                 pass
 
@@ -849,8 +870,7 @@ class TimestampType(IntegerType):
     def operator_after(self, column, operator, arg):
         """ Matches times after the specified time. The time arguement must be given in the format 'YYYY-MM-DD HH:MM:SS' (i.e. Year, Month, Day, Hour, Minute, Second). """
         date_arg = guess_date(arg)
-        return "%s > '%s'" % (self.escape_column_name(self.column),
-                              time.strftime("%Y%m%d %H:%M:%S",date_arg))
+        return "%s > '%s'" % (self.escape_column_name(self.column), date_arg)
 
     def code_before(self,column, operator, arg):
         date_arg = guess_date(arg)
@@ -859,8 +879,7 @@ class TimestampType(IntegerType):
     def operator_before(self,column, operator, arg):
         """ Matches times before the specified time. The time arguement must be as described for 'after'."""
         date_arg = guess_date(arg)
-        return "%s < '%s'" % (self.escape_column_name(self.column),
-                              time.strftime("%Y%m%d %H:%M:%S",date_arg))
+        return "%s < '%s'" % (self.escape_column_name(self.column), date_arg)
 
     def display(self, value, row, result):
         original_query = result.defaults

@@ -28,7 +28,7 @@ LiveCom. This protocol is a little more complicated because messages
 are sent back in a json stream via ajax, rather than simple html.
 """
 import pyflag.FlagFramework as FlagFramework
-from pyflag.TableObj import StringType, TimestampType, InodeIDType, IntegerType, PacketType
+from pyflag.TableObj import StringType, TimestampType, InodeIDType, IntegerType, PacketType, guess_date
 from FileFormats.HTML import decode_entity, HTMLParser
 import pyflag.DB as DB
 import pyflag.Scanner as Scanner
@@ -137,7 +137,7 @@ class GmailScanner(LiveCom.HotmailScanner):
                 if query.has_key(pattern):
                     result[field] = query[pattern]
 
-            if len(result.keys())<2: return False
+            if len(result.keys())<3: return False
             
             ## Fixme: Create VFS node for attachments
             message_id = self.insert_message(result)
@@ -187,35 +187,51 @@ class GmailScanner(LiveCom.HotmailScanner):
 
             try:
                 json = parse_json(self.javascript[self.javascript.find('[[['):])
-                result = {'type':'Read'}
-                
-                for i in json[0]:
-                ## This is a message:
-                    if i[0]=='ms':
-                        message = i[13]
-                        result['From'] = gmail_unescape(message[1])
-                        result['Subject'] = gmail_unescape(message[5])
-                        result['Message'] = gmail_unescape(message[6])
-
-                        message_id = self.insert_message(result)
-
-                        try:
-                            attachment = message[7][0][0]
-                            url = gmail_unescape(attachment[8])
-
-                            ## Make a note of the attachment so we can
-                            ## try to resolve it later.
-                            dbh = DB.DBO(self.case)
-                            dbh.insert("live_message_attachments",
-                                       message_id = message_id,
-                                       url = url)
-                        except IndexError:
-                            pass
-                        
-                        return message_id
+                result = {'type':'Read', "Message":''}
             except Exception,e:
                 print "Unable to parse %s as json stream: %s" % (self.fd.inode , e)
                 return False
+
+            for i in json[0]:
+                print self.fd.inode, i[0]
+                ## Message index (contains all kinds of meta data)
+                if i[0]=='mi':
+                    result['From'] = gmail_unescape(i[7])
+                    result['Subject'] = gmail_unescape(i[16])
+                    result['Sent'] = guess_date(gmail_unescape(i[15]))
+                    for x in i[9]:
+                        try:
+                            if x[0][0]=='me':
+                                result['To'] = gmail_unescape(x[0][1])
+                        except (IndexError, ValueError): pass
+                        
+                ## Message body
+                elif i[0]=='mb':
+                    result['Message'] += gmail_unescape(i[1])
+                ## This is a single combined message:
+                elif i[0]=='ms':
+                    message = i[13]
+                    result['From'] = gmail_unescape(message[1])
+                    result['Subject'] = gmail_unescape(message[5])
+                    result['Message'] = gmail_unescape(message[6])
+
+            if len(result.keys()) > 2:
+                message_id = self.insert_message(result)
+
+##                    try:
+##                        attachment = message[7][0][0]
+##                        url = gmail_unescape(attachment[8])
+
+##                        ## Make a note of the attachment so we can
+##                        ## try to resolve it later.
+##                        dbh = DB.DBO(self.case)
+##                        dbh.insert("live_message_attachments",
+##                                   message_id = message_id,
+##                                   url = url)
+##                    except IndexError:
+##                        pass
+
+                return message_id
 
 ## Unit tests:
 import pyflag.pyflagsh as pyflagsh
@@ -223,9 +239,11 @@ import pyflag.tests as tests
 
 class GmailTests(tests.ScannerTest):
     """ Tests Gmail Scanner """
-    test_case = "PyFlagTestCase"
-    test_file = 'gmail.com.pcap.e01'
-    subsystem = "EWF"
+    test_case = "PyFlagTestCase1"
+    test_file = 'gmail.com.pcap'
+    #test_file = 'a5707_00_01.pcap'
+    #subsystem = "EWF"
+    subsystem = "Advanced"
     fstype = "PCAP Filesystem"
 
     def test01GmailScanner(self):

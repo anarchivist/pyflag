@@ -35,7 +35,7 @@ import pyflag.Reports as Reports
 import plugins.NetworkForensics.PCAPFS as PCAPFS
 import re,time,cgi
 import TreeObj
-from pyflag.TableObj import StringType, TimestampType, InodeIDType, IntegerType, PacketType
+from pyflag.TableObj import StringType, TimestampType, InodeIDType, IntegerType, PacketType, guess_date
 
 def escape(uri):
     """ Make a filename from a URI by escaping / chars """
@@ -248,7 +248,7 @@ class HTTPScanner(StreamScannerFactory):
     def parse_date_time_string(self, s):
         if not s: return 0
         try:
-            return time.mktime(time.strptime(s, "%a, %d %b %Y %H:%M:%S %Z"))
+            return guess_date(s)
         except:
             print "Cant parse %s as a time" % s
             return 0
@@ -368,7 +368,7 @@ class HTTPScanner(StreamScannerFactory):
             url = p.request.get("url")
             try:
                 date = p.response.get("date")
-                date = int(self.parse_date_time_string(date))
+                date = self.parse_date_time_string(date)
             except (KeyError,ValueError):
                 date = 0
 
@@ -409,7 +409,7 @@ class HTTPScanner(StreamScannerFactory):
                        url            = url,
                        response_packet= p.response.get("packet_id"),
                        content_type   = p.response.get("content-type","text/html"),
-                       _date           = "from_unixtime(%r)" % date,
+                       date           = date,
                        referrer       = referer,
                        host           = host,
                        useragent      = p.request.get('user-agent', '-'),
