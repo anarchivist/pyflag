@@ -161,8 +161,7 @@ class SanitizingTag(Tag):
                             'framespacing','frameborder',
                             ]
 
-    def css_filter(self):
-        data = "<style>%s</style>" % self.innerHTML()
+    def css_filter(self, data):
         return re.sub("(?i)url\(([^\)]+)\)",
                       lambda m: "url(%s)" % self.resolve_reference(m.group(1),'text/css'),
                       data)
@@ -177,11 +176,18 @@ class SanitizingTag(Tag):
 
         ## CSS needs to be filtered extra well
         if self.name == 'style':
-            return self.css_filter()
+            return "<style>%s</style>" % self.css_filter(self.innerHTML())
+
+        ## Frames without src are filtered because IE Whinges:
+        if self.name == 'iframe' and 'src' not in self.attributes:
+		return ''
 
         attributes = "".join([" %s='%s'" % (k,v) for k,v \
                               in self.attributes.items() if k in \
                               self.allowable_attributes])
+
+	if 'style' in self.attributes:
+            attributes += ' style=%r' % self.css_filter(self.attributes['style'])
 
         if 'src' in self.attributes:
             attributes += ' src=%s' % self.resolve_reference(self.attributes['src'])
@@ -255,7 +261,8 @@ class ResolvingHTMLTag(SanitizingTag):
             reference="%s://%s%s" % (self.method, self.host, path)
 
         ## Try to make reference more url friendly:
-        reference = reference.replace(" ","%20")
+#        reference = reference.replace(" ","%20")
+        reference = decode_entity(reference)
         dbh = DB.DBO(self.case)
         dbh.execute("select inode_id from http where url=%r and not isnull(http.inode_id) limit 1", reference)
         row = dbh.fetch()
@@ -264,7 +271,7 @@ class ResolvingHTMLTag(SanitizingTag):
                                          report="ViewFile", inode_id=row['inode_id'],
                                          hint=hint)
 
-        return '/images/spacer.png reference=\"%s\"' % original_reference
+        return 'images/spacer.png reference=\"%s\"' % original_reference
 
 
 class HTMLParser(lexer.Lexer):

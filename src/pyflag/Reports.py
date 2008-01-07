@@ -50,7 +50,7 @@ class ReportError(Exception):
             self.ui = text
         else:
             self.ui = ui
-
+            
         if text:
             self.text = text
         else: self.text = ui
@@ -232,7 +232,7 @@ class report:
                      return False
                  
             except TypeCheck.ReportInvalidParamter, e:
-                raise TypeCheck.ReportInvalidParamter , "Parameter %s: %s" % (key,e)
+                raise TypeCheck.ReportInvalidParamter( "Parameter %s: %s" % (key,e))
 
         #If we got here without an exception, all is well
         return True

@@ -79,6 +79,15 @@ class ViewFile(Reports.report):
         return self.default_handler(fd, result)
 
     def guess_content_type(self, fd, query, inode_id):
+        data = fd.read(1024).lower()
+        fd.seek(0)
+        ## This is needed because magic is crap
+	if "<html" in data or "<head" in data:
+              return 'text/html'
+
+        if data.startswith("gif89a"):
+		return "image/gif"
+
         try:
             if query['hint']: content_type=query['hint']
         except KeyError:      
@@ -167,9 +176,7 @@ class ViewFile(Reports.report):
         def generator():
             data = fd.read(100000)
             tag = HTML.ResolvingHTMLTag(inode_id = fd.lookup_id(), case =self.case)
-            tag.add_child(data)
-            filtered = tag.css_filter()
-            print filtered
+            filtered = tag.css_filter(data)
             yield filtered
             
         ui.generator.generator = generator()

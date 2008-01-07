@@ -100,7 +100,7 @@ class TypeChecker:
         string = query[field]
 
         if not string.isalnum():
-            raise ReportInvalidParamter,"Not alphanumeric input"
+            raise ReportInvalidParamter("Not alphanumeric input")
 
     def flag_db(self,field,query):
         """ Tests to see if the string is a valid flag case database """
