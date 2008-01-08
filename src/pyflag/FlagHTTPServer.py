@@ -34,11 +34,18 @@ import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
 import pyflag.UI as UI
 import pyflag.pyflaglog as pyflaglog
-import cgi,os
+import cgi,os,zlib,gzip, cStringIO
 import re,time,sys,socket
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.Theme
+
+def compressBuf(buf):
+    zbuf = cStringIO.StringIO()
+    zfile = gzip.GzipFile(mode = 'wb',  fileobj = zbuf, compresslevel = 9)
+    zfile.write(buf)
+    zfile.close()
+    return zbuf.getvalue()
 
 class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework.Flag):
     """ Main flag webserver handler.
@@ -46,6 +53,8 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
     Dispatches the relevant reports depending on HTTP requests """
     
     server_version = "PyFlag Server, %s" % config.VERSION
+    protocol_version = 'HTTP/1.1'
+    
     def parse_query(self):
         """ Parses the query and prepares a query object.
 
@@ -228,7 +237,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                         if int(last_time) == int(s.st_mtime):
                             self.send_response(304)
                             self.send_header("Expires","Sun, 17 Jan 2038 19:14:07 GMT")
-                            self.send_header("Connection","close")
+                            self.send_header("Content-Length", 0)
                             self.end_headers()
                             return
                         
@@ -237,22 +246,24 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                         #print self.headers.get('If-Modified-Since','')
                     
                     self.send_response(200)
-                    self.send_header("Content-type",ct)
-
+                    self.send_header("Content-type",ct)                        
+                    self.send_header("Last-Modified",self.format_date_time_string(s.st_mtime))
+                    self.send_header("Etag",s.st_ino)
+                    self.send_header("Expires","Sun, 17 Jan 2038 19:14:07 GMT")                
+                    fd = open(path)
+                    f = fd.read()
+                    
                     ## Support content encodings. FIXME: This needs to
                     ## do this only when the browser sends the
                     ## Accept-Encodings.
                     if content_encoding:
-                        print "Will send %s as %s encoding" % (content_encoding,path)
                         self.send_header("Content-Encoding",content_encoding)
+                    elif len(f)>1024:
+                        f = compressBuf(f)
+                        self.send_header("Content-Encoding",'gzip')
                         
-                    self.send_header("Last-Modified",self.format_date_time_string(s.st_mtime))
-                    self.send_header("Etag",s.st_ino)
-                    self.send_header("Connection","close")
-                    self.send_header("Expires","Sun, 17 Jan 2038 19:14:07 GMT")                
+                    self.send_header("Content-Length", "%s" % len(f))
                     self.end_headers()
-                    fd = open(path)
-                    f = fd.read()
                     self.wfile.write(f)
                     fd.close()
                     return
@@ -265,8 +276,11 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
         if self.check_config(result,query):
             self.send_response(200)
             self.send_header("Content-type",result.type)
+            result = result.display()
+            self.send_header("Content-Length", len(result))
             self.end_headers()
-            self.wfile.write(result.display())
+
+            self.wfile.write(result)
             return
 
         # Did the user asked for a complete render of the window?
@@ -330,12 +344,14 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                           # deal with authentication issues here
                           self.send_response(401)
                           self.send_header("WWW-Authenticate", "Basic realm=%r" % self.server_version)
-                          self.end_headers()
                           # if e is a UI, it is what the report wanted us to display as an error page
                           try:
-                              self.wfile.write(e.result.display())
+                              result = e.result.display()
                           except (IndexError, AttributeError):
-                              self.wfile.write("<html><body>Authentication Required for this page</body></html>")
+                              result = "<html><body>Authentication Required for this page</body></html>"
+                          self.send_header("Content-Length", len(result))
+                          self.end_headers()
+                          self.wfile.write(result)
                           return
                       except Reports.ReportError, e:
                           if e.ui:
@@ -363,24 +379,48 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
             self.send_header(k,v)
         
         if result.generator and result.generator.generator:
-            self.send_header("Connection","close")
-            self.send_header("Content-type", result.generator.content_type)
+            self.send_header("Content-Type", result.generator.content_type)
             
             for i in result.generator.headers:
                 self.send_header(i[0],i[1])
 
+            ## Implement chunked transfer:
+            self.send_header("Transfer-Encoding","chunked")
+            self.send_header("Content-Encoding","gzip")
             self.end_headers()
+            import StringIO
+            
+            buf = StringIO.StringIO()
+            zfile = gzip.GzipFile(mode = "wb", fileobj = buf)
 
-            ## Print the data
             for data in result.generator.generator:
-                self.wfile.write(data)
+                zfile.write(data)
+                data = buf.getvalue()
+                if len(data)>0:
+                    self.wfile.write("%x\r\n" % (len(data)))
+                    self.wfile.write(data+"\r\n")
+                    buf.truncate(0)
 
+            ## Write the last chunk:
+            zfile.flush()
+            data = buf.getvalue()
+            if len(data)>0:
+                self.wfile.write("%x\r\n" % len(data))
+                self.wfile.write(data+"\r\n")
+            self.wfile.write("0\r\n\r\n")
             return
 
         self.send_header("Content-type", result.type)
-        self.end_headers()
+        result =result.display()
+        if len(result)>1024 * 10:
+            self.send_header("Content-Encoding","gzip")
+            old_length = len(result)
+            result = compressBuf(result)
+            print "Went from %s to %s" % (old_length, len(result))
 
-        self.wfile.write(result.display())
+        self.send_header("Content-Length", len(result))
+        self.end_headers()
+        self.wfile.write(result)
         return
 
     def log_message(self, format, *args):
@@ -396,7 +436,7 @@ class FlagHTTPServer( SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
 #    pass
 
 def Server(HandlerClass = FlagServerHandler,
-           ServerClass = FlagHTTPServer, protocol="HTTP/1.0"):
+           ServerClass = FlagHTTPServer, protocol="HTTP/1.1"):
     server_address = (config.HTTPSERVER_BINDIF,config.HTTPSERVER_PORT)
 
     HandlerClass.protocol_version = protocol
