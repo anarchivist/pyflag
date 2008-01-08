@@ -165,6 +165,26 @@ class HotmailScanner(Scanner.GenScanFactory):
             self.process_send_message(fd)
             self.process_editread(fd)
             self.process_readmessage(fd)
+            self.process_mail_listing()
+
+        def process_mail_listing(self):
+            """ This looks for the listing in the mail box """
+            table = self.parser.root.find("table",{"class":"ItemListContentTable InboxTable"})
+            if not table: return False
+            
+            result = {'type': 'Listed', 'Message': table}
+
+            mail_box = self.parser.root.find("li", {"class":"FolderItemSelected"})
+            if mail_box:
+                mail_box = mail_box.find("span")
+                if mail_box:
+                    result['From'] = mail_box.innerHTML()
+
+            title = self.parser.root.find("a",{"class":"uxp_hdr_meLink"})
+            if title:
+                result['To'] = title.innerHTML()
+
+            return self.insert_message(result, inode_template = "l%s")
 
 
         def process_send_message(self,fd):
