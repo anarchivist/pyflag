@@ -106,6 +106,19 @@ class LiveTables(FlagFramework.EventHandler):
         `inode_id` int NULL,
         `url` VARCHAR(500))""")
 
+        ## This table keeps a record of http objects which may be used
+        ## to assist with rendering. Often static content on web sites
+        ## is cached for a long time in users browsers. This means
+        ## that they are not requested by the browser at all and this
+        ## causes problems when reconstructing the pages. This table
+        ## allows us to maintain our own cache of such objects which
+        ## we can download by ourselves when needed.
+        dbh.execute("""CREATE table if not exists `http_sundry` (
+        `id` int not null auto_increment,
+        `url` VARCHAR(500),
+        `present` enum('yes', 'no') default 'no',
+        primary key (`id`))""")
+
 import fnmatch
 
 class HotmailScanner(Scanner.GenScanFactory):
@@ -416,7 +429,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
         result.start_table(**{'class':'GeneralTable'})
         dbh = DB.DBO(self.case)
         columns = ["service","type","From","To","CC","BCC","Sent","Subject","Message"]
-        dbh.execute("select `%s` from live_messages where `id`=%r", ('`, `'.join(columns), self.id))
+        dbh.execute("select * from live_messages where `id`=%r", self.id)
         row = dbh.fetch()
         for c in columns:
             if c=='Message':
@@ -429,6 +442,13 @@ class LiveMailViewer(FileSystem.StringIOFile):
                 row[c] = tmp
                 
             result.row(c, row[c])
+
+        dbh.execute("select url from http where inode_id = %r", row['parent_inode_id'])
+        row = dbh.fetch()
+        if row:
+            tmp = result.__class__(result)
+            tmp.text(row['url'], font='typewriter', wrap='full')
+            result.row("URL", tmp)
 
     def summary(self, query, result):
         ## Get the original HTML File:

@@ -1906,7 +1906,7 @@ class ColumnTypeTests(unittest.TestCase):
 
         self.assertRaises(RuntimeError, self.generate_sql, ("'DeletedType' is foobar")),
         self.assertEqual(self.generate_sql("'TimestampType' after 2005-10-10"),
-                         "(1) and (`timestamp` > '20051010 00:00:00')")
+                         "(1) and (`timestamp` > '2005-10-10 00:00:00')")
 
         self.assertEqual(self.generate_sql("'IPType' netmask 10.10.10.1/24"),
                          "(1) and ( ( `source_ip` >= 168430081 and `source_ip` <= 168430335 ) )")
@@ -1916,11 +1916,11 @@ class ColumnTypeTests(unittest.TestCase):
 
         ## Joined filters:
         self.assertEqual(self.generate_sql("InodeType contains 'Z|' and TimestampType after 2005-10-10"),
-                         "(1) and (`inode` like '%Z|%' and `timestamp` > '20051010 00:00:00')")
+                         "(1) and (`inode` like '%Z|%' and `timestamp` > '2005-10-10 00:00:00')")
         self.assertEqual(self.generate_sql("InodeType contains 'Z|' or TimestampType after 2005-10-10 and IntegerType > 5"),
-                         "(1) and (`inode` like '%Z|%' or `timestamp` > '20051010 00:00:00' and `table`.`integer_type` > '5')")
+                         "(1) and (`inode` like '%Z|%' or `timestamp` > '2005-10-10 00:00:00' and `table`.`integer_type` > '5')")
         self.assertEqual(self.generate_sql("(InodeType contains 'Z|' or TimestampType after 2005-10-10) and IntegerType > 5"),
-                         "(1) and (( `inode` like '%Z|%' or `timestamp` > '20051010 00:00:00' ) and `table`.`integer_type` > '5')")
+                         "(1) and (( `inode` like '%Z|%' or `timestamp` > '2005-10-10 00:00:00' ) and `table`.`integer_type` > '5')")
 
     def test10CreateTable(self):
         """ Test table creation """

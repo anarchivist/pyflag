@@ -264,6 +264,6 @@ class TypeTest(pyflag.tests.ScannerTest):
 
         ## Make sure the extra magic is being used properly.
         dbh = DB.DBO(self.test_case)
-        dbh.execute('select count(*) as count from type where type like "%Outlook%"')
+        dbh.execute('select count(*) as count from type where type like "%%Outlook%%"')
         count = dbh.fetch()['count']
         self.failIf(count==0, "Unable to locate an Outlook PST file - maybe we are not using our custom magic file?")

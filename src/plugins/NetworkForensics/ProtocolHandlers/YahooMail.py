@@ -119,6 +119,7 @@ class YahooMailScan(LiveCom.HotmailScanner):
 
 
 class YahooMailViewer(LiveCom.LiveMailViewer):
+    """ This implements some fixups for Yahoo webmail messages """
     specifier = 'y'
 
     def fixup_page(self, root):
@@ -132,4 +133,12 @@ class YahooMailViewer(LiveCom.LiveMailViewer):
         document.write('<style>* { visibility: visible; }</style>');
         </script>""")
 
-
+        tag = root.find("head")
+        new_tag = HTML.ResolvingHTMLTag(name="link", case = tag.case,
+                                        inode_id = tag.inode_id,
+                                        attributes = {
+            'type':'text/css','rel':'stylesheet',
+            'href': "http://us.js2.yimg.com/us.js.yimg.com/lib/hdr/uhbt1_v27_1.8.css"
+            })
+        print "New tag %s" % new_tag
+        tag.add_child(new_tag)

@@ -188,8 +188,12 @@ class SanitizingTag(Tag):
                             ]
 
     def css_filter(self, data):
-        return re.sub("(?i)url\(([^\)]+)\)",
-                      lambda m: "url(%s)" % self.resolve_reference(m.group(1),'text/css'),
+        def resolve_css_references(m):
+            result = self.resolve_reference(m.group(1), build_reference = False)
+            return "url(%s)" % result
+        
+        return re.sub("(?i)url\(\"?([^\)\"]+)\"?\)",
+                      resolve_css_references,
                       data)
 
     def __str__(self):
@@ -199,10 +203,6 @@ class SanitizingTag(Tag):
                 return ''
             #print "Rejected tag %s" % self.name
             return self.innerHTML()
-
-        ## CSS needs to be filtered extra well
-        if self.name == 'style':
-            return "<style>%s</style>" % self.css_filter(self.innerHTML())
 
         ## Frames without src are filtered because IE Whinges:
         if self.name == 'iframe' and 'src' not in self.attributes:
@@ -223,6 +223,11 @@ class SanitizingTag(Tag):
                 attributes += " href=%s" % self.resolve_reference(self.attributes['href'], 'text/css')
             else:
                 attributes += ' href="javascript: alert(%r)"' % urllib.quote(self.attributes['href'])
+
+        ## CSS needs to be filtered extra well
+        if self.name == 'style':
+            return "<style %s>%s</style>" % (attributes,
+                                             self.css_filter(self.innerHTML()))
         
         if self.type == 'selfclose':
             return "<%s%s/>" % (self.name, attributes)
@@ -273,7 +278,7 @@ class ResolvingHTMLTag(SanitizingTag):
 
         self.comment = False
 
-    def resolve_reference(self, reference, hint=''):
+    def resolve_reference(self, reference, hint='', build_reference=True):
         original_reference = reference
 
         ## Absolute reference
@@ -293,15 +298,43 @@ class ResolvingHTMLTag(SanitizingTag):
         dbh.execute("select inode_id from http where url=%r and not isnull(http.inode_id) limit 1", reference)
         row = dbh.fetch()
         if row and row['inode_id']:
-            return '"f?%s" reference="%s"' % (query_type(case=self.case,
-                                                         family="Network Forensics",
-                                                         report="ViewFile",
-                                                         inode_id=row['inode_id'],
-                                                         hint=hint),
-                                              original_reference)
+            result = '"f?%s"' % query_type(case=self.case,
+                                           family="Network Forensics",
+                                           report="ViewFile",
+                                           inode_id=row['inode_id'],
+                                           hint=hint)
+            if build_reference:
+                result += " reference=\"%s\" " % reference
 
-        return 'images/spacer.png reference=\"%s\"' % original_reference
+            return result
 
+        ## Maybe its in the sundry table:
+        dbh.execute("select id from http_sundry where url = %r and present = 'yes'",
+                    reference)
+        row = dbh.fetch()
+        if row and row['id']:
+            result = '"f?%s"' % query_type(case=self.case,
+                                           family="Network Forensics",
+                                           report="ViewFile",
+                                           sundry_id=row['id'],
+                                           hint=hint)
+            if build_reference:
+                result += " reference=\"%s\" " % reference
+
+            return result
+
+        ## We could not find it, so we try to insert to the sundry table
+        dbh.check_index('http_sundry','url')
+        dbh.execute("select * from http_sundry where url=%r", reference)
+        row = dbh.fetch()
+        if not row:
+            dbh.insert('http_sundry', url = reference)
+
+        result = "images/spacer.png"
+        if build_reference:
+            result += " reference=\"%s\" " % reference
+
+        return result
 
 class HTMLParser(lexer.Lexer):
     state = "CDATA"

@@ -64,6 +64,9 @@ class ViewFile(Reports.report):
         if query.has_key('inode'):
             fd = fsfd.open(inode=query['inode'])
             inode_id = fd.lookup_id()
+        elif query.has_key("sundry_id"):
+            fd = FileSystem.File(query['case'], None, "HTTP%s" % query['sundry_id'])
+            inode_id = -1
         else:
             fd = fsfd.open(inode_id=query['inode_id'])
             inode_id = query['inode_id']
