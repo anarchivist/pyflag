@@ -56,8 +56,25 @@ class YahooMailScan(LiveCom.HotmailScanner):
             pyflaglog.log(pyflaglog.DEBUG,"Opening %s for YahooMail processing" % self.fd.inode)
 
             self.process_readmessage(fd)
+            self.process_mail_listing()
             #if self.process_send_message(fd) or self.process_readmessage(fd):
             #    pass
+
+        def process_mail_listing(self):
+            """ This looks for the listing in the mail box """
+            #print self.parser.root
+            table = self.parser.root.find("table",{"id":"datatable"})
+            if not table: return False
+            result = {'type': 'Listed', 'Message': table}
+
+            mail_box = self.parser.root.find("h2", {"id":"folderviewheader"})
+            if mail_box:
+                result['From'] = mail_box.innerHTML()
+
+            title = self.parser.root.find("title").innerHTML().split('-')[-1]
+            result['To'] = title
+
+            return self.insert_message(result, inode_template = "y%s")
 
         def process_send_message(self,fd):
             dbh = DB.DBO(self.case)
@@ -128,11 +145,13 @@ class YahooMailViewer(LiveCom.LiveMailViewer):
         tag = root.find("body")
 
         ## This will not be filtered out because the parser thinks its
-        ## just a string
+        ## just a string - so it will be executed in the browser after
+        ## page loads.
         tag.add_child("""<script>
         document.write('<style>* { visibility: visible; }</style>');
         </script>""")
 
+        ## This stylesheet is stuck in a comment?? WTF??
         tag = root.find("head")
         new_tag = HTML.ResolvingHTMLTag(name="link", case = tag.case,
                                         inode_id = tag.inode_id,
@@ -140,5 +159,4 @@ class YahooMailViewer(LiveCom.LiveMailViewer):
             'type':'text/css','rel':'stylesheet',
             'href': "http://us.js2.yimg.com/us.js.yimg.com/lib/hdr/uhbt1_v27_1.8.css"
             })
-        print "New tag %s" % new_tag
         tag.add_child(new_tag)

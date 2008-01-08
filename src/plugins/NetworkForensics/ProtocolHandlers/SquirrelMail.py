@@ -95,7 +95,7 @@ class SquirrelMailScan(LiveCom.HotmailScanner):
             ## Now the message:
             pre = self.parser.root.find('pre')
             if pre:
-                result['Message'] += pre.innerHTML()
+                result['Message'] += pre.__str__()
                 
             if len(result.keys())>3:
                 return self.insert_message(result)            

@@ -288,7 +288,14 @@ class HTMLStringType(StringType):
     """ A ColumnType which sanitises its input for HTML.
     We also fetch images etc from the db if available.
     """
-    def xdisplay(self, value, row, result):
+    def xxxdisplay(self, value, row, result):
+        parser = HTML.HTMLParser(tag_class = HTML.SanitizingTag)
+        parser.feed(value)
+        parser.close()
+
+        return parser.root.innerHTML()
+
+    def xxdisplay(self, value, row, result):
         parser = HTML.HTMLParser(tag_class = FlagFramework.Curry(HTML.ResolvingHTMLTag,
                                                                  case = result.defaults['case'],
                                                                  inode_id = row['Inode']))
@@ -434,12 +441,17 @@ class LiveMailViewer(FileSystem.StringIOFile):
         for c in columns:
             if c=='Message':
                 ## Filter the message out here:
-                parser = HTML.HTMLParser(tag_class = HTML.TextTag)
+                parser = HTML.HTMLParser(tag_class = \
+                                         FlagFramework.Curry(HTML.ResolvingHTMLTag,
+                                                             case = self.case,
+                                                             inode_id = row['parent_inode_id']))
+                #parser = HTML.HTMLParser(tag_class = HTML.TextTag)
                 parser.feed(row[c])
                 parser.close()
-                tmp = result.__class__(result)
-                tmp.text(parser.root.innerHTML(), font='typewriter', wrap='full')
-                row[c] = tmp
+                #tmp = result.__class__(result)
+                #tmp.text(parser.root.innerHTML(), font='typewriter', wrap='full')
+                #row[c] = tmp
+                row[c] = parser.root.__str__()
                 
             result.row(c, row[c])
 

@@ -222,7 +222,7 @@ class SanitizingTag(Tag):
             if self.name == 'link':
                 attributes += " href=%s" % self.resolve_reference(self.attributes['href'], 'text/css')
             else:
-                attributes += ' href="javascript: alert(%r)"' % urllib.quote(self.attributes['href'])
+                attributes += ' href="javascript: alert(%r)"' % urllib.quote(self.attributes['href'][:100])
 
         ## CSS needs to be filtered extra well
         if self.name == 'style':

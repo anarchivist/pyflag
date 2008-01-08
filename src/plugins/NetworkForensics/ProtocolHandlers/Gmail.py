@@ -251,5 +251,6 @@ class GmailTests(tests.ScannerTest):
         pyflagsh.shell_execv(env=env,
                              command="scan",
                              argv=["*",                   ## Inodes (All)
-                                   "GmailScanner",
+                                   "GmailScanner", "YahooMailScan",
+                                   "SquirrelMailScan", "HotmailScanner"
                                    ])                   ## List of Scanners

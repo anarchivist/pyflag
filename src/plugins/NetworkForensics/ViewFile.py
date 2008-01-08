@@ -1,3 +1,4 @@
+
 """ This plugin provides reports for viewing of files in special
 ways. For example we are able to display properly sanitised html with
 matched images etc.
@@ -85,7 +86,8 @@ class ViewFile(Reports.report):
         data = fd.read(1024).lower()
         fd.seek(0)
         ## This is needed because magic is crap
-	if "<html" in data or "<head" in data:
+        for p in ["<html","<head","<script"]:
+            if p in data:
               return 'text/html'
 
         if data.startswith("gif89a"):
