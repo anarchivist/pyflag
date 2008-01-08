@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """ A small script to load all 4 letter words or more from the english
 dictionary into the dictionary table within pyflag """
 

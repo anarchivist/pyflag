@@ -45,7 +45,7 @@ import gzip
 parser = OptionParser(usage="""%prog path_to_nsrl_directory path_to_nsrl_directory
 
 Loads the NSRL hashes stored in the specified paths.""",
-                      version="Version: %prog PyFlag "+config.VERSION)
+                      version="Version: %prog PyFlag "+str(config.VERSION))
 
 parser.add_option("-d", "--db", default=None,
                   help = "The Database to load NSRL into")
