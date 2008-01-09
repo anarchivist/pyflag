@@ -206,9 +206,12 @@ while 1:
         files = os.listdir(directory)
         files.sort()
 
-        if config.lock not in files:
+        if not os.access(config.lock, os.F_OK):
             for f in files:
                if f in files_we_have: continue
+
+               ## Detect if the lock file appeared:
+               if os.access(config.lock, os.F_OK): break
 
                filename = "%s/%s" % (directory,f)
                load_file(filename)

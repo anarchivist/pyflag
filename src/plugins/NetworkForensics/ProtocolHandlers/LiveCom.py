@@ -450,7 +450,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
                 inode_id = self.parent_inode_id))
             parser.feed(self.message)
             parser.close()
-            edit_area.add_child(parser.root.innerHTML())
+            edit_area.add_child(HTML.decode_unicode(parser.root.innerHTML()))
 
     def stats(self, query,result):
         result.start_table(**{'class':'GeneralTable'})
@@ -471,7 +471,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
                 #tmp = result.__class__(result)
                 #tmp.text(parser.root.innerHTML(), font='typewriter', wrap='full')
                 #row[c] = tmp
-                row[c] = parser.root.__str__()
+                row[c] = HTML.decode_unicode(parser.root.__str__())
                 
             result.row(c, row[c])
 
