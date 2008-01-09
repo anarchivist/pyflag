@@ -647,7 +647,7 @@ class HTMLUI(UI.GenericUI):
         if callback:
             link = "callback_stored=%s" % self.store_callback(callback)
         
-        self.result += """<iframe id='%s' name='%s' class=TreeFrame></iframe>
+        self.result += """<iframe src='images/spacer.png' id='%s' name='%s' class=TreeFrame></iframe>
         <script>AdjustHeightToPageSize('%s');document.getElementById('%s').src='iframe?%s&__pyflag_parent=' + window.__pyflag_parent + '&__pyflag_name=' + window.__pyflag_name;</script>
         """ % (target,target,target,target,link)
         

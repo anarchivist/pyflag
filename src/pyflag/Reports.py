@@ -50,7 +50,6 @@ class ReportError(Exception):
             self.ui = text
         else:
             self.ui = ui
-            
         if text:
             self.text = text
         else: self.text = ui

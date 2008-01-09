@@ -178,7 +178,8 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
         
     def handle_request(self):
         headers = {}
-        
+	accept_gzip_encoding = "gzip" in self.headers.get("Accept-Encoding","")
+
         ## Calculate the query from the request.
         query=self.parse_query()
 
@@ -213,11 +214,10 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                 path = os.path.normpath(config.DATADIR + query.base)
                 if path.startswith(os.path.normpath(config.DATADIR)):
                     ## Check if there is a compressed version of this file:
-                    try:
-                        s=os.stat(path+".gz")
+                    if accept_gzip_encoding and os.access(path + ".gz", os.F_OK):
                         path = path+".gz"
                         content_encoding = "gzip"
-                    except:
+                    else:
                         s = os.stat(path)
                         content_encoding = None
                         
@@ -246,19 +246,16 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                         #print self.headers.get('If-Modified-Since','')
                     
                     self.send_response(200)
-                    self.send_header("Content-type",ct)                        
+                    self.send_header("Content-Type",ct)                        
                     self.send_header("Last-Modified",self.format_date_time_string(s.st_mtime))
                     self.send_header("Etag",s.st_ino)
                     self.send_header("Expires","Sun, 17 Jan 2038 19:14:07 GMT")                
                     fd = open(path)
                     f = fd.read()
                     
-                    ## Support content encodings. FIXME: This needs to
-                    ## do this only when the browser sends the
-                    ## Accept-Encodings.
-                    if content_encoding:
+                    if content_encoding and content_encoding in self.headers.get("Accept-Encoding",""):
                         self.send_header("Content-Encoding",content_encoding)
-                    elif len(f)>1024:
+                    elif len(f)>1024 and accept_gzip_encoding:
                         f = compressBuf(f)
                         self.send_header("Content-Encoding",'gzip')
                         
@@ -270,6 +267,8 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                 else: raise TypeError("Forbidden")
             except (TypeError,OSError),e:
                 self.wfile.write("File not found: %s"%e)
+                self.wfile.close()
+                raise
                 return
 
         #We need to check the configuration and if it is incorrect, we prompt the user
@@ -364,7 +363,6 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                   result.clear()
                   result.heading("Error")
                   import traceback,sys
-                  import cStringIO
                   
                   a = cStringIO.StringIO()
                   traceback.print_tb(sys.exc_info()[2], file=a)
@@ -386,37 +384,38 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
 
             ## Implement chunked transfer:
             self.send_header("Transfer-Encoding","chunked")
-            self.send_header("Content-Encoding","gzip")
+            if accept_gzip_encoding:
+                   self.send_header("Content-Encoding","gzip")
+                   buf = cStringIO.StringIO()
+                   zfile = gzip.GzipFile(mode = "wb", fileobj = buf)
             self.end_headers()
-            import StringIO
-            
-            buf = StringIO.StringIO()
-            zfile = gzip.GzipFile(mode = "wb", fileobj = buf)
 
             for data in result.generator.generator:
-                zfile.write(data)
-                data = buf.getvalue()
+                if accept_gzip_encoding:
+                    zfile.write(data)
+                    data = buf.getvalue()
                 if len(data)>0:
                     self.wfile.write("%x\r\n" % (len(data)))
                     self.wfile.write(data+"\r\n")
+                if accept_gzip_encoding:
                     buf.truncate(0)
 
             ## Write the last chunk:
-            zfile.flush()
-            data = buf.getvalue()
-            if len(data)>0:
-                self.wfile.write("%x\r\n" % len(data))
-                self.wfile.write(data+"\r\n")
+            if accept_gzip_encoding:
+                zfile.flush()
+                data = buf.getvalue()
+                if len(data)>0:
+                    self.wfile.write("%x\r\n" % len(data))
+                    self.wfile.write(data+"\r\n")
             self.wfile.write("0\r\n\r\n")
             return
 
         self.send_header("Content-type", result.type)
         result =result.display()
-        if len(result)>1024 * 10:
+        if len(result)>1024 * 10 and accept_gzip_encoding:
             self.send_header("Content-Encoding","gzip")
             old_length = len(result)
             result = compressBuf(result)
-            print "Went from %s to %s" % (old_length, len(result))
 
         self.send_header("Content-Length", len(result))
         self.end_headers()

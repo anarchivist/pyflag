@@ -442,7 +442,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
 
     def fixup_page(self, root):
         ## We have to inject the message into the edit area:
-        edit_area = root.find("div", {"class":"EditArea"})
+        edit_area = root.find("div", {"class":"EditArea"}) or root.find("div",{"id":"MsgContainer"})
         if edit_area:
             parser = HTML.HTMLParser(tag_class = FlagFramework.Curry(
                 HTML.ResolvingHTMLTag,

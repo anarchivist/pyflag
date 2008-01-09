@@ -166,7 +166,7 @@ class ViewFile(Reports.report):
             #parser = HTML.HTMLParser(tag_class = HTML.Tag)
             data = fd.read(1000000)
             parser.feed(data)
-            while parser.next_token(): pass
+            parser.close()
             
             yield parser.root.innerHTML()
 
