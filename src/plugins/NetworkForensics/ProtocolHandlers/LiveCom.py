@@ -96,7 +96,7 @@ class LiveTables(FlagFramework.EventHandler):
             `CC` VARCHAR(250),
             `BCC` VARCHAR(250),
             `Subject` VARCHAR(250),
-            `Message` Text,
+            `Message` Text default "",
             `Sent` TIMESTAMP NULL,
             primary key (`id`))""")
 
@@ -427,7 +427,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
         if not row: raise RuntimeError("No such message %s" % self.id)
 
         self.parent_inode_id = row['parent_inode_id']
-        self.message = row['Message']
+        self.message = row['Message'] or ""
         self.size = len(self.message)
         
         FileSystem.StringIOFile.__init__(self, case, fd, inode)
@@ -466,7 +466,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
                                                              case = self.case,
                                                              inode_id = row['parent_inode_id']))
                 #parser = HTML.HTMLParser(tag_class = HTML.TextTag)
-                parser.feed(row[c])
+                parser.feed(row[c] or "")
                 parser.close()
                 #tmp = result.__class__(result)
                 #tmp.text(parser.root.innerHTML(), font='typewriter', wrap='full')
