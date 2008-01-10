@@ -81,6 +81,7 @@ import pyflag.Reports as Reports
 import pyflag.FileSystem as FileSystem
 import re,cgi
 import pyflag.pyflaglog as pyflaglog
+import textwrap
 
 class LiveTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
@@ -442,15 +443,19 @@ class LiveMailViewer(FileSystem.StringIOFile):
 
     def fixup_page(self, root):
         ## We have to inject the message into the edit area:
-        edit_area = root.find("div", {"class":"EditArea"}) or root.find("div",{"id":"MsgContainer"})
+        edit_area = root.find("div", {"class":"EditArea"}) or \
+                    root.find("div",{"id":"MsgContainer"}) or \
+                    root.find("textarea",{"id":"fMessageBody"})
         if edit_area:
             parser = HTML.HTMLParser(tag_class = FlagFramework.Curry(
                 HTML.ResolvingHTMLTag,
                 case = self.case,
                 inode_id = self.parent_inode_id))
-            parser.feed(self.message)
+            parser.feed(HTML.decode(self.message))
             parser.close()
-            edit_area.add_child(HTML.decode_unicode(parser.root.innerHTML()))
+            result = parser.root.__str__()
+            result = textwrap.fill(result)
+            edit_area.add_child(result)
 
     def stats(self, query,result):
         result.start_table(**{'class':'GeneralTable'})
@@ -466,12 +471,14 @@ class LiveMailViewer(FileSystem.StringIOFile):
                                                              case = self.case,
                                                              inode_id = row['parent_inode_id']))
                 #parser = HTML.HTMLParser(tag_class = HTML.TextTag)
-                parser.feed(row[c] or "")
+                parser.feed(row[c])
                 parser.close()
                 #tmp = result.__class__(result)
                 #tmp.text(parser.root.innerHTML(), font='typewriter', wrap='full')
                 #row[c] = tmp
-                row[c] = HTML.decode_unicode(parser.root.__str__())
+                r = parser.root.__str__()
+                r = textwrap.fill(r)
+                row[c] = r
                 
             result.row(c, row[c])
 
@@ -486,7 +493,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
         ## Get the original HTML File:
         fsfd = FileSystem.DBFS(self.case)
         fd = fsfd.open(inode_id = self.parent_inode_id)
-        data = fd.read()
+        data = HTML.decode(fd.read())
 
         ## Make a parser:
         p = HTML.HTMLParser(tag_class = FlagFramework.Curry(HTML.ResolvingHTMLTag,

@@ -53,7 +53,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
     Dispatches the relevant reports depending on HTTP requests """
     
     server_version = "PyFlag Server, %s" % config.VERSION
-    protocol_version = 'HTTP/1.1'
+    protocol_version = 'HTTP/1.0'
     
     def parse_query(self):
         """ Parses the query and prepares a query object.
@@ -435,7 +435,7 @@ class FlagHTTPServer( SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
 #    pass
 
 def Server(HandlerClass = FlagServerHandler,
-           ServerClass = FlagHTTPServer, protocol="HTTP/1.1"):
+           ServerClass = FlagHTTPServer, protocol="HTTP/1.0"):
     server_address = (config.HTTPSERVER_BINDIF,config.HTTPSERVER_PORT)
 
     HandlerClass.protocol_version = protocol

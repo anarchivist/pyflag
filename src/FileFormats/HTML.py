@@ -28,10 +28,13 @@ def unquote(string):
     return string
 
 def decode_entity(string):
-    return re.sub("&#(\d+);", lambda x: chr(int(x.group(1))), string)
+    return re.sub("&#(\d+);", lambda x: chr(int(x.group(1)) % 256), string)
 
 def decode_unicode(string):
     return re.sub(r"\\u(..)(..)", lambda x: (chr(int(x.group(1),16)) + chr(int(x.group(2),16))).decode("utf_16_be").encode('utf8'), string)
+
+def decode(string):
+    return decode_unicode(decode_entity(unquote(string)))
 
 class Tag:
     def __init__(self, name=None, attributes=None):
@@ -184,7 +187,7 @@ class SanitizingTag(Tag):
                             'colspan', 'valign','id', 'class','name', 
                             'compact', 'type', 'start', 'rel',
                             'value', 'checked', 'rows','cols',
-                            'framespacing','frameborder',
+                            'framespacing','frameborder','contenteditable'
                             ]
 
     def css_filter(self, data):
