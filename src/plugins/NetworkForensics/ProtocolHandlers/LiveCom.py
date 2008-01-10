@@ -471,7 +471,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
                                                              case = self.case,
                                                              inode_id = row['parent_inode_id']))
                 #parser = HTML.HTMLParser(tag_class = HTML.TextTag)
-                parser.feed(row[c])
+                parser.feed(HTML.decode(row[c] or ""))
                 parser.close()
                 #tmp = result.__class__(result)
                 #tmp.text(parser.root.innerHTML(), font='typewriter', wrap='full')

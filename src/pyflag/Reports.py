@@ -61,8 +61,8 @@ class ReportError(Exception):
                 ui.heading("Error: Unable to create IO Source")
                 ui.para("Error reported was %s" % exception, color='red')
 
-        if not bt:
-            self.bt = traceback.format_exc()
+            if not bt:
+                self.bt = traceback.format_exc()
         
     def __str__(self):
         return self.text
