@@ -97,6 +97,7 @@ class ScannerTest(unittest.TestCase):
                                    "filename=%s" % ( self.test_file),
                                    "offset=%s"%self.offset,
                                    ])
+
         pyflagsh.shell_execv(command="execute",
                              argv=["Load Data.Load Filesystem image",'case=%s' % self.test_case,
                                    "iosource=test",

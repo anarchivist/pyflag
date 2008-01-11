@@ -314,7 +314,7 @@ class WizardTest(PopUpTest):
             callbacks = [page1_cb, page2_cb, page3_cb]
             )
 
-from pyflag.TableObj import StringType,IPType, TimestampType
+from pyflag.ColumnTypes import StringType,IPType, TimestampType
 
 class TableTest(PopUpTest):
     """ Tests the Table widget """

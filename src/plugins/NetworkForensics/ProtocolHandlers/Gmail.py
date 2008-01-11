@@ -28,7 +28,7 @@ LiveCom. This protocol is a little more complicated because messages
 are sent back in a json stream via ajax, rather than simple html.
 """
 import pyflag.FlagFramework as FlagFramework
-from pyflag.TableObj import StringType, TimestampType, InodeIDType, IntegerType, PacketType, guess_date
+from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, PacketType, guess_date
 from FileFormats.HTML import decode_entity, HTMLParser
 import pyflag.DB as DB
 import pyflag.Scanner as Scanner

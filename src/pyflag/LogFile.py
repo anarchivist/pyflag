@@ -36,7 +36,7 @@ config=pyflag.conf.ConfObject()
 import pyflag.pyflaglog as pyflaglog
 import pickle,gzip
 import plugins.LogAnalysis.Whois as Whois
-from pyflag.TableObj import IPType
+from pyflag.ColumnTypes import IPType
 import re
 import pyflag.Registry as Registry
 import pyflag.IO as IO

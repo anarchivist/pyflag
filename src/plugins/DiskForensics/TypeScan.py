@@ -31,7 +31,7 @@ import pyflag.Reports as Reports
 import pyflag.Graph as Graph
 import pyflag.IO as IO
 import pyflag.Registry as Registry
-from pyflag.TableObj import StringType, TimestampType, InodeIDType, FilenameType, IntegerType, InodeType
+from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, FilenameType, IntegerType, InodeType
 
 class TypeTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
@@ -87,46 +87,25 @@ class TypeScan(Scanner.GenScanFactory):
                        type = self.type_str)
 
 class ThumbnailType(InodeIDType):
-    def __init__(self, name='Inode', column='inode', fsfd=None):
+    """ A Column showing thumbnails of inodes """
+    def __init__(self, name='Inode', column='inode_id', fsfd=None):
         InodeIDType.__init__(self,name=name,column=column, case=fsfd.case)
         self.fsfd = fsfd
 
-    ## We dont want any operations on the thumbnail
-    def operators(self):
-        return {}
-        
-    def display(self, inode_id, row, result):
-        tmp = result.__class__(result)
+    def render_thumbnail_hook(self, inode_id, row, result):
         try:
             fd = self.fsfd.open(inode_id=inode_id)
-            inode = self.fsfd.lookup(inode_id=inode_id)
             image = Graph.Thumbnailer(fd,200)
         except IOError:
-            tmp.icon("broken.png")
+            result.icon("broken.png")
             return
 
         if image.height>0:
-            tmp.image(image,width=image.width,height=image.height)
+            result.image(image,width=image.width,height=image.height)
         else:
-            tmp.image(image,width=image.width)
+            result.image(image,width=image.width)
 
-        tmp2 = result.__class__(result)
-        tmp2.decoration="raw"
-        tmp2.link( tmp, target = 
-                   FlagFramework.query_type((), case=self.case,
-                   inode=inode,
-                   family = "Disk Forensics", report = "ViewFile"),
-                   mode = "Summary",
-                   tooltip=inode, border=0
-                   )
-
-        try:
-            tmp2.text("\n%sx%s\n" % (image.owidth,image.oheight))
-        except AttributeError:
-            pass
-
-        tmp2.raw(InodeIDType.display(self,inode_id,row, tmp2))
-        return tmp2
+    display_hooks = InodeIDType.display_hooks[:] + [render_thumbnail_hook,]
 
 ## A report to examine the Types of different files:
 class ViewFileTypes(Reports.report):
@@ -146,7 +125,7 @@ class ViewFileTypes(Reports.report):
         fsfd = FileSystem.DBFS(query["case"])
         try:
             result.table(
-                elements = [ ThumbnailType('Thumbnail','type.inode_id', fsfd = fsfd),
+                elements = [ ThumbnailType(name='Thumbnail',column='type.inode_id', fsfd = fsfd),
                              FilenameType(case=query['case'], table='type'),
                              StringType('Type','type'),
                              IntegerType('Size','inode.size'),
@@ -267,3 +246,11 @@ class TypeTest(pyflag.tests.ScannerTest):
         dbh.execute('select count(*) as count from type where type like "%%Outlook%%"')
         count = dbh.fetch()['count']
         self.failIf(count==0, "Unable to locate an Outlook PST file - maybe we are not using our custom magic file?")
+
+## Add some operators to the InodeType:
+def operator_has_magic(self, column, operator, magic):
+    """ Matches those inodes which match certain magic strings. Note that the TypeScanner must have been run on these inodes first """
+    return "( %s in (select inode_id from type where type like '%%%s%%'))" % \
+           (self.escape_column_name(self.column), magic)
+
+InodeType.operator_has_magic = operator_has_magic

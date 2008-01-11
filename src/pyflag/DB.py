@@ -314,6 +314,13 @@ class DBO:
     transaction = False
     ## This stores references to the pools
     DBH = Store.Store(max_size=10)
+
+    def get_dbh(self, case):
+        try:
+            self.dbh,self.mysql_bin_string=self.DBH.get(case).get()
+        except KeyError:
+            self.DBH.put(Pool(case), key=case)
+            self.dbh,self.mysql_bin_string=self.DBH.get(case).get()
     
     def __init__(self,case=None):
         """ Constructor for DB access. Note that this object implements database connection caching and so should be instantiated whenever needed. If case is None, the handler returned is for the default flag DB
@@ -323,12 +330,7 @@ class DBO:
         if not case:
             case = config.FLAGDB
 
-        try:
-            self.dbh,self.mysql_bin_string=self.DBH.get(case).get()
-        except KeyError:
-            self.DBH.put(Pool(case), key=case)
-            self.dbh,self.mysql_bin_string=self.DBH.get(case).get()
-            
+        self.get_dbh(case)
         self.temp_tables = []
         self.case = case
         self.cursor = self.dbh.cursor()
@@ -369,7 +371,10 @@ class DBO:
         #If anything went wrong we raise it as a DBError
         except Exception,e:
             str = "%s" % e
-            if 'Commands out of sync' in str or 'server has gone away' in str or 'Lost connection' in str:
+            if     'cursor closed' in str or \
+                   'Commands out of sync' in str or \
+                   'server has gone away' in str or \
+                   'Lost connection' in str:
                 pyflaglog.log(pyflaglog.VERBOSE_DEBUG,
                             "Got DB Error: %s, %s" % (str,self.dbh))
 
@@ -382,10 +387,7 @@ class DBO:
                 
                 global db_connections
                 db_connections -=1
-
-##                key = "%s/%s" % (self.case, threading.currentThread().getName())
-                key = "%s" % (self.case)        
-                self.dbh,self.mysql_bin_string=self.DBH.get(key).connect()
+                self.get_dbh(self.case)
                 self.dbh.ignore_warnings = self.cursor.ignore_warnings
                 
                 self.cursor = self.dbh.cursor()
@@ -959,6 +961,19 @@ class DBOTest(unittest.TestCase):
         time.sleep(1)
         ## Wait for both threads to finish
         self.assertEqual(results,['1','1'])
+
+    def test08Reconnect(self):
+        """ Test that we can reconnect if the mysql server dies """
+        dbh = DBO()
+        ## Disconnect now:
+        dbh.cursor.close()
+        ## Remove us from the cache too:
+        dbh.DBH.expire(".")
+        ## Now try to execute a query - it should reconnect transparently:
+        dbh.execute("select 1")
+        row = dbh.fetch()
+
+        self.assertEqual(row['1'], 1)
 
 def print_stats():
     dbh = DBO("mysql")

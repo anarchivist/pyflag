@@ -1080,7 +1080,10 @@ class HTMLUI(UI.GenericUI):
                 ## to translate the output suitably:
                 value = row[elements[i].name]
                 try:
-                    value = elements[i].display(value,row,self)
+                    cell_ui = self.__class__(self)
+                    ## Elements are expected to render on cell_ui
+                    tmp = elements[i].display(value,row,cell_ui)
+                    if tmp: cell_ui = tmp
                 except Exception, e:
                     pyflaglog.log(pyflaglog.ERROR, "Unable to render %r: %s" % (value , e))
 
@@ -1095,9 +1098,9 @@ class HTMLUI(UI.GenericUI):
 
                 ## Render the sorted column with a different style
                 if i==order:
-                    tds+="<td class='sorted-column'>%s</td>" % (value)
+                    tds+="<td class='sorted-column'>%s</td>" % (cell_ui)
                 else:
-                    tds+="<td class='table-cell'>%s</td>" % (value)
+                    tds+="<td class='table-cell'>%s</td>" % (cell_ui)
 
             self.result+="<tr class='%s'> %s </tr>\n" % (old_sorted_style,tds)
             row_count += 1

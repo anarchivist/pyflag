@@ -30,7 +30,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import FileFormats.IECache as IECache
 import pyflag.DB as DB
-from pyflag.TableObj import StringType, TimestampType, FilenameType, InodeIDType
+from pyflag.ColumnTypes import StringType, TimestampType, FilenameType, InodeIDType
 import pyflag.FlagFramework as FlagFramework
 
 class IEIndexEventHandler(FlagFramework.EventHandler):

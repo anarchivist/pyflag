@@ -26,8 +26,8 @@ import FileFormats.RegFile as RegFile
 from pyflag.format import Buffer,RAW
 import pyflag.FileSystem as FileSystem
 import pyflag.Registry as Registry
-from pyflag.TableObj import IntegerType,TimestampType,InodeType,FilenameType, StringType, StateType
-from pyflag.TableObj import DeletedType, BinaryType
+from pyflag.ColumnTypes import IntegerType,TimestampType,InodeType,FilenameType, StringType, StateType
+from pyflag.ColumnTypes import DeletedType, BinaryType
 import pyflag.DB as DB
 import time
 import pyflag.IO as IO

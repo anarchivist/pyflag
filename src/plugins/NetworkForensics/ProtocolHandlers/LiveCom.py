@@ -73,7 +73,7 @@ itself. To get the post values look at the http_parameters table for
 that HTTP object id.
 """
 import pyflag.FlagFramework as FlagFramework
-from pyflag.TableObj import StringType, TimestampType, InodeIDType, IntegerType, PacketType
+from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, PacketType
 import FileFormats.HTML as HTML
 import pyflag.DB as DB
 import pyflag.Scanner as Scanner
@@ -239,7 +239,7 @@ class HotmailScanner(Scanner.GenScanFactory):
             for s in root.search('script'):
                 m=re.match("document\.getElementById\(\"MsgContainer\"\)\.innerHTML='([^']*)'", s.innerHTML())
                 if m:
-                    result['Message'] += m.group(1).decode("string_escape")
+                    result['Message'] += HTML.decode_unicode(m.group(1).decode("string_escape"))
                     break
 
             return self.insert_message(result)            
@@ -330,10 +330,7 @@ class HTMLStringType(StringType):
         parser.feed(value or '')
         parser.close()
 
-        tmp = result.__class__(result)
-	tmp.text(parser.root.innerHTML(), wrap='full', font='typewriter')
-
-        return tmp
+	result.text(parser.root.innerHTML(), wrap='full', font='typewriter')
 
 class LiveComMessages(Reports.report):
     """

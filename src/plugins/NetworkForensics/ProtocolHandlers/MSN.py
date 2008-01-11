@@ -50,7 +50,7 @@ import pyflag.pyflaglog as pyflaglog
 import base64
 import plugins.NetworkForensics.PCAPFS as PCAPFS
 import urllib,os,time,datetime
-from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType, ColumnType
+from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, ColumnType
 
 config.add_option("MSN_PORTS", default='[1863,]',
                   help="A list of ports to be considered for MSN connections")
@@ -207,16 +207,15 @@ class Message:
         
         dbh=DB.DBO(self.case)
         dbh.insert("msn_session",
-                        inode=self.fd.inode,
-                        packet_id=self.get_packet_id(),
-                        sender=sender,
-                        recipient=recipient,
-                        type=type,
-                        transaction_id=tr_id,
-                        data=data,
-                        session_id=sessionid,
-                        p2p_file= p2pfile,
-                        )
+                   inode_id=self.fd.inode_id,
+                   packet_id=self.get_packet_id(),
+                   sender=sender,
+                   recipient=recipient,
+                   type=type,
+                   transaction_id=tr_id,
+                   data=data,
+                   session_id=sessionid,
+                   )
         
     def insert_user_data(self,nick,data_type,data,tr_id=-1,sessionid=None):
         """
@@ -1496,21 +1495,7 @@ class Message:
                     self.fd.inode,
                     headers['sessionid'],
                     self.session_id)
-                #print "ADDING FILE" 
-                dbh.insert("msn_p2p",
-                                session_id = self.session_id,
-                                channel_id = headers['sessionid'],
-                                to_user= headers['to'],
-                                from_user= headers['from'],
-                                context=filename,
-                                inode=new_inode,
-                                )
                 
-                self.insert_session_data(sender=strip_username(headers['from']),
-                                        recipient=strip_username(headers['to']),
-                                        type="P2P FILE TRANSFER - OFFER",
-                                        p2pfile=new_inode)
-
                 try:
                 ## Parse the context line:
                     parser = ContextParser()
@@ -1549,12 +1534,26 @@ class Message:
                 path=os.path.normpath(path+"/../../../../../")
 
                 ## The filename and size is given in the context
-                self.ddfs.VFSCreate(None,
+                new_inode_id = self.ddfs.VFSCreate(None,
                                     new_inode,
                                     "%s/MSN/%s/%s" % (path, date_str, filename),
                                     mtime=mtime,
                                     size=size)
                 
+                dbh.insert("msn_p2p",
+                                session_id = self.session_id,
+                                channel_id = headers['sessionid'],
+                                to_user= headers['to'],
+                                from_user= headers['from'],
+                                context=filename,
+                                inode=new_inode,
+                                )
+
+                self.insert_session_data(sender=strip_username(headers['from']),
+                                        recipient=strip_username(headers['to']),
+                                        type="P2P FILE TRANSFER - OFFER",
+                                        p2pfile=new_inode_id)
+
                 self.inodes.append("CMSN%s-%s" % (headers['sessionid'], 
                                                   self.session_id))
         
@@ -1802,19 +1801,19 @@ class MSNTables(FlagFramework.EventHandler):
     def create(self, dbh,case):
         dbh.execute(
             """ CREATE TABLE if not exists `msn_session` (
-            `inode` VARCHAR(50) NOT NULL,
+            `inode_id` INT NOT NULL,
             `packet_id` INT NOT NULL,
             `session_id` BIGINT,
             `sender` VARCHAR(250),
             `recipient` VARCHAR( 250 ),
             `type` VARCHAR(50),
             `data` TEXT NULL,
-            `p2p_file` VARCHAR( 250 ),
+            `p2p_file` INT NULL,
             `transaction_id`  INT
             )""")
         dbh.execute(
             """ CREATE TABLE if not exists `msn_p2p` (
-            `inode` VARCHAR(250),
+            `inode_id` INT NOT NULL,
             `session_id` INT,
             `channel_id` INT,
             `to_user` VARCHAR(250),
@@ -1823,7 +1822,7 @@ class MSNTables(FlagFramework.EventHandler):
             )""")
         dbh.execute(
             """ CREATE TABLE if not exists `msn_users` (
-            `inode` VARCHAR(50) NOT NULL,
+            `inode_id` INT NOT NULL,
             `packet_id`  INT NOT NULL,
             `session_id` INT NOT NULL,
             `transaction_id`  INT,
@@ -1860,7 +1859,7 @@ class MSNTables(FlagFramework.EventHandler):
                                   'personal_message'
                                   ) NOT NULL ,
             `user_data` TEXT NOT NULL,
-            PRIMARY KEY (`inode`,`session_id`,`user_data_type`,`nick`)
+            PRIMARY KEY (`inode_id`,`session_id`,`user_data_type`,`nick`)
             )""")
 
 class MSNScanner(StreamScannerFactory):
@@ -1909,6 +1908,9 @@ class MSNScanner(StreamScannerFactory):
         # Open individual streams
         forward_fd = self.fsfd.open(inode = forward_inode)
         reverse_fd = self.fsfd.open(inode = reverse_inode)
+        forward_fd_inode_id = forward_fd.lookup_id()
+        reverse_fd_inode_id = reverse_fd.lookup_id()
+
 
         # We actually want to process these as two distinct streams..
         # The problem is that just processing it as a single stream raises
@@ -2150,7 +2152,7 @@ class BrowseMSNData(Reports.report):
             elements = [ ColumnType('Prox','pcap.ts_sec',
                                     callback = draw_prox_cb),
                          TimestampType('Timestamp','pcap.ts_sec'),
-                         InodeType("Stream","inode", case = query['case'],
+                         InodeIDType("Stream","inode_id", case = query['case'],
                                    link = query_type(family="Disk Forensics",
                                                    case=query['case'],
                                                    report='View File Contents',
@@ -2183,7 +2185,7 @@ class BrowseMSNData(Reports.report):
 
                          StringType("Data","data"),
                          IntegerType("Transaction ID","transaction_id"),
-                         InodeType("P2P File","p2p_file", case=query['case']),
+                         InodeIDType("P2P File","p2p_file_id", case=query['case']),
                          ],
             
             #TODO find a nice way to separate date and time (for exporting csv separate), but not have it as the default...
@@ -2202,7 +2204,7 @@ class BrowseMSNData(Reports.report):
             """ This report shows the data known about MSN participants (users).
             """
             result.table(
-                elements = [ InodeType("Stream","inode", case = query['case'],
+                elements = [ InodeIDType("Stream","inode", case = query['case'],
                               link = query_type(family="Disk Forensics",
                                                 case=query['case'],
                                                 report='View File Contents',
@@ -2236,7 +2238,7 @@ class BrowseMSNData(Reports.report):
 
         def file_transfers(query, result):
             result.table(
-                    elements =[InodeType("Stream","inode", case = query['case'],
+                    elements =[InodeIDType("Stream","inode", case = query['case'],
                                       link = query_type(family="Disk Forensics",
                                       case=query['case'],
                                       report='View File Contents',

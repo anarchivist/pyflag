@@ -47,7 +47,7 @@ from plugins.FileFormats.BasicFormats import *
 import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 import struct,re
-from pyflag.TableObj import StringType, PacketType, IPType
+from pyflag.ColumnTypes import StringType, PacketType, IPType
 import pyflag.Store as Store
 
 ## This keeps track of outstanding invitations.

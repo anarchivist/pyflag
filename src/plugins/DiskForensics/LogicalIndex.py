@@ -52,7 +52,7 @@ import index,os,time,re
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
-from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType
+from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType
 
 config.add_option("INDEX_ENCODINGS", default="['UTF-8','UTF-16LE']",
                   help="A list of unicode encodings to mutate the "
@@ -377,7 +377,7 @@ class SearchIndex(Reports.report):
         groupby = query.get('groupby',None)
         del result.defaults['groupby']
         result.table(
-            elements = [ InodeType(case=case, column='inode'),
+            elements = [ InodeIDType(case=case, column='inode.inode_id'),
                          StringType(column='word', name='Word'),
                          OffsetType(column='offset', name='Offset', fsfd=fsfd),
                          IntegerType(column='length', name='Length'),

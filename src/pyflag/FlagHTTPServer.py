@@ -218,9 +218,10 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                         path = path+".gz"
                         content_encoding = "gzip"
                     else:
-                        s = os.stat(path)
                         content_encoding = None
-                        
+
+                    s = os.stat(path)
+
                     try:
                         ## This is the last modified time the browser
                         ## is asking for in local time (not GMT)

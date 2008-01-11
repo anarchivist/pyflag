@@ -41,7 +41,7 @@ from pyflag.Scanner import *
 import pyflag.Scanner as Scanner
 import pyflag.DB as DB
 import pexpect
-from pyflag.TableObj import StringType, TimestampType, InodeType
+from pyflag.ColumnTypes import StringType, TimestampType, InodeType
 
 active = False
 

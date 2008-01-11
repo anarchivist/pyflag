@@ -40,6 +40,8 @@ description = "Offline Whois"
 hidden = False
 order = 40
 
+
+
 config.add_option("GEOIPDIR", default=config.DATADIR,
                   help="The directory containing all the GeoIP files. We try to open (in this"
                   " order) GeoIPCity.dat, GeoLiteCity.dat (if GeoIPCity.dat fails),"
@@ -106,6 +108,22 @@ except ImportError:
     gi_resolver = None
     gi_isp_resolver = None
     gi_org_resolver = None
+
+## The following options control how we display IPs within the GUI:
+# Would be nice if somewhere we did a count(*) and if whois wasn't there
+# we didn't show this either....
+config.add_option("WHOIS_DISPLAY", default=True,
+                  help="Should the WHOIS data be shown within the GUI?")
+
+if gi_resolver:
+    config.add_option("GEOIP_DISPLAY", default=True,
+                      help="Should we show GEOIP data in the normal " \
+                      "display of IP addresses? This only works if the " \
+                      "GEOIPDIR option is set correctly")
+    
+if gi_org_resolver or gi_isp_resolver:
+    config.add_option("EXTENDED_GEOIP_DISPLAY", default=True,
+                      help="Should we show extended GEOIP information? ")
 
 def get_all_geoip_data(ip):
     result = {}
@@ -500,6 +518,300 @@ class WhoisInit(FlagFramework.EventHandler):
 
         dbh.execute("""insert into geoip_org (org) values("Unknown")""")
 
+## The Whois columntypes - these allow for searching on Whois ip
+## addresses:
+config.add_option("PRECACHE_IPMETADATA", default=True,
+                  help="Precache whois data for all IP addresses automatically")
+
+def extended_csv(self, value):
+    """ This extended csv allows us to render GeoIP data into the output """
+    #if self.callback: return ["-", "-", "-"]
+
+    value.replace("\n","\\n")
+    value.replace("\r","\\r")
+
+    geoipdata = Whois.get_all_geoip_data(value)
+
+    if geoipdata.has_key("city"):
+        returnCity = geoipdata['city'] or "Unknown"
+    else:
+        returnCity = "Unknown"
+
+    if geoipdata.has_key("country_code3"):
+        returnCountry = geoipdata['country_code3'] or "---"
+    else:
+        returnCountry = "---"
+
+    if geoipdata.has_key("org"):
+        returnOrg = geoipdata['org'] or "Unknown" 
+    else:
+        returnOrg = "Unknown"
+
+    if geoipdata.has_key("isp"):
+        returnISP = geoipdata['isp'] or "Unknown" 
+    else:
+        returnISP = "Unknown"
+
+    if geoipdata.has_key("latitude"):
+        returnLat = geoipdata['latitude'] or "Unknown" 
+    else:
+        returnLat = "Unknown"
+
+    if geoipdata.has_key("longitude"):
+        returnLong = geoipdata['longitude'] or "Unknown"
+    else:
+        returnLong = "Unknown"
+
+    #self.extended_names = [name, name + "_geoip_city", name + "_geoip_country", name + "_whois_organisation", name + "_geoip_isp", name + "_geoip_lat", name + "_geoip_long"]
+    return {self.name:value, 
+            self.name + "_geoip_city":returnCity, 
+            self.name + "_geoip_country":returnCountry, 
+            self.name + "_geoip_org":returnOrg, 
+            self.name + "_geoip_isp":returnISP, 
+            self.name + "_geoip_lat":returnLat,
+            self.name + "_geoip_long":returnLong}
+
+def operator_whois_country(self, column, operator, country):
+    """ Matches the specified country whois string (e.g. AU, US, CA). Note that this works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
+
+    ## We must ensure there are indexes on the right columns or
+    ## this query will never finish. This could lead to a delay
+    ## the first time this is run...
+    dbh=DB.DBO()
+    dbh.check_index("whois_cache", "ip")
+    dbh.check_index("whois","country")
+
+    return " ( `%s` in (select ip from %s.whois_cache join " \
+           "%s.whois on %s.whois.id=%s.whois_cache.id and "\
+           "%s.whois.country=%r ) ) " \
+           % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
+              config.FLAGDB, config.FLAGDB, country)
+
+def code_maxmind_isp_like(self, column, operator, isp):
+    """ Returns true if column has an ISP which contains the word isp in it """
+    def f(row):
+        data = Whois.get_all_geoip_data(row[self.column])
+        ## this is not that accurate but close:
+        clean_isp = isp.replace('%','.*')
+        if 'isp' in data and re.search(clean_isp,data['isp']):
+            return True
+        else:
+            return False
+
+    return f
+
+def code_maxmind_isp(self, column, operator, isp):
+    """ Returns true if column has an ISP which contains the word isp in it """
+    return self.code_maxmind_isp_like(column, operator, isp)
+
+def operator_maxmind_isp(self, column, operator, isp):
+    """ Matches the specified isp based on maxmind data. Note that works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
+
+    ## We must ensure there are indexes on the right columns or
+    ## this query will never finish. This could lead to a delay
+    ## the first time this is run...
+    dbh=DB.DBO()
+    dbh.check_index("whois_cache", "ip")
+    dbh.check_index("geoip_isp", "id")
+
+    return " ( `%s` in (select ip from %s.whois_cache join " \
+           "%s.geoip_isp on %s.whois_cache.geoip_isp=%s.geoip_isp.id where "\
+           "%s.geoip_isp.isp = %r ) ) " \
+           % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
+              config.FLAGDB, config.FLAGDB, isp)
+
+def operator_maxmind_isp_like(self, column, operator, isp):
+    """ Matches the specified isp. Note that works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
+
+    ## We must ensure there are indexes on the right columns or
+    ## this query will never finish. This could lead to a delay
+    ## the first time this is run...
+    dbh=DB.DBO()
+    dbh.check_index("whois_cache", "ip")
+    dbh.check_index("geoip_isp", "id")
+
+    if not "%" in isp:
+        isp = "%%%s%%" % isp
+
+    return " ( `%s` in (select ip from %s.whois_cache join " \
+           "%s.geoip_isp on %s.whois_cache.geoip_isp=%s.geoip_isp.id where"\
+           " %s.geoip_isp.isp like %r ) ) " \
+           % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
+              config.FLAGDB, config.FLAGDB, isp)
+
+def code_maxmind_org(self, column, operator, org):
+    """ Returns true if column has an ISP which contains the word isp in it """
+    def f(row):
+        data = Whois.get_all_geoip_data(row[self.column])
+        ## this is not that accurate but close:
+        clean_isp = org.replace('%','.*')
+        if 'org' in data and re.search(clean_isp,data['org']):
+            return True
+        else:
+            return False
+
+    return f
+
+def code_maxmind_org_like(self, column, operator, org):
+    return self.code_maxmind_org( column, operator, org)
+
+def operator_maxmind_org(self, column, operator, org):
+    """ Matches the specified isp. Note that works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
+
+    ## We must ensure there are indexes on the right columns or
+    ## this query will never finish. This could lead to a delay
+    ## the first time this is run...
+    dbh=DB.DBO()
+    dbh.check_index("whois_cache", "ip")
+    dbh.check_index("geoip_org", "id")
+
+    return " ( `%s` in (select ip from %s.whois_cache join " \
+           "%s.geoip_org on %s.whois_cache.geoip_org=%s.geoip_org.id where"\
+           " %s.geoip_org.org = %r ) ) " \
+           % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
+              config.FLAGDB, config.FLAGDB, org)
+
+def operator_maxmind_org_like(self, column, operator, org):
+    """ Matches the specified organisation. Note that works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
+
+    ## We must ensure there are indexes on the right columns or
+    ## this query will never finish. This could lead to a delay
+    ## the first time this is run...
+    dbh=DB.DBO()
+    dbh.check_index("whois_cache", "ip")
+    dbh.check_index("geoip_org", "id")
+
+    return " ( `%s` in (select ip from %s.whois_cache join " \
+           "%s.geoip_org on %s.whois_cache.geoip_org=%s.geoip_org.id where"\
+           " %s.geoip_org.org like %r ) ) " \
+           % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
+              config.FLAGDB, config.FLAGDB, org)
+
+def code_maxmind_city(self, column, operator, city):
+    """ Returns true if column has an ISP which contains the word isp in it """
+    def f(row):
+        data = Whois.get_all_geoip_data(row[column])
+        ## this is not that accurate but close:
+        clean_isp = isp.replace('%','.*')
+        if 'city' in data and re.search(clean_isp,data['city']):
+            return True
+        else:
+            return False
+
+    return f
+
+def operator_maxmind_city(self, column, operator, city):
+    """ Matches the specified city string (e.g. Canberra, Chicago). Note that this works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
+
+    ## We must ensure there are indexes on the right columns or
+    ## this query will never finish. This could lead to a delay
+    ## the first time this is run...
+    dbh=DB.DBO()
+    dbh.check_index("whois_cache", "ip")
+    dbh.check_index("geoip_city", "id")
+
+    return " ( `%s` in (select ip from %s.whois_cache join " \
+           "%s.geoip_city on %s.whois_cache.geoip_city=%s.geoip_city.id " \
+           "where %s.geoip_city.city=%r ) ) " \
+           % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
+              config.FLAGDB, config.FLAGDB, city)
+
+# TODO - How do we do this if we don't have access to the case name? 
+#
+#def operator_annotatedIPs(self, column, operator, category):
+#    """ Annotated IPs. Show only those IPs that have annotations 
+#       associated with them of a certain category, or all.  """
+#    
+#   ## We must ensure there are indexes on the right columns or
+#   ## this query will never finish. This could lead to a delay
+#   ## the first time this is run...
+#   dbh=DB.DBO()
+#   dbh.check_index("%s.interesting_ips" % self.case, "ip")
+#   if category=="All":
+#      return " ( `%s` in (select ip from %s.interesting_ips) ) " \
+#           % (self.column, self.case)       
+#   else:
+#      return " ( `%s` in (select ip from %s.interesting_ips where " \
+#             " %s.interesting_ips.category = %r) ) " \
+#           % (self.column, self.case, self.case, country)
+
+def code_maxmind_country(self, column, operator, country):
+    def f(row):
+        data = Whois.get_all_geoip_data(row[column])
+        return data.get("country_code3")==country
+
+    return f
+
+def operator_maxmind_country(self, column, operator, country):
+    """ Matches the specified country string in the GeoIP Database (e.g. FRA, USA, AUS). Note that this works from the whois cache table so you must have allowed complete calculation of whois data when loading the log file or these results will be meaningless. """
+
+    ## We must ensure there are indexes on the right columns or
+    ## this query will never finish. This could lead to a delay
+    ## the first time this is run...
+    dbh=DB.DBO()
+    dbh.check_index("whois_cache", "ip")
+    dbh.check_index("geoip_country", "id")
+
+    return " ( `%s` in (select ip from %s.whois_cache join " \
+           "%s.geoip_country on %s.whois_cache.geoip_country=" \
+           "%s.geoip_country.id where %s.geoip_country.country=%r ) ) " \
+           % (self.column, config.FLAGDB, config.FLAGDB, config.FLAGDB,
+              config.FLAGDB, config.FLAGDB, country)
+
+def geoip_display_hook(self, value, row, result):
+        ## We try to show a whois if possible
+        id = lookup_whois(value)
+        tmp2 = result.__class__(result)
+        tmp3 = result.__class__(result)
+
+        if config.WHOIS_DISPLAY:
+            identify_network(id, value, tmp3)
+
+        try:
+            if config.GEOIP_DISPLAY:
+                geoip_resolve(value,tmp3)
+        except AttributeError:
+            pass
+
+        try:
+            if config.EXTENDED_GEOIP_DISPLAY:
+                geoip_resolve_extended(value,tmp3)
+        except AttributeError:
+            pass
+
+        tmp2.link(tmp3,
+                  target=FlagFramework.query_type(family="Log Analysis", 
+                                                  report="LookupIP", address=value),
+                  pane='popup')
+
+        result.row(tmp2)
+
+def insert(self, value):
+    ### When inserted we need to convert them from string to ints
+    if config.PRECACHE_IPMETADATA==True:
+        lookup_whois(value)
+
+    return "_"+self.column, "inet_aton(%r)" % value.strip()
+    
+from pyflag.ColumnTypes import IPType, add_display_hook, clear_display_hook
+add_display_hook(IPType, "geoip_display_hook", geoip_display_hook,0)
+
+IPType.insert = insert
+IPType.extended_csv = extended_csv
+IPType.operator_whois_country = operator_whois_country
+IPType.code_maxmind_isp_like = code_maxmind_isp_like
+IPType.code_maxmind_isp = code_maxmind_isp
+IPType.operator_maxmind_isp = operator_maxmind_isp
+IPType.operator_maxmind_isp_like = operator_maxmind_isp_like
+IPType.code_maxmind_org = code_maxmind_org
+IPType.code_maxmind_org_like = code_maxmind_org_like
+IPType.operator_maxmind_org = operator_maxmind_org
+IPType.operator_maxmind_org_like = operator_maxmind_org_like
+IPType.code_maxmind_city = code_maxmind_city
+IPType.operator_maxmind_city = operator_maxmind_city
+IPType.code_maxmind_country = code_maxmind_country
+IPType.operator_maxmind_country = operator_maxmind_country
+
 ### Some unit tests for Whois:
 import unittest
 
@@ -527,3 +839,4 @@ class WhoisTest(unittest.TestCase):
             dbh.execute("select netname from whois where id=%r", id)
             row = dbh.fetch()
             self.assertEqual(netname, row['netname'])
+

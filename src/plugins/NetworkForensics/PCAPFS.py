@@ -42,7 +42,7 @@ import reassembler
 from NetworkScanner import *
 import pypcap
 import cStringIO
-from pyflag.TableObj import StringType, IntegerType, TimestampType, InodeType, CounterType
+from pyflag.ColumnTypes import StringType, IntegerType, TimestampType, InodeType, CounterType
 
 
 description = "Network Forensics"

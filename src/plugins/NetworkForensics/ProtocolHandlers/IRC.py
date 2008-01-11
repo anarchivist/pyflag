@@ -34,7 +34,7 @@ import pyflag.Reports as Reports
 import pyflag.pyflaglog as pyflaglog
 import cStringIO,re
 import plugins.NetworkForensics.PCAPFS as PCAPFS
-from pyflag.TableObj import StringType, IntegerType, TimestampType, InodeType
+from pyflag.ColumnTypes import StringType, IntegerType, TimestampType, InodeType
 
 class IRC:
     """ Class to manage the IRC state """

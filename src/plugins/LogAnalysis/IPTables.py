@@ -31,7 +31,7 @@ The log format is described in the file ip4/netfilter/ipt_LOG.c
 # ******************************************************
 import pyflag.LogFile as LogFile
 from pyflag.FlagFramework import Curry
-from pyflag.TableObj import StringType, IPType, IntegerType, TimestampType
+from pyflag.ColumnTypes import StringType, IPType, IntegerType, TimestampType
 import pyflag.conf
 config = pyflag.conf.ConfObject()
 import pyflag.DB as DB

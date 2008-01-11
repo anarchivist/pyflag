@@ -44,7 +44,7 @@ import pyflag.pyflaglog as pyflaglog
 import pyflag.ScannerUtils as ScannerUtils
 import time
 import plugins.LogAnalysis.Whois as Whois
-from pyflag.TableObj import IPType
+from pyflag.ColumnTypes import IPType
 import pyflag.code_parser as code_parser
 
 description = "Load Data"

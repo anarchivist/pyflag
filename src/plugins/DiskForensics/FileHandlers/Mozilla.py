@@ -22,7 +22,7 @@
 """ A parser for handling Mozilla history files. These files are
 stored in the Mork format.
 """
-from pyflag.TableObj import StringType, TimestampType, FilenameType, InodeIDType
+from pyflag.ColumnTypes import StringType, TimestampType, FilenameType, InodeIDType
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB

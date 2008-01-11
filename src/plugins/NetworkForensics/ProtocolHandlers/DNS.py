@@ -28,7 +28,7 @@ from plugins.FileFormats.BasicFormats import *
 import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 import struct
-from pyflag.TableObj import StringType, PacketType, IPType
+from pyflag.ColumnTypes import StringType, PacketType, IPType
 
 
 class DNSString(STRING):

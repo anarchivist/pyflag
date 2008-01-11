@@ -3,7 +3,7 @@ about some files.
 """
 from pyflag.Scanner import *
 import pyflag.Reports as Reports
-from pyflag.TableObj import StringType, TimestampType, InodeType
+from pyflag.ColumnTypes import StringType, TimestampType, InodeType
 
 try:
     import extractor

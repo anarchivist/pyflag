@@ -11,7 +11,7 @@ import pyflag.Registry as Registry
 import pyflag.conf
 config = pyflag.conf.ConfObject()
 import inspect
-import pyflag.TableObj as TableObj
+import pyflag.ColumnTypes as ColumnTypes
 
 ## These are names which can not be set by the user
 HIDDEN_NAMES = ['self', 'link', 'callback', 'link_pane']
@@ -170,9 +170,9 @@ class AdvancedLog(LogFile.Log):
                           ],
             )
 
-class PadType(TableObj.ColumnType):
+class PadType(ColumnTypes.ColumnType):
     def __init__(self, regex='.'):
-        TableObj.ColumnType.__init__(self, name="-", column="-")
+        ColumnTypes.ColumnType.__init__(self, name="-", column="-")
         self.re = re.compile(regex)
         self.ignore = True
         

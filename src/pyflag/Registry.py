@@ -438,9 +438,9 @@ def Init():
     FILEFORMATS = FileFormatRegistry(format.DataType)
 
     ## Register Column Types:
-    import pyflag.TableObj as TableObj
+    import pyflag.ColumnTypes as ColumnTypes
     global COLUMN_TYPES
-    COLUMN_TYPES = ColumnTypeRegistry(TableObj.ColumnType)
+    COLUMN_TYPES = ColumnTypeRegistry(ColumnTypes.ColumnType)
 
     ## Register worker tasks
     import pyflag.Farm as Farm

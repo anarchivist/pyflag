@@ -35,7 +35,7 @@ import pyflag.Reports as Reports
 import plugins.NetworkForensics.PCAPFS as PCAPFS
 import re,time,cgi
 import TreeObj
-from pyflag.TableObj import StringType, TimestampType, InodeIDType, IntegerType, PacketType, guess_date
+from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, PacketType, guess_date
 
 def escape(uri):
     """ Make a filename from a URI by escaping / chars """

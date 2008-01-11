@@ -43,7 +43,7 @@ import time, re
 import pyflag.LogFile as LogFile
 import pyflag.DB as DB
 import FlagFramework
-from pyflag.TableObj import TimestampType, IntegerType, StringType, IPType
+from pyflag.ColumnTypes import TimestampType, IntegerType, StringType, IPType
 import pyflag.conf
 config = pyflag.conf.ConfObject()
 import pyflag.pyflaglog as pyflaglog

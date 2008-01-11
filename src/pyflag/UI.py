@@ -37,7 +37,7 @@ import pyflag.conf
 import pyflag.pyflaglog as pyflaglog
 config=pyflag.conf.ConfObject()
 import pyflag.parser as parser
-from pyflag.TableObj import IntegerType, TimestampType, StringType, FilenameType
+from pyflag.ColumnTypes import IntegerType, TimestampType, StringType, FilenameType
 
 config.LOG_LEVEL=7
 
@@ -125,7 +125,10 @@ class GenericUI:
         keys=[]
         values=[]
         try:
-            dbh.execute(sql,parms)
+            if parms:
+                dbh.execute(sql,parms)
+            else:
+                dbh.execute(sql)
             for row in dbh:
                 keys.append(row[key])
                 values.append(row[value])

@@ -35,7 +35,7 @@ from pyflag.FlagFramework import query_type
 from NetworkScanner import *
 import plugins.NetworkForensics.PCAPFS as PCAPFS
 import TreeObj
-from pyflag.TableObj import StringType, TimestampType, InodeType, IntegerType, PacketType, IPType
+from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, PacketType, IPType
 
 import dissect,sys,struct,sys,cStringIO, re, time, cgi
 
@@ -496,8 +496,6 @@ class FTPScanner(StreamScannerFactory):
 
         ## Save to DB
         controlStream.save_to_db(dbh)
-        
-
 
 class FTPTables(FlagFramework.EventHandler):
     def create(self, dbh, case):

@@ -216,3 +216,10 @@ class MountedTest(pyflag.tests.ScannerTest):
         dbh.execute("select * from file where name = %r",self.test_file)
         row = dbh.fetch()
         self.assert_(row,"Unable to find the file in the VFS???")
+
+class RawTest(pyflag.tests.ScannerTest):
+    """ Test a Raw filesystem """
+    test_case = "PyFlagTestCase"
+    test_file = "pyflag_stdimage_0.4.dd"
+    subsystem = "Raw"
+    fstype = "Raw"

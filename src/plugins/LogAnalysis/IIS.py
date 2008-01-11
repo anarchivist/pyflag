@@ -28,7 +28,7 @@ import pyflag.LogFile as LogFile
 import plugins.LogAnalysis.Simple as Simple
 import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
-from pyflag.TableObj import TimestampType, IntegerType, StringType, IPType
+from pyflag.ColumnTypes import TimestampType, IntegerType, StringType, IPType
 import pyflag.Reports as Reports
 import pyflag.conf
 config=pyflag.conf.ConfObject()

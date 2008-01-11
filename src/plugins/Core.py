@@ -257,33 +257,6 @@ class CaseDBInit(FlagFramework.EventHandler):
         PRIMARY KEY(`id`)
         )""")        
 
-        case_dbh.execute("""CREATE TABLE if not exists `annotate` (
-        `id` INT(11) not null auto_increment,
-        `inode_id` int not null,
-        `inode` VARCHAR(250) NOT NULL,
-        `note` TEXT,
-        `category` VARCHAR( 250 ) NOT NULL default 'Note',
-        PRIMARY KEY(`id`)
-        )""")        
-
-        case_dbh.execute("""CREATE TABLE if not exists `timeline` (
-        `id` INT(11) not null auto_increment,
-        `time` timestamp,
-        `notes` TEXT,
-        `category` VARCHAR( 250 ) NOT NULL default 'Note',
-        PRIMARY KEY(`id`)
-        )""")        
-
-        # The id field here feels kind of redundant, but it keeps DB.py happy for the
-        # caching stuff...
-        case_dbh.execute("""CREATE TABLE if not exists `interesting_ips` (
-        `id` INT(11) not null auto_increment,
-        `ip` INT(11) UNSIGNED UNIQUE,
-        `notes` TEXT,
-        `category` VARCHAR( 250 ) NOT NULL default 'Note',
-        PRIMARY KEY(`id`)
-        )""")
-
         # create the "groupware" tables
         case_dbh.execute("CREATE TABLE IF NOT EXISTS `email` (`inode` VARCHAR(250), `date` TIMESTAMP, `to` VARCHAR(250), `from` VARCHAR(250), `subject` VARCHAR(250));")
         case_dbh.execute("CREATE TABLE IF NOT EXISTS `contact` (`inode` VARCHAR(250), `name` VARCHAR(250), `email` VARCHAR(250), `address` VARCHAR(250), `phone` VARCHAR(250));")

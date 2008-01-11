@@ -935,6 +935,7 @@ def print_info():
                               ("Shell commands", "SHELL_COMMANDS"),
                               ("File systems", "FILESYSTEMS"),
                               ("Image format handlers", "IMAGES"),
+                              ("Column Types", "COLUMN_TYPES"),
                               ):
         print "%s:\n%s\n" % (heading, '-' * len(heading))
         registry = getattr(Registry, registry)

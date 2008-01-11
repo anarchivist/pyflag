@@ -28,7 +28,7 @@ def unquote(string):
     return string
 
 def decode_entity(string):
-    return re.sub("&#(\d+);", lambda x: chr(int(x.group(1)) % 256), string)
+    return re.sub("&#(\d\d)(\d\d)?;", lambda x: chr(int(x.group(1))), string)
 
 def decode_unicode(string):
     return re.sub(r"\\u(..)(..)", lambda x: (chr(int(x.group(1),16)) + chr(int(x.group(2),16))).decode("utf_16_be").encode('utf8'), string)

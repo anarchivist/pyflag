@@ -42,8 +42,8 @@ import pyflag.Scanner as Scanner
 import pyflag.ScannerUtils as ScannerUtils
 import pyflag.Registry as Registry
 import pyflag.parser as parser
-from pyflag.TableObj import IntegerType,TimestampType,InodeType,FilenameType, StringType, StateType
-from pyflag.TableObj import DeletedType, BinaryType
+from pyflag.ColumnTypes import IntegerType,TimestampType,InodeIDType,FilenameType, StringType, StateType
+from pyflag.ColumnTypes import DeletedType, BinaryType
 
 description = "Disk Forensics"
 order=30
@@ -106,7 +106,7 @@ class BrowseFS(Reports.report):
 
         def tabular_view(query,result):
             result.table(
-                elements = [ InodeType('Inode','file.inode',case=query['case']),
+                elements = [ InodeIDType('Inode','file.inode_id',case=query['case']),
                              StringType('Mode','file.mode'),
                              FilenameType(case=query['case'], table='inode'),
                              DeletedType('Del','file.status'),
@@ -151,7 +151,7 @@ class BrowseFS(Reports.report):
                     path=os.path.dirname(path)
 
                 tmp.table(
-                    elements = [ InodeType('Inode','file.inode',case=query['case']),
+                    elements = [ InodeIDType('Inode','file.inode_id',case=query['case']),
                                  FilenameType(basename=True, table='inode'),
                                  DeletedType('Del','file.status'),
                                  IntegerType('File Size','size'),
@@ -239,7 +239,7 @@ class ViewFile(Reports.report):
 class MACTimes(FlagFramework.EventHandler):
     def create(self, dbh, case):
         dbh.execute("""create table if not exists mac(
-        `inode` varchar(250) NOT NULL default '',
+        `inode_id` INT NOT NULL default 0,
         `status` varchar(8) default '',
         `time` timestamp NULL,
         `m` int default NULL,
@@ -262,13 +262,13 @@ class Timeline(Reports.report):
         dbh = self.DBO(query['case'])
         temp_table = dbh.get_temp()
         dbh.check_index("inode","inode")
-        dbh.execute("create temporary table %s select i.inode,f.status,mtime as `time`,1 as `m`,0 as `a`,0 as `c`,0 as `d`,concat(path,name) as `name` from inode as i left join file as f on i.inode=f.inode" %
+        dbh.execute("create temporary table %s select i.inode_id,f.status,mtime as `time`,1 as `m`,0 as `a`,0 as `c`,0 as `d`,concat(path,name) as `name` from inode as i left join file as f on i.inode=f.inode" %
                     (temp_table, ));
-        dbh.execute("insert into %s select i.inode,f.status,atime,0,1,0,0,concat(path,name) from inode as i left join file as f on i.inode=f.inode" % (temp_table,))
-        dbh.execute("insert into %s select i.inode,f.status,ctime,0,0,1,0,concat(path,name) from inode as i left join file as f on i.inode=f.inode" % (temp_table, ))
-        dbh.execute("insert into %s select i.inode,f.status,dtime,0,0,0,1,concat(path,name) from inode as i left join file as f on i.inode=f.inode" % (temp_table, ))
-        dbh.execute("insert into mac select inode,status,time,sum(m) as `m`,sum(a) as `a`,sum(c) as `c`,sum(d) as `d`,name from %s where time>0 group by time,name order by time,name" % temp_table)
-        dbh.check_index("mac","inode")
+        dbh.execute("insert into %s select i.inode_id,f.status,atime,0,1,0,0,concat(path,name) from inode as i left join file as f on i.inode_id=f.inode_id" % (temp_table,))
+        dbh.execute("insert into %s select i.inode_id,f.status,ctime,0,0,1,0,concat(path,name) from inode as i left join file as f on i.inode_id=f.inode_id" % (temp_table, ))
+        dbh.execute("insert into %s select i.inode_id,f.status,dtime,0,0,0,1,concat(path,name) from inode as i left join file as f on i.inode_id=f.inode_id" % (temp_table, ))
+        dbh.execute("insert into mac select inode_id,status,time,sum(m) as `m`,sum(a) as `a`,sum(c) as `c`,sum(d) as `d`,name from %s where time>0 group by time,name order by time,name" % temp_table)
+        dbh.check_index("mac","inode_id")
         
     def progress(self, query, result):
         result.heading("Building Timeline")
@@ -278,7 +278,7 @@ class Timeline(Reports.report):
         result.heading("File Timeline for Filesystem")
         result.table(
             elements=[ TimestampType('Timestamp','time'),
-                       InodeType('Inode','inode', case=query['case']),
+                       InodeIDType('Inode', case=query['case']),
                        DeletedType('Del','status'),
                        BinaryType('m',"m"),
                        BinaryType('a',"a"),

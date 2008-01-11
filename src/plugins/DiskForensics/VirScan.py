@@ -32,7 +32,7 @@ import pyflag.DB as DB
 import os.path
 import pyflag.pyflaglog as pyflaglog
 from pyflag.Scanner import *
-from pyflag.TableObj import StringType, TimestampType, InodeIDType, FilenameType, IntegerType
+from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, FilenameType, IntegerType
 
 WARNING_ISSUED = False
 

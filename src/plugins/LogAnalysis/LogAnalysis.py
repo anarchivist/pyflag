@@ -38,7 +38,7 @@ config=pyflag.conf.ConfObject()
 import re
 import plugins.LogAnalysis.Whois as Whois
 import pyflag.Registry as Registry
-from pyflag.TableObj import ColumnType, StringType
+from pyflag.ColumnTypes import ColumnType, StringType
 
 description = "Log Analysis"
 order = 35

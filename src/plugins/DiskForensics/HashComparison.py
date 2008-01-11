@@ -31,7 +31,7 @@ import pyflag.Reports as Reports
 import pyflag.DB as DB
 import os.path
 from pyflag.Scanner import *
-from pyflag.TableObj import StringType, TimestampType, InodeIDType, FilenameType, ColumnType
+from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, FilenameType, ColumnType
                   
 import md5
 class HashTables(FlagFramework.EventHandler):

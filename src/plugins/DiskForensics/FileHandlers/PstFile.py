@@ -38,7 +38,7 @@ import re
 from pyflag.FlagFramework import normpath, query_type
 import pyflag.FlagFramework as FlagFramework
 import Store
-from pyflag.TableObj import StringType, TimestampType, InodeType
+from pyflag.ColumnTypes import StringType, TimestampType, InodeType
 import pst
 
 def format_properties(properties):

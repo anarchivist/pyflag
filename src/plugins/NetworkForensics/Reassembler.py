@@ -33,7 +33,7 @@ from pyflag.FlagFramework import query_type, get_temp_path
 from NetworkScanner import *
 import struct,re,os
 import reassembler
-from pyflag.TableObj import StringType, IntegerType, TimestampType, InodeType, IPType
+from pyflag.ColumnTypes import StringType, IntegerType, TimestampType, InodeType, IPType
 import pyflag.Reports as Reports
 
 class DataType(StringType):
@@ -89,7 +89,7 @@ class StreamFile(File):
         dbh.check_index("connection_details","inode")
 
         ## Fill in some vital stats
-        dbh.execute("select con_id, reverse, src_ip, dest_ip, src_port, dest_port, ts_sec from `connection_details` where inode=%r limit 1", inode)
+        dbh.execute("select inode_id, con_id, reverse, src_ip, dest_ip, src_port, dest_port, ts_sec from `connection_details` where inode=%r limit 1", inode)
         row=dbh.fetch()
         if row:
             self.con_id = row['con_id']
@@ -99,6 +99,7 @@ class StreamFile(File):
             self.ts_sec = row['ts_sec']
             self.dest_ip = row['dest_ip']
             self.src_ip = row['src_ip']
+            self.inode_id = row['inode_id']
 
         inode = inode.split("|")[-1]
 

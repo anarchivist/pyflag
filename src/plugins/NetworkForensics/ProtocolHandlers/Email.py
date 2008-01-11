@@ -27,7 +27,7 @@ family."""
 
 import pyflag.Reports as Reports
 import pyflag.FlagFramework as FlagFramework
-from pyflag.TableObj import StringType, IntegerType, TimestampType, InodeType
+from pyflag.ColumnTypes import StringType, IntegerType, TimestampType, InodeType
 from FlagFramework import query_type
 
 class BrowseEmail(Reports.report):
