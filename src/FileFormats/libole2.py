@@ -278,8 +278,12 @@ class OLEFile:
         """
         result=[start]
         while result[-1]!=-2:
-            result.append(depot[result[-1]])
-            
+        	value = depot[result[-1]]
+        	if value not in result:
+        		result.append(value)
+        	else: 
+        		raise OLEException("Infinite loop detected in chain, file currupt?")
+
         return result
 
     def read_run(self,run,data,blocksize):
