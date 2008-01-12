@@ -21,7 +21,7 @@
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 
-import pypcap,sys,os,time
+import pypcap,sys,os,time,fcntl
 import pyflag.conf
 config = pyflag.conf.ConfObject()
 import pyflag.pyflagsh as pyflagsh
@@ -98,6 +98,13 @@ try:
     output_fd = open(filename, 'a')
     output_fd.seek(0,os.SEEK_END)
     offset = output_fd.tell()
+
+    ## There can be only one:
+    try:
+        fcntl.flock(output_fd,fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except IOError,e:
+        print "Highlander Error: %s" % e
+        sys.exit(1)
     
 except OSError:
     output_fd = open(filename, 'w')
