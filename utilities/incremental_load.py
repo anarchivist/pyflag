@@ -148,7 +148,7 @@ def load_file(filename):
     pyflaglog.log(pyflaglog.INFO, "%s: Processing %s" % (time.ctime(),filename))
 
     try:
-        input_file = pypcap.PyPCAP(open(filename))
+        input_file = pypcap.PyPCAP(open(filename), output='little')
     except IOError,e:
         pyflaglog.log(pyflaglog.INFO, "Error reading %s: %s" % (filename, e))
         return

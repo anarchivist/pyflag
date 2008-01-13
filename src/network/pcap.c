@@ -46,6 +46,10 @@ int PcapPacketHeader_Read(Packet self, StringIO input) {
   // We start off trying to read the header as big endian
   len = this->__super__->Read(self, input);
 
+  // Is the capture length reasonable?
+  if(this->header.caplen > 0xFFFF)
+    return 0;
+
   // Read the data now:
   this->header.data = talloc_size(self, this->header.caplen);
   CALL(input, read, this->header.data, this->header.caplen);

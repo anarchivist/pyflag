@@ -177,7 +177,7 @@ static PyObject *PyPCAP_dissect(PyPCAP *self, PyObject *args, PyObject *kwds) {
 
   // Get the next packet:
   result = (PyPacket *)PyPCAP_next(self);
-  if(!result) return NULL;
+  if(!result) return PyErr_Format(PyExc_RuntimeError, "Error parsing packet");
 
   // Copy the data into the dissection_buffer:
   CALL(self->dissection_buffer, truncate, 0);
