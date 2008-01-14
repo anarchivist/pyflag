@@ -120,7 +120,7 @@ class IndexScan(GenScanFactory):
         pydbh.execute("select word,id from dictionary where type='word'")
         for row in pydbh:
             try:
-                word = row['word'].decode("UTF-8")
+                word = row['word'].decode("UTF-8").lower()
                 for e in config.INDEX_ENCODINGS:
                     w = word.encode(e)
                     if len(w)>3:
