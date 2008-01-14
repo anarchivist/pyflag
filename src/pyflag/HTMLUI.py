@@ -42,7 +42,7 @@ import pyflag.Theme as Theme
 import cStringIO,csv,time
 import pyflag.Registry as Registry
 import pyflag.parser as parser
-import pyflag.TableObj as TableObj
+from pyflag.ColumnTypes import CounterType, StringType
 import pyflag.pyflaglog as pyflaglog
 import pyflag.FlagFramework as FlagFramework
 
@@ -131,6 +131,9 @@ class HTMLUI(UI.GenericUI):
         if query:
             self.defaults=query
             self.toolbar_ui.defaults = self.defaults
+
+    def clear(self):
+        self.result =''
 
 ## The __pyflag_parent, __pyflag_name are variables set in js window
 ## object to refer back to the logical parent of each pyflag
@@ -851,7 +854,6 @@ class HTMLUI(UI.GenericUI):
 
         def filter_history(query, result):
             """ This callback will render all the history for this filter """
-            from pyflag.TableObj import StringType
             result.heading("History")
 
             new_query = query.clone()
@@ -1004,7 +1006,7 @@ class HTMLUI(UI.GenericUI):
                     e.link = new_query
                     e.link_pane = 'parent'
                     elements = [ e,
-                                 TableObj.CounterType(name='Count'),
+                                 CounterType(name='Count'),
                                  ]
                     break
                 

@@ -33,7 +33,7 @@ from pyflag.FlagFramework import query_type, get_temp_path
 from NetworkScanner import *
 import struct,re,os
 import reassembler
-from pyflag.ColumnTypes import StringType, IntegerType, TimestampType, InodeType, IPType
+from pyflag.ColumnTypes import StringType, IntegerType, TimestampType, InodeIDType, IPType
 import pyflag.Reports as Reports
 
 class DataType(StringType):
@@ -396,7 +396,7 @@ class ViewConnections(Reports.report):
 
     def display(self, query,result):
         result.table(
-            elements = [ InodeType('Inode','inode', case=query['case']),
+            elements = [ InodeIDType('Inode','inode_id', case=query['case']),
                          TimestampType('Timestamp','ts_sec'),
                          IPType('Source','src_ip'),
                          IntegerType('Src Port','src_port'),

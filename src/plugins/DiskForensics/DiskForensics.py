@@ -182,7 +182,7 @@ class BrowseFS(Reports.report):
 
 class ViewFile(Reports.report):
     """ Report to browse the filesystem """
-    parameters = {'inode':'string'}
+    #parameters = {'inode':'string'}
     hidden = True
     family = "Disk Forensics"
     name = "View File Contents"
@@ -196,7 +196,11 @@ class ViewFile(Reports.report):
         fsfd = FileSystem.DBFS( query["case"])
         ## If this is a directory, only show the stats
         try:
-            fd = fsfd.open(inode=query['inode'])
+            if query.has_key('inode'):
+                fd = fsfd.open(inode=query['inode'])
+            else:
+                fd = fsfd.open(inode_id=query['inode_id'])
+                query['inode'] = fd.inode
             image = Graph.Thumbnailer(fd,300)
         except IOError:
             fd = FileSystem.File(query['case'], None, '')

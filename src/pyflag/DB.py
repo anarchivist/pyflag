@@ -83,7 +83,7 @@ config.add_option("DBCACHE_LENGTH", default=1024, type='int',
 config.add_option("MASS_INSERT_THRESHOLD", default=300, type='int',
                   help="Number of rows where the mass insert buffer will be flushed.")
 
-config.add_option("TABLE_QUERY_TIMEOUT", default=20, type='int',
+config.add_option("TABLE_QUERY_TIMEOUT", default=60, type='int',
                   help="The table widget will timeout queries after this many seconds")
 
 

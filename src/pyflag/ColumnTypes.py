@@ -217,8 +217,9 @@ class ColumnType:
         if self.link and not self.callback:
             q = self.link.clone()
             q.FillQueryTarget(value)
+            result.clear()
             result.link(value, q, pane=self.link_pane)
-
+        
     def plain_display_hook(self, value, row, result):
         if value:
             result.text(value)
@@ -285,6 +286,10 @@ class ColumnType:
 
     def select(self):
         """ Returns the SQL required for selecting from the table. """
+        return self.escape_column_name(self.column)
+
+    def orderby(self):
+        """ This is called to get the order by clause """
         return self.escape_column_name(self.column)
 
     def column_decorator(self, table, sql, query, result):
@@ -684,7 +689,7 @@ class InodeType(StringType):
     """ A unified view of inodes """
     hidden = True
     def __init__(self, name='Inode', column='inode', link=None, case=None, callback=None):
-        raise RuntimeError("InodeType is depracated - you must use InodeIDType now")
+        #raise RuntimeError("InodeType is depracated - you must use InodeIDType now")
         self.case = case
         ColumnType.__init__(self,name,column,link,callback=callback)
 

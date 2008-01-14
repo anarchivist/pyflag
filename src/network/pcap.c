@@ -46,8 +46,10 @@ int PcapPacketHeader_Read(Packet self, StringIO input) {
   // We start off trying to read the header as big endian
   len = this->__super__->Read(self, input);
 
-  // Is the capture length reasonable?
-  if(this->header.caplen > 0xFFFF)
+  // Is the capture length reasonable? If not we really can not
+  // proceed because we can not find the next packet along. Returning
+  // 0 will abort the rest of the file now.
+  if(this->header.caplen > 0x1FFFF)
     return 0;
 
   // Read the data now:

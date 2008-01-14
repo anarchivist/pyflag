@@ -456,10 +456,16 @@ class LiveMailViewer(FileSystem.StringIOFile):
 
     def stats(self, query,result):
         result.start_table(**{'class':'GeneralTable'})
-        dbh = DB.DBO(self.case)
+        dbh = DB.DBO(self.case)        
         columns = ["service","type","From","To","CC","BCC","Sent","Subject","Message"]
         dbh.execute("select * from live_messages where `id`=%r", self.id)
         row = dbh.fetch()
+        
+        dbh2 = DB.DBO(self.case)
+        dbh2.execute("select * from inode where inode_id = %r", row['inode_id'])
+        row2 = dbh2.fetch()
+        result.row("Timestamp", row2['mtime'])
+
         for c in columns:
             if c=='Message':
                 ## Filter the message out here:
@@ -503,7 +509,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
         root = p.root
         self.fixup_page(root)
         page = root.innerHTML()
-        
+
         def frame_cb(query, result):
             def generator():
                 yield page

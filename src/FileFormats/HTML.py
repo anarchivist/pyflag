@@ -186,7 +186,7 @@ class SanitizingTag(Tag):
                             'align', 'bgcolor', 'rowspan', 
                             'colspan', 'valign','id', 'class','name', 
                             'compact', 'type', 'start', 'rel',
-                            'value', 'checked', 'rows','cols',
+                            'value', 'checked', 'rows','cols','media',
                             'framespacing','frameborder','contenteditable'
                             ]
 

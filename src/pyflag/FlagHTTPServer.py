@@ -436,7 +436,7 @@ class FlagHTTPServer( SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
 #    pass
 
 def Server(HandlerClass = FlagServerHandler,
-           ServerClass = FlagHTTPServer, protocol="HTTP/1.0"):
+           ServerClass = FlagHTTPServer, protocol="HTTP/1.1"):
     server_address = (config.HTTPSERVER_BINDIF,config.HTTPSERVER_PORT)
 
     HandlerClass.protocol_version = protocol

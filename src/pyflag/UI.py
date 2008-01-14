@@ -282,7 +282,7 @@ class GenericUI:
             
         ## Now calculate the order by:
         try:
-            query_str += "order by %s " % elements[order].select()
+            query_str += "order by %s " % elements[order].order_by()
             if direction=='1':
                 query_str += "asc"
             else: query_str+= "desc"
