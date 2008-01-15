@@ -196,7 +196,7 @@ class ColumnType:
         if self.escape:
             return '.'.join(["`%s`" % x for x in self.column.split('.')])
         else:
-            return self.column
+            return column_name
 
     def code_literal(self, column, operator, arg):
         ## Bit of a hack really:
@@ -288,7 +288,7 @@ class ColumnType:
         """ Returns the SQL required for selecting from the table. """
         return self.escape_column_name(self.column)
 
-    def orderby(self):
+    def order_by(self):
         """ This is called to get the order by clause """
         return self.escape_column_name(self.column)
 
@@ -435,8 +435,12 @@ class StringType(ColumnType):
         "!=":"literal",
         }
 
+    def __init__(self, **kwargs):
+        self.width = kwargs.get('width',255)
+        ColumnType.__init__(self, **kwargs)
+        
     def create(self):
-        return "`%s` VARCHAR(255) default NULL" % self.column
+        return "`%s` VARCHAR(%s) default NULL" % (self.column, self.width)
 
     def code_contains(self, column, operator, arg):
         def x(row):
@@ -696,6 +700,11 @@ class InodeType(StringType):
     def get_inode(self, inode):
         return inode
 
+class InodeIDType(IntegerType):
+    def __init__(self, name='Inode', column='inode.inode_id', link=None, case=None, callback=None):
+        self.case = case
+        ColumnType.__init__(self,name,column,link,callback=callback)
+
     def column_decorator(self, table, sql, query, result):
         case = query['case']
         report = Registry.REPORTS.dispatch(family = 'Disk Forensics',
@@ -717,9 +726,9 @@ class InodeType(StringType):
             
             next_row = dbh.fetch()
             fsfd = FileSystem.DBFS(self.case)
-            inode = self.get_inode(row[self.name])
+            inode_id = row[self.name]
 
-            query.set('inode', inode)
+            query.set('inode_id', inode_id)
             report.display(query, result)
 
             annotate = query.get('annotate','no')
@@ -734,6 +743,8 @@ class InodeType(StringType):
             query.clear('annotate')
 
             new_query = query.clone()
+            del new_query['inode']
+
             if limit==0:
                 result.toolbar(icon = 'stock_left_gray.png')
             else:
@@ -753,16 +764,11 @@ class InodeType(StringType):
 
         return self.name
 
-class InodeIDType(IntegerType):
-    def __init__(self, name='Inode', column='inode_id', link=None, case=None, callback=None):
-        self.case = case
-        ColumnType.__init__(self,name,column,link,callback=callback)
-
 clear_display_hook(InodeIDType)
 
 class FilenameType(StringType):
     hidden = True
-    def __init__(self, name='Filename', inode_id='inode_id',
+    def __init__(self, name='Filename', inode_id='file.inode_id',
                  basename=False, table=None,
                  link=None, link_pane=None, case=None):
         if not link:
@@ -783,7 +789,15 @@ class FilenameType(StringType):
 
     display_hooks = [render_links_display_hook, StringType.link_display_hook]
 
+    def order_by(self):
+        return "concat(file.path, file.name)"
+
     def select(self):
+        if self.table == 'file':
+            if self.basename:
+                return "link, name"
+            else: return "link, concat(path,name)"
+        
         if self.basename:
             return "(select link from file where inode_id=%s.inode_id limit 1) as link," % self.table + \
                    "(select name from file where inode_id=%s.inode_id limit 1)" % self.table
@@ -806,6 +820,9 @@ class FilenameType(StringType):
 
     def operator_literal(self, column, operator, pattern):
         return "`%s` in (select inode_id from file where concat(file.path, file.name) %s %r)" % (self.column, operator, pattern) 
+
+    def create(self):
+        return "path TEXT, name TEXT, link TEXT NULL"
 
 class InodeInfo(StringType):
     """ Displays inode information from inode_id """

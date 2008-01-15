@@ -517,8 +517,16 @@ class LiveMailViewer(FileSystem.StringIOFile):
             result.generator.content_type = 'text/html'
             result.generator.generator = generator()
 
-        result.iframe(callback = frame_cb)
+        def print_cb(query, result):
+            def generator():
+                yield page
+                #yield page.replace("</html","<script>window.print()</script></html")
 
+            result.generator.content_type = 'text/html'
+            result.generator.generator = generator()
+
+        result.iframe(callback = frame_cb)
+        result.toolbar(cb = print_cb, text="Print", icon="printer.png", pane='new')
 
 ## Unit tests:
 import pyflag.pyflagsh as pyflagsh

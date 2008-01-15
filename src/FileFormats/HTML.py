@@ -9,7 +9,7 @@ to keep going as much as possible.
 
 """
 
-import lexer
+import lexer, struct
 import sys,re,urllib,os
 import pyflag.DB as DB
 from FlagFramework import query_type, normpath, get_bt_string
@@ -28,10 +28,13 @@ def unquote(string):
     return string
 
 def decode_entity(string):
-    return re.sub("&#(\d\d)(\d\d)?;", lambda x: chr(int(x.group(1))), string)
+    def decoder(x):
+        return struct.pack("H",int(x.group(1))).decode("utf16").encode("utf8")
+        
+    return re.sub("&#(\d+);", decoder, string)
 
 def decode_unicode(string):
-    return re.sub(r"\\u(..)(..)", lambda x: (chr(int(x.group(1),16)) + chr(int(x.group(2),16))).decode("utf_16_be").encode('utf8'), string)
+    return re.sub(r"\\u(....)", lambda x: struct.pack("H",int(x.group(1),16)).decode("utf16").encode("utf8"), string)
 
 def decode(string):
     return decode_unicode(decode_entity(unquote(string)))
@@ -225,7 +228,7 @@ class SanitizingTag(Tag):
             if self.name == 'link':
                 attributes += " href=%s" % self.resolve_reference(self.attributes['href'], 'text/css')
             else:
-                attributes += ' href="javascript: alert(%r)"' % urllib.quote(self.attributes['href'][:100])
+                attributes += ' href="javascript: alert(%r)"' % (urllib.quote(self.attributes['href'][:100].replace("'","_")))
 
         ## CSS needs to be filtered extra well
         if self.name == 'style':
@@ -440,7 +443,7 @@ class HTMLParser(lexer.Lexer):
                 ## We go back in the stack until we find the matching
                 ## opening tag for this closing tag. This helps us fix
                 ## situations where tags are not properly balanced.
-                while 1:
+                while len(self.stack)>1:
                     old_tag = self.stack.pop(-1)
                     if old_tag.name == self.tag.name:
                         self.tag = self.stack[-1]

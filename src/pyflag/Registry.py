@@ -388,6 +388,7 @@ EVENT_HANDLERS = None
 IMAGES = None
 FILE_HANDLERS = None
 STATS_HANDLERS = None
+CASE_TABLES = None
 
 ## This is required for late initialisation to avoid dependency nightmare.
 def Init():
@@ -473,6 +474,10 @@ def Init():
     import pyflag.Stats as Stats
     global STATS_HANDLERS
     STATS_HANDLERS = ScannerRegistry(Stats.Handler)
+
+    ## Register Case Tables for dynamic schema
+    global CASE_TABLES
+    CASE_TABLES = ScannerRegistry(FlagFramework.CaseTable)
 
 def InitTests():
     return TestsRegistry(unittest.TestCase)

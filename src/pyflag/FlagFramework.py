@@ -936,6 +936,7 @@ def print_info():
                               ("File systems", "FILESYSTEMS"),
                               ("Image format handlers", "IMAGES"),
                               ("Column Types", "COLUMN_TYPES"),
+                              ("Case Tables", "CASE_TABLES"),
                               ):
         print "%s:\n%s\n" % (heading, '-' * len(heading))
         registry = getattr(Registry, registry)
@@ -943,3 +944,10 @@ def print_info():
             print "%s: %s" % (cls, cls.__doc__)
 
         print
+
+class CaseTable:
+    name = None
+    columns = []
+    index = []
+    primary = None
+    extras = []

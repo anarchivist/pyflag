@@ -33,15 +33,15 @@ import pyflag.IO as IO
 import pyflag.Registry as Registry
 from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, FilenameType, IntegerType, InodeType
 
-class TypeTables(FlagFramework.EventHandler):
-    def create(self, dbh, case):
-        dbh.execute(""" CREATE TABLE IF NOT EXISTS `type` (
-        `inode_id` int NOT NULL,
-        `mime` tinytext NOT NULL,
-        `type` tinytext NOT NULL )""")
+##class TypeTables(FlagFramework.EventHandler):
+##    def create(self, dbh, case):
+##        dbh.execute(""" CREATE TABLE IF NOT EXISTS `type` (
+##        `inode_id` int NOT NULL,
+##        `mime` tinytext NOT NULL,
+##        `type` tinytext NOT NULL )""")
         
-        ## Create indexes on this table immediately because we need to select
-        dbh.check_index('type','inode_id')
+##        ## Create indexes on this table immediately because we need to select
+##        dbh.check_index('type','inode_id')
         
 class TypeScan(Scanner.GenScanFactory):
     """ Detect File Type (magic). """
@@ -88,9 +88,15 @@ class TypeScan(Scanner.GenScanFactory):
 
 class ThumbnailType(InodeIDType):
     """ A Column showing thumbnails of inodes """
-    def __init__(self, name='Inode', column='inode_id', fsfd=None):
+    def __init__(self, name='Thumbnail', column='inode_id', fsfd=None, case=None, table=None):
+        if not fsfd:
+            fsfd = FileSystem.DBFS(case)
         InodeIDType.__init__(self,name=name,column=column, case=fsfd.case)
         self.fsfd = fsfd
+        self.table = table
+
+    def select(self):
+        return "%s.inode_id" % self.table
 
     def render_thumbnail_hook(self, inode_id, row, result):
         try:
@@ -230,7 +236,7 @@ import pyflag.tests
 
 class TypeTest(pyflag.tests.ScannerTest):
     """ Magic related Scanner """
-    test_case = "PyFlag Test Case"
+    test_case = "PyFlagTestCase"
     test_file = "pyflag_stdimage_0.4.dd"
     subsystem = 'Advanced'
     offset = "16128s"
@@ -253,4 +259,15 @@ def operator_has_magic(self, column, operator, magic):
     return "( %s in (select inode_id from type where type like '%%%s%%'))" % \
            (self.escape_column_name(self.column), magic)
 
-InodeType.operator_has_magic = operator_has_magic
+InodeIDType.operator_has_magic = operator_has_magic
+
+class TypeCaseTable(FlagFramework.CaseTable):
+    """ Type Table """
+    name = 'type'
+    columns = [ [ InodeIDType, dict(name = 'Inode', column='inode_id', case=None) ],
+                [ StringType, dict(name = 'Mime', column = 'mime')],
+                [ StringType, dict(name = 'Type', column = 'type')],
+                ]
+    index = [ 'type', ]
+    primary = 'inode_id'
+    extras = [ [ ThumbnailType, dict(case = None, table=None) ]]

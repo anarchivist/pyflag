@@ -178,7 +178,10 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
         
     def handle_request(self):
         headers = {}
-	accept_gzip_encoding = "gzip" in self.headers.get("Accept-Encoding","")
+	accept_gzip_encoding = self.server_version.endswith("1.1") and \
+                               "gzip" in self.headers.get("Accept-Encoding","")
+
+        accept_chunked_encoding = self.server_version.endswith("1.1")
 
         ## Calculate the query from the request.
         query=self.parse_query()
@@ -384,13 +387,21 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                 self.send_header(i[0],i[1])
 
             ## Implement chunked transfer:
-            self.send_header("Transfer-Encoding","chunked")
+            if accept_chunked_encoding:
+                self.send_header("Transfer-Encoding","chunked")
             if accept_gzip_encoding:
                    self.send_header("Content-Encoding","gzip")
                    buf = cStringIO.StringIO()
                    zfile = gzip.GzipFile(mode = "wb", fileobj = buf)
             self.end_headers()
 
+            if not accept_chunked_encoding:
+                for data in result.generator.generator:
+                    self.wfile.write(data)
+
+                self.wfile.close()
+                return
+            
             for data in result.generator.generator:
                 if accept_gzip_encoding:
                     zfile.write(data)
@@ -436,7 +447,7 @@ class FlagHTTPServer( SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
 #    pass
 
 def Server(HandlerClass = FlagServerHandler,
-           ServerClass = FlagHTTPServer, protocol="HTTP/1.1"):
+           ServerClass = FlagHTTPServer, protocol="HTTP/1.0"):
     server_address = (config.HTTPSERVER_BINDIF,config.HTTPSERVER_PORT)
 
     HandlerClass.protocol_version = protocol

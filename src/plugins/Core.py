@@ -44,6 +44,7 @@ import pyflag.pyflaglog as pyflaglog
 import os
 import pyflag.FlagFramework as FlagFramework
 import pyflag.Registry as Registry
+from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, FilenameType, IntegerType, InodeType
 
 config.add_option("SCHEMA_VERSION", default=3, absolute=True,
                   help="Current schema version")
@@ -226,6 +227,24 @@ class CaseDBInit(FlagFramework.EventHandler):
     order = 5
     
     def create(self,case_dbh,case):
+        ## Create all CaseTables:
+        for t in Registry.CASE_TABLES.classes:
+            tmp = []
+            for column_cls,args in t.columns:
+                c = column_cls(**args)
+                tmp.append(c.create())
+
+            columns = ',\n'.join(tmp)
+            if t.primary:
+                columns += ", primary key(`%s`)" % t.primary
+            
+            sql = "CREATE TABLE if not exists `%s` (%s)" % (t.name, columns)
+            case_dbh.execute(sql)
+
+            ## Check indexes:
+            for i in t.index:
+                case_dbh.check_index(t.name, i)
+
         case_dbh.execute("""Create table if not exists meta(
         `time` timestamp NOT NULL,
         property varchar(50),
@@ -289,16 +308,16 @@ class CaseDBInit(FlagFramework.EventHandler):
         primary key (inode_id)
         )""",",".join(scanners))
 
-        case_dbh.execute("""CREATE TABLE IF NOT EXISTS file (
-        `inode_id` INT NULL,
-        `inode` VARCHAR(250) NOT NULL,
-        `mode` VARCHAR(3) NOT NULL,
-        `status` VARCHAR(8) NOT NULL,
-        `path` TEXT,
-        `name` TEXT,
-        `link` TEXT NULL,
-        key `inode_id` (`inode_id`)
-        )""")
+##        case_dbh.execute("""CREATE TABLE IF NOT EXISTS file (
+##        `inode_id` INT NULL,
+##        `inode` VARCHAR(250) NOT NULL,
+##        `mode` VARCHAR(3) NOT NULL,
+##        `status` VARCHAR(8) NOT NULL,
+##        `path` TEXT,
+##        `name` TEXT,
+##        `link` TEXT NULL,
+##        key `inode_id` (`inode_id`)
+##        )""")
 
         case_dbh.execute("""CREATE TABLE IF NOT EXISTS block (
         `inode` VARCHAR(250) NOT NULL,
@@ -418,3 +437,15 @@ class CaseDBInit(FlagFramework.EventHandler):
         DB.DBO.DBH.expire(key_re)
         DB.DBIndex_Cache.expire(key_re)
         Scanner.factories.expire(key_re)
+
+
+class FileTable(FlagFramework.CaseTable):
+    """ File table """
+    name = 'file'
+    columns = [ [ InodeIDType, dict(name = 'Inode', column='inode_id', case=None) ],
+                [ StringType, dict(name = 'Inode_deprecated', column = 'inode')],
+                [ StringType, dict(name = 'Mode', column = 'mode', width=3)],
+                [ StringType, dict(name = 'Status', column = 'status', width=8)],
+                [ FilenameType, dict(case = None, table=None)],
+                ]
+    index = [ 'inode_id']

@@ -1277,8 +1277,8 @@ class HTMLUI(UI.GenericUI):
                     groupby = query['groupby'],
                     limit_context="limit%s" % query['groupby'],
                     case = case)
-            except Exception,e:
-                #pyflaglog.log(pyflaglog.ERROR,e)
+            except KeyError,e:
+                pyflaglog.log(pyflaglog.ERROR,e)
                 pass
             
             result.start_form(query)
