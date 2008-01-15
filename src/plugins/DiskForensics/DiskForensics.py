@@ -282,15 +282,16 @@ class Timeline(Reports.report):
         result.heading("File Timeline for Filesystem")
         result.table(
             elements=[ TimestampType('Timestamp','time'),
-                       InodeIDType('Inode', case=query['case']),
+                       InodeIDType('Inode', case=query['case'], table='mac'),
                        DeletedType('Del','status'),
                        BinaryType('m',"m"),
                        BinaryType('a',"a"),
                        BinaryType('c',"c"),
                        BinaryType('d',"d"),
-                       StringType('Filename','name'),
+                       FilenameType(),
                        ],
-            table='mac',
+            table='mac, file',
+            where = "file.inode_id = mac.inode_id",
             case=query['case'],
             )
 

@@ -121,6 +121,7 @@ class ColumnType:
     ## when importing a log file.
     hidden = False
     ignore = False
+    table = None
     
     def __init__(self, name=None,
                  column=None, link='',
@@ -194,7 +195,7 @@ class ColumnType:
 
     def escape_column_name(self, column_name):
         if self.escape:
-            return '.'.join(["`%s`" % x for x in self.column.split('.')])
+            return '.'.join(["`%s`" % x for x in column_name.split('.')])
         else:
             return column_name
 
@@ -286,6 +287,11 @@ class ColumnType:
 
     def select(self):
         """ Returns the SQL required for selecting from the table. """
+        print self.table, self.__class__.__name__
+        if self.table and '.' not in self.column:
+            print self.escape_column_name("%s.%s" % (self.table, self.column))
+            return self.escape_column_name("%s.%s" % (self.table, self.column))
+        
         return self.escape_column_name(self.column)
 
     def order_by(self):
@@ -435,9 +441,9 @@ class StringType(ColumnType):
         "!=":"literal",
         }
 
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         self.width = kwargs.get('width',255)
-        ColumnType.__init__(self, **kwargs)
+        ColumnType.__init__(self, *args, **kwargs)
         
     def create(self):
         return "`%s` VARCHAR(%s) default NULL" % (self.column, self.width)
@@ -701,9 +707,11 @@ class InodeType(StringType):
         return inode
 
 class InodeIDType(IntegerType):
-    def __init__(self, name='Inode', column='inode.inode_id', link=None, case=None, callback=None):
+    def __init__(self, name='Inode', column='inode_id', link=None, case=None,
+                 callback=None, table='inode'):
         self.case = case
         ColumnType.__init__(self,name,column,link,callback=callback)
+        self.table = table
 
     def column_decorator(self, table, sql, query, result):
         case = query['case']
@@ -768,8 +776,8 @@ clear_display_hook(InodeIDType)
 
 class FilenameType(StringType):
     hidden = True
-    def __init__(self, name='Filename', inode_id='file.inode_id',
-                 basename=False, table=None,
+    def __init__(self, name='Filename', inode_id='inode_id',
+                 basename=False, table='file',
                  link=None, link_pane=None, case=None):
         if not link:
             link = query_type(case=case,
@@ -795,8 +803,8 @@ class FilenameType(StringType):
     def select(self):
         if self.table == 'file':
             if self.basename:
-                return "link, name"
-            else: return "link, concat(path,name)"
+                return "link, file.name"
+            else: return "link, concat(file.path,file.name)"
         
         if self.basename:
             return "(select link from file where inode_id=%s.inode_id limit 1) as link," % self.table + \
@@ -848,7 +856,7 @@ class DeletedType(StateType):
     """
     hidden = True
     states = {'deleted':'deleted', 'allocated':'alloc'}
-              
+    table = 'file'
     def display(self,value, row, result):
         """ Callback for rendering deleted items """
         tmp=result.__class__(result)
