@@ -827,7 +827,7 @@ clear_display_hook(InodeIDType)
 
 class FilenameType(StringType):
     hidden = True
-    def __init__(self, name='Filename', inode_id='inode_id',
+    def __init__(self, name='Filename', inode_id='file.inode_id',
                  basename=False, table='file',
                  link=None, link_pane=None, case=None):
         if not link:
@@ -869,9 +869,7 @@ class FilenameType(StringType):
             pass
 
     def operator_literal(self, column, operator, pattern):
-        column = self.escape_column_name(self.column)
-        print column
-        return "%s in (select inode_id from file where concat(file.path, file.name) %s %r)" % (column, operator, pattern) 
+        return "`%s` in (select inode_id from file where concat(file.path, file.name) %s %r)" % (self.column, operator, pattern) 
 
     def create(self):
         return "path TEXT, name TEXT, link TEXT NULL"
