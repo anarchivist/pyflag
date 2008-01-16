@@ -229,21 +229,7 @@ class CaseDBInit(FlagFramework.EventHandler):
     def create(self,case_dbh,case):
         ## Create all CaseTables:
         for t in Registry.CASE_TABLES.classes:
-            tmp = []
-            for column_cls,args in t.columns:
-                c = column_cls(**args)
-                tmp.append(c.create())
-
-            columns = ',\n'.join(tmp)
-            if t.primary:
-                columns += ", primary key(`%s`)" % t.primary
-            
-            sql = "CREATE TABLE if not exists `%s` (%s)" % (t.name, columns)
-            case_dbh.execute(sql)
-
-            ## Check indexes:
-            for i in t.index:
-                case_dbh.check_index(t.name, i)
+            t().create(case_dbh)
 
         case_dbh.execute("""Create table if not exists meta(
         `time` timestamp NOT NULL,

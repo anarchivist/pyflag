@@ -286,7 +286,8 @@ class GenericUI:
             if direction=='1':
                 query_str += "asc"
             else: query_str+= "desc"
-        except:
+        except Exception,e:
+            print e
             pass
         
 

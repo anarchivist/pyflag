@@ -88,7 +88,7 @@ class IndexScan(GenScanFactory):
         default = True
 
     def check_version(self):
-        pdbh = DB.DBO()
+        pydbh = DB.DBO()
         pydbh.execute("select max(id) as version from dictionary")
         row = pydbh.fetch()
         return row['version']

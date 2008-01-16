@@ -256,7 +256,7 @@ def operator_annotated(self, column, operator, pattern):
 #add_display_hook(InodeType, "render_annotate_inode", render_annotate_inode)
 
 add_display_hook(InodeIDType, "render_annotate_inode_id", render_annotate_inode_id)
-
+InodeIDType.operator_annotated = operator_annotated
 
 class InterestingIPObj(TableObj.TableObj):
     table = "interesting_ips"

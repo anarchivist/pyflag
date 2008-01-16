@@ -11,15 +11,13 @@ class GenericReport(Reports.report):
     def form(self, query, result):
         result.heading("Select columns to display")
         for t in Registry.CASE_TABLES.classes:
-            result.start_table()
-            result.para("Table %s" % t.__doc__)
+            result.row("Table %s" % t.__doc__)
             columns = t.columns + t.extras
             
             for i in range(len(columns)):
                 columns_cls, args = columns[i]
                 c = columns_cls(**args)
                 result.checkbox(c.name,'columns', '%s:%s' % (t.name, i))
-            result.end_table()
             
     def interpolate_query(self, table, args, query):
         for k,v in args.items():

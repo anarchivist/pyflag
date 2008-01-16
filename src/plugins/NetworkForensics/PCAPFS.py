@@ -249,7 +249,7 @@ class PCAPFS(DBFS):
                         ## Create a new VFS node:
                         new_inode = "I%s|S%s" % (iosource_name, connection['con_id'])
 
-                        self.VFSCreate(
+                        inode_id = self.VFSCreate(
                             None,
                             new_inode,
                             connection['path'] % "forward",

@@ -194,18 +194,23 @@ class ColumnType:
         return method(column, operator, arg)
 
     def escape_column_name(self, column_name):
-        if self.escape:
+        if self.escape or '.' in column_name:
             return '.'.join(["`%s`" % x for x in column_name.split('.')])
         else:
-            return column_name
+            if self.table:
+                return "`%s`.`%s`" % (self.table, column_name)
+            return "`%s`" % column_name
 
     def code_literal(self, column, operator, arg):
         ## Bit of a hack really:
         return lambda row: eval("%r %s %r" % (row[self.column], operator, arg.__str__()), {})
 
     def operator_literal(self, column,operator, arg):
-        return "%s %s %r" % (self.escape_column_name(self.column),
-                             operator, arg)
+        if self.table:
+            column = self.escape_column_name("%s.%s" % (self.table, self.column))
+        else:
+            column = self.escape_column_name(self.column)
+        return "%s %s %r" % (column, operator, arg)
 
     def code_equal(self, column, operator, arg):
         ## Make sure our arg is actually an integer:
@@ -287,15 +292,15 @@ class ColumnType:
 
     def select(self):
         """ Returns the SQL required for selecting from the table. """
-        print self.table, self.__class__.__name__
         if self.table and '.' not in self.column:
-            print self.escape_column_name("%s.%s" % (self.table, self.column))
             return self.escape_column_name("%s.%s" % (self.table, self.column))
         
         return self.escape_column_name(self.column)
 
     def order_by(self):
         """ This is called to get the order by clause """
+        if self.table:
+            return self.escape_column_name("%s.%s" % (self.table, self.column))
         return self.escape_column_name(self.column)
 
     def column_decorator(self, table, sql, query, result):
@@ -701,7 +706,7 @@ class InodeType(StringType):
     def __init__(self, name='Inode', column='inode', link=None, case=None, callback=None):
         #raise RuntimeError("InodeType is depracated - you must use InodeIDType now")
         self.case = case
-        ColumnType.__init__(self,name,column,link,callback=callback)
+        StringType.__init__(self,name,column,link,callback=callback)
 
     def get_inode(self, inode):
         return inode
@@ -713,6 +718,10 @@ class InodeIDType(IntegerType):
         ColumnType.__init__(self,name,column,link,callback=callback)
         self.table = table
 
+    def operator_contains(self, column, operator, pattern):
+        column = self.escape_column_name(self.column)
+        return "(%s in (select inode_id from inode where inode like '%%%s%%'))" % (column, pattern)
+    
     def column_decorator(self, table, sql, query, result):
         case = query['case']
         report = Registry.REPORTS.dispatch(family = 'Disk Forensics',
@@ -910,7 +919,7 @@ class ColumnTypeTests(unittest.TestCase):
                           DeletedType('DeletedType', column='deleted'),
                           TimestampType('TimestampType','timestamp'),
                           IPType('IPType','source_ip'),
-                          InodeType('InodeType','inode'),
+                          InodeIDType('InodeIDType','inode'),
                           FilenameType('FilenameType'),
                           ]
         self.tablename = 'dummy'
@@ -946,16 +955,12 @@ class ColumnTypeTests(unittest.TestCase):
         self.assertEqual(self.generate_sql("'IPType' netmask 10.10.10.1/24"),
                          "(1) and ( ( `source_ip` >= 168430081 and `source_ip` <= 168430335 ) )")
         
-        self.assertEqual(self.generate_sql("'InodeType' annotated FooBar"),
+        self.assertEqual(self.generate_sql("'InodeIDType' annotated FooBar"),
                          '(1) and (`inode`=(select annotate.inode from annotate where note like "%FooBar%"))')
 
         ## Joined filters:
-        self.assertEqual(self.generate_sql("InodeType contains 'Z|' and TimestampType after 2005-10-10"),
-                         "(1) and (`inode` like '%Z|%' and `timestamp` > '2005-10-10 00:00:00')")
-        self.assertEqual(self.generate_sql("InodeType contains 'Z|' or TimestampType after 2005-10-10 and IntegerType > 5"),
-                         "(1) and (`inode` like '%Z|%' or `timestamp` > '2005-10-10 00:00:00' and `table`.`integer_type` > '5')")
-        self.assertEqual(self.generate_sql("(InodeType contains 'Z|' or TimestampType after 2005-10-10) and IntegerType > 5"),
-                         "(1) and (( `inode` like '%Z|%' or `timestamp` > '2005-10-10 00:00:00' ) and `table`.`integer_type` > '5')")
+        self.assertEqual(self.generate_sql("InodeIDType contains 'Z|' and TimestampType after 2005-10-10"),
+                         "(1) and ((inode_id in (select inode_id from inode where inode like '%Z|%')) and `timestamp` > '2005-10-10 00:00:00')")
 
     def test10CreateTable(self):
         """ Test table creation """

@@ -477,11 +477,11 @@ class ZipScanTest(pyflag.tests.ScannerTest):
         pyflagsh.shell_execv(env=env, command="scan",
                              argv=["*",'ZipScan','GZScan','TarScan','TypeScan'])
 
-        dbh.execute("select count(*) as count from inode where inode like '%|Z%'")
+        dbh.execute("select count(*) as count from inode where inode like '%%|Z%%'")
         count = dbh.fetch()['count']
         self.failIf(count==0, "Could not find any zip files?")
         
-        dbh.execute("select count(*) as count from inode where inode like '%|G0'")
+        dbh.execute("select count(*) as count from inode where inode like '%%|G0'")
         count = dbh.fetch()['count']
         self.failIf(count==0, "Could not find any gzip files?")
 

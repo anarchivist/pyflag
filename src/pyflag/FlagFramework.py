@@ -947,7 +947,34 @@ def print_info():
 
 class CaseTable:
     name = None
+    ## This is an array of: ColumnType Class or instance, argv dict,
+    ## Hidden If ColumnType is a class, argv will be used to
+    ## instantiate it, otherwise argv are ignored.  If column is
+    ## hidden it can not be selected for table construction.
     columns = []
     index = []
     primary = None
+
+    ## These are extra entries in the style of self.columns which will
+    ## be available for table construction, but will not be used in
+    ## creating the table. This is useful when you want to make the
+    ## same column available via a number of different ColumnTypes.
     extras = []
+
+    def create(self, dbh):
+        """ Returns an SQL CREATE statement from our schema description """
+        tmp = []
+        for column_cls,args in self.columns:
+            c = column_cls(**args)
+            tmp.append(c.create())
+
+        columns = ',\n'.join(tmp)
+        if self.primary:
+            columns += ", primary key(`%s`)" % self.primary
+
+        sql = "CREATE TABLE `%s` (%s)" % (self.name, columns)
+        dbh.execute(sql)
+
+        ## Check indexes:
+        for i in self.index:
+            dbh.check_index(self.name, i)

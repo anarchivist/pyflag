@@ -54,6 +54,9 @@ config.add_option('list', short_option='L', default=None,
 config.add_option('pause', short_option='p', default=False, action='store_true',
                   help='Pause after each test')
 
+config.add_option('log', default=None,
+                  help="Log file for resuming tests")
+
 Registry.Init()
 config.parse_options()
 
@@ -72,6 +75,11 @@ elif config.file:
 else:
     classes = test_registry.classes
 
+if config.log:
+    try:
+        done = [ x.strip() for x in open(config.log).readlines() ]
+    except IOError:
+        done = []
 
 ## Only do those tests who are below the current level:
 tmp = []
@@ -97,6 +105,9 @@ import gc
 #gc.set_debug(gc.DEBUG_UNCOLLECTABLE | gc.DEBUG_INSTANCES | gc.DEBUG_SAVEALL | gc.DEBUG_LEAK)
 
 for test_class in classes:
+    if config.log and test_class.__name__ in done:
+        continue
+
     try:
         doc = test_class.__doc__
     except: pass
@@ -117,3 +128,7 @@ for test_class in classes:
 
     if config.pause:
         raw_input("Pause")
+    if config.log:
+        fd = open(config.log,'a')
+        fd.write(test_class.__name__+"\n")
+        fd.close()
