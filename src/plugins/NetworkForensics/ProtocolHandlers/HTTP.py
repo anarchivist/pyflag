@@ -47,7 +47,7 @@ class HTTP:
     def __init__(self,fd,ddfs):
         self.fd=fd
         self.ddfs = ddfs
-        self.request = { 'url':'/unknown_request_%s' % fd.con_id }
+        self.request = { 'url':'/unknown_request_%s' % fd.inode_id }
         self.response = {}
         self.request_re = re.compile("(GET|POST|PUT|OPTIONS|PROPFIND) +([^ ]+) +HTTP/1\..",
                                      re.IGNORECASE)
@@ -186,6 +186,24 @@ class HTTP:
             
         return False
 
+class HTTPCaseTable(FlagFramework.CaseTable):
+    """ HTTP Table - Stores all HTTP transactions """
+    name = 'http'
+    columns = [
+        [ InodeIDType, {} ],
+        [ IntegerType, dict(name = 'Parent', column = 'parent') ],
+        [ IntegerType, dict(name = 'Request Packet', column='request_packet') ],
+        [ StringType, dict(name='Method', column='method', width=10)],
+        [ StringType, dict(name='URL', column='url', width=500)],
+        [ IntegerType, dict(name = "Response Packet", column='response_packet')],
+        [ StringType, dict(name='Content Type', column='content_type')],
+        [ StringType, dict(name='Referrer', column='referrer', width=500)],
+        [ TimestampType, dict(name='Date', column='date')],
+        [ StringType, dict(name='Host', column='host')],
+        [ StringType, dict(name='User Agent', column='useragent')],
+        ]
+    index = ['url','inode_id']
+
 class HTTPTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
         ## This is the information we store about each http request:
@@ -196,20 +214,20 @@ class HTTPTables(FlagFramework.EventHandler):
         ## response_packet - the packet where the response was seen
         ## content_type - The content type
         
-        dbh.execute(
-            """CREATE TABLE if not exists `http` (
-            `inode_id` INT(11) not null,
-            `parent` INT(11) default 0 not null,
-            `request_packet` int null,
-            `method` VARCHAR( 10 ) NULL ,
-            `url` text NULL,
-            `response_packet` int null,
-            `content_type` VARCHAR( 255 ) NULL,
-            `referrer` text NULL,
-            `date` timestamp NULL,
-            `host` VARCHAR(255),
-            `useragent` VARCHAR(255)
-            )""")
+##        dbh.execute(
+##            """CREATE TABLE if not exists `http` (
+##            `inode_id` INT(11) not null,
+##            `parent` INT(11) default 0 not null,
+##            `request_packet` int null,
+##            `method` VARCHAR( 10 ) NULL ,
+##            `url` text NULL,
+##            `response_packet` int null,
+##            `content_type` VARCHAR( 255 ) NULL,
+##            `referrer` text NULL,
+##            `date` timestamp NULL,
+##            `host` VARCHAR(255),
+##            `useragent` VARCHAR(255)
+##            )""")
 
         dbh.execute(
             """CREATE TABLE if not exists `http_parameters` (
@@ -298,9 +316,9 @@ class HTTPScanner(StreamScannerFactory):
         situation might arise if HTTP proxies are used for example.
         """
         ## We only want to process the combined stream once:
-        if stream.con_id>stream.reverse: return
+        if stream.inode_id > stream.reverse: return
 
-        combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.con_id, stream.reverse)
+        combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.inode_id, stream.reverse)
         try:
             fd = self.fsfd.open(inode=combined_inode)
         ## If we cant open the combined stream, we quit (This could
@@ -320,8 +338,6 @@ class HTTPScanner(StreamScannerFactory):
             offset, size = f
 
             ## Create the VFS node:
-            ##path=self.fsfd.lookup(inode="I%s|S%s" % (stream.fd.name, stream.con_id))
-            ##path=os.path.dirname(path)
             new_inode="%s|o%s:%s" % (combined_inode,offset,size)
 
             try:
@@ -414,7 +430,18 @@ class HTTPScanner(StreamScannerFactory):
                        host           = host,
                        useragent      = p.request.get('user-agent', '-'),
                        parent         = parent)                            
-            
+
+            ## Replicate the information about the subobjects in the
+            ## connection_details table - this makes it easier to do
+            ## some queries:
+            dbh.insert("connection_details",
+                       ts_sec = stream.ts_sec,
+                       inode_id = inode_id,
+                       src_ip = stream.src_ip,
+                       src_port = stream.src_port,
+                       dest_ip = stream.dest_ip,
+                       dest_port = stream.dest_port,
+                       )
             ## handle the request's parameters:
             try:
                 self.handle_parameters(p.request, inode_id)
@@ -481,13 +508,14 @@ class BrowseHTTPRequests(Reports.report):
 
         def tabular_view(query,result):
             result.table(
-                elements = [ TimestampType('Date','ts_sec'),
-                             PacketType('Request Packet','request_packet', case=query['case']),
-                             InodeIDType('Inode', 'http.inode_id', case=query['case']),
+                elements = [ TimestampType(name='Date',column='date'),
+                             PacketType(name='Request Packet',column='request_packet',
+                                        case=query['case']),
+                             InodeIDType(case=query['case']),
                              StringType('Method','method'),
                              StringType('URL','url'),
                              StringType('Content Type','content_type') ],
-                table=" http join pcap on request_packet=pcap.id ",
+                table="http",
                 case=query['case']
                 )
 

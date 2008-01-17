@@ -82,7 +82,7 @@ Will perform according to mode the following functions:
 -m dll:      Search all dlls under path for message resources and insert into the pyflag DB.
 -m reg:     Extrach service name to dll mappings from registry files.
 -m event:  Print all event logs in an evt file based on values in the pyflag DB.""",
-                 version="Version: %prog PyFlag "+config.VERSION)
+                 version="Version: %%prog PyFlag %s" % config.VERSION)
 
 config.optparser.add_option("-m", "--mode", default='dll', choices=['dll', 'event', 'reg'], type='choice',
                             help="Set mode for operation (see above)")

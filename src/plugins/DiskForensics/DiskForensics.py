@@ -106,17 +106,16 @@ class BrowseFS(Reports.report):
 
         def tabular_view(query,result):
             result.table(
-                elements = [ InodeIDType('Inode','file.inode_id',case=query['case']),
-                             StringType('Mode','file.mode'),
-                             FilenameType(case=query['case'], table='inode'),
-                             DeletedType('Del','file.status'),
-                             IntegerType('File Size','size'),
-                             TimestampType('Last Modified','mtime'),
-                             TimestampType('Last Accessed','atime'),
-                             TimestampType('Created','ctime'),
+                elements = [ InodeIDType(case=query['case']),
+                             StringType(name='Mode',column = 'mode', table='file'),
+                             FilenameType(case=query['case']),
+                             DeletedType(),
+                             IntegerType(name='File Size',column='size'),
+                             TimestampType(name='Last Modified',column='mtime'),
+                             TimestampType(name='Last Accessed',column='atime'),
+                             TimestampType(name='Created',column='ctime'),
                              ],
-                table='file, inode',
-                where="file.inode_id=inode.inode_id",
+                table='inode',
                 case=query['case'],
                 )
 
@@ -151,14 +150,14 @@ class BrowseFS(Reports.report):
                     path=os.path.dirname(path)
 
                 tmp.table(
-                    elements = [ InodeIDType('Inode','file.inode_id',case=query['case']),
-                                 FilenameType(basename=True, table='inode'),
-                                 DeletedType('Del','file.status'),
+                    elements = [ InodeIDType(case=query['case']),
+                                 FilenameType(basename=True),
+                                 DeletedType(),
                                  IntegerType('File Size','size'),
                                  TimestampType('Last Modified','mtime'),
-                                 StringType('Mode','file.mode') ],
-                    table='file, inode',
-                    where="file.inode_id=inode.inode_id and path=%r and file.mode!='d/d'" % (path+'/'),
+                                 StringType('Mode','mode', table='file') ],
+                    table='inode',
+                    where="file.path=%r and file.mode!='d/d'" % (path+'/'),
                     case=query['case'],
                     pagesize=10,
                     )
@@ -282,16 +281,15 @@ class Timeline(Reports.report):
         result.heading("File Timeline for Filesystem")
         result.table(
             elements=[ TimestampType('Timestamp','time'),
-                       InodeIDType('Inode', case=query['case'], table='mac'),
-                       DeletedType('Del','status'),
+                       InodeIDType(case=query['case']),
+                       DeletedType(),
                        BinaryType('m',"m"),
                        BinaryType('a',"a"),
                        BinaryType('c',"c"),
                        BinaryType('d',"d"),
                        FilenameType(),
                        ],
-            table='mac, file',
-            where = "file.inode_id = mac.inode_id",
+            table='mac',
             case=query['case'],
             )
 

@@ -505,7 +505,7 @@ class FTPTables(FlagFramework.EventHandler):
         # connection
         dbh.execute(
             """CREATE TABLE if not exists `ftp_sessions` (
-            `id` INT(16) not null auto_increment,
+            `inode_id` INT(16) not null ,
             `client_ip` int(11) unsigned not null,
             `server_ip` int(11) unsigned not null,
             `username` varchar(128) not null,
@@ -514,28 +514,26 @@ class FTPTables(FlagFramework.EventHandler):
             `welcome_banner` text,
             `total_bytes` int(32),
             `start_time` timestamp,
-            `inode` varchar(255),
-            primary key (`id`)
+            `inode` varchar(255)
             )""")
 
         # ftp_commands will list each ftp command
         dbh.execute(
             """CREATE TABLE if not exists `ftp_commands` (
-            `id` INT(16) not null auto_increment,
+            `inode_id` INT(16) not null ,
             `ftp_session_id` INT(16) not null, 
             `command_type` varchar(128),
             `command` varchar(128),
             `data` text,
             `timestamp` timestamp,
-            `data_stream` varchar(255),
-            primary key (`id`)
+            `data_stream` varchar(255)
             )""")
         
         # ftp_data_streams will list each ftp data stream (directory 
         # listings and also file transfers etc)
         dbh.execute(
             """CREATE TABLE if not exists `ftp_data_streams` (
-            `id` INT(16) not null auto_increment,
+            `inode_id` INT(16) not null ,
             `ftp_session_id` int(16) not null,
             `source` INT(11) unsigned not null,
             `source_port` INT(16) not null,
@@ -543,8 +541,7 @@ class FTPTables(FlagFramework.EventHandler):
             `destination_port` int(16) not null,
             `purpose` varchar(255) not null,
             `inode` varchar(255) not null,
-            `time_created` timestamp not null,
-            primary key (`id`)
+            `time_created` timestamp not null
             )""")
 
         
@@ -558,11 +555,10 @@ class BrowseFTPRequests(Reports.report):
         def sessions(query, result):
             result.table(
                 elements = [ IntegerType("FTP Session id", "id"),
-                             InodeType("Forward Stream", "inode", 
-                                        case=query['case']),
+                             InodeIDType(case=query['case']),
                              TimestampType("Start Time", "start_time"), 
-                             IPType("Client IP", "client_ip"),
-                             IPType("Server IP", "server_ip"),
+                             IPType("Client IP", "client_ip", case=query['case']),
+                             IPType("Server IP", "server_ip", case=query['case']),
                              StringType("Username", "username"),
                              StringType("Password", "password"),
                              StringType("Server Banner", "server_banner"),

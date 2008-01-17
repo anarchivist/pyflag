@@ -58,7 +58,13 @@ config.add_option("INDEX_ENCODINGS", default="['UTF-8','UTF-16LE']",
                   help="A list of unicode encodings to mutate the "
                   "dictionary through for indexing")
 
-class IndexTables(FlagFramework.EventHandler):
+##class IndexTable(FlagFramework.CaseTable):
+##    name = 'LogicalIndexOffsets'
+##    columns = [ [ InodeIDType, dict(case = None) ],
+##                [ IntegerType, dict(name='Word ID',column='word_id'), True ],
+##                ]
+
+class IndexStatsTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
         dbh.execute("""create table if not exists `LogicalIndexOffsets` (
         `inode_id` INT NOT NULL,

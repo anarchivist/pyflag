@@ -90,6 +90,7 @@ class ScannerTest(unittest.TestCase):
         pyflagsh.shell_execv(command="execute",
                              argv=["Case Management.Create new case",'create_case=%s' % self.test_case])
 
+        if not self.test_file: return
         pyflagsh.shell_execv(command="execute",
                              argv=["Load Data.Load IO Data Source",'case=%s' % self.test_case,
                                    "iosource=test",

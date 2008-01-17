@@ -155,85 +155,82 @@ class BrowseRegistry(DiskForensics.BrowseFS):
         dbh = self.DBO(query['case'])
         new_q=query.clone()
                             
-        try:
-            def table_notebook_cb(query,result):
-                del new_q['mode']
-                del new_q['mark']
-                new_q['__target__']='open_tree'
-                new_q['mode'] = 'Tree View'
-                
-                result.table(
-                    elements = [ StringType('Path','path',
-                                    link = new_q),
+        def table_notebook_cb(query,result):
+            del new_q['mode']
+            del new_q['mark']
+            new_q['__target__']='open_tree'
+            new_q['mode'] = 'Tree View'
+
+            result.table(
+                elements = [ StringType('Path','path',
+                                link = new_q),
+                             StringType('Type','type'),
+                             StringType('Key','reg_key'),
+                             TimestampType('Modified','modified'),
+                             StringType('Value','value') ],
+                table='reg',
+                case=query['case'],
+                )
+
+        def tree_notebook_cb(query,result):
+
+            #Make a tree call back:
+            def treecb(path):
+                """ This call back will render the branch within
+                the registry file."""
+                dbh = DB.DBO(query['case'])
+
+                path = FlagFramework.normpath(path+"/")
+
+                ##Show the directory entries:
+                dbh.execute("select basename from regi where dirname=%r",(path))
+                for row in dbh:
+                    yield(([row['basename'],row['basename'],'branch']))
+
+            def pane_cb(path,table):
+                tmp=result.__class__(result)
+                path = path+'/'
+                dbh.execute("select modified as time from reg where path=%r limit 1",(path))
+                row=dbh.fetch()
+
+                try:
+                    tmp.text("Last modified %s " % row['time'],style='red')
+                    table.row(tmp)
+                except TypeError:
+                    pass
+
+                def callback(value):
+                    if len(value)>50:
+                        value = value[:50] + " ..."
+
+                    return value
+
+                # now display keys in table
+                new_q['mode'] = 'display'
+                new_q['path']=path
+                table.table(
+                    elements = [ StringType('Key','reg_key',
+                                   link = query_type(family=query['family'],
+                                                     report='BrowseRegistryKey',
+                                                     path=path,
+                                                     __target__='key',
+                                                     case=query['case'])),
+
                                  StringType('Type','type'),
-                                 StringType('Key','reg_key'),
-                                 TimestampType('Modified','modified'),
-                                 StringType('Value','value') ],
+                                 StringType('Value','value', callback = callback) ],
                     table='reg',
+                    where="path=%r" % path,
                     case=query['case'],
                     )
 
-            def tree_notebook_cb(query,result):
-                
-                #Make a tree call back:
-                def treecb(path):
-                    """ This call back will render the branch within
-                    the registry file."""
-                    dbh = DB.DBO(query['case'])
+            # display paths in tree
+            result.tree(tree_cb=treecb,pane_cb=pane_cb,branch=[''])
 
-                    path = FlagFramework.normpath(path+"/")
-
-                    ##Show the directory entries:
-                    dbh.execute("select basename from regi where dirname=%r",(path))
-                    for row in dbh:
-                        yield(([row['basename'],row['basename'],'branch']))
-    
-                def pane_cb(path,table):
-                    tmp=result.__class__(result)
-                    path = path+'/'
-                    dbh.execute("select modified as time from reg where path=%r limit 1",(path))
-                    row=dbh.fetch()
-
-                    try:
-                        tmp.text("Last modified %s " % row['time'],style='red')
-                        table.row(tmp)
-                    except TypeError:
-                        pass
-                    
-                    # now display keys in table
-                    new_q['mode'] = 'display'
-                    new_q['path']=path
-                    table.table(
-                        elements = [ StringType('Key','reg_key',
-                                       link = query_type(family=query['family'],
-                                                         report='BrowseRegistryKey',
-                                                         path=path,
-                                                         __target__='key',
-                                                         case=query['case'])),
-                                     
-                                     StringType('Type','type'),
-                                     ## FIXME - Does this need to be a standard type?
-                                     StringType('Value',"if(length(value)<50,value,concat(left(value,50),' .... '))",escape=False) ],
-                        names=('Key','Type','Value'),
-                        table='reg',
-                        where="path=%r" % path,
-                        case=query['case'],
-                        )
-
-                # display paths in tree
-                result.tree(tree_cb=treecb,pane_cb=pane_cb,branch=[''])
-
-            result.notebook(
-                names=['Tree View','Table View'],
-                callbacks=[tree_notebook_cb,table_notebook_cb],
-                context='mode',
-                )
-            
-        except DB.DBError,e:
-            result.heading("Error occured")
-            result.text('It appears that no registry tables are available. Did you remember to run the RegistryScan scanner?')
-            result.para('The Error returned by the database is:')
-            result.text(e,style='red')
+        result.notebook(
+            names=['Tree View','Table View'],
+            callbacks=[tree_notebook_cb,table_notebook_cb],
+            context='mode',
+            )
             
     def reset(self,query):
         dbh = self.DBO(query['case'])
@@ -301,23 +298,16 @@ class InterestingRegKey(Reports.report):
         result.heading("Interesting Registry Keys")
         dbh=self.DBO(query['case'])
 
-        try:
-            result.table(
-                elements = [ StringType('Path','path'),
-                             StringType('Key','reg_key'),
-                             StringType('Value','value'),
-                             TimestampType('Last Modified','modified'),
-                             StringType('Category','category'),
-                             StringType('Description','description') ],
-                table='interestingregkeys ',
-                case=query['case'],
-                #FIXME make a link to view the rest of the reg info
-                #links=[ FlagFramework.query_type((),case=query['case'],family=query['family'],fsimage=query['fsimage'],report='BrowseRegistryKey')]
-                )
-        except DB.DBError,e:
-            result.para("Error reading the registry keys table. Did you remember to run the registry scanner?")
-            result.para("Error reported was:")
-            result.text(e,style="red")
+        result.table(
+            elements = [ StringType('Path','path'),
+                         StringType('Key','reg_key'),
+                         StringType('Value','value'),
+                         TimestampType('Last Modified','modified'),
+                         StringType('Category','category'),
+                         StringType('Description','description') ],
+            table='interestingregkeys ',
+            case=query['case'],
+            )
 
 class InterestingRegKeyInit(FlagFramework.EventHandler):
     def init_default_db(self, dbh,case):
@@ -330,6 +320,7 @@ class InterestingRegKeyInit(FlagFramework.EventHandler):
         PRIMARY KEY  (`id`)
         )""")
 
+        ## FIXME: This should really be in an external file
         keys = [
             ( 'Software/Microsoft/CurrentVersion/Applets/Paint', 'Recent File List', 'User Activity', 'Maintains a list of image files accessed with Paint'),
             ( 'Software/Microsoft/CurrentVersion/Applets', 'RegEdit', 'User Activity', 'The LastKey value maintains the last key accessed using RegEdit'),

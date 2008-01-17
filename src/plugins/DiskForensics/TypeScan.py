@@ -88,13 +88,11 @@ class TypeScan(Scanner.GenScanFactory):
 
 class ThumbnailType(InodeIDType):
     """ A Column showing thumbnails of inodes """
-    def __init__(self, name='Thumbnail', column='inode_id', fsfd=None, case=None, table=None):
-        if not fsfd:
-            fsfd = FileSystem.DBFS(case)
-        InodeIDType.__init__(self,name=name,column=column, case=fsfd.case)
-        self.fsfd = fsfd
-        self.table = table
-
+    def __init__(self, name='Thumbnail', **args ):
+        InodeIDType.__init__(self, **args)
+        self.fsfd = FileSystem.DBFS(self.case)
+        self.name = name
+        
     def select(self):
         return "%s.inode_id" % self.table
 
@@ -128,16 +126,15 @@ class ViewFileTypes(Reports.report):
         result.case_selector()
         
     def display(self,query,result):
-        fsfd = FileSystem.DBFS(query["case"])
         try:
             result.table(
-                elements = [ ThumbnailType(name='Thumbnail',column='type.inode_id', fsfd = fsfd),
-                             FilenameType(case=query['case'], table='type'),
+                elements = [ ThumbnailType(name='Thumbnail',case=query['case']),
+                             FilenameType(case=query['case']),
                              StringType('Type','type'),
-                             IntegerType('Size','inode.size'),
-                             TimestampType('Timestamp','inode.mtime')
+                             IntegerType('Size','size', table='inode'),
+                             TimestampType(name='Timestamp',column='mtime', table='inode')
                              ],
-                table = 'type join inode on inode.inode_id = type.inode_id',
+                table = 'type',
                 case = query['case']
                 )
         except DB.DBError,e:
@@ -178,11 +175,11 @@ class MimeTypeStats(Stats.Handler):
         else:
             t = branch[1].replace("__",'/')
             result.table(
-                elements = [ InodeIDType('Inode', 'type.inode_id', case = self.case),
-                             FilenameType(case = self.case, link_pane='main', table='type'),
-                             IntegerType('Size','inode.size'),
-                             TimestampType('Timestamp','inode.mtime')],
-                table = 'type join inode on inode.inode_id = type.inode_id',
+                elements = [ InodeIDType(case = self.case),
+                             FilenameType(case = self.case, link_pane='main'),
+                             IntegerType('Size','size', table='inode'),
+                             TimestampType('Timestamp','mtime', table='inode')],
+                table = 'type',
                 where = 'type.mime=%r ' % t,
                 case = self.case,
                 )
@@ -264,10 +261,10 @@ InodeIDType.operator_has_magic = operator_has_magic
 class TypeCaseTable(FlagFramework.CaseTable):
     """ Type Table """
     name = 'type'
-    columns = [ [ InodeIDType, dict(name = 'Inode', column='inode_id', case=None) ],
+    columns = [ [ InodeIDType, dict() ],
                 [ StringType, dict(name = 'Mime', column = 'mime')],
                 [ StringType, dict(name = 'Type', column = 'type')],
                 ]
     index = [ 'type', ]
     primary = 'inode_id'
-    extras = [ [ ThumbnailType, dict(case = None, table=None) ]]
+    extras = [ [ ThumbnailType, dict() ]]

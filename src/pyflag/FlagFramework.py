@@ -952,7 +952,7 @@ class CaseTable:
     ## instantiate it, otherwise argv are ignored.  If column is
     ## hidden it can not be selected for table construction.
     columns = []
-    index = []
+    index = ['inode_id']
     primary = None
 
     ## These are extra entries in the style of self.columns which will
@@ -961,18 +961,49 @@ class CaseTable:
     ## same column available via a number of different ColumnTypes.
     extras = []
 
+    def bind_columns(self, case):
+        """ Returns a list of columns bound to the specified case """
+        import pyflag.ColumnTypes as ColumnTypes
+
+        for x in self.columns:
+            column_cls = x[0]
+            args = x[1]
+            args['case'] = case
+            args['table'] = self.name
+            if isinstance(column_cls, ColumnTypes.ColumnType):
+                yield column_cls
+            else:
+                print column_cls
+                yield column_cls(**args)
+
     def create(self, dbh):
         """ Returns an SQL CREATE statement from our schema description """
+        import pyflag.ColumnTypes as ColumnTypes
+        
         tmp = []
-        for column_cls,args in self.columns:
-            c = column_cls(**args)
-            tmp.append(c.create())
+        for x in self.columns:
+            column_cls = x[0]
+            args = x[1]
+            if isinstance(column_cls, ColumnTypes.ColumnType):
+                c = column_cls
+            else:
+                c = column_cls(**args)
+            c.table = self.name
+            ## is there any extra specified?
+            string = c.create()
+            try:
+                string += " " + x[2]
+            except IndexError:
+                pass
+            
+            tmp.append(string)
 
         columns = ',\n'.join(tmp)
         if self.primary:
             columns += ", primary key(`%s`)" % self.primary
 
         sql = "CREATE TABLE `%s` (%s)" % (self.name, columns)
+        dbh.execute("## Creating CaseTable %s" % self)
         dbh.execute(sql)
 
         ## Check indexes:

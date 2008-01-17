@@ -812,6 +812,13 @@ IPType.operator_maxmind_city = operator_maxmind_city
 IPType.code_maxmind_country = code_maxmind_country
 IPType.operator_maxmind_country = operator_maxmind_country
 
+## Some tests for IPType operators:
+IPType.tests.extend([
+    [ "maxmind_country", "USA", False ],
+    [ "maxmind_isp", "Testra", False ],
+    [ "maxmind_org", "Google", False ],
+    ])
+
 ### Some unit tests for Whois:
 import unittest
 

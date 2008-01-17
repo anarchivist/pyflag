@@ -532,9 +532,9 @@ class IRCScanner(StreamScannerFactory):
     
     def process_stream(self, stream, factories):
         ## We only want to process the combined stream once:
-        if stream.con_id>stream.reverse: return
+        if stream.inode_id > stream.reverse: return
         
-        combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.con_id, stream.reverse)
+        combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.inode_id, stream.reverse)
         ## Check to see if this is an IRC stream at all:
         try:
             fd = self.fsfd.open(inode=combined_inode)

@@ -121,14 +121,17 @@ class ColumnType:
     ## when importing a log file.
     hidden = False
     ignore = False
-    table = None
-    
+    ## This is a list of the tests that should be run. In this format:
+    ## filter string, is an exception excepted?
+    tests = [ ["=", "0", False],
+              [">", "0", False] ]
+
     def __init__(self, name=None,
                  column=None, link='',
                  callback=None, link_pane='self',
                  regex = r"[^\s]+",
-                 boundary = r'\s+',
-                 escape=True, wrap=True, **kwargs
+                 boundary = r'\s+', case=None,
+                 wrap=True, table=None, **kwargs
                  ):
         
         if not name or not column:
@@ -143,9 +146,10 @@ class ColumnType:
         self.regex = re.compile(regex)
         self.regex_str = regex
         self.boundary = re.compile(boundary)
-        self.escape = escape
         self.wrap = wrap
-
+        self.table = table
+        self.case = case
+        
     ## These are the symbols which will be treated literally
     symbols = {
         }
@@ -194,22 +198,15 @@ class ColumnType:
         return method(column, operator, arg)
 
     def escape_column_name(self, column_name):
-        if self.escape or '.' in column_name:
-            return '.'.join(["`%s`" % x for x in column_name.split('.')])
-        else:
-            if self.table:
-                return "`%s`.`%s`" % (self.table, column_name)
-            return "`%s`" % column_name
+        if self.table == None: raise RuntimeError("Table can not be None")
+        return "`%s`.`%s`" % (self.table, column_name)
 
     def code_literal(self, column, operator, arg):
         ## Bit of a hack really:
         return lambda row: eval("%r %s %r" % (row[self.column], operator, arg.__str__()), {})
 
     def operator_literal(self, column,operator, arg):
-        if self.table:
-            column = self.escape_column_name("%s.%s" % (self.table, self.column))
-        else:
-            column = self.escape_column_name(self.column)
+        column = self.escape_column_name(self.column)
         return "%s %s %r" % (column, operator, arg)
 
     def code_equal(self, column, operator, arg):
@@ -292,15 +289,10 @@ class ColumnType:
 
     def select(self):
         """ Returns the SQL required for selecting from the table. """
-        if self.table and '.' not in self.column:
-            return self.escape_column_name("%s.%s" % (self.table, self.column))
-        
         return self.escape_column_name(self.column)
 
     def order_by(self):
         """ This is called to get the order by clause """
-        if self.table:
-            return self.escape_column_name("%s.%s" % (self.table, self.column))
         return self.escape_column_name(self.column)
 
     def column_decorator(self, table, sql, query, result):
@@ -360,9 +352,12 @@ class StateType(ColumnType):
         '=': 'is'
         }
 
-    def __init__(self, name='', column='', link='', callback=None):
-        ColumnType.__init__(self, name=name, column=column, link=link, callback=callback)
+    def __init__(self, *args, **kwargs):
+        ColumnType.__init__(self, *args, **kwargs)
         self.docs = {'is': """ Matches when the column is of the specified state. Supported states are %s""" % self.states.keys()}
+        self.tests = [ [ "is" ,"foobar", True ],
+                       [ "is" , self.states.keys()[0], False],
+                       ]
 
     def code_is(self, column, operator, state):
         for k,v in self.states.items():
@@ -379,7 +374,23 @@ class StateType(ColumnType):
         raise RuntimeError("Dont understand state %r. Valid states are %s" % (state,self.states.keys()))
 
     def create(self):
-        return "`%s` enum(%s) default NULL" % (self.column, ','.join(["%r"% x for x in self.states.keys()]))
+        return "`%s` enum(%s) default NULL" % (self.column, ','.join(["%r"% x for x in self.states.values()]))
+
+class SetType(ColumnType):
+    """ This can hold a number of different items simultaneously """
+    hidden = True
+    tests = []
+    states = []
+    symbols = {
+        }
+
+    def __init__(self, *args, **kwargs):
+        ColumnType.__init__(self, *args, **kwargs)
+        self.states = kwargs['states']
+        self.docs = {'contains': """ Matches when the column is of the specified state. Supported states are %s""" % self.states}
+
+    def create(self):
+        return "`%s` set('',%s)" % (self.column, ','.join(["%r"% x for x in self.states]))
 
 class IntegerType(ColumnType):
     symbols = {
@@ -397,7 +408,15 @@ class IntegerType(ColumnType):
         return lambda row: int(row[self.column]) == integer
 
     def create(self):
-        return "`%s` int(11) default 0" % self.column
+        return "`%s` int(11)" % self.column
+
+class BigIntegerType(IntegerType):
+    def create(self):
+        return "`%s` BIGINT default 0" % self.column
+
+class ShortIntegerType(IntegerType):
+    def create(self):
+        return "`%s` MEDIUMINT unsigned default 0" % self.column
 
 class EditableStringType(ColumnType):
     hidden = True
@@ -446,6 +465,13 @@ class StringType(ColumnType):
         "!=":"literal",
         }
 
+    tests = [ ["=", "String", False],
+              ["!=", "String", False],
+              ["contains", "String", False],
+              ["matches", "string", False],
+              ["regex", "[0-9]+", False],
+              ]
+              
     def __init__(self, *args, **kwargs):
         self.width = kwargs.get('width',255)
         ColumnType.__init__(self, *args, **kwargs)
@@ -460,7 +486,7 @@ class StringType(ColumnType):
     
     def operator_contains(self, column, operator, arg):
         """ Matches when the column contains the pattern anywhere. Its the same as placing wildcards before and after the pattern. """
-        return self.operator_literal(column , 'like' , "%" + arg + "%")
+        return self.operator_literal(column , 'like' , "%%" + arg + "%%")
 
     def code_matches(self, column, operator, arg):
         regex = arg.replace("%",".*")
@@ -559,15 +585,19 @@ class TimestampType(IntegerType):
                            character.             
     =========              =====================
     """
-    def __init__(self, name=None, column=None, format="%d/%b/%Y %H:%M:%S",
-                 override_year = 0
-                 ):
-        IntegerType.__init__(self, name, column)
+    tests = IntegerType.tests + [ ["after", "'0943234'", True],
+                                  ["after" ,"2007-10-11", False],
+                                  ["before", "23:22", False]
+                                  ]
+
+    def __init__(self, name='', column='', format="%d/%b/%Y %H:%M:%S",
+                 override_year = 0, **kwargs):
+        IntegerType.__init__(self,name=name,column=column, **kwargs)
         self.format = format
         self.override_year = int(override_year)
 
     def create(self):
-        return "`%s` TIMESTAMP" % self.column
+        return "%s TIMESTAMP NULL" % self.escape_column_name(self.column)
 
     def code_after(self, column, operator, arg):
         """ Matches if the time in the column is later than the time
@@ -606,9 +636,8 @@ class IPType(ColumnType):
     """ Handles creating appropriate IP address ranges from a CIDR specification. """    
     ## Code and ideas were borrowed from Christos TZOTZIOY Georgiouv ipv4.py:
     ## http://users.forthnet.gr/ath/chrisgeorgiou/python/
-    def __init__(self, name='', column='', link='', callback=''):
-        ColumnType.__init__(self, name=name, column=column,
-                            link=link, callback=callback)
+    def __init__(self, name='', column='', **kwargs):
+        ColumnType.__init__(self, name=name, column=column, **kwargs)
         self.extended_names = [name, name + "_geoip_city", name + "_geoip_country", name + "_geoip_org", name + "_geoip_isp", name + "_geoip_lat", name + "_geoip_long"]
     
     # reMatchString: a re that matches string CIDR's
@@ -637,11 +666,23 @@ class IPType(ColumnType):
         '!=': 'literal',
         }
 
+    tests = [ [ "=", "foo", True],
+              ## Cant equate with a range
+              [ "=", '10.10.10.1', False],
+              [ "=", "10.10.10.1/24", True],
+              [ "netmask", "10.10.10.1/24", False],
+              # Should this be valid or not?
+              #[ "netmask", "0", True],
+              ]
+
     def code_equal(self, column, operator, address):
         return lambda row: row[self.column] == address
 
     def operator_equal(self, column, operator, address):
-        return "%s = INET_ATON(%r)" % (self.escape_column_name(self.column), address)
+        numeric_address, broadcast = self.parse_netmask(address)
+        if numeric_address != broadcast:
+            raise RuntimeError("You specified a netmask range for an = comparison. You should probably use the netmask operator instead")
+        return "%s = INET_ATON(%r)" % (self.escape_column_name(self.column), numeric_address)
 
     def literal(self, column, operator, address):
         return "%s %s INET_ATON(%r)" % (self.escape_column_name(self.column), operator, address)
@@ -666,18 +707,17 @@ class IPType(ColumnType):
         # Parse arg as a netmask:
         match = self.reMatchString.match(address)
         try:
-            if match:
-                numbers = [x and int(x) or 0 for x in match.groups()]
-                # by packing we throw errors if any byte > 255
-                packed_address = struct.pack('4B', *numbers[:4]) # first 4 are in network order
-                numeric_address = struct.unpack('!I', packed_address)[0]
-                bits = numbers[4] or numbers[3] and 32 or numbers[2] and 24 or numbers[1] and 16 or 8
-                mask = self.masks[bits]
-                broadcast = (numeric_address & mask)|(~mask)
-                return numeric_address, broadcast
-            
-        except: pass    
-        raise ValueError("%s does not look like a CIDR netmask (e.g. 10.10.10.0/24)" % address)
+            numbers = [x and int(x) or 0 for x in match.groups()]
+            # by packing we throw errors if any byte > 255
+            packed_address = struct.pack('4B', *numbers[:4]) # first 4 are in network order
+            numeric_address = struct.unpack('!I', packed_address)[0]
+            bits = numbers[4] or numbers[3] and 32 or numbers[2] and 24 or numbers[1] and 16 or 8
+            mask = self.masks[bits]
+            broadcast = (numeric_address & mask)|(~mask)
+        
+            return numeric_address, broadcast
+        except Exception,e:
+            raise ValueError("%s does not look like a CIDR netmask (e.g. 10.10.10.0/24)" % address)
     
     def operator_netmask(self, column, operator, address):
         """ Matches IP addresses that fall within the specified netmask. Netmask must be provided in CIDR notation or as an IP address (e.g. 192.168.1.1/24)."""
@@ -712,15 +752,17 @@ class InodeType(StringType):
         return inode
 
 class InodeIDType(IntegerType):
-    def __init__(self, name='Inode', column='inode_id', link=None, case=None,
-                 callback=None, table='inode'):
-        self.case = case
-        ColumnType.__init__(self,name,column,link,callback=callback)
-        self.table = table
+    tests = [ [ "contains", "|G", False ],
+              [ "=", "Itest", False ],
+              ]
+    
+    def __init__(self, **kwargs):
+        ColumnType.__init__(self,  name='Inode', column='inode_id', **kwargs)
+        self.table = 'inode'
 
     def operator_contains(self, column, operator, pattern):
         column = self.escape_column_name(self.column)
-        return "(%s in (select inode_id from inode where inode like '%%%s%%'))" % (column, pattern)
+        return "inode.inode like '%%%s%%'" % pattern
     
     def column_decorator(self, table, sql, query, result):
         case = query['case']
@@ -795,10 +837,9 @@ class FilenameType(StringType):
                               __target__='open_tree',open_tree="%s")
 
         ## This is true we only display the basename
-        self.table = table
         self.basename = basename
         ColumnType.__init__(self,name=name, column=inode_id,
-                            link=link, link_pane=link_pane)
+                            link=link, link_pane=link_pane, table=table)
 
     def render_links_display_hook(self, value,row,result):
         if row['link']:
@@ -810,18 +851,10 @@ class FilenameType(StringType):
         return "concat(file.path, file.name)"
 
     def select(self):
-        if self.table == 'file':
-            if self.basename:
-                return "link, file.name"
-            else: return "link, concat(file.path,file.name)"
-        
         if self.basename:
-            return "(select link from file where inode_id=%s.inode_id limit 1) as link," % self.table + \
-                   "(select name from file where inode_id=%s.inode_id limit 1)" % self.table
-        else:
-            return "(select link from file where inode_id=%s.inode_id limit 1) as link," % self.table + \
-                   "(select concat(path,name) from file where inode_id=%s.inode_id limit 1)" % self.table
-    
+            return "file.link, file.name"
+        else: return "file.link, concat(file.path,file.name)"
+
     ## FIXME: implement filename globbing operators - this should be
     ## much faster than regex or match operators because in marches,
     ## the SQL translates to 'where concat(path,name) like "..."'. With
@@ -836,7 +869,9 @@ class FilenameType(StringType):
             pass
 
     def operator_literal(self, column, operator, pattern):
-        return "`%s` in (select inode_id from file where concat(file.path, file.name) %s %r)" % (self.column, operator, pattern) 
+        column = self.escape_column_name(self.column)
+        print column
+        return "%s in (select inode_id from file where concat(file.path, file.name) %s %r)" % (column, operator, pattern) 
 
     def create(self):
         return "path TEXT, name TEXT, link TEXT NULL"
@@ -865,7 +900,12 @@ class DeletedType(StateType):
     """
     hidden = True
     states = {'deleted':'deleted', 'allocated':'alloc'}
-    table = 'file'
+
+    def __init__(self, states = None, **kwargs):
+        StateType.__init__(self, name='Del', column='status', **kwargs)
+        self.table = 'file'
+        if states: self.states = states
+
     def display(self,value, row, result):
         """ Callback for rendering deleted items """
         tmp=result.__class__(result)
@@ -906,27 +946,47 @@ class PacketType(IntegerType):
 
 ## Unit tests for the column types.
 import unittest,re
+import pyflag.tests
 
-class ColumnTypeTests(unittest.TestCase):
+class ColumnTypeTests(pyflag.tests.ScannerTest):
     """ Column Types """
+    test_case = "PyFlagTestCase"
+    test_file = "pyflag_stdimage_0.4.sgz"
+    subsystem = 'SGZip'
+    order = 20
+    offset = "16128s"
+    
     def setUp(self):
+        pyflag.tests.ScannerTest.setUp(self)
         import pyflag.UI as UI
-        
+        import pyflag.FlagFramework as FlagFramework
+
+        t = FlagFramework.CaseTable()
+        t.name = 'dummy'
         self.ui = UI.GenericUI()
 
-        self.elements = [ IntegerType('IntegerType',column='table.integer_type'),
-                          StringType('StringType',column='foobar.string_type'),
-                          DeletedType('DeletedType', column='deleted'),
+        self.elements = [ IntegerType('IntegerType',column='integer_type', table='dummy'),
+                          StringType('StringType',column='string_type'),
+                          DeletedType('DeletedType', column='deleted', table='dummy'),
                           TimestampType('TimestampType','timestamp'),
                           IPType('IPType','source_ip'),
-                          InodeIDType('InodeIDType','inode'),
+                          InodeIDType('InodeIDType','inode_id'),
                           FilenameType('FilenameType'),
                           ]
         self.tablename = 'dummy'
+        t.columns = [ [e, {}] for e in self.elements]
+
+        dbh=DB.DBO(self.test_case)
+        dbh.drop(self.tablename)
+        t.create(dbh)
 
     def generate_sql(self, filter):
         sql = self.ui._make_sql(elements = self.elements, filter_elements=self.elements,
                                  table = self.tablename, case=None, filter = filter)
+        ## Try to run the SQL to make sure its valid:
+        dbh=DB.DBO(self.test_case)
+        dbh.execute(sql)
+        
         ## We are only interested in the where clause:
         match = re.search("where \((.*)\) order", sql)
         return match.group(1)
@@ -934,33 +994,33 @@ class ColumnTypeTests(unittest.TestCase):
     def test05FilteringTest(self):
         """ Test filters on columns """
         self.assertEqual(self.generate_sql("'IntegerType' > 10"),
-                         "(1) and (`table`.`integer_type` > '10')")
+                         "(1) and (`dummy`.`integer_type` > '10')")
         
         self.assertEqual(self.generate_sql("'StringType' contains 'Key Word'"),
-                         "(1) and (`foobar`.`string_type` like '%Key Word%')")
+                         "(1) and (`dummy`.`string_type` like '%Key Word%')")
 
         self.assertEqual(self.generate_sql("'StringType' matches 'Key Word'"),
-                         "(1) and (`foobar`.`string_type` like 'Key Word')")
+                         "(1) and (`dummy`.`string_type` like 'Key Word')")
 
         self.assertEqual(self.generate_sql("'StringType' regex '[a-z]*'"),
-                         "(1) and (`foobar`.`string_type` rlike '[a-z]*')")
+                         "(1) and (`dummy`.`string_type` rlike '[a-z]*')")
 
         self.assertEqual(self.generate_sql("'DeletedType' is allocated"),
-                         "(1) and (`deleted` = 'alloc')")
+                         "(1) and (`dummy`.`deleted` = 'alloc')")
 
         self.assertRaises(RuntimeError, self.generate_sql, ("'DeletedType' is foobar")),
         self.assertEqual(self.generate_sql("'TimestampType' after 2005-10-10"),
-                         "(1) and (`timestamp` > '2005-10-10 00:00:00')")
+                         "(1) and (`dummy`.`timestamp` > '2005-10-10 00:00:00')")
 
         self.assertEqual(self.generate_sql("'IPType' netmask 10.10.10.1/24"),
                          "(1) and ( ( `source_ip` >= 168430081 and `source_ip` <= 168430335 ) )")
         
         self.assertEqual(self.generate_sql("'InodeIDType' annotated FooBar"),
-                         '(1) and (`inode`=(select annotate.inode from annotate where note like "%FooBar%"))')
+                         '(1) and (`inode_id`=(select annotate.inode_id from annotate where note like "%FooBar%"))')
 
         ## Joined filters:
         self.assertEqual(self.generate_sql("InodeIDType contains 'Z|' and TimestampType after 2005-10-10"),
-                         "(1) and ((inode_id in (select inode_id from inode where inode like '%Z|%')) and `timestamp` > '2005-10-10 00:00:00')")
+                         "(1) and ((`inode`.`inode_id` in (select inode_id from inode where inode like '%Z|%')) and `timestamp` > '2005-10-10 00:00:00')")
 
     def test10CreateTable(self):
         """ Test table creation """

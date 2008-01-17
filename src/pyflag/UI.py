@@ -37,7 +37,6 @@ import pyflag.conf
 import pyflag.pyflaglog as pyflaglog
 config=pyflag.conf.ConfObject()
 import pyflag.parser as parser
-from pyflag.ColumnTypes import IntegerType, TimestampType, StringType, FilenameType
 
 config.LOG_LEVEL=7
 
@@ -260,11 +259,29 @@ class GenericUI:
         ## Calculate the SQL
         query_str = "select "
 
+        ## Fixup the elements - if no table specified use the global
+        ## table - this is just a shortcut which allows us to be lazy:
+        for e in elements:
+            if not e.table: e.table = table
+            if not e.case: e.case = case
+
         ## The columns and their aliases:
         query_str += ",".join([ e.select() + " as `" + e.name + "`" for e in elements ])
 
-        ## The table
-        query_str += " from %s " % table
+        ## The tables are calculated as a join of all the individual
+        ## database tables from all the columns - this allows us to
+        ## put elements from different database tables in the same
+        ## widget automatically.
+        tables = []
+        for e in elements:
+            if e.table not in tables: tables.append(e.table)
+
+        ## Now generate the join clause:
+        query_str += " from %s " % tables[0]
+
+        for i in range(1,len(tables)):
+            query_str += " join `%s` on `%s`.inode_id = `%s`.inode_id " % \
+                         (tables[i], tables[0],tables[i])
 
         ## Is there a filter condition?
         if filter:
@@ -299,6 +316,8 @@ class GenericUI:
     
     def fileselector(self, description, name, vfs=True):
         """ Draws a file selector for files in the upload directory """
+        from pyflag.ColumnTypes import IntegerType, TimestampType, StringType, FilenameType
+
         def vfs_popup(query, result):
             if not query.has_key('case'):
                 result.heading("No case selected")

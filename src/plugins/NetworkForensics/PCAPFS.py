@@ -42,7 +42,7 @@ import reassembler
 from NetworkScanner import *
 import pypcap
 import cStringIO
-from pyflag.ColumnTypes import StringType, IntegerType, TimestampType, InodeType, CounterType
+from pyflag.ColumnTypes import StringType, IntegerType, TimestampType, InodeIDType, CounterType, BigIntegerType, ShortIntegerType, IPType
 
 
 description = "Network Forensics"
@@ -65,34 +65,63 @@ class NetworkingInit(FlagFramework.EventHandler):
         )""")
 
         ## The connection_details table stores information about each
-        ## connection
-        case_dbh.execute(
-            """CREATE TABLE if not exists `connection_details` (
-            `inode_id` int not null,
-            `inode` varchar(250),
-            `con_id` int(11) signed NOT NULL auto_increment,
-            `reverse` int(11) unsigned NOT NULL default '0',
-            `src_ip` int(11) unsigned NOT NULL default '0',
-            `src_port` int(11) unsigned NOT NULL default '0',
-            `dest_ip` int(11) unsigned NOT NULL default '0',
-            `dest_port` int(11) unsigned NOT NULL default '0',
-            `isn` int(100) unsigned NOT NULL default 0,
-            `ts_sec` TIMESTAMP default 0,
-            KEY `con_id` (`con_id`)
-            )""")
+##        ## connection
+##        case_dbh.execute(
+##            """CREATE TABLE if not exists `connection_details` (
+##            `inode_id` int not null,
+##            `inode` varchar(250),
+##            `con_id` int(11) signed NOT NULL auto_increment,
+##            `reverse` int(11) unsigned NOT NULL default '0',
+##            `src_ip` int(11) unsigned NOT NULL default '0',
+##            `src_port` int(11) unsigned NOT NULL default '0',
+##            `dest_ip` int(11) unsigned NOT NULL default '0',
+##            `dest_port` int(11) unsigned NOT NULL default '0',
+##            `isn` int(100) unsigned NOT NULL default 0,
+##            `ts_sec` TIMESTAMP default 0,
+##            KEY `con_id` (`con_id`)
+##            )""")
 
-        ## the connection table store all the packets belonging to
-        ## each connection.
-        case_dbh.execute(
-            """CREATE TABLE if not exists `connection` (
-            `con_id` int(11) signed NOT NULL default '0',
-            `original_id` int(11) unsigned NOT NULL default '0',
-            `packet_id` int(11) unsigned NOT NULL default '0',
-            `seq` int(11) unsigned NOT NULL default '0',
-            `length` mediumint(9) unsigned NOT NULL default '0',
-            `cache_offset`  bigint(9) unsigned NOT NULL default '0'
-            ) """)
+##        ## the connection table store all the packets belonging to
+##        ## each connection.
+##        case_dbh.execute(
+##            """CREATE TABLE if not exists `connection` (
+##            `con_id` int(11) signed NOT NULL default '0',
+##            `original_id` int(11) unsigned NOT NULL default '0',
+##            `packet_id` int(11) unsigned NOT NULL default '0',
+##            `seq` int(11) unsigned NOT NULL default '0',
+##            `length` mediumint(9) unsigned NOT NULL default '0',
+##            `cache_offset`  bigint(9) unsigned NOT NULL default '0'
+##            ) """)
 
+class ConnectionTable(FlagFramework.CaseTable):
+    """ Connection table - contains infomation about all packets involved in a connection """
+    name = 'connection'
+    columns = [
+        [ InodeIDType, {} ],
+        [ IntegerType, dict(name='Original ID', column ='original_id')],
+        [ IntegerType, dict(name='Packet ID', column='packet_id'),
+          "unsigned "],
+        [ IntegerType, dict(name='Sequence', column='seq'),
+          'unsigned '],
+        [ IntegerType, dict(name='Length', column='length'),
+          'unsigned '],
+        [ BigIntegerType, dict(name='Cache Offset', column='cache_offset')],
+        ]
+
+class ConnectionDetailsTable(FlagFramework.CaseTable):
+    """ Connection Details - Contains details about each connection """
+    name ='connection_details'
+    columns = [
+        [ InodeIDType, {} ],
+        [ IntegerType, dict(name='Reverse', column='reverse')],
+        [ IPType, dict(name='Source IP', column='src_ip')],
+        [ ShortIntegerType, dict(name='Source Port', column='src_port')],
+        [ IPType, dict(name='Destination IP', column='dest_ip')],
+        [ ShortIntegerType, dict(name='Destination Port', column='dest_port')],
+        [ IntegerType, dict(name='ISN', column='isn'), 'unsigned default 0'],
+        [ TimestampType, dict(name='Timstamp', column='ts_sec'), 'default 0']
+        ]
+        
 class CachedWriter:
     """ A class which caches data in memory and then flushes to disk
     when ready. This does not tie up file descriptors.
@@ -166,20 +195,19 @@ class PCAPFS(DBFS):
                 ip = packet.find_type("IP")
 
                 ## Connection id have not been set yet:
-                if not connection.has_key('con_id'):
+                if not connection.has_key('inode_id'):
                     ## We insert a null value so we can get a valid
-                    ## autoincrement id. We later update the row with
-                    ## real data.
-                    dbh.insert('connection_details', _fast=True,
-                               src_ip=0)
-                    forward_con_id = dbh.autoincrement()
+                    ## autoincrement id.
+                    dbh.insert('inode', _inode_id='NULL', _fast=True)
+                    forward_inode_id = dbh.autoincrement()
+                    dbh.delete('inode', where='inode_id = %s' % forward_inode_id)
 
-                    dbh.insert('connection_details', _fast=True,
-                               src_ip=0)
-                    reverse_con_id = dbh.autoincrement()
+                    dbh.insert('inode', _inode_id='NULL', _fast=True)
+                    reverse_inode_id = dbh.autoincrement()
+                    dbh.delete('inode', where='inode_id = %s' % reverse_inode_id)
 
-                    connection['con_id'] = forward_con_id;
-                    connection['reverse']['con_id'] = reverse_con_id;
+                    connection['inode_id'] = forward_inode_id;
+                    connection['reverse']['inode_id'] = reverse_inode_id;
 
                     date_str=time.strftime("%Y-%m-%d", time.gmtime(packet.ts_sec))
                     
@@ -194,9 +222,9 @@ class PCAPFS(DBFS):
 
                 ## Record the stream in our database:
                 connection['mtime'] = packet.ts_sec
-                dbh.update('connection_details',
-                           where="con_id='%s'" % connection['con_id'],
-                           reverse = connection['reverse']['con_id'],
+                dbh.insert('connection_details',
+                           inode_id = connection['inode_id'],
+                           reverse = connection['reverse']['inode_id'],
                            
                            ## This is the src address as an int
                            src_ip=ip.src,
@@ -204,7 +232,6 @@ class PCAPFS(DBFS):
                            dest_ip=ip.dest,
                            dest_port=tcp.dest,
                            isn=tcp.seq,
-                           inode='I%s|S%s' % (iosource_name, connection['con_id']),
                            _ts_sec="from_unixtime('%s')" % connection['mtime'],
                            _fast = True
                            )
@@ -212,7 +239,7 @@ class PCAPFS(DBFS):
                 ## This is where we write the data out
                 connection['data'] = CachedWriter(
                     FlagFramework.get_temp_path(dbh.case,
-                                                "I%s|S%s" % (iosource_name, connection['con_id']))
+                                                "I%s|S%s" % (iosource_name, connection['inode_id']))
                     )
 
                 if tcp.data_len > 0:
@@ -229,7 +256,7 @@ class PCAPFS(DBFS):
                     datalen = 0
 
                 dbh.insert("connection",
-                           con_id = connection['con_id'],
+                           inode_id = connection['inode_id'],
                            packet_id = packet.id,
                            cache_offset = fd.offset,
                            length = datalen,
@@ -247,13 +274,14 @@ class PCAPFS(DBFS):
 
                     if fd.offset > 0:
                         ## Create a new VFS node:
-                        new_inode = "I%s|S%s" % (iosource_name, connection['con_id'])
+                        new_inode = "I%s|S%s" % (iosource_name, connection['inode_id'])
 
                         inode_id = self.VFSCreate(
                             None,
                             new_inode,
                             connection['path'] % "forward",
                             size = fd.offset,
+                            inode_id = connection['inode_id'],
                             _mtime = connection['mtime'],
                             _fast = True
                             )
@@ -275,7 +303,7 @@ class PCAPFS(DBFS):
 
                     if fd.offset > 0:
                         ## Create a new VFS node:
-                        new_inode = "I%s|S%s" % (iosource_name, connection['reverse']['con_id'])
+                        new_inode = "I%s|S%s" % (iosource_name, connection['reverse']['inode_id'])
 
                         self.VFSCreate(
                             None,
@@ -366,11 +394,11 @@ class PCAPFS(DBFS):
         pcap_dbh.check_index("connection_details",'src_port')
         pcap_dbh.check_index("connection_details",'dest_ip')
         pcap_dbh.check_index("connection_details",'dest_port')
-        pcap_dbh.check_index('connection_details','inode')
+        pcap_dbh.check_index('connection_details','inode_id')
 
         ## Make sure that no NULL inodes remain (This might be slow?)
-        pcap_dbh.delete("connection_details",
-                        where = "inode is null")
+        ##pcap_dbh.delete("connection_details",
+        ##                where = "inode is null")
 
         
 class PCAPFile(File):

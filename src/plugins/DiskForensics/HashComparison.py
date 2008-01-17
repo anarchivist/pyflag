@@ -32,18 +32,32 @@ import pyflag.DB as DB
 import os.path
 from pyflag.Scanner import *
 from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, FilenameType, ColumnType
-                  
-import md5
-class HashTables(FlagFramework.EventHandler):
-    def create(self, dbh,case):
-        dbh.execute(""" CREATE TABLE IF NOT EXISTS `hash` (
-        `inode_id` int not null,
-        `binary_md5` binary( 16 ) NOT NULL default '',
-        `NSRL_product` varchar(250),
-        `NSRL_filename` varchar(60) not NULL default '',
-        `FileType` varchar(250)
-        )""")
 
+import md5
+
+class HashType(ColumnType):
+    def __init__(self, **kwargs):
+        ColumnType.__init__(self, name="MD5", column='binary_md5', **kwargs)
+
+    def create(self):
+        return "`%s` binary( 16 ) NOT NULL default ''" % self.column
+
+    def display(self, value, row, result):
+        return value.encode("hex").upper()
+
+class HashCaseTable(FlagFramework.CaseTable):
+    name = 'hash'
+    columns = [ [ InodeIDType, dict() ],
+                [ HashType, {} ],
+                [ StringType, dict(name='NSRL Product',
+                                   column='NSRL_product',
+                                   ) ],
+                [ StringType, dict(name='NSRL Filename',
+                                   column='NSRL_filename',
+                                   width=60) ],
+                ]
+    
+class HashTables(FlagFramework.EventHandler):
     def init_default_db(self, dbh, case):
         # Remember to add indexes to this table after uploading the
         # NSRL. Use the nsrl_load.py script.
@@ -91,7 +105,6 @@ class MD5Scan(GenScanFactory):
 
         def process(self, data,metadata=None):
             self.boring(metadata,data)
-            self.type = metadata['magic']
             self.m.update(data)
             self.length+=len(data)
 
@@ -111,7 +124,6 @@ class MD5Scan(GenScanFactory):
                        binary_md5 = self.m.digest(),
                        NSRL_product = nsrl.get('Name','-'),
                        NSRL_filename = nsrl.get('filename','-'),
-                       FileType = self.type,
                        )
 
 class HashComparison(Reports.report):
@@ -126,19 +138,16 @@ class HashComparison(Reports.report):
     def display(self,query,result):
         result.heading("MD5 Hash comparisons")
         dbh=self.DBO(query['case'])
-        dbh.check_index('hash','FileType')
         dbh.check_index('hash','inode_id')
         
         try:
             result.table(
-                elements = [ InodeIDType('Inode','inode_id',
-                                         case=query['case']),
-                             FilenameType(case=query['case'], table='hash'),
-                             StringType('File Type', 'FileType'),
-                             StringType('NSRL Product','NSRL_product'),
-                             StringType('NSRL Filename','NSRL_filename'),
-                             ## We dont want to have any operators on this
-                             ColumnType('MD5','binary_md5', callback=lambda x: x.encode('hex')) ],
+                elements = [ InodeIDType(case=query['case']),
+                             FilenameType(case=query['case']),
+                             StringType('File Type', 'type', table='type'),
+                             StringType('NSRL Product','NSRL_product', table='hash'),
+                             StringType('NSRL Filename','NSRL_filename', table='hash'),
+                             HashType() ],
                 table='hash',
                 case=query['case'],
                 )

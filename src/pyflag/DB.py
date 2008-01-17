@@ -362,7 +362,9 @@ class DBO:
             
         ## Hopefully this does not bear a huge performance overhead???
         params = tuple( DBExpander(i) for i in params )
-        string = query_str % params
+        if params:
+            string = query_str % params
+        else: string = query_str
         try:
             ## The following decode is required to go around MySQLdb's
             ## stupid unicode crap - this has just recently been

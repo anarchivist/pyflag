@@ -57,17 +57,15 @@ class BrowserHistoryReport(Reports.report):
     family = "Disk Forensics"
 
     def display(self, query,result):
-        def hist_cb(query,result):
-            elements = [ InodeIDType('Inode','inode_id', case=query['case']),
-                         TimestampType('LastVisitDate','LastVisitDate'),
-                         StringType('Name', 'name'),
-                         StringType('URL', 'url'),
-                         StringType('Host', 'host'),
-                         StringType('Referrer', 'Referrer'),
-                         ]
-            
+        def hist_cb(query,result):            
             result.table(
-                elements = elements,
+                elements = [ InodeIDType(case=query['case']),
+                             TimestampType('LastVisitDate','LastVisitDate'),
+                             StringType('Name', 'name'),
+                             StringType('URL', 'url'),
+                             StringType('Host', 'host'),
+                             StringType('Referrer', 'Referrer'),
+                             ],
                 table = 'mozilla_history',
                 case = query['case'],
                 filter='hist_filter',
@@ -75,7 +73,7 @@ class BrowserHistoryReport(Reports.report):
 
         def form_cb(query, result):
             result.table(
-                elements = [ InodeIDType('Inode', 'inode_id', case=query['case']),
+                elements = [ InodeIDType(case=query['case']),
                              StringType('Name','name'),
                              StringType('Value', 'value'),
                              ],
@@ -89,7 +87,7 @@ class BrowserHistoryReport(Reports.report):
             dbh.check_index("ie_history" ,"url",10)
             
             result.table(
-                elements = [ InodeIDType('Inode','inode_id', case=query['case']),
+                elements = [ InodeIDType(case=query['case']),
                              StringType('Type','type'),
                              StringType('URL','url'),
                              TimestampType('Modified','modified'),
@@ -99,7 +97,6 @@ class BrowserHistoryReport(Reports.report):
                 table='ie_history',
                 case=query['case']
                 )
-
 
         result.notebook(names = ['Mozilla History', 'Mozilla Forms', 'IE Cache'],
                         callbacks = [ hist_cb, form_cb, ie_history_cb])

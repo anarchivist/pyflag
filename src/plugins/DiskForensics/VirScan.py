@@ -57,12 +57,12 @@ except (pyclamd.ScanError, TypeError, ValueError):
     pyflaglog.log(pyflaglog.WARNING, "Unable to contact clamav - Virus scanning will not be available")
     active = False
     
-class VirusTables(FlagFramework.EventHandler):
-    def create(self, dbh, case):
-        dbh.execute(""" CREATE TABLE IF NOT EXISTS `virus` (
-        `inode_id` int not null,
-        `virus` tinytext NOT NULL,
-        primary key (inode_id))""")
+class VirusTable(FlagFramework.CaseTable):
+    name = 'virus'
+    columns = [ [ InodeIDType, dict(case = None) ],
+                [ StringType, dict(name='Virus', column = 'virus')],
+                ]
+    index = [ 'inode_id']
 
 class VirScan(GenScanFactory):
     """ Scan file for viruses """
@@ -101,18 +101,13 @@ class VirusScan(Reports.report):
     def display(self,query,result):
         result.heading("Virus Scan Results")
         dbh=self.DBO(query['case'])
-        try:
-            result.table(
-                elements = [ InodeIDType('Inode','inode_id',
-                                         case=query['case']),
-                             FilenameType(case=query['case'], table='virus'),
-                             StringType('Virus Detected','virus') ],
-                table='virus',
-                case=query['case'],
-                )
-        except DB.DBError,e:
-            result.para("Unable to display Virus table, maybe you did not run the virus scanner over the filesystem?")
-            result.para("The error I got was %s"%e)
+        result.table(
+            elements = [ InodeIDType(case=query['case']),
+                         FilenameType(case=query['case']),
+                         StringType('Virus Detected','virus') ],
+            table='virus',
+            case=query['case'],
+            )
 
 import pyflag.Stats as Stats
 class VirusStats(Stats.Handler):
@@ -146,12 +141,12 @@ class VirusStats(Stats.Handler):
         else:
             t = branch[1].replace("__",'/')
             result.table(
-                elements = [ InodeType(column='file.inode', case = self.case),
-                             FilenameType(case = self.case, link_pane='main', table='virus'),
-                             IntegerType('Size','inode.size'),
-                             TimestampType('Timestamp','inode.mtime')],
-                table = 'file, inode, virus',
-                where = 'virus.inode=inode.inode and file.inode_id=inode.inode_id and virus.virus = %r ' % t,
+                elements = [ InodeIDType(case = self.case),
+                             FilenameType(case = self.case),
+                             IntegerType('Size','size', table = 'inode'),
+                             TimestampType('Timestamp','mtime', table='inode')],
+                table = 'virus',
+                where = 'virus.virus = %r ' % t,
                 case = self.case,
                 )
 

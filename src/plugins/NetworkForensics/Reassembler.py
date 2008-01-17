@@ -64,9 +64,9 @@ class StreamFile(File):
     Note that this is currently a very Naive reassembler. Stream Reassembling is generally considered a very difficult task. The approach we take is to make a very simple reassembly, and have a different scanner check the stream for potetial inconsistancies.
 
     The inode format is:
-    Scon_id/con_id/con_id
+    Sinode_id/inode_id/inode_id
 
-    con_ids are the connection IDs. If more than one con_id is
+    inode_ids are the connection IDs. If more than one inode_id is
     specified we merge all connections into the same stream based on
     arrival time.
     """
@@ -74,32 +74,6 @@ class StreamFile(File):
 
     def __init__(self, case, fd, inode):
         File.__init__(self,case, fd, inode)
-
-        self.stat_cbs.extend([ self.show_packets, self.combine_streams ])
-        self.stat_names.extend([ "Show Packets", "Combined streams"])
-
-        ## This is a cache of packet lists that we keep so we do not
-        ## have to hit the db all the time.
-        self.packet_list = None
-
-        dbh = DB.DBO(self.case)
-        
-        ## Ensure we have an index on this column
-        dbh.check_index("connection","con_id")
-        dbh.check_index("connection_details","inode")
-
-        ## Fill in some vital stats
-        dbh.execute("select inode_id, con_id, reverse, src_ip, dest_ip, src_port, dest_port, ts_sec from `connection_details` where inode=%r limit 1", inode)
-        row=dbh.fetch()
-        if row:
-            self.con_id = row['con_id']
-            self.src_port = row['src_port']
-            self.dest_port = row['dest_port']
-            self.reverse = row['reverse']
-            self.ts_sec = row['ts_sec']
-            self.dest_ip = row['dest_ip']
-            self.src_ip = row['src_ip']
-            self.inode_id = row['inode_id']
 
         inode = inode.split("|")[-1]
 
@@ -114,37 +88,49 @@ class StreamFile(File):
 
         ## We use the inode column in the connection_details table to
         ## cache this so we only have to combine the streams once.
-        if not self.cached_fd:
-            stream_ids = [ int(x) for x in inode[1:].split("/")]
+        inode_ids = [ int(x) for x in inode[1:].split("/")]
 
-            self.create_new_stream(stream_ids)
-            self.look_for_cached()
+        dbh = DB.DBO(self.case)
         
-##    def read(self, length=None):
-##        try:
-##            return File.read(self, length)
-##        except IOError:
-##            return ''
+        ## Ensure we have an index on this column
+        dbh.check_index("connection","inode_id")
+        dbh.check_index("connection_details","inode_id")
 
+        ## Fill in some vital stats
+        dbh.execute("select inode_id, reverse, src_ip, dest_ip, src_port, dest_port, ts_sec from `connection_details` where inode_id=%r limit 1", inode_ids[0])
+        row=dbh.fetch()
+        self.src_port = row['src_port']
+        self.dest_port = row['dest_port']
+        self.reverse = row['reverse']
+        self.ts_sec = row['ts_sec']
+        self.dest_ip = row['dest_ip']
+        self.src_ip = row['src_ip']
+        self.inode_id = row['inode_id']
+
+        if not self.cached_fd:
+            self.create_new_stream(inode_ids)
+            self.look_for_cached()
+
+        self.stat_cbs.extend([ self.show_packets, self.combine_streams ])
+        self.stat_names.extend([ "Show Packets", "Combined streams"])
+
+        ## This is a cache of packet lists that we keep so we do not
+        ## have to hit the db all the time.
+        self.packet_list = None
+        
     def create_new_stream(self,stream_ids):
         """ Creates a new stream by combining the streams given by the list stream_ids.
         
         @return the new stream id.
         """
         if len(stream_ids)<2: return
-
-        ## If any stream_ids are negative they are already combined:
-        for x in stream_ids:
-            if x<0:
-                raise IOError("Stream %s is already combined")
         
         ## Store the new stream in the cache:
         dbh = DB.DBO(self.case)
 
-        ## This is a placeholder to reserve our con_id
-        dbh.execute("insert into `connection_details` set inode=%r",
-                         (self.inode))
-        self.con_id = dbh.autoincrement()
+        ## This is a placeholder to reserve our inode_id
+        dbh.insert('inode', inode=self.inode)
+        self.inode_id = dbh.autoincrement()
 
         dbh2 = dbh.clone()
 
@@ -167,9 +153,11 @@ class StreamFile(File):
 
         # The output file
         out_fd = open(get_temp_path(dbh.case, self.inode),"w")
+
+        min_packet_id = sys.maxint
         
-        dbh.execute("select con_id,seq,packet_id, length, cache_offset from `connection` where %s order by packet_id",(
-            " or ".join(["con_id=%r" % a for a in stream_ids])
+        dbh.execute("select inode_id,seq,packet_id, length, cache_offset from `connection` where %s order by packet_id",(
+            " or ".join(["inode_id=%r" % a for a in stream_ids])
             ))
 
         dbh2.mass_insert_start("connection")
@@ -179,7 +167,10 @@ class StreamFile(File):
         outfd_position = 0
         for row in dbh:
             # This is the index for this specific stream in all the above arrays
-            index = stream_ids.index(row['con_id'])
+            index = stream_ids.index(row['inode_id'])
+
+            if min_packet_id > row['packet_id']:
+                min_packet_id = row['packet_id']
 
             # First time we saw this stream - the seq is the ISN
             if initials[index]:
@@ -222,7 +213,7 @@ class StreamFile(File):
                     deltas[x] += outfd_len-initial_len
 
             dbh2.mass_insert(
-                con_id=self.con_id,
+                inode_id=self.inode_id,
                 packet_id=row['packet_id'],
                 seq=outfd_position,
                 length=row['length'],
@@ -230,7 +221,7 @@ class StreamFile(File):
                 
                 # This is the original id this
                 # packet came from
-                original_id = row['con_id'])
+                original_id = row['inode_id'])
 
         dbh2.mass_insert_commit()
 
@@ -241,8 +232,6 @@ class StreamFile(File):
                 fd.close()
             except: pass
         
-        #self.cached_fd = open(get_temp_path(dbh.case, self.inode),"r")
-
         ## Now create the stream in the VFS:
         fsfd = FileSystem.DBFS(self.case)
         inode = self.inode[:self.inode.rfind("|")] +"|S%s" % stream_ids[0]
@@ -252,8 +241,7 @@ class StreamFile(File):
        
         ## Get mtime 
         try:
-            
-            dbh2.execute("""select pcap.ts_sec from pcap,`connection` where pcap.id=connection.packet_id and connection.con_id=%s order by pcap.ts_sec asc limit 1""" % (self.con_id))
+            dbh2.execute("select pcap.ts_sec from pcap where pcap.id=%r", min_packet_id)
             metamtime=dbh2.fetch()['ts_sec']
         except (DB.DBError, TypeError), e:
             pyflaglog.log(pyflaglog.WARNING, "Failed to determine mtime of newly combined stream %s" % self.inode)
@@ -265,20 +253,16 @@ class StreamFile(File):
         ##  We also now fill in the details for the combined stream in 
         ##  the connection_details table...
         try:
-            dbh2.execute("""update connection_details set ts_sec=(select pcap.ts_sec from pcap,`connection` where pcap.id=connection.packet_id and connection.con_id=%s order by pcap.ts_sec asc limit 1) where con_id=%s""" % (self.con_id,self.con_id))
+            dbh2.insert("connection_details",
+                        ts_sec = metamtime,
+                        inode_id = self.inode_id,
+                        src_ip = self.src_ip,
+                        src_port = self.src_port,
+                        dest_ip = self.dest_ip,
+                        dest_port = self.dest_port,
+                        )
         except DB.DBError, e:
             pyflaglog.log(pyflaglog.ERROR, "Failed to set the mtime for the combined stream %s" % self.inode)
-
-        ##  Earliest connection in this stream we use for source, 
-        ## source port and dest, and dest port...
-        try:
-            dbh2.execute("""select src_ip,src_port,dest_ip,dest_port from connection_details where %s order by con_id limit 1""", (
-            " or ".join(["con_id=%r" % a for a in stream_ids])
-            ))
-            row = dbh2.fetch()
-            dbh2.execute("""update connection_details set src_port=%s, src_ip=%s, dest_ip=%s, dest_port=%s where con_id=%s""" % (row['src_port'], row['src_ip'], row['dest_ip'], row['dest_port'], self.con_id))
-        except DB.DBError, e:
-            pyflaglog.log(pyflaglog.ERROR, "Failed to set meta data for the combined stream %s" % self.inode)
 
     def get_packet_id(self, position=None):
         """ Gets the current packet id (where the readptr is currently at) """
@@ -287,8 +271,8 @@ class StreamFile(File):
 
         if self.packet_list==None:
             dbh = DB.DBO(self.case)
-            dbh.execute("""select packet_id,cache_offset from `connection` where con_id = %r order by cache_offset desc, length desc """,
-                    (self.con_id))
+            dbh.execute("""select packet_id,cache_offset from `connection` where inode_id = %r order by cache_offset desc, length desc """,
+                    (self.inode_id))
             self.packet_list = [ (row['packet_id'],row['cache_offset']) for row in dbh ]
 
         ## Now try to find the packet_id in memory:
@@ -316,7 +300,7 @@ class StreamFile(File):
             self.forward_id = int(inode[1:].split("/")[0])
             return self
 
-        self.forward_id = self.con_id
+        self.forward_id = self.inode_id
         fsfd = FileSystem.DBFS(self.case)
         return fsfd.open(inode="%s/%s" % (self.inode,self.reverse))
 
@@ -334,7 +318,7 @@ class StreamFile(File):
 
         number_of_rows = 0
         dbh = DB.DBO(self.case)
-        dbh.execute("select * from `connection` where con_id = %r order by cache_offset limit %s, %s", (combined_fd.con_id, limit, config.PAGESIZE))
+        dbh.execute("select * from `connection` where inode_id = %r order by cache_offset limit %s, %s", (combined_fd.inode_id, limit, config.PAGESIZE))
 
         for row in dbh:
             number_of_rows += 1
@@ -384,7 +368,7 @@ class StreamFile(File):
                          ],
             
             table= '`connection` as con , pcap',
-            where = 'con_id="%s" and packet_id=id ' % combined_fd.con_id,
+            where = 'inode_id="%s" and packet_id=id ' % combined_fd.inode_id,
             case=query['case']
             )
 
@@ -396,11 +380,11 @@ class ViewConnections(Reports.report):
 
     def display(self, query,result):
         result.table(
-            elements = [ InodeIDType('Inode','inode_id', case=query['case']),
+            elements = [ InodeIDType(case=query['case']),
                          TimestampType('Timestamp','ts_sec'),
-                         IPType('Source','src_ip'),
+                         IPType('Source','src_ip', case=query['case']),
                          IntegerType('Src Port','src_port'),
-                         IPType('Destination','dest_ip'),
+                         IPType('Destination','dest_ip', case=query['case']),
                          IntegerType('Dest Port','dest_port')],
             table = 'connection_details',
             case = query['case'],

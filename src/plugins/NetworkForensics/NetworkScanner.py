@@ -100,7 +100,7 @@ class StreamScannerFactory(GenScanFactory):
 
     def stream_to_server(self, stream, protocol):
         if stream.dest_port in dissect.fix_ports(protocol):
-            forward_stream = stream.con_id
+            forward_stream = stream.inode_id
             reverse_stream = stream.reverse
         else:
             return None, None
@@ -127,9 +127,9 @@ class StreamScannerFactory(GenScanFactory):
             try:
                 ## This identifies our fd as a stream. We only operate
                 ## on streams otherwise we do not wish to be bothered.
-                self.fd.con_id
+                self.fd.packet_list
                 self.ignore = False
-            except AttributeError:
+            except AttributeError,e:
                 self.ignore = True
                 return
             

@@ -251,9 +251,7 @@ def render_annotate_inode_id(self, value, row, result):
 
 def operator_annotated(self, column, operator, pattern):
     """ This operator selects those inodes with pattern matching their annotation """
-    return '`%s`=(select annotate.inode from annotate where note like "%%%s%%")' % (self.column, pattern)
-
-#add_display_hook(InodeType, "render_annotate_inode", render_annotate_inode)
+    return '`%s`=(select annotate.inode_id from annotate where note like "%%%s%%")' % (self.column, pattern)
 
 add_display_hook(InodeIDType, "render_annotate_inode_id", render_annotate_inode_id)
 InodeIDType.operator_annotated = operator_annotated

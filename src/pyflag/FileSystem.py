@@ -104,7 +104,7 @@ class FileSystem:
         """ list directory content longly """
         pass
 
-    def VFSCreate(self,root_inode,inode, _fast=False, link=None):
+    def VFSCreate(self,root_inode,inode, _fast=False, link=None, inode_id=None):
         """ This method creates inodes within the virtual filesystem.
 
         This facility allows callers to extend the VFS to include more virtual files.
@@ -231,7 +231,7 @@ class DBFS(FileSystem):
         dbh.MySQLHarness("%s/dbtool -t %s -m %r -d drop" %(config.FLAG_BIN,iosource, mount_point))
 
     def VFSCreate(self,root_inode,inode,new_filename,directory=False ,gid=0, uid=0, mode=100777,
-                  _fast=False, **properties):
+                  _fast=False, inode_id=None, **properties):
         ## Basically this is how this function works - if root_inode
         ## is provided we make the new inode inherit the root inodes
         ## path and inode string.
@@ -272,6 +272,9 @@ class DBFS(FileSystem):
                                 size=0)
         if inode:
             inode_properties['inode'] = inode
+
+        if inode_id:
+            inode_properties['inode_id'] = inode_id
         
         try:
             inode_properties['size'] = int(properties['size'])

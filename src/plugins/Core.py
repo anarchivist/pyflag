@@ -44,7 +44,7 @@ import pyflag.pyflaglog as pyflaglog
 import os
 import pyflag.FlagFramework as FlagFramework
 import pyflag.Registry as Registry
-from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, FilenameType, IntegerType, InodeType
+from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, FilenameType, IntegerType, DeletedType, SetType, BigIntegerType
 
 config.add_option("SCHEMA_VERSION", default=3, absolute=True,
                   help="Current schema version")
@@ -274,25 +274,25 @@ class CaseDBInit(FlagFramework.EventHandler):
         except OSError:
             pass
 
-        ## Create an enum for the scanners in the inode table
-        scanners = [ "%r" % s.__name__ for s in Registry.SCANNERS.classes ]
-        case_dbh.execute("""CREATE TABLE IF NOT EXISTS inode (
-        `inode_id` int auto_increment,
-        `inode` VARCHAR(250) NOT NULL,
-        `status` set('unalloc','alloc'),
-        `uid` INT,
-        `gid` INT,
-        `mtime` TIMESTAMP NULL,
-        `atime` TIMESTAMP NULL,
-        `ctime` TIMESTAMP NULL,
-        `dtime` TIMESTAMP NULL,
-        `mode` INT,
-        `links` INT,
-        `link` TEXT,
-        `size` BIGINT NOT NULL,
-        `scanner_cache` set('',%s),
-        primary key (inode_id)
-        )""",",".join(scanners))
+##        ## Create an enum for the scanners in the inode table
+##        scanners = [ "%r" % s.__name__ for s in Registry.SCANNERS.classes ]
+##        case_dbh.execute("""CREATE TABLE IF NOT EXISTS inode (
+##        `inode_id` int auto_increment,
+##        `inode` VARCHAR(250) NOT NULL,
+##        `status` set('unalloc','alloc'),
+##        `uid` INT,
+##        `gid` INT,
+##        `mtime` TIMESTAMP NULL,
+##        `atime` TIMESTAMP NULL,
+##        `ctime` TIMESTAMP NULL,
+##        `dtime` TIMESTAMP NULL,
+##        `mode` INT,
+##        `links` INT,
+##        `link` TEXT,
+##        `size` BIGINT NOT NULL,
+##        `scanner_cache` set('',%s),
+##        primary key (inode_id)
+##        )""",",".join(scanners))
 
 ##        case_dbh.execute("""CREATE TABLE IF NOT EXISTS file (
 ##        `inode_id` INT NULL,
@@ -426,12 +426,39 @@ class CaseDBInit(FlagFramework.EventHandler):
 
 
 class FileTable(FlagFramework.CaseTable):
-    """ File table """
+    """ File table - Complements the VFS inodes with filenames """
     name = 'file'
-    columns = [ [ InodeIDType, dict(name = 'Inode', column='inode_id', case=None) ],
+    columns = [ [ InodeIDType, {} ],
                 [ StringType, dict(name = 'Inode_deprecated', column = 'inode')],
                 [ StringType, dict(name = 'Mode', column = 'mode', width=3)],
                 [ StringType, dict(name = 'Status', column = 'status', width=8)],
-                [ FilenameType, dict(case = None, table=None)],
+                [ FilenameType, {}],
                 ]
     index = [ 'inode_id']
+
+class InodeTable(FlagFramework.CaseTable):
+    """ Inode Table - stores information related to VFS Inodes """
+    name = 'inode'
+    primary = 'inode_id'
+    columns = [ [ InodeIDType, {}, "auto_increment" ],
+                [ StringType, dict(name = 'Inode_', column = 'inode')],
+                [ DeletedType, {} ],
+                [ IntegerType, dict(name = 'UID', column = 'uid')],
+                [ IntegerType, dict(name = 'GID', column = 'gid')],
+                [ TimestampType, dict(name = 'Timestamp', column='mtime')],
+                [ TimestampType, dict(name = 'Timestamp', column='atime')],
+                [ TimestampType, dict(name = 'Timestamp', column='ctime')],
+                [ TimestampType, dict(name = 'Timestamp', column='dtime')],
+                [ IntegerType, dict(name = 'Mode', column='mode')],
+                [ IntegerType, dict(name = 'Links', column='links')],
+                [ StringType, dict(name='Link', column='link', width=500)],
+                [ BigIntegerType, dict(name = 'Size', column='size')],
+                ]
+    
+    def __init__(self):
+        scanners = [ "%r" % s.__name__ for s in Registry.SCANNERS.classes ]
+        self.columns = self.columns + [ [ SetType,
+                                          dict(name='Scanner Cache', column='scanner_cache',
+                                               states = scanners)
+                                          ],
+                                        ]
