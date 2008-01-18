@@ -60,6 +60,10 @@ int Root_Read(Packet self, StringIO input) {
     this->packet.eth = (Packet)CONSTRUCT(ETH_II, Packet, super.Con, self, self);
     return CALL(this->packet.eth, Read, input);
 
+  case DLT_IEEE802_11:
+    this->packet.eth = (Packet)CONSTRUCT(IEEE80211, Packet, super.Con,self, self);
+    return CALL(this->packet.eth, Read, input);
+
   case DLT_LINUX_SLL:
     this->packet.eth = (Packet)CONSTRUCT(Cooked, Packet, super.Con, self, self);
     return CALL(this->packet.eth, Read, input);
@@ -199,6 +203,51 @@ VIRTUAL(PPPOE, Packet)
      NAME_ACCESS(packet, payload, payload, FIELD_TYPE_PACKET);
 
      VMETHOD(super.Read) = PPPOE_Read;
+END_VIRTUAL
+
+/****************************************************
+  IEEE 802 11 wireless headers
+*****************************************************/
+int IEEE80211_Read(Packet self, StringIO input) {
+  IEEE80211 this=(IEEE80211)self;
+  int len;
+
+  len = this->__super__->Read(self, input);
+  
+  /** Now depending on the ethernet type we dispatch another parser */
+  switch(this->packet.type) {
+  case 0x800:
+    this->packet.payload = (Packet)CONSTRUCT(IP, Packet, super.Con, self, self);
+    len += CALL(this->packet.payload, Read, input);
+    break;
+
+  case 0x8864:
+    this->packet.payload = (Packet)CONSTRUCT(PPPOE, Packet, super.Con, self, self);
+    len += CALL(this->packet.payload, Read, input);
+    break;
+
+  default:
+#ifdef __VERBOSE_DEBUG__
+    DEBUG("Unknown ethernet payload type 0x%x.\n", 
+	  this->packet.type);
+#endif
+    break;
+  };
+
+  return len;
+};
+
+VIRTUAL(IEEE80211, Packet)
+     INIT_STRUCT(packet, ieee_802_11_format);
+
+     NAME_ACCESS(packet, bss, bss, FIELD_TYPE_ETH_ADD);
+     NAME_ACCESS(packet, source, source, FIELD_TYPE_ETH_ADD);
+     NAME_ACCESS(packet, dest, dest, FIELD_TYPE_ETH_ADD);
+     NAME_ACCESS(packet, seq, seq, FIELD_TYPE_SHORT_X);
+     NAME_ACCESS(packet, type, type, FIELD_TYPE_SHORT_X);
+     NAME_ACCESS(packet, payload, payload, FIELD_TYPE_PACKET);
+
+     VMETHOD(super.Read) = IEEE80211_Read;
 END_VIRTUAL
 
 /****************************************************

@@ -31,6 +31,7 @@
 /** Format string characters */
 #define STRUCT_NULL 0
 #define STRUCT_CHAR 3
+#define FORMAT_CHAR "\x03"
 
 #define STRUCT_SHORT 4
 #define FORMAT_SHORT "\x04"

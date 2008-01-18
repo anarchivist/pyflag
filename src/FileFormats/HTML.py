@@ -41,9 +41,8 @@ def decode(string):
 
 class Tag:
     def __init__(self, name=None, attributes=None):
-        if not attributes: attributes={}
         self.name = name
-        self.attributes = attributes
+        self.attributes = attributes or {}
         self.children = []
         self.type = 'open'
 
@@ -228,7 +227,7 @@ class SanitizingTag(Tag):
             if self.name == 'link':
                 attributes += " href=%s" % self.resolve_reference(self.attributes['href'], 'text/css')
             else:
-                attributes += ' href="javascript: alert(%r)"' % (urllib.quote(self.attributes['href'][:100].replace("'","_")))
+                attributes += ' href="javascript: alert(%r)"' % (urllib.quote(self.attributes['href'].__str__()[:100].replace("'","_")))
 
         ## CSS needs to be filtered extra well
         if self.name == 'style':

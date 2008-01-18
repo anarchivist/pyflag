@@ -346,8 +346,8 @@ class LiveComMessages(Reports.report):
 
     def display(self, query, result):
         result.table(
-            elements = [ TimestampType('Timestamp','inode.mtime'),
-                         InodeIDType('Inode', 'inode.inode_id', case = query['case']),
+            elements = [ TimestampType('Timestamp','mtime', table='inode'),
+                         InodeIDType(case = query['case']),
                          StringType('From', 'From'),
                          StringType('To', 'To'),
                          StringType('CC', 'CC'),
@@ -357,8 +357,7 @@ class LiveComMessages(Reports.report):
                          StringType('Type','type'),
                          StringType('Service','service'),
                          ],
-            table = 'live_messages,inode',
-            where = 'inode.inode_id=live_messages.inode_id',
+            table = 'live_messages',
             case = query['case']
             )
 

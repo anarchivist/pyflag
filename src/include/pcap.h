@@ -20,6 +20,7 @@ dependancy on libpcap. (We dont actually link against it). */
 #define DLT_PPP		9	/* Point-to-point Protocol */
 #define DLT_FDDI	10	/* FDDI */
 
+#define DLT_IEEE802_11  105     /* IEEE 802.11 wireless */
 #define DLT_LINUX_SLL	113
 
 struct pcap_file_header {

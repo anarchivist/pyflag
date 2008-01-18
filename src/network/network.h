@@ -39,7 +39,8 @@
     Needed packers and unpackers
 *************************************************/
 
-#define STRUCT_ETH_ADDR 10
+#define STRUCT_ETH_ADDR 0x0a
+#define FORMAT_ETH_ADDR "\x0a"
 
 /***********************************************
     The Root node.
@@ -112,6 +113,35 @@ CLASS(ETH_II, Packet)
      struct ethernet_2_struct packet;
 END_CLASS
 
+/***********************************************
+    Wireless IEEE 802.11 headers
+*************************************************/
+struct ieee_802_11_struct {
+  uint16_t frame_control;
+  uint16_t duration;
+  unsigned char bss[6];
+  unsigned char source[6];
+  unsigned char dest[6];
+  uint16_t seq;
+  
+  // Thats the LLC which we just treat the same atm:
+  unsigned char dsap;
+  unsigned char ssap;
+  unsigned char llc_control;
+  unsigned char org_code[3];
+  uint16_t type;
+
+  Packet payload;
+} __attribute__((packed));
+
+#define ieee_802_11_format FORMAT_SHORT FORMAT_SHORT FORMAT_ETH_ADDR \
+  FORMAT_ETH_ADDR FORMAT_ETH_ADDR FORMAT_SHORT			     \
+  FORMAT_CHAR FORMAT_CHAR FORMAT_CHAR FORMAT_CHAR FORMAT_CHAR	     \
+  FORMAT_CHAR FORMAT_SHORT
+
+CLASS(IEEE80211, Packet)
+     struct ieee_802_11_struct packet;
+END_CLASS
 /***********************************************
     IP headers
 *************************************************/
