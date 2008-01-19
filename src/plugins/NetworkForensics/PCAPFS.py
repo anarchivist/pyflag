@@ -595,7 +595,8 @@ class NetworkingSummary(Reports.report):
             output.table(
                 elements = [ CounterType('Number of HTTP Get Requests') ],
                 table='http',
-                case=query['case']
+                case=query['case'],
+                filter="filter",
                 )
             return output
 
@@ -603,7 +604,8 @@ class NetworkingSummary(Reports.report):
             output.table(
                 elements = [ CounterType('Number of IRC Messages') ],
                 table='irc_messages',
-                case=query['case']
+                case=query['case'],
+                filter="filter1",
                 )
             return output
 
@@ -611,7 +613,8 @@ class NetworkingSummary(Reports.report):
             output.table(
                 elements = [ CounterType('Number of MSN Messages') ],
                 table='msn_session',
-                case=query['case']
+                case=query['case'],
+                filter="filter2",
                 )
             return output
 
@@ -619,7 +622,8 @@ class NetworkingSummary(Reports.report):
             output.table(
                 elements = [ CounterType('Number of Emails Messages') ],
                 table='email',
-                case=query['case']
+                case=query['case'],
+                filter="filter3",
                 )
             return output
         

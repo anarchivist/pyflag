@@ -117,6 +117,7 @@ class BrowseFS(Reports.report):
                              ],
                 table='inode',
                 case=query['case'],
+                filter="filter1",
                 )
 
         def tree_view(query,result):
@@ -160,6 +161,7 @@ class BrowseFS(Reports.report):
                     where="file.path=%r and file.mode!='d/d'" % (path+'/'),
                     case=query['case'],
                     pagesize=10,
+                    filter="filter2",
                     )
         
             result.tree(tree_cb = tree_cb,pane_cb = pane_cb, branch = branch )
@@ -194,17 +196,14 @@ class ViewFile(Reports.report):
 
         fsfd = FileSystem.DBFS( query["case"])
         ## If this is a directory, only show the stats
-        try:
-            if query.has_key('inode'):
-                fd = fsfd.open(inode=query['inode'])
-            else:
-                fd = fsfd.open(inode_id=query['inode_id'])
-                query['inode'] = fd.inode
-            image = Graph.Thumbnailer(fd,300)
-        except IOError:
-            fd = FileSystem.File(query['case'], None, '')
-            image = None
+        if query.has_key('inode'):
+            fd = fsfd.open(inode=query['inode'])
+        else:
+            fd = fsfd.open(inode_id=query['inode_id'])
+            query['inode'] = fd.inode
 
+        image = Graph.Thumbnailer(fd,300)
+        
         ## Make a series of links to each level of this inode - this
         ## way we can view parents of this inode.
         tmp = result.__class__(result)

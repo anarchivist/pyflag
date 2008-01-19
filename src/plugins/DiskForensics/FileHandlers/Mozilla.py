@@ -95,7 +95,7 @@ class BrowserHistoryReport(Reports.report):
                              StringType('Filename', 'filename'),
                              StringType('Headers','headers') ],
                 table='ie_history',
-                case=query['case']
+                case=query['case'],
                 )
 
         result.notebook(names = ['Mozilla History', 'Mozilla Forms', 'IE Cache'],

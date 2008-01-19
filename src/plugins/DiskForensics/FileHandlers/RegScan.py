@@ -170,6 +170,7 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                              StringType('Value','value') ],
                 table='reg',
                 case=query['case'],
+                filter = "filter1"
                 )
 
         def tree_notebook_cb(query,result):
@@ -221,6 +222,7 @@ class BrowseRegistry(DiskForensics.BrowseFS):
                     table='reg',
                     where="path=%r" % path,
                     case=query['case'],
+                    filter = "filter2"
                     )
 
             # display paths in tree

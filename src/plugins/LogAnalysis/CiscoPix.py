@@ -385,7 +385,8 @@ class CiscoPixSyslogged(Simple.SimpleLog):
                 columns = ['id','pix_ts','action','rule','src_if', 'src_port', 'src_host', 'dst_if', 'dst_host', 'dst_port','direction','conn_number','protocol',  'duration','bytes'],
                 names = ['ID','PIX TS','PIX Action','PIX Rule', 'Src IF', 'Src Port', 'Src Host', 'Dest IF', 'Dest Host', 'Dest Port', 'Connection Direction','Connection Num','Protocol','Conn Duration','Conn Bytes'],
                 table= "conn_" + query['logtable']+"_log",
-                case=query['case']
+                case=query['case'],
+                filter="filter2",
                 )
         
         result.notebook(

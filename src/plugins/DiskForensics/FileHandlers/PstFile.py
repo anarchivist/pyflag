@@ -254,7 +254,8 @@ class PstExplorer(Reports.report):
                              StringType('To', 'to'),
                              StringType('Subject', 'subject') ],
                 table=('email'),
-                case=query['case']
+                case=query['case'],
+                filter="filter0",
                 )
             return output
         
@@ -266,7 +267,8 @@ class PstExplorer(Reports.report):
                              StringType('Address','address'),
                              StringType('Phone','phone') ],
                 table=('contact'),
-                case=query['case']
+                case=query['case'],
+                filter="filter1",
                 )
             return output
         
@@ -278,7 +280,8 @@ class PstExplorer(Reports.report):
                              StringType('Location','location'),
                              StringType('Comment','comment') ],
                 table=('appointment'),
-                case=query['case']
+                case=query['case'],
+                filter="filter2",
                 )
             return output
         
@@ -290,7 +293,8 @@ class PstExplorer(Reports.report):
                              StringType('Type','type'),
                              StringType('Comment','comment') ],
                 table=('journal'),
-                case=query['case']
+                case=query['case'],
+                filter="filter3",
                 )
             return output
 

@@ -2234,6 +2234,7 @@ class BrowseMSNData(Reports.report):
                         ],
             table = "msn_users join pcap on packet_id=id",
             case = query['case'],
+            filter="filter1",
             )
 
         def file_transfers(query, result):
@@ -2249,17 +2250,18 @@ class BrowseMSNData(Reports.report):
                                 StringType("Context", "context")],
                     table = "msn_p2p",
                     case = query['case'],
-                         )
+                    filter="filter2",
+                    )
 
         result.heading("MSN Data")
         result.notebook(
-                names = ['MSN Sessions',
-                         'MSN Users',
-                         'MSN File Transfers'],
+            names = ['MSN Sessions',
+                     'MSN Users',
+                     'MSN File Transfers'],
             callbacks = [ sessions,
                           users,
-                          file_transfers ]
-                        )
+                          file_transfers ],
+            )
 
 if __name__ == "__main__":
     fd = open("/tmp/case_demo/S93-94")

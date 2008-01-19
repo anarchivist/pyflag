@@ -79,6 +79,7 @@ class ViewCaseReport(Reports.report):
                              ],
                 table = 'annotate',
                 case = query['case'],
+                filter="filter1",
                 )
 
         def Timeline(query, result):
@@ -109,6 +110,7 @@ class ViewCaseReport(Reports.report):
                             ],
                 table = 'timeline',
                 case = query['case'],
+                filter="filter2",
             )
 
             result.toolbar(add_new_event, "Add abritrary event", 
@@ -123,6 +125,7 @@ class ViewCaseReport(Reports.report):
                             ],
                 table = 'interesting_ips',
                 case = query['case'],
+                filter="filter3",
             )
 
         result.heading("Report for case %s" % query['case'])
