@@ -516,11 +516,10 @@ class DBO:
                 self.execute("drop table `cache_%s`",id )
                 self.execute("create table `cache_%s` %s limit %s,%s",
                              (id,sql, lower_limit, config.DBCACHE_LENGTH))
-
-        except:
+                
+        finally:
         ## Make sure the lock is released if we raise
             self.execute("commit")
-            raise
         
         return self.execute("select * from cache_%s limit %s,%s",
                             (id,limit - lower_limit,length))

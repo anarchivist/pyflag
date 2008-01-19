@@ -89,7 +89,7 @@ class Sleuthkit(DBFS):
         DBFS.load(self, mount_point, iosource_name)
 
         # open the skfs
-        iosrc = IO.open(self.case, iosource_name)
+        iosrc = self.iosource
         fs = sk.skfs(iosrc)
 
         dbh_file=DB.DBO(self.case)

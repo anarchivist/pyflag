@@ -82,6 +82,12 @@ class Mounted(IO.Image):
             query = FlagFramework.query_type(string=row['parameters'])
             self.directory = query['directory']
 
+            ## Find the mount point:
+            dbh.execute("select value from filesystems where property='mount point' and iosource=%r", name)
+            row = dbh.fetch()
+            if row:
+                self.mount_point = row['value']
+
         return self
 
 class MountedFS(DBFS):
@@ -100,7 +106,8 @@ class MountedFS(DBFS):
             return -1
     
     def load(self, mount_point, iosource_name):
-        iosrc = IO.open(self.case, iosource_name)
+        DBFS.load(self, mount_point, iosource_name)
+        iosrc = self.iosource
         
         pyflaglog.log(pyflaglog.DEBUG,"Loading files from directory %s" % iosrc.directory)
         dbh_file=DB.DBO(self.case)
@@ -108,7 +115,7 @@ class MountedFS(DBFS):
         
         dbh_inode=DB.DBO(self.case)
         dbh_inode.mass_insert_start('inode')
-        
+
         ## This deals with a mounted filesystem - we dont get the full
         ## forensic joy, but we can handle more filesystems than
         ## sleuthkit can.  The downside is that the user has to mount
@@ -172,13 +179,22 @@ class MountedFS_file(File):
         ## Note this _must_ work because we can only ever be called on
         ## a mounted iosource - it is an error otherwise:
         basepath = fd.io.directory
-
+        
         self.case = case
         dbh = DB.DBO(case)
         dbh.check_index("file" ,"inode")
         dbh.execute("select path,name from file where inode=%r limit 1",(inode))
         row=dbh.fetch()
-        path=basepath+'/'+row['path']+"/"+row['name']
+
+        path = row['path']
+        mount_point = fd.io.mount_point
+        ## Prune the path down to the mount point:
+        if path[:len(mount_point)] != mount_point:
+            raise RuntimeError("Something went wrong - %s should be mounted on %s" % \
+                               (path, mount_point))
+        
+        path = path[len(mount_point):]
+        path=basepath+'/'+path+"/"+row['name']
         self.fd = open(path,'r')
     
     def close(self):
