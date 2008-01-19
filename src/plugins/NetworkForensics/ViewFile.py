@@ -192,7 +192,7 @@ class ViewFile(Reports.report):
             
         ui.generator.generator = generator()
         
-    def mpeg_handler(self, fd, ui):
+    def mpeg3_handler(self, fd, ui):
         ## TODO: run down the ID3 tags here
         
         ## Convert to mp3 at 44100 samples in order to normalise
@@ -206,12 +206,24 @@ class ViewFile(Reports.report):
                 
         ui.sound_control("Listen to file", play_file(fd))
 
+    def flv_handler(self, fd, ui):
+        
+        def play_file(fd):
+            while 1:
+                data = fd.read(64*1024)
+                if not data: break
+
+                yield data
+                
+        ui.video_control("Play file", play_file(fd))
+
     mappings = { "SGML": "text/html"}
 
     dispatcher = { re.compile("text/html"): html_handler,
                    re.compile("image.*"): image_handler,
                    re.compile("application/x-zip"): zip_handler,
-                   re.compile("audio/mpeg"): mpeg_handler,
+                   re.compile("audio/mpeg"): mpeg3_handler,
+                   re.compile("Macromedia Flash Video"): flv_handler,
                    re.compile("css"): css_handler,
                    }
 
