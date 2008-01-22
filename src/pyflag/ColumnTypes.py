@@ -869,8 +869,7 @@ class FilenameType(StringType):
             pass
 
     def operator_literal(self, column, operator, pattern):
-        return "`%s` in (select inode_id from file where concat(file.path, file.name) %s %r)" % (self.column, operator, pattern) 
-
+        return "%s in (select inode_id from file where concat(file.path, file.name) %s %r)" % (self.escape_column_name(self.column), operator, pattern) 
     def create(self):
         return "path TEXT, name TEXT, link TEXT NULL"
 
