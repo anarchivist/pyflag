@@ -1,0 +1,16 @@
+.MenuBar, .PyFlagHeader, .PopupMenu { 
+  display: none;
+}
+
+#PyFlagPage, .TabContent { 
+  float: none;
+  overflow-y: none;
+  height: 100%;
+}
+
+.TabContent, iframe { 
+  float: left;
+  overflow: hidden;
+  display: inline;
+  height: 100%;
+}

@@ -75,30 +75,24 @@ class StreamFile(File):
     def __init__(self, case, fd, inode):
         File.__init__(self,case, fd, inode)
 
-        inode = inode.split("|")[-1]
-
-        ## We allow the user to ask for a number of streams which will
-        ## be combined at the same time. This allows us to create a
-        ## VFS node for both forward and reverse streams, or even
-        ## totally unrelated streams which happen at the same time.
-
-        ## This is handled by creating a "virtual stream" - a new
-        ## stream with a new stream id which collects all the packets
-        ## in the component streams in chronological order.
-
-        ## We use the inode column in the connection_details table to
-        ## cache this so we only have to combine the streams once.
-        inode_ids = [ int(x) for x in inode[1:].split("/")]
-
         dbh = DB.DBO(self.case)
         
         ## Ensure we have an index on this column
         dbh.check_index("connection","inode_id")
         dbh.check_index("connection_details","inode_id")
+        
+        ## We use the inode column in the connection_details table to
+        ## cache this so we only have to combine the streams once.
+        inode = inode.split("|")[-1]
+        self.inode_ids = [ int(x) for x in inode[1:].split("/")]
 
         ## Fill in some vital stats
-        dbh.execute("select inode_id, reverse, src_ip, dest_ip, src_port, dest_port, ts_sec from `connection_details` where inode_id=%r limit 1", inode_ids[0])
+        dbh.execute("select inode.inode_id, reverse, src_ip, dest_ip, src_port, dest_port, ts_sec from `connection_details` join inode on inode.inode_id = connection_details.inode_id where inode.inode=%r limit 1", self.inode)
         row=dbh.fetch()
+        if not row:
+            dbh.execute("select inode_id,reverse, src_ip, dest_ip, src_port, dest_port, ts_sec from `connection_details` where inode_id = %r", self.inode_ids[0])
+            row = dbh.fetch()
+            
         self.src_port = row['src_port']
         self.dest_port = row['dest_port']
         self.reverse = row['reverse']
@@ -107,9 +101,12 @@ class StreamFile(File):
         self.src_ip = row['src_ip']
         self.inode_id = row['inode_id']
 
-        if not self.cached_fd:
-            self.create_new_stream(inode_ids)
-            self.look_for_cached()
+        ## We allow the user to ask for a number of streams which will
+        ## be combined at the same time. This allows us to create a
+        ## VFS node for both forward and reverse streams, or even
+        ## totally unrelated streams which happen at the same time.
+        
+        self.look_for_cached()
 
         self.stat_cbs.extend([ self.show_packets, self.combine_streams ])
         self.stat_names.extend([ "Show Packets", "Combined streams"])
@@ -117,6 +114,17 @@ class StreamFile(File):
         ## This is a cache of packet lists that we keep so we do not
         ## have to hit the db all the time.
         self.packet_list = None
+
+    def read(self,len=None):
+        ## Call our baseclass to see if we have cached data:
+        try:
+            return File.read(self,len)
+        except IOError:
+            pass
+
+        self.create_new_stream(self.inode_ids)
+        self.look_for_cached()
+        return File.read(self,len)
         
     def create_new_stream(self,stream_ids):
         """ Creates a new stream by combining the streams given by the list stream_ids.
@@ -248,8 +256,8 @@ class StreamFile(File):
             metamtime=None
         
         ## Create VFS Entry 
-        fsfd.VFSCreate(None, self.inode, pathname, size=outfd_len, mtime=metamtime)
-
+        self.inode_id = fsfd.VFSCreate(None, self.inode, pathname, size=outfd_len, mtime=metamtime)
+        
         ##  We also now fill in the details for the combined stream in 
         ##  the connection_details table...
         try:
@@ -272,7 +280,7 @@ class StreamFile(File):
         if self.packet_list==None:
             dbh = DB.DBO(self.case)
             dbh.execute("""select packet_id,cache_offset from `connection` where inode_id = %r order by cache_offset desc, length desc """,
-                    (self.inode_id))
+                        (self.inode_id))
             self.packet_list = [ (row['packet_id'],row['cache_offset']) for row in dbh ]
 
         ## Now try to find the packet_id in memory:

@@ -151,7 +151,7 @@ class YahooParser:
 class YahooScanner(StreamScannerFactory):
     """ A Yahoo IM Protocol scanner """
     default = True
-    depends = [ "MSNScanner", ]
+    depends = []
 
     def process_stream(self, stream, factories):
         """ Process the IM stream """

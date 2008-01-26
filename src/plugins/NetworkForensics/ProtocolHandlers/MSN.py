@@ -242,7 +242,7 @@ class Message:
         try:
             dbh = DB.DBO(self.case)
             dbh.insert("msn_users",
-                           inode=self.fd.inode,
+                           inode_id=self.fd.inode_id,
                            packet_id=self.get_packet_id(),
                            transaction_id=tr_id,
                            session_id=sessionid,
@@ -1526,9 +1526,10 @@ class Message:
                 #date_str = mtime.split(" ")[0]
 
                 try:
-                   path=self.ddfs.lookup(inode=self.fd.inode)
+                   path=self.ddfs.lookup(inode_id=self.fd.inode_id)
                 except Exception, e:
-                   pyflaglog.log(pyflaglog.WARNINGS,  "Could not determine "\
+                    print e
+                    pyflaglog.log(pyflaglog.WARNINGS,  "Could not determine "\
                                                       "the path to the inode.")
 
                 path=os.path.normpath(path+"/../../../../../")
@@ -1546,7 +1547,7 @@ class Message:
                                 to_user= headers['to'],
                                 from_user= headers['from'],
                                 context=filename,
-                                inode=new_inode,
+                                inode_id=new_inode_id,
                                 )
 
                 self.insert_session_data(sender=strip_username(headers['from']),
@@ -1596,26 +1597,28 @@ class Message:
                                              headers['sessionid'],
                                              self.session_id,
                                             )
-
+                
+                old_inode_id = self.fd.inode_id
+                
                 old_inode_other_stream = "%s|CMSN%s-%s" % (
                                                 self.otherDir.fd.inode,
                                                 headers['sessionid'],
                                                 self.session_id,
                                             )
-
+                old_inode_other_stream_id = self.otherDir.fd.inode_id
                 dbh=DB.DBO(self.case)
 
                 dbh.execute("""update `msn_session` set p2p_file="None """ \
                             """(Declined)" where p2p_file="%s" or p2p_file """ \
-                            """= "%s" """ % (old_inode, old_inode_other_stream))
+                            """= "%s" """ % (old_inode_id, old_inode_other_stream_id))
 
                 dbh.execute("""select * from `msn_session` where p2p_file=""" \
-                            """"%s" or inode = "%s" """ % (old_inode, 
-                                                        old_inode_other_stream))
+                            """"%s" or inode_id = "%s" """ % (old_inode_id, 
+                                                        old_inode_other_stream_id))
 
-                dbh.execute("""update `msn_p2p` set inode="None (Declined""" \
-                            """)" where inode="%s" or inode="%s"  """ % \
-                                        (old_inode, old_inode_other_stream))
+                dbh.execute("update `msn_p2p` set inode_id=-1 " \
+                            "where inode_id=%s or inode_id=%s " % \
+                            (old_inode_id, old_inode_other_stream_id))
    
                 # Now we actually need to delete it from the VFS!
                 # There is no VFSDelete TODO 
@@ -1901,7 +1904,8 @@ class MSNScanner(StreamScannerFactory):
                                          forward_stream)
         reverse_inode = "I%s|S%s" % (stream.fd.name, 
                                          reverse_stream)
-        
+
+        inodes = [forward_inode, reverse_inode]
         # Open the combined stream.
         fd = self.fsfd.open(inode=combined_inode)
 
@@ -1910,7 +1914,7 @@ class MSNScanner(StreamScannerFactory):
         reverse_fd = self.fsfd.open(inode = reverse_inode)
         forward_fd_inode_id = forward_fd.lookup_id()
         reverse_fd_inode_id = reverse_fd.lookup_id()
-
+        inode_ids = [ forward_fd_inode_id, reverse_fd_inode_id ]
 
         # We actually want to process these as two distinct streams..
         # The problem is that just processing it as a single stream raises
@@ -2006,7 +2010,6 @@ class MSNScanner(StreamScannerFactory):
         # New
 
         iter = 0
-        inodes = [forward_inode, reverse_inode]
         for m in [forward_messages, reverse_messages]: 
             if m.session_id==-1:
                 pyflaglog.log(pyflaglog.VERBOSE_DEBUG,
@@ -2014,12 +2017,12 @@ class MSNScanner(StreamScannerFactory):
                           "stream S%s/%s" % (forward_stream, reverse_stream))
             else:
                 dbh.execute("update msn_session set session_id=%r where "\
-                            "session_id=-1 and inode=%r",
-                            (m.session_id,inodes[iter]))
+                            "session_id=-1 and inode_id=%r",
+                            (m.session_id,inode_ids[iter]))
             try:
                 dbh.execute("update msn_users set session_id=%r where "\
-                            "session_id=-1 and inode=%r",
-                            (m.session_id,inodes[iter]))
+                            "session_id=-1 and inode_id=%r",
+                            (m.session_id,inode_ids[iter]))
 
             except Exception:
                 # We already have this identical row with a real session ID - 
@@ -2052,10 +2055,9 @@ class MSNScanner(StreamScannerFactory):
 
         # New
         iter = 0
-        inodes = [forward_inode, reverse_inode]
         for m in [forward_messages, reverse_messages]:
             dbh.execute("delete from msn_users where session_id=-1 and "\
-                        "inode=%r",inodes[iter])
+                        "inode_id=%r",inode_ids[iter])
         
             # Similarly go back and fix up all the Unknown (Target) entries 
             # with the actual target name
@@ -2065,12 +2067,12 @@ class MSNScanner(StreamScannerFactory):
                                (forward_stream, reverse_stream))
             else:   
                 dbh.execute("update msn_session set recipient=%r where "\
-                            "recipient='Unknown (Target)' and inode=%r",
-                            (m.client_id,inodes[iter]))
+                            "recipient='Unknown (Target)' and inode_id=%r",
+                            (m.client_id,inode_ids[iter]))
 
                 dbh.execute("update msn_session set sender=%r where "\
-                            "sender='Unknown (Target)' and inode=%r",
-                            (m.client_id,inodes[iter]))
+                            "sender='Unknown (Target)' and inode_id=%r",
+                            (m.client_id,inode_ids[iter]))
             iter += 1
 
         # Old
