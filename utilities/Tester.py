@@ -119,16 +119,19 @@ for test_class in classes:
         test_registry.get_name(test_class)))
     print "---------------------------------------"
     suite = unittest.makeSuite(test_class)
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    result = unittest.TextTestRunner(verbosity=2).run(suite)
 
     ## Preform a collection:
     gc.collect()
 
     print "Garbage is %s" % (gc.garbage,)
-
-    if config.pause:
+    
+    ## Only pause for errors
+    if config.pause and result.errors:
         raw_input("Pause")
-    if config.log:
+        
+    ## Only write logs for tests which work perfectly.
+    if config.log and not result.errors:
         fd = open(config.log,'a')
         fd.write(test_class.__name__+"\n")
         fd.close()

@@ -305,10 +305,11 @@ class PCAPFS(DBFS):
                         ## Create a new VFS node:
                         new_inode = "I%s|S%s" % (iosource_name, connection['reverse']['inode_id'])
 
-                        self.VFSCreate(
+                        inode_id = self.VFSCreate(
                             None,
                             new_inode,
                             connection['path'] % "reverse",
+                            inode_id = connection['reverse']['inode_id'],
                             size = fd.offset,
                             _mtime = connection['reverse']['mtime'],
                             _fast = True

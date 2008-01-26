@@ -74,7 +74,6 @@ class StreamFile(File):
 
     def __init__(self, case, fd, inode):
         File.__init__(self,case, fd, inode)
-
         dbh = DB.DBO(self.case)
         
         ## Ensure we have an index on this column
@@ -92,7 +91,7 @@ class StreamFile(File):
         if not row:
             dbh.execute("select inode_id,reverse, src_ip, dest_ip, src_port, dest_port, ts_sec from `connection_details` where inode_id = %r", self.inode_ids[0])
             row = dbh.fetch()
-            
+
         self.src_port = row['src_port']
         self.dest_port = row['dest_port']
         self.reverse = row['reverse']
@@ -105,9 +104,10 @@ class StreamFile(File):
         ## be combined at the same time. This allows us to create a
         ## VFS node for both forward and reverse streams, or even
         ## totally unrelated streams which happen at the same time.
-        
-        self.look_for_cached()
 
+        self.look_for_cached()
+        self.read(0)
+        
         self.stat_cbs.extend([ self.show_packets, self.combine_streams ])
         self.stat_names.extend([ "Show Packets", "Combined streams"])
 

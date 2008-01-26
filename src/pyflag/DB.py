@@ -957,6 +957,8 @@ class DBOTest(unittest.TestCase):
         t=threading.Thread(target=execute_long_query, args=(results,))
         t.start()
         time.sleep(0.2)
+        ## This executes the same query in the current thread a little
+        ## later (it should still be running in the other thread).
         execute_long_query(results)
 
         time.sleep(1)

@@ -215,6 +215,7 @@ class Message:
                    transaction_id=tr_id,
                    data=data,
                    session_id=sessionid,
+                   p2p_file = p2pfile,
                    )
         
     def insert_user_data(self,nick,data_type,data,tr_id=-1,sessionid=None):
@@ -1527,12 +1528,12 @@ class Message:
 
                 try:
                    path=self.ddfs.lookup(inode_id=self.fd.inode_id)
+                   path=os.path.normpath(path+"/../../../../../")
                 except Exception, e:
                     print e
                     pyflaglog.log(pyflaglog.WARNINGS,  "Could not determine "\
                                                       "the path to the inode.")
-
-                path=os.path.normpath(path+"/../../../../../")
+                    raise
 
                 ## The filename and size is given in the context
                 new_inode_id = self.ddfs.VFSCreate(None,
@@ -2375,7 +2376,7 @@ class MSNTests4(MSNTests):
 
         ## Test it has what we expect in it
         fsfd = DBFS(self.test_case)
-        test = fsfd.open(inode=row['p2p_file'])
+        test = fsfd.open(inode_id=row['p2p_file'])
 
         # Check that we got the contents of the file correct
         line = test.read()
@@ -2435,7 +2436,7 @@ class MSNTests7(MSNTests):
 
         ## Test it has what we expect in it
         fsfd = DBFS(self.test_case)
-        test = fsfd.open(inode=row['p2p_file'])
+        test = fsfd.open(inode_id=row['p2p_file'])
 
         # Check that we got the contents of the file correct
         
