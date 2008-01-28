@@ -530,7 +530,7 @@ def extended_csv(self, value):
     value.replace("\n","\\n")
     value.replace("\r","\\r")
 
-    geoipdata = Whois.get_all_geoip_data(value)
+    geoipdata = get_all_geoip_data(value)
 
     if geoipdata.has_key("city"):
         returnCity = geoipdata['city'] or "Unknown"
@@ -590,7 +590,7 @@ def operator_whois_country(self, column, operator, country):
 def code_maxmind_isp_like(self, column, operator, isp):
     """ Returns true if column has an ISP which contains the word isp in it """
     def f(row):
-        data = Whois.get_all_geoip_data(row[self.column])
+        data = get_all_geoip_data(row[self.column])
         ## this is not that accurate but close:
         clean_isp = isp.replace('%','.*')
         if 'isp' in data and re.search(clean_isp,data['isp']):
@@ -642,7 +642,7 @@ def operator_maxmind_isp_like(self, column, operator, isp):
 def code_maxmind_org(self, column, operator, org):
     """ Returns true if column has an ISP which contains the word isp in it """
     def f(row):
-        data = Whois.get_all_geoip_data(row[self.column])
+        data = get_all_geoip_data(row[self.column])
         ## this is not that accurate but close:
         clean_isp = org.replace('%','.*')
         if 'org' in data and re.search(clean_isp,data['org']):
@@ -690,7 +690,7 @@ def operator_maxmind_org_like(self, column, operator, org):
 def code_maxmind_city(self, column, operator, city):
     """ Returns true if column has an ISP which contains the word isp in it """
     def f(row):
-        data = Whois.get_all_geoip_data(row[column])
+        data = get_all_geoip_data(row[column])
         ## this is not that accurate but close:
         clean_isp = isp.replace('%','.*')
         if 'city' in data and re.search(clean_isp,data['city']):
@@ -737,7 +737,7 @@ def operator_maxmind_city(self, column, operator, city):
 
 def code_maxmind_country(self, column, operator, country):
     def f(row):
-        data = Whois.get_all_geoip_data(row[column])
+        data = get_all_geoip_data(row[column])
         return data.get("country_code3")==country
 
     return f

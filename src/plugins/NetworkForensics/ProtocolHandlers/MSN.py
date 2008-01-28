@@ -1623,10 +1623,9 @@ class Message:
    
                 # Now we actually need to delete it from the VFS!
                 # There is no VFSDelete TODO 
-
-                dbh.execute("""delete from `inode` where `inode` = "%s" """ \
-                            """ or inode = "%s" """ % \
-                            (old_inode, old_inode_other_stream))
+                #dbh.execute("""delete from `inode` where `inode` = "%s" """ \
+                #            """ or inode = "%s" """ % \
+                #            (old_inode, old_inode_other_stream))
 
                 ## Remove it from our inodes 
                 try:
@@ -1970,9 +1969,11 @@ class MSNScanner(StreamScannerFactory):
                 forward_messages.parse()
 
         for inode in forward_messages.inodes:
+            print "Scanning %s|%s" % (forward_inode, inode)
             self.scan_as_file("%s|%s" % (forward_inode, inode), factories)
         
         for inode in reverse_messages.inodes:
+            print "Scanning %s|%s" % (reverse_inode, inode)
             self.scan_as_file("%s|%s" % (reverse_inode, inode), factories)
             
         ####

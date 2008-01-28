@@ -208,6 +208,8 @@ class Log:
         ## We append _log to tablename to prevent name clashes in the
         ## db:
         tablename = name+"_log"
+        ## Set the table for our columns:
+        for f in self.fields: f.table = tablename
         
         ## First we create the table. We do this by asking all the
         ## column types for their create clause:

@@ -376,7 +376,9 @@ class ApacheLogTest(LogFile.LogDriverTester):
         
         ## Now try to enforce the same filter on the original table
         ## (which has all the rows in it):
+        for f in log.fields: f.table = self.test_table+"_log"
         filter_sql = parser.parse_to_sql(filter, log.fields)
+
         dbh.execute("select count(*) as c from `%s_log` where %s", (self.test_table, filter_sql))
         row2 = dbh.fetch()
         self.assertEqual(row['c'], row2['c'])

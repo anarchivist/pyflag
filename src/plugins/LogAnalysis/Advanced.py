@@ -13,9 +13,6 @@ config = pyflag.conf.ConfObject()
 import inspect
 import pyflag.ColumnTypes as ColumnTypes
 
-## These are names which can not be set by the user
-HIDDEN_NAMES = ['self', 'link', 'callback', 'link_pane']
-
 class AdvancedLog(LogFile.Log):
     """ An advanced log parser for generic line oriented log files """
     name = "Advanced"
@@ -77,17 +74,8 @@ class AdvancedLog(LogFile.Log):
         column_class = Registry.COLUMN_TYPES.dispatch(columntype)
 
         right = result.__class__(result)
-        (args, varargs, varkw, defaults) = inspect.getargspec(column_class.__init__)
-        d = len(args) - len(defaults)
-        for i in range(len(args)):
-            k = args[i]
-            if k in HIDDEN_NAMES: continue
-
-            fieldname = "field_param_%s_%s" % (number,k)
-            if i > d and defaults[i-d]:
-                result.defaults[fieldname] = defaults[i-d]
-                
-            right.textfield(k, fieldname)
+        log_renderer = column_class.LogParser()
+        log_renderer.render_form("field_param_%s" % (number) , right)
 
         left = result.__class__(result)
         left.row(columntype)
@@ -100,7 +88,7 @@ class AdvancedLog(LogFile.Log):
     def __init__(self,case = None):
         LogFile.Log.__init__(self, case)
         
-        columntypes = [ c.__name__ for c in Registry.COLUMN_TYPES.classes if not c.hidden ]
+        columntypes = [ c.__name__ for c in Registry.COLUMN_TYPES.classes if c.LogParser.LogCompatible ]
         columntypes.sort()
         self.columntypes = [ "New Column", ] + columntypes
 

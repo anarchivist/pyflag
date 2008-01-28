@@ -276,6 +276,7 @@ class GenericUI:
         for e in elements:
             if e.table not in tables: tables.append(e.table)
 
+        print "tables %s" % (tables,)
         ## Now generate the join clause:
         query_str += " from %s " % tables[0]
 

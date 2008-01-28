@@ -107,6 +107,18 @@ except ImportError:
 
         raise ValueError("Unable to parse date %s" % string)
 
+class LogParser:
+    LogCompatible = False
+
+    def render_form(self, basename, result):
+        """ A hook called from the Advanced Log builder which allows us to build this column using the GUI. Note that LogCompatible must be True for this to work. """
+        defaults = {'name':"Name", 'column':"DB Column"}
+        for name in defaults.keys():
+            fieldname = "%s_%s" % (basename,name)
+            result.textfield(name, defaults[name])
+
+
+
 ## The following are common column types which the parser can
 ## handle. ColumnTypes can be defined as plugins by extending the
 ## ColumnTypes base class.
@@ -301,6 +313,10 @@ class ColumnType:
         """
         return self.name
 
+    class LogParser(LogParser):
+        pass
+    
+    ## This allows the column to be used by the log builder.
     def log_parse(self, row):
         """ This is called by the log processing to parse the value of
         this column from the row.
@@ -409,6 +425,9 @@ class IntegerType(ColumnType):
 
     def create(self):
         return "`%s` int(11)" % self.column
+
+    class LogParser(LogParser):
+        LogCompatible = True
 
 class BigIntegerType(IntegerType):
     def create(self):
@@ -898,10 +917,9 @@ class DeletedType(StateType):
     hidden = True
     states = {'deleted':'deleted', 'allocated':'alloc'}
 
-    def __init__(self, states = None, **kwargs):
+    def __init__(self, **kwargs):
         StateType.__init__(self, name='Del', column='status', **kwargs)
         self.table = 'file'
-        if states: self.states = states
 
     def display(self,value, row, result):
         """ Callback for rendering deleted items """
@@ -964,11 +982,11 @@ class ColumnTypeTests(pyflag.tests.ScannerTest):
 
         self.elements = [ IntegerType('IntegerType',column='integer_type', table='dummy'),
                           StringType('StringType',column='string_type'),
-                          DeletedType('DeletedType', column='deleted', table='dummy'),
+                          DeletedType( table='dummy'),
                           TimestampType('TimestampType','timestamp'),
                           IPType('IPType','source_ip'),
-                          InodeIDType('InodeIDType','inode_id'),
-                          FilenameType('FilenameType'),
+                          InodeIDType(),
+                          FilenameType(),
                           ]
         self.tablename = 'dummy'
         t.columns = [ [e, {}] for e in self.elements]
@@ -976,8 +994,10 @@ class ColumnTypeTests(pyflag.tests.ScannerTest):
         dbh=DB.DBO(self.test_case)
         dbh.drop(self.tablename)
         t.create(dbh)
+        for e in self.elements: print e.table
 
     def generate_sql(self, filter):
+        print self.elements
         sql = self.ui._make_sql(elements = self.elements, filter_elements=self.elements,
                                  table = self.tablename, case=None, filter = filter)
         ## Try to run the SQL to make sure its valid:
@@ -1019,11 +1039,3 @@ class ColumnTypeTests(pyflag.tests.ScannerTest):
         self.assertEqual(self.generate_sql("InodeIDType contains 'Z|' and TimestampType after 2005-10-10"),
                          "(1) and ((`inode`.`inode_id` in (select inode_id from inode where inode like '%Z|%')) and `timestamp` > '2005-10-10 00:00:00')")
 
-    def test10CreateTable(self):
-        """ Test table creation """
-        dbh = DB.DBO()
-        
-        ## Check to see if the table create code is valid sql:
-        dbh.execute("create temporary table foobar_001 (%s)", (
-            ',\n'.join([ x.create() for x in self.elements])
-            ))

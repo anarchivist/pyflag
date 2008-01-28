@@ -97,7 +97,7 @@ class LiveTables(FlagFramework.EventHandler):
             `CC` VARCHAR(250),
             `BCC` VARCHAR(250),
             `Subject` VARCHAR(250),
-            `Message` Text default "",
+            `Message` Text,
             `Sent` TIMESTAMP NULL,
             primary key (`id`))""")
 

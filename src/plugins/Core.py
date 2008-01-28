@@ -244,7 +244,8 @@ class CaseDBInit(FlagFramework.EventHandler):
         `timestamp` TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL ,
         `query` MEDIUMTEXT NOT NULL,
         `limit` INT default 0,
-        `length` INT default 100
+        `length` INT default 100,
+        `locked` INT default 1
         ) ENGINE=InnoDB""")
 
         case_dbh.execute("""CREATE TABLE sql_cache_tables (
@@ -396,8 +397,9 @@ class CaseDBInit(FlagFramework.EventHandler):
         `timestamp` TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL ,
         `query` MEDIUMTEXT NOT NULL,
         `limit` INT default 0,
-        `length` INT default 100
-        )""")
+        `length` INT default 100,
+        `locked` INT default 1
+        ) ENGINE=InnoDB""")
 
         dbh.execute("""CREATE TABLE `logs` (
         `timestamp` TIMESTAMP NOT NULL ,

@@ -988,7 +988,8 @@ class CaseTable:
                 c = column_cls
             else:
                 c = column_cls(**args)
-            c.table = self.name
+
+            c.table = c.table or self.name
             ## is there any extra specified?
             string = c.create()
             try:

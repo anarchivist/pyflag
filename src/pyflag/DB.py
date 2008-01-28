@@ -299,6 +299,8 @@ class Pool(Queue):
             mysql_bin_string = "%s -f -u %r -p%r -S%s" % (config.MYSQL_BIN,config.DBUSER,config.DBPASSWD,config.DBUNIXSOCKET)
 
         db_connections +=1
+        c=dbh.cursor()
+        c.execute("set autocommit=1")
         return (dbh,mysql_bin_string)
 
 class DBO:
@@ -339,7 +341,11 @@ class DBO:
     def start_transaction(self):
         self.execute("start transaction")
         self.tranaction = True
-                
+
+    def end_transaction(self):
+        self.execute("commit")
+        self.tranaction = False
+        
     def clone(self):
         """ Returns a new database object for the same case database """
         return self.__class__(self.case)
@@ -362,7 +368,7 @@ class DBO:
             
         ## Hopefully this does not bear a huge performance overhead???
         params = tuple( DBExpander(i) for i in params )
-        if params:
+        if len(params)>0:
             string = query_str % params
         else: string = query_str
         try:
@@ -382,7 +388,7 @@ class DBO:
 
                 ## We terminate the current connection and reconnect
                 ## to the DB
-                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Killing connection because %s. Last query was %s" % (e,self.cursor._last_executed))
+                pyflaglog.log(pyflaglog.DEBUG, "Killing connection because %s. Last query was %s" % (e,self.cursor._last_executed))
                                 
                 self.cursor.kill_connection()
                 del self.dbh
@@ -402,6 +408,22 @@ class DBO:
             elif not str.startswith('Records'):
                 raise DBError(e)
 
+    def expire_cache(self):
+        """ Expires the cache if needed """
+        ## Expire the cache if needed
+        self.start_transaction()
+        try:
+            self.execute("select * from sql_cache where timestamp < date_sub(now(), interval %r minute) for update", config.DBCACHE_AGE)
+            ## Make a copy to maintain the cursor
+            tables = [ row['id'] for row in self]
+            for table_id in tables:
+                self.execute("delete from sql_cache where id = %r" , table_id)
+                self.execute("delete from sql_cache_tables where sql_id = %r" , table_id)
+                self.execute("drop table if exists `cache_%s`" , table_id)
+                
+        finally:
+            self.end_transaction()
+
     def cached_execute(self, sql, limit=0, length=50):
         """ Execute the query_str with params inside the pyflag Cache system.
 
@@ -418,27 +440,22 @@ class DBO:
         Note that races are controlled here by using a tranactional
         table to achieve row level locks.
         """
-        ## Expire the cache if needed
+        self.expire_cache()
         self.start_transaction()
-        try:
-            self.execute("select * from sql_cache where timestamp < date_sub(now(), interval %r minute) for update", config.DBCACHE_AGE)
-            ## Make a copy to maintain the cursor
-            tables = [ row['id'] for row in self]
-            for table_id in tables:
-                self.execute("delete from sql_cache where id = %r" , table_id)
-                self.execute("delete from sql_cache_tables where sql_id = %r" , table_id)
-                self.execute("drop table if exists `cache_%s`" , table_id)
-                
-        finally:
-            self.execute("commit")
-
         ## Try to find the query in the cache. We need a cache which
         ## covers the range we are interested in: This will lock the
         ## row while we generate its underlying cache table:
-        self.start_transaction()
-        try:
-            self.execute("""select * from sql_cache where query = %r and `limit` <= %r and `limit` + `length` >= %r for update""", (sql, limit, limit + length))
+        try:            
+            self.execute("""select * from sql_cache where query = %r and `limit` <= %r and `limit` + `length` >= %r limit 1 for update""", (sql, limit, limit + length))
             row = self.fetch()
+                
+            if row and row['locked']:
+                self.end_transaction()
+                while 1:
+                    self.execute("select locked from sql_cache where id=%r limit 1", row['id'])
+                    row2 = self.fetch()
+                    if row2 and row2['locked']==0: break
+                    time.sleep(1)
 
             if row:            
                 ## Return the query:
@@ -447,17 +464,18 @@ class DBO:
 
                 cache_limit = row['limit']
 
-                ## This releases the lock and allows other threads to have
-                ## a go
-                self.execute("commit")
-
                 ## If we fail to return the table (probably because the
                 ## cache table disappeared) we simply continue on to make
                 ## a new one:
                 try:
+                    ## We need to commit the transaction before the
+                    ## select because we dont want to drain the cursor
+                    ## right now (More SS Crap):
+                    self.end_transaction()
                     return self.execute("select * from cache_%s limit %s,%s",
                                         (row['id'], limit - cache_limit, length))
-                except DBError:
+                except DBError,e:
+                    print e
                     pass
 
             ## Query is not in cache - create a new cache entry: We create
@@ -471,27 +489,28 @@ class DBO:
             
             if not tables or tables[0]==None:
                 ## Release the lock on the row
-                self.execute("commit")
+                self.end_transaction()
                 self.execute(sql)
                 return 
 
             for t in tables:
                 if t == None:
-                    self.execute("commit")
+                    self.end_transaction()
                     self.execute(sql)
                     return
-                
+
             self.insert('sql_cache',
                         query = sql, _timestamp='now()',
                         #tables = ",%s," % ','.join(tables),
                         limit = lower_limit,
                         length = config.DBCACHE_LENGTH,
+                        locked = 1,
                         _fast = True
                         )
 
             ## Create the new table
             id = self.autoincrement()
-
+            
             ## Store the tables in the sql_cache_tables:
             for t in tables:
                 self.insert('sql_cache_tables',
@@ -499,10 +518,6 @@ class DBO:
                             table_name = t,
                             _fast = True)
 
-            ## Lock the new row - this avoids the race above because other
-            ## threads are forced to wait until we finish here:
-            self.execute("select * from sql_cache where id=%r  limit 1 for update", id)
-            
             ## This is needed to flush the SS buffer (we do not want to go
             ## out of sync here..)
             self.fetch()
@@ -511,28 +526,19 @@ class DBO:
             try:
                 self.execute("create table cache_%s %s limit %s,%s",
                              (id,sql, lower_limit, config.DBCACHE_LENGTH))
-            except:
+                self.execute("update sql_cache set locked=0 where id=%r" , id)
+            except Exception,e:
+                print e
                 ## Oops the table already exists (should not happen)
                 self.execute("drop table `cache_%s`",id )
                 self.execute("create table `cache_%s` %s limit %s,%s",
                              (id,sql, lower_limit, config.DBCACHE_LENGTH))
-                
-        finally:
-        ## Make sure the lock is released if we raise
-            self.execute("commit")
+                self.execute("update sql_cache set locked=0 where id=%r" , id)
+        except:
+            self.end_transaction()
         
         return self.execute("select * from cache_%s limit %s,%s",
                             (id,limit - lower_limit,length))
-
-        ## Did we take too long? If we didnt take very long, we lose
-        ## the table and mark the query as uncachable for a
-        ## while. (basically its quicker to just do the query than to
-        ## cache it).
-
-        ## Return the cursor back:
-
-    def commit(self):
-        self.cursor.connection.commit()
 
     def __iter__(self):
         return self
@@ -542,7 +548,7 @@ class DBO:
         self.execute("start transaction")
         try:
             try:
-                self.execute("select sql_id from sql_cache_tables where `table_name`=%r for update", table)
+                self.execute("select sql_id from sql_cache_tables where `table_name`=%r", table)
             except Exception, e:
                 print e
                 pass
@@ -552,7 +558,7 @@ class DBO:
                 self.execute("delete from sql_cache where id=%r", id)
                 self.execute("delete from sql_cache_tables where sql_id=%r", id)
         finally:
-            self.execute("commit")
+            self.end_transaction()
 
     def _calculate_set(self, **fields):
         """ Calculates the required set clause from the fields provided """
@@ -783,7 +789,7 @@ class DBO:
             except: pass
 
             if self.transaction:
-                self.execute("commit")
+                self.end_transaction()
 
             ## Ensure that our mass insert case is comitted in case
             ## users forgot to flush it:
@@ -831,167 +837,3 @@ class DBO:
         if not p_mysql.close():
             pass
     #        raise IOError("MySQL client exited with an error")
-
-## Unit Tests
-import unittest
-
-class DBOTest(unittest.TestCase):
-    """ Database Class Tests """
-    def test01validinstall(self):
-        """ Test to make sure we can locate the pyflag default database """
-        dbh = DBO(None)
-        dbh.execute("show tables")
-        tables = [ row.values()[0] for row in dbh ]
-        self.assert_( 'meta' in tables)
-
-    def test02TemporaryTables(self):
-        """ Test to make sure DBO temporary tables get cleaned up after handle gc """
-        dbh = DBO(None)
-        tablename = dbh.get_temp()
-        dbh.execute("create table %s(field1 text)", tablename)
-        dbh.execute("select * from %s", tablename)
-        result = [ row['field1'] for row in dbh ]
-        self.assertEqual(result, [])
-
-        dbh2 = DBO(None)
-        tablename2 = dbh2.get_temp()
-        self.assert_(tablename2 != tablename)
-
-        del dbh
-        def ExceptionTest():
-            dbh = DBO(None)
-            dbh.execute("select * from %s", tablename)
-
-        self.assertRaises(DBError, ExceptionTest)
-
-    def createTestTable(self, dbh):
-        tablename = dbh.get_temp()
-        dbh.execute("create table %s(field1 int)", tablename)
-
-        for i in range(0,10):
-            dbh.insert(tablename, field1=i)
-
-        return tablename
-
-    def test03ServerSideReconnect(self):
-        """ Test to ensure that dbhs reconnect after an aborted server side connection """
-        dbh = DBO(None)
-        tablename = self.createTestTable(dbh)
-
-        dbh.execute("select * from %s", tablename)
-        result = [ row['field1'] for row in dbh if row['field1'] < 5 ]
-        self.assertEqual(result, range(0,5))
-
-    def test04SlowQueryAbort(self):
-        """ Test to make sure slow queries are aborted """
-        dbh = DBO(None)
-
-        #Make the timeout 1 second for testing
-        dbh.cursor.timeout = 1
-
-        dbh.execute("select sleep(2) as sleep")
-        result = dbh.fetch()['sleep']
-        self.assertEqual(result, 1)
-
-    def test05MassInsert(self):
-        """ Test the mass insert mechanism """
-        dbh = DBO(None)
-        tablename = dbh.get_temp()
-        dbh.execute("create table %s(field1 int)", tablename)
-
-        dbh.mass_insert_start(tablename)
-        ## Escaped variables:
-        dbh.mass_insert(field1 = 1)
-
-        ## Non-escaped insert
-        dbh.mass_insert(_field1 = "1+1")
-
-        dbh.mass_insert_commit()
-        dbh.execute("select * from %s" , tablename)
-
-        result = [ row['field1'] for row in dbh ]
-        self.assertEqual(result, [1,2])
-
-    def test06CachedExecute(self):
-        """ Test that query caching works properly """
-        dbh=DBO()
-        tablename = self.createTestTable(dbh)
-
-        ## Do a cached select:
-        dbh.cached_execute("select * from %s" % tablename)
-        result = [ row['field1'] for row in dbh ]
-        self.assertEqual(result, range(0,10))
-
-        ## Make sure we came from the cache:
-        cached_sql = dbh.cursor._last_executed
-        self.assert_('cache_' in cached_sql)
-
-        ## Update the underlying table:
-        dbh.insert(tablename, field1=1)
-
-        ## query the cache again:
-        dbh.cached_execute("select * from %s" % tablename)
-        result2 = [ row['field1'] for row in dbh ]
-
-        self.assertEqual(result2, result + [1,])
-
-        ## Make sure we have a different cache entry
-        self.assert_(cached_sql != dbh.cursor._last_executed)
-
-    def test07CaseExecuteRace(self):
-        """ Test for race conditions in cache creation """
-        results = []
-        dbh = DBO()
-        dbh.execute("delete from meta where property = 'test row'")
-        dbh.insert("meta", property="test row", value=1)
-        dbh.invalidate("meta")
-        
-        def execute_long_query(results):
-            dbh = DBO()
-            dbh.cached_execute("select value from meta where property='test row' and sleep(2)=0")
-            ## If we get here we are ok:
-            row = dbh.fetch()
-            self.assertEqual(row['value'],'1')
-            results.append(row['value'])
-            
-        t=threading.Thread(target=execute_long_query, args=(results,))
-        t.start()
-        time.sleep(0.2)
-        ## This executes the same query in the current thread a little
-        ## later (it should still be running in the other thread).
-        execute_long_query(results)
-
-        time.sleep(1)
-        ## Wait for both threads to finish
-        self.assertEqual(results,['1','1'])
-
-    def test08Reconnect(self):
-        """ Test that we can reconnect if the mysql server dies """
-        dbh = DBO()
-        ## Disconnect now:
-        dbh.cursor.close()
-        ## Remove us from the cache too:
-        dbh.DBH.expire(".")
-        ## Now try to execute a query - it should reconnect transparently:
-        dbh.execute("select 1")
-        row = dbh.fetch()
-
-        self.assertEqual(row['1'], 1)
-
-def print_stats():
-    dbh = DBO("mysql")
-    dbh.execute("show processlist")
-    connections = {}
-    for row in dbh:
-        try:
-            connections[row['db']]+=1
-        except:
-            connections[row['db']] =1
-            
-    print "Usage statistics for DB"
-    for time, key, pool in DBO.DBH.creation_times:
-        print "%s - I have %s handles, the database has %s handles" % (key,pool.qsize(), connections[key])
-
-if config.LOG_LEVEL >= pyflaglog.VERBOSE_DEBUG:
-    import atexit
-    atexit.register(print_stats)

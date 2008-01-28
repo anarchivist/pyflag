@@ -237,5 +237,5 @@ class RawTest(pyflag.tests.ScannerTest):
     """ Test a Raw filesystem """
     test_case = "PyFlagTestCase"
     test_file = "pyflag_stdimage_0.4.dd"
-    subsystem = "Raw"
+    subsystem = "Advanced"
     fstype = "Raw"
