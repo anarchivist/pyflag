@@ -5,6 +5,8 @@ import pyflag.DB as DB
 from FlagFramework import query_type
 import pyflag.FlagFramework as FlagFramework
 import sk,re,os,os.path
+import pyflag.conf
+config=pyflag.conf.ConfObject()
 
 class IOSubsysFD:
     def __init__(self, io, name):
