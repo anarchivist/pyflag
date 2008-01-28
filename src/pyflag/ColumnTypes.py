@@ -108,16 +108,35 @@ except ImportError:
         raise ValueError("Unable to parse date %s" % string)
 
 class LogParser:
-    LogCompatible = False
+    defaults = [ ['name', "Name", ""],
+                 ['column', "DB Column", ""],
+                 ]
 
     def render_form(self, basename, result):
         """ A hook called from the Advanced Log builder which allows us to build this column using the GUI. Note that LogCompatible must be True for this to work. """
-        defaults = {'name':"Name", 'column':"DB Column"}
-        for name in defaults.keys():
+        for name, description, default in self.defaults:
             fieldname = "%s_%s" % (basename,name)
-            result.textfield(name, defaults[name])
+            result.defaults[fieldname] = default
+            result.textfield(description, fieldname)
 
+    def parse_form(self, basename, query):
+        """ Returns an argv which can be used to instantiate the
+        column type based on query
+        """
+        result = {}
+        for name, description, default in self.defaults:
+            result[name] = query.get(basename+name, default)
 
+        return result
+
+class LogParserMixin:
+    """ This is a mixin class which should be used to designate a
+    class as suitable for log analysis
+    """
+    LogCompatible = True
+    
+    class LogParser(LogParser):
+        pass
 
 ## The following are common column types which the parser can
 ## handle. ColumnTypes can be defined as plugins by extending the
@@ -313,9 +332,6 @@ class ColumnType:
         """
         return self.name
 
-    class LogParser(LogParser):
-        pass
-    
     ## This allows the column to be used by the log builder.
     def log_parse(self, row):
         """ This is called by the log processing to parse the value of
@@ -408,7 +424,7 @@ class SetType(ColumnType):
     def create(self):
         return "`%s` set('',%s)" % (self.column, ','.join(["%r"% x for x in self.states]))
 
-class IntegerType(ColumnType):
+class IntegerType(ColumnType, LogParserMixin):
     symbols = {
         "=":"equal",
         "!=":"literal",
@@ -425,9 +441,6 @@ class IntegerType(ColumnType):
 
     def create(self):
         return "`%s` int(11)" % self.column
-
-    class LogParser(LogParser):
-        LogCompatible = True
 
 class BigIntegerType(IntegerType):
     def create(self):
@@ -478,7 +491,7 @@ class EditableStringType(ColumnType):
 
     display_hooks = [edit_display_hook,]
 
-class StringType(ColumnType):
+class StringType(ColumnType,LogParserMixin):
     symbols = {
         "=":"equal",
         "!=":"literal",
@@ -521,6 +534,11 @@ class StringType(ColumnType):
     def operator_regex(self,column,operator,arg):
         """ This applies the regular expression to the column (Can be slow for large tables) """
         return self.operator_literal(column, 'rlike', arg)
+
+    class LogParser(LogParser):
+        defaults = LogParser.defaults[:]
+        defaults.append(['regex','RegEx', r"[^\s]+"])
+        defaults.append(['boundary', 'Boundary', r"\s+"])
 
 class TimestampType(IntegerType):
     """
@@ -651,6 +669,10 @@ class TimestampType(IntegerType):
 
         return m.end(), self.column, date
 
+    class LogParser(LogParser):
+        defaults = LogParser.defaults[:]
+        defaults.append(['format', 'Format String', "%d/%b/%Y %H:%M:%S"])
+
 class IPType(ColumnType):
     """ Handles creating appropriate IP address ranges from a CIDR specification. """    
     ## Code and ideas were borrowed from Christos TZOTZIOY Georgiouv ipv4.py:
@@ -771,6 +793,8 @@ class InodeType(StringType):
         return inode
 
 class InodeIDType(IntegerType):
+    LogCompatible = False
+    
     tests = [ [ "contains", "|G", False ],
               [ "=", "Itest", False ],
               ]
@@ -849,7 +873,7 @@ class FilenameType(StringType):
     def __init__(self, name='Filename', inode_id='file.inode_id',
                  basename=False, table='file',
                  link=None, link_pane=None, case=None):
-        if not link:
+        if not link and not basename:
             link = query_type(case=case,
                               family='Disk Forensics',
                               report='Browse Filesystem',
@@ -888,7 +912,8 @@ class FilenameType(StringType):
             pass
 
     def operator_literal(self, column, operator, pattern):
-        return "%s in (select inode_id from file where concat(file.path, file.name) %s %r)" % (self.escape_column_name(self.column), operator, pattern) 
+        return "`%s` in (select inode_id from file where concat(file.path, file.name) %s %r)" % (self.column, operator, pattern) 
+
     def create(self):
         return "path TEXT, name TEXT, link TEXT NULL"
 
@@ -944,6 +969,8 @@ class BinaryType(StateType):
 
 class CounterType(IntegerType):
     """ This is used to count the total numbers of things (in a group by) """
+    LogCompatible = False
+    
     def __init__(self, name=None):
         IntegerType.__init__(self, name=name, column='count')
         
@@ -952,6 +979,8 @@ class CounterType(IntegerType):
 
 class PacketType(IntegerType):
     """ A Column type which links directly to the packet browser """
+    LogCompatible = False
+
     def __init__(self, name, column, case):
         IntegerType.__init__(self, name=name, column=column,
                              link = query_type(family='Network Forensics',
@@ -994,10 +1023,8 @@ class ColumnTypeTests(pyflag.tests.ScannerTest):
         dbh=DB.DBO(self.test_case)
         dbh.drop(self.tablename)
         t.create(dbh)
-        for e in self.elements: print e.table
 
     def generate_sql(self, filter):
-        print self.elements
         sql = self.ui._make_sql(elements = self.elements, filter_elements=self.elements,
                                  table = self.tablename, case=None, filter = filter)
         ## Try to run the SQL to make sure its valid:

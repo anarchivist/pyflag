@@ -336,7 +336,7 @@ class Log:
             ## We can calculate the elements directly from our field
             ## list:
             elements = [ f for f in self.fields if f and not f.ignore ],
-            table = "`%s_log`" % table_name,
+            table = "%s_log" % table_name,
             case = self.case
             )
 

@@ -534,7 +534,8 @@ class DBO:
                 self.execute("create table `cache_%s` %s limit %s,%s",
                              (id,sql, lower_limit, config.DBCACHE_LENGTH))
                 self.execute("update sql_cache set locked=0 where id=%r" , id)
-        except:
+        except Exception,e:
+            print e
             self.end_transaction()
         
         return self.execute("select * from cache_%s limit %s,%s",
@@ -806,7 +807,6 @@ class DBO:
             #print "dbh desctrucr: %s " % e
             pass
         except Exception,e:
-            print "%s" % e
             import FlagFramework
             
             print FlagFramework.get_bt_string(e)

@@ -49,19 +49,10 @@ class AdvancedLog(LogFile.Log):
             column_class = Registry.COLUMN_TYPES.dispatch(v)
 
             ## Fill in all the args:
-            (args, varargs, varkw, defaults) = inspect.getargspec(column_class.__init__)
-            d = len(args) - len(defaults)
-            tmp = {}
-            for j in range(len(args)):
-                k = args[j]
-                fieldname = "field_param_%s_%s" % (i,k)
-                try:
-                    tmp[k] = query[fieldname]
-                except KeyError:
-                    pass
-
+            log_renderer = column_class.LogParser()
+            args = log_renderer.parse_form("field_param_%s_" % i, query)
             ## Instantiate the field:
-            self.fields.append(column_class(**tmp))
+            self.fields.append(column_class(**args))
 
         ## Call our base class
         LogFile.Log.parse(self,query,datafile)
@@ -88,7 +79,7 @@ class AdvancedLog(LogFile.Log):
     def __init__(self,case = None):
         LogFile.Log.__init__(self, case)
         
-        columntypes = [ c.__name__ for c in Registry.COLUMN_TYPES.classes if c.LogParser.LogCompatible ]
+        columntypes = [ c.__name__ for c in Registry.COLUMN_TYPES.classes if issubclass(c, ColumnTypes.LogParserMixin) and c.LogCompatible ]
         columntypes.sort()
         self.columntypes = [ "New Column", ] + columntypes
 
