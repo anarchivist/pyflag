@@ -535,8 +535,8 @@ class DBO:
                              (id,sql, lower_limit, config.DBCACHE_LENGTH))
                 self.execute("update sql_cache set locked=0 where id=%r" , id)
         except Exception,e:
-            print e
             self.end_transaction()
+            raise e
         
         return self.execute("select * from cache_%s limit %s,%s",
                             (id,limit - lower_limit,length))

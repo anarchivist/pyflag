@@ -149,7 +149,7 @@ class AdvancedLog(LogFile.Log):
                           ],
             )
 
-class PadType(ColumnTypes.ColumnType):
+class PadType(ColumnTypes.ColumnType, ColumnTypes.LogParserMixin):
     def __init__(self, regex='.'):
         ColumnTypes.ColumnType.__init__(self, name="-", column="-")
         self.re = re.compile(regex)

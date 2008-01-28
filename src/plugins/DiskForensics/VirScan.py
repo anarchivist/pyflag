@@ -58,6 +58,7 @@ except (pyclamd.ScanError, TypeError, ValueError):
     active = False
     
 class VirusTable(FlagFramework.CaseTable):
+    """ Virus Table - Lists Viruses/Tojans detected """
     name = 'virus'
     columns = [ [ InodeIDType, dict(case = None) ],
                 [ StringType, dict(name='Virus', column = 'virus')],

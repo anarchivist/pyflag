@@ -46,6 +46,7 @@ class HashType(ColumnType):
         return value.encode("hex").upper()
 
 class HashCaseTable(FlagFramework.CaseTable):
+    """ Hash Table - Lists MD5 hashes and NSRL Matches """
     name = 'hash'
     columns = [ [ InodeIDType, dict() ],
                 [ HashType, {} ],

@@ -888,7 +888,8 @@ class FilenameType(StringType):
         if row['link']:
             result.text("%s\n->%s" % (value, row['link']), style="red")
 
-    display_hooks = [render_links_display_hook, StringType.link_display_hook]
+    display_hooks = [render_links_display_hook, StringType.plain_display_hook,
+                     StringType.link_display_hook]
 
     def order_by(self):
         return "concat(file.path, file.name)"
