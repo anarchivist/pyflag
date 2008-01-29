@@ -156,7 +156,7 @@ class Advanced(IO.Image):
             ## digit we assume that its part of an evidence set.
             m = filename_re.match(f)
             
-            if m:
+            if m and self.subsys == "ewf":
                 globbed_filenames = []
                 dirname , base = os.path.split(m.group(1))
                 for new_f in os.listdir(dirname):
