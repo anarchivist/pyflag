@@ -344,13 +344,15 @@ class ScanFS(Reports.report):
         result.decoration='naked'
         result.heading("Scanning path %s" % (query['path']))
         scanners = self.calculate_scanners(query)
-        
+        dbh = DB.DBO()
+        dbh.execute("select count(*) as jobs from jobs")
+        jobs = dbh.fetch()['jobs']
+
+        result.para("%s jobs pending (all cases)" % jobs)
         result.para("The following scanners are used: %s" % scanners)
         result.row("System messages:")
-        dbh = DB.DBO()
         dbh.execute("select count(*) as size from logs")
         size = dbh.fetch()['size']
-
         pagesize=20
         dbh.execute("select timestamp,level,message from logs limit %s, %s", (max(size-pagesize,0), pagesize))
         data = '\n'.join(["%(timestamp)s(%(level)s): %(message)s" % row for row in dbh])
