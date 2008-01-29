@@ -3,7 +3,7 @@ about some files.
 """
 from pyflag.Scanner import *
 import pyflag.Reports as Reports
-from pyflag.ColumnTypes import StringType, TimestampType, InodeType
+from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType
 
 try:
     import extractor
@@ -56,12 +56,11 @@ try:
 
         def display(self, query, result):
             result.table(
-                elements = [ InodeType(case=query['case']),
+                elements = [ InodeIDType(case=query['case']),
                              StringType('Property','property'),
                              StringType('Value','value')],
-                table = 'xattr,inode',
+                table = 'xattr',
                 case = query['case'],
-                where = 'inode.inode_id=xattr.inode_id',
                 )
                      
 except ImportError:
