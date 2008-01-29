@@ -4,16 +4,16 @@ noinst_LTLIBRARIES	= libiosubsys.la
 noinst_PROGRAMS		= test
 noinst_HEADERS  = $(srcdir)/*.h
 
-bin_PROGRAMS		= iowrapper
-pkglib_LTLIBRARIES	= libio_hooker.la
+#bin_PROGRAMS		= iowrapper
+#pkglib_LTLIBRARIES	= libio_hooker.la
 
-libio_hooker_la_SOURCES = hooker.c
-libio_hooker_la_LDFLAGS	= -ldl
-libio_hooker_la_LIBADD	= libiosubsys.la
+#libio_hooker_la_SOURCES = hooker.c
+#libio_hooker_la_LDFLAGS	= -ldl
+#libio_hooker_la_LIBADD	= libiosubsys.la
 
-iowrapper_SOURCES	= iowrapper.c 
-iowrapper_CFLAGS	= -DPYFLAG_LIBDIR=\"$(pkglibdir)\"
-iowrapper_LDADD		= libiosubsys.la libio_hooker.la
+#iowrapper_SOURCES	= iowrapper.c 
+#iowrapper_CFLAGS	= -DPYFLAG_LIBDIR=\"$(pkglibdir)\"
+#iowrapper_LDADD		= libiosubsys.la libio_hooker.la
 
 # python stuff
 pkgpyexec_LTLIBRARIES 	= iosubsys.la
