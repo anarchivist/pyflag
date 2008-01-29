@@ -1015,6 +1015,9 @@ class CounterType(IntegerType):
     def select(self):
         return "count(*)"
 
+    def order_by(self):
+        return "count"
+
 class PacketType(IntegerType):
     """ A Column type which links directly to the packet browser """
     LogCompatible = False
