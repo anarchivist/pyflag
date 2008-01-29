@@ -585,6 +585,8 @@ class NetworkingSummary(Reports.report):
     """
     name = "Networking Summary"
     family = "Network Forensics"
+    ## Disabled for now, broken since 0.85
+    hidden = True
     
     def display(self,query,result):
     
