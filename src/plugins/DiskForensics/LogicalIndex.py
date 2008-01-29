@@ -52,7 +52,7 @@ import index,os,time,re
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
-from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType
+from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, ColumnType
 
 config.add_option("INDEX_ENCODINGS", default="['UTF-8','UTF-16LE']",
                   help="A list of unicode encodings to mutate the "
@@ -371,23 +371,29 @@ class DataPreview(OffsetType):
 
         return result
 
-class WordColumn(StringType):
+class WordColumn(ColumnType):
+    symbols = { '=': 'literal'}
+    
     def __init__(self, **kwargs):
         kwargs['column'] = 'word_id'
-        StringType.__init__(self, **kwargs)
-        
-    def select(self):
-        return "(select word from `%s`.dictionary where id=word_id)" % config.FLAGDB
+        self.dict_column = 'word'
+        ColumnType.__init__(self, **kwargs)
 
-class ClassColumn(StringType):
+    def select(self):
+        return "(select %s from `%s`.dictionary where id=`%s`)" % (self.dict_column,
+                                                                   config.FLAGDB, self.column)
+    
+    def operator_literal(self, column, operator,arg):
+        column = self.escape_column_name(self.column)
+        return "(%s in (select id from `%s`.dictionary where %s like '%%%s%%'))" % \
+               (column, config.FLAGDB, self.dict_column, arg)
+
+class ClassColumn(WordColumn):
     """ This shows the class of the dictionary word """
     def __init__(self, **kwargs):
-        kwargs['column'] = 'word_id'
         kwargs['name'] = "Class"
-        StringType.__init__(self, **kwargs)
-
-    def select(self):
-        return "(select class from `%s`.dictionary where id=`%s`)" % (config.FLAGDB, self.column)
+        WordColumn.__init__(self, **kwargs)
+        self.dict_column = 'class'
 
     def where(self):
         return "(substring((select class from `%s`.dictionary where id=`%s`),1,1)!='_')" % (config.FLAGDB, self.column)

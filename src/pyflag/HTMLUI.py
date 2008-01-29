@@ -998,6 +998,7 @@ class HTMLUI(UI.GenericUI):
             for e in elements:
                 if e.name==groupby:
                     new_query = query.clone()
+                    del new_query['groupby']
                     filter_expression = filter_expression.strip().replace('%','%%')
                     if filter_expression: filter_expression += " and "
 
@@ -1270,17 +1271,14 @@ class HTMLUI(UI.GenericUI):
 
         ## This allows grouping (counting) rows with the same value
         def group_by_cb(query,result):
-            try:
+            if query.has_key('groupby'):
                 result.table(
                     elements=elements,
                     table = table,
                     where = where,
-                    groupby = query['groupby'],
+                    groupby = query.get('groupby',0),
                     limit_context="limit%s" % query['groupby'],
                     case = case)
-            except KeyError,e:
-                pyflaglog.log(pyflaglog.ERROR,e)
-                pass
             
             result.start_form(query)
             result.const_selector("Group by", "groupby", column_names, column_names)
