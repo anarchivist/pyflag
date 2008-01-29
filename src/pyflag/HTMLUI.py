@@ -970,7 +970,7 @@ class HTMLUI(UI.GenericUI):
             raise RuntimeError(message)
 
     def table(self,elements=[],table='',where='1',groupby = None, _groupby=None, case=None,
-              limit_context='limit', filter='filter',
+              limit_context='limit', filter='filter',hidden='_hidden',
               **opts):
         ## Building up the args list in this way ensure that defaults
         ## can be specified in _make_sql itself and not be overwritten
@@ -1011,9 +1011,9 @@ class HTMLUI(UI.GenericUI):
                                  CounterType(name='Count'),
                                  ]
                     break
-                
-        args = dict( elements = elements, filter_elements = filter_elements,
-                     table = table, case=case, filter=query.get(filter,''),
+
+        args = dict( table = table, case=case, filter=query.get(filter,''),
+                     elements = elements, filter_elements = filter_elements,
                      groupby = groupby, _groupby=_groupby, order = order)
 
         if where: args['where'] = where
@@ -1021,7 +1021,7 @@ class HTMLUI(UI.GenericUI):
         try:    args['direction'] = query['direction']
         except: pass
 
-        sql = self._make_sql(**args)        
+        sql = self._make_sql(**args)
         ## Now do the rows:
         dbh = DB.DBO(case)
 
@@ -1033,7 +1033,7 @@ class HTMLUI(UI.GenericUI):
         <thead><tr>'''
 
         ## Make the table headers with suitable order by links:
-        hiddens = [ int(x) for x in query.getarray('_hidden') ]
+        hiddens = [ int(x) for x in query.getarray(hidden) ]
 
         column_names = []
         for e in range(len(elements)):
@@ -1181,7 +1181,7 @@ class HTMLUI(UI.GenericUI):
             
             result.start_form(query, pane='self')
             for i in range(len(elements)):
-                result.checkbox(elements[i].name, '_hidden', "%s" % i)
+                result.checkbox(elements[i].name, hidden, "%s" % i)
 
             result.end_form()
 
@@ -1274,6 +1274,7 @@ class HTMLUI(UI.GenericUI):
             if query.has_key('groupby'):
                 result.table(
                     elements=elements,
+                    hidden = '_hidden_gb',
                     table = table,
                     where = where,
                     groupby = query.get('groupby',0),

@@ -259,9 +259,11 @@ class GenericUI:
         ## Calculate the SQL
         query_str = "select "
 
+        total_elements = elements + filter_elements
+
         ## Fixup the elements - if no table specified use the global
         ## table - this is just a shortcut which allows us to be lazy:
-        for e in elements:
+        for e in total_elements:
             if not e.table: e.table = table
             if not e.case: e.case = case
 
@@ -273,7 +275,7 @@ class GenericUI:
         ## put elements from different database tables in the same
         ## widget automatically.
         tables = []
-        for e in elements:
+        for e in total_elements:
             if e.table not in tables: tables.append(e.table)
 
         ## Now generate the join clause:
@@ -288,13 +290,13 @@ class GenericUI:
         else:
             w = []
             
-        for e in elements:
+        for e in total_elements:
             tmp = e.where()
             if tmp: w.append(tmp)
 
         ## Is there a filter condition?
         if filter:
-            filter_str = parser.parse_to_sql(filter, filter_elements)
+            filter_str = parser.parse_to_sql(filter, total_elements)
             if not filter_str: filter_str=1
             
         else: filter_str = 1
