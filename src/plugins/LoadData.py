@@ -411,6 +411,7 @@ class ResetScanners(ScanFS):
                              argv=[query['path'], scanner_names])
 
         ## Reset the ScanFS reports from the database
+        FlagFramework.reset_all(family = query['family'], report="ScanFS", case=query['case'])
         FlagFramework.reset_all(family = query['family'], report="Scan Filesystem", case=query['case'])
 
         ## Browse the filesystem instantly

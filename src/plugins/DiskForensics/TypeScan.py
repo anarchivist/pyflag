@@ -32,17 +32,8 @@ import pyflag.Graph as Graph
 import pyflag.IO as IO
 import pyflag.Registry as Registry
 from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, FilenameType, IntegerType, InodeType
+import fnmatch
 
-##class TypeTables(FlagFramework.EventHandler):
-##    def create(self, dbh, case):
-##        dbh.execute(""" CREATE TABLE IF NOT EXISTS `type` (
-##        `inode_id` int NOT NULL,
-##        `mime` tinytext NOT NULL,
-##        `type` tinytext NOT NULL )""")
-        
-##        ## Create indexes on this table immediately because we need to select
-##        dbh.check_index('type','inode_id')
-        
 class TypeScan(Scanner.GenScanFactory):
     """ Detect File Type (magic). """
     order=5
@@ -58,6 +49,13 @@ class TypeScan(Scanner.GenScanFactory):
         dbh=DB.DBO(self.case)
         dbh.execute("delete from `type`")
 
+    def reset_entire_path(self, path_glob):
+        path = path_glob
+        if not path.endswith("*"): path = path + "*"  
+        db = DB.DBO(self.case)
+        db.execute("delete from type where inode_id in (select inode_id from file where file.path rlike %r)" % (fnmatch.translate(path)))
+        Scanner.GenScanFactory.reset_entire_path(self, path_glob)
+        
     def destroy(self):
         pass
 
