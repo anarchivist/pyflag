@@ -341,6 +341,7 @@ class ScanFS(Reports.report):
 
 
     def progress(self,query,result):
+        result.decoration='naked'
         result.heading("Scanning path %s" % (query['path']))
         scanners = self.calculate_scanners(query)
         
@@ -360,10 +361,11 @@ class ScanFS(Reports.report):
 
     def display(self,query,result):
         ## Browse the filesystem instantly
-        result.refresh(0, FlagFramework.query_type((),case=query['case'],
-           family='Disk Forensics', report='BrowseFS',
-           open_tree = query['path'])
-                       )
+        result.refresh(0,
+                       FlagFramework.query_type(case=query['case'],
+                                                family='Disk Forensics', report='BrowseFS',
+                                                open_tree = query['path']), pane='parent')
+        
  
 class ResetScanners(ScanFS):
     """ This report will reset the specified scanners.

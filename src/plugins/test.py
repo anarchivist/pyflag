@@ -192,9 +192,12 @@ class PopUpTest(Refresher):
 
             result.popup(popup_link_cb, "Popup Links test", tooltip="Try links in the popup")
 
+        def pane4(query, result):
+            result.toolbar(link=query, pane='popup')
+
         result.notebook(
-            names=['Pane 1','Pane 2','Pane 3'],
-            callbacks = [ pane1, pane2, pane3]
+            names=['Pane 1','Pane 2','Pane 3', 'Pane 4'],
+            callbacks = [ pane1, pane2, pane3, pane4]
             )
         
 class ToolTipTest(PopUpTest):

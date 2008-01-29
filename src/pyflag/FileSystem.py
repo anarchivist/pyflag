@@ -223,6 +223,11 @@ class DBFS(FileSystem):
         self.VFSCreate(None, "I%s" % iosource_name, mount_point, 
                        directory=True)
 
+        dbh.insert("filesystems",
+                   iosource = iosource_name,
+                   property = 'mount point',
+                   value = mount_point)
+        
         ## Ensure that we have the IOSource available
         self.iosource = IO.open(self.case, iosource_name)
 

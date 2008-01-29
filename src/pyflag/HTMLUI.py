@@ -327,7 +327,7 @@ class HTMLUI(UI.GenericUI):
         
         if pane=='popup':
             id=self.get_unique_id()
-            return "window.open('f?%s&__pyflag_parent='+window.__pyflag_name+'&__pyflag_name=child_%s','child_%s',  'width=600, height=600,scrollbars=yes'); return false;" % (target, id,id)
+            return "window.open('f?%s&__pyflag_parent='+window.__pyflag_name+'&__pyflag_name=child_%s&__pane=naked','child_%s',  'width=600, height=600,scrollbars=yes'); return false;" % (target, id,id)
 
         if pane=='new':
             id=self.get_unique_id()

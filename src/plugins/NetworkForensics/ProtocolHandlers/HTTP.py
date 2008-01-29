@@ -77,7 +77,7 @@ class HTTP:
 
         self.request = dict(url=m.group(2),
                             method=m.group(1),
-                            packet_id = self.fd.get_packet_id(self.fd.tell())
+                            packet_id = self.fd.get_packet_id()
                             )
         self.read_headers(self.request)
 

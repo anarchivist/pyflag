@@ -342,6 +342,10 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                       result.defaults=query
                   else:
                       try:
+                          result.decoration = query['__pane']
+                      except KeyError: pass
+                      
+                      try:
                           self.process_request(query, result)
                       except FlagFramework.AuthError, e:
                           # deal with authentication issues here

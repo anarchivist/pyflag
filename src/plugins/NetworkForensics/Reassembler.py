@@ -137,9 +137,10 @@ class StreamFile(File):
         dbh = DB.DBO(self.case)
 
         ## This is a placeholder to reserve our inode_id
-        dbh.insert('inode', inode=self.inode)
+        dbh.insert('inode', inode=self.inode, _fast=True)
         self.inode_id = dbh.autoincrement()
-
+        dbh.delete('inode', where="inode_id=%s" % self.inode_id, _fast=True)
+        
         dbh2 = dbh.clone()
 
         ## These are the fds for individual streams
@@ -256,7 +257,7 @@ class StreamFile(File):
             metamtime=None
         
         ## Create VFS Entry 
-        self.inode_id = fsfd.VFSCreate(None, self.inode, pathname, size=outfd_len, mtime=metamtime)
+        self.inode_id = fsfd.VFSCreate(None, self.inode, pathname, size=outfd_len, mtime=metamtime, inode_id=self.inode_id)
         
         ##  We also now fill in the details for the combined stream in 
         ##  the connection_details table...
