@@ -678,7 +678,7 @@ class TimestampType(IntegerType):
         defaults.append(['format', 'Format String', "%d/%b/%Y %H:%M:%S"])
 
 class PCAPTime(TimestampType):
-    symbols = {}
+    symbols = {'=':'equal'}
 
     def select(self):
         return "(select ts_sec from pcap where id=%s.%s limit 1)" % (self.table, self.column)
@@ -700,9 +700,15 @@ class PCAPTime(TimestampType):
         id = dbh.fetch()['id']
         return "%s < '%s'" % (self.escape_column_name(self.column), id)
      
-    # TODO: literal/equal not implemented yet, have to take care of ordering based
-    # on the type of operator etc.
-
+    # FIXME: I'm not sure this is the correct thing to do here
+    # may not scale well, seems to work though
+    def operator_equal(self, column, operator, arg):
+        date_arg = guess_date(arg)
+        dbh = DB.DBO(self.case)
+        dbh.execute("select id from pcap where ts_sec = '%s'" % (date_arg))
+        ids = [ str(row['id']) for row in dbh ]
+        return "%s in (%s)" % (self.escape_column_name(self.column), ",".join(ids))
+ 
 class IPType(ColumnType):
     """ Handles creating appropriate IP address ranges from a CIDR specification. """    
     ## Code and ideas were borrowed from Christos TZOTZIOY Georgiouv ipv4.py:
