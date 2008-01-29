@@ -152,6 +152,7 @@ class ColumnType:
     ## when importing a log file.
     hidden = False
     ignore = False
+
     ## This is a list of the tests that should be run. In this format:
     ## filter string, is an exception excepted?
     tests = [ ["=", "0", False],
@@ -188,6 +189,9 @@ class ColumnType:
     def make_index(self, dbh, table):
         """ Creates an index on table using dbh """
         dbh.check_index(table, self.column)
+
+    def where(self):
+        pass
 
     def operators(self, context = 'sql'):
         """ Returns a list of operators we support """

@@ -359,7 +359,7 @@ class DataPreview(OffsetType):
     def display(self, length, row, result):
         low = max(0,row['Offset']-50)
         high = row['Offset'] + 50 + length
-        fd = self.fsfd.open(inode = row['Inode'])
+        fd = self.fsfd.open(inode_id = row['Inode'])
         fd.slack = True
         fd.overread = True
         fd.seek(low)
@@ -370,6 +370,27 @@ class DataPreview(OffsetType):
         result.text(fd.read(50), font='typewriter', style='black',sanitise='full')
 
         return result
+
+class WordColumn(StringType):
+    def __init__(self, **kwargs):
+        kwargs['column'] = 'word_id'
+        StringType.__init__(self, **kwargs)
+        
+    def select(self):
+        return "(select word from `%s`.dictionary where id=word_id)" % config.FLAGDB
+
+class ClassColumn(StringType):
+    """ This shows the class of the dictionary word """
+    def __init__(self, **kwargs):
+        kwargs['column'] = 'word_id'
+        kwargs['name'] = "Class"
+        StringType.__init__(self, **kwargs)
+
+    def select(self):
+        return "(select class from `%s`.dictionary where id=`%s`)" % (config.FLAGDB, self.column)
+
+    def where(self):
+        return "(substring((select class from `%s`.dictionary where id=`%s`),1,1)!='_')" % (config.FLAGDB, self.column)
 
 class SearchIndex(Reports.report):
     """ Search for indexed keywords """
@@ -383,13 +404,14 @@ class SearchIndex(Reports.report):
         groupby = query.get('groupby',None)
         del result.defaults['groupby']
         result.table(
-            elements = [ InodeIDType(case=case, column='inode.inode_id'),
-                         StringType(column='word', name='Word'),
+            elements = [ InodeIDType(case=case),
+                         WordColumn(name='Word'),
+                         ClassColumn(),
                          OffsetType(column='offset', name='Offset', fsfd=fsfd),
                          IntegerType(column='length', name='Length'),
                          DataPreview(column='length', name='Preview', fsfd=fsfd),
                          ],
-            table = 'LogicalIndexOffsets join pyflag.dictionary on word_id=id join inode on inode.inode_id = LogicalIndexOffsets.inode_id',
+            table = 'LogicalIndexOffsets',
             groupby = groupby,
             case =case,
             )

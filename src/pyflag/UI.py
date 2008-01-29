@@ -276,13 +276,21 @@ class GenericUI:
         for e in elements:
             if e.table not in tables: tables.append(e.table)
 
-        print "tables %s" % (tables,)
         ## Now generate the join clause:
         query_str += " from %s " % tables[0]
 
         for i in range(1,len(tables)):
             query_str += " join `%s` on `%s`.inode_id = `%s`.inode_id " % \
                          (tables[i], tables[0],tables[i])
+
+        if where:
+            w = ["(%s)" % where,]
+        else:
+            w = []
+            
+        for e in elements:
+            tmp = e.where()
+            if tmp: w.append(tmp)
 
         ## Is there a filter condition?
         if filter:
@@ -291,7 +299,7 @@ class GenericUI:
             
         else: filter_str = 1
 
-        query_str += "where ((%s) and (%s)) " % (where, filter_str)
+        query_str += "where (%s and (%s)) " % (" and ".join(w), filter_str)
 
         if groupby:
             query_str += "group by `%s` " % groupby
