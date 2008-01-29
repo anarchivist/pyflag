@@ -1278,7 +1278,8 @@ class HTMLUI(UI.GenericUI):
                     where = where,
                     groupby = query.get('groupby',0),
                     limit_context="limit%s" % query['groupby'],
-                    case = case)
+                    case = case,
+                    filter = filter)
             
             result.start_form(query)
             result.const_selector("Group by", "groupby", column_names, column_names)
