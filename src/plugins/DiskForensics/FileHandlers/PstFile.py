@@ -213,6 +213,8 @@ class PstExplorer(Reports.report):
     name = "Groupware (Email, Contacts, Appointments etc)"
     family = "Disk Forensics"
     description="This report will display all email, contact and calendaring data found in recognised email folders and files (eg. pst)"
+    ## hidden for now
+    hidden=True
     
     def form(self,query,result):
         try:
