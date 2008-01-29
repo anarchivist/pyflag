@@ -841,6 +841,7 @@ class HTMLUI(UI.GenericUI):
                         method = getattr(e,method_name)
                         doc = method.__doc__
                     except:
+                        doc = None
                         pass
                     if not doc:
                         try:
