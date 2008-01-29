@@ -152,7 +152,7 @@ class BrowseFS(Reports.report):
 
                 tmp.table(
                     elements = [ InodeIDType(case=query['case']),
-                                 FilenameType(basename=True),
+                                 FilenameType(basename=True, case=query['case']),
                                  DeletedType(),
                                  IntegerType('File Size','size'),
                                  TimestampType('Last Modified','mtime'),

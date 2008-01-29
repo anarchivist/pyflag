@@ -870,7 +870,7 @@ clear_display_hook(InodeIDType)
 
 class FilenameType(StringType):
     hidden = True
-    def __init__(self, name='Filename', inode_id='file.inode_id',
+    def __init__(self, name='Filename', inode_id='inode_id',
                  basename=False, table='file',
                  link=None, link_pane=None, case=None):
         if not link and not basename:
