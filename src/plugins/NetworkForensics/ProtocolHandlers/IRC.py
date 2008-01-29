@@ -34,7 +34,7 @@ import pyflag.Reports as Reports
 import pyflag.pyflaglog as pyflaglog
 import cStringIO,re
 import plugins.NetworkForensics.PCAPFS as PCAPFS
-from pyflag.ColumnTypes import StringType, IntegerType, TimestampType, InodeType
+from pyflag.ColumnTypes import StringType, IntegerType, TimestampType, InodeType, PCAPTime
 
 class IRC:
     """ Class to manage the IRC state """
@@ -581,8 +581,8 @@ class BrowseIRCChat(Reports.report):
             return tmp
         
         result.table(
-            elements = [ IntegerType('ID','irc_messages.id'),
-                         TimestampType("Timestamp","ts_sec"),
+            elements = [ IntegerType('ID','id'),
+                         PCAPTime("Timestamp","packet_id"),
                          InodeType("Stream","inode",
                             link = query_type(family='Disk Forensics',
                                               case=query['case'],
@@ -599,7 +599,7 @@ class BrowseIRCChat(Reports.report):
                          StringType("Sender Nick","sender"),
                          StringType("Recipient", 'recipient'),
                          StringType("Text",'data') ],
-            table = "irc_messages join pcap on packet_id=pcap.id" ,
+            table = "irc_messages" ,
             case = query['case']
             )
 

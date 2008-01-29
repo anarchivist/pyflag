@@ -554,7 +554,7 @@ class BrowseFTPRequests(Reports.report):
     
         def sessions(query, result):
             result.table(
-                elements = [ IntegerType("FTP Session id", "id"),
+                elements = [ #IntegerType("FTP Session id", "ftp_session_id"),
                              InodeIDType(case=query['case']),
                              TimestampType("Start Time", "start_time"), 
                              IPType("Client IP", "client_ip", case=query['case']),
@@ -586,7 +586,7 @@ class BrowseFTPRequests(Reports.report):
                                                   report = "Browse FTP Data")),
                              TimestampType("Time Created", "time_created"),
                              StringType("Purpose", "purpose"),
-                             InodeType("Inode", "inode", case=query['case'])],
+                             InodeIDType(case=query['case'])],
                 table = 'ftp_data_streams',
                 case = query['case'])
 
@@ -595,7 +595,7 @@ class BrowseFTPRequests(Reports.report):
                         names = ['FTP Sessions',
                                  'FTP Commands',
                                  'FTP Data Streams'],
-                    callbacks = [sessions,
+                        callbacks = [sessions,
                                  commands,
                                  streams]
                         )
