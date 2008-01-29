@@ -673,6 +673,32 @@ class TimestampType(IntegerType):
         defaults = LogParser.defaults[:]
         defaults.append(['format', 'Format String', "%d/%b/%Y %H:%M:%S"])
 
+class PCAPTime(TimestampType):
+    symbols = {}
+
+    def select(self):
+        return "(select ts_sec from pcap where id=%s.%s limit 1)" % (self.table, self.column)
+
+    def order_by(self):
+        return self.column
+
+    def operator_after(self, column, operator, arg):
+        date_arg = guess_date(arg)
+        dbh = DB.DBO(self.case)
+        dbh.execute("select id from pcap where ts_sec > '%s' order by id limit 1" % (date_arg))
+        id = dbh.fetch()['id']
+        return "%s > '%s'" % (self.escape_column_name(self.column), id)
+
+    def operator_before(self, column, operator, arg):
+        date_arg = guess_date(arg)
+        dbh = DB.DBO(self.case)
+        dbh.execute("select id from pcap where ts_sec < '%s' order by id desc limit 1" % (date_arg))
+        id = dbh.fetch()['id']
+        return "%s < '%s'" % (self.escape_column_name(self.column), id)
+     
+    # TODO: literal/equal not implemented yet, have to take care of ordering based
+    # on the type of operator etc.
+
 class IPType(ColumnType):
     """ Handles creating appropriate IP address ranges from a CIDR specification. """    
     ## Code and ideas were borrowed from Christos TZOTZIOY Georgiouv ipv4.py:

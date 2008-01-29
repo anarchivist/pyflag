@@ -50,7 +50,7 @@ import pyflag.pyflaglog as pyflaglog
 import base64
 import plugins.NetworkForensics.PCAPFS as PCAPFS
 import urllib,os,time,datetime
-from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, ColumnType
+from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, ColumnType, PCAPTime
 
 config.add_option("MSN_PORTS", default='[1863,]',
                   help="A list of ports to be considered for MSN connections")
@@ -1614,7 +1614,7 @@ class Message:
                             """= "%s" """ % (old_inode_id, old_inode_other_stream_id))
 
                 dbh.execute("""select * from `msn_session` where p2p_file=""" \
-                            """"%s" or inode_id = "%s" """ % (old_inode_id, 
+                            """"%s" or inode_id = "%s" limit 1 """ % (old_inode_id, 
                                                         old_inode_other_stream_id))
 
                 dbh.execute("update `msn_p2p` set inode_id=-1 " \
@@ -2103,7 +2103,6 @@ class MSNFile(File):
     """ VFS driver for reading the cached MSN files """
     specifier = 'C'
        
-
 class BrowseMSNData(Reports.report):
     """ 
        pass :P
@@ -2153,10 +2152,9 @@ class BrowseMSNData(Reports.report):
                 return tmp
 
             result.table(
-            elements = [ ColumnType('Prox','pcap.ts_sec',
-                                    callback = draw_prox_cb),
-                         TimestampType('Timestamp','pcap.ts_sec'),
-                         InodeIDType("Stream","inode_id", case = query['case'],
+            elements = [ #PCAPTime('Prox','packet_id', callback = draw_prox_cb),
+                         PCAPTime('Timestamp','packet_id'),
+                         InodeIDType(case = query['case'],
                                    link = query_type(family="Disk Forensics",
                                                    case=query['case'],
                                                    report='View File Contents',
@@ -2189,7 +2187,12 @@ class BrowseMSNData(Reports.report):
 
                          StringType("Data","data"),
                          IntegerType("Transaction ID","transaction_id"),
-                         InodeIDType("P2P File","p2p_file_id", case=query['case']),
+                         #IntegerType("P2P File", "p2p_file", case = query['case'],
+                         #          link = query_type(family="Disk Forensics",
+                         #                          case=query['case'],
+                         #                          report='View File Contents',
+                         #                          __target__='inode')),
+                         #InodeIDType("P2P File","p2p_file", case=query['case']),
                          ],
             
             #TODO find a nice way to separate date and time (for exporting csv separate), but not have it as the default...
@@ -2199,7 +2202,7 @@ class BrowseMSNData(Reports.report):
             #We are displaying single inodes, not combined streams to make the linking work            
 #            columns = ['pcap.ts_sec', 'concat(from_unixtime(pcap.ts_sec),".",pcap.ts_usec)', 'left(inode,instr(inode,"/")-1)', 'cast(packet_id as char)', 'session_id','type','sender','recipient','data','transaction_id','p2p_file'],
 #            names = ['Prox','Timestamp','Stream', 'Packet', 'Session ID', 'Type','Sender','Recipient','Data','Transaction ID','P2P File'],
-            table = "msn_session join pcap on packet_id=id",
+            table = "msn_session",
             case = query['case'],
             hide_columns = ['Date']
             )
@@ -2208,7 +2211,7 @@ class BrowseMSNData(Reports.report):
             """ This report shows the data known about MSN participants (users).
             """
             result.table(
-                elements = [ InodeIDType("Stream","inode", case = query['case'],
+                elements = [ InodeIDType(case = query['case'],
                               link = query_type(family="Disk Forensics",
                                                 case=query['case'],
                                                 report='View File Contents',
@@ -2220,7 +2223,8 @@ class BrowseMSNData(Reports.report):
                                                 report='BrowseMSNSessions', 
                                                 __target__='filter',
                                                 filter='"Session ID" = %s')),
-                         TimestampType('Timestamp','pcap.ts_sec'),
+                         #TimestampType('Timestamp','pcap.ts_sec'),
+                         PCAPTime('Timestamp', 'packet_id'),
                          StringType('Data Type', 'user_data_type'),
                          StringType('Nick', 'nick',
                                link = query_type(family="Network Forensics",
@@ -2236,14 +2240,14 @@ class BrowseMSNData(Reports.report):
                          IntegerType("Transaction ID","transaction_id"),
                          StringType("User Data", "user_data")
                         ],
-            table = "msn_users join pcap on packet_id=id",
+            table = "msn_users",
             case = query['case'],
             filter="filter1",
             )
 
         def file_transfers(query, result):
             result.table(
-                    elements =[InodeIDType("Stream","inode", case = query['case'],
+                    elements =[InodeIDType(case = query['case'],
                                       link = query_type(family="Disk Forensics",
                                       case=query['case'],
                                       report='View File Contents',
