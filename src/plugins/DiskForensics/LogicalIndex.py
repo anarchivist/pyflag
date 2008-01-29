@@ -340,7 +340,7 @@ class OffsetType(IntegerType):
                            family="Disk Forensics",
                            report='ViewFile',
                            mode='HexDump',
-                           inode=inode,
+                           inode_id=inode,
                            hexlimit=max(offset-50,0),
                            highlight=offset, length=row['Length'])
         result.link(offset, target=query)
