@@ -18,8 +18,8 @@ noinst_HEADERS		= $(srcdir)/*.h
 pkgpyexec_LTLIBRARIES 	= pypacket.la
 
 pypacket_la_SOURCES	= pypacket.c
-pypacket_la_CPPFLAGS	= $(PYTHON_CSPEC) -I$(top_srcdir)/src/include
-pypacket_la_LDFLAGS	= -module $(PYTHON_LSPEC)
+pypacket_la_CPPFLAGS	= $(PYTHON_CPPFLAGS) -I$(top_srcdir)/src/include
+pypacket_la_LDFLAGS	= -module $(PYTHON_LDFLAGS)
 pypacket_la_LIBADD	= liboo.la
 
 # specifics (libs)
