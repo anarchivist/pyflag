@@ -27,7 +27,8 @@ class AdvancedLog(LogFile.Log):
                 consumed, name, sql = f.log_parse(row)
                 row = row[consumed:]
                 if name:
-                    result[name] = sql
+                    name, value = f.insert(sql)
+                    result[name] = value
 
             yield result
 
@@ -150,7 +151,7 @@ class AdvancedLog(LogFile.Log):
             )
 
 class PadType(ColumnTypes.ColumnType, ColumnTypes.LogParserMixin):
-    def __init__(self, regex='.'):
+    def __init__(self, regex='.', **kwargs):
         ColumnTypes.ColumnType.__init__(self, name="-", column="-")
         self.re = re.compile(regex)
         self.ignore = True
@@ -165,6 +166,11 @@ class PadType(ColumnTypes.ColumnType, ColumnTypes.LogParserMixin):
             return m.end(), None, None
 
         return None, None, None
+
+    class LogParser(ColumnTypes.LogParser):
+        defaults = ColumnTypes.LogParser.defaults[:] + [
+            [ "regex", "regex", "" ],
+            ]
     
 ## Unit tests - a simple syslog parser:
 import time

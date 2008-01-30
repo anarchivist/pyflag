@@ -679,7 +679,8 @@ class TimestampType(IntegerType):
 
 class PCAPTime(TimestampType):
     symbols = {'=':'equal'}
-
+    LogCompatible = False
+    
     def select(self):
         return "(select ts_sec from pcap where id=%s.%s limit 1)" % (self.table, self.column)
 
@@ -709,7 +710,7 @@ class PCAPTime(TimestampType):
         ids = [ str(row['id']) for row in dbh ]
         return "%s in (%s)" % (self.escape_column_name(self.column), ",".join(ids))
  
-class IPType(ColumnType):
+class IPType(ColumnType, LogParserMixin):
     """ Handles creating appropriate IP address ranges from a CIDR specification. """    
     ## Code and ideas were borrowed from Christos TZOTZIOY Georgiouv ipv4.py:
     ## http://users.forthnet.gr/ath/chrisgeorgiou/python/
@@ -759,7 +760,7 @@ class IPType(ColumnType):
         numeric_address, broadcast = self.parse_netmask(address)
         if numeric_address != broadcast:
             raise RuntimeError("You specified a netmask range for an = comparison. You should probably use the netmask operator instead")
-        return "%s = INET_ATON(%r)" % (self.escape_column_name(self.column), numeric_address)
+        return "%s = '%s'" % (self.escape_column_name(self.column), numeric_address)
 
     def literal(self, column, operator, address):
         return "%s %s INET_ATON(%r)" % (self.escape_column_name(self.column), operator, address)
@@ -820,6 +821,8 @@ class IPType(ColumnType):
 class InodeType(StringType):
     """ A unified view of inodes """
     hidden = True
+    LogCompatible = False
+    
     def __init__(self, name='Inode', column='inode', link=None, case=None, callback=None):
         #raise RuntimeError("InodeType is depracated - you must use InodeIDType now")
         self.case = case
@@ -906,6 +909,7 @@ clear_display_hook(InodeIDType)
 
 class FilenameType(StringType):
     hidden = True
+    LogCompatible = False
     def __init__(self, name='Filename', inode_id='inode_id',
                  basename=False, table='file',
                  link=None, link_pane=None, case=None):

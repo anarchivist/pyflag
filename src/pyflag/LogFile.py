@@ -252,7 +252,6 @@ class Log:
             count += 1
             args = None
             columns = {}
-
             if isinstance(fields, list):
                 args = dict()
                 ## Iterate on the shortest of fields (The fields array

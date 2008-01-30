@@ -40,8 +40,6 @@ description = "Offline Whois"
 hidden = False
 order = 40
 
-
-
 config.add_option("GEOIPDIR", default=config.DATADIR,
                   help="The directory containing all the GeoIP files. We try to open (in this"
                   " order) GeoIPCity.dat, GeoLiteCity.dat (if GeoIPCity.dat fails),"
@@ -784,7 +782,9 @@ def geoip_display_hook(self, value, row, result):
                                                   report="LookupIP", address=value),
                   pane='popup')
 
+        result.start_table()
         result.row(tmp2)
+        result.end_table()
 
 def insert(self, value):
     ### When inserted we need to convert them from string to ints
@@ -794,7 +794,7 @@ def insert(self, value):
     return "_"+self.column, "inet_aton(%r)" % value.strip()
     
 from pyflag.ColumnTypes import IPType, add_display_hook, clear_display_hook
-add_display_hook(IPType, "geoip_display_hook", geoip_display_hook,0)
+add_display_hook(IPType, "geoip_display_hook", geoip_display_hook,1)
 
 IPType.insert = insert
 IPType.extended_csv = extended_csv

@@ -327,6 +327,7 @@ class BuildDictionary(Reports.report):
 
 class OffsetType(IntegerType):
     hidden = True
+    LogCompatible = False
     
     def __init__(self, name='', column='', fsfd=None):
         self.fsfd = fsfd
@@ -349,6 +350,8 @@ class OffsetType(IntegerType):
 class DataPreview(OffsetType):
     ## Cant search on this data type at all.
     symbols = {}
+    LogCompatible = False
+    
     def __init__(self, name='', column='', fsfd=None):
         self.name = name
         self.column = column

@@ -38,6 +38,8 @@ import pyflag.Reports as Reports
 
 class DataType(StringType):
     hidden = True
+    LogCompatible = False
+    
     def __init__(self, name=None, combined_fd=None):
         StringType.__init__(self, name=name, column=name)
         self.combined_fd = combined_fd

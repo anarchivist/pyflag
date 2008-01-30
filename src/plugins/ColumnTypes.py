@@ -2,12 +2,12 @@
 from pyflag.ColumnTypes import TimestampType
 
 class Date(TimestampType):
-    """ A Column storing a date """
+    """ A Column storing only the date """
     def create(self):
         return "`%s` DATE" % self.column
     
 class Time(TimestampType):
-    """ A Column storing a time """
+    """ A Column storing only the time of day """
     def create(self):
         return "`%s` TIME " % self.column
 
