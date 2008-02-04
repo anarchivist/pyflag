@@ -87,7 +87,7 @@ class ZipScan(GenScanFactory):
                 self.ddfs.VFSCreate(None,
                                     inode,pathname+"/"+namelist[i],
                                     size=info.file_size,
-                                    mtime=t)
+                                    _mtime=t)
 
                 ## Now call the scanners on this new file (FIXME limit
                 ## the recursion level here)
@@ -177,7 +177,7 @@ class TarScan(GenScanFactory):
                 self.ddfs.VFSCreate(
                     self.inode,"T%s" % i,namelist[i],
                     size=tar.getmember(namelist[i]).size,
-                    mtime=tar.getmember(namelist[i]).mtime,
+                    _mtime=tar.getmember(namelist[i]).mtime,
                     uid=tar.getmember(namelist[i]).uid,
                     gid=tar.getmember(namelist[i]).gid,
                     mode=oct(tar.getmember(namelist[i]).mode),
