@@ -1,3 +1,9 @@
+pyflag (0.86RC1) unstable; urgency=low
+
+  * Released new version.
+
+ -- scudette <scudette@users.sourceforge.net>  Fri,  31 Jan 2008 10:59:00 +1000
+	
 pyflag (0.85) unstable; urgency=low
 
   * Full changelog can be found here: http://www.pyflag.net/pyflah/_darcs/inventory

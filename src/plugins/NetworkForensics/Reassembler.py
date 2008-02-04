@@ -33,7 +33,8 @@ from pyflag.FlagFramework import query_type, get_temp_path
 from NetworkScanner import *
 import struct,re,os
 import reassembler
-from pyflag.ColumnTypes import StringType, IntegerType, TimestampType, InodeIDType, IPType
+from pyflag.ColumnTypes import StringType, IntegerType, TimestampType
+from pyflag.ColumnTypes import InodeIDType, IPType, PCAPTime
 import pyflag.Reports as Reports
 
 class DataType(StringType):
@@ -45,7 +46,7 @@ class DataType(StringType):
         self.combined_fd = combined_fd
         
     def select(self):
-        return 'concat(con.cache_offset, ",", con.length)'
+        return 'concat(connection.cache_offset, ",", connection.length)'
 
     def display(self, value, row, result):
         offset, length = value.split(",")
@@ -373,13 +374,13 @@ class StreamFile(File):
                                                       case=query['case'],
                                                       open_tree ="/eth/payload/payload/data",
                                                       __target__='id')),
-                         TimestampType('Date','pcap.ts_sec'),
-                         IntegerType('Length','con.length'),
+                         PCAPTime('Date','packet_id'),
+                         IntegerType('Length','length'),
                          DataType('Data', combined_fd = combined_fd)
                          ],
             
-            table= '`connection` as con , pcap',
-            where = 'inode_id="%s" and packet_id=id ' % combined_fd.inode_id,
+            table= 'connection',
+            where = 'inode_id="%s" ' % combined_fd.inode_id,
             case=query['case']
             )
 

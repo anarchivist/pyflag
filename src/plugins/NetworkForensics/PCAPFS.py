@@ -497,8 +497,7 @@ class ViewDissectedPacket(Reports.report):
             for b in branch:
                 try:
                     result = getattr(result, b)
-                except AttributeError:
-                    pass
+                except: pass
 
             return result
         
