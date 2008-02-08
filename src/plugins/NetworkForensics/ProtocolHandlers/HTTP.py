@@ -252,7 +252,7 @@ class HTTPScanner(StreamScannerFactory):
         name = "NetworkScanners"
         contains = [ "IRCScanner", "MSNScanner", "HTTPScanner", "POPScanner",
                      "SMTPScanner","RFC2822", "YahooScanner", "FTPScanner",
-                     'HotmailScanner' ]
+                     'HotmailScanner','GmailScanner' ]
         default = True
         special_fs_name = 'PCAPFS'
 

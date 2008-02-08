@@ -1673,22 +1673,15 @@ class HTMLUI(UI.GenericUI):
 
         cb = self.store_callback(mpeg_cb)
 
-        object_tag = '''<div id="flowplayerholder">
-        This will be replaced by the player.
-	</div>
-
-	<script type="text/javascript">
-	// <![CDATA[
-	var fo = new SWFObject("javascript/flowplayer/FlowPlayer.swf", "FlowPlayer%s", "468", "350", "7", "#ffffff", true);
-	// need this next line for local testing, it's optional if your swf is on the same domain as you
-	r html page
-	fo.addParam("allowScriptAccess", "always");
-	fo.addVariable("config", "{ playList: [ {overlayId: 'play' }, { url: '%s' } ], initialScale: 'scale' }");
-	fo.write("flowplayerholder");
-	// ]]>
-	</script>''' % (id, cb)
+        object_tag = '''
+        <object data="javascript/FlowPlayer.swf" width="400" height="250" type="application/x-shockwave-flash">
+        <param name="movie" value="javascript/FlowPlayer.swf" />
+        <param name="flashvars" value="config={videoFile: \'f?callback_stored=%s\'}" />
+        </object>
+        ''' % cb
         
-        self.row(description, object_tag)
+        self.row(description)
+        self.row(object_tag)
 
     def notebook(self,names=[],context="notebook",callbacks=[],
                  descriptions=[], callback_args=[]):
