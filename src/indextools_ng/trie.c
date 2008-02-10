@@ -10,7 +10,7 @@
 The values are set in the lower,upper if they were found. buffer and
 len are suitably adjusted.
 */
-void check_for_repeat(unsigned char *lower, unsigned char *upper, 
+void check_for_repeat(unsigned int *lower, unsigned int *upper, 
 			 char **buffer, int *len) {
   switch(**buffer) {
   case '?':
@@ -37,8 +37,8 @@ void check_for_repeat(unsigned char *lower, unsigned char *upper,
 	  (*len)--;
 	};
 	
-	*lower=(unsigned char)l;
-	*upper=(unsigned char)u;
+	*lower=(unsigned int)l;
+	*upper=(unsigned int)u;
 	return;
       };
     };

@@ -38,8 +38,8 @@ CLASS(TrieNode, Object)
      /** This is a hashtable of our children */
      TrieNode hash_table[16];
 
-     unsigned char lower_limit;
-     unsigned char upper_limit;
+     unsigned int lower_limit;
+     unsigned int upper_limit;
 
      /** This points to a dummy TrieNode object which serves as a
 	 list_head for the peers list of all this nodes children 

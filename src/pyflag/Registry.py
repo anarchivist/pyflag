@@ -479,6 +479,11 @@ def Init():
     global CASE_TABLES
     CASE_TABLES = ScannerRegistry(FlagFramework.CaseTable)
 
+    global MAGIC_HANDLERS
+    import pyflag.Magic as Magic
+
+    MAGIC_HANDLERS = ScannerRegistry(Magic.Magic)
+
 def InitTests():
     return TestsRegistry(unittest.TestCase)
 
