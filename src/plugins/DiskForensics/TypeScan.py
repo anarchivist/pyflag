@@ -33,6 +33,7 @@ import pyflag.IO as IO
 import pyflag.Registry as Registry
 from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, FilenameType, IntegerType, InodeType
 import fnmatch
+import pyflag.Magic as Magic
 
 class TypeScan(Scanner.GenScanFactory):
     """ Detect File Type (magic). """
@@ -60,29 +61,12 @@ class TypeScan(Scanner.GenScanFactory):
         pass
 
     class Scan(Scanner.BaseScanner):
-        def __init__(self, inode,ddfs,outer,factories=None,fd=None):
-            Scanner.BaseScanner.__init__(self, inode,ddfs,outer,factories, fd=fd)
-            self.filename=self.ddfs.lookup(inode=inode)
-            self.type_mime = None
-            self.type_str = None
+        type_str = None
         
-        def process(self, data,metadata=None):
+        def process(self, data, metadata=None):
             if self.type_str==None:
-                magic = FlagFramework.Magic(mode='mime')
-                magic2 = FlagFramework.Magic()
-                self.type_mime = magic.buffer(data)
-                self.type_str = magic2.buffer(data)
-                metadata['mime']=self.type_mime
-                metadata['magic']=self.type_str
-
-        def finish(self):
-            # insert type into DB
-            dbh=DB.DBO(self.case)
-            inode_id = self.fd.lookup_id()
-            dbh.insert('type',
-                       inode_id = inode_id,
-                       mime = self.type_mime,
-                       type = self.type_str)
+                m = Magic.MagicResolver()
+                self.type_str, self.type_mime = m.cache_type(self.case, self.fd.inode_id, data[:1024])
 
 class ThumbnailType(InodeIDType):
     """ A Column showing thumbnails of inodes """

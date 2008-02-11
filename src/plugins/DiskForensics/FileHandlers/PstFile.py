@@ -81,7 +81,7 @@ class PstScan(GenScanFactory):
 
             ## Iterate over all the elements in the file and add VFS
             ## inodes to them:
-            path = self.ddfs.lookup(inode=self.fd.inode)
+            path, inode, inode_id = self.ddfs.lookup(inode=self.fd.inode)
             
             def add_inodes(path, root_item):
                 for item in pst_file.listitems(root_item):

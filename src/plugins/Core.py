@@ -206,7 +206,7 @@ class Scan(Farm.Task):
         factories = Scanner.get_factories(case, scanners.split(","))
 
         if factories:
-            ddfs = factories[0].fsfd
+            ddfs = DBFS(case)
             fd = ddfs.open(inode = inode)
             Scanner.scanfile(ddfs, fd, factories)
             fd.close()

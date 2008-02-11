@@ -65,7 +65,7 @@ class ZipScan(GenScanFactory):
             ## Try to read the fd as a zip file
             z = zipfile.ZipFile(fd,'r')
 
-            pathname = self.ddfs.lookup(inode = self.inode)
+            pathname, inode, inode_id = self.ddfs.lookup(inode = self.inode)
             
             ## List all the files in the zip file:
             dircount = 0
@@ -130,7 +130,8 @@ class GZScan(ZipScan):
                     self.filename = match.groups(1)
                     return
 
-                original_filename = os.path.basename(self.ddfs.lookup(inode=self.inode))
+                path, inode, inode_id = self.ddfs.lookup(inode=self.inode)
+                original_filename = os.path.basename(path)
                 if original_filename.endswith(".gz"):
                     self.filename=original_filename[:-3]
                     return

@@ -298,7 +298,10 @@ class FTPControlStream:
         dbh = DB.DBO(case = self.case)
         dbh.execute("""select * from `pcap` where id="%s" """ % id)
         row = dbh.fetch()
-        return row['ts_sec']
+        if row:
+            return row['ts_sec']
+        
+        return 0
 
     def get_next_packet_id(self,forward=True):
         try:
@@ -601,12 +604,66 @@ class BrowseFTPRequests(Reports.report):
                         )
                                         
 
+import pyflag.Magic as Magic
+class FTPRequestMagic(Magic.Magic):
+    """ Detect FTP Request Stream """
+    type = "FTP Request Stream"
+    mime = "protocol/x-ftp-request"
+    default_score = 20
+
+    regex_rules = [
+        ( "USER [^ ]+\n", (0,10)),
+        ( "\nPASS ", (0,100)),
+        ( "\nSYST", (0,1000)),
+        ( "\nPWD", (0,1000)),
+        ( "\nTYPE ", (0,1000)),
+        ( "\nPASV[\r\n]", (0,1000)),
+        ( "\nRETR ", (0,1000))
+        ]
+
+    samples = [
+        ( 100, \
+"""USER anonymous
+PASS -wget@
+SYST
+PWD
+TYPE I
+PASV
+RETR mm.status""")]
+
+class FTPResponseMagic(Magic.Magic):
+    """ Detect FTP Response Stream"""
+    type = "FTP Response Stream"
+    mime = "protocol/x-ftp-response"
+    default_score = 15
+
+    regex_rules = [
+        ( "\n\d\d\d ", (0,1000))
+        ]
+
+    samples = [
+        (105, \
+"""220 FTP server ready.
+331 Guest login ok, send your complete e-mail address as password.
+230 Guest login ok, access restrictions apply.
+215 UNIX Type: L8
+257 "/" is current directory.
+200 Type set to I.
+227 Entering Passive Mode (192,48,96,9,202,233)
+150 Opening BINARY mode data connection for mm.status (6346 bytes).
+226 Transfer complete.
+221 You could at least say goodbye.
+""")]
 
 import unittest, pyflag.pyflagsh as pyflagsh
+import pyflag.tests as tests
 
-class FTPTests(unittest.TestCase):
+class FTPTests(tests.ScannerTest):
     """ Tests FTP Scanner """
-    order=22
+    test_case = "PyFlagTestCase"
+    test_file = "stdcapture_0.3.pcap"
+    subsystem = "Advanced"
+    fstype = "PCAP Filesystem"
 
     def test01FTPScanner(self):
         """ Test basic FTP scanning """

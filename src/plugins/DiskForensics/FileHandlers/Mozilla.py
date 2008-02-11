@@ -170,6 +170,22 @@ class MozHistScan(Scanner.GenScanFactory):
                         except: pass
 
                         dbh.insert('mozilla_history', **result)
+
+import pyflag.Magic as Magic
+
+class Mork(Magic.Magic):
+    """ Detect Mork files """
+    type = "Mozilla History (Mork)"
+    mime = 'application/x-mozilla-history'
+
+    regex_rules = [
+        ( '<mdb:mork:z', (0,10) ),
+        ]
+
+    samples = [
+        ( 100, '// <!-- <mdb:mork:z v="1.4"/> -->' ),
+        ]
+
             
 import pyflag.tests
 import pyflag.pyflagsh as pyflagsh

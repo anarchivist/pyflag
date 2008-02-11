@@ -91,7 +91,7 @@ class KeyWordSearchTest(pyflag.tests.ScannerTest):
         fsfd = FileSystem.DBFS(self.test_case)
         dbh.execute("select inode_id, word_id, word,offset,length from LogicalIndexOffsets join %s.dictionary on LogicalIndexOffsets.word_id=pyflag.dictionary.id where id>1000 and id<1020", config.FLAGDB)
         for row in dbh:
-            inode = fsfd.lookup(inode_id = row['inode_id'])
+            patg, inode, inode_id = fsfd.lookup(inode_id = row['inode_id'])
             fd = fsfd.open(inode=inode)
             fd.overread = True
             fd.slack = True

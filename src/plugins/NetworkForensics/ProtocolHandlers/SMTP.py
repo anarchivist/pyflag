@@ -132,10 +132,7 @@ class SMTPScanner(StreamScannerFactory):
     default = True
 
     def process_stream(self, stream, factories):
-        forward_stream, reverse_stream = self.stream_to_server(stream, "SMTP")
-        if reverse_stream==None or forward_stream==None: return
-
-        combined_inode = "I%s|S%s/%s" % (stream.fd.name, forward_stream, reverse_stream)
+        combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.inode_id, stream.reverse)
         pyflaglog.log(pyflaglog.DEBUG,"Openning %s for SMTP" % combined_inode)
 
         ## We open the file and scan it for emails:
@@ -151,7 +148,7 @@ class SMTPScanner(StreamScannerFactory):
             count, offset, length = f
             
             ## Create the VFS node:
-            path=self.fsfd.lookup(inode=combined_inode)
+            path, combined_inode, inode_id =self.fsfd.lookup(inode=combined_inode)
             path=os.path.normpath(path+"/../../../../../")
             new_inode="%s|o%s:%s" % (combined_inode,offset,length)
             date_str = stream.ts_sec.split(" ")[0]
@@ -168,6 +165,35 @@ class SMTPScanner(StreamScannerFactory):
             ## able to understand this:
             self.scan_as_file(new_inode, factories)
 
+    class Scan(StreamTypeScan):
+        types = ["protocol/x-smtp-request"]
+
+import pyflag.Magic as Magic
+class SMTPRequestMagic(Magic.Magic):
+    """ Detect SMTP request stream """
+    type = "SMTP Request Stream"
+    mime = "protocol/x-smtp-request"
+    default_score = 25
+    literal_rules = [
+        ( "ehlo ", (0,10)),
+        ( "\nmail from:", (0,500)),
+        ( "\nrcpt to:", (0,500)),
+        ( "\ndata", (0,500))
+        ]
+
+    samples = [
+        ( 100, \
+"""EHLO [192.168.1.34]
+MAIL FROM:<scudette@users.sourceforge.net> SIZE=147450
+RCPT TO:<scudette@users.sourceforge.net>
+DATA
+Message-ID: <42BE76A2.8090608@users.sourceforge.net>
+Date: Sun, 26 Jun 2005 19:34:26 +1000
+From: scudette <scudette@users.sourceforge.net>
+User-Agent: Debian Thunderbird 1.0.2 (X11/20050602)
+X-Accept-Language: en-us, en
+""")]
+    
 ## UnitTests:
 import unittest
 import pyflag.pyflagsh as pyflagsh
@@ -176,7 +202,7 @@ import pyflag.tests
 
 class SMTPTests(pyflag.tests.ScannerTest):
     """ Tests SMTP Scanner """
-    test_case = "PyFlag Network Test Case"
+    test_case = "PyFlagTestCase"
     test_file = "stdcapture_0.3.pcap"
     subsystem = "Advanced"
     fstype = "PCAP Filesystem"

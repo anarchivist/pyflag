@@ -102,23 +102,8 @@ class ViewFile(Reports.report):
             row = dbh.fetch()
             if row and row['content_type']:
                 return row['content_type']
-            
-            try:
-                dbh.execute("select mime,type from type where inode_id=%r limit 1",inode_id)
-                row = dbh.fetch()
-                content_type = row['mime']
-                type = row['type']
-            except (DB.DBError,TypeError):
-                ## We could not find it in the mime table - lets do magic
-                ## ourselves:
-                data = fd.read(1024)
-                fd.seek(0)
 
-                m = Magic(mode = 'mime')
-                content_type = m.buffer(data)
-                m = Magic()
-                type = m.buffer(data)
-
+            print content_type, type
             for k,v in self.mappings.items():
                 if k in type:
                     content_type = v

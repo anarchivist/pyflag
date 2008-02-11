@@ -2155,11 +2155,11 @@ class BrowseMSNData(Reports.report):
             elements = [ #PCAPTime('Prox','packet_id', callback = draw_prox_cb),
                          PCAPTime('Timestamp','packet_id'),
                          InodeIDType(case = query['case'],
-                                   link = query_type(family="Disk Forensics",
-                                                   case=query['case'],
-                                                   report='View File Contents',
-                                                   __target__='inode',
-                                                   mode="Combined streams")),
+                                     link = query_type(family="Disk Forensics",
+                                                       case=query['case'],
+                                                       report='View File Contents',
+                                                       __target__='inode',
+                                                       mode="Combined streams")),
                          IntegerType("Packet","packet_id",
                                   link = query_type(family="Network Forensics",
                                                    case=query['case'],
@@ -2275,6 +2275,41 @@ if __name__ == "__main__":
     fd = open("/tmp/case_demo/S93-94")
     data = fd.read()
     parse_msg(data)
+
+
+## MSN streams look a lot like RFC2822 sometimes:
+import pyflag.Magic as Magic
+class MSNStreamMagic(Magic.Magic):
+    """ Detect MSN Streams """
+    type = "MSN Stream"
+    mime = "protocol/x-msn-messanger"
+    default_score = 20
+
+    regex_rules = [
+        ( "USR \d+ OK [^@]+@[^@]+", (0,1000)),
+        ( "\nCAL \d+ RINGING \d+", (0,1000)),
+        ( "\nACK \d+", (0,1000)),
+        ( "\nTypingUser:", (0,1000)),
+        ( "\nMSG ", (0,1000)),
+        ( "\nUser-Agent: ", (0,1000)),
+        ( "VER \d+ MSN", (0,10)),
+        ( "\nCVR \d+", (0,100)),
+        ( "\nPNG", (0,100)),
+        ( "OUT OTH", (0,100)),
+        ]
+
+    samples = [
+        (100, \
+"""USR 1 OK foo004470@hotmail.com foobar
+CAL 2 RINGING 17528774
+JOI user022714@hotmail.com gumby
+ACK 3
+MSG user022714@hotmail.com gumby 95
+MIME-Version: 1.0
+Content-Type: text/x-msmsgscontrol
+TypingUser: user022714@hotmail.com
+""")]
+        
 
 
 ## UnitTests:

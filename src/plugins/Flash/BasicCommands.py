@@ -322,7 +322,7 @@ class istat(pyflagsh.command):
 
             for row in dbh:
                 inode = row['inode']                
-                filename = self.environment._FS.lookup(inode=inode)
+                filename, inode, inode_id = self.environment._FS.lookup(inode=inode)
                 status=self.environment._FS.istat(inode=inode)
                 if not status:
                     raise RuntimeError("No status available for %s" % arg)
@@ -405,7 +405,7 @@ class stat(ls):
         args=self.args
         for arg in self.glob_files(args):
             try:
-                inode = self.environment._FS.lookup(arg)
+                path,inode,inode_id = self.environment._FS.lookup(arg)
                 status=self.environment._FS.istat(inode=inode)
                 if not status:
                     raise RuntimeError("No status available for %s" % arg)
@@ -591,7 +591,7 @@ class file(ls):
         #Find the inode of the file:
         
         for path in self.glob_files(self.args):
-            inode = self.environment._FS.lookup(path=path)
+            path,inode, inode_id = self.environment._FS.lookup(path=path)
             dbh.execute("select type.inode,name, mime,type from type,file where file.inode =%r and file.inode=type.inode",(inode))
             row = dbh.fetch()
             if row:

@@ -33,7 +33,7 @@ from pyflag.FileSystem import File
 
 
 class RFC2822(Scanner.GenScanFactory):
-    """ Scan RFC2822 Mail messages and insert record into email_ table"""
+    """ Scan RFC2822 Mail messages and insert record into email table"""
     default = True
     depends = ['TypeScan']
     
@@ -42,37 +42,8 @@ class RFC2822(Scanner.GenScanFactory):
         dbh=DB.DBO(self.case)
 
     class Scan(Scanner.StoreAndScanType):
-        types = [ 'text/x-mail.*',
-                  'message/rfc822.*',
-                  ]
+        types = [ 'message/rfc2822' ]
 
-        def boring(self,metadata, data=''):
-            """ The magic determination of RFC2822 messages is too
-            loose, this does further tests to make sure it really is a
-            message.
-
-            In particular POP transcripts are identified as messages
-            since magic looks for the occurances of certain key words
-            near the start of the file, which happens to be after a
-            couple of pop exchanges.
-            """
-            if not Scanner.StoreAndScanType.boring(self,metadata,data=data):
-                ## Look at the first keyword before : at the first
-                ## line, must be one of the rfc keywords listed:
-                line = data.split('\r\n',1)[0].split(':',1)
-                try:
-                    if (line[0].lower() in
-                           ['received','from', 'message-id', 'to', 'subject',
-                            'return-path']):
-                        return False
-                except:
-                    pass
-
-                pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "RFC2822 thought %s is boring despite the magic" % line)
-
-            self.ignore = True
-            return True
- 
         def external_process(self,fd):		    
             count = 0
             try:

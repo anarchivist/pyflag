@@ -591,7 +591,7 @@ class LogicalIndexScannerTest(pyflag.tests.ScannerTest):
         count = 0
         for row in dbh:
             count += 1
-            inode = fsfd.lookup(inode_id = row['inode_id'])
+            path, inode, inode_id = fsfd.lookup(inode_id = row['inode_id'])
             fd = fsfd.open(inode=inode)
             fd.overread = True
             fd.slack = True

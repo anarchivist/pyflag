@@ -75,7 +75,7 @@ class DLLScan(Scanner.GenScanFactory):
                 ## populate the EventMessageSources table from the registry
                 dbh=DB.DBO(self.case)
                 pydbh = DB.DBO()
-                node_id = self.fd.lookup_id()
+                inode_id = self.fd.lookup_id()
                 dbh.execute("select * from reg where reg_key='EventMessageFile' and node_id=%r", node_id)
                 for row in dbh:
                     service = os.path.basename(os.path.normpath(row['path']))
@@ -87,7 +87,7 @@ class DLLScan(Scanner.GenScanFactory):
 
                 return
             
-            filename = self.ddfs.lookup(inode=self.inode)
+            filename, inode, inode_id = self.ddfs.lookup(inode=self.inode)
             b = Buffer(fd=fd)
 
             pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Opening %s to extract messages" % self.inode)
@@ -104,6 +104,22 @@ class DLLScan(Scanner.GenScanFactory):
 
             except (IndexError, IOError, AttributeError):
                 pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "%s does not contain messages" % filename)
+
+## This is used to identify Event log files:
+import pyflag.Magic as Magic
+
+class EventLog(Magic.Magic):
+    """ Detect Windows Event logs """
+    type = "Windows Event Log"
+    mime = 'application/x-win-event'
+
+    regex_rules = [
+        ( 'LfLe', (0,10) ),
+        ]
+
+    samples = [
+        ( 100, '0\x00\x00\x00LfLe\x01\x00\x00\x00\x01'),
+        ]
 
 ## FIXME: This is not finished yet - need to finish the log viewer
 import pyflag.tests

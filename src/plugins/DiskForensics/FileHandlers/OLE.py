@@ -66,7 +66,7 @@ class OLEScan(Scanner.GenScanFactory):
                 data = metadata['Attachment data']
             except KeyError: return
 
-            path = self.ddfs.lookup(inode = self.fd.inode)
+            path, inode, inode_id = self.ddfs.lookup(inode = self.fd.inode)
             new_inode = "%s|O%s" % (self.fd.inode, self.count)
             self.count+=1
             filename = metadata.get('Attach filename', metadata.get('Attach long filenm','Attachment'))

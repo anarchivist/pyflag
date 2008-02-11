@@ -247,7 +247,7 @@ class StreamFile(File):
         ## Now create the stream in the VFS:
         fsfd = FileSystem.DBFS(self.case)
         inode = self.inode[:self.inode.rfind("|")] +"|S%s" % stream_ids[0]
-        old_pathname = fsfd.lookup(inode = inode)
+        old_pathname, inode, inode_id = fsfd.lookup(inode = inode)
         if not old_pathname: old_pathname = "lost+find/%s" % inode
         pathname = os.path.dirname(old_pathname)+"/combined"
        

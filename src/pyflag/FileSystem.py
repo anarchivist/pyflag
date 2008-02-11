@@ -63,6 +63,8 @@ import pyflag.Scanner as Scanner
 import pyflag.Graph as Graph
 import pyflag.Store as Store
 
+FSCache = Store.Store()
+
 class FileSystem:
     """ This is the base class for accessing file systems in PyFlag. This class is abstract and is here purely for documentation purposes.
 
@@ -128,10 +130,10 @@ class FileSystem:
         This object can then be used to read data from the specified file.
         @note: Only files may be opened, not directories."""
         if path:
-            inode = self.lookup(path=path)
+            path, inode, inode_id = self.lookup(path=path)
         elif inode_id:
-            inode = self.lookup(inode_id=inode_id)
-            
+            path, inode, inode_id = self.lookup(inode_id=inode_id)
+
         if not inode:
             raise IOError('Inode not found for file')
 
@@ -142,11 +144,22 @@ class FileSystem:
         for part in parts:
             sofar.append(part)
             try:
-                retfd = Registry.VFS_FILES.vfslist[part[0]](self.case, retfd, '|'.join(sofar))
+## This is some caching which should be faster, but doesnt seem to
+## make much different in practice???
+                
+##                try:
+##                    inode_so_far = '|'.join(sofar)
+                    
+##                    retfd = FSCache.get(inode_so_far)
+##                    print "Got %s from cache (%s)" % (inode_so_far, FSCache.size())
+##                except KeyError:
+                    retfd = Registry.VFS_FILES.vfslist[part[0]](self.case, retfd, '|'.join(sofar))
+##                    FSCache.put(retfd, key=inode_so_far)
                     
             except IndexError:
                 raise IOError, "Unable to open inode: %s, no VFS" % part
 
+        retfd.inode_id = inode_id
         return retfd
 
     def istat(self, path=None, inode=None):
@@ -243,7 +256,8 @@ class DBFS(FileSystem):
         pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Creating new VFS node %s at %s" % (inode, new_filename))
         if root_inode:
             try:
-                new_filename = self.lookup(inode=root_inode) + "/" + new_filename
+                path, root_inode, tmp_inode_id = self.lookup(inode = root_inode)
+                new_filename = path + "/" + new_filename
             except:
                 new_filename = "/"+new_filename
             inode = "%s|%s" % (root_inode,inode)
@@ -373,33 +387,33 @@ class DBFS(FileSystem):
 
             dbh.check_index('file','path', 200)
             dbh.check_index('file','name', 200)
-            dbh.execute("select inode from file where path=%r and (name=%r or name=concat(%r,'/')) and inode!='' limit 1", (dir+'/',name,name))
+            dbh.execute("select inode,inode_id from file where path=%r and (name=%r or name=concat(%r,'/')) and inode!='' limit 1", (dir+'/',name,name))
             res = dbh.fetch()
             if not res:
                 return None
-            return res["inode"]
+            return path, res["inode"], res['inode_id']
         elif inode_id:
             dbh.check_index('inode','inode_id')
-            dbh.execute("select inode from inode where inode_id=%r order by status limit 1", inode_id)
+            dbh.execute("select inode, concat(path,name) as path from inode join file on inode.inode_id=file.inode_id where inode_id=%r order by status limit 1", inode_id)
             res = dbh.fetch()
-            return res['inode']
+            return res['path'],res['inode'], inode_id
         else:
             dbh.check_index('file','inode')
-            dbh.execute("select concat(path,name) as path from file where inode=%r order by status limit 1", inode)
+            dbh.execute("select inode_id,concat(path,name) as path from file where inode=%r order by status limit 1", inode)
             res = dbh.fetch()
             if not res:
                 return None
-            return res["path"]
+            return res["path"], inode, res['inode_id']
         
-    def istat(self, path=None, inode=None):
+    def istat(self, path=None, inode=None, inode_id=None):
         dbh=DB.DBO(self.case)
         if not inode:
-            inode = self.lookup(path)
+            path, inode, inode_id = self.lookup(path)
         if not inode:
             return None
 
         dbh.check_index('inode','inode')
-        dbh.execute("select inode_id, inode, status, uid, gid, mtime, atime, ctime, dtime, mode, links, link, size from inode where inode=%r limit 1",(inode))
+        dbh.execute("select inode_id, inode, status, uid, gid, mtime, atime, ctime, dtime, mode, links, link, size from inode where inode_id=%r limit 1",(inode_id))
         row = dbh.fetch()
         if not row:
             return None
@@ -872,7 +886,7 @@ class File:
         left = result.__class__(result)
         link = result.__class__(result)
 
-        path = fsfd.lookup(inode=query['inode'])
+        path, inode, inode_id = fsfd.lookup(inode=query['inode'])
         if not path: return
         base_path, name = os.path.split(path)
         link.link(path,

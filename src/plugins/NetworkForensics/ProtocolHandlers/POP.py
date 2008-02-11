@@ -132,7 +132,7 @@ class EmailTables(FlagFramework.EventHandler):
         ## This table stores common usernames/passwords:
         dbh.execute(
             """ CREATE TABLE if not exists `passwords` (
-            `inode` VARCHAR(255) NOT NULL,
+            `inode_id` INT,
             `username` VARCHAR(255) NOT NULL,
             `password` VARCHAR(255) NOT NULL,
             `type` VARCHAR(255) NOT NULL
@@ -140,22 +140,8 @@ class EmailTables(FlagFramework.EventHandler):
 
 class POPScanner(StreamScannerFactory):
     """ Collect information about POP transactions.
-
-    This is an example of a scanner which uses packet dissection, as well as the result of the Stream reassembler.
     """
     default = True
-
-    def prepare(self):
-        ## This dict simply stores the fact that a certain Inode is
-        ## a POP stream. We deduce this by checking if ethereal
-        ## decodes it as such. I guess if we want to parse POP
-        ## streams which are not on port 110, we need to tell ethereal
-        ## this via its config file.
-        self.pop_connections = {}
-            
-    def reset(self, inode):
-        dbh = DB.DBO(self.case)    
-        dbh.execute("delete from passwords where type='POP3'")
 
     def process_stream(self, stream, factories):
         forward_stream, reverse_stream = self.stream_to_server(stream, "POP3")
@@ -179,15 +165,15 @@ class POPScanner(StreamScannerFactory):
             offset, length = f[1]
             new_inode="%s|o%s:%s" % (combined_inode,offset, length)
             date_str = stream.ts_sec.split(" ")[0]
-            path=self.fsfd.lookup(inode=combined_inode)
+            path, inode, inode_id = self.fsfd.lookup(inode=combined_inode)
             path=os.path.normpath(path+"/../../../../../")
 
-            self.fsfd.VFSCreate(None,new_inode,
-                                "%s/POP/%s/Message_%s" % (path, date_str,
-                                                          f[0]),
-                                mtime=stream.ts_sec,
-                                size = length
-                                )
+            inode_id = self.fsfd.VFSCreate(None,new_inode,
+                                           "%s/POP/%s/Message_%s" % (path, date_str,
+                                                                     f[0]),
+                                           mtime=stream.ts_sec,
+                                           size = length
+                                           )
 
             ## Scan the new file using the scanner train. If
             ## the user chose the RFC2822 scanner, we will be
@@ -198,17 +184,80 @@ class POPScanner(StreamScannerFactory):
         ## we save it for Ron:
         dbh = DB.DBO(self.case)
         if p.username and p.password:
-            dbh.execute("insert into passwords set inode='S%s',username=%r,password=%r,type='POP3'",(
-                forward_stream,p.username,p.password))
+            dbh.execute("insert into passwords set inode_id=%r,username=%r,password=%r,type='POP3'",(
+                inode_id, p.username, p.password))
+
+    class Scan(StreamTypeScan):
+        types = [ "protocol/x-pop-request" ]
+
+import pyflag.Magic as Magic
+class POPRequstStream(Magic.Magic):
+    """ Detect POP Request stream """
+    type = "POP Request Stream"
+    mime = "protocol/x-pop-request"
+    default_score = 20
+
+    regex_rules = [
+        ## These are the most common pop commands - we look for at least 5 of them:
+        ( "CAPA", (0,50)),
+        ( "\nUSER ", (0,50)),
+        ( "\nPASS ", (0,50)),
+        ( "LIST\r\n", (0,50)),
+        ( "UIDL\r\n", (0,50)),
+        ( "RETR [0-9]+", (0,50)),
+        ( "DELE [0-9]+", (0,50))
+        ]
+
+    samples = [
+        ( 100, \
+"""CAPA
+USER thadon
+PASS password1
+CAPA
+LIST
+UIDL
+RETR 1
+DELE 1
+QUIT
+""")]        
+
+class POPResponseStream(Magic.Magic):
+    """ Detect POP Response stream """
+    type = "POP Response Stream"
+    mime = "protocol/x-pop-response"
+
+    default_score = 20
+    regex_rules = [
+        ( "\n.OK ", (0,500))
+        ]
+
+    samples = [
+        ( 100, \
+"""+OK POP3 mailhost.someisp1.com.au (Version 3.1e-3) http://surgemail.com
++OK Capability list follows
+TOP
+USER
+UIDL
+SURGEMAIL
+.
++OK scudette@users.sourceforg.net nice to hear from you - password required
++OK scudette      has 1 mail messages
++OK 1 30202
++OK 1 (30202)
+""")]
 
 ## UnitTests:
-import unittest
+import pyflag.tests as tests
 import pyflag.pyflagsh as pyflagsh
 from pyflag.FileSystem import DBFS
 
-class POPTests(unittest.TestCase):
+class POPTests(tests.ScannerTest):
     """ Tests POP Scanner """
-    test_case = "PyFlag Network Test Case"
+    test_case = "PyFlagTestCase"
+    test_file = "stdcapture_0.3.pcap.e01"
+    subsystem = "EWF"
+    fstype = "PCAP Filesystem"
+    
     order = 21
     def test01SMTPScanner(self):
         """ Test POP Scanner """
@@ -216,5 +265,10 @@ class POPTests(unittest.TestCase):
         pyflagsh.shell_execv(env=env,
                              command="scan",
                              argv=["*",                   ## Inodes (All)
-                                   "POPScanner", "RFC2822", "TypeScan"
+                                   "POPScanner", "RFC2822",
                                    ])                   ## List of Scanners
+
+        dbh = DB.DBO(self.test_case)
+        dbh.execute("select count(*) as total from passwords where type='POP3'")
+        row = dbh.fetch()
+        self.failIf(row['total']==0,"Could not parse any POP3 passwords")

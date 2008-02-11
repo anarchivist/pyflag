@@ -92,11 +92,32 @@ class NetworkScanner(BaseScanner):
             ## Store it for the future
             metadata['proto_tree']={ self.packet_id: self.proto_tree }
 
+class StreamTypeScan(ScanIfType):
+    """ By Default we now rely on the Magic to idenitify the stream.
+
+    For those streams which rely on port numbers (should not be
+    used really), you can leave the default types (it will match
+    anything - but we will only call process_stream on streams).
+    """
+    types = [ "." ]
+
+    def finish(self):            
+        ## Call the base classes process_stream method with the
+        ## given stream.
+        if not self.boring_status:
+            try:
+                self.fd.reverse
+            except AttributeError,e:
+                return
+
+            self.outer.process_stream(self.fd, self.factories)
+
 class StreamScannerFactory(GenScanFactory):
     """ This is a scanner factory which allows scanners to only
     operate on streams.
     """
     order = 2
+    depends = ['TypeScan']
 
     def stream_to_server(self, stream, protocol):
         if stream.dest_port in dissect.fix_ports(protocol):
@@ -121,20 +142,5 @@ class StreamScannerFactory(GenScanFactory):
         Scanner.scanfile(self.fsfd,fd,factories)
         fd.close()
 
-    class Scan(BaseScanner):
-        def __init__(self,inode,ddfs,outer,factories=None,fd=None):
-            BaseScanner.__init__(self,inode,ddfs,outer,factories=factories,fd=fd)
-            try:
-                ## This identifies our fd as a stream. We only operate
-                ## on streams otherwise we do not wish to be bothered.
-                self.fd.packet_list
-                self.ignore = False
-            except AttributeError,e:
-                self.ignore = True
-                return
-            
-        def finish(self):            
-            ## Call the base classes process_stream method with the
-            ## given stream.
-            if not self.ignore:
-                self.outer.process_stream(self.fd, self.factories)
+    class Scan(StreamTypeScan):
+        pass

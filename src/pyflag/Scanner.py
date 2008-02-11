@@ -365,6 +365,7 @@ class ScanIfType(StoreAndScanType):
             self.boring_status = self.boring(metadata)
 
     def finish(self):
+        print "Scanned type %s" % self.fd.inode
         pass
 
 def resetfile(ddfs, inode,factories):

@@ -43,6 +43,9 @@ class Store:
         self.mutex.acquire()
         self.creation_times = []
         self.mutex.release()
+
+    def size(self):
+        return len(self.creation_times)
         
     def put(self,object, prefix='', key=None):
         """ Stores an object in the Store.  Returns the key for the

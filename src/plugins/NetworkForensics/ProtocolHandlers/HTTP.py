@@ -315,9 +315,6 @@ class HTTPScanner(StreamScannerFactory):
         allows us to processes HTTP connections on unusual ports. This
         situation might arise if HTTP proxies are used for example.
         """
-        ## We only want to process the combined stream once:
-        if stream.inode_id > stream.reverse: return
-
         combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.inode_id, stream.reverse)
         try:
             fd = self.fsfd.open(inode=combined_inode)
@@ -360,7 +357,7 @@ class HTTPScanner(StreamScannerFactory):
             except:
                 date_str = stream.ts_sec.split(" ")[0]
                 
-            path=self.fsfd.lookup(inode=combined_inode)
+            path,inode,inode_id=self.fsfd.lookup(inode=combined_inode)
 
             ## Try to put the HTTP inodes at the mount point. FIXME:
             ## This should not be needed when a http stats viewer is
@@ -450,7 +447,68 @@ class HTTPScanner(StreamScannerFactory):
 
             ## Scan the new file using the scanner train. 
             self.scan_as_file(new_inode, factories)
-        
+
+    class Scan(StreamTypeScan):
+        types = [ "protocol/x-http-request" ]
+
+import pyflag.Magic as Magic
+
+class HTTPRequestMagic(Magic.Magic):
+    """ Identify HTTP Requests """
+    type = "HTTP Request stream"
+    mime = "protocol/x-http-request"
+
+    regex_rules = [
+        ( "[A-Z]+ [^ ]{1,600} HTTP/1.", (0,500)),
+        ]
+    
+    samples = [
+        ( 100, "GET /online.gif?icq=52700562&img=3 HTTP/1.1"),
+        ( 100, "GET http://www.google.com/ HTTP/1.0"),
+        ]
+
+class HTTPResponseMagic(Magic.Magic):
+    """ Identify HTTP Response streams """
+    type = "HTTP Response stream"
+    mime = "protocol/x-http-response"
+    default_score = 80
+
+    regex_rules = [
+        ## If we find one header then maybe
+        ( "HTTP/1.[01] [0-9]{1,3}", (0,10)),
+        ## If we find more headers, we definitiely are looking at HTTP stream
+        ( "\nHTTP/1.[01] [0-9]{1,3}", (1,1000))
+        ]
+
+    samples = [
+        ( 160, \
+"""HTTP/1.1 301 Moved Permanently
+
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<HTML><HEAD>
+<TITLE>301 Moved Permanently</TITLE>
+</HEAD><BODY>
+
+HTTP/1.1 301 Moved Permanently
+"""),
+        ]
+
+class HTTPMagic(Magic.Magic):
+    """ HTTP Objects have content types within the protocol. These may be wrong though so we need to treat them carefully.
+    """
+    def score(self, data, case, inode_id):
+        if case:
+            dbh = DB.DBO(case)
+            dbh.execute("select content_type from http where inode_id = %r", inode_id)
+            row = dbh.fetch()
+            if row:
+                self.type = "HTTP %s" % row['content_type']
+                self.mime = row['content_type']
+                return 40
+
+        return 0
+            
+    
 class BrowseHTTPRequests(Reports.report):
     """
     Browse HTTP Requests
@@ -629,7 +687,6 @@ class HTTPTree(TreeObj.TreeObj):
     tree which causes more pages to be downloaded.
     """
     node_name = "inode_id"
-
 
 ## UnitTests:
 import unittest

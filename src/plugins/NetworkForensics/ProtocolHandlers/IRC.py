@@ -343,10 +343,10 @@ class IRC:
         "ERROR":1,
         }
 
-    def __init__(self,fd):
+    def __init__(self,fd, case):
         self.fd=fd
         self.regex = re.compile("(?::([^ ]+) )?([^ ]+)(?: (.*))?")
-        self.case = self.fd.case
+        self.case = case
         self.dbh = DB.DBO(self.case)
         self.dbh.mass_insert_start("irc_messages")
 
@@ -529,24 +529,23 @@ class IRCTables(FlagFramework.EventHandler):
 class IRCScanner(StreamScannerFactory):
     """ Collect information about IRC traffic """
     default = True
-    
+    depends = ['TypeScan']
+
     def process_stream(self, stream, factories):
-        ## We only want to process the combined stream once:
-        if stream.inode_id > stream.reverse: return
-        
         combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.inode_id, stream.reverse)
         ## Check to see if this is an IRC stream at all:
         try:
             fd = self.fsfd.open(inode=combined_inode)
         except IOError: return
         
-        irc=IRC(fd)
-        if not irc.identify():
-            return
+        irc=IRC(fd, self.case)
         
         pyflaglog.log(pyflaglog.DEBUG,"Openning %s for IRC" % combined_inode)
         irc.parse()
-            
+
+    class Scan(StreamTypeScan):
+        types = [ 'protocol/irc-forward' ]
+
 class BrowseIRCChat(Reports.report):
     """ This allows chat messages to be browsed. """
     name = "Browse IRC Chat"
@@ -603,6 +602,49 @@ class BrowseIRCChat(Reports.report):
             case = query['case']
             )
 
+import pyflag.Magic as Magic
+
+class IRCMagic(Magic.Magic):
+    """ A Magic handler to identify IRC streams """
+    type = "IRC Server Stream"
+    mime = "protocol/irc-forward"
+
+    regex_rules = [
+        ( ':[a-z.]+ [0-9][0-9][0-9]', (0, 1000) )
+        ]
+
+    def score_hit(self, data, match, pending):
+        ## Its possibly an IRC Server stream, we need to do further
+        ## testing:
+        irc = IRC(cStringIO.StringIO(data), None)
+        if irc.identify():
+            return 300
+
+        return 0
+
+    samples = [
+        ( 300, \
+"""NOTICE AUTH :*** Looking up your hostname...
+NOTICE AUTH :*** Checking Ident
+NOTICE AUTH :*** No Ident response
+NOTICE AUTH :*** Couldn't look up your hostname
+:irc.pcug.org.au 001 corleone :Welcome to the Internet Relay Network corleone
+:irc.pcug.org.au 002 corleone :Your host is irc.pcug.org.au[203.10.76.42/6667], running version 2.8/hybrid-6.3.1
+:irc.pcug.org.au 004 corleone irc.pcug.org.au 2.8/hybrid-6.3.1 oOiwszcrkfydnxb biklmnopstve
+:irc.pcug.org.au 005 corleone WALLCHOPS PREFIX=(ov)@+ CHANTYPES=#& MAXCHANNELS=30 MAXBANS=25 NICKLEN=9 TOPICLEN=120 KICKLEN=90 NETWORK=Xnet CHANMODES=be,k,l,imnpst EXCEPTS KNOCK MODES=4 :are supported by this server
+:irc.pcug.org.au 251 corleone :There are 3 users and 15 invisible on 4 servers
+"""),
+        ]
+
+class IRCMagicUser(Magic.Magic):
+    """ Identify USER IRC Streams """
+    type = "IRC Client Stream"
+    mime = "protocol/irc-reverse"
+
+    regex_rules = [
+        ( '\nJOIN #', (0,100)),
+        ( '\nPING [^ \n]+', (0,400))
+        ]
 
 ## UnitTests:
 import unittest

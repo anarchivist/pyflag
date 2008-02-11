@@ -80,7 +80,8 @@ class RegistryScan(GenScanFactory):
             b=Buffer(fd)
             header = RegF(b)
             root_key = header['root_key_offset'].get_value()
-            parent_path = self.ddfs.lookup(inode=self.inode)+'/'
+            parent_path, inode, inode_id = self.ddfs.lookup(inode=self.inode)
+            parent_path += '/'
             
             ## One handle does the reg table, the other handle the
             ## regi table:
