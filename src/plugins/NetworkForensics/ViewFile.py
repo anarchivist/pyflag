@@ -31,9 +31,10 @@ import sys,re,string
 import HTMLParser
 import StringIO
 import re,os.path,cgi, textwrap
-from FlagFramework import query_type,normpath, Magic, Curry
+from FlagFramework import query_type,normpath, Curry
 import pyflag.FileSystem as FileSystem
 import FileFormats.HTML as HTML
+import pyflag.Magic as Magic
 
 ## FIXME: This needs to be pluggable too
 class ViewFile(Reports.report):
@@ -83,30 +84,11 @@ class ViewFile(Reports.report):
         return self.default_handler(fd, result)
 
     def guess_content_type(self, fd, query, inode_id):
-        data = fd.read(1024).lower()
-        fd.seek(0)
-        ## This is needed because magic is crap
-        for p in ["<html","<head","<script"]:
-            if p in data:
-              return 'text/html'
-
-        if data.startswith("gif89a"):
-		return "image/gif"
-
         try:
             if query['hint']: content_type=query['hint']
         except KeyError:      
-            dbh = DB.DBO(self.case)
-            # Is it in the http table?
-            dbh.execute("select content_type from http where inode_id=%r limit 1", inode_id)
-            row = dbh.fetch()
-            if row and row['content_type']:
-                return row['content_type']
-
-            print content_type, type
-            for k,v in self.mappings.items():
-                if k in type:
-                    content_type = v
+            m = Magic.MagicResolver()
+            type, content_type = m.find_inode_magic(self.case, inode_id)
 
         return content_type
     
@@ -202,9 +184,6 @@ class ViewFile(Reports.report):
                 
         ui.video_control("%s" % fd.inode, play_file(fd))
 
-    mappings = { "SGML": "text/html",
-                 "Macromedia Flash Video": "application/x-flv" }
-
     dispatcher = { re.compile("text/html"): html_handler,
                    re.compile("image.*"): image_handler,
                    re.compile("application/x-zip"): zip_handler,
@@ -212,6 +191,18 @@ class ViewFile(Reports.report):
                    re.compile("application/x-flv"): flv_handler,
                    re.compile("css"): css_handler,
                    }
+
+import pyflag.Magic as Magic
+class FLVMagic(Magic.Magic):
+    """ Detect Macromedia Flash Files """
+    type = "Macromedia Flash Video"
+    mime = "application/x-flv"
+
+    regex_rules = [( "FLV", (0,1) )]
+
+    samples = [
+        ( 100, "FLV xxxx" )
+        ]
 
 class HTMLSanitiser(HTMLParser.HTMLParser):
     """ This parser is used to sanitise the html and resolve any

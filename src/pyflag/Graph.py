@@ -60,10 +60,10 @@ class Image:
 
         The default implementation uses magic to determine the content type. This is sufficiently intelligent for most applications. The only reason you might want to override this is if the extra overhead of displaying the image twice is too prohibitive.
         """
-        import pyflag.FlagFramework as FlagFramework
+        import pyflag.Magic as Magic
 
-        magic = FlagFramework.Magic(mode='mime')
-        return magic.buffer(self.display())
+        magic = Magic.MagicResolver()
+        return magic.estimate_type(self.display(), None, None)
     
     def SetFormat(self,format):
         """ A function used to set the output format.
@@ -197,18 +197,13 @@ class Thumbnailer(Image):
         self.fd = fd
         self.width = 0
         self.height = 0
-        ## This stores a small amount of data to determine the magic
-        self.fd.seek(0)
-        self.header = self.fd.read(1000)
-        self.fd.seek(0)
+
         ## Calculate the magic of this file:
-            
-        import pyflag.FlagFramework as FlagFramework
-            
-        magic=FlagFramework.Magic(mode='mime')
-        self.content_type=magic.buffer(self.header)
-        magic=FlagFramework.Magic()
-        self.magic=magic.buffer(self.header)
+        import pyflag.Magic as Magic
+
+        magic = Magic.MagicResolver()
+        self.magic, self.content_type = magic.find_inode_magic(self.fd.case,
+                                                               inode = self.fd.inode)
 
         ## Now use the magic to dispatch the correct handler:
         ## Use the content type to access the thumbnail

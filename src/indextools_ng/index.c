@@ -40,7 +40,6 @@ static int trie_index_init(trie_index *self, PyObject *args, PyObject *kwds) {
 
   self->all_matches = all_matches;
   self->root = CONSTRUCT(RootNode, RootNode, Con, NULL);
-
   if(self->root==NULL)
     return -1;
 
@@ -113,14 +112,18 @@ static PyObject *trie_index_index_xbuffer(trie_index *self, PyObject *args) {
     return(result);
 }
 
+static PyObject *name;
 static PyObject *trie_index_index_buffer(trie_index *self, PyObject *args) {
   PyObject *data;
-  
+  PyObject *result;
+
   if(!PyArg_ParseTuple(args, "O", &data)) 
     return NULL;
   
-  return PyObject_CallMethod(g_index_module, "iter", "OO",
-			     data, self);
+  result = PyObject_CallMethodObjArgs(g_index_module, name,
+				    data, self, NULL);
+
+  return result;
 }
 
 
@@ -203,11 +206,12 @@ static PyObject *trie_iter_next(trie_iter *self) {
   PyObject *match_list;
   PyObject *result;
 
+  match_list = PyList_New(0);
+
   while(self->i < self->len) {
     char *new_buffer = self->data + self->i;
     int new_length = self->len - self->i;
 
-    match_list = PyList_New(0);
     if(self->trie->root->super.Match((TrieNode)self->trie->root, new_buffer, 
 				     &new_buffer, &new_length, match_list)) { 
       /** Append temp to the result. Note that match_list is given to tmp */
@@ -218,6 +222,7 @@ static PyObject *trie_iter_next(trie_iter *self) {
     self->i++;
   };
 
+  Py_DECREF(match_list);
   return PyErr_Format(PyExc_StopIteration, "Done");
 };
 
@@ -280,7 +285,7 @@ PyMODINIT_FUNC initindex(void) {
 #ifdef __DEBUG_V_
     talloc_enable_leak_report_full();
 #endif
-
+    name = PyString_FromString("iter");
     g_index_module = Py_InitModule("index", IndexMethods);
     d = PyModule_GetDict(g_index_module);
 

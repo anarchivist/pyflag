@@ -693,37 +693,6 @@ class HexDump:
 #            ui.text(finish=1)
             offset+=1
 
-import magic
-
-class Magic:
-    """ Singleton class to manage magic library access """
-    ## May need to do locking in future, if libmagic is not reentrant.
-    magic = None
-    mimemagic = None
-
-    def __init__(self,mode=None):
-        if not Magic.magic:
-            Magic.magic=magic.open(magic.MAGIC_CONTINUE)
-            if magic.load(Magic.magic, config.MAGICFILE) < 0:
-                raise IOError("Could not open magic file %s" % config.MAGICFILE)
-
-        if not Magic.mimemagic:
-            Magic.mimemagic=magic.open(magic.MAGIC_MIME | magic.MAGIC_CONTINUE)
-            if magic.load(Magic.mimemagic,config.MAGICFILE) < 0:
-                raise IOError("Could not open magic file %s" % config.MAGICFILE)
-        self.mode=mode
-
-    def buffer(self,buf):
-        """ Return the string representation of the buffer """
-        if self.mode:
-            result=magic.buffer(Magic.mimemagic,buf)
-        else:
-            result=magic.buffer(Magic.magic, buf)
-
-        if not result:
-            return "text/plain"
-        else: return result
-
 class Curry:
     """ This class makes a curried object available for simple inlined functions.
 

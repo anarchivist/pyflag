@@ -209,10 +209,13 @@ class HTMLUI(UI.GenericUI):
 
         @arg file: A file like object derived from FileSystem.File (This must be a generator).
         """
-        magic=FlagFramework.Magic(mode='mime')
+        import pyflag.Magic as Magic
+        
+        magic=Magic.MagicResolver()
         file.seek(0)
         data=file.read(1000)
-        self.generator.content_type=magic.buffer(data)
+        type, self.generator.content_type = magic.get_type(data)
+        
         try:
             name = file.name
         except AttributeError:

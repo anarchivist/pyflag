@@ -76,7 +76,7 @@ class DLLScan(Scanner.GenScanFactory):
                 dbh=DB.DBO(self.case)
                 pydbh = DB.DBO()
                 inode_id = self.fd.lookup_id()
-                dbh.execute("select * from reg where reg_key='EventMessageFile' and node_id=%r", node_id)
+                dbh.execute("select * from reg where reg_key='EventMessageFile' and inode_id=%r", inode_id)
                 for row in dbh:
                     service = os.path.basename(os.path.normpath(row['path']))
                     pydbh.execute("select * from EventMessageSources where source=%r limit 1",service)

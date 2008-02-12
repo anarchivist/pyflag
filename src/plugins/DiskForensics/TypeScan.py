@@ -67,7 +67,9 @@ class TypeScan(Scanner.GenScanFactory):
             if self.type_str==None:
                 m = Magic.MagicResolver()
                 self.type_str, self.type_mime = m.cache_type(self.case, self.fd.inode_id, data[:1024])
-
+                metadata['mime'] = self.type_mime
+                metadata['type'] = self.type_str
+                
 class ThumbnailType(InodeIDType):
     """ A Column showing thumbnails of inodes """
     def __init__(self, name='Thumbnail', **args ):

@@ -394,7 +394,7 @@ class DBFS(FileSystem):
             return path, res["inode"], res['inode_id']
         elif inode_id:
             dbh.check_index('inode','inode_id')
-            dbh.execute("select inode, concat(path,name) as path from inode join file on inode.inode_id=file.inode_id where inode_id=%r order by status limit 1", inode_id)
+            dbh.execute("select file.inode, concat(path,name) as path from inode join file on inode.inode_id=file.inode_id where file.inode_id=%r order by file.status limit 1", inode_id)
             res = dbh.fetch()
             return res['path'],res['inode'], inode_id
         else:
@@ -407,9 +407,12 @@ class DBFS(FileSystem):
         
     def istat(self, path=None, inode=None, inode_id=None):
         dbh=DB.DBO(self.case)
-        if not inode:
+        if path:
             path, inode, inode_id = self.lookup(path)
-        if not inode:
+        elif inode:
+            path, inode, inode_id = self.lookup(inode=inode)
+            
+        if not inode_id:
             return None
 
         dbh.check_index('inode','inode')
@@ -904,7 +907,7 @@ class File:
         #What did libextractor have to say about this file?
         dbh=DB.DBO(self.case)
         dbh.execute("select property,value from xattr where inode_id=%r",
-                         istat['inode_id'])
+                    istat['inode_id'])
         
         for row in dbh:
             left.row(row['property'],': ',row['value'])

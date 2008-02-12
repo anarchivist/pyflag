@@ -47,7 +47,7 @@ class MagicResolver:
 
             pyflaglog.log(pyflaglog.DEBUG,"Loaded %s signatures into Magic engine" % MagicResolver.count)
             
-    def get_type(self, data, case, inode_id):
+    def get_type(self, data, case=None, inode_id=None):
         max_score, scores = self.estimate_type(data, case, inode_id)
         return max_score[1].type_str(), max_score[1].mime_str()
 
@@ -97,12 +97,17 @@ class MagicResolver:
         ## Return the highest score:
         return max_score, scores
 
-    def find_inode_magic(self, case, inode_id):
+    def find_inode_magic(self, case, inode_id=None, inode=None):
         """ A convenience function to resolve an inode's magic.
 
         We check the db cache first.
         """
         dbh = DB.DBO(case)
+
+        if inode:
+            dbh.execute("select inode_id from inode where inode = %r", inode)
+            row = dbh.fetch()
+            inode_id = row['inode_id']
 
         ## Is it already in the type table?
         try:

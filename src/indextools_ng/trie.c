@@ -427,9 +427,11 @@ DataNode DataNode_Con(DataNode self, int data) {
 */
 int DataNode_Match(TrieNode self, char *start, char **buffer, int *len, PyObject *result) {
   DataNode this = (DataNode) self;
-  
+  PyObject *tmp = Py_BuildValue("ii",this->data, *buffer-start);
   /** Append the hit to the list */
-  PyList_Append(result, Py_BuildValue("ii",this->data, *buffer-start));
+  PyList_Append(result, tmp);
+
+  Py_DECREF(tmp);
   
   return True;
 };
