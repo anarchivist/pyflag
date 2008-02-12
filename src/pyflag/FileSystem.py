@@ -198,9 +198,10 @@ class FileSystem:
             fd.seek(0)
             data = fd.read(10240)
             if data:
-                magic = FlagFramework.Magic()
+                import pyflag.Magic as Magic
+                magic = Magic.MagicResolver()
                 result.ruler()
-                sig = magic.buffer(data)
+                sig, ct = magic.get_type(data)
                 result.row("Magic identifies this file as: %s" % sig,**{'colspan':50,'class':'hilight'})
                 fd.close()
                 metadata['magic'] = sig

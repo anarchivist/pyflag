@@ -218,8 +218,8 @@ import pyflag.tests
 class TypeTest(pyflag.tests.ScannerTest):
     """ Magic related Scanner """
     test_case = "PyFlagTestCase"
-    test_file = "pyflag_stdimage_0.4.dd"
-    subsystem = 'Advanced'
+    test_file = "pyflag_stdimage_0.5.e01"
+    subsystem = 'EWF'
     offset = "16128s"
 
     def test01TypeScan(self):
