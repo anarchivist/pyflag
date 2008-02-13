@@ -40,7 +40,7 @@
 #include "../libewf/libewf_includes.h"
 
 #if defined( HAVE_LIBCRYPTO ) && defined( HAVE_OPENSSL_SHA_H )
-#include <openssl/sha.h>
+#include <crypto/sha1.h>
 #else
 #include "../libewf/libewf_digest_context.h"
 #endif

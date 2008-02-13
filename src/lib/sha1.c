@@ -97,7 +97,7 @@ void SHA1Transform(unsigned long state[5], unsigned char buffer[64])
 
 /* SHA1Init - Initialize new context */
 
-void SHA1_Init(SHA_CTX* context)
+int SHA1_Init(SHA_CTX* context)
 {
   /* SHA1 initialization constants */
   context->state[0] = 0x67452301;
@@ -106,12 +106,14 @@ void SHA1_Init(SHA_CTX* context)
   context->state[3] = 0x10325476;
   context->state[4] = 0xC3D2E1F0;
   context->count[0] = context->count[1] = 0;
+
+  return 1;
 }
 
 
 /* Run your data through this. */
 
-void SHA1_Update(SHA_CTX* context, unsigned char* data, unsigned int len)
+int SHA1_Update(SHA_CTX* context, unsigned char* data, unsigned int len)
 {
   unsigned int i, j;
 
@@ -128,12 +130,14 @@ void SHA1_Update(SHA_CTX* context, unsigned char* data, unsigned int len)
   }
   else i = 0;
   memcpy(&context->buffer[j], &data[i], len - i);
+
+  return 1;
 }
 
 
 /* Add padding and return the message digest. */
 
-void SHA1_Final(unsigned char digest[20], SHA_CTX* context)
+int SHA1_Final(unsigned char digest[20], SHA_CTX* context)
 {
   unsigned long i, j;
   unsigned char finalcount[8];
@@ -162,6 +166,7 @@ void SHA1_Final(unsigned char digest[20], SHA_CTX* context)
 			vars */
   SHA1Transform(context->state, context->buffer);
 #endif
+  return 1;
 }
 
 
