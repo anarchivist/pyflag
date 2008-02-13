@@ -75,7 +75,7 @@ THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED WAR
  ****************************************************/
 #include "libevf.h"
 #include "except.h"
-#include "md5.h"
+#include "crypto/md5.h"
 
 // Constant messages:
 static char Malloc[]="Cant Malloc\n";
@@ -440,7 +440,7 @@ void evf_decompress_fds(struct offset_table *offsets,int outfd) {
   cdata=(char *)malloc(offsets->chunk_size+1024);
   if(!data || !cdata) RAISE(E_NOMEMORY,NULL,Malloc);
   
-  MD5Init(&md5);
+  MD5_Init(&md5);
 
   for(i=0;i<offsets->max_chunk;i++) {
     int chunk_size;
@@ -484,7 +484,7 @@ void evf_decompress_fds(struct offset_table *offsets,int outfd) {
     };
 
     /* Calculate the MD5 sum for the buffer */
-    MD5Update(&md5,data,length);
+    MD5_Update(&md5,data,length);
 
     if(write(outfd,data,length)<length) {
       free(data);
@@ -494,7 +494,7 @@ void evf_decompress_fds(struct offset_table *offsets,int outfd) {
     };
   };
 
-  MD5Final(cdata,&md5);
+  MD5_Final(cdata,&md5);
 
   evf_printable_md5(offsets->md5,data);
   evf_debug(0,"Stored MD5 Sum is: %s,  ",data);
@@ -703,7 +703,7 @@ void evf_compress_fds(int chunk_size,int infd, char *filename,int size) {
 
   if(!data || !cdata || !offsets) RAISE(E_NOMEMORY,NULL,Malloc);
 
-  MD5Init(&md5);
+  MD5_Init(&md5);
   //Create the first file
   outfd=creat(filename,S_IRWXU);
   if(outfd<0) RAISE(E_IOERROR,NULL,"Cant create file %s",filename);
@@ -765,7 +765,7 @@ void evf_compress_fds(int chunk_size,int infd, char *filename,int size) {
       };
 
       //Calculate the md5:
-      MD5Update(&md5,data,chunk_size);
+      MD5_Update(&md5,data,chunk_size);
 
       length=chunk_size;
       clength=chunk_size+1024;
@@ -823,7 +823,7 @@ void evf_compress_fds(int chunk_size,int infd, char *filename,int size) {
       section_position=lseek(outfd,0,SEEK_CUR);
       write(outfd,section,sizeof(*section));
       
-      MD5Final(&hash.md5,&md5);
+      MD5_Final(&hash.md5,&md5);
       hash.zero=0;
       hash.zero2=0;
 

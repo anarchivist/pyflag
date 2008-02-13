@@ -23,7 +23,7 @@ These notices must be retained in any copies of any part of this
 documentation and/or software.
  */
 
-#include "md5.h"
+#include "crypto/md5.h"
 
 /* Constants for MD5Transform routine.
  */
@@ -95,7 +95,7 @@ Rotation is separate from addition to prevent recomputation.
 
 /* MD5 initialization. Begins an MD5 operation, writing a new context.
  */
-void MD5Init (context)
+int MD5_Init (context)
 MD5_CTX *context;                                        /* context */
 {
   context->count[0] = context->count[1] = 0;
@@ -105,13 +105,15 @@ MD5_CTX *context;                                        /* context */
   context->state[1] = 0xefcdab89;
   context->state[2] = 0x98badcfe;
   context->state[3] = 0x10325476;
+
+  return 1;
 }
 
 /* MD5 block update operation. Continues an MD5 message-digest
   operation, processing another message block, and updating the
   context.
  */
-void MD5Update (context, input, inputLen)
+int MD5_Update (context, input, inputLen)
 MD5_CTX *context;                                        /* context */
 unsigned char *input;                                /* input block */
 unsigned int inputLen;                     /* length of input block */
@@ -148,12 +150,13 @@ unsigned int inputLen;                     /* length of input block */
   MD5_memcpy
  ((POINTER)&context->buffer[index], (POINTER)&input[i],
   inputLen-i);
+  return 1;
 }
 
 /* MD5 finalization. Ends an MD5 message-digest operation, writing the
   the message digest and zeroizing the context.
  */
-void MD5Final (digest, context)
+int MD5_Final (digest, context)
 unsigned char digest[16];                         /* message digest */
 MD5_CTX *context;                                       /* context */
 {
@@ -167,16 +170,18 @@ MD5_CTX *context;                                       /* context */
 */
   index = (unsigned int)((context->count[0] >> 3) & 0x3f);
   padLen = (index < 56) ? (56 - index) : (120 - index);
-  MD5Update (context, PADDING, padLen);
+  MD5_Update (context, PADDING, padLen);
 
   /* Append length (before padding) */
-  MD5Update (context, bits, 8);
+  MD5_Update (context, bits, 8);
   /* Store state in digest */
   Encode (digest, context->state, 16);
 
   /* Zeroize sensitive information.
 */
   MD5_memset ((POINTER)context, 0, sizeof (*context));
+
+  return 1;
 }
 
 /* MD5 basic transformation. Transforms state based on block.

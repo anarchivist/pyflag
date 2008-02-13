@@ -57,6 +57,8 @@ AC_OUTPUT([
 	src/lib/Makefile 
 	src/lib/libsgzip/Makefile
 	src/lib/libewf/Makefile
+	src/lib/libewf/libewf/Makefile
+	src/lib/libewf/ewftools/Makefile
 	src/lib/libiosubsys/Makefile
 	src/remote/Makefile
 	src/mmedia/Makefile

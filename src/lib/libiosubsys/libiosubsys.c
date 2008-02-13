@@ -7,7 +7,7 @@
 #include "libiosubsys.h"
 #include "except.h"
 #include "../sgzlib.h"
-#include "../libewf/libewf.h"
+#include "libewf.h"
 
 IOOptions IOOptions_add(IOOptions self, IOOptions list, char *name, char *value) {
 
@@ -365,7 +365,7 @@ IOSource EWFIOSource_Con(IOSource self, IOOptions opts) {
     return raise_errors(EIOError, "This does not appear to be an EWF file");
   };
 
-  self->size = libewf_data_size(e);
+  self->size = libewf_get_media_size(e);
 
   talloc_set_destructor((void *)self, EWFIOSource_Destructor);
   return self;

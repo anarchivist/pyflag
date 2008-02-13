@@ -1,24 +1,40 @@
-bin_PROGRAMS		= ewfacquire ewfinfo ewfexport ewfverify
-pkglib_LTLIBRARIES		= libewf.la
-noinst_HEADERS  = $(srcdir)/*.h
+SUBDIRS = \
+	libewf \
+	ewftools
 
-libewf_la_SOURCES    = libewf_endian.c ewf_compress.c ewf_crc.c ewf_data.c   	 \
-	ewf_error2.c ewf_file_header.c ewf_hash.c ewf_header.c ewf_header2.c	 \
-	 ewf_md5hash.c ewf_section.c ewf_sectors.c ewf_table.c ewf_volume.c	 \
-	ewf_volume_smart.c handle.c header_values.c file.c file_read.c file_write.c  \
-	notify.c offset_table.c section_list.c segment_table.c
+EXTRA_DIST = \
+	include/libewf.h.in \
+	include/libewf/libewf_definitions.h.in \
+	include/libewf/libewf_types.h.in \
+	libewf/libewf_config.h \
+	libewf/libewf_config_windows.h \
+	manuals/ewfacquire.1 \
+	manuals/ewfacquirestream.1 \
+	manuals/ewfexport.1 \
+	manuals/ewfinfo.1 \
+	manuals/ewfverify.1 \
+	manuals/libewf.3 \
+	TESTS \
+	libewf.spec.in \
+	libewf.spec \
+	libewf.pc.in
 
-libewf_la_LDFLAGS	   = -lz
-libewf_la_LIBADD	   = ../libexcept.la ../libmd5.la
+pkgconfigdir = $(libdir)/pkgconfig
 
-ewfacquire_SOURCES  =  ewfacquire.c
-ewfacquire_LDADD	   = libewf.la
+include_HEADERS = \
+	include/libewf.h
 
-ewfinfo_SOURCES        = ewfinfo.c
-ewfinfo_LDADD	    = libewf.la
+pkginclude_HEADERS = \
+	include/libewf/libewf_definitions.h \
+	include/libewf/libewf_extern.h \
+	include/libewf/libewf_handle.h \
+	include/libewf/libewf_types.h
 
-ewfexport_SOURCES   = ewfexport.c
-ewfexport_LDADD       =  libewf.la
+libtool: @LIBTOOL_DEPS@
+	cd $(srcdir) && $(SHELL) ./config.status --recheck
 
-ewfverify_SOURCES    = ewfverify.c
-ewfverify_LDADD	  = libewf.la
+lib: library
+
+library:
+	cd $(srcdir)/libewf && $(MAKE) $(AM_MAKEFLAGS)
+
