@@ -35,7 +35,7 @@ class YahooParser:
         self.case = stream.case
 
     def get_details(self, message):
-        return dict(inode=self.stream.inode,
+        return dict(inode_id=self.stream.inode_id,
                     packet_id=self.stream.get_packet_id(self.stream.tell()),
                     session_id=message['session_id'].get_value())
 

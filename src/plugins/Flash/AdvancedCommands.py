@@ -212,8 +212,13 @@ class scanner_reset(scan):
 class load_and_scan(scan):
     """ Load a filesystem and scan it at the same time """
     def help(self):
-        return "load_and_scan iosource fstype mount_point [list of scanners]: Loads the iosource into the right mount point and scans all new inodes using the scanner list. This allows scanning to start as soon as VFS inodes are produced and before the VFS is fully populated."
+        return """load_and_scan iosource mount_point fstype [list of scanners]:
 
+        Loads the iosource into the right mount point and scans all
+        new inodes using the scanner list. This allows scanning to
+        start as soon as VFS inodes are produced and before the VFS is
+        fully populated.
+        """
     def complete(self, text,state):
         if len(self.args)>4 or len(self.args)==4 and not text:
             scanners = [ x for x in Registry.SCANNERS.scanners if x.startswith(text) ]

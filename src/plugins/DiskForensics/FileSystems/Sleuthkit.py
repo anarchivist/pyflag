@@ -231,7 +231,7 @@ class Sleuthkit(DBFS):
                 pdbh.mass_insert(
                     command = 'Scan',
                     arg1 = self.case,
-                    arg2 = inode,
+                    arg2 = inodestr,
                     arg3= scanner_string,
                     cookie=cookie,
                     )

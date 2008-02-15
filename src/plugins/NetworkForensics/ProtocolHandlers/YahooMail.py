@@ -28,7 +28,7 @@ import pyflag.pyflaglog as pyflaglog
 import pyflag.Scanner as Scanner
 import re
 import FileFormats.HTML as HTML
-import pyflag.TableObj as TableObj
+import pyflag.ColumnTypes as ColumnTypes
 import pyflag.FileSystem as FileSystem
 import pyflag.FlagFramework as FlagFramework
 
@@ -129,7 +129,7 @@ class YahooMailScan(LiveCom.HotmailScanner):
                 result['Message'] = msgbody.innerHTML()
                 
             if 'Sent' in result:
-                result['Sent'] = TableObj.guess_date(result['Sent'])
+                result['Sent'] = ColumnTypes.guess_date(result['Sent'])
             
             if len(result.keys())>3:
                 return self.insert_message(result, inode_template = "y%s")            
