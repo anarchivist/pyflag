@@ -509,7 +509,7 @@ class StringType(ColumnType,LogParserMixin):
               ]
               
     def __init__(self, *args, **kwargs):
-        self.width = kwargs.get('width',255)
+        self.width = kwargs.get('width',30000)
         ColumnType.__init__(self, *args, **kwargs)
         
     def create(self):
