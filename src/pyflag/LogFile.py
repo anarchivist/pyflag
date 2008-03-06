@@ -172,7 +172,11 @@ class Log:
                 try:
                     buffer = tmp[1]
                 except:
-                    break
+                    data = fd.read(1024)
+                    if len(data) == 0:
+                        break
+                    buffer = line + data
+                    continue
                 
                 if blank.match(line) or not line:
                     continue
