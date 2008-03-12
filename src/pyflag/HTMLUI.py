@@ -1194,24 +1194,36 @@ class HTMLUI(UI.GenericUI):
         ## This part allows the user to save the table in CSV format:
         def save_table(query,result):
 
-            def generate_output(rows_left):
+            def generate_output(rows_left, format):
                 dbh = DB.DBO(case)
                 row_number = 0
                 data = cStringIO.StringIO()
 
                 requestedExport = query.getarray('exportColumn')
 
-                yield "#Pyflag Table widget output\n#Query was %s.\n" % query
+                if format == "csv":
+                    yield "#Pyflag Table widget output\n#Query was %s.\n" % query
+                elif format == "html":
+                    yield '<html><head title="Pyflag Table Export"><body><h2>Pyflag Table Export</h2>Query was: %s<br />' % query
 
                 try:
-                    yield "# Filter: %s\n" % query[filter]
+                    if format == "csv":
+                        yield "# Filter: %s\n" % query[filter]
+                    elif format == "html":
+                        yield "<h3>Filter: %s</h3>" % query[filter]
                 except KeyError:
                     pass
 
-                yield "#Fields: %s\n" % ",".join(requestedExport)
-
-                csv_writer = csv.DictWriter(data,requestedExport,
-                                            dialect = 'excel')
+                if format == "csv":
+                    yield "#Fields: %s\n" % ",".join(requestedExport)
+                    csv_writer = csv.DictWriter(data,requestedExport,
+                                                dialect = 'excel')
+                elif format == "html":
+                    data.write("<table border=1>")
+                    data.write("<tr>")
+                    for row in requestedExport:
+                    	data.write("<td><b>%s</b></td>" % row)
+                    data.write("</tr>")
 
                 while rows_left > 0:
                 ## Do the query now - we issue multiple queries
@@ -1225,6 +1237,7 @@ class HTMLUI(UI.GenericUI):
                         count += 1
                         row_number+=1
                         result = {}
+                        result_str = ""
                 
                         for i in range(len(elements)):
                             keysWanted = []
@@ -1234,9 +1247,17 @@ class HTMLUI(UI.GenericUI):
                                 if k in requestedExport: keysWanted.append(k)
 
                             for j in range (len(keysWanted)):
-                                result[keysWanted[j]] = elements[i].extended_csv(row[elements[i].name])[keysWanted[j]]
+                            	if format == "csv":
+                                    result[keysWanted[j]] = elements[i].extended_csv(row[elements[i].name])[keysWanted[j]]
+                                elif format == "html":
+                                    result_str += "<td>%s</td>" % elements[i].html(row[elements[i].name])
+                                if query.has_key('export_data'):
+                                	elements[i].export(row[elements[i].name], query['export_dir'])
 
-                        csv_writer.writerow(result)
+                        if format == "csv":
+                            csv_writer.writerow(result)
+                        elif format == "html":
+                            data.write("<tr>%s</tr>" % result_str)
 
                     if count==0: break
                     data.seek(0)
@@ -1244,14 +1265,21 @@ class HTMLUI(UI.GenericUI):
                     yield tmp
                     data.truncate(0)
 
+                if format == "html":
+                	yield "</table></html>"
+
             if query.has_key('save_length'):            
                 rows_required = int(query['save_length'])
                 if rows_required==0:
                     rows_required = sys.maxint
                 
-                result.generator.generator = generate_output(rows_required)
-                result.generator.content_type = "text/csv"
-                result.generator.headers = [("Content-Disposition","attachment; filename=%s_%s.csv" %(case,re.sub("[^a-zA-Z0-9]", "_", table) )),]
+                result.generator.generator = generate_output(rows_required, query['output_format'])
+                if query['output_format'] == "csv":
+                    result.generator.content_type = "text/csv"
+                    result.generator.headers = [("Content-Disposition","attachment; filename=%s_%s.csv" %(case,re.sub("[^a-zA-Z0-9]", "_", table) )),]
+                elif query['output_format'] == "html":
+                    result.generator.content_type = "text/html"
+                    result.generator.headers = [("Content-Disposition","attachment; filename=index.html" % query['export_dir']),]
                 return
 
             result.heading("Save Table output")
@@ -1262,6 +1290,9 @@ class HTMLUI(UI.GenericUI):
                 result.defaults['save_length'] = 0
                 
             result.textfield("How many rows to save? (0 for all rows)", "save_length")
+            result.checkbox("Export DATA?", "export_data", False)
+            result.textfield("Export directory", "export_dir")
+            result.const_selector("Output format", "output_format", ["html", "csv"], ["html", "cvs"])
             for e in range(len(elements)):
                 for col in elements[e].extended_names:
                     if e.__str__() not in query.getarray('_hidden'):

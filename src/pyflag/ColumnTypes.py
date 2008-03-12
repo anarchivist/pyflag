@@ -299,6 +299,16 @@ class ColumnType:
     def extended_csv(self, value):
         return {self.name:self.csv(value)}
 
+    def html(self, value):
+        return value
+
+    def export(self, value, exportdir):
+        """ The export method allows a ColumnType to perform some action when
+        a user exports a table. e.g. Copy data to an export directory
+        """
+        #print "EXPORTING: %s to %s" % (value, exportdir)
+        pass
+
     def create(self):
         """ This needs to generate a create clause for creating this
         table. It is used when we wish to make a table with this
@@ -846,6 +856,25 @@ class InodeIDType(IntegerType):
         column = self.escape_column_name(self.column)
         return "inode.inode like '%%%s%%'" % pattern
     
+    def export(self, value, exportdir):
+        """ Copy Inode data to the exportdir """
+        print "Exporting Inode %s to %s" % (value, exportdir)
+        fsfd = FileSystem.DBFS(self.case)
+        infd = fsfd.open(inode_id=value)
+        outfd = open("%s/%s" % (exportdir, value), "w")
+        try:
+            while True:
+        	    data = infd.read(4096)
+        	    if not data: break
+        	    outfd.write(data)
+        except IOError, e:
+            print "Got Error exporting inode_id %s: %s" % (value, e)
+
+        outfd.close()
+
+    def html(self, value):
+        return '<a href="%s">%s</a>' % (value, value)
+
     def column_decorator(self, table, sql, query, result):
         case = query['case']
         report = Registry.REPORTS.dispatch(family = 'Disk Forensics',
