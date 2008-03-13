@@ -1278,8 +1278,8 @@ class HTMLUI(UI.GenericUI):
                     result.generator.content_type = "text/csv"
                     result.generator.headers = [("Content-Disposition","attachment; filename=%s_%s.csv" %(case,re.sub("[^a-zA-Z0-9]", "_", table) )),]
                 elif query['output_format'] == "html":
-                    result.generator.content_type = "text/html"
-                    result.generator.headers = [("Content-Disposition","attachment; filename=index.html" % query['export_dir']),]
+                    result.generator.content_type = "application/octet-stream"
+                    result.generator.headers = [("Content-Disposition","attachment; filename=index.html"),]
                 return
 
             result.heading("Save Table output")
