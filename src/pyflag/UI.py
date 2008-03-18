@@ -327,7 +327,8 @@ class GenericUI:
     
     def fileselector(self, description, name, vfs=True):
         """ Draws a file selector for files in the upload directory """
-        from pyflag.ColumnTypes import IntegerType, TimestampType, StringType, FilenameType
+        from pyflag.ColumnTypes import IntegerType, TimestampType, \
+             StringType, InodeIDType, FilenameType
 
         def vfs_popup(query, result):
             if not query.has_key('case'):
@@ -341,13 +342,13 @@ class GenericUI:
                 new_query.poparray('callback_stored')
                 
                 result.table(
-                    elements = [ FilenameType(case = case,
+                    elements = [ InodeIDType(),
+                                 FilenameType(case = case,
                                               link = new_query,
                                               link_pane = 'parent'),
                                  IntegerType('File Size', 'size')
                                  ],
-                    table = '`file`, `inode`',
-                    where = 'file.inode_id=inode.inode_id',
+                    table = 'inode',
                     case=case,
                     )
 

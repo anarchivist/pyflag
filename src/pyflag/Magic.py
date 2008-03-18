@@ -97,7 +97,7 @@ class MagicResolver:
         ## Return the highest score:
         return max_score, scores
 
-    def find_inode_magic(self, case, inode_id=None, inode=None):
+    def find_inode_magic(self, case, inode_id=None, inode=None, data=None):
         """ A convenience function to resolve an inode's magic.
 
         We check the db cache first.
@@ -116,11 +116,13 @@ class MagicResolver:
             content_type = row['mime']
             type = row['type']
         except (DB.DBError,TypeError):
-            fsfd = FileSystem.DBFS(case)
-            fd = fsfd.open(inode_id = inode_id)
-            ## We could not find it in the mime table - lets do magic
-            ## ourselves:
-            data = fd.read(1024)
+            if not data:
+                fsfd = FileSystem.DBFS(case)
+                fd = fsfd.open(inode_id = inode_id)
+                ## We could not find it in the mime table - lets do magic
+                ## ourselves:
+                data = fd.read(1024)
+                
             type, content_type = self.cache_type(case, inode_id, data)
 
         return type, content_type

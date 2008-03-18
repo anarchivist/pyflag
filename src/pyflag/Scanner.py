@@ -472,7 +472,8 @@ def scanfile(ddfs,fd,factories):
 
             except Exception,e:
                 pyflaglog.log(pyflaglog.ERRORS,"Scanner (%s) Error: %s" %(o,e))
-                raise
+                # Ignore the error and keep going here:
+                #raise
 
         if not interest:
             pyflaglog.log(pyflaglog.DEBUG, "No interest for %s" % fd.inode)

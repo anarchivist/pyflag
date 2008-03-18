@@ -55,6 +55,7 @@ class Advanced(IO.Image):
     order = 20
     subsys = "advanced"
     io = None
+
     def calculate_partition_offset(self, query, result, offset = 'offset'):
         """ A GUI function to allow the user to derive the offset by calling mmls """
         def mmls_popup(query,result):
@@ -122,7 +123,7 @@ class Advanced(IO.Image):
         return int(m.group(1))* multiplier
 
     def form(self, query, result):
-        result.fileselector("Select %s image:" % self.__class__.__name__.split(".")[-1], name="filename")
+        result.fileselector("Select %s image:" % self.__class__.__name__.split(".")[-1], name="filename", vfs=False)
         self.calculate_partition_offset(query, result)
 
     def make_iosource_args(self, query):
@@ -156,7 +157,7 @@ class Advanced(IO.Image):
             ## digit we assume that its part of an evidence set.
             m = filename_re.match(f)
             
-            if m and self.subsys == "ewf":
+            if m:
                 globbed_filenames = []
                 dirname , base = os.path.split(m.group(1))
                 for new_f in os.listdir(dirname):
@@ -191,8 +192,7 @@ class Advanced(IO.Image):
 
         name can be None, in which case this is an anonymous source (not cached).
         """
-        import iosubsys
-
+        import iosubsys        
         args = self.make_iosource_args(query)
         io = iosubsys.iosource(args)
 
@@ -210,9 +210,13 @@ class Advanced(IO.Image):
         will ideally use the same self.io to instantiate a new
         IOSubsysFD() for each open call.
         """
+        self.cache_io(name, case, query)
+        return IOSubsysFD(self.io, name)
+
+    def cache_io(self, name, case, query=None):
         if not self.io:
             dbh = DB.DBO(case)
-            
+
             ## This basically checks that the query is sane.
             if query:
                 ## Check that all our mandatory parameters have been provided:
@@ -245,7 +249,6 @@ class Advanced(IO.Image):
                 row = dbh.fetch()
                 self.io = self.create(name, case, query_type(string=row['parameters']))
 
-        return IOSubsysFD(self.io, name)
 
 class SGZip(Advanced):
     """ Sgzip is pyflags native image file format """
@@ -254,6 +257,43 @@ class SGZip(Advanced):
 class EWF(Advanced):
     """ EWF is used by other forensic packages like Encase or FTK """
     subsys = 'ewf'
+
+class OffsettedFile(IOSubsysFD):
+    def __init__(self, filename, offset):
+        self.fd = IO.open_URL(filename)
+        self.offset = offset
+        self.fd.seek(0,2)
+        self.size = self.fd.tell() - offset
+        self.fd.seek(offset)
+        self.readptr = 0
+        
+    def seek(self, offset, whence=0):
+        IOSubsysFD.seek(self, offset, whence)
+        self.fd.seek(self.readptr + self.offset)
+
+    def read(self, length=0):
+        result = self.fd.read(length)
+        self.readptr += len(result)
+        return result
+
+class Standard(Advanced):
+    """ Standard image types as obtained by dd """
+    order=10
+
+    def form(self, query, result):
+        result.fileselector("Select %s image:" % self.__class__.__name__.split(".")[-1], name="filename", vfs=True)
+        self.calculate_partition_offset(query, result)
+
+    def create(self, name, case, query):
+        offset = self.calculate_offset_suffix(query.get('offset','0'))
+        filename = query['filename']
+        print "Creating Standard iosource of %s" % filename
+        return OffsettedFile(filename, offset)
+
+    def open(self, name, case, query=None):
+        print "Openning Standard IO Source %s" % name
+        self.cache_io(name, case, query)
+        return self.io
 
 import Store
 

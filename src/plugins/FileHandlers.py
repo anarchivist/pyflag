@@ -33,7 +33,10 @@ class FileMethod(IO.FileHandler):
     def open(self):
         ## Make sure there are no ../
         path = os.path.normpath(self.path)
-        file = config.UPLOADDIR + "/" + self.path
+        if not self.path.startswith(config.UPLOADDIR):
+            file = config.UPLOADDIR + "/" + self.path
+        else:
+            file = self.path
         
         ## We need to handle gzip files transparently here:
         try:

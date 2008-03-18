@@ -75,8 +75,8 @@ class MemoryForensicEventHandler(FlagFramework.EventHandler):
         
 class IOSourceAddressSpace(FileAddressSpace):
     def __init__(self, fd):
-        self.fname = fd.name
-        self.name = fd.name
+        #self.fname = fd.name
+        #self.name = fd.name
         self.fhandle = fd
         self.fsize = fd.size
         self.fast_fhandle = fd

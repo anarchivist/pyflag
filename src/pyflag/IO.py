@@ -149,7 +149,7 @@ def open(case, iosource):
         query = query_type(string=row['parameters'])
         image = Registry.IMAGES.dispatch(query['subsys'])()
         IO_Cache.put(image, key=key)
-        
+
     return image.open(iosource,case)
 
 ## IO subsystem unit tests:

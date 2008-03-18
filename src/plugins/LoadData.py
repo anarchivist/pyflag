@@ -206,8 +206,11 @@ class LoadIOSource(Reports.report):
 
             ## Adjust all the filenames to be rooted at the UPLOADDIR:
             for f in filenames:
-                query['filename'] = os.path.normpath(
-                    "%s/%s" % (config.UPLOADDIR, f))
+                if "://" not in f:
+                    query['filename'] = os.path.normpath(
+                        "%s/%s" % (config.UPLOADDIR, f))
+                else:
+                    query['filename'] = f
 
             io = image.open(query['iosource'], query['case'], query)
         except Exception,e:
@@ -362,6 +365,11 @@ class ScanFS(Reports.report):
         
 
     def display(self,query,result):
+        ## Reset the report cache for us - this eliminates the bug
+        ## where a re-scan on the same directory doesnt work.
+        FlagFramework.reset_all(family = query['family'], report=query['report'],
+                                case=query['case'], path=query['path'])
+
         ## Browse the filesystem instantly
         result.refresh(0,
                        FlagFramework.query_type(case=query['case'],

@@ -34,7 +34,7 @@ import pyflag.pyflaglog as pyflaglog
 from pyflag.Scanner import *
 import zipfile,gzip,tarfile, zlib
 from pyflag.FileSystem import File
-import pyflag.FlagFramework as FlagFramework
+import pyflag.Magic as Magic
 import time,re,os
 import StringIO
 import pyflag.Scanner as Scanner
@@ -123,8 +123,9 @@ class GZScan(ZipScan):
                 ## 1) We try to decompress the first data block from the file to see if the original name is in the header
                 ## 2) Failing this we check if the inodes filename ends with .gz
                 ## 3) Failing that, we call the new file "data"
-                a=FlagFramework.Magic()
-                magic = a.buffer(data)
+                m = Magic.MagicResolver()
+                magic, type_mime = m.find_inode_magic(self.case, inode_id=self.fd.inode_id,
+                                                      data=data[:1024])
                 match = re.search(magic,'was "([^"]+)"')
                 if match:
                     self.filename = match.groups(1)

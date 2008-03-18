@@ -112,7 +112,7 @@ class StreamFile(File):
         self.read(0)
         
         self.stat_cbs.extend([ self.show_packets, self.combine_streams ])
-        self.stat_names.extend([ "Show Packets", "Combined streams"])
+        self.stat_names.extend([ "Show Packets", "Combined stream"])
 
         ## This is a cache of packet lists that we keep so we do not
         ## have to hit the db all the time.
@@ -330,7 +330,7 @@ class StreamFile(File):
 
         number_of_rows = 0
         dbh = DB.DBO(self.case)
-        dbh.execute("select * from `connection` where inode_id = %r order by cache_offset limit %s, %s", (combined_fd.inode_id, limit, config.PAGESIZE))
+        dbh.execute("select * from `connection` where inode_id = %r order by cache_offset limit %s, %s", (combined_fd.lookup_id(), limit, config.PAGESIZE))
 
         for row in dbh:
             number_of_rows += 1
@@ -380,7 +380,7 @@ class StreamFile(File):
                          ],
             
             table= 'connection',
-            where = 'inode_id="%s" ' % combined_fd.inode_id,
+            where = 'inode_id="%s" ' % combined_fd.lookup_id(),
             case=query['case']
             )
 

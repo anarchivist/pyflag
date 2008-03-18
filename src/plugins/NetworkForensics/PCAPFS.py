@@ -401,6 +401,22 @@ class PCAPFS(DBFS):
         ##pcap_dbh.delete("connection_details",
         ##                where = "inode is null")
 
+import pyflag.Magic as Magic
+
+class PCAPMagic(Magic.Magic):
+    """ Identify PCAP files """
+    type = "PCAP tcpdump file"
+    mime = "binary/x-pcap"
+    default_score = 100
+
+    regex_rules = [
+        ( r"\xd4\xc3\xb2\xa1", (0,1)),
+        ( r"\xa1\xb2\xc3\xd4", (0,1))
+        ]
+
+    samples = [
+        ( 100, "\xd4\xc3\xb2\xa1sddsadsasd")
+        ]
         
 class PCAPFile(File):
     """ A file like object to read packets from a pcap file.

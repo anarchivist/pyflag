@@ -391,19 +391,21 @@ class DBFS(FileSystem):
             dbh.execute("select inode,inode_id from file where path=%r and (name=%r or name=concat(%r,'/')) and inode!='' limit 1", (dir+'/',name,name))
             res = dbh.fetch()
             if not res:
-                return None
+                raise RuntimeError("VFS path not found %s/%s" % (dir,name))
             return path, res["inode"], res['inode_id']
+        
         elif inode_id:
             dbh.check_index('inode','inode_id')
             dbh.execute("select file.inode, concat(path,name) as path from inode join file on inode.inode_id=file.inode_id where file.inode_id=%r order by file.status limit 1", inode_id)
             res = dbh.fetch()
             return res['path'],res['inode'], inode_id
+
         else:
             dbh.check_index('file','inode')
             dbh.execute("select inode_id,concat(path,name) as path from file where inode=%r order by status limit 1", inode)
             res = dbh.fetch()
             if not res:
-                return None
+                raise RuntimeError("VFS Inode %s not known" % inode)
             return res["path"], inode, res['inode_id']
         
     def istat(self, path=None, inode=None, inode_id=None):
