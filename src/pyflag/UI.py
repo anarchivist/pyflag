@@ -700,7 +700,6 @@ class TableRenderer:
         except IndexError:
             pass
 
-        print query_str
         return query_str
 
     def generate_rows(self,query):

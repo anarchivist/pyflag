@@ -16,9 +16,21 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
     exportable = True
     name = "HTML Diretory"
 
+    ## An option to control adding extra files linked from the html
+    include_extra_files = False
+    message = "Export HTML Files into a directory"
+
     def form(self, query,result):
-        result.heading("Export HTML Files into a directory")
-        return True
+        result.heading(self.message)
+        submitted = query.has_key('start_limit')
+        query.default('start_limit',0)
+        query.default('end_limit',0)
+
+        result.textfield("Start Row (0)", "start_limit")
+        result.textfield("End Row (0 - no limit)", "end_limit")
+        result.checkbox("Include extra files","include_extra_files","Include files such as inodes in the exported bundle")
+
+        return submitted
 
     def render_tools(self, query, result):
         pass
@@ -55,32 +67,126 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         outfd.write(string)
         outfd.close()
 
-    def render_page(self, page_number, elements, row_generator):
-        """ Returns a single HTML page of data from the row_generator """
-        data = '<html><head title="Pyflag Table Export - Page %s"><body>' % page_number
 
-        ## Write the table headers:
-        data += "<table border=1><tr><th>" + "</th><th>".join(self.column_names) + "</th></tr>" 
+    def render_page(self, page_number, elements, row_generator):
+        header = '''<html><head>
+        <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
+        <style>
+        html, body {
+        overflow: auto;
+        }
+        </style>
+        </head>
+        <body>
+        <script src="javascript/functions.js" type="text/javascript" language="javascript"></script>
+        <div class="PyFlagHeader">
+        %(toolbar)s
+        </div>
+        <div class="PyFlagPage" id="PyFlagPage">
+        <table class="PyFlagTable" ><thead><tr>'''
+
+        result = ''
+        for e in range(len(elements)):
+            n = elements[e].name
+            if self.order==e:
+                if self.direction=='1':
+                    result += "<th>%s<img src='images/increment.png'></th>" % n
+                else:
+                    result += "<th>%s<img src='images/decrement.png'></th>" % n
+            else:
+                result += "<th>%s</th>" % n
+
+        result+='''</tr></thead><tbody class="scrollContent">'''
+
+        old_sorted = None
+        old_sorted_style = ''
+
+        ## Total number of rows
+        self.row_count=0
 
         for row in row_generator:
-            data += "<tr>"
-            for e in elements:
-                data += "<td>%s</td>" % e.render_html(row[e.name], self)
-            data += "</tr>\n"
+            row_elements = []
+            tds = ''
 
-        data += "</table></body></html>"
-            
-        return data
+            ## Render each row at a time:
+            for i in range(len(elements)):
+                ## Give the row to the column element to allow it
+                ## to translate the output suitably:
+                value = row[elements[i].name]
+                try:
+                    ## Elements are expected to render on cell_ui
+                    cell_ui =  elements[i].render_html(value,self)
+                except Exception, e:
+                    pyflaglog.log(pyflaglog.ERROR, "Unable to render %r: %s" % (value , e))
+
+                ## Render the row styles so that equal values on
+                ## the sorted column have the same style
+                if i==self.order and value!=old_sorted:
+                    old_sorted=value
+                    if old_sorted_style=='':
+                        old_sorted_style='alternateRow'
+                    else:
+                        old_sorted_style=''
+
+                ## Render the sorted column with a different style
+                if i==self.order:
+                    tds+="<td class='sorted-column'>%s</td>" % (cell_ui)
+                else:
+                    tds+="<td class='table-cell'>%s</td>" % (cell_ui)
+
+            result += "<tr class='%s'> %s </tr>\n" % (old_sorted_style,tds)
+            self.row_count += 1
+            if self.row_count >= self.pagesize:
+                break
+
+        return header % {'toolbar': self.navigation_buttons(page_number)} + \
+               result + """</tbody></table>
+               </div><script>AdjustHeightToPageSize('PyFlagPage');</script>
+               </body></html>"""
+
+    def navigation_buttons(self, page_number):
+        if page_number==1:
+            result = '<img border="0" src="images/stock_left_gray.png"/>'
+        else:
+            result = '''<a href="page%s.html">
+            <abbr title="Previous Page (%s)">
+            <img border="0" src="images/stock_left.png"/>
+            </abbr>
+            </a>''' % (page_number-1,page_number-1)
+
+        if self.row_count < self.pagesize:
+            result += '<img border="0" src="images/stock_right_gray.png"/>'
+        else:
+            result += '''<a href="page%s.html">
+            <abbr title="Next Page (%s)">
+            <img border="0" src="images/stock_right.png"/>
+            </abbr>
+            </a>''' % (page_number+1,page_number+1)
+
+        return result
 
     def add_constant_files(self):
         """ Adds constant files to the archive like css, images etc """
-        for filename in [ "images/spacer.png" ]:
-            self.add_file("inodes/" + filename, open("%s/%s" % (config.DATADIR, filename)))
+        for filename, dest in [ ("images/spacer.png", "inodes/images/spacer.png"),
+                                ('images/pyflag.css',None,),
+                                ('images/decrement.png',None,),
+                                ('images/increment.png',None),
+                                ('images/stock_left.png',None),
+                                ('images/stock_left_gray.png',None),
+                                ('images/stock_right.png',None),
+                                ('images/stock_right_gray.png',None),
+                                ('images/toolbar-bg.gif',None),
+                                ('javascript/functions.js', None),
+                                ]:
+            if not dest: dest = filename
+            self.add_file(dest, open("%s/%s" % (config.DATADIR, filename)))
 
     def render_table(self, query, result):
         g = self.generate_rows(query)
         self.inodes_in_archive = set()
         self.add_constant_files()
+
+        self.include_extra_files = query.get('include_extra_files',False)
         
         hiddens = [ int(x) for x in query.getarray(self.hidden) ]
 
@@ -93,10 +199,16 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             
         def generator(query, result):
             page = 1
-            self.add_file_from_string("page%s.html" % page,
-                                      self.render_page(1, elements, g))
 
-            yield "<h1> Complete </h1>"
+            while 1:
+                page_data = self.render_page(page, elements, g)
+                if self.row_count ==0: break
+                
+                self.add_file_from_string("page%s.html" % page,
+                                          page_data)
+                                          
+                yield "Page %s" % page
+                page +=1
             
         result.generator.generator = generator(query,result)
 
@@ -127,6 +239,10 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
     def add_file_to_archive(self, inode_id, directory='inodes/'):
         """ Given an inode_id which is a html file, we sanitise it and add
         its references to the bundle in table_renderer."""
+
+        if not self.include_extra_files:
+            return "#"
+
         ## Add the inode to the exported bundle:
         filename = "%s%s" % (directory, inode_id)
 
@@ -186,15 +302,14 @@ class HTMLBundleRenderer(HTMLDirectoryRenderer):
 
     def add_file_from_string(self, filename, string):
         self.zip.writestr(filename, string)
-    
-    def form(self, query,result):
-        result.heading("Export HTML Files into a zip file")
-        return True
+
+    message = "Export HTML Files into a zip file"
 
     def render_table(self, query, result):
         g = self.generate_rows(query)
         self.inodes_in_archive = set()
         self.add_constant_files()
+        self.include_extra_files = query.get('include_extra_files',False)
         
         hiddens = [ int(x) for x in query.getarray(self.hidden) ]
 
