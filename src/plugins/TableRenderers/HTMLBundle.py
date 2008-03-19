@@ -5,7 +5,7 @@ static) - you do not need pyflag to view them, just a web browser.
 
 This is a good way of delivering a report.
 """
-import os, os.path
+import os, os.path, tempfile
 import pyflag.UI as UI
 import csv, cStringIO
 import pyflag.DB as DB
@@ -154,11 +154,74 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             parser.close()
 
             self.add_file_from_string(filename, parser.root.innerHTML())
+        elif 'css' in content_type:
+            data = fd.read(1024*1024)
+            tag = BundleResolvingHTMLTag(table_renderer = self,
+                                         inode_id = inode_id)
+            self.add_file_from_string(filename, tag.css_filter(data))
         else:
             self.add_file(filename, fd)
 
         return filename
 
+import zipfile
+
+class HTMLBundleRenderer(HTMLDirectoryRenderer):
+    name = "HTML Bundle"
+    def __init__(self, *args, **kwargs):
+        self.outfd = cStringIO.StringIO()
+        self.zip = zipfile.ZipFile(self.outfd, "w", zipfile.ZIP_DEFLATED)
+        HTMLDirectoryRenderer.__init__(self, *args, **kwargs)
+
+    def add_file(self, filename, infd):
+        outfd = tempfile.NamedTemporaryFile()
+        while 1:
+            data = infd.read(1024*1024)
+            if not data: break
+            outfd.write(data)
+
+        outfd.flush()
+        self.zip.write(outfd.name, filename)
+        outfd.close()
+
+    def add_file_from_string(self, filename, string):
+        self.zip.writestr(filename, string)
+    
+    def form(self, query,result):
+        result.heading("Export HTML Files into a zip file")
+        return True
+
+    def render_table(self, query, result):
+        g = self.generate_rows(query)
+        self.inodes_in_archive = set()
+        self.add_constant_files()
+        
+        hiddens = [ int(x) for x in query.getarray(self.hidden) ]
+
+        self.column_names = []
+        elements = []
+        for e in range(len(self.elements)):
+            if e in hiddens: continue
+            self.column_names.append(self.elements[e].name)
+            elements.append(self.elements[e])
+            
+        def generator(query, result):
+            page = 1
+            self.add_file_from_string("page%s.html" % page,
+                                      self.render_page(1, elements, g))
+
+            self.zip.close()
+            self.outfd.seek(0)
+            while 1:
+                data = self.outfd.read(1024*1024)
+                if not data: break
+
+                yield data
+
+        result.generator.generator = generator(query,result)
+        result.generator.content_type = "application/x-zip"
+        result.generator.headers = [("Content-Disposition","attachment; filename=table.zip"),]
+        
 ## Here we provide the InodeIDType the ability to render html
 ## correctly:
 from pyflag.ColumnTypes import InodeIDType
