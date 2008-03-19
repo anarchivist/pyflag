@@ -252,78 +252,6 @@ class GenericUI:
                      - (None): No sanitation is done
         """
         pyflaglog.log(pyflaglog.DEBUG, "text not implemented")
-
-    def _make_sql(self,elements=[],filter_elements=[], table='',where=1,groupby = None, _groupby=None,
-                  case=None, filter='', order=0, direction='1', limit = 0):
-        """ Calculates the SQL for the table widget based on the query """
-        ## Calculate the SQL
-        query_str = "select "
-
-        total_elements = elements + filter_elements
-
-        ## Fixup the elements - if no table specified use the global
-        ## table - this is just a shortcut which allows us to be lazy:
-        for e in total_elements:
-            if not e.table: e.table = table
-            if not e.case: e.case = case
-
-        ## The columns and their aliases:
-        query_str += ",".join([ e.select() + " as `" + e.name + "`" for e in elements ])
-
-        ## The tables are calculated as a join of all the individual
-        ## database tables from all the columns - this allows us to
-        ## put elements from different database tables in the same
-        ## widget automatically.
-        tables = []
-        for e in total_elements:
-            if e.table not in tables: tables.append(e.table)
-
-        ## Now generate the join clause:
-        query_str += " from %s " % tables[0]
-
-        for i in range(1,len(tables)):
-            query_str += " join `%s` on `%s`.inode_id = `%s`.inode_id " % \
-                         (tables[i], tables[0],tables[i])
-
-        if where:
-            w = ["(%s)" % where,]
-        else:
-            w = []
-            
-        for e in total_elements:
-            tmp = e.where()
-            if tmp: w.append(tmp)
-
-        ## Is there a filter condition?
-        if filter:
-            filter_str = parser.parse_to_sql(filter, total_elements)
-            if not filter_str: filter_str=1
-            
-        else: filter_str = 1
-
-        query_str += "where (%s and (%s)) " % (" and ".join(w), filter_str)
-
-        if groupby:
-            query_str += "group by `%s` " % groupby
-        elif _groupby:
-            query_str += "group by %s " % groupby
-            
-        ## Now calculate the order by:
-        try:
-            query_str += "order by %s " % elements[order].order_by()
-            if direction=='1':
-                query_str += "asc"
-            else: query_str+= "desc"
-        except Exception,e:
-            print e
-            pass
-        
-
-        ## No longer needed as limits are handled by dbh.cached_execute()
-        ## Limit conditions:
-        ##query_str += " limit %s, %s" % (limit, config.PAGESIZE)
-
-        return query_str
     
     def fileselector(self, description, name, vfs=True):
         """ Draws a file selector for files in the upload directory """
@@ -467,3 +395,459 @@ class GenericUI:
         self.row(description, tmp)
 
 UI = None
+
+config.add_option("PAGESIZE", default=50, type='int',
+                  help="number of rows to display per page in the Table widget")
+
+class TableRenderer:
+    """ This class is responsible for rendering the table widget under
+    various conditions.
+
+    We can extend this class to produce other types of renderers like
+    CSV, HTML, UI, PDF etc.
+    """
+    table =''
+    where = '1'
+    groupby = None
+    _groupby = None
+    case = None
+
+    ## Exportable - indicate if we can participate in exporting
+    exportable = False
+    
+    ## The elements we operate on (should be filled by __init__)
+    elements = None
+
+    ## The variable which contains the paging limit
+    limit_context = 'limit'
+
+    ## The query variable containing the filter expression
+    filter = 'filter'
+    ## The actual filter value
+    filter_str = ''
+    
+    ## The query variable containing a list of columns to hide
+    hidden = '_hidden'
+
+    ## Take default pagesize from the configuration
+    pagesize = config.PAGESIZE
+
+    ## The total number of rows shown by this table render (only valid
+    ## after calling render())
+    row_count = 0
+
+    ## Ascending or descending ordering?
+    direction = 0
+
+    ## The column number which will be sorted:
+    order = 0
+
+    ## Should we group by a column?
+    groupby = None
+    _groupby = None
+
+    def __init__(self, **args):
+        self.__dict__.update(args)
+        
+        ## These are the elements which will be filtered on
+        self.filter_elements = self.elements
+
+    def render(self, query, result):
+        self.filter_str = query.get(self.filter,'')
+
+        if self.groupby or self._groupby:
+            for e in self.elements:
+                if e.name==self.groupby:
+                    new_query = query.clone()
+                    del new_query['groupby']
+                    filter_expression = self.filter_str.strip().replace('%','%%')
+                    if filter_expression: filter_expression += " and "
+
+                    filter_expression += "'%s'='%%s'" % e.name
+                    new_query['__target_format__'] = filter_expression
+                    new_query['__target__'] = self.filter
+                    e.link = new_query
+                    e.link_pane = 'parent'
+
+                    from pyflag.ColumnTypes import CounterType
+
+                    self.elements = [ e,
+                                      CounterType(name='Count'),
+                                      ]
+                    break
+
+        self.render_table(query, result)
+        self.render_tools(query, result)
+
+    def render_tools(self,query, result):
+        """ Called to install all the toolbar callbacks """
+        self.paging_buttons(query, result)
+        self.filter_buttons(query, result)
+        self.configure_button(query, result)
+        self.groupby_button(query, result)
+        self.count_button(query, result)
+        self.export_button(query, result)
+        
+    def count_button(self, query, result):
+        """  This returns the total number of rows in this table - it
+        could take a while which is why its a popup."""
+        def count_cb(query, result):
+            try:
+                filter_str = query[self.filter]
+                sql = parser.parse_to_sql(filter_str, self.elements)
+            except KeyError:
+                sql = 1
+
+            dbh=DB.DBO(self.case)
+            dbh.execute("select count(*) as total from %s where (%s and %s)", (
+                self.table, self.where, sql))
+            row=dbh.fetch()
+            result.heading("Total rows")
+            result.para("%s rows" % row['total'])
+
+        result.toolbar(count_cb, "Count rows matching filter", icon = "add.png")
+        
+    def groupby_button(self, query, result):
+        """ This allows grouping (counting) rows with the same value """
+        def group_by_cb(query,result):
+            if query.has_key('groupby'):
+                result.table(
+                    elements= self.elements,
+                    hidden = '_hidden_gb',
+                    table = self.table,
+                    where = self.where,
+                    groupby = query.get('groupby',0),
+                    limit_context="limit%s" % query['groupby'],
+                    case = self.case,
+                    filter = self.filter)
+            
+            result.start_form(query)
+            result.const_selector("Group by", "groupby", self.column_names, self.column_names)
+            result.end_form()
+            
+        result.toolbar(group_by_cb, "Group By A column",icon="group.png")
+        
+    def configure_button(self, query, result):
+        """ Tool bar icon for hiding and showing columns """
+        ## This is a toolbar popup which allows some fields to be hidden:
+        def hide_fields(query, result):
+            if query.has_key('__submit__'):
+                del query['__submit__']
+                result.refresh(0,query,pane='parent_pane')
+                return
+            
+            result.heading("Hide Columns")
+            
+            result.start_form(query, pane='self')
+            for i in range(len(self.elements)):
+                result.checkbox(self.elements[i].name, self.hidden, "%s" % i)
+
+            result.end_form()
+
+        result.toolbar(cb=hide_fields, icon='spanner.png',
+                       tooltip="Hide columns")
+
+    def filter_buttons(self, query, result):
+        """ Render toolbar buttons related to filtering """
+        
+        ## Add a possible filter condition:
+        def filter_gui(query, result):
+            result.heading("Filter Table")
+            result.start_form(query, pane="self")
+            result.add_filter(query, self.case, parser.parse_to_sql, self.elements, self.filter)
+            result.end_form()
+            
+        ## Add a toolbar icon for the filter:
+        result.toolbar(cb=filter_gui, icon='filter.png',
+                       tooltip=result.defaults.get(self.filter,'Click here to filter table'))
+
+        ## Add a clear filter icon if required
+        try:
+            new_query = query.clone()
+            if new_query.has_key(self.filter):
+                del new_query[self.filter]
+
+                # Make it reset the limit
+                if new_query.has_key(self.limit_context):
+                    del new_query[self.limit_context]
+
+                result.toolbar(link=new_query, icon='clear_filter.png', 
+                               tooltip='Click here to clear the filter',
+                               pane='pane')
+        except: raise
+
+    def paging_buttons(self,query, result):
+        """ Adds toolbar buttons for paging through the table """
+        new_query = query.clone()
+
+        ## The previous button goes back if possible:
+        previous_limit = self.limit - self.pagesize
+        if previous_limit<0:
+            result.toolbar(icon = 'stock_left_gray.png')
+        else:
+            del new_query[self.limit_context]
+            new_query[self.limit_context] = previous_limit
+            result.toolbar(icon = 'stock_left.png',
+                         link = new_query, pane='pane',
+                         tooltip='Previous Page (Rows %s-%s)' % (previous_limit, self.limit))
+
+        ## Now we add the paging toolbar icons
+        ## The next button allows user to page to the next page
+        if self.row_count < self.pagesize:
+            result.toolbar(icon = 'stock_right_gray.png')
+        else:
+            ## We could not fill a full page - means we ran out of
+            ## rows in this table
+            del new_query[self.limit_context]
+            new_query[self.limit_context] = self.limit + self.pagesize
+            result.toolbar(icon = 'stock_right.png',
+                           link = new_query, pane='pane',
+                           tooltip='Next Page (Rows %s-%s)' % (self.limit, self.limit \
+                                                               + self.pagesize))
+
+        ## Add a skip to row toolbar icon:
+        def goto_row_cb(query,result,variable=self.limit_context):
+            """ This is used by the table widget to allow users to skip to a
+            certain row"""
+            limit = query.get(variable,'0')
+            result.decoration = 'naked'
+            result.heading("Skip directly to a row")
+            result.para("You may specify the row number in hex by preceeding it with 0x")
+            result.start_form(query, pane="parent_pane")
+            result.start_table()
+            if limit.startswith('0x'):
+                limit=int(limit,16)
+            else:
+                limit=int(limit)
+
+            result.textfield('Row to skip to', variable)
+            result.end_table()
+            result.end_form()
+
+        result.toolbar(
+            cb = goto_row_cb,
+            text="Row %s" % self.limit,
+            icon="stock_next-page.png", pane='popup',
+            )
+
+    def _make_sql(self, query):
+        """ Calculates the SQL for the table widget based on the query """
+        ## Calculate the SQL
+        query_str = "select "
+        try:
+            self.order = int(query.get('order',0))
+        except: self.order=0
+
+        try:
+            self.direction = int(query.get('direction',0))
+        except: self.direction = 0
+        
+        total_elements = self.elements + self.filter_elements
+
+        ## Fixup the elements - if no table specified use the global
+        ## table - this is just a shortcut which allows us to be lazy:
+        for e in total_elements:
+            if not e.table: e.table = self.table
+            if not e.case: e.case = self.case
+
+        ## The columns and their aliases:
+        query_str += ",".join([ e.select() + " as `" + e.name + "`" for e in self.elements ])
+
+        ## The tables are calculated as a join of all the individual
+        ## database tables from all the columns - this allows us to
+        ## put elements from different database tables in the same
+        ## widget automatically.
+        tables = []
+        for e in total_elements:
+            if e.table not in tables: tables.append(e.table)
+
+        ## Now generate the join clause:
+        query_str += " from %s " % tables[0]
+
+        for i in range(1,len(tables)):
+            query_str += " join `%s` on `%s`.inode_id = `%s`.inode_id " % \
+                         (tables[i], tables[0],tables[i])
+
+        if self.where:
+            w = ["(%s)" % self.where,]
+        else:
+            w = []
+            
+        for e in total_elements:
+            tmp = e.where()
+            if tmp: w.append(tmp)
+
+        ## Is there a filter condition?
+        if self.filter_str:
+            filter_str = parser.parse_to_sql(self.filter_str, total_elements)
+            if not filter_str: filter_str=1
+            
+        else: filter_str = 1
+
+        query_str += "where (%s and (%s)) " % (" and ".join(w), filter_str)
+
+        if self.groupby:
+            query_str += "group by `%s` " % self.groupby
+        elif self._groupby:
+            query_str += "group by %s " % self.groupby
+            
+        ## Now calculate the order by:
+        try:
+            query_str += "order by %s " % self.elements[self.order].order_by()
+            if self.direction == 1:
+                query_str += "asc"
+            else: query_str += "desc"
+        except IndexError:
+            pass
+
+        print query_str
+        return query_str
+
+    def generate_rows(self,query):
+        """ A Generator of rows. Each row is returned as a dictionary
+        with key as the name of the column and value is a cell UI for
+        that cell.
+
+        Renderers can extend this to make the widget table use
+        something other than a database.
+
+        FIXME - Implement a memory based table renderer.
+        """
+        dbh = DB.DBO(self.case)
+        self.sql = self._make_sql(query)
+        ## This allows pyflag to cache the resultset, needed to speed
+        ## paging of slow queries.
+        try:    self.limit = int(query.get(self.limit_context,0))
+        except: self.limit = 0
+        
+        dbh.cached_execute(self.sql,limit=self.limit, length=self.pagesize)
+        
+        return dbh
+
+    def render_table(self, query, result):
+        """ Renders the actual table itself """
+        result.result+='''<table class="PyFlagTable" >
+        <thead><tr>'''
+
+        ## Get a generator for the rows:
+        g = self.generate_rows(query)
+        
+        ## Make the table headers with suitable order by links:
+        hiddens = [ int(x) for x in query.getarray(self.hidden) ]
+
+        self.column_names = []
+        for e in range(len(self.elements)):
+            if e in hiddens: continue
+            new_query = query.clone()
+            ui = result.__class__(result)
+            n = self.elements[e].column_decorator(self.table, self.sql, query, ui)
+            n = n or ui
+            self.column_names.append(n)
+            
+            if self.order==e:
+                if query.get('direction','1')=='1':
+                    tmp = result.__class__(result)
+                    new_query.set('order', e)
+                    new_query.set('direction',0)
+                    tmp.link("%s<img src='images/increment.png'>" % n, target= new_query, pane='self')
+                    result.result+="<th>%s</th>" % tmp
+                else:
+                    tmp = result.__class__(result)
+                    new_query.set('order', e)
+                    new_query.set('direction',1)
+                    tmp.link("%s<img src='images/decrement.png'>" % n, target= new_query, pane='self')
+                    result.result+="<th>%s</th>" % tmp
+            else:
+                tmp = result.__class__(result)
+                new_query.set('order', e)
+                new_query.set('direction',1)
+                tmp.link(n, target= new_query, pane='self')
+                result.result+="<th>%s</th>" % tmp
+
+        result.result+='''</tr></thead><tbody class="scrollContent">'''
+
+        old_sorted = None
+        old_sorted_style = ''
+
+        ## Total number of rows
+        self.row_count=0
+
+        for row in g:
+            row_elements = []
+            tds = ''
+
+            ## Render each row at a time:
+            for i in range(len(self.elements)):
+                if i in hiddens: continue
+
+                ## Give the row to the column element to allow it
+                ## to translate the output suitably:
+                value = row[self.elements[i].name]
+                try:
+                    cell_ui = result.__class__(result)
+                    ## Elements are expected to render on cell_ui
+                    tmp = self.elements[i].display(value,row,cell_ui)
+                    if tmp: cell_ui = tmp
+                except Exception, e:
+                    pyflaglog.log(pyflaglog.ERROR, "Unable to render %r: %s" % (value , e))
+
+                ## Render the row styles so that equal values on
+                ## the sorted column have the same style
+                if i==self.order and value!=old_sorted:
+                    old_sorted=value
+                    if old_sorted_style=='':
+                        old_sorted_style='alternateRow'
+                    else:
+                        old_sorted_style=''
+
+                ## Render the sorted column with a different style
+                if i==self.order:
+                    tds+="<td class='sorted-column'>%s</td>" % (cell_ui)
+                else:
+                    tds+="<td class='table-cell'>%s</td>" % (cell_ui)
+
+            result.result+="<tr class='%s'> %s </tr>\n" % (old_sorted_style,tds)
+            self.row_count += 1
+
+        result.result+="</tbody></table>"
+
+
+    def export_button(self, query, result):
+        """ Provides an interface for exporting the table in a useful way """
+        import pyflag.Registry as Registry
+        
+        def save_table(query, result):
+            result.start_form(query)
+            exporters = [ c for c in Registry.TABLE_RENDERERS.classes if c.exportable ]
+            names = [ c.name for c in exporters ]
+            result.const_selector("Export format", "export_format", names, names)
+
+            try:
+                ## Ask the rederer to show any configuration it might
+                ## need:
+                r_index = names.index(query["export_format"])
+                r = exporters[r_index](elements = self.elements,
+                                       filter_str = self.filter_str,
+                                       case = self.case,
+                                       where = self.where,
+                                       groupby = self.groupby,
+                                       limit_context = self.limit_context,
+                                       filter = self.filter,
+                                       hidden = self.hidden)
+
+                if query.has_key('finished'):
+                    ## Ask the renderer to display the table:
+                    r.render(query, result)
+                    return 
+                
+                if r.form(query, result):
+                    query['finished']=1
+                    result.refresh(0,query)
+                    return
+
+            except KeyError:
+                pass
+
+            result.end_form()
+            
+        result.toolbar(save_table, "Export Table", icon="floppy.png")

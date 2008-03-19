@@ -91,7 +91,7 @@ class FileHandler:
     The open factory function below takes a URL to access the file in
     the form:
 
-    method://name/path
+    method:/name/path
 
     where method is provided by the method property of this class, the
     name and path are both given to the constructor.

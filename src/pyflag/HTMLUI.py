@@ -59,24 +59,6 @@ class HTTPObject:
         self.generator=None
         self.headers=[]
 
-def goto_row_cb(query,result,variable='limit'):
-    """ This is used by the table widget to allow users to skip to a
-    certain row"""
-    limit = query.get(variable,'0')
-    result.decoration = 'naked'
-    result.heading("Skip directly to a row")
-    result.para("You may specify the row number in hex by preceeding it with 0x")
-    result.start_form(query, pane="parent_pane")
-    result.start_table()
-    if limit.startswith('0x'):
-        limit=int(limit,16)
-    else:
-        limit=int(limit)
-        
-    result.textfield('Row to skip to', variable)
-    result.end_table()
-    result.end_form()
-
 class HTMLUI(UI.GenericUI):
     """ A HTML UI implementation.
 
@@ -972,7 +954,28 @@ class HTMLUI(UI.GenericUI):
         if parse_error:
             raise RuntimeError(message)
 
-    def table(self,elements=[],table='',where='1',groupby = None, _groupby=None, case=None,
+    def table(self, **opts):
+        """ Render a table widget. The possible parameters are:
+
+        elements=[],
+        table='',
+        where='1',
+        groupby = None,
+        _groupby=None,
+        case=None,
+        limit_context='limit',
+        filter='filter',
+        hidden='_hidden',
+
+        More comments in TableRenderer()
+        """
+        ## Create a renderer:
+        r = HTMLUITableRenderer(**opts)
+
+        ## Render with it:
+        r.render(self.defaults, self)
+        
+    def xxtable(self,elements=[],table='',where='1',groupby = None, _groupby=None, case=None,
               limit_context='limit', filter='filter',hidden='_hidden',
               **opts):
         ## Building up the args list in this way ensure that defaults
@@ -1031,166 +1034,6 @@ class HTMLUI(UI.GenericUI):
         ## This allows pyflag to cache the resultset, needed to speed
         ## paging of slow queries.
         dbh.cached_execute(sql,limit=limit, length=pagesize)
-
-        self.result+='''<table class="PyFlagTable" >
-        <thead><tr>'''
-
-        ## Make the table headers with suitable order by links:
-        hiddens = [ int(x) for x in query.getarray(hidden) ]
-
-        column_names = []
-        for e in range(len(elements)):
-            if e in hiddens: continue
-            new_query = query.clone()
-            ui = self.__class__(self)
-            n = elements[e].column_decorator(table, sql, query, ui)
-            n = n or ui
-            column_names.append(n)
-            
-            if order==e:
-                if query.get('direction','1')=='1':
-                    tmp = self.__class__(self)
-                    new_query.set('order', e)
-                    new_query.set('direction',0)
-                    tmp.link("%s<img src='images/increment.png'>" % n, target= new_query, pane='self')
-                    self.result+="<th>%s</th>" % tmp
-                else:
-                    tmp = self.__class__(self)
-                    new_query.set('order', e)
-                    new_query.set('direction',1)
-                    tmp.link("%s<img src='images/decrement.png'>" % n, target= new_query, pane='self')
-                    self.result+="<th>%s</th>" % tmp
-            else:
-                tmp = self.__class__(self)
-                new_query.set('order', e)
-                new_query.set('direction',1)
-                tmp.link(n, target= new_query, pane='self')
-                self.result+="<th>%s</th>" % tmp
-
-        self.result+='''</tr></thead><tbody class="scrollContent">'''
-
-        old_sorted = None
-        old_sorted_style = ''
-
-        ## Total number of rows
-        row_count=0
-
-        for row in dbh:
-            row_elements = []
-            tds = ''
-
-            ## Render each row at a time:
-            for i in range(len(elements)):
-                if i in hiddens: continue
-
-                ## Give the row to the column element to allow it
-                ## to translate the output suitably:
-                value = row[elements[i].name]
-                try:
-                    cell_ui = self.__class__(self)
-                    ## Elements are expected to render on cell_ui
-                    tmp = elements[i].display(value,row,cell_ui)
-                    if tmp: cell_ui = tmp
-                except Exception, e:
-                    pyflaglog.log(pyflaglog.ERROR, "Unable to render %r: %s" % (value , e))
-
-                ## Render the row styles so that equal values on
-                ## the sorted column have the same style
-                if i==order and value!=old_sorted:
-                    old_sorted=value
-                    if old_sorted_style=='':
-                        old_sorted_style='alternateRow'
-                    else:
-                        old_sorted_style=''
-
-                ## Render the sorted column with a different style
-                if i==order:
-                    tds+="<td class='sorted-column'>%s</td>" % (cell_ui)
-                else:
-                    tds+="<td class='table-cell'>%s</td>" % (cell_ui)
-
-            self.result+="<tr class='%s'> %s </tr>\n" % (old_sorted_style,tds)
-            row_count += 1
-
-        self.result+="</tbody></table>"
-
-        new_query = query.clone()
-
-        ## The previous button goes back if possible:
-        previous_limit = limit-pagesize
-        if previous_limit<0:
-            self.toolbar(icon = 'stock_left_gray.png')
-        else:
-            del new_query[limit_context]
-            new_query[limit_context] = previous_limit
-            self.toolbar(icon = 'stock_left.png',
-                         link = new_query, pane='pane',
-                         tooltip='Previous Page (Rows %s-%s)' % (previous_limit, limit))
-
-        ## Now we add the paging toolbar icons
-        ## The next button allows user to page to the next page
-        if row_count<pagesize:
-            self.toolbar(icon = 'stock_right_gray.png')
-        else:
-            ## We could not fill a full page - means we ran out of
-            ## rows in this table
-            del new_query[limit_context]
-            new_query[limit_context] = limit+pagesize
-            self.toolbar(icon = 'stock_right.png',
-                         link = new_query, pane='pane',
-                         tooltip='Next Page (Rows %s-%s)' % (limit, limit+pagesize))
-
-        ## Add a skip to row toolbar icon:
-        self.toolbar(
-            cb = goto_row_cb,
-            text="Row %s" % limit,
-            icon="stock_next-page.png", pane='popup',
-            )
-
-        ## Add a possible filter condition:
-        def filter_gui(query, result):
-            result.heading("Filter Table")
-            result.start_form(query, pane="self")
-            result.add_filter(query, case, parser.parse_to_sql, elements, filter)
-            result.end_form()
-            
-        ## Add a toolbar icon for the filter:
-        self.toolbar(cb=filter_gui, icon='filter.png',
-                     tooltip=self.defaults.get(filter,'Click here to filter table'))
-
-        ## Add a clear filter icon if required
-        try:
-            new_query = query.clone()
-            if new_query.has_key(filter):
-
-                del new_query[filter]
-
-                # Make it reset the limit
-                if new_query.has_key('limit'): del new_query['limit']
-
-                self.toolbar(link=new_query, icon='clear_filter.png', 
-                    tooltip=self.defaults.get('delfilter', 
-                    'Click here to clear the filter'), pane='pane')
-        except: pass
-
-        ## This is a toolbar popup which allows some fields to be hidden:
-        def hide_fields(query, result):
-            if query.has_key('__submit__'):
-                del query['__submit__']
-                result.refresh(0,query,pane='parent_pane')
-                return
-            
-            result.heading("Hide Columns")
-            
-            result.start_form(query, pane='self')
-            for i in range(len(elements)):
-                result.checkbox(elements[i].name, hidden, "%s" % i)
-
-            result.end_form()
-
-        self.toolbar(cb=hide_fields, icon='spanner.png',
-                     tooltip="Hide columns")
-
         ## This part allows the user to save the table in CSV format:
         def save_table(query,result):
 
@@ -1302,42 +1145,6 @@ class HTMLUI(UI.GenericUI):
             result.end_form()
             
         self.toolbar(save_table,'Save Table',icon="floppy.png")
-
-        ## This allows grouping (counting) rows with the same value
-        def group_by_cb(query,result):
-            if query.has_key('groupby'):
-                result.table(
-                    elements=elements,
-                    hidden = '_hidden_gb',
-                    table = table,
-                    where = where,
-                    groupby = query.get('groupby',0),
-                    limit_context="limit%s" % query['groupby'],
-                    case = case,
-                    filter = filter)
-            
-            result.start_form(query)
-            result.const_selector("Group by", "groupby", column_names, column_names)
-            result.end_form()
-            
-        self.toolbar(group_by_cb, "Group By A column",icon="group.png")
-
-        ## This returns the total number of rows in this table - it
-        ## could take a while which is why its a popup.
-        def count_cb(query, result):
-            try:
-                filter_str = query[filter]
-                sql = parser.parse_to_sql(filter_str,elements)
-            except KeyError:
-                sql = 1
-
-            dbh=DB.DBO(case)
-            dbh.execute("select count(*) as total from %s where (%s and %s)", (table, where, sql))
-            row=dbh.fetch()
-            result.heading("Total rows")
-            result.para("%s rows" % row['total'])
-
-        self.toolbar(count_cb, "Count rows matching filter", icon = "add.png")
 
     def text(self,*cuts,**options):
         wrap = config.WRAP
@@ -1829,9 +1636,9 @@ config.add_option("MAXTREESIZE", default=13, type='int',
 config.add_option("MAX_DATA_DUMP_SIZE", default=2048, type='int',
                   help="Maximum size of hex dump")
 
-config.add_option("PAGESIZE", default=50, type='int',
-                  help="number of rows to display per page in the Table widget")
-
 config.add_option("REFRESH", default=3, type='int',
                   help="Polling frequency of the gui when analysing")
 
+
+class HTMLUITableRenderer(UI.TableRenderer):
+    pass

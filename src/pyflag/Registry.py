@@ -389,6 +389,7 @@ IMAGES = None
 FILE_HANDLERS = None
 STATS_HANDLERS = None
 CASE_TABLES = None
+TABLE_RENDERERS = None
 
 ## This is required for late initialisation to avoid dependency nightmare.
 def Init():
@@ -483,6 +484,11 @@ def Init():
     import pyflag.Magic as Magic
 
     MAGIC_HANDLERS = ScannerRegistry(Magic.Magic)
+
+    global TABLE_RENDERERS
+    import pyflag.UI as UI
+
+    TABLE_RENDERERS = ScannerRegistry(UI.TableRenderer)
 
 def InitTests():
     return TestsRegistry(unittest.TestCase)
