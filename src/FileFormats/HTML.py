@@ -283,6 +283,17 @@ class ResolvingHTMLTag(SanitizingTag):
 
         self.comment = False
 
+    def make_reference_to_inode(self, inode_id, hint):
+        """ Returns a reference to the given Inode ID.
+
+        This needs to provide a URL to the specified resource.
+        """
+        return '"f?%s"' % query_type(case=self.case,
+                                     family="Network Forensics",
+                                     report="ViewFile",
+                                     inode_id=inode_id,
+                                     hint=hint)
+
     def resolve_reference(self, reference, hint='', build_reference=True):
         original_reference = reference
 
@@ -303,11 +314,8 @@ class ResolvingHTMLTag(SanitizingTag):
         dbh.execute("select inode_id from http where url=%r and not isnull(http.inode_id) limit 1", reference)
         row = dbh.fetch()
         if row and row['inode_id']:
-            result = '"f?%s"' % query_type(case=self.case,
-                                           family="Network Forensics",
-                                           report="ViewFile",
-                                           inode_id=row['inode_id'],
-                                           hint=hint)
+            result = self.make_reference_to_inode(row['inode_id'], hint)
+            
             if build_reference:
                 result += " reference=\"%s\" " % reference
 
@@ -318,11 +326,8 @@ class ResolvingHTMLTag(SanitizingTag):
                     reference)
         row = dbh.fetch()
         if row and row['id']:
-            result = '"f?%s"' % query_type(case=self.case,
-                                           family="Network Forensics",
-                                           report="ViewFile",
-                                           sundry_id=row['id'],
-                                           hint=hint)
+            result = self.make_reference_to_inode(row['id'], hint)
+
             if build_reference:
                 result += " reference=\"%s\" " % reference
 

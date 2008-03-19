@@ -299,7 +299,10 @@ class ColumnType:
     def extended_csv(self, value):
         return {self.name:self.csv(value)}
 
-    def html(self, value):
+    def render_html(self, value, table_renderer):
+        """ This is used by the HTML renderer to render the column
+        into HTML
+        """
         return value
 
     def export(self, value, exportdir):
