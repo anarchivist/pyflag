@@ -316,10 +316,15 @@ class HTMLStringType(StringType):
 
         return parser.root.innerHTML()
 
-    def xxdisplay(self, value, row, result):
-        parser = HTML.HTMLParser(tag_class = FlagFramework.Curry(HTML.ResolvingHTMLTag,
-                                                                 case = result.defaults['case'],
-                                                                 inode_id = row['Inode']))
+    def render_html(self, value, table_renderer):
+        import plugins.TableRenderers.HTMLBundle as HTMLBundle
+        
+        parser = HTML.HTMLParser(tag_class = \
+                                 FlagFramework.Curry(HTMLBundle.BundleResolvingHTMLTag,
+                                                     table_renderer = table_renderer,
+                                                     inode_id = value,
+                                                     prefix = "inodes/"
+                                                     ))
         parser.feed(value)
         parser.close()
 
@@ -437,16 +442,13 @@ class LiveMailViewer(FileSystem.StringIOFile):
 
         return self.message
 
-    def fixup_page(self, root):
+    def fixup_page(self, root, tag_class):
         ## We have to inject the message into the edit area:
         edit_area = root.find("div", {"class":"EditArea"}) or \
                     root.find("div",{"id":"MsgContainer"}) or \
                     root.find("textarea",{"id":"fMessageBody"})
         if edit_area:
-            parser = HTML.HTMLParser(tag_class = FlagFramework.Curry(
-                HTML.ResolvingHTMLTag,
-                case = self.case,
-                inode_id = self.parent_inode_id))
+            parser = HTML.HTMLParser(tag_class = tag_class)
             parser.feed(HTML.decode(self.message))
             parser.close()
             result = parser.root.__str__()
@@ -491,24 +493,37 @@ class LiveMailViewer(FileSystem.StringIOFile):
             tmp.text(row['url'], font='typewriter', wrap='full')
             result.row("URL", tmp)
 
-    def summary(self, query, result):
+    def sanitize_page(self, tag_class):
+        """ This produces a rendered version of the underlying page """
         ## Get the original HTML File:
         fsfd = FileSystem.DBFS(self.case)
         fd = fsfd.open(inode_id = self.parent_inode_id)
         data = HTML.decode(fd.read())
-
+        ## FIXME - This is a hack which works because we always send a
+        ## curried class down:
+        try:
+            tag_class.kwargs['inode_id'] = self.parent_inode_id
+        except AttributeError: pass
+        
         ## Make a parser:
-        p = HTML.HTMLParser(tag_class = FlagFramework.Curry(HTML.ResolvingHTMLTag,
-                                                            case = self.case,
-                                                            inode_id = self.parent_inode_id))
+        p = HTML.HTMLParser(tag_class = tag_class)
         p.feed(data)
         p.close()
 
         ## Allow us to fix the html page
         root = p.root
-        self.fixup_page(root)
-        page = root.innerHTML()
+        self.fixup_page(root, tag_class)
+        return root.innerHTML()        
 
+    def html_export(self, tag_class):
+        ## We need to look at our parent inode here:
+        return self.sanitize_page(tag_class)
+
+    def summary(self, query, result):
+        page = self.sanitize_page(tag_class = \
+                                  FlagFramework.Curry(HTML.ResolvingHTMLTag,
+                                                      case = self.case,
+                                                      inode_id = self.parent_inode_id))
         def frame_cb(query, result):
             def generator():
                 yield page
@@ -526,6 +541,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
 
         result.iframe(callback = frame_cb)
         result.toolbar(cb = print_cb, text="Print", icon="printer.png", pane='new')
+        
 
 ## Unit tests:
 import pyflag.pyflagsh as pyflagsh

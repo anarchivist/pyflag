@@ -11,6 +11,7 @@ import csv, cStringIO
 import pyflag.DB as DB
 import pyflag.conf
 config=pyflag.conf.ConfObject()
+import pyflag.pyflaglog as pyflaglog
 
 class HTMLDirectoryRenderer(UI.TableRenderer):
     exportable = True
@@ -19,6 +20,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
     ## An option to control adding extra files linked from the html
     include_extra_files = False
     message = "Export HTML Files into a directory"
+    limit_context = 'start_limit'
 
     def form(self, query,result):
         result.heading(self.message)
@@ -168,6 +170,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
     def add_constant_files(self):
         """ Adds constant files to the archive like css, images etc """
         for filename, dest in [ ("images/spacer.png", "inodes/images/spacer.png"),
+                                ("images/spacer.png", None),
                                 ('images/pyflag.css',None,),
                                 ('images/decrement.png',None,),
                                 ('images/increment.png',None),
@@ -176,6 +179,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
                                 ('images/stock_right.png',None),
                                 ('images/stock_right_gray.png',None),
                                 ('images/toolbar-bg.gif',None),
+                                ('images/browse.png',None),
                                 ('javascript/functions.js', None),
                                 ]:
             if not dest: dest = filename
@@ -223,13 +227,19 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         ## paging of slow queries.
         try:    self.limit = int(query.get(self.limit_context,0))
         except: self.limit = 0
+        try:    self.end_limit = int(query.get('end_limit',0))
+        except: self.end_limit = 0
 
+        total = 0
         while 1:
             dbh.cached_execute(self.sql,limit = self.limit, length=self.pagesize)
             count = 0
             for row in dbh:
                 yield row
                 count += 1
+                total += 1
+                if self.end_limit > 0 \
+                   and total > self.end_limit: return
 
             if count==0: break
 
@@ -268,7 +278,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             data = fd.read(1024*1024)
             parser.feed(data)
             parser.close()
-
+ 
             self.add_file_from_string(filename, parser.root.innerHTML())
         elif 'css' in content_type:
             data = fd.read(1024*1024)
@@ -346,8 +356,9 @@ import FileFormats.HTML as HTML
 from pyflag.FlagFramework import Curry
 
 class BundleResolvingHTMLTag(HTML.ResolvingHTMLTag):
-    def __init__(self, inode_id, table_renderer, name=None, attributes=None):
+    def __init__(self, inode_id, table_renderer, prefix='', name=None, attributes=None):
         self.table_renderer = table_renderer
+        self.prefix = prefix
         HTML.ResolvingHTMLTag.__init__(self, table_renderer.case, inode_id, name, attributes)
         
     def make_reference_to_inode(self, inode_id, hint):
@@ -356,11 +367,29 @@ class BundleResolvingHTMLTag(HTML.ResolvingHTMLTag):
         m = Magic.MagicResolver()
         type, content_type = m.find_inode_magic(self.case, inode_id)
 
-        return "%s type='%s' " % (inode_id, content_type)
+        return "%s%s type='%s' " % (self.prefix, inode_id, content_type)
 
 def render_html(self, inode_id, table_renderer):
     filename = table_renderer.add_file_to_archive(inode_id, directory='inodes/')
-    
-    return "<a href='%s'>%s</a>" % (filename, inode_id)
+
+    ## A link to the file's body
+    fsfd = FileSystem.DBFS(self.case)
+    fd = fsfd.open(inode_id = inode_id)
+
+    result = "<a href='%s'>%s</a>" % (filename, fd.inode)
+
+    ## A link to the html export if available:
+    try:
+        data = fd.html_export(tag_class = Curry(BundleResolvingHTMLTag,
+                                                inode_id = inode_id,
+                                                table_renderer = table_renderer))
+
+        filename = "inodes/%s_summary" % inode_id
+        table_renderer.add_file_from_string(filename, data)
+        result += "<br/><a href='%s'><img src=images/browse.png /></a>" % (filename,)
+    except AttributeError:
+        raise
+
+    return result
 
 InodeIDType.render_html = render_html
