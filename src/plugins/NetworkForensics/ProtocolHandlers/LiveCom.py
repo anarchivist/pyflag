@@ -322,7 +322,7 @@ class HTMLStringType(StringType):
         parser = HTML.HTMLParser(tag_class = \
                                  FlagFramework.Curry(HTMLBundle.BundleResolvingHTMLTag,
                                                      table_renderer = table_renderer,
-                                                     inode_id = value,
+                                                     inode_id = '',
                                                      prefix = "inodes/"
                                                      ))
         parser.feed(value)

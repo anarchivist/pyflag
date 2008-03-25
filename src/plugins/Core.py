@@ -49,6 +49,10 @@ from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, FilenameT
 config.add_option("SCHEMA_VERSION", default=3, absolute=True,
                   help="Current schema version")
 
+class CachedFile(FileSystem.File):
+    """ A VFS Driver to open cached files """
+    specifier = "x"
+
 class IO_File(FileSystem.File):
     """ A VFS Driver to make the io source available.
 

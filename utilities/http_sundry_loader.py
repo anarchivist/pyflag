@@ -62,7 +62,7 @@ if config.list:
 for regex in config.args:
     dbh.execute("select id,url from http_sundry where url rlike %r and present='no'", regex)
     for row in dbh:
-        new_filename = "%s/case_%s/HTTP%s" % (config.RESULTDIR, config.case, row['id'])
+        new_filename = "%s/case_%s/xHTTP%s" % (config.RESULTDIR, config.case, row['id'])
         print "Retriving %s into %s" % (row['url'], new_filename) ,
         try:
             filanem, headers = urllib.urlretrieve(row['url'], new_filename)

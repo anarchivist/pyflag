@@ -294,9 +294,6 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         ## Add the inode to the exported bundle:
         filename = "%s%s" % (directory, inode_id)
 
-        if self.inodes_in_archive(inode_id):
-            return filename
-
         fsfd = FileSystem.DBFS(self.case)
         fd = fsfd.open(inode_id = inode_id)
 
@@ -304,6 +301,17 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
 
         ## Use the magic in the file:
         type, content_type = m.find_inode_magic(self.case, inode_id)
+
+        if "image" in content_type:
+            filename += ".jpg"
+        elif "html" in content_type:
+            filename += ".html"
+        elif "css" in content_type:
+            filename += ".css"
+
+        if self.filename_in_archive(filename):
+            return filename
+
         if "html" in content_type:
             ## The inode is html - it needs to be sanitised and all
             ## objects referenced from it need to be included in the
@@ -389,6 +397,7 @@ import pyflag.FileSystem as FileSystem
 import pyflag.Magic as Magic
 import FileFormats.HTML as HTML
 from pyflag.FlagFramework import Curry
+import os.path
 
 class BundleResolvingHTMLTag(HTML.ResolvingHTMLTag):
     def __init__(self, inode_id, table_renderer, prefix='', name=None, attributes=None):
@@ -399,10 +408,8 @@ class BundleResolvingHTMLTag(HTML.ResolvingHTMLTag):
     def make_reference_to_inode(self, inode_id, hint):
         ## Ensure that the inode itself is included into the bundle:
         filename = self.table_renderer.add_file_to_archive(inode_id)
-        m = Magic.MagicResolver()
-        type, content_type = m.find_inode_magic(self.case, inode_id)
-
-        return "%s%s type='%s' " % (self.prefix, inode_id, content_type)
+        filename = os.path.basename(filename)
+        return "%s%s " % (self.prefix, filename, )
 
 def render_html(self, inode_id, table_renderer):
     filename = table_renderer.add_file_to_archive(inode_id, directory='inodes/')
@@ -415,7 +422,7 @@ def render_html(self, inode_id, table_renderer):
 
     ## A link to the html export if available:
     try:
-        filename = "inodes/%s_summary" % inode_id
+        filename = "inodes/%s_summary.html" % inode_id
         ## Add the summary page if needed
         if not table_renderer.filename_in_archive(filename):
             data = fd.html_export(tag_class = Curry(BundleResolvingHTMLTag,

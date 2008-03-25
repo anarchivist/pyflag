@@ -338,7 +338,17 @@ class ResolvingHTMLTag(SanitizingTag):
         dbh.execute("select * from http_sundry where url=%r", reference)
         row = dbh.fetch()
         if not row:
-            dbh.insert('http_sundry', url = reference)
+            dbh.insert("inode",
+                       inode = "x")
+            inode_id = dbh.autoincrement()
+            dbh.execute("update inode set inode = 'xHTTP%s' where inode_id = %s " %(inode_id, inode_id))
+            dbh.insert("file",
+                       inode_id = inode_id,
+                       inode = "xHTTP%s" % inode_id,
+                       path = "/http_sundry/",
+                       name = "xHTTP%s" % inode_id)
+            
+            dbh.insert('http_sundry', url = reference, id=inode_id)
 
         result = "images/spacer.png"
         if build_reference:
