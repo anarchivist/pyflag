@@ -449,7 +449,8 @@ class LiveMailViewer(FileSystem.StringIOFile):
                     root.find("textarea",{"id":"fMessageBody"})
         if edit_area:
             parser = HTML.HTMLParser(tag_class = tag_class)
-            parser.feed(HTML.decode(self.message))
+            #parser.feed(HTML.decode(self.message))
+            parser.feed(self.message)
             parser.close()
             result = parser.root.__str__()
             result = textwrap.fill(result)
@@ -498,7 +499,8 @@ class LiveMailViewer(FileSystem.StringIOFile):
         ## Get the original HTML File:
         fsfd = FileSystem.DBFS(self.case)
         fd = fsfd.open(inode_id = self.parent_inode_id)
-        data = HTML.decode(fd.read())
+        #data = HTML.decode(fd.read())
+        data = fd.read()
         ## FIXME - This is a hack which works because we always send a
         ## curried class down:
         try:

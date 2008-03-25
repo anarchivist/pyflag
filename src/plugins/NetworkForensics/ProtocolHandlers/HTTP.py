@@ -315,14 +315,17 @@ class HTTPScanner(StreamScannerFactory):
         allows us to processes HTTP connections on unusual ports. This
         situation might arise if HTTP proxies are used for example.
         """
-        combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.inode_id, stream.reverse)
-        try:
-            fd = self.fsfd.open(inode=combined_inode)
-        ## If we cant open the combined stream, we quit (This could
-        ## happen if we are trying to operate on a combined stream
-        ## already
-        except IOError: return
-        
+        if stream.reverse:
+            combined_inode = "I%s|S%s/%s" % (stream.fd.name, stream.inode_id, stream.reverse)
+            try:
+                fd = self.fsfd.open(inode=combined_inode)
+            ## If we cant open the combined stream, we quit (This could
+            ## happen if we are trying to operate on a combined stream
+            ## already
+            except IOError: return
+        else:
+            fd = stream
+            
         p=HTTP(fd,self.fsfd)
         ## Check that this is really HTTP
         if not p.identify():

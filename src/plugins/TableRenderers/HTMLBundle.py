@@ -13,6 +13,9 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.pyflaglog as pyflaglog
 
+config.add_option("REPORTING_DIR", default=config.RESULTDIR + "/Reports",
+                  help = "Directory to emit reports into.")
+
 class HTMLDirectoryRenderer(UI.TableRenderer):
     exportable = True
     name = "HTML Diretory"
@@ -21,18 +24,21 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
     include_extra_files = False
     message = "Export HTML Files into a directory"
     limit_context = 'start_limit'
+    page_name = "Page"
+    description = "PyFlag Exported Page"
 
     def form(self, query,result):
         result.heading(self.message)
-        submitted = query.has_key('start_limit')
         query.default('start_limit',0)
         query.default('end_limit',0)
 
+        result.textfield("Filename","filename")
+        result.textarea("Description", "description")
         result.textfield("Start Row (0)", "start_limit")
         result.textfield("End Row (0 - no limit)", "end_limit")
         result.checkbox("Include extra files","include_extra_files","Include files such as inodes in the exported bundle")
 
-        return submitted
+        return query.has_key("filename")
 
     def render_tools(self, query, result):
         pass
@@ -42,7 +48,9 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
 
         We read the infd and write it to the specified filename.
         """
-        output_file_name = "/tmp/output/%s" % filename
+        output_file_name = "%s/%s" % (config.REPORTING_DIR, filename)
+
+        print "Adding %s" % output_file_name
         
         ## Make sure any directories exist:
         directory = os.path.dirname(output_file_name)
@@ -58,7 +66,12 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         outfd.close()
 
     def add_file_from_string(self, filename, string):
-        output_file_name = "/tmp/output/%s" % filename
+        if self.filename_in_archive(filename):
+            return
+        
+        output_file_name = "%s/%s" % (config.REPORTING_DIR, filename)
+
+        print "Adding %s" % filename
         
         ## Make sure any directories exist:
         directory = os.path.dirname(output_file_name)
@@ -74,10 +87,13 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         header = '''<html><head>
         <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
         <style>
-        html, body {
-        overflow: auto;
+        html, body, div.PyFlagPage {
+        overflow: visible;
+        height: auto;
+        width: auto;
         }
         </style>
+        <title>%(title)s</title>
         </head>
         <body>
         <script src="javascript/functions.js" type="text/javascript" language="javascript"></script>
@@ -141,29 +157,31 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             if self.row_count >= self.pagesize:
                 break
 
-        return header % {'toolbar': self.navigation_buttons(page_number)} + \
+        return header % {'toolbar': self.navigation_buttons(page_number),
+                         'title': self.description,
+                         } + \
                result + """</tbody></table>
-               </div><script>AdjustHeightToPageSize('PyFlagPage');</script>
+               </div>
                </body></html>"""
 
     def navigation_buttons(self, page_number):
         if page_number==1:
             result = '<img border="0" src="images/stock_left_gray.png"/>'
         else:
-            result = '''<a href="page%s.html">
+            result = '''<a href="%s_%s.html">
             <abbr title="Previous Page (%s)">
             <img border="0" src="images/stock_left.png"/>
             </abbr>
-            </a>''' % (page_number-1,page_number-1)
+            </a>''' % (self.page_name, page_number-1,page_number-1)
 
         if self.row_count < self.pagesize:
             result += '<img border="0" src="images/stock_right_gray.png"/>'
         else:
-            result += '''<a href="page%s.html">
+            result += '''<a href="%s/%s.html">
             <abbr title="Next Page (%s)">
             <img border="0" src="images/stock_right.png"/>
             </abbr>
-            </a>''' % (page_number+1,page_number+1)
+            </a>''' % (self.page_name, page_number+1,page_number+1)
 
         return result
 
@@ -185,9 +203,29 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             if not dest: dest = filename
             self.add_file(dest, open("%s/%s" % (config.DATADIR, filename)))
 
+    def inodes_in_archive(self, inode_id):
+        """ returns True if the inode is already present in the
+        archive
+        """
+        filename = "inodes/%s" % (inode_id)
+        return self.filename_in_archive(filename)
+    
+    def filename_in_archive(self, filename):
+        filename = "%s/%s" % (config.REPORTING_DIR, filename)
+        try:
+            os.stat(filename)
+            return True
+        except OSError:
+            return False
+        
     def render_table(self, query, result):
+        ## Fill in some provided parameters:
+        self.page_name = query['filename']
+        print "Page name is %s " % self.page_name
+
+        self.description = query.get('description','')
+
         g = self.generate_rows(query)
-        self.inodes_in_archive = set()
         self.add_constant_files()
 
         self.include_extra_files = query.get('include_extra_files',False)
@@ -208,7 +246,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
                 page_data = self.render_page(page, elements, g)
                 if self.row_count ==0: break
                 
-                self.add_file_from_string("page%s.html" % page,
+                self.add_file_from_string("%s%s.html" % (self.page_name, page),
                                           page_data)
                                           
                 yield "Page %s" % page
@@ -256,10 +294,8 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         ## Add the inode to the exported bundle:
         filename = "%s%s" % (directory, inode_id)
 
-        if inode_id in self.inodes_in_archive:
+        if self.inodes_in_archive(inode_id):
             return filename
-
-        self.inodes_in_archive.add(inode_id)
 
         fsfd = FileSystem.DBFS(self.case)
         fd = fsfd.open(inode_id = inode_id)
@@ -285,7 +321,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             tag = BundleResolvingHTMLTag(table_renderer = self,
                                          inode_id = inode_id)
             self.add_file_from_string(filename, tag.css_filter(data))
-        else:
+        elif not self.inodes_in_archive(inode_id):
             self.add_file(filename, fd)
 
         return filename
@@ -317,7 +353,6 @@ class HTMLBundleRenderer(HTMLDirectoryRenderer):
 
     def render_table(self, query, result):
         g = self.generate_rows(query)
-        self.inodes_in_archive = set()
         self.add_constant_files()
         self.include_extra_files = query.get('include_extra_files',False)
         
@@ -332,7 +367,7 @@ class HTMLBundleRenderer(HTMLDirectoryRenderer):
             
         def generator(query, result):
             page = 1
-            self.add_file_from_string("page%s.html" % page,
+            self.add_file_from_string("%s/%s.html" % (self.page_name,page),
                                       self.render_page(1, elements, g))
 
             self.zip.close()
@@ -380,12 +415,15 @@ def render_html(self, inode_id, table_renderer):
 
     ## A link to the html export if available:
     try:
-        data = fd.html_export(tag_class = Curry(BundleResolvingHTMLTag,
-                                                inode_id = inode_id,
-                                                table_renderer = table_renderer))
-
         filename = "inodes/%s_summary" % inode_id
-        table_renderer.add_file_from_string(filename, data)
+        ## Add the summary page if needed
+        if not table_renderer.filename_in_archive(filename):
+            data = fd.html_export(tag_class = Curry(BundleResolvingHTMLTag,
+                                                    inode_id = inode_id,
+                                                    table_renderer = table_renderer))
+
+            table_renderer.add_file_from_string(filename, data)
+            
         result += "<br/><a href='%s'><img src=images/browse.png /></a>" % (filename,)
     except AttributeError:
         raise
