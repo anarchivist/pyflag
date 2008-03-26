@@ -19,6 +19,7 @@ config.add_option("REPORTING_DIR", default=config.RESULTDIR + "/Reports",
 class HTMLDirectoryRenderer(UI.TableRenderer):
     exportable = True
     name = "HTML Diretory"
+    distributable = True
 
     ## An option to control adding extra files linked from the html
     include_extra_files = False
@@ -168,7 +169,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         if page_number==1:
             result = '<img border="0" src="images/stock_left_gray.png"/>'
         else:
-            result = '''<a href="%s_%s.html">
+            result = '''<a href="%s%s.html">
             <abbr title="Previous Page (%s)">
             <img border="0" src="images/stock_left.png"/>
             </abbr>
@@ -177,7 +178,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         if self.row_count < self.pagesize:
             result += '<img border="0" src="images/stock_right_gray.png"/>'
         else:
-            result += '''<a href="%s/%s.html">
+            result += '''<a href="%s%s.html">
             <abbr title="Next Page (%s)">
             <img border="0" src="images/stock_right.png"/>
             </abbr>
@@ -283,14 +284,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
 
             self.limit += self.pagesize
 
-
-    def add_file_to_archive(self, inode_id, directory='inodes/'):
-        """ Given an inode_id which is a html file, we sanitise it and add
-        its references to the bundle in table_renderer."""
-
-        if not self.include_extra_files:
-            return "#"
-
+    def make_archive_filename(self, inode_id, directory = 'inodes/'):
         ## Add the inode to the exported bundle:
         filename = "%s%s" % (directory, inode_id)
 
@@ -308,6 +302,17 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             filename += ".html"
         elif "css" in content_type:
             filename += ".css"
+
+        return filename, content_type, fd
+
+    def add_file_to_archive(self, inode_id, directory='inodes/'):
+        """ Given an inode_id which is a html file, we sanitise it and add
+        its references to the bundle in table_renderer."""
+           
+        if not self.include_extra_files:
+            return "#"
+        
+        filename, content_type, fd = self.make_archive_filename(inode_id, directory)
 
         if self.filename_in_archive(filename):
             return filename
@@ -338,6 +343,9 @@ import zipfile
 
 class HTMLBundleRenderer(HTMLDirectoryRenderer):
     name = "HTML Bundle"
+    ## We can not distribute this across children
+    distributable = False
+
     def __init__(self, *args, **kwargs):
         self.outfd = cStringIO.StringIO()
         self.zip = zipfile.ZipFile(self.outfd, "w", zipfile.ZIP_DEFLATED)
@@ -411,30 +419,53 @@ class BundleResolvingHTMLTag(HTML.ResolvingHTMLTag):
         filename = os.path.basename(filename)
         return "%s%s " % (self.prefix, filename, )
 
+import pyflag.Farm as Farm
+import pyflag.pyflaglog as pyflaglog
+
+class Export(Farm.Task):
+    def run(self, case, inode_id, *args):
+        pyflaglog.log(pyflaglog.DEBUG, "Exporting inode_id %s" % inode_id)
+        table_renderer = HTMLDirectoryRenderer(case=case, include_extra_files=True)
+        self.export(case, inode_id, table_renderer)
+
+    def export(self, case, inode_id, table_renderer):
+        filename = table_renderer.add_file_to_archive(inode_id, directory='inodes/')
+
+        ## A link to the file's body
+        fsfd = FileSystem.DBFS(case)
+        fd = fsfd.open(inode_id = inode_id)
+
+        ## A link to the html export if available:
+        try:
+            filename = "inodes/%s_summary.html" % inode_id
+            ## Add the summary page if needed
+            if not table_renderer.filename_in_archive(filename):
+                data = fd.html_export(tag_class = Curry(BundleResolvingHTMLTag,
+                                                        inode_id = inode_id,
+                                                        table_renderer = table_renderer))
+
+                table_renderer.add_file_from_string(filename, data)
+        except AttributeError:
+            raise
+
 def render_html(self, inode_id, table_renderer):
-    filename = table_renderer.add_file_to_archive(inode_id, directory='inodes/')
+    dbh = DB.DBO()
+    case = table_renderer.case
+    dbh.insert("jobs",
+               command = "Export",
+               arg1 = case,
+               arg2 = inode_id,
+               )
 
-    ## A link to the file's body
-    fsfd = FileSystem.DBFS(self.case)
-    fd = fsfd.open(inode_id = inode_id)
-
+    filename, content_type, fd = table_renderer.make_archive_filename(inode_id)
     result = "<a href='%s'>%s</a>" % (filename, fd.inode)
-
-    ## A link to the html export if available:
+    
     try:
         filename = "inodes/%s_summary.html" % inode_id
-        ## Add the summary page if needed
-        if not table_renderer.filename_in_archive(filename):
-            data = fd.html_export(tag_class = Curry(BundleResolvingHTMLTag,
-                                                    inode_id = inode_id,
-                                                    table_renderer = table_renderer))
-
-            table_renderer.add_file_from_string(filename, data)
-            
+        fd.html_export
         result += "<br/><a href='%s'><img src=images/browse.png /></a>" % (filename,)
-    except AttributeError:
-        raise
+    except AttributeError: pass
 
     return result
-
+    
 InodeIDType.render_html = render_html

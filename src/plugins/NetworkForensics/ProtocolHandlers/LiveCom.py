@@ -318,14 +318,14 @@ class HTMLStringType(StringType):
 
     def render_html(self, value, table_renderer):
         import plugins.TableRenderers.HTMLBundle as HTMLBundle
-        
-        parser = HTML.HTMLParser(tag_class = \
-                                 FlagFramework.Curry(HTMLBundle.BundleResolvingHTMLTag,
-                                                     table_renderer = table_renderer,
-                                                     inode_id = '',
-                                                     prefix = "inodes/"
-                                                     ))
-        parser.feed(value)
+        parser = HTML.HTMLParser(tag_class = HTML.SanitizingTag)
+#        parser = HTML.HTMLParser(tag_class = \
+#                                 FlagFramework.Curry(HTMLBundle.BundleResolvingHTMLTag,
+#                                                     table_renderer = table_renderer,
+#                                                     inode_id = '',
+#                                                     prefix = "inodes/"
+#                                                     ))
+        parser.feed(value or '')
         parser.close()
 
         return parser.root.innerHTML()

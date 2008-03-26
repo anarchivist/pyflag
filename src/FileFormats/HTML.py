@@ -242,7 +242,7 @@ class SanitizingTag(Tag):
 
 
     def resolve_reference(self, reference, hint=''):
-        return 'images/spacer.png'
+        return '"images/spacer.png"  '
 
 class ResolvingHTMLTag(SanitizingTag):
     """ A special tag which resolves src and href back into the
