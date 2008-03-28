@@ -139,7 +139,7 @@ class YahooMailViewer(LiveCom.LiveMailViewer):
     """ This implements some fixups for Yahoo webmail messages """
     specifier = 'y'
 
-    def fixup_page(self, root):
+    def fixup_page(self, root, tag_class):
         ## Put in some script to turn on visibility (this emulates
         ## what yahoo does).
         tag = root.find("body")

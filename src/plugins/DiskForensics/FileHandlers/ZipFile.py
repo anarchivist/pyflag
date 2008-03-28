@@ -374,6 +374,49 @@ class GZ_file(DiskForensics.DBFS_file):
         ## Force a new decompressor when rereading:
         self.gz = None
 
+class DeflateFile(GZ_file):
+    """ A File like object to read deflated files """
+    specifier = "d"
+
+    def read(self, length=None):
+        try:
+            return File.read(self,length)
+        except IOError:
+            pass
+
+        if not self.gz:
+            self.fd.seek(0)
+            self.gz = gzip.zlib.decompressobj(-15)
+
+        count = 0
+        step = 1024
+
+        result = ''
+        
+        ## Copy ourself into the file - This is in case we have errors
+        ## in the file, we try to read as much as possible:
+        while 1:
+            try:
+                data=self.gz.decompress(self.fd.read(step))
+            except IOError,e:
+                step /= 2
+                if step<10:
+                    pyflaglog.log(pyflaglog.DEBUG, "Error reading from %s, could only get %s bytes" % (self.fd.inode, count));
+                    break
+                
+                else:
+                    continue
+
+            except Exception, e:
+                pyflaglog.log(pyflaglog.WARNING, "Unable to decompress inode %s" % e)
+                break
+            
+            count += len(data)
+            if len(data)==0: break
+            result+=data
+
+        return result
+
 class Tar_file(DiskForensics.DBFS_file):
     """ A file like object to read files from within tar files. Note that the tar file is specified as an inode in the DBFS """
     specifier = 'T'

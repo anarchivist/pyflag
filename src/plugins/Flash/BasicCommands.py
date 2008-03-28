@@ -383,7 +383,8 @@ class icp(iless):
             print inode
             fd=self.environment._FS.open(inode=inode)
             if mode =='directory':
-                outfd = open(self.args[-1]+"/"+inode,'w')
+                output_filename = inode.replace("/","_")
+                outfd = open("%s/%s" % (self.args[-1], output_filename),'w')
             else:
                 outfd = open(self.args[-1],'w')
                 

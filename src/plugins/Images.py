@@ -287,11 +287,9 @@ class Standard(Advanced):
     def create(self, name, case, query):
         offset = self.calculate_offset_suffix(query.get('offset','0'))
         filename = query['filename']
-        print "Creating Standard iosource of %s" % filename
         return OffsettedFile(filename, offset)
 
     def open(self, name, case, query=None):
-        print "Openning Standard IO Source %s" % name
         self.cache_io(name, case, query)
         return self.io
 

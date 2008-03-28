@@ -353,6 +353,14 @@ class HTTPScanner(StreamScannerFactory):
             except KeyError:
                 pass
 
+            try:
+                if 'deflate' in p.response['content-encoding']:
+                    new_inode += "|d1"
+
+            except KeyError:
+                pass
+
+
             ## stream.ts_sec is already formatted in DB format
             timestamp =  stream.get_packet_ts(offset)
             try:
@@ -569,7 +577,8 @@ class BrowseHTTPRequests(Reports.report):
 
         def tabular_view(query,result):
             result.table(
-                elements = [ TimestampType(name='Date',column='date'),
+                elements = [ TimestampType('Timestamp','mtime', table='inode'),
+                             #TimestampType(name='Date',column='date'),
                              PacketType(name='Request Packet',column='request_packet',
                                         case=query['case']),
                              InodeIDType(case=query['case']),

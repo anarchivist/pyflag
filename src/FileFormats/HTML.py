@@ -16,6 +16,7 @@ from FlagFramework import query_type, normpath, get_bt_string
 
 XML_SPECIAL_CHARS_TO_ENTITIES = { "'" : "squot",
                                   '"' : "quote",
+                                  '"' : "quot",
                                   "&" : "amp",
                                   " " : "nbsp",
                                   "<" : "lt",

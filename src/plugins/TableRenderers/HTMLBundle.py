@@ -67,8 +67,8 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         outfd.close()
 
     def add_file_from_string(self, filename, string):
-        if self.filename_in_archive(filename):
-            return
+        #if self.filename_in_archive(filename):
+        #    return
         
         output_file_name = "%s/%s" % (config.REPORTING_DIR, filename)
 
@@ -88,11 +88,15 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         header = '''<html><head>
         <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
         <style>
-        html, body, div.PyFlagPage {
-        overflow: visible;
-        height: auto;
-        width: auto;
+        body {
+        overflow: auto;
+        height: 100%%;
         }
+
+        div.PyFlagPage {
+        overflow: visible;
+        width: 100%%;
+	}
         </style>
         <title>%(title)s</title>
         </head>
@@ -174,6 +178,8 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             <img border="0" src="images/stock_left.png"/>
             </abbr>
             </a>''' % (self.page_name, page_number-1,page_number-1)
+
+        result += "Page %s" % page_number
 
         if self.row_count < self.pagesize:
             result += '<img border="0" src="images/stock_right_gray.png"/>'
@@ -446,7 +452,7 @@ class Export(Farm.Task):
 
                 table_renderer.add_file_from_string(filename, data)
         except AttributeError:
-            raise
+            pass
 
 def render_html(self, inode_id, table_renderer):
     dbh = DB.DBO()
