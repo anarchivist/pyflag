@@ -43,12 +43,12 @@ class TypeScan(Scanner.GenScanFactory):
     def multiple_inode_reset(self,inode):
         Scanner.GenScanFactory.multiple_inode_reset(self, inode)
         dbh=DB.DBO(self.case)
-        dbh.execute("delete from `type`")
+        dbh.execute("delete from `type` where inode_id in (select inode_id from inode where inode.inode = inode )", inode)
 
     def reset(self,inode):
         Scanner.GenScanFactory.reset(self, inode)
         dbh=DB.DBO(self.case)
-        dbh.execute("delete from `type`")
+        dbh.execute("delete from `type` where inode_id = (select inode_id from inode where inode.inode = %r limit 1)" , inode)
 
     def reset_entire_path(self, path_glob):
         path = path_glob

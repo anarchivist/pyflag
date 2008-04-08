@@ -102,7 +102,6 @@ class Menu(Theme.BasicTheme):
             <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
             <title>%s</title>
             <link rel="stylesheet" type="text/css" href="images/pyflag.css" media="all" />
-            <link rel="stylesheet" type="text/css" href="images/print.css" media="print" />
             <script src="javascript/functions.js" type="text/javascript" language="javascript"></script>
             <script> window.__pyflag_parent = "main"; window.__pyflag_name = "main"; </script>
           </head>

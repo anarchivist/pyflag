@@ -33,7 +33,7 @@ from pyflag.FlagFramework import query_type
 from NetworkScanner import *
 import pyflag.Reports as Reports
 import plugins.NetworkForensics.PCAPFS as PCAPFS
-import re,time,cgi
+import re,time,cgi,Cookie
 import TreeObj
 from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, PacketType, guess_date
 
@@ -298,6 +298,15 @@ class HTTPScanner(StreamScannerFactory):
         dbh = DB.DBO(self.case)
         result =cgi.parse(environ = env, fp = cStringIO.StringIO(body))
 
+        ## Merge in cookies if possible:
+        try:
+            cookie = request['cookie']
+            C = Cookie.SimpleCookie()
+            C.load(cookie)
+            for k in C.keys():
+                result[k] = (C[k].value,)
+        except KeyError: pass
+
         for key,value in result.items():
             ## Non printable keys are probably not keys at all.
             if re.match("[^a-z0-9A-Z_]+",key): return
@@ -396,14 +405,8 @@ class HTTPScanner(StreamScannerFactory):
             except (KeyError,ValueError):
                 date = 0
 
-            try:
-                referer = p.request['referer']
-            except KeyError:
-                try:
-                    referer = p.request['referrer']
-                except KeyError:
-                    referer = ''
-
+            ## Two forms for the referrer:
+            referer = p.request.get('referer', p.request.get('referrer',''))
             if not url.startswith("http://") and not url.startswith("ftp://"):
                 url = "http://%s%s" % (host, url)
 

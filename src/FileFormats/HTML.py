@@ -258,6 +258,30 @@ class SanitizingTag2(SanitizingTag):
 
     forbidden_tag = [ 'script', 'style', 'meta', 'head' ]
 
+
+import pyflag.Store as Store
+URL_STORE = Store.Store()
+
+def get_url(inode_id, case):
+    try:
+        store = URL_STORE.get(case)
+    except KeyError:
+        store = Store.Store()
+        URL_STORE.put(store, key=case)
+
+    ## Now try to retrieve the URL:
+    try:
+        url = store.get(inode_id)
+    except KeyError:
+        dbh = DB.DBO(case)
+        dbh.execute("select url from http where inode_id=%r limit 1", inode_id)
+        row = dbh.fetch()
+        
+        url = row['url']
+        store.put(url, key=inode_id)
+
+    return url
+
 class ResolvingHTMLTag(SanitizingTag):
     """ A special tag which resolves src and href back into the
     database. This is useful in order to show embedded images etc from
@@ -275,11 +299,7 @@ class ResolvingHTMLTag(SanitizingTag):
 
         ## Collect some information about this inode:
         try:
-            dbh = DB.DBO(case)
-            dbh.execute("select url from http where inode_id=%r", inode_id)
-            row = dbh.fetch()
-
-            url = row['url']
+            url = get_url(inode_id, case)
             m=re.search("(http|ftp)://([^/]+)/([^?]*)",url)
             self.method = m.group(1)
             self.host = m.group(2)
@@ -318,6 +338,7 @@ class ResolvingHTMLTag(SanitizingTag):
             path = normpath("%s" % (reference))
             reference="%s://%s%s" % (self.method, self.host, path)
         else:
+            ## FIXME: This leads to references without methods:
             path = normpath("/%s/%s" % (self.base_url,reference))
             reference="%s://%s%s" % (self.method, self.host, path)
 
@@ -328,6 +349,9 @@ class ResolvingHTMLTag(SanitizingTag):
         dbh.execute("select inode_id from http where url=%r and not isnull(http.inode_id) limit 1", reference)
         row = dbh.fetch()
         if row and row['inode_id']:
+            ## This is needed to stop dbh leaks due to the highly
+            ## recursive nature of this function.
+            del dbh
             result = self.make_reference_to_inode(row['inode_id'], hint)
             
             if build_reference:
@@ -340,6 +364,7 @@ class ResolvingHTMLTag(SanitizingTag):
                     reference)
         row = dbh.fetch()
         if row and row['id']:
+            del dbh
             result = self.make_reference_to_inode(row['id'], hint)
 
             if build_reference:

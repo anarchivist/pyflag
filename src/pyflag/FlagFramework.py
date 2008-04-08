@@ -906,6 +906,7 @@ def print_info():
                               ("Image format handlers", "IMAGES"),
                               ("Column Types", "COLUMN_TYPES"),
                               ("Case Tables", "CASE_TABLES"),
+                              ("Magic Handlers", "MAGIC_HANDLERS"),
                               ):
         print "%s:\n%s\n" % (heading, '-' * len(heading))
         registry = getattr(Registry, registry)

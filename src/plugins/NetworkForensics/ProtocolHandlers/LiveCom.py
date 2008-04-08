@@ -461,7 +461,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
             #parser.feed(HTML.decode(self.message))
             parser.feed(self.message)
             parser.close()
-            result = parser.root.__str__()
+            result = HTML.decode_unicode(parser.root.__str__())
             result = textwrap.fill(result)
             edit_area.add_child(result)
 

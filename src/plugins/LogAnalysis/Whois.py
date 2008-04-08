@@ -786,6 +786,46 @@ def geoip_display_hook(self, value, row, result):
         result.row(tmp2)
         result.end_table()
 
+## This exports the GeoIP info into HTML
+import pyflag.HTMLUI as HTMLUI
+def geoip_render_html(self, value, table_renderer):
+        ## We try to show a whois if possible
+        id = lookup_whois(value)
+        tmp3 = HTMLUI.HTMLUI(initial=True)
+
+        if config.WHOIS_DISPLAY:
+            identify_network(id, value, tmp3)
+
+        try:
+            if config.GEOIP_DISPLAY:
+                geoip_resolve(value,tmp3)
+        except AttributeError:
+            pass
+
+        try:
+            if config.EXTENDED_GEOIP_DISPLAY:
+                geoip_resolve_extended(value,tmp3)
+        except AttributeError:
+            pass
+
+        ## Ensure that the flags are copied over:
+        rec = geoip_cached_record(value)
+        flag = "images/flags/%s.gif" % (rec['country2'].lower() or "00")
+        table_renderer.add_file(flag, open("%s/%s" % (config.DATADIR, flag)))
+
+        ## Create a web page for this ip address if needed:
+        filename = "ips/%s.html" % value
+        if not table_renderer.filename_in_archive(filename):
+            tmp = HTMLUI.HTMLUI(initial=True)
+            report = LookupIP(None, tmp)
+            report.display(query= FlagFramework.query_type(family="Log Analysis", 
+                                                           report="LookupIP", address=value),
+                           result = tmp)
+            table_renderer.add_file_from_string(filename, tmp.__str__())
+
+        return "<a href='%s' target='_blank' >%s</a>" % (filename, tmp3)
+    
+
 def insert(self, value):
     ### When inserted we need to convert them from string to ints
     if config.PRECACHE_IPMETADATA==True:
@@ -811,6 +851,7 @@ IPType.code_maxmind_city = code_maxmind_city
 IPType.operator_maxmind_city = operator_maxmind_city
 IPType.code_maxmind_country = code_maxmind_country
 IPType.operator_maxmind_country = operator_maxmind_country
+IPType.render_html = geoip_render_html
 
 ## Some tests for IPType operators:
 IPType.tests.extend([

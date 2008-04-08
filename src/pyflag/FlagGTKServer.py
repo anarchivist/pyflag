@@ -187,11 +187,9 @@ class GTKServer(gtk.Window):
         combobox = gtk.combo_box_new_text()
         combobox.append_text('Select Case')
         dbh = DB.DBO(config.FLAGDB)
-        dbh.execute('select value from meta where property=\'flag_db\'',())
-        while 1:
-            row = dbh.cursor.fetchone()
-            if not row: break
-            combobox.append_text(row[0])
+        dbh.execute('select value from meta where property=\'flag_db\'')
+        for row in dbh:
+            combobox.append_text(row['value'])
         combobox.set_active(0)
         return combobox
 

@@ -1,5 +1,5 @@
 """ This is a collection of very useful column types. """
-from pyflag.ColumnTypes import TimestampType
+from pyflag.ColumnTypes import TimestampType, IntegerType
 
 class Date(TimestampType):
     """ A Column storing only the date """
@@ -10,6 +10,11 @@ class Time(TimestampType):
     """ A Column storing only the time of day """
     def create(self):
         return "`%s` TIME " % self.column
+
+class Float(IntegerType):
+    """ A Float column """
+    def create(self):
+        return "`%s` FLOAT " %self.column
 
 class EpochTimestamp(TimestampType):
     """ A Column storing a timestamp as an integer from the epoch time """

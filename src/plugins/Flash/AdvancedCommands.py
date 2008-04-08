@@ -139,7 +139,9 @@ class scan(pyflagsh.command):
         pdbh.mass_insert_commit()
 
         ## Wait for the scanners to finish:
-        self.wait_for_scan(cookie)            
+        if self.environment.interactive:
+            self.wait_for_scan(cookie)
+            
         yield "Scanning complete"
 
     def wait_for_scan(self, cookie):

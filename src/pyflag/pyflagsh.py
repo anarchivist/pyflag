@@ -52,6 +52,7 @@ class environment:
         self._FS = None
         self.CWD='/'
         self._CASE = case
+        self.interactive = True
 
 class command:
     """ Base class for each command """

@@ -51,8 +51,6 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         """
         output_file_name = "%s/%s/%s" % (config.REPORTING_DIR, self.case, filename)
 
-        print "Adding %s" % output_file_name
-        
         ## Make sure any directories exist:
         directory = os.path.dirname(output_file_name)
         if not os.access(directory, os.F_OK):
@@ -72,8 +70,6 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         
         output_file_name = "%s/%s/%s" % (config.REPORTING_DIR, self.case, filename)
 
-        print "Adding %s" % filename
-        
         ## Make sure any directories exist:
         directory = os.path.dirname(output_file_name)
         if not os.access(directory, os.F_OK):
@@ -229,7 +225,6 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
     def render_table(self, query, result):
         ## Fill in some provided parameters:
         self.page_name = query['filename']
-        print "Page name is %s " % self.page_name
 
         self.description = query.get('description','')
 
@@ -312,9 +307,12 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
 
         return filename, content_type, fd
 
-    def add_file_to_archive(self, inode_id, directory='inodes/'):
+    def add_file_to_archive(self, inode_id, directory='inodes/', visited=None):
         """ Given an inode_id which is a html file, we sanitise it and add
-        its references to the bundle in table_renderer."""
+        its references to the bundle in table_renderer.
+
+        visited is a set which will be passed to any other tags we will use.
+        """
            
         if not self.include_extra_files:
             return "#"
@@ -330,6 +328,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             ## output as well:
             parser = HTML.HTMLParser(tag_class = Curry(BundleResolvingHTMLTag,
                                                        inode_id = inode_id,
+                                                       visited = visited,
                                                        table_renderer = self))
             data = fd.read(1024*1024)
             parser.feed(data)
@@ -339,6 +338,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         elif 'css' in content_type:
             data = fd.read(1024*1024)
             tag = BundleResolvingHTMLTag(table_renderer = self,
+                                         visited =visited,
                                          inode_id = inode_id)
             self.add_file_from_string(filename, tag.css_filter(data))
         elif not self.inodes_in_archive(inode_id):
@@ -416,15 +416,29 @@ from pyflag.FlagFramework import Curry
 import os.path
 
 class BundleResolvingHTMLTag(HTML.ResolvingHTMLTag):
-    def __init__(self, inode_id, table_renderer, prefix='', name=None, attributes=None):
+    """
+    A Tag which followed all its links and saves them to disk.
+    
+    visited is expected to be a set initialised at the top level page,
+    we use it to store all urls we have recursed through to prevent
+    circular references.
+    """
+    def __init__(self, inode_id, table_renderer, prefix='', visited=None,
+                 name=None, attributes=None):
         self.table_renderer = table_renderer
         self.prefix = prefix
+        self.visited = visited
         HTML.ResolvingHTMLTag.__init__(self, table_renderer.case, inode_id, name, attributes)
         
     def make_reference_to_inode(self, inode_id, hint):
         ## Ensure that the inode itself is included into the bundle:
-        filename = self.table_renderer.add_file_to_archive(inode_id)
-        filename = os.path.basename(filename)
+        filename = ''
+        if inode_id not in self.visited:
+            self.visited.add(inode_id)
+            filename = self.table_renderer.add_file_to_archive(inode_id,
+                                                               visited = self.visited)
+            filename = os.path.basename(filename)
+
         return "%s%s " % (self.prefix, filename, )
 
 import pyflag.Farm as Farm
@@ -438,7 +452,8 @@ class Export(Farm.Task):
         self.export(case, inode_id, table_renderer)
 
     def export(self, case, inode_id, table_renderer):
-        filename = table_renderer.add_file_to_archive(inode_id, directory='inodes/')
+        filename = table_renderer.add_file_to_archive(inode_id, directory='inodes/',
+                                                      visited = set())
 
         ## A link to the file's body
         fsfd = FileSystem.DBFS(case)
@@ -449,10 +464,11 @@ class Export(Farm.Task):
             filename = "inodes/%s_summary.html" % inode_id
             ## Add the summary page if needed
             if not table_renderer.filename_in_archive(filename):
-                data = fd.html_export(tag_class = Curry(BundleResolvingHTMLTag,
-                                                        inode_id = inode_id,
-                                                        table_renderer = table_renderer))
-
+                tag = Curry(BundleResolvingHTMLTag,
+                            inode_id = inode_id,
+                            visited = set(),
+                            table_renderer = table_renderer)
+                data = fd.html_export(tag_class = tag)
                 table_renderer.add_file_from_string(filename, data)
         except AttributeError:
             pass
