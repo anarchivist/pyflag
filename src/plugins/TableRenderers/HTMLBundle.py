@@ -80,8 +80,9 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         outfd.close()
 
 
-    def render_page(self, page_number, elements, row_generator):
+    def render_page(self, page_name, page_number, elements, row_generator):
         header = '''<html><head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
         <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
         <style>
         body {
@@ -120,6 +121,9 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         old_sorted = None
         old_sorted_style = ''
 
+        start_value = None
+        end_value = None
+
         ## Total number of rows
         self.row_count=0
 
@@ -150,6 +154,10 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
                 ## Render the sorted column with a different style
                 if i==self.order:
                     tds+="<td class='sorted-column'>%s</td>" % (cell_ui)
+                    end_value = value
+                    if start_value == None:
+                        start_value = value
+    
                 else:
                     tds+="<td class='table-cell'>%s</td>" % (cell_ui)
 
@@ -157,6 +165,15 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             self.row_count += 1
             if self.row_count >= self.pagesize:
                 break
+
+        ## Store critical information about the page in the db:
+        dbh = DB.DBO(self.case)
+        dbh.delete("reporting", where="page_name = %r" % page_name)
+        dbh.insert("reporting",
+                   start_value = start_value,
+                   end_value = end_value,
+                   page_name = page_name,
+                   description = self.description)
 
         return header % {'toolbar': self.navigation_buttons(page_number),
                          'title': self.description,
@@ -246,10 +263,11 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             page = 1
 
             while 1:
-                page_data = self.render_page(page, elements, g)
+                page_name = "%s%s.html" % (self.page_name, page)
+                page_data = self.render_page(page_name, page, elements, g)
                 if self.row_count ==0: break
                 
-                self.add_file_from_string("%s%s.html" % (self.page_name, page),
+                self.add_file_from_string(page_name,
                                           page_data)
                                           
                 yield "Page %s" % page
@@ -311,7 +329,9 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         """ Given an inode_id which is a html file, we sanitise it and add
         its references to the bundle in table_renderer.
 
-        visited is a set which will be passed to any other tags we will use.
+        visited is a dict which will be passed to any other tags we
+        will use.  it mapps the inodes we already visited with the key
+        and their filename as the value.
         """
            
         if not self.include_extra_files:
@@ -419,7 +439,7 @@ class BundleResolvingHTMLTag(HTML.ResolvingHTMLTag):
     """
     A Tag which followed all its links and saves them to disk.
     
-    visited is expected to be a set initialised at the top level page,
+    visited is expected to be a dict initialised at the top level page,
     we use it to store all urls we have recursed through to prevent
     circular references.
     """
@@ -432,13 +452,15 @@ class BundleResolvingHTMLTag(HTML.ResolvingHTMLTag):
         
     def make_reference_to_inode(self, inode_id, hint):
         ## Ensure that the inode itself is included into the bundle:
-        filename = ''
-        if inode_id not in self.visited:
-            self.visited.add(inode_id)
+        try:
+            filename = self.visited[inode_id]
+        except KeyError:
+            self.visited[inode_id] = "images/spacer.png "
             filename = self.table_renderer.add_file_to_archive(inode_id,
                                                                visited = self.visited)
             filename = os.path.basename(filename)
-
+            self.visited[inode_id] = filename
+            
         return "%s%s " % (self.prefix, filename, )
 
 import pyflag.Farm as Farm
@@ -453,7 +475,7 @@ class Export(Farm.Task):
 
     def export(self, case, inode_id, table_renderer):
         filename = table_renderer.add_file_to_archive(inode_id, directory='inodes/',
-                                                      visited = set())
+                                                      visited = {})
 
         ## A link to the file's body
         fsfd = FileSystem.DBFS(case)
@@ -466,7 +488,7 @@ class Export(Farm.Task):
             if not table_renderer.filename_in_archive(filename):
                 tag = Curry(BundleResolvingHTMLTag,
                             inode_id = inode_id,
-                            visited = set(),
+                            visited = {},
                             table_renderer = table_renderer)
                 data = fd.html_export(tag_class = tag)
                 table_renderer.add_file_from_string(filename, data)
@@ -492,5 +514,19 @@ def render_html(self, inode_id, table_renderer):
     except AttributeError: pass
 
     return result
-    
+
+## Inodes get special handling:
 InodeIDType.render_html = render_html
+
+import pyflag.FlagFramework as FlagFramework
+
+## We need a table to maintain the top level page (TOC):
+class ReportingTables(FlagFramework.EventHandler):
+    """ A handler to create reporting specific tables """
+    def create(self, case_dbh, case):
+        case_dbh.execute("""CREATE TABLE reporting(
+        `page_name` VARCHAR(250),
+        `description` TEXT,
+        `start_value` VARCHAR(250),
+        `end_value` VARCHAR(250))""")
+

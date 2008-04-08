@@ -537,9 +537,14 @@ class DBO:
         except Exception,e:
             self.end_transaction()
             raise e
-        
-        return self.execute("select * from cache_%s limit %s,%s",
-                            (id,limit - lower_limit,length))
+
+        ## This is a race which occurs sometimes????
+        try:
+            return self.execute("select * from cache_%s limit %s,%s",
+                                (id,limit - lower_limit,length))
+        except:
+            return self.execute("%s limit %s,%s" %
+                                (sql,lower_limit,length))
 
     def __iter__(self):
         return self

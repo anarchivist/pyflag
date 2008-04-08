@@ -191,7 +191,8 @@ class SanitizingTag(Tag):
                             'colspan', 'valign','id', 'class','name', 
                             'compact', 'type', 'start', 'rel',
                             'value', 'checked', 'rows','cols','media',
-                            'framespacing','frameborder','contenteditable'
+                            'framespacing','frameborder','contenteditable',
+                            'http-equiv', 'content'
                             ]
 
     def css_filter(self, data):
