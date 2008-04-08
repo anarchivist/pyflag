@@ -260,6 +260,8 @@ class ColumnType:
         
     def plain_display_hook(self, value, row, result):
         if value:
+            ## Remove non printable chars:
+            value = ''.join([ x for x in value if ord(x)>31 ])
             result.text(value)
 
     display_hooks = [ plain_display_hook, link_display_hook, ]
@@ -303,6 +305,10 @@ class ColumnType:
         """ This is used by the HTML renderer to render the column
         into HTML
         """
+        if value:
+            ## Remove non printable chars:
+            value = ''.join([ x for x in value if ord(x)>31 ])
+
         return value
 
     def export(self, value, exportdir):

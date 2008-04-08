@@ -154,14 +154,15 @@ class TextTag(Tag):
             return "\n"
 
         if self.name in ['script','style']:
-	    return ''
+	    return ' '
 
         data = decode_unicode(self.innerHTML())
-        data = re.sub("[\r\n]+","\n",data)	
+        data = re.sub(r"[\r\n]+","\n",data)
+        data = re.sub(r" +"," ",data)
+        data = unquote(data)
+        #data = data.replace("\n","<br />")
 
-	return data
-        return "%s" % data.replace("\n","<br>")
-
+        return data+" "
 
 class SanitizingTag(Tag):
     """ This is a version of Tag which restricts the attributes
@@ -244,6 +245,18 @@ class SanitizingTag(Tag):
 
     def resolve_reference(self, reference, hint=''):
         return '"images/spacer.png"  '
+
+class SanitizingTag2(SanitizingTag):
+    """ A more restrictive sanitiser which removes e.g. body tags etc """
+    allowable_tags = [ 'b','i','a','img','em','br','strong',
+                       'tt', 'li', 'ol', 'ul', 'p', 'table', 'td', 'tr',
+                       'h1', 'h2', 'h3', 'pre',
+                       'form', 'html', 'pre', 'body',
+                       'sup', 'input', 'label', 'option','select',
+                       'div','span','nobr','u', 
+                       'textarea','center','small']
+
+    forbidden_tag = [ 'script', 'style', 'meta', 'head' ]
 
 class ResolvingHTMLTag(SanitizingTag):
     """ A special tag which resolves src and href back into the
@@ -495,7 +508,7 @@ class HTMLParser(lexer.Lexer):
         while self.next_token(): pass
 
 if __name__ == '__main__':
-    l = HTMLParser(verbose=1, tag_class = SanitizingTag)
+    l = HTMLParser(verbose=1, tag_class = SanitizingTag2)
 
     if len(sys.argv)==1:
         l.feed("foobar");
@@ -541,6 +554,8 @@ if __name__ == '__main__':
         ## This is a test for dom navigation
         root = l.root
         print root.tree()
+        print root.innerHTML()
+        sys.exit(0)
         print "Inner HTML %s" % root.innerHTML()
 
         print l.Tag

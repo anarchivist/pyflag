@@ -82,6 +82,7 @@ import pyflag.FileSystem as FileSystem
 import re,cgi
 import pyflag.pyflaglog as pyflaglog
 import textwrap
+import pyflag.HTMLUI as HTMLUI
 
 class LiveTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
@@ -318,7 +319,8 @@ class HTMLStringType(StringType):
 
     def render_html(self, value, table_renderer):
         import plugins.TableRenderers.HTMLBundle as HTMLBundle
-        parser = HTML.HTMLParser(tag_class = HTML.SanitizingTag)
+#        parser = HTML.HTMLParser(tag_class = HTML.SanitizingTag2)
+        parser = HTML.HTMLParser(tag_class = HTML.TextTag)
 #        parser = HTML.HTMLParser(tag_class = \
 #                                 FlagFramework.Curry(HTMLBundle.BundleResolvingHTMLTag,
 #                                                     table_renderer = table_renderer,
@@ -328,14 +330,21 @@ class HTMLStringType(StringType):
         parser.feed(value or '')
         parser.close()
 
-        return parser.root.innerHTML()
+        text = parser.root.innerHTML()
+
+        ## Make sure its wrapped:
+        ui = HTMLUI.HTMLUI(initial=True)
+        ui.text(text, wrap ='full', font='typewriter')
+        return ui.__str__()
 
     def display(self, value, row, result):
         parser = HTML.HTMLParser(tag_class = HTML.TextTag)
         parser.feed(value or '')
         parser.close()
 
-	result.text(parser.root.innerHTML(), wrap='full', font='typewriter')
+        value = parser.root.innerHTML()
+
+	result.text(value, wrap='full', font='typewriter')
 
 class LiveComMessages(Reports.report):
     """

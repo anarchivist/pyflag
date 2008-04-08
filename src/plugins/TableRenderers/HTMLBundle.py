@@ -49,7 +49,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
 
         We read the infd and write it to the specified filename.
         """
-        output_file_name = "%s/%s" % (config.REPORTING_DIR, filename)
+        output_file_name = "%s/%s/%s" % (config.REPORTING_DIR, self.case, filename)
 
         print "Adding %s" % output_file_name
         
@@ -70,7 +70,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         #if self.filename_in_archive(filename):
         #    return
         
-        output_file_name = "%s/%s" % (config.REPORTING_DIR, filename)
+        output_file_name = "%s/%s/%s" % (config.REPORTING_DIR, self.case, filename)
 
         print "Adding %s" % filename
         
@@ -197,6 +197,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         for filename, dest in [ ("images/spacer.png", "inodes/images/spacer.png"),
                                 ("images/spacer.png", None),
                                 ('images/pyflag.css',None,),
+                                ('images/next_line.png', None),
                                 ('images/decrement.png',None,),
                                 ('images/increment.png',None),
                                 ('images/stock_left.png',None),
@@ -218,7 +219,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         return self.filename_in_archive(filename)
     
     def filename_in_archive(self, filename):
-        filename = "%s/%s" % (config.REPORTING_DIR, filename)
+        filename = "%s/%s/%s" % (config.REPORTING_DIR, self.case, filename)
         try:
             os.stat(filename)
             return True
@@ -345,64 +346,65 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
 
         return filename
 
-import zipfile
+## This is disabled now because its not distributable.
+##import zipfile
 
-class HTMLBundleRenderer(HTMLDirectoryRenderer):
-    name = "HTML Bundle"
-    ## We can not distribute this across children
-    distributable = False
+##class HTMLBundleRenderer(HTMLDirectoryRenderer):
+##    name = "HTML Bundle"
+##    ## We can not distribute this across children
+##    distributable = False
 
-    def __init__(self, *args, **kwargs):
-        self.outfd = cStringIO.StringIO()
-        self.zip = zipfile.ZipFile(self.outfd, "w", zipfile.ZIP_DEFLATED)
-        HTMLDirectoryRenderer.__init__(self, *args, **kwargs)
+##    def __init__(self, *args, **kwargs):
+##        self.outfd = cStringIO.StringIO()
+##        self.zip = zipfile.ZipFile(self.outfd, "w", zipfile.ZIP_DEFLATED)
+##        HTMLDirectoryRenderer.__init__(self, *args, **kwargs)
 
-    def add_file(self, filename, infd):
-        outfd = tempfile.NamedTemporaryFile()
-        while 1:
-            data = infd.read(1024*1024)
-            if not data: break
-            outfd.write(data)
+##    def add_file(self, filename, infd):
+##        outfd = tempfile.NamedTemporaryFile()
+##        while 1:
+##            data = infd.read(1024*1024)
+##            if not data: break
+##            outfd.write(data)
 
-        outfd.flush()
-        self.zip.write(outfd.name, filename)
-        outfd.close()
+##        outfd.flush()
+##        self.zip.write(outfd.name, filename)
+##        outfd.close()
 
-    def add_file_from_string(self, filename, string):
-        self.zip.writestr(filename, string)
+##    def add_file_from_string(self, filename, string):
+##        self.zip.writestr(filename, string)
 
-    message = "Export HTML Files into a zip file"
+##    message = "Export HTML Files into a zip file"
 
-    def render_table(self, query, result):
-        g = self.generate_rows(query)
-        self.add_constant_files()
-        self.include_extra_files = query.get('include_extra_files',False)
+##    def render_table(self, query, result):
+##        g = self.generate_rows(query)
+##        self.add_constant_files()
+##        self.include_extra_files = query.get('include_extra_files',False)
         
-        hiddens = [ int(x) for x in query.getarray(self.hidden) ]
+##        hiddens = [ int(x) for x in query.getarray(self.hidden) ]
 
-        self.column_names = []
-        elements = []
-        for e in range(len(self.elements)):
-            if e in hiddens: continue
-            self.column_names.append(self.elements[e].name)
-            elements.append(self.elements[e])
+##        self.column_names = []
+##        elements = []
+##        for e in range(len(self.elements)):
+##            if e in hiddens: continue
+##            self.column_names.append(self.elements[e].name)
+##            elements.append(self.elements[e])
             
-        def generator(query, result):
-            page = 1
-            self.add_file_from_string("%s/%s.html" % (self.page_name,page),
-                                      self.render_page(1, elements, g))
+##        def generator(query, result):
+##            page = 1
+##            self.add_file_from_string("%s/%s.html" % (self.page_name,page),
+##                                      self.render_page(1, elements, g))
 
-            self.zip.close()
-            self.outfd.seek(0)
-            while 1:
-                data = self.outfd.read(1024*1024)
-                if not data: break
+##            self.zip.close()
+##            self.outfd.seek(0)
+##            while 1:
+##                data = self.outfd.read(1024*1024)
+##                if not data: break
 
-                yield data
+##                yield data
 
-        result.generator.generator = generator(query,result)
-        result.generator.content_type = "application/x-zip"
-        result.generator.headers = [("Content-Disposition","attachment; filename=table.zip"),]
+##        result.generator.generator = generator(query,result)
+##        result.generator.content_type = "application/x-zip"
+##        result.generator.headers = [("Content-Disposition","attachment; filename=table.zip"),]
         
 ## Here we provide the InodeIDType the ability to render html
 ## correctly:
@@ -429,6 +431,7 @@ import pyflag.Farm as Farm
 import pyflag.pyflaglog as pyflaglog
 
 class Export(Farm.Task):
+    """ A Distributable table for exporting an inode into HTML """
     def run(self, case, inode_id, *args):
         pyflaglog.log(pyflaglog.DEBUG, "Exporting inode_id %s" % inode_id)
         table_renderer = HTMLDirectoryRenderer(case=case, include_extra_files=True)
