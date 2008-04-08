@@ -197,7 +197,14 @@ class SanitizingTag(Tag):
 
     def css_filter(self, data):
         def resolve_css_references(m):
-            result = self.resolve_reference(m.group(1), build_reference = False)
+            url = m.group(1)
+            args={}
+            ## This is a bit of a hack - magic detection of css is
+            ## quite hard
+            if url.endswith("css"):
+                args['hint'] = 'text/css'
+                
+            result = self.resolve_reference(url, build_reference = False, **args)
             return "url(%s)" % result
         
         return re.sub("(?i)url\(\"?([^\)\"]+)\"?\)",

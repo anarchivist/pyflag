@@ -460,7 +460,7 @@ class BundleResolvingHTMLTag(HTML.ResolvingHTMLTag):
                                                                visited = self.visited)
             filename = os.path.basename(filename)
             self.visited[inode_id] = filename
-            
+
         return "%s%s " % (self.prefix, filename, )
 
 import pyflag.Farm as Farm
