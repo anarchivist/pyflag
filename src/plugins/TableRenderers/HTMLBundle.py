@@ -12,6 +12,7 @@ import pyflag.DB as DB
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.pyflaglog as pyflaglog
+import pyflag.HTMLUI as HTMLUI
 
 config.add_option("REPORTING_DIR", default=config.RESULTDIR + "/Reports",
                   help = "Directory to emit reports into.")
@@ -98,7 +99,6 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         <title>%(title)s</title>
         </head>
         <body>
-        <script src="javascript/functions.js" type="text/javascript" language="javascript"></script>
         <div class="PyFlagHeader">
         %(toolbar)s
         </div>
@@ -186,7 +186,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         if page_number==1:
             result = '<img border="0" src="images/stock_left_gray.png"/>'
         else:
-            result = '''<a href="%s%s.html">
+            result = '''<a href="%s%03u.html">
             <abbr title="Previous Page (%s)">
             <img border="0" src="images/stock_left.png"/>
             </abbr>
@@ -197,7 +197,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         if self.row_count < self.pagesize:
             result += '<img border="0" src="images/stock_right_gray.png"/>'
         else:
-            result += '''<a href="%s%s.html">
+            result += '''<a href="%s%03u.html">
             <abbr title="Next Page (%s)">
             <img border="0" src="images/stock_right.png"/>
             </abbr>
@@ -263,7 +263,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             page = 1
 
             while 1:
-                page_name = "%s%s.html" % (self.page_name, page)
+                page_name = "%s%03u.html" % (self.page_name, page)
                 page_data = self.render_page(page_name, page, elements, g)
                 if self.row_count ==0: break
                 
@@ -272,8 +272,53 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
                                           
                 yield "Page %s" % page
                 page +=1
-            
+
+                ## update the TOC page:
+                self.toc()
+        
         result.generator.generator = generator(query,result)
+
+    def toc(self):
+        result = HTMLUI.HTMLUI(initial = True)
+        result.heading("Case %s" % self.case)
+
+        result.start_table(**{'class': 'PyFlagTable'})
+        result.raw("<thead><th>Filename</th><th>Description</th><th>From</th><th>To</th></thead>")
+        dbh = DB.DBO(self.case)
+        dbh.execute("select * from reporting order by page_name")
+        for row in dbh:
+            if row['start_value'] == 'None': continue
+            
+            result.row("<a href=%r>%s</a>" % (row['page_name'],row['page_name']),
+                       row['description'],
+                       row['start_value'],
+                       row['end_value'],
+                       **{'class':'alternateRow'})
+        result.end_table()
+
+        result.raw("<p><p>\n<font size='-5' color=red>Report Produced using PyFlag Ver. %s</font>" % config.VERSION)
+
+        page = '''<html><head><link media="all" href="images/pyflag.css" type="text/css" rel="stylesheet">
+        <title>Table of Content</title>
+        <style>
+        body {
+        overflow: auto;
+        height: 100%%;
+        }
+
+        div.PyFlagPage {
+        overflow: visible;
+        width: 100%%;
+	}
+        </style>
+        </head>
+        <body>
+        <div id="PyFlagPage" class="PyFlagPage">
+        %s
+        </div>
+        </body></html>''' % result
+
+        self.add_file_from_string("toc.html", page)
 
     def generate_rows(self, query):
         """ This implementation gets all the rows, but makes small
@@ -316,12 +361,13 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         ## Use the magic in the file:
         type, content_type = m.find_inode_magic(self.case, inode_id)
 
-        if "image" in content_type:
-            filename += ".jpg"
-        elif "html" in content_type:
-            filename += ".html"
-        elif "css" in content_type:
-            filename += ".css"
+        for k,v in {"jpeg": ".jpg",
+                    "gif": ".gif",
+                    "html": ".html",
+                    "css":  ".css",
+                    "png": ".png"}.items():
+            if k in content_type:
+                filename += v
 
         return filename, content_type, fd
 
