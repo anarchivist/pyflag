@@ -186,7 +186,7 @@ def uniq(table_object,fieldname,proposed_value,query=None,id=None,result=None):
         import pyflag.TableObj as TableObj
         raise TableObj.ConstraintError(result)
 
-def noop(description=None, choices=None, variable=None, ui=None, **options ):
+def noop(self, description=None, choices=None, variable=None, ui=None, **options ):
     """ A noop action """
 
 def selector_display(self, description=None, variable=None, result=None, table=None, case=None, field=None, force=False, default=None, **options ):

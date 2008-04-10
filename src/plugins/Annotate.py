@@ -72,8 +72,8 @@ class ViewCaseReport(Reports.report):
     def display(self,query,result):
         def Annotated_inodes(query, result):
             result.table(
-                elements = [ InodeIDType('Inode', 'inode_id', case=query['case']),
-                             FilenameType(case=query['case'], table='annotate'),
+                elements = [ InodeIDType(case=query['case']),
+                             FilenameType(case=query['case']),
                              StringType('Category','category'),
                              StringType('Note','note'),
                              ],
@@ -140,6 +140,20 @@ class ViewCaseReport(Reports.report):
 
 
 class AnnotationObj(TableObj.TableObj):
+    def store_inode(self, fieldname, proposed_value, query=None, id=None, result=None):
+        dbh = DB.DBO(self.case)
+        dbh.execute("select inode_id from inode where inode = %r limit 1", proposed_value)
+        row = dbh.fetch()
+        query.set(fieldname, row['inode_id'])
+
+    def inode_action(self, table_obj, description = None, variable= None, result=None, defaults=None):
+        dbh = DB.DBO(self.case)
+        dbh.execute("select inode from inode where inode_id = %r limit 1", defaults[variable])
+        row = dbh.fetch()
+        result.defaults.set(variable, row['inode'])
+
+        result.textfield(description, variable, size=40)
+        
     table = "annotate"
     columns = (
         'inode_id', 'Inode', 
@@ -149,14 +163,18 @@ class AnnotationObj(TableObj.TableObj):
 
     add_constraints = {
         'category': TableActions.selector_constraint,
+#        'inode_id': store_inode,
         }
 
     edit_constraints = {
         'category': TableActions.selector_constraint,
+#        'inode_id': store_inode,
         }
 
     def __init__(self, case=None, id=None):
         self.form_actions = {
+            #'inode_id': self.inode_action,
+            'inode_id': TableActions.noop,
             'note': TableActions.textarea,
             'category': FlagFramework.Curry(TableActions.selector_display,
                               table='annotate', field='category', case=case),
@@ -165,14 +183,15 @@ class AnnotationObj(TableObj.TableObj):
         TableObj.TableObj.__init__(self,case,id)
 
 ## We add callback to allow annotation of Inode displays:
-def render_annotate_inode_id(self, value, row, result):
-    if not value: return ''
+def render_annotate_inode_id(self, inode_id, row, result):
+    inode = ''
+    if not inode_id: return ''
     
     link = FlagFramework.query_type(case=self.case,
                                     family='Disk Forensics',
                                     report='ViewFile',
                                     mode = 'Summary',
-                                    inode_id = value)
+                                    inode_id = inode_id)
     ## This is the table object which is responsible for the
     ## annotate table:
     original_query = result.defaults
@@ -185,13 +204,13 @@ def render_annotate_inode_id(self, value, row, result):
 
         annotate = AnnotationObj(case=self.case)
         ## We are dealing with this inode
-        del query['inode_id']
-        query['inode_id'] = value
+        query.set('inode_id',inode_id)
         ## does a row already exist?
-        row = annotate.select(inode_id=value)
+        row = annotate.select(inode_id=inode_id)
         if row:
             query['id'] = row['id']
 
+        print query
         ## We got submitted - actually try to do the deed:
         if 'Annotate' in query.getarray('__submit__'):
             result.start_table()
@@ -209,7 +228,7 @@ def render_annotate_inode_id(self, value, row, result):
 
         ## Present the user with the form:
         result.start_form(query, pane='self')
-        result.heading("Inode %s" % value)
+        result.heading("Inode %s" % inode)
         if row:
             annotate.edit_form(query,result)
         else:
@@ -219,7 +238,7 @@ def render_annotate_inode_id(self, value, row, result):
 
         def del_annotation(query, result):
             dbh = DB.DBO(query['case'])
-            dbh.delete('annotate', "inode_id=%r" % value)
+            dbh.delete('annotate', "inode_id=%r" % inode_id)
 
             del query['note']
             del query['category']
@@ -231,13 +250,14 @@ def render_annotate_inode_id(self, value, row, result):
 
     ## Check to see if the inode exists at all:
     dbh = DB.DBO(self.case)
-    dbh.execute("select inode,inode_id from inode where inode.inode_id = %r", value)
+    dbh.execute("select inode,inode_id from inode where inode.inode_id = %r", inode_id)
     row = dbh.fetch()
     if not row: return ''
 
-    value = row['inode']
+    inode = row['inode']
     annotate = AnnotationObj(case=self.case)
-    row = annotate.select(inode_id=value)
+    row = annotate.select(inode_id=inode_id)
+
     tmp1 = result.__class__(result)
     tmp2 = result.__class__(result)
     if row:
@@ -245,16 +265,19 @@ def render_annotate_inode_id(self, value, row, result):
     else:
         tmp1.popup(annotate_cb, "Annotate", icon="pen.png")
 
-    if len(value)> 15:
-        value1="..%s" % value[-13:]
+    if len(inode)> 15:
+        value1="..%s" % inode[-13:]
     else:
-        value1 = value
-    tmp2.link(value1, tooltip = value, target=link)
+        value1 = inode
+    tmp2.link(value1, tooltip = inode, target=link)
     result.row(tmp1,tmp2)
 
 def operator_annotated(self, column, operator, pattern):
     """ This operator selects those inodes with pattern matching their annotation """
-    return '`%s`=(select annotate.inode_id from annotate where note like "%%%s%%")' % (self.column, pattern)
+    return '`%s`.`%s` in (select annotate.inode_id from annotate' \
+           ' where note like "%%%s%%")' % (self.table,
+                                           self.column,
+                                           pattern)
 
 add_display_hook(InodeIDType, "render_annotate_inode_id", render_annotate_inode_id)
 InodeIDType.operator_annotated = operator_annotated
