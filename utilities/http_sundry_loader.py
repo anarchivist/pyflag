@@ -70,5 +70,5 @@ for regex in config.args:
                        _fast = True,
                        present = 'yes')
             print "Ok"
-        except IOError,e:
+        except Exception,e:
             print "Error: %s" % e

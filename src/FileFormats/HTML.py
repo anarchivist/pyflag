@@ -192,7 +192,7 @@ class SanitizingTag(Tag):
                             'compact', 'type', 'start', 'rel',
                             'value', 'checked', 'rows','cols','media',
                             'framespacing','frameborder','contenteditable',
-                            'http-equiv', 'content'
+                            'content'
                             ]
 
     def css_filter(self, data):
@@ -230,6 +230,10 @@ class SanitizingTag(Tag):
 	if 'style' in self.attributes:
             attributes += ' style=%r' % self.css_filter(self.attributes['style'])
 
+        if 'http-equiv' in self.attributes:
+            if self.attributes['http-equiv'].lower() == "content-type":
+                attributes += " http-equiv = %r " % self.attributes['http-equiv']
+                
         if 'src' in self.attributes:
             attributes += ' src=%s' % self.resolve_reference(self.attributes['src'])
 

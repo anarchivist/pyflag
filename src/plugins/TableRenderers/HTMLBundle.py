@@ -270,7 +270,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
                 self.add_file_from_string(page_name,
                                           page_data)
                                           
-                yield "Page %s" % page
+                yield "Page %s<br />" % page
                 page +=1
 
                 ## update the TOC page:
