@@ -458,12 +458,13 @@ class LiveMailViewer(FileSystem.StringIOFile):
                     root.find("textarea",{"id":"fMessageBody"})
         if edit_area:
             parser = HTML.HTMLParser(tag_class = tag_class)
-            #parser.feed(HTML.decode(self.message))
-            parser.feed(self.message)
+            parser.feed(HTML.decode(self.message))
+            #parser.feed(self.message)
             parser.close()
             result = HTML.decode(parser.root.__str__())
             result = textwrap.fill(result)
-            edit_area.add_child(result)
+            edit_area.add_child(parser.root)
+            edit_area.name = 'div'
 
     def stats(self, query,result):
         result.start_table(**{'class':'GeneralTable'})
@@ -524,10 +525,17 @@ class LiveMailViewer(FileSystem.StringIOFile):
         ## Allow us to fix the html page
         root = p.root
         self.fixup_page(root, tag_class)
+
+        ## Add the timestamp to the title of the page - so when you
+        ## print it out we can identify it:
+        s = fsfd.istat(inode_id = self.parent_inode_id)
+        title_tag = root.find("title")
+        title_tag.children = [ "%s %s %s" % (title_tag.innerHTML(),
+                                             s['mtime'], s['inode']) ,]
+        
         return root.innerHTML()        
 
     def html_export(self, tag_class):
-        ## We need to look at our parent inode here:
         return self.sanitize_page(tag_class)
 
     def summary(self, query, result):

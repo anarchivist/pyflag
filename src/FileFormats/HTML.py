@@ -358,12 +358,16 @@ class ResolvingHTMLTag(SanitizingTag):
 #        reference = reference.replace(" ","%20")
         reference = decode_entity(reference)
         dbh = DB.DBO(self.case)
-        dbh.execute("select inode_id from http where url=%r and not isnull(http.inode_id) limit 1", reference)
+        dbh.execute("select status,inode_id from http where url=%r and not isnull(http.inode_id) limit 1", reference)
         row = dbh.fetch()
         if row and row['inode_id']:
             ## This is needed to stop dbh leaks due to the highly
             ## recursive nature of this function.
             del dbh
+
+            ## If the target was redirected - take care of that:
+            ## (DANGER - a circular redirection could be problematic)
+            ## FIXME - do this (we need to store the location header)
             result = self.make_reference_to_inode(row['inode_id'], hint)
             
             if build_reference:

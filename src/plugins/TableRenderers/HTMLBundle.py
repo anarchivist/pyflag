@@ -270,7 +270,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
                 self.add_file_from_string(page_name,
                                           page_data)
                                           
-                yield "Page %s<br />" % page
+                yield "Page %s\n" % page
                 page +=1
 
                 ## update the TOC page:
@@ -334,20 +334,14 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         try:    self.end_limit = int(query.get('end_limit',0))
         except: self.end_limit = 0
 
-        total = 0
-        while 1:
-            dbh.cached_execute(self.sql,limit = self.limit, length=self.pagesize)
-            count = 0
-            for row in dbh:
-                yield row
-                count += 1
-                total += 1
-                if self.end_limit > 0 \
-                   and total > self.end_limit: return
+        dbh.execute(self.sql + " limit %s,999999" % self.limit)
+        count = 0
+        for row in dbh:
+            yield row
+            count += 1
 
-            if count==0: break
-
-            self.limit += self.pagesize
+            if self.end_limit > 0 \
+               and total > self.end_limit: return
 
     def make_archive_filename(self, inode_id, directory = 'inodes/'):
         ## Add the inode to the exported bundle:
@@ -399,6 +393,17 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             data = fd.read(1024*1024)
             parser.feed(data)
             parser.close()
+
+            ## Add more information to the title of page if needed
+            s = fd.stat()
+            title_tag = parser.root.find("title")
+            if title_tag:
+                title_tag.children = [ "%s %s %s %s" % (title_tag.innerHTML(),
+                                                        s['mtime'], s['inode'], self.case) ,]
+            else:
+                head = parser.root.find("head")
+                if head:
+                    head.add_child("<title>%s %s %s</title>"%  (s['mtime'], s['inode'], self.case))
  
             self.add_file_from_string(filename, parser.root.innerHTML())
         elif 'css' in content_type:

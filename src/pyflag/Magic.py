@@ -133,10 +133,12 @@ class MagicResolver:
         type, content_type = self.get_type(data, case, inode_id)
 
         ## Store it in the db for next time:
-        dbh.insert("type",
-                   inode_id = inode_id,
-                   mime = content_type,
-                   type = type)
+        try:
+            dbh.insert("type",
+                       inode_id = inode_id,
+                       mime = content_type,
+                       type = type)
+        except: pass
 
         return type, content_type
     
