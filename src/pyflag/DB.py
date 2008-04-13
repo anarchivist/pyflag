@@ -237,11 +237,33 @@ class Pool(Queue):
     existing ones whenever possible (of course we need to create new
     ones if the connection state is important (e.g. iterating through
     a resultset while doing some different db activity).
+
+    The pool maintains a cache of case parameters, which we get from
+    the meta table. If these change, The cache needs to be expired.
     """
     def __init__(self, case, poolsize=0):
         self.case=case
         self.indexes = {}
+        self._parameters = {}
         Queue.__init__(self, poolsize)
+
+    def parameter(self, string):
+        try:
+            return self._parameters[string]
+        except KeyError:
+            dbh, tmp = self.get()
+            c=dbh.cursor()
+
+            c.execute("select value from meta where property = %r limit 1" % string)
+            row = c.fetchone()
+            try:
+                return row['value']
+            except:
+                return None
+
+    def parameter_flush(self):
+        """ Expire the parameter cache """
+        self._parameters = {}
 
     def put(self, dbh):
         pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Returning dbh to pool %s" % self.case)
@@ -254,9 +276,18 @@ class Pool(Queue):
                 result=self.empty() and self.connect() or Queue.get(self, block)
 
                 pyflaglog.log(pyflaglog.VERBOSE_DEBUG, "Getting dbh from pool %s" % self.case)
-                return result
             except Empty:
-                return self.connect()
+                result = self.connect()
+
+##            ## Ensure the tz is adjusted appropriately:
+##            tz=pool.parameter("TZ")
+##            if result.tz != tz:
+##                print "Adjusting TZ to %s" % tz
+##                c=result.cursor()
+##                c.execute("set time_zone = %r" % tz)
+##                self.dbh.tz = tz
+
+            return result
         except Exception,e:
             raise DBError("Unable to connect - does the DB Exist?: %s" % e)
 
@@ -301,6 +332,9 @@ class Pool(Queue):
         db_connections +=1
         c=dbh.cursor()
         c.execute("set autocommit=1")
+
+        ## Make sure we record the TZ:
+        dbh.tz = None
         return (dbh,mysql_bin_string)
 
 class DBO:
@@ -319,11 +353,14 @@ class DBO:
 
     def get_dbh(self, case):
         try:
-            self.dbh,self.mysql_bin_string=self.DBH.get(case).get()
+            pool = self.DBH.get(case)
         except KeyError:
-            self.DBH.put(Pool(case), key=case)
-            self.dbh,self.mysql_bin_string=self.DBH.get(case).get()
-    
+            pool = Pool(case)
+            self.DBH.put(pool, key=case)
+        
+        self.dbh,self.mysql_bin_string=pool.get()
+        ## Check if we need to adjust the timezone:
+            
     def __init__(self,case=None):
         """ Constructor for DB access. Note that this object implements database connection caching and so should be instantiated whenever needed. If case is None, the handler returned is for the default flag DB
 

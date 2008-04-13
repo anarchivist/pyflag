@@ -291,6 +291,7 @@ class Standard(Advanced):
 
     def open(self, name, case, query=None):
         self.cache_io(name, case, query)
+        self.io.seek(0)
         return self.io
 
 import Store

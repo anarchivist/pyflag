@@ -530,8 +530,9 @@ class LiveMailViewer(FileSystem.StringIOFile):
         ## print it out we can identify it:
         s = fsfd.istat(inode_id = self.parent_inode_id)
         title_tag = root.find("title")
-        title_tag.children = [ "%s %s %s" % (title_tag.innerHTML(),
-                                             s['mtime'], s['inode']) ,]
+        if title_tag:
+            title_tag.children = [ "%s %s %s" % (title_tag.innerHTML(),
+                                                 s['mtime'], s['inode']) ,]
         
         return root.innerHTML()        
 

@@ -205,6 +205,16 @@ class HTTPCaseTable(FlagFramework.CaseTable):
         ]
     index = ['url','inode_id']
 
+class HTTPParameterCaseTable(FlagFramework.CaseTable):
+    """ HTTP Parameters - Stores request details """
+    name = 'http_parameters'
+    columns = [
+        [ InodeIDType, {} ],
+        [ StringType, dict(name = 'Parameter', column = 'key') ],
+        [ StringType, dict(name = 'Value', column = 'value')],
+        ]
+    index = [ 'inode_id', 'key' ]
+
 class HTTPTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
         ## This is the information we store about each http request:
@@ -230,14 +240,14 @@ class HTTPTables(FlagFramework.EventHandler):
 ##            `useragent` VARCHAR(255)
 ##            )""")
 
-        dbh.execute(
-            """CREATE TABLE if not exists `http_parameters` (
-            `id` int(11) not null auto_increment,
-            `inode_id` int not null,
-            `key` VARCHAR(255) not null,
-            `value` mediumblob not null,
-            primary key (`id`)
-            ) """)
+##        dbh.execute(
+##            """CREATE TABLE if not exists `http_parameters` (
+##            `id` int(11) not null auto_increment,
+##            `inode_id` int not null,
+##            `key` VARCHAR(255) not null,
+##            `value` mediumblob not null,
+##            primary key (`id`)
+##            ) """)
 
         dbh.check_index("http", "url", 100)
         dbh.check_index("http", "inode_id")
@@ -385,16 +395,11 @@ class HTTPScanner(StreamScannerFactory):
             ## written.
             path=os.path.normpath(path+"/../../../../../")
 
-            ## No point creating VFS inodes of 0 size because we dont
-            ## need to scan them:
-            if size>0:
-                inode_id = self.fsfd.VFSCreate(None,new_inode,
-                                    "%s/HTTP/%s/%s" % (path,date_str,
-                                                       escape(p.request['url'])),
-                                    mtime=timestamp, size=size
-                                    )
-            else:
-                inode_id = 0
+            inode_id = self.fsfd.VFSCreate(None,new_inode,
+                                           "%s/HTTP/%s/%s" % (path,date_str,
+                                                              escape(p.request['url'])),
+                                           mtime=timestamp, size=size
+                                           )
                 
             ## Store information about this request in the
             ## http table:
@@ -461,8 +466,10 @@ class HTTPScanner(StreamScannerFactory):
             except KeyError:
                 pass
 
-            ## Scan the new file using the scanner train. 
-            self.scan_as_file(new_inode, factories)
+            ## Only scan the new file using the scanner train if its
+            ## size of bigger than 0:
+            if size>0:
+                self.scan_as_file(new_inode, factories)
 
     class Scan(StreamTypeScan):
         types = [ "protocol/x-http-request" ]

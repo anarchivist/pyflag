@@ -487,6 +487,7 @@ class TableRenderer:
         self.groupby_button(query, result)
         self.count_button(query, result)
         self.export_button(query, result)
+        self.sql_button(query, result)
         
     def count_button(self, query, result):
         """  This returns the total number of rows in this table - it
@@ -628,6 +629,17 @@ class TableRenderer:
             cb = goto_row_cb,
             text="Row %s" % self.limit,
             icon="stock_next-page.png", pane='popup',
+            )
+
+    def sql_button(self, query, result):
+        def button_cb(query, result):
+            result.heading("SQL Statement used")
+            result.para(self._make_sql(query))
+
+        result.toolbar(
+            cb = button_cb,
+            text = "SQL Used",
+            icon = "sql.png", pane = 'popup',
             )
 
     def _make_sql(self, query):

@@ -241,6 +241,12 @@ class CaseDBInit(FlagFramework.EventHandler):
         value text,
         KEY property(property),
         KEY joint(property,value(20)))""")
+
+        ## Defaults
+        case_dbh.insert("meta",
+                        property = "TZ",
+                        value = "SYSTEM",
+                        _fast = True)
         
         ## This is a transactional table for managing the cache
         case_dbh.execute("""CREATE TABLE if not exists `sql_cache` (
@@ -376,7 +382,6 @@ class CaseDBInit(FlagFramework.EventHandler):
         value text default NULL
         ) engine=MyISAM;""")
 
-
         ## This is required for the new distributed architecture
         dbh.execute("""create table jobs (
 	`id` int unsigned auto_increment, 
@@ -469,3 +474,57 @@ class InodeTable(FlagFramework.CaseTable):
                                                states = scanners)
                                           ],
                                         ]
+
+class CaseConfiguration(Reports.report):
+    """
+    Case Configuration
+    ==================
+
+    This report allows case specific configuations.
+
+    Timezone
+    --------
+    
+    This is the timezone which will be used to view the data.  When
+    data is loaded into PyFlag, the iosource itself has a distinct
+    timezone associated with it. When users view this data, times are
+    automatically presented in the case timezone.
+
+    The case timezone may be specified as SYSTEM which simply
+    specifies no special timezone adjustment. If the evidence is
+    imported with a SYSTEM timezone, the dates the user views are in
+    the same zone that is displayed.
+
+    Note that if you do not see any timezones here, you should run the
+    following command to load them into mysql:
+
+    sh$ mysql_tzinfo_to_sql /usr/share/zoneinfo | mysql -u root -p mysql
+    
+    """
+    parameters = { 'TZ': "string"}
+    family = "Case Management"
+    name = "Configure Case"
+    
+    def form(self, query, result):
+        result.heading("Case configuration")
+
+        timezones = [ 'SYSTEM', ]
+        dbh = DB.DBO()
+        dbh.execute('select name from mysql.time_zone_name where name like "posix/%"')
+        for row in dbh:
+            tz = row['name'][len("posix/"):]
+            timezones.append(tz)
+
+        result.const_selector("Timezone", "TZ", timezones, timezones)
+
+    def display(self, query, result):
+        dbh = DB.DBO(query['case'])
+        result.heading("Setting case parameters")
+        for prop in ['TZ',]:
+            dbh.execute("update meta set value = %r where property = %r",
+                        query[prop],
+                        prop)
+            result.row(prop, query[prop])
+
+        ## Expire the parameters:
+        dbh.DBH.get(query['case']).parameter_flush()
