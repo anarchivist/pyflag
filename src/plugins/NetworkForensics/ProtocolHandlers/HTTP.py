@@ -212,6 +212,7 @@ class HTTPParameterCaseTable(FlagFramework.CaseTable):
         [ InodeIDType, {} ],
         [ StringType, dict(name = 'Parameter', column = 'key') ],
         [ StringType, dict(name = 'Value', column = 'value')],
+        [ IntegerType, dict(name = 'Attachment', column='indirect')],
         ]
     index = [ 'inode_id', 'key' ]
 
@@ -307,20 +308,47 @@ class HTTPScanner(StreamScannerFactory):
                    QUERY_STRING=query)
 
         dbh = DB.DBO(self.case)
-        result =cgi.parse(environ = env, fp = cStringIO.StringIO(body))
 
-        for key,value in result.items():
+        ## Merge in cookies if possible:
+        try:
+            cookie = request['cookie']
+            C = Cookie.SimpleCookie()
+            C.load(cookie)
+            for k in C.keys():
+                dbh.insert('http_parameters',
+                           inode_id = inode_id,
+                           key = k,
+                           value = C[k].value)
+                
+        except KeyError: pass
+
+        result =cgi.FieldStorage(environ = env, fp = cStringIO.StringIO(body))
+        count = 1
+        for key in result:
             ## Non printable keys are probably not keys at all.
             if re.match("[^a-z0-9A-Z_]+",key): continue
             value = result[key]
+            try:
+                value = value[0]
+            except: pass
+
             ## Deal with potentially very large uploads:
             if len(value.value) > 1024:
                 path,inode,inode_id=self.fsfd.lookup(inode_id=inode_id)
-                print "Attachment %s of length %s" % (value.filename, len(value.value))
                 ## This is not quite correct at the moment because the
                 ## mime VFS driver is unable to reconstruct the file
                 ## from scratch
-                new_inode = inode + "|m%s" % count
+                new_inode = "m%s" % count
+                new_inode_id = self.fsfd.VFSCreate(inode, new_inode,
+                                               value.filename,
+                                               size = len(value.value))
+                fd = self.fsfd.open(inode_id=new_inode_id)
+                ## dump the file to the correct filename:
+                open(fd.get_temp_path(),'w').write(value.value)
+                dbh.insert('http_parameters',
+                       inode_id = inode_id,
+                       key = key,
+                       indirect = new_inode_id)                
             else:
                 dbh.insert('http_parameters',
                        inode_id = inode_id,
@@ -413,24 +441,25 @@ class HTTPScanner(StreamScannerFactory):
             if not url.startswith("http://") and not url.startswith("ftp://"):
                 url = "http://%s%s" % (host, url)
 
+            ## Not sure if we really care about this?
             ## Find referred page:
-            parent = 0
+##            parent = 0
             dbh = DB.DBO(self.case)
-            if referer:
-                dbh.execute("select inode_id from http where url=%r order by inode_id desc limit 1", referer)
-                row = dbh.fetch()
+##            if referer:
+##                dbh.execute("select inode_id from http where url=%r order by inode_id desc limit 1", referer)
+##                row = dbh.fetch()
 
-                ## If there is no referrer we just make a psuedo entry
-                if not row:
-                    ## Find out the host
-                    m=re.match("(http://|ftp://)([^/]+)([^\?\&\=]*)",
-                               "%s" % referer)
-                    if m:
-                        host = m.group(2)
-                        dbh.insert("http", url=referer, host=host)
-                        parent = dbh.autoincrement()
-                else:
-                    parent = row['inode_id']
+##                ## If there is no referrer we just make a psuedo entry
+##                if not row:
+##                    ## Find out the host
+##                    m=re.match("(http://|ftp://)([^/]+)([^\?\&\=]*)",
+##                               "%s" % referer)
+##                    if m:
+##                        host = m.group(2)
+##                        dbh.insert("http", url=referer, host=host)
+##                        parent = dbh.autoincrement()
+##                else:
+##                    parent = row['inode_id']
 
             dbh.insert('http',
                        inode_id = inode_id,
@@ -444,7 +473,8 @@ class HTTPScanner(StreamScannerFactory):
                        referrer       = referer,
                        host           = host,
                        useragent      = p.request.get('user-agent', '-'),
-                       parent         = parent)                            
+                       )
+#                       parent         = parent)                            
 
             ## Replicate the information about the subobjects in the
             ## connection_details table - this makes it easier to do

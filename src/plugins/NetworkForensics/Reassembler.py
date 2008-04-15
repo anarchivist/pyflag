@@ -204,7 +204,6 @@ class StreamFile(File):
                 out_fd.seek(outfd_position)
             except Exception,e:
                 print FlagFramework.get_bt_string(e)
-                print outfd_position
                 raise
 
             # Only try to write if there is a reverse file.
@@ -283,8 +282,8 @@ class StreamFile(File):
 
         if self.packet_list==None:
             dbh = DB.DBO(self.case)
-            dbh.execute("""select packet_id,cache_offset from `connection` where inode_id = %r order by cache_offset desc, length desc """,
-                        (self.inode_id))
+            dbh.execute("""select packet_id,cache_offset from `connection` where inode_id = (select inode_id from inode where inode=%r limit 1) order by cache_offset desc, length desc """,
+                        (self.inode))
             self.packet_list = [ (row['packet_id'],row['cache_offset']) for row in dbh ]
 
         ## Now try to find the packet_id in memory:

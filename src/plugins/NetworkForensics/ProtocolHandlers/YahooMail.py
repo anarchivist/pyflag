@@ -45,7 +45,7 @@ class YahooMailScan(LiveCom.HotmailScanner):
             if not Scanner.StoreAndScanType.boring(self, metadata, data=''):
                 m=re.search("<title>[^<]+Yahoo! Mail", data)
                 if m:
-                    self.username = ''
+                    self.username = None
                     ## Make a new parser:
                     if not self.parser:
                         self.parser =  HTML.HTMLParser(verbose=0)
@@ -56,10 +56,47 @@ class YahooMailScan(LiveCom.HotmailScanner):
         def external_process(self, fd):
             pyflaglog.log(pyflaglog.DEBUG,"Opening %s for YahooMail processing" % self.fd.inode)
 
+            ## Try to determine the username:
+            try:
+                title = self.parser.root.find("title").children[0]
+                m = re.search("[^@ ]+@[^ ]+", title)
+                if m:
+                    self.username = m.group(0)
+            except:
+                pass
+
             self.process_readmessage(fd)
             self.process_mail_listing()
+            self.process_edit_read()
             self.process_send_message(fd)
 
+        def process_edit_read(self):
+            """ Process when an edit box is read from the server """
+            root = self.parser.root
+            result = {}
+            for field, tag, pattern in [('To','textarea','tofield'),
+                                        ('CC','textarea','ccfield'),
+                                        ('Bcc','textarea', 'bccfield'),
+                                        ('Subject', 'input', 'subjectfield')]:
+                tmp = root.find(tag, {'id': pattern})
+                if tmp:
+                    try:
+                        result[field] = HTML.decode_entity(tmp.children[0])
+                    except IndexError:
+                        pass
+
+            ## Find the message:
+            tmp = root.find('input', {'name':'PlainMsg'})
+            if tmp:
+                message = HTML.decode_entity(tmp['value'])
+                if message:
+                    result['Message'] = message
+
+            if result:
+                result['type']='Edit Read'
+                
+                return self.insert_message(result, inode_template="y%s")
+        
         def process_mail_listing(self):
             """ This looks for the listing in the mail box """
             table = self.parser.root.find("table",{"id":"datatable"})
@@ -80,6 +117,9 @@ class YahooMailScan(LiveCom.HotmailScanner):
             dbh.execute("select `key`,`value` from http_parameters where inode_id = %r", self.fd.inode_id)
             query = dict([(r['key'].lower(),r['value']) for r in dbh])
             result = {'type':'Edit Sent'}
+            if self.username:
+                result['From'] = self.username
+
             for field, pattern in [('To','send_to'),
                                    ('From','username'),
                                    ('CC','send_to_cc'),
@@ -92,15 +132,15 @@ class YahooMailScan(LiveCom.HotmailScanner):
                                    ('To', 'to'),
                                    ('CC', 'cc'),
                                    ('Bcc','bcc'),
-                                   ('From','defFromAddress'),
-                                   ('Subject', 'Subj'),
+                                   ('From','deffromaddress'),
+                                   ('Subject', 'subj'),
                                    ]:
                 if query.has_key(pattern):
                     result[field] = query[pattern]
 
             if len(result.keys())>2:
                 ## Fixme: Create VFS node for attachments
-                return self.insert_message(result)
+                return self.insert_message(result,inode_template="y%s")
 
             else: return False
 
@@ -192,6 +232,7 @@ class YahooMailViewer(LiveCom.LiveMailViewer):
         ## This will not be filtered out because the parser thinks its
         ## just a string - so it will be executed in the browser after
         ## page loads.
+        
         tag.add_child("""<script>
         document.write('<style>* { visibility: visible; }</style>');
         </script>""")
@@ -205,3 +246,22 @@ class YahooMailViewer(LiveCom.LiveMailViewer):
             'href': "http://us.js2.yimg.com/us.js.yimg.com/lib/hdr/uhbt1_v27_1.8.css"
             })
         tag.add_child(new_tag)
+
+import pyflag.tests as tests
+import pyflag.pyflagsh as pyflagsh
+
+class YahooMailTests(tests.ScannerTest):
+    """ Test YahooMail Scanner """
+    test_case = "PyFlagTestCase"
+    test_file = "yahoomail_simple.pcap"
+    subsystem = "Standard"
+    fstype = "PCAP Filesystem"
+
+    def test01YahooMailScanner(self):
+        """ Test HTTP Scanner """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env,
+                             command="scan",
+                             argv=["*",                   ## Inodes (All)
+                                   "YahooMailScan",
+                                   ])                   ## List of Scanners
