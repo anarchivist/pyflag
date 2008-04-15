@@ -421,7 +421,7 @@ class DBO:
                    'server has gone away' in str or \
                    'Lost connection' in str:
                 pyflaglog.log(pyflaglog.VERBOSE_DEBUG,
-                            "Got DB Error: %s, %s" % (str,self.dbh))
+                            "Got DB Error: %s" % (str))
 
                 ## We terminate the current connection and reconnect
                 ## to the DB
@@ -879,3 +879,4 @@ class DBO:
         if not p_mysql.close():
             pass
     #        raise IOError("MySQL client exited with an error")
+

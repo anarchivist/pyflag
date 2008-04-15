@@ -31,6 +31,7 @@ import FileFormats.HTML as HTML
 import pyflag.ColumnTypes as ColumnTypes
 import pyflag.FileSystem as FileSystem
 import pyflag.FlagFramework as FlagFramework
+import pyflag.ColumnTypes as ColumnTypes
 
 class YahooMailScan(LiveCom.HotmailScanner):
     """ Detect YahooMail Sessions """
@@ -42,9 +43,9 @@ class YahooMailScan(LiveCom.HotmailScanner):
             ## We dont think its boring if our base class does not:
             ## And the data contains '<title>\s+Yahoo! Mail' in the top.
             if not Scanner.StoreAndScanType.boring(self, metadata, data=''):
-                m=re.search("<title>\s+Yahoo! Mail\s+-\s+([^< ]+)", data)
+                m=re.search("<title>[^<]+Yahoo! Mail", data)
                 if m:
-                    self.username = m.group(1)
+                    self.username = ''
                     ## Make a new parser:
                     if not self.parser:
                         self.parser =  HTML.HTMLParser(verbose=0)
@@ -57,12 +58,10 @@ class YahooMailScan(LiveCom.HotmailScanner):
 
             self.process_readmessage(fd)
             self.process_mail_listing()
-            #if self.process_send_message(fd) or self.process_readmessage(fd):
-            #    pass
+            self.process_send_message(fd)
 
         def process_mail_listing(self):
             """ This looks for the listing in the mail box """
-            #print self.parser.root
             table = self.parser.root.find("table",{"id":"datatable"})
             if not table: return False
             result = {'type': 'Listed', 'Message': table}
@@ -86,7 +85,16 @@ class YahooMailScan(LiveCom.HotmailScanner):
                                    ('CC','send_to_cc'),
                                    ('Bcc', 'send_to_bcc'),
                                    ('Subject', 'subject'),
-                                   ('Message', 'body')]:
+                                   ('Message', 'body'),
+
+                                   ## These apply for Yahoo Versions after 20080424:
+                                   ('Message', 'content'),
+                                   ('To', 'to'),
+                                   ('CC', 'cc'),
+                                   ('Bcc','bcc'),
+                                   ('From','defFromAddress'),
+                                   ('Subject', 'Subj'),
+                                   ]:
                 if query.has_key(pattern):
                     result[field] = query[pattern]
 
@@ -101,8 +109,45 @@ class YahooMailScan(LiveCom.HotmailScanner):
 
             ## Try to find the messageheader
             header = self.parser.root.find("table", {"class":"messageheader"})
-            if not header: return
+            if header: return self.process_message_yahoo1(result, header)
             
+            header = self.parser.root.find("div", {"class":"msgheader"})
+            if header: return self.process_message_yahoo2(result, header)
+
+        def process_message_yahoo2(self, result, header):
+            try:
+                result['Subject'] = header.find(".", {"id":"message_view_subject"}).innerHTML()
+            except AttributeError: pass
+
+            try:
+                date = header.find("div", {"id":"message_view_date"}).text()
+                result['Sent'] = ColumnTypes.guess_date(date).__str__()
+            except AttributeError: pass
+
+            context = None
+            for div in header.search("div"):
+                try:
+                    cls = div.attributes['class']
+                except KeyError: continue
+
+                if cls == "details" and context:
+                    if context not in result:
+                        result[context] = div.innerHTML()
+                    context = None
+
+                if cls == "label":
+                    a = div.text().strip()
+                    if a.startswith("To:"):
+                        context = "To"
+                    elif a.startswith("From:"):
+                        context = "From"
+                        
+            result['Message'] = header.innerHTML()
+
+            return result
+            
+        def process_message_yahoo1(self, result, header):
+            """ Handle Yahoo mail from old version (prior to 20080224) """
             ## Look through all its rows:
             context = None
             for td in header.search("td"):
@@ -114,13 +159,13 @@ class YahooMailScan(LiveCom.HotmailScanner):
                     context = None
 
                 data = td.innerHTML()
-                if data.lower().startswith('from:'):
+                if data.lower().strip().startswith('from:'):
                     context = 'From'
-                elif data.lower().startswith('to:'):
+                elif data.lower().strip().startswith('to:'):
                     context = 'To'
-                elif data.lower().startswith('date:'):
+                elif data.lower().strip().startswith('date:'):
                     context = 'Sent'
-                elif data.lower().startswith('subject:'):
+                elif data.lower().strip().startswith('subject:'):
                     context = 'Subject'
 
             ## Now the message:

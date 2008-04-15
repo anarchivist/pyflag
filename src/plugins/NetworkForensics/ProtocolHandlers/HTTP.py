@@ -282,7 +282,7 @@ class HTTPScanner(StreamScannerFactory):
             print "Cant parse %s as a time" % s
             return 0
 
-    def handle_parameters(self, request, id):
+    def handle_parameters(self, request, inode_id):
         """ Store the parameters of the request in the http_parameters
         table. We parse both GET and POST parameters here.
         """
@@ -296,7 +296,7 @@ class HTTPScanner(StreamScannerFactory):
             return
         
         ## We use pythons standard CGI module for parsing, this allows
-        ## us to handle both kinds on post encodings
+        ## us to handle both kinds of post encodings
         ## (multipart/form-data and
         ## application/x-www-form-urlencoded).
         body = request.get('body','')
@@ -309,26 +309,23 @@ class HTTPScanner(StreamScannerFactory):
         dbh = DB.DBO(self.case)
         result =cgi.parse(environ = env, fp = cStringIO.StringIO(body))
 
-        ## Merge in cookies if possible:
-        try:
-            cookie = request['cookie']
-            C = Cookie.SimpleCookie()
-            C.load(cookie)
-            for k in C.keys():
-                result[k] = (C[k].value,)
-        except KeyError: pass
-
         for key,value in result.items():
             ## Non printable keys are probably not keys at all.
-            if re.match("[^a-z0-9A-Z_]+",key): return
-            try:
-                value = value[0]
-            except: pass
-            
-            dbh.insert('http_parameters',
-                       inode_id = id,
+            if re.match("[^a-z0-9A-Z_]+",key): continue
+            value = result[key]
+            ## Deal with potentially very large uploads:
+            if len(value.value) > 1024:
+                path,inode,inode_id=self.fsfd.lookup(inode_id=inode_id)
+                print "Attachment %s of length %s" % (value.filename, len(value.value))
+                ## This is not quite correct at the moment because the
+                ## mime VFS driver is unable to reconstruct the file
+                ## from scratch
+                new_inode = inode + "|m%s" % count
+            else:
+                dbh.insert('http_parameters',
+                       inode_id = inode_id,
                        key = key,
-                       value = value)
+                       value = value.value)
             
     def process_stream(self, stream, factories):
         """ We look for HTTP requests to identify the stream. This
