@@ -84,30 +84,34 @@ import pyflag.pyflaglog as pyflaglog
 import textwrap
 import pyflag.HTMLUI as HTMLUI
 
+class WebMailTable(FlagFramework.CaseTable):
+    """ Table to store Web mail related information """
+    name = 'webmail_messages'
+    columns = [
+        [ InodeIDType, {} ],
+        [ InodeIDType, dict(column = 'parent_inode_id')],
+        [ StringType, dict(name="Service", column='service')],
+        [ StringType, dict(name='Type', column='type')],
+        [ StringType, dict(name='From', column='From')],
+        [ StringType, dict(name='To', column='To')],
+        [ StringType, dict(name='CC', column='CC')],
+        [ StringType, dict(name='BCC', column='BCC')],
+        [ StringType, dict(name='Subject', column='subject')],
+        [ StringType, dict(name='Message', column='message')],
+        [ StringType, dict(name='Identifier', column='message_id')],
+        [ TimestampType, dict(name='Sent', column='sent')],
+        ]
+
+class WebMailAttachmentTable(FlagFramework.CaseTable):
+    """ Table to store web mail attachment references """
+    name = "webmail_attachments"
+    columns = [
+        [ InodeIDType, dict(name = "Message Inode") ],
+        [ InodeIDType, dict(name = "Attachment", column="attachment") ],
+        ]
+
 class LiveTables(FlagFramework.EventHandler):
     def create(self, dbh, case):
-        dbh.execute(
-            """ CREATE table if not exists `live_messages` (
-            `id` int not null auto_increment,
-            `inode_id` int not null,
-            `parent_inode_id` int not null,
-            `service` VARCHAR(50),
-            `type` enum('Edit Read','Edit Sent','Read','Listed') default 'Edit Read',
-            `From` VARCHAR(250),
-            `To` VARCHAR(250),
-            `CC` VARCHAR(250),
-            `BCC` VARCHAR(250),
-            `Subject` VARCHAR(250),
-            `Message` Text,
-            `Sent` TIMESTAMP NULL,
-            primary key (`id`))""")
-
-        ## We need to keep the URL in case we find it later on
-        dbh.execute( """ CREATE table if not exists `live_message_attachments` (
-        `message_id` int NOT NULL,
-        `inode_id` int NULL,
-        `url` VARCHAR(500))""")
-
         ## This table keeps a record of http objects which may be used
         ## to assist with rendering. Often static content on web sites
         ## is cached for a long time in users browsers. This means
@@ -132,7 +136,7 @@ class HotmailScanner(Scanner.GenScanFactory):
         Scanner.GenScanFactory.multiple_inode_reset(self, inode_glob)
         dbh = DB.DBO(self.case)
         sql = fnmatch.translate(inode_glob)
-        dbh.delete("live_messages", where="inode_id in (select inode_id from inode where inode rlike %r)" % sql) 
+        dbh.delete("webmail_messages", where="inode_id in (select inode_id from inode where inode rlike %r)" % sql) 
     
     class Scan(Scanner.StoreAndScanType):
         types = (
@@ -287,24 +291,21 @@ class HotmailScanner(Scanner.GenScanFactory):
             
         def insert_message(self, result, inode_template="l%s"):
             dbh = DB.DBO(self.case)
-            dbh.insert('live_messages', service=self.service,
-                       parent_inode_id = self.fd.inode_id,
-                       **result)
-            
-            id = dbh.autoincrement()
 
             dbh.execute("select mtime from inode where inode_id = %r" , self.fd.inode_id)
             row = dbh.fetch()
 
             inode_id = self.ddfs.VFSCreate(self.fd.inode,
-                                           inode_template % id,
+                                           inode_template % self.fd.inode_id,
                                            "Message", mtime = row['mtime'],
                                            _fast = True)
 
-            dbh.update('live_messages',where = 'id = "%s"' % id,
-                       inode_id = inode_id)
+            dbh.insert('webmail_messages', service=self.service,
+                       parent_inode_id = self.fd.inode_id,
+                       inode_id = inode_id,
+                       **result)
             
-            return id
+            return inode_id
 
 class HTMLStringType(StringType):
     """ A ColumnType which sanitises its input for HTML.
@@ -346,16 +347,30 @@ class HTMLStringType(StringType):
 
 	result.text(value, wrap='full', font='typewriter')
 
-class LiveComMessages(Reports.report):
+class AttachmentColumn(InodeIDType):
+    """ Displays the attachments related to the webmail message """
+    def display(self, value, row, result):
+        dbh = DB.DBO(self.case)
+        dbh.execute("select file.inode_id as inode_id, name from file, webmail_attachments where webmail_attachments.inode_id = %r and file.inode_id = webmail_attachments.attachment", value)
+        for row in dbh:
+            link = result.__class__(result)
+            link.link(row['name'], FlagFramework.query_type(family = "Disk Forensics",
+                                                            report = "ViewFile",
+                                                            case = self.case,
+                                                            mode = 'Summary',
+                                                            inode_id = row['inode_id']))
+            result.row(link)
+
+class WebMailMessages(Reports.report):
     """
-    Browse LiveCom/Hotmail messages.
+    Browse WebMail messages.
     --------------------------------
 
-    This allows the results from the hotmail message scanner to be viewed.
+    This allows the results from the various webmail scanners to be viewed.
 
     """
 
-    name = "Browse Hotmail Messages"
+    name = "Browse WebMail Messages"
     family = "Network Forensics"
 
     def display(self, query, result):
@@ -368,10 +383,12 @@ class LiveComMessages(Reports.report):
                          StringType('BCC', 'BCC'),
                          StringType('Subject', 'Subject'),
                          HTMLStringType('Message','Message'),
+                         StringType('MessageID', 'message_id'),
+                         AttachmentColumn(name='Attachment',case = query['case']),
                          StringType('Type','type'),
                          StringType('Service','service'),
                          ],
-            table = 'live_messages',
+            table = 'webmail_messages',
             case = query['case']
             )
 
@@ -383,7 +400,7 @@ class TableViewer(FileSystem.StringIOFile):
 
     Format is 't%s:%s:%s:%s' % (table_name, column_name, value, column_to_retrieve (optional))
 
-    e.g. tlive_messages:id:2
+    e.g. twebmail_messages:id:2
     """
     specifier = 't'
 
@@ -433,7 +450,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
         parts = inode.split('|')
         self.id = parts[-1][1:]
         dbh = DB.DBO(case)
-        dbh.execute("select * from live_messages where id=%r", (self.id))
+        dbh.execute("select * from webmail_messages where id=%r", (self.id))
         row = dbh.fetch()
         if not row: raise RuntimeError("No such message %s" % self.id)
 
@@ -470,7 +487,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
         result.start_table(**{'class':'GeneralTable'})
         dbh = DB.DBO(self.case)        
         columns = ["service","type","From","To","CC","BCC","Sent","Subject","Message"]
-        dbh.execute("select * from live_messages where `id`=%r", self.id)
+        dbh.execute("select * from webmail_messages where `id`=%r", self.id)
         row = dbh.fetch()
         
         dbh2 = DB.DBO(self.case)
@@ -584,6 +601,6 @@ class HotmailTests(tests.ScannerTest):
                                    ])                   ## List of Scanners
 
         dbh = DB.DBO(self.test_case)
-        dbh.execute("select count(*) as c from live_messages")
+        dbh.execute("select count(*) as c from webmail_messages")
         row = dbh.fetch()
         self.assert_(row['c'] > 0, "No hotmail messages were found")

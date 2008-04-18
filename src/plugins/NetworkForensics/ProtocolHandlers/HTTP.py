@@ -333,7 +333,7 @@ class HTTPScanner(StreamScannerFactory):
             except: pass
 
             ## Deal with potentially very large uploads:
-            if len(value.value) > 1024:
+            if hasattr(value,'filename') and value.filename:
                 path,inode,inode_id=self.fsfd.lookup(inode_id=inode_id)
                 ## This is not quite correct at the moment because the
                 ## mime VFS driver is unable to reconstruct the file

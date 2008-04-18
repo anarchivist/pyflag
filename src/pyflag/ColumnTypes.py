@@ -567,6 +567,10 @@ class StringType(ColumnType,LogParserMixin):
         defaults.append(['regex','RegEx', r"[^\s]+"])
         defaults.append(['boundary', 'Boundary', r"\s+"])
 
+class LongStringType(StringType):
+    def create(self):
+        return "`%s` TEXT default NULL" % (self.column)
+
 class TimestampType(IntegerType):
     """
     This is a timestamp parser.
@@ -861,8 +865,8 @@ class InodeIDType(IntegerType):
               [ "=", "Itest", False ],
               ]
     
-    def __init__(self, **kwargs):
-        ColumnType.__init__(self,  name='Inode', column='inode_id', **kwargs)
+    def __init__(self, name='Inode', column='inode_id', **kwargs):
+        ColumnType.__init__(self,  name=name, column=column, **kwargs)
         self.table = 'inode'
 
     def operator_contains(self, column, operator, pattern):

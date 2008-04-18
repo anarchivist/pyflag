@@ -191,7 +191,7 @@ class Sleuthkit(DBFS):
             if inode.alloc:
                 status = 'alloc'
             else:
-                status = 'unalloc'
+                status = 'deleted'
 
             try:
                 f = fs.open(inode=str(inode))

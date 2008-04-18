@@ -1,5 +1,5 @@
 # ******************************************************
-# Copyright 2004: Commonwealth of Australia.
+# Copyright 2008: Commonwealth of Australia.
 #
 # Michael Cohen <scudette@users.sourceforge.net>
 #
@@ -94,6 +94,8 @@ class YahooMailScan(LiveCom.HotmailScanner):
 
             if result:
                 result['type']='Edit Read'
+                if self.username:
+                    result['From'] = self.username
                 
                 return self.insert_message(result, inode_template="y%s")
         
@@ -107,8 +109,8 @@ class YahooMailScan(LiveCom.HotmailScanner):
             if mail_box:
                 result['From'] = mail_box.innerHTML()
 
-            title = self.parser.root.find("title").innerHTML().split('-')[-1]
-            result['To'] = title
+            if self.username:
+                result['To'] = self.username
 
             return self.insert_message(result, inode_template = "y%s")
 
@@ -134,15 +136,24 @@ class YahooMailScan(LiveCom.HotmailScanner):
                                    ('Bcc','bcc'),
                                    ('From','deffromaddress'),
                                    ('Subject', 'subj'),
+                                   ('message_id', 'ym.gen'),
                                    ]:
                 if query.has_key(pattern):
                     result[field] = query[pattern]
 
-            if len(result.keys())>2:
-                ## Fixme: Create VFS node for attachments
-                return self.insert_message(result,inode_template="y%s")
+            if len(result.keys())<=2: return False
 
-            else: return False
+            new_inode_id = self.insert_message(result,inode_template="y%s")
+
+            ## Do attachments:
+            dbh.execute("select * from http_parameters where inode_id = %r and `key` like 'userFile%%'", self.fd.inode_id)
+            inodes = [ row['indirect'] for row in dbh if row['indirect'] ]
+            for inode in inodes:
+                dbh.insert('webmail_attachments',
+                           inode_id = new_inode_id,
+                           attachment = inode)
+                
+            return True
 
         def process_readmessage(self, fd):
             result = {'type': 'Read', 'Message':'' }
@@ -184,7 +195,7 @@ class YahooMailScan(LiveCom.HotmailScanner):
                         
             result['Message'] = header.innerHTML()
 
-            return result
+            return self.insert_message(result, inode_template = "y%s")
             
         def process_message_yahoo1(self, result, header):
             """ Handle Yahoo mail from old version (prior to 20080224) """
@@ -215,11 +226,15 @@ class YahooMailScan(LiveCom.HotmailScanner):
                 
             if 'Sent' in result:
                 result['Sent'] = ColumnTypes.guess_date(result['Sent'])
-            
+
+            ## Find the message id:
+            tag = header.find('input', dict(name='MsgId'))
+            if tag:
+                result['message_id'] = tag['value']
+
             if len(result.keys())>3:
-                return self.insert_message(result, inode_template = "y%s")            
-
-
+                return self.insert_message(result, inode_template = "y%s")
+            
 class YahooMailViewer(LiveCom.LiveMailViewer):
     """ This implements some fixups for Yahoo webmail messages """
     specifier = 'y'
@@ -245,6 +260,7 @@ class YahooMailViewer(LiveCom.LiveMailViewer):
             'type':'text/css','rel':'stylesheet',
             'href': "http://us.js2.yimg.com/us.js.yimg.com/lib/hdr/uhbt1_v27_1.8.css"
             })
+
         tag.add_child(new_tag)
 
 import pyflag.tests as tests

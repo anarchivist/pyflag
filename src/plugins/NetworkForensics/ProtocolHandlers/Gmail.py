@@ -156,7 +156,7 @@ class GmailScanner(LiveCom.HotmailScanner):
                                                    k, mtime = row['mtime'],
                                                    _fast = True)
                     
-                    dbh.insert("live_message_attachments",
+                    dbh.insert("webmail_message_attachments",
                                message_id = message_id,
                                inode_id = inode_id)
 
