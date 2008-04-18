@@ -528,3 +528,33 @@ class CaseConfiguration(Reports.report):
 
         ## Expire the parameters:
         dbh.DBH.get(query['case']).parameter_flush()
+
+class PyFlagStatistics(Reports.report):
+    """ Display statistics on the currently running pyflag
+    installation."""
+    parameters = {}
+    family = "Case Management"
+    name = "PyFlag Stats"
+
+    def display(self, query, result):
+        result.heading("PyFlag Statistics")
+        dbh = DB.DBO()
+        dbh.execute("select count(*) as count from jobs where state='pending'")
+        row = dbh.fetch()
+        result.row("Version", config.VERSION)
+        result.row("Outstanding jobs", row['count'])
+
+        cdbh = DB.DBO(query['case'])
+        cdbh.execute("select count(*) as count from inode")
+        row = cdbh.fetch()
+        result.row("Total Inodes in VFS", row['count'])
+        result.end_table()
+
+        
+        pyflaglog.render_system_messages(result)
+
+        def info_cb(query,result):
+            result.heading("PyFlag Plugins")
+            result.text(FlagFramework.print_info(), font='typewriter')
+            
+        result.toolbar(cb=info_cb, icon="question.png")

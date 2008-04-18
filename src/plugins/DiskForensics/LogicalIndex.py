@@ -558,7 +558,29 @@ class LogicalIndexTests(unittest.TestCase):
 
         for id,v in expected.items():
             self.assertEqual(v,[],"Some terms were not found. Expected %s to find %s" % (dictionary[id],v))
-            
+
+class LogicalIndexMemoryTest(LogicalIndexTests):
+    """ Test memory leaks under the indexer """
+
+    total_size = 100*1024*1024
+    
+    def test01IndexTest(self):
+        """ Test memory footprint of indexing engine """
+        dictionary = { 5:"hello", 10:"world", 15:"hell",
+                               20:"this", 40:"is", 60:"a test" }
+        idx = self.build_idx(dictionary)
+        
+        line = "Hello cruel world, this is a test of indexing" * 1024
+        size = self.total_size
+        while size>0:
+            size -= len(line)
+            matching_words = []
+            for offset, matches in idx.index_buffer(line):
+                for id , length in matches:
+                    word = dictionary[id]
+                    matched = line[offset:offset+length]
+                    matching_words.append(matched)
+        
 import pyflag.pyflagsh as pyflagsh
 from pyflag.FileSystem import DBFS
 

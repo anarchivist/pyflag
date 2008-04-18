@@ -487,7 +487,7 @@ if __name__ == "__main__":
     config.parse_options()
 
     if config.info:
-        FlagFramework.print_info()
+        print FlagFramework.print_info()
         sys.exit(0)
     
     flag = FlagFramework.Flag()

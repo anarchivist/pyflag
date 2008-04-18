@@ -898,7 +898,7 @@ def inet_aton(address):
     return struct.unpack("I", socket.inet_aton(address))[0]
 
 def print_info():
-    print "PyFlag installation information:"
+    result = "PyFlag installation information:"
     for heading, registry in (("Scanners", "SCANNERS"),
                               ("VFS File drivers", "VFS_FILES"),
                               ("Shell commands", "SHELL_COMMANDS"),
@@ -908,12 +908,12 @@ def print_info():
                               ("Case Tables", "CASE_TABLES"),
                               ("Magic Handlers", "MAGIC_HANDLERS"),
                               ):
-        print "%s:\n%s\n" % (heading, '-' * len(heading))
+        result += "\n%s:\n%s\n" % (heading, '-' * len(heading))
         registry = getattr(Registry, registry)
         for cls in registry.classes:
-            print "%s: %s" % (cls, cls.__doc__)
+            result+= "%s: %s\n" % (cls, cls.__doc__)
 
-        print
+    return result
 
 class CaseTable:
     name = None

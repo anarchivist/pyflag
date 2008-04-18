@@ -353,16 +353,7 @@ class ScanFS(Reports.report):
 
         result.para("%s jobs pending (all cases)" % jobs)
         result.para("The following scanners are used: %s" % scanners)
-        result.row("System messages:")
-        dbh.execute("select count(*) as size from logs")
-        size = dbh.fetch()['size']
-        pagesize=20
-        dbh.execute("select timestamp,level,message from logs limit %s, %s", (max(size-pagesize,0), pagesize))
-        data = '\n'.join(["%(timestamp)s(%(level)s): %(message)s" % row for row in dbh])
-        tmp=result.__class__(result)
-        tmp.text(data,font='typewriter',style="red")
-        result.row(tmp)
-        
+        pyflaglog.render_system_messages(result)
 
     def display(self,query,result):
         ## Reset the report cache for us - this eliminates the bug
