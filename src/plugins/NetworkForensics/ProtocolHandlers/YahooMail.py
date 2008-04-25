@@ -65,11 +65,13 @@ class YahooMailScan(LiveCom.HotmailScanner):
             except:
                 pass
 
-            self.process_readmessage(fd)
-            self.process_mail_listing()
-            self.process_edit_read()
-            self.process_send_message(fd)
-
+            ## Find out what kind on message this is:
+            self.process_readmessage(fd) or \
+                  self.process_mail_listing() or \
+                  self.process_edit_read() or \
+                  self.process_send_message(fd) or\
+                  self.process_main_page()
+                                         
         def process_edit_read(self):
             """ Process when an edit box is read from the server """
             root = self.parser.root
@@ -98,6 +100,14 @@ class YahooMailScan(LiveCom.HotmailScanner):
                     result['From'] = self.username
                 
                 return self.insert_message(result, inode_template="y%s")
+
+        def process_main_page(self):
+            """ Search for a main page """
+            result = {'type': 'Front Page'}
+            if self.parser.root.find("div",{"class":"toptitle"}):
+                result['message'] = "Front Page"
+
+            return self.insert_message(result, inode_template = "y%s")
         
         def process_mail_listing(self):
             """ This looks for the listing in the mail box """
@@ -141,7 +151,7 @@ class YahooMailScan(LiveCom.HotmailScanner):
                 if query.has_key(pattern):
                     result[field] = query[pattern]
 
-            if len(result.keys())<=2: return False
+            if len(result.keys())<=3: return False
 
             new_inode_id = self.insert_message(result,inode_template="y%s")
 
@@ -149,14 +159,21 @@ class YahooMailScan(LiveCom.HotmailScanner):
             dbh.execute("select * from http_parameters where inode_id = %r and `key` like 'userFile%%'", self.fd.inode_id)
             inodes = [ row['indirect'] for row in dbh if row['indirect'] ]
             for inode in inodes:
-                dbh.insert('webmail_attachments',
-                           inode_id = new_inode_id,
-                           attachment = inode)
+                if new_inode_id > 1:
+                    dbh.insert('webmail_attachments',
+                               inode_id = new_inode_id,
+                               attachment = inode)
                 
             return True
 
         def process_readmessage(self, fd):
             result = {'type': 'Read', 'Message':'' }
+
+            dbh = DB.DBO(self.case)
+            dbh.execute("select value from http_parameters where inode_id = %r and `key`='MsgId'", self.fd.inode_id)
+            row = dbh.fetch()
+            if row:
+                result['MessageID'] = row['value']
 
             ## Try to find the messageheader
             header = self.parser.root.find("table", {"class":"messageheader"})
