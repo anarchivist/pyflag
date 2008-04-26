@@ -2055,7 +2055,7 @@ ntfs_proc_attrseq(NTFS_INFO * ntfs,
 
                 /* add to the end of the existing list */
                 fs_name->next = (TSK_FS_INODE_NAME_LIST *)
-                    talloc_size(fs_name, sizeof(TSK_FS_INODE_NAME_LIST));
+                    talloc_size(fs_inode, sizeof(TSK_FS_INODE_NAME_LIST));
                 if (fs_name->next == NULL) {
                     return 1;
                 }
@@ -2065,7 +2065,7 @@ ntfs_proc_attrseq(NTFS_INFO * ntfs,
             else {
                 /* First name, so we start a list */
                 fs_inode->name = fs_name = (TSK_FS_INODE_NAME_LIST *)
-                    talloc_size(fs_name, sizeof(TSK_FS_INODE_NAME_LIST));
+                    talloc_size(fs_inode, sizeof(TSK_FS_INODE_NAME_LIST));
                 if (fs_name == NULL) {
                     return 1;
                 }
