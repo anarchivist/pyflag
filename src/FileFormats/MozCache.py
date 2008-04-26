@@ -132,11 +132,9 @@ class CacheEntry(SimpleStruct):
         [ 'DataSize', BEULONG ],
         [ 'KeySize', BEULONG ],
         [ 'MetaDataSize', BEULONG ],
-        [ 'KeyData', STRING, dict(length= lambda x: x['KeySize'])],
+        [ 'KeyData', STRING, dict(length= lambda x: int(x['KeySize'])-1)],
         [ 'MetaData', CacheMetaData, dict(length= lambda x: x['MetaDataSize'])],
         ]
-
-blocksizes = [256, 1024, 4096]
 
 class MozCache:
     def __init__(self, path):
@@ -150,37 +148,26 @@ class MozCache:
         self.map_buffer = Buffer(fd=self.map_fd)
         self.mapfile = MapFile(self.map_buffer)
 
+    def records(self):
+        for record in self.mapfile['CacheRecords']:
+    	    if record['DataLocation']['Reserved'] or record['MetaLocation']['Reserved']:
+    		    continue
+
+            if record['HashNumber'] != 0 and record['DataLocation']['DataLocationInitialized'] == True:
+                yield self.get_entry(record['MetaLocation'])
+        
     def get_entry(self, location):
         fd = self.data_fds[location['DataFile']-1]
         fd.seek(0)
-        offset = location['DataBlockSize'] * location['DataStartBlock']
-        buffer = Buffer(fd=fd, offset=location['DataBlockSize'] * location['DataStartBlock'])
-        print "reading offset: %s(%s*%s) from file %s" % (offset, location['DataBlockSize'], location['DataStartBlock'], location['DataFile']-1)
+        offset = 4096 + location['DataBlockSize'] * location['DataStartBlock']
+        buffer = Buffer(fd=fd, offset=offset)
         return CacheEntry(buffer)
 
 def print_map(mapfile):
     mozcache = MozCache(sys.argv[1])
-    print mozcache.mapfile
-    internal = 0
-    external = 0
-    error = 0
-    for record in mozcache.mapfile['CacheRecords']:
-    	if record['DataLocation']['Reserved'] or record['MetaLocation']['Reserved']:
-    		continue
-
-        if record['HashNumber'] != 0 and record['DataLocation']['DataLocationInitialized'] == True:
-        	print record
-        	try:
-    		    meta = mozcache.get_entry(record['MetaLocation'])
-    		    print meta
-    		    external += 1
-    		except Exception, e:
-    		    print Exception, e
-    		    error += 1
-    		#print "%Xd01" % record['HashNumber']
-
-    print error
-    print external
+    #print mozcache.mapfile
+    for entry in mozcache.records():
+    	print entry['KeyData']
 
 if __name__ == "__main__":
 	print_map(sys.argv[1])
