@@ -420,6 +420,12 @@ class LONG_ARRAY(ARRAY):
 class ULONG_ARRAY(ARRAY):
     target_class = ULONG
 
+class BELONG_ARRAY(ARRAY):
+    target_class = BELONG
+
+class BEULONG_ARRAY(ARRAY):
+    target_class = BEULONG
+
 class STRING(BYTE):
     visible = True
     
