@@ -55,7 +55,8 @@ class Tag:
 
     def __str__(self):
         attributes = "".join([" %s='%s'" % (k,urllib.quote(v)) for k,v \
-                               in self.attributes.items()])
+                              in self.attributes.items() if v ])
+        
         if self.type == 'selfclose':
             return "<%s%s/>" % (self.name, attributes)
         else:

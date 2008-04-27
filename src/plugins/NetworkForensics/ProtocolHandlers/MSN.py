@@ -1533,7 +1533,6 @@ class Message:
                     print e
                     pyflaglog.log(pyflaglog.WARNINGS,  "Could not determine "\
                                                       "the path to the inode.")
-                    #raise
 
                 ## The filename and size is given in the context
                 new_inode_id = self.ddfs.VFSCreate(None,

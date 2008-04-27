@@ -65,7 +65,8 @@ for regex in config.args:
         new_filename = "%s/case_%s/xHTTP%s" % (config.RESULTDIR, config.case, row['id'])
         print "Retriving %s into %s" % (row['url'], new_filename) ,
         try:
-            filanem, headers = urllib.urlretrieve(row['url'], new_filename)
+            url = urllib.unquote(row['url'])
+            filanem, headers = urllib.urlretrieve(url, new_filename)
             dbh2.update("http_sundry", where="id = %s" % row['id'],
                        _fast = True,
                        present = 'yes')

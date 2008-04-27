@@ -278,6 +278,11 @@ class YahooMailViewer(LiveCom.LiveMailViewer):
             'href': "http://us.js2.yimg.com/us.js.yimg.com/lib/hdr/uhbt1_v27_1.8.css"
             })
 
+        ## There are various visibility:hiddens all through the place:
+        for style in root.search("style"):
+            try:
+                style.children[0] = style.children[0].replace("visibility:hidden","")
+            except: pass
         tag.add_child(new_tag)
 
 import pyflag.tests as tests

@@ -490,7 +490,7 @@ class HTTPScanner(StreamScannerFactory):
             ## handle the request's parameters:
             try:
                 self.handle_parameters(p.request, inode_id)
-            except KeyError:
+            except (KeyError, TypeError):
                 pass
 
             ## Only scan the new file using the scanner train if its

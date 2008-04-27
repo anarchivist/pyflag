@@ -543,7 +543,7 @@ class Export(Farm.Task):
                             table_renderer = table_renderer)
                 data = fd.html_export(tag_class = tag)
                 table_renderer.add_file_from_string(filename, data)
-        except AttributeError:
+        except AttributeError,e:
             pass
 
 def render_html(self, inode_id, table_renderer):

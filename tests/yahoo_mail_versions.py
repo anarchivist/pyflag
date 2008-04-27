@@ -8,6 +8,7 @@ from optparse import OptionParser
 import sys, re
 import pyflag.DB as DB
 import pyflag.FileSystem as FileSystem
+import FileFormats.HTML as HTML
 
 Registry.Init()
 
@@ -31,6 +32,18 @@ YahooMailScan = Registry.SCANNERS.dispatch("YahooMailScan")
 def insert_message(self, result, inode_template = "l%s"):
     ## We dont really want to touch the db in here - just print it out
     ## nicely:
+    try:
+        ## Try to render the html as text:
+        message = result['Message'].__str__()
+        p = HTML.HTMLParser(tag_class = HTML.TextTag)
+        p.feed(message)
+        p.close()
+
+        result['Message'] = p.root.__str__()
+        
+    except KeyError:
+        pass
+    
     for k,v in result.items():
         print "   %s: %r" % (k,v)
 
@@ -44,6 +57,7 @@ dbh.execute("select * from http where url like '%yahoo.com/ym/%'")
 factory = YahooMailScan(fsfd)
 
 for row in dbh:
+    if not row['inode_id']: continue
     print "-----------------------------"
     print "Inode_id = %s" % row['inode_id']
     print "URL = %s" % row['url']

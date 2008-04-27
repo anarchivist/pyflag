@@ -478,9 +478,10 @@ class LiveMailViewer(FileSystem.StringIOFile):
             parser.feed(HTML.decode(self.message))
             #parser.feed(self.message)
             parser.close()
-            result = HTML.decode(parser.root.__str__())
+            result = parser.root.__str__()
             result = textwrap.fill(result)
-            edit_area.add_child(parser.root)
+            #edit_area.add_child(parser.root)
+            edit_area.add_child(result)
             edit_area.name = 'div'
 
     def stats(self, query,result):
