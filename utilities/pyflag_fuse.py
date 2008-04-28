@@ -37,6 +37,11 @@ def flag2mode(flags):
 
     return m
 
+class FuseError(IOError):
+    def __init__(self, message='',errno=1):
+        self.errno = errno
+        IOError.__init__(self,message)
+
 class PyFlagVFS(Fuse):
     def __init__(self, *args, **kw):
         Fuse.__init__(self, *args, **kw)
@@ -68,37 +73,37 @@ class PyFlagVFS(Fuse):
             yield fuse.Direntry(e)
 
     def unlink(self, path):
-        raise IOError("Unable to modify Virtual Filesystem")
+        raise FuseError("Unable to modify Virtual Filesystem")
 
     def rmdir(self, path):
-        raise IOError("Unable to modify Virtual Filesystem")
+        raise FuseError("Unable to modify Virtual Filesystem")
 
     def symlink(self, path, path1):
-        raise IOError("Unable to modify Virtual Filesystem")
+        raise FuseError("Unable to modify Virtual Filesystem")
 
     def rename(self, path, path1):
-        raise IOError("Unable to modify Virtual Filesystem")
+        raise FuseError("Unable to modify Virtual Filesystem")
 
     def link(self, path, path1):
-        raise IOError("Unable to modify Virtual Filesystem")
+        raise FuseError("Unable to modify Virtual Filesystem")
 
     def chmod(self, path, mode):
-        raise IOError("Unable to modify Virtual Filesystem")
+        raise FuseError("Unable to modify Virtual Filesystem")
 
     def chown(self, path, user, group):
-        raise IOError("Unable to modify Virtual Filesystem")
+        raise FuseError("Unable to modify Virtual Filesystem")
 
     def truncate(self, path, size):
-        raise IOError("Unable to modify Virtual Filesystem")
+        raise FuseError("Unable to modify Virtual Filesystem")
     
     def mknod(self, path, mode, dev):
-        raise IOError("Unable to modify Virtual Filesystem")
+        raise FuseError("Unable to modify Virtual Filesystem")
     
     def mkdir(self, path, mode):
-        raise IOError("Unable to modify Virtual Filesystem")
+        raise FuseError("Unable to modify Virtual Filesystem")
 
     def utime(self, path, times):
-        raise IOError("Unable to modify Virtual Filesystem")
+        raise FuseError("Unable to modify Virtual Filesystem")
 
     def access(self, path, mode):
         pass
@@ -157,6 +162,10 @@ def print_help():
 ## Hook onto the print_help
 config.optparser.print_help = print_help
 
+config.set_usage("""%prog [options] mountpoint
+PyFlag FUSE Filesystem: mounts the pyflag VFS into the operating system fs.""",
+                 version = "Version: %%prog PyFlag %s" % config.VERSION)
+
 def main():
     config.add_option("debug",short_option='d', default=False, action='store_true',
                       help = "Fuse Debug")
@@ -187,18 +196,11 @@ def main():
         pyflaglog.log(pyflaglog.ERRORS, "You must specify only one mount point")
         sys.exit(-1)
         
-    usage = """
-PyFlag FUSE Filesystem: mounts the pyflag VFS into the operating system fs.
-
-""" + Fuse.fusage
-
-    server = PyFlagVFS(version="%prog " + fuse.__version__,
-                 usage=usage,
-                 dash_s_do='setsingle')
+    server = PyFlagVFS(dash_s_do='setsingle')
     
     server.fuse_args.mountpoint = config.args[0]
-    print "Mounting on %s" % server.fuse_args.mountpoint
-
+    pyflaglog.log(pyflaglog.DEBUG,"Mounting on %s" % server.fuse_args.mountpoint)
+    
     args = ['-s']
     if config.debug: args.append("-d")
     if config.foreground: args.append("-f")
