@@ -1,6 +1,28 @@
 #!/usr/bin/env python
+# ******************************************************
+# David Collett <daveco@users.sourceforge.net>
 #
-
+# ******************************************************
+#  Version: FLAG $Version: 0.86RC1 Date: Thu Jan 31 01:21:19 EST 2008$
+# ******************************************************
+#
+# * This program is free software; you can redistribute it and/or
+# * modify it under the terms of the GNU General Public License
+# * as published by the Free Software Foundation; either version 2
+# * of the License, or (at your option) any later version.
+# *
+# * This program is distributed in the hope that it will be useful,
+# * but WITHOUT ANY WARRANTY; without even the implied warranty of
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# * GNU General Public License for more details.
+# *
+# * You should have received a copy of the GNU General Public License
+# * along with this program; if not, write to the Free Software
+# * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# ******************************************************
+"""
+Utility to mount the PyFlag Virtual FileSystem using fuse.
+"""
 import os, sys
 from errno import *
 from stat import *
@@ -38,6 +60,9 @@ def flag2mode(flags):
     return m
 
 class FuseError(IOError):
+    """ A class to raise when we want to signal an error from the
+    fs. Errnos are taken from /usr/include/asm-generic/errno-base.h
+    """
     def __init__(self, message='',errno=1):
         self.errno = errno
         print message
@@ -136,6 +161,12 @@ class PyFlagVFS(Fuse):
 
         def fgetattr(self):
             return self.fs.lstat(path=self.path)
+
+        def direct_io(self, *args, **kwargs):
+            raise FuseError("Direct IO not supported")
+
+        def keep_cache(self, *args, **kwargs):
+            raise FuseError("Direct IO not supported")
 
     def main(self, *a, **kw):
 
