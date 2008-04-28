@@ -40,6 +40,7 @@ def flag2mode(flags):
 class FuseError(IOError):
     def __init__(self, message='',errno=1):
         self.errno = errno
+        print message
         IOError.__init__(self,message)
 
 class PyFlagVFS(Fuse):
@@ -52,7 +53,11 @@ class PyFlagVFS(Fuse):
 
     def getattr(self, path):
         path = os.path.normpath("%s/%s" % (self.root, path))
-        result = self.fs.lstat(path=path)
+        try:
+            result = self.fs.lstat(path=path)
+        except RuntimeError,e:
+            raise FuseError("%s Not found" % path, 2)
+        
         if not result:
             return os.stat_result((16877, 1L, 1, 1, 0, 0, 4096L, 0, 0, 0))
 
@@ -61,7 +66,7 @@ class PyFlagVFS(Fuse):
     def readlink(self, path):
         result = self.fs.readlink(path)
         if not result:
-            raise OSError("Cannot read symbolic link %s" % path)
+            raise FuseError("Cannot read symbolic link %s" % path, 2)
 
         return result
 
@@ -124,7 +129,7 @@ class PyFlagVFS(Fuse):
             return self.file.read(length)
 
         def write(self, buf, offset):
-            raise IOError("Unable to write to forensic filesystem on %s" % path)
+            raise FuseError("Unable to write to forensic filesystem on %s" % path)
 
         def release(self, flags):
             self.file.close()
