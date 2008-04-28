@@ -209,6 +209,18 @@ class FileSystem:
                 metadata['magic'] = ''
         
         return 10
+
+    def lstat(self,path):
+        """ standards compliant 'stat' returns a stat_result """
+        pass
+
+    def readlink(self,path):
+        """ return value of a symbolic link """
+        pass
+
+    def listdir(self,path):
+        """ standards compliant listdir, generates directory entries. """
+        return self.ls(path)
     
 class DBFS(FileSystem):
     """ Class for accessing filesystems using data in the database """
@@ -489,6 +501,48 @@ class DBFS(FileSystem):
         for c in scanners:
             c.destroy()
 
+    def lstat(self,path):
+        """ standards compliant 'stat' returns a stat_result """
+        dbh=DB.DBO(self.case)
+        path, inode, inode_id = self.lookup(path)
+
+        if not inode_id:
+            return None
+
+        dbh.check_index('inode','inode')
+        dbh.execute("select inode_id, inode, uid, gid, unix_timestamp(mtime) as mtime, unix_timestamp(atime) as atime, unix_timestamp(ctime) as ctime, mode, links, size from inode where inode_id=%r limit 1",(inode_id))
+        result = dbh.fetch()
+        if not result:
+            return None
+
+        if self.isdir(path): 
+            result['mode'] = 16877
+        else:
+            result['mode'] = 33188
+
+        result = os.stat_result((result['mode'],1,0,result['links'] or 0,result['uid'] or 0,result['gid'] or 0,result['size'] or 0,result['atime'] or 0,result['mtime'] or 0,result['ctime'] or 0))
+
+        return result
+
+    def readlink(self,path):
+        """ return value of a symbolic link """
+        dbh=DB.DBO(self.case)
+        path, inode, inode_id = self.lookup(path)
+
+        if not inode_id:
+            return None
+
+        dbh.check_index('inode','inode')
+        dbh.execute("select link from inode where inode_id=%r limit 1",(inode_id))
+        row = dbh.fetch()
+        if not row:
+            return None
+        return row['link']
+
+    def listdir(self,path):
+        """ standards compliant listdir, generates directory entries. """
+        return self.ls(path)
+ 
 ## These are some of the default views that will be seen in View File
 def goto_page_cb(query,result,variable):
     try:

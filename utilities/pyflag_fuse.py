@@ -1,34 +1,16 @@
-""" This script implements a fuse filesystem for access to the pyflag virtual filesystem.
+#!/usr/bin/env python
+#
 
-Fuse (http://fuse.sourceforge.net/) is a system for implementing filesystems in userspace. The advantage of Fuse over kernel level filesystem drivers is that due to it being implemented in userspace, the filesystem can be quite complex.
+import os, sys
+from errno import *
+from stat import *
+import fcntl
 
-This implementation allows access to the pyflag VFS using fuse. After mounting the filesystem it is possible to use arbitrary software directly on the VFS files, even if the files are completely virtual.
+import fuse
+from fuse import Fuse
 
-Installation:
----------------
-To install fuse you can either download the source from the fuse web site or:
-
-apt-get install fuse-utils fuse-source python-fuse
-
-cd /usr/src/
-tar xvzf fuse.tar.gz
-cd modules/fuse/
-./configure && make && make install
-
-Mounting the fuse filesystem:
-----------------------------------
-To mount the filesystem (from within the pyflag main directory):
-
-fusermount /mnt/point/ ./launch.sh utilities/pyflag_fuse.py -case demo -filesystem fs
-
-Now you can just use the VFS within /mnt/point.
-
-to unmount:
-fusemount -u /mnt/point
-
-Note that you do not need to be root as long as fusemount is suid root.
-"""
-from fuse import Fuse        
+import pyflag.conf
+config = pyflag.conf.ConfObject()
 import pyflag.DB as DB
 import pyflag.IO as IO
 import pyflag.FileSystem as FileSystem
@@ -36,47 +18,60 @@ import pyflag.Registry as Registry
 
 Registry.Init()
 
-import os,sys
-from errno import *
-from stat import *
+#config.add_option("case", default=None,
+#                  help="Case to load the files into (mandatory). Case must have been created already.")
 
-import thread
+#config.parse_options(final=False)
 
-class Xmp(Fuse):
-    def __init__(self, *args, **kw):    
+if not hasattr(fuse, '__version__'):
+    raise RuntimeError, \
+        "your fuse-py doesn't know of fuse.__version__, probably it's too old."
+
+fuse.fuse_python_api = (0, 2)
+
+fuse.feature_assert('stateful_files', 'has_init')
+
+def flag2mode(flags):
+    md = {os.O_RDONLY: 'r', os.O_WRONLY: 'w', os.O_RDWR: 'w+'}
+    m = md[flags & (os.O_RDONLY | os.O_WRONLY | os.O_RDWR)]
+
+    if flags | os.O_APPEND:
+        m = m.replace('w', 'a', 1)
+
+    return m
+
+class PyFlagVFS(Fuse):
+
+    def __init__(self, *args, **kw):
         Fuse.__init__(self, *args, **kw)
-        self.case=kw['case']
-        io=IO.open(self.case,kw['filesystem'])
-        self.fs=Registry.FILESYSTEMS.fs['DBFS'](self.case,kw['filesystem'],io)
-        
-    def mythread(self):
-    
-        """
-        The beauty of the FUSE python implementation is that with the python interp
-        running in foreground, you can have threads
-        """    
-        print "mythread: started"
-    flags = 1
-    
+
+        self.case="test"
+        self.fs = FileSystem.DBFS(case=self.case)
+        self.root = '/'
+
     def getattr(self, path):
-        if path=='/': return (16877, 1L, 0L, 3L, 0, 0, 8192L, 0, 0, 0)
+        print "get getattr for %s" % path
+        if path=='/': 
+            return os.stat_result((16877, 1L, 1, 1, 0, 0, 4096L, 0, 0, 0))
 
-        result = self.fs.istat(path=path)
+        result = self.fs.lstat(path=path)
+        if not result: 
+            raise OSError("Unable to stat file %s" % path)
 
-        if not result: raise IOError("Unable to stat file %s" % path)
-        ## The mode is actually stored as octal
-        if self.fs.isdir(path): result['mode']="40"+("%s" % result['mode'])[-3:]
-        mode = int("%s"%result['mode'],8)
-        result = ( mode,1,0,result['links'],result['uid'],result['gid'],result['size'],result['atime_epoch'],result['mtime_epoch'],result['ctime_epoch'])
         return result
 
     def readlink(self, path):
-        raise IOError("No symbolic links supported on forensic filesystem at %s" % path)
+        result = self.fs.readlink(path)
+        if not result:
+            raise OSError("Cannot read symbolic link %s" % path)
 
-    def getdir(self, path):
-        if not path.endswith('/'): path=path+'/'
-        result = [ (x,0) for x in self.fs.ls(path=path) ]
         return result
+
+    def readdir(self, path, offset):
+        if not path.endswith('/'): path=path+'/'
+        for e in self.fs.ls(path=path):
+            if e == "": continue
+            yield fuse.Direntry(e)
 
     def unlink(self, path):
         raise IOError("Unable to modify Virtual Filesystem")
@@ -111,55 +106,64 @@ class Xmp(Fuse):
     def utime(self, path, times):
         raise IOError("Unable to modify Virtual Filesystem")
 
-    def open(self, path, flags):
-        self.fs.open(path=path)
-        return 0
-    
-    def read(self, path, len, offset):
-    	f = self.fs.open(path=path)
-    	f.seek(offset)
-    	return f.read(len)
-    
-    def write(self, path, buf, off):
-        raise IOError("Unable to write to forensic filesystem on %s" % path)
-    
-    def release(self, path, flags):
-        return 0
+    def access(self, path, mode):
+        pass
 
     def statfs(self):
-        """
-        Should return a tuple with the following 6 elements:
-            - blocksize - size of file blocks, in bytes
-            - totalblocks - total number of blocks in the filesystem
-            - freeblocks - number of free blocks
-            - totalfiles - total number of file inodes
-            - freefiles - nunber of free file inodes
-    
-        Feel free to set any of the above values to 0, which tells
-        the kernel that the info is not available.
-        """
-        blocks_size = 1024
-        blocks = 100000
-        blocks_free = 25000
-        files = 100000
-        files_free = 60000
-        namelen = 80
-        return (blocks_size, blocks, blocks_free, files, files_free, namelen)
+        return fuse.StatVfs()
 
-    def fsync(self, path, isfsyncfile):
-        return 0
-    
+    class PyFlagVFSFile(object):
+
+        def __init__(self, path, flags, *mode):
+            self.case="test"
+            self.fs = FileSystem.DBFS(case=self.case)
+            self.path = path
+            self.file = self.fs.open(path=self.path)
+
+        def read(self, length, offset):
+            self.file.seek(offset)
+            return self.file.read(length)
+
+        def write(self, buf, offset):
+            raise IOError("Unable to write to forensic filesystem on %s" % path)
+
+        def release(self, flags):
+            self.file.close()
+
+        def fgetattr(self):
+            return self.fs.lstat(path=self.path)
+
+    def main(self, *a, **kw):
+
+        self.file_class = self.PyFlagVFSFile
+        return Fuse.main(self, *a, **kw)
+
+
+def main():
+
+    usage = """
+PyFlag FUSE Filesystem: mounts the pyflag VFS into the operating system fs.
+
+""" + Fuse.fusage
+
+    server = Xmp(version="%prog " + fuse.__version__,
+                 usage=usage,
+                 dash_s_do='setsingle')
+
+    server.parser.add_option(mountopt="root", metavar="PATH", default='/',
+                             help="mirror filesystem from under PATH [default: %default]")
+    server.parser.add_option("-c","--case",default=None,help="Case to open")
+    server.parse(values=server, errex=1)
+
+    try:
+        if server.fuse_args.mount_expected():
+            os.chdir(server.root)
+    except OSError:
+        print >> sys.stderr, "can't enter root of underlying filesystem"
+        sys.exit(1)
+
+    server.main()
+
+
 if __name__ == '__main__':
-    import optparse
-    parser = optparse.OptionParser(usage = "Fuse filesystem providing access to the pyflag VFS.\n Usage: fusermount /mnt/point/ ./launch.sh utilities/pyflag_fuse.py --case demo --filesystem fs\n", version="%prog version 0.1")
-    parser.add_option("-c","--case",default=None,help="Case to open")
-    parser.add_option("-f","--filesystem",default=None,help="Filesystem to open (must be already loaded)")
-    (options, args) = parser.parse_args()
-    if not options.case or not options.filesystem:
-        print "You must specify both case and filesystem. Try -h for help."
-        sys.exit(-1)
-    else:
-        server = Xmp(case=options.case,filesystem=options.filesystem)
-        server.flags = 0
-        server.multithreaded = 1;
-        server.main()
+    main()
