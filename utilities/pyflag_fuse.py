@@ -140,9 +140,16 @@ def print_help():
     ## seem to be passed.
     self = config.optparser
     print self.format_help()
-    
-    ## This is so stupid - we need to create a whole instance to
-    ## get the underlying library to print help...
+
+    ## This is so stupid - we need to create a whole instance to get
+    ## the underlying library to print help... and the library insists
+    ## on printing to stderr while we do to stdout... This hackery is
+    ## to make it do what we want.
+    sys.stdout.flush()
+    errfd = sys.stderr.fileno()
+    os.close(errfd)
+    os.dup2(sys.stdout.fileno(), errfd)
+
     t = PyFlagVFS()
     t.fuse_args.setmod('showhelp')
     t.main()
@@ -192,8 +199,6 @@ PyFlag FUSE Filesystem: mounts the pyflag VFS into the operating system fs.
     server.fuse_args.mountpoint = config.args[0]
     print "Mounting on %s" % server.fuse_args.mountpoint
 
-    #print server.parser.option_list
-    #server.parser.add_option("-c","--case",default=None,help="Case to open")
     args = ['-s']
     if config.debug: args.append("-d")
     if config.foreground: args.append("-f")
