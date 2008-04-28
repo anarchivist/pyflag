@@ -400,7 +400,7 @@ class DBFS(FileSystem):
 
             dbh.check_index('file','path', 200)
             dbh.check_index('file','name', 200)
-            dbh.execute("select inode,inode_id from file where path=%r and (name=%r or name=concat(%r,'/')) and inode!='' limit 1", (dir+'/',name,name))
+            dbh.execute("select inode,inode_id from file where path=%r and (name=%r or name=concat(%r,'/')) limit 1", (dir+'/',name,name))
             res = dbh.fetch()
             if not res:
                 raise RuntimeError("VFS path not found %s/%s" % (dir,name))

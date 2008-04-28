@@ -7,21 +7,18 @@ from stat import *
 import fcntl
 
 import fuse
-from fuse import Fuse
+from fuse import Fuse, FuseOptParse
 
-import pyflag.conf
-config = pyflag.conf.ConfObject()
 import pyflag.DB as DB
 import pyflag.IO as IO
 import pyflag.FileSystem as FileSystem
 import pyflag.Registry as Registry
+import pyflag.pyflaglog as pyflaglog
+
+import pyflag.conf
+config = pyflag.conf.ConfObject()
 
 Registry.Init()
-
-#config.add_option("case", default=None,
-#                  help="Case to load the files into (mandatory). Case must have been created already.")
-
-#config.parse_options(final=False)
 
 if not hasattr(fuse, '__version__'):
     raise RuntimeError, \
@@ -41,22 +38,18 @@ def flag2mode(flags):
     return m
 
 class PyFlagVFS(Fuse):
-
     def __init__(self, *args, **kw):
         Fuse.__init__(self, *args, **kw)
 
-        self.case="test"
+        self.case=config.case
         self.fs = FileSystem.DBFS(case=self.case)
-        self.root = '/'
+        self.root = config.fsroot
 
     def getattr(self, path):
-        print "get getattr for %s" % path
-        if path=='/': 
-            return os.stat_result((16877, 1L, 1, 1, 0, 0, 4096L, 0, 0, 0))
-
+        path = os.path.normpath("%s/%s" % (self.root, path))
         result = self.fs.lstat(path=path)
-        if not result: 
-            raise OSError("Unable to stat file %s" % path)
+        if not result:
+            return os.stat_result((16877, 1L, 1, 1, 0, 0, 4096L, 0, 0, 0))
 
         return result
 
@@ -68,6 +61,7 @@ class PyFlagVFS(Fuse):
         return result
 
     def readdir(self, path, offset):
+        path = os.path.normpath("%s/%s" % (self.root, path))
         if not path.endswith('/'): path=path+'/'
         for e in self.fs.ls(path=path):
             if e == "": continue
@@ -113,10 +107,10 @@ class PyFlagVFS(Fuse):
         return fuse.StatVfs()
 
     class PyFlagVFSFile(object):
-
         def __init__(self, path, flags, *mode):
-            self.case="test"
+            self.case=config.case
             self.fs = FileSystem.DBFS(case=self.case)
+            path = os.path.normpath("%s/%s" % (config.fsroot, path))
             self.path = path
             self.file = self.fs.open(path=self.path)
 
@@ -139,25 +133,79 @@ class PyFlagVFS(Fuse):
         return Fuse.main(self, *a, **kw)
 
 
-def main():
+## Help is handled a little differently for us because we need to
+## print the fuse help too: (This is such a hack....)
+def print_help():
+    ## This is special because config is a singleton so self does not
+    ## seem to be passed.
+    self = config.optparser
+    print self.format_help()
+    
+    ## This is so stupid - we need to create a whole instance to
+    ## get the underlying library to print help...
+    t = PyFlagVFS()
+    t.fuse_args.setmod('showhelp')
+    t.main()
 
+## Hook onto the print_help
+config.optparser.print_help = print_help
+
+def main():
+    config.add_option("debug",short_option='d', default=False, action='store_true',
+                      help = "Fuse Debug")
+
+    config.add_option("case", default=None,
+                      help="Case to load the files into (mandatory). "
+                      " Case must have been created already.")
+
+    config.add_option("foreground", short_option='f', default=False, action='store_true',
+                      help = 'Foreground')
+
+    config.add_option("fuse_option",short_option='o', default=None,
+                      help = 'Fuse specific options (see -h)')
+
+    config.add_option("fsroot", short_option='r', default='/',
+                      help="mirror filesystem from under PATH")
+
+    config.parse_options()
+
+    if not config.case:
+        pyflaglog.log(pyflaglog.ERRORS, "A case must be specified")
+        sys.exit(-1)
+
+    if len(config.args)==0:
+        pyflaglog.log(pyflaglog.ERRORS, "You must specify a mount point")
+        sys.exit(-1)
+    elif len(config.args)>1:
+        pyflaglog.log(pyflaglog.ERRORS, "You must specify only one mount point")
+        sys.exit(-1)
+        
     usage = """
 PyFlag FUSE Filesystem: mounts the pyflag VFS into the operating system fs.
 
 """ + Fuse.fusage
 
-    server = Xmp(version="%prog " + fuse.__version__,
+    server = PyFlagVFS(version="%prog " + fuse.__version__,
                  usage=usage,
                  dash_s_do='setsingle')
+    
+    server.fuse_args.mountpoint = config.args[0]
+    print "Mounting on %s" % server.fuse_args.mountpoint
 
-    server.parser.add_option(mountopt="root", metavar="PATH", default='/',
-                             help="mirror filesystem from under PATH [default: %default]")
-    server.parser.add_option("-c","--case",default=None,help="Case to open")
-    server.parse(values=server, errex=1)
+    #print server.parser.option_list
+    #server.parser.add_option("-c","--case",default=None,help="Case to open")
+    args = ['-s']
+    if config.debug: args.append("-d")
+    if config.foreground: args.append("-f")
+    if config.fuse_option:
+        args.append("-o")
+        args.append(config.fuse_option)
+    
+    server.parse(args=args,values=server, errex=1)
 
     try:
         if server.fuse_args.mount_expected():
-            os.chdir(server.root)
+            os.chdir("/")
     except OSError:
         print >> sys.stderr, "can't enter root of underlying filesystem"
         sys.exit(1)
