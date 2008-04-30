@@ -21,6 +21,8 @@
 # ******************************************************
 """ A parser for handling Mozilla history files. These files are
 stored in the Mork format.
+
+    Also contains a parser for handing Mozilla/Firefox Cache directories.
 """
 from pyflag.ColumnTypes import StringType, TimestampType, FilenameType, InodeIDType
 import pyflag.Reports as Reports
@@ -28,6 +30,7 @@ import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
 import pyflag.Scanner as Scanner
 import FileFormats.MozHist as MozHist
+import FileFormats.MozCache as MozCache
 import pyflag.pyflaglog as pyflaglog
 
 class MozHistEventHandler(FlagFramework.EventHandler):
@@ -186,7 +189,46 @@ class Mork(Magic.Magic):
         ( 100, '// <!-- <mdb:mork:z v="1.4"/> -->' ),
         ]
 
-            
+## Mozilla Cache handling
+
+class MozCacheScan(Scanner.GenScanFactory):
+    """ Scan for Mozilla Cache files """
+    default = True
+    depends = []
+    
+    class Scan(Scanner.StoreAndScan):
+        def boring(self, metadata, data=''):
+            s = self.fd.stat()
+            if s['name'] == "_CACHE_MAP_":
+            	return False
+            return True
+
+        def external_process(self, fd):
+            #find the other files we need in order to process cache
+            s = self.fd.stat()
+            filename = "%s%s" % (s['path'], s['name'])
+            data_fds = [ 
+                self.ddfs.open("%s_CACHE_001_" % s['path']),
+                self.ddfs.open("%s_CACHE_002_" % s['path']),
+                self.ddfs.open("%s_CACHE_003_" % s['path'])
+            ]
+
+            mozcache = MozCache.MozCache(fd, data_fds)
+            #print mozcache
+
+            # process each cache record
+            for record in mozcache.records():
+            	meta = record.get_entry()
+            	# add vfs entries for cache data inside datafiles
+                if record.record['DataLocation']['DataFile'] != 0:
+                    fileidx, offset, len = record.get_data_location()
+                    self.ddfs.VFSCreate(None,
+                                        '%s|o%s:%s' % (data_fds[fileidx].inode, offset, len), 
+                                        "%s%08Xd01" % (s['path'], record.record['HashNumber']),
+                                        _mtime=meta['LastModified'],
+                                        _atime=meta['LastFetched'],
+                                        size=len)
+
 import pyflag.tests
 import pyflag.pyflagsh as pyflagsh
 

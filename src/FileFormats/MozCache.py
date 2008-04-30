@@ -32,7 +32,8 @@
     http://lxr.mozilla.org/mozilla1.8/source/netwerk/cache/src/nsDiskCacheMap.h
 
 """
-import format,sys
+import os, sys
+
 from format import *
 from plugins.FileFormats.BasicFormats import *
 
@@ -41,6 +42,18 @@ def BLOCK_SIZE_FOR_INDEX(index):
     if index:
     	return (256 << (2 * ((index) - 1)))
     return 0
+
+def GenerateHash(key):
+    """ Hashing algorithm used by Mozilla to match URL (keys) to files """
+    h = 0
+    for i in range(len(key)):
+        h = (h >> (32 - 4)) ^ ((h & 0xFFFFFFF) << 4) ^ ord(key[i])
+
+    if h==0: 
+        return -1
+    return h
+
+data_files = [ "_CACHE_001_", "_CACHE_002_", "_CACHE_003_" ]
 
 class DataLocation(BEULONG):
     """ Location Definition """
@@ -132,19 +145,49 @@ class CacheEntry(SimpleStruct):
         [ 'DataSize', BEULONG ],
         [ 'KeySize', BEULONG ],
         [ 'MetaDataSize', BEULONG ],
-        [ 'KeyData', STRING, dict(length= lambda x: int(x['KeySize'])-1)],
+        [ 'KeyData', STRING, dict(length= lambda x: int(x['KeySize']))],
         [ 'MetaData', CacheMetaData, dict(length= lambda x: x['MetaDataSize'])],
         ]
 
+class MozCacheRecord:
+    def __init__(self, mozcache, record):
+        self.mozcache = mozcache
+        self.record = record
+        self.meta = self._get_entry()
+
+    def get_entry(self):
+        return self.meta
+
+    def _get_entry(self):
+        fd = self.mozcache.data_fds[self.record['MetaLocation']['DataFile']-1]
+        fd.seek(0)
+        offset = 4096 + self.record['MetaLocation']['DataBlockSize'] * self.record['MetaLocation']['DataStartBlock']
+        buffer = Buffer(fd=fd, offset=offset)
+        return CacheEntry(buffer)
+
+    def get_data_location(self):
+        """ returns a tuple of (fileno, offset, length) specifying location
+        of data """
+        return (self.record['DataLocation']['DataFile'] - 1, 
+                4096 + self.record['DataLocation']['DataBlockSize'] * self.record['DataLocation']['DataStartBlock'],
+                int(self.meta['DataSize']))
+
+    def get_data(self):
+        if self.record['DataLocation']['DataFile'] == 0:
+        	# read record from its own file
+        	filename = "%s%s%08Xd01" % (self.mozcache.path, os.path.sep, self.record['HashNumber'])
+        	fd = open(filename)
+        	return fd.read()
+        else:
+            fd = self.mozcache.data_fds[self.record['DataLocation']['DataFile']-1]
+            _, offset, length = self.get_data_location()
+            fd.seek(offset)
+            return fd.read(length)
+
 class MozCache:
-    def __init__(self, path):
-        self.path = path
-        self.map_fd = open("%s/_CACHE_MAP_" % self.path)
-        self.data_fds = [ 
-            open("%s/_CACHE_001_" % self.path),
-            open("%s/_CACHE_002_" % self.path),
-            open("%s/_CACHE_003_" % self.path)
-            ]
+    def __init__(self, map_fd, data_fds):
+        self.map_fd = map_fd
+        self.data_fds = data_fds
         self.map_buffer = Buffer(fd=self.map_fd)
         self.mapfile = MapFile(self.map_buffer)
 
@@ -154,20 +197,72 @@ class MozCache:
     		    continue
 
             if record['HashNumber'] != 0 and record['DataLocation']['DataLocationInitialized'] == True:
-                yield self.get_entry(record['MetaLocation'])
-        
-    def get_entry(self, location):
-        fd = self.data_fds[location['DataFile']-1]
-        fd.seek(0)
-        offset = 4096 + location['DataBlockSize'] * location['DataStartBlock']
-        buffer = Buffer(fd=fd, offset=offset)
-        return CacheEntry(buffer)
+                yield MozCacheRecord(self, record)
 
-def print_map(mapfile):
-    mozcache = MozCache(sys.argv[1])
-    #print mozcache.mapfile
-    for entry in mozcache.records():
-    	print entry['KeyData']
+    def __str__(self):
+        result = [str(self.mapfile),]
+        for record in self.records():
+    	    result.append(str(record.record))
+    	    entry = record.get_entry()
+    	    result.append(str(entry))
+    	return "".join(result)
+ 
+
+class MozCache_path(MozCache):
+    def __init__(self, path):
+        self.path = path
+        map_fd = open("%s/_CACHE_MAP_" % self.path)
+        data_fds = [ 
+            open("%s/_CACHE_001_" % self.path),
+            open("%s/_CACHE_002_" % self.path),
+            open("%s/_CACHE_003_" % self.path)
+            ]
+        MozCache.__init__(self, map_fd, data_fds)
 
 if __name__ == "__main__":
-	print_map(sys.argv[1])
+    """ Test program for Mozilla/Firefox cache. It can export all internal
+    cache entries and build a html index for browsing """
+
+    html_page = """
+    <html>
+    <head>
+    <title>Firefox Cache Viewer</title>
+    <head>
+    <body>
+    <h2>Firefox Cache Viewer</h2>
+    <table border=1>
+    %s
+    </table>
+    </body>
+    </html>
+    """
+
+    html_record = """
+    <tr>
+    <td><pre><a href=%s>%08X</a></pre></td>
+    <td>%s</td>
+    </tr>
+    """
+
+    mozcache = MozCache_path(sys.argv[1])
+    #print mozcache.mapfile
+    html_rec = []
+    for record in mozcache.records():
+    	#print record.record
+    	entry = record.get_entry()
+    	print entry
+    	if record.record['DataLocation']['DataFile'] != 0:
+    		data = record.get_data()
+    		filename = "exported-%08Xd01" % record.record['HashNumber']
+    		fd = open("%s/%s" % (mozcache.path, filename), "w")
+    		fd.write(data)
+    		fd.close()
+    	else:
+    	    filename = "%08Xd01" % record.record['HashNumber']
+
+        html_rec.append(html_record % (filename, record.record['HashNumber'], entry['KeyData']))
+
+    print "Building index in %s/index.html\n" % mozcache.path
+    fd = open("%s/index.html" % mozcache.path, "w")
+    fd.write(html_page % "\n".join(html_rec))
+    fd.close()
