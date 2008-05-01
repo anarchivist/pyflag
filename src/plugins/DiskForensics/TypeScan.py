@@ -162,7 +162,9 @@ class MimeTypeStats(Stats.Handler):
                 elements = [ InodeIDType(case = self.case),
                              FilenameType(case = self.case, link_pane='main'),
                              IntegerType('Size','size', table='inode'),
-                             TimestampType('Timestamp','mtime', table='inode')],
+                             TimestampType('Timestamp','mtime', table='inode'),
+                             StringType('Type', 'type', table='type'),
+                             ],
                 table = 'type',
                 where = 'type.mime=%r ' % t,
                 case = self.case,
@@ -201,11 +203,12 @@ class TypeStats(Stats.Handler):
         else:
             t = branch[1].replace("__",'/')
             result.table(
-                elements = [ InodeIDType(column='type.inode_id', case = self.case),
-                             FilenameType(case = self.case, link_pane='main', table='type'),
-                             IntegerType('Size','inode.size'),
-                             TimestampType('Timestamp','inode.mtime')],
-                table = 'type join inode on inode.inode_id = type.inode_id',
+                elements = [ InodeIDType(case = self.case),
+                             FilenameType(case = self.case, link_pane='main'),
+                             IntegerType('Size','size', table='inode'),
+                             TimestampType('Timestamp','mtime', table='inode'),
+                             StringType('Mime', 'mime', table='type')],
+                table = 'type',
                 where = 'type.type=%r ' % t,
                 case = self.case,
                 )
