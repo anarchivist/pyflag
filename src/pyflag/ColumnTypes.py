@@ -789,7 +789,7 @@ class IPType(ColumnType, LogParserMixin):
             raise RuntimeError("You specified a netmask range for an = comparison. You should probably use the netmask operator instead")
         return "%s = '%s'" % (self.escape_column_name(self.column), numeric_address)
 
-    def literal(self, column, operator, address):
+    def operator_literal(self, column, operator, address):
         return "%s %s INET_ATON(%r)" % (self.escape_column_name(self.column), operator, address)
 
     def code_matches(self, column, operator, address):

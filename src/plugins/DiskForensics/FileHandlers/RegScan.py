@@ -307,7 +307,7 @@ class InterestingRegKey(Reports.report):
                          TimestampType('Last Modified','modified'),
                          StringType('Category','category'),
                          StringType('Description','description') ],
-            table='interestingregkeys ',
+            table='interestingregkeys',
             case=query['case'],
             )
 
