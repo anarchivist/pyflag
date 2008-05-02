@@ -388,7 +388,7 @@ class WordColumn(ColumnType):
     
     def operator_literal(self, column, operator,arg):
         column = self.escape_column_name(self.column)
-        return "(%s in (select id from `%s`.dictionary where %s like '%%%s%%'))" % \
+        return "(%s in (select id from `%s`.dictionary where %s = %r))" % \
                (column, config.FLAGDB, self.dict_column, arg)
 
 class ClassColumn(WordColumn):
