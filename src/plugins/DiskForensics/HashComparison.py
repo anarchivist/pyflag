@@ -35,6 +35,9 @@ from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, FilenameT
 
 import md5
 
+config.add_option('hashdb', short_option='H', default="nsrldb",
+                  help = "The database which will be used to store hash sets (like nsrl)")
+
 class HashType(ColumnType):
     def __init__(self, **kwargs):
         ColumnType.__init__(self, name="MD5", column='binary_md5', **kwargs)
@@ -62,26 +65,33 @@ class HashTables(FlagFramework.EventHandler):
     def init_default_db(self, dbh, case):
         # Remember to add indexes to this table after uploading the
         # NSRL. Use the nsrl_load.py script.
-        dbh.execute("""CREATE TABLE `NSRL_hashes` (
-        `md5` varchar(16) NOT NULL default '',
-        `filename` varchar(60) NOT NULL default '',
-        `productcode` int(11) NOT NULL default '0',
-        `oscode` varchar(60) NOT NULL default ''
-        ) engine=MyISAM""")
-
-        dbh.execute("""CREATE TABLE `NSRL_products` (
-        `Code` mediumint(9) NOT NULL default '0',
-        `Name` varchar(250) NOT NULL default '',
-        `Version` varchar(20) NOT NULL default '',
-        `OpSystemCode` varchar(20) NOT NULL default '',
-        `ApplicationType` varchar(250) NOT NULL default ''
-        ) engine=MyISAM COMMENT='Stores NSRL Products'""")
-
-        dbh.insert("NSRL_products",
-                   code=0,
-                   name='Unknown',
-                   _fast=True);
-
+        ## We initialise the nsrl database if it does not already exist:
+        try:
+            dbh.execute("""CREATE database if not exists `%s`""", config.HASHDB)
+            ndbh = DB.DBO(config.HASHDB)
+            
+            ndbh.execute("""CREATE TABLE if not exists `NSRL_hashes` (
+            `md5` varchar(16) NOT NULL default '',
+            `filename` varchar(60) NOT NULL default '',
+            `productcode` int(11) NOT NULL default '0',
+            `oscode` varchar(60) NOT NULL default ''
+            ) engine=MyISAM""")
+            
+            ndbh.execute("""CREATE TABLE if not exists `NSRL_products` (
+            `Code` mediumint(9) NOT NULL default '0',
+            `Name` varchar(250) NOT NULL default '',
+            `Version` varchar(20) NOT NULL default '',
+            `OpSystemCode` varchar(20) NOT NULL default '',
+            `ApplicationType` varchar(250) NOT NULL default ''
+            ) engine=MyISAM COMMENT='Stores NSRL Products'""")
+            
+            ndbh.insert("NSRL_products",
+                        code=0,
+                        name='Unknown',
+                        _fast=True);
+        except Exception,e:
+            print e
+            pass
 
 
 class MD5Scan(GenScanFactory):
@@ -93,7 +103,7 @@ class MD5Scan(GenScanFactory):
         GenScanFactory.__init__(self, fsfd)
         
         ## Make sure we have indexes on the NSRL tables:
-        dbh_flag=DB.DBO(None)
+        dbh_flag=DB.DBO(config.HASHDB)
         dbh_flag.check_index("NSRL_hashes","md5",4)
         dbh_flag.check_index("NSRL_products","Code")
 
@@ -113,7 +123,7 @@ class MD5Scan(GenScanFactory):
             ## Dont do short files
             if self.length<16: return
             
-            dbh_flag=DB.DBO(None)
+            dbh_flag=DB.DBO(config.HASHDB)
             dbh_flag.execute("select filename,Name from NSRL_hashes join NSRL_products on productcode=Code where md5=%r limit 1",self.m.digest())
             nsrl=dbh_flag.fetch()
             if not nsrl: nsrl={}

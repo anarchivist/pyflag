@@ -41,44 +41,64 @@ import sys,os
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import gzip
+import pyflag.Registry as Registry
 
-parser = OptionParser(usage="""%prog path_to_nsrl_directory path_to_nsrl_directory
+config.set_usage(usage="""%prog path_to_nsrl_directory path_to_nsrl_directory
 
 Loads the NSRL hashes stored in the specified paths.""",
                       version="Version: %prog PyFlag "+str(config.VERSION))
 
-parser.add_option("-d", "--db", default=None,
-                  help = "The Database to load NSRL into")
-
-parser.add_option('-i', '--index', default=False, action='store_true',
+config.add_option('index', short_option='i', default=False,
+                  action='store_true',
                   help = "Create indexes on the NSRL table instead")
 
-parser.add_option('-r', '--reset',action="store_true", default=False,
+config.add_option('reset', short_option='r', action="store_true",
+                  default=False,
                   help = "Drops (deletes) the NSRL tables from the database")
 
-(options, args) = parser.parse_args()
+config.add_option('stats' , short_option='s', action='store_true',
+                  default = False,
+                  help = "Prints statistics about the NSRL database loaded")
 
-dbh=DB.DBO(options.db)
+Registry.Init()
+config.parse_options()
+
+try:
+    dbh = DB.DBO(config.hashdb)
+    ## Check for the tables
+    dbh.execute("desc NSRL_hashes")
+    for row in dbh: pass
+    dbh.execute("desc NSRL_products")
+    for row in dbh: pass
+except Exception,e:
+    ## Check if the nsrl db exists:
+    hash_table_event_handler = Registry.EVENT_HANDLERS.dispatch("HashTables")()
+    hash_table_event_handler.init_default_db(DB.DBO(),None)
+    dbh = DB.DBO(config.hashdb)
+
 dbh.cursor.ignore_warnings = True
 
+if config.stats:
+    dbh.execute("select count(*) as c from NSRL_hashes")
+    hashes = dbh.fetch()['c']
+    dbh.execute("select count(*) as c from NSRL_products")
+    products = dbh.fetch()['c']
+
+    print "There are %s hashes and %s products loaded" % (hashes, products)
+    sys.exit(0)
+
 #Get a handle to our database
-if options.reset:
+if config.reset:
     print "Dropping NSRL tables"
-    dbh.execute("drop table if exists NSRL_hashes")
-    dbh.execute("drop table if exists NSRL_products")
+    dbh.execute("delete from NSRL_hashes")
+    dbh.execute("delete from NSRL_products")
     sys.exit(-1)
 
-if options.index:
+if config.index:
     print "Creating indexes on NSRL hashs (This could take several hours!!!)"
     dbh.check_index("NSRL_hashes","md5",4)
     print "Done!!"
     sys.exit(0)
-
-def to_md5(string):
-    result=[]
-    for i in range(0,32,2):
-        result.append(chr(int(string[i:i+2],16)))
-    return "".join(result)
 
 ## First do the main NSRL hash table
 def MainNSRLHash(dirname):
@@ -113,7 +133,6 @@ def MainNSRLHash(dirname):
 
         try:
             dbh.mass_insert(
-#                md5=to_md5(row[1]),
                 ## This should be faster:
                 md5=row[1].decode("hex"),
                 filename=row[3],
@@ -173,30 +192,15 @@ def ProductTable(dirname):
     dbh.mass_insert_commit()
         
 if __name__=="__main__":
-    if not args:
+    if not config.args:
         print "You didn't specify any NSRL directories to operate on. Nothing to do!!!"
-    else:
-        dbh.execute("""CREATE TABLE if not exists `NSRL_hashes` (
-          `md5` char(16) binary NOT NULL default '',
-          `filename` varchar(250) NOT NULL default '',
-          `productcode` int NOT NULL default 0,
-          `oscode` varchar(250) NOT NULL default ''
-        ) DEFAULT CHARACTER SET latin1 """)
-
-        dbh.execute("""CREATE TABLE if not exists `NSRL_products` (
-        `Code` MEDIUMINT NOT NULL ,
-        `Name` VARCHAR( 250 ) NOT NULL ,
-        `Version` VARCHAR( 250 ) NOT NULL ,
-        `OpSystemCode` VARCHAR( 250 ) NOT NULL ,
-        `ApplicationType` VARCHAR( 250 ) NOT NULL
-        ) COMMENT = 'Stores NSRL Products'
-        """)
+        sys.exit(0)
         
-        for arg in args:
-            try:
-                MainNSRLHash(arg)
-            except IOError:
-                print "Unable to read main hash db, doing product table only"
-
-            ProductTable(arg)    
-            print "You may wish to run this program with the -i arg to create indexes now. Otherwise indexes will be created the first time they are needed."
+    for arg in config.args:
+        try:
+            MainNSRLHash(arg)
+        except IOError:
+            print "Unable to read main hash db, doing product table only"
+            
+        ProductTable(arg)    
+        print "You may wish to run this program with the -i arg to create indexes now. Otherwise indexes will be created the first time they are needed."

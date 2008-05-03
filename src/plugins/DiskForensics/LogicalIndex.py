@@ -625,3 +625,41 @@ class LogicalIndexScannerTest(pyflag.tests.ScannerTest):
 
         ## Did we find all the secrets?
         self.assertEqual(count,11)
+
+import unittest,time, random
+
+class HashTrieIndexTests(unittest.TestCase):
+    """ Tests the performance of Hash Trie indexing. """
+    word_file = "/usr/share/dict/words"
+    test_file = "%s/pyflag_stdimage_0.5.dd" % config.UPLOADDIR
+
+    def test01timing_tests(self):
+        """ Tests timing of indexing """
+        for count in [10, 100, 1000, 10000, 100000]:
+            words = [ line.strip() for line in open(self.word_file) if len(line) >= 3 ]
+            idx = index.Index()
+            t = time.time()
+            print "Loading %s words: " % count,
+            fd = open(self.word_file)
+
+            ## We want to load words from the dictionary in random
+            ## order so we dont have a bias due to the fact the
+            ## dictionary is sorted.
+            for line_count in range(0,count):
+                if len(words)==0: break
+                i = random.randint(0,len(words)-1)
+                idx.add_word(words.pop(i), 1, index.WORD_LITERAL)
+                
+            new_t = time.time()
+            print "Done - %s seconds (%s lines)" % (new_t - t, line_count)
+            fd = open(self.test_file)
+            count = 0
+            while 1:
+                data = fd.read(1024*1024)
+                if len(data)==0: break
+
+                for offset,matches in idx.index_buffer(data):
+                    for id, length in matches:
+                        count+=1
+
+            print "Indexed file in %s seconds (%s hits)" % (time.time() - new_t, count)
