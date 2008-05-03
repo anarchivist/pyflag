@@ -593,7 +593,6 @@ class DBO:
             try:
                 self.execute("select sql_id from sql_cache_tables where `table_name`=%r", table)
             except Exception, e:
-                print e
                 pass
             ids = [row['sql_id'] for row in self]
             for id in ids:
