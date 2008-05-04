@@ -371,7 +371,7 @@ class CaseDBInit(FlagFramework.EventHandler):
 
         ## Make sure we start with a clean slate
         tdbh.execute("drop database if exists %s" % config.FLAGDB)
-        tdbh.execute("create database `%s`" % config.FLAGDB)
+        tdbh.execute("create database `%s` default character set utf8" % config.FLAGDB)
 
         ## Source the initial database script. (We no longer use
         ## db.setup to initialise the database - everything is done by

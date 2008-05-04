@@ -636,7 +636,7 @@ class create_case(load):
         case = self.args[0]
         dbh.cursor.ignore_warnings = True
         try:
-           dbh.execute("Create database `%s`",(case))
+           dbh.execute("Create database `%s` default character set utf8",(case))
         except DB.DBError, e:
            raise RuntimeError("Unable to create case %s, does the database "\
                               "already have a table with this name? Cowardly"\

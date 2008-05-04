@@ -155,6 +155,18 @@ class DBOTest(tests.ScannerTest):
 
         self.assertEqual(row['1'], 1)
 
+    def test09Unicode(self):
+        """ Test that we can insert and retrieve unicode characters """
+        dbh = DB.DBO(self.test_case)
+        tests = [ u'this is a \u0d61 char\'acter ' ,]
+        for v in tests:
+            dbh.delete("meta", where="property='TestString'", _fast=True)
+            dbh.insert("meta", property= "TestString", value=v,
+            _fast=True)
+            dbh.execute("select * from meta where property='TestString' limit 1")
+            row = dbh.fetch()
+            self.assertEqual(row['value'],v, "Expected %s, got %s" % (v,row['value']))
+
 def print_stats():
     dbh = DB.DBO("mysql")
     dbh.execute("show processlist")

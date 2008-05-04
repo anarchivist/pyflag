@@ -27,7 +27,7 @@
 # ******************************************************
 
 """ This module contains db related functions """
-import MySQLdb
+import MySQLdb,re
 import MySQLdb.cursors
 import _mysql
 import pyflag.conf
@@ -36,7 +36,7 @@ config = pyflag.conf.ConfObject()
 import pyflag.pyflaglog as pyflaglog
 import time,types
 from Queue import Queue, Full, Empty
-from MySQLdb.constants import FIELD_TYPE
+from MySQLdb.constants import FIELD_TYPE, FLAG
 import threading
 
 ## This store stores information about indexes
@@ -86,15 +86,17 @@ config.add_option("MASS_INSERT_THRESHOLD", default=300, type='int',
 config.add_option("TABLE_QUERY_TIMEOUT", default=60, type='int',
                   help="The table widget will timeout queries after this many seconds")
 
+import types
+import MySQLdb.converters
 
-## This is the dispatcher for db converters
-conv = {
-    FIELD_TYPE.LONG: long,
-    FIELD_TYPE.INT24: long,
-    FIELD_TYPE.LONGLONG: long,
-    FIELD_TYPE.TINY: int,
-    FIELD_TYPE.SHORT: int,
-    }
+conv = MySQLdb.converters.conversions.copy()
+
+## Remove those conversions which we do not want:
+del conv[FIELD_TYPE.TIMESTAMP]
+del conv[FIELD_TYPE.DATETIME]
+del conv[FIELD_TYPE.TIME]
+del conv[FIELD_TYPE.DATE]
+del conv[FIELD_TYPE.YEAR]
 
 def escape(string):
     return MySQLdb.escape_string(string)
@@ -103,9 +105,9 @@ class DBError(Exception):
     """ Generic Database Exception """
     pass
 
-class DBExpander:
-    """ A utility class for interpolating into the query string.
-
+def expand(sql, params):
+    """ A utility function for interpolating into the query string.
+    
     This class implements the correct interpolation so that %s is not escaped and %r is escaped in the mysql interpolation.
 
     @Note: We cant use the MySQLdb native interpolation because it has a brain dead way of interpolating - it always escapes _ALL_ parameters and always adds quotes around anything. So for example:
@@ -114,14 +116,20 @@ class DBExpander:
 
     Does not work as it should, since the table name is always enclosed in quotes which is incorrect.
     """
-    def __init__(self,string):
-        self.string = str(string)
+    d = dict(count = 0)
+    
+    def cb(m):
+        if m.group(1)=="s":
+            result = "%s" % params[d['count']]
+            d['count'] +=1
+            return result
 
-    def __str__(self):
-        return self.string
-
-    def __repr__(self):
-        return "'%s'"% escape(self.string)
+        elif m.group(1)=='r':
+            result = "'%s'" % escape(("%s" % params[d['count']]).encode("utf8"))
+            d['count'] +=1
+            return result
+            
+    return re.sub("%(r|s)", cb, sql)
 
 class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
     """ This cursor combines client side and server side result storage.
@@ -303,8 +311,8 @@ class Pool(Queue):
                     port=config.DBPORT,
                     cursorclass=PyFlagCursor,
                     conv = conv,
-                    use_unicode = False,
-                    #charset='latin1'
+                    use_unicode = True,
+                    charset='utf8'
                     )
 
         if config.DBPASSWD:
@@ -403,16 +411,10 @@ class DBO:
         except (AttributeError,IndexError):
             pass
             
-        ## Hopefully this does not bear a huge performance overhead???
-        params = tuple( DBExpander(i) for i in params )
-        if len(params)>0:
-            string = query_str % params
-        else: string = query_str
+        string = expand(query_str, params)
+        #print string
         try:
-            ## The following decode is required to go around MySQLdb's
-            ## stupid unicode crap - this has just recently been
-            ## introduced:
-            self.cursor.execute(string.decode('latin1'))
+            self.cursor.execute(string)
         #If anything went wrong we raise it as a DBError
         except Exception,e:
             str = "%s" % e
@@ -440,7 +442,7 @@ class DBO:
                 ## Redo the query with the new connection - if we fail
                 ## again, we just raise - otherwise we risk running
                 ## into recursion issues:
-                return self.cursor.execute(string.decode('latin1'))
+                return self.cursor.execute(string)
                 
             elif not str.startswith('Records'):
                 raise DBError(e)

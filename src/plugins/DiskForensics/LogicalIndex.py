@@ -640,7 +640,6 @@ class HashTrieIndexTests(unittest.TestCase):
             idx = index.Index()
             t = time.time()
             print "Loading %s words: " % count,
-            fd = open(self.word_file)
 
             ## We want to load words from the dictionary in random
             ## order so we dont have a bias due to the fact the

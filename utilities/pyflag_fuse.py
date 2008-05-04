@@ -99,8 +99,9 @@ class PyFlagVFS(Fuse):
         path = os.path.normpath("%s/%s" % (self.root, path))
         if not path.endswith('/'): path=path+'/'
         for e in self.fs.ls(path=path):
-            if e == "": continue
-            yield fuse.Direntry(e)
+            if not e: continue
+            
+            yield fuse.Direntry(e.encode("utf8"))
 
     def unlink(self, path):
         raise FuseError("Unable to modify Virtual Filesystem")
