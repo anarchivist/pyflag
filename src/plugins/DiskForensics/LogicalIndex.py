@@ -102,7 +102,7 @@ class IndexScan(GenScanFactory):
     def prepare(self):
         ## Create new index trie - This takes a serious amount of time
         ## for large dictionaries (about 2 sec for 70000 words):
-        self.index = index.Index()
+        self.index = index.Index(unique=1)
         self.version = self.check_version()
         
         pydbh = DB.DBO(None)
@@ -185,6 +185,9 @@ class IndexScan(GenScanFactory):
             ## Check we are operating with the correct dictionary version
             if self.outer.version != self.outer.check_version():
                 self.outer.prepare()
+
+            ## Make sure the index is fresh:
+            outer.index.clear_set()
             
             self.dbh = DB.DBO(fd.case)
             self.dbh.mass_insert_start('LogicalIndexOffsets')
@@ -559,6 +562,20 @@ class LogicalIndexTests(unittest.TestCase):
         for id,v in expected.items():
             self.assertEqual(v,[],"Some terms were not found. Expected %s to find %s" % (dictionary[id],v))
 
+    def test04uniqueIndexing(self):
+        """ Test unique indexing mode """
+        idx = index.Index(unique=True)
+        idx.add_word("\d{2,5}", 1, index.WORD_EXTENDED)
+
+        data = "1234567890" * 3
+        results = []
+        for offset, matches in idx.index_buffer(data):
+            for id, length in matches:
+                print "Found hit %s" % data[offset:offset+length]
+                results.append(offset)
+                
+        self.assertEqual(len(results),1)
+
 class LogicalIndexMemoryTest(LogicalIndexTests):
     """ Test memory leaks under the indexer """
 
@@ -624,7 +641,7 @@ class LogicalIndexScannerTest(pyflag.tests.ScannerTest):
             self.assertEqual(data.lower(), row['word'].lower())
 
         ## Did we find all the secrets?
-        self.assertEqual(count,11)
+        self.assertEqual(count,2)
 
 import unittest,time, random
 

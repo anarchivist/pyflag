@@ -53,7 +53,7 @@ CLASS(TrieNode, Object)
 	 *buffer-start = length of match).
      */
      int METHOD(TrieNode, Match, char *start, char **buffer, int *len, 
-		PyObject *result);
+		struct trie_iter *result);
 
      /** This method must return True or False when comparing at
 	 buffer. It must consume the number of chars that are equal
@@ -96,4 +96,32 @@ END_CLASS
 // Some useful prototypes:
 int LiteralNode_casecompare(TrieNode self, char **buffer, int *len);
 int CharacterClass_wildcard_compare(TrieNode self, char **buffer, int *len);
+
+// The python objects which control it all:
+typedef struct {
+  PyObject_HEAD
+  RootNode root;
+  // A bool to signify if we should get all matches or just the first
+  // one.
+  int all_matches;
+  // This is the set where we maintain previous matches and skip any
+  // future hits which were already found. The set may be cleared with
+  // clear_set() and specific matches can be rejected with
+  // reject(). This parameter is set via a keyword arg. By default we
+  // return all matches (and this is NULL).
+  PyObject *set;
+} trie_index;
+
+// The indexer returns an iterator of all the matches:
+typedef struct {
+  PyObject_HEAD
+  trie_index *trie;
+  PyObject *pydata;
+  char *data;
+  int len;
+  int i;
+  PyObject *match_list;
+} trie_iter;
+
+
 #endif

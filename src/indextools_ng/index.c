@@ -5,24 +5,6 @@
 
 PyObject *g_index_module;
 
-typedef struct {
-  PyObject_HEAD
-  RootNode root;
-  // A bool to signify if we should get all matches or just the first
-  // one.
-  int all_matches;
-} trie_index;
-
-// The indexer returns an iterator of all the matches:
-typedef struct {
-  PyObject_HEAD
-  trie_index *trie;
-  PyObject *pydata;
-  char *data;
-  int len;
-  int i;
-} trie_iter;
-
 static void trie_index_dealloc(trie_index *self) {
   if(self->root) {
     talloc_free(self->root);
@@ -32,10 +14,11 @@ static void trie_index_dealloc(trie_index *self) {
 
 static int trie_index_init(trie_index *self, PyObject *args, PyObject *kwds) {
   int all_matches = 1;
-  static char *kwlist[] = {"all",NULL};
+  int unique;
+  static char *kwlist[] = {"unique",NULL};
 
   if(kwds && !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwlist,
-					  &all_matches))
+					  &unique))
     return -1;
 
   self->all_matches = all_matches;
@@ -43,7 +26,15 @@ static int trie_index_init(trie_index *self, PyObject *args, PyObject *kwds) {
   if(self->root==NULL)
     return -1;
 
-    return 0;
+  if(unique) {
+    self->set = PySet_New(NULL);
+    if(self->set == NULL) {
+      talloc_free(self->root);
+      return -1;
+    };
+  } else self->set = NULL;
+
+  return 0;
 }
 
 static PyObject *trie_index_add_word(trie_index *self, PyObject *args) {
@@ -61,56 +52,33 @@ static PyObject *trie_index_add_word(trie_index *self, PyObject *args) {
     return Py_None;
 };
 
-static PyObject *trie_index_index_xbuffer(trie_index *self, PyObject *args) {
-    char *buffer;
-    int length;
-    int i;
-    PyObject *result, *match_list;
+static PyObject *trie_index_clear_set(trie_index *self, PyObject *args) {
+  if(self->set) {
+    PySet_Clear(self->set);
+  } else 
+    return PyErr_Format(PyExc_SystemError, "Indexer not running in unique mode");
 
-    if(!PyArg_ParseTuple(args, "s#", &buffer, &length)) 
-        return NULL;
+  Py_RETURN_NONE;
+};
 
-    result = PyList_New(0);
-    match_list = PyList_New(0);
+static PyObject *trie_index_reject(trie_index *self, PyObject *args) {
+  int key=0;
 
-    for(i=0; i<length; i++) {
-        char *new_buffer = buffer+i;
-        int new_length = length-i;
-        PyObject *tmp;
+  if(!PyArg_ParseTuple(args, "i", &key)) 
+    return NULL;
 
-        if(self->root->super.Match((TrieNode)self->root, new_buffer, 
-		                            &new_buffer, &new_length, match_list)) {
+  if(!key) return PyErr_Format(PyExc_AttributeError, "You must specify a word id");
 
-            /** Append temp to the result. Note that match_list is given to tmp */
-            tmp = Py_BuildValue("iN",i,match_list);
-            if(PyList_Append(result, tmp)<0) {
-	            Py_DECREF(tmp);
-	            Py_DECREF(result);
-	            return NULL;
-            }
+  if(self->set) {
+    PyObject *pkey = PyLong_FromLong(key);
+    PySet_Discard(self->set, pkey);
+    
+    Py_DECREF(pkey);
+  } else
+    return PyErr_Format(PyExc_SystemError, "Not running in unique mode");
 
-	    // If we only need one match we just skip this in the
-	    // buffer:
-	    if(self->all_matches == 0) {
-	      // FIXME- get the longest match - now we get the first match
-	      PyObject *first_match = PyList_GetItem(match_list, 0);
-	      PyObject *length_obj;
-	      if(first_match) {
-		length_obj = PyTuple_GetItem(first_match, 1);
-		if(length_obj) i+=PyLong_AsLong(length_obj);
-	      };
-	    };
-
-            Py_DECREF(tmp);
-
-            // Make a new match_list
-            match_list=PyList_New(0);
-        }
-    }
-
-    Py_DECREF(match_list);
-    return(result);
-}
+  Py_RETURN_NONE;
+};
 
 static PyObject *name;
 static PyObject *trie_index_index_buffer(trie_index *self, PyObject *args) {
@@ -132,6 +100,10 @@ static PyMethodDef trie_index_methods[] = {
      "Add a word to the trie" },
     {"index_buffer", (PyCFunction)trie_index_index_buffer, METH_KEYWORDS | METH_VARARGS,
      "index the given buffer" },
+    {"clear_set", (PyCFunction)trie_index_clear_set, METH_VARARGS,
+     "Clears the set cache. The indexer maintains a set of previously reported hits. When a new hit is found to a previously reported hit, we ignore it. This clears the set to allow us to report the same hits again. We primarily use this to ensure we only report one hit per inode. This function takes no arguments"},
+    {"reject", (PyCFunction)trie_index_reject, METH_VARARGS,
+     "rejects a hit reported by the indexer. This essentially clears that hit from the set and allows it to be re-reported later. We primarily use this to reduce false positives by applying a more complex regex over the results returned from the less compres regex in order to eliminate false positives."},
     {NULL}  /* Sentinel */
 };
 
@@ -180,6 +152,7 @@ static PyTypeObject trie_indexType = {
 static void trie_iter_dealloc(trie_iter *self) {
   Py_DECREF(self->trie);
   Py_DECREF(self->pydata);
+  Py_DECREF(self->match_list);
   self->ob_type->tp_free((PyObject*)self);
 };
 
@@ -199,30 +172,33 @@ static int trie_iter_init(trie_iter *self, PyObject *args, PyObject *kwds) {
 
   Py_INCREF(trie);
   self->trie = trie;
+
+  // Create a match list:
+  self->match_list = PyList_New(0);
+
   return 0;
 };
 
 static PyObject *trie_iter_next(trie_iter *self) {
-  PyObject *match_list;
   PyObject *result;
-
-  match_list = PyList_New(0);
 
   while(self->i < self->len) {
     char *new_buffer = self->data + self->i;
     int new_length = self->len - self->i;
 
     if(self->trie->root->super.Match((TrieNode)self->trie->root, new_buffer, 
-				     &new_buffer, &new_length, match_list)) { 
-      /** Append temp to the result. Note that match_list is given to tmp */
-      result = Py_BuildValue("iN", self->i, match_list);
+				     &new_buffer, &new_length, self)) { 
+
+      /** Append temp to the result. Note that match_list is given to
+	  result. We create a new match_list for us to use */
+      result = Py_BuildValue("iN", self->i, self->match_list);
+      self->match_list = PyList_New(0);
       self->i++;
       return result;
     };
     self->i++;
   };
 
-  Py_DECREF(match_list);
   return PyErr_Format(PyExc_StopIteration, "Done");
 };
 

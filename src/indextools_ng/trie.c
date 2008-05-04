@@ -294,7 +294,7 @@ void TrieNode_AddWord(TrieNode self, char **word, int *len, long int data,
   return;
 };
 
-int TrieNode_Match(TrieNode self, char *start, char **buffer, int *len, PyObject *result) {
+int TrieNode_Match(TrieNode self, char *start, char **buffer, int *len, trie_iter *result) {
   int i;
   int found=False;
   uint16_t h;
@@ -425,11 +425,25 @@ DataNode DataNode_Con(DataNode self, int data) {
 /** Data nodes automatically match - if we get to them, we have a
     match. We also can set the result 
 */
-int DataNode_Match(TrieNode self, char *start, char **buffer, int *len, PyObject *result) {
+int DataNode_Match(TrieNode self, char *start, char **buffer, int *len, trie_iter *result) {
   DataNode this = (DataNode) self;
-  PyObject *tmp = Py_BuildValue("ii",this->data, *buffer-start);
+  PyObject *tmp;
+  PyObject *data = PyLong_FromLong(this->data);
+
+  // We check to see if we need to update the result:
+  if(result->trie->set) {
+    if(PySet_Contains(result->trie->set, data)) {
+      Py_DECREF(data);
+      return True;
+    } else {
+      PySet_Add(result->trie->set, data);
+    };
+  };
+
+  tmp = Py_BuildValue("Ni",data, *buffer-start);
+
   /** Append the hit to the list */
-  PyList_Append(result, tmp);
+  PyList_Append(result->match_list, tmp);
 
   Py_DECREF(tmp);
   
