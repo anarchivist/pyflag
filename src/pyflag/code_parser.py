@@ -1,4 +1,4 @@
-def eval_expression(elements, name, operator, arg):
+def eval_expression(elements, name, operator, arg, ui):
 #    print "Evaluating %s.%s(%r)" % (name,operator,arg)
     ## Try and find the element with the specified name:
     element = None
@@ -11,7 +11,7 @@ def eval_expression(elements, name, operator, arg):
         raise RuntimeError("Column %s not known" % name)
 
     ## Use the element to parse:
-    return element.parse(name, operator, arg, context='code')
+    return element.parse(name, operator, arg, context='code', ui=ui)
 
 def logical_operator_parse(left, operator, right):
     if operator=="and":
@@ -42,20 +42,20 @@ class CodeParserScanner(runtime.Scanner):
 
 class CodeParser(runtime.Parser):
     Context = runtime.Context
-    def goal(self, types, _parent=None):
-        _context = self.Context(_parent, self._scanner, 'goal', [types])
-        clause = self.clause(types, _context)
+    def goal(self, types, ui, _parent=None):
+        _context = self.Context(_parent, self._scanner, 'goal', [types, ui])
+        clause = self.clause(types, ui, _context)
         END = self._scan('END', context=_context)
         return clause
 
-    def clause(self, types, _parent=None):
-        _context = self.Context(_parent, self._scanner, 'clause', [types])
-        expr = self.expr(types, _context)
+    def clause(self, types, ui, _parent=None):
+        _context = self.Context(_parent, self._scanner, 'clause', [types, ui])
+        expr = self.expr(types, ui, _context)
         result = expr
         while self._peek('LOGICAL_OPERATOR', 'END', "'\\\\)'", context=_context) == 'LOGICAL_OPERATOR':
             LOGICAL_OPERATOR = self._scan('LOGICAL_OPERATOR', context=_context)
             logical_operator = LOGICAL_OPERATOR
-            expr = self.expr(types, _context)
+            expr = self.expr(types, ui, _context)
             result = logical_operator_parse(result, logical_operator, expr)
         return result
 
@@ -72,8 +72,8 @@ class CodeParser(runtime.Parser):
             WORD = self._scan('WORD', context=_context)
             return WORD
 
-    def expr(self, types, _parent=None):
-        _context = self.Context(_parent, self._scanner, 'expr', [types])
+    def expr(self, types, ui, _parent=None):
+        _context = self.Context(_parent, self._scanner, 'expr', [types, ui])
         _token = self._peek('STR', 'STR2', 'WORD', "'\\\\('", context=_context)
         if _token != "'\\\\('":
             term = self.term(_context)
@@ -81,10 +81,10 @@ class CodeParser(runtime.Parser):
             WORD = self._scan('WORD', context=_context)
             operator = WORD
             term = self.term(_context)
-            return  eval_expression(types, column,operator,term)
+            return  eval_expression(types, column,operator,term, ui)
         else: # == "'\\\\('"
             self._scan("'\\\\('", context=_context)
-            clause = self.clause(types, _context)
+            clause = self.clause(types, ui, _context)
             self._scan("'\\\\)'", context=_context)
             return  clause
 
@@ -97,7 +97,7 @@ def parse(rule, text):
 
 
 
-def parse_eval(text, types):
+def parse_eval(text, types, ui):
     """ This return a parse tree from the expression in text using the
     table objects in types.
 
@@ -114,7 +114,7 @@ def parse_eval(text, types):
     """
     P = CodeParser(CodeParserScanner(text))
     try:
-        return P.goal(types)
+        return P.goal(types, ui)
     except runtime.SyntaxError, e:
         raise RuntimeError("\n%s\n%s^\n%s" % (text, '-' * e.pos[2], e.msg))
 

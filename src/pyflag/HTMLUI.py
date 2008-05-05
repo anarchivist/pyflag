@@ -857,13 +857,13 @@ class HTMLUI(UI.GenericUI):
 
         ## OK Now to render the GUI:
         message = self.__class__(self)
-        parse_error = False
+        message.decoration = 'naked'
         try:
             filter_str = query[filter_context]
             
             ## Check the current filter string for errors by attempting to parse it:
             try:
-                parser(filter_str,elements)
+                parser(filter_str,elements, message)
 
                 ## This is good if we get here - lets refresh to it now:
                 if query.has_key('__submit__'):
@@ -891,10 +891,15 @@ class HTMLUI(UI.GenericUI):
                     self.refresh(0,query,pane='parent_pane')
                     return
 
+            ## Let the parser raise a UI object if they want:
+            except self.__class__:
+                raise
+
             except Exception,e:
-                parse_error = True
                 message.text('Error parsing expression: %s' % e, style='red', font='typewriter')
                 message.text('',style='black', font='normal')
+
+                raise message
 
         except KeyError,e:
 
@@ -951,9 +956,6 @@ class HTMLUI(UI.GenericUI):
         self.toolbar(cb=filter_help, text="Click here for operator help", icon='help.png')
         self.toolbar(cb=filter_history, text="See filter history", icon='clock.png')
 
-        if parse_error:
-            raise RuntimeError(message)
-
     def table(self, **opts):
         """ Render a table widget. The possible parameters are:
 
@@ -970,7 +972,7 @@ class HTMLUI(UI.GenericUI):
         More comments in TableRenderer()
         """
         ## Create a renderer:
-        r = HTMLUITableRenderer(**opts)
+        r = UI.TableRenderer(**opts)
 
         ## Render with it:
         r.render(self.defaults, self)
@@ -1640,5 +1642,4 @@ config.add_option("REFRESH", default=3, type='int',
                   help="Polling frequency of the gui when analysing")
 
 
-class HTMLUITableRenderer(UI.TableRenderer):
-    pass
+HTMLUITableRenderer = UI.TableRenderer

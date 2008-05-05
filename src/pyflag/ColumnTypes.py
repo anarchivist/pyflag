@@ -212,10 +212,17 @@ class ColumnType:
     ## with code context, we expect to get back a function of
     ## prototype: x(row) which evaluates the expression given a dict
     ## row of all the columns in the row.
-    def parse(self, column, operator, arg, context='sql'):
+    def parse(self, column, operator, arg, context='sql', ui=None, elements=None):
+        """ Parse the current expression using the operators available
+        in the column type. ui is a ui which may be used by us to
+        render any specialised errors (if we raise it the GUI will
+        render it for us). elements is the full list of all the other
+        elements involved in the parsing."""
         ## Try to find the method which handles this operator. We look
         ## first in symbols and then in a method containing the name
         ## requested:
+        self.ui = ui
+        self.elements = elements
         if context == 'sql':
             prefix = "operator_"
         else:
@@ -227,7 +234,8 @@ class ColumnType:
         else:
             try:
                 method = getattr(self, prefix + operator)
-            except:
+            except Exception,e:
+                print e
                 raise RuntimeError("%s is of type %s and has no operator %r.\nDoes it make sense to use this operator on this data?" % (column, ("%s"% self.__class__).split('.')[-1], operator))
 
         return method(column, operator, arg)
@@ -255,8 +263,9 @@ class ColumnType:
         if self.link and not self.callback:
             q = self.link.clone()
             q.FillQueryTarget(value)
+            tmp = result.__str__()
             result.clear()
-            result.link(value, q, pane=self.link_pane)
+            result.link(tmp, q, pane=self.link_pane)
         
     def plain_display_hook(self, value, row, result):
         if value:

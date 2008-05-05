@@ -1,4 +1,4 @@
-def eval_expression(elements, name, operator, arg):
+def eval_expression(elements, name, operator, arg, ui):
 #    print "Evaluating %s.%s(%r)" % (name,operator,arg)
     ## Try and find the element with the specified name:
     element = None
@@ -11,7 +11,7 @@ def eval_expression(elements, name, operator, arg):
         raise RuntimeError("Column %s not known" % name)
 
     ## Use the element to parse:
-    return element.parse(name, operator, arg, context='code')
+    return element.parse(name, operator, arg, context='code', ui=ui)
 
 def logical_operator_parse(left, operator, right):
     if operator=="and":
@@ -31,15 +31,15 @@ parser CodeParser:
     token WORD: '[-:+*/!@$%^&=\<\>.a-zA-Z0-9_]+'
     token LOGICAL_OPERATOR: "(and|or|AND|OR)"
 
-    rule goal<<types>>: clause<<types>>  END {{ return clause }}
+    rule goal<<types, ui>>: clause<<types, ui>>  END {{ return clause }}
 
     ## A clause is a sequence of expressions seperated by logical
     ## operators. Since our operators are the same as SQL, we just
     ## copy them in.
-    rule clause<<types>>: expr<<types>> {{ result = expr }}
+    rule clause<<types, ui>>: expr<<types, ui>> {{ result = expr }}
                     (
                         LOGICAL_OPERATOR {{ logical_operator = LOGICAL_OPERATOR }}
-                        expr<<types>> {{ result = logical_operator_parse(result, logical_operator, expr) }}
+                        expr<<types, ui>> {{ result = logical_operator_parse(result, logical_operator, expr) }}
                      )*  {{ return result }}
 
     ## A term may be encapsulated with " or ' or not. Note that
@@ -53,15 +53,15 @@ parser CodeParser:
     ## be encapsulated in ( ) in order to be put into the
     ## clause. Since out operators have the same precendence as SQL we
     ## just need to preserve the ( ).
-    rule expr<<types>>: term {{ column = term }}
+    rule expr<<types, ui>>: term {{ column = term }}
                      WORD {{ operator = WORD }}
-                     term {{ return  eval_expression(types, column,operator,term)}}
+                     term {{ return  eval_expression(types, column,operator,term, ui)}}
                      #Preserve parenthases
-                     | '\\(' clause<<types>> '\\)' {{ return  clause }}
+                     | '\\(' clause<<types, ui>> '\\)' {{ return  clause }}
 
 %%
 
-def parse_eval(text, types):
+def parse_eval(text, types, ui):
     """ This return a parse tree from the expression in text using the
     table objects in types.
 
@@ -78,7 +78,7 @@ def parse_eval(text, types):
     """
     P = CodeParser(CodeParserScanner(text))
     try:
-        return P.goal(types)
+        return P.goal(types, ui)
     except runtime.SyntaxError, e:
         raise RuntimeError("\n%s\n%s^\n%s" % (text, '-' * e.pos[2], e.msg))
 

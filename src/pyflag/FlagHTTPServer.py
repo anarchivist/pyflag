@@ -316,6 +316,12 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                 
                 ## Use it
                 cb(query,result)
+
+                ## This lets the callback handle its own error message
+                ## by raising a HTMLUI
+            except HTMLUI.HTMLUI,e:
+                result = e
+
                 ## If the cb raises an exception, we let the user know:
             except Exception,e:
                 pyflaglog.log(pyflaglog.ERROR,"Unable to call callback %s: %s" % (cb_key,e))
@@ -366,6 +372,9 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                           else:
                               result.clear()
                               FlagFramework.get_traceback(e, result)
+
+              except HTMLUI.HTMLUI, e:
+                  result = e
                           
               except Exception,e:
                   result.clear()

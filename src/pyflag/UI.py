@@ -399,6 +399,26 @@ UI = None
 config.add_option("PAGESIZE", default=50, type='int',
                   help="number of rows to display per page in the Table widget")
 
+def _make_join_clause(total_elements):
+    query_str = ''
+    ## The tables are calculated as a join of all the individual
+    ## database tables from all the columns - this allows us to
+    ## put elements from different database tables in the same
+    ## widget automatically.
+    tables = []
+    for e in total_elements:
+        if e.table not in tables: tables.append(e.table)
+
+    ## Now generate the join clause:
+    query_str += " from %s " % tables[0]
+
+    for i in range(1,len(tables)):
+        query_str += " join `%s` on `%s`.inode_id = `%s`.inode_id " % \
+                     (tables[i], tables[0],tables[i])
+
+    return query_str
+
+
 class TableRenderer:
     """ This class is responsible for rendering the table widget under
     various conditions.
@@ -641,7 +661,7 @@ class TableRenderer:
             text = "SQL Used",
             icon = "sql.png", pane = 'popup',
             )
-
+    
     def _make_sql(self, query):
         """ Calculates the SQL for the table widget based on the query """
         ## Calculate the SQL
@@ -664,21 +684,8 @@ class TableRenderer:
 
         ## The columns and their aliases:
         query_str += ",".join([ e.select() + " as `" + e.name + "`" for e in self.elements ])
-
-        ## The tables are calculated as a join of all the individual
-        ## database tables from all the columns - this allows us to
-        ## put elements from different database tables in the same
-        ## widget automatically.
-        tables = []
-        for e in total_elements:
-            if e.table not in tables: tables.append(e.table)
-
-        ## Now generate the join clause:
-        query_str += " from %s " % tables[0]
-
-        for i in range(1,len(tables)):
-            query_str += " join `%s` on `%s`.inode_id = `%s`.inode_id " % \
-                         (tables[i], tables[0],tables[i])
+        
+        query_str += _make_join_clause(total_elements)
 
         if self.where:
             w = ["(%s)" % self.where,]
@@ -691,7 +698,7 @@ class TableRenderer:
 
         ## Is there a filter condition?
         if self.filter_str:
-            filter_str = parser.parse_to_sql(self.filter_str, total_elements)
+            filter_str = parser.parse_to_sql(self.filter_str, total_elements, ui=None)
             if not filter_str: filter_str=1
             
         else: filter_str = 1

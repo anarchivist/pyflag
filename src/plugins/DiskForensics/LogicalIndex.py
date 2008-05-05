@@ -21,23 +21,6 @@
 
 # ******************************************************
 """ This module uses the indexing tools to scan the logical files within an image. This allows us to do keyword matching against compressed files, PST files etc.
-
-This module contains a Scanner to be called by the scanning framework, and a set of reports allowing the management of the dictionary as well as the querying of the index.
-
-Implementation Note:
-The indextools engine stores a 64bit offset for the occurance of the indexed word. This number is split along a bit mask into two components: The block number and the offset within the block.
-
-For example assume that the blocksize is 2^20 (=1,048,576). When the scanner is scanning a new file it allocates blocks of this size, and stores these into the database as inode vs blocknumber pairs. The indextools then stores blocknumber << 20 | offset_within_block.
-
-When we need to retrieve this we get a list of offsets from the indextools. The problem them becomes how to map these indexes back into an inode and relative offset. We do this by selecting those rows which have the given blocknumber, finding out their inode and seeking the relative offset into the inode's file.
-
-Example:
-Suppose we find the word 'Linux' at the 27th byte of inode 5 (Assuming the first 4 inodes are smaller than the blocksize 2^20), indextools will store this offset as 5 << 20 | 27. We therefore insert into the database a row saying that block 5 belongs to inode 5.
-
-When we retrieve this offset (o), we search through the db for the inode containing block o>>20 (5) and receive inode 5. We then seek o & (2^20-1) = 27 bytes into it.
-
-Note that if a single file is larger than the blocksize, we have multiple entries in the database assigning a number of blocks to the same inode. This is not a problem if it is taken into account when reassembling the information.
-
 """
 import pyflag.pyflaglog as pyflaglog
 import pyflag.FlagFramework as FlagFramework
@@ -52,7 +35,9 @@ import index,os,time,re
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.DB as DB
+import pyflag.UI as UI
 from pyflag.ColumnTypes import StringType, TimestampType, InodeIDType, IntegerType, ColumnType
+import pyflag.parser as parser
 
 config.add_option("INDEX_ENCODINGS", default="['UTF-8','UTF-16LE']",
                   help="A list of unicode encodings to mutate the "
@@ -250,7 +235,7 @@ class IndexEventHandler(FlagFramework.EventHandler):
         `id` int auto_increment,
         `word` VARCHAR( 250 ) binary NOT NULL ,
         `class` VARCHAR( 50 ) NOT NULL ,
-        `encoding` SET( 'all', 'asci', 'ucs16' ) DEFAULT 'all' NOT NULL,
+        `encoding` SET( 'all', 'ascii', 'ucs16' ) DEFAULT 'all' NOT NULL,
         `type` set ( 'word','literal','regex' ) DEFAULT 'literal' NOT NULL,
         PRIMARY KEY  (`id`))""")
         
@@ -332,9 +317,9 @@ class OffsetType(IntegerType):
     hidden = True
     LogCompatible = False
     
-    def __init__(self, name='', column='', fsfd=None):
+    def __init__(self, name='', column='', table=None,fsfd=None):
         self.fsfd = fsfd
-        IntegerType.__init__(self, name,column)
+        IntegerType.__init__(self, name,column, table=table)
         
     def display(self, offset, row, result):
         result = result.__class__(result)
@@ -350,28 +335,43 @@ class OffsetType(IntegerType):
         result.link(offset, target=query)
         return result
 
-class DataPreview(OffsetType):
+## This ColumnType is quite expensive - I guess its necessary though
+class DataPreview(ColumnType):
+    """ A previewer for the hit. """
     ## Cant search on this data type at all.
     symbols = {}
     LogCompatible = False
-    
-    def __init__(self, name='', column='', fsfd=None):
-        self.name = name
-        self.column = column
-        self.sql = column
-        OffsetType.__init__(self, name, column, fsfd=fsfd)
-        #self.fsfd = fsfd
 
-    def display(self, length, row, result):
-        low = max(0,row['Offset']-50)
-        high = row['Offset'] + 50 + length
-        fd = self.fsfd.open(inode_id = row['Inode'])
+    def __init__(self, name='', case=None, width=20, table="LogicalIndexOffsets"):
+        self.case = case
+        self.table = table
+        self.name = name
+        self.width =width
+
+    def select(self):
+        return "concat(%s,',', %s,',', %s)" % (self.escape_column_name("offset"),
+                                       self.escape_column_name("inode_id"),
+                                       self.escape_column_name("length"))
+    
+    def display(self, value, row, result):
+        ## We expect ints from the DB - do nothing otherwise
+        try:
+            offset, inode_id, length = value.split(",")
+            offset = int(offset)
+            length = int(length)
+        except: return
+
+        ## Look through the files and make a preview view of each hit
+        fsfd = FileSystem.DBFS(self.case)
+        low = max(0,offset - self.width)
+        high = offset + self.width + length
+        fd = fsfd.open(inode_id = inode_id)
         fd.slack = True
         fd.overread = True
         fd.seek(low)
 
         result = result.__class__(result)
-        result.text(fd.read(row['Offset']-low), font='typewriter', style='black', sanitise='full')
+        result.text(fd.read(offset-low), font='typewriter', style='black', sanitise='full')
         result.text(fd.read(length), font='typewriter',  style='red',sanitise='full')
         result.text(fd.read(50), font='typewriter', style='black',sanitise='full')
 
@@ -379,21 +379,78 @@ class DataPreview(OffsetType):
 
 class WordColumn(ColumnType):
     symbols = { '=': 'literal'}
+    inactive = False
     
-    def __init__(self, **kwargs):
-        kwargs['column'] = 'word_id'
-        self.dict_column = 'word'
-        ColumnType.__init__(self, **kwargs)
+    def __init__(self, name = 'Word', case=None):
+        self.case = case
+        ColumnType.__init__(self, column = 'word_id', name = name,
+                            table='LogicalIndexOffsets')
 
-    def select(self):
-        return "(select %s from `%s`.dictionary where id=`%s`)" % (self.dict_column,
-                                                                   config.FLAGDB, self.column)
+    def plain_display_hook(self, value, row, result):
+        dbh = DB.DBO()
+        dbh.execute("select word, type from dictionary where id=%r limit 1", value)
+        row = dbh.fetch()
+        word=row['word']
+        
+        if row['type'] in ['literal','regex']:
+            result.text(word.decode("ascii", "ignore"))
+        else:
+            ## Force it to ascii for display
+            result.text(word.decode("utf8"))
+
+    display_hooks = [ plain_display_hook, ColumnType.link_display_hook ]
     
-    def operator_literal(self, column, operator,arg):
+    def operator_literal(self, column, operator, arg):
+        ## We can refer to the word by text or word id:
         column = self.escape_column_name(self.column)
-        return "(%s in (select id from `%s`.dictionary where %s = %r))" % \
-               (column, config.FLAGDB, self.dict_column, arg)
+        try:
+            id = int(arg)
+            return "%s %s '%s'" % (column, operator, id)
+        except ValueError:
+            return "(%s in (select id from `%s`.dictionary where word = %r))" % \
+                   (column, config.FLAGDB, arg)
 
+    def operator_hit(self, column, operator, arg):
+        """ Search for a hit in the dictionary """
+        dbh = DB.DBO()
+        dbh.execute("select id from dictionary where word = %r limit 1", arg)
+        row = dbh.fetch()
+        if not row:
+            ## If there is nowhere to report the error - fall back to
+            ## a noop
+            if not self.ui:
+                return "1"
+
+            ## Allow the user to reindex the currently selected set of
+            ## inodes with a new dictionary based on the new word
+            self.ui.heading("Word %r not found in dictionary" % arg)
+                
+            ## Remove any references to the LogicalIndexOffsets table
+            ## - this will allow us to count how many inodes are
+            ## involved in the re-indexing without making references
+            ## to this column type.
+            elements = [ e for e in self.elements if e.table != "LogicalIndexOffsets" ]
+
+            ## Calculate the new filter string
+            sql = parser.parse_to_sql(self.ui.defaults['filter'],
+                                      elements, None)
+
+            sql = "%s where %s" % (UI._make_join_clause(elements),
+                                                  sql)
+            cdbh = DB.DBO(self.case)
+            cdbh.execute("select count(*) as c %s" % sql)
+            count = cdbh.fetch()['c']
+            cdbh.execute("select sum(inode.size) as s %s" % sql)
+            total = cdbh.fetch()['s']
+
+            self.ui.para("This will affect %s inodes and require rescanning %s bytes" % (count,total))
+
+            ## Ok - Show the error to the user:
+            raise self.ui
+
+        return "(%s = %s)" % (self.escape_column_name(self.column),
+                              row['id'])
+        
 class ClassColumn(WordColumn):
     """ This shows the class of the dictionary word """
     def __init__(self, **kwargs):
@@ -441,6 +498,47 @@ class BrowseIndexKeywords(Reports.report):
                                                    groupby = 'Word',
                                                    case = query['case']
                                                    ))
+
+import pyflag.UI as UI
+
+## This makes sure that we only add methods to the class
+if "Keyword" not in UI.TableRenderer.__doc__:
+    original_render_tools = UI.TableRenderer.render_tools
+    original_render = UI.TableRenderer.render
+
+class TableRenderer(UI.TableRenderer):
+    """ A modified Table renderer which supports Keyword Indexes """
+    def render_tools(self, query, result):
+        original_render_tools(self, query, result)
+        self.indexing_button(query, result)
+
+    ## Install our toolbar button in the main Table renderer:
+    def indexing_button(self, query, result):
+        """ This adds a new column for the keyword hits """
+        new_query = query.clone()
+        if query.has_key("indexing_column"):
+            del new_query["indexing_column"]
+
+            result.toolbar(link = new_query, icon="search.png",
+                           tooltip = "Hide Index hits", pane = 'self')
+
+        else:
+            new_query['indexing_column'] = 1            
+            result.toolbar(link = new_query, icon="search.png",
+                           tooltip = "Show Index hits", pane = 'self')
+
+    def render(self, query,result):
+        if query.has_key("indexing_column"):
+            print "Will add the indexing column"
+            self.elements.append(WordColumn(name='Word',
+                                            case = query['case']))
+            self.elements.append(DataPreview(name='Preview',
+                                             case = query['case']))
+
+        original_render(self, query, result)
+        
+## Install the new updated table renderer:
+UI.TableRenderer = TableRenderer
 
 ## Unit tests
 import unittest
@@ -573,7 +671,9 @@ class LogicalIndexTests(unittest.TestCase):
             for id, length in matches:
                 print "Found hit %s" % data[offset:offset+length]
                 results.append(offset)
-                
+
+        ## We should only find a single hit since we are in unique
+        ## mode
         self.assertEqual(len(results),1)
 
 class LogicalIndexMemoryTest(LogicalIndexTests):

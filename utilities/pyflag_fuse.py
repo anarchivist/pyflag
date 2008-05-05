@@ -65,7 +65,6 @@ class FuseError(IOError):
     """
     def __init__(self, message='',errno=1):
         self.errno = errno
-        print message
         IOError.__init__(self,message)
 
 class PyFlagVFS(Fuse):

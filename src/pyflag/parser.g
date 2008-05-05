@@ -23,7 +23,7 @@ type of the columns presented.
 # * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # ******************************************************
 
-def eval_expression(elements, name, operator, arg):
+def eval_expression(elements, name, operator, arg, result_ui):
 #    print "Evaluating %s.%s(%r)" % (name,operator,arg)
     ## Try and find the element with the specified name:
     element = None
@@ -33,10 +33,11 @@ def eval_expression(elements, name, operator, arg):
             break
     
     if not element:
-        raise RuntimeError("Column %s not known" % name)
+        return "1"
+        #raise RuntimeError("Column %s not known" % name)
 
     ## Use the element to parse:
-    return element.parse(name, operator, arg)
+    return element.parse(name, operator, arg, ui=result_ui, elements = elements)
 
 %%
 parser SearchParser:
@@ -48,15 +49,15 @@ parser SearchParser:
     token WORD: '[-:+*/!@$%^&=\<\>.a-zA-Z0-9_]+'
     token LOGICAL_OPERATOR: "(and|or|AND|OR)"
 
-    rule goal<<types>>: clause<<types>>  END {{ return clause }}
+    rule goal<<types, ui>>: clause<<types, ui>>  END {{ return clause }}
 
     ## A clause is a sequence of expressions seperated by logical
     ## operators. Since our operators are the same as SQL, we just
     ## copy them in.
-    rule clause<<types>>: expr<<types>> {{ result = expr }}
+    rule clause<<types, ui>>: expr<<types, ui>> {{ result = expr }}
                     (
                         LOGICAL_OPERATOR {{ logical_operator = LOGICAL_OPERATOR }}
-                        expr<<types>> {{ result = "%s %s %s" % (result, logical_operator, expr) }}
+                        expr<<types, ui>> {{ result = "%s %s %s" % (result, logical_operator, expr) }}
                      )*  {{ return result }}
 
     ## A term may be encapsulated with " or ' or not. Note that
@@ -70,18 +71,18 @@ parser SearchParser:
     ## be encapsulated in ( ) in order to be put into the
     ## clause. Since out operators have the same precendence as SQL we
     ## just need to preserve the ( ).
-    rule expr<<types>>: term {{ column = term }}
+    rule expr<<types, ui>>: term {{ column = term }}
                      WORD {{ operator = WORD }}
-                     term {{ return  eval_expression(types, column,operator,term)}}
+                     term {{ return  eval_expression(types, column,operator,term, ui)}}
                      #Preserve parenthases
-                     | '\\(' clause<<types>> '\\)' {{ return "( %s )" % clause }}
+                     | '\\(' clause<<types, ui>> '\\)' {{ return "( %s )" % clause }}
 
 %%
 
-def parse_to_sql(text, types):
+def parse_to_sql(text, types, ui):
     P = SearchParser(SearchParserScanner(text))
     try:
-        return P.goal(types)
+        return P.goal(types, ui)
     except runtime.SyntaxError, e:
         raise RuntimeError("\n%s\n%s^\n%s" % (text, '-' * e.pos[2], e.msg))
 
