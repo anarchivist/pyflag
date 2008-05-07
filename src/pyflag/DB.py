@@ -696,8 +696,11 @@ class DBO:
         if args: columns = args
         
         for k,v in columns.items():
-            ## _field means to pass the field 
-            if k.startswith('_'):
+            ## _field means to pass the field
+            if k.startswith("__"):
+                v="_binary'%s'" % escape(v)
+                k=k[2:]
+            elif k.startswith('_'):
                 k=k[1:]
             else:
                 v="'%s'" % escape(unicode(v))
