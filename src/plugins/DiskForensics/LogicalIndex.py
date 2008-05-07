@@ -378,7 +378,7 @@ class DataPreview(ColumnType):
         return result
 
 class WordColumn(ColumnType):
-    symbols = { '=': 'literal'}
+    symbols = { '=': 'hit'}
     inactive = False
     
     def __init__(self, name = 'Word', case=None):
@@ -400,16 +400,6 @@ class WordColumn(ColumnType):
 
     display_hooks = [ plain_display_hook, ColumnType.link_display_hook ]
     
-    def operator_literal(self, column, operator, arg):
-        ## We can refer to the word by text or word id:
-        column = self.escape_column_name(self.column)
-        try:
-            id = int(arg)
-            return "%s %s '%s'" % (column, operator, id)
-        except ValueError:
-            return "(%s in (select id from `%s`.dictionary where word = %r))" % \
-                   (column, config.FLAGDB, arg)
-
     def operator_hit(self, column, operator, arg):
         """ Search for a hit in the dictionary """
         dbh = DB.DBO()
@@ -519,7 +509,7 @@ class TableRenderer(UI.TableRenderer):
         if query.has_key("indexing_column"):
             del new_query["indexing_column"]
 
-            result.toolbar(link = new_query, icon="search.png",
+            result.toolbar(link = new_query, icon="nosearch.png",
                            tooltip = "Hide Index hits", pane = 'self')
 
         else:
@@ -539,6 +529,10 @@ class TableRenderer(UI.TableRenderer):
         
 ## Install the new updated table renderer:
 UI.TableRenderer = TableRenderer
+
+## This is how we can add new words to the dictionary and facilitate scanning:
+#class AddWords(reports.Repo
+
 
 ## Unit tests
 import unittest

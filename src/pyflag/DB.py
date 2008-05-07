@@ -121,15 +121,19 @@ def expand(sql, params):
     def cb(m):
         if m.group(1)=="s":
             result = "%s" % params[d['count']]
-            d['count'] +=1
-            return result
-
+            
+        ## Raw escaping
         elif m.group(1)=='r':
             result = "'%s'" % escape(("%s" % params[d['count']]).encode("utf8"))
-            d['count'] +=1
-            return result
+
+        ## This needs to be binary escaped:
+        elif m.group(1)=='b':
+            result = "_binary'%s'" % escape(params[d['count']])
+
+        d['count'] +=1
+        return result
             
-    return re.sub("%(r|s)", cb, sql)
+    return re.sub("%(r|s|b)", cb, sql)
 
 class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
     """ This cursor combines client side and server side result storage.
@@ -609,7 +613,10 @@ class DBO:
         tmp = []
         sql = []
         for k,v in fields.items():
-            if k.startswith("_"):
+            if k.startswith("__"):
+                sql.append('`%s`=%b')
+                k=k[2:]
+            elif k.startswith("_"):
                 sql.append('`%s`=%s')
                 k=k[1:]
             else:

@@ -124,7 +124,8 @@ class MD5Scan(GenScanFactory):
             if self.length<16: return
             
             dbh_flag=DB.DBO(config.HASHDB)
-            dbh_flag.execute("select filename,Name from NSRL_hashes join NSRL_products on productcode=Code where md5=%r limit 1",self.m.digest())
+            digest = self.m.digest()
+            dbh_flag.execute("select filename,Name from NSRL_hashes join NSRL_products on productcode=Code where md5=%b limit 1", digest)
             nsrl=dbh_flag.fetch()
             if not nsrl: nsrl={}
             
@@ -132,7 +133,7 @@ class MD5Scan(GenScanFactory):
             inode_id = self.fd.lookup_id()
             dbh.insert('hash',
                        inode_id = inode_id,
-                       binary_md5 = self.m.digest(),
+                       __binary_md5 = digest,
                        NSRL_product = nsrl.get('Name','-'),
                        NSRL_filename = nsrl.get('filename','-'),
                        )
@@ -181,7 +182,7 @@ class HashScanTest(pyflag.tests.ScannerTest):
     
     order = 20
     def test_scanner(self):
-        """ Check the virus scanner works """
+        """ Check the hash scanner works """
         dbh = DB.DBO(self.test_case)
 
         env = pyflagsh.environment(case=self.test_case)
