@@ -68,6 +68,11 @@ int Root_Read(Packet self, StringIO input) {
     this->packet.eth = (Packet)CONSTRUCT(Cooked, Packet, super.Con, self, self);
     return CALL(this->packet.eth, Read, input);
 
+  case DLT_RAW:
+  case DLT_RAW2:
+    this->packet.eth = (Packet)CONSTRUCT(IP, Packet, super.Con, self, self);
+    return CALL(this->packet.eth, Read, input);
+
   default:
     DEBUG("unable to parse link type of %u\n", this->packet.link_type);
     return -1;
