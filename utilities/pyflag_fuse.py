@@ -36,6 +36,7 @@ import pyflag.IO as IO
 import pyflag.FileSystem as FileSystem
 import pyflag.Registry as Registry
 import pyflag.pyflaglog as pyflaglog
+import pyflag.FlagFramework as FlagFramework
 
 import pyflag.conf
 config = pyflag.conf.ConfObject()
@@ -76,31 +77,46 @@ class PyFlagVFS(Fuse):
         self.root = config.fsroot
 
     def getattr(self, path):
-        path = os.path.normpath("%s/%s" % (self.root, path))
         try:
-            result = self.fs.lstat(path=path)
-        except RuntimeError,e:
-            raise FuseError("%s Not found" % path, 2)
-        
-        if not result:
-            return os.stat_result((16877, 1L, 1, 1, 0, 0, 4096L, 0, 0, 0))
+            path = os.path.normpath("%s/%s" % (self.root, path))
+            try:
+                result = self.fs.lstat(path=path)
+            except RuntimeError,e:
+                raise FuseError("%s Not found" % path, 2)
 
-        return result
+            if not result:
+                return os.stat_result((16877, 1L, 1, 1, 0, 0, 4096L, 0, 0, 0))
+
+            return result
+        except FuseError: raise
+        except Exception,e:
+            print "%r: %s" % (e,e)
+            print FlagFramework.get_bt_string(e)
 
     def readlink(self, path):
-        result = self.fs.readlink(path)
-        if not result:
-            raise FuseError("Cannot read symbolic link %s" % path, 2)
+        try:
+            result = self.fs.readlink(path)
+            if not result:
+                raise FuseError("Cannot read symbolic link %s" % path, 2)
 
-        return result
+            return result
+        except FuseError: raise
+        except Exception,e:
+            print "%r: %s" % (e,e)
+            print FlagFramework.get_bt_string(e)
+
 
     def readdir(self, path, offset):
-        path = os.path.normpath("%s/%s" % (self.root, path))
-        if not path.endswith('/'): path=path+'/'
-        for e in self.fs.ls(path=path):
-            if not e: continue
+        try:
+            path = os.path.normpath("%s/%s" % (self.root, path))
+            if not path.endswith('/'): path=path+'/'
+            for e in self.fs.ls(path=path):
+                if not e: continue
             
-            yield fuse.Direntry(e.encode("utf8"))
+                yield fuse.Direntry(e.encode("utf8"))
+        except Exception,e:
+            print "%r: %s" % (e,e)
+            print FlagFramework.get_bt_string(e)
 
     def unlink(self, path):
         raise FuseError("Unable to modify Virtual Filesystem")
