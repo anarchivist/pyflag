@@ -408,8 +408,8 @@ class WordColumn(ColumnType):
         if not row:
             ## If there is nowhere to report the error - fall back to
             ## a noop
-            if not self.ui:
-                return "1"
+            #if not self.ui:
+            #    return "1"
 
             ## Allow the user to reindex the currently selected set of
             ## inodes with a new dictionary based on the new word
@@ -425,12 +425,12 @@ class WordColumn(ColumnType):
             sql = parser.parse_to_sql(self.ui.defaults['filter'],
                                       elements, None)
 
-            sql = "%s where %s" % (UI._make_join_clause(elements),
+            final_sql = "%s where %s" % (UI._make_join_clause(elements),
                                                   sql)
             cdbh = DB.DBO(self.case)
-            cdbh.execute("select count(*) as c %s" % sql)
+            cdbh.execute("select count(*) as c %s" % final_sql)
             count = cdbh.fetch()['c']
-            cdbh.execute("select sum(inode.size) as s %s" % sql)
+            cdbh.execute("select sum(inode.size) as s %s" % final_sql)
             total = cdbh.fetch()['s']
 
             self.ui.para("This will affect %s inodes and require rescanning %s bytes" % (count,total))

@@ -37,6 +37,8 @@ import pyflag.conf
 import pyflag.pyflaglog as pyflaglog
 config=pyflag.conf.ConfObject()
 import pyflag.parser as parser
+import pyflag.Registry as Registry
+
 
 config.LOG_LEVEL=7
 
@@ -832,8 +834,7 @@ class TableRenderer:
 
     def export_button(self, query, result):
         """ Provides an interface for exporting the table in a useful way """
-        import pyflag.Registry as Registry
-        
+
         def save_table(query, result):
             result.start_form(query)
             exporters = [ c for c in Registry.TABLE_RENDERERS.classes if c.exportable ]
@@ -869,3 +870,8 @@ class TableRenderer:
             result.end_form()
             
         result.toolbar(save_table, "Export Table", icon="floppy.png")
+
+## This is a reference for the original table renderer. This is needed
+## for the Registry to still pick up our classes even if the above
+## TableRenderer has been replaced.
+TableRendererBaseClass = TableRenderer

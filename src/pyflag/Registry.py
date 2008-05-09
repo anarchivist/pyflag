@@ -488,7 +488,7 @@ def Init():
     global TABLE_RENDERERS
     import pyflag.UI as UI
 
-    TABLE_RENDERERS = ScannerRegistry(UI.TableRenderer)
+    TABLE_RENDERERS = ScannerRegistry(UI.TableRendererBaseClass)
 
 def InitTests():
     return TestsRegistry(unittest.TestCase)

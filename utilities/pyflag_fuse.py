@@ -82,6 +82,8 @@ class PyFlagVFS(Fuse):
             try:
                 result = self.fs.lstat(path=path)
             except RuntimeError,e:
+                print "Error: %s" % e
+                print FlagFramework.get_bt_string(e)                
                 raise FuseError("%s Not found" % path, 2)
 
             if not result:
