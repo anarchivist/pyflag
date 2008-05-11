@@ -191,6 +191,10 @@ class Mork(Magic.Magic):
 
 ## Mozilla Cache handling
 
+import httplib
+import StringIO
+import time
+
 class MozCacheScan(Scanner.GenScanFactory):
     """ Scan for Mozilla Cache files """
     default = True
@@ -216,18 +220,49 @@ class MozCacheScan(Scanner.GenScanFactory):
             mozcache = MozCache.MozCache(fd, data_fds)
             #print mozcache
 
+            dbh = DB.DBO(self.case)
+
             # process each cache record
             for record in mozcache.records():
             	meta = record.get_entry()
+
             	# add vfs entries for cache data inside datafiles
                 if record.record['DataLocation']['DataFile'] != 0:
                     fileidx, offset, len = record.get_data_location()
-                    self.ddfs.VFSCreate(None,
+                    inode_id = self.ddfs.VFSCreate(None,
                                         '%s|o%s:%s' % (data_fds[fileidx].inode, offset, len), 
                                         "%s%08Xd01" % (s['path'], record.record['HashNumber']),
                                         _mtime=meta['LastModified'],
                                         _atime=meta['LastFetched'],
                                         size=len)
+                else:
+                    (_, _, inode_id) = self.ddfs.lookup(path="%s%08Xd01" % (s['path'], record.record['HashNumber']))
+                
+                # add to http table
+                # TODO: handle exceptions (missing request-method (myciwyg
+                # urls)). Handle gzip encoding (create new VFS entry with
+                # gzip/deflate driver and update inode_id to point to it?)
+                try:
+                    method = meta['MetaData']['request-method']
+                    header = meta['MetaData']['response-head'].splitlines(True)
+                    status = header[0].split(None, 2)[1]
+                    header = httplib.HTTPMessage(StringIO.StringIO("".join(header[1:])))
+                    try:
+                        date = time.strftime("%Y-%m-%d:%H:%M:%S", header.getdate("date"))
+                    except TypeError:
+                        date = 0
+                    
+                    dbh.insert("http", 
+                            inode_id=inode_id, 
+                            url=meta['KeyData'],
+                            method=method,
+                            status=status,
+                            content_type=header.getheader("content-type"),
+                            date=date,
+                            )
+                except Exception, e:
+                    print "Got Exception: %s" % e
+                    print meta
 
 import pyflag.tests
 import pyflag.pyflagsh as pyflagsh
@@ -235,6 +270,7 @@ import pyflag.pyflagsh as pyflagsh
 class MozHistScanTest(pyflag.tests.ScannerTest):
     """ Test Mozilla History scanner """
     test_case = "PyFlagTestCase"
+
     test_file = "pyflag_stdimage_0.4.e01"
     subsystem = 'EWF'
     offset = "16128s"
