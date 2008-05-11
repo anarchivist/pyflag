@@ -73,6 +73,20 @@ class Sleuthkit_File(File):
 
         return result
 
+    def explain(self, query,result):
+        self.fd.explain(query, result)
+
+        ## List the blocks in this file:
+        tmp = result.__class__(result)
+        tmp.para("Block size is %s bytes" % self.block_size)
+        tmp.row("Block","Extent")
+        dbh = DB.DBO(self.case)
+        dbh.execute("select * from block where inode = %r order by `index`" , self.inode)
+        for row in dbh:
+            tmp.row(row['block'], row['count'])
+
+        result.row("Sleuthkit File %s" % self.inode[1:],tmp)
+            
 class Sleuthkit(DBFS):
     """ A new improved Sleuthit based filesystem """
     name = 'Sleuthkit'

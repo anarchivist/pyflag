@@ -89,12 +89,21 @@ class IO_File(FileSystem.File):
     def tell(self):
         return self.io.tell()
         
-    def explain(self, result):
+    def explain(self, query, result):
         tmp = result.__class__(result)
-        self.io.explain(tmp)
-        dbh = DB.DBO(self.case)    
+        try:
+            self.io.explain(tmp)
+        except AttributeError:
+            dbh = DB.DBO(self.case)
+            dbh.execute("select parameters from iosources where name=%r" , self.name)
+            row = dbh.fetch()
+            q = FlagFramework.query_type(string = row['parameters'])
+            q.clear('report')
+            q.clear('family')
+            for k,v in q.items():
+                tmp.row(k,v)
+            
         result.row("IO Subsys %s:" % self.name, tmp, valign="top")
-        result.row("Mount point",dbh.get_meta("mount_point_%s" % self.name))
 
 import sys
 
@@ -156,6 +165,13 @@ class OffsetFile(FileSystem.File):
         
         self.readptr+=len(result)
         return result
+
+    def explain(self, query, result):
+        self.fd.explain(query,result)
+
+        result.row("Offset","Extract %s bytes from %s starting at byte %s" % (self.size,
+                                                                              self.fd.inode,
+                                                                              self.offset))
 
 class Help(Reports.report):
     """ This facility displays helpful messages """

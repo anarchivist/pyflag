@@ -597,8 +597,8 @@ class File:
         @note: This is not meant to be called directly, the File object must be created by a valid FileSystem object's open method.
         """
         # Install default views
-        self.stat_names = ["Statistics","HexDump", "TextDump", "Download","Summary"]
-        self.stat_cbs=[self.stats,self.hexdump,self.textdump, self.download, self.summary]
+        self.stat_names = ["Statistics","HexDump", "TextDump", "Download","Summary", "Explain"]
+        self.stat_cbs=[self.stats,self.hexdump,self.textdump, self.download, self.summary, self.explain]
 
         # each file should remember its own part of the inode
         self.case = case
@@ -792,9 +792,11 @@ class File:
                 buffer += data
 
 
-    def explain(self, result):
+    def explain(self, query, result):
         """ This method is called to explain how we arrive at this
         data"""
+        if self.fd:
+            self.fd.explain(query, result)
         result.row(self.__class__.__name__, self.__doc__)
 
     def summary(self,query,result):

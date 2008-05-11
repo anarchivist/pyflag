@@ -219,6 +219,7 @@ class ZipFile(File):
         except:
             offset = int(ourpart)
 
+        self.offset = offset
         ## Ensure that we can read the file header:
         b = Zip.Buffer(fd=fd)[offset:]
         self.header = Zip.ZipFileHeader(b)
@@ -312,6 +313,12 @@ class ZipFile(File):
             self.seek(offset, rel)
             return
 
+    def explain(self, query, result):
+        self.fd.explain(query, result)
+
+        result.row("Zip File", "Decompress ZipFileHeader structure at "
+                   "offset %s with length %s" % (self.offset, self.compressed_length))
+
 class GZ_file(DiskForensics.DBFS_file):
     """ A file like object to read gzipped files. """
     specifier = 'G'
@@ -374,6 +381,11 @@ class GZ_file(DiskForensics.DBFS_file):
         ## Force a new decompressor when rereading:
         self.gz = None
 
+    def explain(self, query, result):
+        self.fd.explain(query, result)
+
+        result.row("Gzip File", "Use Gzip algorithm to decompress %s" % self.fd.inode)
+
 class DeflateFile(GZ_file):
     """ A File like object to read deflated files """
     specifier = "d"
@@ -416,6 +428,11 @@ class DeflateFile(GZ_file):
             result+=data
 
         return result
+
+    def explain(self, query, result):
+        self.fd.explain(query, result)
+
+        result.row("Gzip File", "Use deflate algorithm to decompress %s" % self.fd.inode)
 
 class Tar_file(DiskForensics.DBFS_file):
     """ A file like object to read files from within tar files. Note that the tar file is specified as an inode in the DBFS """

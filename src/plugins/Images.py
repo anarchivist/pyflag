@@ -248,7 +248,7 @@ class Advanced(IO.Image):
                 dbh.execute("select parameters from iosources where name = %r" , name)
                 row = dbh.fetch()
                 self.io = self.create(name, case, query_type(string=row['parameters']))
-
+                self.parameters = row['parameters']
 
 class SGZip(Advanced):
     """ Sgzip is pyflags native image file format """
