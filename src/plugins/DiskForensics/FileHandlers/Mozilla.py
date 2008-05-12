@@ -195,6 +195,23 @@ import httplib
 import StringIO
 import time
 
+def parse_response(meta):
+    """ Parse Cache Metadata, returns (method, status, header) """
+    try:
+        method = meta['request-method']
+    except KeyError:
+        method = "UNKNOWN"
+
+    try:
+        header = meta['response-head'].splitlines(True)
+        status = header[0].split(None, 2)[1]
+        header = httplib.HTTPMessage(StringIO.StringIO("".join(header[1:])))
+    except KeyError:
+        status = "UNKNOWN"
+        header = httplib.HTTPMessage(StringIO.StringIO())
+
+    return (method, status, header)
+
 class MozCacheScan(Scanner.GenScanFactory):
     """ Scan for Mozilla Cache files """
     default = True
@@ -225,44 +242,52 @@ class MozCacheScan(Scanner.GenScanFactory):
             # process each cache record
             for record in mozcache.records():
             	meta = record.get_entry()
-
+            	(method, status, header) = parse_response(meta['MetaData'])
+ 
             	# add vfs entries for cache data inside datafiles
                 if record.record['DataLocation']['DataFile'] != 0:
-                    fileidx, offset, len = record.get_data_location()
+                    fileidx, offset, length = record.get_data_location()
+                    inode = '%s|o%s:%s' % (data_fds[fileidx].inode, offset, length)
+                    # if data is content-encoded (gzip/deflate) append gzip
+                    # driver to inode
+                    if header.getheader("content-encoding"):
+                    	inode += "|G1"
+                    	length = 0
+                    # add to the VFS
                     inode_id = self.ddfs.VFSCreate(None,
-                                        '%s|o%s:%s' % (data_fds[fileidx].inode, offset, len), 
+                                        inode,
                                         "%s%08Xd01" % (s['path'], record.record['HashNumber']),
                                         _mtime=meta['LastModified'],
                                         _atime=meta['LastFetched'],
-                                        size=len)
+                                        size=length)
                 else:
-                    (_, _, inode_id) = self.ddfs.lookup(path="%s%08Xd01" % (s['path'], record.record['HashNumber']))
+                    (path, inode, inode_id) = self.ddfs.lookup(path="%s%08Xd01" % (s['path'], record.record['HashNumber']))
+                    # if data is content-encoded, have to make a new inode to
+                    # get uncompressed data
+                    if header.getheader("content-encoding"):
+                    	inode_id = self.ddfs.VFSCreate(None,
+                                        "%s|G1" % inode,
+                                        "%s/Uncompressed" % path,
+                                        _mtime=meta['LastModified'],
+                                        _atime=meta['LastFetched'],
+                                        size=0)
                 
                 # add to http table
-                # TODO: handle exceptions (missing request-method (myciwyg
-                # urls)). Handle gzip encoding (create new VFS entry with
-                # gzip/deflate driver and update inode_id to point to it?)
                 try:
-                    method = meta['MetaData']['request-method']
-                    header = meta['MetaData']['response-head'].splitlines(True)
-                    status = header[0].split(None, 2)[1]
-                    header = httplib.HTTPMessage(StringIO.StringIO("".join(header[1:])))
-                    try:
-                        date = time.strftime("%Y-%m-%d:%H:%M:%S", header.getdate("date"))
-                    except TypeError:
-                        date = 0
-                    
-                    dbh.insert("http", 
-                            inode_id=inode_id, 
-                            url=meta['KeyData'],
-                            method=method,
-                            status=status,
-                            content_type=header.getheader("content-type"),
-                            date=date,
-                            )
-                except Exception, e:
-                    print "Got Exception: %s" % e
-                    print meta
+                    date = time.strftime("%Y-%m-%d:%H:%M:%S", header.getdate("date"))
+                except TypeError:
+                    date = 0
+                # chomp NULL from end
+                url = str(meta['KeyData'])[:-1]
+                if url.startswith("HTTP:"): url = url[len("HTTP:"):]
+                dbh.insert("http", 
+                        inode_id=inode_id, 
+                        url=url,
+                        method=method,
+                        status=status,
+                        content_type=header.getheader("content-type"),
+                        date=date,
+                        )
 
 import pyflag.tests
 import pyflag.pyflagsh as pyflagsh
