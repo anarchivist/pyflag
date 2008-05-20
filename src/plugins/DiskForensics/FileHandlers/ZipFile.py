@@ -170,6 +170,7 @@ class TarScan(GenScanFactory):
             tar=tarfile.TarFile(name='/', fileobj=fd)
             
             ## List all the files in the tar file:
+            inodes = []
             dircount = 0
             namelist = tar.getnames()
             for i in range(len(namelist)):
@@ -188,8 +189,10 @@ class TarScan(GenScanFactory):
                     )
                 
                 new_inode="%s|T%s" % (self.inode,i)
+                inodes.append(new_inode)
+            for inode in inodes:
                 ## Scan the new file using the scanner train:
-                fd=self.ddfs.open(inode=new_inode)
+                fd=self.ddfs.open(inode=inode)
                 Scanner.scanfile(self.ddfs,fd,self.factories)
 
 ZIPCACHE = Store.Store(max_size=5)
