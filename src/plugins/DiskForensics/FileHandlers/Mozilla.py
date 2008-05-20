@@ -242,35 +242,32 @@ class MozCacheScan(Scanner.GenScanFactory):
             # process each cache record
             for record in mozcache.records():
             	meta = record.get_entry()
-            	(method, status, header) = parse_response(meta['MetaData'])
- 
-            	# add vfs entries for cache data inside datafiles
+            	(method, status, header) = parse_response(meta['MetaData'])    
+
+            	# deal with content-encoding (gzip/deflate)
+                encoding_driver = ""
+                encoding = header.getheader("content-encoding")
+                if encoding:
+                    if "gzip" in encoding.lower():
+                    	encoding_driver = "|G1"
+                    elif "deflate" in encoding.lower():
+                    	encoding_driver = "|d1"
+
+            	# locate embedded entries 
                 if record.record['DataLocation']['DataFile'] != 0:
                     fileidx, offset, length = record.get_data_location()
                     inode = '%s|o%s:%s' % (data_fds[fileidx].inode, offset, length)
-                    # if data is content-encoded (gzip/deflate) append gzip
-                    # driver to inode
-                    if header.getheader("content-encoding"):
-                    	inode += "|G1"
-                    	length = 0
-                    # add to the VFS
-                    inode_id = self.ddfs.VFSCreate(None,
-                                        inode,
-                                        "%s%08Xd01" % (s['path'], record.record['HashNumber']),
-                                        _mtime=meta['LastModified'],
-                                        _atime=meta['LastFetched'],
-                                        size=length)
                 else:
-                    (path, inode, inode_id) = self.ddfs.lookup(path="%s%08Xd01" % (s['path'], record.record['HashNumber']))
-                    # if data is content-encoded, have to make a new inode to
-                    # get uncompressed data
-                    if header.getheader("content-encoding"):
-                    	inode_id = self.ddfs.VFSCreate(None,
-                                        "%s|G1" % inode,
-                                        "%s/Uncompressed" % path,
-                                        _mtime=meta['LastModified'],
-                                        _atime=meta['LastFetched'],
-                                        size=0)
+                    inode = self.ddfs.lookup(path="%s%08Xd01" % (s['path'], record.record['HashNumber'].get_value()))[1]
+
+                # add new entry to the VFS
+                if encoding: length=0
+                inode_id = self.ddfs.VFSCreate(None,
+                                    "%s%s" % (inode, encoding_driver),
+                                    "%s/%08Xd01" % (filename, record.record['HashNumber'].get_value()),
+                                    _mtime=meta['LastModified'],
+                                    _atime=meta['LastFetched'],
+                                    size=length)
                 
                 # add to http table
                 try:
