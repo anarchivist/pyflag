@@ -505,6 +505,9 @@ if __name__ == "__main__":
     if config.THEME=="AJAX":
         import pyflag.AJAXUI as AJAXUI
         UI.UI = AJAXUI.AJAXUI
+    elif config.THEME=="XML":
+        import pyflag.XMLUI as XMLUI
+        UI.UI = XMLUI.XMLUI
     else:
         import pyflag.HTMLUI as HTMLUI
         UI.UI = HTMLUI.HTMLUI
