@@ -115,7 +115,7 @@ class ResetCase(Reports.report):
     order = 30
 
     def form(self,query,result):
-        result.defaults = query
+        query['reset_case']=query['case']
         result.para("Please select the case to reset. Note that all data in this case will be lost.")
         result.case_selector(case="reset_case")
         return result
