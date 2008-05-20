@@ -133,4 +133,6 @@ class ResetCase(Reports.report):
         report = NewCase(self.flag, self.ui)
         report.display(query,tmp)
 
+        query['case'] = query['reset_case']
+
         result.para("Case %s has been reset" % query['reset_case'])
