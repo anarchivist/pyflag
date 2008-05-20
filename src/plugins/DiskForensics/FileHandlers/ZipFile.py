@@ -69,6 +69,7 @@ class ZipScan(GenScanFactory):
             
             ## List all the files in the zip file:
             dircount = 0
+            inodes = []
             namelist = z.namelist()
             for i in range(len(namelist)):
                 ## Add the file into the VFS
@@ -83,15 +84,16 @@ class ZipScan(GenScanFactory):
 
                 info = z.infolist()[i]
                 inode = "%s|Z%s:%s" % (self.inode,info.header_offset, info.compress_size)
+                inodes.append(inode)
 
                 self.ddfs.VFSCreate(None,
                                     inode,pathname+"/"+namelist[i],
                                     size=info.file_size,
                                     _mtime=t)
 
+            for inode in inodes:
                 ## Now call the scanners on this new file (FIXME limit
                 ## the recursion level here)
-                #fd = ZipFile(self.case, self.fd, inode)
                 fd = self.ddfs.open(inode = inode)
                 Scanner.scanfile(self.ddfs,fd,self.factories)
 
