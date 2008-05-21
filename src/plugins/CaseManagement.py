@@ -92,7 +92,7 @@ class DelCase(Reports.report):
         pass
 
     def form(self,query,result):
-        result.defaults = query
+        query['remove_case']=query['case']
         result.para("Please select the case to delete. Note that all data in this case will be lost.")
         result.case_selector(case="remove_case")
         return result
