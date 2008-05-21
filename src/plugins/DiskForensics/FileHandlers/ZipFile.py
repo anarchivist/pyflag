@@ -42,6 +42,7 @@ import gzip
 import plugins.DiskForensics.DiskForensics as DiskForensics
 import pyflag.Store as Store
 import FileFormats.Zip as Zip
+import pyflag.Time as Time
 
 class ZipScan(GenScanFactory):
     """ Recurse into Zip Files """
@@ -67,6 +68,10 @@ class ZipScan(GenScanFactory):
 
             pathname, inode, inode_id = self.ddfs.lookup(inode = self.inode)
             
+            ## retrieve evidence timezone, this is necessary because zip files
+            ## store time in localtime
+            evidence_tz = Time.get_evidence_tz_name(self.case, fd)
+
             ## List all the files in the zip file:
             dircount = 0
             inodes = []
@@ -74,8 +79,8 @@ class ZipScan(GenScanFactory):
             for i in range(len(namelist)):
                 ## Add the file into the VFS
                 try:
-                    ## Convert the time to a common format.
-                    t = time.mktime(list(z.infolist()[i].date_time) +[0,0,0])
+                    ## Convert the time to case timezone
+                    t = Time.convert(z.infolist()[i].date_time, case=self.case, evidence_tz=evidence_tz)
                 except:
                     t=0
 
@@ -89,7 +94,7 @@ class ZipScan(GenScanFactory):
                 self.ddfs.VFSCreate(None,
                                     inode,pathname+"/"+namelist[i],
                                     size=info.file_size,
-                                    _mtime=t)
+                                    mtime=t)
 
             for inode in inodes:
                 ## Now call the scanners on this new file (FIXME limit

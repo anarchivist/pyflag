@@ -291,14 +291,6 @@ class Pool(Queue):
             except Empty:
                 result = self.connect()
 
-##            ## Ensure the tz is adjusted appropriately:
-##            tz=pool.parameter("TZ")
-##            if result.tz != tz:
-##                print "Adjusting TZ to %s" % tz
-##                c=result.cursor()
-##                c.execute("set time_zone = %r" % tz)
-##                self.dbh.tz = tz
-
             return result
         except Exception,e:
             raise DBError("Unable to connect - does the DB Exist?: %s" % e)
@@ -345,8 +337,6 @@ class Pool(Queue):
         c=dbh.cursor()
         c.execute("set autocommit=1")
 
-        ## Make sure we record the TZ:
-        dbh.tz = None
         return (dbh,mysql_bin_string)
 
 class DBO:
@@ -371,8 +361,14 @@ class DBO:
             self.DBH.put(pool, key=case)
         
         self.dbh,self.mysql_bin_string=pool.get()
-        ## Check if we need to adjust the timezone:
-            
+
+        ## Ensure the tz is properly reset before handing out dbh:
+        c = self.dbh.cursor()
+        try:
+            c.execute('set time_zone = (select value from meta where property="TZ")')
+        except MySQLdb.Error, e:
+            pass
+
     def __init__(self,case=None):
         """ Constructor for DB access. Note that this object implements database connection caching and so should be instantiated whenever needed. If case is None, the handler returned is for the default flag DB
 

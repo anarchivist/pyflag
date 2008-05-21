@@ -2,6 +2,7 @@
 """
 import _strptime, time
 from datetime import date as datetime_date
+import pyflag.DB as DB
 
 _regex_cache = {}
 
@@ -165,3 +166,66 @@ def strptime(data_string, format="%a %b %d %H:%M:%S %Y"):
     return time.struct_time((year, month, day,
                              hour, minute, second,
                              weekday, julian, tz)), found
+
+# below are some helpful functions to deal with date and timezone translation
+
+from dateutil.tz import gettz
+from dateutil.parser import parse as du_parse
+import datetime
+from os.path import basename
+
+from pyflag.FileSystem import DBFS
+
+def get_case_tz_name(case):
+    """ return the name of the current case timezone """
+    dbh = DB.DBO(case)
+    dbh.execute('select value from meta where property="TZ" limit 1')
+    row = dbh.fetch()
+    if row['value'] == "SYSTEM":
+    	return None
+    else:
+        return row['value']
+
+def get_case_tz(case):
+    """ return the tzinfo for the current case timezone """
+    return gettz(get_case_tz_name(case))
+
+def get_evidence_tz_name(case, fd):
+    """ return the name of the timezone for the given piece of evidence """
+    try:
+        tz = fd.gettz()
+        return tz
+    except AttributeError:
+        pass
+
+    ## fd is not an a File descendant, it could be a cached file
+    ddfs = DBFS(case)
+    fd2 = ddfs.open(inode = basename(fd.name))
+    return fd2.gettz()
+
+def parse(timestr, case=None, evidence_tz=None, **options):
+    """ Parse a time string using dateutil.parser.  Current Time and Evidence
+    timezone are used as a defaults for missing values on parsing. The result
+    is a time string suitable for mysql expressed in case timezone """
+    evidence_tz = gettz(evidence_tz)
+    case_tz = get_case_tz(case)
+
+    DEFAULT = datetime.datetime(tzinfo=gettz("UTC"), *time.gmtime()[:6]).astimezone(evidence_tz)
+    dt = du_parse(timestr, default=DEFAULT, **options).astimezone(case_tz)
+    return time.strftime("%Y-%m-%d %H:%M:%S", dt.timetuple())
+
+def convert(timeval, case=None, evidence_tz=None):
+    """ Convert a datetime or time tuple from evidence timezone to case timezone """
+    evidence_tz = gettz(evidence_tz)
+    case_tz = get_case_tz(case)
+
+    # convert to datetime if not already
+    if not isinstance(timeval, datetime.datetime):
+    	timeval = datetime.datetime(*timeval)
+
+    # set a timezone if none is set
+    if not timeval.tzinfo:
+    	timeval = datetime.datetime(tzinfo=evidence_tz, *timeval.timetuple()[:6])
+
+    dt = timeval.astimezone(case_tz)
+    return time.strftime("%Y-%m-%d %H:%M:%S", dt.timetuple())

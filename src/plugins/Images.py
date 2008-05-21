@@ -46,6 +46,7 @@ class IOSubsysFD:
         """ close subsystem """
         pass
 
+
 filename_re = re.compile("(.+?)(\d+)$")
 
 class Advanced(IO.Image):
@@ -237,6 +238,7 @@ class Advanced(IO.Image):
                     dbh.insert('iosources',
                                name = query['iosource'],
                                type = self.__class__.__name__,
+                               timezone = query['TZ'],
                                parameters = "%s" % query,
                                _fast = True)
                 else:

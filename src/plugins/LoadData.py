@@ -177,6 +177,7 @@ class LoadIOSource(Reports.report):
         drivers = Registry.IMAGES.class_names
         try:
             result.const_selector("Select IO Subsystem", 'subsys', drivers, drivers)
+            result.tz_selector("Evidence Timezone", "TZ")
 
             ## Instantiate the required factory:
             image = Registry.IMAGES.dispatch(query['subsys'])()

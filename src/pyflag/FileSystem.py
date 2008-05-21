@@ -766,6 +766,16 @@ class File:
             
         return stats
 
+    def gettz(self):
+        """ return the original evidence timezone of this file """
+        iosource = self.inode.split('|')[0][1:]
+        dbh=DB.DBO(self.case)
+        dbh.execute("select timezone from iosources where name=%r limit 1", iosource)
+        row = dbh.fetch()
+        if row['timezone'] == "SYSTEM":
+        	return None
+        return row['timezone']
+
     def __iter__(self):
         self.seek(0)
         return self

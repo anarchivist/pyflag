@@ -285,6 +285,7 @@ class CaseDBInit(FlagFramework.EventHandler):
         `id` INT(11) not null auto_increment,
         `name` VARCHAR(250) NOT NULL,
         `type` VARCHAR(250) NOT NULL,
+        `timezone` VARCHAR(250) NOT NULL,
         `parameters` TEXT,
         PRIMARY KEY(`id`)
         )""")        
@@ -523,15 +524,7 @@ class CaseConfiguration(Reports.report):
     
     def form(self, query, result):
         result.heading("Case configuration")
-
-        timezones = [ 'SYSTEM', ]
-        dbh = DB.DBO()
-        dbh.execute('select name from mysql.time_zone_name where name like "posix/%"')
-        for row in dbh:
-            tz = row['name'][len("posix/"):]
-            timezones.append(tz)
-
-        result.const_selector("Timezone", "TZ", timezones, timezones)
+        result.tz_selector("Timezone", "TZ")
 
     def display(self, query, result):
         dbh = DB.DBO(query['case'])

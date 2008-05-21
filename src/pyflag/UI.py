@@ -140,6 +140,17 @@ class GenericUI:
 
         self.const_selector(description,name,keys,values,**options)
 
+    def tz_selector(self,description,name,**options):
+        """ Draws a timezone selector """
+        timezones = [ 'SYSTEM', ]
+        dbh = DB.DBO()
+        dbh.execute('select name from mysql.time_zone_name where name like "posix/%"')
+        for row in dbh:
+            tz = row['name'][len("posix/"):]
+            timezones.append(tz)
+
+        self.const_selector(description, name, timezones, timezones)
+
     def textfield(self,description,name,**options):
         """ Draws a textfield in a table row. """
         pyflaglog.log(pyflaglog.DEBUG, "textfield not implemented")

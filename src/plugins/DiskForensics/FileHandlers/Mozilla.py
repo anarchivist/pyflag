@@ -193,7 +193,7 @@ class Mork(Magic.Magic):
 
 import httplib
 import StringIO
-import time
+import pyflag.Time as Time
 
 def parse_response(meta):
     """ Parse Cache Metadata, returns (method, status, header) """
@@ -270,8 +270,11 @@ class MozCacheScan(Scanner.GenScanFactory):
                                     size=length)
                 
                 # add to http table
+                # we parse the date, it is automatically returned in case
+                # timezone. We do not need to supply an evidence timezone as
+                # http date strings contain a timezone specification.
                 try:
-                    date = time.strftime("%Y-%m-%d:%H:%M:%S", header.getdate("date"))
+                    date = Time.parse(header.getheader("date"), case=self.case, evidence_tz=None) 
                 except TypeError:
                     date = 0
                 # chomp NULL from end
