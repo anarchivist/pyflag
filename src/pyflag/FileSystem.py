@@ -384,7 +384,7 @@ class DBFS(FileSystem):
     def dent_walk(self, path='/'):
         dbh=DB.DBO(self.case)
         dbh.check_index('file','path', 200)
-        dbh.execute("select name, mode, status from file where path=%r order by name" % ( path))
+        dbh.execute("select name, mode, status from file where path=%r order by name" , ( path))
         return [ row for row in dbh ]
         #for i in self.dbh:
         #    yield(i)
@@ -1066,7 +1066,7 @@ def glob_sql(pattern):
     if globbing_re.search(name):
         name_sql = "name rlike '^%s$'" % translate(name)
     else:
-        name_sql = "name=%r" % name
+        name_sql = DB.expand("name=%r", name)
     
     if name and path:
         sql = "select concat(path,name) as path from file where %s and %s group by file.path,file.name" % (path_sql,name_sql)

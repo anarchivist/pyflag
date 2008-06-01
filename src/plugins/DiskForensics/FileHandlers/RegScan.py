@@ -136,7 +136,7 @@ class RegistryScan(GenScanFactory):
             regi_handle.drop("interestingregkeys");
             
             ## These collect interesting keys. FIXME - Do we really
-            ## need the like clause its vaery slow especially since it
+            ## need the like clause its very slow especially since it
             ## has a wildcard at the start.
             regi_handle.execute("""create table `interestingregkeys` select 
             a.path, a.modified, a.type,a.reg_key, a.value, b.category, 

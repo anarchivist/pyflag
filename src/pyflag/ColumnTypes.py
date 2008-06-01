@@ -286,7 +286,7 @@ class ColumnType:
         if self.callback:
             value = self.callback(value)
         elif self.wrap:
-            value = textwrap.fill(value.__str__())
+            value = textwrap.fill( "%s" % value)
 
         ## Allow all our display hooks to do their things
         for hook in self.display_hooks:

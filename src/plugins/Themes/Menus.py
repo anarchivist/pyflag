@@ -64,6 +64,7 @@ class Menu(Theme.BasicTheme):
 
         result = '''<html>
         <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
         <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
         <link rel="stylesheet" type="text/css" href="images/print.css" media="print" />
         </head>

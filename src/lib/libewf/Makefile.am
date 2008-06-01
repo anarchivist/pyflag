@@ -21,14 +21,15 @@ EXTRA_DIST = \
 
 pkgconfigdir = $(libdir)/pkgconfig
 
-include_HEADERS = \
-	include/libewf.h
+#include_HEADERS = \
+#	include/libewf.h
 
 pkginclude_HEADERS = \
 	include/libewf/libewf_definitions.h \
 	include/libewf/libewf_extern.h \
 	include/libewf/libewf_handle.h \
 	include/libewf/libewf_types.h
+	include/libewf.h
 
 libtool: @LIBTOOL_DEPS@
 	cd $(srcdir) && $(SHELL) ./config.status --recheck

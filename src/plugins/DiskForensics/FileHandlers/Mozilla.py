@@ -268,7 +268,6 @@ class MozCacheScan(Scanner.GenScanFactory):
                                     _mtime=meta['LastModified'],
                                     _atime=meta['LastFetched'],
                                     size=length)
-                
                 # add to http table
                 # we parse the date, it is automatically returned in case
                 # timezone. We do not need to supply an evidence timezone as

@@ -286,11 +286,14 @@ def get_url(inode_id, case):
     try:
         url = store.get(inode_id)
     except KeyError:
+        url = ''
         dbh = DB.DBO(case)
         dbh.execute("select url from http where inode_id=%r limit 1", inode_id)
         row = dbh.fetch()
-        
-        url = row['url']
+
+        if row:
+            url = row['url']
+            
         store.put(url, key=inode_id)
 
     return url
@@ -304,16 +307,16 @@ class ResolvingHTMLTag(SanitizingTag):
     to the parser because we need to know the inode and case (our
     constructor takes more parameters.
     """
-
+    url_re = re.compile("(http|ftp)://([^/]+)/([^?]*)")
     def __init__(self, case, inode_id, name=None, attributes=None):
         self.case = case
         self.inode_id = inode_id
         SanitizingTag.__init__(self, name, attributes)
 
         ## Collect some information about this inode:
-        try:
-            url = get_url(inode_id, case)
-            m=re.search("(http|ftp)://([^/]+)/([^?]*)",url)
+        url = get_url(inode_id, case)
+        m=self.url_re.search(url)
+        if m:
             self.method = m.group(1)
             self.host = m.group(2)
             self.base_url = os.path.dirname(m.group(3))
@@ -323,7 +326,7 @@ class ResolvingHTMLTag(SanitizingTag):
             if self.base_url.endswith("/"):
                 self.base_url = self.base_url[:-1]
 
-        except Exception,e:
+        else:
             self.method = ''
             self.host = ''
             self.base_url = ''

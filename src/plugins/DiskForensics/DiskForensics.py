@@ -158,7 +158,7 @@ class BrowseFS(Reports.report):
                                  TimestampType('Last Modified','mtime'),
                                  StringType('Mode','mode', table='file') ],
                     table='inode',
-                    where="file.path=%r and file.mode!='d/d'" % (path+'/'),
+                    where=DB.expand("file.path=%r and file.mode!='d/d'", (path+'/')),
                     case=query['case'],
                     pagesize=10,
                     filter="filter2",
@@ -356,7 +356,7 @@ class DBFS_file(FileSystem.File):
         if not self.blocks:
             # now try to find blocks in the resident table
             dbh.check_index("resident","inode")
-            dbh.execute("select data from resident where inode=%r limit 1" % (self.data['inode']));
+            dbh.execute("select data from resident where inode=%r limit 1", (self.data['inode']));
             row = dbh.fetch()
             if not row:
                 raise IOError("Cant find any file data")

@@ -140,10 +140,16 @@ class query_type:
             for k,v in params.items():
                 self.__setitem__(k,v)
 
+        ## Make sure our query is parsed into unicode if needed:
+        for i in range(len(self.q)):
+            self.q[i] = (smart_unicode(self.q[i][0]), smart_unicode(self.q[i][1]))
+
     def __str__(self):
-        """ Prints the query object as a url string """
+        """ Prints the query object as a url string. We encode ourself
+        into utf8 to cater for any unicode present."""
         mark=''
         tmp = self.clone()
+        result = []
         
         if tmp.has_key('__mark__'):
             mark='#'+ tmp.__getitem__('__mark__')
@@ -153,10 +159,17 @@ class query_type:
             if k.startswith("__"):
                 del tmp[k]
 
-        return cgi.urllib.urlencode(tmp.q)+mark
+        for k,v in tmp.q:
+            result.append("%s=%s" % (iri_to_uri(k), iri_to_uri(v)))
+
+        return "&".join(result)
 
     def __repr__(self):
-        return cgi.urllib.urlencode(self.q)
+        result = ''
+        for k,v in self.q:
+            result += "%r: %r\n" % (k,v)
+
+        return result
     
     def __delitem__(self,item):
         """ Removes all instance of item from the CGI object """
@@ -176,7 +189,7 @@ class query_type:
 
     def set(self, key, value):
         del self[key]
-        self[key]=value
+        self[key]=smart_unicode(value)
 
     def default(self, key, value):
         """ Set key to value only if key is not yet defined """
@@ -251,7 +264,7 @@ class query_type:
         if i=='case' and self.has_key('case'):
             self.__delitem__('case')
         
-        self.q.append((i,x))
+        self.q.append((i,smart_unicode(x)))
         
     def __getitem__(self,item):
         """ Implements the dictionary access method """
@@ -315,7 +328,7 @@ def urlencode(string):
 
     """
     result = ''
-    for c in str(string):
+    for c in "%s" % string:
         if not c.isalnum() and c not in "/.":
             result +="%%%02X" % ord(c)
         else:
@@ -369,7 +382,7 @@ class Flag:
         #report class - The lock is shared amongst all objects)
         report.executing[thread_name]={'query': canonical_query, 'error': None}
         try:
-            report.analyse(query)
+            analysis_result = report.analyse(query)
         ## These are deliberate errors that reports raise with their own custom UI message:
         except Reports.ReportError,e:
             report.executing[thread_name]['error'] = e
@@ -390,7 +403,7 @@ class Flag:
                 dbh = DB.DBO(query['case'])
             except KeyError:
                 dbh = DB.DBO(None)
-        
+
             dbh.execute("insert into meta set property=%r,value=%r",('report_executed',canonical_query))
         except DB.DBError:
             pass
@@ -980,3 +993,56 @@ class CaseTable:
         ## Check indexes:
         for i in self.index:
             dbh.check_index(self.name, i)
+
+## The following functions are for unicode support and are mostly
+## borrowed from django:
+def smart_unicode(s, encoding='utf-8', errors='strict'):
+    """
+    Returns a unicode object representing 's'. Treats bytestrings using the
+    'encoding' codec.
+    """
+    if not isinstance(s, basestring,):
+        if hasattr(s, '__unicode__'):
+            s = unicode(s)
+        else:
+            s = unicode(str(s), encoding, errors)
+    elif not isinstance(s, unicode):
+        s = s.decode(encoding, errors)
+
+    return s
+
+def smart_str(s, encoding='utf-8', errors='strict'):
+    """
+    Returns a bytestring version of 's', encoded as specified in 'encoding'.
+    """
+    if not isinstance(s, basestring):
+        try:
+            return str(s)
+        except UnicodeEncodeError:
+            return unicode(s).encode(encoding, errors)
+    elif isinstance(s, unicode):
+        return s.encode(encoding, errors)
+    elif s and encoding != 'utf-8':
+        return s.decode('utf-8', errors).encode(encoding, errors)
+    else:
+        return s
+
+import urllib
+def iri_to_uri(iri):
+    """
+    Convert an Internationalized Resource Identifier (IRI) portion to a URI
+    portion that is suitable for inclusion in a URL.
+
+    This is the algorithm from section 3.1 of RFC 3987.  However, since we are
+    assuming input is either UTF-8 or unicode already, we can simplify things a
+    little from the full method.
+
+    Returns an ASCII string containing the encoded result.
+    """
+    # The list of safe characters here is constructed from the printable ASCII
+    # characters that are not explicitly excluded by the list at the end of
+    # section 3.1 of RFC 3987.
+    if iri is None:
+        return iri
+    return urllib.quote(smart_str(iri), safe='/#%[]=:;$&()+,!?*')
+

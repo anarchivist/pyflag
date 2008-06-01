@@ -33,7 +33,7 @@ The output within flag is abstracted such that it is possible to connect any GUI
 import re,cgi,types,textwrap,sys
 from urllib import quote
 import pyflag.FlagFramework as FlagFramework
-from pyflag.FlagFramework import urlencode
+from pyflag.FlagFramework import urlencode, iri_to_uri
 import pyflag.DB as DB
 import pyflag.conf
 import pyflag.UI as UI
@@ -136,7 +136,7 @@ class HTMLUI(UI.GenericUI):
 
         ## Try to prpegate __pyflag_parent, __pyflag_name if present
         try:
-            self.result = "<script> window.__pyflag_parent = %r; window.__pyflag_name = %r; </script>" % (self.defaults['__pyflag_parent'], self.defaults['__pyflag_name']) + self.result
+            self.result = "<script> window.__pyflag_parent = '%s'; window.__pyflag_name = '%s'; </script>" % (self.defaults['__pyflag_parent'], self.defaults['__pyflag_name']) + self.result
         except Exception,e:
             pass
 
@@ -479,7 +479,7 @@ class HTMLUI(UI.GenericUI):
                 
                 link['open_tree'] = FlagFramework.normpath("/".join(branch[:depth] + [name]))
                 open_tree = FlagFramework.urlencode(link['open_tree'])
-                sv=value.__str__().replace(' ','&nbsp;')
+                sv=("%s" % value).replace(' ','&nbsp;')
 
                 ## Mark the currently opened branch especially
                 img_class = 'PyFlagTreeNode'
@@ -504,12 +504,12 @@ class HTMLUI(UI.GenericUI):
                 else:
                     preamble += "<img class='PyFlagTreeVerticalLine' src='images/treenode_blank.gif'>"
 
-                result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img class=%r src='%s'>" % (cb,query['right_pane_cb'],quote(link.__str__()), img_class, img_src)
+                result+="<a href=\"javascript:tree_open('%s','%s','f?%s')\"><img class=%r src='%s'>" % (cb,query['right_pane_cb'],iri_to_uri(link), img_class, img_src)
 
                 if len(branch)-1==depth and name == branch[depth]:
-                    result+="&nbsp;<span class='PyFlagTreeSelected'>%s</span></a></span>\n" % str(sv)
+                    result+= u"&nbsp;<span class='PyFlagTreeSelected'>%s</span></a></span>\n" % unicode(sv)
                 else:
-                    result+="&nbsp;%s</a></span>\n" % str(sv)
+                    result+= u"&nbsp;%s</a></span>\n" % unicode(sv)
                     
                 result+="\n"
                 
@@ -618,6 +618,9 @@ class HTMLUI(UI.GenericUI):
                 
             result.result = '''<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
             <HTML>
+            <head>
+              <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+            </head>
             <script> window.__pyflag_name = "%s"; window.__pyflag_parent="%s";</script>
             <FRAMESET FRAMEBORDER=1 FRAMESPACING=1 COLS="340,*">
             <FRAME SRC="f?%s" name=left id=left scrolling=auto>
@@ -1049,7 +1052,9 @@ class HTMLUI(UI.GenericUI):
                 if format == "csv":
                     yield "#Pyflag Table widget output\n#Query was %s.\n" % query
                 elif format == "html":
-                    yield '<html><head title="Pyflag Table Export"><body><h2>Pyflag Table Export</h2>Query was: %s<br />' % query
+                    yield '''<html><head title="Pyflag Table Export">
+                    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+                    </head><body><h2>Pyflag Table Export</h2>Query was: %s<br />''' % query
 
                 try:
                     if format == "csv":
@@ -1189,7 +1194,7 @@ class HTMLUI(UI.GenericUI):
                 self.result += "%s%s" % (format,d)
 
         for d in cuts:
-            self.text_var = str(d)
+            self.text_var = "%s" % d
             line_break="<br>\n"
             if (options.has_key('font') and options['font']=='typewriter'):
                 line_break = "\n"

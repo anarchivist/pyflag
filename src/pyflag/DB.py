@@ -98,8 +98,10 @@ del conv[FIELD_TYPE.TIME]
 del conv[FIELD_TYPE.DATE]
 del conv[FIELD_TYPE.YEAR]
 
+escape_re = re.compile("([\x00'\b\"\r\n\t\\%])")
 def escape(string):
-    return MySQLdb.escape_string(string)
+    result = escape_re.sub(r"\\\1", string)
+    return result
 
 class DBError(Exception):
     """ Generic Database Exception """
@@ -116,15 +118,19 @@ def expand(sql, params):
 
     Does not work as it should, since the table name is always enclosed in quotes which is incorrect.
     """
+    sql = unicode(sql)
     d = dict(count = 0)
+
+    if isinstance(params, basestring):
+        params = (params,)
     
     def cb(m):
         if m.group(1)=="s":
-            result = "%s" % params[d['count']]
+            result = "%s" % (unicode(params[d['count']]))
             
         ## Raw escaping
         elif m.group(1)=='r':
-            result = "'%s'" % escape(("%s" % params[d['count']]).encode("utf8"))
+            result = "'%s'" % escape(unicode(params[d['count']]))
 
         ## This needs to be binary escaped:
         elif m.group(1)=='b':
@@ -132,8 +138,10 @@ def expand(sql, params):
 
         d['count'] +=1
         return result
-            
-    return re.sub("%(r|s|b)", cb, sql)
+
+    result = re.sub("%(r|s|b)", cb, sql)
+
+    return result
 
 class PyFlagCursor(MySQLdb.cursors.SSDictCursor):
     """ This cursor combines client side and server side result storage.
