@@ -164,6 +164,18 @@ class report:
         """ Resets the report by doing all thats needed to return the report to the pre-analysed state. This may mean deletion of cache tables etc. Note that derived classes do not need to touch the meta table at all, this is done by the do_reset() method. Derived classes simply need to do the right thing here """
         pass
 
+    def clear_cache(self, query):
+        """ This can be called from the display method to clear any
+        caching which may have occured - this allows the report to be
+        run again. This is only suitable for reports which do not have
+        lasting effect.."""
+        import pyflag.FlagFramework as FlagFramework
+        
+        dbh = DB.DBO(query['case'])
+        canonical_query = FlagFramework.canonicalise(query)
+        dbh.execute("delete from meta where property = 'report_executed' and value = %r", 
+                    canonical_query);
+
     def do_reset(self,query):
         """ This method actively resets the report named in params.
 

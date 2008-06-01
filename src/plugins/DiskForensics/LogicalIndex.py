@@ -332,7 +332,8 @@ class OffsetType(IntegerType):
                            inode_id=inode,
                            hexlimit=max(offset-50,0),
                            highlight=offset, length=row['Length'])
-        result.link(offset, target=query)
+        
+        result.link(offset, query)
         return result
 
 ## This ColumnType is quite expensive - I guess its necessary though
@@ -425,8 +426,8 @@ class WordColumn(ColumnType):
             sql = parser.parse_to_sql(self.ui.defaults['filter'],
                                       elements, None)
 
-            final_sql = "%s where %s" % (UI._make_join_clause(elements),
-                                                  sql)
+            tables = UI._make_join_clause(elements)
+            final_sql = "%s where %s" % (tables, sql)
             cdbh = DB.DBO(self.case)
             cdbh.execute("select count(*) as c %s" % final_sql)
             count = cdbh.fetch()['c']
@@ -434,6 +435,14 @@ class WordColumn(ColumnType):
             total = cdbh.fetch()['s']
 
             self.ui.para("This will affect %s inodes and require rescanning %s bytes" % (count,total))
+
+            ## Make up the link for the use:
+            link = FlagFramework.query_type(report = "Add Word", family = "Keyword Indexing",
+                                            case = self.case, tables = tables,
+                                            inode_sql = sql, word = arg)
+            
+            self.ui.link("Click here to scan these inodes", link,
+                         pane = 'self')
 
             ## Ok - Show the error to the user:
             raise self.ui
@@ -530,10 +539,149 @@ class TableRenderer(UI.TableRenderer):
 ## Install the new updated table renderer:
 UI.TableRenderer = TableRenderer
 
+## This is a global index we use for workers
+INDEX = None
+INDEX_VERSION = 0
+def reindex():
+    global INDEX
+    print "Rebuilding index"
+    dbh = DB.DBO()
+    dbh.execute("select max(id) as max from dictionary")
+    row = dbh.fetch()
+    if row:
+        INDEX_VERSION = row['max']
+    
+    dbh.execute("select word,id,type from dictionary")
+    INDEX = index.Index(unique=1)
+    for row in dbh:
+        t = row['type']
+        if t == 'literal':
+            INDEX.add_word(row['word'],row['id'], index.WORD_LITERAL)
+        elif t == 'regex':
+            INDEX.add_word(row['word'], row['id'] , index.WORD_EXTENDED)
+        elif t=='word':
+            try:
+                word = row['word'].decode("UTF-8").lower()
+                for e in config.INDEX_ENCODINGS:
+                    w = word.encode(e)
+                    if len(w)>3:
+                        INDEX.add_word(w,row['id'], index.WORD_ENGLISH)
+            except UnicodeDecodeError:
+                pass
+
+
+    print INDEX
 ## This is how we can add new words to the dictionary and facilitate scanning:
-#class AddWords(reports.Repo
+class AddWords(Reports.report):
+    """ Add a new word to the indexing dictionary """
+    family = 'Keyword Indexing'
+    name = "Add Word"
+    description = "Add a new word to the dictionary and scan selected inodes "
+    
+    parameters = { "word": "any", "case":"any",
+                   "class": "any",
+                   "type": "any",
+                   "inode_sql": "any",
+                   "tables": "any" }
 
+    def form(self, query,result):
+        result.textfield("Word to add", "word")
+        result.selector('Classification:','class','select class as `key`,class as `value` from dictionary group by class order by class',())
+        result.textfield('(Or create a new class:)','class_override')
+        result.const_selector('Type:','type',('word','literal','regex'),('Word','Literal','RegEx'))
 
+        result.para("Will search for %s" % query['inode_sql'])
+        if query.has_key("class_override"):
+            query['class'] = query['class_override']
+            result.refresh(0, query)
+
+    def analyse(self, query):
+        pdbh = DB.DBO()
+
+        ## Insert the new word into the dictionary:
+        word_class = query.get('class_override', query['class'])
+        pdbh.insert('dictionary', **{
+            'word' : query['word'],
+            'class':  word_class,
+            'type':  query['type']})
+
+        ## Send a broadcast to tell all workers to rebuild their indexes:
+        pdbh.insert('jobs',
+                    command = "ReIndex",
+                    state = "broadcast",
+                    _fast = True
+                    )
+
+        ## Now schedule all their indexing tasks:
+        pdbh.mass_insert_start("jobs")
+        reindex()
+        
+        sql = "select inode.inode_id %s where %s and inode.version > %s" % (query['tables'],query['inode_sql'], INDEX_VERSION)
+
+        dbh = DB.DBO(query['case'])
+        dbh.execute(sql)
+
+        cookie = int(time.time())
+        for row in dbh:
+            pdbh.mass_insert(
+                cookie = cookie,
+                command = "Index",
+                arg1 = query['case'],
+                arg2 = row['inode_id'])
+
+        pdbh.mass_insert_commit()
+        Farm.wake_workers()
+
+        ## Now wait here until everyone is finished:
+        while 1:
+            pdbh.execute("select count(*) as c from jobs where cookie=%r", cookie)
+            row = pdbh.fetch()
+            if row['c']==0: break
+
+            time.sleep(1)
+            
+        return 1
+
+    def display(self, query, result):
+        ## Make sure this report is not cached now so we can reissue
+        ## the same query again:
+        self.clear_cache(query)
+            
+import pyflag.Farm as Farm
+
+class ReIndex(Farm.Task):
+    """ A task to reindex the dictionary (used after a dictionary update)"""
+    def run(self, *args):
+        reindex()
+
+class Index(Farm.Task):
+    """ A task to index an inode with the dictionary """
+    def run(self, case, inode_id, *args):
+        global INDEX
+        if not INDEX: reindex()
+
+        print "Indexing inode_id %s %s" % (inode_id, INDEX)
+        fsfd = FileSystem.DBFS(case)
+        fd = fsfd.open(inode_id=inode_id)
+        buff_offset = 0
+        dbh = DB.DBO(case)
+        dbh.mass_insert_start("LogicalIndexOffsets")
+
+        while 1:
+            data = fd.read(1024*1024)
+            if len(data)==0: break
+
+            for offset, matches in INDEX.index_buffer(data):
+                for id, length in matches:
+                    dbh.mass_insert(
+                        inode_id = inode_id,
+                        word_id = id,
+                        offset = offset + buff_offset,
+                        length = length,
+                        version = INDEX_VERSION)
+
+            buff_offset += len(data)
+    
 ## Unit tests
 import unittest
 import pyflag.mspst

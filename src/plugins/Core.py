@@ -481,6 +481,8 @@ class InodeTable(FlagFramework.CaseTable):
                 [ IntegerType, dict(name = 'Links', column='links')],
                 [ StringType, dict(name='Link', column='link', width=500)],
                 [ BigIntegerType, dict(name = 'Size', column='size')],
+                ## The dictionary version used on this inode:
+                [ IntegerType, dict(name = "Index Version", column='version')],
                 ]
     
     def __init__(self):
