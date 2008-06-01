@@ -133,6 +133,8 @@ class Sleuthkit(DBFS):
             insert_file(inode_id, inode, type, path, name)
 
         def insert_file(inode_id, inode, type, path, name):
+            path = path.decode("utf8")
+            name = name.decode("utf8")
             # dont do anything for realloc inodes
             if inode.alloc == 2:
                 return
@@ -262,7 +264,7 @@ class Sleuthkit(DBFS):
         # walk the directory tree
         for root, dirs, files in fs.walk(root_dir, unalloc=True, inodes=True):
             dbh_file.mass_insert(inode = '', mode = 'd/d',
-                                 status = 'alloc', path=FlagFramework.normpath(mount_point+root[1]),
+                                 status = 'alloc', path=FlagFramework.normpath(mount_point+root[1].decode("utf8")),
                                  name = '')
             for d in dirs:
                 #insert_file(d[0], 'd/d', root[1], d[1])

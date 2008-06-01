@@ -127,11 +127,11 @@ def expand(sql, params):
     
     def cb(m):
         if m.group(1)=="s":
-            result = "%s" % (unicode(params[d['count']]))
+            result = u"%s" % (unicode(params[d['count']]))
             
         ## Raw escaping
         elif m.group(1)=='r':
-            result = "'%s'" % escape(unicode(params[d['count']]))
+            result = u"'%s'" % escape(unicode(params[d['count']]))
 
         ## This needs to be binary escaped:
         elif m.group(1)=='b':
@@ -684,7 +684,7 @@ class DBO:
             if k.startswith('_'):
                 k=k[1:]
             else:
-                v="'%s'" % escape(v.__str__())
+                v="'%s'" % escape(unicode(v))
                 
             try:
                 self.mass_insert_cache[k][self.mass_insert_row_count]=v

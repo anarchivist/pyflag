@@ -81,6 +81,7 @@ class ScannerTest(unittest.TestCase):
     fstype = "Sleuthkit"
     offset = 0
     mount_point = '/'
+    TZ="SYSTEM"
 
     def test00preLoadCase(self):
         """ Load test Case"""
@@ -99,6 +100,7 @@ class ScannerTest(unittest.TestCase):
                                    "subsys=%s" % self.subsystem,
                                    "filename=%s" % ( self.test_file),
                                    "offset=%s"%self.offset,
+                                   "TZ=%s" % self.TZ
                                    ])
 
         pyflagsh.shell_execv(command="execute",

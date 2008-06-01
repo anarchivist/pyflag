@@ -444,7 +444,11 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
 
         self.send_header("Content-Length", len(result))
         self.end_headers()
-        self.wfile.write(result.encode("utf8"))
+        if isinstance(result, unicode):
+            self.wfile.write(result.encode("utf8"))
+        else:
+            self.wfile.write(result)
+            
         return
 
     def log_message(self, format, *args):
