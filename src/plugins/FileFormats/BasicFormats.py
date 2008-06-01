@@ -623,13 +623,16 @@ class WIN_FILETIME(SimpleStruct):
     def to_unixtime(self):
         """ Returns the current time as a unix time """
         t=float(self['high'].get_value())* 2**32 +self['low'].get_value()
-        return (t*1e-7 - 11644473600)
+        if t:
+            return int(t*1e-7 - 11644473600)
+        return 0
 
     def get_value(self):
         """ We just return the unix time here """
         return self.to_unixtime()
 
     def __str__(self):
+        """ NOTE: time is returned in localtime according to your current TZ """
         t = self.to_unixtime()
         try:
             return time.strftime("%Y/%m/%d %H:%M:%S",time.localtime(t))

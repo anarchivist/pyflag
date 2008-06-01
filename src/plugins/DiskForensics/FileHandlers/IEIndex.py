@@ -30,19 +30,23 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import FileFormats.IECache as IECache
 import pyflag.DB as DB
-from pyflag.ColumnTypes import StringType, TimestampType, FilenameType, InodeIDType
+from pyflag.ColumnTypes import StringType, TimestampType, FilenameType, InodeIDType, LongStringType
 import pyflag.FlagFramework as FlagFramework
 
-class IEIndexEventHandler(FlagFramework.EventHandler):
-    def create(self, dbh, case):
-        dbh.execute("""CREATE TABLE IF NOT EXISTS ie_history (
-        `inode_id` int not null,
-        `type` VARCHAR(20) NOT NULL,
-        `url` TEXT NOT NULL,
-        `modified` TIMESTAMP DEFAULT 0,
-        `accessed` TIMESTAMP DEFAULT 0,
-        `filename` VARCHAR(500),
-        `headers` TEXT)""")                
+class IECaseTable(FlagFramework.CaseTable):
+    """ IE History Table - Stores all Internet Explored History """
+    name = 'ie_history'
+    columns = [
+        [ InodeIDType, {} ],
+        [ StringType, dict(name='Type', column='type', width=20) ],
+        [ StringType, dict(name='URL', column='url', width=500) ],
+        [ TimestampType, dict(name='Modified', column='modified') ],
+        [ TimestampType, dict(name='Accessed', column='accessed') ],
+        [ StringType, dict(name='Filename', column='filename', width=500) ],
+        [ LongStringType, dict(name='Headers', column='headers') ],
+        ]
+
+    index = ['url','inode_id']
 
 class IEIndex(Scanner.GenScanFactory):
     """ Load in IE History files """
@@ -68,8 +72,8 @@ class IEIndex(Scanner.GenScanFactory):
                     dbh.mass_insert(inode_id = inode_id,
                                     type = event['type'],
                                     url = event['url'],
-                                    modified = event['modified_time'],
-                                    accessed = event['accessed_time'],
+                                    _modified = 'from_unixtime(%d)' % event['modified_time'].get_value(),
+                                    _accessed = 'from_unixtime(%d)' % event['accessed_time'].get_value(),
                                     filename = event['filename'],
                                     headers = event['data'])
 

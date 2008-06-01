@@ -674,7 +674,7 @@ class TimestampType(IntegerType):
         self.override_year = int(override_year)
 
     def create(self):
-        return "%s TIMESTAMP NULL" % self.escape_column_name(self.column)
+        return "%s TIMESTAMP NULL DEFAULT '0000-00-00 00:00:00'" % self.escape_column_name(self.column)
 
     def code_after(self, column, operator, arg):
         """ Matches if the time in the column is later than the time
