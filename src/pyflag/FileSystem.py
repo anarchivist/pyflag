@@ -350,12 +350,12 @@ class DBFS(FileSystem):
             if not path.endswith('/'):
                 path=path+'/'
 
-            where =" path=%r " % path
+            where = DB.expand(" path=%r " ,path)
         else:
             ## We are listing the exact file specified:
-            where =" path=%r and name=%r" %  (
+            where = DB.expand(" path=%r and name=%r", (
                 FlagFramework.normpath(os.path.dirname(path)+'/'),
-                os.path.basename(path))
+                os.path.basename(path)))
                    
         mode =''
         if(dirs == 1):

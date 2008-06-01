@@ -67,7 +67,7 @@ class scan_path(pyflagsh.command):
             
         ## FIXME For massive images this should be broken up, as in the old GUI method
         dbh=DB.DBO(self.environment._CASE)
-        dbh.execute("select inode.inode from inode join file on file.inode = inode.inode where file.path rlike %r" % fnmatch.translate(path))
+        dbh.execute("select inode.inode from inode join file on file.inode = inode.inode where file.path rlike %r", fnmatch.translate(path))
 
         pdbh = DB.DBO()
         pdbh.mass_insert_start('jobs')

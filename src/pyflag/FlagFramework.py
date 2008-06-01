@@ -816,7 +816,8 @@ def delete_case(case):
 
     ## Remove any jobs that may be outstanding (dont touch the
     ## currently processing jobs)
-    dbh.delete('jobs',"arg1=%r and state='pending' " % case, _fast= True)
+    dbh.delete('jobs',DB.expand("arg1=%r and state='pending' " , case),
+               _fast= True)
 
     ## Now wait until there are no more processing jobs:
     total_time = 0
@@ -836,7 +837,8 @@ def delete_case(case):
 
     try:
       #Delete the case from the database
-      dbh.delete('meta',"property='flag_db' and value=%r" % case, _fast=True)
+      dbh.delete('meta',DB.expand("property='flag_db' and value=%r" , case),
+                 _fast=True)
       dbh.execute("drop database if exists `%s`" ,case)
     except DB.DBError,e:
         print e

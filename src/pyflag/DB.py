@@ -98,9 +98,10 @@ del conv[FIELD_TYPE.TIME]
 del conv[FIELD_TYPE.DATE]
 del conv[FIELD_TYPE.YEAR]
 
-escape_re = re.compile("([\x00'\b\"\r\n\t\\%])")
+escape_re = re.compile(r"(['\b\"\r\n\t\\%])")
 def escape(string):
     result = escape_re.sub(r"\\\1", string)
+    result = result.replace("\x00","\\0")
     return result
 
 class DBError(Exception):
@@ -134,7 +135,7 @@ def expand(sql, params):
 
         ## This needs to be binary escaped:
         elif m.group(1)=='b':
-            result = "_binary'%s'" % escape(params[d['count']])
+            result = u"_binary'%s'" % escape(params[d['count']].decode("latin1"))
 
         d['count'] +=1
         return result
