@@ -320,7 +320,7 @@ class HTTPScanner(StreamScannerFactory):
                            key = k,
                            value = C[k].value)
                 
-        except KeyError: pass
+        except (KeyError, Cookie.CookieError): pass
 
         result =cgi.FieldStorage(environ = env, fp = cStringIO.StringIO(body))
         count = 1

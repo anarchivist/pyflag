@@ -119,13 +119,13 @@ class GmailScanner(LiveCom.HotmailScanner):
             ## Check to see if this is a POST request (i.e. mail is
             ## sent to the server):
             dbh = DB.DBO(self.case)
-            dbh.execute("select `id`,`key`,`value` from http_parameters where inode_id=%r", self.fd.inode_id)
+            dbh.execute("select `inode_id`,`key`,`value` from http_parameters where inode_id=%r", self.fd.inode_id)
             query = {}
             key_map = {}
 
             for row in dbh:
                 query[row['key'].lower()] = row['value']
-                key_map[row['key'].lower()] = row['id']
+                key_map[row['key'].lower()] = row['inode_id']
 
             result = {'type':'Edit Sent'}
             for field, pattern in [('To','to'),
@@ -149,16 +149,16 @@ class GmailScanner(LiveCom.HotmailScanner):
                     dbh.execute("select mtime from inode where inode_id = %r" , self.fd.inode_id)
                     row = dbh.fetch()
 
-                    new_inode = "thttp_parameters:id:%s:value" % key_map[k]
+                    new_inode = "thttp_parameters:inode_id:%s:value" % key_map[k]
                     
                     inode_id = self.ddfs.VFSCreate(self.fd.inode,
                                                    new_inode,
                                                    k, mtime = row['mtime'],
                                                    _fast = True)
                     
-                    dbh.insert("webmail_message_attachments",
-                               message_id = message_id,
-                               inode_id = inode_id)
+                    dbh.insert("webmail_attachments",
+                               inode_id = message_id,
+                               attachment = inode_id)
 
                     fd = self.ddfs.open(inode = "%s|%s" % (self.fd.inode, new_inode))
                     Scanner.scanfile(self.ddfs, fd, self.factories)

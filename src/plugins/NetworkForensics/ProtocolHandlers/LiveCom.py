@@ -161,7 +161,7 @@ class HotmailScanner(Scanner.GenScanFactory):
             Scanner.StoreAndScanType.process(self, data, metadata)
             ## Feed our parser some more:
             if not self.boring_status:
-                self.parser.feed(data)
+                self.parser.feed(data.decode("utf8"))
                 ## Get all the tokens
                 while self.parser.next_token(True): pass
 

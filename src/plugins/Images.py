@@ -238,7 +238,7 @@ class Advanced(IO.Image):
                     dbh.insert('iosources',
                                name = query['iosource'],
                                type = self.__class__.__name__,
-                               timezone = query['TZ'],
+                               timezone = query.get('TZ',"SYSTEM"),
                                parameters = "%s" % query,
                                _fast = True)
                 else:

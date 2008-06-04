@@ -133,8 +133,9 @@ class Sleuthkit(DBFS):
             insert_file(inode_id, inode, type, path, name)
 
         def insert_file(inode_id, inode, type, path, name):
-            path = path.decode("utf8")
-            name = name.decode("utf8")
+            path = path.decode("utf8","ignore")
+            name = name.decode("utf8","ignore")
+            
             # dont do anything for realloc inodes
             if inode.alloc == 2:
                 return

@@ -266,7 +266,7 @@ def lookup_whois(ip):
             insert_whois_cache(sql_ip, id, ipinfo)
         except DB.DBError, e: 
             pyflaglog.log(pyflaglog.WARNING, "Problem in GeoIP " \
-                          "caching: %s" % e)
+                          "caching: %s %s" % (e,ip))
     return id
 
 def _geoip_cached_record(ip):

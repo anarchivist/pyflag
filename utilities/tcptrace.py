@@ -116,7 +116,11 @@ def tcp_callback(s):
 
 processor = reassembler.Reassembler(packet_callback = Callback)
 for f in args:
-    pcap_file = pypcap.PyPCAP(open(f))
+    try:
+        pcap_file = pypcap.PyPCAP(open(f))
+    except IOError:
+        continue
+    
     while 1:
         try:
             packet = pcap_file.dissect()

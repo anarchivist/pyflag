@@ -115,7 +115,7 @@ class Log:
         ## Is there a filter implemented?
         fields = [ x for x in self.fields if x]
         if filter:
-            filter_parser = code_parser.parse_eval(filter, fields)
+            filter_parser = code_parser.parse_eval(filter, fields, None)
         else:
             filter_parser = None
 
@@ -246,7 +246,8 @@ class Log:
 
         ## Is there a filter implemented?
         if filter:
-            filter_parser = code_parser.parse_eval(filter, fields)
+            print fields
+            filter_parser = code_parser.parse_eval(filter, fields, None)
         else:
             filter_parser = None
 
@@ -269,7 +270,7 @@ class Log:
 
                         ## Ask the columns to format their own insert statements
                         key, value = c.insert(v)
-                        args[key] = value
+                        args[str(key)] = value
                     except (IndexError,AttributeError),e:
                         pyflaglog.log(pyflaglog.WARNING, "Attribute or Index Error when inserting value into field: %r" % e)
             elif isinstance(fields, dict):
@@ -281,7 +282,7 @@ class Log:
                 if not filter_parser(columns): continue
 
             if args:
-                dbh.mass_insert( **args)
+                dbh.mass_insert(args)
             
             if rows and count > rows:
                 break

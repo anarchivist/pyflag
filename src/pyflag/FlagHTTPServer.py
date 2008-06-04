@@ -315,6 +315,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
                 result.callback = cb_key
                 
                 ## Use it
+                query.__repr__()
                 cb(query,result)
 
                 ## This lets the callback handle its own error message
@@ -437,6 +438,9 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
 
         self.send_header("Content-type", result.type)
         result =result.display()
+        if isinstance(result, unicode):
+            result = result.encode("utf8")
+
         if len(result)>1024 * 10 and accept_gzip_encoding:
             self.send_header("Content-Encoding","gzip")
             old_length = len(result)
@@ -444,10 +448,7 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
 
         self.send_header("Content-Length", len(result))
         self.end_headers()
-        if isinstance(result, unicode):
-            self.wfile.write(result.encode("utf8"))
-        else:
-            self.wfile.write(result)
+        self.wfile.write(result)
             
         return
 

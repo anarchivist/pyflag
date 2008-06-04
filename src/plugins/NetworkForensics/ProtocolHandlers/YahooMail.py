@@ -173,7 +173,7 @@ class YahooMailScan(LiveCom.HotmailScanner):
             dbh.execute("select value from http_parameters where inode_id = %r and `key`='MsgId'", self.fd.inode_id)
             row = dbh.fetch()
             if row:
-                result['MessageID'] = row['value']
+                result['message_id'] = row['value']
 
             ## Try to find the messageheader
             header = self.parser.root.find("table", {"class":"messageheader"})
@@ -184,12 +184,12 @@ class YahooMailScan(LiveCom.HotmailScanner):
 
         def process_message_yahoo2(self, result, header):
             try:
-                result['Subject'] = header.find(".", {"id":"message_view_subject"}).innerHTML()
+                result['subject'] = header.find(".", {"id":"message_view_subject"}).innerHTML()
             except AttributeError: pass
 
             try:
                 date = header.find("div", {"id":"message_view_date"}).text()
-                result['Sent'] = ColumnTypes.guess_date(date).__str__()
+                result['sent'] = ColumnTypes.guess_date(date).__str__()
             except AttributeError: pass
 
             context = None

@@ -62,7 +62,7 @@ class Menu(Theme.BasicTheme):
         else:
             toolbar_str = ''
 
-        result = '''<html>
+        result = u'''<html>
         <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
         <link rel="stylesheet" type="text/css" href="images/pyflag.css" />
@@ -80,7 +80,7 @@ class Menu(Theme.BasicTheme):
         result += data
         
 ##        result +="</div><script>AdjustHeightToPageSize('PyFlagPage'); bug_check();</script></body>"
-        result +="</div><script>AdjustHeightToPageSize('PyFlagPage');</script></body>"
+        result += u"</div><script>AdjustHeightToPageSize('PyFlagPage');</script></body>"
 
         return result
     

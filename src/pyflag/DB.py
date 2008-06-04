@@ -98,7 +98,7 @@ del conv[FIELD_TYPE.TIME]
 del conv[FIELD_TYPE.DATE]
 del conv[FIELD_TYPE.YEAR]
 
-escape_re = re.compile(r"(['\b\"\r\n\t\\%])")
+escape_re = re.compile(r"(['\b\"\r\n\t\\])")
 def escape(string):
     result = escape_re.sub(r"\\\1", string)
     result = result.replace("\x00","\\0")
@@ -107,6 +107,20 @@ def escape(string):
 class DBError(Exception):
     """ Generic Database Exception """
     pass
+
+def force_unicode(string):
+    """ Make sure the string is unicode where its supposed to be """
+    if isinstance(string, str):
+        try:
+            return unicode(string)
+        except:
+            print "String %r should be unicode" % string
+            
+        return unicode(string, "utf-8", "ignore")
+
+    return unicode(string)
+
+expand_re = re.compile("%(r|s|b)")
 
 def expand(sql, params):
     """ A utility function for interpolating into the query string.
@@ -127,11 +141,11 @@ def expand(sql, params):
     
     def cb(m):
         if m.group(1)=="s":
-            result = u"%s" % (unicode(params[d['count']]))
+            result = u"%s" % (force_unicode(params[d['count']]))
             
         ## Raw escaping
         elif m.group(1)=='r':
-            result = u"'%s'" % escape(unicode(params[d['count']]))
+            result = u"'%s'" % escape(force_unicode(params[d['count']]))
 
         ## This needs to be binary escaped:
         elif m.group(1)=='b':
@@ -140,7 +154,7 @@ def expand(sql, params):
         d['count'] +=1
         return result
 
-    result = re.sub("%(r|s|b)", cb, sql)
+    result = expand_re.sub(cb,sql)
 
     return result
 
@@ -676,9 +690,11 @@ class DBO:
         self.mass_insert_row_count = 0
         self.mass_insert_fast = _fast
     
-    def mass_insert(self, **columns):
+    def mass_insert(self, args=None, **columns):
         """ Starts a mass insert operation. When done adding rows, call commit_mass_insert to finalise the insert.
         """
+        if args: columns = args
+        
         for k,v in columns.items():
             ## _field means to pass the field 
             if k.startswith('_'):

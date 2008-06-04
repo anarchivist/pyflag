@@ -186,6 +186,9 @@ class ColumnType:
     symbols = {
         }
 
+    def __repr__(self):
+        return "<ColumnType %s, name %s>" % (self.__class__.__name__, self.name)
+
     def make_index(self, dbh, table):
         """ Creates an index on table using dbh """
         dbh.check_index(table, self.column)

@@ -12,7 +12,7 @@ to keep going as much as possible.
 import lexer, struct
 import sys,re,urllib,os
 import pyflag.DB as DB
-from FlagFramework import query_type, normpath, get_bt_string
+from FlagFramework import query_type, normpath, get_bt_string, iri_to_uri
 
 XML_SPECIAL_CHARS_TO_ENTITIES = { "'" : "squot",
                                   '"' : "quote",
@@ -54,7 +54,7 @@ class Tag:
         return self.attributes[item.lower()]
 
     def __str__(self):
-        attributes = "".join([" %s='%s'" % (k,urllib.quote(v)) for k,v \
+        attributes = "".join([" %s='%s'" % (k,iri_to_uri(v)) for k,v \
                               in self.attributes.items() if v ])
         
         if self.type == 'selfclose':
