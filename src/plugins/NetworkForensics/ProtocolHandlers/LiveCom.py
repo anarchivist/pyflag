@@ -108,6 +108,7 @@ class WebMailAttachmentTable(FlagFramework.CaseTable):
     columns = [
         [ InodeIDType, dict(name = "Message Inode") ],
         [ InodeIDType, dict(name = "Attachment", column="attachment") ],
+        [ StringType, dict(name='URL', column='url')],
         ]
 
 class LiveTables(FlagFramework.EventHandler):
@@ -161,7 +162,7 @@ class HotmailScanner(Scanner.GenScanFactory):
             Scanner.StoreAndScanType.process(self, data, metadata)
             ## Feed our parser some more:
             if not self.boring_status:
-                self.parser.feed(data.decode("utf8"))
+                self.parser.feed(data.decode("utf8","ignore"))
                 ## Get all the tokens
                 while self.parser.next_token(True): pass
 
@@ -450,12 +451,12 @@ class LiveMailViewer(FileSystem.StringIOFile):
         parts = inode.split('|')
         self.id = parts[-1][1:]
         dbh = DB.DBO(case)
-        dbh.execute("select * from webmail_messages where id=%r", (self.id))
+        dbh.execute("select * from webmail_messages where parent_inode_id=%r", (self.id))
         row = dbh.fetch()
         if not row: raise RuntimeError("No such message %s" % self.id)
 
         self.parent_inode_id = row['parent_inode_id']
-        self.message = row['Message'] or ""
+        self.message = row['message'] or ""
         self.size = len(self.message)
         
         FileSystem.StringIOFile.__init__(self, case, fd, inode)
@@ -466,7 +467,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
             return FileSystem.StringIOFile.read(self, length)
         except IOError: pass
 
-        return self.message
+        return self.message.encode("utf8")
 
     def fixup_page(self, root, tag_class):
         ## We have to inject the message into the edit area:
@@ -480,7 +481,7 @@ class LiveMailViewer(FileSystem.StringIOFile):
             parser.close()
             result = parser.root.__str__()
             result = textwrap.fill(result)
-            #edit_area.add_child(parser.root)
+            edit_area.prune()
             edit_area.add_child(result)
             edit_area.name = 'div'
 

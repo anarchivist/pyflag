@@ -33,6 +33,7 @@ The output within flag is abstracted such that it is possible to connect any GUI
 import re,cgi,types,os,time
 import pyflag.FlagFramework as FlagFramework
 import pyflag.DB as DB
+from pyflag.DB import expand
 import pyflag.conf
 import pyflag.pyflaglog as pyflaglog
 config=pyflag.conf.ConfObject()
@@ -820,7 +821,7 @@ class TableRenderer:
                     tmp = self.elements[i].display(value,row,cell_ui)
                     if tmp: cell_ui = tmp
                 except Exception, e:
-                    pyflaglog.log(pyflaglog.ERROR, "Unable to render %r: %s" % (value , e))
+                    pyflaglog.log(pyflaglog.ERROR, expand("Unable to render %r: %s" , (value , e)))
 
                 ## Render the row styles so that equal values on
                 ## the sorted column have the same style
@@ -833,9 +834,9 @@ class TableRenderer:
 
                 ## Render the sorted column with a different style
                 if i==self.order:
-                    tds+="<td class='sorted-column'>%s</td>" % (cell_ui)
+                    tds+="<td class='sorted-column'>%s</td>" % (FlagFramework.smart_unicode(cell_ui))
                 else:
-                    tds+="<td class='table-cell'>%s</td>" % (cell_ui)
+                    tds+="<td class='table-cell'>%s</td>" % (FlagFramework.smart_unicode(cell_ui))
 
             result.result+="<tr class='%s'> %s </tr>\n" % (old_sorted_style,tds)
             self.row_count += 1

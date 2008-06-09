@@ -389,12 +389,12 @@ class StreamFile(File):
         dbh = DB.DBO(self.case)
         combined_fd = self.get_combined_fd()
 
-        tmp.row("Packet ID", "Offset", "Length")
+        tmp.row("Packet ID", "Offset", "Length", type='heading', **{'class': 'explain'})
         dbh.execute("select packet_id, offset, pcap.length as length from `connection` join pcap on pcap.id=`connection`.packet_id where inode_id = %r order by cache_offset", combined_fd.lookup_id())
         for row in dbh:
-            tmp.row(row['packet_id'], row['offset'], row['length'])
+            tmp.row(row['packet_id'], row['offset'], row['length'], **{'class': 'explain'})
 
-        result.row("Stream %s" % self.inode, tmp)
+        result.row("Stream %s" % self.inode, tmp, **{'class':'explainrow'})
 
 class ViewConnections(Reports.report):
     """ View the connection table """

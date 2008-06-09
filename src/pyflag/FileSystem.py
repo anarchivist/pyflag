@@ -58,7 +58,7 @@ import time,re
 import math
 import bisect
 import zipfile
-import cStringIO
+import StringIO
 import pyflag.Scanner as Scanner
 import pyflag.Graph as Graph
 import pyflag.Store as Store
@@ -807,7 +807,8 @@ class File:
         data"""
         if self.fd:
             self.fd.explain(query, result)
-        result.row(self.__class__.__name__, self.__doc__)
+            
+        result.row(self.__class__.__name__, self.__doc__, **{'class': 'explainrow'})
 
     def summary(self,query,result):
         """ This method draws a summary of the file.
@@ -1001,10 +1002,15 @@ class StringIOFile(File):
     on the disk.
     """
     def look_for_cached(self):
+        try:
+            if self.cached_fd:
+                return
+        except AttributeError: pass
+        
         self.cached_fd = None
         data = self.read()
 
-        self.cached_fd = cStringIO.StringIO(data)
+        self.cached_fd = StringIO.StringIO(data)
 
     def seek(self, offset, rel=0):
         self.cached_fd.seek(offset,rel)

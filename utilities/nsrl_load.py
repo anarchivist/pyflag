@@ -137,7 +137,7 @@ def MainNSRLHash(dirname):
                 __md5=row[1].decode("hex"),
                 filename=row[3],
                 productcode=row[5],
-                oscode=row[6],
+                oscode=row[6], 
                 )
         except (ValueError,DB.DBError, TypeError),e:
             print "SQL Error skipped %s" %e
@@ -185,6 +185,7 @@ def ProductTable(dirname):
                 Version=row[2],
                 OpSystemCode=row[3],
                 ApplicationType=row[6],
+               
                 )
         except (TypeError, ValueError,DB.DBError),e:
             print "SQL Error skipped %s" %e

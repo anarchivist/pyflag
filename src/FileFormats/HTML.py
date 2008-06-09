@@ -12,7 +12,7 @@ to keep going as much as possible.
 import lexer, struct
 import sys,re,urllib,os
 import pyflag.DB as DB
-from FlagFramework import query_type, normpath, get_bt_string, iri_to_uri
+from FlagFramework import query_type, normpath, get_bt_string, smart_str, smart_unicode, iri_to_uri
 
 XML_SPECIAL_CHARS_TO_ENTITIES = { "'" : "squot",
                                   '"' : "quote",
@@ -30,7 +30,7 @@ def unquote(string):
 
 def decode_entity(string):
     def decoder(x):
-        return struct.pack("H",int(x.group(1))).decode("utf16").encode("utf8")
+        return struct.pack("H",int(x.group(1))).decode("utf16")
         
     return re.sub("&#(\d+);", decoder, string)
 
@@ -39,6 +39,20 @@ def decode_unicode(string):
 
 def decode(string):
     return decode_unicode(decode_entity(unquote(string)))
+
+def join_urls(first, last):
+    """ Joins the first url with the last, returnning a normalised
+    url. If last url is absolute we dont join them. This function can
+    be used to ensure that urls are converted to absolute urls."""
+    if last.startswith("http"):
+        return last
+
+    m = re.match("(https?://[^/]+/)([^?]+)/", first)
+    if first:
+        return m.group(1) + os.path.normpath("%s/%s" % (m.group(2), last))
+    
+    else:
+        return os.path.normpath("%s/%s" % (first, last))
 
 class Tag:
     def __init__(self, name=None, attributes=None):
@@ -63,10 +77,13 @@ class Tag:
             return "<%s%s>%s</%s>" % (self.name, attributes,
                                       self.innerHTML(), self.name)
 
+    def __unicode__(self):
+        return self.__str__()
+
     def innerHTML(self):
         result = ''
         for c in self.children:
-            result += c.__str__()
+            result += smart_str(c)
 
         return result
 
@@ -77,6 +94,10 @@ class Tag:
             self.children[-1] += child
         except (IndexError, TypeError):
             self.children.append(child)
+
+    def prune(self):
+        """ Remove all children of this node """
+        self.children = []
 
     def tree(self, width=''):
         result = "%s%s\n" % (width, self.name)
@@ -242,7 +263,8 @@ class SanitizingTag(Tag):
             if self.name == 'link':
                 attributes += " href=%s" % self.resolve_reference(self.attributes['href'], 'text/css')
             else:
-                attributes += ' href="javascript: alert(%r)"' % (urllib.quote(self.attributes['href'].__str__()[:100].replace("'","_")))
+                attributes += DB.expand(' href="javascript: alert(%r)"',
+                                        iri_to_uri(self.attributes['href'][:100]))
 
         ## CSS needs to be filtered extra well
         if self.name == 'style':
@@ -398,7 +420,7 @@ class ResolvingHTMLTag(SanitizingTag):
         row = dbh.fetch()
         if not row:
             dbh.insert("inode",
-                       inode = "x")
+                       inode = "x", _fast=True)
             inode_id = dbh.autoincrement()
             dbh.execute("update inode set inode = 'xHTTP%s' where inode_id = %s " %(inode_id, inode_id))
             dbh.insert("file",

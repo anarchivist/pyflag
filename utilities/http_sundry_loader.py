@@ -27,6 +27,7 @@ import pyflag.conf
 config = pyflag.conf.ConfObject()
 import pyflag.DB as DB
 import sys,urllib
+import shutil
 
 config.set_usage(usage = """%prog --case casename regex
 
@@ -40,6 +41,9 @@ for static objects.
 config.add_option("case", default=None,
                   help = "The case to load (mandatory)")
 
+config.add_option("copy", default=None,
+                  help = "The case to copy to. If this is specified, we just copy all the sundry objects from the specified case to this one")
+
 config.add_option("list", short_option='l', default=False, action='store_true',
                   help = "List the urls matching the regexes but do not fetch them")
 
@@ -49,7 +53,34 @@ if not config.case:
     print "You must select a case..."
     sys.exit(1)
 
+def make_filename(id, case):
+    return "%s/case_%s/xHTTP%s" % (config.RESULTDIR, case, id)
+
 dbh = DB.DBO(config.case)
+if config.copy:
+    dest_dbh = DB.DBO(config.copy)
+    dbh.execute("select *  from http_sundry")
+    for row in dbh:
+        original_id = row['id']
+        
+        ## We need to reorder the sundry objects into the inode table
+        ## ids and thus get a new inode id:
+        dest_dbh.insert("inode", inode = "x", _fast=True)
+        inode_id = dest_dbh.autoincrement()
+        dest_dbh.execute("update inode set inode = 'xHTTP%s' where inode_id = %s " %(inode_id, inode_id))
+        row['id'] = inode_id
+        
+        dest_dbh.insert("http_sundry", **row)
+        ## Now copy the file:
+        src = make_filename(original_id, config.case)
+        dest = make_filename(inode_id, config.copy)
+
+        print "Copying %s to %s" % (src,dest)
+        shutil.copy(src, dest)
+
+    sys.exit(0)
+        
+
 dbh2 = DB.DBO(config.case)
 if config.list:
     for regex in config.args:
@@ -62,7 +93,7 @@ if config.list:
 for regex in config.args:
     dbh.execute("select id,url from http_sundry where url rlike %r and present='no'", regex)
     for row in dbh:
-        new_filename = "%s/case_%s/xHTTP%s" % (config.RESULTDIR, config.case, row['id'])
+        new_filename = make_filename(row['id'], config.case)
         print "Retriving %s into %s" % (row['url'], new_filename) ,
         try:
             url = urllib.unquote(row['url'])

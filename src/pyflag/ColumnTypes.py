@@ -249,11 +249,11 @@ class ColumnType:
 
     def code_literal(self, column, operator, arg):
         ## Bit of a hack really:
-        return lambda row: eval("%r %s %r" % (row[self.column], operator, arg.__str__()), {})
+        return lambda row: eval(DB.expand("%r %s %r", (row[self.column], operator, arg.__str__())), {})
 
     def operator_literal(self, column,operator, arg):
         column = self.escape_column_name(self.column)
-        return "%s %s %r" % (column, operator, arg)
+        return DB.expand("%s %s %r" ,(column, operator, arg))
 
     def code_equal(self, column, operator, arg):
         ## Make sure our arg is actually an integer:
@@ -440,12 +440,13 @@ class StateType(ColumnType):
     def operator_is(self, column, operator, state):
         for k,v in self.states.items():
             if state.lower()==k:
-                return "%s = %r" % (self.escape_column_name(self.column), v)
+                return DB.expand("%s = %r" ,(self.escape_column_name(self.column), v))
 
         raise RuntimeError("Dont understand state %r. Valid states are %s" % (state,self.states.keys()))
 
     def create(self):
-        return "`%s` enum(%s) default NULL" % (self.column, ','.join(["%r"% x for x in self.states.values()]))
+        return DB.expand("`%s` enum(%s) default NULL" ,
+                         (self.column, ','.join([ DB.expand("%r",x) for x in self.states.values()])))
 
 class SetType(ColumnType):
     """ This can hold a number of different items simultaneously """
@@ -461,7 +462,8 @@ class SetType(ColumnType):
         self.docs = {'contains': """ Matches when the column is of the specified state. Supported states are %s""" % self.states}
 
     def create(self):
-        return "`%s` set('',%s)" % (self.column, ','.join(["%r"% x for x in self.states]))
+        return DB.expand("`%s` set('',%s)" ,
+                         (self.column, ','.join([DB.expand("%r",x) for x in self.states])))
 
 class IntegerType(ColumnType, LogParserMixin):
     symbols = {
@@ -802,7 +804,8 @@ class IPType(ColumnType, LogParserMixin):
         return "%s = '%s'" % (self.escape_column_name(self.column), numeric_address)
 
     def operator_literal(self, column, operator, address):
-        return "%s %s INET_ATON(%r)" % (self.escape_column_name(self.column), operator, address)
+        return DB.expand("%s %s INET_ATON(%r)" ,
+                         (self.escape_column_name(self.column), operator, address))
 
     def code_matches(self, column, operator, address):
         """ Matches the IP address specified exactly """
@@ -853,7 +856,7 @@ class IPType(ColumnType, LogParserMixin):
         return "inet_ntoa(`%s`)" % (self.column)
 
     def insert(self,value):
-        return "_"+self.column, "inet_aton(%r)" % value.strip()
+        return "_"+self.column, DB.expand("inet_aton(%r)", value.strip())
 
     display_hooks = IntegerType.display_hooks[:]
 
@@ -900,7 +903,7 @@ class InodeIDType(IntegerType):
             print "Got Error exporting inode_id %s: %s" % (value, e)
 
         outfd.close()
-
+        
     def html(self, value):
         return '<a href="%s">%s</a>' % (value, value)
 
@@ -1012,7 +1015,8 @@ class FilenameType(StringType):
 
     def operator_literal(self, column, operator, pattern):
         column = self.escape_column_name(self.column)
-        return "%s in (select inode_id from file where concat(file.path, file.name) %s %r)" % (column, operator, pattern) 
+        return DB.expand("%s in (select inode_id from file where concat(file.path, file.name) %s %r)",
+                         (column, operator, pattern))
 
     def create(self):
         return "path TEXT, name TEXT, link TEXT NULL"
@@ -1034,7 +1038,8 @@ class InodeInfo(StringType):
         return "(select `%s` from inode where inode_id=%s.inode_id limit 1)" % (self.field, self.table)
     
     def operator_literal(self, column, operator, pattern):
-        return "`%s` in (select inode_id from inode where `%s` %s %r)" % (self.column, self.field, operator, pattern) 
+        return DB.expand("`%s` in (select inode_id from inode where `%s` %s %r)",
+                         (self.column, self.field, operator, pattern) )
 
 class DeletedType(StateType):
     """ This is a column type which shows deleted inodes graphically

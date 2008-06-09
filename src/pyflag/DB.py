@@ -98,10 +98,13 @@ del conv[FIELD_TYPE.TIME]
 del conv[FIELD_TYPE.DATE]
 del conv[FIELD_TYPE.YEAR]
 
-escape_re = re.compile(r"(['\b\"\r\n\t\\])")
-def escape(string):
+escape_re = re.compile(r"([\b\r\n\t\\])")
+def escape(string, quote=''):
     result = escape_re.sub(r"\\\1", string)
     result = result.replace("\x00","\\0")
+    for q in quote:
+        result = result.replace(q,'\\'+q)
+        
     return result
 
 class DBError(Exception):
@@ -114,8 +117,9 @@ def force_unicode(string):
         try:
             return unicode(string)
         except:
-            print "String %r should be unicode" % string
-            
+            #print "String %r should be unicode" % string
+            pass
+        
         return unicode(string, "utf-8", "ignore")
 
     return unicode(string)
@@ -145,7 +149,8 @@ def expand(sql, params):
             
         ## Raw escaping
         elif m.group(1)=='r':
-            result = u"'%s'" % escape(force_unicode(params[d['count']]))
+            result = u"'%s'" % escape(force_unicode(params[d['count']]), quote="'")
+            #result = u"'%s'" % escape(force_unicode(params[d['count']]))
 
         ## This needs to be binary escaped:
         elif m.group(1)=='b':
@@ -433,8 +438,10 @@ class DBO:
             params = params[0]
         except (AttributeError,IndexError):
             pass
-            
-        string = expand(query_str, params)
+
+        if params:
+            string = expand(query_str, params)
+        else: string = query_str
         #print string
         try:
             self.cursor.execute(string)

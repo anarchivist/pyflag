@@ -101,9 +101,12 @@ class IO_File(FileSystem.File):
             q.clear('report')
             q.clear('family')
             for k,v in q.items():
-                tmp.row(k,v)
+                if k == 'filename' and v.startswith(config.UPLOADDIR):
+                    v = v[len(config.UPLOADDIR):]
+                    
+                tmp.row(k,v, **{'class': 'explain'})
             
-        result.row("IO Subsys %s:" % self.name, tmp, valign="top")
+        result.row("IO Subsys %s:" % self.name, tmp, **{'class': 'explainrow'})
 
 import sys
 

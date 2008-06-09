@@ -13,6 +13,7 @@ import pyflag.conf
 config=pyflag.conf.ConfObject()
 import pyflag.pyflaglog as pyflaglog
 import pyflag.HTMLUI as HTMLUI
+from pyflag.DB import expand
 
 config.add_option("REPORTING_DIR", default=config.RESULTDIR + "/Reports",
                   help = "Directory to emit reports into.")
@@ -168,7 +169,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
 
         ## Store critical information about the page in the db:
         dbh = DB.DBO(self.case)
-        dbh.delete("reporting", where="page_name = %r" % page_name)
+        dbh.delete("reporting", where=DB.expand("page_name = %r", page_name))
         dbh.insert("reporting",
                    start_value = start_value,
                    end_value = end_value,
@@ -210,6 +211,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         for filename, dest in [ ("images/spacer.png", "inodes/images/spacer.png"),
                                 ("images/spacer.png", None),
                                 ('images/pyflag.css',None,),
+                                ('images/pyflag.css', "inodes/images/pyflag.css",),
                                 ('images/next_line.png', None),
                                 ('images/decrement.png',None,),
                                 ('images/increment.png',None),
@@ -218,6 +220,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
                                 ('images/stock_right.png',None),
                                 ('images/stock_right_gray.png',None),
                                 ('images/toolbar-bg.gif',None),
+                                ('images/question.png',None),
                                 ('images/browse.png',None),
                                 ('javascript/functions.js', None),
                                 ]:
@@ -289,7 +292,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         for row in dbh:
             if row['start_value'] == 'None': continue
             
-            result.row("<a href=%r>%s</a>" % (row['page_name'],row['page_name']),
+            result.row(expand("<a href=%r>%s</a>", (row['page_name'],row['page_name'])),
                        row['description'],
                        row['start_value'],
                        row['end_value'],
@@ -546,6 +549,18 @@ class Export(Farm.Task):
         except AttributeError,e:
             pass
 
+        ## Now explain this file:
+        import pyflag.HTMLUI as HTMLUI
+        result = HTMLUI.HTMLUI(initial = True)
+        result.heading("How to derive inode %s" % fd.inode)
+        
+        filename = "inodes/%s_explain.html" % inode_id
+        
+        result.decoration='naked'
+        fd.explain(None, result)
+        
+        table_renderer.add_file_from_string(filename, result.display())
+
 def render_html(self, inode_id, table_renderer):
     dbh = DB.DBO()
     case = table_renderer.case
@@ -556,13 +571,17 @@ def render_html(self, inode_id, table_renderer):
                )
 
     filename, content_type, fd = table_renderer.make_archive_filename(inode_id)
-    result = "<a href='%s'>%s</a>" % (filename, fd.inode)
+    result = "<a href='%s'>%s</a><br />" % (filename, fd.inode)
     
     try:
         filename = "inodes/%s_summary.html" % inode_id
         fd.html_export
-        result += "<br/><a href='%s'><img src=images/browse.png /></a>" % (filename,)
+        result += "<a href='%s'><img src=images/browse.png /></a>" % (filename,)
     except AttributeError: pass
+
+    ## Add a link to the explaination page:
+    filename = "inodes/%s_explain.html" % inode_id
+    result+="<a href='%s'><img src=images/question.png /></a>" %(filename,)
 
     return result
 

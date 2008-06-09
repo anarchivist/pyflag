@@ -35,6 +35,7 @@ from urllib import quote
 import pyflag.FlagFramework as FlagFramework
 from pyflag.FlagFramework import urlencode, iri_to_uri
 import pyflag.DB as DB
+from pyflag.DB import expand
 import pyflag.conf
 import pyflag.UI as UI
 config=pyflag.conf.ConfObject()
@@ -170,10 +171,9 @@ class HTMLUI(UI.GenericUI):
         options.update(opts)
         try:
             if options['autosubmit']:
-                result.append("onchange=\"submit_form(%r,%r,%r,%r); return false;\"" % ('self',
-                                                                                      'None',
-                                                                                      '',''
-                                                                                      ))
+                result.append(
+                    expand("onchange=\"submit_form(%r,%r,%r,%r); return false;\"" ,
+                           ('self', 'None','','' )))
                 del options['autosubmit']
         except:
             pass
@@ -225,10 +225,12 @@ class HTMLUI(UI.GenericUI):
         tmp.decoration='raw'
         #Redefine our display method to just dump the binary object back
         if tmp.type.startswith("image"):
-            self.result +=  '<img type=%r src="f?draw_stored=%s" %s />'  % (tmp.type,self.store(tmp),opt)
+            self.result +=  expand('<img type=%r src="f?draw_stored=%s" %s />',
+                                   (tmp.type,self.store(tmp),opt))
         else:
         ## Store the ui for later retrieval by the browser when we fetch the target:
-            self.result +=  '<object type=%r data="f?draw_stored=%s" %s />'  % (tmp.type,self.store(tmp),opt)
+            self.result += expand('<object type=%r data="f?draw_stored=%s" %s />',
+                                  (tmp.type,self.store(tmp),opt))
 
     def store_callback(self,callback):
         """ Function registers the callback with the server.
@@ -251,7 +253,7 @@ class HTMLUI(UI.GenericUI):
     
     def start_table(self,**options):
         self.table_depth += 1
-        if not options.has_key("class"): options['class'] = "Row"
+        #if not options.has_key("class"): options['class'] = "Row"
         self.result += "<table %s>\n" % self.opt_to_str(options)
 
     def row(self,*columns, **options):
@@ -360,11 +362,13 @@ class HTMLUI(UI.GenericUI):
             string=tmp
 
         js = self._calculate_js_for_pane(target=q, pane=pane)
-        base = "<a href='f?%s' onclick=%r>%s</a>" % (q, js, string)
+        base = expand("<a href='f?%s' onclick=%r>%s</a>",
+                      (q, js, string))
 
         ## Add tooltip if needed:
         if tooltip:
-            self.result+="<abbr title=%r>%s</abbr>" % (quote_quotes(tooltip),base)
+            self.result+= expand("<abbr title=%r>%s</abbr>",
+                                 (quote_quotes(tooltip),base))
         else:
             self.result+=base
 
@@ -384,11 +388,13 @@ class HTMLUI(UI.GenericUI):
             height=768
 
         if icon:
-            base = "<img alt='%s' border=0 src='images/%s' onclick=\"popup('f?%s','%s',%r,%r); return false;\" class=PopupIcon />" % (label,icon, self.defaults,cb, width, height)
+            base = expand("<img alt='%s' border=0 src='images/%s' onclick=\"popup('f?%s','%s',%r,%r); return false;\" class=PopupIcon />", (label,icon, self.defaults,cb, width, height))
         else:
-            base = "<input type=button value=%r onclick=\"popup('f?%s','%s',%r,%r); return false;\" />" % (label,self.defaults,cb,width,height)
+            base = expand("<input type=button value=%r onclick=\"popup('f?%s','%s',%r,%r); return false;\" />",
+                          (label,self.defaults,cb,width,height))
         if tooltip:
-            self.result += "<abbr title=%r>%s</abbr>" % (quote_quotes(tooltip),base)
+            self.result += expand("<abbr title=%r>%s</abbr>",
+                                  (quote_quotes(tooltip),base))
         else:
             self.result += base
 

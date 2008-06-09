@@ -17,6 +17,7 @@ config.set_usage(usage = """%prog [options]
 Detect Yahoo mail versions.  """)
 
 config.add_option('case', short_option='c', default=None, help='Case to inspect')
+config.add_option('inode',short_option='i', default=None, help='Only test this inode')
 
 config.parse_options()
 
@@ -34,7 +35,7 @@ def insert_message(self, result, inode_template = "l%s"):
     ## nicely:
     try:
         ## Try to render the html as text:
-        message = result['Message'].__str__()
+        message = unicode(result['Message'])
         p = HTML.HTMLParser(tag_class = HTML.TextTag)
         p.feed(message)
         p.close()
@@ -48,20 +49,12 @@ def insert_message(self, result, inode_template = "l%s"):
         print "   %s: %r" % (k,v)
 
     return True
-        
-YahooMailScan.Scan.insert_message = insert_message
 
-fsfd = FileSystem.DBFS(config.case)
-dbh = DB.DBO(config.case)
-dbh.execute("select * from http where url like '%yahoo.com/ym/%'")
-factory = YahooMailScan(fsfd)
-
-for row in dbh:
-    if not row['inode_id']: continue
+def test_inode(inode_id, url, factory, fsfd):
     print "-----------------------------"
-    print "Inode_id = %s" % row['inode_id']
-    print "URL = %s" % row['url']
-    fd = fsfd.open(inode_id = row['inode_id'])
+    print "Inode_id = %s" % inode_id
+    print "URL = %s" % url
+    fd = fsfd.open(inode_id = inode_id)
     data = fd.read()
 
     m=re.search(r"<!-- (v\d+\.\d+\.\d+) (\d+) -->", data)
@@ -75,3 +68,19 @@ for row in dbh:
     scanner = factory.Scan(fd.inode, fsfd, factory, factories=[factory,], fd=fd)
     scanner.process(data, metadata = {})
     scanner.finish()
+            
+YahooMailScan.Scan.insert_message = insert_message
+
+fsfd = FileSystem.DBFS(config.case)
+factory = YahooMailScan(fsfd)
+
+if config.inode:
+    path, inode, inode_id = fsfd.lookup(inode = config.inode)
+    test_inode(inode_id, '', factory, fsfd)
+else:
+    dbh = DB.DBO(config.case)
+    dbh.execute("select * from http where url like '%yahoo.com/ym/%'")
+
+    for row in dbh:
+        if not row['inode_id']: continue
+        test_inode(row['inode_id'], row['url'], factory, fsfd)

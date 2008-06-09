@@ -328,7 +328,7 @@ h1 {
  }
 
 /** Table alignment */
-table.PyFlagTable td.Integer { 
+td.Integer { 
   text-align: right;
  }
 
@@ -340,3 +340,19 @@ table.PyFlagTable {
 .Row { 
   clear: left;
  }
+
+tr.explain td, tr.explain th { 
+  border-right: 2px solid #999;
+  border-bottom: 2px solid #999;
+  background: #eeeeee;
+  vertical-align: top;
+}
+
+tr.explain th { 
+  background: #ffeeee;
+}
+
+tr.explainrow td { 
+  padding: 4px;
+  vertical-align: top; 
+}

@@ -124,7 +124,8 @@ class FileList:
     def __init__(self, args):
         ## This keeps all instances of pcap files:
         self.files = []
-
+        count = 0
+        
         ## This is a list of the time of the next packet in each file (floats):
         self.times = []
         self.firstValid = None
@@ -134,13 +135,17 @@ class FileList:
             try:
                 fd = PCAPParser(f)
                 fd.next()
-
+                count += 1
+                if (count % 100) == 0:
+                    sys.stdout.write("\rPre-processed %s files" % count)
+                    sys.stdout.flush()
+                    
             except IOError:
-                print "Unable to read %s, skipping" % f
+                #print "Unable to read %s, skipping" % f
                 continue
 
             except StopIteration:
-                print "Unable to read packet from %s, skipping" % f
+                #print "Unable to read packet from %s, skipping" % f
                 continue
 
             if not self.firstValid:

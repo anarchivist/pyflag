@@ -118,7 +118,8 @@ class JpegCarver(Scanner.Carver):
         else:
             return j.size()
     
-class CarveScan(Scanner.GenScanFactory):
+#class CarveScan(Scanner.GenScanFactory):
+class CarveScan:
     """ Carve out files """
     ## We must run after the Index scanner
     order = 300
