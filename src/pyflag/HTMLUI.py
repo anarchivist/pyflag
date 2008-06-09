@@ -153,6 +153,9 @@ class HTMLUI(UI.GenericUI):
 
         return self.result
 
+    def __unicode__(self):
+        return self.__str__()
+
     def heading(self,string):
         self.result += "<h1>%s</h1>"%string
 
@@ -226,11 +229,11 @@ class HTMLUI(UI.GenericUI):
         #Redefine our display method to just dump the binary object back
         if tmp.type.startswith("image"):
             self.result +=  expand('<img type=%r src="f?draw_stored=%s" %s />',
-                                   (tmp.type,self.store(tmp),opt))
+                                   (quote_quotes(tmp.type),self.store(tmp),opt))
         else:
         ## Store the ui for later retrieval by the browser when we fetch the target:
             self.result += expand('<object type=%r data="f?draw_stored=%s" %s />',
-                                  (tmp.type,self.store(tmp),opt))
+                                  (quote_quotes(tmp.type),self.store(tmp),opt))
 
     def store_callback(self,callback):
         """ Function registers the callback with the server.
@@ -328,10 +331,10 @@ class HTMLUI(UI.GenericUI):
                 pass
 
         if pane=='parent':
-            return "link_to_parent(\"%s\", window.__pyflag_parent); return false;" % target
+            return "link_to_parent(\"f?%s\", window.__pyflag_parent); return false;" % target
 
         if pane=='parent_pane':
-            return "link_to_parent(\"%s\", 0); return false;" % target
+            return "link_to_parent(\"f?%s\", 0); return false;" % target
 
         if pane=="main":
             #return "post_link('f?%s','main'); find_window_by_name(window.__pyflag_name).close(); return false;" % target
@@ -363,7 +366,7 @@ class HTMLUI(UI.GenericUI):
 
         js = self._calculate_js_for_pane(target=q, pane=pane)
         base = expand("<a href='f?%s' onclick=%r>%s</a>",
-                      (q, js, string))
+                      (q, quote_quotes(js), string))
 
         ## Add tooltip if needed:
         if tooltip:
@@ -391,7 +394,7 @@ class HTMLUI(UI.GenericUI):
             base = expand("<img alt='%s' border=0 src='images/%s' onclick=\"popup('f?%s','%s',%r,%r); return false;\" class=PopupIcon />", (label,icon, self.defaults,cb, width, height))
         else:
             base = expand("<input type=button value=%r onclick=\"popup('f?%s','%s',%r,%r); return false;\" />",
-                          (label,self.defaults,cb,width,height))
+                          (quote_quotes(label),self.defaults,cb,width,height))
         if tooltip:
             self.result += expand("<abbr title=%r>%s</abbr>",
                                   (quote_quotes(tooltip),base))

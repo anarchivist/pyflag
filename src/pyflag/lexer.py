@@ -36,7 +36,7 @@ class Lexer:
     verbose = 0
     state_stack = []
     processed = 0
-    processed_buffer = ''
+    processed_buffer = u''
     saved_state = None
     flags = 0
     

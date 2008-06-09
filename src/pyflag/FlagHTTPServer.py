@@ -411,6 +411,9 @@ class FlagServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler, FlagFramework
 
             if not accept_chunked_encoding:
                 for data in result.generator.generator:
+                    if isinstance(data, unicode):
+                        data = data.encode("utf8")
+                        
                     self.wfile.write(data)
 
                 self.wfile.close()
