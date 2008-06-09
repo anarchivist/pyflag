@@ -710,7 +710,7 @@ class DBO:
             elif k.startswith('_'):
                 k=k[1:]
             else:
-                v="'%s'" % escape(unicode(v))
+                v=expand("%r", v)
                 
             try:
                 self.mass_insert_cache[k][self.mass_insert_row_count]=v
