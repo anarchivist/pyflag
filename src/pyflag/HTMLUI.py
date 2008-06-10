@@ -8,7 +8,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.86RC1 Date: Thu Jan 31 01:21:19 EST 2008$
+#  Version: FLAG $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -49,7 +49,7 @@ import pyflag.FlagFramework as FlagFramework
 
 def quote_quotes(string):
     """ Replaces \' with \" for insertion into html """
-    return string.replace('\'',"\"")
+    return string.replace('\'',"&quote;")
 
 class HTMLException(Exception):
     """ An exception raised within the UI - should not escape from this module """
@@ -310,10 +310,10 @@ class HTMLUI(UI.GenericUI):
         pane: The current javascript pane - this is useful for paging in trees etc.
         """
         if pane=='self':
-            return "post_link('f?%s',window.__pyflag_name); return false;" % target
+            return "post_link('f?%s',window.__pyflag_name); return false;" % iri_to_uri(target)
 
         if pane=='pane':
-            return "post_link('f?%s',0); return false;" % target
+            return "post_link('f?%s',0); return false;" % iri_to_uri(target)
         
         if pane=='popup':
             id=self.get_unique_id()
@@ -1328,7 +1328,8 @@ class HTMLUI(UI.GenericUI):
         else: callback = 'None'
 
         if value:
-            return "<input type=submit name=%s value='%s' onclick=\"submit_form(%r,%r,%r,%r); return false;\" %s>\n" % (name,value,target,callback,name,value,self.opt_to_str(opts))
+            return expand("<input type=submit name=%s value='%s' onclick=\"submit_form(%r,%r,%r,%r); return false;\" %s>\n",
+                          (name,value,target,callback,name,value,self.opt_to_str(opts)))
         else: return ''
 
     def end_form(self,value='Submit',name='__submit__',**opts):

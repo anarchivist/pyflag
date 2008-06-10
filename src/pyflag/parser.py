@@ -5,7 +5,7 @@ type of the columns presented.
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.84RC4 Date: Wed May 30 20:48:31 EST 2007$
+#  Version: FLAG $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or

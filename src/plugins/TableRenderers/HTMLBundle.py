@@ -78,7 +78,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             os.makedirs(directory)
         
         outfd = open(output_file_name, 'w')
-        outfd.write(string)
+        outfd.write(string.encode("utf8"))
         outfd.close()
 
 

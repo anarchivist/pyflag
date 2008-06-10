@@ -12,7 +12,9 @@ to keep going as much as possible.
 import lexer, struct
 import sys,re,urllib,os
 import pyflag.DB as DB
+from pyflag.DB import expand
 from FlagFramework import query_type, normpath, get_bt_string, smart_str, smart_unicode, iri_to_uri
+import pyflag.FileSystem as FileSystem
 
 XML_SPECIAL_CHARS_TO_ENTITIES = { "'" : "squot",
                                   '"' : "quote",
@@ -27,6 +29,16 @@ def unquote(string):
         string = string.replace("&%s;" % v, k)
 
     return string
+
+def url_unquote(string):
+    def decoder(x):
+        return x.group(1).decode("hex")
+
+    result = re.sub("%(..)", decoder, string)
+    ## references seem to _always_ be encoded using utf8 - even if the
+    ## page is encoded using a different charset??? This whole quoting
+    ## thing is very confusing.
+    return smart_unicode(result, 'utf8')
 
 def decode_entity(string):
     def decoder(x):
@@ -54,36 +66,49 @@ def join_urls(first, last):
     else:
         return os.path.normpath("%s/%s" % (first, last))
 
+## NOTE: All data within the tag and parser is kept as binary
+## strings. The parser can discover the charset while parsing the
+## page, but defaults to utf8. Data is converted to unicode when the
+## tag is printed or attributes are fetched using __getitem__. We must
+## ensure that the lexer operates on byte strings (not unicode)
+## because unicode regular expressions are very slow.
 class Tag:
-    def __init__(self, name=None, attributes=None):
+    ## This will be replaced by a shared reference to the parsers
+    ## charset. This allows the lexer to change everyone's charset by
+    ## updating this array.
+    charset = ['utf8',]
+    def __init__(self, name=None, attributes=None, charset=None):
         self.name = name
         self.attributes = attributes or {}
         self.children = []
         self.type = 'open'
+        if charset:
+            self.charset = charset
 
     def __setitem__(self, item, value):
         self.attributes[item.lower()] = value
 
     def __getitem__(self, item):
-        return self.attributes[item.lower()]
+        return smart_unicode(self.attributes[item.lower()], self.charset[0],'ignore')
 
     def __str__(self):
-        attributes = "".join([" %s='%s'" % (k,iri_to_uri(v)) for k,v \
+        attributes = "".join([expand(" %s='%s'",(k,iri_to_uri(v))) for k,v \
                               in self.attributes.items() if v ])
         
         if self.type == 'selfclose':
-            return "<%s%s/>" % (self.name, attributes)
+            return expand("<%s%s/>", (self.name, attributes))
         else:
-            return "<%s%s>%s</%s>" % (self.name, attributes,
-                                      self.innerHTML(), self.name)
+            return expand("<%s%s>%s</%s>", (self.name, attributes,
+                                      self.innerHTML(), self.name))
 
     def __unicode__(self):
-        return self.__str__()
+        return smart_unicode(self.__str__(), encoding = self.charset[0])
 
     def innerHTML(self):
-        result = ''
+        """ charset is the desired output charset """
+        result = u''
         for c in self.children:
-            result += smart_str(c)
+            result += smart_unicode(c, encoding = self.charset[0])
 
         return result
 
@@ -100,7 +125,7 @@ class Tag:
         self.children = []
 
     def tree(self, width=''):
-        result = "%s%s\n" % (width, self.name)
+        result = expand("%s%s\n", (width, self.name))
         width += ' '
         for c in self.children:
             try:
@@ -214,7 +239,6 @@ class SanitizingTag(Tag):
                             'compact', 'type', 'start', 'rel',
                             'value', 'checked', 'rows','cols','media',
                             'framespacing','frameborder','contenteditable',
-                            'content'
                             ]
 
     def css_filter(self, data):
@@ -254,7 +278,8 @@ class SanitizingTag(Tag):
 
         if 'http-equiv' in self.attributes:
             if self.attributes['http-equiv'].lower() == "content-type":
-                attributes += " http-equiv = %r " % self.attributes['http-equiv']
+                ## PF _always_ outputs in utf8
+                attributes += ' http-equiv = "Content-Type" content="text/html; charset=UTF-8"'
                 
         if 'src' in self.attributes:
             attributes += ' src=%s' % self.resolve_reference(self.attributes['src'])
@@ -268,14 +293,15 @@ class SanitizingTag(Tag):
 
         ## CSS needs to be filtered extra well
         if self.name == 'style':
-            return "<style %s>%s</style>" % (attributes,
-                                             self.css_filter(self.innerHTML()))
+            return expand("<style %s>%s</style>" , (attributes,
+                                             self.css_filter(self.innerHTML())))
         
         if self.type == 'selfclose':
-            return "<%s%s/>" % (self.name, attributes)
+            return expand("<%s%s/>" , (self.name, attributes))
         else:
-            return "<%s%s>%s</%s>" % (self.name, attributes,
-                                      self.innerHTML(), self.name)
+            return expand("<%s%s>%s</%s>", (self.name, attributes,
+                                            self.innerHTML(),
+                                            self.name))
 
 
     def resolve_reference(self, reference, hint=''):
@@ -315,7 +341,13 @@ def get_url(inode_id, case):
 
         if row:
             url = row['url']
-            
+        else:
+            ## Its not in the http take, maybe its in the VFS:
+            dbh.execute("select concat(path,name) as path from file where inode_id = %r limit 1", inode_id)
+            row = dbh.fetch()
+            if row:
+                url = row['path']
+
         store.put(url, key=inode_id)
 
     return url
@@ -330,10 +362,10 @@ class ResolvingHTMLTag(SanitizingTag):
     constructor takes more parameters.
     """
     url_re = re.compile("(http|ftp)://([^/]+)/([^?]*)")
-    def __init__(self, case, inode_id, name=None, attributes=None):
+    def __init__(self, case, inode_id, name=None, attributes=None, charset=None):
         self.case = case
         self.inode_id = inode_id
-        SanitizingTag.__init__(self, name, attributes)
+        SanitizingTag.__init__(self, name, attributes, charset)
 
         ## Collect some information about this inode:
         url = get_url(inode_id, case)
@@ -342,30 +374,36 @@ class ResolvingHTMLTag(SanitizingTag):
             self.method = m.group(1)
             self.host = m.group(2)
             self.base_url = os.path.dirname(m.group(3))
-            if not self.base_url.startswith("/"):
-                self.base_url = "/"+self.base_url
-
-            if self.base_url.endswith("/"):
-                self.base_url = self.base_url[:-1]
-
         else:
             self.method = ''
             self.host = ''
-            self.base_url = ''
+            self.base_url = url
 
+        if not self.base_url.startswith("/"):
+            self.base_url = "/"+self.base_url
+            
+        if self.base_url.endswith("/"):
+            self.base_url = self.base_url[:-1]
+        else:
+            self.base_url = os.path.dirname(url)
+            
         self.comment = False
 
-    def make_reference_to_inode(self, inode_id, hint):
+    def make_reference_to_inode(self, inode_id, hint=None):
         """ Returns a reference to the given Inode ID.
 
         This needs to provide a URL to the specified resource.
         """
-        return '"f?%s"' % query_type(case=self.case,
+        result = query_type(case=self.case,
                                      family="Network Forensics",
                                      report="ViewFile",
-                                     inode_id=inode_id,
-                                     hint=hint)
+                                     inode_id=inode_id)
 
+        if hint:
+            result['hint'] = hint
+
+        return '"f?%s"' % result
+    
     def resolve_reference(self, reference, hint='', build_reference=True):
         original_reference = reference
 
@@ -375,10 +413,21 @@ class ResolvingHTMLTag(SanitizingTag):
         elif reference.startswith("/"):
             path = normpath("%s" % (reference))
             reference="%s://%s%s" % (self.method, self.host, path)
-        else:
+        elif self.method:
             ## FIXME: This leads to references without methods:
             path = normpath("/%s/%s" % (self.base_url,reference))
             reference="%s://%s%s" % (self.method, self.host, path)
+        ## If we get here the reference is not absolute, and we dont
+        ## have a method - chances are that its in the VFS:
+        else:
+            fsfd = FileSystem.DBFS(self.case)
+            new_reference = url_unquote(reference)
+            url = os.path.normpath(os.path.join(self.base_url, new_reference))
+            try:
+                path, inode, inode_id = fsfd.lookup(path = url)
+                if inode_id:
+                    return self.make_reference_to_inode(inode_id)
+            except RuntimeError: pass
 
         ## Try to make reference more url friendly:
 #        reference = reference.replace(" ","%20")
@@ -470,7 +519,7 @@ class HTMLParser(lexer.Lexer):
         [ "TAG", "[^ /<>]+", "TAG_NAME", "ATTRIBUTE LIST"],
 
         ## An attribute list is a list of key=value pairs within a tag
-        [ "ATTRIBUTE LIST", "([-a-z0-9A-Z]+)\s*=", "ATTRIBUTE_NAME", "ATTRIBUTE VALUE"],
+        [ "ATTRIBUTE LIST", "([-a-z0-9A-Z_]+)\s*=", "ATTRIBUTE_NAME", "ATTRIBUTE VALUE"],
         [ "ATTRIBUTE LIST", ">", "END_TAG", "CDATA"],
         
         ## Swallow spaces
@@ -495,13 +544,19 @@ class HTMLParser(lexer.Lexer):
     def __init__(self, verbose = 0, tag_class = None):
         lexer.Lexer.__init__(self, verbose)
         self.Tag = tag_class or Tag
+        ## Default charset we use to decode our input. Note that this
+        ## is an array in order to have all tags keep a reference to
+        ## this. This way we can change our charset half way through
+        ## parsing the document and have all existing tag objects
+        ## update.
+        self.charset = ["utf8",]
         
         ## First we create the root of the DOM
         self.TAG_START(None, None)
         self.root = self.tag
         self.stack = [self.root,]
         self.tag.name = 'root'
-        
+
     def CDATA(self, token, match):
         self.tag.add_child(match.group(0))
 
@@ -565,17 +620,22 @@ class HTMLParser(lexer.Lexer):
             return "SCRIPT"
                 
     def TAG_START(self, token, match):
-        self.tag = self.Tag()
+        self.tag = self.Tag(charset = self.charset)
         
     def ATTRIBUTE_VALUE(self, token, match):
         self.tag[self.current_attribute] = match.group(1) or match.group(2)
+        if self.tag.name=='meta' and self.current_attribute=='content':
+            m = re.search("charset=([^ \"]+)", self.tag[self.current_attribute])
+            if m:
+                print "Setting charset to %s" % m.group(1)
+                self.charset[0] = m.group(1)
 
     def close(self):
         """ Just a conveniece function to force us to parse all the data """
         while self.next_token(): pass
 
 if __name__ == '__main__':
-    l = HTMLParser(verbose=1, tag_class = SanitizingTag2)
+    l = HTMLParser(verbose=1, tag_class = SanitizingTag)
 
     if len(sys.argv)==1:
         l.feed("foobar");
@@ -587,7 +647,7 @@ if __name__ == '__main__':
         l.feed("<<a> here <bo< ld> sdfd");
 
         while l.next_token(True): pass
-
+        
         # Split input - space between the < and / for closing tags
         l.feed(" sfsfd < /bold attr1");
 
@@ -609,7 +669,9 @@ if __name__ == '__main__':
 
     else:
         fd = open(sys.argv[1])
-        for line in fd:
+        while 1:
+            line=fd.read(1024*10)
+            if not(line): break
             l.feed(line)
             
             ## Get all the tokens

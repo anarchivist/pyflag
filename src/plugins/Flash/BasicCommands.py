@@ -4,7 +4,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.86RC1 Date: Thu Jan 31 01:21:19 EST 2008$
+#  Version: FLAG $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -367,6 +367,8 @@ class iiless(iless):
                 
             pipe.close()
             yield 'Viewing of %s with less successful' % row['inode']
+
+
     
 class icp(iless):
     """ Copy Inodes from the VFS to the file system """
@@ -396,6 +398,33 @@ class icp(iless):
             outfd.close()
             yield 'Copying of %s into %s successful' % (inode,self.args[-1])
 
+    
+class iicp(iless):
+    """ Copy Inodes from the VFS to the file system """
+    def execute(self):
+        print self.args
+        ## check that last arg is a dir
+        mode = "file"
+        if len(self.args)>2 and not os.isdir(self.args[-1]):
+            raise RuntimeError("Last argument must be a directory for multiple files")
+        else:
+            mode = "directory"
+        
+        for inode_id in self.args[:-1]:
+            fd=self.environment._FS.open(inode_id=inode_id)
+            if mode =='directory':
+                output_filename = inode_id
+                outfd = open("%s/%s" % (self.args[-1], output_filename),'w')
+            else:
+                outfd = open(self.args[-1],'w')
+                
+            while 1:
+                data=fd.read(10000)
+                if not data: break
+                outfd.write(data)
+                    
+            outfd.close()
+            yield 'Copying of %s into %s successful' % (inode_id,self.args[-1])
 
 class stat(ls):
     """ stats a list of files in the filesystem """

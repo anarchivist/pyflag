@@ -8,7 +8,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG  $Version: 0.86RC1 Date: Thu Jan 31 01:21:19 EST 2008$
+#  Version: FLAG  $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -104,7 +104,7 @@ def escape(string, quote=''):
     result = result.replace("\x00","\\0")
     for q in quote:
         result = result.replace(q,'\\'+q)
-        
+
     return result
 
 class DBError(Exception):
@@ -710,7 +710,7 @@ class DBO:
             elif k.startswith('_'):
                 k=k[1:]
             else:
-                v=expand("%r", v)
+                v=expand("%r", (v,))
                 
             try:
                 self.mass_insert_cache[k][self.mass_insert_row_count]=v

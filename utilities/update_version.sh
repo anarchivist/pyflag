@@ -2,7 +2,7 @@
 ##This little utility function is used to update the version information in all files:
 
 DIRS="src utilities"
-NEWVERSION=0.86RC1
+NEWVERSION=0.87-pre1
 
 exp="s/\\\$Version:.*\\\$/\\\$Version: $NEWVERSION Date: "`date`"\\\$/"
 

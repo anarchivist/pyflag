@@ -8,7 +8,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.86RC1 Date: Thu Jan 31 01:21:19 EST 2008$
+#  Version: FLAG $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -998,7 +998,7 @@ class CaseTable:
 
 ## The following functions are for unicode support and are mostly
 ## borrowed from django:
-def smart_unicode(s, encoding='utf-8', errors='strict'):
+def smart_unicode(s, encoding='utf-8', errors='ignore'):
     """
     Returns a unicode object representing 's'. Treats bytestrings using the
     'encoding' codec.

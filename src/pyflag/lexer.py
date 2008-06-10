@@ -2,7 +2,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.86RC1 Date: Thu Jan 31 01:21:19 EST 2008$
+#  Version: FLAG $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -36,7 +36,7 @@ class Lexer:
     verbose = 0
     state_stack = []
     processed = 0
-    processed_buffer = u''
+    processed_buffer = ''
     saved_state = None
     flags = 0
     
@@ -101,7 +101,6 @@ class Lexer:
             if state.match(current_state):
                 if self.verbose > 2:
                     print "%s: Trying to match %r with %r" % (self.state, self.buffer[:10], re_str)
-                    
                 m = regex.match(self.buffer)
                 if m:
                     if self.verbose > 3:

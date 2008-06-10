@@ -4,7 +4,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.86RC1 Date: Thu Jan 31 01:21:19 EST 2008$
+#  Version: FLAG $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -108,7 +108,7 @@ class WebMailAttachmentTable(FlagFramework.CaseTable):
     columns = [
         [ InodeIDType, dict(name = "Message Inode") ],
         [ InodeIDType, dict(name = "Attachment", column="attachment") ],
-        [ StringType, dict(name='URL', column='url')],
+        [ StringType, dict(name = "URL", column='url')],
         ]
 
 class LiveTables(FlagFramework.EventHandler):
@@ -467,6 +467,8 @@ class LiveMailViewer(FileSystem.StringIOFile):
             return FileSystem.StringIOFile.read(self, length)
         except IOError: pass
 
+        ## We must always return a byte string for reads (files are
+        ## always bytestreams)
         return self.message.encode("utf8")
 
     def fixup_page(self, root, tag_class):
