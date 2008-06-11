@@ -8,7 +8,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
+#  Version: FLAG $Version: 0.87-pre1 Date: Thu Jun 12 00:48:38 EST 2008$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -331,10 +331,11 @@ class HTMLUI(UI.GenericUI):
                 pass
 
         if pane=='parent':
-            return "link_to_parent(\"f?%s\", window.__pyflag_parent); return false;" % target
+            ## target is a query and can not have quotes:
+            return "link_to_parent('f?%s', window.__pyflag_parent); return false;" % target
 
         if pane=='parent_pane':
-            return "link_to_parent(\"f?%s\", 0); return false;" % target
+            return "link_to_parent('f?%s', 0); return false;" % target
 
         if pane=="main":
             #return "post_link('f?%s','main'); find_window_by_name(window.__pyflag_name).close(); return false;" % target
@@ -343,7 +344,7 @@ class HTMLUI(UI.GenericUI):
     def link(self,string,target=None,options=None,icon=None,tooltip=None, pane='main', **target_options):
         ## If the user specified a URL, we just use it as is:
         try:
-            self.result+="<a href='%s' target=_top>%s</a>" % (target_options['url'],string)
+            self.result += expand("<a href='%s' target=_top>%s</a>",(target_options['url'],string))
             return
         except KeyError:
             pass
@@ -365,8 +366,8 @@ class HTMLUI(UI.GenericUI):
             string=tmp
 
         js = self._calculate_js_for_pane(target=q, pane=pane)
-        base = expand("<a href='f?%s' onclick=%r>%s</a>",
-                      (q, quote_quotes(js), string))
+        base = expand("<a href='f?%s' onclick=\"%s\">%s</a>",
+                      (q, js, string))
 
         ## Add tooltip if needed:
         if tooltip:

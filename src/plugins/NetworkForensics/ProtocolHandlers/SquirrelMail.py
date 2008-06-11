@@ -4,7 +4,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
+#  Version: FLAG $Version: 0.87-pre1 Date: Thu Jun 12 00:48:38 EST 2008$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -44,10 +44,12 @@ class SquirrelMailScan(LiveCom.HotmailScanner):
                 self.handle_downloads(row['url'])
                 return True
 
-            if (row and "compose.php" in row['url']) or "SquirrelMail" in data[:256]:
-                self.parser =  HTMLParser(verbose=0)
-                self.url = row['url']
-                return False
+            urls = [ "compose.php", "right_main.php?", "read_body.php?"]
+            for url in urls:
+                if (row and url in row['url']):
+                    self.parser =  HTMLParser(verbose=0)
+                    self.url = row['url']
+                    return False
             
             return True
 

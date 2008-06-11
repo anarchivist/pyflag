@@ -9,7 +9,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
+#  Version: FLAG $Version: 0.87-pre1 Date: Thu Jun 12 00:48:38 EST 2008$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -408,8 +408,10 @@ class DBFS(FileSystem):
         
         elif inode_id:
             dbh.check_index('inode','inode_id')
-            dbh.execute("select file.inode, concat(path,name) as path from inode join file on inode.inode_id=file.inode_id where file.inode_id=%r order by file.status limit 1", inode_id)
+            dbh.execute("select inode.inode, concat(path,name) as path from inode left join file on inode.inode_id=file.inode_id where inode.inode_id=%r order by file.status limit 1", inode_id)
             res = dbh.fetch()
+            if not res: raise IOError("Inode ID %s not found" % inode_id)
+            
             return res['path'],res['inode'], inode_id
 
         else:
@@ -750,7 +752,6 @@ class File:
                 return data
 
         except AttributeError,e:
-            print e
             raise IOError("No cached file: (%s)" % e )
 
     def stat(self):

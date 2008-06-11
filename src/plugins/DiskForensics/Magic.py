@@ -86,7 +86,7 @@ class FSStates(Magic.Magic):
             dbh.execute("select * from file where inode_id=%r", inode_id)
             row = dbh.fetch()
             
-            if row['mode']=='d/d':
+            if row and row['mode']=='d/d':
                 self.type = "Directory"
                 return 100
 

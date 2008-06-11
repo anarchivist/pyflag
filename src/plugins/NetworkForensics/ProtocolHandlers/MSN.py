@@ -17,7 +17,7 @@ version (I believe this is version 11 at 20060531).
 #
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
+#  Version: FLAG $Version: 0.87-pre1 Date: Thu Jun 12 00:48:38 EST 2008$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or

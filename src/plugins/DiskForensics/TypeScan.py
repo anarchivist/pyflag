@@ -2,7 +2,7 @@
 # David Collett <daveco@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
+#  Version: FLAG $Version: 0.87-pre1 Date: Thu Jun 12 00:48:38 EST 2008$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -79,6 +79,22 @@ class ThumbnailType(InodeIDType):
         
     def select(self):
         return "%s.inode_id" % self.table
+
+    ## When exporting to html we need to export the thumbnail too:
+    def render_html(self, inode_id, table_renderer):
+        try:
+            fd = self.fsfd.open(inode_id = inode_id)
+            image = Graph.Thumbnailer(fd, 200)
+
+            filename, ct, fd = table_renderer.make_archive_filename(inode_id, directory = "thumbnails/")
+            inode_filename, ct, fd = table_renderer.make_archive_filename(inode_id)
+        
+            table_renderer.add_file_from_string(filename,
+                                                image.display())
+        except IOError:
+            return "<a href=%r ><img src='images/broken.png' /></a>" % inode_filename
+
+        return "<a href=%r ><img src=%r /></a>" % (inode_filename, filename)
 
     def render_thumbnail_hook(self, inode_id, row, result):
         try:

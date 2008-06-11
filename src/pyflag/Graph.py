@@ -8,7 +8,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
+#  Version: FLAG $Version: 0.87-pre1 Date: Thu Jun 12 00:48:38 EST 2008$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -209,7 +209,7 @@ class Thumbnailer(Image):
         ## Use the content type to access the thumbnail
         try:
             method=getattr(self,self.dispatcher[self.content_type])
-        except KeyError:
+        except KeyError,e:
             self.Unknown()
             return
 
@@ -269,9 +269,12 @@ class Thumbnailer(Image):
         """ Handles Jpeg thumbnails.
         """
         ## Calculate some basic statistics
+        fd = cStringIO.StringIO(self.fd.read(2000000) + "\xff\xd9")
+
         try:
-            self.image = PIL.Image.open(self.fd)
-        except:
+            self.image = PIL.Image.open(fd)
+        except Exception,e:
+            print e
             self.size_x=24
             self.set_image("no.png")
             return
@@ -285,6 +288,10 @@ class Thumbnailer(Image):
         self.thumbnail = cStringIO.StringIO()
         try:
             self.image.thumbnail((self.size_x,self.size_x / ratio), PIL.Image.NEAREST)
+        except Exception,e:
+            print e
+
+        try:
             self.image.save(self.thumbnail,self.image.format)
             self.thumbnail.seek(0)
             self.width, self.height = self.image.size

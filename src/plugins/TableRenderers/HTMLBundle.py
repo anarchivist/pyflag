@@ -67,6 +67,8 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         outfd.close()
 
     def add_file_from_string(self, filename, string):
+        """ Add a new file to the archive called filename with
+        contents of string. Note string is not a unicode object here. """
         #if self.filename_in_archive(filename):
         #    return
         
@@ -78,7 +80,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             os.makedirs(directory)
         
         outfd = open(output_file_name, 'w')
-        outfd.write(string.encode("utf8"))
+        outfd.write(string)
         outfd.close()
 
 
@@ -271,7 +273,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
                 if self.row_count ==0: break
                 
                 self.add_file_from_string(page_name,
-                                          page_data)
+                                          page_data.encode("utf8"))
                                           
                 yield "Page %s\n" % page
                 page +=1
@@ -301,7 +303,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
 
         result.raw("<p><p>\n<font size='-5' color=red>Report Produced using PyFlag Ver. %s</font>" % config.VERSION)
 
-        page = '''<html><head><link media="all" href="images/pyflag.css" type="text/css" rel="stylesheet">
+        page = u'''<html><head><link media="all" href="images/pyflag.css" type="text/css" rel="stylesheet">
         <title>Table of Content</title>
         <style>
         body {
@@ -321,7 +323,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
         </div>
         </body></html>''' % result
 
-        self.add_file_from_string("toc.html", page)
+        self.add_file_from_string("toc.html", page.encode("utf8"))
 
     def generate_rows(self, query):
         """ This implementation gets all the rows, but makes small
@@ -344,7 +346,7 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
             count += 1
 
             if self.end_limit > 0 \
-               and total > self.end_limit: return
+               and count > self.end_limit: return
 
     def make_archive_filename(self, inode_id, directory = 'inodes/'):
         ## Add the inode to the exported bundle:
@@ -408,13 +410,13 @@ class HTMLDirectoryRenderer(UI.TableRenderer):
                 if head:
                     head.add_child("<title>%s %s %s</title>"%  (s['mtime'], s['inode'], self.case))
  
-            self.add_file_from_string(filename, parser.root.innerHTML())
+            self.add_file_from_string(filename, parser.root.innerHTML().encode("utf8"))
         elif 'css' in content_type:
             data = fd.read(1024*1024)
             tag = BundleResolvingHTMLTag(table_renderer = self,
                                          visited =visited,
                                          inode_id = inode_id)
-            self.add_file_from_string(filename, tag.css_filter(data))
+            self.add_file_from_string(filename, tag.css_filter(data).encode("utf8"))
         elif not self.inodes_in_archive(inode_id):
             self.add_file(filename, fd)
 
@@ -498,11 +500,12 @@ class BundleResolvingHTMLTag(HTML.ResolvingHTMLTag):
     circular references.
     """
     def __init__(self, inode_id, table_renderer, prefix='', visited=None,
-                 name=None, attributes=None):
+                 name=None, attributes=None, charset=None):
         self.table_renderer = table_renderer
         self.prefix = prefix
         self.visited = visited
-        HTML.ResolvingHTMLTag.__init__(self, table_renderer.case, inode_id, name, attributes)
+        HTML.ResolvingHTMLTag.__init__(self, table_renderer.case, inode_id,
+                                       name, attributes, charset=charset)
         
     def make_reference_to_inode(self, inode_id, hint):
         ## Ensure that the inode itself is included into the bundle:
@@ -545,7 +548,7 @@ class Export(Farm.Task):
                             visited = {},
                             table_renderer = table_renderer)
                 data = fd.html_export(tag_class = tag)
-                table_renderer.add_file_from_string(filename, data)
+                table_renderer.add_file_from_string(filename, data.encode("utf8"))
         except AttributeError,e:
             pass
 

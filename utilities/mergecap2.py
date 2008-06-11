@@ -2,7 +2,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
+#  Version: FLAG $Version: 0.87-pre1 Date: Thu Jun 12 00:48:38 EST 2008$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -62,7 +62,10 @@ config.add_option("split", default=None, type='int', short_option='s',
 config.add_option("split_by_hours", default=None, type='int', 
                     help = "Split PCAP files by hours.")
 
-config.add_option("output", default=None, 
+config.add_option("sort", default=True, action='store_false', short_option='d',
+                  help = "Dont pre-process files in time order. This implies that files are already sorted by name.")
+
+config.add_option("output", default="little", 
                     help="Forces output endianess to this(big or little)")
 
 config.parse_options(True)
@@ -121,7 +124,7 @@ class PCAPParser:
     
 class FileList:
     """ A sorted list of PcapFiles """
-    def __init__(self, args):
+    def __init__(self, args, sort = True):
         ## This keeps all instances of pcap files:
         self.files = []
         count = 0
@@ -129,43 +132,67 @@ class FileList:
         ## This is a list of the time of the next packet in each file (floats):
         self.times = []
         self.firstValid = None
+        self.sort = sort
+
+        ## Dont bother sorting the files by times
+        if not sort:
+            args.sort()
+            for f in args:
+                self.put(PCAPParser(f))
 
         ## Initialise the timestamps of all args
-        for f in args:
-            try:
-                fd = PCAPParser(f)
-                fd.next()
-                count += 1
-                if (count % 100) == 0:
-                    sys.stdout.write("\rPre-processed %s files" % count)
-                    sys.stdout.flush()
-                    
-            except IOError:
-                #print "Unable to read %s, skipping" % f
-                continue
+        else:
+            for f in args:
+                try:
+                    fd = PCAPParser(f)
+                    fd.next()
+                    count += 1
+                    if (count % 100) == 0:
+                        sys.stdout.write("\rPre-processed %s files" % count)
+                        sys.stdout.flush()
 
-            except StopIteration:
-                #print "Unable to read packet from %s, skipping" % f
-                continue
+                except IOError:
+                    #print "Unable to read %s, skipping" % f
+                    continue
 
-            if not self.firstValid:
-                self.firstValid = f
+                except StopIteration:
+                    #print "Unable to read packet from %s, skipping" % f
+                    continue
 
-
-            self.put(fd)
-            fd.reset()
+                self.put(fd)
+                fd.reset()
+ 
+        if not self.firstValid:
+            self.firstValid = f
 
     def put(self, f):
         """ Stores PcapFile f in sequence """
+        if self.sort:
+            offset = bisect.bisect(self.times, f.timestamp)
+            self.files.insert(offset, f)
+            self.times.insert(offset, f.timestamp)
+        else:
+            self.files.insert(0, f)
 
-        offset = bisect.bisect(self.times, f.timestamp)
-        self.files.insert(offset, f)
-        self.times.insert(offset, f.timestamp)
 
     def __iter__(self):
         return self
 
     def next(self):
+        ## If we dont sort files, we just grab the next packet off the
+        ## first file in the list:
+        if not self.sort and len(self.files):
+            try:
+                return self.files[0].next()
+            except (StopIteration, IOError):
+                ## Remove this file now:
+                try:
+                    self.files.pop(0)
+                except IndexError: raise StopIteration
+                
+                ## Return the next file
+                return self.next()
+
         ## Grab the next packet with the smallest timestamp:
         try:
             f = self.files.pop(0)
@@ -184,11 +211,16 @@ class FileList:
             return self.next()
 
 
-f=FileList(args)
+f=FileList(args, config.sort)
 
 ## Force endianess if necessary:
 if config.output:
-    fd = pypcap.PyPCAP(open(f.firstValid), output=config.output)
+    for file in f.files:
+        try:
+            fd = pypcap.PyPCAP(open(file.filename), output=config.output)
+        except IOError: continue
+
+        break
 else:
     fd = pypcap.PyPCAP(open(f.firstValid))
 ##

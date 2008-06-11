@@ -4,7 +4,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
+#  Version: FLAG $Version: 0.87-pre1 Date: Thu Jun 12 00:48:38 EST 2008$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -384,8 +384,8 @@ class WebMailMessages(Reports.report):
                          StringType('BCC', 'BCC'),
                          StringType('Subject', 'Subject'),
                          HTMLStringType('Message','Message'),
-                         StringType('MessageID', 'message_id'),
-                         AttachmentColumn(name='Attachment',case = query['case']),
+                         #StringType('MessageID', 'message_id'),
+                         #AttachmentColumn(name='Attachment',case = query['case']),
                          StringType('Type','type'),
                          StringType('Service','service'),
                          ],

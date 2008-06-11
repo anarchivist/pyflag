@@ -8,7 +8,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG  $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
+#  Version: FLAG  $Version: 0.87-pre1 Date: Thu Jun 12 00:48:38 EST 2008$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -544,7 +544,6 @@ class DBO:
                     return self.execute("select * from cache_%s limit %s,%s",
                                         (row['id'], limit - cache_limit, length))
                 except DBError,e:
-                    print e
                     pass
 
             ## Query is not in cache - create a new cache entry: We create

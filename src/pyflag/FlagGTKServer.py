@@ -10,7 +10,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG ($Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$)
+#  Version: FLAG ($Version: 0.87-pre1 Date: Thu Jun 12 00:48:38 EST 2008$)
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -298,7 +298,7 @@ class GTKServer(gtk.Window):
         result=GTKUI.GTKUI(server=main,ftoolbar=main.ftoolbar)
         result.heading("PyFlag - Forensic and Log Analysis GUI")
         result.text("""
-        Version: $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
+        Version: $Version: 0.87-pre1 Date: Thu Jun 12 00:48:38 EST 2008$
         Copyright 2004-2005:
            David Collett <daveco@users.sourceforge.net>
            Michael Cohen <scudette@users.sourceforge.net>

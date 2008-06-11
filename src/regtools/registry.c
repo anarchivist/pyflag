@@ -1,5 +1,5 @@
 /*
- * This file is part of PyFlag $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
+ * This file is part of PyFlag $Version: 0.87-pre1 Date: Thu Jun 12 00:48:38 EST 2008$
  * registry.c - registry access routines for regedit (regutils package)
  * Copyright (C) 1998 Memorial University of Newfoundland
  * 

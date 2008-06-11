@@ -451,8 +451,8 @@ class SKFSTests2(tests.FDTest):
 class LargeFileTest(pyflag.tests.ScannerTest):
     """ Test that pyflag can load very large images efficiently (WinXp) """
     test_case = "WinXp"
-    test_file = "winxp.sgz"
-    subsystem = 'SGZip'
+    test_file = "winxp"
+    subsystem = 'Advanced'
     level = 15
     
    
@@ -460,6 +460,6 @@ class LargeFileTest(pyflag.tests.ScannerTest):
 	""" Run all scanners on the image """ 
         env = pyflagsh.environment(case=self.test_case)
         pyflagsh.shell_execv(env=env, command="scan",
-                             argv=["*",'TypeScan','MD5Scan','DLLScan','IEIndex','RFC2822','RegistryScan','OLEScan','PstScan','IndexScan'])
-#                             argv=["*",'*'])
+#                             argv=["*",'TypeScan','MD5Scan','DLLScan','IEIndex','RFC2822','RegistryScan','OLEScan','PstScan','IndexScan'])
+                             argv=["*",'*'])
 

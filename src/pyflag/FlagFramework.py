@@ -8,7 +8,7 @@
 # Michael Cohen <scudette@users.sourceforge.net>
 #
 # ******************************************************
-#  Version: FLAG $Version: 0.87-pre1 Date: Tue Jun 10 13:18:41 EST 2008$
+#  Version: FLAG $Version: 0.87-pre1 Date: Thu Jun 12 00:48:38 EST 2008$
 # ******************************************************
 #
 # * This program is free software; you can redistribute it and/or
@@ -841,7 +841,6 @@ def delete_case(case):
                  _fast=True)
       dbh.execute("drop database if exists `%s`" ,case)
     except DB.DBError,e:
-        print e
         pass
 
     ## Delete the temporary directory corresponding to this case and all its content
