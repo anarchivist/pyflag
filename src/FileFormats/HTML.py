@@ -415,8 +415,7 @@ class ResolvingHTMLTag(SanitizingTag):
             reference="%s://%s%s" % (self.method, self.host, path)
         elif self.method:
             ## FIXME: This leads to references without methods:
-            path = normpath("/%s/%s" % (self.base_url,reference))
-            reference="%s://%s%s" % (self.method, self.host, path)
+            reference="%s/%s" % (self.base_url, reference)
         ## If we get here the reference is not absolute, and we dont
         ## have a method - chances are that its in the VFS:
         else:

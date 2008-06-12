@@ -127,7 +127,12 @@ class StreamFile(File):
 
         self.create_new_stream(self.inode_ids)
         self.look_for_cached()
-        return File.read(self,len)
+        ## For the reassembler its sometimes legitimate to have no
+        ## cached file - this is because the file length is 0 bytes,
+        ## and the reassembler does not bother to create it
+        try:
+            return File.read(self,len)
+        except IOError: return ''
         
     def create_new_stream(self,stream_ids):
         """ Creates a new stream by combining the streams given by the list stream_ids.

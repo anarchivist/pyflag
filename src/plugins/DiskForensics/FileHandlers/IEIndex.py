@@ -23,14 +23,14 @@
 
 We use the files's magic to trigger the scanner off - so its imperative that the TypeScan scanner also be run or this will not work. We also provide a report to view the history files.
 """
-import os.path
+import os.path, cStringIO
 import pyflag.Scanner as Scanner
 import pyflag.Reports as Reports
 import pyflag.conf
 config=pyflag.conf.ConfObject()
 import FileFormats.IECache as IECache
 import pyflag.DB as DB
-from pyflag.ColumnTypes import StringType, TimestampType, FilenameType, InodeIDType, LongStringType
+from pyflag.ColumnTypes import StringType, TimestampType, FilenameType, InodeIDType, LongStringType, IntegerType
 import pyflag.FlagFramework as FlagFramework
 
 class IECaseTable(FlagFramework.CaseTable):
@@ -38,6 +38,7 @@ class IECaseTable(FlagFramework.CaseTable):
     name = 'ie_history'
     columns = [
         [ InodeIDType, {} ],
+        [ IntegerType, dict(name='Offset', column='offset')],
         [ StringType, dict(name='Type', column='type', width=20) ],
         [ StringType, dict(name='URL', column='url', width=500) ],
         [ TimestampType, dict(name='Modified', column='modified') ],
@@ -48,6 +49,41 @@ class IECaseTable(FlagFramework.CaseTable):
 
     index = ['url','inode_id']
 
+class IECarver(Scanner.GenScanFactory):
+    """ An IE History carver """
+    default = True
+    depends = []
+
+    class Scan(Scanner.BaseScanner):
+        def process(self, buf, metadata = None):
+            """ We try to find a URL entry here """
+            b = IECache.Buffer(fd = cStringIO.StringIO(buf))
+            dbh = DB.DBO(self.case)
+            dbh.mass_insert_start('ie_history')
+            
+            buff_offset = 0
+            while 1:
+                buff_offset = buf.find("URL ", buff_offset)
+                if buff_offset<0 or len(buf) - buff_offset < 0x70:
+                    break
+
+                ## Now we do couple of checks before we plunge in:
+                if "\x01\x00 \x00" == buf[buff_offset + 0x40 : buff_offset + 0x44]:
+                    event = IECache.URLEntry(b[buff_offset:])
+                    args = dict(inode_id = self.fd.inode_id,
+                                offset = buff_offset,
+                                type  = event['type'],
+                                url = event['url'],
+                                _modified = 'from_unixtime(%d)' % event['modified_time'].get_value(),
+                                _accessed = 'from_unixtime(%d)' % event['accessed_time'].get_value(),
+                                filename = event['filename'],)
+                    try:
+                        args['headers'] = event['data']
+                    except: pass
+                    dbh.mass_insert(args)
+                    
+                buff_offset += 1
+    
 class IEIndex(Scanner.GenScanFactory):
     """ Load in IE History files """
     default = True
@@ -79,6 +115,26 @@ class IEIndex(Scanner.GenScanFactory):
 
 import pyflag.tests
 import pyflag.pyflagsh as pyflagsh
+
+class IECacheCarverTest(pyflag.tests.ScannerTest):
+    """ Test IE History carver """
+    test_case = "PyFlagTestCase"
+    test_file = "pyflag_stdimage_0.4.dd"
+    subsystem = 'Standard'
+    offset = "0"
+    fstype = "Raw"
+    
+    def test01RunScanner(self):
+        """ Test IE History scanner """
+        env = pyflagsh.environment(case=self.test_case)
+        pyflagsh.shell_execv(env=env, command="scan",
+                             argv=["*",'IECarver'])
+
+        dbh = DB.DBO(self.test_case)
+        dbh.execute("select count(*) as c from ie_history")
+        row = dbh.fetch()['c']
+        print "Got %s rows" % row
+        self.assert_(row >= 20)
 
 class IECacheScanTest(pyflag.tests.ScannerTest):
     """ Test IE History scanner """
